@@ -1,0 +1,2 @@
+b678f336 2026-09-13 22:34:57 fix(tiers S03-p1-F2): /new reads the tier rosters from a user-readable route
+cd043907 2026-09-14 07:36:40 fix(tiers S03-p1-F1): the Claude and Grok relays are asked for the file's full model id

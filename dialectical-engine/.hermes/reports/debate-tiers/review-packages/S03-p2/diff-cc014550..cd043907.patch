@@ -1,0 +1,890 @@
+diff --git a/dialectical-engine/acceptance/claude-relay.test.ts b/dialectical-engine/acceptance/claude-relay.test.ts
+index b17eeb4c..d48646a0 100644
+--- a/dialectical-engine/acceptance/claude-relay.test.ts
++++ b/dialectical-engine/acceptance/claude-relay.test.ts
+@@ -153,6 +153,79 @@ describe("FAIR-02 Claude Code CLI relay", () => {
+     expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1]).toBe("sonnet");
+   });
+ 
++  it("asks the CLI for the caller's full model id", async () => {
++    const capturedEnvelopeScript = [
++      'console.log(JSON.stringify({',
++      '  is_error: false, result: JSON.stringify({ argumentList: process.argv }),',
++      '  modelUsage: { "claude-opus-5": {} }',
++      '}));'
++    ].join("");
++    const relay = await startClaudeRelay({
++      port: 0,
++      timeoutMs: 1_000,
++      model: "claude-opus-5",
++      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", capturedEnvelopeScript, "--"] }
++    });
++    handles.push(relay);
++
++    const response = await postCompletion(relay, "Assess this claim.");
++    expect(response.status).toBe(200);
++    const completion = await response.json() as {
++      choices: readonly { message: { content: string } }[];
++    };
++    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
++      argumentList: readonly string[];
++    };
++    expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1])
++      .toBe("claude-opus-5");
++  });
++
++  it("gives the full model id precedence over a model alias", async () => {
++    const capturedEnvelopeScript = [
++      'console.log(JSON.stringify({',
++      '  is_error: false, result: JSON.stringify({ argumentList: process.argv }),',
++      '  modelUsage: {',
++      '    "claude-sonnet-5": { canonicalModel: "claude-sonnet-5" },',
++      '    "claude-opus-5": { canonicalModel: "claude-opus-5" }',
++      '  }',
++      '}));'
++    ].join("");
++    const relay = await startClaudeRelay({
++      port: 0,
++      timeoutMs: 1_000,
++      model: "claude-opus-5",
++      modelAlias: "sonnet",
++      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", capturedEnvelopeScript, "--"] }
++    });
++    handles.push(relay);
++
++    expect(relay.model).toBe("claude-opus-5");
++    const response = await postCompletion(relay, "Assess this claim.");
++    expect(response.status).toBe(200);
++    const completion = await response.json() as {
++      choices: readonly { message: { content: string } }[];
++    };
++    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
++      argumentList: readonly string[];
++    };
++    expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1])
++      .toBe("claude-opus-5");
++  });
++
++  it("refuses a non-full id on the model path", async () => {
++    const result = await startClaudeRelay({
++      port: 0,
++      timeoutMs: 1_000,
++      model: "opus",
++      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
++    }).then((relay) => {
++      handles.push(relay);
++      return "NO_THROW";
++    }, (error: unknown) => String(error));
++
++    expect(result).toContain("CLAUDE_CLI_MODEL_INVALID");
++  });
++
+   it("maps an OpenAI request to claude -p --output-format json with closed stdin and reports true lineage", async () => {
+     const environmentKeys = [
+       "HOME", "PATH", "TMPDIR", "LANG", "USER", "LOGNAME",
+diff --git a/dialectical-engine/acceptance/claude-relay.ts b/dialectical-engine/acceptance/claude-relay.ts
+index e40eeae2..3b8c5595 100644
+--- a/dialectical-engine/acceptance/claude-relay.ts
++++ b/dialectical-engine/acceptance/claude-relay.ts
+@@ -58,26 +58,37 @@ const observedTokenUsageSchema = z.object({
+ }).passthrough();
+ 
+ const CLAUDE_MODEL_ALIAS_PATTERN = /^[a-z0-9]+$/u;
++const CLAUDE_MODEL_ID_PATTERN = /^claude-[a-z0-9.-]+$/u;
+ 
+-function matchesRequestedModelFamily(model: string, usage: unknown, alias: string): boolean {
++type ClaudeModelRequest =
++  | Readonly<{ kind: "alias"; value: string }>
++  | Readonly<{ kind: "model"; value: string }>;
++
++function matchesRequestedModel(model: string, usage: unknown, request: ClaudeModelRequest): boolean {
+   const observed = observedTokenUsageSchema.safeParse(usage);
+   const identities = [model, ...(observed.success && observed.data.canonicalModel !== undefined
+     ? [observed.data.canonicalModel]
+     : [])];
++  if (request.kind === "model") {
++    return identities.some((identity) => identity === request.value);
++  }
+   return identities.some((identity) => identity.toLocaleLowerCase("en-US")
+     .split(/[^a-z0-9]+/u)
+-    .includes(alias));
++    .includes(request.value));
+ }
+ 
+-function resolveClaudeModel(modelUsage: Readonly<Record<string, unknown>>, alias: string): string {
++function resolveClaudeModel(
++  modelUsage: Readonly<Record<string, unknown>>,
++  request: ClaudeModelRequest
++): string {
+   const entries = Object.entries(modelUsage);
+   if (entries.length === 1) return entries[0]![0];
+-  const requested = entries.filter(([model, usage]) => matchesRequestedModelFamily(model, usage, alias));
++  const requested = entries.filter(([model, usage]) => matchesRequestedModel(model, usage, request));
+   if (requested.length === 1) return requested[0]![0];
+   throw new CliRelayFailure("FAILED", "CLAUDE_CLI_MODEL_UNRESOLVED");
+ }
+ 
+-function parseClaudeEnvelope(stdout: string, alias: string) {
++function parseClaudeEnvelope(stdout: string, request: ClaudeModelRequest) {
+   let decoded: unknown;
+   try {
+     decoded = JSON.parse(stdout);
+@@ -89,7 +100,7 @@ function parseClaudeEnvelope(stdout: string, alias: string) {
+   if (envelope.data.is_error !== false) throw new CliRelayFailure("FAILED", "CLAUDE_CLI_FAILED");
+   const content = envelope.data.result.trim();
+   if (content.length === 0) throw new CliRelayFailure("FAILED", "CLAUDE_CLI_OUTPUT_INVALID");
+-  const model = resolveClaudeModel(envelope.data.modelUsage, alias);
++  const model = resolveClaudeModel(envelope.data.modelUsage, request);
+   const observed = observedTokenUsageSchema.safeParse(envelope.data.modelUsage[model]);
+   const inputTokens = observed.success
+     ? observed.data.input_tokens ?? observed.data.inputTokens
+@@ -113,9 +124,15 @@ function parseClaudeEnvelope(stdout: string, alias: string) {
+   });
+ }
+ 
+-function createClaudeAdapter(alias: string): CliRelayAdapter {
+-  if (!CLAUDE_MODEL_ALIAS_PATTERN.test(alias)) {
+-    throw new CliRelayFailure("FAILED", "CLAUDE_CLI_MODEL_ALIAS_INVALID");
++function createClaudeAdapter(request: ClaudeModelRequest): CliRelayAdapter {
++  const valid = request.kind === "model"
++    ? CLAUDE_MODEL_ID_PATTERN.test(request.value)
++    : CLAUDE_MODEL_ALIAS_PATTERN.test(request.value);
++  if (!valid) {
++    throw new CliRelayFailure(
++      "FAILED",
++      request.kind === "model" ? "CLAUDE_CLI_MODEL_INVALID" : "CLAUDE_CLI_MODEL_ALIAS_INVALID"
++    );
+   }
+   return {
+   maker: ANTHROPIC_MAKER,
+@@ -139,9 +156,9 @@ function createClaudeAdapter(alias: string): CliRelayAdapter {
+     "--strict-mcp-config",
+     "--no-session-persistence",
+     "--tools", "",
+-    "--model", alias
++    "--model", request.value
+   ],
+-  parseCompletion: (stdout) => parseClaudeEnvelope(stdout, alias)
++  parseCompletion: (stdout) => parseClaudeEnvelope(stdout, request)
+   };
+ }
+ 
+@@ -150,6 +167,8 @@ export interface ClaudeRelayOptions {
+   readonly timeoutMs: number;
+   /** Test-only process seam. It is rejected outside NODE_ENV=test and is never read from acceptance config. */
+   readonly testOnlyCommand?: CommandSpec;
++  /** The full model id asked of the CLI (`--model`); takes precedence over modelAlias. */
++  readonly model?: string;
+   /** The alias asked of the CLI (`--model`); defaults to CLAUDE_MODEL_ALIAS. Lineage stays CLI-reported. */
+   readonly modelAlias?: string;
+ }
+@@ -173,7 +192,10 @@ export async function startClaudeRelay(options: ClaudeRelayOptions): Promise<Cla
+     options.testOnlyCommand,
+     "TEST_ONLY_CLAUDE_COMMAND_FORBIDDEN"
+   );
+-  const claudeAdapter = createClaudeAdapter(options.modelAlias ?? CLAUDE_MODEL_ALIAS);
++  const request: ClaudeModelRequest = options.model === undefined
++    ? { kind: "alias", value: options.modelAlias ?? CLAUDE_MODEL_ALIAS }
++    : { kind: "model", value: options.model };
++  const claudeAdapter = createClaudeAdapter(request);
+   const handshake = await invokeCli(command, claudeAdapter, CLAUDE_HANDSHAKE_PROMPT, options.timeoutMs);
+   const server = await startCliRelayServer({
+     port: options.port,
+diff --git a/dialectical-engine/acceptance/grok-relay.test.ts b/dialectical-engine/acceptance/grok-relay.test.ts
+index fca03d7d..e0a63319 100644
+--- a/dialectical-engine/acceptance/grok-relay.test.ts
++++ b/dialectical-engine/acceptance/grok-relay.test.ts
+@@ -133,6 +133,27 @@ describe("GROK-01 Grok Build CLI relay", () => {
+     expect(relayed.argumentList).not.toContain("read-only");
+   });
+ 
++  it("asks the CLI for the caller's full model id", async () => {
++    const relay = await startGrokRelay({
++      port: 0,
++      timeoutMs: 1_000,
++      model: "grok-4.6-build",
++      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
++    });
++    handles.push(relay);
++
++    const response = await postCompletion(relay, "Assess this claim.");
++    expect(response.status).toBe(200);
++    const completion = await response.json() as {
++      choices: readonly { message: { content: string } }[];
++    };
++    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
++      argumentList: readonly string[];
++    };
++    expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1])
++      .toBe("grok-4.6-build");
++  });
++
+   it("maps the OpenAI-compatible transcript to a single, verbatim, tool-less Grok call", async () => {
+     const environmentKeys = [
+       "HOME", "PATH", "TMPDIR", "LANG", "XAI_API_KEY",
+diff --git a/dialectical-engine/acceptance/grok-relay.ts b/dialectical-engine/acceptance/grok-relay.ts
+index f8e10abc..a4a9da55 100644
+--- a/dialectical-engine/acceptance/grok-relay.ts
++++ b/dialectical-engine/acceptance/grok-relay.ts
+@@ -81,7 +81,7 @@ function parseGrokEnvelope(stdout: string): {
+  */
+ export type GrokSandboxProfile = "read-only" | "none";
+ 
+-function createGrokAdapter(sandboxProfile: GrokSandboxProfile): CliRelayAdapter {
++function createGrokAdapter(sandboxProfile: GrokSandboxProfile, model?: string): CliRelayAdapter {
+   return {
+   maker: XAI_MAKER,
+   authEnvironmentKeys: ["XAI_API_KEY"],
+@@ -101,7 +101,8 @@ function createGrokAdapter(sandboxProfile: GrokSandboxProfile): CliRelayAdapter
+     "--no-memory",
+     "--no-subagents",
+     "--disable-web-search",
+-    "--tools", ""
++    "--tools", "",
++    ...(model === undefined ? [] : ["--model", model])
+   ],
+   parseCompletion: (stdout) => parseGrokEnvelope(stdout)
+   };
+@@ -114,6 +115,8 @@ export interface GrokRelayOptions {
+   readonly testOnlyCommand?: CommandSpec;
+   /** CLI sandbox profile; defaults to `read-only`. See GrokSandboxProfile. */
+   readonly sandboxProfile?: GrokSandboxProfile;
++  /** The full model id asked of the CLI (`--model`). Lineage stays CLI-reported. */
++  readonly model?: string;
+ }
+ 
+ export interface GrokRelayHandle extends CliRelayHandle {
+@@ -128,7 +131,7 @@ export async function startGrokRelay(options: GrokRelayOptions): Promise<GrokRel
+     options.testOnlyCommand,
+     "TEST_ONLY_GROK_COMMAND_FORBIDDEN"
+   );
+-  const adapter = createGrokAdapter(options.sandboxProfile ?? "read-only");
++  const adapter = createGrokAdapter(options.sandboxProfile ?? "read-only", options.model);
+   const handshake = await invokeCli(
+     command,
+     adapter,
+diff --git a/dialectical-engine/apps/api/src/index.ts b/dialectical-engine/apps/api/src/index.ts
+index 86e52755..f41ec7e0 100644
+--- a/dialectical-engine/apps/api/src/index.ts
++++ b/dialectical-engine/apps/api/src/index.ts
+@@ -18,6 +18,7 @@ import {
+   LegacyRunClaimRequestSchema,
+   LegacyRunClaimResultSchema,
+   NodeSchema,
++  PlanTierRostersSchema,
+   PrivateDebateErasureRequestSchema,
+   PrivateDebateErasureStatusSchema,
+   PLAN_TIER_ROSTERS,
+@@ -39,6 +40,7 @@ import {
+   type Inspection,
+   type InvestigationAccepted,
+   type Node,
++  type PlanTierRosters,
+   type RunProjection,
+   type Session
+ } from "@debateai/contract";
+@@ -136,6 +138,7 @@ export const authorizationPolicyInventory = Object.freeze([
+   { route: "GET /v1/support/status", auth: "public", session: "optional", resource: "support-status", action: "read" },
+   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
+   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
++  { route: "GET /v1/plan-tiers", auth: "user", resource: "plan-tier-rosters", action: "read" },
+   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
+   { route: "GET /v1/dev/evaluator", auth: "operator", resource: "evaluator", action: "read" },
+   { route: "POST /v1/dev/evaluator/consumer-selection", auth: "operator", resource: "evaluator", action: "select-consumer" },
+@@ -158,7 +161,7 @@ export const authorizationPolicyInventory = Object.freeze([
+   origin?: RouteOriginPolicy;
+   session?: RouteSessionPolicy;
+   resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" |
+-    "deployment" | "evaluator" | "support-session" | "support-message" | "support-case" |
++    "deployment" | "plan-tier-rosters" | "evaluator" | "support-session" | "support-message" | "support-case" |
+     "support-status";
+   action: string;
+ }>[]);
+@@ -230,6 +233,7 @@ export interface AskApplication {
+   readNode(answerId: string, nodeId: string, session: Session, ownership: RunOwnershipAccess): Promise<Node | null>;
+   recordInvestigation(answerId: string, gapRef: string, userInput: string | null, session: Session, ownership: RunOwnershipAccess): Promise<InvestigationAccepted | null>;
+   unlinkMemoryLink(answerId: string, session: Session, ownership: RunOwnershipAccess): Promise<{ readonly memory_link_id: string; readonly state: "UNLINKED" } | null>;
++  readPlanTierRosters?(session: Session): Promise<PlanTierRosters>;
+   readDeployment(session: Session): Promise<Deployment>;
+   events(runId: string, session: Session, ownership: RunOwnershipAccess): AsyncIterable<unknown>;
+ }
+@@ -864,6 +868,18 @@ export function buildApi(options: ApiOptions): FastifyInstance {
+     return reply.send(request.session);
+   });
+ 
++  api.get("/v1/plan-tiers", routePolicy("GET /v1/plan-tiers"), async (request, reply) => {
++    if (options.application.readPlanTierRosters === undefined) {
++      throw new TypedDomainError(
++        "DEPLOYMENT_REGISTER_UNAVAILABLE",
++        "No sealed plan-tier roster row exists"
++      );
++    }
++    return reply.send(PlanTierRostersSchema.parse(
++      await options.application.readPlanTierRosters(request.session)
++    ));
++  });
++
+   api.get("/v1/deployment", routePolicy("GET /v1/deployment"), async (request, reply) => {
+     return reply.send(DeploymentSchema.parse(await options.application.readDeployment(request.session)));
+   });
+@@ -1468,6 +1484,12 @@ export class PostgresAskApplication implements AskApplication {
+     });
+   }
+ 
++  async readPlanTierRosters(session: Session): Promise<PlanTierRosters> {
++    const deployment = await this.readDeployment(session);
++    const row = deployment.register.rows.find(({ row_key }) => row_key === "planTierRosters");
++    return PlanTierRostersSchema.parse(row?.value);
++  }
++
+   async *events(runId: string, _session: Session, ownership: RunOwnershipAccess): AsyncIterable<unknown> {
+     const access = ownership;
+     const [result, failedWork] = await Promise.all([this.pool.query<{
+diff --git a/dialectical-engine/apps/runner/src/dev-cli-provider-panel.ts b/dialectical-engine/apps/runner/src/dev-cli-provider-panel.ts
+index a790c72d..5e033a8e 100644
+--- a/dialectical-engine/apps/runner/src/dev-cli-provider-panel.ts
++++ b/dialectical-engine/apps/runner/src/dev-cli-provider-panel.ts
+@@ -120,13 +120,13 @@ export function createDevelopmentCliProviderPanelOperations(
+       });
+       if (slot.word === "claude") return (port) => startClaudeRelay({
+         port, timeoutMs: DEVELOPMENT_CLI_CALL_TIMEOUT_MS, model: slot.model
+-      } as unknown as Parameters<typeof startClaudeRelay>[0]);
++      });
+       return (port) => startGrokRelay({
+         port,
+         timeoutMs: DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
+         model: slot.model,
+         sandboxProfile: "none"
+-      } as unknown as Parameters<typeof startGrokRelay>[0]);
++      });
+     }))
+   });
+ }
+diff --git a/dialectical-engine/apps/ui/app/new/page.tsx b/dialectical-engine/apps/ui/app/new/page.tsx
+index e5fded58..96a6e4a8 100755
+--- a/dialectical-engine/apps/ui/app/new/page.tsx
++++ b/dialectical-engine/apps/ui/app/new/page.tsx
+@@ -96,6 +96,7 @@ function NewDebateForm({ token }: { token: string }) {
+   const [decisionScope, setDecisionScope] = useState<string>(DECISION_SCOPE_DEFAULT);
+   const [asOf, setAsOf] = useState(() => dateTimeLocalValue(new Date()));
+   const [sessionDefaultsError, setSessionDefaultsError] = useState<string | null>(null);
++  const [planTierRostersError, setPlanTierRostersError] = useState<string | null>(null);
+   const [error, setError] = useState<string | null>(null);
+   const [submitting, setSubmitting] = useState(false);
+ 
+@@ -111,16 +112,19 @@ function NewDebateForm({ token }: { token: string }) {
+       if (!active) return;
+       setSessionDefaultsError(`ASK_SESSION_DEFAULTS_UNAVAILABLE: ${failure instanceof Error ? failure.message : "Session read failed"}`);
+     });
+-    void contractClient.readDeployment().then((deployment) => {
++    void contractClient.readPlanTiers().then((rosters) => {
+       if (!active) return;
+-      const rosterRow = deployment.register.rows.find((row) => row.row_key === "planTierRosters");
+-      const rosters = rosterRow?.value as Partial<Record<PlanTier, unknown>> | undefined;
+-      if (!Array.isArray(rosters?.free) || !rosters.free.every((modelId) => typeof modelId === "string") ||
+-        !Array.isArray(rosters.premium) || !rosters.premium.every((modelId) => typeof modelId === "string")) {
+-        return;
+-      }
+       setPlanTierRosters({ free: rosters.free, premium: rosters.premium });
+-    }).catch(() => undefined);
++      setPlanTierRostersError(null);
++    }).catch((failure: unknown) => {
++      if (!active) return;
++      setPlanTierRosters(EMPTY_PLAN_TIER_ROSTERS);
++      setPlanTierRostersError(
++        `ASK_PLAN_TIER_ROSTERS_UNAVAILABLE: ${
++          failure instanceof Error ? failure.message : "Plan tier roster read failed"
++        }`
++      );
++    });
+     return () => { active = false; };
+   }, [token]);
+ 
+@@ -336,6 +340,7 @@ function NewDebateForm({ token }: { token: string }) {
+           </div>
+ 
+           {sessionDefaultsError ? <div className="error" style={{ marginTop: 14 }}>{sessionDefaultsError}</div> : null}
++          {planTierRostersError ? <div className="error" style={{ marginTop: 14 }}>{planTierRostersError}</div> : null}
+ 
+           <button
+             type="button"
+diff --git a/dialectical-engine/packages/contract/src/client.ts b/dialectical-engine/packages/contract/src/client.ts
+index f5083550..5923aa31 100644
+--- a/dialectical-engine/packages/contract/src/client.ts
++++ b/dialectical-engine/packages/contract/src/client.ts
+@@ -12,6 +12,7 @@ import {
+   LegacyRunClaimRequestSchema,
+   LegacyRunClaimResultSchema,
+   NodeSchema,
++  PlanTierRostersSchema,
+   PrivateDebateErasureStatusSchema,
+   PublicationTransitionSchema,
+   PublicDebateListSchema,
+@@ -32,6 +33,7 @@ import {
+   type InvestigationAccepted,
+   type InvestigationRequest,
+   type Node,
++  type PlanTierRosters,
+   type PublicDebate,
+   type RunEvent,
+   type RunProjection,
+@@ -285,6 +287,7 @@ export interface ContractClient {
+   }>;
+   submitAsk(input: AskRequest): Promise<AskAccepted>;
+   readSession(): Promise<Session>;
++  readPlanTiers(): Promise<PlanTierRosters>;
+   readDeployment(): Promise<Deployment>;
+   readAnswerIndex(limit: number, offset: number): Promise<AnswerIndex>;
+   readAnswer(answerId: string, version?: number): Promise<Answer>;
+@@ -503,6 +506,7 @@ export function createContractClient(
+     ),
+     submitAsk: (input: AskRequest) => request("/v1/asks", AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
+     readSession: () => request("/v1/session", SessionSchema),
++    readPlanTiers: () => request("/v1/plan-tiers", PlanTierRostersSchema),
+     readDeployment: () => request("/v1/deployment", DeploymentSchema),
+     readAnswerIndex: (limit: number, offset: number) => request(`/v1/answers?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`, AnswerIndexSchema),
+     readAnswer: (answerId: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}${versionQuery(version)}`, AnswerSchema),
+diff --git a/dialectical-engine/packages/contract/src/index.ts b/dialectical-engine/packages/contract/src/index.ts
+index 071ca3a2..211085d4 100644
+--- a/dialectical-engine/packages/contract/src/index.ts
++++ b/dialectical-engine/packages/contract/src/index.ts
+@@ -305,6 +305,12 @@ export const DeploymentSchema = z.object({
+ }).strict();
+ export type Deployment = z.infer<typeof DeploymentSchema>;
+ 
++export const PlanTierRostersSchema = z.object({
++  free: z.array(z.string().trim().min(1)),
++  premium: z.array(z.string().trim().min(1))
++}).strict();
++export type PlanTierRosters = z.infer<typeof PlanTierRostersSchema>;
++
+ export const LabeledNumberSchema = z.object({
+   value: z.number().finite(),
+   kind: z.string().min(1),
+@@ -676,6 +682,7 @@ export const contractInventory = Object.freeze({
+     "GET /v1/support/status",
+     "POST /v1/asks",
+     "GET /v1/session",
++    "GET /v1/plan-tiers",
+     "GET /v1/deployment",
+     "GET /v1/dev/evaluator",
+     "POST /v1/dev/evaluator/consumer-selection",
+@@ -703,7 +710,7 @@ export const contractInventory = Object.freeze({
+     AccountErasureCancelRequestSchema,AccountErasureCancelledSchema,PrivateDebateErasureRequestSchema,
+     PrivateDebateErasureStatusSchema,LegacyRunClaimRequestSchema,LegacyRunClaimResultSchema,
+     PublicationTransitionSchema, PublicDebateSummarySchema, PublicDebateSchema, PublicDebateListSchema,
+-    DeploymentSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
++    DeploymentSchema, PlanTierRostersSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
+     AnswerSchema, InspectionSchema, NodeSchema,
+     RunEventSchema, ComposedSegmentSchema, NumberSlotSchema, BandCeilingSchema, StalenessStateSchema,
+     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,
+diff --git a/dialectical-engine/tests/render/tier01-new-plan-tier.test.tsx b/dialectical-engine/tests/render/tier01-new-plan-tier.test.tsx
+index a20de25d..f08ff7b6 100644
+--- a/dialectical-engine/tests/render/tier01-new-plan-tier.test.tsx
++++ b/dialectical-engine/tests/render/tier01-new-plan-tier.test.tsx
+@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
+   createDebate: vi.fn(),
+   push: vi.fn(),
+   readDeployment: vi.fn(),
++  readPlanTiers: vi.fn(),
+   readSession: vi.fn()
+ }));
+ 
+@@ -53,6 +54,7 @@ vi.mock("@/lib/api", () => ({
+   createDebate: mocks.createDebate,
+   contractClient: {
+     readDeployment: mocks.readDeployment,
++    readPlanTiers: mocks.readPlanTiers,
+     readSession: mocks.readSession
+   }
+ }));
+@@ -90,6 +92,10 @@ describe("S01 /new plan tier", () => {
+     mocks.createDebate.mockReset().mockResolvedValue({ id: "run-tier" });
+     mocks.push.mockReset();
+     mocks.readDeployment.mockReset().mockResolvedValue(deploymentFixture);
++    mocks.readPlanTiers.mockReset().mockResolvedValue({
++      free: deploymentFixture.register.rows[0]!.value.free,
++      premium: deploymentFixture.register.rows[0]!.value.premium
++    });
+     mocks.readSession.mockReset().mockRejectedValue(new Error("session unavailable in render test"));
+     const container = document.createElement("div");
+     document.body.append(container);
+@@ -203,9 +209,43 @@ describe("S01 /new plan tier", () => {
+     expect(mocks.readSession).toHaveBeenCalledTimes(1);
+   });
+ 
++  // Property: a refused roster read is visible and no stale/default model id is rendered.
++  // Production break: swallow readPlanTiers rejection and retain EMPTY_PLAN_TIER_ROSTERS.
++  it("S03-25 R31 names an unavailable plan-tier roster read and renders no ids", async () => {
++    mocks.readSession.mockResolvedValue({
++      session_id: "00000000-0000-4000-8000-000000000000",
++      asker_id: "probe-asker"
++    });
++    mocks.readPlanTiers.mockRejectedValue(new Error("PLAN_TIER_ROSTERS_OFFLINE"));
++    await renderPage();
++
++    expect([...document.querySelectorAll('.ndTierModel')]).toEqual([]);
++    expect(document.querySelector('.error')?.textContent).toBe(
++      "ASK_PLAN_TIER_ROSTERS_UNAVAILABLE: PLAN_TIER_ROSTERS_OFFLINE"
++    );
++  });
++
++  // Property: the cards render all five ids returned by the user-readable roster surface.
++  // Production break: keep reading the operator-only deployment surface instead of readPlanTiers.
++  it("S03-26 R16 renders both tier lists from the user-readable roster response", async () => {
++    mocks.readDeployment.mockRejectedValue(new Error("OPERATOR_REQUIRED"));
++    await renderPage();
++
++    expect([...document.querySelectorAll<HTMLElement>('.ndTierModel')].map((model) =>
++      model.textContent?.trim()
++    )).toEqual([
++      "gpt-5.6-luna",
++      "glm-5.3-flash",
++      "gpt-5.6-sol",
++      "claude-opus-5",
++      "grok-4.6-build"
++    ]);
++    expect(document.body.textContent).not.toContain("OPERATOR_REQUIRED");
++  });
++
+   // Property: the Free card renders the file-fed deployment roster and no retired model id.
+   // Production break: keep rendering the compiled PLAN_TIER_ROSTERS export instead of the register row.
+-  it("S03-24 R16 renders the Free card from the deployment roster row", async () => {
++  it("S03-24 R16 renders the Free card from the plan-tier roster response", async () => {
+     vi.resetModules();
+     vi.doMock("@debateai/contract", () => ({
+       PLAN_TIER_ROSTERS: {
+@@ -228,7 +268,7 @@ describe("S01 /new plan tier", () => {
+     }
+   });
+ 
+-  it("S01-25 R3 names each tier's models from the deployment roster row", async () => {
++  it("S01-25 R3 names each tier's models from the plan-tier roster response", async () => {
+     await renderPage();
+ 
+     expect(document.querySelector('#planTier-free')?.textContent).toContain("gpt-5.6-luna");
+@@ -271,10 +311,10 @@ describe("S01 /new plan tier", () => {
+   });
+ 
+   it("uses shared model metadata for the five real and six alternate roster id shapes", async () => {
+-    mocks.readDeployment.mockResolvedValueOnce(deploymentWithRosters({
++    mocks.readPlanTiers.mockResolvedValueOnce({
+       free: ["gpt-5.6-luna", "claude-sonnet-5", "openai-o3", "sol-gpt-5", "GPT-5.6-SOL"],
+       premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build", "claude_opus", "grok/4.6", "gemini-3"]
+-    }));
++    });
+     await renderPage();
+ 
+     expect([...document.querySelectorAll<HTMLElement>('.ndTierModel .modelDot')].map((dot) =>
+diff --git a/dialectical-engine/tests/unit/api.test.ts b/dialectical-engine/tests/unit/api.test.ts
+index bd7a06ef..1944a8fa 100644
+--- a/dialectical-engine/tests/unit/api.test.ts
++++ b/dialectical-engine/tests/unit/api.test.ts
+@@ -66,6 +66,10 @@ function fixtureApplication(): AskApplication {
+     readRunAnswer: async () => null,
+     readRun: async () => null,
+     readAnswerIndex: async (_session, limit, offset) => ({ items: [], open_runs: [], limit, offset, total: 0 }),
++    readPlanTierRosters: async () => ({
++      free: [...PLAN_TIER_ROSTERS.free],
++      premium: [...PLAN_TIER_ROSTERS.premium]
++    }),
+     readDeployment: async () => ({
+       register: { register_version: 1, rows: [] }, scorecards: [], model_ledger: [],
+       fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
+@@ -235,6 +239,81 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
+     await api.close();
+   });
+ 
++  // Property: an ordinary authenticated user receives exactly the application's sealed roster row.
++  // Production break: omit GET /v1/plan-tiers or answer it from a compiled roster constant.
++  it("serves the register's plan-tier roster row to an ordinary user", async () => {
++    const application = fixtureApplication() as AskApplication & {
++      readPlanTierRosters(session: Session): Promise<Readonly<{
++        free: readonly string[];
++        premium: readonly string[];
++      }>>;
++    };
++    application.readPlanTierRosters = async () => ({
++      free: ["free-register-model-a", "free-register-model-b"],
++      premium: ["premium-register-model-a", "premium-register-model-b", "premium-register-model-c"]
++    });
++    const api = buildApi({ application });
++    const response = await api.inject({
++      method: "GET", url: "/v1/plan-tiers", headers: USER_HEADERS
++    });
++
++    expect(response.statusCode).toBe(200);
++    expect(response.json()).toEqual({
++      free: ["free-register-model-a", "free-register-model-b"],
++      premium: ["premium-register-model-a", "premium-register-model-b", "premium-register-model-c"]
++    });
++    await api.close();
++  });
++
++  // Property: the roster surface is unavailable without an authenticated cookie session.
++  // Production break: declare GET /v1/plan-tiers public or omit it from the governed route table.
++  it("requires a session for the plan-tier roster route", async () => {
++    const api = buildApi({ application: fixtureApplication() });
++    const response = await api.inject({ method: "GET", url: "/v1/plan-tiers" });
++
++    expect(response.statusCode).toBe(401);
++    expect(response.json()).toEqual({ error: "SESSION_REQUIRED" });
++    await api.close();
++  });
++
++  // Property: the production application projects the planTierRosters row from its sealed deployment.
++  // Production break: return PLAN_TIER_ROSTERS or any source other than register.register_row.
++  it("reads plan-tier rosters from the sealed deployment register row", async () => {
++    const pool = {
++      query: async (statement: string) => {
++        if (statement.includes("FROM register.register_row")) {
++          return { rows: [{
++            row_key: "planTierRosters",
++            value_json: {
++              free: ["free-register-a", "free-register-b"],
++              premium: ["premium-register-a", "premium-register-b", "premium-register-c"]
++            },
++            source_ref: "config/models.yaml"
++          }] };
++        }
++        if (statement.includes("FROM scorecard.scorecard_cell") ||
++          statement.includes("FROM identity.run_execution_binding")) {
++          return { rows: [] };
++        }
++        throw new Error(`UNEXPECTED_QUERY:${statement}`);
++      }
++    };
++    const application = new PostgresAskApplication(
++      pool as never,
++      { dispatch: async () => undefined },
++      admissionSettings({ registerVersion: 7 }),
++      undefined,
++      {} as never,
++      { server: {} as never, legacy: {} as never }
++    );
++    const rosters = await application.readPlanTierRosters(USER_IDENTITY.authenticated.session);
++
++    expect(rosters).toEqual({
++      free: ["free-register-a", "free-register-b"],
++      premium: ["premium-register-a", "premium-register-b", "premium-register-c"]
++    });
++  });
++
+   it("validates POST /v1/asks against the contract and forwards the resolved principal", async () => {
+     let observedAsker = "";
+     const application = fixtureApplication();
+diff --git a/dialectical-engine/tests/unit/contract.test.ts b/dialectical-engine/tests/unit/contract.test.ts
+index 9d67b0d9..527324c1 100644
+--- a/dialectical-engine/tests/unit/contract.test.ts
++++ b/dialectical-engine/tests/unit/contract.test.ts
+@@ -10,6 +10,7 @@ import {
+   NumberSlotSchema,
+   RunProjectionSchema,
+   TierSourceSchema,
++  createContractClient,
+   contractInventory
+ } from "@debateai/contract";
+ 
+@@ -51,6 +52,7 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
+     expect(contractInventory.routes).toEqual(expect.arrayContaining([
+       "POST /v1/asks",
+       "GET /v1/session",
++      "GET /v1/plan-tiers",
+       "GET /v1/deployment",
+       "GET /v1/answers/{id}",
+       "GET /v1/answers/{id}/inspection",
+@@ -96,6 +98,48 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
+     expect(() => AskRequestSchema.parse({ question_line: "missing ruled fields" })).toThrow();
+   });
+ 
++  // Property: the roster resource admits exactly free/premium arrays of non-empty model ids.
++  // Production break: omit PlanTierRostersSchema or allow a blank/unknown-key payload.
++  it("validates the closed plan-tier roster response", () => {
++    const schema = (contractInventory.resources as unknown as Record<string, {
++      parse(value: unknown): unknown;
++    }>).PlanTierRostersSchema;
++    expect(schema).toBeDefined();
++    if (schema === undefined) throw new TypeError("PlanTierRostersSchema is missing");
++    expect(schema.parse({
++      free: ["free-a", "free-b"],
++      premium: ["premium-a", "premium-b", "premium-c"]
++    })).toEqual({
++      free: ["free-a", "free-b"],
++      premium: ["premium-a", "premium-b", "premium-c"]
++    });
++    expect(() => schema.parse({ free: [""], premium: ["premium-a"] })).toThrow();
++    expect(() => schema.parse({
++      free: ["free-a"], premium: ["premium-a"], hidden: ["secret-model"]
++    })).toThrow();
++  });
++
++  // Property: readPlanTiers GETs the governed route and validates its response schema.
++  // Production break: point the client at /v1/deployment or return unvalidated JSON.
++  it("reads plan-tier rosters through the contract client", async () => {
++    const observedUrls: string[] = [];
++    const client = createContractClient("http://api.test", (async (input) => {
++      observedUrls.push(String(input));
++      return new Response(JSON.stringify({
++        free: ["free-a", "free-b"],
++        premium: ["premium-a", "premium-b", "premium-c"]
++      }), { status: 200, headers: { "content-type": "application/json" } });
++    }) as typeof fetch) as ReturnType<typeof createContractClient> & {
++      readPlanTiers(): Promise<Readonly<{ free: readonly string[]; premium: readonly string[] }>>;
++    };
++
++    await expect(Promise.resolve().then(() => client.readPlanTiers())).resolves.toEqual({
++      free: ["free-a", "free-b"],
++      premium: ["premium-a", "premium-b", "premium-c"]
++    });
++    expect(observedUrls).toEqual(["http://api.test/v1/plan-tiers"]);
++  });
++
+   it("R12 admits plan_tier free and premium and refuses anything else", () => {
+     const validAsk = {
+       question_line: "What follows from this evidence?",
+diff --git a/dialectical-engine/tests/unit/dev-cli-provider-panel.test.ts b/dialectical-engine/tests/unit/dev-cli-provider-panel.test.ts
+index e84a4f77..2a55d6de 100644
+--- a/dialectical-engine/tests/unit/dev-cli-provider-panel.test.ts
++++ b/dialectical-engine/tests/unit/dev-cli-provider-panel.test.ts
+@@ -259,24 +259,114 @@ describe("development CLI full-id starts", () => {
+     });
+   });
+ 
+-  it("passes the full Claude model id without a modelAlias key", async () => {
++  it("starts the Claude relay with `--model claude-opus-5`", async () => {
++    relayStarts.claude.mockClear();
++    const operations = createDevelopmentCliProviderPanelOperations(loadModelConfig(process.cwd()));
++    await operations.starts[1]!(8796);
++    const panelOptions = relayStarts.claude.mock.calls[0]?.[0];
++    expect(panelOptions).toBeDefined();
++
++    const { startClaudeRelay } = await vi.importActual<
++      typeof import("../../acceptance/claude-relay.js")
++    >("../../acceptance/claude-relay.js");
++    const capturedEnvelopeScript = [
++      'console.log(JSON.stringify({',
++      '  is_error: false,',
++      '  result: JSON.stringify({ argumentList: process.argv }),',
++      '  modelUsage: { "claude-opus-5": {} }',
++      '}));'
++    ].join("");
++    const relay = await startClaudeRelay({
++      ...panelOptions!,
++      port: 0,
++      timeoutMs: 1_000,
++      testOnlyCommand: {
++        binary: process.execPath,
++        prefixArguments: ["-e", capturedEnvelopeScript, "--"]
++      }
++    });
++    try {
++      const response = await fetch(`${relay.baseUrl}/v1/chat/completions`, {
++        method: "POST",
++        headers: { "content-type": "application/json", authorization: relay.authorizationHeader },
++        body: JSON.stringify({
++          model: "ignored-by-relay",
++          messages: [{ role: "user", content: "Assert argv." }]
++        })
++      });
++      expect(response.status).toBe(200);
++      const completion = await response.json() as {
++        choices: readonly { message: { content: string } }[];
++      };
++      const relayed = JSON.parse(completion.choices[0]!.message.content) as {
++        argumentList: readonly string[];
++      };
++      expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1])
++        .toBe("claude-opus-5");
++    } finally {
++      await relay.close();
++    }
++  });
++
++  it("passes the configured Claude id through the typed model option", async () => {
+     relayStarts.claude.mockClear();
+     const operations = createDevelopmentCliProviderPanelOperations(loadModelConfig(process.cwd()));
+     await operations.starts[1]!(8796);
+     expect(relayStarts.claude).toHaveBeenCalledWith({
+       port: 8796, timeoutMs: 180000, model: "claude-opus-5"
+     });
+-    expect(relayStarts.claude.mock.calls[0]?.[0]).not.toHaveProperty("modelAlias");
+   });
+ 
+-  it("passes the full Grok model id without allocating a start to either API entry", async () => {
++  it("starts the Grok relay with `--model grok-4.6-build`", async () => {
+     relayStarts.grok.mockClear();
+     const operations = createDevelopmentCliProviderPanelOperations(loadModelConfig(process.cwd()));
+     expect(operations.starts).toHaveLength(3);
+     await operations.starts[2]!(8793);
+-    expect(relayStarts.grok).toHaveBeenCalledWith({
++    const panelOptions = relayStarts.grok.mock.calls[0]?.[0];
++    expect(panelOptions).toEqual({
+       port: 8793, timeoutMs: 180000, model: "grok-4.6-build", sandboxProfile: "none"
+     });
++
++    const { startGrokRelay } = await vi.importActual<
++      typeof import("../../acceptance/grok-relay.js")
++    >("../../acceptance/grok-relay.js");
++    const capturedEnvelopeScript = [
++      'console.log(JSON.stringify({',
++      '  text: JSON.stringify({ argumentList: process.argv }),',
++      '  stopReason: "end_turn",',
++      '  modelUsage: { "grok-4.6-build": {} }',
++      '}));'
++    ].join("");
++    const relay = await startGrokRelay({
++      ...panelOptions!,
++      port: 0,
++      timeoutMs: 1_000,
++      testOnlyCommand: {
++        binary: process.execPath,
++        prefixArguments: ["-e", capturedEnvelopeScript, "--"]
++      }
++    });
++    try {
++      const response = await fetch(`${relay.baseUrl}/v1/chat/completions`, {
++        method: "POST",
++        headers: { "content-type": "application/json", authorization: relay.authorizationHeader },
++        body: JSON.stringify({
++          model: "ignored-by-relay",
++          messages: [{ role: "user", content: "Assert argv." }]
++        })
++      });
++      expect(response.status).toBe(200);
++      const completion = await response.json() as {
++        choices: readonly { message: { content: string } }[];
++      };
++      const relayed = JSON.parse(completion.choices[0]!.message.content) as {
++        argumentList: readonly string[];
++      };
++      expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1])
++        .toBe("grok-4.6-build");
++    } finally {
++      await relay.close();
++    }
+   });
+ });
+ 
+diff --git a/dialectical-engine/tests/unit/s7-authorization.test.ts b/dialectical-engine/tests/unit/s7-authorization.test.ts
+index b21ee4c2..8ee23a35 100644
+--- a/dialectical-engine/tests/unit/s7-authorization.test.ts
++++ b/dialectical-engine/tests/unit/s7-authorization.test.ts
+@@ -48,6 +48,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
+   { route: "GET /v1/support/status", auth: "public", session: "optional", resource: "support-status", action: "read" },
+   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
+   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
++  { route: "GET /v1/plan-tiers", auth: "user", resource: "plan-tier-rosters", action: "read" },
+   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
+   { route: "GET /v1/dev/evaluator", auth: "operator", resource: "evaluator", action: "read" },
+   { route: "POST /v1/dev/evaluator/consumer-selection", auth: "operator", resource: "evaluator", action: "select-consumer" },
+@@ -108,6 +109,10 @@ function fixtureApplication(): AskApplication {
+     readNode: async () => null,
+     recordInvestigation: async () => null,
+     unlinkMemoryLink: async () => ({ memory_link_id: "memory:test", state: "UNLINKED" }),
++    readPlanTierRosters: async () => ({
++      free: ["free-a", "free-b"],
++      premium: ["premium-a", "premium-b", "premium-c"]
++    }),
+     readDeployment: async () => ({
+       register: { register_version: 1, rows: [] }, scorecards: [], model_ledger: [],
+       fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }

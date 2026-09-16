@@ -1,0 +1,15 @@
+ dialectical-engine/acceptance/claude-relay.test.ts | 73 ++++++++++++++++
+ dialectical-engine/acceptance/claude-relay.ts      | 46 +++++++---
+ dialectical-engine/acceptance/grok-relay.test.ts   | 21 +++++
+ dialectical-engine/acceptance/grok-relay.ts        |  9 +-
+ dialectical-engine/apps/api/src/index.ts           | 24 +++++-
+ .../apps/runner/src/dev-cli-provider-panel.ts      |  4 +-
+ dialectical-engine/apps/ui/app/new/page.tsx        | 21 +++--
+ dialectical-engine/packages/contract/src/client.ts |  4 +
+ dialectical-engine/packages/contract/src/index.ts  |  9 +-
+ .../tests/render/tier01-new-plan-tier.test.tsx     | 48 ++++++++++-
+ dialectical-engine/tests/unit/api.test.ts          | 79 +++++++++++++++++
+ dialectical-engine/tests/unit/contract.test.ts     | 44 ++++++++++
+ .../tests/unit/dev-cli-provider-panel.test.ts      | 98 +++++++++++++++++++++-
+ .../tests/unit/s7-authorization.test.ts            |  5 ++
+ 14 files changed, 450 insertions(+), 35 deletions(-)
