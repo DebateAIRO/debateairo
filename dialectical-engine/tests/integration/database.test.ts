@@ -460,7 +460,16 @@ async function startProviderDouble(
       // scripted queue keeps its exact positions and its own assertions stand unchanged.
       // The member scores fidelity 0, i.e. tau 0: selection is strictly greater-than, so
       // a panel voice can never displace the author's and no fixture's tau moves.
-      if (body.includes("Assess an existing debate node authored by another maker")) {
+      // W7 / V-BLIND-CONTEXT: a STRUCTURAL key, never prose. The sentence this
+      // replaces was prompt text, and the ruling changed it — the branch stopped
+      // matching and 23 of this file's fixtures died on a misrouted response.
+      // Measured on the shipped prompts: every assessment key (`fatalFlags`,
+      // `counterargumentStrength`, …) is in the JUDGE prompt too, because judge
+      // embeds the whole assessment schema, so the panel is the assessment
+      // WITHOUT the judge's `restatement_text` — a negative pinned by
+      // `tests/unit/t03-judge-panel.test.ts`. Bare identifiers survive the JSON
+      // encoding that defeats a quoted fragment (T3 N4, below).
+      if (body.includes("fatalFlags") && !body.includes("restatement_text")) {
         calls += 1;
         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
           id: `panel-assess-${calls}`,
@@ -477,7 +486,7 @@ async function startProviderDouble(
       // because an evaluator request carries the candidate statement, not the
       // segment contract. Without this the evaluator was handed whatever sat at
       // the head of the queue — a judgement — and failed its own schema.
-      const requestKind: ResponseClass = body.includes("Review an existing debate node") ? "REVIEW"
+      const requestKind: ResponseClass = body.includes("edge_bearings") ? "REVIEW"
         : body.includes("restatement_text") ? "JUDGE"
           : body.includes("fairness_to_losers") ? "EVALUATOR"
             : body.includes("conforms,findings") ? "CONFORMANCE"

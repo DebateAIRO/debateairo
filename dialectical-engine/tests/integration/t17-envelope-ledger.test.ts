@@ -182,8 +182,22 @@ const COMPOSITION = JSON.stringify({ segments: [
 type RequestKind = "PANEL" | "REVIEW" | "JUDGE" | "CONFORMANCE" | "R9" | "COMPOSE" | "EVALUATOR";
 
 function classify(body: string): RequestKind {
-  if (body.includes("Assess an existing debate node authored by another maker")) return "PANEL";
-  if (body.includes("Review an existing debate node")) return "REVIEW";
+  // W7 / V-BLIND-CONTEXT: the panel and review keys are STRUCTURAL — keys of the
+  // organ's own JSON contract — never prose. The sentences they replaced
+  // ("Assess an existing debate node authored by another maker", "Review an
+  // existing debate node") are prompt TEXT, and a ruling changed it: the panel
+  // branch stopped matching and every panel body fell through to the terminal
+  // JUDGE below, silently, while the ledger-derived counts above stayed correct.
+  // Measured on the shipped prompts: `edge_bearings` occurs in the review prompt
+  // and nowhere else, while every assessment key (`fatalFlags`,
+  // `counterargumentStrength`, `steelman`, `ambiguityFlags`) occurs in the JUDGE
+  // prompt as well — judge embeds the whole assessment schema — so the panel is
+  // the assessment WITHOUT the judge's `restatement_text`. That negative is
+  // itself pinned by `tests/unit/t03-judge-panel.test.ts`. Both keys are bare
+  // identifiers, so they survive the packet's JSON encoding, which a quoted
+  // fragment would not (it arrives as \").
+  if (body.includes("fatalFlags") && !body.includes("restatement_text")) return "PANEL";
+  if (body.includes("edge_bearings")) return "REVIEW";
   // T9: the EVALUATOR replaced BOTH retired serve-path organs. Its marker is
   // tested BEFORE "restatement_text" because the evaluator's criteria list
   // names `restatement`, and before the COMPOSE marker for the same reason —
@@ -573,6 +587,17 @@ describe("T17 · the recomputed ceiling covers a maximum-path run's OBSERVED led
         panelSites: (PANEL_SIZE - 1) * MATERIALIZED_NODES,
         panelAttempts: (PANEL_SIZE - 1) * MATERIALIZED_NODES * ATTEMPTS_PER_PANEL_SITE
       });
+
+      // (1b) W7 / V-BLIND-CONTEXT: the count above is read from the CALL-SITE
+      //      NAMESPACE, which the runner stamps whether or not this double
+      //      understood the request — so it stayed green while `classify` sent
+      //      every panel body to JUDGE and every member failed on the wrong
+      //      schema. The attempt arithmetic is identical either way (three
+      //      attempts per site, failing or succeeding), so nothing else in this
+      //      file could see it. This row reads the DOUBLE's own classification.
+      const classifiedPanel = primary.counts().PANEL + secondary.counts().PANEL;
+      expect({ panelClassifiedByDouble: classifiedPanel, ledgerPanelAttempts: panelAttempts })
+        .toEqual({ panelClassifiedByDouble: panelAttempts, ledgerPanelAttempts: panelAttempts });
 
       // (2) The run really did take the maximum path: every cooldown-wrapped
       //     judge site spent BOTH sequences. Read off the ledger by call site.

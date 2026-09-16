@@ -60,7 +60,16 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
       // than from `pending`, so every authoring/review/compose fixture below
       // keeps its exact queue position — the panel adds calls, it does not
       // re-order the ceremony's scripted ones.
-      if (body.includes("Assess an existing debate node authored by another maker")) {
+      // W7 / V-BLIND-CONTEXT: a STRUCTURAL key, never prose. The sentence this
+      // replaces was prompt text that a ruling changed, and the branch went dead
+      // — the panel leg was answered out of the scripted queue and the ceremony
+      // came back with LABEL-BASIS-INCOMPLETE. Measured on the shipped prompts:
+      // the assessment keys are in the JUDGE prompt too (judge embeds the whole
+      // assessment schema), so the panel is the assessment WITHOUT the judge's
+      // `restatement_text`, a negative pinned by
+      // `tests/unit/t03-judge-panel.test.ts`. Bare identifiers survive the JSON
+      // encoding that defeats a quoted fragment (T3 N4, below).
+      if (body.includes("fatalFlags") && !body.includes("restatement_text")) {
         calls += 1;
         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
           id: `acceptance-panel-${calls}`,
@@ -73,7 +82,7 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
       // the wire JSON-encoded, so a quoted fragment like `"statement": non-empty string`
       // arrives as \"statement\" and never matches — the old check was dead, and only
       // the FIFO fallback below hid it.
-      const requestKind: ResponseClass = body.includes("Review an existing debate node") ? "REVIEW"
+      const requestKind: ResponseClass = body.includes("edge_bearings") ? "REVIEW"
         : body.includes("restatement_text") ? "JUDGE"
           // F-SEALEDROWS-B: the EVALUATOR discriminator is the SHIPPED prompt
           // itself (see `test-fixtures/evaluator-double.ts`), so it cannot go

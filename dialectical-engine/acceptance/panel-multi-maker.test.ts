@@ -116,8 +116,17 @@ async function startProviderDouble(input: {
       calls += 1;
       // Signals are chosen to survive JSON escaping of the rendered packet: a
       // quoted fragment appears as \" in the wire body and would never match.
+      //
+      // W7 / V-BLIND-CONTEXT: they are also STRUCTURAL now — keys of each
+      // organ's JSON contract rather than sentences of its prompt. The prose
+      // these replace was changed by a ruling, both branches went dead, and the
+      // panel silently ran with one member. Measured on the shipped prompts:
+      // `edge_bearings` is the review prompt alone, while every assessment key
+      // is in the JUDGE prompt too (judge embeds the whole assessment schema),
+      // so the panel is the assessment WITHOUT the judge's `restatement_text` —
+      // a negative pinned by `tests/unit/t03-judge-panel.test.ts`.
       let content: string;
-      if (body.includes("Assess an existing debate node authored by another maker")) {
+      if (body.includes("fatalFlags") && !body.includes("restatement_text")) {
         assessCalls += 1;
         if (failAssess) {
           // A member that answers with prose is a PARSE_FAILURE, not a
@@ -127,7 +136,7 @@ async function startProviderDouble(input: {
         } else {
           content = JSON.stringify(assessmentBody(input.scores));
         }
-      } else if (body.includes("Review an existing debate node")) {
+      } else if (body.includes("edge_bearings")) {
         // T5/S3-1: one bearing per edge THIS call offered, read off the wire.
         // This double does not assess bearings, so every offered edge comes
         // back cannot-assess (null) and stays UNKNOWN — which is why T3's panel
