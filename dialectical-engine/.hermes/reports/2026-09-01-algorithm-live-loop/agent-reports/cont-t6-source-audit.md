@@ -200,3 +200,55 @@ Ranked by tokens saved per line of effort.
    task's four judgement calls were "can I legally do the thing the packet asked for?". A packet that
    derived `allowed` from the route it selected — and said which routes it had therefore excluded —
    would have removed all three.
+
+---
+
+# Addendum — fix round 1 (F1), commit `40a96201`
+
+One finding entered rework: `migrations/0061_algorithm_publication_profiles.sql:34` created its
+trigger bare, so the file was still not replayable after C1 made its function idempotent. Fixed with
+the repo's drop-first pattern and pinned by a new test that applies the migration twice.
+
+**What is new, and it sharpens §2.2 into something worse than I wrote there.**
+
+In §2.2 I reported that the gates measure declaration syntax and called it a rule-strength finding.
+Round 1 shows the stronger version, and it is not hypothetical: **C1's green gate was a statement
+about the rule's KEYWORD SET, and it certified a file that does not work.**
+
+`auditMigrationReplaySafety` (`tools/orphan-audit/src/index.ts:576-596`) has exactly four members —
+`ADD COLUMN`, `ADD CONSTRAINT`, `CREATE FUNCTION`, `CREATE [UNIQUE] INDEX`. No `CREATE TRIGGER`. So
+C1 removed the one statement in `0061` the rule could see, the audit printed a clean file, three gate
+runs agreed, and the migration still raised `42710 … already exists` on its second application. I had
+even named the gap myself, as out-of-contract finding 4 — and then reported the cluster green anyway,
+because the gate said so and the gap was someone else's to fix.
+
+**That is the actual lesson, and it is about me, not the tool.** I treated "the audit lists nothing
+for this file" and "this file is replay-safe" as the same claim, while simultaneously holding written
+evidence that they were not. The audit answers *"does this file contain a keyword on my list?"*. The
+question the ticket asked was *"is this file replayable?"*. Nothing but running it twice answers the
+second, and running it twice cost **one test file and about ninety seconds** once the harness was
+found (`tests/support/testDatabase.ts` + the `applySqlOnly` pattern in
+`tests/integration/tint1-upgrade-migration.test.ts` — both already existed).
+
+**Rule I would add to the worker contract:** *when a gate's verdict is the evidence for a property,
+state the property in words and ask whether the gate's mechanism can reach it. If the gate reads
+source text and the property is runtime behaviour, the gate is a screen, not a proof — go execute the
+thing.* Round 0's §2.2 asked for negative fixtures on each rule; this round says the same demand from
+the other end, and the cheaper one to adopt first: **a migration's replay-safety is proved by
+applying it twice, and this repository had never applied any migration twice.**
+
+**Price:** a full REV round — one finding, one fix commit, three gate runs, two mutants, this
+addendum. **Price of prevention: the same ninety seconds, spent before the C1 handoff instead of
+after it.** I had the finding in hand and filed it as future work rather than as a reason to doubt my
+own green. That is the most expensive habit in this transcript, and it is not a tooling problem.
+
+**Dead end avoided this round:** `CREATE OR REPLACE TRIGGER` works on this server (proved by mutant
+M13, which the test correctly does NOT catch) and is a legitimate second implementation. I kept
+drop-first because nine other migrations use it; do not re-litigate this as a defect in either
+direction.
+
+**Where the packet was wrong, confirmed:** the round-0 packet scoped `0061` to *"line 10 only"*, which
+made the trigger on line 34 unreachable. The coordinator has acknowledged this as a packet defect and
+widened the surface. It is the fourth item in §5 and the only one that cost a rework round — **a
+write surface scoped by LINE inside a file the task is meant to make CORRECT will eventually exclude
+the defect.** Scope by file and by reason, never by line.

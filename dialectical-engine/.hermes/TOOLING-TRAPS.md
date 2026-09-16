@@ -4661,3 +4661,28 @@ not in 4 000 lines of prose every author skims.
   And when a cheap probe contradicts a gate you have already run, the probe is wrong until proved
   otherwise.** Cost here: one minute, because the contradiction was loud; in a case where the probe
   had merely *agreed* with an expectation, it would have been invisible.
+
+## A migration audit's verdict is about its KEYWORD LIST, not about replayability (2026-09-16, BUILD(CONT-T6), fix round 1)
+- `auditMigrationReplaySafety` (`tools/orphan-audit/src/index.ts:576-596`) checks four things:
+  `ADD COLUMN`, `ADD CONSTRAINT`, `CREATE FUNCTION`, `CREATE [UNIQUE] INDEX`. There is **no
+  `CREATE TRIGGER` member.** `migrations/0061_algorithm_publication_profiles.sql` had a bare
+  `CREATE FUNCTION` *and* a bare `CREATE TRIGGER`. Fixing the function emptied the file's blocking
+  list; three gate runs agreed; the migration still died on its second application with
+  `trigger "…" for relation "…" already exists` (SQLSTATE `42710`, `CreateTriggerFiringOn`).
+- The gap had already been WRITTEN DOWN by the same seat, as an out-of-contract finding, in the same
+  handoff that reported the cluster green. Knowing the gate is incomplete and still quoting its green
+  is the failure — not the incomplete gate.
+- **Rule: state the property in words, then ask whether the gate's MECHANISM can reach it.** "The
+  audit lists nothing for this file" and "this file is replay-safe" are different claims; a
+  text-scanning rule can only ever support the first. Where the property is runtime behaviour, run
+  it: `startTestDatabase()` + the real `migrate(pool)` + re-applying one file's bytes
+  (`tests/integration/migration-0061-replay.test.ts`, modelled on
+  `tests/integration/tint1-upgrade-migration.test.ts:108`) costs about ninety seconds.
+- Why nothing had ever caught it: the production migrator keys its ledger on the file NAME and skips
+  a recorded one (`packages/db/src/index.ts:730-732`), so a non-replayable migration is SILENT in
+  normal operation and only surfaces on a restore, a branch database or a squashed chain. Before this
+  round, **no test in this repository applied any migration twice.**
+- Companion finding for anyone fixing the class: `DROP TRIGGER IF EXISTS <name> ON <table>;` before
+  `CREATE TRIGGER` is this repo's settled pattern (nine migrations, e.g. `0002_s02.sql:73`);
+  `CREATE OR REPLACE TRIGGER` also works on the embedded server here and closes the brief
+  no-trigger window that drop-first opens.
