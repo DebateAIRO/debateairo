@@ -3984,7 +3984,14 @@ describe("apps/runner — legal command lifecycle", () => {
         verdict_unavailable: null,
         confidence_band: "TEST_CAPPED_BAND",
         band_ceiling: { label: "TEST_DEFAULT_CEILING" },
-        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE", "LABEL-BASIS-INCOMPLETE"]
+        // W2 / F-VS11-1 (V-S11-1, V-S11-GRADER): this fixture seals BOTH synthesis
+        // refs to `provider:test-layer` (`:238-239`, with `identicalRoleRefs: true`)
+        // — deliberately, as the comment there says, "exactly the case T16's
+        // identical-refs warning describes". Same-identity operation is lawful, and
+        // the served answer must now SAY SO, so `DEGRADED-DIVERSITY` joins this list.
+        // Its position is measured, not chosen: the chain appends it after the fact
+        // bundle's marks and the runner appends LABEL-BASIS-INCOMPLETE after that.
+        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE", "DEGRADED-DIVERSITY", "LABEL-BASIS-INCOMPLETE"]
       });
       expect(projection?.condition_mark_records).toEqual(expect.arrayContaining([
         expect.objectContaining({
