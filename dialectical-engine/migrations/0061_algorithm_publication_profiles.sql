@@ -31,6 +31,7 @@ BEGIN
 END;
 $$;
 REVOKE ALL ON FUNCTION register._algorithm_publication_profile_guard() FROM PUBLIC;
+DROP TRIGGER IF EXISTS register_version_algorithm_profile_guard ON register.register_version;
 CREATE TRIGGER register_version_algorithm_profile_guard
 BEFORE INSERT ON register.register_version
 FOR EACH ROW EXECUTE FUNCTION register._algorithm_publication_profile_guard();
