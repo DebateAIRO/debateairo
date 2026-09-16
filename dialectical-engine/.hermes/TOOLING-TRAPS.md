@@ -5662,3 +5662,56 @@ not in 4 000 lines of prose every author skims.
   the count pin, drop the row AND its manifest key so the builder stays internally consistent.
   Run both; the pair is the evidence, and reporting only the first credits the count pin with a
   kill it did not make (`:1877`).
+
+## `board-lint` SKIPS every `F*-*.md` and reports the count it was HANDED, not the count it checked (2026-09-16, RECORDS(CONT-T19))
+
+- `tools/board-lint.sh:8` is `case "$base" in F*-*.md) continue;; esac` — "finding tickets carry no
+  state block". Enumerated in `board/` on 2026-09-16: **183** `.md` files, **130** match that pattern,
+  **53** are actually validated.
+- `:35` prints `board-lint: OK ($# files)` — `$#` is the argument count. So the line
+  `board-lint: OK (183 files)` means *183 files were handed in*, and says nothing about how many were
+  examined. It overstates coverage by 130.
+- Consequence for the record: every sentence in this mission of the form "board N files lint-clean"
+  is evidence about the non-`F` minority only. This is the same defect class the mission has been
+  chasing everywhere else — **a count presented as evidence of something it does not count**
+  (D67 ADDENDUM 2) — living inside the instrument meant to catch it.
+- **What to do instead:** to validate a finding ticket, copy it to a name the skip does not match
+  (`W-RELINT-<file>`) and lint that. RECORDS(CONT-T19) linted its 43 new tickets this way: `OK (43
+  files)`, rc=0. Cost of the workaround: one `cp` loop.
+
+## Appending a TRUTHFUL history comment to a board ticket can flip its risk-tier verdict (2026-09-16, RECORDS(CONT-T19))
+
+- `tools/board-lint.sh:30-33` greps the WHOLE FILE for `migration|register row|sealed row|provider
+  spend|ceremony|scoring|credential|security|destructive|schema change` and demands `risk_tier: high`
+  if any of them appears — comments, appended history and all.
+- So a records seat that documents what a ticket actually landed can turn a green ticket red without
+  touching a line of its state. It happened to `W10-call-budget-truthfulness.md`: its own tier comment
+  reads *"changes failure classification and two sealed cost rows"* — the pattern matches `sealed row`,
+  which `sealed cost rows` does not contain, so the ticket had been mis-tiered `medium` from the start
+  and only the wording hid it.
+- Two real problems, not one. (1) The tier is a **pre-work** gate being applied to a ticket that is
+  already `done`. (2) The rule reads history as if it were scope.
+- **The trap is the reflex, not the rule:** the cheapest way to clear the row is to reword the comment,
+  which deletes a true fact to satisfy a grep — the same antipattern as reshaping a literal to clear a
+  source-purity row (`F-W10-D-PURITY-REGEX`). Leave it red, name it, and let the field's owner fix the
+  field.
+
+## A detached gate writes `.start` in the first second and its `.four-count.txt` only at the end (2026-09-16, RECORDS(CONT-T19))
+
+- `scratchpad/logs/final-gate/full-<sha>.start` and `.log` exist from the moment the run is launched;
+  `.four-count.txt` appears only when the suite finishes. `full-c1c08bd7.start` was on disk at 17:52;
+  at 18:28 the four-count still did not exist.
+- Reading `.start` — or the growing `.log` — as "the gate finished" produces a fabricated four-count,
+  and the arithmetic temptation is strong because the expected delta is known. **Test for the
+  `.four-count.txt` file BY NAME**, and if it is absent say the run is in flight. Never predict it.
+
+## A worktree-isolated session refuses any Bash command that computes a path into a variable (2026-09-16, RECORDS(CONT-T19))
+
+- In a worktree-isolated seat, `M=<mission root>` followed by `sed -n '1,20p' $M/FILE` is REFUSED:
+  *"runs sed with a value computed at runtime … inside a construct too complex to verify"*. So is a
+  `python3 - <<PY` heredoc whose TEXT contains the word `git`, and so is a long compound command with
+  many heredocs.
+- Cost on this seat: three refused calls before the pattern was clear.
+- **Write every path out literally**, keep compound commands short, and put long generated text in a
+  scratchpad file that is then `cat >>`-ed into place. A records seat feels this most, because it is the
+  one seat whose natural style is a root variable plus a loop.
