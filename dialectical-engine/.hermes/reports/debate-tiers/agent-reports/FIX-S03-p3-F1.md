@@ -239,3 +239,83 @@ required grants. It should then execute one generated embedded-postgres probe un
 this case the table would have shown `GET /v1/plan-tiers → readPlanTierRosters → register.register_row
 → debateai_runtime → SELECT` and rejected the extra identity edge before any review pass or live
 restart. That turns role truth from a late V-only observation into dispatch-time evidence.
+
+## RULING 8
+
+### Cause
+
+The model file and the Grok CLI use two different namespaces that the implementation treated as
+one. `grok-4.6-build` is the lineage Grok 1.0.30 reports in `modelUsage`; its selectable request id
+is `grok-4.6`. The S03 relay passed the reported lineage back through `--model`, so the real CLI
+rejected every start even though the permissive fake accepted the same argument. The surrounding
+`Promise.allSettled` then mapped that rejection to `CLI_HANDSHAKE_UNAVAILABLE` without printing its
+cause, leaving the served Premium panel one maker short with no class-(c) evidence.
+
+The repair treats the Grok file id as a post-handshake identity pin: Grok starts without `--model`,
+and the relay refuses with `GROK_CLI_MODEL_MISMATCH expected=<file id> answered=<reported id>` unless
+the answer is exact. Codex and Claude still receive their file ids through `--model`. This is the
+only coherent reading of R18 for a CLI whose selectable id and honestly reported lineage differ:
+the pin is the identity admitted after the handshake, not necessarily a selector flag. The
+settled→slot mapping now prints one `DEV_PROVIDER_SLOT_UNAVAILABLE class (c)` line for every rejected
+CLI relay. That hunk lives in `dev-cli-provider-panel.ts`; neither the API-slot class-(a)/(b) code nor
+`dev-provider-panel.ts` changed.
+
+### Price
+
+- V needed a second served-stack test after the privilege repair before this boundary mismatch was
+  visible: the stack came up, but Premium starts still failed because its Grok member was absent.
+- The RULING 8 continuation added four RED detectors, two production mutants with byte-hash restore
+  proofs, three 28-test focused runs, one real Grok call costing `$0.01114452`, C3, C4, §5, and
+  before/after typecheck. The two inherited embedded-database matrix runs consumed about five of the
+  roughly seventeen minutes even though this repair did not touch a database path.
+- Before the orchestrator clarified that the frozen ruling itself satisfied the brainstorming gate,
+  the generic skill workflow invited an unnecessary approval pause. Packet authority must be
+  explicit at dispatch when it supersedes a skill's conversational gate.
+
+### What nearly went wrong
+
+- Replacing `grok-4.6-build` in `config/models.yaml` with the selectable alias would have made boot
+  look healthy while violating R3/V-32 and breaking admission's exact comparison with the lineage
+  the CLI actually reports.
+- Sending `--model grok-4.6` would have selected today's default but still encoded an unowned alias
+  and coupled the file to a second identifier. Starting without the flag and checking the answer
+  keeps one source of identity truth.
+- Merely removing `--model` would have restored availability but lost the pin. Mutant B proves that
+  a CLI answering `grok-4.5-build` must be refused by a typed code naming both ids.
+- Logging only when the whole panel became insufficient would still hide rejected slots whenever
+  two other makers survived. The diagnostic belongs on each rejected settled outcome.
+
+### Dead ends not to re-derive
+
+- Do not rename the file's Grok id to a selectable alias and do not add a second Grok id to the model
+  schema for this behavior.
+- Do not pass any `--model` value to Grok 1.0.30 from this panel. Codex and Claude keep their existing
+  selectors because those CLIs accept the configured ids.
+- Do not trust a fake CLI that accepts arbitrary flags. The regression double must reject an unknown
+  `--model` with the real CLI's JSON error and succeed without it.
+- Do not swallow a rejected CLI relay in `Promise.allSettled`; emit exactly one class-(c) line and
+  keep `DEV_CLI_PROVIDER_PANEL_INSUFFICIENT_MAKERS` unchanged.
+
+### What must improve
+
+1. Extend the model/transport manifest with explicit `selection id` versus `reported lineage id`
+   semantics per CLI. A single field may represent both only when the real CLI proves they coincide.
+2. Make every CLI fake reject unsupported or unknown options by default. Permissive argument doubles
+   should be treated as incomplete unless a real-boundary transcript proves the option.
+3. Add a static invariant for every `Promise.allSettled` consumer: each rejected external dependency
+   must be surfaced once with its configured identity and typed cause before any fallback mapping.
+4. Run one bounded real-CLI handshake when a packet adds or changes a CLI flag. The cost here was one
+   call and about one cent; it would have prevented multiple review and served-stack cycles.
+5. Partition verification by changed capability. Keep the focused transport and panel matrix on this
+   continuation, but reuse an attested database-suite frame when no database path or dependency
+   changed instead of spending minutes rebuilding identical ephemeral clusters.
+
+### Toward a one-prompt machine
+
+At packet freeze, generate a transport contract table from the model file and each adapter:
+configured id → CLI selector syntax → expected reported id → fake rejection transcript → one real
+probe. Compile that table into the fake CLI and the handshake assertion, then require every settled
+startup result to produce either a healthy slot or a typed class-(c) line. For Grok the generated row
+would say `grok-4.6-build → no selector → grok-4.6-build`; the old `--model grok-4.6-build` edge would
+fail before dispatch. One prompt could then produce the test double, the adapter pin, the diagnostic,
+and the exact boundary proof from the same machine-readable contract.
