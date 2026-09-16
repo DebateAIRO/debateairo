@@ -271,7 +271,7 @@ describe("S06 provider gateway binding", () => {
   it("captures one provider occurrence after the real gateway exhausts all attempts", async () => {
     let sequence = 0;
     const client = {
-      async query(sql: string) {
+      async query(sql: string, values?: readonly unknown[]) {
         if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") return { rows: [] };
         if (sql.includes("ledger.allocate_sequence")) {
           sequence += 1;
@@ -287,6 +287,25 @@ describe("S06 provider gateway binding", () => {
             }],
           };
         }
+        // `acquireRunContentLease` acquires with pg_TRY_advisory_lock and reads
+        // `acquired` off the row (packages/db/src/index.ts:331, :334). That form is
+        // pinned by tests/architecture/s6-content-encryption-contract.test.ts:52-57,
+        // which also forbids the blocking `pg_advisory_lock(hashtextextended($1,0))`.
+        // Any row without `acquired: true` reads as CONTENTION and sends the lease
+        // into an unbounded unlock-and-retry loop. This client modelled the lease not
+        // at all, so the try-lock reached the throw below — the third member of
+        // F-PG-STUB-QUERY-TEXT-CLASS, stale by ABSENCE rather than by a stale branch.
+        if (sql.includes("pg_try_advisory_lock")) return { rows: [{ acquired: true }] };
+        if (sql.includes("run_private_content_is_live")) {
+          // `assertLive` compares the row COUNT against the leased run ids and
+          // requires every `live` to be true (packages/db/src/index.ts:377-384),
+          // so the answer is tied to the run actually requested rather than to a
+          // constant. Same shape as tests/unit/pro01-runner-tree.test.ts:207.
+          return {
+            rows: [{ run_id: String((values?.[0] as readonly string[])[0]), live: true }],
+          };
+        }
+        if (sql.includes("pg_advisory_unlock")) return { rows: [{ unlocked: true }] };
         throw new Error(`UNEXPECTED_CLIENT_QUERY:${sql}`);
       },
       release() {},
