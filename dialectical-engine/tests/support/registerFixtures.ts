@@ -19,11 +19,11 @@ export const LEGACY_REGISTER_V1_SNAPSHOT_SHA256 =
 
 export const TEST_PLAN_TIER_ROSTERS = PLAN_TIER_ROSTERS;
 
-// Moved 2026-09-12 when the development provider set grew from one slot per maker to one
-// per plan-tier roster member (V: "Both free and premium need to be accessible at the same
-// time"). The previous three-slot snapshot was 120bdfea9776cff5...
+// The database-sealed v4 has one CLI provider per maker. The later five-slot set has digest
+// 42b90bca671d96d6e1c53de5c3115ca2ab7a5e11b33ad0d9eb0437f44a32c6eb and arrives by
+// GENERAL publication; it was never part of historical v4.
 export const DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 =
-  "42b90bca671d96d6e1c53de5c3115ca2ab7a5e11b33ad0d9eb0437f44a32c6eb" as const;
+  "120bdfea9776cff519113d915694f02b1e4302a14a4282c8e6272a0bf09a5e96" as const;
 
 function fixtureValueAst(value: unknown): CanonicalJsonAst {
   if (value === null || typeof value === "string" || typeof value === "boolean") return value;
