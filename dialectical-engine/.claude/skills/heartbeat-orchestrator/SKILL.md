@@ -190,6 +190,11 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   the slice head: low → correctness/tests · medium → + security/data-safety · high → + product-truth.
   **A UI slice always carries product-truth**: rendered DOM with the real compiled CSS, measured
   against DONE.md's artboards in both modes.
+  **A slice that adds a route or a query is measured under the product's database ROLE**: the packet's
+  charge names the role (`SET ROLE <runtime role>` on embedded postgres after the migrations) — a
+  superuser pool is privilege-blind, and three passes plus a re-check passed a route that fails 42501 on
+  every real database (V's TEST(S03) finding, 2026-09-16: the roster route reused a read whose join the
+  runtime role may not touch).
 - Union the lens verdicts into `reviews/REV-<S>-p<r>-UNION.md`: PASS only when every lens passed.
   Two lenses disagreeing on ONE finding get a single-finding re-check node, never a re-review.
 - REWORK → FIX(S) nodes split by FINDING surface — every file a finding needs to change sits in ONE node, and two nodes whose files overlap run one after the other; parallel only when disjoint (FIX-S01-p1 split a lock's semantics from its appearance and the fix landed on one side), every finding of the pass assigned,

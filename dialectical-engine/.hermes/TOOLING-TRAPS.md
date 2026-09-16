@@ -3096,3 +3096,9 @@ The fixture's `DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 = 42b90bca…` at th
 
 ## The harness browser pane refuses a bare `navigate` to localhost — open it with `preview_start {url}` first (2026-09-16)
 `navigate https://localhost:3000/login` and `navigate http://127.0.0.1:8931/nodes.html` both returned "denied or failed"; `preview_start {url: http://127.0.0.1:8931/nodes.html}` opened the pane and the graph pages rendered (the PNG flow in `scripts/graph-png/`). The live stack's proof stayed curl's. SendUserFile of the PNGs is desktop-only (the remote upload returns 400 for 1.4 MB and 8.3 MB alike).
+
+## Embedded postgres with a superuser pool is privilege-blind — measure a new route's read under the product's ROLE (2026-09-16, V's TEST(S03) finding)
+`GET /v1/plan-tiers` passed three review passes and the re-check, then failed `DEPENDENCY_42501` on V's database: it reused the operator read whose ledger query joins `identity.run_execution_binding`, granted to no runtime role. The migrations create the roles, so a test can `SET ROLE debateai_runtime` on its pool and see the refusal (`tests/integration/plan-tiers-route-privileges.test.ts`). Read-only reproduction on the real database: a migrator-URL pool with `SET ROLE <api role>` and the route's SQL (`coverage/serve/diag-privs.ts`, `diag-plan-tiers-role.ts`). The API log's `diagnostic` carries the SQLSTATE (`DEPENDENCY_42501`) — read it before guessing.
+
+## The orchestrator never `claim`s a Codex seat's ticket — the seat claims for itself (2026-09-16, RULING 7)
+The DISPATCHED comment gives the CLAIM shape and the seat runs `hermes kanban claim`; an orchestrator claim leaves the seat's claim refused. `hermes kanban reclaim <t>` releases it. (Agent-tool Claude seats are the opposite: the orchestrator holds the lock and the pointer says "do not run claim".)
