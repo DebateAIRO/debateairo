@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { parseAcceptanceArguments } from "./run-acceptance.js";
 import { announceAbsentMakers } from "./absent-makers.js";
@@ -167,4 +168,33 @@ describe("ACC-01 an absent configured maker is LOUD before the debate starts", (
     expect(absent).toHaveLength(1);
   });
 
+  /**
+   * F-GROK-SANDBOX-PROFILE fix round 1 / F2. "Before the debate starts" was
+   * UNVERIFIED in round 0: the only end-to-end witness is
+   * `runAcceptanceCeremony`, which starts an embedded PostgreSQL, an API and
+   * three real vendor CLIs, and it offers no injection seam for the runtime
+   * (`AcceptanceCeremonyOptions` carries `databaseDataDirectory` and nothing
+   * else), so a recorded-sequence assertion is not reachable here.
+   *
+   * This is the floor and it is named as such: a SOURCE-ORDER pin, anchored on
+   * the two SYMBOLS and never on line numbers (TOOLING-TRAPS `:329`), scoped to
+   * the ceremony function's own body so the import list cannot satisfy it. Both
+   * anchors are asserted PRESENT first, because an ordering assertion over a
+   * symbol that is absent would pass vacuously.
+   */
+  it("calls the announcer before it builds the runtime, inside runAcceptanceCeremony", async () => {
+    const source = await readFile(new URL("./run-acceptance.ts", import.meta.url), "utf8");
+    const ceremonyAt = source.indexOf("export async function runAcceptanceCeremony(");
+    expect(ceremonyAt, "runAcceptanceCeremony must exist to have an order at all").toBeGreaterThan(-1);
+    const body = source.slice(ceremonyAt);
+
+    const announcerAt = body.indexOf("announceAbsentMakers(");
+    const runtimeAt = body.indexOf("createAcceptanceRuntime(");
+    expect(announcerAt, "the ceremony must CALL the announcer").toBeGreaterThan(-1);
+    expect(runtimeAt, "the ceremony must build the runtime").toBeGreaterThan(-1);
+    expect(
+      announcerAt,
+      "a configured maker's absence is announced BEFORE the runtime that runs the debate is built"
+    ).toBeLessThan(runtimeAt);
+  });
 });
