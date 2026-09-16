@@ -114,4 +114,12 @@ Full-suite gates at `96e3c91c`, `78e89ea4`, `6cdc14b2`, `c1c08bd7` ≈ **3 hours
 
 ---
 
+## Scoped re-check (`2bcb47a8..7b35227b`), appended after the fix dispatch
+
+**Outcome.** F1, F2, F3, F5 CLOSED on evidence I took myself at tip `7b35227b` — gate (a) 5 files 43/43, gate (b) 2 files 114/114 (91 of them real-PostgreSQL rows), both typecheck projects exit 0, board-lint rc 0 now printing `validated 53 of 226; 173 … skipped by design`, and for F1/F3 instruments I proved have teeth (F1's per-process `S`/`U` attempt log cannot yield `["S","S"]` without the retry; F3's recursive read counts 4 where the old one counted 3 and passed blind). F4 stays open by routing. Final verdict **MERGEABLE**, with three named residuals: F4's ticket, the new `tools/packet-lint.sh:20` sibling of F5, and deferred-minor 38 (the Node 22.23.1 run that owns 100 of the 141 reds).
+
+**The murder case turned on me too, and it is the same cause.** My F1 cited `acceptance/grok-relay.test.ts:1982-2052`; that file is 549 lines. I had transcribed **line offsets from the review package** (`review-whole-branch-…diff`, read with `Read offset=1993`) as source-file lines. That is Cause 1 of this very report — *asserting a number I had not measured in the file it names* — committed by the reviewer who wrote it, in the same document. It proves the diagnosis is structural, not a competence gap: a human-or-model reading a diff with its own line numbering will keep doing this, so **the fix is that review packages must carry source line anchors, not package offsets** — add it to upgrade 6. Worth noting for the machine's design: the fix seat caught it, verified path/symbol/behaviour independently, reported the defect and did **not** spend a dispatch round on a stale citation. That judgement — correct a wrong constant, refuse to stall on it — is the behaviour the packet-lint upgrade should make routine, and it is the one place in this mission where the process worked exactly as designed.
+
+---
+
 comments read through: 0 (no Hermes board in this continuation; the SDD ledger is the board and carries no comment threads).
