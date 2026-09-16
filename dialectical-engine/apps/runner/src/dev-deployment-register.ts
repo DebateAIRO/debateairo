@@ -339,18 +339,8 @@ const DEVELOPMENT_HISTORICAL_V4_CONFIGURED_PROVIDER_SET_ROW = Object.freeze({
       }),
       Object.freeze({
         adapterKind: "openai-compatible-http" as const,
-        maker: "OpenAI",
-        providerRef: "development:codex-premium-cli"
-      }),
-      Object.freeze({
-        adapterKind: "openai-compatible-http" as const,
         maker: "Anthropic",
         providerRef: "development:claude-cli"
-      }),
-      Object.freeze({
-        adapterKind: "openai-compatible-http" as const,
-        maker: "Anthropic",
-        providerRef: "development:claude-premium-cli"
       }),
       Object.freeze({
         adapterKind: "openai-compatible-http" as const,

@@ -96,18 +96,8 @@ const PRE_S03_DEVELOPMENT_PROVIDER_PANEL = Object.freeze({
     }),
     Object.freeze({
       adapterKind: "openai-compatible-http" as const,
-      maker: "OpenAI",
-      providerRef: "development:codex-premium-cli"
-    }),
-    Object.freeze({
-      adapterKind: "openai-compatible-http" as const,
       maker: "Anthropic",
       providerRef: "development:claude-cli"
-    }),
-    Object.freeze({
-      adapterKind: "openai-compatible-http" as const,
-      maker: "Anthropic",
-      providerRef: "development:claude-premium-cli"
     }),
     Object.freeze({
       adapterKind: "openai-compatible-http" as const,
@@ -210,7 +200,7 @@ describe("DEV-05 complete development deployment register", () => {
     const historicalRows = await preS03DevelopmentV4Rows();
     expect(historicalRows).toHaveLength(32);
     expect(computeRegisterSnapshotSha256(historicalRows))
-      .toBe("42b90bca671d96d6e1c53de5c3115ca2ab7a5e11b33ad0d9eb0437f44a32c6eb");
+      .toBe("120bdfea9776cff519113d915694f02b1e4302a14a4282c8e6272a0bf09a5e96");
     await createPostgresRegisterPublicationPort(database.pool).importHistorical({
       registerVersion: parseRegisterVersionText("4"),
       rows: historicalRows
@@ -225,7 +215,7 @@ describe("DEV-05 complete development deployment register", () => {
     })).resolves.toMatchObject({
       registerVersion: "4",
       rowCount: 32,
-      snapshotSha256: "42b90bca671d96d6e1c53de5c3115ca2ab7a5e11b33ad0d9eb0437f44a32c6eb"
+      snapshotSha256: "120bdfea9776cff519113d915694f02b1e4302a14a4282c8e6272a0bf09a5e96"
     });
     expect((await database.pool.query(
       "SELECT row_key,value_json,source_ref FROM register.register_row WHERE register_version=4 ORDER BY row_key"
@@ -674,9 +664,7 @@ describe("DEV-05 complete development deployment register", () => {
       configuredMakers: ["Anthropic", "OpenAI", "xAI"],
       configuredProviders: [
         { providerRef: "development:codex-cli", maker: "OpenAI" },
-        { providerRef: "development:codex-premium-cli", maker: "OpenAI" },
         { providerRef: "development:claude-cli", maker: "Anthropic" },
-        { providerRef: "development:claude-premium-cli", maker: "Anthropic" },
         { providerRef: "development:grok-cli", maker: "xAI" }
       ]
     });
