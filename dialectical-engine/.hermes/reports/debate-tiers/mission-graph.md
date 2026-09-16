@@ -12,7 +12,7 @@ flowchart LR
   t_90015321(["(finding) REQ-REV-p1 B4 — S02 R12/R13 + acceptance step 9 order a BUIL"]):::done
   t_d316d314(["(finding) REQ-REV-p1 N1 — V-DECISIONS-PACKET.md rows V-11/V-12 truncat"]):::done
   t_6f812bf4(["(finding) REQ-REV-p1 N2 — INSTRUCTIONS.md:65-66 names one of the three"]):::done
-  t_a5b40dbc(["(finding) REQ-REV-p1 N3 — three R19 suites have no recorded baseline: "]):::ready
+  t_a5b40dbc(["(finding) REQ-REV-p1 N3 — three R19 suites have no recorded baseline: "]):::done
   t_30b2f287(["(finding) REQ-REV-p1 N4 — S02 R5 misstates assertMakerAdmission (throw"]):::done
   t_25ca3234(["(finding) REQ-REV-p1 N5 — packet defect (orchestrator): packets/REQ.md"]):::done
   t_83843b64(["(finding) REQ-REV-p1 N6 — packet defect (orchestrator): COMMON.md:41 l"]):::done
@@ -41,7 +41,7 @@ flowchart LR
   t_4fdfce80(["(finding) ARCH-S02 P-A packet defect (orchestrator) — ARCH-S02 charge "]):::done
   t_ac7da71c(["(finding) ARCH-S02 P-B packet defect (orchestrator) — both ARCH packet"]):::done
   t_38f2276c(["(finding) ARCH-S01 F1 — tests/render/ux01-new-debate-form.test.tsx:57-"]):::ready
-  t_cc5fa2a7(["(finding) ARCH-S01 F2 — tests/unit/v2ui-pages.test.ts:83 slices an EMP"]):::ready
+  t_cc5fa2a7(["(finding) ARCH-S01 F2 — tests/unit/v2ui-pages.test.ts:83 slices an EMP"]):::done
   t_1b8a5ad8(["(finding) ARCH-S01 F3 — tests/unit/consent-s02-style-contract.test.ts:"]):::ready
   t_db48537d(["(finding) ARCH-S01 F4 — SPEC R19 and BASELINE.md index by 'suites a re"]):::done
   t_68ce7adc(["(finding) ARCH-S01 F5 packet defect (orchestrator) — ARCH-S01 charge 5"]):::done
@@ -64,31 +64,30 @@ flowchart LR
   t_97d3cd5c(["(finding) ARCH-REV-S02-p1 N11 — PLAN.md §5's header claims every comma"]):::done
   t_54027d98["(claude-opus-5) MOCK S01 — the Free/Premium selector on /new as a Clau"]:::done
   t_484dffaa(["(finding) ARCH-REV-S01-p1 N1 — the Free lock leaves TWO false claims o"]):::done
-  t_3fbece20(["(finding) ARCH-REV-S01-p1 N2 — SPEC R17's 'no colour literal outside t"]):::ready
-  t_d20b1ffd(["(finding) ARCH-REV-S01-p1 N3 — step S01-42 has no done-criterion, and "]):::ready
-  t_60e806a8(["(finding) ARCH-REV-S01-p1 N4 — S01-24's done-criterion is false at bas"]):::ready
+  t_3fbece20(["(finding) ARCH-REV-S01-p1 N2 — SPEC R17's 'no colour literal outside t"]):::done
+  t_d20b1ffd(["(finding) ARCH-REV-S01-p1 N3 — step S01-42 has no done-criterion, and "]):::done
+  t_60e806a8(["(finding) ARCH-REV-S01-p1 N4 — S01-24's done-criterion is false at bas"]):::done
   t_750a12c2(["(finding) ARCH-REV-S01-p1 N5 — PLAN §8 credits C2 with a detection it "]):::done
-  t_8afd38d0(["(finding) ARCH-REV-S01-p1 N6 — two of the six screens under-specify th"]):::ready
+  t_8afd38d0(["(finding) ARCH-REV-S01-p1 N6 — two of the six screens under-specify th"]):::done
   t_23cd2a0e(["(finding) ARCH-REV-S01-p1 N7 — 'Eight are RED at base' is seven (the s"]):::done
-  t_b5bc6288(["(finding) ARCH-REV-S01-p1 N8 — the R21 delta command writes a shared g"]):::ready
-  t_0cac29d7(["(finding) ARCH-REV-S01-p1 N9 — 'globals.css styles :disabled for exact"]):::ready
+  t_b5bc6288(["(finding) ARCH-REV-S01-p1 N8 — the R21 delta command writes a shared g"]):::done
+  t_0cac29d7(["(finding) ARCH-REV-S01-p1 N9 — 'globals.css styles :disabled for exact"]):::done
   t_251cd802(["(finding) ARCH-REV-S01-p1 P1 packet defect (orchestrator) — ARCH-REV-S"]):::done
   t_c3eeee2b(["(finding) ARCH-REV-S01-p1 P2 packet defect (orchestrator) — the inputs"]):::done
   t_64f2363d(["(finding) ARCH-REV-S01-p1 P3 packet defect (orchestrator) — the exhaus"]):::done
-  t_f05c54bd["(V) DONE S01 — V defines done on the canvas: https://claude.ai/code/ar"]:::done
   t_e82bc6b0["(V) DONE S01 — define done on the canvas (https://claude.ai/code/artif"]:::done
-  t_95c4c2ee(["(finding) MOCK-S01 F1 (product) — .ndSelect draws the box while the na"]):::ready
+  t_95c4c2ee(["(finding) MOCK-S01 F1 (product) — .ndSelect draws the box while the na"]):::done
   t_4b5c0d2f(["(finding) MOCK-S01 F2 packet defect (orchestrator) — MOCK-S01.md:24 na"]):::done
-  t_dc5c78a7(["(finding) MOCK-S01 F3 (repo) — tests/render/stubs/next-navigation.ts l"]):::ready
+  t_dc5c78a7(["(finding) MOCK-S01 F3 (repo) — tests/render/stubs/next-navigation.ts l"]):::done
   t_68d0730a(["(finding) MOCK-S01 F4 packet defect (orchestrator) — charge 3 enumerat"]):::done
   t_337549e2(["(finding) MOCK-S01 F5 packet defect (orchestrator, minor) — charge 3's"]):::done
   t_fc4f384d(["(finding) ARCH-FIX-S02 F-6 — the published R13 ask-literal grep answer"]):::done
   t_853d7670(["(finding) ARCH-FIX-S02 F-7 — C2/C3/C4's absolute green targets (53, 41"]):::ready
   t_36b90c6f(["(finding) ARCH-FIX-S02 seat's own defect, corrected on the record — th"]):::done
   t_422678f3["(gpt-5.6-sol) BUILD S02-C1 — the run records its tier (store side): mi"]:::done
-  t_7273eea5["(gpt-5.6-sol) BUILD S02-C3 — roster read discipline (architecture guar"]:::blocked
-  t_1675b61f["(gpt-5.6-sol) BUILD S02-C2 — the filter and the typed refusal (evaluat"]:::blocked
-  t_05227ae2["(gpt-5.6-sol) BUILD S02-C4 — the wire: the ask's tier reaches the run "]:::todo
+  t_7273eea5["(gpt-5.6-sol) BUILD S02-C3 — roster read discipline (architecture guar"]:::done
+  t_1675b61f["(gpt-5.6-sol) BUILD S02-C2 — the filter and the typed refusal (evaluat"]:::done
+  t_05227ae2["(gpt-5.6-sol) BUILD S02-C4 — the wire: the ask's tier reaches the run "]:::done
   t_e407c049(["(finding) ARCH-REV-S02-p2 N1 — S02-V1's published total is off by two:"]):::ready
   t_2c90d113(["(finding) ARCH-REV-S02-p2 N2 — the receipt that certifies F-6's blesse"]):::done
   t_79bc55d3(["(finding) ARCH-REV-S02-p2 N3 — grep is two binaries on this Mac: inlin"]):::done
@@ -191,7 +190,186 @@ flowchart LR
   t_ec9ca195(["(finding) REV-S01-p3 product-truth N2 (pre-existing, NOT S01's — conse"]):::ready
   t_5859ed3f(["(finding) REV-S01-p3 product-truth N3 (orchestrator, package) — review"]):::done
   t_978dfce7(["(finding) REV-S01-p3 product-truth P1 (the seat, self-reported) — used"]):::done
-  t_960275af(["(finding) TEST(S01) gate (orchestrator, V-reported) — the gate message"]):::todo
+  t_960275af(["(finding) TEST(S01) gate (orchestrator, V-reported) — the gate message"]):::ready
+  t_425ec2a9(["(finding) TEST(S01) serve (orchestrator) — the S01 lane has no .local/"]):::ready
+  t_73466447(["(finding) TEST(S01) serve (cross-mission, V's stack) — launchd keepali"]):::ready
+  t_521a5d1a(["(finding) orchestrator record defect — the REV-S01-p3 correctness B1 e"]):::ready
+  t_299adfae(["(finding) serve-plan defect (orchestrator) — RESUME-HERE §4 served the"]):::ready
+  t_a1191036(["(finding) auth UX trap (pre-existing, consent/auth surface, NOT S01) —"]):::ready
+  t_d6451f28(["(finding) auth copy defect (pre-existing, consent/auth surface, NOT S0"]):::ready
+  t_425a0357(["(finding) TEST(S01) serve — the product's RUNNER stage cannot pass its"]):::ready
+  t_efe7c2e3(["(finding) TEST(S01) serve (orchestrator) — the serve order of record l"]):::ready
+  t_ce7452ba(["(finding) BUILD-S02-C2 F1 — PLAN.md:624 (S02-C2-S9 sweep item 5) names"]):::ready
+  t_1e99444c(["(finding) BUILD-S02-C2 F2 — PLAN.md:599 (S02-C2-S8) says api.test.ts e"]):::ready
+  t_11067c64["(orchestrator) GATE S02 — assemble review-packages/S02-p1 (mechanical:"]:::done
+  t_edf20575["(claude-opus-5) REV S02 p1 — lens correctness/tests (blind, own detach"]:::done
+  t_2061ade7["(claude-opus-5) REV S02 p1 — lens security/data-safety (blind, own det"]:::done
+  t_cb78a63d["(claude-opus-5) REV S02 p1 — lens product-truth (blind, own detached w"]:::done
+  t_2e74f402(["(finding) BUILD-S02-C3 F1 — predicate wording for case 3 conflicts bet"]):::ready
+  t_5983f27a(["(finding) BUILD-S02-C4 P1 (packet defect, orchestrator) — packets/BUIL"]):::ready
+  t_dbbb615b(["(finding) BUILD-S02-C4 P2 (packet defect, orchestrator) — packets/BUIL"]):::ready
+  t_d86b98ce(["(finding) REV-S02-p1 security N1 — apps/api/src/index.ts:1207 PLAN_TIE"]):::done
+  t_ca46998d(["(finding) REV-S02-p1 security N2 — tests/integration/evaluator-databas"]):::done
+  t_8f8520e6(["(finding) REV-S02-p1 security N3 (packet defect, orchestrator) — revie"]):::done
+  t_cc661b9e(["(finding) REV-S02-p1 product-truth B1 (BLOCKING) — tests/unit/tiers-s0"]):::done
+  t_2c95f424(["(finding) REV-S02-p1 product-truth N1 — the asker reads the internal e"]):::ready
+  t_1ec7cae5(["(finding) REV-S02-p1 product-truth N2 — the tier governs admission, no"]):::ready
+  t_bd8e3b18(["(finding) REV-S02-p1 product-truth N3 — tests/architecture/tiers-s02-r"]):::done
+  t_f2da2b9a(["(finding) REV-S02-p1 product-truth N4 — tests/architecture/tiers-s02-r"]):::done
+  t_cf4f7f56(["(finding) REV-S02-p1 product-truth N5 (against the orchestrator) — COM"]):::done
+  t_018d588c(["(finding) REV-S02-p1 product-truth N6 — the frozen SPEC-v2's line cita"]):::ready
+  t_0e696ff8(["(finding) REV-S02-p1 product-truth N7 — apps/ui/components/landing/car"]):::ready
+  t_ca11cffb(["(finding) REV-S02-p1 correctness B1 (BLOCKING) — packages/db/src/index"]):::done
+  t_51aa7ae5(["(finding) REV-S02-p1 correctness N3 — tests/unit/tiers-s02-wire.test.t"]):::done
+  t_c38a3fdd(["(finding) REV-S02-p1 correctness N4 — tests/unit/tiers-s02-admission.t"]):::done
+  t_42d46edd(["(finding) REV-S02-p1 correctness N6 (orchestrator relay) — docs/missio"]):::done
+  t_512afe29(["(finding) REV-S02-p1 correctness N7 (packet defect, orchestrator) — pa"]):::done
+  t_ee9362b5["(gpt-5.6-sol) FIX S02 p1 F1 — the run-write surface: correctness B1 t_"]:::done
+  t_780edb02["(gpt-5.6-sol) FIX S02 p1 F3 — the architecture guard: product N3/corre"]:::done
+  t_9d4e5e77["(gpt-5.6-sol) FIX S02 p1 F2 — the admission/API test surface, AFTER F1"]:::done
+  t_1a0293cc["(claude-opus-5) REV S02 p2 — lens correctness/tests (blind, own detach"]:::done
+  t_37e841db["(claude-opus-5) REV S02 p2 — lens product-truth (blind, own detached w"]:::done
+  t_8f1eba25(["(finding) FIX-S02-p1-F3 P1 (packet defect, orchestrator) — packets/FIX"]):::ready
+  t_d1df96d4(["(finding) FIX-S02-p1-F1 P1 (packet defect, orchestrator) — packets/FIX"]):::ready
+  t_35e0669f(["(finding) FIX-S02-p1-F1 R1 (promoted-probe defect, seat REV-S02-p1-cor"]):::done
+  t_97267279["(orchestrator) MERGE S01 — local merge of slice/tiers-s01 @ 9ddbb1ef i"]:::done
+  t_f32eea3c["(orchestrator) MERGE S02 — local merge of slice/tiers-s02 (the FIX hea"]:::done
+  t_8a444c53["(grok-4.6) WHOLE-REV — the whole feature (S01 + S02 on integration/deb"]:::done
+  t_f6e379a9["(hermes-glm-5.3-flash) WHOLE-REV — the whole feature (S01 + S02 on int"]:::done
+  t_b4321df2["(V) WHOLE — manual QA of the whole feature on integration/debate-tiers"]:::ready
+  t_287da7fe(["(finding) FIX-S02-p1-F2 P1 (packet defect, orchestrator) — packets/FIX"]):::ready
+  t_4c5ab31a(["(finding) REV-S02-p2 product-truth N1 — tests/unit/tiers-s02-admission"]):::done
+  t_449557e2(["(finding) REV-S02-p2 product-truth N2 — tests/architecture/tiers-s02-r"]):::done
+  t_651f1aef(["(finding) REV-S02-p2 product-truth N3 — tests/unit/tiers-s02-admission"]):::done
+  t_831d69f6(["(finding) REV-S02-p2 product-truth N4 (packet defect, orchestrator) — "]):::done
+  t_b656e947(["(finding) REV-S02-p2 correctness N1 — tests/architecture/tiers-s02-ros"]):::done
+  t_25b00c0e(["(finding) REV-S02-p2 correctness N2 — apps/api/src/index.ts:1206-1213:"]):::done
+  t_d7c9ab51(["(finding) REV-S02-p2 correctness N3 — apps/api/src/index.ts:1209-1212:"]):::done
+  t_4c190885(["(finding) REV-S02-p2 correctness N4 (packet defect, orchestrator) — pa"]):::done
+  t_3be5462f(["(finding) REV-S02-p2 correctness V-ROW → row V-30 default-bound item —"]):::done
+  t_778cbf5c["(gpt-5.6-sol) FIX S02 p2-residue — the pass-2 N residue in ONE seat be"]:::done
+  t_95545048(["(finding) FIX-S02-p2-residue P1 (packet defect, orchestrator) — packet"]):::done
+  t_07aefd90(["(finding) WHOLE-REV grok-4.6 N1 (packet defect, orchestrator) — packet"]):::ready
+  t_f14b0ca0[["(V) S03 — Free tier on API keys: Luna 5.6 + GLM 5.3 Flash, both tiers'"]]:::slice
+  t_089ce7cc["(claude-opus-5) REQ S03 — SPEC(S03) frozen with its ui: flag, PLAN sca"]:::done
+  t_f2364116["(claude-opus-5) REQ-REV S03 — blind review of SPEC(S03) and the REQ-S0"]:::done
+  t_6b7afd11["(claude-opus-5) ARCH S03 — PLAN(S03): clusters, boundaries, ADRs (the "]:::done
+  t_ff973916["(claude-opus-5) ARCH-REV S03 — blind review of PLAN(S03) (one pass)"]:::done
+  t_ec1eda80(["(finding) S03-intake P1 (orchestrator) — 6a05a0d0 swept another sessio"]):::done
+  t_362756f2(["(finding) REQ-S03 F1 (intake defect, orchestrator) — 00-intake-S03.md "]):::done
+  t_d3efaa75(["(finding) REQ-S03 F2 (intake defect, orchestrator) — 00-intake-S03.md "]):::done
+  t_74ea8495(["(finding) REQ-S03 F3 (baseline conflict, orchestrator) — the intake ga"]):::done
+  t_1292cc86(["(finding) REQ-REV-S03 p1 B1 — SPEC:85-93 (R8) + :247-248 (R27) vs :228"]):::done
+  t_748b2433(["(finding) REQ-REV-S03 p1 B2 — SPEC:314-318 (acceptance step 8) vs :194"]):::done
+  t_d502e39f(["(finding) REQ-REV-S03 p1 B3 — SPEC:286-287 vs :192-193 (R20 class 4) +"]):::done
+  t_779f1412(["(finding) REQ-REV-S03 p1 N1 — SPEC:10-11 / DECISIONS.md:70 / INSTRUCTI"]):::done
+  t_c2facf8f(["(finding) REQ-REV-S03 p1 N2 — SPEC:255 dev-api-environment 9/10 row is"]):::done
+  t_15aaa0f2(["(finding) REQ-REV-S03 p1 N3 — SPEC:118-119 + :264-265 say 'five' refus"]):::done
+  t_fb08cd74(["(finding) REQ-REV-S03 p1 N4 — R14 (SPEC:139-146) asserts properties of"]):::done
+  t_7a5d54fc(["(finding) REQ-REV-S03 p1 N5 — the S02 supersession trace: SPEC-v2(S02)"]):::done
+  t_8d3fca48(["(finding) REQ-REV-S03 p1 N6 (packet defect, orchestrator) — REQ-S03.md"]):::done
+  t_667e0926(["(finding) REQ-REV-S03 p1 N7 (protocol) — a CLAIM's 'session id' from a"]):::done
+  t_9ee87d3d["(claude-opus-5) REQ-FIX S03 — SPEC-v2(S03) with the supersession heade"]:::done
+  t_580ac829["(claude-opus-5) REQ-REV S03 p2 — scoped blind re-review of SPEC-v2(S03"]:::done
+  t_d8d52693(["(finding) REQ-REV-S03 p2 B1 — SPEC-v2.md:276-278 (R23): the clause 'mi"]):::done
+  t_abc8a0d7(["(finding) REQ-REV-S03 p2 N1 — SPEC-v2.md:248 + :346: R20 class 6 = 'R1"]):::done
+  t_4ce3896f(["(finding) REQ-REV-S03 p2 N2 — SPEC-v2.md:327: R27's tiers-s02-rosters "]):::done
+  t_6a06e1a6(["(finding) REQ-REV-S03 p2 N3 — SPEC-v2.md:120-121 vs :326/:327: R8 says"]):::done
+  t_a038f774(["(finding) REQ-REV-S03 p2 N4 — the REQ-FIX handoff reported SPEC-v2 as "]):::done
+  t_c07a7724(["(finding) REQ-REV-S03 p2 N5 (orchestrator) — packets/COMMON.md:7 still"]):::done
+  t_19ed95ac["(claude-opus-5) REQ-FIX S03 p3 — SPEC-v3(S03): B1(p2) (R23's clause na"]:::done
+  t_d99f6df3["(claude-opus-5) REQ-REV S03 p3 — scoped blind re-review of SPEC-v3(S03"]:::done
+  t_b5e02c9b(["(finding) REQ-REV-S03 p3 N1 — SPEC-v3.md:302: R33's rule is general (n"]):::done
+  t_16703d67(["(finding) REQ-REV-S03 p3 N2 — INSTRUCTIONS.md:18 still states the S01/"]):::done
+  t_3e3111b1(["(finding) ARCH-S03 F-ARCH-1 — tests/integration/dev-provider-panel.tes"]):::ready
+  t_629bccad(["(finding) ARCH-S03 F-ARCH-2 — the class of F-ARCH-1 swept: R27 names 1"]):::done
+  t_967ec1ab(["(finding) ARCH-S03 F-ARCH-3 — SPEC-v3 R13 'Whatever is chosen applies "]):::ready
+  t_492abb53(["(finding) ARCH-REV-S03 p1 B1 — PLAN.md:396-411 (S21): 'configuredProvi"]):::done
+  t_32e0064f(["(finding) ARCH-REV-S03 p1 B2 — PLAN.md:676-690 (§2 table): (1) apps/ui"]):::done
+  t_3642e0f1(["(finding) ARCH-REV-S03 p1 B3 — PLAN.md:357-376 (S19) vs :427-440 (S23)"]):::done
+  t_9c8bed6b(["(finding) ARCH-REV-S03 p1 N1 — a class of SEVEN '(re-)measured this pa"]):::done
+  t_ae811df5(["(finding) ARCH-REV-S03 p1 N2 — three JSON examples unlabelled EXACT/CO"]):::done
+  t_a0319f99(["(finding) ARCH-REV-S03 p1 N3 — S19's DEV_PROVIDER_SLOT_UNRESOLVED name"]):::done
+  t_4a0fac2b(["(finding) ARCH-REV-S03 p1 N4 — PLAN:680 C3's surface says 'the seven s"]):::done
+  t_5b1e1a09(["(finding) ARCH-REV-S03 p1 N5 — PLAN:255-257 S14's edit instruction con"]):::done
+  t_3ea0777e(["(finding) ARCH-REV-S03 p1 N6 — PLAN:960 S12's comment text (R7's heade"]):::done
+  t_a70e950e(["(finding) ARCH-REV-S03 p1 P1 (packet defect, orchestrator) — ARCH-REV-"]):::done
+  t_f14aab0f["(claude-opus-5) ARCH-FIX S03 — PLAN(S03) rework after ARCH-REV p1: B1 "]:::done
+  t_f06b97cf["(claude-opus-5) ARCH-REV S03 p2 — scoped blind re-review of PLAN(S03):"]:::done
+  t_4fdd4c5a["F-ARCH-4 — S23's planTierRosters row moves the pinned v4 snapshot dige"]:::done
+  t_21cf2dc8["B1-p2 — tests/architecture/dev-deployment-register.test.ts is written "]:::done
+  t_75d81376["N1-p2 — S21's done-criterion calls a module-private predicate no test "]:::done
+  t_c1f10e3c["N2-p2 — nothing MEASURES that the three CLIs pass their new argument; "]:::done
+  t_b59af9e4["N3-p2 — C3's aggregate '3 failed' can hide a different post-state 3; n"]:::done
+  t_112df324["N4-p2 — two harmless command-vs-surface gaps (dev-runner-provider-set."]:::done
+  t_7e3dcc6b["N5-p2 — PACKET DEFECT (orchestrator): ARCH-REV-S03-p2 charge 5 compare"]:::done
+  t_4d657ee9["N6-p2 (orchestrator) — pnpm-lock.yaml is TRACKED and named in no clust"]:::done
+  t_06759d41["ARCH-FIX(S03) — pass 3 of 3, the last: B1-p2 + folds N1-p2…N6-p2"]:::done
+  t_3fe3198c["ARCH-REV(S03) — pass 3 of 3: scoped to B1-p2's closure (a REWORK here "]:::done
+  t_77c0cb5f["BUILD(S03-C1) — config/models.yaml + @debateai/model-config + generate"]:::done
+  t_6a2ba493["BUILD(S03-C2) — remote base-URL admission, the probe budget + Z.AI ext"]:::done
+  t_843976bb["BUILD(S03-C3) — slots, register row, api.env predicates, restart comma"]:::done
+  t_f0797f95["BUILD(S03-C4) — /new reads the register row; admission fixtures move; "]:::done
+  t_4e3c526d["N1-p3 — surfaces.mjs's completeness assertion is keyed on (step, path)"]:::done
+  t_7980530a["N2-p3 — LIVE: S1's Done-when 'git status --porcelain lists exactly C1'"]:::done
+  t_0949f07f["N3-p3 — S10's relocated ordering case takes tier01-roster.test.ts to 2"]:::done
+  t_4a9e6d6a["N4-p3 — S21's four-CLI source-text case mis-describes its fourth membe"]:::done
+  t_4a7dce26["N5-p3 — S21's drift case (through assembleDevelopmentApiEnvironment) p"]:::done
+  t_a32a5fd7["N6-p3 — record residues: DECISIONS is 573 lines (570 was the last ruli"]:::done
+  t_4ee5b800["(orchestrator) GATE S03 — assemble review-packages/S03-p1 (mechanical:"]:::done
+  t_2fe87227["(claude-opus-5) REV S03 p1 lens correctness-tests — blind slice review"]:::done
+  t_31d988e8["(claude-opus-5) REV S03 p1 lens product-truth — blind slice review of "]:::done
+  t_8f344263["(claude-opus-5) REV S03 p1 lens security-data-safety — blind slice rev"]:::done
+  t_ad04e504(["(finding) REV-S03-p1 correctness B1 — SPEC-v3 R18 unmet for cli: claud"]):::done
+  t_9eceb1c1(["(finding) REV-S03-p1 correctness N1 — the S28 residue names acceptance"]):::ready
+  t_043884ca(["(finding) REV-S03-p1 correctness N2 — R25 'api.env follows a removal' "]):::ready
+  t_4d451841(["(finding) REV-S03-p1 correctness N3 — readProviderKeys validates the k"]):::ready
+  t_1ff80878(["(finding) REV-S03-p1 correctness N4 — base-URL admission (shape.ts:153"]):::ready
+  t_7c7d39a2(["(finding) REV-S03-p1 correctness N5 (packet defect, orchestrator) — ch"]):::ready
+  t_36bb05e5(["(finding) REV-S03-p1 correctness N6 (packet defect, orchestrator) — pr"]):::ready
+  t_fcdecc36(["(finding) REV-S03-p1 product-truth B1 — /new's tier cards are EMPTY fo"]):::done
+  t_13d08f99(["(finding) REV-S03-p1 product-truth N1 — probes.md (orchestrator) carri"]):::ready
+  t_fffda6e4(["(finding) REV-S03-p1 product-truth N2 — SPEC-v3 acceptance steps 6/10a"]):::ready
+  t_fcc38a3a(["(finding) REV-S03-p1 product-truth N3 (packet defect, orchestrator) — "]):::ready
+  t_4502672b(["(finding) REV-S03-p1 security N1 — model-config-no-secret.test.ts:16-1"]):::ready
+  t_7fc66f4b(["(finding) REV-S03-p1 security N2 — provider-discovery.ts:140 returns a"]):::ready
+  t_3e493864(["(finding) REV-S03-p1 security N3 — MAX_PROBE_RESPONSE_BYTES (64 KiB) i"]):::ready
+  t_ff3f897d(["(finding) REV-S03-p1 security N4 — packages/providers/src/index.ts:120"]):::ready
+  t_b9eced76(["(finding) REV-S03-p1 security N5 — dev-provider-keys.ts:23-37 lstats o"]):::ready
+  t_d219be2f(["(finding) REV-S03-p1 security N6 (packet defect, orchestrator) — the p"]):::ready
+  t_00c717d2(["(finding) REV-S03-p1 security N7 — the key file's format is unwritten:"]):::ready
+  t_d5ccdd90["(gpt-5.6-sol) FIX S03 p1 F2 — /new reads the tier rosters from a user-"]:::done
+  t_87ecea60["(gpt-5.6-sol) FIX S03 p1 F1 — the Claude and Grok relays honour config"]:::done
+  t_ab69627a["(claude-opus-5) REV S03 p2 lens correctness-tests — scoped blind revie"]:::done
+  t_1f2f4ab2["(claude-opus-5) REV S03 p2 lens product-truth — scoped blind review of"]:::done
+  t_8a000762["(claude-opus-5) REV S03 p2 lens security-data-safety — scoped blind re"]:::done
+  t_16070253(["(finding) REV-S03-p2 product-truth B1 — the published planTierRosters "]):::ready
+  t_45d21126(["(finding) REV-S03-p2 product-truth N1 (packet defect, orchestrator) — "]):::ready
+  t_4401d530(["(finding) REV-S03-p2 product-truth N3 — the package's 'file↔rosters mo"]):::ready
+  t_896c869b(["(finding) REV-S03-p2 security N8 — acceptance/grok-relay.ts:105 append"]):::ready
+  t_d454f1ec(["(finding) REV-S03-p2 security N9 — apps/api/src/index.ts:1536-1537 (re"]):::ready
+  t_dbcee8b4(["(finding) REV-S03-p2 security N10 (package defect, orchestrator) — rev"]):::ready
+  t_3f720fb8(["(finding) REV-S03-p2 security N10a (packet defect, orchestrator) — REV"]):::ready
+  t_ab14b051(["(finding) REV-S03-p2 correctness B1 (record-level; inherited by the me"]):::ready
+  t_4f2feee7(["(finding) REV-S03-p2 correctness N1 — acceptance/claude-relay.ts:72 ex"]):::ready
+  t_e0b5046f(["(finding) REV-S03-p2 correctness N2 — packages/contract/src/index.ts:3"]):::ready
+  t_2b1252ae(["(finding) REV-S03-p2 correctness N3 — apps/api/src/index.ts:1537 (revi"]):::ready
+  t_6b5f3f8c(["(finding) REV-S03-p2 correctness N8 (packet defect, orchestrator) — RE"]):::ready
+  t_2ab42655["(gpt-5.6-sol) FIX S03 p2 F1 — the published planTierRosters row is rea"]:::done
+  t_f2e090a2["(claude-opus-5) REV S03 p3 lens correctness-tests — scoped blind revie"]:::done
+  t_08142adf["(claude-opus-5) REV S03 p3 lens product-truth — scoped blind review of"]:::done
+  t_005aaddc["(claude-opus-5) REV S03 p3 lens security-data-safety — scoped blind re"]:::done
+  t_f0767487(["(finding) REV-S03-p3 security N11 (non-blocking) — apps/api/src/index."]):::ready
+  t_ff8a497d(["(finding) REV-S03-p3 security N12 (packet defect, orchestrator) — pack"]):::ready
+  t_9a808054(["(finding) REV-S03-p3 N13 (blocking for the slice via product-truth; me"]):::ready
+  t_6b9ca826(["(finding) REV-S03-p3 N14 (blocking for the slice via product-truth; me"]):::ready
+  t_39fcc4d4(["(finding) REV-S03-p3 product-truth N1 (non-blocking) — display-vs-exec"]):::ready
+  t_909dbfe1["(claude-opus-5) REV S03 p3 RE-CHECK (single finding, product-truth) — "]:::done
+  t_8bbb55e1(["(finding) REV-S03-p3 correctness B1 (BLOCKING; pass-3 → V row) — S03 g"]):::ready
+  t_d2f82945(["(finding) REV-S03-p3 correctness N9 (non-blocking) — the F1 projection"]):::ready
+  t_6f44048e(["(finding) REV-S03-p3 correctness N10 (non-blocking) — the planTierRost"]):::ready
+  t_1f84c179(["(finding) REV-S03-p3 correctness N11 (non-blocking, record) — the F1 h"]):::ready
+  t_85cdfdeb["(gpt-5.6-sol) FIX S03 p3 F1 — V-47 + V-49 (V's ruling 2026-09-16): pla"]:::running
   t_cb9482de --> t_e95f08a5
   t_e95f08a5 --> t_a4a6ea69
   t_a4a6ea69 --> t_485d6613
@@ -385,6 +563,114 @@ flowchart LR
   t_6e2413b7 --> t_a043c943
   t_6e2413b7 --> t_844ba282
   t_6e2413b7 --> t_9bec090b
+  t_11abead2 --> t_425ec2a9
+  t_11abead2 --> t_73466447
+  t_11abead2 --> t_521a5d1a
+  t_11abead2 --> t_299adfae
+  t_11abead2 --> t_a1191036
+  t_11abead2 --> t_d6451f28
+  t_11abead2 --> t_425a0357
+  t_11abead2 --> t_efe7c2e3
+  t_1675b61f --> t_ce7452ba
+  t_1675b61f --> t_1e99444c
+  t_7273eea5 --> t_11067c64
+  t_05227ae2 --> t_11067c64
+  t_11067c64 --> t_edf20575
+  t_11067c64 --> t_2061ade7
+  t_11067c64 --> t_cb78a63d
+  t_7273eea5 --> t_2e74f402
+  t_05227ae2 --> t_5983f27a
+  t_05227ae2 --> t_dbbb615b
+  t_2061ade7 --> t_d86b98ce
+  t_2061ade7 --> t_ca46998d
+  t_2061ade7 --> t_8f8520e6
+  t_cb78a63d --> t_cc661b9e
+  t_cb78a63d --> t_2c95f424
+  t_cb78a63d --> t_1ec7cae5
+  t_cb78a63d --> t_bd8e3b18
+  t_cb78a63d --> t_f2da2b9a
+  t_cb78a63d --> t_cf4f7f56
+  t_cb78a63d --> t_018d588c
+  t_cb78a63d --> t_0e696ff8
+  t_edf20575 --> t_ca11cffb
+  t_edf20575 --> t_51aa7ae5
+  t_edf20575 --> t_c38a3fdd
+  t_edf20575 --> t_42d46edd
+  t_edf20575 --> t_512afe29
+  t_edf20575 --> t_ca46998d
+  t_edf20575 --> t_d86b98ce
+  t_edf20575 --> t_bd8e3b18
+  t_edf20575 --> t_f2da2b9a
+  t_edf20575 --> t_ee9362b5
+  t_edf20575 --> t_780edb02
+  t_2061ade7 --> t_ee9362b5
+  t_2061ade7 --> t_780edb02
+  t_cb78a63d --> t_ee9362b5
+  t_cb78a63d --> t_780edb02
+  t_ee9362b5 --> t_9d4e5e77
+  t_edf20575 --> t_9d4e5e77
+  t_2061ade7 --> t_9d4e5e77
+  t_cb78a63d --> t_9d4e5e77
+  t_ee9362b5 --> t_1a0293cc
+  t_9d4e5e77 --> t_1a0293cc
+  t_780edb02 --> t_1a0293cc
+  t_ee9362b5 --> t_37e841db
+  t_9d4e5e77 --> t_37e841db
+  t_780edb02 --> t_37e841db
+  t_780edb02 --> t_8f1eba25
+  t_ee9362b5 --> t_d1df96d4
+  t_ee9362b5 --> t_35e0669f
+  t_1a0293cc --> t_f32eea3c
+  t_37e841db --> t_f32eea3c
+  t_97267279 --> t_f32eea3c
+  t_f32eea3c --> t_8a444c53
+  t_f32eea3c --> t_f6e379a9
+  t_8a444c53 --> t_b4321df2
+  t_f6e379a9 --> t_b4321df2
+  t_b4321df2 --> t_e4b4ab3a
+  t_9d4e5e77 --> t_287da7fe
+  t_37e841db --> t_4c5ab31a
+  t_37e841db --> t_449557e2
+  t_37e841db --> t_651f1aef
+  t_37e841db --> t_831d69f6
+  t_1a0293cc --> t_b656e947
+  t_1a0293cc --> t_25b00c0e
+  t_1a0293cc --> t_d7c9ab51
+  t_1a0293cc --> t_4c190885
+  t_778cbf5c --> t_f32eea3c
+  t_1a0293cc --> t_3be5462f
+  t_778cbf5c --> t_95545048
+  t_8a444c53 --> t_07aefd90
+  t_089ce7cc --> t_f2364116
+  t_6b7afd11 --> t_ff973916
+  t_9ee87d3d --> t_580ac829
+  t_19ed95ac --> t_d99f6df3
+  t_d99f6df3 --> t_6b7afd11
+  t_f14aab0f --> t_f06b97cf
+  t_f06b97cf --> t_4fdd4c5a
+  t_06759d41 --> t_21cf2dc8
+  t_06759d41 --> t_3fe3198c
+  t_f06b97cf --> t_77c0cb5f
+  t_f06b97cf --> t_6a2ba493
+  t_f06b97cf --> t_06759d41
+  t_3fe3198c --> t_843976bb
+  t_843976bb --> t_f0797f95
+  t_77c0cb5f --> t_843976bb
+  t_77c0cb5f --> t_f0797f95
+  t_3fe3198c --> t_4e3c526d
+  t_3fe3198c --> t_7980530a
+  t_3fe3198c --> t_0949f07f
+  t_3fe3198c --> t_4a9e6d6a
+  t_3fe3198c --> t_4a7dce26
+  t_3fe3198c --> t_a32a5fd7
+  t_2ab42655 --> t_f2e090a2
+  t_f2e090a2 --> t_f14b0ca0
+  t_2ab42655 --> t_08142adf
+  t_08142adf --> t_f14b0ca0
+  t_2ab42655 --> t_005aaddc
+  t_005aaddc --> t_f14b0ca0
+  t_f2e090a2 --> t_85cdfdeb
+  t_909dbfe1 --> t_85cdfdeb
   classDef done fill:#dfe9df,stroke:#3E7A4E
   classDef running fill:#f3ece0,stroke:#A8823E
   classDef ready fill:#fdfbf6,stroke:#6E675C
@@ -396,4 +682,4 @@ flowchart LR
   classDef slice fill:#d6e4f5,stroke:#2F5D9E,stroke-width:2px
 ```
 
-_rendered 2026-09-10 11:14 from board `debate-tiers` — 192 nodes, 193 edges_
+_rendered 2026-09-16 15:36 from board `debate-tiers` — 370 nodes, 301 edges_
