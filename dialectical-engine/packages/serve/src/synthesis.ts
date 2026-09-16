@@ -95,8 +95,24 @@ export interface SynthesisDigest {
 export const DIGEST_COMPRESSION_LEVELS: readonly (number | null)[] =
   Object.freeze([null, 480, 240, 120, 60, 24]);
 
-/** How many surviving objections the emphasis field carries (S6-2: top-2). */
-export const DIGEST_EMPHASIS_OBJECTION_COUNT = 2;
+/**
+ * How many surviving objections the emphasis field carries (S6-2: top-2).
+ *
+ * Deliberately NOT exported — this is the carrier form the source-purity law
+ * accepts for it. That law refuses an EXPORTED numeric literal outside
+ * packages/published-arithmetic because a published number is a policy value
+ * that belongs in a register/law carrier. This one is not policy: it is the
+ * cardinality the S6-2 ruling fixes, it has exactly one call site (the emphasis
+ * selection below), and no surface outside this file has ever imported it. A
+ * deployment must not be able to reseal it, which is what a register row would
+ * mean. The audit's GOAL_RULED_LAW_CARRIERS reconciliation is for constants the
+ * goal ORDERS to be exported and imported elsewhere (T1's 1-5 depth bound);
+ * naming this one there would widen a deliberately narrow exemption for a
+ * symbol nothing imports. The file's real policy value is the evaluator loop
+ * bound, and it is a sealed register row (`evaluatorLoopMaxRounds`), never a
+ * code constant — see the header above.
+ */
+const DIGEST_EMPHASIS_OBJECTION_COUNT = 2;
 
 /** The mark a digest that had to be tightened to fit the budget rides on. */
 export const DIGEST_COMPRESSED_MARK = "DIGEST-COMPRESSED" as const;

@@ -7,7 +7,7 @@ WHERE profile.register_version = 5
     WHERE row.register_version = profile.register_version
   );
 
-CREATE FUNCTION register._algorithm_publication_profile_guard()
+CREATE OR REPLACE FUNCTION register._algorithm_publication_profile_guard()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
