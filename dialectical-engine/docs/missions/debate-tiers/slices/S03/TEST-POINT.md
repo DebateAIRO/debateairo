@@ -28,7 +28,7 @@ The slice ticket closes only on V's veto. Everything below is the state at the F
 
 ## 3. Rows for V (`V-DECISIONS-PACKET.md`; the defaults bind until ruled)
 
-V-34 (keys) · V-41 · V-42 · V-48 = NO (residue) · **V-50** (RULING 4 = the same FIX node — default taken) · **V-51** (the runner readiness gate: one line, V's call) · **V-52** (RULING 5 inside S03 — default taken, landed f43b3f8b) · **V-53** (V-51 sequencing: the two-command procedure by default).
+V-34 (keys) · V-41 · V-42 · V-48 = NO (residue) · **V-50** (RULING 4 = the same FIX node — default taken) · **V-51** (the runner readiness gate: one line, V's call) · **V-52** (RULING 5 inside S03 — default taken, landed f43b3f8b) · **V-53** (V-51 sequencing: the two-command procedure by default) · **V-54** (V's first test finding — the roster route's privilege gap: RULING 7 inside S03, default taken, landed 1a1c4ede).
 
 ## 4. Residue (ticketed; shown, not hidden)
 
