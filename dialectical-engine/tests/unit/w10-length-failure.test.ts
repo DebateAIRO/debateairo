@@ -390,7 +390,14 @@ describe("W10 F1/F2 class member C · the support model refuses a truncated comp
     });
   }
 
-  const ASK = { system: "be brief", messages: [{ role: "user" as const, content: "hello" }] };
+  // `language` is REQUIRED on this port and vitest never typechecks
+  // (`.hermes/TOOLING-TRAPS.md:4934`), so the first green run said nothing
+  // about it; `pnpm run typecheck` did.
+  const ASK = {
+    system: "be brief",
+    messages: [{ role: "user" as const, content: "hello" }],
+    language: "en" as const
+  };
 
   it("refuses a completion cut off at the limit instead of serving the fragment", async () => {
     // At the base this adapter sets NO `max_tokens` and never reads
