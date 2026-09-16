@@ -1,0 +1,5 @@
+$ tsx apps/runner/src/dev-auth-stack-cli.ts
+DEV_PROVIDER_SLOT_UNAVAILABLE class (a) tier=free model=gpt-5.6-luna
+DEV_PROVIDER_SLOT_UNAVAILABLE class (a) tier=free model=glm-5.3-flash
+DEV_AUTH_STACK_DATA_FAILED:DEV_AUTH_DATA_PLANE_REGISTER_FAILED:DEV_AUTH_DATA_PLANE_REGISTER_FAILED
+[ELIFECYCLE] Command failed with exit code 1.
