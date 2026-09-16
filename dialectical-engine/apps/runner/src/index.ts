@@ -2164,18 +2164,29 @@ export class WalkingSkeletonRunner {
       // unresolved bound is refused HERE, under the SAME name, before the claim
       // and before anything is spent; `0` for an ABSENT family is unchanged, so
       // that case still reaches the gate below.
-      ...(this.settings.synthesisRolePolicy === undefined
-        ? [0]
-        : (["synthesizerBound", "evaluatorBound"] as const).map((bound) => {
-          const deadlineMs = this.settings.synthesisRolePolicy?.[bound]?.deadlineMs;
-          if (deadlineMs === undefined) {
-            throw new TypedDomainError(
-              "SYNTHESIS_ROLE_CONTROLS_UNRESOLVED",
-              `T9: the sealed ${bound} is a T16 register row (J8); a synthesis-role policy that reached the runner without it is refused by name, never dereferenced (goal 39-40)`
-            );
-          }
-          return deadlineMs;
-        }))
+      //
+      // Round 2: each bound is its OWN scalar argument, never a list. A numeric
+      // ARRAY in shipped code is read by the S1-1 single-source oracle
+      // (`tests/unit/s1-1-depth-contract.test.ts`) as a candidate domain for the
+      // ruled depth ceiling, and one it cannot evaluate is conservatively a
+      // site — this expression was flagged `[DOMAIN_ENUMERATION]` when it built
+      // its arguments with `.map`. The maximum stays scalar for that reader.
+      this.settings.synthesisRolePolicy === undefined
+        ? 0
+        : this.settings.synthesisRolePolicy.synthesizerBound?.deadlineMs ?? ((): never => {
+          throw new TypedDomainError(
+            "SYNTHESIS_ROLE_CONTROLS_UNRESOLVED",
+            "T9: the sealed synthesizerBound is a T16 register row (J8); a synthesis-role policy that reached the runner without it is refused by name, never dereferenced (goal 39-40)"
+          );
+        })(),
+      this.settings.synthesisRolePolicy === undefined
+        ? 0
+        : this.settings.synthesisRolePolicy.evaluatorBound?.deadlineMs ?? ((): never => {
+          throw new TypedDomainError(
+            "SYNTHESIS_ROLE_CONTROLS_UNRESOLVED",
+            "T9: the sealed evaluatorBound is a T16 register row (J8); a synthesis-role policy that reached the runner without it is refused by name, never dereferenced (goal 39-40)"
+          );
+        })()
     );
     assertClaimCoversCall({
       claimMs: this.settings.claimMs,
