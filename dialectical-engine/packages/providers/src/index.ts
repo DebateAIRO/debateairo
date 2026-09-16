@@ -336,6 +336,29 @@ function observedFinishReason(decoded: unknown): string | null {
   return parsed.success ? parsed.data.choices[0]!.finish_reason ?? null : null;
 }
 
+/**
+ * W10/2 (D58 — the outcome is the ticket's, the mechanism is this seat's): the
+ * bound a retry asks for after `n` length failures on the same call.
+ *
+ * At the base a truncation routed to the schema-repair path, which APPENDS a
+ * correction and reuses the same bound: attempt 2 had a longer input, the
+ * identical `max_tokens`, and the same schema to satisfy — output at least as
+ * long as the one just cut. Attempts 2 and 3 were byte-identical requests, so
+ * all three calls burned producing one failure, reported as a contract error.
+ *
+ * The escalation is LINEAR in the number of length failures, so every attempt
+ * of a truncating call is distinct and the worst case is bounded by
+ * `maxAttempts` (3 attempts → at most 3x the sealed ceiling). The SEALED
+ * `tokenCeiling` itself is untouched: this is a per-attempt ask made only after
+ * a measured truncation, never a new default.
+ */
+export function lengthRetryTokenCeiling(sealedTokenCeiling: number, lengthFailures: number): number {
+  if (!Number.isInteger(lengthFailures) || lengthFailures < 0) {
+    throw new TypeError("PROVIDER_LENGTH_RETRY_FAILURE_COUNT_INVALID");
+  }
+  return sealedTokenCeiling * (lengthFailures + 1);
+}
+
 function digest(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -366,6 +389,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     let lastOutcome: "TIMED_OUT" | "FAILED" = "FAILED";
     let lastLedgerEntryRef = "PROVIDER_LEDGER_ENTRY_UNRESOLVED";
     let attemptPacket = request.packet;
+    /** W10/2: how many attempts of THIS call were cut off at the bound. */
+    let lengthFailures = 0;
     let lastContentRejection: {
       attempts: number;
       parseStatus: ProviderContentRejectionStatus;
@@ -375,6 +400,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     } | null = null;
 
     for (let attempt = 1; attempt <= request.bound.maxAttempts; attempt += 1) {
+      const attemptTokenCeiling = lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures);
       const inputHash = digest(JSON.stringify(attemptPacket));
       const attemptId = randomUUID();
       const startedAt = new Date();
@@ -391,7 +417,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           signal: AbortSignal.timeout(request.bound.deadlineMs),
           body: JSON.stringify({
             model: this.#options.model,
-            max_tokens: request.bound.tokenCeiling,
+            max_tokens: attemptTokenCeiling,
             messages: attemptPacket.messages
           })
         });
@@ -442,7 +468,11 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             // W10/1: the reason this completion stopped, recorded on EVERY
             // attempt. `raw_artifact.metadata` is unconstrained jsonb, so the
             // truncation is durable even though `parse_status` cannot name it.
-            finish_reason: finishReason
+            finish_reason: finishReason,
+            // W10/2: the bound this attempt actually asked for. Without it the
+            // ledger cannot tell a raised retry from a repeat of the attempt
+            // that was just cut off.
+            token_ceiling: attemptTokenCeiling
           },
           parseStatus: classifiedContent.parseStatus,
           parseError: classifiedContent.parseError,
@@ -492,7 +522,15 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             rawArtifactRef,
             ledgerEntryRef
           };
-          if (attempt < request.bound.maxAttempts && request.buildRepairPacket !== undefined) {
+          if (contentRejection.parseStatus === PROVIDER_CONTENT_LENGTH_EXCEEDED) {
+            // W10/2: a truncation is NOT repaired by asking again for the same
+            // thing. Appending a correction is strictly counterproductive here
+            // — it lengthens the input the model must re-read while the output
+            // it owes stays the same — so the next attempt re-sends the
+            // ORIGINAL packet under a raised bound.
+            lengthFailures += 1;
+            attemptPacket = request.packet;
+          } else if (attempt < request.bound.maxAttempts && request.buildRepairPacket !== undefined) {
             attemptPacket = request.buildRepairPacket({
               rawText: responseJson.choices[0]!.message.content,
               parseStatus: contentRejection.parseStatus,

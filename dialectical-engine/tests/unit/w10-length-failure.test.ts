@@ -125,3 +125,80 @@ describe("W10 C1 · a length failure is classified as a length failure", () => {
     expect((rejection as ProviderContentUnacceptedError).lastParseStatus).toBe("PARSE_FAILED");
   });
 });
+
+/**
+ * The schema-repair packet the runner installs (`apps/runner/src/index.ts`
+ * `buildSchemaRepairPacket`): it APPENDS a correction to the existing messages
+ * and reuses the same bound. For a truncation that makes attempt 2 strictly
+ * worse — longer input, identical `max_tokens`, the same schema to satisfy.
+ */
+function appendingRepairPacket(packet: ProviderCallRequest["packet"], parseError: string): ProviderCallRequest["packet"] {
+  return {
+    messages: [...packet.messages, {
+      role: "user",
+      content: `The previous response violated the declared JSON contract. Machine parse error: ${parseError}`
+    }]
+  };
+}
+
+describe("W10 C2 · a truncation is not retried into the identical truncation", () => {
+  it("raises the attempt's bound after a length failure instead of re-asking under the same one", async () => {
+    const { gateway, attempts } = scriptedGateway([
+      { finish_reason: "length", content: TRUNCATED_JSON }
+    ]);
+    const packet = { messages: [{ role: "user" as const, content: "compose the served answer" }] };
+    await gateway.call(w10Request({
+      bound: { maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 },
+      packet,
+      buildRepairPacket: ({ parseError }) => appendingRepairPacket(packet, parseError)
+    })).catch(() => undefined);
+    expect(attempts).toHaveLength(3);
+    // Asserted from the RECORDED attempts, not from the fixture's own bookkeeping.
+    expect(attempts.map((attempt) => attempt.artifact.metadata.token_ceiling))
+      .toEqual([2_048, 4_096, 6_144]);
+    expect(attempts.map((attempt) => attempt.body.max_tokens)).toEqual([2_048, 4_096, 6_144]);
+  });
+
+  it("never repeats a byte-identical attempt while the provider keeps truncating", async () => {
+    const { gateway, attempts } = scriptedGateway([
+      { finish_reason: "length", content: TRUNCATED_JSON }
+    ]);
+    const packet = { messages: [{ role: "user" as const, content: "compose the served answer" }] };
+    await gateway.call(w10Request({
+      bound: { maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 },
+      packet,
+      buildRepairPacket: ({ parseError }) => appendingRepairPacket(packet, parseError)
+    })).catch(() => undefined);
+    const rendered = attempts.map((attempt) => JSON.stringify(attempt.body));
+    expect(new Set(rendered).size).toBe(rendered.length);
+  });
+
+  it("stops appending on a truncation retry — the input the model must re-read never grows", async () => {
+    const { gateway, attempts } = scriptedGateway([
+      { finish_reason: "length", content: TRUNCATED_JSON }
+    ]);
+    const packet = { messages: [{ role: "user" as const, content: "compose the served answer" }] };
+    await gateway.call(w10Request({
+      bound: { maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 },
+      packet,
+      buildRepairPacket: ({ parseError }) => appendingRepairPacket(packet, parseError)
+    })).catch(() => undefined);
+    for (const attempt of attempts) {
+      expect(attempt.body.messages).toEqual(packet.messages);
+    }
+  });
+
+  it("D71 boundary — a SCHEMA failure keeps the appending repair path and the sealed bound", async () => {
+    const { gateway, attempts } = scriptedGateway([
+      { finish_reason: "stop", content: "this is not json at all" }
+    ]);
+    const packet = { messages: [{ role: "user" as const, content: "compose the served answer" }] };
+    await gateway.call(w10Request({
+      bound: { maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 },
+      packet,
+      buildRepairPacket: ({ parseError }) => appendingRepairPacket(packet, parseError)
+    })).catch(() => undefined);
+    expect(attempts.map((attempt) => attempt.body.max_tokens)).toEqual([2_048, 2_048, 2_048]);
+    expect(attempts.map((attempt) => attempt.body.messages.length)).toEqual([1, 2, 2]);
+  });
+});
