@@ -30,8 +30,8 @@ export function PublicHonestyDrawer({
           </section>
           <section className="wsSection" aria-label="Verdict">
             <h3>Verdict</h3>
-            <p>{answer.verdict_available ? (answer.verdict ?? "Verdict unavailable") : "Verdict unavailable"}</p>
-            {answer.confidence_band ? <p>Confidence: {answer.confidence_band}</p> : null}
+            <p data-ai-generated={answer.verdict_available && answer.verdict !== null ? "true" : undefined}>{answer.verdict_available ? (answer.verdict ?? "Verdict unavailable") : "Verdict unavailable"}</p>
+            {answer.confidence_band ? <p data-ai-generated="true">Confidence: {answer.confidence_band}</p> : null}
           </section>
           {answer.badges.length > 0 ? (
             <section className="wsSection" aria-label="Badges">
@@ -42,12 +42,12 @@ export function PublicHonestyDrawer({
           {answer.residual_objections.length > 0 ? (
             <section className="wsSection" aria-label="Residual objections">
               <h3>Residual objections</h3>
-              {answer.residual_objections.map((objection, index) => <p key={index}>{objection}</p>)}
+              {answer.residual_objections.map((objection, index) => <p key={index} data-ai-generated="true">{objection}</p>)}
             </section>
           ) : null}
           <section className="wsSection" aria-label="What could reverse this">
             <h3>What could reverse this</h3>
-            <p>{answer.reversal_point}</p>
+            <p data-ai-generated="true">{answer.reversal_point}</p>
           </section>
           <section className="wsSection" aria-label="Public snapshot limits">
             <h3>Not in this snapshot</h3>

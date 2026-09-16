@@ -1,5 +1,8 @@
 "use client";
 
+import { AiNotice } from "@/components/AiNotice";
+import { AI_NOTICE } from "@/lib/aiDisclosure";
+
 import { CSSProperties, FormEvent, KeyboardEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
@@ -174,6 +177,7 @@ function NewDebateForm({ token }: { token: string }) {
       <div className="ndInner">
         <p className="ndEyebrow">NEW QUESTION</p>
         <h1 className="ndTitle">What should we debate?</h1>
+        <div className="ndAiDisclosure"><AiNotice body={AI_NOTICE.newDebate} /></div>
         <form onSubmit={submit} onKeyDown={onKeyDown}>
           {error ? <div className="error" style={{ marginTop: 16 }}>{error}</div> : null}
 

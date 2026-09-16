@@ -58,6 +58,7 @@ export function LandingSample(): JSX.Element {
               {/* inner core */}
               <article
                 className="lpCardCore"
+                data-ai-generated="true"
                 data-bezel="core"
                 data-stance={card.stance}
                 aria-label={`Turn ${card.turn}, ${card.role}`}

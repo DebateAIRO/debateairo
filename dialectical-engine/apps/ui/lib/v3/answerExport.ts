@@ -1,4 +1,5 @@
 import type { Answer, EventType, ExecutionLedgerDigest, InvestigationGap } from "@debateai/contract";
+import { AI_EXPORT_DISCLOSURE } from "../aiDisclosure";
 
 /**
  * UI-01: the ONE decision behind the answer export.
@@ -75,6 +76,7 @@ export function buildAnswerExport(input: AnswerExportInput): AnswerExport {
   }
 
   const payload = {
+    ai_disclosure: AI_EXPORT_DISCLOSURE,
     answer,
     execution_ledger_digest: ledgerDigest,
     live_honesty: {

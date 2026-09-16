@@ -70,6 +70,7 @@ export function VerdictBanner({ verdict }: { verdict: VerdictSummary | undefined
       aria-label="Verdict"
       data-verdict-band={verdict.verdictBand}
       data-verdict-state={verdict.verdictState}
+      data-ai-generated="true"
     >
       <div className="verdictBannerHead">
         <span className="verdictBadge" data-verdict-band={verdict.verdictBand}>

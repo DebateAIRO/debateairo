@@ -103,14 +103,14 @@ export function AnswerHonestyDrawer({
           <section className="wsSection" aria-label="Verdict">
             <div className="drawerSectionTitle">Verdict</div>
             {answer.verdict_state !== null ? (
-              <div className="drawerFindingText">{answer.verdict_state}</div>
+              <div className="drawerFindingText" data-ai-generated="true">{answer.verdict_state}</div>
             ) : (
               <div className="drawerFindingText">
                 Verdict unavailable · {answer.verdict_unavailable?.reason_ref ?? "no reason recorded"}
               </div>
             )}
             {answer.confidence_band !== null ? (
-              <div className="drawerFindingText">Confidence band: {answer.confidence_band}</div>
+              <div className="drawerFindingText" data-ai-generated="true">Confidence band: {answer.confidence_band}</div>
             ) : null}
             {answer.band_ceiling !== null ? (
               <div className="drawerFindingText">
@@ -270,7 +270,7 @@ export function AnswerHonestyDrawer({
               <ul className="drawerFindingList">
                 {answer.residual_objections.map((objection) => (
                   <li key={objection} className="drawerFindingItem">
-                    <div className="drawerFindingText">{objection}</div>
+                    <div className="drawerFindingText" data-ai-generated="true">{objection}</div>
                   </li>
                 ))}
               </ul>
@@ -279,7 +279,7 @@ export function AnswerHonestyDrawer({
 
           <section className="wsSection" aria-label="What would reverse this">
             <div className="drawerSectionTitle">What would reverse this</div>
-            <div className="drawerFindingText">{answer.reversal_point}</div>
+            <div className="drawerFindingText" data-ai-generated="true">{answer.reversal_point}</div>
           </section>
 
           {answer.value_hinges.length > 0 ? (

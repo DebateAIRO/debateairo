@@ -1,4 +1,5 @@
 import type { PublicDebate } from "@debateai/contract";
+import { AI_EXPORT_DISCLOSURE } from "../aiDisclosure";
 
 export type PublicAnswerExport = Readonly<{
   available: true;
@@ -8,6 +9,7 @@ export type PublicAnswerExport = Readonly<{
 
 export function buildPublicAnswerExport(debate: PublicDebate): PublicAnswerExport {
   const payload = {
+    ai_disclosure: AI_EXPORT_DISCLOSURE,
     public_ref: debate.public_ref,
     question: debate.question,
     author_pseudonym: debate.author_pseudonym,

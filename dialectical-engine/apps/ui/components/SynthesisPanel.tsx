@@ -45,7 +45,7 @@ export function SynthesisPanel(view: SynthesisView) {
             <div className="synthPendingNote">Synthesis runs once the tree completes…</div>
           </div>
         ) : (
-          <div className="synthCards">
+          <div className="synthCards" data-ai-generated="true">
             {view.structured ? null : (
               <>
                 <section className="synthCard synthPro">

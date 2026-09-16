@@ -1,5 +1,8 @@
 "use client";
 
+import { AiNotice } from "@/components/AiNotice";
+import { AI_NOTICE } from "@/lib/aiDisclosure";
+
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
@@ -1250,6 +1253,8 @@ export default function DebatePageClient({
 
       {publicMode && publicHeader ? publicHeader : null}
 
+      <div className="debateAiDisclosure"><AiNotice body={AI_NOTICE.debate} /></div>
+
       {/* ---- verdict-first banner (flag-gated: NEXT_PUBLIC_VERDICT_FIRST_UI) ---- */}
       {!publicMode && process.env.NEXT_PUBLIC_VERDICT_FIRST_UI === "true" ? <VerdictBanner verdict={debate.verdict} /> : null}
 
@@ -1961,13 +1966,13 @@ function SingleShotMain({ result }: { result: SingleShotResult }) {
     <div className="singleShot scroll">
       <div className="singleShotInner">
         <div className="nodeEyebrow">Single-shot result</div>
-        <h1 className="display sm" style={{ marginTop: 8 }}>
+        <h1 className="display sm" style={{ marginTop: 8 }} data-ai-generated="true">
           {result.final_text}
         </h1>
-        <p className="lede" style={{ marginTop: 10 }}>
+        <p className="lede" style={{ marginTop: 10 }} data-ai-generated="true">
           {result.global_winner.reason}
         </p>
-        <div className="singleShotGrid">
+        <div className="singleShotGrid" data-ai-generated="true">
           <section className="synthCard synthPro">
             <div className="synthCardLabel pro">↑ Strongest Pro</div>
             <div className="synthCardClaim">{result.strongest_pro}</div>
@@ -1977,7 +1982,7 @@ function SingleShotMain({ result }: { result: SingleShotResult }) {
             <div className="synthCardClaim">{result.strongest_con}</div>
           </section>
         </div>
-        <div className="singleShotColumns">
+        <div className="singleShotColumns" data-ai-generated="true">
           <section>
             <div className="synthSectionTitle">Pros ({result.pros.length})</div>
             <ul className="synthSectionList">

@@ -92,7 +92,7 @@ export function DebateSplit({
                     >
                       {role === "root" ? "● Root" : `${pal.arrow} ${roleLabel(node)}`}
                     </span>
-                    <span className="splitChipClaim">{node.claim}</span>
+                    <span className="splitChipClaim" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</span>
                   </button>
                 </div>
               );
@@ -112,7 +112,7 @@ export function DebateSplit({
           </div>
         ) : (
           <div className="splitFocusShell" data-reference-split-focus>
-            <div className="splitFocusMain" style={{ borderColor: "var(--line)" }}>
+            <div className="splitFocusMain" data-ai-generated="true" style={{ borderColor: "var(--line)" }}>
             <span className="referenceStanceTab" style={{ background: focusPal?.line }} aria-hidden />
             <div className="splitFocusHead referenceMetaRow">
               <span
@@ -255,7 +255,7 @@ function PerspectiveCard({ node, onFocus }: { node: DebateNode; onFocus: (id: st
   return (
     <button type="button" className="splitPerspective" onClick={() => onFocus(node.id)}>
       <span className="splitPerspectiveBadge">◆ {roleLabel(node)}</span>
-      <span className="splitPerspectiveClaim">{node.claim}</span>
+      <span className="splitPerspectiveClaim" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</span>
       <span className="splitPerspectiveMeta">
         {pro} for · {con} against ▸
       </span>
@@ -302,7 +302,7 @@ function SplitCard({
   return (
     <div className="splitCardWrap">
       <div className="splitCardShell">
-      <div className="splitCard" style={cardStyle}>
+      <div className="splitCard" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"} style={cardStyle}>
         <span className="referenceStanceTab" style={{ background: pal.line }} aria-hidden />
         {scrutiny ? (
           <span className="scrutinyBadge" style={{ borderColor: scrutiny.color }}>

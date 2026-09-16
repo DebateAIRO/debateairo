@@ -163,7 +163,7 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
                 maker={readoutNode.maker}
               />
             ) : null}
-            <div className="mapReadoutClaim">{readoutNode.claim}</div>
+            <div className="mapReadoutClaim" data-ai-generated={readoutRole === "root" ? undefined : "true"}>{readoutNode.claim}</div>
             <div className="mapReadoutFooter">
               <span>Hover a wedge to inspect · click to focus</span>
               <span style={{ flex: 1 }} />

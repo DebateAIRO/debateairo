@@ -7,6 +7,7 @@ import { resolveSupportActions } from "@debateai/support-kb/navigation";
 import { requestPreferences } from "../../lib/consent.js";
 import { BrandMark } from "../TopBar.js";
 import { ModeToggle } from "../ModeToggle.js";
+import { AiNotice } from "../AiNotice";
 import { supportCaseLink } from "./caseLink.js";
 import {
   browserSupportConversationStorage,
@@ -648,7 +649,10 @@ export function Assistant({
       const sources = message.sources ?? Object.freeze([]);
       const actions = message.actions ?? Object.freeze([]);
       const hasFooter = link !== null || sources.length > 0 || actions.length > 0;
-      return <article className={`supportMessage supportMessage--${message.role}`} key={message.id} data-role={message.role}>
+      const generated = message.role === "assistant" && message.outcome === "ANSWER_GROUNDED";
+      return <article className={`supportMessage supportMessage--${message.role}`} key={message.id} data-role={message.role}
+        data-ai-generated={generated ? "true" : undefined}
+        data-content-origin={message.role === "user" ? "user" : generated ? "ai" : "automated"}>
         {message.role === "assistant" ? <div className="supportMessageShell">
           <div className="supportMessageTab" aria-hidden />
           <div className="supportMessageCore">
@@ -661,7 +665,7 @@ export function Assistant({
                 {actions.map((action) => <a href={action.href} key={action.id}>{action.label}</a>)}
               </nav>}
               {link === null ? null : <>
-                <span>DOCS · PRODUCT GUIDE</span>
+                <span>{generated ? "AI · " : ""}DOCS · PRODUCT GUIDE</span>
                 <a href={link}>View source →</a>
               </>}
             </footer>}
@@ -706,6 +710,7 @@ export function Assistant({
         >{CLOSE_ARROW}</button>}
         {languageControls}
       </div>
+      <AiNotice variant="banner" language={language} />
       {conversation}
       {ratingControls}
       <button
@@ -782,7 +787,7 @@ export function Assistant({
           <div className="supportAgentAvatar" aria-hidden>◆</div>
           <div className="supportAgentIdentity">
             <div><h1>Support agent</h1><span className={`supportOnline supportOnline--${statusLabel.toLowerCase()}`}>{statusLabel}</span></div>
-            <p>Answers from public product guidance, cites its source, and hands off to a person when it cannot.</p>
+            <p><strong>You are talking to an AI, not a person.</strong> It answers from public product guidance, cites its source, and hands off to a person when it cannot.</p>
           </div>
           <button className="supportNewConversation" type="button" onClick={beginNewConversation}>New conversation</button>
         </header>
@@ -796,6 +801,7 @@ export function Assistant({
             followLatestRef.current = pane.scrollHeight - pane.scrollTop - pane.clientHeight <= 48;
           }}
         >
+          <AiNotice variant="banner" language={language} />
           <p className="supportTimestamp">Today · Support conversation</p>
           {conversation}
           <div ref={conversationEndRef} data-support-conversation-end aria-hidden />

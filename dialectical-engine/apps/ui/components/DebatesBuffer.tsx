@@ -18,7 +18,9 @@ function LibraryRow({
   meta,
   models,
   status,
-  state
+  state,
+  generatedStatus = false,
+  confidenceBand
 }: {
   href: string;
   claim: string;
@@ -27,6 +29,8 @@ function LibraryRow({
   models: readonly string[];
   status: string;
   state: "complete" | "generating" | "failed" | "contested" | "unsupported";
+  generatedStatus?: boolean;
+  confidenceBand?: string | null;
 }) {
   return (
     <Link className="libRow" href={href} data-library-row>
@@ -35,6 +39,7 @@ function LibraryRow({
         <p className="libRowMeta">
           {by === undefined ? null : <>By <span className="libRowBy">{by}</span> · </>}
           {meta}
+          {confidenceBand ? <> · <span data-ai-generated="true">{confidenceBand}</span></> : null}
         </p>
       </div>
       {models.length > 0 ? (
@@ -52,7 +57,7 @@ function LibraryRow({
           })}
         </div>
       ) : null}
-      <span className="libStatus" data-state={state}>{status}</span>
+      <span className="libStatus" data-state={state} data-ai-generated={generatedStatus ? "true" : undefined}>{status}</span>
       <span className="libArrow" aria-hidden>→</span>
     </Link>
   );
@@ -110,11 +115,12 @@ export function PublicDebatesBuffer({
         by={debate.author_pseudonym}
         meta={joinMeta([
           relativeTime(debate.published_at),
-          modelCount,
-          debate.confidence_band?.toLowerCase()
+          modelCount
         ])}
+        confidenceBand={debate.confidence_band?.toLowerCase()}
         models={debate.models ?? []}
         status={verdict}
+        generatedStatus={debate.verdict !== null}
         state={debate.verdict === null
           ? "generating"
           : debate.verdict === "CONTESTED"
