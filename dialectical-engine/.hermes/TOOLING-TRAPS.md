@@ -5532,3 +5532,45 @@ not in 4 000 lines of prose every author skims.
 - **Rule: run WHO-READS-THIS-STRING before the design, not before the edit. A reader outside your
   write contract converts "change the literal" into "make the change invisible to that reader",
   and that is a different implementation, not a later fix.**
+
+## Two entry paths, different relay COUNTS, one provider list — a positional lookup names the wrong maker LOUDLY (2026-09-16, FIX(CONT-T17) round 1)
+- The ceremony starts three relays `[codex, claude, grok]`; `main.ts`'s standalone boot starts two,
+  `[claude, grok]`. Both read the SAME three-row configured provider set
+  (`seed-register.ts:48-51`, order `[OpenAI, Anthropic, xAI]`).
+- The round-0 announcer indexed `configuredProviders[index]`, which is correct for the ceremony and
+  aligned by luck, not by construction. Reused as-is on the boot path it would have printed
+  `MAKER ABSENT OpenAI CLAUDE_CLI_FAILED` — **a wrong maker named loudly, which is strictly worse
+  than the silence the ticket exists to remove**, and no test in either file would have noticed,
+  because every fixture on the ceremony side aligns.
+- `policy.providers.slice(1)` "fixes" it for exactly as long as nobody adds a fourth provider or
+  reorders the register — the same shape as `:329` (a coordinate that the document elsewhere
+  mandates moving).
+- Remedy: the announcer takes `{ providerRef, start }` pairs and looks the maker up BY REF. Which
+  relay sits at which index is the CALL SITE's knowledge and only the call site's; a shared helper
+  that infers it from position is guessing.
+- **Rule: before reusing a positional mapping at a second call site, compare the two ARITIES. Equal
+  lengths today is not a contract, and the failure mode of a loud channel is a confident lie.**
+
+## Which module a shared helper belongs in is an IMPORT-EDGE measurement, not a taste call (2026-09-16, FIX(CONT-T17) round 1)
+- The review asked for one announcer used by both `run-acceptance.ts` and `main.ts`, and offered
+  "import it from `run-acceptance.ts`, or move it to a small module — say which and why".
+- One `grep` settles it: `run-acceptance.ts:8-13` already imports `createAcceptanceRuntime` and
+  `loadAcceptanceCeremonyEnvironment` **from `main.ts`**. So `main.ts` → `run-acceptance.ts` closes
+  a cycle. A shared leaf module (`absent-makers.ts`) is the only direction that is not one.
+- The check costs one grep and replaces an argument with a fact. It also generalises: any "should A
+  import B or B import A" question is already answered by the existing edges.
+- **Rule: read the existing import edges BEFORE choosing a home for shared code. The answer is in
+  the tree, not in the discussion.**
+
+## A regression pin over an already-true property has NO RED, and saying otherwise is fabrication (2026-09-16, FIX(CONT-T17) round 1)
+- F2 asked for a source-order pin: the ceremony announces before it builds the runtime. That was
+  already true at the parent commit, so the new assertion was **GREEN the moment it was written**.
+  There is no RED frame to paste and inventing one would be a `heartbeat-protocol` §3.6 violation.
+- The pin is still worth having and its worth is still provable — by the MUTANT. Moving the
+  announce+probe block to after `createAcceptanceRuntime(` turned it red and nothing else in a
+  six-file, 53-case gate moved. That is the falsifiability evidence a RED frame would have given.
+- Two supporting details: the pin is anchored on the two SYMBOLS, never on line numbers (`:329`);
+  and both anchors are asserted PRESENT first, because an ordering assertion over a symbol that is
+  absent passes vacuously — the negative-assertion failure mode of `:329`.
+- **Rule: distinguish a DEFECT test (RED first, always) from a REGRESSION pin (green at birth). For
+  the second, the mutant is not optional — it is the only evidence the pin can fail at all.**

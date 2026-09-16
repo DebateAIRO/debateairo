@@ -159,3 +159,74 @@ parts that needed judgement were all **contract-vs-brief conflicts**, and they a
   Named, not touched.
 - The degraded path costs **two** real CLI invocations at ceremony time (the closing run priced one
   Grok handshake at 0.0066 USD). Only the degraded path pays it. Disclosed, not optimised.
+
+---
+
+## Fix round 1 — addendum to the case file
+
+Round 1 of 5 on the orchestrator's review of `a38dde4a..fd004992`. Commits `4dfc3062` (F1),
+`383f7644` (F2), plus this docs commit. Full evidence in the SDD report's `## Fix round 1`.
+
+### The thing I nearly shipped, again, and it was the same shape as the original crime
+
+The review asked me to reuse round 0's announcer on the second entry path. The obvious move —
+`announceAbsentMakers(relayStarts, policy.providers)` in `main.ts`, one line — **would have printed
+the wrong maker's name.** The ceremony starts three relays and the boot starts two, against one
+three-row provider list, so a positional lookup answers `OpenAI` for a failed `claude`.
+
+That is worth dwelling on as a CAUSE, because it is the ticket's own defect wearing the opposite
+costume. F-GROK-SANDBOX-PROFILE exists because a channel was silent. The natural fix made the
+channel loud. **A loud channel that is wrong is a regression against a silent one**, and nothing in
+the round-0 tests would have caught it: every ceremony fixture aligns three-to-three, so the bug is
+invisible precisely where the coverage is.
+
+Cost of catching it: one `sed` over `main.ts` and one over `seed-register.ts`, before writing code —
+because the review's own constants had to be verified anyway, and verifying them is what surfaced the
+arity mismatch. **Cost had I not: a wrong-attribution defect in the loud path, found by an operator
+reading a ceremony log, i.e. the most expensive possible discovery site.**
+
+### What this says about the machine
+
+1. **"Reuse the helper at the second call site" is never a one-liner until the ARITIES match.** The
+   generalisable check is mechanical: before reusing a positional mapping, compare the lengths of
+   the two arrays at both call sites. That belongs in the reviewer's checklist, not in a seat's
+   luck.
+2. **The module-home question answered itself from the import graph.** The review offered a choice
+   ("import it, or move it — say which and why"). One grep settled it: `run-acceptance.ts` already
+   imports from `main.ts`, so the reverse closes a cycle. **Any "should A import B or B import A"
+   question is already answered by the existing edges** — read them instead of deliberating. Cost
+   of the grep: seconds. This is the cheapest decision procedure in the whole round.
+3. **A regression pin has no RED, and the honest report says so.** F2's assertion was green the
+   moment it was written, because the property already held. I did not manufacture a RED frame; the
+   mutant carries the falsifiability instead. Worth making explicit in the protocol: the worker
+   contract's "RED before GREEN, on every pass" (§3.5) is written for DEFECT tests. For a
+   regression pin the equivalent obligation is the mutant, and conflating the two invites exactly
+   the fabrication §3.6 forbids.
+4. **My own sweep claim was too loose and I caught it only by running it.** I had written "there are
+   exactly two `Promise.allSettled` relay-start sites" into the report. The grep returns **six**
+   sites; two are the class, three are teardown, and one (`discovery.ts:119`) needed reading to
+   classify — it turns out to be safe, because it converts a rejection into an explicit `ABSENT`
+   record rather than dropping it. **A class sweep asserted from memory is not a sweep.** §3.2 says
+   record it member by member, and the reason is now concrete: I was wrong about the count by a
+   factor of three, in a document I was about to hand to a reviewer.
+
+### What would have made this round unnecessary
+
+The round-0 contract was drawn around **the file where the bug was found**, not around the class the
+sweep finds. I named `main.ts:694` as a finding in round 0 and could not touch it. One extra file in
+the round-0 `allowed` list would have merged two rounds into one — and, more importantly, the arity
+mismatch would have been found while the announcer was still being designed, instead of after it had
+shipped with a positional signature that then had to change.
+
+**The upgrade: run the class sweep at DISPATCH time and draw the contract around its members.** The
+orchestrator already has the grep; it costs one command and it is the difference between a one-round
+and a two-round fix. This is the same recommendation as §5.3 in the round-0 report, now with a price
+attached: one full review cycle plus one signature migration.
+
+### Packet/contract notes for this round
+
+- The round-1 contract was complete: every file I needed was in `allowed`, including the "one new
+  small module if you choose it" clause, which is exactly the degree of freedom the import-graph
+  answer needed. No defects to report.
+- The review's four constants (`main.ts:694-700`, `claude-relay.ts:29`, `grok-relay.test.ts:295-296`,
+  `claude-relay.test.ts:375-376`) were all verified true before use.
