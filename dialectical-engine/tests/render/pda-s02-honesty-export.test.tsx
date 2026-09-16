@@ -56,11 +56,18 @@ describe("S02 public honesty and export", () => {
     expect(text.match(/not included in this public snapshot/gi)?.length ?? 0).toBeGreaterThanOrEqual(2);
     expect(text).toContain(publicDebate.answer.reversal_point);
     expect(text).toContain("owner-only");
+    const verdict = container.querySelector('section[aria-label="Verdict"]')!;
+    expect(verdict.querySelector("p")?.closest('[data-ai-generated="true"]')).not.toBeNull();
+    expect(container.querySelector('section[aria-label="Answer state"]')?.closest('[data-ai-generated="true"]')).toBeNull();
   });
 
   it("opens honesty from the public page and exposes export immediately", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const container = await mount(<PublicDebatePageClient debate={publicDebate} />);
+    const notice = container.querySelector('[aria-label="AI disclosure"]');
+    expect(notice?.textContent).toContain("may be inaccurate");
+    expect(notice?.querySelector('a[href="/ai-transparency"]')).not.toBeNull();
+    expect(container.querySelector('[data-ai-generated="true"]')?.textContent).toContain("Public answer content.");
     const download = container.querySelector<HTMLAnchorElement>("a[download]");
     expect(download).not.toBeNull();
     expect(download!.getAttribute("href")).toMatch(/^data:application\/json/);
@@ -79,8 +86,10 @@ describe("S02 public honesty and export", () => {
     const exported = buildPublicAnswerExport(publicDebate);
     const encoded = exported.href.slice(exported.href.indexOf(",") + 1);
     const decoded = decodeURIComponent(encoded);
-    const parsed = JSON.parse(decoded) as { answer: { reversal_point: string } };
+    const parsed = JSON.parse(decoded);
     expect(parsed.answer.reversal_point).toBe(publicDebate.answer.reversal_point);
+    expect(parsed.ai_disclosure).toMatchObject({ content_origin: "ai", human_editorial_review: false });
+    expect(parsed.question).toBe(publicDebate.question);
     for (const forbidden of [
       "execution_ledger_digest",
       "memory_disclosure",

@@ -83,6 +83,10 @@ describe("UI-01 export decision — S14's dual gate, restored once", () => {
 
     const payload = JSON.parse(decodeURIComponent(result.href.replace(/^data:application\/json;charset=utf-8,/, "")));
     expect(payload.answer.answer_id).toBe(answer.answer_id);
+    expect(payload.ai_disclosure).toMatchObject({
+      content_origin: "ai", human_editorial_review: false,
+      scope: "Generated arguments, reviews, scores and verdicts; excludes the user's question and operational records."
+    });
     // The claim on the button is now true of the bytes it downloads.
     expect(payload.execution_ledger_digest).toEqual(digestFixture);
     expect(payload.live_honesty).toEqual({
@@ -98,7 +102,7 @@ describe("UI-01 export decision — S14's dual gate, restored once", () => {
     if (!result.available) throw new Error("unreachable");
     const payload = JSON.parse(decodeURIComponent(result.href.replace(/^data:application\/json;charset=utf-8,/, "")));
     // S14 exported exactly { answer, execution_ledger_digest }; the restored
-    // export adds live honesty and drops nothing.
-    expect(Object.keys(payload).sort()).toEqual(["answer", "execution_ledger_digest", "live_honesty"]);
+    // export adds live honesty and AI disclosure, and drops nothing.
+    expect(Object.keys(payload).sort()).toEqual(["ai_disclosure", "answer", "execution_ledger_digest", "live_honesty"]);
   });
 });

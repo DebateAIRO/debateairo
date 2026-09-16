@@ -40,6 +40,7 @@ export function ReferenceScoreBadges({
       <button
         type="button"
         className="scoreBadgeButton scoreTransition"
+        data-ai-generated="true"
         aria-label={`Open the recorded V3 scores for ${node.claim}`}
         onClick={(event) => {
           event.stopPropagation();
@@ -69,6 +70,7 @@ export function ReferenceScoreBadges({
           key={badge.id}
           className={`scoreBadge v3 ${badge.id}`}
           data-v3-score={badge.id}
+          data-ai-generated="true"
           title={badge.title}
         >
           {badge.pillText}
@@ -87,7 +89,7 @@ export function ReferenceReviewLine({ review }: { review?: ContractNode["review"
       ? "REVIEW DISPUTED BY:"
       : "REVIEW COULD NOT ASSESS:";
   return (
-    <div className="nodeReviewLine" data-node-review={review.outcome}>
+    <div className="nodeReviewLine" data-node-review={review.outcome} data-ai-generated="true">
       <span className={`drawerReviewLabel ${disputed ? "dispute" : "agree"}`}>{label}</span>
       <ModelMetaLine
         modelId={review.reviewer_lineage.model_id}

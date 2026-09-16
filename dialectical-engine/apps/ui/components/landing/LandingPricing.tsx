@@ -1,4 +1,6 @@
 import type { JSX } from "react";
+import { AiNotice } from "../AiNotice";
+import { AI_NOTICE } from "@/lib/aiDisclosure";
 
 /* The document's closing CTA: centred, with the pro/rule/con motif above it.
    The pricing line carries the id the nav points at. */
@@ -33,6 +35,9 @@ export function LandingPricing(): JSX.Element {
       <p id="pricing" className="lpPricing">
         First [PLACEHOLDER] rounds free, then [PLACEHOLDER] per month. Cancel whenever.
       </p>
+      <footer id="ai-transparency" className="lpAiTransparency">
+        <AiNotice variant="block" body={AI_NOTICE.landingBlock} />
+      </footer>
     </section>
   );
 }

@@ -163,6 +163,7 @@ function ThreadRowCard({
         <div className="threadCardShell" data-reference-thread-card>
           <div
             className="threadCard"
+            data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}
             style={cardStyle}
             role={canOpen ? "button" : undefined}
             tabIndex={canOpen ? 0 : undefined}

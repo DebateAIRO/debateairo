@@ -325,6 +325,7 @@ function CanvasCard({
       ref={registerRef}
       style={cardStyle}
       data-node-id={node.id}
+      data-ai-generated={role === "root" ? undefined : "true"}
       data-bezel="shell"
       data-stance={stance}
       data-low-strength={VERDICT_FIRST_UI_ENABLED && lowStrength ? "true" : undefined}

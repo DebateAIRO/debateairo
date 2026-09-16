@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { AiNotice } from "../AiNotice";
 
 export function LandingHero(): JSX.Element {
   return (
@@ -29,6 +30,9 @@ export function LandingHero(): JSX.Element {
         <a className="lpCtaGhost" href="#transcripts">
           Read a scored transcript
         </a>
+      </div>
+      <div className="lpAiDisclosure">
+        <AiNotice variant="pill" body={<><strong>AI-generated content.</strong> Every argument, score and verdict on this site is produced by AI models, not by people, and is marked as such in the output.</>} />
       </div>
       <ul aria-label="Debate practice facts" className="lpStatBar">
         <li>Four turns per round</li>

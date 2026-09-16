@@ -9147,3 +9147,68 @@ a:focus-visible {
 }
 
 /* === end consent-ui S02 === */
+
+/* Shared AI Notice from the design document: strip, pill, block and banner. */
+.aiNotice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 9px 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--shell);
+  color: var(--text-2);
+}
+.aiNotice p { margin: 0; min-width: 0; font-size: 10.5px; line-height: 1.55; overflow-wrap: anywhere; }
+.aiNotice strong { font-weight: 700; color: var(--ink); }
+.aiNoticeBadge {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: var(--muted);
+  color: var(--bg);
+  font: 800 8.5px var(--font-mono);
+}
+.aiNotice a, .lpRoot .aiNotice a {
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.aiNotice a:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 2px; }
+.aiNotice--pill {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 8px 14px 8px 10px;
+  border-radius: 999px;
+  border-color: var(--line-strong);
+}
+.aiNotice--pill p { color: var(--ink); font-size: 11px; }
+.aiNotice--banner { gap: 11px; padding: 10px 13px; border-color: var(--line-strong); border-radius: 11px; }
+.aiNotice--banner .aiNoticeBadge { width: 20px; height: 20px; }
+.aiNotice--block { display: block; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.aiNotice--block h2 { margin: 0 0 7px; font: 700 10px var(--font-mono); letter-spacing: .18em; color: var(--ink); }
+.aiNotice--block p { max-width: 84ch; font-size: 11px; line-height: 1.65; }
+.lpAiDisclosure { margin-top: 44px; }
+.lpAiDisclosure .aiNotice { padding: 9px 16px 9px 12px; background: var(--lp-raised); }
+.lpAiDisclosure .aiNotice p { font-size: 13px; }
+.lpAiTransparency { max-width: 70ch; margin: 56px auto 0; padding-top: 26px; border-top: 1px solid var(--line); font-size: 12.5px; text-align: left; }
+.lpAiTransparency .aiNotice p { font-size: 12.5px; line-height: 1.7; }
+.libAiDisclosure { margin-top: 14px; }
+.ndAiDisclosure { margin-top: 16px; margin-bottom: 20px; }
+.debateAiDisclosure { flex: 0 0 auto; padding: 10px 20px; border-bottom: 1px solid var(--line); }
+.supportChatScroll > .aiNotice { margin-bottom: 16px; }
+.supportAssistantCompact > .aiNotice { margin: 0 0 12px; }
+.aiTransparencyPage article { width: min(100%, 760px); margin: 32px auto; }
+.aiTransparencyPage h1 { font-family: var(--font-display); font-size: clamp(28px, 5vw, 42px); line-height: 1.15; }
+.aiTransparencyPage h2 { margin-top: 28px; font-size: 18px; }
+.aiTransparencyPage p { line-height: 1.7; color: var(--text-2); }
+.aiTransparencyPage code { overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .aiNotice--pill { border-radius: 16px; }
+  .debateAiDisclosure { padding: 8px 12px; }
+}

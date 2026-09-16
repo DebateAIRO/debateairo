@@ -43,7 +43,7 @@ function ArgumentCard({
   const model = lineage === null ? null : modelMeta(lineage.model_id);
 
   return (
-    <article className="publicArgumentCard" data-side={side}>
+    <article className="publicArgumentCard" data-side={side} data-ai-generated="true">
       <div className="publicArgumentCore">
         <span className="publicArgumentAccent" aria-hidden />
         <div className="publicArgumentTop">
@@ -98,7 +98,7 @@ export function PublicDebateOverview({
     <main className="publicOverviewScroll scroll" data-design-turn="3b">
       <div className="publicOverview">
         <div className="publicOverviewInner">
-        <section className="publicVerdictShell" aria-labelledby="public-verdict-label">
+        <section className="publicVerdictShell" aria-labelledby="public-verdict-label" data-ai-generated="true">
           <div className="publicVerdictCore">
             <span className="publicVerdictTab" aria-hidden />
             <div className="publicVerdictHead">
