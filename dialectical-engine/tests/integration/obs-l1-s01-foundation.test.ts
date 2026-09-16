@@ -722,9 +722,17 @@ describe("S01 obs store foundation on real PostgreSQL", () => {
         AND privilege_type = 'SELECT' AND grantee LIKE 'debateai_obs_%'
       ORDER BY grantee
     `);
+    // `debateai_observation_agent` is admitted by
+    // `migrations/0057_observation_foundation.sql:223-226`, which grants it SELECT on
+    // the SAFE VIEW and on no base table. That is least privilege by construction:
+    // `obs.run_correlation_v` (`0034_obs_foundation.sql:267-270`) projects exactly the
+    // five safe columns, and `0060_observation_throughput_views.sql:30` explicitly
+    // REVOKEs ALL PRIVILEGES on `core.run`, `core.work_item` and `ledger.raw_artifact`
+    // from that role. The chokepoint holds for it; it is a reader of the view, never
+    // of the table behind it.
     expect(viewGrants.rows.map((row) => row.grantee)).toEqual([
       "debateai_obs_human", "debateai_obs_listener", "debateai_obs_view_owner",
-      "debateai_obs_watchdog"
+      "debateai_obs_watchdog", "debateai_observation_agent"
     ]);
 
     await withRole("debateai_obs_listener", async (listener) => {
@@ -779,6 +787,11 @@ describe("S01 obs store foundation on real PostgreSQL", () => {
           code: "42501",
           message: "permission denied for table run"
         },
+        // NOT UPDATED — see the same note at the `safeCoreReads` pin below. The five
+        // columns are `migrations/0034_obs_foundation.sql:274-275`'s column grant;
+        // `migrations/0060_observation_throughput_views.sql:23` supersedes it with a
+        // TABLE-level `GRANT SELECT ON core.run`, so this pin is the guard that caught
+        // a least-privilege widening, not an inventory that drifted.
         safeCoreReads: [{
           grantee: "debateai_obs_view_owner",
           columns: ["battery_version", "created_at_seq", "register_version", "risk_tier", "run_id"]
@@ -868,6 +881,19 @@ describe("S01 obs store foundation on real PostgreSQL", () => {
       GROUP BY grantee
       ORDER BY grantee
     `);
+    // NOT UPDATED — this pin is correct and the product is not.
+    // `migrations/0034_obs_foundation.sql:274-275` grants the view owner a COLUMN list
+    // (`GRANT SELECT (run_id, created_at_seq, register_version, battery_version,
+    // risk_tier) ON core.run`). `migrations/0060_observation_throughput_views.sql:23`
+    // then issues a TABLE-level `GRANT SELECT ON core.run,core.work_item,
+    // ledger.raw_artifact TO debateai_obs_view_owner`, which supersedes that list and
+    // hands the owner every column of `core.run` — `caller_scope`, `content_ciphertext`,
+    // `content_attestation`, `question_line`, `question_blind_index`, `session_id` and
+    // the rest. The views this owner owns are `security_invoker = false`, so its reach
+    // IS the chokepoint's floor, and 0060's own `obs.run_throughput_v` (`:24-32`) reads
+    // only `run.run_id` and `run.created_at_seq` — both already in the 0034 list, so the
+    // widening buys nothing. The repair is a forward migration narrowing 0060's grant
+    // back to a column list; `migrations/**` is outside this seat's write contract.
     const safeColumns = ["battery_version", "created_at_seq", "register_version", "risk_tier", "run_id"];
     expect(safeCoreReads.rows).toEqual([
       { grantee: "debateai_obs_view_owner", columns: safeColumns }

@@ -36,7 +36,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  *   - the continuation is the REAL `migrate()`, not a local copy of it, so the
  *     name-keyed skip that makes an amendment inert is the code under test;
  *   - the verdict is the REAL `assertContentProvisionDatabaseRole` against the
- *     REAL nine SCRAM LOGIN principals, so the assertion is the same attestation
+ *     REAL eleven SCRAM LOGIN principals, so the assertion is the same attestation
  *     that failed in b7 — not a paraphrase of its counting SQL. Nothing here
  *     hardcodes the ruled function count; the attestation stays its own author.
  *
@@ -126,7 +126,39 @@ async function seedTheDeployedExposure(target: TestDatabase): Promise<void> {
   await target.pool.query(`GRANT EXECUTE ON FUNCTION ${GUARD} TO PUBLIC`);
 }
 
-/** The nine SCRAM LOGIN principals, provisioned the way DEV-03 provisions them. */
+/**
+ * The one capability role whose CREATE lands ABOVE the `THROUGH` cutoff.
+ *
+ * `assertCapabilityRoles` (`apps/runner/src/dev-database-principals.ts:405-413`)
+ * requires every capability role in `DEVELOPMENT_DATABASE_PRINCIPALS` to exist
+ * before it provisions the LOGIN principals. Two support capability roles are in
+ * that table, and only one of them is reachable from this arm's premise:
+ *
+ *   - `debateai_support` — `migrations/0050_support_foundation.sql:10`,
+ *     `CREATE ROLE debateai_support NOLOGIN NOINHERIT`. `0050_support_*` sorts
+ *     BELOW `0052_t5_reviewer_measured_edges.sql`, so `applyThrough` already ran
+ *     it and this fixture must not touch it.
+ *   - `debateai_support_config_operator` — `migrations/0055_register_support_publication.sql:19`,
+ *     `CREATE ROLE debateai_support_config_operator NOLOGIN NOINHERIT`. `0055`
+ *     sorts ABOVE the cutoff, so the 0052-recorded state this arm exists to stand
+ *     on cannot have it, and the provisioner throws
+ *     `DEV_DATABASE_CAPABILITY_ROLES_INVALID` before the attestation is ever reached.
+ *
+ * It is created here with exactly 0055's attributes and NOTHING else: no grant, no
+ * membership in either direction, no privilege on `GUARD`. That is the least
+ * privilege 0055 itself enforces — `:21-31` raises `SUPPORT_CONFIG_ROLE_INVALID`
+ * on LOGIN/INHERIT/SUPERUSER/CREATEROLE/CREATEDB/REPLICATION/BYPASSRLS, `:32-41`
+ * on any membership, `:42-55` on `debateai_runtime`/`debateai_replay`/`debateai_support`
+ * being a member of it — so nothing about the privilege state this arm measures moves.
+ *
+ * A bare CREATE, not `IF NOT EXISTS`, on purpose: if `0055` ever sorts below the
+ * cutoff, this line fails loudly instead of silently pinning nothing.
+ */
+async function createPostCutoffCapabilityRole(target: TestDatabase): Promise<void> {
+  await target.pool.query("CREATE ROLE debateai_support_config_operator NOLOGIN NOINHERIT");
+}
+
+/** The eleven SCRAM LOGIN principals, provisioned the way DEV-03 provisions them. */
 async function provisionPrincipals(target: TestDatabase): Promise<ReadonlyMap<string, string>> {
   secretRoot = await mkdtemp(join(tmpdir(), "debateai-tint1-upgrade-"));
   const credentialFilePath = join(secretRoot, "database-principals.env");
@@ -183,6 +215,7 @@ describe("TINT1 · the forward revoke reaches a database that ALREADY applied 00
     database = await startTestDatabase();
     await applyThrough(database, THROUGH);
     await seedTheDeployedExposure(database);
+    await createPostCutoffCapabilityRole(database);
     const credentials = await provisionPrincipals(database);
 
     // THE PREMISE. This ledger already records 0052, so the production migrator
