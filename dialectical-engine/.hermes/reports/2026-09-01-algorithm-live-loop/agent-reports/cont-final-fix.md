@@ -189,3 +189,59 @@ line for whoever owns it.
 F4 (the retired served-vs-consumed contract field walk, `tools/orphan-audit/src/index.ts:1252-1295`
 and `tests/architecture/s14-contract.test.ts:33-43`) was routed by the reviewer to the records
 ticket beside deferred-minors row 1. No code was written for it here.
+
+---
+
+## 10. Fix round 2 — my own collateral, and what it teaches
+
+Round 1 was reviewed green, and then the orchestrator's **full-suite** gate at `7b35227b` found two
+reds my three gates could not see: `tests/unit/s1-1-depth-contract.test.ts` — "keeps the owning
+declaration as the only depth-bound site in shipped code" and "leaves no duplicate definition of the
+ruled ceiling anywhere in shipped code". The frame names my line:
+
+```
+apps/runner/src/index.ts:2150 [DOMAIN_ENUMERATION] const longestDeadline = Math.max(
+```
+
+**The cause, and it is mine.** F2's refusal was right; its SHAPE was not. I built the two synthesis
+arguments as a list — `...(policy === undefined ? [0] : [...].map(…))` — and a **numeric array in
+shipped code** is exactly what the S1-1 single-source oracle hunts. That oracle deliberately does
+not enumerate spellings of the depth ceiling (its header records that enumerating spellings was
+refuted by codex in an earlier round); it flags any *ruled or conservatively unknown* numeric-array
+occurrence and admits ONE line in the entire tree. An array behind a `.map` with a block body is
+unknown, and unknown is a site. My expression had nothing to do with depth — and that is the point.
+
+**What I got wrong, precisely: I chose a shape for readability and never asked who reads shapes.**
+In round 1 I ran the WHO-READS sweep for F5, because the packet made it binding *for a literal I was
+changing*. I did not run the equivalent question for the new **numeric expression** I was
+introducing, and no gate in my packet covered it. The law has a third limb I had not drawn:
+
+> A literal has quoting readers. A path has path readers. **A new numeric shape in `packages/`,
+> `apps/` or `web/` has the S1-1 oracle** — whatever the subject matter is.
+
+A gate list assembled from the finding's own subject (a claim guard, a relay probe, a coverage row)
+will never contain a whole-tree source oracle. That is a **structural** hole, not an attention
+lapse: it recurs for every seat whose diff introduces a shape rather than a value.
+
+**Upgrade — U7, and it belongs next to U5.** The gate runner should carry a small **always-on tail**
+that every seat runs regardless of subject: the whole-tree source oracles. `s1-1-depth-contract`
+costs **3.2s for 1010 cases**. My entire round-1 gate budget was ~35 seconds of compute; this would
+have added three. The economics are not arguable — the reason it was skipped is that nobody listed
+it, which is precisely what an always-on tail fixes.
+
+**Cost of this miss:** one full-suite gate (143 files) to detect, one fix round, one re-review — and
+it landed *after* a green verdict, which is the expensive place to land.
+
+**The fix, and why it needed no exemption.** The coordinator's packet said to prefer a shape the
+oracle does not read as a domain over an allow-list entry. That was available: each bound is now its
+own **scalar** argument to `Math.max`, refusing by the same name via a `never`-returning arrow. The
+oracle sees no array, so there is nothing to exempt — `1010 passed (1010)`, the owning declaration
+at `packages/contract/src/index.ts:112` still the only admitted site, and
+`tests/unit/s1-1-depth-contract.test.ts` is **not modified by this pass**. F2's behaviour is intact:
+the pin at `tests/integration/database.test.ts:5783-5819` stays green and the whole file is 91/91.
+
+**A second-order note worth more than the fix.** The arrow-IIFE shape I first rejected in round 1 —
+"an idiom this file has never used" (`grep -c '(() => {' apps/runner/src/index.ts` was 0) — is what
+round 2 shipped. I rejected it on taste and chose a list; the list had a reader and the idiom did
+not. **When two shapes are equivalent for the human reader, prefer the one with fewer machine
+readers** — and find out which that is before committing, not after the gate.

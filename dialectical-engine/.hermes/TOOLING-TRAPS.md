@@ -5743,3 +5743,27 @@ not in 4 000 lines of prose every author skims.
   range back, and cite the SYMBOL beside the line so the citation survives the file moving.** The same
   packet's other constants were checked the same way: `index.ts:2161-2162` verified exact,
   `board-lint.sh` stated as 26 lines and measured at 34.
+
+## A NUMERIC ARRAY in shipped code has the S1-1 depth oracle as a reader — the WHO-READS law's third limb (2026-09-16, FIX(WHOLE-BRANCH) round 2)
+
+- A claim-guard fix in `apps/runner/src/index.ts` built two `Math.max` arguments with
+  `...(cond ? [0] : [...].map(...))`. Nothing about it concerns depth. `tests/unit/s1-1-depth-contract.test.ts`
+  still took two cases red at the next full-suite gate:
+  `apps/runner/src/index.ts:2150 [DOMAIN_ENUMERATION] const longestDeadline = Math.max(`.
+- **Why:** the oracle "inverts the burden" by design (its own header, `:300-325`) — it does not
+  enumerate spellings of the ceiling, it flags any **ruled OR conservatively unknown numeric-array
+  occurrence** and admits exactly ONE line in the whole tree
+  (`packages/contract/src/index.ts:112 [DEPTH_BOUND_LITERAL] export const EXPANSION_DEPTH_MAX = 5;`).
+  An array whose cells it cannot evaluate — anything behind a `.map` with a block body, an unmodelled
+  call, an async callback (fixtures K7c, K34, K50) — is UNDETERMINED, and UNDETERMINED is a site. A
+  bare `[0,1,2,3,4,5]` is `OTHER`; an array it cannot decide is worse off than one it can.
+- **Rule: WHO READS THIS STRING has a third limb. A literal has quoting readers, a path has
+  path readers — and a NEW NUMERIC SHAPE in `packages/`/`apps/`/`web/` has the S1-1 oracle, whatever
+  the subject matter. Any diff that introduces an array of numbers into shipped code runs
+  `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts` (3.2s, 1010 cases) before it is
+  handed on.** A gate list built from the finding's own subject will not contain it.
+- **Remedy, in preference order:** keep the expression scalar so the oracle reads no domain at all
+  (what this fix did — two plain `Math.max` arguments; 1010/1010, no exemption, no edit to the
+  oracle); an allow-list entry only when the array is genuinely required, and then with the reason
+  written in beside it the way the existing entries carry theirs.
+- Cost: one full-suite gate (143 files, two reds), one fix round, one re-review.
