@@ -3,7 +3,7 @@
 ```yaml
 state:
   ticket: W10
-  risk_tier: medium          # changes failure classification and two sealed cost rows; no change to any served answer
+  risk_tier: high            # 2026-09-16 orchestrator: raised from medium — the ticket landed a migration (0064) and two sealed rows, the board's floor trigger; no change to any served answer
   status: done
   owner: { agent: claude, session: tbd }
   contract:
