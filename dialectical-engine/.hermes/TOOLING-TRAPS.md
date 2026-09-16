@@ -5634,3 +5634,31 @@ not in 4 000 lines of prose every author skims.
 - **Rule: a mechanical sweep defined by a grep is defined over file CONTENT; the write contract has to
   be defined over file ROLE. Before editing anything whose name says `superseded`, `archive`, `.orig`
   or `-v1`, ask what would be false about it afterwards.**
+
+## A new REGISTER ROW's readers include the PUBLICATION PINS, not only the manifests — and a count pin carries no name to grep (2026-09-16, FIX(CONT-T15) round 2)
+
+- W10/3 added two sealed rows to T16's manifest. The new-emission sweep (`:5222`) was run as
+  written — grep the literal, then grep EXACT pins of the collection it joins — and it correctly
+  found and updated `ALGORITHM_REGISTER_ROW_KEYS`'s own counts (15 -> 17), the manifest iterators
+  and the acceptance spread. The full-suite gate then reported a red the sweep could not have
+  found: `tests/architecture/register-support-publication.test.ts:369`,
+  `expected [...] to have a length of 47 but got 49`.
+- **That assertion mentions no row key, no manifest symbol and no register identifier.** It names a
+  local variable and an integer, and the set the rows joined is two call-frames away
+  (`buildAlgorithmRegisterRows` -> `buildDevelopmentAlgorithmRegisterRows` ->
+  `buildDevelopmentDeploymentRegisterPublicationRows`). Both prescribed greps are keyed on NAMES,
+  and a count pin is the one reader shape that carries no name.
+- The same suite holds four MORE counts that must NOT move — `historicalRows` 14 (bootstrap),
+  the legacy v4 snapshot 32, and two "248 policy decimals" clauses that are AUTH-policy-scoped
+  (`AUTH_POLICY_ROW_KEYS` + mfa/session/recovery/productRole, over the BOOTSTRAP rows and over
+  `AUTH_POLICY_REGISTER_ROWS`). Recomputing 248 to include a new row's numerics would break a
+  correct pin to accommodate a row it was never about, and the suite would go green on a lie.
+- **Rule: for a new member of any PRODUCED SET, add a third sweep limb — grep the PRODUCER's name
+  (`grep -rnE '<builderFunction>|<MANIFEST_CONST>' tests acceptance`) and check every hit for a
+  size assertion on what it returns. Then, before changing any number in the suite you land on,
+  read each neighbouring count's own derivation and record why it does or does not move.**
+- Corollary for the mutant: dropping the row from the seeder does NOT prove the count pin — T16's
+  manifest guard (`ALGORITHM_REGISTER_ROWS_INVALID`) refuses first, one layer earlier. To kill at
+  the count pin, drop the row AND its manifest key so the builder stays internally consistent.
+  Run both; the pair is the evidence, and reporting only the first credits the count pin with a
+  kill it did not make (`:1877`).

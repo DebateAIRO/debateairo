@@ -429,3 +429,88 @@ claim no longer covered the call), three-run worst-wins, and log-first gate runs
 | Both typechecks | 0 before any edit, 0 after |
 | `mode change` count in the round's diff | 0 |
 | Wall clock | ~50 minutes |
+
+---
+
+# Fix round 2 — the reader that had no name
+
+Round 2 of 5, base `20a95f0a`, tip `35dc4c15`. One red, one commit, one number changed.
+Wall clock ~20 minutes. The interesting part is not the fix; it is that **my C3 sweep obeyed the
+WHO-READS law exactly and still missed this reader**, and the reason is precise enough to fix.
+
+## 1 · CAUSE — the law greps for NAMES; this reader is a bare integer
+
+The new-emission limb (`TOOLING-TRAPS.md:5222`) says: a literal that is ALTERED has readers of the
+literal; a literal newly EMITTED has readers of the COLLECTION it joins. I ran both greps. They
+found `ALGORITHM_REGISTER_ROW_KEYS`'s own counts, the manifest iterators, the acceptance spread,
+and I updated 15 → 17.
+
+What they cannot find is `expect(developmentRows).toHaveLength(47)`. That assertion mentions **no
+row key, no manifest symbol, no register identifier** — it names a local variable and an integer,
+and the set my rows joined is two call-frames away (`buildAlgorithmRegisterRows` →
+`buildDevelopmentAlgorithmRegisterRows` → `buildDevelopmentDeploymentRegisterPublicationRows`).
+Both prescribed greps are keyed on names. **A number is not a name, and a count pin is the one
+reader shape that carries no identifier at all.**
+
+**Price:** one full-suite gate by the orchestrator, one dispatched round, ~20 minutes and ~35k
+tokens — to change one digit.
+
+**UPGRADE, and it is one command:** the collection sweep should grep for counts of the **PRODUCER**,
+not of the value. For a register row that is
+`grep -rnE 'buildDevelopmentDeploymentRegisterPublicationRows|ALGORITHM_REGISTER_ROW_KEYS' tests acceptance`
+followed by, for each hit, "does this file pin a length/size of what that producer returns?". I ran
+exactly that this round and it found the reader in one pass — after the fact. It belongs in the law
+as a third limb: **for a new member of any produced SET, grep the PRODUCER's name and check each
+hit for a size assertion.**
+
+## 2 · What I nearly got wrong, twice
+
+1. **Changing 248 because the round's message raised the possibility.** The instruction said to
+   measure whether the "248 policy decimals" clause counts every row's numerics. It does not: both
+   forms are AUTH-policy-scoped (`policyKeys` over `historicalRows`, and `AUTH_POLICY_REGISTER_ROWS`
+   over the exported constants). Had I "helpfully" recomputed 248 to include my three numeric
+   fields, I would have broken a correct pin to accommodate a row it was never about — and the
+   suite would have gone green on a lie. **Reading the derivation took four minutes and was the
+   whole job.** The instruction to read before changing any number was the right instruction.
+2. **Inferring the delta instead of measuring it.** 49 − 47 = 2 and C3 added 2 rows is a very
+   persuasive coincidence, and it is still an inference. The probe cost two minutes and turned it
+   into a fact: 49 emitted, 0 duplicate keys, 47 with exactly those two keys removed. If some other
+   lane had also added a row and one of mine had failed to seed, the arithmetic would have looked
+   identical and the pin would have been updated over a real defect.
+
+## 3 · A mutant that killed at the wrong layer, usefully
+
+The round asked for "drop one of the two rows from the port input → the pin is red". Done literally
+(M16), the pin never runs: T16's own manifest guard refuses first with
+`The seeded row set does not match the declared T16 row manifest`. So the requested mutant proves
+the manifest guard, not the count pin.
+
+I ran a second (M17) that drops the row AND its manifest key, leaving the builder internally
+consistent, and got the kill at the count pin itself (`49 but got 48`). **Two mutants, two layers,
+and the pair is the actual evidence:** a dropped row is caught by the manifest, and a row set that
+is consistent but smaller than the deployment publishes is caught by the count. Reporting only M16
+would have credited the count pin with a kill it did not make — the `:1877` family ("a mutant
+killed ONLY by a planted control looks identical in the suite summary").
+
+## 4 · What worked
+
+- **The round handed me a frame and a file, and told me to re-take the RED myself.** I did, and it
+  matched byte for byte. That is a 30-second check that removes any doubt about a stale gate.
+- **"A count that does not move is left alone and you say why"** turned four unchanged numbers into
+  four recorded reasons instead of four silent omissions. The reviewer can now audit my *inaction*.
+- The sweep table classifies every hit, including the sixteen that merely share a number (32-byte
+  keys, envelopes, grader cells). Listing non-readers with a reason is what makes the sweep
+  mechanically checkable, and it cost three lines each.
+
+## 5 · Numbers for this round
+
+| | |
+|---|---|
+| Commits | 1 fix (`35dc4c15`) + this docs commit |
+| Numbers changed | 1 (47 → 49), with W10/3 + T16 cited |
+| Numbers deliberately unchanged | 4, each with a written reason |
+| Mutants | 2 — both killed, at two different layers |
+| Gate | 1 file, 14/14, three runs, `testResults.length` = 1 each; worst run green |
+| `pnpm run typecheck` | 0 before, 0 after |
+| `mode change` count in the round's diff | 0 |
+| Wall clock | ~20 minutes |
