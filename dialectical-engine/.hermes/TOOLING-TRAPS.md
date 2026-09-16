@@ -4750,3 +4750,47 @@ not in 4 000 lines of prose every author skims.
 - **Rule: a security finding carries the QUERY that measures the state, not an adjective and not a
   count.** The next seat then runs one command instead of reconciling three narrations — and the
   count cannot be wrong, because nobody types it.
+
+## A DIFFERING blob hash is not restore-justification — only the STRING is (2026-09-16, BUILD(CONT-T4))
+- The scope amendment (`plans/2026-09-16-algorithm-live-loop-continuation.md:101`) gives a verdict for
+  the EQUAL case only: three equal hashes on `^1`/`^2`/HEAD ⇒ the merge cannot be the cause. It gives
+  no verdict for the DIFFERS case, and that is precisely where a seat invents work, because a
+  differing hash reads as evidence of a merge-dropped site.
+- Measured here on `s8-publication-contract.test.ts:169`: `apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx`
+  is `913fc863` on `^1` and `4ec000f1` on `^2` and at HEAD — a real reconcile toward `^2`. It still is
+  NOT a dropped render site: `git show '5e617776^1:./<path>' | grep -c PublicAnswerDisclosure` → **0**.
+  The whole `^1`→HEAD delta is six inserted lines adding `SupportWidget`. The expected string was
+  absent on both parents; `PublicAnswerDisclosure` is defined at
+  `apps/ui/components/PublicAnswerDisclosure.tsx:3` and imported by nothing on `^1`, `^2` or HEAD.
+- **Rule, two steps, and the second decides:** (1) hashes equal ⇒ EXCLUDED; (2) hashes differ ⇒ grep
+  the `^1` BLOB for the expectation string — present on `^1` and absent at HEAD ⇒ RESTORE, absent on
+  `^1` ⇒ EXCLUDED exactly like (1). Cost of the missing step: one seat-hour and, had it been skipped,
+  an invented "restore" of a component neither parent ever composed.
+
+## Bound the merge's blast radius ONCE per zone, before decomposing anything (2026-09-16, BUILD(CONT-T4))
+- `git diff --name-only 5e617776^1 HEAD -- ./apps/ui` prints **26** paths. Any failing row whose
+  source is not one of those 26 cannot be merge debt, whatever the suite is called and however the
+  directory as a whole was resolved. That one command settles §10 item 6's entire 16-row "UI
+  ownership" block before a packet exists.
+- All eight rows dispatched to BUILD(CONT-T4) read sources outside that list (or inside it without
+  the string), so all eight were RED ON BOTH PARENTS and the node wrote zero lines of product code.
+  Seven of the eleven sources are byte-identical triples, including `DebateCanvas.tsx` `aec019cc`,
+  `DebatePageClient.tsx` `10608541`, `DebateThread.tsx` `a36c6de4`, `lib/types.ts` `8bdfc0b8`,
+  `lib/recommendation.ts` `539c5341`.
+- This is the ZONE-level form of the ASSERTION-level rule at `:4434`. That entry says attribute per
+  assertion; this one says you can often skip the per-assertion work entirely, because the zone diff
+  is one command and it excludes rows wholesale. **A verdict row must therefore be keyed by the
+  SOURCE PATH its failing assertion reads, not by its suite name** — a row keyed by a path can be
+  checked against the blast-radius list mechanically; a row keyed by a suite name cannot, and that is
+  how §6's prose survived two seats.
+
+## Prove the instrument can still say YES before reporting eight NOs (2026-09-16, BUILD(CONT-T4))
+- An attribution that returns EXCLUDED for every row it is given is indistinguishable, from the
+  outside, from an attribution that is simply broken. Before writing "no work here", run one POSITIVE
+  CONTROL inside your own read surface: a string the merge really did drop.
+- Control used here: `apps/ui/app/page.tsx` is `3d43ab3b` on `^1` and `d004d0fb` at HEAD, and
+  `grep -c 'return <LandingPage />'` is **1** on `^1` and **0** at HEAD — the method returns RESTORE
+  for it, so its eight EXCLUDEDs are measurements and not a dead instrument.
+- Same generating condition as `:1887` ("Before claiming 'no real code exercises this rule', prove
+  your instrument can SEE the difference"), reached from attribution instead of from mutation
+  testing. A null verdict ships with its control or it is not evidence.
