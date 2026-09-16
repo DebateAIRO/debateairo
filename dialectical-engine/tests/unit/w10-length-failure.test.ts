@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import type { Pool } from "pg";
 import { describe, expect, it } from "vitest";
 import {
   OpenAICompatibleProviderGateway,
@@ -5,6 +7,17 @@ import {
   type ProviderCallRequest,
   type RawArtifactInput
 } from "@debateai/providers";
+// The module that OWNS these symbols, exactly as `tests/integration/
+// t16-algorithm-register.test.ts:64` reaches them: the register barrel's export
+// list is not this seat's surface, so the test reads the owner directly.
+import {
+  ALGORITHM_REGISTER_ROW_KEYS,
+  buildAlgorithmRegisterRows,
+  readSynthesisRoleControls
+} from "../../packages/register/src/algorithm-policy.js";
+// The JUDGE's clock read from the row that DECLARES it, never restated here:
+// the whole defect is two numbers that were supposed to relate and did not.
+import { DEVELOPMENT_ORGAN_COST_BOUNDS } from "../../apps/runner/src/dev-deployment-register.js";
 
 /**
  * W10 (`board/W10-call-budget-truthfulness.md`, audit
@@ -200,5 +213,114 @@ describe("W10 C2 · a truncation is not retried into the identical truncation", 
     })).catch(() => undefined);
     expect(attempts.map((attempt) => attempt.body.max_tokens)).toEqual([2_048, 2_048, 2_048]);
     expect(attempts.map((attempt) => attempt.body.messages.length)).toEqual([1, 2, 2]);
+  });
+});
+
+/**
+ * A pool that answers the ONE query `readFamily` makes, from a row set the test
+ * controls. `register.register_row` is APPEND-ONLY and a seeder re-reads what it
+ * wrote (`.hermes/TOOLING-TRAPS.md:1759`), so "the deployment never sealed this
+ * row" is modelled at the READ, not by mutating a seeded register.
+ */
+function registerPoolWithout(omitted: readonly string[]): Pool {
+  const sealed: Readonly<Record<string, unknown>> = {
+    synthesizerRoleRef: { kind: "SYNTHESIZER_ROLE_REF", providerRef: "development:codex-cli", provisional: true },
+    evaluatorRoleRef: { kind: "EVALUATOR_ROLE_REF", providerRef: "development:claude-cli", provisional: true },
+    evaluatorLoopMaxRounds: { kind: "EVALUATOR_LOOP_MAX_ROUNDS", maxRounds: 3 },
+    synthesizerCallBound: {
+      kind: "SYNTHESIZER_CALL_BOUND", maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000
+    },
+    evaluatorCallBound: {
+      kind: "EVALUATOR_CALL_BOUND", maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000
+    }
+  };
+  return {
+    query: async (_text: string, values: readonly unknown[]) => ({
+      rows: (values[1] as readonly string[])
+        .filter((rowKey) => !omitted.includes(rowKey) && sealed[rowKey] !== undefined)
+        .map((rowKey) => ({ row_key: rowKey, value_json: sealed[rowKey], source_ref: "w10-test:scratch" }))
+    })
+  } as unknown as Pool;
+}
+
+const W10_ROWS_INPUT = {
+  deploymentSourceRef: "W10-TEST-algorithm-register.md#w10",
+  synthesizerRoleRef: "development:codex-cli",
+  evaluatorRoleRef: "development:claude-cli",
+  providerFamilies: [{ familyRef: "openai", providerRefs: ["development:codex-cli", "development:claude-cli"] }]
+} as const;
+
+function mintedRow(
+  rowKey: string,
+  input: Parameters<typeof buildAlgorithmRegisterRows>[0] = W10_ROWS_INPUT
+): { readonly maxAttempts: number; readonly tokenCeiling: number; readonly deadlineMs: number } {
+  const row = buildAlgorithmRegisterRows(input).find((candidate) => candidate.rowKey === rowKey);
+  if (row === undefined) throw new Error(`no ${rowKey} row was minted`);
+  return row.value as { maxAttempts: number; tokenCeiling: number; deadlineMs: number };
+}
+
+describe("W10 C3 · the synthesizer and the evaluator have bounds of their own", () => {
+  it("mints sealed SYNTHESIZER and EVALUATOR cost rows in the T16 manifest", () => {
+    expect(ALGORITHM_REGISTER_ROW_KEYS).toContain("synthesizerCallBound");
+    expect(ALGORITHM_REGISTER_ROW_KEYS).toContain("evaluatorCallBound");
+  });
+
+  it("gives both roles a deadline no shorter than the judge's", () => {
+    // The two hardest calls in the system had the shortest clock, because they
+    // borrowed COMPOSER and CONFORMANCE — two organs T9 retired, both at 60_000,
+    // while the JUDGE — which answers about a SINGLE node — carried 180_000.
+    const judgeDeadlineMs = DEVELOPMENT_ORGAN_COST_BOUNDS.organs.JUDGE.deadlineMs;
+    expect(judgeDeadlineMs).toBeGreaterThan(DEVELOPMENT_ORGAN_COST_BOUNDS.organs.COMPOSER.deadlineMs);
+    expect(mintedRow("synthesizerCallBound").deadlineMs).toBeGreaterThanOrEqual(judgeDeadlineMs);
+    expect(mintedRow("evaluatorCallBound").deadlineMs).toBeGreaterThanOrEqual(judgeDeadlineMs);
+  });
+
+  it("rises with a deployment whose judge clock is longer than the sealed floor", () => {
+    const longerJudge = { ...W10_ROWS_INPUT, judgeDeadlineMs: 240_000 };
+    expect(mintedRow("synthesizerCallBound", longerJudge).deadlineMs).toBe(240_000);
+    expect(mintedRow("evaluatorCallBound", longerJudge).deadlineMs).toBe(240_000);
+  });
+
+  it("D71 boundary — tokenCeiling stays 2048 and is not set from an estimate", () => {
+    expect(mintedRow("synthesizerCallBound").tokenCeiling).toBe(2_048);
+    expect(mintedRow("evaluatorCallBound").tokenCeiling).toBe(2_048);
+    expect(mintedRow("synthesizerCallBound").maxAttempts).toBe(3);
+    expect(mintedRow("evaluatorCallBound").maxAttempts).toBe(3);
+  });
+
+  it("fails loudly at startup when a register never sealed the SYNTHESIZER row", async () => {
+    const rejection = await readSynthesisRoleControls(registerPoolWithout(["synthesizerCallBound"]), 5)
+      .then(() => null, (error: unknown) => error);
+    expect(rejection).toBeInstanceOf(Error);
+    expect((rejection as { code?: string }).code).toBe("SYNTHESIS_ROLE_CONTROLS_UNRESOLVED");
+    expect(String((rejection as Error).message)).toContain("synthesizerCallBound");
+  });
+
+  it("fails loudly at startup when a register never sealed the EVALUATOR row", async () => {
+    const rejection = await readSynthesisRoleControls(registerPoolWithout(["evaluatorCallBound"]), 5)
+      .then(() => null, (error: unknown) => error);
+    expect(rejection).toBeInstanceOf(Error);
+    expect((rejection as { code?: string }).code).toBe("SYNTHESIS_ROLE_CONTROLS_UNRESOLVED");
+    expect(String((rejection as Error).message)).toContain("evaluatorCallBound");
+  });
+
+  it("hands both sealed bounds to the deployment that read the family", async () => {
+    const controls = await readSynthesisRoleControls(registerPoolWithout([]), 5);
+    expect(controls.synthesizerBound).toEqual({ maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 });
+    expect(controls.evaluatorBound).toEqual({ maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 });
+  });
+
+  it("declares both rows in the migration that seals them", async () => {
+    // The number is MEASURED at write time, never predicted
+    // (`.hermes/TOOLING-TRAPS.md:4963`): 0063 was the highest on this branch.
+    const migration = await readFile("migrations/0064_synthesis_role_cost_rows.sql", "utf8");
+    expect(migration).toContain("('synthesizerCallBound',");
+    expect(migration).toContain("('evaluatorCallBound',");
+    expect(migration).toContain("'synthesisRoles'");
+  });
+
+  it("seeds both rows from the development deployment's own judge clock", async () => {
+    const seeder = await readFile("apps/runner/src/dev-deployment-register.ts", "utf8");
+    expect(seeder).toContain("judgeDeadlineMs: DEVELOPMENT_ORGAN_COST_BOUNDS.organs.JUDGE.deadlineMs");
   });
 });

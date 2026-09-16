@@ -460,7 +460,12 @@ export function buildDevelopmentAlgorithmRegisterRows(
     deploymentSourceRef: DEVELOPMENT_ALGORITHM_SOURCE_REF,
     synthesizerRoleRef: roleRefs.synthesizerRoleRef,
     evaluatorRoleRef: roleRefs.evaluatorRoleRef,
-    providerFamilies: deriveProviderFamilies(providerPanel.configuredProviders)
+    providerFamilies: deriveProviderFamilies(providerPanel.configuredProviders),
+    // W10/3: this deployment's OWN judge clock is the floor the two synthesis
+    // cost rows are sealed against. Read from the row that declares it, never
+    // restated — a second literal here is exactly how the 60_000/180_000
+    // inversion survived T9.
+    judgeDeadlineMs: DEVELOPMENT_ORGAN_COST_BOUNDS.organs.JUDGE.deadlineMs
   }).map((row) => Object.freeze(row)));
 }
 

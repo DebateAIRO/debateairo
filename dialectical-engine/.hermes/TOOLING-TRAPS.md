@@ -5264,3 +5264,36 @@ not in 4 000 lines of prose every author skims.
   change.
 - **Rule: a ticket that writes under `acceptance/` takes BOTH projects, and a packet that names only
   the root one is reporting a gate it does not have.**
+
+## The source-purity law does not see a NUMERIC SEPARATOR, so it enforces itself at random (2026-09-16, BUILD(CONT-T15))
+
+- `tools/orphan-audit/src/index.ts:694` refuses an exported numeric source literal with
+  `/export\s+const\s+([A-Z][A-Z0-9_]*)\s*=\s*-?\d+(?:\.\d+)?\s*[;\n]/`. I added three exported
+  constants to `packages/register/src/algorithm-policy.ts` in ONE commit: `= 180_000;`, `= 2_048;`
+  and `= 3;`. `audit:source` reported exactly ONE new blocking row. The two with a `_` separator
+  are invisible to the regex — `\d+` stops at `180`, and `_000;` is not `\s*[;\n]`.
+- The failure mode is the dangerous direction: the audit's silence reads as "this export is
+  lawful", and the obvious way to clear the one row it DID report is to write `3` as `3_0`... which
+  makes the law unenforceable in the file that most needs it. Same family as `:4626` (the law is
+  defeated by a TYPE ANNOTATION) from the other side — there the seat evades by adding syntax, here
+  the SEPARATOR the house style already uses everywhere does it for free.
+- **Rule: treat every exported SCREAMING_CASE number as covered by the law whatever the audit says,
+  and clear a row by REMOVING the export (module-private, or a sealed register row), never by
+  reshaping the literal. Reading the rule's regex is a 30-second measurement and it is the only way
+  to know whether a green audit means "lawful" or "unparsed".**
+
+## Adding a row to an EXISTING register family buys the loud startup failure; a NEW family does not (2026-09-16, BUILD(CONT-T15))
+
+- W10 mints two sealed cost rows and owes "a register without the row fails loudly at startup".
+  A new `synthesisCost` family needs a reader, and a reader is only reachable at boot if it is
+  re-exported from `packages/register/src/index.ts` — an explicit export list that was NOT in this
+  seat's write contract. The rows went into `SYNTHESIS_ROLE_ROW_KEYS` instead: that family is
+  already read at every deployment's boot (`apps/runner/src/dev-runner-policy.ts:203`), so the
+  existing `SYNTHESIS_ROLE_CONTROLS_UNRESOLVED` names the missing key with no new wiring at all.
+- The corollary is the cost: `tests/architecture/t16-algorithm-register-rows.test.ts:141` asserts
+  "the same N rows in THE migration that seals them" and reads ONE path. Extending a manifest from
+  a NEW migration file makes that test report the new rows as undeclared — which reads as "you
+  forgot the migration" when the truth is "the oracle reads one file". Concatenate the sources.
+- **Rule: before minting a register row family, ask which boot already reads it. The cheapest loud
+  failure is an existing reader's, and it costs one array entry instead of a barrel export, a
+  policy field and a settings field in three files you may not own.**

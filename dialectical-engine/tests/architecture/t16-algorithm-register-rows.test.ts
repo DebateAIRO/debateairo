@@ -130,16 +130,27 @@ describe("T16 algorithm register rows — schema, seeding and grep-proof", () =>
     ]).length).toBeGreaterThan(0);
   });
 
-  it("declares one manifest of fifteen rows across five families", () => {
-    expect(ALGORITHM_REGISTER_ROW_KEYS).toHaveLength(15);
-    expect(new Set(ALGORITHM_REGISTER_ROW_KEYS).size).toBe(15);
+  it("declares one manifest of seventeen rows across five families", () => {
+    // T16 seeded fifteen; W10/3 added `synthesizerCallBound` and
+    // `evaluatorCallBound` to the SYNTHESIS ROLE family (the two roles' own cost
+    // bounds, which until then borrowed the retired COMPOSER/CONFORMANCE rows).
+    // The family count is unchanged: W10 extends T16's manifest, it does not
+    // open a sixth family.
+    expect(ALGORITHM_REGISTER_ROW_KEYS).toHaveLength(17);
+    expect(new Set(ALGORITHM_REGISTER_ROW_KEYS).size).toBe(17);
     expect(Object.keys(ALGORITHM_REGISTER_ROW_FAMILIES)).toEqual([
       "stopping", "verdictLabel", "synthesisRoles", "panelWeighting", "envelope"
     ]);
   });
 
-  it("declares the same fifteen rows in the migration that seals them", async () => {
-    const migration = await readFile("migrations/0050_t16_algorithm_register_rows.sql", "utf8");
+  it("declares the same seventeen rows in the migrations that seal them", async () => {
+    // Two migrations now carry the manifest: 0050 seals T16's fifteen and 0064
+    // seals W10's two. A row declared in NEITHER is the omission this test
+    // exists to catch, so the sources are concatenated rather than swapped.
+    const migration = (await Promise.all([
+      readFile("migrations/0050_t16_algorithm_register_rows.sql", "utf8"),
+      readFile("migrations/0064_synthesis_role_cost_rows.sql", "utf8")
+    ])).join("\n");
     for (const rowKey of ALGORITHM_REGISTER_ROW_KEYS) {
       expect(migration, rowKey).toContain(`('${rowKey}',`);
     }

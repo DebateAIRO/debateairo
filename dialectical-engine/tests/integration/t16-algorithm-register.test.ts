@@ -55,6 +55,9 @@ const RULING_J8 = "algorithm-live-loop-DECISIONS.md#J8+configured-provider-set-d
 const RULING_BANDS =
   "algorithm-live-loop-DECISIONS.md#J1+packages/register/src/engine-shape.ts#ENGINE_BAND_ORDER";
 const RULING_FAMILY_MAP = "algorithm-live-loop-DECISIONS.md#J1+register:configuredProviderSet";
+/** W10/3: the ticket that MEASURED the inverted deadline chose these two values. */
+const RULING_W10 =
+  "algorithm-live-loop-board/W10-call-budget-truthfulness.md#3+audits/token-budget-reasoning.md";
 const RULING_ENVELOPE =
   "goal-v4-2026-09-01:285-295+packages/register/src/engine-shape.ts#ENGINE_BRANCHING_FACTOR";
 
@@ -110,6 +113,24 @@ const T16_EXPECTED_ROWS = [
     rowKey: "evaluatorLoopMaxRounds",
     rulingRef: RULING_GOAL,
     value: { kind: "EVALUATOR_LOOP_MAX_ROUNDS", maxRounds: 3 }
+  },
+  // W10/3 (`board/W10-call-budget-truthfulness.md` section 3): the two roles'
+  // OWN cost bounds. Before them the synthesizer borrowed COMPOSER's and the
+  // evaluator CONFORMANCE's — two organs T9 retired — so both carried 60_000
+  // while the JUDGE carried 180_000. The deadline is the development
+  // deployment's own judge clock; `tokenCeiling` stays 2048 until a live run
+  // reports `usage.completion_tokens`.
+  {
+    family: "synthesisRoles",
+    rowKey: "synthesizerCallBound",
+    rulingRef: RULING_W10,
+    value: { kind: "SYNTHESIZER_CALL_BOUND", maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 }
+  },
+  {
+    family: "synthesisRoles",
+    rowKey: "evaluatorCallBound",
+    rulingRef: RULING_W10,
+    value: { kind: "EVALUATOR_CALL_BOUND", maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 }
   },
   { family: "panelWeighting", rowKey: "dispersionScale", rulingRef: RULING_J1, value: { kind: "DISPERSION_SCALE", scale: 1 } },
   {

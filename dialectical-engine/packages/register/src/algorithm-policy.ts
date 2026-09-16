@@ -42,7 +42,15 @@ export const VERDICT_LABEL_ROW_KEYS = Object.freeze([
 export const SYNTHESIS_ROLE_ROW_KEYS = Object.freeze([
   "synthesizerRoleRef",
   "evaluatorRoleRef",
-  "evaluatorLoopMaxRounds"
+  "evaluatorLoopMaxRounds",
+  // W10/3: the two roles' own cost bounds. Until they existed the synthesizer
+  // borrowed COMPOSER's and the evaluator CONFORMANCE's — two organs T9
+  // retired — so the cost envelope still described the retired architecture.
+  // They join the SYNTHESIS ROLE family deliberately: that family is already
+  // read at every deployment's boot, so a register that never sealed them fails
+  // loudly there instead of at the first served answer.
+  "synthesizerCallBound",
+  "evaluatorCallBound"
 ] as const);
 
 export const PANEL_WEIGHTING_ROW_KEYS = Object.freeze([
@@ -85,8 +93,44 @@ export const T16_FAMILY_MAP_REF =
   "algorithm-live-loop-DECISIONS.md#J1+register:configuredProviderSet" as const;
 export const T16_ENVELOPE_REF =
   "goal-v4-2026-09-01:285-295+packages/register/src/engine-shape.ts#ENGINE_BRANCHING_FACTOR" as const;
+/**
+ * W10/3: the two cost rows are ruled by the W10 ticket, which is the first
+ * document that measured the inversion. Neither the goal nor J1 mentions them,
+ * and a sealed row naming a ruling that never chose its value is audit poison
+ * (the same reason J8 owns the role identities and J1 does not).
+ */
+export const T16_W10_COST_RULING_REF =
+  "algorithm-live-loop-board/W10-call-budget-truthfulness.md#3+audits/token-budget-reasoning.md" as const;
 
 export const SYNTHESIS_ROLE_REFS_IDENTICAL_WARNING = "SYNTHESIS_ROLE_REFS_IDENTICAL" as const;
+
+/**
+ * W10/3 (`board/W10-call-budget-truthfulness.md` §3, audit
+ * `audits/token-budget-reasoning.md` "The deadline is inverted").
+ *
+ * The JUDGE answers about a SINGLE node and carries 180 seconds. The
+ * synthesizer reads the whole digest and writes the served answer — the longest
+ * generation in the system — and the evaluator reads digest, label and
+ * candidate and must return a reasoned objection. Both inherited 60 seconds
+ * from organs that no longer exist. This is the FLOOR, never a ceiling: a
+ * deployment whose judge clock is longer raises both with it
+ * (`AlgorithmRegisterRowsInput.judgeDeadlineMs`).
+ *
+ * Module-PRIVATE on purpose. The source-purity law refuses an exported numeric
+ * source literal outside `packages/published-arithmetic` because a bare number
+ * in source is a policy value that belongs in a register carrier — and this
+ * file IS that carrier: the number leaves here only inside a sealed row.
+ * Exporting it would be a second source of truth wearing a constant's name.
+ */
+const SYNTHESIS_ROLE_DEADLINE_FLOOR_MS = 180_000;
+/**
+ * W10/3: left where it is ON PURPOSE. Item 1 of the ticket makes a hit VISIBLE
+ * (a truncation is now named), and `usage.completion_tokens` is already
+ * recorded per attempt, so the first approved live run sets this from data
+ * instead of from an estimate. Raising it now would be guessing.
+ */
+const SYNTHESIS_ROLE_TOKEN_CEILING = 2_048;
+const SYNTHESIS_ROLE_MAX_ATTEMPTS = 3;
 
 export interface AlgorithmRegisterRow {
   readonly rowKey: string;
@@ -99,6 +143,13 @@ export interface ProviderFamilyEntry {
   readonly providerRefs: readonly string[];
 }
 
+/** W10/3: one organ's sealed cost bound, in the shape the gateway's `CallBound` reads. */
+export interface SealedCallBound {
+  readonly maxAttempts: number;
+  readonly tokenCeiling: number;
+  readonly deadlineMs: number;
+}
+
 export interface AlgorithmRegisterRowsInput {
   /** Deployment-scoped provenance prefix — dev, acceptance or production. */
   readonly deploymentSourceRef: string;
@@ -107,6 +158,13 @@ export interface AlgorithmRegisterRowsInput {
   readonly evaluatorRoleRef: string;
   /** Family ↦ provider refs, as the deployment's own configured provider set names them. */
   readonly providerFamilies: readonly ProviderFamilyEntry[];
+  /**
+   * W10/3: this deployment's own JUDGE deadline, when it has one. The sealed
+   * synthesis deadlines are `max(floor, judge)`, so "no shorter than the
+   * judge's" is enforced by construction rather than by two numbers that happen
+   * to agree today. A deployment that does not pass it gets the floor.
+   */
+  readonly judgeDeadlineMs?: number;
 }
 
 function requireRef(value: string, label: string): string {
@@ -174,6 +232,15 @@ export function buildAlgorithmRegisterRows(
   if (new Set(providerRefs).size !== providerRefs.length) {
     throw new TypedDomainError("ALGORITHM_REGISTER_ROWS_INVALID", "A provider may belong to one family only");
   }
+  // W10/3: the FLOOR is the judge's sealed clock. A deployment that declares a
+  // longer one raises both synthesis roles with it; one that declares a shorter
+  // one (or none) gets the floor, so these two rows can never come out below the
+  // judge's — which is exactly the inversion the audit measured.
+  const judgeDeadlineMs = input.judgeDeadlineMs ?? SYNTHESIS_ROLE_DEADLINE_FLOOR_MS;
+  if (!Number.isInteger(judgeDeadlineMs) || judgeDeadlineMs <= 0) {
+    throw new TypedDomainError("ALGORITHM_REGISTER_ROWS_INVALID", "judgeDeadlineMs must be a positive integer");
+  }
+  const synthesisDeadlineMs = Math.max(SYNTHESIS_ROLE_DEADLINE_FLOOR_MS, judgeDeadlineMs);
   const ref = (ruling: string): string => `${deployment}+${ruling}`;
   const rows: readonly AlgorithmRegisterRow[] = [
     { rowKey: "globalStopDelta", value: { kind: "GLOBAL_STOP_DELTA", delta: 0.02 }, sourceRef: ref(T16_GOAL_RULING_REF) },
@@ -211,6 +278,26 @@ export function buildAlgorithmRegisterRows(
       rowKey: "evaluatorLoopMaxRounds",
       value: { kind: "EVALUATOR_LOOP_MAX_ROUNDS", maxRounds: 3 },
       sourceRef: ref(T16_GOAL_RULING_REF)
+    },
+    {
+      rowKey: "synthesizerCallBound",
+      value: {
+        kind: "SYNTHESIZER_CALL_BOUND",
+        maxAttempts: SYNTHESIS_ROLE_MAX_ATTEMPTS,
+        tokenCeiling: SYNTHESIS_ROLE_TOKEN_CEILING,
+        deadlineMs: synthesisDeadlineMs
+      },
+      sourceRef: ref(T16_W10_COST_RULING_REF)
+    },
+    {
+      rowKey: "evaluatorCallBound",
+      value: {
+        kind: "EVALUATOR_CALL_BOUND",
+        maxAttempts: SYNTHESIS_ROLE_MAX_ATTEMPTS,
+        tokenCeiling: SYNTHESIS_ROLE_TOKEN_CEILING,
+        deadlineMs: synthesisDeadlineMs
+      },
+      sourceRef: ref(T16_W10_COST_RULING_REF)
     },
     { rowKey: "dispersionScale", value: { kind: "DISPERSION_SCALE", scale: 1 }, sourceRef: ref(T16_JUDGE_RULING_REF) },
     {
@@ -309,6 +396,21 @@ const rowSchemas = {
   evaluatorLoopMaxRounds: z.object({
     kind: z.literal("EVALUATOR_LOOP_MAX_ROUNDS"),
     maxRounds: positiveInteger
+  }).strict(),
+  // W10/3: the deadline floor is IN THE MEMBER TYPE, so a register sealed with
+  // the retired organs' 60_000 is refused by its own reader with
+  // SYNTHESIS_ROLE_CONTROLS_INVALID — the inversion cannot be re-sealed by hand.
+  synthesizerCallBound: z.object({
+    kind: z.literal("SYNTHESIZER_CALL_BOUND"),
+    maxAttempts: positiveInteger,
+    tokenCeiling: positiveInteger,
+    deadlineMs: positiveInteger.min(SYNTHESIS_ROLE_DEADLINE_FLOOR_MS)
+  }).strict(),
+  evaluatorCallBound: z.object({
+    kind: z.literal("EVALUATOR_CALL_BOUND"),
+    maxAttempts: positiveInteger,
+    tokenCeiling: positiveInteger,
+    deadlineMs: positiveInteger.min(SYNTHESIS_ROLE_DEADLINE_FLOOR_MS)
   }).strict(),
   dispersionScale: z.object({ kind: z.literal("DISPERSION_SCALE"), scale: unitInterval }).strict(),
   repeatedFamilyMultiplier: z.object({
@@ -466,6 +568,10 @@ export interface SynthesisRoleControls {
   readonly evaluatorRoleRef: string;
   readonly evaluatorLoopMaxRounds: number;
   readonly identicalRoleRefs: boolean;
+  /** W10/3: the role's OWN sealed cost bound, no longer COMPOSER's. */
+  readonly synthesizerBound: SealedCallBound;
+  /** W10/3: the role's OWN sealed cost bound, no longer CONFORMANCE's. */
+  readonly evaluatorBound: SealedCallBound;
   readonly sourceRefs: Readonly<Record<string, string>>;
 }
 
@@ -479,7 +585,8 @@ export async function readSynthesisRoleControls(
   registerVersion: number
 ): Promise<SynthesisRoleControls> {
   const family = await readFamily(pool, registerVersion, "SYNTHESIS_ROLE_CONTROLS", [
-    "synthesizerRoleRef", "evaluatorRoleRef", "evaluatorLoopMaxRounds"
+    "synthesizerRoleRef", "evaluatorRoleRef", "evaluatorLoopMaxRounds",
+    "synthesizerCallBound", "evaluatorCallBound"
   ]);
   const synthesizerRoleRef = family.values.synthesizerRoleRef.providerRef;
   const evaluatorRoleRef = family.values.evaluatorRoleRef.providerRef;
@@ -491,12 +598,23 @@ export async function readSynthesisRoleControls(
       + `candidate written by its own configured provider identity`
     );
   }
+  const sealedBound = (value: {
+    readonly maxAttempts: number;
+    readonly tokenCeiling: number;
+    readonly deadlineMs: number;
+  }): SealedCallBound => Object.freeze({
+    maxAttempts: value.maxAttempts,
+    tokenCeiling: value.tokenCeiling,
+    deadlineMs: value.deadlineMs
+  });
   return Object.freeze({
     registerVersion,
     synthesizerRoleRef,
     evaluatorRoleRef,
     evaluatorLoopMaxRounds: family.values.evaluatorLoopMaxRounds.maxRounds,
     identicalRoleRefs,
+    synthesizerBound: sealedBound(family.values.synthesizerCallBound),
+    evaluatorBound: sealedBound(family.values.evaluatorCallBound),
     sourceRefs: family.sourceRefs
   });
 }
