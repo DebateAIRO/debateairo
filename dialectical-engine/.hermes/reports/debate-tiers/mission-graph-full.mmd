@@ -368,7 +368,23 @@ flowchart LR
   t_d2f82945(["(finding) REV-S03-p3 correctness N9 (non-blocking) — the F1 projection"]):::ready
   t_6f44048e(["(finding) REV-S03-p3 correctness N10 (non-blocking) — the planTierRost"]):::ready
   t_1f84c179(["(finding) REV-S03-p3 correctness N11 (non-blocking, record) — the F1 h"]):::ready
-  t_85cdfdeb["(gpt-5.6-sol) FIX S03 p3 F1 — V-47 + V-49 (V's ruling 2026-09-16): pla"]:::running
+  t_85cdfdeb["(gpt-5.6-sol) FIX S03 p3 F1 — V-47 + V-49 (V's ruling 2026-09-16): pla"]:::done
+  t_06b3ae45["(claude-opus-5) REV S03 p3 RE-CHECK (V-authorized, V-47/V-49) lens cor"]:::done
+  t_e5adea05["(claude-opus-5) REV S03 p3 RE-CHECK (V-authorized, V-47/V-49) lens pro"]:::done
+  t_877d51de["(gpt-5.6-sol) FIX S03 p3 F1 — RULING 4 (the same seat, session resumed"]:::done
+  t_14d21a1a["(finding · pre-S03 · cross-mission · N) the seed replays the sealed v4"]:::ready
+  t_657958bd["(residue · N) dev-auth-stack-cli prints only DEV_* codes — development"]:::ready
+  t_6c5ed985["(N · REV-S03-p3r correctness N12) class sweep incomplete: tests/archit"]:::ready
+  t_8f9c2e92["(N · REV-S03-p3r correctness N13 · packet defect, orchestrator) the st"]:::ready
+  t_90c036f2["(N · REV-S03-p3r correctness N14) two records of C4 name different com"]:::ready
+  t_06e3b004["(N · REV-S03-p3r correctness N15) apps/runner/src/dev-deployment-regis"]:::ready
+  t_f18d202e["(B · REV-S03-p3r product-truth B1 · BLOCKING) a broken config/models.y"]:::ready
+  t_8d8a1151["(N · REV-S03-p3r product-truth N2 · carried from passes 1–3, class now"]:::ready
+  t_8106e863["(N · REV-S03-p3r product-truth N3) step 8's warning names a class lett"]:::ready
+  t_d99b6ae0["(N · REV-S03-p3r product-truth N4 · packet defect, orchestrator) revie"]:::ready
+  t_415cee4b["(N · REV-S03-p3r product-truth N5 · packet defect, orchestrator) V-DEC"]:::ready
+  t_dd719fff["(N · REV-S03-p3r product-truth N6 · pre-existing, not S03's · same han"]:::todo
+  t_9db56a07["(gpt-5.6-sol) FIX S03 p3 F1 — RULING 5 (the same seat, session resumed"]:::done
   t_cb9482de --> t_e95f08a5
   t_e95f08a5 --> t_a4a6ea69
   t_a4a6ea69 --> t_485d6613
@@ -670,6 +686,16 @@ flowchart LR
   t_005aaddc --> t_f14b0ca0
   t_f2e090a2 --> t_85cdfdeb
   t_909dbfe1 --> t_85cdfdeb
+  t_85cdfdeb --> t_06b3ae45
+  t_06b3ae45 --> t_f14b0ca0
+  t_85cdfdeb --> t_e5adea05
+  t_e5adea05 --> t_f14b0ca0
+  t_85cdfdeb --> t_877d51de
+  t_877d51de --> t_06b3ae45
+  t_877d51de --> t_e5adea05
+  t_f18d202e --> t_dd719fff
+  t_e5adea05 --> t_9db56a07
+  t_9db56a07 --> t_f14b0ca0
   classDef done fill:#dfe9df,stroke:#3E7A4E
   classDef running fill:#f3ece0,stroke:#A8823E
   classDef ready fill:#fdfbf6,stroke:#6E675C
