@@ -298,9 +298,24 @@ describe("P4-10 loopback relay authentication", () => {
     };
     const start = async (label: string) => {
       const childObservation = join(temporaryDirectory, `${label}-child.json`);
+      // W6 (SECURITY), fix round 1 / F2: the observation's `environment` is a
+      // PROJECTION over an explicit allow-list, never `process.env`. This member
+      // writes to a FILE rather than into model content, so it never reaches
+      // `ledger.raw_artifact` — but it is the same shape and it wrote every
+      // variable the relay admits, in clear, to disk.
+      // Its own assertions (`:371-373`) name no individual key: they assert the
+      // file lacks the relay's Bearer credential. The allow-list is therefore
+      // derived from what the PRODUCT admits for this adapter — the four common
+      // keys (`acceptance/relay-core.ts:69`) plus the two fixed ones (`:93-94`),
+      // with `authEnvironmentKeys` and `testEnvironmentKeys` both empty above —
+      // so the exact-set the emission can carry is fully covered and anything
+      // unnamed, the W6 canary included, is dropped.
       const script = [
         'const { writeFileSync } = require("node:fs");',
-        `writeFileSync(${JSON.stringify(childObservation)}, JSON.stringify({ argv: process.argv, environment: process.env }));`,
+        "const echoedEnvironmentKeys = ['HOME','LANG','OLDPWD','PATH','PWD','TMPDIR'];",
+        'const environment = {};',
+        'for (const key of echoedEnvironmentKeys) { if (process.env[key] !== undefined) environment[key] = process.env[key]; }',
+        `writeFileSync(${JSON.stringify(childObservation)}, JSON.stringify({ argv: process.argv, environment }));`,
         'process.stdout.write("OK");'
       ].join("");
       const handle = await startCliRelayServer({

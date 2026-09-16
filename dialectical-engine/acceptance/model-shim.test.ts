@@ -97,9 +97,23 @@ describe("ACC-01 model shim", () => {
       XAI_API_KEY: "xai-test-sentinel",
       UNRELATED_SECRET: "must-not-reach-child"
     });
+    // W6 (SECURITY), fix round 1 / F1: the probe's `environment` is a PROJECTION
+    // over an explicit allow-list, never `process.env`. Serialising the whole
+    // environment put every variable the shim admits — a real maker credential
+    // among them — into the model content that `ledger.raw_artifact` persists.
+    // Same projection shape as the product's own `buildCliChildEnvironment`
+    // (`acceptance/relay-core.ts:81-84`), and the same shape as the four members
+    // fixed in Task 16. Every key is here because an assertion below reads it:
+    //   asserted PRESENT — `:153-160` (exact-set toEqual);
+    //   asserted ABSENT  — `:162-166`. An absence assertion is evidence only if
+    //   the key WOULD be echoed when the shim admits it, so those keys stay
+    //   named. Anything unnamed — the W6 canary included — is dropped.
     const probeScript = [
       'const { readdirSync, writeFileSync } = require("node:fs");',
-      'const payload = JSON.stringify({ cwd: process.cwd(), pwd: process.env.PWD, oldpwd: process.env.OLDPWD, entries: readdirSync(process.cwd()), environment: process.env });',
+      "const echoedEnvironmentKeys = ['CODEX_HOME','HOME','LANG','OLDPWD','OPENAI_API_KEY','PATH','PWD','TMPDIR','ANTHROPIC_API_KEY','DATABASE_URL','SSH_AUTH_SOCK','UNRELATED_SECRET','XAI_API_KEY'];",
+      'const environment = {};',
+      'for (const key of echoedEnvironmentKeys) { if (process.env[key] !== undefined) environment[key] = process.env[key]; }',
+      'const payload = JSON.stringify({ cwd: process.cwd(), pwd: process.env.PWD, oldpwd: process.env.OLDPWD, entries: readdirSync(process.cwd()), environment });',
       'writeFileSync("vendor-litter.txt", "test-only litter");',
       'console.log(JSON.stringify({ type: "thread.started", thread_id: "01a000e7-3ea0-7f91-b166-7104741ef333" }));',
       'console.log(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: payload } }));'
