@@ -162,6 +162,15 @@ type CallableDeclaration = {
   readonly id: string;
   readonly callName: string;
   readonly body: string;
+  /**
+   * `this`-field name (with its `#`, if private) -> the class it is constructed
+   * from, for every field of the declaring class whose construction is
+   * unambiguous. A method body sees only its own text, so without this map a
+   * `this.#field.method(` call can only be resolved by the unqualified-name
+   * fallback below — which gives up the moment two classes declare a method of
+   * the same name.
+   */
+  readonly fieldClasses?: ReadonlyMap<string, string>;
 };
 
 function maskNonCode(source: string): string {
@@ -260,6 +269,28 @@ function braceDepthAt(source: string, start: number, index: number): number {
   return depth;
 }
 
+/**
+ * Every `this.<field> = … new ClassName(` assignment in one class body, keyed by
+ * field name. A field assigned two different classes is DROPPED rather than
+ * guessed: an orphan audit that over-approximates reachability hides the orphans
+ * it exists to find.
+ */
+function constructedFields(classBody: string): ReadonlyMap<string, string> {
+  const candidates = new Map<string, Set<string>>();
+  for (const match of classBody.matchAll(
+    /\bthis\s*\.\s*(#?[A-Za-z_$][\w$]*)\s*=[^;]*?\bnew\s+([A-Za-z_$][\w$]*)\s*\(/g
+  )) {
+    const seen = candidates.get(match[1]!) ?? new Set<string>();
+    seen.add(match[2]!);
+    candidates.set(match[1]!, seen);
+  }
+  const resolved = new Map<string, string>();
+  for (const [field, classes] of candidates) {
+    if (classes.size === 1) resolved.set(field, [...classes][0]!);
+  }
+  return resolved;
+}
+
 function callableDeclarations(source: string): readonly CallableDeclaration[] {
   const masked = maskNonCode(source);
   const declarations: CallableDeclaration[] = [];
@@ -275,6 +306,7 @@ function callableDeclarations(source: string): readonly CallableDeclaration[] {
     const classClose = matchingBrace(masked, classOpen);
     if (classClose === null) continue;
     const classBody = masked.slice(classOpen + 1, classClose);
+    const fieldClasses = constructedFields(classBody);
     const methodPattern = /(?:^|\n)\s*(?:(?:public|private|protected|static|readonly|async|override)\s+)*(constructor|[A-Za-z_$][\w$]*)\s*(?:<[^\n{};]*>)?\s*\(/g;
     const methods = [...classBody.matchAll(methodPattern)]
       .filter((methodMatch) => braceDepthAt(classBody, 0, methodMatch.index) === 0)
@@ -285,7 +317,8 @@ function callableDeclarations(source: string): readonly CallableDeclaration[] {
       declarations.push({
         id: `${className}.${methodName}`,
         callName: methodName === "constructor" ? className : methodName,
-        body: classBody.slice(methodMatch.index + methodMatch[0].length, methods[methodIndex + 1]?.index)
+        body: classBody.slice(methodMatch.index + methodMatch[0].length, methods[methodIndex + 1]?.index),
+        fieldClasses
       });
     }
   }
@@ -315,7 +348,11 @@ export async function auditSurfaceReachability(): Promise<{
     }
   }
 
-  const referencedDeclarations = (source: string, currentId?: string): readonly string[] => {
+  const referencedDeclarations = (
+    source: string,
+    currentId?: string,
+    fieldClasses?: ReadonlyMap<string, string>
+  ): readonly string[] => {
     const referenced = new Set<string>();
     const constructedVariables = new Map<string, string>();
     for (const match of source.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new\s+([A-Za-z_$][\w$]*)\s*\(/g)) {
@@ -331,6 +368,21 @@ export async function auditSurfaceReachability(): Promise<{
     for (const match of source.matchAll(/\bnew\s+([A-Za-z_$][\w$]*)\s*\(/g)) {
       for (const id of byCallName.get(match[1]!) ?? []) {
         if (id.endsWith(".constructor")) referenced.add(id);
+      }
+    }
+    // `this.#field.method(` — the field's class comes from the DECLARING class
+    // body, which this method body does not contain. Without it the call falls
+    // through to the unqualified-name fallback, which resolves a name only while
+    // it is unique in the whole tree; a second class declaring `read(`
+    // anywhere then detaches a live edge with no diagnostic.
+    if (fieldClasses !== undefined) {
+      for (const match of source.matchAll(
+        /\bthis\s*\.\s*(#?[A-Za-z_$][\w$]*)\s*\.\s*([A-Za-z_$][\w$]*)\s*\(/g
+      )) {
+        const fieldClass = fieldClasses.get(match[1]!);
+        if (fieldClass === undefined) continue;
+        const exact = `${fieldClass}.${match[2]!}`;
+        if (declarations.has(exact)) referenced.add(exact);
       }
     }
     const currentClass = currentId?.includes(".") === true ? currentId.slice(0, currentId.indexOf(".")) : null;
@@ -368,7 +420,7 @@ export async function auditSurfaceReachability(): Promise<{
     reachable.add(id);
     const declaration = declarations.get(id);
     if (declaration === undefined) continue;
-    pending.push(...referencedDeclarations(declaration.body, declaration.id));
+    pending.push(...referencedDeclarations(declaration.body, declaration.id, declaration.fieldClasses));
   }
   return {
     declaredEntryPointFiles: productionEntryPointFiles,
