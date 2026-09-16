@@ -5479,3 +5479,56 @@ not in 4 000 lines of prose every author skims.
 - **Rule: when a value must stop being emitted, ask what the assertion that reads it was proving,
   and find the one-way representation that still proves it. "Delete the assertion" and "keep the
   leak" are both wrong answers, and they are the only two on offer if the question is not asked.**
+
+## The relay DISCARDS the vendor's own diagnosis, so no policy can be keyed on it (2026-09-16, BUILD(CONT-T17))
+- F-GROK-SANDBOX-PROFILE was diagnosed from grok's stderr: `error: could not apply the
+  'read-only' sandbox profile`. The brief and the packet both name that text as the thing the
+  fake rejects with, which reads as "match on it".
+- `acceptance/relay-core.ts:202` is `child.stderr.resume()` — the stream is drained and thrown
+  away — and `:229` rejects with the adapter's flat `failureCode`. So the ONLY thing that reaches
+  the caller is `GROK_CLI_FAILED`, for a refused sandbox, a dead binary and a bad credential
+  alike. `relay-core.ts` is read-only under this ticket, so widening it was not on offer either.
+- The remedy is a DIFFERENTIAL probe, not a textual one: re-run the identical handshake WITHOUT
+  the flag and degrade only when the second one succeeds. That is also exactly the experiment the
+  closing run ran by hand (`board/F-GROK-SANDBOX-PROFILE.md`, diagnostic 01:05).
+- **Rule: before designing any "detect WHY the child failed" branch, read what the spawn wrapper
+  keeps. A failure code that is one constant per adapter carries no reason, and a fake that
+  writes the real error text to stderr will look like it is being matched when nothing reads it.**
+
+## A MISSING named export makes `expect(a).toBe(b)` PASS, because BOTH sides are `undefined` (2026-09-16, BUILD(CONT-T17))
+- Refinement of `:1807` ("a missing named export binds `undefined` and the suite runs"), one step
+  worse. The RED-first test imported `GROK_SANDBOX_PROFILE` (not yet exported) and asserted
+  `expect(relay.sandboxProfile).toBe(GROK_SANDBOX_PROFILE)`. Both sides were `undefined`, so that
+  assertion PASSED at base and the RED frame came from the NEXT assertion instead.
+- The failure mode is silent in the direction that matters: a suite whose every new assertion
+  compares a missing field to a missing constant is GREEN at base and proves nothing.
+- **Rule: at least one RED assertion per new field must compare against a LITERAL written in the
+  test, never against an imported constant that does not exist yet — and read which assertion the
+  RED frame actually names, not just that the test failed.**
+
+## Two arms of a fallback that fail with the SAME code cannot pin which one was re-thrown (2026-09-16, BUILD(CONT-T17))
+- The property was "when the profile-less probe ALSO fails, re-throw the ORIGINAL failure, never
+  the probe's". The first double exited 1 both ways, so both failures were `GROK_CLI_FAILED` and
+  the assertion `message === "GROK_CLI_FAILED"` was satisfied by either behaviour. It passed at
+  base, it passed after the change, and the mutant that deletes the re-throw SURVIVED it.
+- Fix: make the second arm fail DIFFERENTLY — the profile-less double now HANGS, so its code is
+  `GROK_CLI_TIMEOUT` and only the original can still be named `GROK_CLI_FAILED`. Mutant
+  `M6-probe-not-differential` went from surviving to killed on that one change to the double.
+- **Rule: a "which error propagates" assertion is worthless while both candidates serialise to
+  the same string. Give the double two DISTINGUISHABLE failures before writing the assertion, and
+  prove it with the mutant that swaps them.**
+
+## A literal you are making CONDITIONAL is still pinned unconditionally in a suite you may not edit (2026-09-16, BUILD(CONT-T17))
+- WHO-READS-THIS-STRING on `"--sandbox", "read-only"` found `acceptance/adversarial-corpus.test.ts:653`
+  (GROK-ARGV-01) pinning the exact Grok argument list — a file OUTSIDE this ticket's write
+  contract, which lists only `grok-relay.test.ts` and `run-acceptance.test.ts`.
+- That is not a blocker but a DESIGN CONSTRAINT, and finding it before writing code is what made
+  the design right: the default path had to stay argument-for-argument identical, with the flag
+  removed only on a proven-degraded path. Had the flag been made conditional on something the
+  fixture also takes, the out-of-contract pin would have gone red and the only remedies would
+  have been a contract breach or a weaker assertion.
+- The untouched fixture then becomes free evidence: `adversarial-corpus` proves the admitted
+  boundary (flag kept) in a suite the seat never wrote — the D71 fixture pair, live.
+- **Rule: run WHO-READS-THIS-STRING before the design, not before the edit. A reader outside your
+  write contract converts "change the literal" into "make the change invisible to that reader",
+  and that is a different implementation, not a later fix.**
