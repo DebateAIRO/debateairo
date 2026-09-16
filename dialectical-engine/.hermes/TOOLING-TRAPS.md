@@ -5239,3 +5239,28 @@ not in 4 000 lines of prose every author skims.
 - **Rule: adding a value to a collection is a change to every EXACT pin of that collection. Run the
   collection sweep whenever you add a producer, and note that the WHO-READS-THIS-STRING grep will
   return a clean bill of health that does not cover it.**
+
+## `Tests  no tests` is a COLLECTION failure, and a passed/total parser reads it as 0/0 (2026-09-16, BUILD(CONT-T14))
+- Adding a REQUIRED field to a function's input breaks the call sites a test file builds at DESCRIBE
+  scope — before any `test()` body runs. vitest 4.1.10 then prints `Test Files 1 failed (1)` and
+  `Tests  no tests`, names the FIXTURE line as the frame, and lists no test names at all.
+- This is a third shape for the `## vitest summary line shapes` entry (:4370), which covers
+  `N failed`, `N passed` and both: `no tests` has NEITHER field. A parser that defaults both to 0
+  reports `0/0` — indistinguishable from an empty suite, and an `rc`-only classifier calls it RED
+  for the wrong reason, so the seat debugs an assertion that never ran.
+- It is also the run-level face of `:5198` ("adding a REQUIRED field is a change to fixtures in
+  other packages, and vitest cannot see it"): here the fixtures were in the SAME file, and it still
+  could not be seen until collection.
+- **Rule: treat `Tests  no tests` as BROKEN, never as RED and never as 0/0. Read the frame — it
+  points at a fixture, not at a defect — and fix the call sites before reading any verdict.**
+
+## `pnpm run typecheck` cannot see `acceptance/`, and a packet can name it as the only typecheck gate (2026-09-16, BUILD(CONT-T14))
+- Second instance of `:1239`, now as a PACKET defect rather than a seat's mistake: the verification
+  block said "`pnpm run typecheck` gains no diagnostic" for a ticket whose entire product diff lives
+  in `acceptance/eval-harness.ts`. The root `tsconfig.json` `include` list omits `acceptance/`, so
+  that command compiles none of it and returns 0 errors whatever the diff does.
+- Measured both ways at base a87dc60b and at tip 39b2b46d: `pnpm run typecheck` → 0, `pnpm exec tsc
+  --noEmit -p acceptance/tsconfig.json` → 0. The second is the one that can say anything about the
+  change.
+- **Rule: a ticket that writes under `acceptance/` takes BOTH projects, and a packet that names only
+  the root one is reporting a gate it does not have.**
