@@ -4686,3 +4686,67 @@ not in 4 000 lines of prose every author skims.
   `CREATE TRIGGER` is this repo's settled pattern (nine migrations, e.g. `0002_s02.sql:73`);
   `CREATE OR REPLACE TRIGGER` also works on the embedded server here and closes the brief
   no-trigger window that drop-first opens.
+
+## A privilege floor specified by CITING a migration is scoped to the wrong set of readers (2026-09-16, BUILD(CONT-T5B))
+- The packet's outcome said: narrow `debateai_obs_view_owner` on `core.work_item` and
+  `ledger.raw_artifact` "to exactly what **0060's own views** READ". Measured, a SECOND landed
+  migration widens the same table — `migrations/0058_observation_safe_views.sql:23` issues a
+  table-level `GRANT SELECT ON core.work_item,core.run_progress_event` — and its own view
+  `obs.work_item_liveness_v` (`0058:1-10`) reads `claimed_by`, `claim_deadline` and
+  `settled_artifact_ref`, which **no 0060 view reads**. Implemented literally, the fix breaks that view.
+- Built as the neighbour mutant (drop `claimed_by` from the new column list) and run:
+  `obs.work_item_liveness_v: FAILED 42501 permission denied for table work_item`, while
+  `obs-l1-s01-foundation.test.ts` stayed **12 passed (12)** and
+  `obs-agent-06-{views,status}.test.ts` stayed **8 passed (8)**. **No committed test in this
+  repository catches a wrong column list on `core.work_item` or `ledger.raw_artifact`** — the two
+  guard rows pin `core.run` only. A seat that followed the packet's sentence and ran its prescribed
+  verification would have shipped a broken production view under a fully green board.
+- **Rule: enumerate the readers of a privilege FROM THE DATABASE, never from the migration a finding
+  cites.** A finding names the migration that BROKE the floor; it never names the migrations that
+  DEPEND on it. The query that answers it, for any owner:
+
+      SELECT tn.nspname, t.relname, array_agg(DISTINCT a.attname ORDER BY a.attname)
+      FROM pg_rewrite r JOIN pg_class v ON v.oid=r.ev_class
+      JOIN pg_depend d ON d.objid=r.oid AND d.classid='pg_rewrite'::regclass
+      JOIN pg_class t ON t.oid=d.refobjid JOIN pg_namespace tn ON tn.oid=t.relnamespace
+      JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=d.refobjsubid
+      WHERE pg_get_userbyid(v.relowner)='<role>' AND t.relkind='r' AND d.refobjsubid>0
+      GROUP BY tn.nspname, t.relname
+
+- Corollary for refutation rounds: **build the neighbour mutant out of the packet's own scoping rule.**
+  If the packet says "exactly what Y reads", mutate the code to exactly that and see what breaks. This
+  is the cheapest test of a packet's premise that exists, and it is what surfaced the defect here.
+
+## `REVOKE SELECT ON <table>` also clears that table's COLUMN-level grants (2026-09-16, BUILD(CONT-T5B))
+- So a "narrow the table-level grant back to a column list" repair is necessarily REVOKE-then-GRANT,
+  in that order, and it must RE-ISSUE the original column list even though an earlier migration
+  already granted it. Measured after `migrations/0062_obs_view_owner_column_floor.sql`:
+  `has_table_privilege` false on all three tables, `core.run` back to exactly its 5 columns.
+- `GRANT`/`REVOKE` are outside `auditMigrationReplaySafety`'s keyword list entirely
+  (`tools/orphan-audit/src/index.ts:613-633` knows only `ADD COLUMN`, `ADD CONSTRAINT`,
+  `CREATE FUNCTION`, `CREATE [UNIQUE] INDEX`). Its silence is not evidence of replay-safety — see
+  `:4665`. Proof costs ~35 s: re-apply the file's own bytes twice against the live chain, then
+  re-read both `information_schema.column_privileges` and every dependent view's row count.
+
+## A scratchpad `.mts` probe can drive this repo's REAL test database without entering the write contract (2026-09-16, BUILD(CONT-T5B))
+- `pnpm exec tsx /abs/path/probe.mts` from `dialectical-engine/`, importing
+  `tests/support/testDatabase.ts` and `packages/db/src/index.ts` **by absolute path**: the project's
+  own files resolve their bare specifiers (`@debateai/db`, `embedded-postgres`) from their own
+  directory, so a probe living outside the repo still gets `startTestDatabase()` + the real
+  `migrate(pool)`. `.mts` avoids the CJS top-level-`await` death at `:1258`.
+- The owner role here is `NOLOGIN`, so "connect as the role" is closed. Two routes work:
+  query a `security_invoker = false` view as ANYONE (PostgreSQL checks the view OWNER's base-table
+  privileges, so the read exercises the floor), and `SET ROLE <owner>` from the superuser pool for a
+  direct per-column boundary read. Neither needs `configureRolePasswords`.
+- This is the instrument "measure before you speculate" has been missing for database work: it
+  produced the before-table, the after-table, the per-column boundary rows and the view-liveness
+  proof in one run, and it writes nothing inside `allowed`.
+
+## Three prose copies of a cardinality, all wrong (2026-09-16, BUILD(CONT-T5B))
+- `task-5-report.md:366` (F1), the `NOT UPDATED` comment at `obs-l1-s01-foundation.test.ts:884` and
+  the trap at `:4579` each say the widening gave the owner **"all 18"** columns of `core.run`.
+  Measured on the chain, and printed by the RED diff itself: **25**. Nothing depended on the number,
+  which is exactly why it drifted three times.
+- **Rule: a security finding carries the QUERY that measures the state, not an adjective and not a
+  count.** The next seat then runs one command instead of reconciling three narrations — and the
+  count cannot be wrong, because nobody types it.
