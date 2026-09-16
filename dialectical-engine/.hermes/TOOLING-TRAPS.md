@@ -5345,3 +5345,68 @@ not in 4 000 lines of prose every author skims.
   coverage — strengthen the assertion until it NAMES the outcome the ticket owes, then re-run.
   A green test written against a weak predicate is how a missing behaviour gets recorded as a
   present one.**
+
+## A leak class named by FILE TYPE under-counts a class named by CODE SHAPE (2026-09-16, BUILD(CONT-T16))
+- W6's ticket named two "fixtures"; the packet corrected it to four, three under
+  `acceptance/test-fixtures/` plus one generated inline. The packet's own sweep,
+  `grep -rn 'environment: process.env' acceptance`, returns **six**: the two extra are
+  `acceptance/model-shim.test.ts:102` and `acceptance/relay-core.test.ts:303`, both
+  `process.env` serialisers built as script STRINGS inside a test file, neither of which
+  reads as "a fixture" to anyone scanning `test-fixtures/`.
+- Each correction moved the count the same way (2 → 4 → 6) and each was made by the SWEEP,
+  never by the framing. `model-shim.test.ts:102` is the same severity as the four that were
+  fixed: its payload becomes the shim's model content.
+- **Rule: define a leak class by the CODE SHAPE that leaks (the expression), never by the
+  directory or the noun the ticket used. Run the shape sweep before believing any count,
+  including the packet's — a packet that asserts "exactly N members" is asserting a
+  measurement with an expiry (`:5045`).**
+
+## A `×`-based vitest failure oracle matches a test NAME containing `×` (2026-09-16, BUILD(CONT-T16))
+- A log-summarising runner grepped `'×|✗|FAIL|error TS|AssertionError'` to print failing cases.
+  On a run including `acceptance/runtime-policy.test.ts` it printed **40 lines** for a run with
+  exactly **1** failure: that suite's describe block is named `T9 × F33 — the acceptance runtime
+  policy carries the sealed synthesis-role family`, so every `stdout |` line carrying the test
+  name matched.
+- The noise is loud rather than silent, so it does not fake a green — but it inverts the
+  cost the oracle exists to save, and a seat skimming it can read 40 as the failure count.
+- **Rule: anchor a failure oracle on the reporter's own line shape (`^[[:space:]]*(×|✓)` for a
+  verbose case line, ` FAIL ` with its surrounding spaces) and take the COUNT from the
+  `Tests` summary line or the JSON, never from a grep over free text.** Same family as
+  `:1521` ("vitest's ` FAIL ` lines are not a usable oracle from captured output").
+
+## An allow-list projection in a fixture SHRINKS the reach of the consumer's exact-set assertion (2026-09-16, BUILD(CONT-T16))
+- `claude-relay.test.ts:227-240`, `grok-relay.test.ts:201-211` and
+  `adversarial-corpus.test.ts:429-438` each pin the fixture's whole echoed environment with an
+  exact-set `toEqual`. While the fixture echoed `process.env`, those assertions caught **any**
+  key the product's `buildCliChildEnvironment` wrongly admitted. Once the fixture projects over
+  an allow-list, they catch only keys the FIXTURE names — an admitted key nobody anticipated is
+  now invisible to them.
+- This is the price of the W6 remedy, not a defect in it, and it is why the allow-list must be
+  the union of the PRESENT-asserted and the ABSENT-asserted keys: an absence assertion is
+  evidence only if the key would have been echoed had the product admitted it. Narrowing to the
+  present-asserted keys alone would have silently voided five absence assertions
+  (`claude-relay.test.ts:241-243`, `grok-relay.test.ts:212-217`, `hermes-relay.test.ts:67,71,72`).
+- **Rule: when a remedy narrows what a double EMITS, every assertion that reads that emission
+  loses reach by exactly the same amount. Sweep the readers and widen the allow-list to cover
+  the negative assertions, or delete them as the dead evidence they have become — never leave
+  an absence assertion standing over a key the double can no longer emit.**
+- Residual, reported as a finding rather than fixed here: a name-only echo of the FULL key set
+  beside the projected values would restore the lost reach at zero credential risk, but it is a
+  NEW EMISSION with its own reader duty and is outside this ticket's write surface.
+
+## A fixture generated INSIDE a test file cannot be imported — read its source and run it, and let the positive control prove the extractor worked (2026-09-16, BUILD(CONT-T16))
+- The fourth W6 member is a `const fixtureScript = [ …string literals… ].join("")` inside
+  `acceptance/adversarial-corpus.test.ts`. It is not exported, not a file, and re-typing it into
+  the canary test would have tested the COPY (`:2051`).
+- What works: read the test file's own source, slice the region between `const fixtureScript = [`
+  and `].join(`, match the double-quoted literals with `/"(?:[^"\\]|\\.)*"/gu` and `JSON.parse`
+  each — the literals are double-quoted TS strings, therefore already valid JSON, so no `eval`
+  and no `new Function` is needed. Then spawn `node -e <script> -- <prompt>`.
+- The failure mode this invites is a VACUOUS green: an extractor that finds nothing yields an
+  empty script, no output, and no canary — which reads exactly like a fixed fixture. The guard
+  is a positive control in the SAME assertion pair: an admitted, named variable must come back
+  with its exact value. Verified both directions — the M1 mutant (whole-environment restored)
+  applied to that region turned the case RED, proving the harness runs the product's script and
+  not a stale copy.
+- **Rule: a probe that reconstructs its subject asserts something it can only satisfy when the
+  reconstruction WORKED (`:4787`), in the same test, before any absence assertion is believed.**
