@@ -361,3 +361,161 @@ Reading their state to dispatch both reviews on gpt-6-astra.
 - The seat found the pro01 defect is a class: two more rows (xrev01; load01, which hangs 120 s in every full suite) are red on dev from the same commit — F-PG-STUB-QUERY-TEXT-CLASS, the next lane's first item, with F-S8-FIXTURE-CONTRACT-PARSED (the `as never` cast that hid the missing fields) and F-DIAG-TAIL-N.
 - Process: D64 ADDENDUM 8 (known reds derived from the last attribution with a ticket each; confirmatory gates for comment-only changes); records block v3 (#56); #55 for the packet's "no additional failures anywhere".
 - dev = e2adf68b, not pushed (260 ahead). Open on V: the Grok re-run and the F-TOOL-MUTATE-3 row.
+
+## 2026-09-16 — continuation on the Mac mini (19 tasks, serial, one seat at a time)
+
+The mission's records reached this host on the archive merges `21582ba0` / `7248b335`; the base is the
+reconciled tip `5e617776` plus the lockfile fix `96e3c91c` (D73 a/b). Board = the SDD ledger
+`/Users/stefannour/DebateAIRO/debateairo/.claude/worktrees/algo-loop-2026-09-16/.superpowers/sdd/2026-09-16-algorithm-live-loop-continuation/progress.md`.
+Plan `fb36138c`, amended `913add73` and `0f36978d`. Reviewer for every task: the orchestrator
+(Fable 5.1), against the task's own diff package. Every verdict below is the ORCHESTRATOR's review
+line in that ledger, not the seat's self-assessment. Wall clock `fb36138c` 03:26 → `c1c08bd7` 17:51
+(14 h 25 min, enumerated from the commit timestamps this pass).
+
+### Phase 1 — the merge's attribution debt (Tasks 1–9 + 5b)
+
+- **T1 web/ retirement** — `f9c2eed9..742fecd2`. Review: spec ✅ after **1 fix round**; the deletion of
+  `s14-ui.test.ts` had dropped assertions on LIVE subjects, re-homed verbatim into
+  `tests/unit/s14-live-projections.test.ts` (7 tests, 7 mutants each killed by its own arm). Finding
+  carried forward: two unowned architecture edges became visible (`apps/api→support-kb`,
+  `apps/runner→support-kb`). Ledger :25–:31.
+- **T2 obs-agent repoRoot** — `78962f86..6b2cdca4`. Review clean, first round. Typecheck 35 → **0
+  errors total**; every insertion is `repoRoot: observationRepoRoot()`, the accessor `main.ts:61`
+  already uses; `apps/observation-agent/src` byte-identical. Ledger :33–:36.
+- **T3 UI tokens** — `1f113095..f53e0911`. Review clean **as re-scoped**: four reachable rows fixed in
+  `globals.css`/`ModeToggle`; the three `role-token-map` rows proved red on BOTH parents by blob hash
+  and ruled V's UI program's. This is where per-assertion attribution was adopted (D73 e/1). Ledger
+  :38–:45.
+- **T8 stub-class lane + third sweep member** — `cd9d546a..496b10f9`. Review clean. `load01` **120 008 ms
+  → 1 ms**; the s8 transport-ambiguous answer is contract-parsed (its literal had been contract-INVALID
+  for twelve days); both `as never` casts gone. Outcome-3 N2 parked INFEASIBLE ON THIS HOST (its source
+  records exist only on the laptop) → F-DIAG-TAIL-N stays open. Ledger :47–:51.
+- **T5 entry point + inventory drift** — `8d3bfe10..d29b76c9`. Review clean, six clusters. The
+  verifier's "dropped shutdown" was WRONG (V's `9c68ceb3` moved it). **NEW SECURITY FINDING (V's line):**
+  `migrations/0060:23` grants TABLE-level SELECT on `core.run`, `core.work_item`, `ledger.raw_artifact`
+  to `debateai_obs_view_owner`, superseding `0034`'s five-column floor — the owner reaches
+  `content_ciphertext`, `question_line`, `question_blind_index`, `session_id`. → **Task 5b minted.**
+  Ledger :53–:59.
+- **T6 source audit + architecture default + manifest guard** — `ceb95cc0..ee3dd765`. Review clean after
+  **1 fix round** (`0061`'s bare `CREATE TRIGGER` was not replayable; `40a96201` drops first, with
+  `tests/integration/migration-0061-replay.test.ts`). The seat's note, worth keeping: **no test in this
+  repository had ever applied a migration twice before this one.** Ledger :61–:66.
+- **T5b grant floor** — `1681a0e3..aba06025`. Review clean after **1 fix round**. Forward migration
+  `0062` revokes the table-level grants and re-grants the **pg_depend-measured** union of the owner's
+  views' reads (run 5/25, work_item 7/12, raw_artifact 4/20, run_progress_event 3); the class's fourth
+  member (`0058:23`, `core.run_progress_event`) swept in; `pg_depend` proves the role owns exactly five
+  views over exactly these four tables — **the class is closed**. Ledger :68–:76.
+- **T4 UI render sites** — `a7a2ac20..959550af`, **records only, zero code**. Closed as ATTRIBUTED: all
+  eight rows plus row 11 excluded, every source they read byte-identical on `^1`, `^2` and HEAD. Eight
+  tickets drafted for V's UI program. Positive control measured: `apps/ui/app/page.tsx` lost the
+  anonymous landing branch — `^1` `3d43ab3b` vs `^2`/HEAD `d004d0fb`, i.e. HEAD == V's parent, changed
+  by V's own commits (`b300ee91`, `af50e349`) → **V's deliberate change, not merge damage**; a question
+  for V, not a task. Ledger :78–:84.
+- **T7 depth single-source law** — `56c91618..43505420`. Review clean, first round. The packet's remedy
+  ("route to `EXPANSION_DEPTH_MAX`") was WRONG at 4/4 sites — three are AES-GCM cipher envelope version
+  bytes and applying it would write byte 5 into every wrapped key; the seat measured and NAMED them
+  instead (`WRAPPED_KEY_VERSION_TAG`, `CONTENT_ENVELOPE_VERSION_TAG`, `SEMANTIC_ENVELOPE_VERSION_TAG`),
+  values unchanged. Corpus re-derived 233 → 386 files. Ledger :86–:90.
+- **T9 environment block, undetermined rows, the Phase 1 gate** — `696e5880..07060aa7`. Review clean after
+  **1 fix round**. 21 undetermined rows attributed; the record's `env:module-resolution` verdict REFUTED;
+  the appeared red bisected over 52 commits to `58ba1376` and fixed at `78e89ea4`. Ledger :92–:96.
+
+**PHASE 1 GATE OF RECORD — `78e89ea4`:** typecheck 0; `audit:architecture` 27 rows / exactly F31's 3;
+`audit:source` exactly F31's 3; four-count **142 / 0 / 0 / 1**; **5050 / 5192**; files 31 / 419; every
+remaining red name carries a ticket or a cause. Ledger :96.
+
+### Phase 2 — the eight tickets the mission never dispatched (Tasks 10–17)
+
+- **T10 V-SEC-1 / fold-lane FL-1** — `a30c549f..3ccda038` (incl. **1 fix round on a FRESH seat**). The
+  peer's `origin/security/handoff-b21-serve-answer` landed, its migration renumbered `0063`, reconciled
+  against T9's `ServeGateResult`. The orchestrator's own neighbour run found F1 **Critical**: `0063`
+  `CREATE OR REPLACE`d guard functions owned by `0038`/`0040`, so a replay silently reverted them.
+  Fixed: `serve.answer` owns its own guard functions, keeps the pinned trigger names, calls but never
+  redefines `0038`/`0040`'s; the attestation is bound to `(answer_id, answer_version)` and sealed inside
+  the write transaction. Ledger :101–:105.
+- **T11 W7 blind review** — `e6477f64..f7b54d1d` (**1 fix round**). Both `author_maker` payload sites
+  removed, the "authored by another participant" framing kept, `author_maker` deleted from the
+  `UntrustedPromptFieldName` union so a re-add fails to compile. The prompt edit's real blast radius:
+  **27 of 103** reader tests, one suite passing SILENTLY with its PANEL leg misclassified. Fix round moved
+  four doubles from prose to structure (PANEL = `fatalFlags && !restatement_text`, REVIEW =
+  `edge_bearings`, both measured). Ledger :107–:112.
+- **T12 W9 minimum payload** — `b37263e4..50f8a4bd`. Review ACCEPTED, first round.
+  `toSynthesisPromptPayload` is an ALLOW-LIST projection; both runner sites pinned by count (0
+  `JSON.stringify(request)`, 2 projection calls, 1 definition); `SYNTHESIZER_INSTRUCTIONS` carries the
+  agreement obligation. Three product defects found and NOT fixed (out of scope): F-T12-1/2/3. Ledger
+  :114–:116.
+- **T13 W2 DEGRADED-DIVERSITY emitter** — `35615ee0..061b5067` (**1 fix round**). The mark had a UI label
+  and no emitter for the whole mission; it is now set on the SERVED path in `runServeGateChain`, null on
+  both crash constructors. The fix round was caused by the orchestrator's own packet gap: WHO-READS-THIS-
+  STRING covered literals, not a NEW EMISSION — clause amended. Ledger :118–:123.
+- **T14 W1 one fixed grader** — `a87dc60b..0e289c0d`. Review ACCEPTED, first round. `resolveFixedGrader`
+  is candidate-independent (sorted-first, deterministic); `gradersPerCell` 2 → 1 and the projection
+  90/180 → 75/150. Three rulings taken on V's behalf — see the V packet. Ledger :125–:127.
+- **T15 W10 a length failure says so** — `90610345..7ff995cd` (**1 fix round**) **and** `35dc4c15..c1c08bd7`
+  (**round 2**). `finish_reason` carried, `length` classified `LENGTH_EXCEEDED`; a truncation re-sends the
+  ORIGINAL packet under a raised bound; `synthesizerCallBound`/`evaluatorCallBound` minted through T16's
+  mechanism, REQUIRED at the type level and spent at both call sites. Round 2 existed because **the final
+  gate found the reader the sweep could not see** — a `toHaveLength(47)` count pin with no symbol in it.
+  Ledger :129–:132, `FINAL GATE ATTRIBUTION`.
+- **T16 W6 fixture env leak (SECURITY)** — `f0f9eeb2..f13dacc4` (**1 fix round**). The class had **six**
+  members, not four; `ANTHROPIC_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN` were still echoed **by value** after
+  round 0 — the original incident's shape was still live. Closed: a credential-shaped value travels only
+  as a digest, `environmentKeyNames` restores exact-set reach, `grep -rn 'environment: process.env'
+  acceptance` = 0 hits, re-measured by the orchestrator. **W6 CLOSED.** Ledger :134–:139.
+- **T17 F-GROK-SANDBOX-PROFILE** — `a38dde4a..5ace5d7c` (**1 fix round**). An absent maker is now printed
+  loudly before the debate starts; `--sandbox read-only` is probed first and, on failure, the identical
+  handshake re-runs without it, printing `RELAY DEGRADED xAI SANDBOX-PROFILE-UNAVAILABLE <code>` — and if
+  the unsandboxed handshake also fails the ORIGINAL failure is re-thrown, so **an absent maker is never
+  traded for an unprotected one**. `acceptance/absent-makers.ts` is the ONE announcer, keyed by
+  providerRef (a positional lookup would have named OpenAI for a failed claude). Ledger :141–:145.
+
+### Phase 3 — tools and records (Tasks 18–19)
+
+- **T18 mission tools ported to this host** — `6cdc14b2..94b0971b` (**1 fix round**). Seven laptop-bound
+  tools made host-independent (root from the tool's own location / `git rev-parse --show-toplevel`,
+  binaries by `ACCEPTANCE_*_BINARY` or `command -v`), D18/D60 behaviour byte-for-byte unchanged; the
+  re-run readiness packet written at
+  `/Users/stefannour/DebateAIRO/debateairo/.claude/worktrees/algo-loop-2026-09-16/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/packets/readiness-ask-2026-09-16.md`.
+  Standing by design: the tools are untestable below the credential gate, and the readiness table is a
+  transcription the operator re-measures at run time. Ledger :147–:151.
+- **T19 records** — this section, D73, the LEDGER rows, the V-packet section, the board reconcile and
+  `agent-reports/w12-closure-audit-2026-09-16.md`.
+
+### THE FINAL GATE — `6cdc14b2` (product files identical to Task 17's tip `5ace5d7c`)
+
+Measured by the orchestrator, detached, with an instrument validated by reproducing `96e3c91c` → 170/1/0/1
+and `78e89ea4` → 142/0/0/1 exactly. The four-count line, verbatim:
+
+```
+FOUR-COUNT  failures=141  suite-load=0  skips=0  unhandled=1
+TOTALS(json)  tests=5271  passed=5130  failedTests=141  files=425  failedFiles=32
+```
+
+Delta against the Phase 1 gate `78e89ea4`: **NEW 1** — `tests/architecture/register-support-publication.test.ts`
+› *"preserves the exact legacy hashes while the actual port input owns all 248 policy decimals"*,
+`expected … to have a length of 47 but got 49` at `:369`; the +2 are Task 15's two sealed cost rows
+(`359a3e84`) — ENTAILED to Task 15, **fixed at `35dc4c15`**. **CLEARED 2** — the F22 RSS/load rows
+(consistent-with `env:resource`). **UNHANDLED 1** — the same s7
+`ENCRYPTED_RUN_OWNER_TRANSFER_REQUIRES_REWRAP` rejection as at `96e3c91c` and `78e89ea4`; known,
+entailed, Phase-1-owned. **STILL RED 140** — name-identical to the Phase 1 list (100 `localStorage`
+Node-26 rows in `tests/render` + the 40 owned rows). New tests since `78e89ea4`: 5271 − 5192 = **79**.
+Both typecheck projects 0 at `5ace5d7c`; both audits unchanged since Task 15's baseline (F31's three
+rows). **PRODUCT FINAL at `35dc4c15`** (`c1c08bd7` is docs).
+
+### Open after this continuation
+
+- **The full-suite re-run at the tip `c1c08bd7`** — started detached with the same instrument. Its
+  four-count is MEASURED, never predicted; the orchestrator appends the result. Until it lands, the gate
+  of record for this branch is `6cdc14b2` **plus** the Task 15 round-2 fix at `35dc4c15`.
+- **Operator-owed, cannot be done by a seat:** a Node **22.23.1** run (expected to clear ~100
+  `localStorage` rows and reveal ~4 real `t1-canvas` reds); the **Grok re-run** (Docker Desktop, then the
+  ceremony once); the **acceptance ceremony re-run** on this branch; the **mono-maker run**; the **δ/ε
+  refit** — the last three need the operator's credential and go (D18/D72).
+- **Never authorized, still not done:** T3B (never authorized), T14b (gated off by T14a-G3),
+  F-TOOL-MUTATE-3 (at the rework cap, awaiting V's row).
+- **Reported to the operator, merged into neither line:** the peer security branch
+  `origin/security/2026-09-01-hardening` (`35bd80c4`) carries **130** commits not in `origin/dev` and
+  **379** not in `origin/main` — both counts measured this pass, STRENGTH entailed.
+- **The judge's whole-goal verdict does not exist and cannot be issued from this branch** — see
+  `agent-reports/w12-closure-audit-2026-09-16.md`.
+- **Nothing was pushed.** D70 stands: the operator performs every push and every merge.
