@@ -5055,3 +5055,64 @@ not in 4 000 lines of prose every author skims.
   (`UntrustedPromptFieldName`). Deleting the union member with the sites turns a re-add into a
   compile error instead of a one-line edit — vitest still transpiles the mutant, so the guard and the
   compiler both speak.
+
+## CORRECTION to my own dead end: the integration AND acceptance suites DO run on this host, Docker or not (2026-09-16, BUILD(CONT-T11) fix round 1)
+- Round 0 I wrote, and filed as a DEAD END, "do not run the integration or acceptance suites in this
+  worktree — the Docker daemon is not running, their verdict would be an environment artifact". It is
+  **false for this repo**: `tests/support/testDatabase.ts` defers testcontainers under DR-121 and runs
+  a REAL embedded PostgreSQL, and the acceptance suites drive fake CLIs. Measured this round:
+  `tests/integration/t17-envelope-ledger.test.ts` completes in **3 s**, and the five-file reader set
+  (`judgement`, `t17-envelope-ledger`, `database`, `ceremony`, `panel-multi-maker`) runs 103 tests
+  well inside one tool call.
+- The error was built from two TRUE statements — "Docker is not running" (from the packet's
+  named-facts line) and "integration suites usually need a database, which usually needs Docker" —
+  combined into a claim about THIS repo that one command would have refuted.
+- **Rule: an UNVERIFIED line must name the command that would settle it, and if that command runs in
+  under a minute you are not allowed to write UNVERIFIED — you run it.** A DEAD END is advice against
+  looking, which makes it the highest-authority thing a seat writes and the one that must be measured
+  hardest. Cost of this one sentence: 27 broken assertions shipped past a handoff, plus a full review
+  and fix round.
+
+## A ledger-derived count cannot see a misrouted provider double — the arithmetic is identical either way (same seat, same day)
+- `tests/integration/t17-envelope-ledger.test.ts` was GREEN while its double classified **zero** panel
+  calls: every panel body fell through a dead prose discriminator to the chain's terminal
+  `return "JUDGE"`, was answered with a judge artifact, and failed `judgeAssessmentSchema`. Its panel
+  assertions read `ledger.ledger_entry` by call-site namespace (`call_site_key LIKE 'PANEL:%'`), which
+  the RUNNER stamps regardless of what the double understood.
+- The reason no other number could see it: misrouted, the body inherited the JUDGE branch's larger
+  failure budget and the runner's own 3-attempt panel bound ended the site — three ledger rows;
+  routed correctly, the double fails twice and succeeds on the third — three ledger rows.
+  `ATTEMPTS_PER_PANEL_SITE` is satisfied by a panel that never worked. The file's `PANEL_ASSESSMENT`
+  response constant had never been served in its life.
+- **Rule: a suite that owns a provider double asserts the DOUBLE's own classification counts, not only
+  the ledger's. A count satisfied by both the working and the broken case is a coincidence with a
+  number in it.** The row added here reads `primary.counts().PANEL + secondary.counts().PANEL` and
+  compares it to the ledger's panel attempts; it printed `{ panelClassifiedByDouble: 0,
+  ledgerPanelAttempts: 24 }` at the broken tip.
+
+## "A key of its own schema" is not automatically unique to its organ — judge embeds the whole assessment schema (same seat, same day)
+- A review asked for the panel double to key on `counterargumentStrength` or `fatalFlags`, "a key of
+  its JSON schema". Measured over the three shipped system prompts (slice each `role: "system"`
+  template literal out of `packages/judgement/src/index.ts` and test membership):
+  `fatalFlags`, `counterargumentStrength`, `steelman` and `ambiguityFlags` are in the **JUDGE** prompt
+  as well, because `judgeArtifactSchema` is the judge's own fields **plus
+  `judgeAssessmentSchema.shape`**. Only `edge_bearings` (review) and `restatement_text` /
+  `way_of_knowing` / `value_laden` (judge) are single-organ.
+- Keying the panel on either suggested token alone would have stolen every JUDGE call — the same
+  silent misroute in the opposite direction, hiding behind a panel that now looks repaired.
+- **Rule: "unique key" is a claim about a SET of organs and costs one script to check. Where no single
+  token discriminates, use a conjunction whose negative is independently pinned** — here
+  `fatalFlags && !restatement_text`, with the absence of `restatement_text` from the panel prompt
+  already asserted by `tests/unit/t03-judge-panel.test.ts`.
+
+## The house pattern that stops a stale discriminator existed already, and one package's shape made it unreusable (same seat, same day)
+- `acceptance/test-fixtures/evaluator-double.ts` imports the SHIPPED `EVALUATOR_CONTRACT_TEXT`
+  constant and asserts AT IMPORT that `JSON.stringify(text) === '"' + text + '"'`, so the double's
+  discriminator "cannot go stale silently" — exactly the failure the four judgement doubles then
+  suffered, in the same repo, months later.
+- They could not reuse it because the judgement prompts are inline template literals inside
+  `Judge.judge` / `Judge.review` / `Judge.assess`, not exported constants. The gap is structural, not
+  cultural.
+- **Rule for reviewers: before auditing a coupling class, ask whether a sibling already solved it and
+  why THIS caller cannot use the solution. That question is cheaper than the audit and it finds the
+  real root cause** — here, "a prompt that cannot be imported" rather than "prose used as a key".

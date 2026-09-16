@@ -120,8 +120,10 @@ repo tool (`tools/run-gate.sh`), written once with N4 fixed, rather than re-inve
 - **Do not fix the four dispatchers here.** They are out of contract (`acceptance/**`,
   `tests/integration/**`) and the remedy is a shape change (U1), not a string substitution repeated
   four times. Filed as F2 with the remedy.
-- **Do not run the integration or acceptance suites in this worktree.** Docker daemon is not
-  running; their verdict here would be an environment artifact, not evidence.
+- ~~**Do not run the integration or acceptance suites in this worktree.** Docker daemon is not
+  running; their verdict here would be an environment artifact, not evidence.~~
+  **WRONG — CORRECTED IN FIX ROUND 1 (§8).** They run here, in seconds. Struck in place rather than
+  deleted, because a dead end that was never true is the more useful record.
 - **Do not "clean up" `authorMaker` from the interfaces.** `JudgeSubjectInput.authorMaker` is now
   unread by `review`/`assess` and reads like dead weight. It is not: the field is the request-side
   record of provenance, and V's rule is RECORDED and WITHHELD. Deleting it would satisfy a linter
@@ -158,3 +160,93 @@ repo tool (`tools/run-gate.sh`), written once with N4 fixed, rather than re-inve
 | the class sweep that found F2 | 2 rounds — the highest-value rounds in this task |
 | harness self-inflicted (N4 exit status; one environment refusal of a multi-line heredoc) | 2 rounds |
 | rework rounds | 0 |
+
+---
+
+## 8. Fix round 1 — the murder I nearly signed off on
+
+Tip `aebb08e1`. Two findings fixed, one deferred as a ticket draft, all five readers green three
+times. This section is the part of the case file that matters most, because the round exists at all
+only because of a sentence I wrote.
+
+### 8.1 The cause, and it is mine: I inferred an environment instead of measuring it
+
+I reported that the integration and acceptance suites "cannot execute in this worktree" because the
+Docker daemon is not running, and I filed it as a DEAD END — advice to the next seat NOT to look.
+Measured this round: `tests/support/testDatabase.ts` defers testcontainers under DR-121 and runs a
+REAL embedded PostgreSQL, and the acceptance suites drive fake CLIs. All five readers run here.
+`tests/integration/t17-envelope-ledger.test.ts` took **3 seconds**.
+
+The mechanics of the error are worth naming exactly, because they are reusable:
+
+1. My packet's named-facts line said "Docker daemon not running". True.
+2. I knew integration suites usually need a database, and databases usually need Docker. True in
+   general.
+3. I combined two true statements into a conclusion about THIS repo and never ran the one command
+   that would have settled it. **A fact I could have measured in 90 seconds, I inferred.**
+4. Worse than being wrong: I promoted the inference to a DEAD END — the section of a report whose
+   whole purpose is to stop other people from checking.
+
+**Price:** 27 broken assertions shipped past me at `266d9e2b`, an orchestrator review round, a
+five-commit fix round, and — had the orchestrator trusted my UNVERIFIED line — a silently broken
+panel in the acceptance suite. **Rule I would put in the packet template: an UNVERIFIED line must
+name the COMMAND that would settle it. If the command is under a minute, you are not allowed to write
+UNVERIFIED; you run it.** A dead end is the highest-authority thing a seat writes, because it is
+advice against looking, and mine was the cheapest possible thing to check.
+
+### 8.2 What the fix round found that the review did not
+
+**A suite can be green over an organ that never once worked.** `t17-envelope-ledger` passed at my tip
+with every panel member failing. Its panel assertions read the LEDGER's call-site namespace, which the
+runner stamps regardless of what the double understood, and — this is the part nobody would guess —
+the attempt arithmetic is IDENTICAL either way: three attempts per panel site whether the member
+succeeds on the third or exhausts the bound on the third. The suite's own `PANEL_ASSESSMENT` response
+constant had never been served in its life. **A count that is satisfied by both the working and the
+broken case is not a check; it is a coincidence with a number in it.** The new observability row reads
+the double's own classification instead: RED at my tip with
+`{ panelClassifiedByDouble: 0, ledgerPanelAttempts: 24 }`.
+
+**The suggested fix would have created the opposite defect.** The review told me to key the panel
+double on `counterargumentStrength` or `fatalFlags`. Measured across the three shipped prompts: BOTH
+appear in the JUDGE prompt too, because `judgeArtifactSchema` embeds `judgeAssessmentSchema.shape`.
+Keying on either alone would have stolen every judge call — the same class of silent misroute, in the
+other direction, and hiding behind a panel that now looks fixed. The instrument was twenty lines that
+slice each `role: "system"` template literal out of the source and test token membership. **A
+"unique" key is a claim about a SET of organs, and it costs one script to check.**
+
+### 8.3 The upgrade this round makes concrete (and the one it cannot)
+
+My round-0 report named "prompt TEXT is being used as an INTERFACE" as the highest-leverage upgrade.
+The fix round sharpened it into something better, because the remedy **already exists in this repo
+and could not be reused**: `acceptance/test-fixtures/evaluator-double.ts` imports the SHIPPED
+`EVALUATOR_CONTRACT_TEXT` constant and asserts at import that it survives JSON encoding, so that
+discriminator "cannot go stale silently" — the exact failure the four judgement doubles then suffered.
+They could not do the same because the judgement prompts are inline template literals, not exported
+constants.
+
+**So the real finding is not "prose is a bad key". It is: a solved problem existed in the repo and one
+package's shape made it unreusable.** That is a much cheaper thing to look for in a review than a
+prose-coupling audit — ask "does a sibling already solve this, and why can this caller not use it?"
+F3's ticket draft carries the remedy (an organ marker in the envelope, or exported prompt constants
+with the evaluator double's import-time assertion).
+
+### 8.4 What I did right, and would keep
+
+- Adding the t17 observability row BEFORE touching any discriminator. It produced the one RED frame
+  that the orchestrator's own JSON could not: the silent case, stated as a number.
+- Measuring the key before choosing it, against the instruction. The contract explicitly permitted
+  this ("if a suggested key turns out not to be unique to its organ, choose one that is and report
+  the difference") — and a packet that pre-authorises disagreement-with-evidence is worth more than
+  one that is merely correct.
+- The two-sided mutant: prose reworded → readers GREEN (coupling gone), guard RED (framing still
+  pinned). One mutant, two properties, and it names which layer owns which.
+
+### 8.5 Prices, this round
+
+| item | cost |
+|---|---|
+| root-cause phase (readers.json, failure extraction, token survey, evaluator-request shape) | 6 rounds — the token survey alone prevented a new silent misroute |
+| the RED observability row and its run | 2 rounds |
+| four doubles + the pin, edited and committed | 4 rounds |
+| gates (typecheck ×2, readers ×3, guard, neighbours, mutant ×2) | 9 runs, all logged, none overwritten |
+| rework rounds caused by my own dead end | **1 whole round — the cost of one unmeasured sentence** |
