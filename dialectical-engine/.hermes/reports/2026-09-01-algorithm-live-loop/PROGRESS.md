@@ -522,11 +522,32 @@ test file differs). **UNHANDLED 1** — the same s7 rejection. **STILL RED 140**
 **Every one of the 141 is owned:** 100 `env:toolchain` (`localStorage`, Node 26), 40 owned rows, 1
 `env:resource`. Appended by the orchestrator, as RESUME's "exact next action" instructed.
 
+### THE FINAL GATE — `5c996693` (product final at `ee73e39a`) — the gate of record for this branch
+
+After the whole-branch review's fix rounds (F1 retry-before-degrade `9304d106`, F2 `79719627`, F3
+`40bf8b11`, F5 `293db256`, and round 2's `ee73e39a` — the claim-guard maximum kept scalar for the S1-1
+oracle), measured by the orchestrator 2026-09-16 17:25–18:10Z (20:25–21:10 local), detached, on a
+quiet machine, same instrument. The four-count line, verbatim from
+`scratchpad/logs/final-gate/full-5c996693.four-count.txt`:
+
+```
+FOUR-COUNT  failures=140  suite-load=0  skips=0  unhandled=1
+TOTALS(json)  tests=5275  passed=5135  failedTests=140  files=425  failedFiles=31
+```
+
+Delta against `7b35227b` (143/0/0/1): CLEARED 3 — the two S1-1 depth-oracle cases (round 2's fix,
+entailed) and the F22 load-coupled `registration-database` row (env:resource, the machine was quiet);
+NEW 0. Against the previous gate of record `c1c08bd7` (141/0/0/1): NEW 0, CLEARED 1. Against the
+Phase 1 gate `78e89ea4` (142/0/0/1): NEW 0, CLEARED 2, STILL RED 140 — name-identical. UNHANDLED 1 —
+the same s7 `ENCRYPTED_RUN_OWNER_TRANSFER_REQUIRES_REWRAP` rejection as at every gate. **Every one of
+the 140 is owned:** 100 `env:toolchain` (`localStorage`, Node 26) and 40 owned rows. Both typecheck
+projects 0 and both audits at F31's three rows, taken by the reviewer at `5c996693`.
+
 ### Open after this continuation
 
-- **The gate of record is `c1c08bd7` — 141/0/0/1** (above). A Node 22.23.1 run and a quiet machine are
-  the two environment conditions under which the 101 environment rows are expected to move; both are the
-  operator's.
+- **The gate of record is `5c996693` — 140/0/0/1** (above). A Node 22.23.1 run is the one environment
+  condition under which the 100 `localStorage` rows are expected to move (and ~4 real `t1-canvas` reds
+  to appear); it is the operator's.
 - **Operator-owed, cannot be done by a seat:** a Node **22.23.1** run (expected to clear ~100
   `localStorage` rows and reveal ~4 real `t1-canvas` reds); the **Grok re-run** (Docker Desktop, then the
   ceremony once); the **acceptance ceremony re-run** on this branch; the **mono-maker run**; the **δ/ε

@@ -336,3 +336,23 @@ to print the six absent facts (`agent-reports/w12-closure-audit-2026-09-16.md` �
 the M≥2 re-run with Docker up, the M=1 run, δ/ε, the seven confirm-items, the verdict.
 
 **Nothing is pushed.** Tip when this entry was written: the commit that carries it.
+
+## 2026-09-16 21:1x — NEWEST ENTRY WINS
+
+**The continuation is FINISHED and REVIEWED.** The blind second-lens whole-branch review returned
+**MERGEABLE** (re-confirmed twice after its own fix rounds); the product is final at `ee73e39a`; the
+gate of record for the branch is **`5c996693` — `FOUR-COUNT failures=140 suite-load=0 skips=0
+unhandled=1 · tests=5275 passed=5135 files=425 failedFiles=31`**, every name owned (100 Node-26
+`localStorage` rows, 40 owned rows; the same s7 rejection as at every gate). Against the Phase 1 gate:
+nothing new, two cleared. The rows are in `PROGRESS.md` (§ THE FINAL GATE — `5c996693`) and `LEDGER.md`.
+
+**Nothing is pushed and nothing is merged (D70).** The operator's next actions, in order:
+1. push `mission/2026-09-16-algorithm-live-loop-continuation`;
+2. (code, no spend) extend the ceremony's phase report to print the six facts the W12 audit found absent
+   (`agent-reports/w12-closure-audit-2026-09-16.md` §6 step 1);
+3. the Node 22.23.1 run of the suite;
+4. the M≥2 ceremony re-run on this branch per `packets/readiness-ask-2026-09-16.md` (Docker up so Grok
+   joins sandboxed — or as-is, degraded loudly), then the M=1 run, δ/ε, the seven confirm-items, the verdict;
+5. the V packet's 2026-09-16 rows — every default binds until V says otherwise.
+Residual tickets on the board: F-T1-FX-ORPH-04-NO-LIVE-SUBJECT (+ the review's F4), F-PACKET-LINT-COUNT-HANDED,
+F-RELAY-BINARY-HOST-DEFAULT, and the 43 filed by RECORDS(CONT-T19).
