@@ -203,14 +203,27 @@ function cliInstalledOnPath(cli: ModelConfigCli): boolean {
 }
 
 function validateRoster(entries: UnknownRecord[], tier: PlanTierWord): void {
-  const makers = entries.map(maker);
-  if (entries.length < 2 || new Set(makers).size !== makers.length) {
+  if (entries.length < 2) {
     shapeError({
       code: "MODEL_CONFIG_TIER_ROSTER_INVALID",
       classNumber: 5,
       tier,
       detail: "each tier needs at least two entries from distinct makers"
     });
+  }
+
+  const seenMakers = new Set<string>();
+  for (const entry of entries) {
+    const entryMaker = maker(entry);
+    if (seenMakers.has(entryMaker)) {
+      shapeError({
+        code: "MODEL_CONFIG_TIER_ROSTER_INVALID",
+        classNumber: 5,
+        ...entryContext(entry, tier),
+        detail: "each tier needs at least two entries from distinct makers"
+      });
+    }
+    seenMakers.add(entryMaker);
   }
 }
 

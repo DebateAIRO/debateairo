@@ -70,7 +70,12 @@ interface LoadOptions {
 
 function expectShapeError(
   contents: string,
-  expected: { code: ShapeCode; classNumber: number },
+  expected: {
+    code: ShapeCode;
+    classNumber: number;
+    tier?: "free" | "premium";
+    model?: string | undefined;
+  },
   options: LoadOptions = {
     isCliInstalled: () => true
   }
@@ -78,7 +83,10 @@ function expectShapeError(
   const ModelConfigShapeError =
     modelConfig.ModelConfigShapeError as ShapeErrorConstructor;
   const marker = new ModelConfigShapeError({
-    ...expected,
+    code: expected.code,
+    classNumber: expected.classNumber,
+    ...(expected.tier === undefined ? {} : { tier: expected.tier }),
+    ...(expected.model === undefined ? {} : { model: expected.model }),
     detail: "expected shape refusal"
   });
   const loadModelConfig = modelConfig.loadModelConfig as (
@@ -156,7 +164,9 @@ describe("model configuration shape classes", () => {
     });
   });
 
-  it("class 5 refuses a tier with only one maker", () => {
+  it("class 5 refuses a tier with fewer than two entries without naming a model", () => {
+    // Property: an undersized tier has no individual repeated entry to name.
+    // Break caught: attributing the aggregate roster failure to its sole entry.
     expectShapeError(
       VALID_CONFIG.replace(
         `  - api: zai
@@ -168,7 +178,30 @@ describe("model configuration shape classes", () => {
       ),
       {
         classNumber: 5,
-        code: "MODEL_CONFIG_TIER_ROSTER_INVALID"
+        code: "MODEL_CONFIG_TIER_ROSTER_INVALID",
+        tier: "free",
+        model: undefined
+      }
+    );
+  });
+
+  it("class 5 names the first repeated maker entry's model", () => {
+    // Property: a repeated-maker refusal identifies the first entry whose maker was already seen.
+    // Break caught: raising the aggregate class-5 error without the refused entry's model.
+    expectShapeError(
+      VALID_CONFIG.replace(
+        `  - cli: grok
+    model: grok-4.6-build
+`,
+        `  - cli: claude
+    model: claude-sonnet-5
+`
+      ),
+      {
+        classNumber: 5,
+        code: "MODEL_CONFIG_TIER_ROSTER_INVALID",
+        tier: "premium",
+        model: "claude-sonnet-5"
       }
     );
   });

@@ -153,12 +153,12 @@ export async function startDevelopmentAuthStack(
   operations: DevelopmentAuthStackOperations
 ): Promise<DevelopmentAuthStack> {
   await fixedStage(
-    "DEV_AUTH_STACK_CONTRACT_GENERATION_FAILED",
-    () => operations.generateContract()
-  );
-  await fixedStage(
     "DEV_AUTH_STACK_MODEL_CONFIG_INVALID",
     () => operations.checkModelConfig()
+  );
+  await fixedStage(
+    "DEV_AUTH_STACK_CONTRACT_GENERATION_FAILED",
+    () => operations.generateContract()
   );
   const occupied = await fixedStage(
     "DEV_AUTH_STACK_PREFLIGHT_FAILED",
@@ -309,8 +309,9 @@ export function createDevelopmentAuthStackOperations(
         checkedModelConfig = loadModelConfig(repositoryRoot);
       } catch (error) {
         if (error instanceof ModelConfigShapeError) {
+          const model = error.model === undefined ? "" : ` model=${error.model}`;
           console.error(
-            `DEV_AUTH_STACK_MODEL_CONFIG_INVALID tier=${error.tier} model=${error.model} class ${error.classNumber}`
+            `DEV_AUTH_STACK_MODEL_CONFIG_INVALID tier=${error.tier}${model} class ${error.classNumber}`
           );
         }
         throw error;
