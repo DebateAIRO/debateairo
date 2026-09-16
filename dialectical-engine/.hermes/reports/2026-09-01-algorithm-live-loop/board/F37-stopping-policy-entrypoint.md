@@ -10,4 +10,9 @@ close (F33 panelPolicy, F34 claimTimeProbe, F37 stoppingPolicy).
 IMPACT: the closing flagship run is M≥2, so this blocks the Global DoD outright.
 DISPOSITION (J27): the pass-through fix stays in T3C, isolated in its own commit; and because
 D28's enumeration duty is now overdue at the third instance, T3C also adds the CLASS gate.
-status: working (T3C) · escalation_target: v_packet if the class gate cannot be built in-lane
+status: done · escalation_target: v_packet if the class gate cannot be built in-lane
+
+## 2026-09-16 continuation
+Moved `working (T3C)` → `done` by RECORDS(CONT-T19). Citation: `PROGRESS.md:53` — T3C merged at
+integration `19bbb4c4`, *"F37 stoppingPolicy wiring and the J27 class gate are all in"*. The class gate
+the escalation clause worried about WAS built in-lane, so the escalation never fired. STRENGTH: entailed.

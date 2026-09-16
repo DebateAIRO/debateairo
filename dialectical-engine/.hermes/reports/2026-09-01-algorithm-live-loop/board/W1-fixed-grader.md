@@ -4,7 +4,7 @@
 state:
   ticket: W1
   risk_tier: high
-  status: queued
+  status: done
   owner: { agent: claude, session: tbd }
   contract:
     allowed: []
@@ -39,3 +39,17 @@ non-commensurability mark for the case where a deployment genuinely cannot suppl
 arms, and make it fire ONLY then.
 
 Closes F-S11-5 by dissolving it. No provider call is authorized.
+
+## 2026-09-16 continuation
+Moved `queued` → `done` by RECORDS(CONT-T19). Landed by **Task 14**, range `a87dc60b..0e289c0d`
+(`39b2b46d` the product change). `resolveFixedGrader` takes no candidate — one identity, deterministic,
+disclosed AS fixed in the preflight (`GRADER FIXED …`) and in the comparison table; the exclusion and
+repeat-before-candidate ranking are gone; `assessComparability` reads the seats; `anyDegraded` now means
+exactly *"one grader did not grade every arm"*. `gradersPerCell` 2 → 1, projection 90/180 → 75/150. No
+provider call was made. Orchestrator's review: **ACCEPTED, first round** — RED 4/48 at base → GREEN 50/50
+×3, mutants 3/1/8/5 red, neighbour green, typecheck 0 on BOTH the root and the acceptance projects at base
+and tip (SDD ledger :125–:127). STRENGTH: entailed.
+**Three rulings travelled with it, each a V row** (`V-DECISIONS-PACKET.md`, 2026-09-16 section A):
+`BLIND-GRADING-DEGRADED` and `GRADER-REPEATS-IDENTITY` retired as harness-local; `gradersPerCell` = 1
+supersedes the goal's "2 graders" clause; and **F-W1-1 — no register row nominates the grader**, so the
+choice is sorted-first until V seals one.

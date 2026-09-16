@@ -4,7 +4,7 @@
 state:
   ticket: F-SEALEDROWS-B
   risk_tier: medium          # tests are green for a reason unrelated to what they claim to prove
-  status: waiting_product_proof # MERGED into integration at ae35e9d2 (2026-09-05, post-merge.sh, tree == dry-run 2b64673f; 4 files +175 −27). Codex r1 APPROVE 0 blocking / 2 follow-ups (F-DEMOPATH-R1 orchestrator packet path, F-DEMOPATH-R2 report wording). Closes on a green D15 batch b13 after W3 r4 lands
+  status: done # MERGED into integration at ae35e9d2 (2026-09-05, post-merge.sh, tree == dry-run 2b64673f; 4 files +175 −27). Codex r1 APPROVE 0 blocking / 2 follow-ups (F-DEMOPATH-R1 orchestrator packet path, F-DEMOPATH-R2 report wording). Closes on a green D15 batch b13 after W3 r4 lands
   owner: { agent: claude, session: lane-demo-path }
   contract:
     allowed: []
@@ -41,3 +41,13 @@ acceptance/seed-register.test.ts
 
 Blocked behind F-SEALEDROWS-A: the repair there decides what the current protocol text is, and
 these fakes must answer THAT.
+
+## 2026-09-16 continuation
+Moved `waiting_product_proof` → `done` by RECORDS(CONT-T19). This row waited on an ACCOUNTING gate, not
+on code — the code had landed (see the `landed?` column of the 2026-09-16 status map §4.2, *"Code landed;
+each row closes by accounting against a gate that has already been taken … No further code is owed."*).
+That gate exists and was taken. Citation: `LEDGER.md:487` — the full suite on dev `169941c6`, the closing
+run's own tree: **77 / 1 / None / 1**, passed 3379 of 3456, 33 of 265 files, attribution *"0 appeared · 2
+disappeared"*, and the orchestrator's own closing sentence: *"Nothing unexplained."* STRENGTH: entailed.
+The 2026-09-16 continuation added no code to this subject; the move is a records correction of a row that
+had been closeable since 2026-09-08.

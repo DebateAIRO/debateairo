@@ -4,7 +4,7 @@
 state:
   ticket: W7
   risk_tier: high            # it is the premise that makes same-model grading legitimate
-  status: ready
+  status: done
   owner: { agent: claude, session: tbd }
   contract:
     allowed: []
@@ -41,3 +41,19 @@ is RECORDED and WITHHELD, not forgotten.
 
 **Add a test that fails if any prompt payload carries an authorship token.** The defect survived
 because nothing checked; a guard over the whole prompt surface is what stops the next one.
+
+## 2026-09-16 continuation
+Moved `ready` → `done` by RECORDS(CONT-T19). Landed by **Task 11**, range `e6477f64..f7b54d1d`
+(`abb6b21b` the product change). Both `author_maker` payload sites removed; the *"authored by another
+participant"* framing kept (the reviewer still knows the text is foreign, just not whose); `author_maker`
+deleted from the `UntrustedPromptFieldName` union so a re-add **fails to compile**; a guard with a
+coverage row over every `role: "system"` site; and no assertion anywhere that the reviewer differs from
+the author. Orchestrator's review of the product change: the ruling exactly (SDD ledger :107–:112).
+STRENGTH: entailed.
+**What this ticket cost, and it belongs on the record:** editing one clause of two system prompts broke
+**27 of 103** assertions across four provider doubles — and one suite (`t17-envelope-ledger`) went on
+passing SILENTLY with its PANEL leg classified as JUDGE. Fix round 1 moved all four doubles from prose to
+structure (PANEL = `fatalFlags && !restatement_text`, REVIEW = `edge_bearings`, both measured unique) and
+made t17's PANEL leg observable.
+**Deferred, now its own ticket:** `F-W7-ORGAN-MARKER` — the doubles still key on schema keys a schema
+change can move; an explicit organ marker in the untrusted-fields envelope is the durable form.

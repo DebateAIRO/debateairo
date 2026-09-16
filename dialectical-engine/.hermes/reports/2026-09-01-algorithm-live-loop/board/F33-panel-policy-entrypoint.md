@@ -9,4 +9,11 @@ DISPOSITION: fix lane T3C after S06 closes (same seat, same pattern as S06 B1: r
 through T16's reader with provenance, pass it, add the mandatory-entry-point-settings row,
 production-entry-point-level assertion, RED first); codex review; judge; merge before the
 flagship run. Verified by codex S06 r2 item (7) first.
-status: queued · escalation_target: v_packet if not closed before W12
+status: done · escalation_target: v_packet if not closed before W12
+
+## 2026-09-16 continuation
+Moved `queued` → `done` by RECORDS(CONT-T19). The ticket's own DISPOSITION is what happened: lane T3C
+ran after S06 closed and wired the family through T16's reader. Citation: `PROGRESS.md:53` — *"T3C
+MERGED — integration 19bbb4c4. SEVEN lanes landed … F33 panelPolicy, F34 claim-time probe, F37
+stoppingPolicy wiring and the J27 class gate are all in: before this merge the shipped code could not
+run ANY multi-maker debate."* STRENGTH: entailed. Closure is a records move only; no code was owed.

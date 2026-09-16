@@ -8,4 +8,11 @@ as F33 / S06 B1, worst member (those fail loudly with no spend; this one degrade
 DISPOSITION (J20): folded into T3C's charge by orchestrator amendment — same file, same
 pattern, same seat; RED first (a pinned member absent since ask → today no disclosure), then
 wire the probe on the production path with the claim-time gate; codex reviews it with T3C.
-status: working (T3C) · escalation_target: v_packet if not closed with T3C
+status: done · escalation_target: v_packet if not closed with T3C
+
+## 2026-09-16 continuation
+Moved `working (T3C)` → `done` by RECORDS(CONT-T19). Citation: `PROGRESS.md:53` — T3C merged at
+integration `19bbb4c4` with *"F34 claim-time probe"* named among the four things it landed. The ticket
+was left in `working` after its lane merged. STRENGTH: entailed.
+Carried forward, NOT closed by this move: the production half is **T14b**, which T14a's gates left
+UNAUTHORIZED (T14a-G3) and which no one has authorized since. That half belongs to `F1-claimtimeprobe-production-gap`.

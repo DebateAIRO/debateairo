@@ -4,7 +4,7 @@
 state:
   ticket: W6
   risk_tier: high            # writes live credential values into a persisted ledger
-  status: ready
+  status: done
   owner: { agent: claude, session: tbd }
   contract:
     allowed: []
@@ -37,3 +37,18 @@ in front of you, redact in place and say so, exactly as the W4 seat did.
 
 V is rotating the exposed key. That is the operational half; this is the code half, and neither
 substitutes for the other.
+
+## 2026-09-16 continuation
+Moved `ready` → `done` by RECORDS(CONT-T19). Landed by **Task 16**, range `f0f9eeb2..f13dacc4`.
+**Round 0 was not enough and the record should say so:** the seat's own F4 was CRITICAL —
+`ANTHROPIC_API_KEY` and `CLAUDE_CODE_OAUTH_TOKEN` were still echoed **by value**, so the original
+incident's shape was still live after the first commit; and the class had **six** members, not the four
+the packet asserted. Fix round 1 closed it: a credential-shaped VALUE is emitted only as
+`sha256:<16 hex>`; `environmentKeyNames` (sorted, names only) restores the exact-set reach the allow-list
+had removed; the credential-shape rule is one PATTERN stated identically in all six members rather than a
+list in six places — *a list in six places is how the leak survived*. Orchestrator's review: **ACCEPTED,
+W6 CLOSED** — 8 files / 87 / 0 ×3, both typechecks 0/0, three mutants killed at both layers, and
+`grep -rn 'environment: process.env' acceptance` = **0 hits, re-measured by the orchestrator** (SDD ledger
+:134–:139). STRENGTH: entailed.
+**Deferred, now its own ticket:** the sweep is one literal — a member written `env: process.env` would
+pass it. See `F-W6-ENV-SHAPE-AUDIT`.

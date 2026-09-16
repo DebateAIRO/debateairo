@@ -4,7 +4,7 @@
 state:
   ticket: W2
   risk_tier: high
-  status: queued
+  status: done
   owner: { agent: claude, session: tbd }
   contract:
     allowed: []
@@ -34,3 +34,19 @@ and the detection all exist; only the emission is missing.
 V ruled this is required: after V-S11-1 and V-S11-GRADER, same-identity operation is LEGITIMATE, and
 disclosure is what keeps it honest. A vocabulary member with a label and no producer is a promise the
 system does not keep.
+
+## 2026-09-16 continuation
+Moved `queued` → `done` by RECORDS(CONT-T19). Landed by **Task 13**, range `35615ee0..061b5067`
+(`e4bd9821` the product change). The charge was exactly met: `deriveDegradedDiversity` reads the two
+SEALED refs and the mark, with its `{roles, identity}` detail, is set on the SERVED path in
+`runServeGateChain` — a served-answer record, never a payload field — and null on both crash
+constructors. Orchestrator's review: *"the product change is the ticket's mechanism"*; the orchestrator
+then ran six unit suites pinning exact mark lists (97/97) and eight integration/acceptance readers (173
+tests, 1 red — a stale pin, fixed in round 1 at `e78d195d` with the ruling cited and the position
+measured). SDD ledger :118–:123. STRENGTH: entailed.
+**Ruling recorded with it (V row):** the `{roles, identity}` detail is NOT persisted as a
+`ConditionMarkRecord` — the mark reaches the reader, and the identity is already in the register rows and
+the ledger.
+**Finding this ticket generated, now its own ticket:** `F-W2-PRODUCER-SWEEP` — `DEGRADED-DIVERSITY` sat in
+the 37-member vocabulary with a rendered UI label and no emitter for the whole mission, and nothing checks
+that the other 36 have producers.

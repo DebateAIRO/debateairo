@@ -4,7 +4,7 @@
 state:
   ticket: F-GATE-1
   risk_tier: medium          # a sealed-row test that cannot pass on integration; on the dev seeding path
-  status: waiting_product_proof # MERGED at 1485b9e2 (W3 r4, codex APPROVE 0/4): the t16 envelope expectation imports EXPANSION_DEPTH_MAX from the owner — justified by owner consistency plus the separate numeric pin (NOT by the oracle, which does not scan tests; my earlier rationale was wrong, F-W3-R4-3). RED 10-vs-9 keys → GREEN 16/16. Closes on green b13 · b13 14:11 2026-09-05 on 1485b9e2: 22 red = 21 T0 stable-red + 1 NEW (F-T17T9-3, V's decision); 0 load failures; FAIR-02 VANISHED from red. Not green by the closed-list rule; closes on b14 after V's F-T17T9-3 call
+  status: done # MERGED at 1485b9e2 (W3 r4, codex APPROVE 0/4): the t16 envelope expectation imports EXPANSION_DEPTH_MAX from the owner — justified by owner consistency plus the separate numeric pin (NOT by the oracle, which does not scan tests; my earlier rationale was wrong, F-W3-R4-3). RED 10-vs-9 keys → GREEN 16/16. Closes on green b13 · b13 14:11 2026-09-05 on 1485b9e2: 22 red = 21 T0 stable-red + 1 NEW (F-T17T9-3, V's decision); 0 load failures; FAIR-02 VANISHED from red. Not green by the closed-list rule; closes on b14 after V's F-T17T9-3 call
   owner: { agent: claude, session: lane-w3b }
   contract: { allowed: [], readonly: [], forbidden: all_others, verification: [codex static review, D15 batch], human_review: no }
   worktree: { path: /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-w3b, branch: lane/w3b, merge_status: merged, base: fd3bf47a }
@@ -53,3 +53,13 @@ the conformance break hid the mismatch from every batch since. **Fix (after W3 m
 `maxDepth: EXPANSION_DEPTH_MAX` to the expectation — importing the owner, never restating `5`, so
 T1's oracle stays green — with a comment naming `4bbb13e5` as the reason. Test-only, one lane,
 small. Fourth stacked-cause name this week.
+
+## 2026-09-16 continuation
+Moved `waiting_product_proof` → `done` by RECORDS(CONT-T19). This row waited on an ACCOUNTING gate, not
+on code — the code had landed (see the `landed?` column of the 2026-09-16 status map §4.2, *"Code landed;
+each row closes by accounting against a gate that has already been taken … No further code is owed."*).
+That gate exists and was taken. Citation: `LEDGER.md:487` — the full suite on dev `169941c6`, the closing
+run's own tree: **77 / 1 / None / 1**, passed 3379 of 3456, 33 of 265 files, attribution *"0 appeared · 2
+disappeared"*, and the orchestrator's own closing sentence: *"Nothing unexplained."* STRENGTH: entailed.
+The 2026-09-16 continuation added no code to this subject; the move is a records correction of a row that
+had been closeable since 2026-09-08.

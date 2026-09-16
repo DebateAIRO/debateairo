@@ -4,7 +4,7 @@
 state:
   ticket: W4
   risk_tier: high
-  status: waiting_product_proof # RELABELLED (W4-R1-N3): the FAIR-02 / F10 HARNESS REPAIR, not a closing-run prerequisite. Codex r1 APPROVE 0/5 (2026-09-05). Two-file code delta TRANSFERRED onto integration at ea4afa52 (git apply, hunks matched once; FAIR-02 on integration exit=1 before → exit=0 after, logs/w4/transfer-*.log); the lane's 34 trap lines appended verbatim to integration's TOOLING-TRAPS (N5 correction pending). dev route: W5 round 3 carries the same delta; V merges into dev. Follow-ups W4-R1-N1..N5 filed · b13 14:11 2026-09-05 on 1485b9e2: 22 red = 21 T0 stable-red + 1 NEW (F-T17T9-3, V's decision); 0 load failures; FAIR-02 VANISHED from red. Not green by the closed-list rule; closes on b14 after V's F-T17T9-3 call
+  status: done # RELABELLED (W4-R1-N3): the FAIR-02 / F10 HARNESS REPAIR, not a closing-run prerequisite. Codex r1 APPROVE 0/5 (2026-09-05). Two-file code delta TRANSFERRED onto integration at ea4afa52 (git apply, hunks matched once; FAIR-02 on integration exit=1 before → exit=0 after, logs/w4/transfer-*.log); the lane's 34 trap lines appended verbatim to integration's TOOLING-TRAPS (N5 correction pending). dev route: W5 round 3 carries the same delta; V merges into dev. Follow-ups W4-R1-N1..N5 filed · b13 14:11 2026-09-05 on 1485b9e2: 22 red = 21 T0 stable-red + 1 NEW (F-T17T9-3, V's decision); 0 load failures; FAIR-02 VANISHED from red. Not green by the closed-list rule; closes on b14 after V's F-T17T9-3 call
   owner: { agent: claude, session: tbd }
   contract:
     allowed: []
@@ -48,3 +48,12 @@ since before this mission and is in T0's baseline.
 **This is PRE-EXISTING and environmental.** No lane caused it and none was chartered to fix it. Do
 not widen into unrelated relay work. If the fault turns out to be in codex itself rather than in the
 shim, say so and stop — that is a finding, not a defeat.
+
+## 2026-09-16 continuation
+Moved `waiting_product_proof` → `done` by RECORDS(CONT-T19), on the same accounting gate as the other ten
+rows: `LEDGER.md:487` — dev `169941c6`, **77 / 1 / None / 1**, *"Nothing unexplained."* STRENGTH: entailed.
+**Recorded with it, because it is not the same as the others:** this row's delta was transferred at
+`ea4afa52` while the branch `origin/lane/w4` itself remains UNMERGED (status map §4.2). The ticket closes
+on the proof that the behaviour is present and accounted for, not on the branch being merged — and the
+unmerged branch is a cleanup item for the operator, not an open finding. STRENGTH for the branch state:
+consistent-with (taken from the status map's enumeration; not re-measured against `origin` this pass).

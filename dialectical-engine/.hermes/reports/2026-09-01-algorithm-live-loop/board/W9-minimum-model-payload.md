@@ -4,7 +4,7 @@
 state:
   ticket: W9
   risk_tier: medium          # no behaviour change intended; it removes an inference channel and closes a stated-rule gap
-  status: ready
+  status: done
   owner: { agent: claude, session: tbd }
   contract:
     allowed: []
@@ -58,3 +58,19 @@ A test that FAILS if any model-facing payload contains `roleRef`, `round`, `stag
 `registerVersion` — asserted over the payload actually sent, not over the request. The identity
 leak in the review prompts (W7) survived because nothing checked the prompt surface; one guard
 should cover both tickets' properties.
+
+## 2026-09-16 continuation
+Moved `ready` → `done` by RECORDS(CONT-T19). Landed by **Task 12**, range `b37263e4..50f8a4bd`
+(`7cfbde9e` the product change). `toSynthesisPromptPayload` is an **allow-list projection** — role,
+instructions, digest and the label's four numbers, plus `candidateStatement` for the evaluator and
+`priorObjection` on a RETRY — and never `roleRef`, `round`, `stage` or `registerVersion`. The REQUEST
+object keeps every field; only what reaches the model narrowed. `SYNTHESIZER_INSTRUCTIONS` now states the
+agreement obligation (F-W9-1), and the guard is extended with the synthesis builders. Both runner sites
+are pinned BY COUNT: 0 `JSON.stringify(request)`, 2 projection calls, 1 definition. Orchestrator's review:
+**ACCEPTED, first round** — RED-A 14/23 on the true base, guard 23/23 ×3, neighbours 133/133 over 4 files,
+readers 89/89 + 4/4, typecheck 0, M1–M6 red, N1–N2 green (SDD ledger :114–:116). STRENGTH: entailed.
+**Ruling recorded with it (V row):** `priorCandidateRef` is WITHHELD — an artifact address, outside the
+ruling's kept-list. One `projectedKeys` entry overturns it.
+**Found here, NOT caused here, and now separate tickets:** `F-T12-1` (a serve outcome that cannot
+persist), `F-T12-2` (the runner discards every cause), `F-T12-3` (in-handler throws present as
+TRANSPORT_DEATH).
