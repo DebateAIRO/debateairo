@@ -189,3 +189,69 @@ Ranked by what each would have removed from today.
    reads a number". Its value showed up immediately: the mutant changed *which*
    assertion in the arm failed, which is precisely the signal that proves the
    count is pinned rather than incidentally satisfied.
+
+---
+
+## 9. Addendum — fix round 1 (F1), stamped at `25cfaa8ac3dc999d2b728492b0b38c7762b1cd9b`
+
+The review found one gap and it is the most instructive thing in this task.
+
+**The cause: the retirement rule operated on FILES, and the honest unit is the
+ASSERTION-to-SUBJECT edge.** `tests/unit/s14-ui.test.ts` was not one thing. It
+was four assertions whose subjects were the retired `web/lib/*` modules and
+seven whose subjects are live, unchanged modules — `@debateai/serve`,
+`@debateai/contract`, `@debateai/kernel`, and the shipped renderer at
+`apps/ui/lib/v3/labels.ts`. The brief said "delete the file entirely unless an
+`apps/ui` equivalent of EVERY assertion exists", which is a file-level verdict
+over a mixed file, and it takes the live subjects down with the dead ones. I
+followed it, and I named the loss in §6.3 of this report — but naming a loss is
+not the same as refusing to cause it. The correct move was to stop at the
+contradiction between "delete the file" and "never lose a live pin" and hand it
+up (§3.7), instead of executing the wording and filing the consequence as a
+finding. **That is the one thing I would do differently.**
+
+Generalised, for the retirement primitive in §8.1: a retirement's unit of work
+is `(assertion, subject module)`. Classify each import of a condemned test file
+by whether its module still exists; only the assertions whose subject is gone
+may retire. A file-level verdict is only correct when the classification is
+unanimous, and you cannot know that without running the classification.
+
+**What I nearly got wrong this round.** I almost took the reviewer's block (d)
+as a drop, because the deleted file's `abstentionKindLabel` came from the
+retired web module and the obvious reading is "that renderer is gone". The grep
+says otherwise: `apps/ui/lib/v3/labels.ts:80` exports `abstentionKindLabel` and
+two shipped components render through it. The arm re-homed. One command, again,
+decided a retirement.
+
+**New: a re-home is a FIRST RUN, not a move.** Four of the seven re-homed
+assertions had never executed on this tree — the suite was a load failure on
+every merge parent. Their green here is the first evidence they hold, not a
+restoration of a previously passing state. `CONDITION_MARKS` really does have 37
+entries; until this commit that number was a comment's arithmetic. If those
+assertions had failed, the "lost coverage" everyone was protecting would have
+been imaginary. Rule: never describe re-homing dead assertions as preserving
+coverage until they have gone green once.
+
+**New: map typecheck diagnostics to BLOCKS before moving code.** The requirement
+was "gains no diagnostic". Two of the deleted file's eight diagnostics
+(`'label' is of type 'unknown'` at `:131` and `:137`) sat on exactly the two
+arms I was re-homing. They did not come back — because they existed only while
+`.map(render)` ranged over a union of one typed and one untyped renderer, and
+collapsing to the single shipped renderer types cleanly. I knew that before
+writing the file because I mapped each diagnostic to its arm first. Without that
+mapping, "gains no diagnostic" would have been a coin flip resolved after the
+fact.
+
+**Repeat offender, fifth instance:** `grep --include=*.ts` unquoted under zsh,
+`(eval):1: no matches found`. Already in this file four times. It keeps
+recurring because the trap is recorded as prose for humans to remember rather
+than as something the shell or a wrapper enforces. Cost this round: one round
+trip. The §8 upgrade list should carry it as a tooling change, not a lesson.
+
+**Mutant discipline paid again.** Block (e) is three independent `it`s; the
+reviewer asked for one mutant per block, and one mutant would have pinned the
+429 arm while reporting the whole taxonomy as covered. Splitting it into three
+(429 recode, `InspectionSchema` `.strict()` removed, SSE `buffer +=` → `=`)
+proved each arm separately. And the neighbour mutant — changing the
+`UNSERVED-MAKER-POSITION` label TEXT, which stayed green — turned "I dropped the
+label-text pin as instructed" from a claim into a measurement.
