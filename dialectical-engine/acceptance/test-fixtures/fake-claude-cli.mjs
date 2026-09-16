@@ -11,6 +11,43 @@ const prompt = printIndex >= 0 ? argumentList[printIndex + 1] ?? "" : "";
 
 const REPORTED_MODEL = "claude-fake-cli-model";
 
+// W6 (SECURITY): the echo below is a PROJECTION over this allow-list, never
+// `process.env`. Serialising the whole environment put every variable the relay
+// admits — a real maker credential among them — into the model content that
+// `ledger.raw_artifact` persists. Same projection shape as the product's own
+// `buildCliChildEnvironment` (`acceptance/relay-core.ts:81-84`).
+// Every key is here because an acceptance assertion reads it:
+//   asserted PRESENT — claude-relay.test.ts:230-239 (exact-set toEqual);
+//   asserted ABSENT  — claude-relay.test.ts:241-243. An absence assertion is
+//   evidence only if the key WOULD be echoed when the relay admits it, so those
+//   keys stay named. Anything unnamed — the W6 canary included — is dropped.
+const ECHOED_ENVIRONMENT_KEYS = [
+  "ANTHROPIC_API_KEY",
+  "CLAUDE_CODE_OAUTH_TOKEN",
+  "HOME",
+  "LANG",
+  "LOGNAME",
+  "OLDPWD",
+  "PATH",
+  "PWD",
+  "TMPDIR",
+  "USER",
+  "DATABASE_URL",
+  "OPENAI_API_KEY",
+  "SSH_AUTH_SOCK",
+  "UNRELATED_SECRET",
+  "XAI_API_KEY"
+];
+
+function echoedEnvironment() {
+  const echoed = {};
+  for (const key of ECHOED_ENVIRONMENT_KEYS) {
+    const value = process.env[key];
+    if (value !== undefined) echoed[key] = value;
+  }
+  return echoed;
+}
+
 function envelope(overrides) {
   return JSON.stringify({
     is_error: false,
@@ -59,6 +96,6 @@ if (process.env.FAKE_CLAUDE_ALWAYS_FAIL === "1") {
   process.stdout.write("this is not a JSON envelope\n");
 } else {
   process.stdout.write(`${envelope({
-    result: JSON.stringify({ prompt, argumentList, environment: process.env })
+    result: JSON.stringify({ prompt, argumentList, environment: echoedEnvironment() })
   })}\n`);
 }

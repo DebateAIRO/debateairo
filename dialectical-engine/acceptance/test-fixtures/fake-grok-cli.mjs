@@ -5,11 +5,46 @@ const singleIndex = argumentList.indexOf("--single");
 const prompt = singleIndex >= 0 ? argumentList[singleIndex + 1] ?? "" : "";
 const REPORTED_MODEL = "grok-fake-cli-model";
 
+// W6 (SECURITY): the echo below is a PROJECTION over this allow-list, never
+// `process.env`. Serialising the whole environment put every variable the relay
+// admits — a real maker credential among them — into the model content that
+// `ledger.raw_artifact` persists. Same projection shape as the product's own
+// `buildCliChildEnvironment` (`acceptance/relay-core.ts:81-84`).
+// Every key is here because an acceptance assertion reads it:
+//   asserted PRESENT — grok-relay.test.ts:204-210 (exact-set toEqual);
+//   asserted ABSENT  — grok-relay.test.ts:212-217. An absence assertion is
+//   evidence only if the key WOULD be echoed when the relay admits it, so those
+//   keys stay named. Anything unnamed — the W6 canary included — is dropped.
+const ECHOED_ENVIRONMENT_KEYS = [
+  "HOME",
+  "LANG",
+  "OLDPWD",
+  "PATH",
+  "PWD",
+  "TMPDIR",
+  "XAI_API_KEY",
+  "ANTHROPIC_API_KEY",
+  "CLAUDE_CODE_OAUTH_TOKEN",
+  "DATABASE_URL",
+  "OPENAI_API_KEY",
+  "SSH_AUTH_SOCK",
+  "UNRELATED_SECRET"
+];
+
+function echoedEnvironment() {
+  const echoed = {};
+  for (const key of ECHOED_ENVIRONMENT_KEYS) {
+    const value = process.env[key];
+    if (value !== undefined) echoed[key] = value;
+  }
+  return echoed;
+}
+
 // Redacted Grok Build 1.0.0 envelope captured by the rev1 product-truth lens.
 // No credential, private prompt, or raw provider payload is retained; only the
 // observed public field shape and a test-controlled verbatim model key.
 const envelope = (overrides = {}) => JSON.stringify({
-  text: JSON.stringify({ prompt, argumentList, environment: process.env }),
+  text: JSON.stringify({ prompt, argumentList, environment: echoedEnvironment() }),
   stopReason: "end_turn",
   sessionId: "redacted-session",
   requestId: "redacted-request",

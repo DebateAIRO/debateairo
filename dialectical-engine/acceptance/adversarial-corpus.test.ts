@@ -71,12 +71,28 @@ async function startObservationRelay(
   options: ObservationRelayOptions = {}
 ): Promise<ObservationRelay> {
   const observations: Observation[] = [];
+  // W6 (SECURITY): the observation's `environment` is a PROJECTION over an
+  // explicit allow-list, never `process.env`. Serialising the whole environment
+  // put every variable the relay admits — a real maker credential among them —
+  // into the model content that `ledger.raw_artifact` persists. Same projection
+  // shape as the product's own `buildCliChildEnvironment` (`relay-core.ts:81-84`).
+  // Every key is here because an assertion below reads it:
+  //   asserted PRESENT — `:432-438` (SECRET-01 exact-set toEqual) and `:483`
+  //   (DB-01 exact key set);
+  //   asserted ABSENT  — the SECRET-01 sentinels set at `:409-414` and DB-01's
+  //   DATABASE_URL at `:465`, both of which those exact-set assertions read as
+  //   an absence. An absence assertion is evidence only if the key WOULD be
+  //   echoed when the relay admits it, so those keys stay named. Anything
+  //   unnamed — the W6 canary included — is dropped.
   const fixtureScript = [
     "const prompt = process.argv[1] ?? '';",
     "const requestedCapabilities = [];",
     "if (prompt.includes('SELECT p4_corpus_canary')) requestedCapabilities.push('DATABASE');",
     "if (prompt.includes('P4_OUTSIDE_SCRATCH_SENTINEL')) requestedCapabilities.push('FILESYSTEM');",
-    "const observation = { pid: process.pid, cwd: process.cwd(), argv: process.argv.slice(1), environment: process.env, prompt, requestedCapabilities };",
+    "const echoedEnvironmentKeys = ['HOME','LANG','OLDPWD','P4_ALLOWED_MAKER_KEY','PATH','PWD','TMPDIR','ANTHROPIC_API_KEY','DATABASE_URL','OPENAI_API_KEY','SSH_AUTH_SOCK','UNRELATED_SECRET','XAI_API_KEY'];",
+    "const environment = {};",
+    "for (const key of echoedEnvironmentKeys) { if (process.env[key] !== undefined) environment[key] = process.env[key]; }",
+    "const observation = { pid: process.pid, cwd: process.cwd(), argv: process.argv.slice(1), environment, prompt, requestedCapabilities };",
     "process.stdout.write(JSON.stringify(observation));"
   ].join("");
   const adapter: CliRelayAdapter = {
