@@ -302,3 +302,130 @@ killed M3 unprompted).
 | `pnpm run audit:source` | byte-identical to base (rc=1, same 3 pre-existing rows) |
 | Rework rounds | 0 |
 | Wall clock | ~55 minutes |
+
+---
+
+# Fix round 1 — the case reopened
+
+Round 1 of 5, base `f427fd9f`, tip `777f03b3`. Four commits (F3, F7, F1/F2 member C, and a
+typecheck follow-up). The orchestrator charged all six of my packet issues to itself and used
+issue (1) — the contract drawn around the defect instead of the fix — as this round's reason.
+**Section 1.1 of the pass-1 report was the right call and it was also the expensive one: the
+work it deferred cost a whole extra round.** That is the single most useful number in this file.
+
+## 1 · What the round proved about the pass-1 decision
+
+I refused to ship an optional settings field with no in-contract producer, called it a no-op, and
+reported the gap. Round 1 granted the missing files and the fix took **~25 minutes**: a required
+field, one line in `dev-runner-policy`, four read sites, five fixtures. `main.ts` — granted — was
+not needed at all, because it already forwards the policy whole.
+
+So the true cost of the pass-1 contract gap was: ~20 minutes discovering it, a full extra dispatch,
+and a second full verification pass (~35 minutes of gate time). **Roughly 2 hours and ~120k tokens
+to deliver 25 minutes of code.** The refusal was still correct — shipping the no-op would have cost
+more, later, with a green board — but the price of an under-drawn `allowed` list is now measured,
+not argued.
+
+**UPGRADE, restated with the number attached:** derive `allowed` by walking the data path of each
+charge to its producer. One `grep -rn '<the settings field>' apps packages` at packet-authoring
+time would have printed the five constructors in one second and saved the round.
+
+## 2 · The three self-inflicted regressions, and what each one teaches
+
+I was green on the cluster gate and RED on the suite. The first full `database.test.ts` run
+reported **25 failures**. All three causes were mine.
+
+### 2.1 A new call bound is a CLAIM-GUARD change (25 failures)
+I gave the two roles distinct bounds so the recorded-bound assertion could tell them apart, and
+picked `deadlineMs` as the discriminator. The claim requirement is
+`holds * (cooldown + deadline) + deadline + margin`, and that file runs `maxCooldownHoldsPerRun: 2`
+with `cooldownMs: 600_000` — so **every extra millisecond of deadline costs three against the
+claim**, and +4_000ms needed +12_000ms nobody had budgeted.
+**Price:** one full suite run (~5 min) plus the diagnosis. **Cure:** discriminate on a field that
+is not in the claim arithmetic, and pin the deadline's participation in ONE dedicated test.
+**What I nearly got wrong:** raising `claimMs` in the fixture. It would have gone green and
+silently changed the timing envelope of 25 unrelated scenarios.
+
+### 2.2 A guard that dereferences a REQUIRED field pre-empts the refusal that owns its absence
+One test casts `synthesisRolePolicy` away on purpose to pin the RUNTIME gate behind the required
+type. My claim read dereferenced it ~80 lines earlier, so the named
+`SYNTHESIS_ROLE_CONTROLS_UNRESOLVED` became `Cannot read properties of undefined`. The refusal was
+still there and still correct — it had simply become unreachable.
+**Cure:** optional-chain and fold to a value that cannot change the verdict (`?? 0` in a
+`Math.max`), naming the refusal that owns the case in the comment. **Not** a silent default: a
+deferral to the gate that reports it properly.
+**Generalisable:** before adding a read of a required-typed field, grep for a runtime gate on that
+same field.
+
+### 2.3 Raising a RETIRED organ's bound drives nothing once the role has its own
+Two fixtures raised `conformanceBound.maxAttempts` / `composerBound.maxAttempts` to force repair
+attempts. After the rewiring those budgets moved, the roles spent one attempt, and the runs died on
+the first schema failure with **Zod frames naming product fields** (`objection`, `criteria`,
+`segments`). That reads as "your product change broke the schema"; it was a fixture that had
+quietly stopped provisioning. Same family as TOOLING-TRAPS `:5136` (a fixture defect wearing the
+product's costume), from a new direction: the fixture did not break, it stopped MATTERING.
+
+## 3 · The finding that was not what it was filed as
+
+F7 arrived as "add the missing test case, cheap". I wrote it, and **it passed on arrival**. The
+honest move at that moment is the whole lesson: a test written for a missing case that passes is
+either coverage or a weak predicate, and you cannot tell without strengthening it. Naming the
+status in the assertion turned it red — `PROVIDER_CALL_FAILED` where `LENGTH_EXCEEDED` was owed. It
+was a missing BEHAVIOUR.
+**Price:** ~10 minutes. **Value:** a real defect one layer in from C1's, which would otherwise have
+shipped behind a green test that "covered" it.
+**UPGRADE:** when a "missing case" test passes on arrival, do not file it as coverage. Strengthen
+the assertion until it names the outcome the ticket owes, then re-run.
+
+## 4 · What made the class sweep cheap, for once
+
+The round handed me a decision RULE instead of a verdict ("sealed vocabulary → ticket; not sealed →
+fix"). Applying it took three greps and produced three defensible answers, one of them a fix. That
+is the cheapest review instruction I have received in this mission: **a rule I can apply costs a
+fraction of a list of members I have to adjudicate**, and it makes the report mechanically
+checkable — the reviewer re-runs my greps rather than re-arguing my judgement.
+The measurement that decided member C: `SUPPORT_MODEL_` appears **0** times in
+`KNOWN_DOMAIN_CODES`, **0** in `apps/api/src/index.ts`, **0** in the generated membership test and
+**0** in `migrations/`. One command, three tickets' worth of scope settled.
+
+## 5 · What still cost tokens in this round
+
+| # | cost centre | price | fix |
+|---|---|---|---|
+| 1 | Full `tests/integration/database.test.ts` runs (4 of them) | ~20 min wall, ~10k tokens of summaries | The `-t` filter for iteration is right, but it cannot see the 25 collateral failures. **A fast pre-flight that runs only the scenarios sharing the changed fixture** would have caught 2.1 in seconds |
+| 2 | Splitting one test file across two commits (F7 / member C) | ~10 min of park-and-restore | `git add -p` is unavailable non-interactively; a `tools/` helper that stages a named `describe` block would pay for itself |
+| 3 | Re-deriving the reader set for a new emission | ~6k tokens | still the `tools/who-reads.sh` I asked for in pass 1 |
+| 4 | vitest's typecheck blindness, again | one round-trip | the fixture ran green while missing a REQUIRED field; only `pnpm run typecheck` saw it. **Run typecheck immediately after the first GREEN, not at the end** |
+
+## 6 · The one-prompt machine, refined by this round
+
+Pass 1 said: derive contracts from the data path, make packets executable, put the two house
+scripts in `tools/`, index the laws, add a no-op detector. This round adds two:
+
+6. **Give seats a decision RULE, not a finding list, whenever the finding is a class.** §4 above:
+   it collapsed three members into three greps and made the answer auditable.
+7. **A fix round must budget for the blast radius of its own fix.** Every one of my three
+   regressions was a fixture that depended on a value I moved. The packet that grants a required
+   field should also say: *the compile errors are your reader list; run the FULL suite of every
+   file they name before you claim the cluster.* I ran the full suite because the round's
+   verification order told me to — had it not, three green cluster gates would have shipped 25
+   broken scenarios.
+
+**Still true and still working:** RED-first per finding, the refutation duty (M13's frame —
+`PROVIDER_CALL_FAILED` where `CLAIM_BOUND_MISMATCH` was owed — is exactly the evidence that the
+claim no longer covered the call), three-run worst-wins, and log-first gate runs.
+
+## 7 · Numbers for this round
+
+| | |
+|---|---|
+| Commits | 4 (`4ca14051`, `c45342ee`, `af895e4a`, `777f03b3`) |
+| Findings addressed | F3 (fixed), F7 (fixed — and reclassified), F1/F2 (1 of 3 fixed, 2 ticketed with their seals named) |
+| New assertions | 6 (2 F3, 2 F7, 2 member C) |
+| Mutants | 4 — all killed (M12, M13, M14, M15) |
+| Self-inflicted regressions found and fixed | 3 (25 + 2 failing scenarios) |
+| Gate | 13 files, 282/282, three runs, `testResults.length` = 13 each; worst run green |
+| `audit:source` | byte-identical to the pass-1 base |
+| Both typechecks | 0 before any edit, 0 after |
+| `mode change` count in the round's diff | 0 |
+| Wall clock | ~50 minutes |

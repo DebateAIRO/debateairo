@@ -5297,3 +5297,51 @@ not in 4 000 lines of prose every author skims.
 - **Rule: before minting a register row family, ask which boot already reads it. The cheapest loud
   failure is an existing reader's, and it costs one array entry instead of a barrel export, a
   policy field and a settings field in three files you may not own.**
+
+## A new CALL BOUND is a CLAIM-GUARD change, and the fixtures pay for it three times over (2026-09-16, FIX(CONT-T15) round 1)
+
+- W10 pointed the synthesis legs at their own sealed bounds and added those deadlines to
+  `assertClaimCoversCall`'s maximum (`apps/runner/src/index.ts` execute). My fixture gave the two
+  roles DISTINCT bounds so the recorded-bound assertion could tell them apart, and picked
+  `deadlineMs` 4_000/5_000 as the discriminator. **25 scenarios in
+  `tests/integration/database.test.ts` died with CLAIM_BOUND_MISMATCH.**
+- The arithmetic is `holds * (cooldown + deadline) + deadline + margin`
+  (`packages/battery/src/index.ts:216-231`). That file's fixtures carry
+  `maxCooldownHoldsPerRun: 2`, so every extra millisecond of deadline costs THREE against the
+  claim; +4_000ms needed +12_000ms of claim that nobody had budgeted.
+- **Rule: a fixture that must DISCRIMINATE between two bound objects differs on a field that is
+  not in the claim arithmetic — `tokenCeiling` or `maxAttempts`, never `deadlineMs`. Pin the
+  deadline's participation in the claim in ONE dedicated test that expects the refusal, instead of
+  paying for it in every scenario that merely needs the run to start.**
+
+## A guard that dereferences a REQUIRED field pre-empts the runtime refusal that OWNS its absence (same seat, same day)
+
+- `synthesisRolePolicy` is required on `WalkingSkeletonSettings`, and the runner still carries a
+  runtime gate that throws the NAMED `SYNTHESIS_ROLE_CONTROLS_UNRESOLVED` when it is missing —
+  because a JavaScript caller, a cast or settings built from parsed data can defeat the type. One
+  test casts it away on purpose to pin exactly that.
+- My claim arithmetic read `this.settings.synthesisRolePolicy.synthesizerBound.deadlineMs` ~80
+  lines EARLIER than that gate, so the test reported
+  `TypeError: Cannot read properties of undefined (reading 'synthesizerBound')`. The named refusal
+  still existed and was still correct; it had simply become unreachable.
+- Cure: optional-chain in the guard and fold to a value that cannot change its verdict (`?? 0`
+  inside a `Math.max`), with a comment naming the refusal that owns the case. The absence is not
+  silently defaulted — it is DEFERRED to the gate that reports it properly.
+- **Rule: before adding a read of a required-typed field, `grep` for a runtime gate on that same
+  field. If one exists, every read placed ahead of it must be absence-tolerant, or the gate's test
+  is measuring your TypeError instead of your product's refusal.**
+
+## A reviewer's "missing test" can be a missing BEHAVIOUR, and the weak assertion hides which (same seat, same day)
+
+- Fix round 1 filed F7 as "add the missing case: strict parse fails AND finish_reason is length →
+  LENGTH_EXCEEDED wins", scoped as cheap coverage. The first version of that test asserted
+  `instanceof Error` plus the recorded finish reason — and passed on arrival, which reads as
+  "coverage added, behaviour already correct".
+- Naming the status in the assertion turned it red: the call failed as `PROVIDER_CALL_FAILED`,
+  because a cut that lands before a parseable envelope reaches `responseSchema.parse` and throws
+  before any content classification happens. A transport-shaped name for a length failure, which
+  is the very defect the ticket exists to remove, one layer in.
+- **Rule: when a test written to cover a "missing case" passes on arrival, do not file it as
+  coverage — strengthen the assertion until it NAMES the outcome the ticket owes, then re-run.
+  A green test written against a weak predicate is how a missing behaviour gets recorded as a
+  present one.**
