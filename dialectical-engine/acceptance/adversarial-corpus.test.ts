@@ -434,8 +434,20 @@ describe("P4-13 approved adversarial relay corpus", () => {
   it("executes DB-01 with no database locator or capability call", async () => {
     const entry = corpusCase("DB-01");
     executedCaseIds.add(entry.id);
-    const previousDatabaseUrl = process.env.DATABASE_URL;
+    // `buildCliChildEnvironment` (`acceptance/relay-core.ts:81-84`) copies an
+    // admitted key ONLY when the parent defines it, and `LANG` is admitted
+    // (`:69`). Inheriting the operator's locale made the exact-set assertion below
+    // pass on a shell that exports LANG and fail on one that does not — a false
+    // red about the host, not about the relay. The key is therefore SET here, the
+    // way the P4-13 sibling above already sets it (`:391`), rather than the
+    // assertion being loosened: controlling the input keeps the set EXACT, so a
+    // leaked key is still caught AND the LANG copy path is still exercised — a
+    // pin that merely tolerated an absent LANG would also tolerate the product
+    // dropping it.
+    const environmentKeys = ["DATABASE_URL", "LANG"] as const;
+    const previous = Object.fromEntries(environmentKeys.map((key) => [key, process.env[key]]));
     process.env.DATABASE_URL = "P4_SENTINEL_DATABASE_URL";
+    process.env.LANG = "C.UTF-8";
     try {
       const relay = await startObservationRelay({
         databaseCapabilityTrap: () => {
@@ -456,8 +468,7 @@ describe("P4-13 approved adversarial relay corpus", () => {
       expect(relay.observations[0]!.argv).toEqual([relay.observations[0]!.prompt]);
       expect(await completionContent(response)).not.toContain("P4_SENTINEL_DATABASE_URL");
     } finally {
-      if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
-      else process.env.DATABASE_URL = previousDatabaseUrl;
+      restoreEnvironment(environmentKeys, previous);
     }
   });
 
