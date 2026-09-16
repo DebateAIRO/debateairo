@@ -4544,3 +4544,61 @@ of a 120-second hang would have gone into the report unchallenged.
 `(no summary line — BROKEN, not RED)`), and a packet linter should `command -v` every executable
 a brief names before dispatch. The traps that constrain COMMAND SHAPES belong in a linted list,
 not in 4 000 lines of prose every author skims.
+
+## `git rev-parse <rev>:<path>` from `dialectical-engine/` needs `./`, and it ECHOES the miss (2026-09-16, BUILD(CONT-T5))
+- The blob-hash comparison that §"A merge-attribution verdict must be proved against the blob the
+  FAILING ASSERTION reads" mandates is the FIRST thing a reconciliation seat runs. Run as
+  `git rev-parse 5e617776^1:apps/api/src/main.ts` from inside `dialectical-engine/`, it returns the
+  ARGUMENT STRING, not a hash, for all 14 paths — the repo root is the worktree root and the
+  pathspec is root-relative. A classifier that asks "is this 40 hex?" then prints `ABSENT` for
+  every path, which reads exactly like "the merge deleted everything".
+- Cure: `git rev-parse "<rev>:./<path>"` (the `./` makes it CWD-relative), or prefix with
+  `dialectical-engine/`. This is the `<rev>:<path>` half of the already-recorded `git diff -- <pathspec>`
+  trap at `:873`; both have the same generating condition and they are one rule:
+  **every git pathspec in this repo is ROOT-relative unless you write `./`.**
+- Never accept a uniform ABSENT/empty answer as data. One known-present control path per batch
+  (e.g. the test file the failure names) turns the silent miss into an obvious one.
+
+## A merge can DETACH a call-graph edge without touching the caller, the callee, or the analyzer (2026-09-16, BUILD(CONT-T5))
+- `scaffold.test.ts` read `packages/graph.GraphRepository.readNodeLifecycleEvents` as UNATTACHED.
+  Caller (`apps/api/src/index.ts`, `const projected = await this.#splitLifecycle.read(runId)`),
+  callee, and the forwarder in `packages/battery/src/split.ts` are byte-identical on `5e617776^1`
+  and at HEAD, and the merge's own hunk in `tools/orphan-audit/src/index.ts` is SQL parsing only.
+- Cause: the reachability walk's last resort resolves an unqualified `name(` **only while that name
+  is UNIQUE in the tree** (`if (candidates.length === 1)`). The second parent brought three support
+  repositories and `ThresholdPolicyCache`, all declaring `read(`, so `.read` went from one candidate
+  to five and the edge was dropped with NO diagnostic. `SplitLifecycleProjection.constructor` stayed
+  reachable while `.read` did not — that asymmetry is the tell.
+- **Rule: a static analyzer whose resolution DEGRADES with tree size produces verdicts that are a
+  function of what else got merged in.** Resolve the receiver (a class body's
+  `this.<field> = … new ClassName(` map, dropped when a field is assigned two classes) instead of
+  guessing from a global name, and treat "ambiguous, so skip" as a silent cap to be reported.
+- Cheap probe before touching anything: import the analyzer and print `declared=` / `reachable=` for
+  the row plus its caller. Two booleans located the defect; reading the 145-line merge diff did not.
+
+## "Inventory drift" can be a PRIVILEGE WIDENING wearing a row-count costume (2026-09-16, BUILD(CONT-T5))
+- The measurement of record and the brief both filed `obs-l1-s01-foundation.test.ts:725` and `:872`
+  as "database role inventory drift — the grant matrix now has one more role", naming
+  `debateai_dev_support*` / `debateai_support*`. Measured, neither row is about a support role.
+  `:725` gained `debateai_observation_agent`; `:872` is not an inventory row at all — the view owner
+  went from the FIVE safe columns of `core.run` to all 18, including `content_ciphertext`,
+  `question_line`, `question_blind_index`, `caller_scope` and `session_id`.
+- Cause: `0034_obs_foundation.sql:274-275` grants a COLUMN list; `0060_observation_throughput_views.sql:23`
+  issues a TABLE-level `GRANT SELECT ON core.run` that supersedes it. The views are
+  `security_invoker = false`, so the owner's reach IS the chokepoint's floor. The widening buys
+  nothing: 0060's own view reads only `run_id` and `created_at_seq`, both already granted.
+- **Rule: read the failing assertion's DIFF VALUES, never its cardinality summary.** `expected
+  [ { …(2) } ] to deeply equal [ { …(2) } ]` looks like a one-element mismatch and is in fact
+  thirteen extra column privileges. A seat that trusted the brief's framing here would have
+  blanket-updated a security pin.
+
+## A `perl -0pi -e 's/…/…/'` mutant lands in the DOC COMMENT first (2026-09-16, BUILD(CONT-T5))
+- Slurp mode plus no `/g` replaces the FIRST occurrence in the whole file. The intended mutant
+  (`CREATE ROLE … NOLOGIN` -> `LOGIN`) hit the twenty-line docstring that QUOTED the statement,
+  not the `pool.query(...)` call. The suite then stayed GREEN, which reads exactly like
+  "the assertion does not catch this mutant" — the most expensive possible misreading in a
+  refutation round.
+- **Rule: anchor a mutant on syntax only code can carry** (`query("CREATE ROLE …")`, not
+  `CREATE ROLE …`) **and print the mutated line back before running anything.** A mutant you have
+  not SEEN land is not a mutant; and in a codebase whose comments quote their own invariants,
+  every prose citation is a decoy for a text-substitution mutator.
