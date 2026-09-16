@@ -4859,3 +4859,50 @@ not in 4 000 lines of prose every author skims.
   explanation and left the mutant standing — a green restore over a still-mutated file.
 - **Rule: `cp <backup> <file>` then assert `md5 -q` equality and print `git status --porcelain`.
   A revert that is a regex is a second mutation.**
+
+## vitest's jsdom environment SKIPS any global the runtime already defines (2026-09-16, BUILD(CONT-T9))
+- 100 of the 122 `tests/render` reds were `TypeError: Cannot read properties of undefined (reading 'clear')`
+  — the bare `localStorage` global. jsdom 30.0.1 *does* supply `window.localStorage`; it never arrives.
+- Cause, read out of the installed runner (`vitest/dist/chunks/index.DC7d2Pf8.js:243-248`, `getWindowKeys`):
+  `if (k in global) return keysArray.includes(k);` — a key already present on `globalThis` is copied ONLY
+  if it is in vitest's explicit `KEYS`/`additionalKeys` list. `localStorage` appears NOWHERE in that file
+  (`grep '"localStorage"'` → rc=1), so it is filtered out of the copy set.
+- Node 26.5.0 defines the key and leaves it `undefined`:
+  `node -e "console.log('localStorage' in globalThis, typeof globalThis.localStorage)"` → `true undefined`,
+  with `ExperimentalWarning: localStorage is not available because --localstorage-file was not provided`.
+  On the declared Node 22.23.1 the key does not exist, so vitest copies jsdom's and the block is green.
+- **Rule: when a jsdom global is missing under vitest, check `'<key>' in globalThis` under the bare runtime
+  FIRST. A newer Node that merely DECLARES a web global silently disables vitest's jsdom copy of it.**
+  Priced here: the block reproduces standalone in 13 s, and the whole diagnosis is two greps and one probe.
+
+## An environment defect is a LOWER bound on the red count, never an upper one (same seat, same day)
+- Supplying the missing global as a pure measurement — `NODE_OPTIONS=--localstorage-file=<scratch>` , no repo
+  edit, no install — took `tests/render` from `115 failed | 219 passed` to `19 failed | 315 passed`.
+- 96 rows were pure environment. But **4 rows that had been counted inside the 100 were real, independent
+  failures** that the `TypeError` had been masking: `t1-canvas` › *renders nested shell/core bezels…*,
+  › *keeps BASE, FINAL, and an accessible Details control…*, › *maps all completed review outcomes…*,
+  › *uses a structural line token for the DebateMap hub ring*. All read blobs identical on both parents.
+- **Rule: before filing "N rows are environment", REMOVE the environment defect and re-measure. A row that
+  throws in setup never reaches its assertion, so its verdict is unknown, not green.** Fixing the host will
+  RAISE this suite's red count by 4, and a report that promised "100 rows go green" would have been wrong.
+
+## An ABLATION settles attribution that three blob hashes cannot (same seat, same day)
+- Six rows read files the merge resolved toward `^2`, which is the textbook "merge-caused regression against
+  the first parent" shape. The hashes support it; they do not prove it.
+- Cheap decisive step: `git show '<parent>:./<path>' > f` , `cp f <path>`, re-run the covering files, restore
+  from a byte-identical backup. `PublicDebatePageClient.tsx` and `DebatePageGate.tsx` differ from `^1` by
+  exactly one thing each — a fragment wrap adding `<SupportWidget />`. Ablated to `^1`, all six rows stayed
+  RED (`4 failed | 2 passed (6)` and `2 failed | 8 passed (10)`), so the merge is NOT the cause of any of them.
+- **Rule: a differing blob is a hypothesis. Restore the parent's blob, re-run, and let the suite answer.**
+  Pairs with the existing entry `A merge-attribution verdict must be proved against the blob the FAILING
+  ASSERTION reads` — that one narrows WHICH file; this one tests WHETHER that file matters.
+
+## An oracle can pin a vocabulary that existed on NEITHER parent (same seat, same day)
+- `t3-library` ×4 query `[data-library-row]` and `[data-library-row][data-bezel="shell"]`. The attribute
+  occurs **zero** times in `apps/ui` at HEAD, and `git grep -c data-library-row <rev> -- ./apps/ui/` exits 1
+  on `5e617776^1` AND on `5e617776^2`. The rows cannot ever have passed on either side of the merge.
+- The measured text — `.count` reads `'41 TOTAL'` where the test wants `'4 TOTAL'` — looks like a count
+  regression and reads as merge debt. It is a selector that matches a different element entirely.
+- **Rule: when an assertion fails on a SELECTOR, grep the selector across both parents before attributing.
+  Absence on both is entailed pre-existing, and it is one grep.** Same family as `A class member can be
+  stale by ABSENCE, and a sweep that greps the SYMPTOM cannot see it`.
