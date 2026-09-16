@@ -168,7 +168,14 @@ describe("V-BLIND-CONTEXT — the judgement prompt surface withholds authorship"
     // A `role: "system"` site is one prompt builder. If someone adds a fourth,
     // this row fails before any of the withholding rows can report a coverage
     // it never had.
-    const systemSites = readdirSync(JUDGEMENT_SRC)
+    // F3: RECURSIVE. The package is flat today, and the non-recursive read was
+    // therefore correct and blind at the same time — a builder added under any
+    // subdirectory escaped the row silently, and the withholding rows below
+    // would then have reported a coverage they never had. Depth is not a
+    // property of today's tree that this row may rely on.
+    // `encoding` is not decoration: the `recursive` overload without it is
+    // typed `string[] | Buffer[]`, and `tsc` — never vitest — is what says so.
+    const systemSites = readdirSync(JUDGEMENT_SRC, { encoding: "utf8", recursive: true })
       .filter((entry) => entry.endsWith(".ts"))
       .map((entry) => readFileSync(`${JUDGEMENT_SRC}/${entry}`, "utf8"))
       .join("\n")
