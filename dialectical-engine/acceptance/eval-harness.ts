@@ -12,15 +12,20 @@ import { TypedDomainError } from "@debateai/kernel";
  * call, so a refusal cannot leave spend behind it.
  *
  * WHAT THIS MODULE OWNS: the matrix, the projection, the candidate arm set, the
- * blind grader assignment, the DEGRADATIONS and their disclosures, the few
+ * FIXED grader and its disclosure, the remaining degradations, the few
  * remaining refusals, and the comparison table T15b routes to V.
  *
+ * ONE FIXED GRADER (V-S11-GRADER). The same identity grades every arm — the
+ * constant that makes the scores commensurable — and it is disclosed AS fixed.
+ * A grader that shares an identity, a model or a maker with the candidate is
+ * lawful and RECORDED, never excluded.
+ *
  * DEGRADE AND DISCLOSE, DO NOT REFUSE (V-S11-1). A capacity shortfall — too few
- * identities for three arms, too few for two independent graders, or a single
- * identity holding both roles — RUNS on what the deployment can express and
- * emits a visible condition mark naming what was compromised. Only an ABSENCE
- * refuses: an empty provider set, an unconfigured sealed ref (J24), missing
- * recorded debates, an absent T9 surface, and the approval gate itself.
+ * identities for three arms, or a single identity holding both roles — RUNS on
+ * what the deployment can express and emits a visible condition mark naming what
+ * was compromised. Only an ABSENCE refuses: an empty provider set, an
+ * unconfigured sealed ref (J24), missing recorded debates, an absent T9 surface,
+ * and the approval gate itself.
  *
  * WHAT IT DOES NOT OWN: the synthesizer and evaluator request shapes and the
  * evaluator loop. Those are T9's (`packages/serve/src/synthesis.ts`, lane/s07,
@@ -38,18 +43,25 @@ import { TypedDomainError } from "@debateai/kernel";
  * acceptance runs — no new debate generation) × 3 candidate role configs × ≤2
  * evaluator rounds; graded blind by 2 graders that are never the candidate".
  *
- * These four numbers are the task text and the harness never exceeds them. It
- * may fall SHORT of them: under V-S11-1 a deployment that cannot express three
- * arms, or cannot seat two non-candidate graders, runs the largest meaningful
- * matrix it can and marks the reduction — `recordedDebateCount` is the one
- * figure that still refuses, because the debates are reused rather than a
- * capacity of the deployment (V-S11-3).
+ * `gradersPerCell` is the ONE figure V overrode. V-S11-GRADER (2026-09-03):
+ * "the grading should always be done by the same model, so they are correctly
+ * measured against each other." The grader is FIXED across every arm, so a cell
+ * is graded ONCE by that one identity: a second seat would either repeat the
+ * fixed grader — buying no independence, only spend — or break the constant
+ * that makes the arms commensurable. The goal's "2 graders that are never the
+ * candidate" is superseded by the ruling, not by this module's preference.
+ *
+ * The other three numbers are the task text and the harness never exceeds them.
+ * It may fall SHORT of them: under V-S11-1 a deployment that cannot express
+ * three arms runs the largest meaningful matrix it can and marks the reduction —
+ * `recordedDebateCount` is the one figure that still refuses, because the
+ * debates are reused rather than a capacity of the deployment (V-S11-3).
  */
 export const EVAL_HARNESS_MATRIX = Object.freeze({
   recordedDebateCount: 5,
   candidateConfigCount: 3,
   evaluatorRoundCap: 2,
-  gradersPerCell: 2
+  gradersPerCell: 1
 });
 
 /**
@@ -99,7 +111,9 @@ function requirePositiveInteger(value: number, label: string): number {
 /**
  * One cell is (debate x config). Each of its evaluator rounds costs one
  * synthesizer call and one evaluator call; each cell is then graded once per
- * blind grader. `nominal` assumes every call succeeds on its first attempt;
+ * blind grader seat — one seat, under V-S11-GRADER's fixed grader, so the
+ * grader term is `cells` rather than `cells x 2`. `nominal` assumes every call
+ * succeeds on its first attempt;
  * `worst case` assumes every call exhausts its attempts. V approves the worst
  * case, so a run can only ever cost LESS than the number printed.
  */
@@ -138,7 +152,8 @@ export function renderProjection(projection: CallProjection): readonly string[] 
       + ` x ${String(projection.candidateConfigCount)} candidate role configs`
       + ` x <=${String(projection.evaluatorRoundCap)} evaluator rounds`,
     `blind graders per cell: ${String(projection.gradersPerCell)}`
-      + " (independent of the candidate where the deployment allows; any shortfall is disclosed below)",
+      + " (ONE FIXED identity grades every arm; a grader that shares an identity, model or maker"
+      + " with a candidate is disclosed, never excluded)",
     `per-call max attempts: ${String(projection.maxAttemptsPerCall)}`,
     `per-call token ceiling: ${String(projection.tokenCeilingPerCall)}`,
     `call breakdown: ${String(projection.synthesizerCalls)} synthesizer`
@@ -283,23 +298,32 @@ export function deriveCandidateSet(input: {
 /* ----------------------------------------------------------- blind grading */
 
 /**
- * V RULING V-S11-1 (2026-09-03) — BEST OUTCOME UNDER CONSTRAINTS, NOT A RULE
- * FOLLOWED TO THE BONE. This block is the policy, not a waiver for one
- * deployment.
+ * V RULING V-S11-GRADER (2026-09-03) — ONE FIXED GRADER FOR EVERY ARM, AND A
+ * SHARED IDENTITY IS NOT CONTAMINATION. This block is that ruling.
  *
- * A short grader pool is a DEGRADATION TO DISCLOSE, never a stop. If only one
- * model is available the whole debate runs on that one model: a legitimate
- * configuration, not a failure state. Each seat is a NEW INSTANCE with its own
- * role-specific prompt — never one session carrying several roles — and the
- * same-model provenance is RECORDED rather than hidden. "Graded by another AI"
- * stays the preference, satisfied where the deployment allows; "if possible" is
- * part of the rule, not an escape from it. The shape is V-ROLE-1 / J24's: a
- * DISCLOSED substitution is acceptable, a silent one never is, and goal line 26
- * requires every degradation to emit a visible condition mark.
+ * TWO RULES. (1) The grader is FIXED across every arm — "the grading should
+ * always be done by the same model, so they are correctly measured against each
+ * other". A constant grader cannot correlate with the arm, so the confound is
+ * DISSOLVED rather than disclosed. (2) A grader sharing an identity with the
+ * candidate is NOT contamination: impartiality here comes from the EXECUTION
+ * MODEL, not from identity separation — each seat is a fresh instance that
+ * receives a task and a stage-specific prompt and does not know who produced
+ * what it is reading.
+ *
+ * WHAT THIS REPLACES: the complement ranking that excluded candidate
+ * identities, exhausted independent ones and repeated one before seating a
+ * candidate ref. That was a careful solution to a problem this architecture does
+ * not have, and it is what made the arms non-commensurable (F-S11-5, dissolved).
+ *
+ * WHAT SURVIVES: V-S11-1's disclosure law, unchanged. Which identity graded, and
+ * whether it shares a model or a maker family with the candidate, is RECORDED
+ * and DISCLOSED — now not as a risk flag but because a reader is entitled to
+ * know how an answer was produced. The fixed grader is itself disclosed AS
+ * fixed, since a reader comparing arms must know the constant. And the
+ * non-commensurability mark stays available for the deployment that genuinely
+ * cannot put one grader in front of every arm — firing ONLY then.
  */
 
-export const BLIND_GRADING_DEGRADED_MARK = "BLIND-GRADING-DEGRADED" as const;
-export const GRADER_REPEATS_IDENTITY_MARK = "GRADER-REPEATS-IDENTITY" as const;
 export const GRADER_IS_CANDIDATE_EVALUATOR_MARK = "GRADER-IS-CANDIDATE-EVALUATOR" as const;
 export const GRADER_IS_CANDIDATE_SYNTHESIZER_MARK = "GRADER-IS-CANDIDATE-SYNTHESIZER" as const;
 export const GRADER_SHARES_CANDIDATE_FAMILY_MARK = "GRADER-SHARES-CANDIDATE-FAMILY" as const;
@@ -354,16 +378,19 @@ export interface GraderSeat {
    * `CANDIDATE_EVALUATOR` on exactly the one-model deployment V legitimised (codex r2 B1).
    */
   readonly relations: readonly GraderRelation[];
-  /** True when an earlier seat in the SAME cell already used this identity. */
-  readonly repeatOfEarlierSeat: boolean;
 }
 
 export interface BlindGradingAssignment {
   readonly configId: string;
   readonly seats: readonly GraderSeat[];
-  readonly degraded: boolean;
+  /** The ONE identity that graded this arm. Equal across arms is the commensurability property. */
+  readonly fixedGraderRoleRef: string;
+  /**
+   * DISCLOSURE marks, not degradations (V-S11-GRADER). A grader that shares an identity, a model
+   * or a maker with the candidate is lawful here; the fact is recorded so a reader can see it.
+   */
   readonly marks: readonly string[];
-  /** One sentence naming exactly what was compromised and why. */
+  /** One sentence naming which identity graded this arm and how it stands to the candidate. */
   readonly disclosure: string;
   /** KNOWN: a grader seat uses one of the candidate's own provider refs. */
   readonly sameProviderIdentityAsCandidate: boolean;
@@ -380,64 +407,59 @@ function relationsOf(ref: string, candidate: CandidateRoleConfig): readonly Grad
 }
 
 /**
- * Seats `gradersPerCell` graders, best available first.
+ * THE RUN'S ONE GRADER. Chosen from the deployment's configured identities WITHOUT looking at any
+ * candidate — that independence from the arm is the whole point, so this function takes no
+ * candidate and cannot be made to complement one.
  *
- * The ranking, and the reason it is this ranking:
- *   1. INDEPENDENT identities — neither of the candidate's refs. Exhaust these FIRST, and keep
- *      drawing from them by REPEATING one rather than reaching for a candidate ref: a repeat
- *      still satisfies "graded by another AI" for both seats, which a candidate ref does not.
- *   2. The candidate's EVALUATOR — it shaped the statement through its objections but did not
- *      author it.
- *   3. The candidate's SYNTHESIZER — the author of the statement under grading, so it is last.
- *   4. An identity holding BOTH candidate roles is ranked below either alone.
+ * The choice is the sorted-first configured ref: deterministic, so one deployment always yields
+ * the same grader and two runs of it are comparable to each other. No register row nominates a
+ * grader today (the sealed synthesis controls carry only the two role refs), and inventing one
+ * here would be a seal this module has no authority to write.
  *
- * Only an EMPTY pool refuses: that is an absence, not a degradation.
+ * An EMPTY configured set is the one refusal: it is an ABSENCE, not a degradation, and it is the
+ * case the non-commensurability mark is retained for — a deployment that cannot put one grader in
+ * front of every arm.
+ */
+export function resolveFixedGrader(input: {
+  readonly graderPool: readonly ConfiguredProviderIdentity[];
+}): ConfiguredProviderIdentity {
+  const pool = [...new Map(input.graderPool.map((identity) => [identity.providerRef, identity])).values()]
+    .sort((left, right) => left.providerRef.localeCompare(right.providerRef));
+  const fixed = pool[0];
+  if (fixed === undefined) {
+    throw new TypedDomainError(
+      "EVAL_BLIND_GRADER_POOL_EMPTY",
+      "This deployment configures no provider identity, so no single grader can be seated for "
+      + "every arm and there is nothing to grade with"
+    );
+  }
+  return fixed;
+}
+
+/**
+ * Seats the run's FIXED grader on one arm (V-S11-GRADER).
  *
- * NOTE ON WHAT THIS DOES NOT FIX. Preferring the complement makes grader identity a function of
- * the arm, which is a CONFOUND for the cross-arm comparison. That is not repaired here — it is
- * detected by `assessComparability` and the table then refuses to rank (codex r2 B2).
+ * There is no ranking left to apply: the grader is a constant of the RUN, resolved once by
+ * `resolveFixedGrader` and handed to every arm, so grader identity cannot be a function of the
+ * arm and the cross-arm confound the complement ranking created cannot arise. What this function
+ * still does is the DISCLOSURE: how the fixed grader stands to THIS candidate — the same provider
+ * identity, the same model where that is observable, the same maker family — recorded, never
+ * hidden (V-S11-1), and never a reason to exclude it (V-S11-GRADER).
  */
 export function assignBlindGraders(input: {
   readonly candidate: CandidateRoleConfig;
+  readonly fixedGrader: ConfiguredProviderIdentity;
   readonly graderPool: readonly ConfiguredProviderIdentity[];
   readonly gradersPerCell: number;
 }): BlindGradingAssignment {
-  const pool = [...new Map(input.graderPool.map((identity) => [identity.providerRef, identity])).values()];
-  if (pool.length === 0) {
-    throw new TypedDomainError(
-      "EVAL_BLIND_GRADER_POOL_EMPTY",
-      `Config ${input.candidate.configId} has no configured provider identity to grade with; `
-      + "a degradation needs something to degrade to"
-    );
-  }
-  const rankOf = (ref: string): number => {
-    const relations = relationsOf(ref, input.candidate);
-    if (relations.length === 2) return 3;
-    if (relations[0] === "CANDIDATE_SYNTHESIZER") return 2;
-    if (relations[0] === "CANDIDATE_EVALUATOR") return 1;
-    return 0;
-  };
-  const independent = pool
-    .filter((identity) => rankOf(identity.providerRef) === 0)
-    .sort((left, right) => left.providerRef.localeCompare(right.providerRef));
-  const ordered = independent.length > 0
-    ? independent
-    : [...pool].sort((left, right) =>
-        rankOf(left.providerRef) - rankOf(right.providerRef)
-        || left.providerRef.localeCompare(right.providerRef));
-
-  const seats: GraderSeat[] = [];
-  const used = new Set<string>();
-  for (let seat = 0; seat < input.gradersPerCell; seat += 1) {
-    const identity = ordered[seat % ordered.length];
-    if (identity === undefined) break;
-    seats.push(Object.freeze({
-      graderRoleRef: identity.providerRef,
-      relations: relationsOf(identity.providerRef, input.candidate),
-      repeatOfEarlierSeat: used.has(identity.providerRef)
-    }));
-    used.add(identity.providerRef);
-  }
+  const pool = [...new Map(
+    [...input.graderPool, input.fixedGrader].map((identity) => [identity.providerRef, identity])
+  ).values()];
+  const seatCount = requirePositiveInteger(input.gradersPerCell, "gradersPerCell");
+  const seats: GraderSeat[] = Array.from({ length: seatCount }, () => Object.freeze({
+    graderRoleRef: input.fixedGrader.providerRef,
+    relations: relationsOf(input.fixedGrader.providerRef, input.candidate)
+  }));
 
   const identityOf = (ref: string): ConfiguredProviderIdentity | undefined =>
     pool.find((entry) => entry.providerRef === ref);
@@ -466,31 +488,29 @@ export function assignBlindGraders(input: {
         ? "NO"
         : "UNKNOWN";
 
+  // DISCLOSURE marks, not degradation marks. Under V-S11-GRADER a grader that shares an identity
+  // or a family with the candidate is lawful — the fact is recorded so a reader sees it, and the
+  // run is not thereby compromised. The only run-level degradation left is non-commensurability,
+  // and that is decided across arms in `summariseGradingProvenance`.
   const relationUnion = new Set(seats.flatMap((seat) => [...seat.relations]));
   const marks: string[] = [];
-  if (seats.some((seat) => seat.repeatOfEarlierSeat)) marks.push(GRADER_REPEATS_IDENTITY_MARK);
   if (relationUnion.has("CANDIDATE_EVALUATOR")) marks.push(GRADER_IS_CANDIDATE_EVALUATOR_MARK);
   if (relationUnion.has("CANDIDATE_SYNTHESIZER")) marks.push(GRADER_IS_CANDIDATE_SYNTHESIZER_MARK);
   if (sameMakerAsCandidate === "YES") marks.push(GRADER_SHARES_CANDIDATE_FAMILY_MARK);
-  const degraded = marks.length > 0;
 
-  const distinct = new Set(seats.map((seat) => seat.graderRoleRef)).size;
   const freshness = " Instance freshness is UNVERIFIED: no per-call instance reference is recorded.";
-  const disclosure = !degraded
-    ? `${input.candidate.configId}: ${String(seats.length)} grader seats filled from `
-      + `${String(distinct)} distinct identities, none of them the candidate's`
-    : sameProviderIdentityAsCandidate
-      ? `${input.candidate.configId}: the candidate's own identities grade it — `
-        + `${seats.map((seat) => `${seat.graderRoleRef} as ${seat.relations.join("+")}`).join(", ")}; `
-        + "the grade is not independent of the configuration it scores." + freshness
-      : `${input.candidate.configId}: ${String(seats.length)} grader seats filled from `
-        + `${String(distinct)} distinct identity that is not the candidate's; the two observations `
-        + "come from one provider identity and are not independent of each other." + freshness;
+  const relationWord = seats[0]?.relations.join("+") ?? "UNSEATED";
+  const disclosure =
+    `${input.candidate.configId}: graded by ${input.fixedGrader.providerRef}, the run's FIXED `
+    + `grader seated for every arm; to this arm it stands as ${relationWord}`
+    + (sameMakerAsCandidate === "YES" ? ", sharing the candidate's maker family" : "")
+    + ". A shared identity, model or family is RECORDED, never a reason to exclude "
+    + "(V-S11-GRADER)." + freshness;
   return Object.freeze({
     configId: input.candidate.configId,
     seats: Object.freeze(seats),
-    degraded,
-    marks: Object.freeze(degraded ? [BLIND_GRADING_DEGRADED_MARK, ...marks] : []),
+    fixedGraderRoleRef: input.fixedGrader.providerRef,
+    marks: Object.freeze(marks),
     disclosure,
     sameProviderIdentityAsCandidate,
     sameModelAsCandidate,
@@ -500,8 +520,13 @@ export function assignBlindGraders(input: {
 
 /**
  * B2: whether the arms can be compared at all. A pooled mean is only a role measurement when
- * every arm faced the SAME panel; otherwise the arm's mean carries the grader's effect and the
- * role configuration's effect summed together, and no amount of disclosure separates them.
+ * every arm was graded by the SAME identity; otherwise the arm's mean carries the grader's effect
+ * and the role configuration's effect summed together, and no amount of disclosure separates
+ * them. Under V-S11-GRADER one fixed grader makes this the ordinary case rather than the lucky
+ * one — the verdict remains because a deployment can still fail to supply it.
+ *
+ * It reads the SEATS, never the declared `fixedGraderRoleRef`: what graded the arm is the fact,
+ * and a claim that disagrees with the seats must lose to the seats.
  */
 export interface ComparabilityVerdict {
   readonly comparable: boolean;
@@ -511,23 +536,40 @@ export interface ComparabilityVerdict {
 export function assessComparability(
   assignments: readonly BlindGradingAssignment[]
 ): ComparabilityVerdict {
-  if (assignments.length < 2) {
-    return Object.freeze({ comparable: false, reason: "a single arm is not a comparison" });
+  if (assignments.length === 0) {
+    return Object.freeze({ comparable: false, reason: "no arm was seated with a grader" });
   }
   const signatures = new Set(assignments.map((assignment) =>
     assignment.seats.map((seat) => seat.graderRoleRef).sort().join("|")));
   if (signatures.size > 1) {
     return Object.freeze({
       comparable: false,
-      reason: "the arms were graded by different panels, so an arm's mean confounds the grader "
-        + "with the role configuration and no cross-arm ranking can be inferred"
+      reason: "the arms were graded by different identities, so an arm's mean confounds the "
+        + "grader with the role configuration and no cross-arm ranking can be inferred"
     });
   }
-  return Object.freeze({ comparable: true, reason: "every arm faced the same panel" });
+  if (assignments.length < 2) {
+    return Object.freeze({ comparable: false, reason: "a single arm is not a comparison" });
+  }
+  return Object.freeze({ comparable: true, reason: "every arm was graded by the same fixed grader" });
+}
+
+/**
+ * The property the non-commensurability mark exists for, stated once: did ONE grader stand in
+ * front of EVERY arm? Zero arms is a NO — no grader was seated at all — and that is the refusal
+ * case, not a silent pass.
+ */
+function oneGraderGradedEveryArm(assignments: readonly BlindGradingAssignment[]): boolean {
+  if (assignments.length === 0) return false;
+  const graders = new Set(assignments.flatMap((assignment) =>
+    assignment.seats.map((seat) => seat.graderRoleRef)));
+  return graders.size === 1;
 }
 
 export interface GradingProvenanceSummary {
   readonly graderSetsByConfig: Readonly<Record<string, readonly string[]>>;
+  /** The one identity that graded every arm, or null when the run could not seat one. */
+  readonly fixedGraderRoleRef: string | null;
   readonly marks: readonly string[];
   readonly anyDegraded: boolean;
   readonly disclosures: readonly string[];
@@ -537,13 +579,18 @@ export interface GradingProvenanceSummary {
 /**
  * Run-level provenance.
  *
- * `anyDegraded` counts RUN-LEVEL degradation too. With four identities and three arms every
- * assignment can be individually clean while the panels still differ — the r2 summary then
- * returned `anyDegraded: false` beside a degradation mark, which is a contradiction a
- * programmatic consumer would act on (codex r2 N2).
+ * `anyDegraded` is now exactly ONE condition: the run could not put a single grader in front of
+ * every arm. V-S11-GRADER removed the others — a grader sharing an identity or a family with the
+ * candidate is lawful, and a repeated seat no longer exists. This is the same shape codex r2 N2
+ * required, with the per-arm term dropped rather than negated: a summary may never report
+ * `anyDegraded: false` beside a degradation mark.
  *
- * MODEL-IDENTITY-UNKNOWN and INSTANCE-FRESHNESS-UNVERIFIED are EVIDENCE GAPS, not capacity
- * degradations: they say what this harness cannot observe, and they do not make an arm degraded.
+ * `disclosures` carries EVERY arm's disclosure, not only a degraded subset: V-S11-1's law is that
+ * provenance is recorded and disclosed, and a disclosure that only appears when something went
+ * wrong is not a record of how the answer was produced.
+ *
+ * MODEL-IDENTITY-UNKNOWN and INSTANCE-FRESHNESS-UNVERIFIED are EVIDENCE GAPS, not degradations:
+ * they say what this harness cannot observe, and they do not make an arm degraded.
  */
 export function summariseGradingProvenance(
   assignments: readonly BlindGradingAssignment[]
@@ -559,15 +606,20 @@ export function summariseGradingProvenance(
   }
   if (assignments.length > 0) marks.push(INSTANCE_FRESHNESS_UNVERIFIED_MARK);
   const signatures = new Set(Object.values(graderSetsByConfig).map((refs) => [...refs].sort().join("|")));
-  const panelsVary = signatures.size > 1;
-  if (panelsVary) marks.push(GRADER_SET_VARIES_BY_CONFIG_MARK);
+  if (signatures.size > 1) marks.push(GRADER_SET_VARIES_BY_CONFIG_MARK);
   const comparability = assessComparability(assignments);
-  if (assignments.length > 0 && !comparability.comparable) marks.push(CROSS_ARM_COMPARISON_UNAVAILABLE_MARK);
+  // THE NON-COMMENSURABILITY MARK, and the ONLY condition it may fire on (V-S11-GRADER): the
+  // deployment could not supply one grader for all arms. A single arm graded by the fixed grader
+  // is commensurable-in-principle and raises NO mark — it is simply not a comparison, which the
+  // verdict says on its own.
+  const oneGraderEverywhere = oneGraderGradedEveryArm(assignments);
+  if (!oneGraderEverywhere) marks.push(CROSS_ARM_COMPARISON_UNAVAILABLE_MARK);
   return Object.freeze({
     graderSetsByConfig: Object.freeze(graderSetsByConfig),
+    fixedGraderRoleRef: oneGraderEverywhere ? assignments[0]?.fixedGraderRoleRef ?? null : null,
     marks: Object.freeze(marks),
-    anyDegraded: assignments.some((assignment) => assignment.degraded) || panelsVary,
-    disclosures: Object.freeze(assignments.filter((a) => a.degraded).map((a) => a.disclosure)),
+    anyDegraded: !oneGraderEverywhere,
+    disclosures: Object.freeze(assignments.map((assignment) => assignment.disclosure)),
     comparability
   });
 }
@@ -820,8 +872,13 @@ export async function runEvalHarness(
       configuredProviderRefs: configuredProviders.map((identity) => identity.providerRef),
       candidateConfigCount: EVAL_HARNESS_MATRIX.candidateConfigCount
     });
+    // ONE grader, resolved ONCE for the whole run and handed to every arm. Resolving it here —
+    // outside the per-arm map, from a function that never sees a candidate — is what makes
+    // "fixed across arms" structural rather than a coincidence of the pool's contents.
+    const fixedGrader = resolveFixedGrader({ graderPool: configuredProviders });
     assignments = Object.freeze(candidateSet.configs.map((candidate) => assignBlindGraders({
       candidate,
+      fixedGrader,
       graderPool: configuredProviders,
       gradersPerCell: EVAL_HARNESS_MATRIX.gradersPerCell
     })));
@@ -856,13 +913,20 @@ export async function runEvalHarness(
   // preflight and BEFORE the approval gate, so V reads what was compromised alongside the count
   // it is asked to approve. A disclosure that arrives after approval has disclosed nothing.
   const provenance = summariseGradingProvenance(assignments);
+  // V-S11-GRADER: the fixed grader is disclosed AS FIXED, here in the free preflight, because a
+  // reader comparing arms must know the constant before the count it is asked to approve.
+  if (provenance.fixedGraderRoleRef !== null) {
+    dependencies.emit(
+      `GRADER FIXED: ${provenance.fixedGraderRoleRef} grades every arm — the constant that makes `
+      + "the arms commensurable (V-S11-GRADER)"
+    );
+  }
   for (const mark of candidateSet.marks) {
     dependencies.emit(`CONDITION MARK ${mark} · ${candidateSet.disclosure}`);
   }
   for (const assignment of assignments) {
     for (const mark of assignment.marks) {
-      if (mark === BLIND_GRADING_DEGRADED_MARK) dependencies.emit(`CONDITION MARK ${mark} · ${assignment.disclosure}`);
-      else dependencies.emit(`CONDITION MARK ${mark} · ${assignment.configId}`);
+      dependencies.emit(`CONDITION MARK ${mark} · ${assignment.disclosure}`);
     }
   }
   if (provenance.marks.includes(MODEL_IDENTITY_UNKNOWN_MARK)) {
@@ -879,8 +943,8 @@ export async function runEvalHarness(
   }
   if (provenance.marks.includes(GRADER_SET_VARIES_BY_CONFIG_MARK)) {
     dependencies.emit(
-      `CONDITION MARK ${GRADER_SET_VARIES_BY_CONFIG_MARK} · the arms are not graded by the same `
-      + "panel"
+      `CONDITION MARK ${GRADER_SET_VARIES_BY_CONFIG_MARK} · the arms were not all graded by one `
+      + "identity, so this deployment could not supply a fixed grader"
     );
   }
   if (provenance.marks.includes(CROSS_ARM_COMPARISON_UNAVAILABLE_MARK)) {
@@ -1043,7 +1107,7 @@ export function renderComparisonTable(input: {
         : (scores.reduce((total, score) => total + score, 0) / scores.length).toFixed(2);
       const observations = scores.length === 0
         ? "UNGRADED"
-        : `${String(scores.length)} from ${String(distinct)} distinct graders`;
+        : `${String(scores.length)} from ${String(distinct)} grader${distinct === 1 ? "" : "s"}`;
       lines.push(
         `| ${config.configId} | ${config.synthesizerRoleRef} | ${config.evaluatorRoleRef} `
         + `| ${arm} | ${mean} | ${observations} |`
@@ -1062,7 +1126,7 @@ export function renderComparisonTable(input: {
     const graders = assignment === undefined
       ? "UNASSIGNED"
       : assignment.seats
-        .map((seat) => `${seat.graderRoleRef} (${seat.relations.join("+")}${seat.repeatOfEarlierSeat ? ", repeat" : ""})`)
+        .map((seat) => `${seat.graderRoleRef} (${seat.relations.join("+")})`)
         .join(", ");
     lines.push(
       `| prov ${config.configId} | synthesizer ${config.synthesizerRoleRef} `
@@ -1075,8 +1139,17 @@ export function renderComparisonTable(input: {
   lines.push("");
   lines.push(EVAL_PROVENANCE_UNSETTLED_NOTICE);
   lines.push("");
+  // The constant, stated in the artifact itself: a reader comparing two rows of this table is
+  // entitled to know that one identity produced every score in it (V-S11-GRADER).
+  if (provenance.fixedGraderRoleRef !== null) {
+    lines.push(
+      `FIXED GRADER: ${provenance.fixedGraderRoleRef} graded every arm — the same identity across `
+      + "rows, which is what makes these arms comparable at all."
+    );
+    lines.push("");
+  }
   lines.push(provenance.marks.length === 0
-    ? "CONDITION MARKS: none — every cell was graded by two independent identities"
+    ? "CONDITION MARKS: none"
     : `CONDITION MARKS: ${provenance.marks.join(", ")}`);
   for (const disclosure of provenance.disclosures) lines.push(`  ${disclosure}`);
   lines.push("");
