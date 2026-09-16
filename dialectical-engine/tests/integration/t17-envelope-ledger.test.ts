@@ -112,32 +112,37 @@ function judgementDouble(statement: string, fidelity = 0.72): string {
 }
 
 /**
- * The EVALUATOR's own round, read from the packet the runner actually sent.
+ * The EVALUATOR's own round, COUNTED per server rather than read off the wire.
  *
  * codex r1 BLOCKING: the first version of this double returned `satisfied: true`
  * for EVERY evaluator input, so `runSynthesisLoop` broke out of its `for` after
  * round 1 and this "maximum path" test measured a ONE-ROUND run — two role sites
  * where the sealed bound allows six. A fixture that cannot reach the maximum
- * cannot be evidence about the maximum.
+ * cannot be evidence about the maximum. That property is what this helper
+ * exists to hold, and it still holds.
  *
- * It throws rather than defaulting: a double that silently guesses a round would
- * put the fixture straight back to measuring something other than what it says.
+ * W9 / V-MINIMUM-PAYLOAD (2026-09-03) is why it no longer PARSES the round:
+ * `round` is withheld from every model-facing payload, because a configured
+ * `evaluatorLoopMaxRounds` turns "round 3" into "this is your last attempt" and
+ * changes the decision the evaluator faces. The previous version read
+ * `.round` out of the last message and THREW when it was absent
+ * (`T17_EVALUATOR_ROUND_UNREADABLE`), which killed the handler, killed the
+ * socket, burned every attempt and surfaced as `TRANSPORT_DEATH` on the serve
+ * leg — a double reading a field the product had stopped sending.
+ *
+ * Counting, not parsing, is the house pattern in this very file:
+ * `conformanceVerdict` already derives round 1 vs round 2 from the ORDER of its
+ * content responses. This counter is scoped to the evaluator limb of one server
+ * rather than to a packet hash, precisely because the projection makes two
+ * consecutive evaluator packets byte-identical — so the ordinal has to come from
+ * the sequence, which is the only place it still exists.
  */
-function evaluatorRound(body: string): number {
-  let round: unknown;
-  try {
-    const envelope = JSON.parse(body) as { messages?: readonly { content?: unknown }[] };
-    const messages = envelope.messages ?? [];
-    const packet = messages[messages.length - 1]?.content;
-    if (typeof packet !== "string") throw new Error("no packet");
-    round = (JSON.parse(packet) as { round?: unknown }).round;
-  } catch (error) {
-    throw new Error("T17_EVALUATOR_PACKET_UNREADABLE", { cause: error });
-  }
-  if (typeof round !== "number" || !Number.isInteger(round) || round < 1) {
-    throw new Error(`T17_EVALUATOR_ROUND_UNREADABLE:${String(round)}`);
-  }
-  return round;
+function evaluatorRoundCounter(): () => number {
+  let responses = 0;
+  return () => {
+    responses += 1;
+    return responses;
+  };
 }
 
 /**
@@ -254,6 +259,8 @@ async function startMaximumPathProvider(label: string): Promise<{
       ? { conforms: false, findings: ["test-layer: first composition round is rejected"] }
       : { conforms: true, findings: [] };
   };
+  /** W9 / V-MINIMUM-PAYLOAD: the evaluator's round is counted here, not parsed. */
+  const nextEvaluatorRound = evaluatorRoundCounter();
   let served = 0;
   const server: Server = createServer((request, response) => {
     const chunks: Buffer[] = [];
@@ -298,7 +305,7 @@ async function startMaximumPathProvider(label: string): Promise<{
               // recomposes; round 2 passes and the run still completes. Counted
               // per packet, so each segment's first content response is round 1.
               ? JSON.stringify(conformanceVerdict(packetKey))
-              : kind === "EVALUATOR" ? JSON.stringify(evaluatorVerdict(evaluatorRound(body)))
+              : kind === "EVALUATOR" ? JSON.stringify(evaluatorVerdict(nextEvaluatorRound()))
                 : kind === "R9" ? JSON.stringify({ pass: true })
                 : judgementDouble(`${label} position ${served}`);
       response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({

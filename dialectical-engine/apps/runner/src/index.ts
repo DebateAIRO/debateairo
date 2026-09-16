@@ -93,6 +93,7 @@ import {
   PROTECTED_CORE_GUARD_RETIRED_MARK,
   runServeGateChain,
   ServeRepository,
+  toSynthesisPromptPayload,
   type BandCeilingRegisterRow,
   type ComposedSegment,
   type CompositionBudgetResolution,
@@ -4078,7 +4079,7 @@ export class WalkingSkeletonRunner {
         });
         const packet: PromptPacket = { messages: [
           { role: "system", content: "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. node_refs must name the node ids of the digest nodes whose facts the segment asserts, so every load-bearing claim traces to a digest node. Preserve the digest and add no facts. When the digest nodes a segment cites rest on reasoning alone, with no measured or looked-up evidence behind them, return at least two segments in order: the first segment states the provisional answer as a hypothesis; the second segment states the research plan that would lift it." },
-          { role: "user", content: JSON.stringify(request) }
+          { role: "user", content: toSynthesisPromptPayload(request) }
         ] };
         const response = await callSynthesisRole(role.provider, {
           runId: run.runId,
@@ -4154,7 +4155,7 @@ export class WalkingSkeletonRunner {
         const evaluatorCallSiteKey = synthesisCallSiteKey({ role: "EVALUATOR", round: request.round });
         const packet: PromptPacket = { messages: [
           { role: "system", content: EVALUATOR_CONTRACT_TEXT },
-          { role: "user", content: JSON.stringify(request) }
+          { role: "user", content: toSynthesisPromptPayload(request) }
         ] };
         const response = await callSynthesisRole(role.provider, {
           runId: run.runId,

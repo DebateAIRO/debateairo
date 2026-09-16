@@ -270,9 +270,24 @@ export interface SynthesisLoopControls {
   readonly evaluatorLoopMaxRounds: number;
 }
 
+/**
+ * F-W9-1 (2026-09-03): the final sentence states the obligation the EVALUATOR
+ * was already instructed to grade — "agreement between the statement and the
+ * code label", and overstatement. Before it, the synthesizer RECEIVED
+ * `codeLabel` and was never told what to do with it, so a rule was enforced
+ * against a party that had never been told it was bound by it. That costs a
+ * wasted round every time the synthesizer writes prose inconsistent with a label
+ * nobody told it to honour, and at worst a loop that cannot converge, because
+ * the retry carries the objection and still never states the rule.
+ *
+ * This is not MORE than the minimum payload — it is part of the minimum. A party
+ * judged on agreement with the label needs to know it is judged on it.
+ */
 export const SYNTHESIZER_INSTRUCTIONS =
   "Write the served statement from the digest below. Every load-bearing claim must trace to a "
-  + "digest node. Do not overstate the evidence, and state the losing positions fairly.";
+  + "digest node. Do not overstate the evidence, and state the losing positions fairly. Your "
+  + "statement must agree with the supplied code label, and must claim no more confidence than "
+  + "that label carries.";
 
 export const EVALUATOR_INSTRUCTIONS =
   "Judge the candidate statement against the digest and the code label. Check fairness to the "
@@ -429,6 +444,63 @@ export function buildEvaluatorRequest(input: {
   });
   assertFreshContextRequest(request);
   return request;
+}
+
+/**
+ * W9 / V-MINIMUM-PAYLOAD (2026-09-03): the ONE model-facing projection of a
+ * synthesis request. Both runner call sites send exactly this string, and
+ * `tests/unit/prompt-surface-guard.test.ts` pins that they do.
+ *
+ * It is an ALLOW-LIST, not a delete-list, and that is the whole point. The
+ * request key sets are FIXED (`assertFreshContextRequest` enforces them), and
+ * the heartbeat's remedy for a fixed key set is a named allow-list: a field
+ * added to a request type later is withheld by CONSTRUCTION rather than by
+ * someone remembering to exclude it. `JSON.stringify(request)` was the opposite
+ * rule — send everything, and hope the next field is harmless.
+ *
+ * WITHHELD, per the ruling:
+ *  · `roleRef` — the routing address; the runner resolves the provider from it
+ *    one line above the prompt and the model can do nothing with it.
+ *  · `round` — the loop bound is configured, so "round 3" means "last attempt"
+ *    and changes the decision both roles face. Neither task depends on the count.
+ *  · `stage` — a retry already carries `priorObjection`, which shows the
+ *    situation more directly than the flag states it.
+ *  · `codeLabel.registerVersion` — settings metadata, useless to a writer.
+ *  · `priorCandidateRef` — an artifact ADDRESS, the same class as `roleRef`, and
+ *    absent from the ruling's kept-list. Withheld on that reading; see the guard.
+ *
+ * KEPT, because the tasks depend on them: `instructions`, `digest`, the code
+ * label's real numbers, `candidateStatement` (the evaluator's entire job) and
+ * `priorObjection` on a retry (without it a rewrite is blind and can only repeat
+ * itself). `role` names the task the payload IS and is not machinery.
+ *
+ * Nothing leaves the REQUEST object: `assertFreshContextRequest` inspects the
+ * request, the audit record keeps full provenance, and the frozen key sets above
+ * are untouched. V's rule is RECORDED and WITHHELD, never forgotten.
+ */
+export function toSynthesisPromptPayload(
+  request: SynthesizerRequest | EvaluatorRequest
+): string {
+  const codeLabel = {
+    verdictLabel: request.codeLabel.verdictLabel,
+    servedNodeId: request.codeLabel.servedNodeId,
+    servedStrength: request.codeLabel.servedStrength,
+    margin: request.codeLabel.margin
+  };
+  const task = {
+    role: request.role,
+    instructions: request.instructions,
+    digest: request.digest,
+    codeLabel
+  };
+  if (request.role === "EVALUATOR") {
+    return JSON.stringify({ ...task, candidateStatement: request.candidateStatement });
+  }
+  return JSON.stringify(
+    request.stage === "RETRY"
+      ? { ...task, priorObjection: request.priorObjection }
+      : task
+  );
 }
 
 /* -------------------------------------------------------------------- loop */
