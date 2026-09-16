@@ -4794,3 +4794,68 @@ not in 4 000 lines of prose every author skims.
 - Same generating condition as `:1887` ("Before claiming 'no real code exercises this rule', prove
   your instrument can SEE the difference"), reached from attribution instead of from mutation
   testing. A null verdict ships with its control or it is not evidence.
+
+## The S1-1 depth oracle's ceiling arm scans RAW PHYSICAL LINES, so a COMMENT that quotes the bound is a violation (2026-09-16, BUILD(CONT-T7))
+- `ceilingSites` (`tests/support/depthOracle.ts:1243`) runs `kindOfCeilingLiteral` over
+  `source.split("\n")` BEFORE it runs `declarationUnits`. `declarationUnits` strips comments; the
+  raw-line pass does not. So any physical line matching `/depth/i` **and** a bare `5`
+  (`/(?<![\w.$])5(?![\w.$])/`) is a `DEPTH_BOUND_LITERAL`, including a JSDoc line.
+- Measured: `packages/serve/src/synthesis.ts:109`, ` * goal ORDERS to be exported and imported
+  elsewhere (T1's 1-5 depth bound);` — the `5` in `1-5` is bare, and the row reads as a second
+  definition of the ruled ceiling. `dcd2f89c` wrote that sentence in a commit whose own message
+  argues about "the narrowness property s1-1-depth-contract pins": the seat reasoned about the
+  oracle and never ran it (3.0 s).
+- **The fix is the ruling's own mechanism applied to prose: NAME the constant, never restate its
+  value.** `(T1's EXPANSION_DEPTH_MAX)` matches `/depth/i` and carries no bare 5 — measured clean.
+- **Rule: a commit that touches any path in `tests/support/shipped-corpus.manifest.txt` runs
+  `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts`, including a comment-only commit.**
+
+## The same oracle's DOMAIN arm reports an UNDETERMINED numeric array, which is NOT a depth duplicate (same seat, same day)
+- `domainSites` keeps every candidate whose verdict is not `OTHER` — i.e. `RULED` (the literal IS
+  `[1,2,3,4,5]`) **or `UNDETERMINED`** (the evaluator could not decide). A numeric array literal
+  consumed by a call the evaluator does not model is UNDETERMINED, so it is reported.
+- Measured at `56c91618`: `apps/api/src/support/keys.ts:402/444/489` — three AES-GCM **envelope
+  version bytes**, `Buffer.from([1])` / `Buffer.from([2])`. They have nothing to do with depth, and
+  the ticket's instruction to "route each site to `EXPANSION_DEPTH_MAX`" would have written byte 5
+  into every wrapped support DEK and broken `parseWrappedEnvelope`'s `bytes[0] !== 1` guard.
+- Neighbour control, measured: `const X = [1];` alone is **green** (EXACT -> OTHER). So the arm
+  pins "an occurrence I cannot decide", not "an array containing a small number". The row's NAME
+  ("leaves no duplicate definition of the ruled ceiling") mispredicts this every time.
+- **Remedy that works and is honest: name the element.** `isNumericElement`
+  (`tests/support/depthOracle.ts:176`) accepts only numeric literals, so `Buffer.from([VERSION_TAG])`
+  is not a candidate at all. A false positive and a true positive get the SAME edit here, because
+  the allow-list (`OWNING_DECLARATION`) is inside the test file and no worker may touch it.
+- **Rule: before acting on an oracle row, read the classifier and probe it. Never infer the remedy
+  from the ruling the oracle serves.**
+
+## Import a TypeScript oracle module straight from the scratchpad with plain `node` — no tsx, no repo write (same seat)
+- `await import("file:///…/dialectical-engine/tests/support/depthOracle.ts")` from a `.mjs` in the
+  scratchpad works under Node 26.5.0 type-stripping. The module's own `import ts from
+  "typescript-classic"` resolves from **its** directory, so the repo's node_modules is found even
+  though the script is outside the repo.
+- This sidesteps `:907` ("the root `typescript@7.0.2` package ships NO JavaScript compiler API")
+  entirely — you never import typescript yourself — and `:2005`/`:1258` (tsx resolving from the
+  script's directory).
+- One 2-second run classified eight synthetic shapes. The alternative was eight 3-second suite runs
+  and eight assertion-diff reads. **Rule: when a gate's verdict is a pure function exported by a
+  module, call the function; do not re-run the gate to ask it questions.**
+
+## VARIANT 10 of the multi-path `vitest run` family: a packet GLOB that matches nothing never reaches the runner (same seat)
+- The brief dictated `pnpm exec vitest run tests/unit/t1-*.test.ts tests/unit/register-s09.test.ts`.
+  No file matches `tests/unit/t1-*.test.ts` in this tree (it holds `t10-`, `t11-`, `t12-`, `t15-`,
+  `t17-`; the only literal `t1-` file is `tests/architecture/t1-argon2-worker-contract.test.ts`).
+- zsh aborts at expansion: `(eval):1: no matches found: tests/unit/t1-*.test.ts`, **rc=1, and the
+  redirected log file is never created** because nothing ran. Variants 8 and 9 (`:2462`, `:4441`)
+  both assume vitest RAN and dropped a path silently; this one is louder but classifies the same
+  way — any harness that reads exit status sees "suite failed".
+- **Rule: a packet carries no unexpanded glob. A seat expands every glob with `ls -1` first, `[ -f ]`
+  every literal path, and asserts `Test Files N (N)` against the path count.**
+
+## Revert a mutant from a byte-identical BACKUP, never by reverse substitution — the fix's own doc comment can contain the mutant's text (same seat)
+- Refines `:4595` ("a `perl -0pi -e` mutant lands in the DOC COMMENT first") from the opposite
+  direction: there the forward mutant hit a comment; here the **comment I added to explain the fix**
+  contains the literal string `Buffer.from([1])`, so the reverse substitution
+  `s/Buffer\.from\(\[1\]\)/Buffer.from([WRAPPED_KEY_VERSION_TAG])/` would have edited the
+  explanation and left the mutant standing — a green restore over a still-mutated file.
+- **Rule: `cp <backup> <file>` then assert `md5 -q` equality and print `git status --porcelain`.
+  A revert that is a regex is a second mutation.**
