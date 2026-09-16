@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "../../packages/db/src/index.js";
 import { createObservationDatabasePort } from "../../apps/observation-agent/src/core/database.js";
+import { observationRepoRoot } from "../../apps/observation-agent/src/core/paths.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 const migrationPath = resolve("migrations/0060_observation_throughput_views.sql");
@@ -94,6 +95,7 @@ describe("OBS-06 safe throughput views", () => {
     await createThroughputModule().probe({
       now: new Date("2026-09-04T10:00:30.000Z"), timeoutMs: 2_000,
       database: createObservationDatabasePort(database!.pool), stateDir: "/tmp/obs-06-rollup",
+      repoRoot: observationRepoRoot(),
       targets: Object.freeze([]), targetFragment: null, configuration: Object.freeze({}),
       thresholds: Object.freeze({ window_minutes: 5, run_failure_window_minutes: 60 })
     });
