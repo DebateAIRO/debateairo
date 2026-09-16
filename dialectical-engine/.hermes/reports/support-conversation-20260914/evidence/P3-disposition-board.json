@@ -1,0 +1,206 @@
+{
+  "at": "2026-09-16T07:00:54.345088+00:00",
+  "rows": [
+    {
+      "key": "LIVE_GUIDANCE",
+      "ticket": "t_8596ccbc",
+      "status": "archived",
+      "lastComment": {
+        "author": "Astra",
+        "body": "RESOLVED within demonstrated final pass3 scope at5cbfc6d: REV1+REV3: one finite seven-once actual matrix now useful/grounded, six accepted drafts and one exact reviewed recovery; not model-improvement proof. See REV1/2/3-p3 reports and consumers; other security blockers and Forgot remain.",
+        "created_at": 1789541946
+      }
+    },
+    {
+      "key": "OBS_CORRELATION",
+      "ticket": "t_f9e289db",
+      "status": "archived",
+      "lastComment": {
+        "author": "Astra",
+        "body": "RESOLVED within demonstrated final pass3 scope at5cbfc6d: REV1+REV2: fixed bounded seven-key projection and strict isolated-cursor consumer; ambiguous on duplicate/extra records. No API-event join or discarded-byte proof. See REV1/2/3-p3 reports and consumers; other security blockers and Forgot remain.",
+        "created_at": 1789541947
+      }
+    },
+    {
+      "key": "TYPE_P2_REGRESSION",
+      "ticket": "t_5bce1d7b",
+      "status": "done",
+      "lastComment": {
+        "author": "Astra",
+        "body": "RESOLVED within demonstrated final pass3 scope at5cbfc6d: REV1: mission TS2532 corrected at606b; exact inherited76 diagnostics remain, project typecheck still fails. See REV1/2/3-p3 reports and consumers; other security blockers and Forgot remain.",
+        "created_at": 1789541947
+      }
+    },
+    {
+      "key": "INT_P2_DEGRADED",
+      "ticket": "t_480d1d11",
+      "status": "done",
+      "lastComment": {
+        "author": "Astra",
+        "body": "RESOLVED within demonstrated final pass3 scope at5cbfc6d: REV1: projection-only fixture repair preserves every assertion. Independent8/8 and admitted/absent projection control prove call/refusal/usage/health distinction. Original977/1/1 whole-suite frame retained. See REV1/2/3-p3 reports and consumers; other security blockers and Forgot remain.",
+        "created_at": 1789541947
+      }
+    },
+    {
+      "key": "SEC_ENCODED_CREDENTIAL",
+      "ticket": "t_f2ecb7e7",
+      "status": "done",
+      "lastComment": {
+        "author": "Astra",
+        "body": "RESOLVED within demonstrated final pass3 scope at5cbfc6d: REV2: demonstrated single/deeper encoded-credential members reject in answer/summary. No arbitrary-encoding guarantee. See REV1/2/3-p3 reports and consumers; other security blockers and Forgot remain.",
+        "created_at": 1789541948
+      }
+    },
+    {
+      "key": "LIVE2_ACTION_ID",
+      "ticket": "t_67a569fe",
+      "status": "archived",
+      "lastComment": {
+        "author": "Astra",
+        "body": "RESOLVED within demonstrated final pass3 scope at5cbfc6d: REV2+REV3:35 exact IDs and bounded transforms reject,52 labels accepted, aliases request-bound; actual seven visible replies clean and both creation actions canonical. See REV1/2/3-p3 reports and consumers; other security blockers and Forgot remain.",
+        "created_at": 1789541948
+      }
+    },
+    {
+      "key": "SEC_P1",
+      "ticket": "t_4bccb334",
+      "status": "triage",
+      "lastComment": {
+        "author": "default",
+        "body": "BLOCKED: Owner decision after final review cap; B1: coordinator-bearing supplied credential-value tail remains in synthetic user storage/model transit. Partial fixes retained.",
+        "created_at": 1789541949
+      }
+    },
+    {
+      "key": "SEC_CREDENTIAL_POLICY",
+      "ticket": "t_db79b682",
+      "status": "triage",
+      "lastComment": {
+        "author": "default",
+        "body": "BLOCKED: Owner decision after final review cap; B2: positive finite/modal English/Romanian plus-groups inherit prior negation and pass screening.",
+        "created_at": 1789541949
+      }
+    },
+    {
+      "key": "SEC_P2",
+      "ticket": "t_18646f0a",
+      "status": "triage",
+      "lastComment": {
+        "author": "default",
+        "body": "BLOCKED: Owner decision after final review cap; B2+B3: shared case-summary sink accepts additive positive security operations and assignment-prefixed decoded paths; reviewed answer recovery does not cover summaries.",
+        "created_at": 1789541949
+      }
+    },
+    {
+      "key": "SEC_P3",
+      "ticket": "t_55cc12ff",
+      "status": "triage",
+      "lastComment": {
+        "author": "default",
+        "body": "BLOCKED: Owner decision after final review cap; B3: encoded backslash/drive/UNC forms after equals pass screens and synthetic answer storage/return; no clickability/execution claim.",
+        "created_at": 1789541950
+      }
+    },
+    {
+      "key": "REV1_P3",
+      "ticket": "t_88683868",
+      "status": "done",
+      "lastComment": {
+        "author": "Astra",
+        "body": "CONSUMED final pass3 PASS named correctness at5cbfc6d483aae0f56eabfdee00a6829e09e76c3d. Root verified all180 GATE inputs,108 product paths, indexed artifacts and six actual native skill bodies. Consumer REV1-p3-consumption.json. Review work complete; substantive limitations/findings retained. No CP1 acceptance.",
+        "created_at": 1789541945
+      }
+    },
+    {
+      "key": "REV2_P3",
+      "ticket": "t_fa16515a",
+      "status": "done",
+      "lastComment": {
+        "author": "Astra",
+        "body": "CONSUMED final pass3 REWORK security; B1-B3 open at5cbfc6d483aae0f56eabfdee00a6829e09e76c3d. Root verified all180 GATE inputs,108 product paths, indexed artifacts and six actual native skill bodies. Consumer REV2-p3-consumption.json. Review work complete; substantive limitations/findings retained. No CP1 acceptance.",
+        "created_at": 1789541946
+      }
+    },
+    {
+      "key": "REV3_P3",
+      "ticket": "t_689d8959",
+      "status": "done",
+      "lastComment": {
+        "author": "Astra",
+        "body": "CONSUMED final pass3 BLOCKED on DEST; product-truth portion PASS at5cbfc6d483aae0f56eabfdee00a6829e09e76c3d. Root verified all180 GATE inputs,108 product paths, indexed artifacts and six actual native skill bodies. Consumer REV3-p3-consumption.json. Review work complete; substantive limitations/findings retained. No CP1 acceptance.",
+        "created_at": 1789541946
+      }
+    },
+    {
+      "key": "CP1",
+      "ticket": "t_e584e488",
+      "status": "todo",
+      "lastComment": {
+        "author": "default",
+        "body": "BLOCKED: Existing Forgot destination and final-pass security decision remain unresolved. Not ready for user verification or acceptance.",
+        "created_at": 1789541950
+      }
+    },
+    {
+      "key": "DEST",
+      "ticket": "t_979fe293",
+      "status": "blocked",
+      "lastComment": {
+        "author": "ASTRA",
+        "body": "ASTRA dependency refinement authorized by owner internal-reordering instruction: DEST now directly blocks human CP1 rather than technical GATE, so independent whole-bundle review may proceed while V-1 is pending. GATE must carry destination UNVERIFIED explicitly; reviewers cannot certify destination or full CP1. Actual destination/catalog/server/UI changes require scoped independent re-review before READY FOR USER VERIFICATION. No acceptance by silence or reviewer PASS; CP2 remains gated.",
+        "created_at": 1789385150
+      }
+    },
+    {
+      "key": "V_P3_DECISION",
+      "ticket": "t_c5d11148",
+      "status": "blocked",
+      "lastComment": {
+        "author": "default",
+        "body": "BLOCKED: Final pass3 REWORK requires an explicit owner decision; no further correction or review dispatched.",
+        "created_at": 1789541943
+      }
+    },
+    {
+      "key": "COMPAT_P3_STATE",
+      "ticket": "t_08c1b60f",
+      "status": "triage",
+      "lastComment": {
+        "author": "Astra",
+        "body": "STATE\n{\n  \"ticket\": \"t_08c1b60f\",\n  \"node\": \"COMPAT_P3_STATE\",\n  \"risk_tier\": \"low\",\n  \"status\": \"queued\",\n  \"owner\": {\n    \"agent\": \"Astra\",\n    \"session\": null\n  },\n  \"model\": \"gpt-6-astra\",\n  \"authority_epoch\": 1,\n  \"rework_round\": 2,\n  \"final_review_pass\": 3,\n  \"contract\": {\n    \"allowed\": [\n      \"recorded finding only; no implementation dispatch\"\n    ],\n    \"forbidden\": \"all_others\",\n    \"human_review\": false\n  },\n  \"comments_read_through\": 0,\n  \"human_acceptance\": \"NOT_APPLICABLE\"\n}",
+        "created_at": 1789541944
+      }
+    },
+    {
+      "key": "COPY_P3_RO",
+      "ticket": "t_3b61afe3",
+      "status": "triage",
+      "lastComment": {
+        "author": "Astra",
+        "body": "STATE\n{\n  \"ticket\": \"t_3b61afe3\",\n  \"node\": \"COPY_P3_RO\",\n  \"risk_tier\": \"low\",\n  \"status\": \"queued\",\n  \"owner\": {\n    \"agent\": \"Astra\",\n    \"session\": null\n  },\n  \"model\": \"gpt-6-astra\",\n  \"authority_epoch\": 1,\n  \"rework_round\": 2,\n  \"final_review_pass\": 3,\n  \"contract\": {\n    \"allowed\": [\n      \"recorded finding only; no implementation dispatch\"\n    ],\n    \"forbidden\": \"all_others\",\n    \"human_review\": false\n  },\n  \"comments_read_through\": 0,\n  \"human_acceptance\": \"NOT_APPLICABLE\"\n}",
+        "created_at": 1789541944
+      }
+    },
+    {
+      "key": "PROC_REV1_P3_SCOPE",
+      "ticket": "t_68be7367",
+      "status": "triage",
+      "lastComment": {
+        "author": "Astra",
+        "body": "STATE\n{\n  \"ticket\": \"t_68be7367\",\n  \"node\": \"PROC_REV1_P3_SCOPE\",\n  \"risk_tier\": \"low\",\n  \"status\": \"queued\",\n  \"owner\": {\n    \"agent\": \"Astra\",\n    \"session\": null\n  },\n  \"model\": \"gpt-6-astra\",\n  \"authority_epoch\": 1,\n  \"rework_round\": 2,\n  \"final_review_pass\": 3,\n  \"contract\": {\n    \"allowed\": [\n      \"recorded finding only; no implementation dispatch\"\n    ],\n    \"forbidden\": \"all_others\",\n    \"human_review\": false\n  },\n  \"comments_read_through\": 0,\n  \"human_acceptance\": \"NOT_APPLICABLE\"\n}",
+        "created_at": 1789541945
+      }
+    },
+    {
+      "key": "SOURCE_CUSTODY",
+      "ticket": "t_e582c85f",
+      "status": "ready",
+      "lastComment": {
+        "author": "Astra",
+        "body": "Final REV3 retains historical source custody UNVERIFIED; no restoration/actor inference. The old56-path forward window is historical. Its final receipt observes81 current dirty paths; later ROOT-source-custody-p3-observation.json records82 with same sourceHEAD/index and clean isolated product5cb. No unrelated contents inspected; current shared-source changes are preserved.",
+        "created_at": 1789541950
+      }
+    }
+  ],
+  "qualifiedNativeTransitions": "Hermes complete/block declined for triage findings, and block declined for dependency-waiting CP1, while returning shell rc0. Root readbacks caught this. Three resolved triage findings were archived using the supported command. Four unresolved security findings remain triage with explicit owner-decision links/comments. CP1 remains native todo behind blocked DEST and V_P3_DECISION; it is not ready. No bypass/promote or direct task-status DB edit used."
+}

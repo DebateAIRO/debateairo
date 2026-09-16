@@ -106,7 +106,11 @@
     "SOURCE_SERIALIZATION": "t_851668bc",
     "TYPE_P2_REGRESSION": "t_5bce1d7b",
     "INT_P2_DEGRADED": "t_480d1d11",
-    "FIX_P2_DEGRADED": "t_7f51fcb1"
+    "FIX_P2_DEGRADED": "t_7f51fcb1",
+    "V_P3_DECISION": "t_c5d11148",
+    "COMPAT_P3_STATE": "t_08c1b60f",
+    "COPY_P3_RO": "t_3b61afe3",
+    "PROC_REV1_P3_SCOPE": "t_68be7367"
   },
   "edges": [
     [

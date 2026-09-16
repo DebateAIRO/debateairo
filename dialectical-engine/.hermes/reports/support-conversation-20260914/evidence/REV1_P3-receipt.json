@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "node": "REV1_P3",
+  "ticket": "t_88683868",
+  "session": "/root/plan_review",
+  "model": "gpt-5.6-sol",
+  "verdict": "PASS",
+  "scope": "final pass3 correctness and functional architecture",
+  "productRevision": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
+  "runtimeEvidenceRevision": "606b2eabea1dc9212159e53c193cf69655424e77",
+  "sourceRevision": "446c685e977104ecf2b0b5ee0519f7123968429f",
+  "evidenceFreeze": "bc0e85fc6013e0067cdb178a4bf7cc0526bdd72c",
+  "gateManifestSha256": "83c3d7e6e961464eb2baf2096b9ad4df5d24054c55ec81622de0732c6e8d5aa4",
+  "finalProductManifestSha256": "666236be2799d448df75a64ab8e3793c31fc67c4f803df297107d6d3040d60e2",
+  "measurements": {
+    "lensInputsVerified": 74,
+    "immutableGateInputsVerified": 180,
+    "finalProductPathsVerified": 108,
+    "targetedTestFilesPassed": 1,
+    "targetedTestsPassed": 8,
+    "directServiceAcceptedCases": 1,
+    "directServiceRecoveredRejectedClasses": 5,
+    "directServiceRefusalControls": 2,
+    "currentCorpusEntries": 36,
+    "englishEntries": 18,
+    "romanianEntries": 18,
+    "capabilityLanguageContextsScanned": 22
+  },
+  "artifacts": [
+    {
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/REV1-p3.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV1-p3.md",
+      "sha256": "568d560fc7dd340064a53be3e4a4e0560b457c3033878fe680dc84f2db7a9b62",
+      "bytes": 12585
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/REV1_P3.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/REV1_P3.md",
+      "sha256": "b166f702745d0892a91621e61379de78689526af3dca89aeac342406e63620c4",
+      "bytes": 10343
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/REV1_P3/degraded_projection_control.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/REV1_P3/degraded_projection_control.ts",
+      "sha256": "e80cc2ae5bf68678e234279aa117176c9ef92f9c76b801df5436e97f60ffafe1",
+      "bytes": 4379
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/REV1_P3/recovery_contract_control.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/REV1_P3/recovery_contract_control.ts",
+      "sha256": "e3652941e36271d26552f960942a564d0a63424b22e01e60e53bafcc438eec33",
+      "bytes": 11202
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/REV1_P3-degraded-final.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/REV1_P3-degraded-final.log",
+      "sha256": "32a729ab2c6abc4872be3cd0bc51adb375ce88fb1effeead5c63e4912297a855",
+      "bytes": 1245
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/REV1_P3-degraded-final-attempt2.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/REV1_P3-degraded-final-attempt2.log",
+      "sha256": "9736548ed97ddc1ef2cf2c02e94990bc11a0f95fe847e2db1eebbe0ba78f1d43",
+      "bytes": 1586
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/REV1_P3-degraded-projection-control.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/REV1_P3-degraded-projection-control.log",
+      "sha256": "9e6b696f52196ddf6016fffa7098f1e8d84cd7a70135b16ad28d3bbfcd119331",
+      "bytes": 1200
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/REV1_P3-degraded-projection-control-attempt2.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/REV1_P3-degraded-projection-control-attempt2.log",
+      "sha256": "40381615c7ade1902a2c6c6c3e01c9f6dd418fd140fed0b699c56e28906f4ea0",
+      "bytes": 371
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/REV1_P3-recovery-contract-control.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/REV1_P3-recovery-contract-control.log",
+      "sha256": "329f7a841adf9474921ddaaeaf039ec1d5c43d3cb91bd61d2316d893e4d4390a",
+      "bytes": 580
+    }
+  ],
+  "verification": {
+    "targetedFixture": "PASS; 1 file, 8 tests",
+    "projectionControl": "PASS; projection present causes one screened refusal with exact usage and restored health; projection absent causes zero-call NO_SOURCE",
+    "recoveryContractControl": "PASS; accepted draft, five rejected classes, two refusal controls, exact current corpus and 22 context surfaces",
+    "custody": "PASS; primary and detached product worktrees clean at exact product revision after temporary symlink removal",
+    "heavyLease": "RELEASED"
+  },
+  "limitations": [
+    "Forgot-password destination remains owner-blocked and unverified",
+    "actual model, HTTP, database and browser were not exercised by this reviewer",
+    "LIVE_P2 actual behavior remains attributed to the unchanged production bytes at runtimeEvidenceRevision",
+    "project typecheck retains the attributed 76-diagnostic baseline and does not pass",
+    "source verification is HEAD-only; source working-byte exactness is not claimed",
+    "one transient out-of-packet apps/runner/node_modules symlink to the same exact clean product revision was removed and disclosed"
+  ],
+  "usage": "UNAVAILABLE"
+}

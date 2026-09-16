@@ -1,0 +1,1 @@
+{"status":"PASS","frozenProduct":"5cbfc6d483aae0f56eabfdee00a6829e09e76c3d","positive":{"modelCalls":1,"outcome":"REFUSE_SAFETY","usage":{"input_tokens":3,"output_tokens":4,"cost_usd":0.001},"degraded":{"degraded":false}},"negative":{"modelCalls":0,"outcome":"NO_SOURCE","hasUsage":false,"degraded":{"degraded":true,"since":"2026-09-16T08:00:00.000Z","reason":"relay"}}}

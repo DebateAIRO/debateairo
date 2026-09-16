@@ -239,7 +239,7 @@
     "REV1_P3": {
       "session": "/root/plan_review",
       "ticket": "t_88683868",
-      "status": "packaged_pending_freeze_dispatch",
+      "status": "completed_pass_named_scope_consumed",
       "revision": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
       "reviewPass": 3,
       "heavy_lease": false
@@ -247,7 +247,7 @@
     "REV2_P3": {
       "session": "/root/forgot_destination",
       "ticket": "t_fa16515a",
-      "status": "packaged_pending_freeze_dispatch",
+      "status": "completed_rework_consumed",
       "revision": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
       "reviewPass": 3,
       "heavy_lease": false
@@ -255,21 +255,26 @@
     "REV3_P3": {
       "session": "/root/baseline",
       "ticket": "t_689d8959",
-      "status": "packaged_pending_freeze_dispatch",
+      "status": "completed_blocked_destination_technical_pass_consumed",
       "revision": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
       "reviewPass": 3,
       "heavy_lease": false
+    },
+    "GATE_P3": {
+      "session": "/root",
+      "status": "completed_evidence_package",
+      "revision": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d"
     }
   },
   "heavy_lease": null,
-  "state": "CP1_FINAL_PASS3_PACKAGED",
-  "last_event": "2026-09-16T06:32:59.933948+00:00",
-  "pending_owner_decision": "V-1 forgot-password destination",
+  "state": "CP1_WAITING_OWNER_DECISIONS_AFTER_FINAL_PASS3",
+  "last_event": "2026-09-16T07:03:28.658266+00:00",
+  "pending_owner_decision": "V-1 existing Forgot destination; V-2 focused security correction/review beyond final pass cap",
   "lane": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
   "baseline_claim": "b7ca2c41",
   "git_slot": null,
   "source_preservation": "Forward56-path/index/full-index custody verified; intake serialized-diff gap remains unverified, no underlying file-byte/cause inference.",
-  "last_review_interim": "All final pass2 lenses consumed REWORK; selected complete reviewed projections plus exact reviewed recovery and security U3-U6 under SPEC-v3.",
+  "last_review_interim": "All three final pass3 reviews consumed; correctness PASS, security B1-B3 REWORK, product BLOCKED on DEST with technical portion PASS.",
   "last_blueprint_milestone": "PLAN_P2 consumed;36 corpus records,21/2 disjoint paths,25 final suites.",
   "last_author_milestone": "Final5cbf one-test fixture correction consumed;8/8 focused, all runtime/config/content unchanged from606b.",
   "last_transport_recovery": "FIX_P2 same Sol resumed after explicit network response decoding error; no active command; edits/RED preserved.",

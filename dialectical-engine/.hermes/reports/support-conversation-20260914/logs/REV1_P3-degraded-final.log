@@ -1,0 +1,27 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-correctness/dialectical-engine
+
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/support-degraded.test.ts [ tests/integration/support-degraded.test.ts ]
+Error: Cannot find package '@debateai/support-kb/catalog' imported from /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-correctness/dialectical-engine/apps/api/src/support/answer.ts
+ ❯ apps/api/src/support/answer.ts:6:1
+      4|   HelpCorpusEntry,HelpCorpusSnapshotLookup,LoadedHelpCorpus
+      5| } from "@debateai/support-kb";
+      6| import {
+       | ^
+      7|   SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,type SupportAction
+      8| } from "@debateai/support-kb/catalog";
+ ❯ tests/integration/support-degraded.test.ts:2:1
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_MODULE_NOT_FOUND' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  09:40:38
+   Duration  181ms (transform 54ms, setup 0ms, import 0ms, tests 0ms, environment 0ms)
+
