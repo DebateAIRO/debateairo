@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "node": "FIX3",
+  "profile": "support-preview",
+  "supervisor": {
+    "pid": 12958,
+    "processGroup": 12958,
+    "parentPid": 1,
+    "command": ["pnpm", "dev:auth:up"],
+    "presentAtHandoff": true,
+    "loadedRevision": "82f57f1ebaaf59a9ee0ea81d3084c4d57f7557b0"
+  },
+  "observedAtHandoff": {
+    "normalTlsHelpStatus": 200,
+    "previewListeners": [3100, 3101, 8890, 8891, 8892, 8893, 8894, 8895, 8896],
+    "preservedOriginalListeners": [8790, 8791, 8792, 8793, 8794, 8795, 8796]
+  },
+  "committedRevision": "43cf9386ea3c9e7c79523ec38debe63271d19292",
+  "requiresSupportedReloadForLive3": true,
+  "stackStoppedByFix3": false,
+  "stackReloadedByFix3": false,
+  "actualRequestsMadeByFix3": 0,
+  "tlsBypassUsed": false,
+  "originalServicesModified": false,
+  "sandboxCurlConnectionResult": "ENVIRONMENTAL_UNAVAILABLE"
+}

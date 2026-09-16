@@ -1,0 +1,480 @@
+{
+  "schemaVersion": 1,
+  "status": "UNREVIEWED_COMPONENT_HANDOFF",
+  "productRevision": "dfeb7eef93de31e19367760d87c09ca1ef76544e",
+  "componentPath": "packages/support-kb/recovery/components.json",
+  "componentFileSha256": "5ee8d592c3f1b3550c1f2af74c030fbbc12e80e258dc71b57aa28de045f99e8a",
+  "catalogPath": "packages/support-kb/src/catalog.ts:SUPPORT_CATALOG_CANONICAL",
+  "catalogSha256": "24784328a4bb8d4e5205b3036dd369268180df792243db1c296a0a7ed2a0f9fe",
+  "componentCount": 36,
+  "ownerRatification": {
+    "ratifiedBy": "",
+    "ratifiedOn": ""
+  },
+  "components": [
+    {
+      "logicalKey": "account-access.en",
+      "id": "account-access",
+      "lang": "en",
+      "sourceOrigin": "packages/support-kb/content/account-access.en.md",
+      "articleSha256": "17aac248d75d7ad161fba2a44068d20743a9759ae56c9b30359c7e1d5550c2e7",
+      "modelProjectionSha256": "c138d4ed2ecd19847cb74b1fd7ad91eb9b047369cb2a391f15563e0915ec192a",
+      "fallbackSha256": "6b5d2dcff5c21d11eae6c6a92cabea39ec253e8e54b5d890d9b25d56f9eab32d",
+      "intendedActionIds": [
+        "sign-in",
+        "forgot-password",
+        "sign-up"
+      ]
+    },
+    {
+      "logicalKey": "account-access.ro",
+      "id": "account-access",
+      "lang": "ro",
+      "sourceOrigin": "packages/support-kb/content/account-access.ro.md",
+      "articleSha256": "5048de52b22b474fb8185e718fcaf235cd23896eff8fd7e42f4399d5266e9410",
+      "modelProjectionSha256": "e3ca804d9cd657ec82e9a9f81fd2dc1299997ee59cc4a752e757cd9e67d6ef98",
+      "fallbackSha256": "47d2b4b41acc0d0ef976bab9e08e5f617303612bfeda2b969a2958d6618ad8c0",
+      "intendedActionIds": [
+        "sign-in",
+        "forgot-password",
+        "sign-up"
+      ]
+    },
+    {
+      "logicalKey": "account-settings.en",
+      "id": "account-settings",
+      "lang": "en",
+      "sourceOrigin": "packages/support-kb/content/account-settings.en.md",
+      "articleSha256": "2cab95047c1c34109794f3fc1ad620784bbb97b9267160d471551454d296f628",
+      "modelProjectionSha256": "67f5ce1fd18952c94a981f772e32e29c8c526b5591d656c202260486826a0d62",
+      "fallbackSha256": "6d99d7eeb445525b3bf3cf55f4283ee24fec536ff4f9ccc3a3b1f928904091bf",
+      "intendedActionIds": [
+        "settings",
+        "privacy-preferences"
+      ]
+    },
+    {
+      "logicalKey": "account-settings.ro",
+      "id": "account-settings",
+      "lang": "ro",
+      "sourceOrigin": "packages/support-kb/content/account-settings.ro.md",
+      "articleSha256": "e2b2834ff96da50a0511b2647ae490f6f99af80e317a74caddb16ee8262bc5d9",
+      "modelProjectionSha256": "f941492f0a6bed283a0fd70aa6ffeb20304b40c5bdfdd8e01f438cf3094f08f8",
+      "fallbackSha256": "1b7be7bebd1932a4630bea3df60d016218ecedca1ef538ac14510ef66d5f2aad",
+      "intendedActionIds": [
+        "settings",
+        "privacy-preferences"
+      ]
+    },
+    {
+      "logicalKey": "browse-public-debates.en",
+      "id": "browse-public-debates",
+      "lang": "en",
+      "sourceOrigin": "packages/support-kb/content/browse-public-debates.en.md",
+      "articleSha256": "8059a2e46af231765a80f61854752aa5a9ec49e60c95dc715eb3e82a39618fad",
+      "modelProjectionSha256": "c5c6d262a33abda6c4cf76024cfaa5f42c2b51f2e3242ae3ed3d3bf157ba1034",
+      "fallbackSha256": "c5294a4cae6fc88b300ec64634fbbb2531e7eef783bed814f387834804f21bb6",
+      "intendedActionIds": [
+        "home",
+        "public-catalog",
+        "your-debates",
+        "method",
+        "sample-transcript"
+      ]
+    },
+    {
+      "logicalKey": "browse-public-debates.ro",
+      "id": "browse-public-debates",
+      "lang": "ro",
+      "sourceOrigin": "packages/support-kb/content/browse-public-debates.ro.md",
+      "articleSha256": "0fb2aa501c0980af4afb52520c10e51ca0814266bd2258b1f727fa52d16e0241",
+      "modelProjectionSha256": "87cb63222b2a74f1c75e4d25c28e69e35de0673049d4be055f7de201459e0897",
+      "fallbackSha256": "37bd679ea02946cbdcf7948c7d1345376592335f4e8bde3b2e78adf339e0f40d",
+      "intendedActionIds": [
+        "home",
+        "public-catalog",
+        "your-debates",
+        "method",
+        "sample-transcript"
+      ]
+    },
+    {
+      "logicalKey": "budget-tier-choice.en",
+      "id": "budget-tier-choice",
+      "lang": "en",
+      "sourceOrigin": "packages/support-kb/content/budget-tier-choice.en.md",
+      "articleSha256": "a49d563ef7bfec75ed179a70adb54c25947aa9cbe4db557698eacc84d1d3c683",
+      "modelProjectionSha256": "e6d5adf85f44c3fd1aaa2c70d095f6f2474723a5b72393d4a006f0206fa64104",
+      "fallbackSha256": "cb920483c56311f42b1adf89c581320a4a5344dcc90028fa458ad6028867d601",
+      "intendedActionIds": [
+        "start-debate"
+      ]
+    },
+    {
+      "logicalKey": "budget-tier-choice.ro",
+      "id": "budget-tier-choice",
+      "lang": "ro",
+      "sourceOrigin": "packages/support-kb/content/budget-tier-choice.ro.md",
+      "articleSha256": "e648150ae607bb98c55059eaea6162ffc2cd09df437721b75c8c7b226ef4984d",
+      "modelProjectionSha256": "d8648bd28c6eddb018f6508c7c1eed9e0a20941807979d42701e35e4351ea371",
+      "fallbackSha256": "1496048887bc41ba3968fdaf7d0fe17e43feffaba1f1c997f46f0b420d30652f",
+      "intendedActionIds": [
+        "start-debate"
+      ]
+    },
+    {
+      "logicalKey": "debate-topic-and-description.en",
+      "id": "debate-topic-and-description",
+      "lang": "en",
+      "sourceOrigin": "packages/support-kb/content/debate-topic-and-description.en.md",
+      "articleSha256": "695b7b405e599260acd7c5a51f897f46b52b238f2860a20168cd14cfdc176bad",
+      "modelProjectionSha256": "290097ca24858424c4bc2a6845182a9c1cbcd0214c6a3109e2b32cf7e0bd0f56",
+      "fallbackSha256": "7234ce24457ad97fe943e93b1caf0e28a8d74e30aa1748f1d29b158cdcba67b7",
+      "intendedActionIds": [
+        "start-debate"
+      ]
+    },
+    {
+      "logicalKey": "debate-topic-and-description.ro",
+      "id": "debate-topic-and-description",
+      "lang": "ro",
+      "sourceOrigin": "packages/support-kb/content/debate-topic-and-description.ro.md",
+      "articleSha256": "90f1fff60a4245eeda7b5131b671772b425e8ab682f967c4c31c2ad42c7207a2",
+      "modelProjectionSha256": "8cd97dedffdf9b059f4d809b73f60f59174007b42a7a99998989c354af93bee8",
+      "fallbackSha256": "c6470bf637f904245f4c5f468c1b33c1d43d03fa0b45d1d3ba32eb47f12840f7",
+      "intendedActionIds": [
+        "start-debate"
+      ]
+    },
+    {
+      "logicalKey": "delete-a-private-debate.en",
+      "id": "delete-a-private-debate",
+      "lang": "en",
+      "sourceOrigin": "packages/support-kb/content/delete-a-private-debate.en.md",
+      "articleSha256": "7c37881f26d875f87a0177bc35593d9f52a1739b25a848df98ad2d478c7bdb26",
+      "modelProjectionSha256": "9ae0d23732c129d4b3e3e06b4c81833a5546b214506ecc53c3b531b4856dc49c",
+      "fallbackSha256": "92409ee15ce6ed5f380136ab090d3ce2a82ee355e379e7d068609baf9e92365b",
+      "intendedActionIds": [
+        "owner-debate"
+      ]
+    },
+    {
+      "logicalKey": "delete-a-private-debate.ro",
+      "id": "delete-a-private-debate",
+      "lang": "ro",
+      "sourceOrigin": "packages/support-kb/content/delete-a-private-debate.ro.md",
+      "articleSha256": "afc631bec586e463df1b217d79fc9ea694f873f5690b028c7b79aa65d83cfaa9",
+      "modelProjectionSha256": "1f4b3b1719c76d8223159dd73049c47761dd4fd6482103d40cf31d53fd2b54a3",
+      "fallbackSha256": "46037245889b3c11b737e40222ce1c6d1b800020a92ee4e92725ad03d8338727",
+      "intendedActionIds": [
+        "owner-debate"
+      ]
+    },
+    {
+      "logicalKey": "export-json.en",
+      "id": "export-json",
+      "lang": "en",
+      "sourceOrigin": "packages/support-kb/content/export-json.en.md",
+      "articleSha256": "c31c5bd3a2eb80e1352f27431e459f8272ae37605a9988210cff2aa82d6b7ea5",
+      "modelProjectionSha256": "690569195ed4098fd00b5bf102658f9bd26b2610897ca816163f8abb2a47946d",
+      "fallbackSha256": "6abec339af9fc96715c8964a17341461db4042701acb1f54e1e9deea37421afb",
+      "intendedActionIds": [
+        "owner-debate",
+        "public-debate"
+      ]
+    },
+    {
+      "logicalKey": "export-json.ro",
+      "id": "export-json",
+      "lang": "ro",
+      "sourceOrigin": "packages/support-kb/content/export-json.ro.md",
+      "articleSha256": "5016b1370fbbd83ed2e647cfdeb8a2c10b4052ef8861807abed2ee4b0ae8f02b",
+      "modelProjectionSha256": "70c63bd09f0577e45c6c20ab542013cf6caba0e2f0290782f4d6589ef868720f",
+      "fallbackSha256": "78dc48a23f8a2de1e4af205d26f1d743a9000ed2c375437b0cfe2acb66d82cd3",
+      "intendedActionIds": [
+        "owner-debate",
+        "public-debate"
+      ]
+    },
+    {
+      "logicalKey": "getting-started-debate.en",
+      "id": "getting-started-debate",
+      "lang": "en",
+      "sourceOrigin": "packages/support-kb/content/getting-started-debate.en.md",
+      "articleSha256": "a438b7c7a91342dee7c5edb2efe48e586be2cc33d9a2eafabaadad2882f6f9e8",
+      "modelProjectionSha256": "059900a11c6ec871145ee61e4aaca7214c76c02e8dab61dbec67eb08e6a3017e",
+      "fallbackSha256": "c844161c3430edcfb0a195df7ffff6bcf82c0826ab454bf817631933649bed48",
+      "intendedActionIds": [
+        "home",
+        "public-catalog",
+        "your-debates",
+        "method",
+        "sample-transcript",
+        "start-debate"
+      ]
+    },
+    {
+      "logicalKey": "getting-started-debate.ro",
+      "id": "getting-started-debate",
+      "lang": "ro",
+      "sourceOrigin": "packages/support-kb/content/getting-started-debate.ro.md",
+      "articleSha256": "f2a848dbaa9131d3165f50ce2004f1fba874032a48d7bdf1ba90f96c8aa205af",
+      "modelProjectionSha256": "23c930ba398c6bdf4c119b30bae509946ca8a483c9b0cb18e9ac6bd238220d80",
+      "fallbackSha256": "ef982f6420391eeaaf23c475afb230fcee91afc2183c4b945403283802d09e8a",
+      "intendedActionIds": [
+        "home",
+        "public-catalog",
+        "your-debates",
+        "method",
+        "sample-transcript",
+        "start-debate"
+      ]
+    },
+    {
+      "logicalKey": "guide-how-it-works.en",
+      "id": "guide-how-it-works",
+      "lang": "en",
+      "sourceOrigin": "packages/support-kb/content/guide-how-it-works.en.md",
+      "articleSha256": "05316f05e559cd866948ab7f464a681d6875fe8aad5143e956eeb20077bc46c5",
+      "modelProjectionSha256": "758085d81051393bd3520c43c84a23689a652c5dc6b15e0154a46a1fcf7cd528",
+      "fallbackSha256": "c1ed3a89b00d46ac7f1710280ef768f9d66adec20d20aaa18815596e6a5c2265",
+      "intendedActionIds": [
+        "owner-debate"
+      ]
+    },
+    {
+      "logicalKey": "guide-how-it-works.ro",
+      "id": "guide-how-it-works",
+      "lang": "ro",
+      "sourceOrigin": "packages/support-kb/content/guide-how-it-works.ro.md",
+      "articleSha256": "94acc4db2ccecb9a0d4f5b82350e91d26643b76c6caff879019edc107a3e3000",
+      "modelProjectionSha256": "65482fb1f90d62942b4e6f87a289c151978250fb385efc10d12c8e239780c195",
+      "fallbackSha256": "cb344a791adc4616c177c993b4f186595725f6ea3de8b1f95fcd8a6f0ff07ed8",
+      "intendedActionIds": [
+        "owner-debate"
+      ]
+    },
+    {
+      "logicalKey": "privacy-consent.en",
+      "id": "privacy-consent",
+      "lang": "en",
+      "sourceOrigin": "packages/support-kb/content/privacy-consent.en.md",
+      "articleSha256": "54cca7dbfb790c9d6aac077b00775e5ac6d5bc277be38733e92047bc63c262d5",
+      "modelProjectionSha256": "5de30c60b097bc464f12d9aef13fbc67e0c15c6d5aa4ca1a91f82fe77fc394ae",
+      "fallbackSha256": "419fbdd08f1d581b9484d6df1cb6b63077aef93ab627b9ab87c0c6054ce66d49",
+      "intendedActionIds": [
+        "settings",
+        "privacy-preferences"
+      ]
+    },
+    {
+      "logicalKey": "privacy-consent.ro",
+      "id": "privacy-consent",
+      "lang": "ro",
+      "sourceOrigin": "packages/support-kb/content/privacy-consent.ro.md",
+      "articleSha256": "e9b04331a2aa76d3ed9bd45c2199263dc476ae62d15c33db30ed537fedeb5c5d",
+      "modelProjectionSha256": "7db208bec972f230adaddf05162305126e6aeeb431fd66bad468886e2c62710e",
+      "fallbackSha256": "940316e6b1a66598baa91183116c92477be57df65885dc22b1ce4954393e11f6",
+      "intendedActionIds": [
+        "settings",
+        "privacy-preferences"
+      ]
+    },
+    {
+      "logicalKey": "public-answer-disclosure.en",
+      "id": "public-answer-disclosure",
+      "lang": "en",
+      "sourceOrigin": "packages/support-kb/content/public-answer-disclosure.en.md",
+      "articleSha256": "e67c271558e6bb5b4100fa735059e781e453c268808d555c6e85af36e3e678ea",
+      "modelProjectionSha256": "1ee826de541e74d701fd502bfe70e85c009da2b94d3e6d38c1fc98924f251670",
+      "fallbackSha256": "9c733e8f40697f0cd9f15f5984947edaff532a10bc3375d10ca94747e10cc569",
+      "intendedActionIds": [
+        "public-debate"
+      ]
+    },
+    {
+      "logicalKey": "public-answer-disclosure.ro",
+      "id": "public-answer-disclosure",
+      "lang": "ro",
+      "sourceOrigin": "packages/support-kb/content/public-answer-disclosure.ro.md",
+      "articleSha256": "6e845c95414ae5b9190cf5917136776d7af931eaf626b2da4a0540b3bf7925f1",
+      "modelProjectionSha256": "4ee30438ed6e75bb79f2e458bb78a6e8e8b79d3271e59c372dff626ce23a3819",
+      "fallbackSha256": "903906d5fc6d89668a42a2108cf30e21b1ec166a9fdce9e7aeff1bf4882fa45d",
+      "intendedActionIds": [
+        "public-debate"
+      ]
+    },
+    {
+      "logicalKey": "publish-a-debate.en",
+      "id": "publish-a-debate",
+      "lang": "en",
+      "sourceOrigin": "packages/support-kb/content/publish-a-debate.en.md",
+      "articleSha256": "9385f0dd00f8014e3445d1ee4c8c5230dc12d0379766d35c9c7845814f288e29",
+      "modelProjectionSha256": "83119e6803f854c04ad0153b55cc69212563a92f6b7e350ef29f656ff6c90a3c",
+      "fallbackSha256": "b2974fdf83f15e7142380698b7b21a95bd9efe7cbcfaa5d07028f292bcfd53ef",
+      "intendedActionIds": [
+        "owner-debate"
+      ]
+    },
+    {
+      "logicalKey": "publish-a-debate.ro",
+      "id": "publish-a-debate",
+      "lang": "ro",
+      "sourceOrigin": "packages/support-kb/content/publish-a-debate.ro.md",
+      "articleSha256": "41858b13ebb6bcec19430b6a63cae6f5854b25ad02e8ac74617d83b087355c3c",
+      "modelProjectionSha256": "834ec781e6645753549cfca72d8d7bdc70ecb425f1eba125b25c5e04410ea598",
+      "fallbackSha256": "a6f1ef4a94b53df2d77fdd63a14c3f596adaac6b437ab3586424d21815284b26",
+      "intendedActionIds": [
+        "owner-debate"
+      ]
+    },
+    {
+      "logicalKey": "risk-tier-choice.en",
+      "id": "risk-tier-choice",
+      "lang": "en",
+      "sourceOrigin": "packages/support-kb/content/risk-tier-choice.en.md",
+      "articleSha256": "3ca67a93a3b159c0b284b2bd75093fd9bc70e20d03c357f4ac1fdcb3df522715",
+      "modelProjectionSha256": "37a5e399d53e5c284febfd79f40fe36bfc611eddb254ccb9a758469e66557929",
+      "fallbackSha256": "7908d0b36c5c62a863ee064095bc3f528792d9588fba9f88c523ea978dffb7f2",
+      "intendedActionIds": [
+        "start-debate"
+      ]
+    },
+    {
+      "logicalKey": "risk-tier-choice.ro",
+      "id": "risk-tier-choice",
+      "lang": "ro",
+      "sourceOrigin": "packages/support-kb/content/risk-tier-choice.ro.md",
+      "articleSha256": "f40e8583d9ec012f6510c4f6ae6a6527680bc279f393388dc8cd2a31762f4d96",
+      "modelProjectionSha256": "0845807a9ba9cc68c608a5be752fdbaa08147fe8aed5a06a61021bb91675a34a",
+      "fallbackSha256": "d35f24c30f5998d0a8945f6efdd97cbebf45c0612b6181ff47c48c81951b02ab",
+      "intendedActionIds": [
+        "start-debate"
+      ]
+    },
+    {
+      "logicalKey": "support-cases.en",
+      "id": "support-cases",
+      "lang": "en",
+      "sourceOrigin": "packages/support-kb/content/support-cases.en.md",
+      "articleSha256": "96ea24b2aff54d46beeb25cec255041f335e93c52590829ad64f53ad62fe9aa2",
+      "modelProjectionSha256": "7560677362565332479dbe8c16b0e4035278a077512c7eeffdb3bbaa4ba0b76d",
+      "fallbackSha256": "bfc3f07ee653c9d9e798fd8468f1bf658a3ef29e72aef75ba93c348c96a50948",
+      "intendedActionIds": [
+        "help",
+        "support-status"
+      ]
+    },
+    {
+      "logicalKey": "support-cases.ro",
+      "id": "support-cases",
+      "lang": "ro",
+      "sourceOrigin": "packages/support-kb/content/support-cases.ro.md",
+      "articleSha256": "2346f0b14cfd3ac25ccd609d8268809da9975dc2079179778e10df3da7f88aac",
+      "modelProjectionSha256": "e993e92c67a698c504f3b6bac0eceeb4e47afb56ba02bd10f5c3c5d00274b10c",
+      "fallbackSha256": "dec984e5c9ae5fcf5e0ab7d575aef01339b9300ca42bce94950ab3a39d13ee82",
+      "intendedActionIds": [
+        "help",
+        "support-status"
+      ]
+    },
+    {
+      "logicalKey": "support-status-limits.en",
+      "id": "support-status-limits",
+      "lang": "en",
+      "sourceOrigin": "packages/support-kb/content/support-status-limits.en.md",
+      "articleSha256": "7f111d034af0d6ba0765c9bf008d6d8981f8a589e1731695e9bbf7d5f213f15f",
+      "modelProjectionSha256": "0f18f40c0d5b2985ce4db08f0c8c7555c7a4b235ab86032172913c6ca362ab89",
+      "fallbackSha256": "0dae00645b03d17b120a79cc212696648a9dd76f3f86a2cbab26db710f618534",
+      "intendedActionIds": [
+        "help",
+        "support-status"
+      ]
+    },
+    {
+      "logicalKey": "support-status-limits.ro",
+      "id": "support-status-limits",
+      "lang": "ro",
+      "sourceOrigin": "packages/support-kb/content/support-status-limits.ro.md",
+      "articleSha256": "884956c2b04303c8412a4859746a526d5577e9392e2066843aa977500857511f",
+      "modelProjectionSha256": "d4163c89dd29974c170da40e39c0f1d34849ac8acec08aa7413d439a0f7dcfbd",
+      "fallbackSha256": "df43c7cccd6017dc7890ba24ceb4255620a3927ca066879fc017f1e508638bb1",
+      "intendedActionIds": [
+        "help",
+        "support-status"
+      ]
+    },
+    {
+      "logicalKey": "unpublish-a-debate.en",
+      "id": "unpublish-a-debate",
+      "lang": "en",
+      "sourceOrigin": "packages/support-kb/content/unpublish-a-debate.en.md",
+      "articleSha256": "70e53322f323778974e50ca4f4342a4e8cba5c41d5139d51452530a40c7563a2",
+      "modelProjectionSha256": "64f871c823dd78f05d18f50ec45373fa07a9ad79f72b4234c8adc9aae443db0b",
+      "fallbackSha256": "db2b5340f4c9089567e0c8b4559cc9ac4749039b91bd3a8b2fbbd5c799991c1f",
+      "intendedActionIds": [
+        "owner-debate"
+      ]
+    },
+    {
+      "logicalKey": "unpublish-a-debate.ro",
+      "id": "unpublish-a-debate",
+      "lang": "ro",
+      "sourceOrigin": "packages/support-kb/content/unpublish-a-debate.ro.md",
+      "articleSha256": "a741f94571245aadbb6f25d6da5c3c5b87bdf5bf72fa4c5aaf8e03980abce9d0",
+      "modelProjectionSha256": "9be645d5de8cd8f8c26603966f9e9b8f3d58b7cb7c8a95e9cb7b0fd71289fe25",
+      "fallbackSha256": "b8e1ec1cf886a71658412f2b4bcfdb0dd8c91cd424c94aad3df4c377ecd2af7f",
+      "intendedActionIds": [
+        "owner-debate"
+      ]
+    },
+    {
+      "logicalKey": "unsupported-capabilities.en",
+      "id": "unsupported-capabilities",
+      "lang": "en",
+      "sourceOrigin": "packages/support-kb/content/unsupported-capabilities.en.md",
+      "articleSha256": "6e7f19d6d7c00fe4d10660e4dff7ad52e16ae8ff3d85cea13717780af586ec6f",
+      "modelProjectionSha256": "784bf45291c975c87dd6bb1a11f5b1812ecbefc7f0f52ee5cfb66dbdb4f6e9bd",
+      "fallbackSha256": "4feec8aa3b78a1d52916a3484adce247fb94a68b2107c1d5816fdc9c29e7f41f",
+      "intendedActionIds": [
+        "owner-debate"
+      ]
+    },
+    {
+      "logicalKey": "unsupported-capabilities.ro",
+      "id": "unsupported-capabilities",
+      "lang": "ro",
+      "sourceOrigin": "packages/support-kb/content/unsupported-capabilities.ro.md",
+      "articleSha256": "c07bb1a6a85f14a034a134a08250f22721f772ce54bd77d18ff63f7df93d350b",
+      "modelProjectionSha256": "c9865d48ace58951f1c0c5bf85cd99b50dd6985d276fdeff7d4094e060c9acb5",
+      "fallbackSha256": "48de85c1329b80861e5bc5a7d1e2ce2dee433ec1f7bfd67ce0cd4596644702d2",
+      "intendedActionIds": [
+        "owner-debate"
+      ]
+    },
+    {
+      "logicalKey": "view-public-debate.en",
+      "id": "view-public-debate",
+      "lang": "en",
+      "sourceOrigin": "packages/support-kb/content/view-public-debate.en.md",
+      "articleSha256": "995068c814cec3ba1dd0f0ecf320bea04fc8c66acc9703b8cd70cec72cfca053",
+      "modelProjectionSha256": "c0185e375681e9d609b041f1e7fbbc1e33bd4c4c6489a3ea715fd52797ba35ab",
+      "fallbackSha256": "6d06676fd87b3c96b5194ea459eec98846f322ef28a7890a1261667a37f71ac5",
+      "intendedActionIds": [
+        "public-debate"
+      ]
+    },
+    {
+      "logicalKey": "view-public-debate.ro",
+      "id": "view-public-debate",
+      "lang": "ro",
+      "sourceOrigin": "packages/support-kb/content/view-public-debate.ro.md",
+      "articleSha256": "9faf157365acb8b560208eb822cda7cd42c83e845d2a551853ea5c97ccf9c260",
+      "modelProjectionSha256": "b084890fbed2cc9e663966f07ddeff0be6c3bef33bbfb9edfb6b8f38d579df40",
+      "fallbackSha256": "a69efa62f629372892e35d12f5d258c93409e4ca585205c7616bb637e01e7de6",
+      "intendedActionIds": [
+        "public-debate"
+      ]
+    }
+  ]
+}

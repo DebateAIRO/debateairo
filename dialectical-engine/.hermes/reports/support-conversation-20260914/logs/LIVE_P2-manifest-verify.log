@@ -1,0 +1,8 @@
+file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P2/verify-manifest.mjs:21
+    throw new Error(`LIVE_P2_MANIFEST_MISMATCH:${artifact.missionRelative}`);
+          ^
+
+Error: LIVE_P2_MANIFEST_MISMATCH:.hermes/reports/support-conversation-20260914/logs/LIVE_P2-manifest-verify.log
+    at file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P2/verify-manifest.mjs:21:11
+
+Node.js v22.23.1

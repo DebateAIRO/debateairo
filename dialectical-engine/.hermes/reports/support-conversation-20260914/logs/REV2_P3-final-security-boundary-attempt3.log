@@ -1,0 +1,1042 @@
+{
+  "revision": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
+  "substrate": "actual final TypeScript modules with in-memory model/message ports; frozen diagnostic consumer; no socket, HTTP, database, browser, preview, provider, relay, auth, reset, or account traffic",
+  "redaction": [
+    {
+      "id": "closed-quote",
+      "input": "My recovery code is «quartz amber fern»; keep it private.",
+      "fragments": [
+        "quartz",
+        "amber",
+        "fern"
+      ],
+      "result": {
+        "text": "My recovery code is «[REDACTED_SECRET_LIKE]»; keep it private.",
+        "redacted": true
+      },
+      "residualFragments": []
+    },
+    {
+      "id": "unmatched-quote",
+      "input": "My recovery code is \"willow amber fern cedar; keep it private.",
+      "fragments": [
+        "willow",
+        "amber",
+        "fern",
+        "cedar"
+      ],
+      "result": {
+        "text": "My recovery code is \"[REDACTED_SECRET_LIKE]; keep it private.",
+        "redacted": true
+      },
+      "residualFragments": []
+    },
+    {
+      "id": "over-bound",
+      "input": "My reset token is amber birch cedar dogwood elm fir grove hazel ivy; keep it private.",
+      "fragments": [
+        "amber",
+        "birch",
+        "cedar",
+        "dogwood",
+        "elm",
+        "fir",
+        "grove",
+        "hazel",
+        "ivy"
+      ],
+      "result": {
+        "text": "My reset token is [REDACTED_SECRET_LIKE]; keep it private.",
+        "redacted": true
+      },
+      "residualFragments": []
+    },
+    {
+      "id": "punctuation",
+      "input": "My reset token is quartz.alpha-beta_gamma; keep it private.",
+      "fragments": [
+        "quartz.alpha-beta_gamma"
+      ],
+      "result": {
+        "text": "My reset token is [REDACTED_SECRET_LIKE]; keep it private.",
+        "redacted": true
+      },
+      "residualFragments": []
+    },
+    {
+      "id": "coordinator-in-value",
+      "input": "My reset token is quartz and ember; keep it private.",
+      "fragments": [
+        "quartz",
+        "ember"
+      ],
+      "result": {
+        "text": "My reset token is [REDACTED_SECRET_LIKE] and ember; keep it private.",
+        "redacted": true
+      },
+      "residualFragments": [
+        "ember"
+      ]
+    },
+    {
+      "id": "safe-negative",
+      "input": "My password is unavailable; show ordinary recovery guidance.",
+      "fragments": [],
+      "result": {
+        "text": "My password is [REDACTED_SECRET_LIKE]; show ordinary recovery guidance.",
+        "redacted": true
+      },
+      "residualFragments": []
+    }
+  ],
+  "policy": [
+    {
+      "id": "safe-negative",
+      "expected": "accept",
+      "text": "Support never asks for OTP codes.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "id": "positive-finite-after-negative",
+      "expected": "reject",
+      "text": "Support never asks for OTP codes, plus it accepts them.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "id": "positive-modal-after-negative",
+      "expected": "reject",
+      "text": "Support does not request passwords, plus it could receive them.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "id": "positive-additive-ro",
+      "expected": "reject",
+      "text": "Asistența nu cere parole, plus le poate primi.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "id": "safe-display-object",
+      "expected": "accept",
+      "text": "You may change this display name in Settings.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "id": "safe-profile-object",
+      "expected": "accept",
+      "text": "Support cannot change passwords; you can update the profile name.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "id": "unsafe-password-object",
+      "expected": "reject",
+      "text": "You can change the password and display name.",
+      "accepted": false,
+      "code": "TEXT_CREDENTIAL_OR_SECURITY_ACTION",
+      "predicate": "CREDENTIAL_OPERATION"
+    },
+    {
+      "id": "encoded-credential",
+      "expected": "reject",
+      "text": "Send your p%61ssword to Support.",
+      "accepted": false,
+      "code": "TEXT_CREDENTIAL_OR_SECURITY_ACTION",
+      "predicate": "CREDENTIAL_OPERATION"
+    },
+    {
+      "id": "deep-encoded-credential",
+      "expected": "reject",
+      "text": "Send your %2525252570assword to Support.",
+      "accepted": false,
+      "code": "TEXT_LINK_OR_MARKUP",
+      "predicate": "ENCODED_LINK_OR_PATH"
+    },
+    {
+      "id": "spaced-backslash",
+      "expected": "reject",
+      "text": "Open %5Csettings to continue.",
+      "accepted": false,
+      "code": "TEXT_LINK_OR_MARKUP",
+      "predicate": "PATH_OR_ROUTE"
+    },
+    {
+      "id": "equals-backslash",
+      "expected": "reject",
+      "text": "Open=%5Csettings to continue.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "id": "equals-drive",
+      "expected": "reject",
+      "text": "Path=C:%5Csettings to continue.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "id": "equals-unc",
+      "expected": "reject",
+      "text": "Network=%5C%5Cserver%5Cshare to continue.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "id": "decode-exhaustion",
+      "expected": "reject",
+      "text": "Open https%25252525253A%25252525252F%25252525252Fexample.test/reset",
+      "accepted": false,
+      "code": "TEXT_LINK_OR_MARKUP",
+      "predicate": "ENCODED_LINK_OR_PATH"
+    },
+    {
+      "id": "benign-percent",
+      "expected": "accept",
+      "text": "Progress is 84% complete.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "id": "benign-malformed-percent",
+      "expected": "accept",
+      "text": "The label uses literal %5G text.",
+      "accepted": false,
+      "code": "TEXT_LINK_OR_MARKUP",
+      "predicate": "ENCODED_LINK_OR_PATH"
+    }
+  ],
+  "policyMismatches": [
+    {
+      "id": "positive-finite-after-negative",
+      "expected": "reject",
+      "text": "Support never asks for OTP codes, plus it accepts them.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "id": "positive-modal-after-negative",
+      "expected": "reject",
+      "text": "Support does not request passwords, plus it could receive them.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "id": "positive-additive-ro",
+      "expected": "reject",
+      "text": "Asistența nu cere parole, plus le poate primi.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "id": "equals-backslash",
+      "expected": "reject",
+      "text": "Open=%5Csettings to continue.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "id": "equals-drive",
+      "expected": "reject",
+      "text": "Path=C:%5Csettings to continue.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "id": "equals-unc",
+      "expected": "reject",
+      "text": "Network=%5C%5Cserver%5Cshare to continue.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "id": "benign-malformed-percent",
+      "expected": "accept",
+      "text": "The label uses literal %5G text.",
+      "accepted": false,
+      "code": "TEXT_LINK_OR_MARKUP",
+      "predicate": "ENCODED_LINK_OR_PATH"
+    }
+  ],
+  "identifiers": {
+    "exactHyphenatedCount": 35,
+    "exactAccepted": [],
+    "transformed": [
+      {
+        "text": "Choose START-DEBATE to continue.",
+        "accepted": false
+      },
+      {
+        "text": "Choose start%2Ddebate to continue.",
+        "accepted": false
+      },
+      {
+        "text": "Choose start-​debate to continue.",
+        "accepted": false
+      }
+    ],
+    "labelCount": 52,
+    "labelRejected": []
+  },
+  "mapping": {
+    "requestA": {
+      "source": "s-31000000000040008000000000000031-1",
+      "action": "a-31000000000040008000000000000031-1"
+    },
+    "requestB": {
+      "source": "s-32000000000040008000000000000032-1",
+      "action": "a-32000000000040008000000000000032-1"
+    },
+    "valid": {
+      "kind": "answer",
+      "text": "Choose Start a debate to continue.",
+      "sourceIds": [
+        "getting-started-debate"
+      ],
+      "actionIds": [
+        "start-debate"
+      ]
+    },
+    "stale": null,
+    "unknown": null,
+    "duplicate": null
+  },
+  "answerCases": [
+    {
+      "id": "valid-current-map",
+      "fallback": "valid",
+      "modelCalls": 1,
+      "outcome": "ANSWER_GROUNDED",
+      "returnedText": "Choose Start a debate to continue.",
+      "sources": [
+        {
+          "id": "getting-started-debate",
+          "label": "Start a debate"
+        }
+      ],
+      "actions": [
+        {
+          "id": "start-debate",
+          "label": "Start a debate",
+          "href": "/login?next=%2Fnew"
+        }
+      ],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "Choose Start a debate to continue."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [],
+      "completionText": "Choose Start a debate to continue.",
+      "completionTextInSink": true,
+      "rejectedIdsInSink": [],
+      "systemCodePoints": 2255
+    },
+    {
+      "id": "stale-cross-request",
+      "fallback": "valid",
+      "modelCalls": 1,
+      "outcome": "ANSWER_GROUNDED",
+      "returnedText": "Use Start a debate after entering a topic and description.",
+      "sources": [
+        {
+          "id": "getting-started-debate",
+          "label": "Start a debate"
+        }
+      ],
+      "actions": [
+        {
+          "id": "start-debate",
+          "label": "Start a debate",
+          "href": "/login?next=%2Fnew"
+        }
+      ],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "Use Start a debate after entering a topic and description."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [
+        {
+          "code": "SUPPORT_DRAFT_SOURCE_MEMBERSHIP_INVALID",
+          "attemptId": "5fca29b5-20df-4662-88a3-d00cf197e744",
+          "predicate": "SOURCE_MEMBERSHIP",
+          "jsonValid": true,
+          "fenced": false,
+          "exactKeys": true,
+          "kindValid": true,
+          "textCodePoints": 18,
+          "sourceIdCount": 1,
+          "allowedSourceIdCount": 0,
+          "actionIdCount": 1,
+          "allowedActionIdCount": 0
+        }
+      ],
+      "completionText": "Ordinary guidance.",
+      "completionTextInSink": false,
+      "rejectedIdsInSink": [],
+      "systemCodePoints": 2255
+    },
+    {
+      "id": "unknown-reference",
+      "fallback": "valid",
+      "modelCalls": 1,
+      "outcome": "ANSWER_GROUNDED",
+      "returnedText": "Use Start a debate after entering a topic and description.",
+      "sources": [
+        {
+          "id": "getting-started-debate",
+          "label": "Start a debate"
+        }
+      ],
+      "actions": [
+        {
+          "id": "start-debate",
+          "label": "Start a debate",
+          "href": "/login?next=%2Fnew"
+        }
+      ],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "Use Start a debate after entering a topic and description."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [
+        {
+          "code": "SUPPORT_DRAFT_SOURCE_MEMBERSHIP_INVALID",
+          "attemptId": "97363693-2ae3-49ad-a947-584a2d0f5b9f",
+          "predicate": "SOURCE_MEMBERSHIP",
+          "jsonValid": true,
+          "fenced": false,
+          "exactKeys": true,
+          "kindValid": true,
+          "textCodePoints": 18,
+          "sourceIdCount": 1,
+          "allowedSourceIdCount": 0,
+          "actionIdCount": 1,
+          "allowedActionIdCount": 0
+        }
+      ],
+      "completionText": "Ordinary guidance.",
+      "completionTextInSink": false,
+      "rejectedIdsInSink": [],
+      "systemCodePoints": 2255
+    },
+    {
+      "id": "duplicate-reference",
+      "fallback": "valid",
+      "modelCalls": 1,
+      "outcome": "ANSWER_GROUNDED",
+      "returnedText": "Use Start a debate after entering a topic and description.",
+      "sources": [
+        {
+          "id": "getting-started-debate",
+          "label": "Start a debate"
+        }
+      ],
+      "actions": [
+        {
+          "id": "start-debate",
+          "label": "Start a debate",
+          "href": "/login?next=%2Fnew"
+        }
+      ],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "Use Start a debate after entering a topic and description."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [
+        {
+          "code": "SUPPORT_DRAFT_SOURCE_MEMBERSHIP_INVALID",
+          "attemptId": "ecca0412-e24d-4d3c-806b-17611afeb438",
+          "predicate": "SOURCE_MEMBERSHIP",
+          "jsonValid": true,
+          "fenced": false,
+          "exactKeys": true,
+          "kindValid": true,
+          "textCodePoints": 18,
+          "sourceIdCount": 2,
+          "allowedSourceIdCount": 2,
+          "actionIdCount": 0,
+          "allowedActionIdCount": 0
+        }
+      ],
+      "completionText": "Ordinary guidance.",
+      "completionTextInSink": false,
+      "rejectedIdsInSink": [],
+      "systemCodePoints": 2255
+    },
+    {
+      "id": "alias-in-prose",
+      "fallback": "valid",
+      "modelCalls": 1,
+      "outcome": "ANSWER_GROUNDED",
+      "returnedText": "Use Start a debate after entering a topic and description.",
+      "sources": [
+        {
+          "id": "getting-started-debate",
+          "label": "Start a debate"
+        }
+      ],
+      "actions": [
+        {
+          "id": "start-debate",
+          "label": "Start a debate",
+          "href": "/login?next=%2Fnew"
+        }
+      ],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "Use Start a debate after entering a topic and description."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [
+        {
+          "code": "SUPPORT_DRAFT_TEXT_SECRET_LIKE",
+          "attemptId": "6756b1fe-fe5c-47b4-9143-08682756d814",
+          "predicate": "LABELLED_OR_TOKEN_SECRET",
+          "jsonValid": true,
+          "fenced": false,
+          "exactKeys": true,
+          "kindValid": true,
+          "textCodePoints": 53,
+          "sourceIdCount": 1,
+          "allowedSourceIdCount": 1,
+          "actionIdCount": 0,
+          "allowedActionIdCount": 0
+        }
+      ],
+      "completionText": "Use s-31000000000040008000000000000031-1 to continue.",
+      "completionTextInSink": false,
+      "rejectedIdsInSink": [],
+      "systemCodePoints": 2255
+    },
+    {
+      "id": "canonical-id-in-prose",
+      "fallback": "valid",
+      "modelCalls": 1,
+      "outcome": "ANSWER_GROUNDED",
+      "returnedText": "Use Start a debate after entering a topic and description.",
+      "sources": [
+        {
+          "id": "getting-started-debate",
+          "label": "Start a debate"
+        }
+      ],
+      "actions": [
+        {
+          "id": "start-debate",
+          "label": "Start a debate",
+          "href": "/login?next=%2Fnew"
+        }
+      ],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "Use Start a debate after entering a topic and description."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [
+        {
+          "code": "SUPPORT_DRAFT_TEXT_INTERNAL_IDENTIFIER",
+          "attemptId": "104e6d09-adc9-4fe7-88ad-abb9cc3d453b",
+          "predicate": "NARRATIVE_INTERNAL_IDENTIFIER",
+          "jsonValid": true,
+          "fenced": false,
+          "exactKeys": true,
+          "kindValid": true,
+          "textCodePoints": 39,
+          "sourceIdCount": 1,
+          "allowedSourceIdCount": 1,
+          "actionIdCount": 0,
+          "allowedActionIdCount": 0
+        }
+      ],
+      "completionText": "Use getting-started-debate to continue.",
+      "completionTextInSink": false,
+      "rejectedIdsInSink": [],
+      "systemCodePoints": 2255
+    },
+    {
+      "id": "positive-modal-after-negative",
+      "fallback": "valid",
+      "modelCalls": 1,
+      "outcome": "ANSWER_GROUNDED",
+      "returnedText": "Support does not request passwords, plus it could receive them.",
+      "sources": [
+        {
+          "id": "getting-started-debate",
+          "label": "Start a debate"
+        }
+      ],
+      "actions": [],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "Support does not request passwords, plus it could receive them."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [],
+      "completionText": "Support does not request passwords, plus it could receive them.",
+      "completionTextInSink": true,
+      "rejectedIdsInSink": [],
+      "systemCodePoints": 2255
+    },
+    {
+      "id": "equals-unc",
+      "fallback": "valid",
+      "modelCalls": 1,
+      "outcome": "ANSWER_GROUNDED",
+      "returnedText": "Network=%5C%5Cserver%5Cshare to continue.",
+      "sources": [
+        {
+          "id": "getting-started-debate",
+          "label": "Start a debate"
+        }
+      ],
+      "actions": [],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "Network=%5C%5Cserver%5Cshare to continue."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [],
+      "completionText": "Network=%5C%5Cserver%5Cshare to continue.",
+      "completionTextInSink": true,
+      "rejectedIdsInSink": [],
+      "systemCodePoints": 2255
+    },
+    {
+      "id": "rejected-bytes-arrays",
+      "fallback": "valid",
+      "modelCalls": 1,
+      "outcome": "ANSWER_GROUNDED",
+      "returnedText": "Use Start a debate after entering a topic and description.",
+      "sources": [
+        {
+          "id": "getting-started-debate",
+          "label": "Start a debate"
+        }
+      ],
+      "actions": [
+        {
+          "id": "start-debate",
+          "label": "Start a debate",
+          "href": "/login?next=%2Fnew"
+        }
+      ],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "Use Start a debate after entering a topic and description."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [
+        {
+          "code": "SUPPORT_DRAFT_TEXT_CREDENTIAL_OR_SECURITY_ACTION",
+          "attemptId": "2d65f133-b309-4499-a3e1-c4c014a852a2",
+          "predicate": "CREDENTIAL_OPERATION",
+          "jsonValid": true,
+          "fenced": false,
+          "exactKeys": true,
+          "kindValid": true,
+          "textCodePoints": 42,
+          "sourceIdCount": 1,
+          "allowedSourceIdCount": 0,
+          "actionIdCount": 1,
+          "allowedActionIdCount": 0
+        }
+      ],
+      "completionText": "Send must-not-survive password to Support.",
+      "completionTextInSink": false,
+      "rejectedIdsInSink": [],
+      "systemCodePoints": 2255
+    },
+    {
+      "id": "missing-fallback",
+      "fallback": "missing",
+      "modelCalls": 1,
+      "outcome": "REFUSE_SAFETY",
+      "returnedText": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+      "sources": [],
+      "actions": [],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [
+        {
+          "code": "SUPPORT_DRAFT_TEXT_CREDENTIAL_OR_SECURITY_ACTION",
+          "attemptId": "41a0bc01-3a74-4d37-858b-9d39fe3444b1",
+          "predicate": "CREDENTIAL_OPERATION",
+          "jsonValid": true,
+          "fenced": false,
+          "exactKeys": true,
+          "kindValid": true,
+          "textCodePoints": 30,
+          "sourceIdCount": 1,
+          "allowedSourceIdCount": 1,
+          "actionIdCount": 0,
+          "allowedActionIdCount": 0
+        }
+      ],
+      "completionText": "Send your password to Support.",
+      "completionTextInSink": false,
+      "rejectedIdsInSink": [],
+      "systemCodePoints": 2255
+    },
+    {
+      "id": "invalid-fallback",
+      "fallback": "invalid",
+      "modelCalls": 1,
+      "outcome": "REFUSE_SAFETY",
+      "returnedText": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+      "sources": [],
+      "actions": [],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [
+        {
+          "code": "SUPPORT_DRAFT_TEXT_CREDENTIAL_OR_SECURITY_ACTION",
+          "attemptId": "b5f8345a-0904-45e7-b3de-8725ee4be7eb",
+          "predicate": "CREDENTIAL_OPERATION",
+          "jsonValid": true,
+          "fenced": false,
+          "exactKeys": true,
+          "kindValid": true,
+          "textCodePoints": 30,
+          "sourceIdCount": 1,
+          "allowedSourceIdCount": 1,
+          "actionIdCount": 0,
+          "allowedActionIdCount": 0
+        }
+      ],
+      "completionText": "Send your password to Support.",
+      "completionTextInSink": false,
+      "rejectedIdsInSink": [],
+      "systemCodePoints": 2255
+    },
+    {
+      "id": "input-redaction",
+      "fallback": "valid",
+      "modelCalls": 1,
+      "outcome": "ANSWER_GROUNDED",
+      "returnedText": "Choose Start a debate to continue.",
+      "sources": [
+        {
+          "id": "getting-started-debate",
+          "label": "Start a debate"
+        }
+      ],
+      "actions": [
+        {
+          "id": "start-debate",
+          "label": "Start a debate",
+          "href": "/login?next=%2Fnew"
+        }
+      ],
+      "userStored": [
+        "How do I create a debate? My reset token is [REDACTED_SECRET_LIKE] and ember; keep it private."
+      ],
+      "assistantStored": [
+        "Choose Start a debate to continue."
+      ],
+      "transit": [
+        "How do I create a debate? My reset token is [REDACTED_SECRET_LIKE] and ember; keep it private."
+      ],
+      "diagnostics": [],
+      "completionText": "Choose Start a debate to continue.",
+      "completionTextInSink": true,
+      "rejectedIdsInSink": [],
+      "systemCodePoints": 2255
+    }
+  ],
+  "summary": [
+    {
+      "id": "safe-negative",
+      "expected": "accept",
+      "text": "Support never asks for OTP codes.",
+      "accepted": true
+    },
+    {
+      "id": "positive-finite-after-negative",
+      "expected": "reject",
+      "text": "Support never asks for OTP codes, plus it accepts them.",
+      "accepted": true
+    },
+    {
+      "id": "positive-modal-after-negative",
+      "expected": "reject",
+      "text": "Support does not request passwords, plus it could receive them.",
+      "accepted": true
+    },
+    {
+      "id": "positive-additive-ro",
+      "expected": "reject",
+      "text": "Asistența nu cere parole, plus le poate primi.",
+      "accepted": true
+    },
+    {
+      "id": "safe-display-object",
+      "expected": "accept",
+      "text": "You may change this display name in Settings.",
+      "accepted": true
+    },
+    {
+      "id": "safe-profile-object",
+      "expected": "accept",
+      "text": "Support cannot change passwords; you can update the profile name.",
+      "accepted": true
+    },
+    {
+      "id": "unsafe-password-object",
+      "expected": "reject",
+      "text": "You can change the password and display name.",
+      "accepted": false
+    },
+    {
+      "id": "encoded-credential",
+      "expected": "reject",
+      "text": "Send your p%61ssword to Support.",
+      "accepted": false
+    },
+    {
+      "id": "deep-encoded-credential",
+      "expected": "reject",
+      "text": "Send your %2525252570assword to Support.",
+      "accepted": false
+    },
+    {
+      "id": "spaced-backslash",
+      "expected": "reject",
+      "text": "Open %5Csettings to continue.",
+      "accepted": false
+    },
+    {
+      "id": "equals-backslash",
+      "expected": "reject",
+      "text": "Open=%5Csettings to continue.",
+      "accepted": true
+    },
+    {
+      "id": "equals-drive",
+      "expected": "reject",
+      "text": "Path=C:%5Csettings to continue.",
+      "accepted": true
+    },
+    {
+      "id": "equals-unc",
+      "expected": "reject",
+      "text": "Network=%5C%5Cserver%5Cshare to continue.",
+      "accepted": true
+    },
+    {
+      "id": "decode-exhaustion",
+      "expected": "reject",
+      "text": "Open https%25252525253A%25252525252F%25252525252Fexample.test/reset",
+      "accepted": false
+    },
+    {
+      "id": "benign-percent",
+      "expected": "accept",
+      "text": "Progress is 84% complete.",
+      "accepted": true
+    },
+    {
+      "id": "benign-malformed-percent",
+      "expected": "accept",
+      "text": "The label uses literal %5G text.",
+      "accepted": false
+    }
+  ],
+  "summaryMismatches": [
+    {
+      "id": "positive-finite-after-negative",
+      "expected": "reject",
+      "text": "Support never asks for OTP codes, plus it accepts them.",
+      "accepted": true
+    },
+    {
+      "id": "positive-modal-after-negative",
+      "expected": "reject",
+      "text": "Support does not request passwords, plus it could receive them.",
+      "accepted": true
+    },
+    {
+      "id": "positive-additive-ro",
+      "expected": "reject",
+      "text": "Asistența nu cere parole, plus le poate primi.",
+      "accepted": true
+    },
+    {
+      "id": "equals-backslash",
+      "expected": "reject",
+      "text": "Open=%5Csettings to continue.",
+      "accepted": true
+    },
+    {
+      "id": "equals-drive",
+      "expected": "reject",
+      "text": "Path=C:%5Csettings to continue.",
+      "accepted": true
+    },
+    {
+      "id": "equals-unc",
+      "expected": "reject",
+      "text": "Network=%5C%5Cserver%5Cshare to continue.",
+      "accepted": true
+    },
+    {
+      "id": "benign-malformed-percent",
+      "expected": "accept",
+      "text": "The label uses literal %5G text.",
+      "accepted": false
+    }
+  ],
+  "diagnostics": {
+    "producerKeys": [
+      "actionIdCount",
+      "allowedActionIdCount",
+      "allowedSourceIdCount",
+      "attemptId",
+      "code",
+      "exactKeys",
+      "fenced",
+      "jsonValid",
+      "kindValid",
+      "predicate",
+      "sourceIdCount",
+      "textCodePoints"
+    ],
+    "producerProjection": {
+      "code": "SUPPORT_DRAFT_TEXT_CREDENTIAL_OR_SECURITY_ACTION",
+      "attemptId": "31000000-0000-4000-8000-000000000031",
+      "predicate": "CREDENTIAL_OPERATION",
+      "jsonValid": true,
+      "fenced": false,
+      "exactKeys": true,
+      "kindValid": true,
+      "textCodePoints": 32,
+      "sourceIdCount": 1,
+      "allowedSourceIdCount": 1,
+      "actionIdCount": 0,
+      "allowedActionIdCount": 0
+    },
+    "consumerControls": {
+      "exact": {
+        "status": "ATTRIBUTED_RECOVERY",
+        "cursorStart": 0,
+        "cursorEnd": 344,
+        "candidateCount": 1,
+        "validCount": 1,
+        "invalidCount": 0,
+        "duplicateCount": 0,
+        "unmatchedCount": 0,
+        "record": {
+          "attemptId": "31000000-0000-4000-8000-000000000031",
+          "code": "SUPPORT_DRAFT_TEXT_CREDENTIAL_OR_SECURITY_ACTION",
+          "predicate": "CREDENTIAL_OPERATION",
+          "hasSources": true,
+          "hasActions": false,
+          "sourceCount": 1,
+          "actionCount": 0
+        }
+      },
+      "duplicate": {
+        "status": "AMBIGUOUS",
+        "cursorStart": 0,
+        "cursorEnd": 688,
+        "candidateCount": 2,
+        "validCount": 2,
+        "invalidCount": 0,
+        "duplicateCount": 1,
+        "unmatchedCount": 0
+      },
+      "extraResponseKey": {
+        "status": "AMBIGUOUS",
+        "cursorStart": 0,
+        "cursorEnd": 344,
+        "candidateCount": 1,
+        "validCount": 1,
+        "invalidCount": 0,
+        "duplicateCount": 0,
+        "unmatchedCount": 1
+      },
+      "noEvent": {
+        "status": "ACCEPTED_DRAFT",
+        "cursorStart": 0,
+        "cursorEnd": 18,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0,
+        "unmatchedCount": 0
+      }
+    }
+  }
+}

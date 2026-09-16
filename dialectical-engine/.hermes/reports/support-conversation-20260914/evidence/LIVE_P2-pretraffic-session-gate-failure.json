@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "revision": "606b2eabea1dc9212159e53c193cf69655424e77",
+  "base_url": "https://localhost:3100",
+  "browser": {
+    "driver": "playwright@1.61.1",
+    "executablePath": "/Users/vladmihaimiron/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell",
+    "headless": true,
+    "tls_bypass": false,
+    "fresh_profile": true
+  },
+  "support_api": "actual",
+  "relay": "actual unchanged support-preview relay",
+  "identity": "actual anonymous visitor",
+  "synthetic_support_overrides": false,
+  "credential_or_recovery_operations": 0,
+  "attested_snapshot": {
+    "kbVersion": "d674533e89d145bf9203248e2e324b451e57a2f1d3f257614d31678b7ac379df",
+    "componentSha256": "5ee8d592c3f1b3550c1f2af74c030fbbc12e80e258dc71b57aa28de045f99e8a",
+    "selectingReviewSha256": "867d7a75d1918b1d3c7d796bda9d7a83d03028d367f5a3c04c30a018bd75b77f"
+  },
+  "pre_request_adapter_proof": {
+    "sha256": "a5638ebcbe5a2cc5edcb7ef3c2212eba2cf65b33341de3b6df86e0d2a8f94691",
+    "completedAt": "2026-09-15T17:32:12.711Z",
+    "controls": 54
+  },
+  "session_kb_versions": [],
+  "pre_request_pins": [],
+  "prompts": [],
+  "navigations": [],
+  "network": [
+    {
+      "operation": "support_status",
+      "status": 200
+    }
+  ],
+  "console_error_count": 2,
+  "console_error_categories": {
+    "HTTP_401": 2,
+    "HTTP_404": 0,
+    "JS_OR_HYDRATION": 0,
+    "OTHER": 0
+  },
+  "screenshots": [],
+  "completed": false,
+  "failure": {
+    "name": "Error",
+    "message": "LIVE_P2_RUNTIME_SESSION_VERSION_UNAVAILABLE"
+  }
+}

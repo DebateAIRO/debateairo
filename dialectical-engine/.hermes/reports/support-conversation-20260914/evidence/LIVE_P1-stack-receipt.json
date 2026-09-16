@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "node": "LIVE_P1",
+  "revision": "e0dcfe77f49655bea774bdfacf988b911be4ff06",
+  "previous_supervisor": {
+    "pid": 91461,
+    "process_group": 91461,
+    "parent_pid": 1,
+    "loaded_revision": "6e5ab5fc41acebbff4264efc7d481df3db8dce44",
+    "normal_tls_help_status": 200,
+    "stopped_via_supported_owned_lifecycle": true
+  },
+  "final_launch": {
+    "attempt": 1,
+    "ready": true,
+    "pid": 45639,
+    "process_group": 45639,
+    "parent_pid": 1,
+    "loaded_revision": "e0dcfe77f49655bea774bdfacf988b911be4ff06",
+    "ready_marker": "DEV_AUTH_STACK_READY=https://localhost:3100:RUNNER_REGISTERED",
+    "normal_tls_help_status": 200,
+    "preview_listeners": [3100, 3101, 8890, 8891, 8892, 8893, 8894, 8895, 8896],
+    "preserved_original_listeners": [8790, 8791, 8792, 8793, 8794, 8795, 8796],
+    "present_after_browser_exit_and_ten_second_idle": true,
+    "detached": true,
+    "live_log_mode": "0600"
+  },
+  "browser_profile_removed": true,
+  "tls_bypass_used": false,
+  "original_services_modified": false,
+  "preview_left_active": true
+}

@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "ticket": "t_36e6e01e",
+  "session": "/root/preview",
+  "input_revision": "58fbaa7d5535dad89b479b98776cf2b8e88b978e",
+  "commit": "1ed6c29d327db535259bb428eb181e1e97081c99",
+  "product_files": [
+    {
+      "path": "dialectical-engine/apps/ui/components/support/Assistant.tsx",
+      "blob": "2bc4a1f1935c6a2920dca122a8ba974863d5d8a2"
+    },
+    {
+      "path": "dialectical-engine/apps/ui/package.json",
+      "blob": "b7bc73bcfb1691df19e74de5be2d85ffad48482e"
+    },
+    {
+      "path": "dialectical-engine/pnpm-lock.yaml",
+      "blob": "8b0f6abeb9afc8d30adcf495cba7276a65409c48"
+    },
+    {
+      "path": "dialectical-engine/tests/render/sup-01-help.test.tsx",
+      "blob": "9a61001cbc6195792a8a09174d8ae518ba6b09cb"
+    }
+  ],
+  "artifacts": {
+    "evidence/UI.md": "9ea5ca24a6f9fba1ae69d477d372cde7790544876e537b332cb3ca80de5b50d4",
+    "agent-reports/UI.md": "6db28ba8637996cbf742a737566ec72453aaa69468b6c1992fa88de16be933a5",
+    "evidence/UI-typecheck-comparison.json": "27a73cd8833ece996ed1264da4f24a023238ae47c50b5f1fb4fbb92cc6963d39",
+    "evidence/UI-browser-receipt.json": "10da77db530450f7201735e735ebf57a7c885277f8890987f76cdafeffd0bc25",
+    "evidence/UI-full-en.png": "831891fb1737e510ae549ab2fedf29a6f2ef0bad52262a1af3a37c22a01a564c",
+    "evidence/UI-full-ro.png": "39f74668bdedc444a6cff7d0a725773715826bd4ebbdf3333c64abc390e07f75",
+    "evidence/UI-compact-en.png": "446a572e39eb36415c8308b2fe71fc7bd67b7b0f65460b650f1a0cb4d54d13ff",
+    "evidence/UI-compact-ro.png": "958a6e20b12e955a28cb6e22bc3fb332dc1863e59a2f522ba761f775f5ee4f68",
+    "probes/UI/capture-ui.mjs": "d24801f0bf93071e5874e5ec7d72c30eebd5952181534bc7bf2ff3867119c580",
+    "probes/UI/compare_typecheck.py": "118135ca4a7b971b259b18b22c5c5dd71a8c95e005e1fc2b71095aed6de47dfc"
+  },
+  "logs": {
+    "UI-baseline-cluster-normal.log": "77bbb513cb2f76a965e35bfc2e1f96e7292e410ac1f87fd661b9c7188feb4038",
+    "UI-red-render.log": "9ddfcd6737e69f0c1d34d28a70ae3b8eb1607943b0a32343bb27babc56540dd3",
+    "UI-red-second-mismatch-storage.log": "7b8f5389d8ab171e4660b1aa542d757a1e355d77355652ceeb21dacf858e87d9",
+    "UI-green-second-mismatch-storage.log": "7d68ed2cde8c7cbb2a19bf40422cc2a3aa8eb32f55e7d2a3b61858f96089ccd5",
+    "UI-green-render-final.log": "53ba752f84d820df7576e38e053db3ed031633bdbf14df918d2a87111650d585",
+    "UI-green-cluster-final.log": "d0c71ccb57a88e1ff9faee0d6d4a4339d5fe0452c8fd7462c03d7079a93e3d56",
+    "UI-tsx-typecheck-final.log": "70685b4df7789c854b9e1ceab7d78a6d0f9a0831c11eb0010b7b5fdbe0e50c39",
+    "UI-root-typecheck.log": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "UI-mutant-render-actions.log": "17e496ad923821f88dec5e4de1403aff01be2ad733aaa588aaf6bb0f6911c59d",
+    "UI-mutant-action-href.log": "411dd96e8d5b8428dd66d8d9248278505ce76eda65cd46db5576892394584150",
+    "UI-neighbor-mutant-action-href.log": "8efe7259bbf9b3dd7c294cbb8d702df5173fd25da0546dd17f4bd4a39a1c352b",
+    "UI-browser-hydration-debug.log": "b03266207adfcc375c492769e369c68edc0d4ead7ea4549ce99d82913cde0310",
+    "UI-browser-capture-final.log": "10da77db530450f7201735e735ebf57a7c885277f8890987f76cdafeffd0bc25",
+    "UI-stack-live.log": "d2cfd5ca88768d376633ef36c04c7ad010d0f2399cfbcf23698e620102076a04"
+  },
+  "limitations": [
+    "Repository typecheck has 76 inherited diagnostics and is not a full PASS.",
+    "Browser Support API responses were synthetic; live-relay answer quality was not exercised.",
+    "The exact Forgot-password destination and actual Forgot click remain UNVERIFIED."
+  ]
+}

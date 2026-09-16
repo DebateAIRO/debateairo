@@ -1,0 +1,17 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ ✓ tests/integration/support-degraded.test.ts > SUP-06 automatic degraded state > treats a screened model draft as successful relay transport 25ms
+ ✓ tests/integration/support-degraded.test.ts > SUP-06 automatic degraded state > returns the exact deterministic DISABLED notice without degrading when the final gate observes OFF 2ms
+ ✓ tests/integration/support-degraded.test.ts > SUP-06 automatic degraded state > short-circuits while unavailable and clears only after a controlled half-open success 2ms
+ ✓ tests/integration/support-degraded.test.ts > SUP-06 automatic degraded state > admits only one concurrent half-open probe 0ms
+ ✓ tests/integration/support-degraded.test.ts > SUP-06 automatic degraded state > records cap separately and preserves the first unavailable instant 0ms
+ ✓ tests/integration/support-degraded.test.ts > SUP-06 automatic degraded state > bounds a never-settling half-open probe end-to-end and releases its durable lease 908ms
+ ✓ tests/integration/support-degraded.test.ts > SUP-06 automatic degraded state > bounds a never-settling half-open readLimits dependency to one second 857ms
+ ✓ tests/integration/support-degraded.test.ts > SUP-06 automatic degraded state > bounds a never-settling half-open enter dependency to one second 855ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  21:10:50
+   Duration  3.37s (transform 299ms, setup 0ms, import 637ms, tests 2.65s, environment 0ms)
+

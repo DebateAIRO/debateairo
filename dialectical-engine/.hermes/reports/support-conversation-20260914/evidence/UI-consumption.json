@@ -1,0 +1,11 @@
+{
+  "measuredAt": "2026-09-14T12:19:27.168431+00:00",
+  "revision": "1ed6c29d327db535259bb428eb181e1e97081c99",
+  "verifiedCommittedFiles": 4,
+  "verifiedArtifactHashes": 10,
+  "verifiedLogHashes": 14,
+  "manifestSha256": "c3d29165f1b18c838875d141aad7fbd2470bb918bffb5d569b6d9f5fa2a6fbfa",
+  "liveLogHistoricalCopy": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UI-stack-at-consumption.log",
+  "liveLogHistoricalSha256": "d2cfd5ca88768d376633ef36c04c7ad010d0f2399cfbcf23698e620102076a04",
+  "note": "Original UI-stack-live.log remains owned and mutable under the active supported stack. This copy freezes exactly the verified UI handoff bytes; later appends do not retroactively invalidate historical evidence. No owner acceptance."
+}

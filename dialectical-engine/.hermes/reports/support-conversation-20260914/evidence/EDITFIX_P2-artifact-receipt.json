@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "node": "EDITFIX_P2",
+  "baseRevision": "f440287179f71e18a4b4b93607951c1e5f862cc1",
+  "productCommit": "dfeb7eef93de31e19367760d87c09ca1ef76544e",
+  "receiptSelfExcluded": true,
+  "artifactCount": 10,
+  "artifacts": [
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/EDITFIX_P2.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/EDITFIX_P2.md",
+      "sha256": "26dabc9ada0f9db05821436b9955a89f0c49262b4684c966b0460777ae68c24a",
+      "bytes": 3260
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/EDITFIX_P2-changed-records.json",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/EDITFIX_P2-changed-records.json",
+      "sha256": "288b23806aae911211bb65c145e229bb879cc3455d9ebdba3c8a22716057f292",
+      "bytes": 13451
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/EDITFIX_P2-editorial-digests.json",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/EDITFIX_P2-editorial-digests.json",
+      "sha256": "1e80f9fa142e50d0acee729dc0505e12ab5726268315babb96acde24ffae9601",
+      "bytes": 20525
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/EDITFIX_P2-inputs.json",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/EDITFIX_P2-inputs.json",
+      "sha256": "9cb2b1a8d53fac6d46fc63c5e39b3a9d5fbe712247256c8d9d133261f84c66e4",
+      "bytes": 16367
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/EDITFIX_P2-product-manifest.json",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/EDITFIX_P2-product-manifest.json",
+      "sha256": "d26a2a420c296e231b9ad8726e6a2ee96de96ccbf9d96aebb58ad337c83e884e",
+      "bytes": 711
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/EDITFIX_P2.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/EDITFIX_P2.md",
+      "sha256": "958a59bab0a1001ea057b3dd7e2d443a79b43946d8e23aa67b5ace7728887f27",
+      "bytes": 3192
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/EDITFIX_P2-semantic-final.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/EDITFIX_P2-semantic-final.log",
+      "sha256": "26d2fec541697244ba3d969891b69b290f5a930482eb02850a8c37d7fffd59b3",
+      "bytes": 1219
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/EDITFIX_P2-semantic.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/EDITFIX_P2-semantic.log",
+      "sha256": "3be8b9768b409ee959b7d0a8569f210cfd9069c06f68c4d285bc345aac7c709a",
+      "bytes": 1362
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/EDITFIX_P2/generate-editorial-digests.mjs",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/EDITFIX_P2/generate-editorial-digests.mjs",
+      "sha256": "941466b29bb5fbc4aaaabfb91768c222d90ca7d65275cc590f86e179015158c0",
+      "bytes": 2180
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/EDITFIX_P2/verify-components.mjs",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/EDITFIX_P2/verify-components.mjs",
+      "sha256": "ca660d97c04f4df41fc0eb0ca6e8079ea3ffbec12a57a272b8f1648645022592",
+      "bytes": 2411
+    }
+  ]
+}

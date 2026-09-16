@@ -1,0 +1,148 @@
+{
+  "at": "2026-09-14T14:54:15.947960+00:00",
+  "node": "LIVE3",
+  "manifest_sha256": "86442c6e87fb7746548758ed76cac4b3d22726747901111bae34a5b500870b5e",
+  "revision": "43cf9386ea3c9e7c79523ec38debe63271d19292",
+  "product_status_clean": true,
+  "verified_references": [
+    {
+      "path": "agent-reports/LIVE3.md",
+      "sha256": "63a9ecad5e45f16efe526dc0a8873f5efcbbd47108efda753beb149ff219ce26"
+    },
+    {
+      "path": "evidence/LIVE3.md",
+      "sha256": "3ee68aa6fcfdaf99c3ae6259fcacde6df97d5fb4adcf67dfa3b91a72ed43c2b9"
+    },
+    {
+      "path": "evidence/LIVE3-required-suites.json",
+      "sha256": "499adb3c737645de7947d10fdb23c58aaeb3b5a9c79af9c50ffea621f357050a"
+    },
+    {
+      "path": "evidence/LIVE3-actual-relay-receipt.json",
+      "sha256": "928c5fa840f64fb5125479e0cebbe28322e5a96edef516dcb989a3b40262bc88"
+    },
+    {
+      "path": "evidence/LIVE3-diagnostic-baseline.json",
+      "sha256": "5663050c0365ca4f84a832ca1226b15a3ad70c7b085f90024830752eb3d2321f"
+    },
+    {
+      "path": "evidence/LIVE3-diagnostic-counts.json",
+      "sha256": "6e2905404fbc2188df349fae7c343f6b047e2f5b331d7dbe3e15cd52934fc64c"
+    },
+    {
+      "path": "evidence/LIVE3-stack-custody.json",
+      "sha256": "356c0b11c79d6420453194141e333435887bb957bcf5fa8f01100b30b57b5c25"
+    },
+    {
+      "path": "evidence/LIVE3-stack-custody-r2.json",
+      "sha256": "9c4ee9eb318cd1dea6484bcdb8816aba24f7d793b3d8dd3596f20f3b494323ed"
+    },
+    {
+      "path": "evidence/LIVE3-stack-receipt.json",
+      "sha256": "837bcf9a5b0b3d17f093966c358438a979a898c6ec8a2b46d2253ab0139fbe9f"
+    },
+    {
+      "path": "evidence/LIVE3-full-en.png",
+      "sha256": "25058398665ac76f17d9527e62148091082f0502884d691c7351895cdd9879a9"
+    },
+    {
+      "path": "evidence/LIVE3-full-ro.png",
+      "sha256": "e22cd133fc7664db81edb37d9cf4d9087df7ed5de000cb4736df663427259c1c"
+    },
+    {
+      "path": "evidence/LIVE3-compact-ro.png",
+      "sha256": "a2ac01f571ffa1d9610b3f356ee29eb00bbe13ff6de4ead7cce80ffb4026d4e5"
+    },
+    {
+      "path": "logs/LIVE3-integrated-suite.log",
+      "sha256": "cc904520b68a5df7c1dab8c7ba15afb0cdbf9e3718c991272e1f3adc7fbdae73"
+    },
+    {
+      "path": "logs/LIVE3-stack-preflight.log",
+      "sha256": "a5a76f9edfa6d46da1cdd5417e3e32676b0f29e7bdbbc063b70325e09638ef0e"
+    },
+    {
+      "path": "logs/LIVE3-stack-reload-stop.log",
+      "sha256": "fcabf344c5fae43b9bc37fb87d3f1a950fc5c5c4bb21f2f054232798f068227a"
+    },
+    {
+      "path": "logs/LIVE3-launch-detached.log",
+      "sha256": "f27a6134cdd93d9d87bf24b3ddd6a9ec561eeff643ffa0760c4468625991303a"
+    },
+    {
+      "path": "logs/LIVE3-stack-ready.log",
+      "sha256": "51b522dfeafb5ba7745aff2ea7009d21a7da6e95e5e6b2420dd37c3ad4ec6354"
+    },
+    {
+      "path": "logs/LIVE3-stack-ready-diagnosis.log",
+      "sha256": "a34b6c3555021c6dfbc145efcef1370034a288333220ed798b6c2887bdcf75ac"
+    },
+    {
+      "path": "logs/LIVE3-stack-launch-category.log",
+      "sha256": "aae96f0ec20a9d79691ccad9b2cca8159a5739c8dafd70d99c17eaadae313ffb"
+    },
+    {
+      "path": "logs/LIVE3-stack-detached.log",
+      "sha256": "de98b2cfafdb83af147c4e13a14f539133089391589ef5c5a760b4091e582b0b"
+    },
+    {
+      "path": "logs/LIVE3-launch-detached-r2.log",
+      "sha256": "416709643d17569abef844e3f91fb40bec27e76da5768e9cb021ac66ddc58432"
+    },
+    {
+      "path": "logs/LIVE3-stack-ready-r2.log",
+      "sha256": "013801b9be3c3a29f8a2e11e70b53193ef6ef5f8a2d29b71807a5d61d8c6934a"
+    },
+    {
+      "path": "logs/LIVE3-actual-relay-browser.log",
+      "sha256": "35ffd311451e8021d43ae2069014af1927b0ab5a5717eb72350010d400cd6e24"
+    },
+    {
+      "path": "logs/LIVE3-console-classifier-control.log",
+      "sha256": "159aa9a497656a1a184ada9311fafabd1fac33108f2cf84a24c3adcff93351e0"
+    },
+    {
+      "path": "logs/LIVE3-diagnostic-counts.log",
+      "sha256": "ec9aa801a2704dbd0c6f9dceb6498f5c38ef27191539b114e35ae07c5fdba7ca"
+    },
+    {
+      "path": "logs/LIVE3-stack-postflight.log",
+      "sha256": "20e8e2e9a6975fb8c7d7658cb4b88248ddc50a0729f352b4b8765b2229bfa642"
+    },
+    {
+      "path": "probes/LIVE3/start-preview-detached.mjs",
+      "sha256": "decb562b748a221456d31dbbb0605d84ef145b8df3b8a9f9ad2bd9064afe65bb"
+    },
+    {
+      "path": "probes/LIVE3/start-preview-detached-r2.mjs",
+      "sha256": "98907abaca6960edf55f65f465668963e0eb3d7b05355955687c334e63550b04"
+    },
+    {
+      "path": "probes/LIVE3/capture-actual-relay.mjs",
+      "sha256": "345c454ad07ba4591cbc6dccd1d744506c9a4dc27584f11a460f67527e9b53cc"
+    },
+    {
+      "path": "probes/LIVE3/console-classifier.mjs",
+      "sha256": "9ebf232a8c37c587013ce28404186230ddb3925b5e96a79131b64e31d9d9a33f"
+    },
+    {
+      "path": "probes/LIVE3/verify-console-classifier.mjs",
+      "sha256": "18720262faf4e725f167f920fa4d8330790124679ceac37d26f92b130bcac10f"
+    },
+    {
+      "path": "probes/LIVE3/count-diagnostics.mjs",
+      "sha256": "8c8276531a332305fb77c8f8c0f914e777f50c899b07359181f646ac7bb6711b"
+    },
+    {
+      "path": "probes/LIVE3/build-manifest.mjs",
+      "sha256": "60ac6d3a0292bd2e8850fef32e9e302e484178143f69fc90ab23ae3a21507452"
+    },
+    {
+      "path": "probes/LIVE3/verify-manifest.mjs",
+      "sha256": "b9bbfadcb7e90e11f4105002072f97f75948928bea124065a220dd5e8028f7ec"
+    }
+  ],
+  "result": "FUNCTIONAL_BLOCKER",
+  "root_scope": "Mechanical receipt/hash/ref verification only; content outcome is the Sol worker claim. No raw private log text printed; no runtime requests.",
+  "current_preview_custody": "Worker receipt records PID40443 PPID1 normal TLS200 after browser exit and10s idle; not freshly independently measured by root."
+}

@@ -1,0 +1,64 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ × tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers every rejected ordinary knowledge envelope from the pinned top source: not-json 22ms
+   → expected { …(7) } to match object { outcome: 'ANSWER_GROUNDED', …(3) }
+(3 matching properties omitted from actual)
+ × tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers every rejected ordinary knowledge envelope from the pinned top source: {"kind":"tool","text":"ignored","sourceIds":[],"actionIds":[]} 7ms
+   → expected { …(7) } to match object { outcome: 'ANSWER_GROUNDED', …(3) }
+(3 matching properties omitted from actual)
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > maps request-local model references to canonical response provenance
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps matching whole reviewed sections above 12,000 and below the 24,000 system cap
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > filters unavailable actions before the model sees the output contract
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > uses the exact immutable snapshot object already resolved by the route
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > reports only the closed diagnostic shape for a rejected completion
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects an internal identifier before canonical assistant storage
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects a request alias in narrative text before canonical assistant storage
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects a source reference issued for a prior request
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > assigns distinct opaque identities to separate rejected model attempts
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers every rejected ordinary knowledge envelope from the pinned top source: not-json
+ FAIL  tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers every rejected ordinary knowledge envelope from the pinned top source: {"kind":"tool","text":"ignored","sourceIds":[],"actionIds":[]}
+AssertionError: expected { …(7) } to match object { outcome: 'ANSWER_GROUNDED', …(3) }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+@@ -1,14 +1,9 @@
+  {
+-   "outcome": "ANSWER_GROUNDED",
+-   "sources": [
+-     {
+-       "id": "getting-started-debate",
+-       "label": "Crosscap article",
+-     },
+-   ],
+-   "text": "Use the reviewed guidance for this topic.",
++   "outcome": "REFUSE_SAFETY",
++   "sources": [],
++   "text": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+    "usage": {
+      "cost_usd": 0.002,
+      "input_tokens": 11,
+      "output_tokens": 7,
+    },
+
+ ❯ tests/unit/support-answer-context.test.ts:64:22
+     62|
+     63|       expect(complete).toHaveBeenCalledTimes(1);
+     64|       expect(result).toMatchObject({
+       |                      ^
+     65|         outcome: "ANSWER_GROUNDED",text: top.fallback,
+     66|         sources: [{ id: top.id,label: top.title }],usage: { input_toke…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 9 skipped (11)
+   Start at  18:48:26
+   Duration  314ms (transform 125ms, setup 0ms, import 194ms, tests 30ms, environment 0ms)
+

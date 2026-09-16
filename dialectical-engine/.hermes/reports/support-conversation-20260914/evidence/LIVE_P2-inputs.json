@@ -1,0 +1,71 @@
+{
+  "node": "LIVE_P2",
+  "revision": "606b2eabea1dc9212159e53c193cf69655424e77",
+  "inputs": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/ATTEST_P2-consumption.json",
+      "sha256": "fcab1dd7da70b48dc00b1ec7dcea3ead4607a3ed24e13ecfb6c05dc654a54ad0"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/ATTEST_P2.md",
+      "sha256": "46b4d668051b40c875ec13d64a48ae26bf21fa7a5e8be672c229adb899af55cf"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/ATTEST_P2-snapshot-receipt.json",
+      "sha256": "cfdaf33e1fc4e5e303d00764be509829e6631e36a60aece79813b6fb42163de2"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX_P2-consumption.json",
+      "sha256": "41e580a63b5be31f6ca408277db8b50c70719907ea36f46b5d415b420eb31183"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/HARNESS_P2-consumption.json",
+      "sha256": "56568d834d611d6f26131b8880e9594bcfea69a69c534869432f7ee985494506"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/HARNESS_P2-control-receipt.json",
+      "sha256": "e963aad4fa7270dec467a0b0a411cf6ab10bd7f4496927f9cad0125a81b4a9d4"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE_P1.md",
+      "sha256": "9ea008867e15118f8d481aee0fcaf0d63da30726dff43a7659ab4150e92b6f23"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE_P1-actual-relay-receipt.json",
+      "sha256": "b2cc1d4c31ab873f9119b8c580adc4ae69bdb5276dbc5837480f0bec01cd64f4"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE_P1-stack-receipt.json",
+      "sha256": "5346de0c3ffbbe63ef7f00000dc30e03f0bc2a2065df83e76e41ba8e636fe5cc"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE_P2-required-suites.json",
+      "sha256": "172cbfcef619b42a178eaa18676b179356c5d886a9d8313283522f839b4d1ec1"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/HARNESS_P2/diagnostic-consumer.mjs",
+      "sha256": "6f60ecfca6622517a032be204773c572584dd48b949ffe0eccdf2e399cb91db5"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/HARNESS_P2/response-evidence.mjs",
+      "sha256": "4c26d1b9125703db664959ad4b8395eee7c5a171ea79dc3df744ba5f3ffcf182"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/HARNESS_P2/verify-diagnostic-consumer.mjs",
+      "sha256": "d1c805399b178d819fa1f1eb385b2de03fb60c3283f57ef6cc1c2109b0116dc2"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P1/capture-actual-relay.mjs",
+      "sha256": "7670423c23733536ce14c870e6be9fbd4c07ea70fe26cd23c226a79def1dca13"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P1/console-classifier.mjs",
+      "sha256": "9ebf232a8c37c587013ce28404186230ddb3925b5e96a79131b64e31d9d9a33f"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P1/start-preview-detached.mjs",
+      "sha256": "14662c67e145af6bb697b2fad370a3edc32b76992e6d6575c5274a4d1c02faeb"
+    }
+  ],
+  "scope": "Current final snapshot adapter controls before actual traffic; one25-file integrated run; same7 prompts once; final pass3 follows regardless of live result."
+}

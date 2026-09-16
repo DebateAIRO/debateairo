@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "node": "FIX2",
+  "profile": "support-preview",
+  "command": ["pnpm", "dev:auth:up"],
+  "diagnosticRuntime": {
+    "pid": 95978,
+    "processGroup": 95978,
+    "startedAt": "2026-09-14T13:25:17.779Z",
+    "normalTls": true,
+    "producerRevisionState": "pre-correction",
+    "diagnosticInstrumentationPresent": true,
+    "actualRequests": 1
+  },
+  "handoffObservation": {
+    "url": "https://localhost:3100/help",
+    "connected": false,
+    "httpStatus": 0,
+    "processInspectionAvailable": false
+  },
+  "committedRevision": "82f57f1ebaaf59a9ee0ea81d3084c4d57f7557b0",
+  "requiresSupportedReloadForLive2": true,
+  "originalServicesModified": false,
+  "tlsBypassUsed": false,
+  "additionalActualRequestMade": false
+}

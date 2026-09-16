@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "node": "NAV",
+  "status": "READY_FOR_PEER_REVIEW",
+  "ticket": "t_a7eb5e1f",
+  "session": "/root/requirements",
+  "inputRevision": "1d84592c0d639dfebaea4ac3aa9cb0711555e251",
+  "integratedRevision": "252f8faf46d987e1df89778eff0439ea140994d0",
+  "commit": "58fbaa7d5535dad89b479b98776cf2b8e88b978e",
+  "files": {
+    "apps/api/src/main.ts": "1e7f8828a07b34818c7baf1b2efcd74cbc5c365a6ef9962bb97d8dc92b7392f1",
+    "apps/api/src/support/answer.ts": "e3897528f327b8140ff980b29f3a563b7e4810b3e1cea55df653a99ecebbadc7",
+    "apps/api/src/support/classify.ts": "7ee8129d680e964d2a24ffcf72b8aadeff36c9ffff68c33293be778f455a7ba6",
+    "apps/api/src/support/index.ts": "260b5af2b0115618e8c62e80b221a6122c5637aa52686a89af55fa5ce08e9679",
+    "apps/api/src/support/response-policy.ts": "30b7f356f5f784e0902e0393e4a5a1bfc68f3e1f92b756cfffbf3f7aa62219d7",
+    "apps/api/src/support/security-guidance.ts": "cf2ee07a3eda95043f4684787a13dd2b745af8d3fc3e41cabf6c7e1297cdc742",
+    "packages/db/src/support.ts": "3ac60a1a868e72db7e51149664e5552911cdd2979485222d546b5fd03b579082",
+    "tests/integration/support-degraded.test.ts": "ade3852f10ba95f8bb92a9e42a58c716e0305de5d4802a5e984ade1b9100ade8",
+    "tests/integration/support-metrics.test.ts": "6812049005b4cd632cf3fdfa8992b4b201620620045916baa05299230dcd4562",
+    "tests/integration/support-routes.test.ts": "486956562b0a4fbe7b712c899dd68db0085792ba76c38eb0d58239bda7cdf821",
+    "tests/unit/support-classify.test.ts": "591d810548007bf9c5fe5b6b586d61bf7e85ae4f8c46eb50a5dea7dfdcd51147",
+    "tests/unit/support-escalation.test.ts": "85f2054f420af68eda63a49b2068a2966af09d7eedc31f53030d5591cb4ce92b",
+    "tests/unit/support-response-policy.test.ts": "cdbee70819d89b364bb398a778c43ad304e6b6bf2058a6b421d41dfb42ef6761",
+    "tests/unit/support-security-guidance.test.ts": "d77622c2fca090473e184e38b6ae3ee4b048329eea8d52a409bb51363cff44c7"
+  },
+  "logs": {
+    "baseline": "0a1b589ed1e4e35112e93dc3ceddb10159e15db3f4951c7bb210e7d7d67b8270",
+    "red": "ff081ed08f7717fa6f641ff5e3609d8b5e29417a6f094e830741d11949e1e519",
+    "green1": "69a96c6c2fc19d2989c192f5ee53b9a50813b7e657b388c61086874cb9a77ed7",
+    "green2": "a2c60cb62de7bbf4f8f4aca7a1efafb994757da5351e88e7ac76421604242eea",
+    "latestAggregate": "e67ef1aeee0bd1574ce6b3b78d0f7dba469842cef91824f20788f87de90ff58e",
+    "missingMembers": "e7511368e024652908b5a65c33fecb5ab03d22a6a90a2fa95dba8dfb174516a6",
+    "typecheck": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "mutantScreen": "6d3f8d144b93ebf8a4dc983a1a09bbae5642c06ea53ccf0c89644564ec71a64f",
+    "mutantSnapshot": "b795b5ef1041f4d6a24dc946dc4be34a6e80a08de76d5497e441fa864168b042",
+    "mutantCanonical": "2fc01989d946b1c84a4bd5085888520fd881585c5efe70f7ecf4e1bf1b606854",
+    "restored": "5d2c7f0db0ff762fb3313d44e2b6b800f2941b92689404cf71d415e751fec397"
+  },
+  "tests": {
+    "baseline": { "filesPassed": 7, "testsPassed": 496 },
+    "red": { "filesFailed": 3, "testsFailed": 5, "testsPassed": 342 },
+    "green2": { "filesPassed": 6, "testsPassed": 507 },
+    "latestAggregate": { "filesPassed": 8, "testsPassed": 549 },
+    "remainingExactPacketFrame": { "filesPassed": 2, "testsPassed": 21 },
+    "allNinePacketSuitesEvidenced": true
+  },
+  "mutations": {
+    "screen": { "filesFailed": 1, "testsFailed": 3, "testsPassed": 17 },
+    "snapshot": { "filesFailed": 1, "testsFailed": 1, "testsSkipped": 97 },
+    "canonical": { "filesFailed": 1, "testsFailed": 2, "testsSkipped": 96 },
+    "restored": { "filesPassed": 2, "testsPassed": 23, "testsSkipped": 95 }
+  },
+  "typecheck": { "repositoryPassed": false, "navOwnedDiagnostics": 0 },
+  "forgotPasswordDestinationVerified": false,
+  "ownerAcceptance": false,
+  "actualUsage": "UNAVAILABLE"
+}

@@ -1,0 +1,260 @@
+{
+  "schema_version": 1,
+  "revision": "085fff68f8b22743978d1efafd7ad9fd204e5a6f",
+  "base_url": "https://localhost:3100",
+  "browser": {
+    "driver": "playwright@1.61.1",
+    "executablePath": "/Users/vladmihaimiron/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell",
+    "headless": true,
+    "tls_bypass": false,
+    "fresh_profile": true
+  },
+  "support_api": "actual",
+  "relay": "actual unchanged support-preview relay",
+  "identity": "actual anonymous visitor",
+  "synthetic_support_overrides": false,
+  "credential_or_recovery_operations": 0,
+  "prompts": [
+    {
+      "sequence": 1,
+      "mode": "full",
+      "language": "en",
+      "topic": "creation",
+      "input": "How do I create a debate?",
+      "api": {
+        "status": 200,
+        "outcome": "REFUSE_SAFETY",
+        "text": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+        "sources": [],
+        "actions": [],
+        "error": null
+      },
+      "visible": {
+        "text": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+        "sources": [],
+        "actions": []
+      },
+      "api_dom_text_equal": true,
+      "api_dom_source_labels_equal": true,
+      "api_dom_actions_equal": true,
+      "grounded_success": false
+    },
+    {
+      "sequence": 2,
+      "mode": "full",
+      "language": "en",
+      "topic": "settings",
+      "input": "What can I change in Settings?",
+      "api": {
+        "status": 200,
+        "outcome": "REFUSE_SAFETY",
+        "text": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+        "sources": [],
+        "actions": [],
+        "error": null
+      },
+      "visible": {
+        "text": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+        "sources": [],
+        "actions": []
+      },
+      "api_dom_text_equal": true,
+      "api_dom_source_labels_equal": true,
+      "api_dom_actions_equal": true,
+      "grounded_success": false
+    },
+    {
+      "sequence": 3,
+      "mode": "full",
+      "language": "en",
+      "topic": "export",
+      "input": "How does JSON export work?",
+      "api": {
+        "status": 200,
+        "outcome": "ANSWER_GROUNDED",
+        "text": "JSON export works in two contexts. For an owner debate, the Export option appears only after a served answer and a readable execution-ledger digest are available. When you use it, it downloads a JSON file containing the answer, the ledger digest, and the current honesty records. For a published debate, you can export its published JSON snapshot instead. Note the conditions: export is not available for an unfinished owner answer, the product does not offer Markdown export here, and a public download does not include private owner data.",
+        "sources": [
+          {
+            "id": "export-json",
+            "label": "Export a debate as JSON"
+          },
+          {
+            "id": "guide-how-it-works",
+            "label": "How to read a debate"
+          }
+        ],
+        "actions": [],
+        "error": null
+      },
+      "visible": {
+        "text": "JSON export works in two contexts. For an owner debate, the Export option appears only after a served answer and a readable execution-ledger digest are available. When you use it, it downloads a JSON file containing the answer, the ledger digest, and the current honesty records. For a published debate, you can export its published JSON snapshot instead. Note the conditions: export is not available for an unfinished owner answer, the product does not offer Markdown export here, and a public download does not include private owner data.",
+        "sources": [
+          "Export a debate as JSON",
+          "How to read a debate"
+        ],
+        "actions": []
+      },
+      "api_dom_text_equal": true,
+      "api_dom_source_labels_equal": true,
+      "api_dom_actions_equal": true,
+      "grounded_success": true
+    },
+    {
+      "sequence": 4,
+      "mode": "full",
+      "language": "ro",
+      "topic": "creation",
+      "input": "Cum creez o dezbatere?",
+      "api": {
+        "status": 200,
+        "outcome": "REFUSE_SAFETY",
+        "text": "Aici e nevoie de o persoană, nu de un asistent. Alege „Vorbește cu o persoană” și o persoană îți va citi mesajul.",
+        "sources": [],
+        "actions": [],
+        "error": null
+      },
+      "visible": {
+        "text": "Aici e nevoie de o persoană, nu de un asistent. Alege „Vorbește cu o persoană” și o persoană îți va citi mesajul.",
+        "sources": [],
+        "actions": []
+      },
+      "api_dom_text_equal": true,
+      "api_dom_source_labels_equal": true,
+      "api_dom_actions_equal": true,
+      "grounded_success": false
+    },
+    {
+      "sequence": 5,
+      "mode": "full",
+      "language": "ro",
+      "topic": "settings",
+      "input": "Ce pot schimba în Setări?",
+      "api": {
+        "status": 200,
+        "outcome": "REFUSE_SAFETY",
+        "text": "Aici e nevoie de o persoană, nu de un asistent. Alege „Vorbește cu o persoană” și o persoană îți va citi mesajul.",
+        "sources": [],
+        "actions": [],
+        "error": null
+      },
+      "visible": {
+        "text": "Aici e nevoie de o persoană, nu de un asistent. Alege „Vorbește cu o persoană” și o persoană îți va citi mesajul.",
+        "sources": [],
+        "actions": []
+      },
+      "api_dom_text_equal": true,
+      "api_dom_source_labels_equal": true,
+      "api_dom_actions_equal": true,
+      "grounded_success": false
+    },
+    {
+      "sequence": 6,
+      "mode": "full",
+      "language": "ro",
+      "topic": "export",
+      "input": "Cum funcționează exportul JSON?",
+      "api": {
+        "status": 200,
+        "outcome": "REFUSE_SAFETY",
+        "text": "Aici e nevoie de o persoană, nu de un asistent. Alege „Vorbește cu o persoană” și o persoană îți va citi mesajul.",
+        "sources": [],
+        "actions": [],
+        "error": null
+      },
+      "visible": {
+        "text": "Aici e nevoie de o persoană, nu de un asistent. Alege „Vorbește cu o persoană” și o persoană îți va citi mesajul.",
+        "sources": [],
+        "actions": []
+      },
+      "api_dom_text_equal": true,
+      "api_dom_source_labels_equal": true,
+      "api_dom_actions_equal": true,
+      "grounded_success": false
+    },
+    {
+      "sequence": 7,
+      "mode": "compact",
+      "language": "ro",
+      "topic": "creation-repeat",
+      "input": "Cum creez o dezbatere?",
+      "api": {
+        "status": 200,
+        "outcome": "REFUSE_SAFETY",
+        "text": "Aici e nevoie de o persoană, nu de un asistent. Alege „Vorbește cu o persoană” și o persoană îți va citi mesajul.",
+        "sources": [],
+        "actions": [],
+        "error": null
+      },
+      "visible": {
+        "text": "Aici e nevoie de o persoană, nu de un asistent. Alege „Vorbește cu o persoană” și o persoană îți va citi mesajul.",
+        "sources": [],
+        "actions": []
+      },
+      "api_dom_text_equal": true,
+      "api_dom_source_labels_equal": true,
+      "api_dom_actions_equal": true,
+      "grounded_success": false
+    }
+  ],
+  "navigations": [
+    {
+      "input": "pointer",
+      "performed": false,
+      "reason": "NO_RENDERED_ACTION"
+    },
+    {
+      "input": "keyboard-enter",
+      "performed": false,
+      "reason": "NO_RENDERED_ACTION"
+    }
+  ],
+  "network": [
+    {
+      "operation": "support_status",
+      "status": 200
+    },
+    {
+      "operation": "create_session",
+      "status": 201
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    },
+    {
+      "operation": "create_session",
+      "status": 201
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    }
+  ],
+  "console_error_count": 11,
+  "screenshots": [
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE-full-en.png",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE-full-ro.png",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE-compact-ro.png"
+  ],
+  "completed": true
+}

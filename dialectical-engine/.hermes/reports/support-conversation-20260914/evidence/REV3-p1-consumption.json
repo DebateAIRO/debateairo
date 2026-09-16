@@ -1,0 +1,29 @@
+{
+  "at": "2026-09-14T16:33:11.632050+00:00",
+  "review": "REV3-p1",
+  "session": "/root/baseline",
+  "revision": "6e5ab5fc41acebbff4264efc7d481df3db8dce44",
+  "report": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV3-p1.md",
+    "sha256": "52ca1fe4c456b2b5cf534ad86a551a2252a1dcb076fb32451126f6f13d70970e"
+  },
+  "selfReport": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/REV3.md",
+    "sha256": "228dc61b6073f1dd27ea6dd822d95b63d60cf0b1edd6229fd86100972f3323f6"
+  },
+  "gateManifestSha256": "ab6221c1e5e1a4fa3050854005a646242bbc7472522d2745077eea77a2da48f0",
+  "gateInputHashesReverified": 114,
+  "productFilesReverified": 99,
+  "skills": {
+    "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-10-40-01a09ef7-e096-7c31-9b35-806840028cf0.jsonl",
+    "floor": [
+      "using-superpowers",
+      "heartbeat-protocol",
+      "heartbeat-reviewer",
+      "verification-before-completion"
+    ],
+    "rc": 0,
+    "output": "ok   using-superpowers (2)\nok   heartbeat-protocol (4)\nok   heartbeat-reviewer (2)\nok   verification-before-completion (2)\nSKILLS LOADED verified: 4 / 4\n"
+  },
+  "scope": "Mechanical immutable-input/report/hash/current-byte verification; reviewer content verdict is independent Sol evidence, not root content judgment. Probe hashes consumed separately if present."
+}

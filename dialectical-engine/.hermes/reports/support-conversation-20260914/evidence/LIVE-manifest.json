@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "ticket": "t_3fd09b62",
+  "session": "/root/preview",
+  "revision": "085fff68f8b22743978d1efafd7ad9fd204e5a6f",
+  "product_or_git_changes": 0,
+  "required_suite_input": {
+    "path": "evidence/LIVE-required-suites.json",
+    "sha256": "fcbc23ac4d6704a87b87d560002c2c1b23237f63fc56cf694602b731395d5464",
+    "file_count": 20
+  },
+  "measured": {
+    "test_files_passed": 20,
+    "tests_passed": 730,
+    "tests_todo": 1,
+    "duration_seconds": 79.19,
+    "actual_prompts": 7,
+    "grounded_successes": 1,
+    "refuse_safety_results": 6,
+    "support_message_http_200": 7,
+    "support_session_http_201": 2,
+    "support_status_http_200": 1,
+    "performed_navigations": 0,
+    "credential_or_recovery_operations": 0
+  },
+  "artifacts": {
+    "evidence/LIVE.md": "cd24e134802ca6a1d48266641db59ea8832b3ce1ff07d23e51d10c8d780c2333",
+    "agent-reports/LIVE.md": "db20d9335f9f9b76d42aed7406f7faeb4ce7865181e60e93f16f1a262ca56fb2",
+    "evidence/LIVE-actual-relay-receipt.json": "febf97ebaffc5213540ab04ec1ce348ff07a005a81634e80e5c08ce5f90dc625",
+    "evidence/LIVE-full-en.png": "f828eb9ee4abd8eb12f1846092a2bd4691b13df504ce2d33cd02d0326032693a",
+    "evidence/LIVE-full-ro.png": "abf2b629edbae9850c2d1d4f15e37a16b93df48c6b7e97d3baf5f464c9eccdd0",
+    "evidence/LIVE-compact-ro.png": "bcb982f6fc5dab1adf2f7c66762969473f7cb20aa28b51f2b454b7820b2b56d7",
+    "probes/LIVE/capture-actual-relay.mjs": "a25f995fa8ba0be748493610fe11d9b59a343f1ecfa2e721fe7f406d3ae33a82"
+  },
+  "logs": {
+    "LIVE-integrated-suite.log": "d8d8786b529dfb9df35e3d4076cc2dc57496a40ebdfe09818f1e7de9531bb39d",
+    "LIVE-stack-preflight.log": "a6f2b7971be4375482b8ec8d4f4fc0240f05d9b02720d06ce4ade16479950315",
+    "LIVE-actual-relay-browser.log": "5c2d560547b04b020885a1a5999793a213db2eecdb0b47e0d42877f57c1efe67",
+    "LIVE-stack-postflight.log": "a6f2b7971be4375482b8ec8d4f4fc0240f05d9b02720d06ce4ade16479950315"
+  },
+  "limitations": [
+    "CP1-A09 is blocked: six of seven required real UI/API/relay prompts returned REFUSE_SAFETY.",
+    "No safe external reason identifies the exact response-policy predicate for the rejected drafts.",
+    "The raw rejected completions were not read or stored.",
+    "The exact Forgot-password destination and action remain UNKNOWN and UNVERIFIED.",
+    "Actual model token and cost usage are unavailable."
+  ],
+  "preview": {
+    "profile": "support-preview",
+    "supervisor_pid": 71877,
+    "process_group": 71877,
+    "parent_pid": 1,
+    "ordinary_tls_help_status": 200,
+    "active_after_walkthrough": true,
+    "restarted_by_live": false
+  }
+}

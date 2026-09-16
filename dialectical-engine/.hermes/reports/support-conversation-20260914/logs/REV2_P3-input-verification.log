@@ -1,0 +1,28 @@
+{
+  "revision": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
+  "indexRevision": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
+  "gateRevision": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
+  "productManifestRevision": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
+  "indexInputs": {
+    "count": 80,
+    "bytesRead": 2207130,
+    "mismatches": []
+  },
+  "gateImmutableInputs": {
+    "count": 180,
+    "bytesRead": 4976865,
+    "mismatches": []
+  },
+  "productFiles": {
+    "count": 108,
+    "bytesRead": 1523874,
+    "mismatches": []
+  },
+  "patches": {
+    "count": 2,
+    "bytesRead": 663623,
+    "mismatches": []
+  },
+  "expectedProductPathCount": 108,
+  "allMatch": true
+}

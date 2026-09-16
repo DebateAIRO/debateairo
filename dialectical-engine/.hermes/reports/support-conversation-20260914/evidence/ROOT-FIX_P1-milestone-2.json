@@ -1,0 +1,30 @@
+{
+  "at": "2026-09-14T17:16:37.738099+00:00",
+  "authority": "Author interim message only; not final consumption or independent review",
+  "ticket": "t_ad0185b6",
+  "session": "/root/requirements",
+  "reported": {
+    "implementationPaths": 16,
+    "allowedPaths": 20,
+    "unitPassed": 243,
+    "fixtureSinkPassed": 129,
+    "mutationClasses": [
+      "request binding",
+      "multiword redaction",
+      "governed negation",
+      "canonical exhaustion",
+      "exact ID",
+      "encoded credential"
+    ],
+    "restorationClaim": true,
+    "nonDiscriminatingRetainedProbe": "max-passes-only",
+    "scopeNeed": false
+  },
+  "remaining": [
+    "final current-byte affected union",
+    "one final typecheck attribution",
+    "exact clean commit",
+    "final report/manifest/self-report/handoff"
+  ],
+  "rootDecision": "Continue author node with existing leases; LIVE_P1 remains nondispatchable until exact final consumption."
+}

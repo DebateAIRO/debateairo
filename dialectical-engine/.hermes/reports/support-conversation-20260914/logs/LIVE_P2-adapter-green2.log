@@ -1,0 +1,48 @@
+{"responseEvidenceProperties":9,"transitionAndAmbiguityFixtures":18,"totalControls":27,"exactProducerKeys":7,"validRecoveryAttributed":true,"validRefusalAttributed":true,"groundedNoEventAcceptedDraft":true,"recoveryMatchNoEventAcceptedDraft":true,"mismatchedRecoveryAmbiguous":true,"incompatibleTerminalAmbiguous":true,"missingRefusalEventAmbiguous":true,"hostileDropped":true,"invalidUuidAmbiguous":true,"unknownCodeAmbiguous":true,"unknownPredicateAmbiguous":true,"malformedAmbiguous":true,"multipleAmbiguous":true,"duplicateAmbiguous":true,"recoveryDuplicateAmbiguous":true,"delayedOrOutOfWindowAmbiguous":true,"unknownEvidenceAmbiguous":true,"extraEvidenceAmbiguous":true}
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  {
++   fallbackSha256: 'c1ed3a89b00d46ac7f1710280ef768f9d66adec20d20aaa18815596e6a5c2265',
+-   fallbackSha256: '6abec339af9fc96715c8964a17341461db4042701acb1f54e1e9deea37421afb',
+    kbVersion: 'd674533e89d145bf9203248e2e324b451e57a2f1d3f257614d31678b7ac379df',
+    language: 'en',
++   pinnedSourceId: 'guide-how-it-works',
+-   pinnedSourceId: 'export-json',
+    sequence: 3,
+    topic: 'export'
+  }
+
+    at <anonymous> (/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P2/verify-pre-request-adapter.ts:64:10)
+    at Array.map (<anonymous>)
+    at <anonymous> (/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P2/verify-pre-request-adapter.ts:59:20)
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: {
+    sequence: 3,
+    language: 'en',
+    topic: 'export',
+    kbVersion: 'd674533e89d145bf9203248e2e324b451e57a2f1d3f257614d31678b7ac379df',
+    pinnedSourceId: 'guide-how-it-works',
+    fallbackSha256: 'c1ed3a89b00d46ac7f1710280ef768f9d66adec20d20aaa18815596e6a5c2265'
+  },
+  expected: {
+    sequence: 3,
+    language: 'en',
+    topic: 'export',
+    kbVersion: 'd674533e89d145bf9203248e2e324b451e57a2f1d3f257614d31678b7ac379df',
+    pinnedSourceId: 'export-json',
+    fallbackSha256: '6abec339af9fc96715c8964a17341461db4042701acb1f54e1e9deea37421afb'
+  },
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v22.23.1

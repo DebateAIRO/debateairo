@@ -1,0 +1,8 @@
+file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P2/verify-idle-custody.mjs:67
+process.stdout.write(JSON.stringify(receipt,null,2) + "\n");
+               ^
+
+TypeError: Cannot read properties of undefined (reading 'write')
+    at file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P2/verify-idle-custody.mjs:67:16
+
+Node.js v22.23.1

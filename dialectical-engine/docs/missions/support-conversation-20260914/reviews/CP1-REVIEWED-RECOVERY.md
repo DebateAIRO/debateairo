@@ -1,0 +1,39 @@
+# CP1 final correction: reviewed recovery and complete projections
+
+## Authority and decision
+
+Adopt REV1 pass2's reviewed deterministic recovery architecture together with the final REV2 security invariants. This is the correction after final review pass2, followed by one final pass3 review. No additional prompt-only preparation or sampling loop is authorized.
+
+The owner requires natural, useful, reviewed EN/RO product guidance and preservation of the runtime Support model. The owner does not require every final narrative byte to originate from the model. The approved canonical-reply definition already permits server-authored or server-validated text, and deterministic security guidance already exists. A real single attempt to the same model, with an exact reviewed source fallback after a rejected draft, is within the authorized implementation objective. No new owner decision is needed for this routine internal architecture choice. This ruling does not authorize changing the model, bypassing safety, redesigning the interface or declaring model-generated quality from fallback text.
+
+This document and SPEC-v3 supersede the conflicting server-answer prohibition in CP1-R14-ALIASES and the unconditional refusal semantics in SPEC-v2 R15/R16/A06/A07. Historical documents and failed evidence remain unchanged. Request-local aliases, strict four-key model envelopes and trusted canonical actions remain mandatory.
+
+## Exact trusted data and admission
+
+Every shipped snapshot entry and language, including legacy/in-code entries and the scanned24 article files, needs a complete model-facing factual projection and concise visitor-facing fallback. The author must enumerate the complete current corpus, not treat24 files as a complete census. Both texts are exact, immutable data tied to the same source snapshot and reviewed against current product facts. The factual projection preserves whole policy/capability facts while removing canonical IDs, catalog routes and repository metadata; raw article bodies are not used as an implicit model projection. Titles and capability labels are included in admission checks. The composed24,000-code-point ceiling and whole-section behavior remain.
+
+New projections and fallback text require separate Sol editorial review and exact hashes before preview admission. Do not inherit owner ratification for newly written text from an unchanged legacy article, invent reviewer identity, or self-attest. Preserve existing article provenance; bind new components and selecting review records into kbVersion. Release remains blocked for unratified new content. The author chooses the simplest explicit data/schema format in a bounded blueprint with exact paths; it must make missing, stale, malformed or mismatched review evidence fail closed. Production-corpus admission tests must load every actual shipped entry, rather than only synthetic route-free bodies.
+
+## Runtime branches and effects
+
+A valid model draft follows the current alias validation, canonical mapping, source/action checks and trusted resolver. After a successful single model call whose draft is rejected, ordinary knowledge-answer work may discard the entire draft and select only the exact reviewed fallback of the deterministic top-ranked source selected before the call from the pinned snapshot. Never interpolate user/model bytes, rewrite substrings of a draft, use its rejected source/action arrays, read a newer live snapshot, or substitute the raw article body.
+
+The chosen fallback must pass corpus admission, the repaired credential/path policy and stable canonical cipher/redactor screening. It must be sufficient for its source's product guidance, with truthful prerequisites/limits and canonical provenance. Attach the canonical source and only source-appropriate actions admitted by the existing trusted current-context resolver. No guessed dynamic owner link or unavailable action is introduced.
+
+An admitted fallback is ANSWER_GROUNDED and receives the existing normal grounded effects, including rating eligibility and resolution semantics. A rejected draft by itself still never drives E2/E6, relay-unavailable status or a second attempt. Retain actual call usage/spend/reservations and the bounded rejection diagnostic. If there is no reviewed selected fallback, keep REFUSE_SAFETY and its non-rateable/non-resolution effects. No-source, transport failure, degraded, explicit-human, private-status/ownership, consent, encryption/shred and account-capability behavior stay on their existing paths. This recovery branch does not apply to case summaries; their strict four-key/empty-array/bounded/non-authoritative safe replacement contract remains.
+
+The diagnostic producer remains bounded and the evidence consumer keeps exactly seven producer keys. A grounded response may now coexist with a rejected-draft diagnostic in its isolated window; the later live harness must test this expected branch before traffic instead of treating every such event as unmatched. Preserve ambiguity rules, raw-content exclusion, and the distinction between bounded cursor attribution and an API join. Report model-accepted and reviewed-recovery evidence separately only where the observations support that distinction. No new public response shape or SQL outcome migration is authorized.
+
+## Security invariants for the same correction
+
+Once a supported credential label and value connector identify a supplied value, no suffix may survive at a sink. Unmatched quotes, over-bound strings and punctuation-bearing values must conservatively redact the whole uncertain value/tail or reject before any sink. Do not raise a word cap and leave a new residual boundary. Preserve benign intent-only questions.
+
+Negation governs its own operation group. A new positive finite/modal/auxiliary group after coordination gets independent scope or fails closed if ambiguous. References bind to their governed object; an explicit display-name object must not bind to an older password noun. Preserve safe negative lists and limitations and all52 current human labels in neutral descriptive framing. Do not solve compatibility by globally exempting credential operations.
+
+Every canonical view reaches the shared answer and summary screens. Decoded slash/backslash and applicable drive/UNC path forms must fail before persistence; bounded decoding/exhaustion and benign percentage controls remain. Preserve all35 exact hyphenated ID controls, current/stale/unknown/duplicate alias rejection and the existing capability restrictions. A finite matrix is evidence, not a formal guarantee for arbitrary language.
+
+## Sequence and final oracle
+
+Blueprint the exact schema, files, corpus enumeration, runtime branch/effects, editorial handoff and test union. Then implement the security/code/data correction with unreviewed new data explicitly excluded, obtain separate exact-byte editorial review, and have the original author bind the actual review evidence and finish current-byte verification. This editorial prerequisite is part of the selected final correction, not another functional-review pass or hidden preparation loop.
+
+Only after final author/attestation consumption may LIVE_P2 run the integrated union retaining all23 prior suites plus every new/affected member, prove the updated strict-seven consumer, reload the supported owned preview, and issue the same seven prompts once. Require seven useful accurate answers, canonical sources/actions, EN creation pointer and compact RO keyboard, API/DOM equality and current idle custody. Preserve every failure. Final independent correctness/security/product review is pass3/3. No CP1 readiness or CP2/CP3 advancement follows without the owner's explicit acceptance; the verified existing Forgot destination is still missing and no substitute is permitted.

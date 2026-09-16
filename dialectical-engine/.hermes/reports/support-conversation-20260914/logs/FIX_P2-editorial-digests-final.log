@@ -1,0 +1,11 @@
+{
+  "status": "UNREVIEWED_COMPONENT_HANDOFF",
+  "productRevision": "f440287179f71e18a4b4b93607951c1e5f862cc1",
+  "componentFileSha256": "54e871653032b1190d79182483f2a28ea2516ab180672a8a91f429a86b584d6f",
+  "catalogSha256": "24784328a4bb8d4e5205b3036dd369268180df792243db1c296a0a7ed2a0f9fe",
+  "componentCount": 36,
+  "ownerRatification": {
+    "ratifiedBy": "",
+    "ratifiedOn": ""
+  }
+}

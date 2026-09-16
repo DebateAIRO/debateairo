@@ -1,0 +1,164 @@
+{
+  "status": "EXACT FINAL PASS2 LENS INDEX",
+  "lens": "REV1",
+  "revision": "e0dcfe77f49655bea774bdfacf988b911be4ff06",
+  "focus": "F1 architecture and affected context/strict-response/snapshot/public-navigation interfaces; prior correctness C1-C3 disposition retained.",
+  "inputs": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/INSTRUCTIONS.md",
+      "sha256": "4582bc82bdcdef28ac4e06b4a4eb1a413fee84e8e07bc4374049a9c0ca451bf9"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/SPEC-v2.md",
+      "sha256": "a692cc55515a2a581330aaaf8a5549e844f64e848c1d620234aff2d5c362d029"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/DONE.md",
+      "sha256": "7481c49de9d86da03dc4cd5107dbe8057a456950acb24bcd46c7f78ccbdb3456"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV-CP1-p1-UNION.md",
+      "sha256": "b3ddf9b92daf517c851472842feffb6a543056d86e96e70808d64e84de070349"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/CP1-R14-ALIASES.md",
+      "sha256": "6110e1b51b8aea6ca671409b74dc4421ee336a8d7e872edd29e2c55e9a8da5e9"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/CP1-SOURCE-DRIFT.md",
+      "sha256": "f092e0898c0b23a2e9ef38098741e365c79e5ac6520ce6562f745d8f8b61304f"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX_P1.md",
+      "sha256": "8169b9081c950cdc01ce1c28ab548f1ad4ee832f548506f58d8135da0d491a0a"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX_P1-manifest.json",
+      "sha256": "e449c6371b348c455f1ae0be64284106d9c3c0b4d977e176e9c9efbf806c5540"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX_P1-consumption.json",
+      "sha256": "c2033deb3afd14b79a0d1216ce50a169b14738c1e2463173b78cb93c16128f8d"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE_P1.md",
+      "sha256": "9ea008867e15118f8d481aee0fcaf0d63da30726dff43a7659ab4150e92b6f23"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE_P1-consumption.json",
+      "sha256": "911f10618b9c1c4d129465f2900a7935b70c6b97883d98d219b7e0e3dfa27759"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_P2.md",
+      "sha256": "8d8db6280c4b068e96ad46dace431e1ab1389906e8d5922941f0558f0f6c3d3b"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_P2-manifest.json",
+      "sha256": "656c3390c7e65de70f3708eb38ac24e89efcbfaf7a0426e48686abe291b44949"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV1-p1.md",
+      "sha256": "e9f3e31c1f1fbae4b32209ea34152675b964a047e913f6ae8f91ab2a1bae4e0f"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/REV1-p1-consumption.json",
+      "sha256": "4c45a3e3bb11c071a197b770f37ebf05f58d7bd4146351b7a1b9ad709bc711a6"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/FIX_P1-IMPLEMENTATION.md",
+      "sha256": "5ba43ff1d1c4a39a668be3a354eac2828c89bc5a99ed4a8a891ef61823a8d477"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE_P1-actual-relay-receipt.json",
+      "sha256": "b2cc1d4c31ab873f9119b8c580adc4ae69bdb5276dbc5837480f0bec01cd64f4"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/review-packages/CP1-p2/README.md",
+      "sha256": "37555a5c2dc544dccfa4e48dfcca397e7404f3bfff41b0a04d4592ddbb9f2335"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/review-packages/CP1-p2/CP1-pass1-correction-e0dcfe77.patch",
+      "sha256": "e408f9a3b14204f5459f106ab74f28637774ae60bf85c6fa2259f8c92361cb9b"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE-pre-LIVE_P1-inventory.json",
+      "sha256": "516e60c9da0174bf0ab0bd519544eb8fcd25a85f40513760a81ab36d4b6af06e"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FIX_P1.md",
+      "sha256": "d6df292e89f9d4b7e41b9753cd5852ac0ddc2f803f1e2bd58f589695cb9a5cee"
+    }
+  ],
+  "productPaths": [
+    {
+      "path": "apps/api/src/support/answer.ts",
+      "sha256": "a124a60a4637140f1cc07f8462412ac8c6606ddde5369a57c79a8c45f30c643c",
+      "changedInCorrection": true
+    },
+    {
+      "path": "apps/api/src/support/model-references.ts",
+      "sha256": "b1738b971f9096e555eb7603d64b25f7ce4d26e79689d28d801bb697bc6dd1b3",
+      "changedInCorrection": true
+    },
+    {
+      "path": "apps/api/src/support/response-policy.ts",
+      "sha256": "20db230a974897e3ea70d75bab0af1e76a56760e4f6ecd30e910c8b8e1ab3923",
+      "changedInCorrection": true
+    },
+    {
+      "path": "packages/kernel/src/index.ts",
+      "sha256": "206c7eb204dc28bbb507892f87a431198f6ef98c03de75dc1cff04d3fcc3cc11",
+      "changedInCorrection": true
+    },
+    {
+      "path": "packages/kernel/src/support-credentials.ts",
+      "sha256": "ce1019f1156833642592d21a03cfb6b758142ebc43766c201128bea5c075492b",
+      "changedInCorrection": true
+    },
+    {
+      "path": "packages/kernel/src/support-text-views.ts",
+      "sha256": "e43bf7e2c6c745617877155aeb96ad4e27da4b0e9b7f99d9299a0594c0d551c9",
+      "changedInCorrection": true
+    },
+    {
+      "path": "packages/support-kb/src/context.ts",
+      "sha256": "b7d3a231f0c7ddca9fcc5f756cd6a2ccead7211dc9d2eddc32bb6417d386d288",
+      "changedInCorrection": true
+    },
+    {
+      "path": "tests/unit/support-model-references.test.ts",
+      "sha256": "63c0aa1363f1c06bd751d4d9f7f32d553be566611b56350524ff4ae70fe7b293",
+      "changedInCorrection": true
+    },
+    {
+      "path": "tests/unit/support-answer-context.test.ts",
+      "sha256": "565958e25e9e3df95d416548b4a39ae01d1a7350b63bc1415cf8d64c5196208e",
+      "changedInCorrection": true
+    },
+    {
+      "path": "tests/unit/support-context.test.ts",
+      "sha256": "6146f12a64e34aa756a541e39d5de436130b2b931d587cfdb49215c3b51bbcb4",
+      "changedInCorrection": true
+    }
+  ],
+  "allChangedPaths": [
+    "apps/api/src/support/answer.ts",
+    "apps/api/src/support/model-references.ts",
+    "apps/api/src/support/response-policy.ts",
+    "packages/kernel/src/index.ts",
+    "packages/kernel/src/support-credentials.ts",
+    "packages/kernel/src/support-text-views.ts",
+    "packages/support-kb/src/context.ts",
+    "tests/integration/support-cases.test.ts",
+    "tests/integration/support-routes.test.ts",
+    "tests/unit/support-answer-context.test.ts",
+    "tests/unit/support-context.test.ts",
+    "tests/unit/support-credentials.test.ts",
+    "tests/unit/support-model-references.test.ts",
+    "tests/unit/support-redaction.test.ts",
+    "tests/unit/support-response-policy.test.ts",
+    "tests/unit/support-text-views.test.ts"
+  ],
+  "historicalReuse": "Prior pass1 package immutable evidence retained by reference; no wholesale reread required. Current full product inventory must still be verified mechanically.",
+  "mechanicalFloor": "Verify GATE_P2 manifest hash, full103current product hashes, and own index input hashes; read contents only as needed for this lens."
+}

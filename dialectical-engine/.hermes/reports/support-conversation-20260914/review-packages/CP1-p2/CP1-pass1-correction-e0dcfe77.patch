@@ -1,0 +1,1296 @@
+diff --git a/dialectical-engine/apps/api/src/support/answer.ts b/dialectical-engine/apps/api/src/support/answer.ts
+index ff78be8cf5bc7f352ea384718aab0d0b017c2d64..3ccff86225f2be7bb66f3016e41be0e763b993e6 100644
+--- a/dialectical-engine/apps/api/src/support/answer.ts
++++ b/dialectical-engine/apps/api/src/support/answer.ts
+@@ -20,6 +20,10 @@ import type { SupportDegradedPort } from "./degraded.js";
+ import {
+   diagnoseSupportDraft,parseSupportDraft,type SupportDraftReport,validateSupportDraft
+ } from "./response-policy.js";
++import {
++  createSupportModelReferenceFactory,translateSupportDraftReferences,
++  type SupportModelReferenceFactory
++} from "./model-references.js";
+ 
+ const MAX_RETRIEVED_ENTRIES = 3;
+ const MAX_SYSTEM_CODE_POINTS = 24_000;
+@@ -126,7 +130,7 @@ function boundedSystem(entries: readonly HelpCorpusEntry[], language: SupportLan
+ }
+ 
+ function structuredInstruction(language: SupportLanguage): string {
+-  const shape = '{"kind":"answer","text":"<grounded answer>","sourceIds":["<allowed source id>"],"actionIds":[]}';
++  const shape = '{"kind":"answer","text":"<grounded answer>","sourceIds":["<allowed source reference>"],"actionIds":[]}';
+   return language === "ro"
+     ? `Returnează numai un singur obiect JSON, fără alte chei și fără text înainte sau după: ${shape}. kind trebuie să fie answer. Secțiunea finală OUTPUT CONTRACT enumeră singurele sourceIds și actionIds permise; înlocuiește exemplele și copiază identificatorii exact, citând cel puțin un sourceId. Nu scrie niciodată identificatori de surse, acțiuni sau capabilități, rute ori căi în text; exprimă navigarea numai prin actionIds. Poți explica limite și condiții despre setările de securitate, dar nu solicita, primi, transforma, verifica sau repeta niciodată parole, coduri ori alte date de autentificare și nu afirma că ai efectuat o schimbare de securitate.`
+     : `Return only one JSON object, with no other keys and no text before or after it: ${shape}. kind must be answer. The final OUTPUT CONTRACT lists the only allowed sourceIds and actionIds; replace the examples and copy identifiers exactly, citing at least one sourceId. Never write source IDs, action IDs, capability IDs, routes, or paths inside text; express navigation only through actionIds. You may explain limitations and prerequisites for security settings, but never request, receive, transform, validate, or repeat passwords, codes, or other credentials, and never claim that you performed a security change.`;
+@@ -185,6 +189,7 @@ export function createSupportAnswerService(input: Readonly<{
+   degraded?: SupportDegradedPort;
+   incidents?: Pick<SupportIncidentRepositoryPort,"readActiveIncidents">;
+   reportDraftDiagnostic?: (diagnostic: SupportDraftReport) => void;
++  modelReferenceFactory?: () => SupportModelReferenceFactory;
+   clock?: () => Date;
+ }>): SupportAnswerPort {
+   const clock = input.clock ?? (() => new Date());
+@@ -201,6 +206,8 @@ export function createSupportAnswerService(input: Readonly<{
+       const availableActionIds = resolveSupportActions(SUPPORT_ACTION_IDS,{
+         signedIn: request.signedIn === true,language: request.language
+       }).map(({ id }) => id);
++      const modelReferenceFactory = structured
++        ? (input.modelReferenceFactory ?? createSupportModelReferenceFactory)() : undefined;
+       const context = structured ? buildSupportKnowledgeContext({
+         entries: eligibleEntries,
+         capabilities: SUPPORT_CAPABILITIES,
+@@ -208,6 +215,7 @@ export function createSupportAnswerService(input: Readonly<{
+         query: prepared.text,
+         historyText: "",
+         availableActionIds,
++        referenceFor: modelReferenceFactory!.referenceFor,
+         maxCodePoints: MAX_SYSTEM_CODE_POINTS
+           - [...`${structuredInstruction(request.language)}\n\n`].length
+       }) : undefined;
+@@ -283,18 +291,36 @@ export function createSupportAnswerService(input: Readonly<{
+           throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
+         }
+         const diagnostic = structured ? diagnoseSupportDraft(
+-          completion.text,context!.sourceIds,context!.requestedActionIds
++          completion.text,
++          context!.sourceReferences.map(({ reference }) => reference),
++          context!.actionReferences.map(({ reference }) => reference),
++          [
++            ...context!.sourceIds,...context!.requestedActionIds,
++            ...context!.sourceReferences.map(({ reference }) => reference),
++            ...context!.actionReferences.map(({ reference }) => reference)
++          ]
+         ) : undefined;
+         if (diagnostic !== undefined && diagnostic.code !== "ACCEPTED") {
+           input.reportDraftDiagnostic?.(Object.freeze({ attemptId,...diagnostic }));
+         }
+         const parsed = structured
+-          ? parseSupportDraft(completion.text,context!.sourceIds) : undefined;
+-        const draft = !structured ? undefined
++          ? parseSupportDraft(completion.text,[
++            ...context!.sourceIds,...context!.requestedActionIds,
++            ...context!.sourceReferences.map(({ reference }) => reference),
++            ...context!.actionReferences.map(({ reference }) => reference)
++          ]) : undefined;
++        const referenceDraft = !structured ? undefined
+           : parsed === null || parsed === undefined ? null
+           : validateSupportDraft(
+-            parsed,context!.sourceIds,context!.requestedActionIds
++            parsed,
++            context!.sourceReferences.map(({ reference }) => reference),
++            context!.actionReferences.map(({ reference }) => reference)
+           );
++        const draft = !structured ? undefined
++          : referenceDraft === null || referenceDraft === undefined ? null
++          : translateSupportDraftReferences(referenceDraft,{
++            sources:context!.sourceReferences,actions:context!.actionReferences
++          });
+         const rejected = structured && draft === null;
+         const modelText = structured
+           ? rejected ? supportTemplate("REFUSE_SAFETY",request.language) : draft!.text
+diff --git a/dialectical-engine/apps/api/src/support/model-references.ts b/dialectical-engine/apps/api/src/support/model-references.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..12815ac01e20aa9690e24fc373c7c3b3175fd852
+--- /dev/null
++++ b/dialectical-engine/apps/api/src/support/model-references.ts
+@@ -0,0 +1,54 @@
++import { randomUUID } from "node:crypto";
++import type { SupportActionId } from "@debateai/support-kb/catalog";
++import type { SupportDraft } from "./response-policy.js";
++
++export type SupportModelReferenceKind = "source" | "action";
++export type SupportModelReferenceFactory = Readonly<{
++  referenceFor(kind: SupportModelReferenceKind,index: number): string;
++}>;
++export type SupportModelReferencePair<CanonicalId extends string = string> = Readonly<{
++  reference: string;
++  canonicalId: CanonicalId;
++}>;
++export type SupportModelReferenceMap = Readonly<{
++  sources: readonly SupportModelReferencePair[];
++  actions: readonly SupportModelReferencePair<SupportActionId>[];
++}>;
++export type CanonicalSupportDraft = Readonly<{
++  kind: "answer";
++  text: string;
++  sourceIds: readonly string[];
++  actionIds: readonly SupportActionId[];
++}>;
++
++export function createSupportModelReferenceFactory(
++  requestId: string = randomUUID()
++): SupportModelReferenceFactory {
++  const namespace = requestId.toLocaleLowerCase("en-US").replaceAll("-","");
++  if (!/^[0-9a-f]{32}$/u.test(namespace)) throw new TypeError("SUPPORT_MODEL_REFERENCE_NAMESPACE_INVALID");
++  return Object.freeze({
++    referenceFor: (kind,index) => {
++      if (!Number.isSafeInteger(index) || index < 0 || index >= 3) {
++        throw new TypeError("SUPPORT_MODEL_REFERENCE_INDEX_INVALID");
++      }
++      return `${kind === "source" ? "s" : "a"}-${namespace}-${index + 1}`;
++    }
++  });
++}
++
++export function translateSupportDraftReferences(
++  draft: SupportDraft,references: SupportModelReferenceMap
++): CanonicalSupportDraft | null {
++  if (new Set(draft.sourceIds).size !== draft.sourceIds.length
++    || new Set(draft.actionIds).size !== draft.actionIds.length) return null;
++  const sources = new Map(references.sources.map(({ reference,canonicalId }) => [reference,canonicalId]));
++  const actions = new Map(references.actions.map(({ reference,canonicalId }) => [reference,canonicalId]));
++  const sourceIds = draft.sourceIds.map((reference) => sources.get(reference));
++  const actionIds = draft.actionIds.map((reference) => actions.get(reference));
++  if (sourceIds.some((id) => id === undefined) || actionIds.some((id) => id === undefined)) return null;
++  return Object.freeze({
++    kind:"answer",text:draft.text,
++    sourceIds:Object.freeze(sourceIds as string[]),
++    actionIds:Object.freeze(actionIds as SupportActionId[])
++  });
++}
+diff --git a/dialectical-engine/apps/api/src/support/response-policy.ts b/dialectical-engine/apps/api/src/support/response-policy.ts
+index 74232bcfacb57fb46a9d82c3b40dd81e2a7db5a9..8e93a51aa1b17b2e02e380de2fd93f2fe4c1af17 100644
+--- a/dialectical-engine/apps/api/src/support/response-policy.ts
++++ b/dialectical-engine/apps/api/src/support/response-policy.ts
+@@ -1,5 +1,5 @@
+ import { z } from "zod";
+-import { analyzeSupportCredentialText } from "@debateai/kernel";
++import { analyzeSupportCredentialText,canonicalSupportTextViews } from "@debateai/kernel";
+ import {
+   SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,type SupportActionId
+ } from "@debateai/support-kb/catalog";
+@@ -24,7 +24,7 @@ export type SupportDraft = Readonly<{
+   kind: "answer";
+   text: string;
+   sourceIds: readonly string[];
+-  actionIds: readonly SupportActionId[];
++  actionIds: readonly string[];
+ }>;
+ export type SupportCaseSummaryDraft = Readonly<{
+   kind: "case_summary";
+@@ -127,25 +127,10 @@ const SIX_DIGIT_CODE = /\b\d{6}\b/u;
+ const GROUPED_SECURITY_CODE = /\b\d{3,8}(?:[- ]\d{3,8})+\b/u;
+ const REDACTION_ECHO = /\[REDACTED_(?:SECRET_LIKE|CONTACT|URL_QUERY)\]/u;
+ const NARRATIVE_ID = /\b[a-z0-9]+(?:-[a-z0-9]+)+\b/giu;
+-const AMBIGUOUS_HUMAN_IDS = new Set([
+-  "forgot-password","privacy-preferences","sign-in","support-status"
+-]);
+ const CLOSED_NARRATIVE_IDS = new Set<string>([
+   ...SUPPORT_ACTION_IDS,...SUPPORT_CAPABILITIES.map(({ id }) => id),
+   ...SUPPORT_CAPABILITIES.flatMap(({ articleIds }) => articleIds)
+-].filter((id) => id.includes("-") && !AMBIGUOUS_HUMAN_IDS.has(id)));
+-
+-function normalizedForScreening(value: string): readonly string[] {
+-  const values = [value.normalize("NFKC").replace(/[\p{Cc}\p{Cf}]/gu,"")];
+-  for (let pass = 0; pass < 2; pass += 1) {
+-    try {
+-      const decoded = decodeURIComponent(values.at(-1)!);
+-      if (decoded === values.at(-1)) break;
+-      values.push(decoded.normalize("NFKC").replace(/[\p{Cc}\p{Cf}]/gu,""));
+-    } catch { break; }
+-  }
+-  return Object.freeze(values);
+-}
++].filter((id) => id.includes("-")));
+ 
+ function containsCredentialOrSecurityAction(value: string): boolean {
+   const facts = analyzeSupportCredentialText(value);
+@@ -169,10 +154,12 @@ function result(
+   code: SupportDraftDiagnosticCode,predicate: SupportDraftPredicate
+ ): TextScreenResult { return Object.freeze({ code,predicate }); }
+ 
+-function linkPredicate(normalized: readonly string[]): SupportDraftPredicate | null {
+-  for (const candidate of normalized) {
++function linkPredicate(value: string): SupportDraftPredicate | null {
++  const canonical = canonicalSupportTextViews(value);
++  if (canonical.unsafeEncoding) return "ENCODED_LINK_OR_PATH";
++  for (const candidate of canonical.views) {
+     if (!MARKUP_OR_LINK.test(candidate)) continue;
+-    if (candidate !== normalized[0]) return "ENCODED_LINK_OR_PATH";
++    if (candidate !== canonical.views[0]) return "ENCODED_LINK_OR_PATH";
+     if (/(?:\[[^\]]+\]\s*\(|<\/?[a-z][^>]*>)/iu.test(candidate)) return "MARKUP";
+     if (/(?:https?:\/\/|www\.|(?:^|\s)\/\/)/iu.test(candidate)) return "RAW_LINK_OR_PROTOCOL";
+     return "PATH_OR_ROUTE";
+@@ -185,7 +172,7 @@ function containsInternalIdentifier(
+ ): boolean {
+   const ids = new Set(CLOSED_NARRATIVE_IDS);
+   for (const id of additionalIds) if (id.includes("-")) ids.add(id.toLocaleLowerCase("en-US"));
+-  return normalizedForScreening(value).some((candidate) => {
++  return canonicalSupportTextViews(value).views.some((candidate) => {
+     NARRATIVE_ID.lastIndex = 0;
+     return [...candidate.toLocaleLowerCase("en-US").matchAll(NARRATIVE_ID)]
+       .some(([id]) => ids.has(id));
+@@ -194,15 +181,17 @@ function containsInternalIdentifier(
+ 
+ function screenCategory(value: string,internalIds: readonly string[] = []): TextScreenResult | null {
+   if ([...value].length > MAX_TEXT_CODE_POINTS) return result("TEXT_TOO_LONG","TEXT_LENGTH");
+-  const normalized = normalizedForScreening(value);
++  const canonical = canonicalSupportTextViews(value);
++  const normalized = canonical.views;
+   if (normalized[0]!.trim() === "") return result("TEXT_EMPTY","TEXT_EMPTY");
+-  const unsafeLink = linkPredicate(normalized);
++  const unsafeLink = linkPredicate(value);
+   if (unsafeLink !== null) return result("TEXT_LINK_OR_MARKUP",unsafeLink);
+-  if (analyzeSupportCredentialText(value).credentialValueSpans.length > 0
++  if (normalized.some((candidate) =>
++    analyzeSupportCredentialText(candidate).credentialValueSpans.length > 0)
+     || normalized.some((candidate) => SECRET_LIKE.test(candidate))) {
+     return result("TEXT_SECRET_LIKE","LABELLED_OR_TOKEN_SECRET");
+   }
+-  if (containsCredentialOrSecurityAction(value)) {
++  if (normalized.some(containsCredentialOrSecurityAction)) {
+     return result("TEXT_CREDENTIAL_OR_SECURITY_ACTION","CREDENTIAL_OPERATION");
+   }
+   if (normalized.some((candidate) => SIX_DIGIT_CODE.test(candidate))) {
+@@ -229,7 +218,8 @@ const ANSWER_KEYS = Object.freeze(["actionIds","kind","sourceIds","text"]);
+ export function diagnoseSupportDraft(
+   raw: string,
+   allowedSourceIds: readonly string[],
+-  allowedActionIds: readonly SupportActionId[]
++  allowedActionIds: readonly string[],
++  narrativeInternalIds: readonly string[] = [...allowedSourceIds,...allowedActionIds]
+ ): SupportDraftDiagnostic {
+   const fenced = raw.trimStart().startsWith("```") || raw.trimEnd().endsWith("```");
+   const base: Omit<SupportDraftDiagnostic,"code" | "predicate"> = {
+@@ -272,7 +262,7 @@ export function diagnoseSupportDraft(
+   if (!kindValid) return result("KIND_INVALID","KIND",values);
+   const parsed = schema.safeParse(decoded);
+   if (!parsed.success) return result("SCHEMA_INVALID","SCHEMA",values);
+-  const unsafeText = screenCategory(parsed.data.text,allowedSourceIds);
++  const unsafeText = screenCategory(parsed.data.text,narrativeInternalIds);
+   if (unsafeText !== null) return result(unsafeText.code,unsafeText.predicate,values);
+   if (parsed.data.sourceIds.length === 0
+     || new Set(parsed.data.sourceIds).size !== parsed.data.sourceIds.length
+@@ -295,7 +285,7 @@ export function parseSupportDraft(raw: string,internalIds: readonly string[] = [
+       kind: parsed.data.kind,
+       text: parsed.data.text,
+       sourceIds: Object.freeze([...parsed.data.sourceIds]),
+-      actionIds: Object.freeze([...parsed.data.actionIds] as SupportActionId[])
++      actionIds: Object.freeze([...parsed.data.actionIds])
+     });
+   } catch {
+     return null;
+diff --git a/dialectical-engine/packages/kernel/src/index.ts b/dialectical-engine/packages/kernel/src/index.ts
+index 62e348fd0a616ef02771ba96ea4a113e0e4295bf..d49d73452ed01e1b8ad3c8f970c5015343b853b5 100644
+--- a/dialectical-engine/packages/kernel/src/index.ts
++++ b/dialectical-engine/packages/kernel/src/index.ts
+@@ -283,6 +283,7 @@ export function exhaustive(value: never): never {
+ }
+ 
+ export * from "./support-credentials.js";
++export * from "./support-text-views.js";
+ 
+ export class TypedDomainError extends Error {
+   constructor(readonly code: string, message: string) {
+diff --git a/dialectical-engine/packages/kernel/src/support-credentials.ts b/dialectical-engine/packages/kernel/src/support-credentials.ts
+index d0902905fb4dad77e805c8beee29a98449950ca1..1d01360645a8660cba0ea690a415b586d7127a03 100644
+--- a/dialectical-engine/packages/kernel/src/support-credentials.ts
++++ b/dialectical-engine/packages/kernel/src/support-credentials.ts
+@@ -67,7 +67,7 @@ const TERM_PATTERNS: readonly Readonly<{
+ const OPERATION_PATTERNS: readonly Readonly<{
+   kind: SupportSecurityOperationKind;pattern: RegExp;
+ }>[] = Object.freeze([
+-  { kind: "solicit",pattern: /\b(?:send(?:ing)?|sent|shar(?:e|es|ed|ing)|provid(?:e|es|ed|ing)|giv(?:e|es|en|ing)|suppl(?:y|ies|ied|ying)|request(?:s|ed|ing)?|ask(?:s|ed|ing)?|submit(?:s|ted|ting)?|enter(?:s|ed|ing)?|typ(?:e|es|ed|ing)|past(?:e|es|ed|ing)|upload(?:s|ed|ing)?|tell(?:s|ing)?|told|show(?:s|ed|ing)?|solicit\p{L}*|trimit\p{L}*|partaj\p{L}*|furniz\p{L}*|introduc\p{L}*|lip\p{L}*|incarc\p{L}*|spun\p{L}*|arat\p{L}*)\b/giu },
++  { kind: "solicit",pattern: /\b(?:send(?:ing)?|sent|shar(?:e|es|ed|ing)|provid(?:e|es|ed|ing)|giv(?:e|es|en|ing)|suppl(?:y|ies|ied|ying)|request(?:s|ed|ing)?|ask(?:s|ed|ing)?|submit(?:s|ted|ting)?|enter(?:s|ed|ing)?|typ(?:e|es|ed|ing)|past(?:e|es|ed|ing)|upload(?:s|ed|ing)?|tell(?:s|ing)?|told|show(?:s|ed|ing)?|solicit\p{L}*|cer\p{L}*|trimit\p{L}*|partaj\p{L}*|furniz\p{L}*|introduc\p{L}*|lip\p{L}*|incarc\p{L}*|spun\p{L}*|arat\p{L}*)\b/giu },
+   { kind: "receive",pattern: /\b(?:receiv(?:e|es|ed|ing)|accept(?:s|ed|ing)?|prim\p{L}*|accept\p{L}*)\b/giu },
+   { kind: "repeat",pattern: /\b(?:repeat(?:s|ed|ing)?|repet\p{L}*)\b/giu },
+   { kind: "transform",pattern: /\b(?:transform(?:s|ed|ing)?|decod(?:e|es|ed|ing)|encod(?:e|es|ed|ing)|transform\p{L}*|decod\p{L}*|encod\p{L}*)\b/giu },
+@@ -77,10 +77,18 @@ const OPERATION_PATTERNS: readonly Readonly<{
+ ]);
+ 
+ const NEGATION = /\b(?:never|do\s+not|does\s+not|did\s+not|cannot|can\s+not|can't|must\s+not|will\s+not|should\s+not|nu|niciodata|nu\s+poate|nu\s+pot|nu\s+trebuie)\b/giu;
+-const REFERENCE = /(?:\b(?:it|them|this|that|these|those|acesta|aceasta|acestea|acestora)\b|-o\b|-le\b)/giu;
+-const SCOPE_BOUNDARY = /(?:[.!?;\n]+|\b(?:but|however|instead|except|unless|then|dar|insa|apoi|in\s+schimb)\b|\b(?:and|si)\s+(?=(?:you|the\s+visitor|support|i|we|they|should|must|will|can|please|send|share|provide|give|submit|enter|paste|upload|tell|show|receive|accept|repeat|transform|validate|decode|encode|reset|change|replace|regenerate|tu|vizitator|asistenta|trebuie|poti|vei|va|trim|partaj|furniz|introduc|lip|incarc|spun|arat|prim|accept|repet|transform|valid|decod|encod|reset|schimb|inlocu|regener)))/giu;
++const REFERENCE = /(?:\b(?:it|them|this|that|these|those|acesta|aceasta|acestea|acestora|le|lor)\b|-o\b|-le\b)/giu;
++const SCOPE_BOUNDARY = /(?:[.!?;\n]+|,?\s*\b(?:but|however|instead|except|unless|then|therefore|thus|so|as\s+a\s+result|because|while|although|yet|which\s+means|and\s+(?:also|then|generally|sometimes|later|still)|dar|insa|apoi|deci|asa\s+ca|prin\s+urmare|deoarece|fiindca|desi|totusi|ceea\s+ce\s+inseamna|si\s+de\s+asemenea)\b|\b(?:and|si)\s+(?=(?:you|the\s+visitor|support|i|we|they|should|must|will|can|please|send|share|provide|give|submit|enter|paste|upload|tell|show|receive|accept|repeat|transform|validate|decode|encode|reset|change|replace|regenerate|tu|vizitator|asistenta|trebuie|poti|vei|va|trim|partaj|furniz|introduc|lip|incarc|spun|arat|prim|accept|repet|transform|valid|decod|encod|reset|schimb|inlocu|regener)))/giu;
+ const SENTENCE_BOUNDARY = /[.!?;\n]+/gu;
+-const LABEL_CONNECTOR = /^\s*(?:(?:my|your|his|her|our|their|visitor(?:'s)?|meu|mea|mele|ta|tau|dvs|dumneavoastra|utilizatorului)\s+){0,2}(?:(?:is|are|este|e|sunt)\b|:|=)\s*([^\s,;.!?]+)/iu;
++const LABEL_CONNECTOR = /^\s*(?:(?:my|your|his|her|our|their|visitor(?:'s)?|meu|mea|mele|ta|tau|dvs|dumneavoastra|utilizatorului)\s+){0,2}(?:(?:is|are|este|e|sunt)\b|:|=)\s*/iu;
++const VALUE_TOKEN = /^[^\s,;.!?]+/u;
++const VALUE_STOP_WORDS = new Set([
++  "and","but","because","keep","please","so","then","therefore","which","while",
++  "asa","apoi","dar","deci","iar","pastreaza","pentru","si"
++]);
++const QUOTE_PAIRS = new Map([["\"","\""],["'","'"],["„","”"],["“","”"],["«","»"]]);
++const MAX_VALUE_WORDS = 6;
++const MAX_VALUE_CODE_UNITS = 160;
+ const NON_VALUE_WORDS = new Set([
+   "available","disponibil","disponibile","encrypted","forgotten","invalid","missing","never","not","private","protected",
+   "required","safe","secure","unavailable","unknown","niciodata","nu","necesara",
+@@ -148,6 +156,27 @@ function uniqueSpans(spans: readonly SupportTextSpan[]): readonly SupportTextSpa
+     }));
+ }
+ 
++function labelledValueSpan(text: string,start: number): Readonly<{ start: number;end: number }> | null {
++  const first = text[start];
++  const closing = first === undefined ? undefined : QUOTE_PAIRS.get(first);
++  if (closing !== undefined) {
++    const end = text.indexOf(closing,start + 1);
++    if (end <= start + 1 || end - start > MAX_VALUE_CODE_UNITS) return null;
++    return Object.freeze({ start:start + 1,end });
++  }
++  let cursor = start;
++  let end = start;
++  for (let count = 0;count < MAX_VALUE_WORDS;count += 1) {
++    const spacing = /^\s*/u.exec(text.slice(cursor))?.[0] ?? "";
++    const tokenStart = cursor + spacing.length;
++    const token = VALUE_TOKEN.exec(text.slice(tokenStart))?.[0];
++    if (token === undefined || VALUE_STOP_WORDS.has(token) || tokenStart - start > MAX_VALUE_CODE_UNITS) break;
++    end = tokenStart + token.length;
++    cursor = end;
++  }
++  return end > start ? Object.freeze({ start,end }) : null;
++}
++
+ export function analyzeSupportCredentialText(source: string): SupportCredentialFacts {
+   const normalized = normalizeWithMap(source);
+   const scopes = scopesFor(normalized.text);
+@@ -172,10 +201,13 @@ export function analyzeSupportCredentialText(source: string): SupportCredentialF
+   for (const term of normalizedTerms) {
+     const suffix = normalized.text.slice(term.end,term.end + 120);
+     const connector = LABEL_CONNECTOR.exec(suffix);
+-    const value = connector?.[1];
+-    if (connector === null || value === undefined || NON_VALUE_WORDS.has(value)) continue;
+-    const relative = connector[0].lastIndexOf(value);
+-    values.push(originalSpan(normalized,term.end + relative,term.end + relative + value.length));
++    if (connector === null) continue;
++    const valueStart = term.end + connector[0].length;
++    const span = labelledValueSpan(normalized.text,valueStart);
++    if (span === null) continue;
++    const firstWord = normalized.text.slice(span.start,span.end).split(/\s+/u)[0]!;
++    if (NON_VALUE_WORDS.has(firstWord)) continue;
++    values.push(originalSpan(normalized,span.start,span.end));
+   }
+ 
+   const negations: SupportScopedFact[] = [];
+diff --git a/dialectical-engine/packages/kernel/src/support-text-views.ts b/dialectical-engine/packages/kernel/src/support-text-views.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..1841f93a1e88ad3d344485cf212436a41d4e10df
+--- /dev/null
++++ b/dialectical-engine/packages/kernel/src/support-text-views.ts
+@@ -0,0 +1,37 @@
++export type CanonicalSupportTextViews = Readonly<{
++  views: readonly string[];
++  unsafeEncoding: boolean;
++}>;
++
++const MAX_DECODE_PASSES = 4;
++const ENCODED_RUN = /(?:%[0-9a-f]{2})+/giu;
++const UNRESOLVED_DANGEROUS_ENCODING = /%[0-9a-f]{2}/iu;
++const MALFORMED_STRUCTURAL_ENCODING = /%(?:2f|3a|5c|2|3|5)(?![0-9a-f])/iu;
++
++function normalized(value: string): string {
++  return value.normalize("NFKC").replace(/[\p{Cc}\p{Cf}]/gu,"");
++}
++
++function decodeRuns(value: string): string {
++  return value.replace(ENCODED_RUN,(run) => {
++    try { return decodeURIComponent(run); }
++    catch { return run; }
++  });
++}
++
++/** Bounded canonical views for Support output screening; decoding never expands input. */
++export function canonicalSupportTextViews(value: string): CanonicalSupportTextViews {
++  const views: string[] = [normalized(value)];
++  for (let pass = 0;pass < MAX_DECODE_PASSES;pass += 1) {
++    const previous = views.at(-1)!;
++    const decoded = normalized(decodeRuns(previous));
++    if (decoded === previous) break;
++    views.push(decoded);
++  }
++  const final = views.at(-1)!;
++  return Object.freeze({
++    views:Object.freeze([...new Set(views)]),
++    unsafeEncoding: UNRESOLVED_DANGEROUS_ENCODING.test(final)
++      || MALFORMED_STRUCTURAL_ENCODING.test(final)
++  });
++}
+diff --git a/dialectical-engine/packages/support-kb/src/context.ts b/dialectical-engine/packages/support-kb/src/context.ts
+index 3a69f4ba8102bad6226458317a54c4b268aea0eb..4d67ace28c5fbaa766e62d1503af3ad2d770cf4e 100644
+--- a/dialectical-engine/packages/support-kb/src/context.ts
++++ b/dialectical-engine/packages/support-kb/src/context.ts
+@@ -1,10 +1,19 @@
+ import type { HelpCorpusEntry } from "./index.js";
+-import type { SupportActionId, SupportCapability, SupportLanguage } from "./catalog.js";
++import {
++  SUPPORT_ACTION_CATALOG,type SupportActionId,type SupportCapability,type SupportLanguage
++} from "./catalog.js";
++
++export type SupportKnowledgeReference<CanonicalId extends string = string> = Readonly<{
++  reference: string;
++  canonicalId: CanonicalId;
++}>;
+ 
+ export type SupportKnowledgeContext = Readonly<{
+   text: string;
+   sourceIds: readonly string[];
+   requestedActionIds: readonly SupportActionId[];
++  sourceReferences: readonly SupportKnowledgeReference[];
++  actionReferences: readonly SupportKnowledgeReference<SupportActionId>[];
+ }>;
+ 
+ const POLICY: Readonly<Record<SupportLanguage, readonly string[]>> = Object.freeze({
+@@ -12,14 +21,14 @@ const POLICY: Readonly<Record<SupportLanguage, readonly string[]>> = Object.free
+     "Use only the reviewed sources and capability catalog below.",
+     "Never request, receive, repeat, or submit credentials or security codes.",
+     "Never claim that Support changed account or security state.",
+-    "Name actions only by their closed action id; never invent a URL.",
++    "Use only the request references listed in the output contract; never invent a URL.",
+     "Describe unavailable, local-only, conditional, and owner-only behavior honestly.",
+   ]),
+   ro: Object.freeze([
+     "Folosește numai sursele verificate și catalogul de capabilități de mai jos.",
+     "Nu solicita, primi, repeta sau trimite niciodată parole ori coduri de securitate.",
+     "Nu afirma niciodată că Asistența a schimbat starea contului sau a securității.",
+-    "Numește acțiunile numai prin identificatorul lor închis; nu inventa un URL.",
++    "Folosește numai referințele cererii enumerate în contractul de ieșire; nu inventa un URL.",
+     "Descrie corect comportamentele indisponibile, locale, condiționate și rezervate proprietarului.",
+   ]),
+ });
+@@ -66,20 +75,32 @@ function baseSection(
+   availableActionIds: ReadonlySet<SupportActionId>,
+ ): string {
+   const policy = POLICY[language].map((line) => `- ${line}`).join("\n");
++  const actionById = new Map(SUPPORT_ACTION_CATALOG.map((action) => [action.id,action]));
++  const availability: Readonly<Record<SupportCapability["availability"],Readonly<Record<SupportLanguage,string>>>> = {
++    public: { en:"available to all visitors",ro:"disponibilă tuturor vizitatorilor" },
++    "signed-out": { en:"available to signed-out visitors",ro:"disponibilă vizitatorilor neautentificați" },
++    "signed-in": { en:"available to signed-in visitors",ro:"disponibilă vizitatorilor autentificați" },
++    owner: { en:"available only in verified owner context",ro:"disponibilă numai într-un context verificat de proprietar" },
++    "public-reference": { en:"available with a verified public debate reference",ro:"disponibilă cu o referință verificată la o dezbatere publică" },
++    unresolved: { en:"destination not yet verified",ro:"destinație încă neverificată" },
++    excluded: { en:"not available through Support",ro:"indisponibilă prin Asistență" }
++  };
+   const catalog = capabilities.map((item) => {
+     const available = item.actionIds.filter((id) => availableActionIds.has(id));
+-    const actions = available.length === 0 ? "none" : available.join(", ");
+-    return `- ${item.id}: ${item.labels[language]} | route=${item.route} | availability=${item.availability} | actions=${actions}`;
++    const actions = available.length === 0 ? "none" : available
++      .map((id) => actionById.get(id)?.labels[language])
++      .filter((label): label is string => label !== undefined).join(", ");
++    return `- ${item.labels[language]} | ${availability[item.availability][language]} | actions=${actions}`;
+   }).join("\n");
+   return `SUPPORT POLICY\n${policy}\n\nCAPABILITY CATALOG\n${catalog}`;
+ }
+ 
+-function articleSection(entry: HelpCorpusEntry): string {
+-  return `\n\nSOURCE ${entry.id}\nTITLE: ${entry.title}\n${entry.body}`;
++function articleSection(entry: HelpCorpusEntry,reference: string): string {
++  return `\n\nSOURCE ${reference}\nTITLE: ${entry.title}\n${entry.body}`;
+ }
+ 
+ function outputContract(
+-  sourceIds: readonly string[],actionIds: readonly SupportActionId[]
++  sourceIds: readonly string[],actionIds: readonly string[]
+ ): string {
+   return [
+     "\n\nOUTPUT CONTRACT",
+@@ -96,6 +117,7 @@ export function buildSupportKnowledgeContext(input: Readonly<{
+   historyText: "";
+   maxCodePoints: number;
+   availableActionIds: readonly SupportActionId[];
++  referenceFor(kind: "source" | "action",index: number): string;
+ }>): SupportKnowledgeContext {
+   if (input.historyText !== "") throw new Error("SUPPORT_KB_HISTORY_NOT_AVAILABLE_IN_CP1");
+   const availableActionIds = new Set(input.availableActionIds);
+@@ -125,7 +147,11 @@ export function buildSupportKnowledgeContext(input: Readonly<{
+     }
+     if (actionIds.length === 3) break;
+   }
+-  if ([...`${base}${outputContract([],actionIds)}`].length > input.maxCodePoints) {
++  const actionReferences = actionIds.map((canonicalId,index) => Object.freeze({
++    reference:input.referenceFor("action",index),canonicalId
++  }));
++  if ([...`${base}${outputContract([],actionReferences.map(({ reference }) => reference))}`].length
++    > input.maxCodePoints) {
+     throw new Error("SUPPORT_KB_CONTEXT_LIMIT_TOO_SMALL");
+   }
+ 
+@@ -148,19 +174,42 @@ export function buildSupportKnowledgeContext(input: Readonly<{
+ 
+   let text = base;
+   const sourceIds: string[] = [];
++  const sourceReferences: SupportKnowledgeReference[] = [];
+   for (const { entry } of ranked) {
+     if (sourceIds.length >= 3) break;
+-    const section = articleSection(entry);
+-    if ([...`${text}${section}${outputContract([...sourceIds,entry.id],actionIds)}`].length
++    const reference = input.referenceFor("source",sourceIds.length);
++    const section = articleSection(entry,reference);
++    if ([...`${text}${section}${outputContract(
++      [...sourceReferences.map((item) => item.reference),reference],
++      actionReferences.map((item) => item.reference)
++    )}`].length
+       > input.maxCodePoints) continue;
+     text += section;
+     sourceIds.push(entry.id);
++    sourceReferences.push(Object.freeze({ reference,canonicalId:entry.id }));
++  }
++  text += outputContract(
++    sourceReferences.map(({ reference }) => reference),
++    actionReferences.map(({ reference }) => reference)
++  );
++
++  const aliases = [...sourceReferences,...actionReferences].map(({ reference }) => reference);
++  const canonicalIds = new Set([
++    ...input.capabilities.map(({ id }) => id),
++    ...input.capabilities.flatMap(({ articleIds }) => articleIds),
++    ...SUPPORT_ACTION_CATALOG.map(({ id }) => id)
++  ]);
++  if (new Set(aliases).size !== aliases.length
++    || aliases.some((alias) => !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(alias)
++      || canonicalIds.has(alias))) {
++    throw new Error("SUPPORT_KB_MODEL_REFERENCE_INVALID");
+   }
+-  text += outputContract(sourceIds,actionIds);
+ 
+   return Object.freeze({
+     text,
+     sourceIds: Object.freeze(sourceIds),
+     requestedActionIds: Object.freeze(actionIds),
++    sourceReferences: Object.freeze(sourceReferences),
++    actionReferences: Object.freeze(actionReferences)
+   });
+ }
+diff --git a/dialectical-engine/tests/integration/support-cases.test.ts b/dialectical-engine/tests/integration/support-cases.test.ts
+index 193245094a3fa4f7c35d86efea0427e88beb29af..f6e748f04a0ef8e4060f05292f62a00ad66a2623 100644
+--- a/dialectical-engine/tests/integration/support-cases.test.ts
++++ b/dialectical-engine/tests/integration/support-cases.test.ts
+@@ -413,6 +413,16 @@ describe("SUP-02 cases", () => {
+       "The advisory summary was omitted because it did not pass Support safety checks."],
+     ["en","The visitor should use start-debate to continue.",
+       "The advisory summary was omitted because it did not pass Support safety checks."]
++    ,["en","Support does not receive passwords and also asks the visitor to send them here.",
++      "The advisory summary was omitted because it did not pass Support safety checks."]
++    ,["ro","Asistența nu primește parole, așa că cere vizitatorului să le trimită aici.",
++      "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței."]
++    ,["en","Send the visitor p%61ssword to Support.",
++      "The advisory summary was omitted because it did not pass Support safety checks."]
++    ,["en","Open https%25253A%25252F%25252Fexample.test/reset.",
++      "The advisory summary was omitted because it did not pass Support safety checks."]
++    ,["en","The visitor should use forgot-password to continue.",
++      "The advisory summary was omitted because it did not pass Support safety checks."]
+   ] as const)("replaces an unsafe %s advisory summary before seal and persistence", async (
+     language,hostile,fallback
+   ) => {
+@@ -439,7 +449,7 @@ describe("SUP-02 cases", () => {
+ 
+   it("screens legacy transcript, reply, and summary plaintext during case access", async () => {
+     const caseId = randomUUID();
+-    const legacy = "legacyvalue7";
++    const legacy = "legacy inert value";
+     const fallback = "The advisory summary was omitted because it did not pass Support safety checks.";
+     const access = createSupportCaseAccessService({
+       repository: {
+@@ -460,10 +470,10 @@ describe("SUP-02 cases", () => {
+         unwrapDataKey: vi.fn(async () => Buffer.alloc(32,1)),
+         openContent: vi.fn((description: Readonly<{ kind: string }>) => {
+           if (description.kind === "case-snapshot") return Buffer.from(JSON.stringify([{
+-            messageId: randomUUID(),role: "user",text: `My password is ${legacy}`
++            messageId: randomUUID(),role: "user",text: `My password is "${legacy}".`
+           }]));
+-          if (description.kind === "case-message") return Buffer.from(`Parola mea este ${legacy}`);
+-          return Buffer.from(`Open //invalid.example/reset with password ${legacy}.`);
++          if (description.kind === "case-message") return Buffer.from(`Parola mea este „${legacy}”.`);
++          return Buffer.from(`Open //invalid.example/reset with password "${legacy}".`);
+         }),
+         sealContent: vi.fn()
+       } as never
+diff --git a/dialectical-engine/tests/integration/support-routes.test.ts b/dialectical-engine/tests/integration/support-routes.test.ts
+index 96f4115c450bab01234125339db5e0dbdb0067fa..c283cc5a92651dc1540903ecf863a60b871fbecb 100644
+--- a/dialectical-engine/tests/integration/support-routes.test.ts
++++ b/dialectical-engine/tests/integration/support-routes.test.ts
+@@ -17,6 +17,7 @@ import {
+   createSupportAnswerService,
+   type SupportAnswerPort
+ } from "../../apps/api/src/support/answer.js";
++import { createSupportModelReferenceFactory } from "../../apps/api/src/support/model-references.js";
+ import { createSupportCaseAccessService,type SupportCaseAccessPort } from "../../apps/api/src/support/cases.js";
+ import {
+   KeyBasedAdapter,
+@@ -65,6 +66,10 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
+ const KB_VERSION = "a".repeat(64);
+ const IDENTITY = testHttpIdentity("support-routes");
+ const CLOCK_BASE_MS = Date.parse("2026-09-06T12:00:00.000Z");
++const MODEL_REFERENCE_REQUEST_ID = "10000000-0000-4000-8000-000000000001";
++const MODEL_SOURCE_REFERENCE = "s-10000000000040008000000000000001-1";
++const MODEL_ACTION_REFERENCE = "a-10000000000040008000000000000001-1";
++const modelReferenceFactory = () => createSupportModelReferenceFactory(MODEL_REFERENCE_REQUEST_ID);
+ const INVALID_CLOCK_OBSERVATIONS = Object.freeze([
+   ["NaN", Number.NaN],
+   ["positive infinity", Number.POSITIVE_INFINITY],
+@@ -2053,8 +2058,8 @@ describe("SUP-01 support routes", () => {
+           text: JSON.stringify({
+             kind: "answer",
+             text: "Open the new debate page to start.",
+-            sourceIds: ["getting-started-debate"],
+-            actionIds: ["start-debate"]
++            sourceIds: [MODEL_SOURCE_REFERENCE],
++            actionIds: [MODEL_ACTION_REFERENCE]
+           }),
+           usage: Object.freeze({ input_tokens: 9,output_tokens: 11,cost_usd: 0.001 })
+         });
+@@ -2067,7 +2072,7 @@ describe("SUP-01 support routes", () => {
+     const answer = createSupportAnswerService({
+       entries: [article],snapshots,
+       messages: messageCipher,
+-      modelFor: () => model,
++      modelFor: () => model,modelReferenceFactory,
+       clock: () => instants.shift() ?? new Date(CLOCK_BASE_MS + 30)
+     });
+     const server = api(true,{ clock: () => new Date(CLOCK_BASE_MS),answerPort: answer });
+@@ -2148,10 +2153,10 @@ describe("SUP-01 support routes", () => {
+           return Object.freeze({ text: JSON.stringify({
+             kind: "answer",
+             text: "JSON export requires a served answer and readable ledger digest.",
+-            sourceIds: ["export-json"],actionIds: []
++            sourceIds: [MODEL_SOURCE_REFERENCE],actionIds: []
+           }) });
+         }
+-      }),
++      }),modelReferenceFactory,
+       clock: (() => {
+         let at = CLOCK_BASE_MS + 30_000_000;
+         return () => new Date(++at);
+@@ -2172,8 +2177,10 @@ describe("SUP-01 support routes", () => {
+       sources: [{ id: "export-json",label: "Export a debate as JSON" }],
+       actions: []
+     });
+-    expect(system).toContain("- owner-debate: Owner debate workspace");
+-    expect(system).toContain("availability=owner | actions=none");
++    expect(system).toContain("- Owner debate workspace");
++    expect(system).toContain("available only in verified owner context | actions=none");
++    expect(system).not.toContain("owner-debate:");
++    expect(system).not.toContain("route=");
+     expect(system).toContain("actionIds=none");
+     await server.close();
+   });
+@@ -2710,10 +2717,12 @@ describe("SUP-01 support routes", () => {
+   });
+ 
+   it.each([
+-    ["en","My password is routevalue7","My password is routevalue8","203.0.113.231"],
+-    ["ro","Parola mea este rutavalue7","Parola mea este rutavalue8","203.0.113.232"]
++    ["en",'My password is "route inert seven".','My password is "route inert eight".',
++      /route inert (?:seven|eight)/u,"203.0.113.231"],
++    ["ro","Parola mea este „rută inertă șapte”.","Parola mea este „rută inertă opt” .",
++      /rută inertă (?:șapte|opt)/u,"203.0.113.232"]
+   ] as const)("redacts supplied %s credentials before session storage and the E3 case snapshot", async (
+-    _language,first,second,ip
++    _language,first,second,forbidden,ip
+   ) => {
+     const respond = vi.fn<SupportAnswerPort["respond"]>();
+     const server = api(true,{ answerPort: Object.freeze({ respond }) });
+@@ -2730,7 +2739,7 @@ describe("SUP-01 support routes", () => {
+     expect(respond).not.toHaveBeenCalled();
+     const sessionMessages = await messageCipher.listSession({ sessionId: opened.body.session_id });
+     const projected = sessionMessages.map(({ text }) => text).join(" ");
+-    expect(projected).not.toMatch(/routevalue[78]|rutavalue[78]/u);
++    expect(projected).not.toMatch(forbidden);
+     expect(sessionMessages.filter(({ role }) => role === "user")
+       .every(({ redacted,text }) => redacted && text.includes("[REDACTED_SECRET_LIKE]")))
+       .toBe(true);
+@@ -2747,7 +2756,7 @@ describe("SUP-01 support routes", () => {
+     );
+     try {
+       const snapshot = plaintext.toString("utf8");
+-      expect(snapshot).not.toMatch(/routevalue[78]|rutavalue[78]/u);
++      expect(snapshot).not.toMatch(forbidden);
+       expect(snapshot).toContain("[REDACTED_SECRET_LIKE]");
+     } finally { dataKey.fill(0);plaintext.fill(0); }
+     await server.close();
+diff --git a/dialectical-engine/tests/unit/support-answer-context.test.ts b/dialectical-engine/tests/unit/support-answer-context.test.ts
+index 9715dbe533ee242812cc041c18f95f0827617c4e..5d140cab06f94e9dddccc98c78ab92279e6e2306 100644
+--- a/dialectical-engine/tests/unit/support-answer-context.test.ts
++++ b/dialectical-engine/tests/unit/support-answer-context.test.ts
+@@ -5,10 +5,16 @@ import {
+   createHelpCorpusSnapshotLookup,type HelpCorpusEntry,type LoadedHelpCorpus
+ } from "../../packages/support-kb/src/index.js";
+ import type { SupportMessageCipherPort } from "../../apps/api/src/support/session.js";
++import { createSupportModelReferenceFactory } from "../../apps/api/src/support/model-references.js";
++
++const REFERENCE_REQUEST_ID = "10000000-0000-4000-8000-000000000001";
++const SOURCE_REFERENCE = "s-10000000000040008000000000000001-1";
++const ACTION_REFERENCE = "a-10000000000040008000000000000001-1";
++const modelReferenceFactory = () => createSupportModelReferenceFactory(REFERENCE_REQUEST_ID);
+ 
+ function entry(id: string,body: string): HelpCorpusEntry {
+   return Object.freeze({
+-    id,lang: "en",title: `Crosscap ${id}`,status: "shipped",
++    id,lang: "en",title: "Crosscap article",status: "shipped",
+     sources: Object.freeze(["fixture"]),verifiedAgainst: "fixture",
+     ratifiedBy: "V",ratifiedOn: "2026-09-01",body
+   });
+@@ -37,6 +43,47 @@ function request(snapshot: LoadedHelpCorpus) {
+ }
+ 
+ describe("CP1 composed answer context", () => {
++  it("maps request-local model references to canonical response provenance", async () => {
++    const snapshot = corpus([
++      entry("getting-started-debate","create debate topic plan controls")
++    ],"9".repeat(64));
++    const sourceReference = "s-10000000000040008000000000000001-1";
++    const actionReference = "a-10000000000040008000000000000001-1";
++    let system = "";
++    const service = createSupportAnswerService({
++      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
++      modelReferenceFactory: () => Object.freeze({
++        referenceFor: (kind: "source" | "action") =>
++          kind === "source" ? sourceReference : actionReference
++      }),
++      modelFor: () => Object.freeze({
++        complete: async (input: Readonly<{ system: string }>) => {
++          system = input.system;
++          return Object.freeze({ text: JSON.stringify({
++            kind: "answer",text: "Choose Start a debate to continue.",
++            sourceIds: [sourceReference],actionIds: [actionReference]
++          }) });
++        }
++      }) as never,
++      clock: (() => { let at = Date.parse("2026-09-14T10:00:00.000Z");return () => new Date(++at); })()
++    } as never);
++
++    const result = await service.respond({
++      ...request(snapshot),text: "How do I create a debate?"
++    });
++
++    expect(result).toMatchObject({
++      outcome: "ANSWER_GROUNDED",
++      sources: [{ id: "getting-started-debate",label: "Crosscap article" }],
++      actions: [{ id: "start-debate",label: "Start a debate",href: "/login?next=%2Fnew" }]
++    });
++    expect(system).toContain(sourceReference);
++    expect(system).toContain(actionReference);
++    for (const forbidden of ["getting-started-debate","start-debate","new-debate","/new","route="]) {
++      expect(system).not.toContain(forbidden);
++    }
++  });
++
+   it("keeps matching whole reviewed sections above 12,000 and below the 24,000 system cap", async () => {
+     const entries = [
+       entry("crosscap-alpha",`alpha crosscap ${"a".repeat(4_000)} alpha-end-marker`),
+@@ -49,11 +96,11 @@ describe("CP1 composed answer context", () => {
+       system = input.system;
+       return Object.freeze({ text: JSON.stringify({
+         kind: "answer",text: "The reviewed sections describe the requested feature.",
+-        sourceIds: ["crosscap-alpha"],actionIds: []
++        sourceIds: [SOURCE_REFERENCE],actionIds: []
+       }) });
+     });
+     const service = createSupportAnswerService({
+-      entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
++      entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,modelReferenceFactory,
+       modelFor: () => Object.freeze({ complete }) as never,
+       clock: (() => { let at = Date.parse("2026-09-14T10:00:00.000Z");return () => new Date(++at); })()
+     });
+@@ -66,9 +113,9 @@ describe("CP1 composed answer context", () => {
+     expect(system).toContain("beta-end-marker");
+     expect(system).toContain("gamma-end-marker");
+     expect(system).toContain("The final OUTPUT CONTRACT lists the only allowed sourceIds and actionIds");
+-    expect(system).toContain("sourceIds=crosscap-alpha,crosscap-beta,crosscap-gamma");
++    expect(system).toContain("sourceIds=s-10000000000040008000000000000001-1,s-10000000000040008000000000000001-2,s-10000000000040008000000000000001-3");
+     expect(system).toContain("actionIds=none");
+-    expect(system).toContain('{"kind":"answer","text":"<grounded answer>","sourceIds":["<allowed source id>"],"actionIds":[]}');
++    expect(system).toContain('{"kind":"answer","text":"<grounded answer>","sourceIds":["<allowed source reference>"],"actionIds":[]}');
+   });
+ 
+   it("filters unavailable actions before the model sees the output contract", async () => {
+@@ -81,10 +128,10 @@ describe("CP1 composed answer context", () => {
+           system = input.system;
+           return Object.freeze({ text: JSON.stringify({
+             kind: "answer",text: "JSON export requires a served answer and readable ledger.",
+-            sourceIds: ["export-json"],actionIds: []
++            sourceIds: [SOURCE_REFERENCE],actionIds: []
+           }) });
+         }
+-      }) as never,
++      }) as never,modelReferenceFactory,
+       clock: (() => { let at = Date.parse("2026-09-14T10:00:00.000Z");return () => new Date(++at); })()
+     });
+ 
+@@ -95,8 +142,10 @@ describe("CP1 composed answer context", () => {
+     expect(result.outcome).toBe("ANSWER_GROUNDED");
+     expect(system).toContain("actionIds=none");
+     expect(system).toContain("Never write source IDs, action IDs, capability IDs, routes, or paths inside text");
+-    expect(system).toContain("owner-debate:");
+-    expect(system).toContain("availability=owner | actions=none");
++    expect(system).toContain("Owner debate workspace");
++    expect(system).toContain("available only in verified owner context | actions=none");
++    expect(system).not.toContain("owner-debate:");
++    expect(system).not.toContain("route=");
+   });
+ 
+   it("uses the exact immutable snapshot object already resolved by the route", async () => {
+@@ -109,13 +158,13 @@ describe("CP1 composed answer context", () => {
+       system = input.system;
+       return Object.freeze({ text: JSON.stringify({
+         kind: "answer",text: "Selected snapshot answer.",
+-        sourceIds: ["selected-a"],actionIds: []
++        sourceIds: [SOURCE_REFERENCE],actionIds: []
+       }) });
+     });
+     const service = createSupportAnswerService({
+       entries: snapshotB.entries,
+       snapshots: createHelpCorpusSnapshotLookup(snapshotB),messages,
+-      modelFor: () => Object.freeze({ complete }) as never,
++      modelFor: () => Object.freeze({ complete }) as never,modelReferenceFactory,
+       clock: (() => { let at = Date.parse("2026-09-14T10:00:00.000Z");return () => new Date(++at); })()
+     });
+ 
+@@ -133,7 +182,7 @@ describe("CP1 composed answer context", () => {
+     const reportDraftDiagnostic = vi.fn();
+     const service = createSupportAnswerService({
+       entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
+-      reportDraftDiagnostic,
++      reportDraftDiagnostic,modelReferenceFactory,
+       modelFor: () => Object.freeze({
+         complete: async () => Object.freeze({ text: "```json\n{}\n```" })
+       }) as never,
+@@ -164,9 +213,9 @@ describe("CP1 composed answer context", () => {
+       modelFor: () => Object.freeze({
+         complete: async () => Object.freeze({ text: JSON.stringify({
+           kind: "answer",text: "Select start-debate to continue.",
+-          sourceIds: ["selected-a"],actionIds: []
++          sourceIds: [SOURCE_REFERENCE],actionIds: []
+         }) })
+-      }) as never,
++      }) as never,modelReferenceFactory,
+       clock: (() => { let at = Date.parse("2026-09-14T10:00:00.000Z");return () => new Date(++at); })()
+     });
+ 
+@@ -179,12 +228,57 @@ describe("CP1 composed answer context", () => {
+     }));
+   });
+ 
++  it("rejects a request alias in narrative text before canonical assistant storage", async () => {
++    const snapshot = corpus([entry("selected-a","alpha crosscap selected marker")],"7".repeat(64));
++    const service = createSupportAnswerService({
++      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
++      modelReferenceFactory,
++      modelFor: () => Object.freeze({
++        complete: async () => Object.freeze({ text: JSON.stringify({
++          kind: "answer",text: `Select ${SOURCE_REFERENCE} to continue.`,
++          sourceIds: [SOURCE_REFERENCE],actionIds: []
++        }) })
++      }) as never,
++      clock: (() => { let at = Date.parse("2026-09-14T10:00:00.000Z");return () => new Date(++at); })()
++    });
++
++    const result = await service.respond(request(snapshot));
++
++    expect(result).toMatchObject({ outcome: "REFUSE_SAFETY",sources: [],actions: [] });
++    expect(result.text).not.toContain(SOURCE_REFERENCE);
++  });
++
++  it("rejects a source reference issued for a prior request", async () => {
++    const snapshot = corpus([entry("selected-a","alpha crosscap selected marker")],"8".repeat(64));
++    const firstFactory = createSupportModelReferenceFactory(REFERENCE_REQUEST_ID);
++    const secondFactory = createSupportModelReferenceFactory("20000000-0000-4000-8000-000000000002");
++    const factories = [firstFactory,secondFactory];
++    const service = createSupportAnswerService({
++      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
++      modelReferenceFactory: () => factories.shift()!,
++      modelFor: () => Object.freeze({
++        complete: async () => Object.freeze({ text: JSON.stringify({
++          kind: "answer",text: "Selected snapshot answer.",
++          sourceIds: [firstFactory.referenceFor("source",0)],actionIds: []
++        }) })
++      }) as never,
++      clock: (() => { let at = Date.parse("2026-09-14T10:00:00.000Z");return () => new Date(++at); })()
++    });
++
++    await expect(service.respond(request(snapshot))).resolves.toMatchObject({
++      outcome: "ANSWER_GROUNDED",sources: [{ id: "selected-a" }]
++    });
++    await expect(service.respond(request(snapshot))).resolves.toMatchObject({
++      outcome: "REFUSE_SAFETY",sources: [],actions: []
++    });
++  });
++
+   it("assigns distinct opaque identities to separate rejected model attempts", async () => {
+     const snapshot = corpus([entry("selected-a","alpha crosscap selected-a-end")],"f".repeat(64));
+     const reports: Array<Readonly<{ attemptId: string }>> = [];
+     const service = createSupportAnswerService({
+       entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
+-      reportDraftDiagnostic: (report) => { reports.push(report); },
++      reportDraftDiagnostic: (report) => { reports.push(report); },modelReferenceFactory,
+       modelFor: () => Object.freeze({
+         complete: async () => Object.freeze({ text: "not-json" })
+       }) as never,
+diff --git a/dialectical-engine/tests/unit/support-context.test.ts b/dialectical-engine/tests/unit/support-context.test.ts
+index 78925512fb4853dc770b26219be0a2f8c04e55c4..f4fc2dc1cd1e90a0592cc0f12792322294a4bd5d 100644
+--- a/dialectical-engine/tests/unit/support-context.test.ts
++++ b/dialectical-engine/tests/unit/support-context.test.ts
+@@ -1,9 +1,20 @@
+ import { describe, expect, it } from "vitest";
+ 
+ import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
+-import { buildSupportKnowledgeContext } from "../../packages/support-kb/src/context.js";
++import { buildSupportKnowledgeContext as buildContext } from "../../packages/support-kb/src/context.js";
+ import type { HelpCorpusEntry } from "../../packages/support-kb/src/index.js";
+ 
++type ContextInput = Parameters<typeof buildContext>[0];
++function buildSupportKnowledgeContext(
++  input: Omit<ContextInput,"referenceFor"> & Partial<Pick<ContextInput,"referenceFor">>
++) {
++  return buildContext({
++    ...input,
++    referenceFor: input.referenceFor ?? ((kind,index) =>
++      `${kind === "source" ? "s" : "a"}-10000000000040008000000000000001-${index + 1}`)
++  });
++}
++
+ function entry(
+   id: string,
+   lang: "en" | "ro",
+@@ -106,7 +117,7 @@ describe("Support knowledge context", () => {
+       language: "en",
+       query: "export note distinct long marker",
+       historyText: "",
+-      maxCodePoints: base.text.length + 120,
++      maxCodePoints: base.text.length + 200,
+     });
+ 
+     expect(result.sourceIds).toEqual(["short"]);
+@@ -174,8 +185,8 @@ describe("Support knowledge context", () => {
+     });
+ 
+     expect(result.text).toContain("OUTPUT CONTRACT");
+-    expect(result.text).toContain(`sourceIds=${result.sourceIds.join(",")}`);
+-    expect(result.text).toContain(`actionIds=${result.requestedActionIds.join(",") || "none"}`);
++    expect(result.text).toContain(`sourceIds=${result.sourceReferences.map(({ reference }) => reference).join(",")}`);
++    expect(result.text).toContain(`actionIds=${result.actionReferences.map(({ reference }) => reference).join(",") || "none"}`);
+     expect(result.sourceIds).toHaveLength(1);
+   });
+ 
+@@ -216,8 +227,42 @@ describe("Support knowledge context", () => {
+     });
+ 
+     expect(result.requestedActionIds).toEqual([]);
+-    expect(result.text).toContain("- owner-debate: Spațiul de lucru al proprietarului");
+-    expect(result.text).toContain("availability=owner | actions=none");
++    expect(result.text).toContain("- Spațiul de lucru al proprietarului");
++    expect(result.text).toContain("disponibilă numai într-un context verificat de proprietar | actions=none");
+     expect(result.text).toContain("actionIds=none");
+   });
++
++  it("projects only request-local references and human labels to the model", () => {
++    const result = buildSupportKnowledgeContext({
++      entries: [entry(
++        "getting-started-debate","en","Start a debate",
++        "Choose the topic and plan controls before starting."
++      )],
++      capabilities: SUPPORT_CAPABILITIES,
++      language: "en",query: "How do I create a debate?",historyText: "",
++      maxCodePoints: 24_000,availableActionIds: SUPPORT_ACTION_IDS,
++      referenceFor: (kind: "source" | "action",index: number) =>
++        `${kind === "source" ? "s" : "a"}-10000000000040008000000000000001-${index + 1}`
++    } as never);
++
++    expect(result).toMatchObject({
++      sourceIds: ["getting-started-debate"],requestedActionIds: ["start-debate"],
++      sourceReferences: [{
++        reference: "s-10000000000040008000000000000001-1",
++        canonicalId: "getting-started-debate"
++      }],
++      actionReferences: [{
++        reference: "a-10000000000040008000000000000001-1",
++        canonicalId: "start-debate"
++      }]
++    });
++    expect(result.text).toContain("SOURCE s-10000000000040008000000000000001-1");
++    expect(result.text).toContain("actionIds=a-10000000000040008000000000000001-1");
++    for (const forbidden of ["getting-started-debate","start-debate","new-debate","/new","route="]) {
++      expect(result.text).not.toContain(forbidden);
++    }
++    expect(result.text).toContain("Create a debate with plan controls");
++    expect(result.text).toContain("Start a debate");
++    expect(result.text).toContain("signed-in visitors");
++  });
+ });
+diff --git a/dialectical-engine/tests/unit/support-credentials.test.ts b/dialectical-engine/tests/unit/support-credentials.test.ts
+index db6e57490cedb190b1ce3ee279b2ba1e7842088e..5ffb1849a216c3611e1daf14e066175a1518a624 100644
+--- a/dialectical-engine/tests/unit/support-credentials.test.ts
++++ b/dialectical-engine/tests/unit/support-credentials.test.ts
+@@ -36,6 +36,29 @@ describe("Support credential lexical facts", () => {
+       .toEqual([secret]);
+   });
+ 
++  it.each([
++    ['My password is "inert horse battery".',"inert horse battery"],
++    ["Parola mea este „inert cal albastru”.","inert cal albastru"],
++    ["My recovery code is inert horse battery; keep it private.","inert horse battery"],
++    ["Codul de verificare este inert cal albastru, păstrează-l privat.","inert cal albastru"]
++  ])("maps a complete bounded multiword supplied value: %s", (text,secret) => {
++    const facts = analyzeSupportCredentialText(text);
++    expect(facts.credentialValueSpans.map(({ start,end }) => text.slice(start,end)))
++      .toContain(secret);
++  });
++
++  it.each([
++    ["Support does not receive passwords and also asks you to send them here.","solicit"],
++    ["Support does not receive passwords, so send them here.","solicit"],
++    ["Asistența nu primește parole și de asemenea îți cere să le trimiți aici.","solicit"],
++    ["Asistența nu primește parole, așa că trimite-le aici.","solicit"],
++    ["Support does not receive passwords while it asks you to send them here.","solicit"],
++    ["Support does not receive passwords and generally asks you to send them here.","solicit"]
++  ])("does not carry negation into a later coordinated operation: %s", (text,kind) => {
++    const operations = analyzeSupportCredentialText(text).operations.filter((row) => row.kind === kind);
++    expect(operations.some(({ negated }) => negated === false)).toBe(true);
++  });
++
+   it("emits only closed lexical facts and numeric spans", () => {
+     const hostile = "Send your passwords and then validate them.";
+     const serialized = JSON.stringify(analyzeSupportCredentialText(hostile));
+diff --git a/dialectical-engine/tests/unit/support-model-references.test.ts b/dialectical-engine/tests/unit/support-model-references.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..675d2ea89805e856a0aebb93e18747cbb31c5b7d
+--- /dev/null
++++ b/dialectical-engine/tests/unit/support-model-references.test.ts
+@@ -0,0 +1,51 @@
++import { describe,expect,it } from "vitest";
++
++import {
++  createSupportModelReferenceFactory,translateSupportDraftReferences
++} from "../../apps/api/src/support/model-references.js";
++
++describe("CP1 request-local model references", () => {
++  const requestA = "10000000-0000-4000-8000-000000000001";
++  const requestB = "20000000-0000-4000-8000-000000000002";
++
++  it("binds opaque source and action aliases to one request namespace", () => {
++    const first = createSupportModelReferenceFactory(requestA);
++    const second = createSupportModelReferenceFactory(requestB);
++    const firstSource = first.referenceFor("source",0);
++    const firstAction = first.referenceFor("action",0);
++
++    expect(firstSource).not.toContain("getting-started-debate");
++    expect(firstAction).not.toContain("start-debate");
++    expect(second.referenceFor("source",0)).not.toBe(firstSource);
++    expect(first.referenceFor("source",0)).toBe(firstSource);
++  });
++
++  it("maps only unique references from the current request to canonical ids", () => {
++    const current = createSupportModelReferenceFactory(requestA);
++    const stale = createSupportModelReferenceFactory(requestB);
++    const sourceReference = current.referenceFor("source",0);
++    const actionReference = current.referenceFor("action",0);
++    const references = {
++      sources: [{ reference: sourceReference,canonicalId: "getting-started-debate" }],
++      actions: [{ reference: actionReference,canonicalId: "start-debate" }]
++    } as const;
++    const base = {
++      kind: "answer" as const,text: "Choose Start a debate to continue.",
++      sourceIds: [sourceReference],actionIds: [actionReference]
++    };
++
++    expect(translateSupportDraftReferences(base,references)).toEqual({
++      kind: "answer",text: base.text,
++      sourceIds: ["getting-started-debate"],actionIds: ["start-debate"]
++    });
++    expect(translateSupportDraftReferences({
++      ...base,sourceIds: [stale.referenceFor("source",0)]
++    },references)).toBeNull();
++    expect(translateSupportDraftReferences({
++      ...base,sourceIds: [sourceReference,sourceReference]
++    },references)).toBeNull();
++    expect(translateSupportDraftReferences({
++      ...base,actionIds: ["unknown-reference"]
++    },references)).toBeNull();
++  });
++});
+diff --git a/dialectical-engine/tests/unit/support-redaction.test.ts b/dialectical-engine/tests/unit/support-redaction.test.ts
+index 3a96f464a2fe2025f79ca8635a874e32830a5add..d11fb4bfd819b92b09a31c8b09a965a950bfda74 100644
+--- a/dialectical-engine/tests/unit/support-redaction.test.ts
++++ b/dialectical-engine/tests/unit/support-redaction.test.ts
+@@ -28,6 +28,11 @@ describe("CP1 Support credential redaction", () => {
+     ["Paro\u200Bla mea este inert-fag-7","inert-fag-7"],
+     ["Codurile de recuperare sunt INERTRECOVERY","INERTRECOVERY"],
+     ["Datele de autentificare sunt INERTAUTH","INERTAUTH"]
++    ,['My password is "inert horse battery".',"inert horse battery"]
++    ,["Parola mea este „inert cal albastru”.","inert cal albastru"]
++    ,["Recovery code is inert maple river; keep it private.","inert maple river"]
++    ,["Codul de securitate este inert arțar râu, păstrează-l privat.","inert arțar râu"]
++    ,["My ｐａｓｓｗｏｒｄ is inert compatibility value; keep it private.","inert compatibility value"]
+   ])("redacts every declared labelled credential class before transit: %s", (text,secret) => {
+     const result = redactSupportText(text);
+     expect(result).toMatchObject({ redacted: true });
+@@ -35,6 +40,11 @@ describe("CP1 Support credential redaction", () => {
+     expect(result.text).toContain("[REDACTED_SECRET_LIKE]");
+   });
+ 
++  it("stops an unquoted value at a declared coordinator without consuming benign prose", () => {
++    const result = redactSupportText("My password is inert horse battery and I need help.");
++    expect(result.text).toBe("My password is [REDACTED_SECRET_LIKE] and I need help.");
++  });
++
+   it.each([
+     "I forgot my password",
+     "Am uitat parola",
+@@ -45,7 +55,9 @@ describe("CP1 Support credential redaction", () => {
+ 
+   it.each([
+     ["My pass\u200Bword is inert-birch-7","inert-birch-7"],
+-    ["OTP is INERTABC","INERTABC"]
++    ["OTP is INERTABC","INERTABC"],
++    ['My password is "inert horse battery".',"inert horse battery"],
++    ["Parola mea este „inert cal albastru”.","inert cal albastru"]
+   ])("keeps a supplied credential out of canonical seal, persistence, and model transit: %s", async (
+     text,secret
+   ) => {
+diff --git a/dialectical-engine/tests/unit/support-response-policy.test.ts b/dialectical-engine/tests/unit/support-response-policy.test.ts
+index 4eb76df36152ea2ddbb25ab4c65696aa7dc72127..44eff8ca5996c39c40095a7594e6b6fc194d07a4 100644
+--- a/dialectical-engine/tests/unit/support-response-policy.test.ts
++++ b/dialectical-engine/tests/unit/support-response-policy.test.ts
+@@ -6,6 +6,7 @@ import {
+   projectSupportDraftReport,
+   validateSupportDraft
+ } from "../../apps/api/src/support/response-policy.js";
++import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
+ 
+ function raw(text: string, overrides: Readonly<Record<string,unknown>> = {}): string {
+   return JSON.stringify({
+@@ -103,12 +104,12 @@ describe("CP1 support model response policy", () => {
+ 
+   it.each([
+     "Settings does not offer controls to replace a password or regenerate MFA. Support cannot accept credentials.",
+-    "A fresh sign-in may be required in Settings, but Support cannot receive passwords or security codes.",
++    "A fresh sign in may be required in Settings, but Support cannot receive passwords or security codes.",
+     "Setările nu oferă controale pentru înlocuirea parolei sau regenerarea MFA. Asistența nu poate primi date de autentificare.",
+     "În Setări poate fi necesară o autentificare recentă, dar Asistența nu poate primi parole sau coduri de securitate.",
+     "You can change your account name in Settings. Support cannot receive your password.",
+     "Poți schimba numele contului în Setări. Asistența nu poate primi parola.",
+-    "Recovery codes are available only after sign-in.",
++    "Recovery codes are available only after sign in.",
+     "Codurile de recuperare sunt disponibile după autentificare.",
+     "Reset tokens expire and must remain private.",
+     "Codul de verificare este necesar pentru autentificare."
+@@ -138,6 +139,17 @@ describe("CP1 support model response policy", () => {
+     "Asistența nu primește parole și trebuie să trimiți parola aici.",
+     "Support cannot receive your password. Send it here instead.",
+     "Asistența nu poate primi parola. Trimite-o aici în schimb."
++    ,"Support does not receive passwords and also asks you to send them here."
++    ,"Support does not receive passwords, so send them here."
++    ,"Support does not receive passwords and then asks you to send them here."
++    ,"Asistența nu primește parole și de asemenea îți cere să le trimiți aici."
++    ,"Asistența nu primește parole, așa că trimite-le aici."
++    ,"Send your p%61ssword to Support."
++    ,"Trimite p%2561rola către Asistență."
++    ,"Support does not receive passwords while it asks you to send them here."
++    ,"Support does not receive passwords and generally asks you to send them here."
++    ,"Send your %EF%BD%90%EF%BD%81%EF%BD%93%EF%BD%93%EF%BD%97%EF%BD%8F%EF%BD%92%EF%BD%84 to Support."
++    ,"Send your pass%E2%80%8Bword to Support."
+   ])("keeps credential solicitation, execution, and labelled values rejected: %s", (text) => {
+     const value = raw(text,{ actionIds: [] });
+     expect(parseSupportDraft(value)).toBeNull();
+@@ -150,6 +162,10 @@ describe("CP1 support model response policy", () => {
+     ["capability","Use owner-debate to export.",["export-json"]],
+     ["selected source","Read getting-started-debate for details.",["getting-started-debate"]],
+     ["control-obfuscated action","Select start-\u200Bdebate to continue.",["getting-started-debate"]]
++    ,["formerly excepted action","Select forgot-password to continue.",["account-access"]]
++    ,["formerly excepted action","Select privacy-preferences to continue.",["privacy-consent"]]
++    ,["formerly excepted action","Select sign-in to continue.",["account-access"]]
++    ,["formerly excepted action","Read support-status for details.",["support-status-limits"]]
+   ])("rejects a closed internal %s identifier in visitor prose", (_kind,text,sourceIds) => {
+     const value = raw(text,{ sourceIds,actionIds: [] });
+     expect(parseSupportDraft(value,sourceIds)).toBeNull();
+@@ -158,10 +174,24 @@ describe("CP1 support model response policy", () => {
+     });
+   });
+ 
++  it.each([...new Set([
++    ...SUPPORT_ACTION_IDS,
++    ...SUPPORT_CAPABILITIES.map(({ id }) => id),
++    ...SUPPORT_CAPABILITIES.flatMap(({ articleIds }) => articleIds)
++  ])].filter((id) => id.includes("-")))(
++    "rejects exact catalog machine id %s in narrative prose",(id) => {
++      expect(parseSupportDraft(raw(`Select ${id} to continue.`,{ actionIds: [] }))).toBeNull();
++    }
++  );
++
+   it.each([
+     "Open Settings to review the ordinary feature name.",
+     "Deschide Setări pentru a vedea numele obișnuit al funcției.",
+     "Return home after reading Help."
++    ,"Select Forgot password to continue."
++    ,"Alege Preferințe de confidențialitate pentru a continua."
++    ,"Choose Sign in to continue."
++    ,"Read Support status for details."
+   ])("keeps ambiguous human-facing feature names usable: %s", (text) => {
+     const value = raw(text,{ actionIds: [] });
+     expect(parseSupportDraft(value)).not.toBeNull();
+@@ -178,6 +208,9 @@ describe("CP1 support model response policy", () => {
+     ["percent-encoded HTTPS URL", raw("Open https%3A%2F%2Fexample.test/reset")],
+     ["percent-encoded path", raw("Open %2Fsettings")],
+     ["double-encoded path", raw("Open %252Fsettings")],
++    ["triple-encoded URL", raw("Open https%25253A%25252F%25252Fexample.test/reset")],
++    ["deeper encoded path", raw("Open %2525252Fsettings")],
++    ["malformed structural escape", raw("Open https%3")],
+     ["path instruction", raw("Go to /settings to continue")],
+     ["Markdown link", raw("Use [this link](/new)")],
+     ["HTML", raw("Choose <a href='/new'>Start</a>")],
+@@ -191,6 +224,14 @@ describe("CP1 support model response policy", () => {
+     expect(parseSupportDraft(value)).toBeNull();
+   });
+ 
++  it.each([
++    "Progress is 50% complete.",
++    "The 100% local export remains available.",
++    "Progresul este 50% finalizat."
++  ])("keeps benign percentage text usable: %s", (text) => {
++    expect(parseSupportDraft(raw(text,{ actionIds: [] }))).not.toBeNull();
++  });
++
+   it("accepts only the exact purpose-specific advisory summary envelope", () => {
+     expect(parseSupportCaseSummaryDraft(JSON.stringify({
+       kind: "case_summary",text: "The visitor needs help understanding debate creation.",
+@@ -219,6 +260,10 @@ describe("CP1 support model response policy", () => {
+     "The visitor should use start-debate to continue.",
+     "The visitor should read getting-started-debate for details.",
+     "Support does not receive passwords and the visitor should send a password here."
++    ,"Support does not receive passwords and also asks the visitor to send them here."
++    ,"Send the visitor p%61ssword to Support."
++    ,"Open https%25253A%25252F%25252Fexample.test/reset"
++    ,"The visitor should use forgot-password to continue."
+   ])("rejects unsafe advisory summary text before sealing: %s", (text) => {
+     expect(parseSupportCaseSummaryDraft(JSON.stringify({
+       kind: "case_summary",text,sourceIds: [],actionIds: []
+diff --git a/dialectical-engine/tests/unit/support-text-views.test.ts b/dialectical-engine/tests/unit/support-text-views.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..ca00d6f86d014327d120948f089f2306b4e366e0
+--- /dev/null
++++ b/dialectical-engine/tests/unit/support-text-views.test.ts
+@@ -0,0 +1,32 @@
++import { describe,expect,it } from "vitest";
++
++import { canonicalSupportTextViews } from "../../packages/kernel/src/support-text-views.js";
++
++describe("CP1 bounded canonical Support text views", () => {
++  it.each([
++    ["p%61ssword","password"],
++    ["p%2561ssword","password"],
++    ["%EF%BD%90%EF%BD%81%EF%BD%93%EF%BD%93%EF%BD%97%EF%BD%8F%EF%BD%92%EF%BD%84","password"],
++    ["pass%E2%80%8Bword","password"],
++    ["https%253A%252F%252Fexample.test/reset","https://example.test/reset"]
++  ])("decodes valid transformations to a fixed point: %s", (input,expected) => {
++    const result = canonicalSupportTextViews(input);
++    expect(result.views).toContain(expected);
++    expect(result.unsafeEncoding).toBe(false);
++  });
++
++  it.each([
++    "https%252525253A%252525252F%252525252Fexample.test/reset",
++    "%2525252570assword",
++    "%252525252Fsettings",
++    "https%3"
++  ])("flags dangerous encoding that remains at or beyond the bound: %s", (input) => {
++    expect(canonicalSupportTextViews(input).unsafeEncoding).toBe(true);
++  });
++
++  it.each(["Progress is 50% complete.","The export is 100% local."])(
++    "preserves a benign percentage: %s",(input) => {
++      expect(canonicalSupportTextViews(input)).toMatchObject({ unsafeEncoding: false });
++    }
++  );
++});

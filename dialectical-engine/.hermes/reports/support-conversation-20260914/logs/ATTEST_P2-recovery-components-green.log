@@ -1,0 +1,12 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ ✓ tests/unit/support-recovery-components.test.ts > reviewed Support recovery components > admits a complete exact-hash bilingual component set into an immutable snapshot 26ms
+ ✓ tests/unit/support-recovery-components.test.ts > reviewed Support recovery components > fails strict loading when recovery review is missing, malformed, stale, or tampered 3ms
+ ✓ tests/unit/support-recovery-components.test.ts > reviewed Support recovery components > changes snapshot identity when exact admitted component bytes change 3ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  20:01:28
+   Duration  194ms (transform 56ms, setup 0ms, import 76ms, tests 33ms, environment 0ms)
+

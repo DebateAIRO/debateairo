@@ -1,0 +1,35 @@
+{
+  "at": "2026-09-14T18:02:38.842612+00:00",
+  "review": "REV1-p2",
+  "session": "/root/plan_review",
+  "revision": "e0dcfe77f49655bea774bdfacf988b911be4ff06",
+  "report": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV1-p2.md",
+    "sha256": "198fe5f116e52d466d1e51559f98f4d4678fa05bc4c49537e710dcb3746bb0f8"
+  },
+  "selfReport": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/REV1_P2.md",
+    "sha256": "957a414647545a09e3b8728a581ac9b17b61d4e43d4e7b52c90a6bc894089ce2"
+  },
+  "gateManifestSha256": "656c3390c7e65de70f3708eb38ac24e89efcbfaf7a0426e48686abe291b44949",
+  "gateInputHashesReverified": 82,
+  "lensIndex": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/review-packages/CP1-p2/REV1-inputs.json",
+    "sha256": "07fc2a933f6ea1fa5f0bb82757c1cca8605804ed10a7f0c240cf40254af73a4a",
+    "inputHashesReverified": 21
+  },
+  "productFilesReverified": 103,
+  "skills": {
+    "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-38-35-01a09f11-6f5f-74b2-9bba-1442a15308ef.jsonl",
+    "floor": [
+      "using-superpowers",
+      "heartbeat-protocol",
+      "heartbeat-reviewer",
+      "verification-before-completion"
+    ],
+    "rc": 0,
+    "output": "ok   using-superpowers (4)\nok   heartbeat-protocol (7)\nok   heartbeat-reviewer (4)\nok   verification-before-completion (4)\nSKILLS LOADED verified: 4 / 4\n"
+  },
+  "capturedProbeAndLogHashes": [],
+  "scope": "Mechanical exact input/report/hash/current-byte verification. Verdict and product claims are independent Sol reviewer evidence. Additional claimed skills and cited probe outcomes require explicit consumption."
+}

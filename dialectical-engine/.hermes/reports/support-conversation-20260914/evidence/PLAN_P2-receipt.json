@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "node": "PLAN_P2",
+  "ticket": "t_302f2087",
+  "session": "/root/requirements",
+  "sourceRevision": "446c685e977104ecf2b0b5ee0519f7123968429f",
+  "productRevision": "e0dcfe77f49655bea774bdfacf988b911be4ff06",
+  "branch": "codex/support-conversation-cp1",
+  "packetFreeze": "7b83a30d65ebc5f4fc8f1b81b552068b5bf12f15",
+  "inputFreeze": "68f0efbc05101b36e3f26110bec56e7eb99f05e3",
+  "packetSha256": "5cfd080fd07c5fae992ae00a1e947e8e0dca2e2455af2f5277d4b4535de65823",
+  "commentsReadThrough": 6,
+  "measurements": {
+    "logicalArticleIds": 18,
+    "corpusEntries": 36,
+    "englishEntries": 18,
+    "romanianEntries": 18,
+    "solReviewedArticleRecords": 24,
+    "legacyOwnerRatifiedArticleRecords": 12,
+    "productionInCodeEntries": 0,
+    "proposedRecoveryRecords": 36,
+    "fixP2ProductPaths": 21,
+    "attestP2ProductPaths": 2,
+    "retainedTests": 23,
+    "newTests": 2,
+    "finalIntegratedTests": 25
+  },
+  "artifacts": {
+    "docs/missions/support-conversation-20260914/reviews/PLAN_P2-BLUEPRINT.md": "c0360af90d1432422b2603360a81429827565060b9a4f7ed27f02cf773ba88e4",
+    ".hermes/reports/support-conversation-20260914/evidence/PLAN_P2-inventory.json": "02fba414162b01c88cfbf7405cb33a71b2d1d3ff47c0211db944df6d8d5e871f",
+    ".hermes/reports/support-conversation-20260914/agent-reports/PLAN_P2.md": "8911c7c90e9bb1270e9960669f1059da7ea644a2de14bd22c528ab186a5061e2"
+  },
+  "probes": {
+    ".hermes/reports/support-conversation-20260914/probes/PLAN_P2/corpus-inventory.ts": "6f80c3e7435a17d87fac199faf65442ef4af5ed32ac4cb9ce0f5ce53d5290489",
+    ".hermes/reports/support-conversation-20260914/probes/PLAN_P2/build-inventory.mjs": "3c0bf775f6133da3a2a4ec86ccd2b3fab2ac103ed3e744ea1060f6442e507e83",
+    ".hermes/reports/support-conversation-20260914/probes/PLAN_P2/static-check.mjs": "746cfb3059e4402b9462e6ee16b5a410d7bd28db61c8cabc5a9a4580a82a059b"
+  },
+  "logs": {
+    ".hermes/reports/support-conversation-20260914/logs/PLAN_P2-corpus-inventory.log": "3dc339435fbac43b197f0326831448a9b32b4e85ecdc8a69e36375e6f1869d8c",
+    ".hermes/reports/support-conversation-20260914/logs/PLAN_P2-inventory-build.log": "02fba414162b01c88cfbf7405cb33a71b2d1d3ff47c0211db944df6d8d5e871f",
+    ".hermes/reports/support-conversation-20260914/logs/PLAN_P2-static-check.log": "2809dd4004c91a9a39d73110cce7778f7ef0ccff66e1d0028a0a67ccada78937",
+    ".hermes/reports/support-conversation-20260914/logs/PLAN_P2-static-check-final.log": "2809dd4004c91a9a39d73110cce7778f7ef0ccff66e1d0028a0a67ccada78937",
+    ".hermes/reports/support-conversation-20260914/logs/PLAN_P2-lane-final.log": "fb1f2bc68e9ff8f35f2cd6dbe3d0463c5c064c2237f838f3d0fe70494c059486"
+  },
+  "verification": {
+    "corpusInventory": "PASS rc0; pure support-kb definitions only; no network, database, process, model, or service side effect",
+    "staticContract": "PASS rc0; 36 article hashes, bilingual census, disjoint ownership, 25-test union, recovery trigger wording, and single integrated-union ownership",
+    "laneFinal": "PASS rc0; clean porcelain output contains branch header only at exact product revision",
+    "implementationStatus": "NOT_RUN_DOCUMENTATION_ONLY"
+  },
+  "unverified": [
+    "projection and fallback bytes do not exist",
+    "separate editorial review and manifest attestation do not exist",
+    "FIX_P2 and ATTEST_P2 implementation and focused checks have not run",
+    "LIVE_P2 exact 25-file union and seven-prompt run have not run",
+    "final pass 3/3 has not run",
+    "Forgot-password destination remains owner-blocked",
+    "CP1 is not ready or accepted"
+  ],
+  "usage": "UNAVAILABLE"
+}

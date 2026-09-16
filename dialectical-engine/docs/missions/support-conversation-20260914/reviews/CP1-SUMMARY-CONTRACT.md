@@ -1,0 +1,11 @@
+# CP1 advisory-summary boundary interpretation
+
+Operational interface ruling by Astra, 2026-09-14; preserves frozen SPEC-v2 rather than changing its requirements. Same author implements; separate Sol reviewer verifies.
+
+CP1-R14 requires every model completion to use a bounded strict draft containing exactly kind, text, sourceIds and actionIds. Its source-citation requirement applies to an answer. Advisory case summaries are a different purpose and do not derive from reviewed product knowledge. Their strict envelope therefore uses a distinct case_summary kind, text, and sourceIds/actionIds arrays that must both be empty. No fabricated knowledge citation or navigation authority is introduced.
+
+A summary retains its existing one-paragraph, at-most80-word constraint and passes the shared credential, claim, markup and normalized link boundary before sealing or persistence. Invalid drafts receive deterministic safe server content, with no second model attempt or raw rejected-output logging. The existing case record may persist that safe fallback as DONE and non-authoritative; case summaries do not possess a conversational outcome/rating field. Internal validation evidence must still distinguish rejection from accepted content. Do not add migrations or pretend an ordinary case-status value is a conversation outcome. Preserve usage, transport health, timeout/failure reporting, access, encryption and shredding. Previously stored summary text must be screened before projection to a visitor.
+
+The author proposed a two-key purpose-specific draft. That would contradict the explicit four-key envelope, so it was narrowed to the compatible four-key version above before implementation. This is a requirement interpretation and routing decision, not a reviewer PASS or owner checkpoint acceptance.
+
+C3 dynamic navigation: without a trusted verified projection, generic grounded replies correctly drop dynamic debate actions. The separate authenticated and consent-gated own-context service already owns those projections. CP1 does not authorize forwarding guessed or model-supplied identifiers to make generic actions appear reachable. No new adapter is required solely for the expectation candidate; final reviewer confirms the code-backed disposition.

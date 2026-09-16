@@ -1,0 +1,63 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-product/dialectical-engine
+
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > renders the complete Turn 11 help desk information architecture
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > offers only verified full-page shortcuts and uses the existing cookie opener
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > submits a Turn 11 suggestion immediately without priming the composer
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > starts a clean conversation
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > reports the public Support configuration as unavailable even when the relay is healthy
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > renders disclosure first and exposes native keyboard/form semantics
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > applies the Romanian override to disclosure and every typed request
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > renders conversation content as text and never links external response URLs
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > renders the exact deterministic en DISABLED notice
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > renders the exact deterministic ro DISABLED notice
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > admits only frozen same-origin response links as anchors
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > renders the exact en automated case acknowledgement with its case link
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > renders the exact ro automated case acknowledgement with its case link
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > retains automated token/SLA/link fields from the browser client contract
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > returns a structured RATE_LIMITED outcome from a real 429 response
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > returns the fresh-session DISABLED terminal reply instead of reading a missing session
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > renders the frozen degraded notice for an unstructured non-2xx response
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > replaces a persisted anonymous capability before a signed-in request
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > renders an E5 acknowledgement returned by the rating request
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > renders SHREDDED returned by consent, rating, and escalation mutations
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > preserves the structured SHREDDED envelope on every browser mutation client
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > uses the same-origin CSRF boundary for every browser support mutation
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > shows rating controls only after ANSWER_GROUNDED
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > shows rating controls only after NO_SOURCE
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > does not show rating controls after REFUSE_ZONE
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > does not show rating controls after REFUSE_INJECTION
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > does not show rating controls after REFUSE_SAFETY
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > does not show rating controls after DEGRADED
+ ✓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > renders reviewed sources and canonical actions in fullPage=false language=en 49ms
+ ✓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > renders reviewed sources and canonical actions in fullPage=true language=en 21ms
+ ✓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > renders reviewed sources and canonical actions in fullPage=false language=ro 9ms
+ ✓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > renders reviewed sources and canonical actions in fullPage=true language=ro 24ms
+ ✓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > renders response text and source labels as literal text 6ms
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > accepts complete source/action arrays at the browser response boundary
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > rejects non-array sources without accepting partial response decorations
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > rejects source with an extra key without accepting partial response decorations
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > rejects unknown source without accepting partial response decorations
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > rejects duplicate source without accepting partial response decorations
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > rejects more than three sources without accepting partial response decorations
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > rejects non-array actions without accepting partial response decorations
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > rejects action with an extra key without accepting partial response decorations
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > rejects unknown action without accepting partial response decorations
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > rejects duplicate action without accepting partial response decorations
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > rejects mismatched action label without accepting partial response decorations
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > rejects mismatched action href without accepting partial response decorations
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > rejects more than three actions without accepting partial response decorations
+ ✓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > rejects forged decorations restored from session storage 4ms
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > clears stale A and retries the same redacted turn once through fresh B
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > stops after a second exact snapshot mismatch
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > does not restart for a different conflict
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > does not restart for an extended snapshot envelope
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > keeps unresolved en password recovery inside Support with no action
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > keeps unresolved ro password recovery inside Support with no action
+ ↓ tests/render/sup-01-help.test.tsx > SUP-01 /help assistant > opens the verified first-party Forgot password flow after V-1 supplies its exact destination
+
+ Test Files  1 passed (1)
+      Tests  6 passed | 48 skipped (54)
+   Start at  09:44:39
+   Duration  1.17s (transform 138ms, setup 0ms, import 250ms, tests 115ms, environment 685ms)
+

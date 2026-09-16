@@ -1,0 +1,31 @@
+{
+  "root_thread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "agents": [
+    {
+      "agent": "/root/requirements",
+      "id": "01a09ef7-fa46-7b73-bc98-70f84abd06cc",
+      "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-10-46-01a09ef7-fa46-7b73-bc98-70f84abd06cc.jsonl"
+    },
+    {
+      "agent": "/root/preview",
+      "id": "01a09f02-346a-7fb0-aa70-0424f1fdd21e",
+      "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-21-56-01a09f02-346a-7fb0-aa70-0424f1fdd21e.jsonl"
+    },
+    {
+      "agent": "/root/baseline",
+      "id": "01a09ef7-e096-7c31-9b35-806840028cf0",
+      "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-10-40-01a09ef7-e096-7c31-9b35-806840028cf0.jsonl"
+    },
+    {
+      "agent": "/root/forgot_destination",
+      "id": "01a09ef8-1b81-7cb1-9a2d-015a5e8346b6",
+      "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-10-55-01a09ef8-1b81-7cb1-9a2d-015a5e8346b6.jsonl"
+    },
+    {
+      "agent": "/root/plan_review",
+      "id": "01a09f11-6f5f-74b2-9bba-1442a15308ef",
+      "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-38-35-01a09f11-6f5f-74b2-9bba-1442a15308ef.jsonl"
+    }
+  ],
+  "scope": "Only metadata matched on this mission root; no raw transcript content copied."
+}

@@ -1,0 +1,49 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ × tests/integration/support-degraded.test.ts > SUP-06 automatic degraded state > treats a screened model draft as successful relay transport 23ms
+   → expected { …(6) } to match object { outcome: 'REFUSE_SAFETY', …(1) }
+(5 matching properties omitted from actual)
+ ↓ tests/integration/support-degraded.test.ts > SUP-06 automatic degraded state > returns the exact deterministic DISABLED notice without degrading when the final gate observes OFF
+ ↓ tests/integration/support-degraded.test.ts > SUP-06 automatic degraded state > short-circuits while unavailable and clears only after a controlled half-open success
+ ↓ tests/integration/support-degraded.test.ts > SUP-06 automatic degraded state > admits only one concurrent half-open probe
+ ↓ tests/integration/support-degraded.test.ts > SUP-06 automatic degraded state > records cap separately and preserves the first unavailable instant
+ ↓ tests/integration/support-degraded.test.ts > SUP-06 automatic degraded state > bounds a never-settling half-open probe end-to-end and releases its durable lease
+ ↓ tests/integration/support-degraded.test.ts > SUP-06 automatic degraded state > bounds a never-settling half-open readLimits dependency to one second
+ ↓ tests/integration/support-degraded.test.ts > SUP-06 automatic degraded state > bounds a never-settling half-open enter dependency to one second
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/support-degraded.test.ts > SUP-06 automatic degraded state > treats a screened model draft as successful relay transport
+AssertionError: expected { …(6) } to match object { outcome: 'REFUSE_SAFETY', …(1) }
+(5 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "outcome": "REFUSE_SAFETY",
+-   "usage": {
+-     "cost_usd": 0.001,
+-     "input_tokens": 3,
+-     "output_tokens": 4,
+-   },
++   "outcome": "NO_SOURCE",
+  }
+
+ ❯ tests/integration/support-degraded.test.ts:57:8
+     55|       detectedLanguage: "en",overrideLanguage: null,modelRef: "relay",
+     56|       kbVersion: snapshot.kbVersion,signedIn: false,receivedAt: new Da…
+     57|     })).resolves.toMatchObject({
+       |        ^
+     58|       outcome: "REFUSE_SAFETY",
+     59|       usage: { input_tokens: 3,output_tokens: 4,cost_usd: 0.001 }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 skipped (8)
+   Start at  21:10:31
+   Duration  772ms (transform 301ms, setup 0ms, import 656ms, tests 24ms, environment 0ms)
+

@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "ticket": "t_48f43282",
+  "session": "/root/preview",
+  "revision": "82f57f1ebaaf59a9ee0ea81d3084c4d57f7557b0",
+  "product_or_git_changes": 0,
+  "required_suite_input": {
+    "path": "evidence/LIVE2-required-suites.json",
+    "sha256": "e72fa9afb890b6b518bc92bf100a510082f77d250e8c137d407d99945c0b3e60",
+    "file_count": 20
+  },
+  "measured": {
+    "test_files_passed": 20,
+    "tests_passed": 758,
+    "tests_todo": 1,
+    "duration_seconds": 80.11,
+    "actual_prompts": 7,
+    "grounded_outcomes": 4,
+    "refuse_safety_outcomes": 3,
+    "clean_manual_passes": 3,
+    "manual_navigation_concerns": 1,
+    "support_message_http_200": 7,
+    "support_session_http_201": 2,
+    "support_status_http_200": 1,
+    "performed_navigations": 1,
+    "credential_or_recovery_operations": 0,
+    "fixed_diagnostic_counts": {
+      "KEY_SET_INVALID": 1,
+      "TEXT_CREDENTIAL_OR_SECURITY_ACTION": 2
+    }
+  },
+  "artifacts": {
+    "evidence/LIVE2.md": "c042b40a39e7dd1d298a92403cf6520b59979942fcf1cc656119d85e0f727da6",
+    "agent-reports/LIVE2.md": "db3bd2b4dd1a60e157fb77fe83f763541c1bd8040d9ecc091af6fe7250dde440",
+    "evidence/LIVE2-actual-relay-receipt.json": "f4f155a324d800cd1bc4cae96c5f1cad8b56ff27b78c74bd54e8acdad2a79b0d",
+    "evidence/LIVE2-diagnostic-baseline.json": "75f1a8992bda7a0c39e74440d327805786ad93a8ae8d5138b1c8ba432bb92a06",
+    "evidence/LIVE2-diagnostic-counts.json": "052280c1bf2ab87867ddef8871f2ef25b9793232253712c2c624935a60ce4051",
+    "evidence/LIVE2-stack-custody.json": "b623467f62100f17430bdad7f58e5ec41de542c5541e09c11de0eb49c8b37aa6",
+    "evidence/LIVE2-stack-receipt.json": "59ac913cc01eae47c939cb4ff051d2553b18a219ca2bd2689d907bfc578c9839",
+    "evidence/LIVE2-full-en.png": "e3dc6c0bee3131efdaf17f9e6fda83a751d2407452ca8da9a7b1333bc9a33a9c",
+    "evidence/LIVE2-full-ro.png": "f381acb0e549deb4a4d538f94ce3177b6d4118439f737ccda8237416a9de7ca7",
+    "evidence/LIVE2-compact-ro.png": "a8376f45e6dbbe94b5166d91415d0147f0b6391be24837db6f5b0bbd0f86850a",
+    "probes/LIVE2/capture-actual-relay.mjs": "db98b9881a6cd9580b984a420a332c388e748b0fbd1cb499672019e4834a441c",
+    "probes/LIVE2/start-preview-detached.mjs": "75e7afd0c605bec33c68c631e2b7e69f45bd06436c041dc1f12107a13379c143"
+  },
+  "logs": {
+    "LIVE2-integrated-suite.log": "14dd1343a9c31f79df80a573ef8b52844727a2a675b947a07c038c7c97b9e450",
+    "LIVE2-stack-preflight.log": "76365a24ca5d910911f5ed7156de0bc4fa37c05c7279b5f54e106774790882c7",
+    "LIVE2-stack-reload-stop.log": "0611ecb4b8e8b4138796a3b0546b3ba41ce1e1629807321a6102cf40bc66cffe",
+    "LIVE2-launch-detached.log": "54ebb1fa5ed89d8170ed09e57b57849dff4980e49cf4c1351ebd5c24e7828c4e",
+    "LIVE2-stack-ready.log": "985fb5697455b0b23fdb4ea9e2be3975a5c7dab98970670325bd9597e3b891fd",
+    "LIVE2-actual-relay-browser.log": "01199326786146f857173920799d3ce34ba1140dd7dc34fed8695d4ccbd17fbb",
+    "LIVE2-stack-postflight.log": "742034650b55b67444d41885486a2926a99b175f13a1bd82e2fb6bc377138953"
+  },
+  "excluded_mutable_sensitive_log": "logs/LIVE2-stack-detached.log",
+  "limitations": [
+    "CP1-A09 remains blocked by English creation and both Settings results.",
+    "Fixed diagnostic events have no request identifier; category-to-prompt attribution is not proved.",
+    "Romanian export names owner-debate in text although no anonymous action resolves.",
+    "The exact Forgot-password destination and action remain UNKNOWN and UNVERIFIED.",
+    "Actual model token and cost usage are unavailable."
+  ],
+  "preview": {
+    "profile": "support-preview",
+    "supervisor_pid": 12958,
+    "process_group": 12958,
+    "parent_pid": 1,
+    "ordinary_tls_help_status": 200,
+    "active_after_browser_and_idle": true,
+    "loaded_after_full_predecessor_stop": true
+  }
+}

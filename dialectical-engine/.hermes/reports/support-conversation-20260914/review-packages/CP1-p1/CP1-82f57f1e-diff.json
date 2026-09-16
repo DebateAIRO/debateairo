@@ -1,0 +1,10 @@
+{
+  "state": "DRAFT; LIVE2 and GATE pending",
+  "base": "b7ca2c413bf3242ce18e29a397dc9a3aa9228893",
+  "revision": "82f57f1ebaaf59a9ee0ea81d3084c4d57f7557b0",
+  "patch": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/review-packages/CP1-p1/CP1-82f57f1e.patch",
+  "sha256": "316e7f8881a6ca9b097f8402a17b82d1239e54bbd5bef03e212fa9f199eb7b26",
+  "inventorySha256": "bf9013e340b388d9ee086782caa8c049668af6f8c8ba1401c41a34880c2c3781",
+  "pathCount": 97,
+  "ownerAcceptance": "PENDING"
+}

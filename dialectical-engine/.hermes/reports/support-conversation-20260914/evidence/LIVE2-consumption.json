@@ -1,0 +1,20 @@
+{
+  "at": "2026-09-14T14:02:51.923801+00:00",
+  "revision": "82f57f1ebaaf59a9ee0ea81d3084c4d57f7557b0",
+  "manifestSha256": "46119f7178dd9feb26d86d1dbb1548703d1683f8a31678e89844fe99aad56fe7",
+  "referencesVerified": 20,
+  "outcomes": [
+    "REFUSE_SAFETY",
+    "REFUSE_SAFETY",
+    "ANSWER_GROUNDED",
+    "ANSWER_GROUNDED",
+    "REFUSE_SAFETY",
+    "ANSWER_GROUNDED",
+    "ANSWER_GROUNDED"
+  ],
+  "cleanManualPasses": 3,
+  "navigationConcern": "RO export names unresolved internal owner-debate action",
+  "diagnosticAttribution": "aggregate window only; no per-request ID",
+  "previewClarification": "Preflight found95978 alive and normalTLS200; old failed connection does not establish exit. Supported reload12958 persisted after browser and idle.",
+  "ownerAcceptance": "PENDING"
+}

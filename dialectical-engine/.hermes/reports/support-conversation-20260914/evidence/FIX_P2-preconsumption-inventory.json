@@ -1,0 +1,471 @@
+{
+  "at": "2026-09-15T15:53:09.504895+00:00",
+  "state": "MECHANICAL_CURRENT_COMMIT_ONLY_AUTHOR_HANDOFF_PENDING",
+  "base": "e0dcfe77f49655bea774bdfacf988b911be4ff06",
+  "productCommit": "f440287179f71e18a4b4b93607951c1e5f862cc1",
+  "productBaseline": "b7ca2c413bf3242ce18e29a397dc9a3aa9228893",
+  "changedFiles": [
+    "dialectical-engine/apps/api/src/main.ts",
+    "dialectical-engine/apps/api/src/support/answer.ts",
+    "dialectical-engine/apps/api/src/support/response-policy.ts",
+    "dialectical-engine/apps/runner/src/support-status-cli.ts",
+    "dialectical-engine/packages/kernel/src/support-credentials.ts",
+    "dialectical-engine/packages/kernel/src/support-text-views.ts",
+    "dialectical-engine/packages/support-kb/recovery/components.json",
+    "dialectical-engine/packages/support-kb/src/context.ts",
+    "dialectical-engine/packages/support-kb/src/index.ts",
+    "dialectical-engine/packages/support-kb/src/recovery.ts",
+    "dialectical-engine/tests/integration/support-cases.test.ts",
+    "dialectical-engine/tests/integration/support-metrics.test.ts",
+    "dialectical-engine/tests/integration/support-routes.test.ts",
+    "dialectical-engine/tests/unit/support-answer-context.test.ts",
+    "dialectical-engine/tests/unit/support-context.test.ts",
+    "dialectical-engine/tests/unit/support-credentials.test.ts",
+    "dialectical-engine/tests/unit/support-kb.test.ts",
+    "dialectical-engine/tests/unit/support-recovery-components.test.ts",
+    "dialectical-engine/tests/unit/support-redaction.test.ts",
+    "dialectical-engine/tests/unit/support-response-policy.test.ts",
+    "dialectical-engine/tests/unit/support-text-views.test.ts"
+  ],
+  "files": [
+    {
+      "path": "dialectical-engine/acceptance/hermes-relay.test.ts",
+      "sha256": "b1445541d46c78c67ee87cfa35bd8e932bee877a3c191cad1bc4f196deca9cc0"
+    },
+    {
+      "path": "dialectical-engine/acceptance/hermes-relay.ts",
+      "sha256": "2e0355acd88d3aa696e6155437f51c51fc9e60fd641529f7b1945791108235c4"
+    },
+    {
+      "path": "dialectical-engine/apps/api/src/main.ts",
+      "sha256": "449015f503515a956dba85e1a998594bf1aa0092b6967c8ff512fe0af9fc033d"
+    },
+    {
+      "path": "dialectical-engine/apps/api/src/support/answer.ts",
+      "sha256": "16e1eb66a8f72a0bed59c00ab879bcddd54e191de5046baec8610d859ec77c76"
+    },
+    {
+      "path": "dialectical-engine/apps/api/src/support/cases.ts",
+      "sha256": "7bcb12bcf6c5930194c047a300b22be2e2331bdbc6ad5d0b650f4d1fdc1dbcfe"
+    },
+    {
+      "path": "dialectical-engine/apps/api/src/support/classify.ts",
+      "sha256": "7ee8129d680e964d2a24ffcf72b8aadeff36c9ffff68c33293be778f455a7ba6"
+    },
+    {
+      "path": "dialectical-engine/apps/api/src/support/index.ts",
+      "sha256": "2248e2a8a025670915cd97802c61513539ab6798780f589088ddb4c301149852"
+    },
+    {
+      "path": "dialectical-engine/apps/api/src/support/model-references.ts",
+      "sha256": "b1738b971f9096e555eb7603d64b25f7ce4d26e79689d28d801bb697bc6dd1b3"
+    },
+    {
+      "path": "dialectical-engine/apps/api/src/support/model.ts",
+      "sha256": "ec3dcfd9e53f725e939a7f6d62f8a5f71094cab007e11f8261ce12104219b565"
+    },
+    {
+      "path": "dialectical-engine/apps/api/src/support/response-policy.ts",
+      "sha256": "f81978ad607583e547dc2d7b374bd22d5a4094726445fa779d4e0bc5aa04f87a"
+    },
+    {
+      "path": "dialectical-engine/apps/api/src/support/security-guidance.ts",
+      "sha256": "cf2ee07a3eda95043f4684787a13dd2b745af8d3fc3e41cabf6c7e1297cdc742"
+    },
+    {
+      "path": "dialectical-engine/apps/api/src/support/session.ts",
+      "sha256": "d312e3b0f56e85b318d05336223bc3beebd80a67b8a13b507edfd0442d569836"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-api-environment.ts",
+      "sha256": "ef3694270c582d8cfd8cc3767b950db9a28d66be0a3019f27467d622bd594ee5"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-api-process.ts",
+      "sha256": "826f2d6dc4d4e374c678a16447cb597162bb3a2c85b07f338a93577abbad5f45"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-auth-data-plane.ts",
+      "sha256": "456abfdb1f57473b4a1be8b2ef7e9d7f2cb4dd6098ec5f42053b1b310ff88c0d"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-auth-stack-cli.ts",
+      "sha256": "b33869aa58c4a038cff1194a53e7a33873e24ca37f9ac94cd547993f252aed97"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-auth-stack-profile.ts",
+      "sha256": "e997aa81f9505d1b9148d0e9bf414694df7674e07892891a7443b96142fbe4fb"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-auth-stack.ts",
+      "sha256": "ed93e423bc880f4084c15b401d5d443ac33239ad0d9efb478294c7ec204b93a4"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-cli-provider-panel.ts",
+      "sha256": "a6434cfc1a9576d99092968d92a08891b3698634ea83a42caa3a3a7600e8f597"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-hatchet-token.ts",
+      "sha256": "104d54d7edc943ff69d36b4d7556901ba40108e23ef3a386a4983d808c2e960b"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-provider-panel.ts",
+      "sha256": "bae8dde83f20228ee06b3136e35ff59c9f3447341078c5d1473a14b6e11577ff"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-runner-process.ts",
+      "sha256": "1b989e168ce51bd093248106e52e6cf60780596f8ea0a0a356c7809acfa0242d"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-support-model.ts",
+      "sha256": "d6677e3e2966f98733a80ea479c189301e7e17682cade45b7355259e2d7b6721"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-ui-process.ts",
+      "sha256": "5b672dd3868436ba719ba262b94e4ac03b7dbd230518b5d7b48110812b60c5e0"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/main.ts",
+      "sha256": "ee10aa430acb397315702ffe8278baffe8477900b321bc2a21432a8f44c38602"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/support-config-cli-credentials.ts",
+      "sha256": "46743738dea907e75a95ea8f964c09264bf3dc98930e5170412e42ee7f7be0b9"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/support-status-cli.ts",
+      "sha256": "0029680ac3456a7b8022121a15e848be1a7fced202c0760642fbc4b6046ff494"
+    },
+    {
+      "path": "dialectical-engine/apps/ui/components/support/Assistant.tsx",
+      "sha256": "80a26625bd72da1e683d0fcb54efe75692417525780ec3ffcb838a883e31c5d9"
+    },
+    {
+      "path": "dialectical-engine/apps/ui/package.json",
+      "sha256": "688743153b446e08dbb36fd4ef13ae290da8b2413789de76e070e2c1431251bd"
+    },
+    {
+      "path": "dialectical-engine/compose.dev.yaml",
+      "sha256": "d73757e40b4acf2ad0a258ad2b0019f455265aebd9080766d1cb18aa53a24beb"
+    },
+    {
+      "path": "dialectical-engine/deploy/dev-auth/README.md",
+      "sha256": "ba9853200786d7a763a401b3dd1014b827945922ce2da4f66de2d2ef0de393eb"
+    },
+    {
+      "path": "dialectical-engine/deploy/dev-auth/tls-front-door.d.mts",
+      "sha256": "35034f63b84831c66b0102ae3766348dac0e1bab3140807ae3e81817d5171055"
+    },
+    {
+      "path": "dialectical-engine/deploy/dev-auth/tls-front-door.mjs",
+      "sha256": "24f931e18bb49cde5e99efe091cd31bd7edb9459a18d101036f919cfd33315b9"
+    },
+    {
+      "path": "dialectical-engine/deploy/dev-auth/validate-compose-postgres.mjs",
+      "sha256": "00212b07d9e4478f872d7a3cfaa62b4dcf6cf72dc4c8b14181e38d85ccd61a32"
+    },
+    {
+      "path": "dialectical-engine/packages/db/src/support.ts",
+      "sha256": "3ac60a1a868e72db7e51149664e5552911cdd2979485222d546b5fd03b579082"
+    },
+    {
+      "path": "dialectical-engine/packages/kernel/src/index.ts",
+      "sha256": "206c7eb204dc28bbb507892f87a431198f6ef98c03de75dc1cff04d3fcc3cc11"
+    },
+    {
+      "path": "dialectical-engine/packages/kernel/src/support-credentials.ts",
+      "sha256": "f6610059d37e3852365c0a044374c2015415dfe646cb88771d259d887599b207"
+    },
+    {
+      "path": "dialectical-engine/packages/kernel/src/support-text-views.ts",
+      "sha256": "4e92b211735052dc41018727eb6b50ff72541be00a89d02b5fbd2ce040f95d3f"
+    },
+    {
+      "path": "dialectical-engine/packages/register/src/register-publication.ts",
+      "sha256": "fed2a2474f597c8acfe83476b1948cafbf794724dcf58568f5ddccf942d170ed"
+    },
+    {
+      "path": "dialectical-engine/packages/register/src/runtime-environment.ts",
+      "sha256": "2299123f4b2e5b831fde81340ad1f7ce2002c18f0735b88d9d3fac49df4796fa"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/account-access.en.md",
+      "sha256": "17aac248d75d7ad161fba2a44068d20743a9759ae56c9b30359c7e1d5550c2e7"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/account-access.ro.md",
+      "sha256": "5048de52b22b474fb8185e718fcaf235cd23896eff8fd7e42f4399d5266e9410"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/account-settings.en.md",
+      "sha256": "2cab95047c1c34109794f3fc1ad620784bbb97b9267160d471551454d296f628"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/account-settings.ro.md",
+      "sha256": "e2b2834ff96da50a0511b2647ae490f6f99af80e317a74caddb16ee8262bc5d9"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/budget-tier-choice.en.md",
+      "sha256": "a49d563ef7bfec75ed179a70adb54c25947aa9cbe4db557698eacc84d1d3c683"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/budget-tier-choice.ro.md",
+      "sha256": "e648150ae607bb98c55059eaea6162ffc2cd09df437721b75c8c7b226ef4984d"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/debate-topic-and-description.en.md",
+      "sha256": "695b7b405e599260acd7c5a51f897f46b52b238f2860a20168cd14cfdc176bad"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/debate-topic-and-description.ro.md",
+      "sha256": "90f1fff60a4245eeda7b5131b671772b425e8ab682f967c4c31c2ad42c7207a2"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/export-json.en.md",
+      "sha256": "c31c5bd3a2eb80e1352f27431e459f8272ae37605a9988210cff2aa82d6b7ea5"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/export-json.ro.md",
+      "sha256": "5016b1370fbbd83ed2e647cfdeb8a2c10b4052ef8861807abed2ee4b0ae8f02b"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/getting-started-debate.en.md",
+      "sha256": "a438b7c7a91342dee7c5edb2efe48e586be2cc33d9a2eafabaadad2882f6f9e8"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/getting-started-debate.ro.md",
+      "sha256": "f2a848dbaa9131d3165f50ce2004f1fba874032a48d7bdf1ba90f96c8aa205af"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/guide-how-it-works.en.md",
+      "sha256": "05316f05e559cd866948ab7f464a681d6875fe8aad5143e956eeb20077bc46c5"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/guide-how-it-works.ro.md",
+      "sha256": "94acc4db2ccecb9a0d4f5b82350e91d26643b76c6caff879019edc107a3e3000"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/privacy-consent.en.md",
+      "sha256": "54cca7dbfb790c9d6aac077b00775e5ac6d5bc277be38733e92047bc63c262d5"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/privacy-consent.ro.md",
+      "sha256": "e9b04331a2aa76d3ed9bd45c2199263dc476ae62d15c33db30ed537fedeb5c5d"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/risk-tier-choice.en.md",
+      "sha256": "3ca67a93a3b159c0b284b2bd75093fd9bc70e20d03c357f4ac1fdcb3df522715"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/risk-tier-choice.ro.md",
+      "sha256": "f40e8583d9ec012f6510c4f6ae6a6527680bc279f393388dc8cd2a31762f4d96"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/support-cases.en.md",
+      "sha256": "96ea24b2aff54d46beeb25cec255041f335e93c52590829ad64f53ad62fe9aa2"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/support-cases.ro.md",
+      "sha256": "2346f0b14cfd3ac25ccd609d8268809da9975dc2079179778e10df3da7f88aac"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/support-status-limits.en.md",
+      "sha256": "7f111d034af0d6ba0765c9bf008d6d8981f8a589e1731695e9bbf7d5f213f15f"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/support-status-limits.ro.md",
+      "sha256": "884956c2b04303c8412a4859746a526d5577e9392e2066843aa977500857511f"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/unsupported-capabilities.en.md",
+      "sha256": "6e7f19d6d7c00fe4d10660e4dff7ad52e16ae8ff3d85cea13717780af586ec6f"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/content/unsupported-capabilities.ro.md",
+      "sha256": "c07bb1a6a85f14a034a134a08250f22721f772ce54bd77d18ff63f7df93d350b"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/package.json",
+      "sha256": "11ae5b086ed8242c86eb21f2e99af208c217fb87d1e72947b78ad973a84f6b19"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/recovery/components.json",
+      "sha256": "54e871653032b1190d79182483f2a28ea2516ab180672a8a91f429a86b584d6f"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/reviews/manifest.json",
+      "sha256": "02b1396b131ddf437dc361679ecbad6587d1fafda3a2a17b889ec370492f5fab"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/src/catalog.ts",
+      "sha256": "be0c28d2629fa01cba3351e31f6f4864391fcc091b33d978e52551471bc41e36"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/src/context.ts",
+      "sha256": "0840c6bfddf58bf5d38d990046e3ccd1b7b70da00621077f77bf2b6f269687b2"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/src/index.ts",
+      "sha256": "8224c2268db9e2d739ba93198e331ff6c64e0d854c3780ca09df89922813d628"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/src/navigation.ts",
+      "sha256": "d55c80d91d7e0d737787220539b26dc10ebf8f497d09a58e86e0160c81469cfe"
+    },
+    {
+      "path": "dialectical-engine/packages/support-kb/src/recovery.ts",
+      "sha256": "74b2f258cd108efa796daf5e6361bfd01a34625efa975d3d62adda9a8c44ead3"
+    },
+    {
+      "path": "dialectical-engine/pnpm-lock.yaml",
+      "sha256": "7f703323acea8f06eadd9d5167d1bacdb2ceb37dfe7ce67dc3a7a1190545ca44"
+    },
+    {
+      "path": "dialectical-engine/tests/architecture/dev-compose-postgres.test.ts",
+      "sha256": "9f6d59b76d23b025e6b2dc264fe4905d642f2f43412de16c8521b7058c2231c6"
+    },
+    {
+      "path": "dialectical-engine/tests/architecture/dev-local-auth-topology-spec.test.ts",
+      "sha256": "132f89079be33fc6d648299efb7978c2850492c5d1b8aa5bd796149ecffe0ac9"
+    },
+    {
+      "path": "dialectical-engine/tests/architecture/support-catalog-coverage.test.ts",
+      "sha256": "78c69649a3459eee15a7c1c40bde9ceaf21d7b7812ea5cbcc4e8dfe2cd1a78fe"
+    },
+    {
+      "path": "dialectical-engine/tests/integration/dev-api-process.test.ts",
+      "sha256": "8e21cc0897bc6a8363939705cbe12887600adfff46abceaf3244b0a958a6022d"
+    },
+    {
+      "path": "dialectical-engine/tests/integration/dev-hatchet-token.test.ts",
+      "sha256": "e64666bd4d062176479eee132c852e55fe6ce6e06ee1a97def57f98988f71960"
+    },
+    {
+      "path": "dialectical-engine/tests/integration/dev-provider-panel.test.ts",
+      "sha256": "1a2ad3c78216b9a5b6c2708effa05ec1d656be14b9b4444a324a0b727061ed7d"
+    },
+    {
+      "path": "dialectical-engine/tests/integration/dev-tls-readiness.test.ts",
+      "sha256": "f4ed6c0364295b73d68a88f3caec67d18f03efed57aa2a31d32c368e0041ce0f"
+    },
+    {
+      "path": "dialectical-engine/tests/integration/dev-ui-process.test.ts",
+      "sha256": "3bbfc8eb730ae504564ce1f632a39e0a9f5d14bfec8b44ad1d0a68b77ea5c022"
+    },
+    {
+      "path": "dialectical-engine/tests/integration/register-support-publication.test.ts",
+      "sha256": "c2e43404cfa431d7a278b945d8b7cfec4db800cebda727d946965586b5a92c1a"
+    },
+    {
+      "path": "dialectical-engine/tests/integration/support-cases.test.ts",
+      "sha256": "c2d17ae9f9b7f5b1be935e9624f0899b9e2d30219d5346afdfc387ef1ac32acd"
+    },
+    {
+      "path": "dialectical-engine/tests/integration/support-config-principals.test.ts",
+      "sha256": "714b46cd4bdb9ca1bd6d6d120d767411bc39a2ccdb7dc97101702f8b91f27b1a"
+    },
+    {
+      "path": "dialectical-engine/tests/integration/support-degraded.test.ts",
+      "sha256": "ade3852f10ba95f8bb92a9e42a58c716e0305de5d4802a5e984ade1b9100ade8"
+    },
+    {
+      "path": "dialectical-engine/tests/integration/support-metrics.test.ts",
+      "sha256": "0e1da0f98c3440b5218934f0010b90a725aa1d880bfd09d4c5cd3748941872f9"
+    },
+    {
+      "path": "dialectical-engine/tests/integration/support-routes.test.ts",
+      "sha256": "5ffca4bfdadf17915db434d3fba9652e380d541a566b271d1c5169f8f3797d5a"
+    },
+    {
+      "path": "dialectical-engine/tests/render/sup-01-help.test.tsx",
+      "sha256": "8c9612bfbe09371ca31ade8b11140998127be20552a8ea89c62b101d6ab56c7d"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/dev-auth-data-plane.test.ts",
+      "sha256": "ad607d786630968b50cc7e3b4a70a2c415e897210f85fdc56904ed1cfecc9343"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/dev-auth-stack-profile.test.ts",
+      "sha256": "ec4e59fe4e4b5b1920df3d349be8061add654f4f9ed5b79a5f07d0b6a3c10b18"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/dev-auth-stack.test.ts",
+      "sha256": "004986a43939fc9b9f38f4ff57db473af7d6cdc9f0f0f24a40e27525d4e4b97f"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/dev-cli-provider-panel.test.ts",
+      "sha256": "9c6b9e1e9c739464cf82476ce276d89a12d5c81cfb09fafd79a6f90c37e45a97"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/register-publication.test.ts",
+      "sha256": "e4e3d5dc597da75a8744555a5107ea8ab3e1a1de12af951426327793e1a2fcda"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/support-answer-context.test.ts",
+      "sha256": "30f2345a2ca0e8539fc74dc9f2d25fedb312906e9e1fc05d172ca53fb90ebd1e"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/support-classify.test.ts",
+      "sha256": "591d810548007bf9c5fe5b6b586d61bf7e85ae4f8c46eb50a5dea7dfdcd51147"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/support-context.test.ts",
+      "sha256": "b978d9fd2305854ecbc7c70f9ab6c2c26a8d62b5e81752384bf409d06bfbbfeb"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/support-credentials.test.ts",
+      "sha256": "baab04442041be61898105b9e898ed1d79ad5191489fcbf0489c343866dc5e07"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/support-escalation.test.ts",
+      "sha256": "85f2054f420af68eda63a49b2068a2966af09d7eedc31f53030d5591cb4ce92b"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/support-kb.test.ts",
+      "sha256": "6d647c3e871b6248ac7b79438e1c694321cbfb908017ae3f370f8d4fd3465c70"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/support-model-references.test.ts",
+      "sha256": "63c0aa1363f1c06bd751d4d9f7f32d553be566611b56350524ff4ae70fe7b293"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/support-model.test.ts",
+      "sha256": "a598dede7eec3528055930f1d71dfd4f485920622a5a5dba206286fc55407358"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/support-navigation.test.ts",
+      "sha256": "5c2489530cc0614906720f45f485c54876a7830a4e62a322cd25101fd1101052"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/support-recovery-components.test.ts",
+      "sha256": "d27d0bb0e81510dc03223c70bc43c3f053702ab8eb2b414b062ff0903ed77070"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/support-redaction.test.ts",
+      "sha256": "8331bb96896967ecd327c873c978d3be84925a77899b9759b512cd924bfd7276"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/support-response-policy.test.ts",
+      "sha256": "9a0a9142495e57a9241aa200d91380029e8d5d631836e9dc390c6f1e7c373d98"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/support-security-guidance.test.ts",
+      "sha256": "d77622c2fca090473e184e38b6ae3ee4b048329eea8d52a409bb51363cff44c7"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/support-text-views.test.ts",
+      "sha256": "87a131f999f2b6edd89e0fde5d748f8ba80ffa989d1bb6948373609fcbbaa9ca"
+    }
+  ],
+  "clean": true,
+  "finalAffectedLog": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P2-affected-final.log",
+    "sha256": "e28ce3f334d57d45465e791f3824681766c89498401f3379a6d1375cc5b13eb1",
+    "summary": [
+      " Test Files  11 passed (11)",
+      "      Tests  448 passed (448)",
+      "   Duration  9.11s (transform 546ms, setup 0ms, import 2.34s, tests 5.86s, environment 1ms)"
+    ]
+  },
+  "limits": "Does not consume unfinished author reports or establish editorial eligibility, final integrated/live evidence, or owner acceptance."
+}

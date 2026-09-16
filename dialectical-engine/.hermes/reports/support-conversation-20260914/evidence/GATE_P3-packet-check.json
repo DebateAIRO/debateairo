@@ -1,0 +1,27 @@
+{
+  "at": "2026-09-16T06:34:40.952196+00:00",
+  "freeze": "bc0e85fc6013e0067cdb178a4bf7cc0526bdd72c",
+  "initialFreeze": "ac55729b9b88954c67d482a4b48fe2403755d479",
+  "sourceHead": "446c685e977104ecf2b0b5ee0519f7123968429f",
+  "productCommit": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
+  "packets": [
+    {
+      "packet": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REV1_P3.md",
+      "sha256": "843227402218f2c55a5215a59c058987422b181e1db7d3b966831204458d8fad",
+      "rc": 0,
+      "output": "OK dispatchable: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REV1_P3.md (main-tree HEAD at check time: 446c685e \u2014 the packet's base is the LANE base; stamp both in the dispatch comment)\n"
+    },
+    {
+      "packet": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REV2_P3.md",
+      "sha256": "494076b74d5ade6920a3c91006e5ed70527bc52c665d100fc944553648ecfec6",
+      "rc": 0,
+      "output": "OK dispatchable: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REV2_P3.md (main-tree HEAD at check time: 446c685e \u2014 the packet's base is the LANE base; stamp both in the dispatch comment)\n"
+    },
+    {
+      "packet": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REV3_P3.md",
+      "sha256": "66b5d652cf2d649929511033b96bd1de1f87840ea4a8ac54ca4da93d195674b4",
+      "rc": 0,
+      "output": "OK dispatchable: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REV3_P3.md (main-tree HEAD at check time: 446c685e \u2014 the packet's base is the LANE base; stamp both in the dispatch comment)\n"
+    }
+  ]
+}

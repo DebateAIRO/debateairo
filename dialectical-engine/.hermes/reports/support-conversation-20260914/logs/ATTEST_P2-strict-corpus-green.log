@@ -1,0 +1,10 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ ✓ tests/unit/support-recovery-attestation.test.ts > production Support recovery attestation > admits the exact separately reviewed 36-record corpus as a deterministic immutable snapshot 82ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  19:50:42
+   Duration  243ms (transform 57ms, setup 0ms, import 77ms, tests 83ms, environment 0ms)
+

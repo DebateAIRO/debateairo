@@ -1,0 +1,20 @@
+{
+  "commit": "6e5ab5fc41acebbff4264efc7d481df3db8dce44",
+  "baseCommit": "43cf9386ea3c9e7c79523ec38debe63271d19292",
+  "files": {
+    "apps/api/src/main.ts": "82b56c6b73eb414c6db5abb9813831284232cc491d360ccc7c4a246891113270",
+    "apps/api/src/support/answer.ts": "01bd1ce3e1a66230e9cebfd4b2eb5fe254fedc74a6c700eb3c95c8d4b4efae23",
+    "apps/api/src/support/response-policy.ts": "5162e81e73d51715a9026c7b3c3a0ba612b6289ab8413519e5587ce2b2ccb564",
+    "packages/kernel/src/index.ts": "d8446b803a7d2d1b060d6a201417eece97807d2c51553e02ae3d99e33816de99",
+    "packages/kernel/src/support-credentials.ts": "4a5668ad06ea0543a627934129ab91d05a0f7a815f9ab8028071b86e805d9538",
+    "tests/integration/support-cases.test.ts": "17203a50f09e649a1dfd256ff3ab3a09ae149639ba8e2cc152d48c33a8db308a",
+    "tests/integration/support-routes.test.ts": "8327f9a19cfaecf2660f2ea4c0717938ff06181d3defd0c727776aa1fe75efe0",
+    "tests/unit/support-answer-context.test.ts": "0266bfc2d42bb981a475414d32208085e7d71ec5f4a16da2fa4cef291fb90e9b",
+    "tests/unit/support-credentials.test.ts": "86c719faa3134e4edac787abec261b2006b68f6affd0c45940cac085e2f31173",
+    "tests/unit/support-redaction.test.ts": "988b0441142f0c4f101fed88932eb7872d3d6cac3848e703391c333411489fb8",
+    "tests/unit/support-response-policy.test.ts": "d045c77b49b649c4cd8140a03e76f9d22f7e777a6db18686a2fee22e1ff60d3b"
+  },
+  "authorManifestPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX4-manifest.json",
+  "authorManifestSha256": "e1b113374522545c4961015b60729e38665618f8abd839f066a1e412822f7164",
+  "normalization": "Removed exactly one verified Git-root dialectical-engine/ prefix from every key for the lane-relative inventory consumer; no path filtered."
+}
