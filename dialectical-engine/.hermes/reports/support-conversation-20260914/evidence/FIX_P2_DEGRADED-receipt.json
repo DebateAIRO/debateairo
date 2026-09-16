@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "status": "FIX_P2_DEGRADED AUTHORED; REV1_P3 DISPOSITION PENDING",
+  "node": "FIX_P2_DEGRADED",
+  "ticket": "t_7f51fcb1",
+  "session": "/root/requirements",
+  "sourceRevision": "446c685e977104ecf2b0b5ee0519f7123968429f",
+  "baseRevision": "606b2eabea1dc9212159e53c193cf69655424e77",
+  "finalRevision": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
+  "cause": "Structured fixture entry lacked modelProjection, so deterministic context admission returned NO_SOURCE before model transport.",
+  "correction": "Added only the safe modelProjection field; fallback remains absent; all existing REFUSE_SAFETY, usage, storage, and relay-health assertions remain.",
+  "verification": {
+    "targetedRed": {
+      "testFiles": 1,
+      "passed": 0,
+      "failed": 1,
+      "skipped": 7,
+      "outcome": "NO_SOURCE"
+    },
+    "affectedFileGreen": {
+      "testFiles": 1,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    "trackedDiffPaths": [
+      "dialectical-engine/tests/integration/support-degraded.test.ts"
+    ],
+    "nonTestRuntimeConfigContentChanged": false,
+    "worktreeClean": true
+  },
+  "inputEvidence": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/LIVE_P2-integrated-suite.log",
+      "sha256": "b8901466de0fc1059b420565a2082c31e6b1bb818c08ce6854a6e74745aa39e7",
+      "bytes": 474507,
+      "kind": "completedIntegratedFailure"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/ATTEST_P2-consumption.json",
+      "sha256": "fcab1dd7da70b48dc00b1ec7dcea3ead4607a3ed24e13ecfb6c05dc654a54ad0",
+      "bytes": 37682,
+      "kind": "consumedAttestation"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE_P2-required-suites.json",
+      "sha256": "172cbfcef619b42a178eaa18676b179356c5d886a9d8313283522f839b4d1ec1",
+      "bytes": 4619,
+      "kind": "exactFinalUnion"
+    }
+  ],
+  "artifacts": [
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/FIX_P2_DEGRADED.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX_P2_DEGRADED.md",
+      "sha256": "5a0920105a45fd7c8ed04a566d3bd592a4ee5f949ae805481caa365ef87294da",
+      "bytes": 4772,
+      "kind": "evidence"
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/FIX_P2_DEGRADED.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FIX_P2_DEGRADED.md",
+      "sha256": "5c077ed9d4f9ef104c4ba59ce5f206197c984de30a958fd1b6bb8401845e8cc1",
+      "bytes": 3952,
+      "kind": "selfReport"
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/FIX_P2_DEGRADED-target-red.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P2_DEGRADED-target-red.log",
+      "sha256": "80345a8adc78d11a7b0265e45d6fa96f4e9868896cc7afcf90209e184f07def3",
+      "bytes": 2690,
+      "kind": "redLog"
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/FIX_P2_DEGRADED-file-green.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P2_DEGRADED-file-green.log",
+      "sha256": "b013fde167ba1b1f3b95195d839e77007bc0c6f0420dda23d6b7df9e2fcec6d1",
+      "bytes": 1584,
+      "kind": "greenLog"
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/FIX_P2_DEGRADED-scope-proof.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P2_DEGRADED-scope-proof.log",
+      "sha256": "b3120d1b59d9c559ac6cdccd6f727b8c45598bbbf4f46c4de20166df412ebb35",
+      "bytes": 1011,
+      "kind": "preCommitScopeLog"
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/FIX_P2_DEGRADED-final-custody.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P2_DEGRADED-final-custody.log",
+      "sha256": "107a26a018f4ff6b6fcbde8a096b2c8255f2fd6055f2e7bc938b7ec7e954f655",
+      "bytes": 1052,
+      "kind": "finalCustodyLog"
+    },
+    {
+      "laneRelative": "tests/integration/support-degraded.test.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/integration/support-degraded.test.ts",
+      "sha256": "0559fdf2dceeadac10b7d544094ff02e0b84067102fb2e8787c24bce200d0df6",
+      "bytes": 10834,
+      "kind": "productTest"
+    }
+  ],
+  "artifactCount": 7,
+  "leases": {
+    "heavy": "RELEASE AT HANDOFF",
+    "scopedGit": "RELEASE AT HANDOFF"
+  },
+  "limits": [
+    "No runtime/content/config/source change.",
+    "No preview/browser/HTTP/provider/model traffic or new live sample.",
+    "REV1_P3 owns the finding disposition.",
+    "Forgot destination and owner acceptance remain unresolved."
+  ],
+  "excluded": [
+    "this receipt itself"
+  ]
+}

@@ -1,0 +1,2267 @@
+diff --git a/dialectical-engine/apps/api/src/main.ts b/dialectical-engine/apps/api/src/main.ts
+index 94d36caabeb852e49e3816072ecba4c57216692c..63f6bc809c461b5849432af0188faed785ea0ba3 100644
+--- a/dialectical-engine/apps/api/src/main.ts
++++ b/dialectical-engine/apps/api/src/main.ts
+@@ -80,7 +80,9 @@ const environment = loadApiEnvironment();
+ const supportKnowledge = loadHelpCorpus(resolve("packages/support-kb/content"),{
+   reviewManifest: JSON.parse(readFileSync(
+     resolve("packages/support-kb/reviews/manifest.json"),"utf8"
+-  )) as unknown
++  )) as unknown,
++  recoveryComponents: readFileSync(resolve("packages/support-kb/recovery/components.json")),
++  requireReviewedRecovery: true
+ });
+ const supportKnowledgeSnapshots = createHelpCorpusSnapshotLookup(supportKnowledge);
+ const kek = loadKek(environment.KEK_PATH);
+diff --git a/dialectical-engine/apps/api/src/support/answer.ts b/dialectical-engine/apps/api/src/support/answer.ts
+index 3ccff86225f2be7bb66f3016e41be0e763b993e6..ddd30fa42432cabe9880c4edad6c1d21adc23a8a 100644
+--- a/dialectical-engine/apps/api/src/support/answer.ts
++++ b/dialectical-engine/apps/api/src/support/answer.ts
+@@ -18,7 +18,8 @@ import {
+ import { SupportQueueError,type SupportRelayQueue } from "./queue.js";
+ import type { SupportDegradedPort } from "./degraded.js";
+ import {
+-  diagnoseSupportDraft,parseSupportDraft,type SupportDraftReport,validateSupportDraft
++  diagnoseSupportDraft,parseSupportDraft,screenSupportModelText,
++  type SupportDraftReport,validateSupportDraft
+ } from "./response-policy.js";
+ import {
+   createSupportModelReferenceFactory,translateSupportDraftReferences,
+@@ -220,8 +221,12 @@ export function createSupportAnswerService(input: Readonly<{
+           - [...`${structuredInstruction(request.language)}\n\n`].length
+       }) : undefined;
+       const entries = structured
+-        ? eligibleEntries.filter((entry) => entry.lang === request.language
+-          && context!.sourceIds.includes(entry.id))
++        ? context!.sourceIds.flatMap((id) => {
++          const entry = eligibleEntries.find((candidate) =>
++            candidate.lang === request.language && candidate.id === id
++          );
++          return entry === undefined ? [] : [entry];
++        })
+         : retrieve(eligibleEntries,prepared.text,request.language);
+       if (entries.length === 0) {
+         const completedAt = strictAfter(request.receivedAt,clock);
+@@ -244,6 +249,12 @@ export function createSupportAnswerService(input: Readonly<{
+           sources: Object.freeze([]),actions: Object.freeze([])
+         });
+       }
++      const recoveryEntry = structured ? entries[0] : undefined;
++      const sourceActionIds = recoveryEntry === undefined ? Object.freeze([]) : Object.freeze(
++        context!.requestedActionIds.filter((id) => SUPPORT_CAPABILITIES.some(({ articleIds,actionIds }) =>
++          articleIds.includes(recoveryEntry.id) && actionIds.includes(id)
++        ))
++      );
+ 
+       let completion: Awaited<ReturnType<SupportModelPort["complete"]>> | undefined;
+       let firstTokenAt: Date | undefined;
+@@ -322,8 +333,12 @@ export function createSupportAnswerService(input: Readonly<{
+             sources:context!.sourceReferences,actions:context!.actionReferences
+           });
+         const rejected = structured && draft === null;
++        const recovered = rejected
++          && recoveryEntry?.fallback !== undefined
++          && screenSupportModelText(recoveryEntry.fallback);
+         const modelText = structured
+-          ? rejected ? supportTemplate("REFUSE_SAFETY",request.language) : draft!.text
++          ? recovered ? recoveryEntry.fallback
++          : rejected ? supportTemplate("REFUSE_SAFETY",request.language) : draft!.text
+           : withoutModelSources(completion.text);
+         if (modelText === "") throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
+         input.degraded?.markAvailable();
+@@ -333,12 +348,12 @@ export function createSupportAnswerService(input: Readonly<{
+           groundedText,supportIntentSurface(request.text),
+           await input.incidents.readActiveIncidents(),request.language
+         );
+-        const outcome = rejected ? "REFUSE_SAFETY" as const : "ANSWER_GROUNDED" as const;
+-        const sources = rejected ? Object.freeze([]) : Object.freeze(entries
+-          .filter((entry) => structured ? draft!.sourceIds.includes(entry.id) : true)
++        const outcome = rejected && !recovered ? "REFUSE_SAFETY" as const : "ANSWER_GROUNDED" as const;
++        const sources = rejected && !recovered ? Object.freeze([]) : Object.freeze((recovered
++          ? [recoveryEntry!] : entries.filter((entry) => structured ? draft!.sourceIds.includes(entry.id) : true))
+           .map((entry) => Object.freeze({ id: entry.id,label: entry.title })));
+-        const actions = rejected || !structured ? Object.freeze([]) : resolveSupportActions(
+-          draft!.actionIds,
++        const actions = rejected && !recovered || !structured ? Object.freeze([]) : resolveSupportActions(
++          recovered ? sourceActionIds : draft!.actionIds,
+           { signedIn: request.signedIn === true,language: request.language }
+         );
+         const messageId = randomUUID();
+diff --git a/dialectical-engine/apps/api/src/support/response-policy.ts b/dialectical-engine/apps/api/src/support/response-policy.ts
+index 8e93a51aa1b17b2e02e380de2fd93f2fe4c1af17..5939ec9a389e4ac7cf6d88f6034ac5b7129956bc 100644
+--- a/dialectical-engine/apps/api/src/support/response-policy.ts
++++ b/dialectical-engine/apps/api/src/support/response-policy.ts
+@@ -1,5 +1,8 @@
+ import { z } from "zod";
+-import { analyzeSupportCredentialText,canonicalSupportTextViews } from "@debateai/kernel";
++import {
++  analyzeSupportCredentialText,canonicalSupportTextViews,supportTextContainsCredentialOperation,
++  supportTextHasUnsafePath
++} from "@debateai/kernel";
+ import {
+   SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,type SupportActionId
+ } from "@debateai/support-kb/catalog";
+@@ -132,20 +135,6 @@ const CLOSED_NARRATIVE_IDS = new Set<string>([
+   ...SUPPORT_CAPABILITIES.flatMap(({ articleIds }) => articleIds)
+ ].filter((id) => id.includes("-")));
+ 
+-function containsCredentialOrSecurityAction(value: string): boolean {
+-  const facts = analyzeSupportCredentialText(value);
+-  return facts.operations.some((operation) => {
+-    if (operation.negated) return false;
+-    if (facts.credentialTerms.some((term) => term.scope === operation.scope)) return true;
+-    const reference = facts.references.some((candidate) => candidate.scope === operation.scope);
+-    if (!reference) return false;
+-    return facts.credentialTerms.some((term) =>
+-      term.scope < operation.scope && operation.scope - term.scope <= 1
+-      && operation.sentence - term.sentence <= 1
+-    );
+-  });
+-}
+-
+ type TextScreenResult = Readonly<{
+   code: SupportDraftDiagnosticCode;predicate: SupportDraftPredicate;
+ }>;
+@@ -158,7 +147,7 @@ function linkPredicate(value: string): SupportDraftPredicate | null {
+   const canonical = canonicalSupportTextViews(value);
+   if (canonical.unsafeEncoding) return "ENCODED_LINK_OR_PATH";
+   for (const candidate of canonical.views) {
+-    if (!MARKUP_OR_LINK.test(candidate)) continue;
++    if (!MARKUP_OR_LINK.test(candidate) && !supportTextHasUnsafePath(candidate)) continue;
+     if (candidate !== canonical.views[0]) return "ENCODED_LINK_OR_PATH";
+     if (/(?:\[[^\]]+\]\s*\(|<\/?[a-z][^>]*>)/iu.test(candidate)) return "MARKUP";
+     if (/(?:https?:\/\/|www\.|(?:^|\s)\/\/)/iu.test(candidate)) return "RAW_LINK_OR_PROTOCOL";
+@@ -191,7 +180,7 @@ function screenCategory(value: string,internalIds: readonly string[] = []): Text
+     || normalized.some((candidate) => SECRET_LIKE.test(candidate))) {
+     return result("TEXT_SECRET_LIKE","LABELLED_OR_TOKEN_SECRET");
+   }
+-  if (normalized.some(containsCredentialOrSecurityAction)) {
++  if (normalized.some(supportTextContainsCredentialOperation)) {
+     return result("TEXT_CREDENTIAL_OR_SECURITY_ACTION","CREDENTIAL_OPERATION");
+   }
+   if (normalized.some((candidate) => SIX_DIGIT_CODE.test(candidate))) {
+diff --git a/dialectical-engine/apps/runner/src/support-status-cli.ts b/dialectical-engine/apps/runner/src/support-status-cli.ts
+index 2e0d45ac56bdc149c4f51186d2c3125e8a75d921..3e2328c5028f3d5d7588b45b5ddbfffe1ef68cc8 100644
+--- a/dialectical-engine/apps/runner/src/support-status-cli.ts
++++ b/dialectical-engine/apps/runner/src/support-status-cli.ts
+@@ -1,3 +1,4 @@
++import { readFileSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { pathToFileURL } from "node:url";
+ import { TypedDomainError } from "@debateai/kernel";
+@@ -249,7 +250,13 @@ function parseArguments(arguments_: readonly string[]): Readonly<{
+ 
+ async function main(): Promise<void> {
+   const arguments_ = parseArguments(process.argv.slice(2));
+-  const knowledge = loadHelpCorpus(resolve("packages/support-kb/content"));
++  const knowledge = loadHelpCorpus(resolve("packages/support-kb/content"),{
++    reviewManifest: JSON.parse(readFileSync(
++      resolve("packages/support-kb/reviews/manifest.json"),"utf8"
++    )) as unknown,
++    recoveryComponents: readFileSync(resolve("packages/support-kb/recovery/components.json")),
++    requireReviewedRecovery: true
++  });
+   let output: string;
+   if (arguments_.configurationCredentialFile === null
+     || arguments_.supportDataCredentialFile === null) {
+diff --git a/dialectical-engine/packages/kernel/src/support-credentials.ts b/dialectical-engine/packages/kernel/src/support-credentials.ts
+index 1d01360645a8660cba0ea690a415b586d7127a03..221fc59235e1b1e3380b3ca1b922d5464fb930e2 100644
+--- a/dialectical-engine/packages/kernel/src/support-credentials.ts
++++ b/dialectical-engine/packages/kernel/src/support-credentials.ts
+@@ -37,6 +37,7 @@ export type SupportCredentialFacts = Readonly<{
+   operations: readonly SupportSecurityOperationFact[];
+   negations: readonly SupportScopedFact[];
+   references: readonly SupportScopedFact[];
++  nonCredentialObjects: readonly SupportScopedFact[];
+ }>;
+ 
+ type NormalizedText = Readonly<{
+@@ -77,23 +78,24 @@ const OPERATION_PATTERNS: readonly Readonly<{
+ ]);
+ 
+ const NEGATION = /\b(?:never|do\s+not|does\s+not|did\s+not|cannot|can\s+not|can't|must\s+not|will\s+not|should\s+not|nu|niciodata|nu\s+poate|nu\s+pot|nu\s+trebuie)\b/giu;
+-const REFERENCE = /(?:\b(?:it|them|this|that|these|those|acesta|aceasta|acestea|acestora|le|lor)\b|-o\b|-le\b)/giu;
+-const SCOPE_BOUNDARY = /(?:[.!?;\n]+|,?\s*\b(?:but|however|instead|except|unless|then|therefore|thus|so|as\s+a\s+result|because|while|although|yet|which\s+means|and\s+(?:also|then|generally|sometimes|later|still)|dar|insa|apoi|deci|asa\s+ca|prin\s+urmare|deoarece|fiindca|desi|totusi|ceea\s+ce\s+inseamna|si\s+de\s+asemenea)\b|\b(?:and|si)\s+(?=(?:you|the\s+visitor|support|i|we|they|should|must|will|can|please|send|share|provide|give|submit|enter|paste|upload|tell|show|receive|accept|repeat|transform|validate|decode|encode|reset|change|replace|regenerate|tu|vizitator|asistenta|trebuie|poti|vei|va|trim|partaj|furniz|introduc|lip|incarc|spun|arat|prim|accept|repet|transform|valid|decod|encod|reset|schimb|inlocu|regener)))/giu;
++const REFERENCE = /(?:\b(?:it|them|this|that|these|those|acesta|aceasta|acestea|acestora|il|le|lor)\b|-o\b|-le\b)/giu;
++const NON_CREDENTIAL_OBJECT = /\b(?:display\s+name|account\s+name|profile\s+name|nume(?:le)?\s+(?:afisat|contului|profilului))\b/giu;
++const SCOPE_BOUNDARY = /(?:[.!?;\n]+|,?\s*\b(?:but|however|instead|except|unless|then|therefore|thus|so|as\s+a\s+result|because|while|although|yet|which\s+means|and\s+(?:also|then|generally|sometimes|later|still)|dar|insa|apoi|deci|asa\s+ca|prin\s+urmare|deoarece|fiindca|desi|totusi|ceea\s+ce\s+inseamna|si\s+de\s+asemenea)\b|\b(?:and|si)\s+(?=(?:you|the\s+visitor|support|i|we|they|may|might|should|must|will|would|can|could|is|are|please|send|share|provide|give|submit|enter|paste|upload|tell|show|receive|accept|repeat|transform|validate|decode|encode|reset|change|replace|regenerate|tu|vizitator|asistenta|poate|pot|ar|este|sunt|trebuie|poti|vei|va|vor|trim|partaj|furniz|introduc|lip|incarc|spun|arat|prim|accept|repet|transform|valid|verific|decod|encod|reset|schimb|inlocu|regener)))/giu;
+ const SENTENCE_BOUNDARY = /[.!?;\n]+/gu;
+ const LABEL_CONNECTOR = /^\s*(?:(?:my|your|his|her|our|their|visitor(?:'s)?|meu|mea|mele|ta|tau|dvs|dumneavoastra|utilizatorului)\s+){0,2}(?:(?:is|are|este|e|sunt)\b|:|=)\s*/iu;
+-const VALUE_TOKEN = /^[^\s,;.!?]+/u;
+ const VALUE_STOP_WORDS = new Set([
+   "and","but","because","keep","please","so","then","therefore","which","while",
+   "asa","apoi","dar","deci","iar","pastreaza","pentru","si"
+ ]);
+ const QUOTE_PAIRS = new Map([["\"","\""],["'","'"],["„","”"],["“","”"],["«","»"]]);
+-const MAX_VALUE_WORDS = 6;
+-const MAX_VALUE_CODE_UNITS = 160;
++const VALUE_HARD_DELIMITER = /[;\n]|[.!?](?=\s|$)|,(?=\s*(?:and|but|because|keep|please|so|then|therefore|which|while|asa|apoi|dar|deci|iar|pastreaza|pentru|si)\b)/giu;
++const VALUE_COORDINATOR = /\s+\b(?:and|but|because|keep|please|so|then|therefore|which|while|asa|apoi|dar|deci|iar|pastreaza|pentru|si)\b/giu;
+ const NON_VALUE_WORDS = new Set([
+   "available","disponibil","disponibile","encrypted","forgotten","invalid","missing","never","not","private","protected",
+   "required","safe","secure","unavailable","unknown","niciodata","nu","necesara",
+   "necesar","protejata","protejat","sigura","sigur","uitata","uitat"
+ ]);
++const VALUE_ARTICLES = new Set(["a","an","o","un","una"]);
+ 
+ function normalizeWithMap(source: string): NormalizedText {
+   let text = "";
+@@ -161,20 +163,25 @@ function labelledValueSpan(text: string,start: number): Readonly<{ start: number
+   const closing = first === undefined ? undefined : QUOTE_PAIRS.get(first);
+   if (closing !== undefined) {
+     const end = text.indexOf(closing,start + 1);
+-    if (end <= start + 1 || end - start > MAX_VALUE_CODE_UNITS) return null;
+-    return Object.freeze({ start:start + 1,end });
++    if (end > start + 1) return Object.freeze({ start:start + 1,end });
++    const remainder = text.slice(start + 1);
++    VALUE_HARD_DELIMITER.lastIndex = 0;
++    const delimiter = VALUE_HARD_DELIMITER.exec(remainder);
++    const unmatchedEnd = delimiter === null ? text.length : start + 1 + delimiter.index;
++    return unmatchedEnd > start + 1 ? Object.freeze({ start:start + 1,end:unmatchedEnd }) : null;
+   }
+-  let cursor = start;
+-  let end = start;
+-  for (let count = 0;count < MAX_VALUE_WORDS;count += 1) {
+-    const spacing = /^\s*/u.exec(text.slice(cursor))?.[0] ?? "";
+-    const tokenStart = cursor + spacing.length;
+-    const token = VALUE_TOKEN.exec(text.slice(tokenStart))?.[0];
+-    if (token === undefined || VALUE_STOP_WORDS.has(token) || tokenStart - start > MAX_VALUE_CODE_UNITS) break;
+-    end = tokenStart + token.length;
+-    cursor = end;
+-  }
+-  return end > start ? Object.freeze({ start,end }) : null;
++  const remainder = text.slice(start);
++  VALUE_HARD_DELIMITER.lastIndex = 0;
++  VALUE_COORDINATOR.lastIndex = 0;
++  const hard = VALUE_HARD_DELIMITER.exec(remainder)?.index ?? remainder.length;
++  const coordinator = VALUE_COORDINATOR.exec(remainder)?.index ?? remainder.length;
++  const end = start + Math.min(hard,coordinator);
++  const trimmedEnd = start + remainder.slice(0,end-start).trimEnd().length;
++  const words = remainder.slice(0,trimmedEnd-start).trimStart().split(/\s+/u);
++  const firstWord = words[0] ?? "";
++  if (VALUE_STOP_WORDS.has(firstWord) || NON_VALUE_WORDS.has(firstWord)
++    || (VALUE_ARTICLES.has(firstWord) && NON_VALUE_WORDS.has(words[1] ?? ""))) return null;
++  return trimmedEnd > start ? Object.freeze({ start,end:trimmedEnd }) : null;
+ }
+ 
+ export function analyzeSupportCredentialText(source: string): SupportCredentialFacts {
+@@ -229,6 +236,8 @@ export function analyzeSupportCredentialText(source: string): SupportCredentialF
+       const negated = [...normalized.text.slice(scopeStart,match.index).matchAll(NEGATION)].length > 0;
+       const span = originalSpan(normalized,match.index,match.index + match[0].length);
+       if (terms.some((term) => span.start >= term.start && span.end <= term.end)) continue;
++      const operationText = normalized.text.slice(match.index,match.index + match[0].length);
++      if (kind === "security-change" && /^(?:recovery|recuperare|recuperarea|recuperarii|inscriere|inscrierii|enrollment)$/u.test(operationText)) continue;
+       operations.push(Object.freeze({
+         kind,...span,
+         scope,sentence:scopes[scope]?.sentence ?? 0,negated
+@@ -246,9 +255,34 @@ export function analyzeSupportCredentialText(source: string): SupportCredentialF
+       scope,sentence:scopes[scope]?.sentence ?? 0
+     }));
+   }
++  const nonCredentialObjects: SupportScopedFact[] = [];
++  NON_CREDENTIAL_OBJECT.lastIndex = 0;
++  for (const match of normalized.text.matchAll(NON_CREDENTIAL_OBJECT)) {
++    const scope = scopeAt(scopes,match.index);
++    nonCredentialObjects.push(Object.freeze({
++      ...originalSpan(normalized,match.index,match.index + match[0].length),
++      scope,sentence:scopes[scope]?.sentence ?? 0
++    }));
++  }
+   return Object.freeze({
+     credentialTerms:Object.freeze(terms),credentialValueSpans:uniqueSpans(values),
+     operations:Object.freeze(operations),negations:Object.freeze(negations),
+-    references:Object.freeze(references)
++    references:Object.freeze(references),nonCredentialObjects:Object.freeze(nonCredentialObjects)
++  });
++}
++
++/** Shared credential-operation relation used by every Support text sink. */
++export function supportTextContainsCredentialOperation(value: string): boolean {
++  const facts = analyzeSupportCredentialText(value);
++  return facts.operations.some((operation) => {
++    if (operation.negated) return false;
++    if (facts.credentialTerms.some((term) => term.scope === operation.scope)) return true;
++    if (facts.nonCredentialObjects.some((object) => object.scope === operation.scope)) return false;
++    const reference = facts.references.some((candidate) => candidate.scope === operation.scope);
++    if (!reference) return false;
++    return facts.credentialTerms.some((term) =>
++      term.scope < operation.scope && operation.scope - term.scope <= 1
++      && operation.sentence - term.sentence <= 1
++    );
+   });
+ }
+diff --git a/dialectical-engine/packages/kernel/src/support-text-views.ts b/dialectical-engine/packages/kernel/src/support-text-views.ts
+index 1841f93a1e88ad3d344485cf212436a41d4e10df..d786403f40744905ee8101f5e2a1fc6418949bdc 100644
+--- a/dialectical-engine/packages/kernel/src/support-text-views.ts
++++ b/dialectical-engine/packages/kernel/src/support-text-views.ts
+@@ -35,3 +35,11 @@ export function canonicalSupportTextViews(value: string): CanonicalSupportTextVi
+       || MALFORMED_STRUCTURAL_ENCODING.test(final)
+   });
+ }
++
++const UNSAFE_PATH = /(?:^|[\s('"`])(?:\/{1,2}(?=\S)|\\{1,2}(?=\S)|\.{1,2}[\\/](?=\S)|[a-z]:[\\/](?=\S))/iu;
++
++/** True when any bounded canonical view contains a URL-independent path form. */
++export function supportTextHasUnsafePath(value: string): boolean {
++  const canonical = canonicalSupportTextViews(value);
++  return canonical.unsafeEncoding || canonical.views.some((candidate) => UNSAFE_PATH.test(candidate));
++}
+diff --git a/dialectical-engine/packages/support-kb/recovery/components.json b/dialectical-engine/packages/support-kb/recovery/components.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..8a3cb92d87d0d3a8300658284de30b18cbe79aa3
+--- /dev/null
++++ b/dialectical-engine/packages/support-kb/recovery/components.json
+@@ -0,0 +1,257 @@
++{
++  "schemaVersion": 1,
++  "components": [
++    {
++      "id": "account-access",
++      "lang": "en",
++      "articleSha256": "17aac248d75d7ad161fba2a44068d20743a9759ae56c9b30359c7e1d5550c2e7",
++      "modelProjection": "Sign in begins on the account page with the password step. The required second step offers the configured authenticator code or a saved unused recovery code. Email verification is required for registration. Authenticator enrollment is also required. Both stages continue only from valid account-flow state. Support cannot receive passwords, verification tokens, authenticator secrets, or recovery codes.",
++      "fallback": "Choose Sign in. After the password step, the required second step offers the configured authenticator code or a saved unused recovery code. Choose Create account to register. Email verification is required. Authenticator enrollment is also required. Both stages continue only from valid account-flow state. Support cannot receive passwords, verification tokens, authenticator secrets, or recovery codes."
++    },
++    {
++      "id": "account-access",
++      "lang": "ro",
++      "articleSha256": "5048de52b22b474fb8185e718fcaf235cd23896eff8fd7e42f4399d5266e9410",
++      "modelProjection": "Autentificarea începe în pagina contului cu pasul parolei. Al doilea pas obligatoriu oferă un cod din autentificatorul configurat sau un cod de recuperare salvat și nefolosit. Verificarea emailului este obligatorie pentru înregistrare. Este obligatorie și înrolarea autentificatorului. Ambele etape continuă numai din starea validă a fluxului contului. Asistența nu poate primi parole, tokeni de verificare, secrete de autentificator sau coduri de recuperare.",
++      "fallback": "Alege Autentificare. După pasul parolei, al doilea pas obligatoriu oferă un cod din autentificatorul configurat sau un cod de recuperare salvat și nefolosit. Alege Creează un cont pentru înregistrare. Verificarea emailului este obligatorie. Este obligatorie și înrolarea autentificatorului. Ambele etape continuă numai din starea validă a fluxului contului. Nu introduce în Asistență parole, tokeni de verificare, secrete de autentificator sau coduri de recuperare."
++    },
++    {
++      "id": "account-settings",
++      "lang": "en",
++      "articleSha256": "2cab95047c1c34109794f3fc1ad620784bbb97b9267160d471551454d296f628",
++      "modelProjection": "After signing in, Settings contains session review and revocation, browser consent preferences, legacy debate claim, and account-erasure controls. Sensitive controls require fresh authentication in their owning page. The ordinary page does not offer active controls to change email, replace a password, regenerate active MFA, or edit deployment routing. Support can explain these limits but cannot perform the controls or receive credentials and confirmation phrases.",
++      "fallback": "After signing in, choose Settings to review or revoke sessions, manage browser consent, claim legacy debates, or begin account erasure. Sensitive controls require fresh authentication on the page. The page does not offer controls to change email, replace a password, regenerate active MFA, or edit deployment routing. Support can explain the controls but cannot perform them or receive credentials."
++    },
++    {
++      "id": "account-settings",
++      "lang": "ro",
++      "articleSha256": "e2b2834ff96da50a0511b2647ae490f6f99af80e317a74caddb16ee8262bc5d9",
++      "modelProjection": "După autentificare, Setări conține revizuirea și revocarea sesiunilor, preferințele de consimțământ din browser, revendicarea dezbaterilor vechi și controalele pentru ștergerea contului. Controalele sensibile cer autentificare recentă în pagina care le gestionează. Pagina obișnuită nu are acum controale active pentru înlocuirea emailului, înlocuirea parolei, regenerarea MFA activă sau rutarea implementării. Asistența poate explica limitele, dar nu poate executa controalele și nu poate primi date de autentificare ori fraze de confirmare.",
++      "fallback": "După autentificare, alege Setări pentru revizuirea sau revocarea sesiunilor, consimțământul din browser, revendicarea dezbaterilor vechi ori ștergerea contului. Controalele sensibile cer autentificare recentă în pagină. Pagina nu oferă schimbarea emailului, înlocuirea parolei, regenerarea MFA activă sau modificarea rutării implementării. Asistența poate explica aceste controale, dar nu le poate executa și nu poate primi date de autentificare."
++    },
++    {
++      "id": "browse-public-debates",
++      "lang": "en",
++      "articleSha256": "8059a2e46af231765a80f61854752aa5a9ec49e60c95dc715eb3e82a39618fad",
++      "modelProjection": "Signed-in members can browse published debates from the home page. A published debate can also be opened without signing in when its public link is shared.",
++      "fallback": "Sign in and choose Public debates from Home to browse published debates. A shared public debate link can also be opened without signing in."
++    },
++    {
++      "id": "browse-public-debates",
++      "lang": "ro",
++      "articleSha256": "0fb2aa501c0980af4afb52520c10e51ca0814266bd2258b1f727fa52d16e0241",
++      "modelProjection": "Membrii autentificați pot răsfoi dezbaterile publicate din pagina Acasă. O dezbatere publicată poate fi deschisă și fără autentificare atunci când este distribuit linkul ei public.",
++      "fallback": "Autentifică-te și alege Dezbateri publice din Acasă pentru a răsfoi dezbaterile publicate. Un link public distribuit poate fi deschis și fără autentificare."
++    },
++    {
++      "id": "budget-tier-choice",
++      "lang": "en",
++      "articleSha256": "a49d563ef7bfec75ed179a70adb54c25947aa9cbe4db557698eacc84d1d3c683",
++      "modelProjection": "The composition budget tier records how much work a composition may spend. Free keeps the current default fixed. Premium allows Low, Medium, or High before the run starts. This choice does not prove a paid subscription, checkout, or guaranteed model availability.",
++      "fallback": "In the debate form, Free keeps the composition budget at its fixed default. With Premium selected, choose Low, Medium, or High before starting the run. The selection does not prove payment or guarantee that a model is available."
++    },
++    {
++      "id": "budget-tier-choice",
++      "lang": "ro",
++      "articleSha256": "e648150ae607bb98c55059eaea6162ffc2cd09df437721b75c8c7b226ef4984d",
++      "modelProjection": "Nivelul bugetului de compoziție înregistrează câtă muncă poate aloca procesul. Planul Free păstrează valoarea implicită fixă. Premium permite alegerea Low, Medium sau High înainte de pornirea rulării. Alegerea nu dovedește un abonament plătit, o plată sau disponibilitatea garantată a unui model.",
++      "fallback": "În formularul dezbaterii, Free păstrează bugetul compoziției la valoarea implicită fixă. Cu Premium selectat, alege Low, Medium sau High înainte de pornirea rulării. Selecția nu dovedește plata și nu garantează disponibilitatea unui model."
++    },
++    {
++      "id": "debate-topic-and-description",
++      "lang": "en",
++      "articleSha256": "695b7b405e599260acd7c5a51f897f46b52b238f2860a20168cd14cfdc176bad",
++      "modelProjection": "Topic holds the question or claim to examine and requires more than six characters. Premium also permits one steering-menu selection per line and free-text steering annotations. Free clears and disables those steering fields. The current form has no separate description field.",
++      "fallback": "Enter the question or claim in Topic using more than six characters. Premium can add one steering selection per line and free-text annotations; Free clears and disables those inputs. There is no separate description field in the current form."
++    },
++    {
++      "id": "debate-topic-and-description",
++      "lang": "ro",
++      "articleSha256": "90f1fff60a4245eeda7b5131b671772b425e8ab682f967c4c31c2ad42c7207a2",
++      "modelProjection": "Câmpul Topic conține întrebarea sau afirmația examinată și cere mai mult de șase caractere. Premium permite și câte o selecție de îndrumare pe linie plus adnotări libere. Free golește și dezactivează aceste câmpuri. Formularul curent nu are un câmp separat pentru descriere.",
++      "fallback": "Scrie întrebarea sau afirmația în Topic folosind mai mult de șase caractere. Premium poate adăuga câte o selecție de îndrumare pe linie și adnotări libere; Free golește și dezactivează aceste câmpuri. Formularul curent nu are un câmp separat pentru descriere."
++    },
++    {
++      "id": "delete-a-private-debate",
++      "lang": "en",
++      "articleSha256": "7c37881f26d875f87a0177bc35593d9f52a1739b25a848df98ad2d478c7bdb26",
++      "modelProjection": "Deleting a private debate requires signing in, ownership, the debate page's delete control, and fresh authentication when requested. A published debate must be unpublished before deletion.",
++      "fallback": "Sign in and open a debate you own. Choose its delete control and complete fresh authentication when the page asks. If the debate is published, unpublish it before deletion."
++    },
++    {
++      "id": "delete-a-private-debate",
++      "lang": "ro",
++      "articleSha256": "afc631bec586e463df1b217d79fc9ea694f873f5690b028c7b79aa65d83cfaa9",
++      "modelProjection": "Ștergerea unei dezbateri private cere autentificare, proprietatea dezbaterii, controlul de ștergere din pagina ei și autentificare recentă când este solicitată. O dezbatere publicată trebuie retrasă de la publicare înainte de ștergere.",
++      "fallback": "Autentifică-te și deschide o dezbatere care îți aparține. Alege controlul de ștergere și finalizează autentificarea recentă când pagina o cere. Dacă dezbaterea este publicată, retrage mai întâi publicarea."
++    },
++    {
++      "id": "export-json",
++      "lang": "en",
++      "articleSha256": "c31c5bd3a2eb80e1352f27431e459f8272ae37605a9988210cff2aa82d6b7ea5",
++      "modelProjection": "For an owner debate, Export appears only after a served answer and a readable execution-ledger digest exist. The JSON download contains the answer, ledger digest, and current honesty records. A public debate can export its published JSON snapshot. Markdown export and unfinished owner answers are unavailable, and public downloads exclude private owner data.",
++      "fallback": "Open a debate you own after its answer is served and its execution-ledger digest is readable, then choose Export for JSON containing the answer, digest, and current honesty records. A public debate can export its published JSON snapshot. Markdown, unfinished owner answers, and private owner data in public downloads are not available."
++    },
++    {
++      "id": "export-json",
++      "lang": "ro",
++      "articleSha256": "5016b1370fbbd83ed2e647cfdeb8a2c10b4052ef8861807abed2ee4b0ae8f02b",
++      "modelProjection": "Pentru dezbaterea proprietarului, Export apare numai după existența unui răspuns servit și a unui rezumat lizibil al registrului de execuție. Descărcarea JSON conține răspunsul, rezumatul registrului și înregistrările curente de onestitate. O dezbatere publică poate exporta copia JSON publicată. Exportul Markdown și răspunsurile neterminate ale proprietarului nu sunt disponibile, iar descărcările publice exclud datele private ale proprietarului.",
++      "fallback": "Deschide o dezbatere care îți aparține după servirea răspunsului și disponibilitatea rezumatului lizibil al registrului de execuție, apoi alege Export pentru JSON cu răspunsul, rezumatul și înregistrările curente de onestitate. O dezbatere publică poate exporta copia JSON publicată. Markdown, răspunsurile neterminate și datele private ale proprietarului în descărcări publice nu sunt disponibile."
++    },
++    {
++      "id": "getting-started-debate",
++      "lang": "en",
++      "articleSha256": "a438b7c7a91342dee7c5edb2efe48e586be2cc33d9a2eafabaadad2882f6f9e8",
++      "modelProjection": "The complete debate form requires signing in and a topic longer than six characters. Free keeps visible risk, budget, depth, and steering controls fixed. Premium allows the current risk, budget, depth, and steering controls to be edited before Start run. The Home composer can carry the topic to the complete form when direct start is unavailable. Support does not start the debate for the visitor.",
++      "fallback": "Sign in, choose Start a debate, and enter a question or claim longer than six characters. Free keeps the visible risk, budget, depth, and steering controls fixed. Premium lets you edit those controls before choosing Start run. Home can carry your topic into the complete form when direct start is unavailable. Support does not start the debate for you."
++    },
++    {
++      "id": "getting-started-debate",
++      "lang": "ro",
++      "articleSha256": "f2a848dbaa9131d3165f50ce2004f1fba874032a48d7bdf1ba90f96c8aa205af",
++      "modelProjection": "Formularul complet al dezbaterii cere autentificare și un subiect mai lung de șase caractere. Free păstrează fixe controalele vizibile pentru risc, buget, adâncime și îndrumare. Premium permite modificarea controalelor curente înainte de Start run. Compozitorul din Acasă poate transfera subiectul în formularul complet când pornirea directă nu este disponibilă. Asistența nu pornește dezbaterea pentru vizitator.",
++      "fallback": "Autentifică-te, alege Pornește o dezbatere și introdu o întrebare sau afirmație cu mai mult de șase caractere. Free păstrează fixe controalele vizibile pentru risc, buget, adâncime și îndrumare. Premium permite modificarea lor înainte de Start run. Acasă poate transfera subiectul în formularul complet când pornirea directă nu este disponibilă. Asistența nu pornește dezbaterea în locul tău."
++    },
++    {
++      "id": "guide-how-it-works",
++      "lang": "en",
++      "articleSha256": "05316f05e559cd866948ab7f464a681d6875fe8aad5143e956eeb20077bc46c5",
++      "modelProjection": "When artifacts exist, the debate workspace can show an argument tree, threads, split inspection, a map, answer status, evidence, and honesty details. Claim cards identify model and side. Challenge changes local scrutiny and investigation state but does not prove a durable rebuttal run. Generation history can be unavailable, and an empty panel does not prove that older versions never existed. Export is conditional JSON, not Markdown.",
++      "fallback": "The debate workspace can show the argument tree, threads, split inspection, map, answer status, evidence, and honesty details when available. Claim cards show model and side. Challenge changes local scrutiny state; it does not prove a durable rebuttal run. Empty history does not prove there were no older versions. Export is conditional JSON rather than Markdown."
++    },
++    {
++      "id": "guide-how-it-works",
++      "lang": "ro",
++      "articleSha256": "94acc4db2ccecb9a0d4f5b82350e91d26643b76c6caff879019edc107a3e3000",
++      "modelProjection": "Când artefactele există, spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezi și detalii de onestitate. Cardurile afirmațiilor indică modelul și partea. Challenge schimbă starea locală de examinare și investigație, dar nu dovedește o rulare durabilă de răspuns. Istoricul poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. Exportul este JSON condiționat, nu Markdown.",
++      "fallback": "Spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, harta, starea răspunsului, dovezile și detaliile de onestitate când sunt disponibile. Cardurile arată modelul și partea. Challenge schimbă examinarea locală; nu dovedește o rulare durabilă de răspuns. Istoricul gol nu dovedește absența versiunilor mai vechi. Exportul este JSON condiționat, nu Markdown."
++    },
++    {
++      "id": "privacy-consent",
++      "lang": "en",
++      "articleSha256": "54cca7dbfb790c9d6aac077b00775e5ac6d5bc277be38733e92047bc63c262d5",
++      "modelProjection": "Signed-in members can open browser privacy preferences from Settings. The preference is browser-local and does not by itself prove that every analytics or cookie system is active or disabled. Privacy policy text uses the product's existing modal where its opener is available. No verified standalone Privacy or Terms page exists in the current route set.",
++      "fallback": "Sign in, choose Settings, then choose Privacy preferences. The preference is local to that browser and does not by itself prove the state of every analytics or cookie system. Privacy policy text opens in the existing product modal where available; there is no verified standalone Privacy or Terms page."
++    },
++    {
++      "id": "privacy-consent",
++      "lang": "ro",
++      "articleSha256": "e9b04331a2aa76d3ed9bd45c2199263dc476ae62d15c33db30ed537fedeb5c5d",
++      "modelProjection": "Membrii autentificați pot deschide preferințele de confidențialitate din browser din Setări. Preferința este locală browserului și nu dovedește singură starea fiecărui sistem de analiză sau cookie. Textul politicii de confidențialitate folosește fereastra existentă a produsului acolo unde deschiderea este disponibilă. Setul curent de rute nu are o pagină independentă verificată pentru Confidențialitate sau Termeni.",
++      "fallback": "Autentifică-te, alege Setări, apoi Preferințe de confidențialitate. Preferința este locală browserului și nu dovedește singură starea fiecărui sistem de analiză sau cookie. Textul politicii se deschide în fereastra existentă a produsului acolo unde este disponibilă; nu există o pagină independentă verificată pentru Confidențialitate sau Termeni."
++    },
++    {
++      "id": "public-answer-disclosure",
++      "lang": "en",
++      "articleSha256": "e67c271558e6bb5b4100fa735059e781e453c268808d555c6e85af36e3e678ea",
++      "modelProjection": "Published debates may be indexed by search engines, and copies can remain after unpublishing. The public page shows answer status and the time reflected by its evidence, and states when a verdict is unavailable. Publications created before argument-tree publishing contain only the answer summary.",
++      "fallback": "Before reading a published debate, remember that search engines may index it and copies can remain after unpublishing. The public page shows answer status, the evidence time, and whether a verdict is unavailable. Older publications from before argument-tree publishing contain only the answer summary."
++    },
++    {
++      "id": "public-answer-disclosure",
++      "lang": "ro",
++      "articleSha256": "6e845c95414ae5b9190cf5917136776d7af931eaf626b2da4a0540b3bf7925f1",
++      "modelProjection": "Dezbaterile publicate pot fi indexate de motoarele de căutare, iar copiile pot rămâne după retragerea publicării. Pagina publică arată starea răspunsului și momentul reflectat de dovezi și precizează când verdictul nu este disponibil. Publicările create înainte de publicarea arborilor de argumente conțin numai rezumatul răspunsului.",
++      "fallback": "Înainte să citești o dezbatere publicată, reține că motoarele de căutare o pot indexa și că unele copii pot rămâne după retragerea publicării. Pagina publică arată starea răspunsului, momentul dovezilor și indisponibilitatea verdictului. Publicările mai vechi decât arborii publicați conțin numai rezumatul răspunsului."
++    },
++    {
++      "id": "publish-a-debate",
++      "lang": "en",
++      "articleSha256": "9385f0dd00f8014e3445d1ee4c8c5230dc12d0379766d35c9c7845814f288e29",
++      "modelProjection": "Publishing requires signing in, ownership of the debate, the publish control on its page, and fresh authentication when requested.",
++      "fallback": "Sign in and open a debate you own. Choose its publish control, then complete fresh authentication when the page asks."
++    },
++    {
++      "id": "publish-a-debate",
++      "lang": "ro",
++      "articleSha256": "41858b13ebb6bcec19430b6a63cae6f5854b25ad02e8ac74617d83b087355c3c",
++      "modelProjection": "Publicarea cere autentificare, proprietatea dezbaterii, controlul de publicare din pagina ei și autentificare recentă atunci când este solicitată.",
++      "fallback": "Autentifică-te și deschide o dezbatere care îți aparține. Alege controlul de publicare, apoi finalizează autentificarea recentă când pagina o cere."
++    },
++    {
++      "id": "risk-tier-choice",
++      "lang": "en",
++      "articleSha256": "3ca67a93a3b159c0b284b2bd75093fd9bc70e20d03c357f4ac1fdcb3df522715",
++      "modelProjection": "Risk tier records how much is riding on the answer. Free fixes it at Standard. Premium allows Casual, Standard, or High stakes before the run starts. The submitted run records the effective selection, and Support cannot change it after submission.",
++      "fallback": "In the debate form, Free fixes risk at Standard. With Premium selected, choose Casual, Standard, or High stakes before starting the run. The submitted run records the effective choice, and Support cannot change it afterward."
++    },
++    {
++      "id": "risk-tier-choice",
++      "lang": "ro",
++      "articleSha256": "f40e8583d9ec012f6510c4f6ae6a6527680bc279f393388dc8cd2a31762f4d96",
++      "modelProjection": "Nivelul de risc înregistrează cât de mult depinde de răspuns. Free îl fixează la Standard. Premium permite alegerea Casual, Standard sau High stakes înainte de pornirea rulării. Rularea trimisă înregistrează selecția efectivă, iar Asistența nu o poate schimba după trimitere.",
++      "fallback": "În formularul dezbaterii, Free fixează riscul la Standard. Cu Premium selectat, alege Casual, Standard sau High stakes înainte de pornirea rulării. Rularea trimisă înregistrează selecția efectivă, iar Asistența nu o poate schimba ulterior."
++    },
++    {
++      "id": "support-cases",
++      "lang": "en",
++      "articleSha256": "96ea24b2aff54d46beeb25cec255041f335e93c52590829ad64f53ad62fe9aa2",
++      "modelProjection": "Talk to a human creates an asynchronous Support case, not a telephone call. The server case receipt gives a response target of forty-eight hours, while another panel currently says one working day on weekdays. The receipt is authoritative until the wording is aligned. Keep the case receipt private because it controls case access. Support does not verify inbox delivery.",
++      "fallback": "Choose Talk to a human to create an asynchronous case; it is not a telephone call. Rely on the server receipt's forty-eight-hour response target while another panel still says one working day on weekdays. Keep the receipt private because it controls access to the case. Support does not verify inbox delivery."
++    },
++    {
++      "id": "support-cases",
++      "lang": "ro",
++      "articleSha256": "2346f0b14cfd3ac25ccd609d8268809da9975dc2079179778e10df3da7f88aac",
++      "modelProjection": "Cere ajutorul unei persoane creează un caz asincron de Asistență, nu un apel telefonic. Confirmarea serverului oferă un termen țintă de patruzeci și opt de ore, iar alt panou spune în prezent o zi lucrătoare în zilele lucrătoare. Confirmarea este autoritară până la alinierea textelor. Păstrează confirmarea privată deoarece controlează accesul la caz. Asistența nu verifică livrarea în inbox.",
++      "fallback": "Alege Cere ajutorul unei persoane pentru un caz asincron; nu este un apel telefonic. Bazează-te pe termenul de patruzeci și opt de ore din confirmarea serverului cât timp alt panou spune încă o zi lucrătoare în zilele lucrătoare. Păstrează confirmarea privată deoarece controlează accesul la caz. Asistența nu verifică livrarea în inbox."
++    },
++    {
++      "id": "support-status-limits",
++      "lang": "en",
++      "articleSha256": "7f111d034af0d6ba0765c9bf008d6d8981f8a589e1731695e9bbf7d5f213f15f",
++      "modelProjection": "The Help status block describes information published for Support and can be limited or stale. It does not prove the health of every debate engine, model, provider, or deployment. With consent and ownership checks, signed-in Support can read only the approved status projection for the visitor's debate, not the question, claims, answer, another user's debate, or account-security state.",
++      "fallback": "Choose Support status on Help for the published Support information, which can be limited or stale and does not prove every engine, model, provider, or deployment is healthy. With consent and ownership checks, signed-in Support can read only the approved status projection for your debate, not its content, another person's debate, or account-security state."
++    },
++    {
++      "id": "support-status-limits",
++      "lang": "ro",
++      "articleSha256": "884956c2b04303c8412a4859746a526d5577e9392e2066843aa977500857511f",
++      "modelProjection": "Blocul de stare din Ajutor descrie informațiile publicate pentru Asistență și poate fi limitat sau învechit. El nu dovedește starea fiecărui motor de dezbatere, model, furnizor sau implementare. Cu verificarea consimțământului și a proprietății, Asistența autentificată poate citi numai proiecția aprobată de stare pentru dezbaterea vizitatorului, nu întrebarea, afirmațiile, răspunsul, dezbaterea altei persoane sau starea de securitate a contului.",
++      "fallback": "Alege Starea serviciului de asistență din Ajutor pentru informațiile publicate, care pot fi limitate sau învechite și nu dovedesc starea fiecărui motor, model, furnizor ori implementare. Cu verificarea consimțământului și proprietății, Asistența autentificată poate citi numai proiecția aprobată de stare pentru dezbaterea ta, nu conținutul ei, dezbaterea altei persoane sau securitatea contului."
++    },
++    {
++      "id": "unpublish-a-debate",
++      "lang": "en",
++      "articleSha256": "70e53322f323778974e50ca4f4342a4e8cba5c41d5139d51452530a40c7563a2",
++      "modelProjection": "Unpublishing requires signing in, ownership of the debate, the unpublish control on its page, and fresh authentication when requested. Copies indexed elsewhere can remain afterward.",
++      "fallback": "Sign in and open a debate you own. Choose its unpublish control and complete fresh authentication when the page asks. Copies indexed elsewhere may remain after unpublishing."
++    },
++    {
++      "id": "unpublish-a-debate",
++      "lang": "ro",
++      "articleSha256": "a741f94571245aadbb6f25d6da5c3c5b87bdf5bf72fa4c5aaf8e03980abce9d0",
++      "modelProjection": "Retragerea publicării cere autentificare, proprietatea dezbaterii, controlul corespunzător din pagina ei și autentificare recentă atunci când este solicitată. Copiile indexate în alte locuri pot rămâne ulterior.",
++      "fallback": "Autentifică-te și deschide o dezbatere care îți aparține. Alege controlul de retragere a publicării și finalizează autentificarea recentă când pagina o cere. Copiile indexate în alte locuri pot rămâne după retragerea publicării."
++    },
++    {
++      "id": "unsupported-capabilities",
++      "lang": "en",
++      "articleSha256": "6e7f19d6d7c00fe4d10660e4dff7ad52e16ae8ff3d85cea13717780af586ec6f",
++      "modelProjection": "The current product has no resources for node regeneration, scoring feedback, settings writes, or adaptive-depth approval. Depth mode, scrutiny depth, branching width, concurrency, and maximum-token controls are displayed as legacy options but are not sent in the current run contract. Challenge changes local page state instead of starting a durable rebuttal. Generation history can fail to load and appear empty. Support cannot turn these limitations into working actions.",
++      "fallback": "The current product cannot regenerate a node, submit scoring feedback, write settings, or approve adaptive depth. Several depth, width, concurrency, and token controls are legacy displays and are not sent with the current run. Challenge changes only local page state, and generation history can fail to load and appear empty. Support cannot turn these limits into working actions."
++    },
++    {
++      "id": "unsupported-capabilities",
++      "lang": "ro",
++      "articleSha256": "c07bb1a6a85f14a034a134a08250f22721f772ce54bd77d18ff63f7df93d350b",
++      "modelProjection": "Produsul curent nu are resurse pentru regenerarea unui nod, feedback de evaluare, scrierea setărilor sau aprobarea adâncimii adaptive. Modul adâncimii, profunzimea examinării, lățimea ramificării, concurența și limita de tokeni sunt afișate ca opțiuni vechi, dar nu sunt trimise în contractul curent al rulării. Challenge schimbă starea locală a paginii în loc să pornească un răspuns durabil. Istoricul generărilor poate eșua la încărcare și poate apărea gol. Asistența nu poate transforma limitele în acțiuni funcționale.",
++      "fallback": "Produsul curent nu poate regenera un nod, trimite feedback de evaluare, scrie setări sau aproba adâncimea adaptivă. Mai multe controale de adâncime, lățime, concurență și tokeni sunt afișaje vechi și nu sunt trimise cu rularea curentă. Challenge schimbă numai starea locală, iar istoricul poate eșua la încărcare și poate apărea gol. Asistența nu poate transforma aceste limite în acțiuni funcționale."
++    },
++    {
++      "id": "view-public-debate",
++      "lang": "en",
++      "articleSha256": "995068c814cec3ba1dd0f0ecf320bea04fc8c66acc9703b8cd70cec72cfca053",
++      "modelProjection": "A published debate can be opened without signing in from its public link. That link contains the debate's public reference.",
++      "fallback": "Open the shared public debate link without signing in. The link already contains the debate's public reference."
++    },
++    {
++      "id": "view-public-debate",
++      "lang": "ro",
++      "articleSha256": "9faf157365acb8b560208eb822cda7cd42c83e845d2a551853ea5c97ccf9c260",
++      "modelProjection": "O dezbatere publicată poate fi deschisă fără autentificare din linkul ei public. Linkul conține referința publică a dezbaterii.",
++      "fallback": "Deschide linkul public distribuit fără autentificare. Linkul conține deja referința publică a dezbaterii."
++    }
++  ]
++}
+diff --git a/dialectical-engine/packages/support-kb/reviews/manifest.json b/dialectical-engine/packages/support-kb/reviews/manifest.json
+index 60554bc1ce327394b34c979d3bbb79ca5419693c..47f1d9869ea0b098b14edc956a40e20869ada1a4 100644
+--- a/dialectical-engine/packages/support-kb/reviews/manifest.json
++++ b/dialectical-engine/packages/support-kb/reviews/manifest.json
+@@ -1,5 +1,5 @@
+ {
+-  "schemaVersion": 1,
++  "schemaVersion": 2,
+   "catalog": {
+     "sha256": "24784328a4bb8d4e5205b3036dd369268180df792243db1c296a0a7ed2a0f9fe",
+     "reviewedBy": "SOL",
+@@ -224,5 +224,478 @@
+       "reviewedOn": "2026-09-14",
+       "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-p2.md"
+     }
+-  ]
++  ],
++  "recovery": {
++    "componentFileSha256": "5ee8d592c3f1b3550c1f2af74c030fbbc12e80e258dc71b57aa28de045f99e8a",
++    "components": [
++      {
++        "id": "account-access",
++        "lang": "en",
++        "articleSha256": "17aac248d75d7ad161fba2a44068d20743a9759ae56c9b30359c7e1d5550c2e7",
++        "modelProjectionSha256": "c138d4ed2ecd19847cb74b1fd7ad91eb9b047369cb2a391f15563e0915ec192a",
++        "fallbackSha256": "6b5d2dcff5c21d11eae6c6a92cabea39ec253e8e54b5d890d9b25d56f9eab32d",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "account-access",
++        "lang": "ro",
++        "articleSha256": "5048de52b22b474fb8185e718fcaf235cd23896eff8fd7e42f4399d5266e9410",
++        "modelProjectionSha256": "e3ca804d9cd657ec82e9a9f81fd2dc1299997ee59cc4a752e757cd9e67d6ef98",
++        "fallbackSha256": "47d2b4b41acc0d0ef976bab9e08e5f617303612bfeda2b969a2958d6618ad8c0",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "account-settings",
++        "lang": "en",
++        "articleSha256": "2cab95047c1c34109794f3fc1ad620784bbb97b9267160d471551454d296f628",
++        "modelProjectionSha256": "67f5ce1fd18952c94a981f772e32e29c8c526b5591d656c202260486826a0d62",
++        "fallbackSha256": "6d99d7eeb445525b3bf3cf55f4283ee24fec536ff4f9ccc3a3b1f928904091bf",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "account-settings",
++        "lang": "ro",
++        "articleSha256": "e2b2834ff96da50a0511b2647ae490f6f99af80e317a74caddb16ee8262bc5d9",
++        "modelProjectionSha256": "f941492f0a6bed283a0fd70aa6ffeb20304b40c5bdfdd8e01f438cf3094f08f8",
++        "fallbackSha256": "1b7be7bebd1932a4630bea3df60d016218ecedca1ef538ac14510ef66d5f2aad",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "browse-public-debates",
++        "lang": "en",
++        "articleSha256": "8059a2e46af231765a80f61854752aa5a9ec49e60c95dc715eb3e82a39618fad",
++        "modelProjectionSha256": "c5c6d262a33abda6c4cf76024cfaa5f42c2b51f2e3242ae3ed3d3bf157ba1034",
++        "fallbackSha256": "c5294a4cae6fc88b300ec64634fbbb2531e7eef783bed814f387834804f21bb6",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "browse-public-debates",
++        "lang": "ro",
++        "articleSha256": "0fb2aa501c0980af4afb52520c10e51ca0814266bd2258b1f727fa52d16e0241",
++        "modelProjectionSha256": "87cb63222b2a74f1c75e4d25c28e69e35de0673049d4be055f7de201459e0897",
++        "fallbackSha256": "37bd679ea02946cbdcf7948c7d1345376592335f4e8bde3b2e78adf339e0f40d",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "budget-tier-choice",
++        "lang": "en",
++        "articleSha256": "a49d563ef7bfec75ed179a70adb54c25947aa9cbe4db557698eacc84d1d3c683",
++        "modelProjectionSha256": "e6d5adf85f44c3fd1aaa2c70d095f6f2474723a5b72393d4a006f0206fa64104",
++        "fallbackSha256": "cb920483c56311f42b1adf89c581320a4a5344dcc90028fa458ad6028867d601",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "budget-tier-choice",
++        "lang": "ro",
++        "articleSha256": "e648150ae607bb98c55059eaea6162ffc2cd09df437721b75c8c7b226ef4984d",
++        "modelProjectionSha256": "d8648bd28c6eddb018f6508c7c1eed9e0a20941807979d42701e35e4351ea371",
++        "fallbackSha256": "1496048887bc41ba3968fdaf7d0fe17e43feffaba1f1c997f46f0b420d30652f",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "debate-topic-and-description",
++        "lang": "en",
++        "articleSha256": "695b7b405e599260acd7c5a51f897f46b52b238f2860a20168cd14cfdc176bad",
++        "modelProjectionSha256": "290097ca24858424c4bc2a6845182a9c1cbcd0214c6a3109e2b32cf7e0bd0f56",
++        "fallbackSha256": "7234ce24457ad97fe943e93b1caf0e28a8d74e30aa1748f1d29b158cdcba67b7",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "debate-topic-and-description",
++        "lang": "ro",
++        "articleSha256": "90f1fff60a4245eeda7b5131b671772b425e8ab682f967c4c31c2ad42c7207a2",
++        "modelProjectionSha256": "8cd97dedffdf9b059f4d809b73f60f59174007b42a7a99998989c354af93bee8",
++        "fallbackSha256": "c6470bf637f904245f4c5f468c1b33c1d43d03fa0b45d1d3ba32eb47f12840f7",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "delete-a-private-debate",
++        "lang": "en",
++        "articleSha256": "7c37881f26d875f87a0177bc35593d9f52a1739b25a848df98ad2d478c7bdb26",
++        "modelProjectionSha256": "9ae0d23732c129d4b3e3e06b4c81833a5546b214506ecc53c3b531b4856dc49c",
++        "fallbackSha256": "92409ee15ce6ed5f380136ab090d3ce2a82ee355e379e7d068609baf9e92365b",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "delete-a-private-debate",
++        "lang": "ro",
++        "articleSha256": "afc631bec586e463df1b217d79fc9ea694f873f5690b028c7b79aa65d83cfaa9",
++        "modelProjectionSha256": "1f4b3b1719c76d8223159dd73049c47761dd4fd6482103d40cf31d53fd2b54a3",
++        "fallbackSha256": "46037245889b3c11b737e40222ce1c6d1b800020a92ee4e92725ad03d8338727",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "export-json",
++        "lang": "en",
++        "articleSha256": "c31c5bd3a2eb80e1352f27431e459f8272ae37605a9988210cff2aa82d6b7ea5",
++        "modelProjectionSha256": "690569195ed4098fd00b5bf102658f9bd26b2610897ca816163f8abb2a47946d",
++        "fallbackSha256": "6abec339af9fc96715c8964a17341461db4042701acb1f54e1e9deea37421afb",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "export-json",
++        "lang": "ro",
++        "articleSha256": "5016b1370fbbd83ed2e647cfdeb8a2c10b4052ef8861807abed2ee4b0ae8f02b",
++        "modelProjectionSha256": "70c63bd09f0577e45c6c20ab542013cf6caba0e2f0290782f4d6589ef868720f",
++        "fallbackSha256": "78dc48a23f8a2de1e4af205d26f1d743a9000ed2c375437b0cfe2acb66d82cd3",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "getting-started-debate",
++        "lang": "en",
++        "articleSha256": "a438b7c7a91342dee7c5edb2efe48e586be2cc33d9a2eafabaadad2882f6f9e8",
++        "modelProjectionSha256": "059900a11c6ec871145ee61e4aaca7214c76c02e8dab61dbec67eb08e6a3017e",
++        "fallbackSha256": "c844161c3430edcfb0a195df7ffff6bcf82c0826ab454bf817631933649bed48",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "getting-started-debate",
++        "lang": "ro",
++        "articleSha256": "f2a848dbaa9131d3165f50ce2004f1fba874032a48d7bdf1ba90f96c8aa205af",
++        "modelProjectionSha256": "23c930ba398c6bdf4c119b30bae509946ca8a483c9b0cb18e9ac6bd238220d80",
++        "fallbackSha256": "ef982f6420391eeaaf23c475afb230fcee91afc2183c4b945403283802d09e8a",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "guide-how-it-works",
++        "lang": "en",
++        "articleSha256": "05316f05e559cd866948ab7f464a681d6875fe8aad5143e956eeb20077bc46c5",
++        "modelProjectionSha256": "758085d81051393bd3520c43c84a23689a652c5dc6b15e0154a46a1fcf7cd528",
++        "fallbackSha256": "c1ed3a89b00d46ac7f1710280ef768f9d66adec20d20aaa18815596e6a5c2265",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "guide-how-it-works",
++        "lang": "ro",
++        "articleSha256": "94acc4db2ccecb9a0d4f5b82350e91d26643b76c6caff879019edc107a3e3000",
++        "modelProjectionSha256": "65482fb1f90d62942b4e6f87a289c151978250fb385efc10d12c8e239780c195",
++        "fallbackSha256": "cb344a791adc4616c177c993b4f186595725f6ea3de8b1f95fcd8a6f0ff07ed8",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "privacy-consent",
++        "lang": "en",
++        "articleSha256": "54cca7dbfb790c9d6aac077b00775e5ac6d5bc277be38733e92047bc63c262d5",
++        "modelProjectionSha256": "5de30c60b097bc464f12d9aef13fbc67e0c15c6d5aa4ca1a91f82fe77fc394ae",
++        "fallbackSha256": "419fbdd08f1d581b9484d6df1cb6b63077aef93ab627b9ab87c0c6054ce66d49",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "privacy-consent",
++        "lang": "ro",
++        "articleSha256": "e9b04331a2aa76d3ed9bd45c2199263dc476ae62d15c33db30ed537fedeb5c5d",
++        "modelProjectionSha256": "7db208bec972f230adaddf05162305126e6aeeb431fd66bad468886e2c62710e",
++        "fallbackSha256": "940316e6b1a66598baa91183116c92477be57df65885dc22b1ce4954393e11f6",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "public-answer-disclosure",
++        "lang": "en",
++        "articleSha256": "e67c271558e6bb5b4100fa735059e781e453c268808d555c6e85af36e3e678ea",
++        "modelProjectionSha256": "1ee826de541e74d701fd502bfe70e85c009da2b94d3e6d38c1fc98924f251670",
++        "fallbackSha256": "9c733e8f40697f0cd9f15f5984947edaff532a10bc3375d10ca94747e10cc569",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "public-answer-disclosure",
++        "lang": "ro",
++        "articleSha256": "6e845c95414ae5b9190cf5917136776d7af931eaf626b2da4a0540b3bf7925f1",
++        "modelProjectionSha256": "4ee30438ed6e75bb79f2e458bb78a6e8e8b79d3271e59c372dff626ce23a3819",
++        "fallbackSha256": "903906d5fc6d89668a42a2108cf30e21b1ec166a9fdce9e7aeff1bf4882fa45d",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "publish-a-debate",
++        "lang": "en",
++        "articleSha256": "9385f0dd00f8014e3445d1ee4c8c5230dc12d0379766d35c9c7845814f288e29",
++        "modelProjectionSha256": "83119e6803f854c04ad0153b55cc69212563a92f6b7e350ef29f656ff6c90a3c",
++        "fallbackSha256": "b2974fdf83f15e7142380698b7b21a95bd9efe7cbcfaa5d07028f292bcfd53ef",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "publish-a-debate",
++        "lang": "ro",
++        "articleSha256": "41858b13ebb6bcec19430b6a63cae6f5854b25ad02e8ac74617d83b087355c3c",
++        "modelProjectionSha256": "834ec781e6645753549cfca72d8d7bdc70ecb425f1eba125b25c5e04410ea598",
++        "fallbackSha256": "a6f1ef4a94b53df2d77fdd63a14c3f596adaac6b437ab3586424d21815284b26",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "risk-tier-choice",
++        "lang": "en",
++        "articleSha256": "3ca67a93a3b159c0b284b2bd75093fd9bc70e20d03c357f4ac1fdcb3df522715",
++        "modelProjectionSha256": "37a5e399d53e5c284febfd79f40fe36bfc611eddb254ccb9a758469e66557929",
++        "fallbackSha256": "7908d0b36c5c62a863ee064095bc3f528792d9588fba9f88c523ea978dffb7f2",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "risk-tier-choice",
++        "lang": "ro",
++        "articleSha256": "f40e8583d9ec012f6510c4f6ae6a6527680bc279f393388dc8cd2a31762f4d96",
++        "modelProjectionSha256": "0845807a9ba9cc68c608a5be752fdbaa08147fe8aed5a06a61021bb91675a34a",
++        "fallbackSha256": "d35f24c30f5998d0a8945f6efdd97cbebf45c0612b6181ff47c48c81951b02ab",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "support-cases",
++        "lang": "en",
++        "articleSha256": "96ea24b2aff54d46beeb25cec255041f335e93c52590829ad64f53ad62fe9aa2",
++        "modelProjectionSha256": "7560677362565332479dbe8c16b0e4035278a077512c7eeffdb3bbaa4ba0b76d",
++        "fallbackSha256": "bfc3f07ee653c9d9e798fd8468f1bf658a3ef29e72aef75ba93c348c96a50948",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "support-cases",
++        "lang": "ro",
++        "articleSha256": "2346f0b14cfd3ac25ccd609d8268809da9975dc2079179778e10df3da7f88aac",
++        "modelProjectionSha256": "e993e92c67a698c504f3b6bac0eceeb4e47afb56ba02bd10f5c3c5d00274b10c",
++        "fallbackSha256": "dec984e5c9ae5fcf5e0ab7d575aef01339b9300ca42bce94950ab3a39d13ee82",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "support-status-limits",
++        "lang": "en",
++        "articleSha256": "7f111d034af0d6ba0765c9bf008d6d8981f8a589e1731695e9bbf7d5f213f15f",
++        "modelProjectionSha256": "0f18f40c0d5b2985ce4db08f0c8c7555c7a4b235ab86032172913c6ca362ab89",
++        "fallbackSha256": "0dae00645b03d17b120a79cc212696648a9dd76f3f86a2cbab26db710f618534",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "support-status-limits",
++        "lang": "ro",
++        "articleSha256": "884956c2b04303c8412a4859746a526d5577e9392e2066843aa977500857511f",
++        "modelProjectionSha256": "d4163c89dd29974c170da40e39c0f1d34849ac8acec08aa7413d439a0f7dcfbd",
++        "fallbackSha256": "df43c7cccd6017dc7890ba24ceb4255620a3927ca066879fc017f1e508638bb1",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "unpublish-a-debate",
++        "lang": "en",
++        "articleSha256": "70e53322f323778974e50ca4f4342a4e8cba5c41d5139d51452530a40c7563a2",
++        "modelProjectionSha256": "64f871c823dd78f05d18f50ec45373fa07a9ad79f72b4234c8adc9aae443db0b",
++        "fallbackSha256": "db2b5340f4c9089567e0c8b4559cc9ac4749039b91bd3a8b2fbbd5c799991c1f",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "unpublish-a-debate",
++        "lang": "ro",
++        "articleSha256": "a741f94571245aadbb6f25d6da5c3c5b87bdf5bf72fa4c5aaf8e03980abce9d0",
++        "modelProjectionSha256": "9be645d5de8cd8f8c26603966f9e9b8f3d58b7cb7c8a95e9cb7b0fd71289fe25",
++        "fallbackSha256": "b8e1ec1cf886a71658412f2b4bcfdb0dd8c91cd424c94aad3df4c377ecd2af7f",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "unsupported-capabilities",
++        "lang": "en",
++        "articleSha256": "6e7f19d6d7c00fe4d10660e4dff7ad52e16ae8ff3d85cea13717780af586ec6f",
++        "modelProjectionSha256": "784bf45291c975c87dd6bb1a11f5b1812ecbefc7f0f52ee5cfb66dbdb4f6e9bd",
++        "fallbackSha256": "4feec8aa3b78a1d52916a3484adce247fb94a68b2107c1d5816fdc9c29e7f41f",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "unsupported-capabilities",
++        "lang": "ro",
++        "articleSha256": "c07bb1a6a85f14a034a134a08250f22721f772ce54bd77d18ff63f7df93d350b",
++        "modelProjectionSha256": "c9865d48ace58951f1c0c5bf85cd99b50dd6985d276fdeff7d4094e060c9acb5",
++        "fallbackSha256": "48de85c1329b80861e5bc5a7d1e2ce2dee433ec1f7bfd67ce0cd4596644702d2",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "view-public-debate",
++        "lang": "en",
++        "articleSha256": "995068c814cec3ba1dd0f0ecf320bea04fc8c66acc9703b8cd70cec72cfca053",
++        "modelProjectionSha256": "c0185e375681e9d609b041f1e7fbbc1e33bd4c4c6489a3ea715fd52797ba35ab",
++        "fallbackSha256": "6d06676fd87b3c96b5194ea459eec98846f322ef28a7890a1261667a37f71ac5",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "view-public-debate",
++        "lang": "ro",
++        "articleSha256": "9faf157365acb8b560208eb822cda7cd42c83e845d2a551853ea5c97ccf9c260",
++        "modelProjectionSha256": "b084890fbed2cc9e663966f07ddeff0be6c3bef33bbfb9edfb6b8f38d579df40",
++        "fallbackSha256": "a69efa62f629372892e35d12f5d258c93409e4ca585205c7616bb637e01e7de6",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-15",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      }
++    ]
++  }
+ }
+diff --git a/dialectical-engine/packages/support-kb/src/context.ts b/dialectical-engine/packages/support-kb/src/context.ts
+index 4d67ace28c5fbaa766e62d1503af3ad2d770cf4e..3a17392c774115de85a821622f6a641f2b2d8a49 100644
+--- a/dialectical-engine/packages/support-kb/src/context.ts
++++ b/dialectical-engine/packages/support-kb/src/context.ts
+@@ -96,7 +96,7 @@ function baseSection(
+ }
+ 
+ function articleSection(entry: HelpCorpusEntry,reference: string): string {
+-  return `\n\nSOURCE ${reference}\nTITLE: ${entry.title}\n${entry.body}`;
++  return `\n\nSOURCE ${reference}\n${entry.modelProjection ?? ""}`;
+ }
+ 
+ function outputContract(
+@@ -163,7 +163,7 @@ export function buildSupportKnowledgeContext(input: Readonly<{
+     });
+   }
+   const ranked = input.entries
+-    .filter(({ lang }) => lang === input.language)
++    .filter(({ lang,modelProjection }) => lang === input.language && modelProjection !== undefined)
+     .map((entry) => ({
+       entry,
+       score: (capabilityArticleScore.get(entry.id) ?? 0)
+diff --git a/dialectical-engine/packages/support-kb/src/index.ts b/dialectical-engine/packages/support-kb/src/index.ts
+index aa9d72e0522520a14dab9d349fb96f7c5e3adb60..6ec743b4111c41ea476f9527c48f564b47468207 100644
+--- a/dialectical-engine/packages/support-kb/src/index.ts
++++ b/dialectical-engine/packages/support-kb/src/index.ts
+@@ -5,6 +5,10 @@ import { TextDecoder } from "node:util";
+ 
+ import { TypedDomainError } from "@debateai/kernel";
+ import { SUPPORT_CATALOG_CANONICAL } from "./catalog.js";
++import {
++  parseSupportRecoveryComponents,supportRecoveryTextSha256,
++  type SupportRecoveryComponent
++} from "./recovery.js";
+ 
+ export type HelpCorpusLanguage = "en" | "ro";
+ export type HelpCorpusStatus = "shipped" | "intended";
+@@ -19,6 +23,9 @@ export type HelpCorpusEntry = Readonly<{
+   ratifiedBy: "V" | "";
+   ratifiedOn: string;
+   body: string;
++  modelProjection?: string;
++  fallback?: string;
++  recoveryReview?: SupportRecoveryReview;
+ }>;
+ 
+ export type SupportReviewDetails = Readonly<{
+@@ -34,10 +41,26 @@ export type SupportArticleReview = SupportReviewDetails & Readonly<{
+   sha256: string;
+ }>;
+ 
++export type SupportRecoveryReview = SupportReviewDetails & Readonly<{
++  id: string;
++  lang: HelpCorpusLanguage;
++  articleSha256: string;
++  modelProjectionSha256: string;
++  fallbackSha256: string;
++  ratifiedBy: "V" | "";
++  ratifiedOn: string;
++}>;
++
++export type SupportRecoveryReviewManifest = Readonly<{
++  componentFileSha256: string;
++  components: readonly SupportRecoveryReview[];
++}>;
++
+ export type SupportReviewManifest = Readonly<{
+-  schemaVersion: 1;
++  schemaVersion: 1 | 2;
+   catalog: SupportReviewDetails & Readonly<{ sha256: string }>;
+   articles: readonly SupportArticleReview[];
++  recovery?: SupportRecoveryReviewManifest;
+ }>;
+ 
+ export type LoadedHelpCorpus = Readonly<{
+@@ -46,6 +69,8 @@ export type LoadedHelpCorpus = Readonly<{
+   ignoredCount: number;
+   previewReviewedCount: number;
+   ownerRatifiedCount: number;
++  recoveryReviewedCount: number;
++  recoveryOwnerRatifiedCount: number;
+   catalogDigest: string;
+   reviewManifest: SupportReviewManifest;
+   /**
+@@ -289,6 +314,10 @@ function reviewManifestError(detail: string): never {
+   throw new SupportKbError("SUPPORT_KB_REVIEW_MANIFEST_INVALID", detail);
+ }
+ 
++function recoveryReviewError(detail: string): never {
++  throw new SupportKbError("SUPPORT_KB_RECOVERY_REVIEW_INVALID", detail);
++}
++
+ function parseReviewDetails(value: unknown, subject: string): SupportReviewDetails {
+   if (typeof value !== "object" || value === null) reviewManifestError(`${subject} must be an object`);
+   const record = value as Record<string, unknown>;
+@@ -322,13 +351,14 @@ function parseReviewManifest(value: unknown): SupportReviewManifest {
+   if (typeof value !== "object" || value === null) reviewManifestError("manifest must be an object");
+   const record = value as Record<string, unknown>;
+   if (
+-    record.schemaVersion !== 1
++    (record.schemaVersion !== 1 && record.schemaVersion !== 2)
+     || !Array.isArray(record.articles)
+     || typeof record.catalog !== "object"
+     || record.catalog === null
+-    || Object.keys(record).sort().join(",") !== "articles,catalog,schemaVersion"
++    || Object.keys(record).sort().join(",") !== (record.schemaVersion === 1
++      ? "articles,catalog,schemaVersion" : "articles,catalog,recovery,schemaVersion")
+   ) {
+-    reviewManifestError("manifest must contain exactly schemaVersion, catalog and articles");
++    reviewManifestError("manifest has an invalid schema or key set");
+   }
+   const catalogRecord = record.catalog as Record<string, unknown>;
+   const catalogDetails = parseReviewDetails(catalogRecord, "catalog");
+@@ -359,16 +389,73 @@ function parseReviewManifest(value: unknown): SupportReviewManifest {
+       ...details,
+     });
+   });
++  let recovery: SupportRecoveryReviewManifest | undefined;
++  if (record.schemaVersion === 2) {
++    if (record.recovery === null || typeof record.recovery !== "object" || Array.isArray(record.recovery)) {
++      recoveryReviewError("recovery must be an object");
++    }
++    const rawRecovery = record.recovery as Record<string,unknown>;
++    if (Object.keys(rawRecovery).sort().join(",") !== "componentFileSha256,components"
++      || typeof rawRecovery.componentFileSha256 !== "string"
++      || !SHA256.test(rawRecovery.componentFileSha256)
++      || !Array.isArray(rawRecovery.components)) {
++      recoveryReviewError("recovery must contain an exact file digest and component array");
++    }
++    const recoverySeen = new Set<string>();
++    const recoveryComponents = rawRecovery.components.map((value,index) => {
++      const subject = `recovery.components[${index}]`;
++      if (value === null || typeof value !== "object" || Array.isArray(value)) recoveryReviewError(`${subject} must be an object`);
++      const row = value as Record<string,unknown>;
++      const allowed = [
++        "articleSha256","evidence","fallbackSha256","id","lang","modelProjectionSha256",
++        "ratifiedBy","ratifiedOn","reviewedBy","reviewedOn","reviewerSession"
++      ];
++      if (Object.keys(row).sort().join(",") !== allowed.join(",")) recoveryReviewError(`${subject} has an invalid key set`);
++      if (typeof row.id !== "string" || !ENTRY_ID.test(row.id)) recoveryReviewError(`${subject}.id is invalid`);
++      if (row.lang !== "en" && row.lang !== "ro") recoveryReviewError(`${subject}.lang is invalid`);
++      for (const key of ["articleSha256","modelProjectionSha256","fallbackSha256"] as const) {
++        if (typeof row[key] !== "string" || !SHA256.test(row[key])) recoveryReviewError(`${subject}.${key} is invalid`);
++      }
++      const details = parseReviewDetails({
++        id: row.id,lang: row.lang,sha256: row.articleSha256,
++        reviewedBy: row.reviewedBy,reviewerSession: row.reviewerSession,
++        reviewedOn: row.reviewedOn,evidence: row.evidence
++      },subject);
++      if ((row.ratifiedBy !== "" && row.ratifiedBy !== "V")
++        || typeof row.ratifiedOn !== "string"
++        || (row.ratifiedOn !== "" && !isIsoDate(row.ratifiedOn))
++        || ((row.ratifiedBy === "V") !== (row.ratifiedOn !== ""))) {
++        recoveryReviewError(`${subject} has invalid paired owner ratification`);
++      }
++      const key = `${row.id}.${row.lang}`;
++      if (recoverySeen.has(key)) recoveryReviewError(`${subject} duplicates ${key}`);
++      recoverySeen.add(key);
++      return Object.freeze({
++        id: row.id,lang: row.lang,articleSha256: row.articleSha256,
++        modelProjectionSha256: row.modelProjectionSha256,fallbackSha256: row.fallbackSha256,
++        ...details,ratifiedBy: row.ratifiedBy,ratifiedOn: row.ratifiedOn
++      }) as SupportRecoveryReview;
++    });
++    recovery = Object.freeze({
++      componentFileSha256: rawRecovery.componentFileSha256,
++      components: Object.freeze(recoveryComponents)
++    });
++  }
+   return Object.freeze({
+-    schemaVersion: 1,
++    schemaVersion: record.schemaVersion,
+     catalog: Object.freeze({ sha256: catalogRecord.sha256, ...catalogDetails }),
+     articles: Object.freeze(articles),
++    ...(recovery === undefined ? {} : { recovery }),
+   });
+ }
+ 
+ export function loadHelpCorpus(
+   directory: string,
+-  options: Readonly<{ reviewManifest?: unknown }> = {},
++  options: Readonly<{
++    reviewManifest?: unknown;
++    recoveryComponents?: string | Buffer;
++    requireReviewedRecovery?: boolean;
++  }> = {},
+ ): LoadedHelpCorpus {
+   const reviewManifest = parseReviewManifest(options.reviewManifest);
+   const catalogDigest = sha256(SUPPORT_CATALOG_CANONICAL);
+@@ -477,19 +564,100 @@ export function loadHelpCorpus(
+     }
+   }
+ 
++  const recoveryDocument = options.recoveryComponents === undefined
++    ? undefined : parseSupportRecoveryComponents(options.recoveryComponents);
++  if (options.requireReviewedRecovery === true && recoveryDocument === undefined) {
++    throw new SupportKbError("SUPPORT_KB_RECOVERY_REVIEW_REQUIRED","recovery component bytes are required");
++  }
++  if (options.requireReviewedRecovery === true && reviewManifest.recovery === undefined) {
++    throw new SupportKbError("SUPPORT_KB_RECOVERY_REVIEW_REQUIRED","recovery review attestation is required");
++  }
++  const expectedRecoveryKeys = shippedFiles.map(({ entry }) => `${entry.id}.${entry.lang}`);
++  const recoveryKeys = recoveryDocument?.components.map(({ id,lang }) => `${id}.${lang}`) ?? [];
++  if (recoveryDocument !== undefined
++    && (recoveryKeys.length !== expectedRecoveryKeys.length
++      || recoveryKeys.some((key,index) => key !== expectedRecoveryKeys[index]))) {
++    throw new SupportKbError("SUPPORT_KB_RECOVERY_COMPONENT_INVALID","component keys must equal shipped article keys");
++  }
++  const recoveryReviews = reviewManifest.recovery?.components ?? [];
++  const recoveryReviewKeys = recoveryReviews.map(({ id,lang }) => `${id}.${lang}`);
++  if (reviewManifest.recovery !== undefined
++    && (recoveryDocument === undefined
++      || reviewManifest.recovery.componentFileSha256 !== recoveryDocument.fileSha256
++      || recoveryReviewKeys.length !== recoveryKeys.length
++      || recoveryReviewKeys.some((key,index) => key !== recoveryKeys[index]))) {
++    recoveryReviewError("recovery review does not bind the exact complete component file");
++  }
++  const componentsByKey = new Map<string,SupportRecoveryComponent>(
++    recoveryDocument?.components.map((component) => [`${component.id}.${component.lang}`,component]) ?? []
++  );
++  const recoveryReviewsByKey = new Map<string,SupportRecoveryReview>(
++    recoveryReviews.map((review) => [`${review.id}.${review.lang}`,review])
++  );
++  const admittedEntries: HelpCorpusEntry[] = [];
++  const selectedRecoveryLines: string[] = [];
++  const reviewedRecoveryKeys = new Set<string>();
++  const ratifiedRecoveryKeys = new Set<string>();
++  for (const file of shippedFiles) {
++    const key = `${file.entry.id}.${file.entry.lang}`;
++    const component = componentsByKey.get(key);
++    const review = recoveryReviewsByKey.get(key);
++    const articleSha256 = sha256(file.bytes);
++    const reviewed = component !== undefined && review !== undefined
++      && component.articleSha256 === articleSha256
++      && review.articleSha256 === articleSha256
++      && review.modelProjectionSha256 === supportRecoveryTextSha256(component.modelProjection)
++      && review.fallbackSha256 === supportRecoveryTextSha256(component.fallback);
++    if (component !== undefined && component.articleSha256 !== articleSha256) {
++      throw new SupportKbError("SUPPORT_KB_RECOVERY_HASH_INVALID",`${key} article hash is stale`);
++    }
++    if (!reviewed) {
++      if (options.requireReviewedRecovery === true) {
++        throw new SupportKbError("SUPPORT_KB_RECOVERY_REVIEW_INVALID",`${key} is not exactly reviewed`);
++      }
++      // Legacy/article-only callers keep their existing corpus view. Once a
++      // component document is supplied, however, only separately reviewed
++      // projection/fallback records are admitted into the returned snapshot.
++      if (recoveryDocument === undefined) admittedEntries.push(file.entry);
++      continue;
++    }
++    admittedEntries.push(Object.freeze({
++      ...file.entry,modelProjection: component.modelProjection,fallback: component.fallback,
++      recoveryReview: review
++    }));
++    selectedRecoveryLines.push([
++      `recovery:${key}`,articleSha256,review.modelProjectionSha256,review.fallbackSha256,
++      review.reviewedBy,review.reviewerSession,review.reviewedOn,review.evidence,
++      review.ratifiedBy,review.ratifiedOn
++    ].join(":"));
++    reviewedRecoveryKeys.add(key);
++    if (review.ratifiedBy === "V") ratifiedRecoveryKeys.add(key);
++  }
++
+   const manifest = [
+     `catalog:${catalogDigest}`,
+     ...shippedFiles.map(({ filename, bytes }) => `${filename}:${sha256(bytes)}`),
+     ...selectedReviewLines,
++    ...(recoveryDocument === undefined ? [] : [
++      `recovery-file:${recoveryDocument.fileSha256}`,
++      recoveryDocument.canonicalManifest,
++      ...selectedRecoveryLines
++    ]),
+   ].join("\n");
+   const shippedCount = shippedFiles.length / LANGUAGES.length;
+ 
+   return Object.freeze({
+-    entries: Object.freeze(shippedFiles.map(({ entry }) => entry)),
++    entries: Object.freeze(admittedEntries),
+     shippedCount,
+     ignoredCount: byId.size - shippedCount,
+     previewReviewedCount,
+     ownerRatifiedCount,
++    recoveryReviewedCount: [...new Set(shippedFiles.map(({ entry }) => entry.id))].filter((id) =>
++      reviewedRecoveryKeys.has(`${id}.en`) && reviewedRecoveryKeys.has(`${id}.ro`)
++    ).length,
++    recoveryOwnerRatifiedCount: [...new Set(shippedFiles.map(({ entry }) => entry.id))].filter((id) =>
++      ratifiedRecoveryKeys.has(`${id}.en`) && ratifiedRecoveryKeys.has(`${id}.ro`)
++    ).length,
+     catalogDigest,
+     reviewManifest,
+     manifest,
+diff --git a/dialectical-engine/packages/support-kb/src/recovery.ts b/dialectical-engine/packages/support-kb/src/recovery.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..2a853422bc92b1ff5dc6d5fdb1027e36799f7caa
+--- /dev/null
++++ b/dialectical-engine/packages/support-kb/src/recovery.ts
+@@ -0,0 +1,109 @@
++import { createHash } from "node:crypto";
++import { TextDecoder } from "node:util";
++
++import {
++  analyzeSupportCredentialText,canonicalSupportTextViews,supportTextContainsCredentialOperation,
++  supportTextHasUnsafePath,TypedDomainError
++} from "@debateai/kernel";
++import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "./catalog.js";
++
++export type SupportRecoveryComponent = Readonly<{
++  id: string;
++  lang: "en" | "ro";
++  articleSha256: string;
++  modelProjection: string;
++  fallback: string;
++}>;
++
++export type ParsedSupportRecoveryComponents = Readonly<{
++  schemaVersion: 1;
++  components: readonly SupportRecoveryComponent[];
++  fileSha256: string;
++  canonicalManifest: string;
++}>;
++
++const SHA256 = /^[0-9a-f]{64}$/u;
++const ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
++const COMPONENT_KEYS = ["articleSha256","fallback","id","lang","modelProjection"];
++const CLOSED_IDS = new Set([
++  ...SUPPORT_ACTION_IDS,...SUPPORT_CAPABILITIES.map(({ id }) => id),
++  ...SUPPORT_CAPABILITIES.flatMap(({ articleIds }) => articleIds)
++].filter((id) => id.includes("-")));
++const NARRATIVE_ID = /\b[a-z0-9]+(?:-[a-z0-9]+)+\b/giu;
++const MARKUP_OR_URL = /(?:https?:\/\/|www\.|\[[^\]]+\]\s*\(|<\/?[a-z][^>]*>)/iu;
++const REPOSITORY_METADATA = /(?:^|\s)(?:apps|packages|tests|tools)\/[a-z0-9_./\[\]-]+|\b[a-z0-9_.-]+\.(?:ts|tsx|js|json|md):\d+\b/iu;
++const CONTROL = /[\p{Cc}\p{Cf}]/u;
++const CYRILLIC = /\p{Script=Cyrillic}/u;
++
++function fail(detail: string): never {
++  throw new TypedDomainError("SUPPORT_KB_RECOVERY_COMPONENT_INVALID",detail);
++}
++
++function decode(bytes: Buffer): string {
++  try { return new TextDecoder("utf-8",{ fatal: true }).decode(bytes); }
++  catch { return fail("component file must be valid UTF-8"); }
++}
++
++function sha256(value: string | Buffer): string {
++  return createHash("sha256").update(value).digest("hex");
++}
++
++export function isSupportRecoveryTextSafe(value: string): boolean {
++  if (value.trim() === "" || [...value].length > 4_000 || CONTROL.test(value) || CYRILLIC.test(value)) return false;
++  const canonical = canonicalSupportTextViews(value);
++  if (canonical.unsafeEncoding || supportTextHasUnsafePath(value)) return false;
++  return canonical.views.every((candidate) => {
++    if (MARKUP_OR_URL.test(candidate) || REPOSITORY_METADATA.test(candidate)) return false;
++    if (analyzeSupportCredentialText(candidate).credentialValueSpans.length > 0) return false;
++    if (supportTextContainsCredentialOperation(candidate)) return false;
++    NARRATIVE_ID.lastIndex = 0;
++    return ![...candidate.toLocaleLowerCase("en-US").matchAll(NARRATIVE_ID)]
++      .some(([id]) => CLOSED_IDS.has(id));
++  });
++}
++
++export function parseSupportRecoveryComponents(input: string | Buffer): ParsedSupportRecoveryComponents {
++  const bytes = typeof input === "string" ? Buffer.from(input,"utf8") : Buffer.from(input);
++  let decoded: unknown;
++  try { decoded = JSON.parse(decode(bytes)) as unknown; }
++  catch { return fail("component file must contain JSON"); }
++  if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)) fail("root must be an object");
++  const root = decoded as Record<string,unknown>;
++  if (Object.keys(root).sort().join(",") !== "components,schemaVersion"
++    || root.schemaVersion !== 1 || !Array.isArray(root.components)) {
++    fail("root must contain exactly schemaVersion 1 and components");
++  }
++  const seen = new Set<string>();
++  const components = root.components.map((value,index) => {
++    if (value === null || typeof value !== "object" || Array.isArray(value)) fail(`components[${index}] must be an object`);
++    const row = value as Record<string,unknown>;
++    if (Object.keys(row).sort().join(",") !== COMPONENT_KEYS.join(",")) fail(`components[${index}] has unexpected keys`);
++    if (typeof row.id !== "string" || !ID.test(row.id)) fail(`components[${index}].id is invalid`);
++    if (row.lang !== "en" && row.lang !== "ro") fail(`components[${index}].lang is invalid`);
++    if (typeof row.articleSha256 !== "string" || !SHA256.test(row.articleSha256)) fail(`components[${index}].articleSha256 is invalid`);
++    if (typeof row.modelProjection !== "string" || !isSupportRecoveryTextSafe(row.modelProjection)) fail(`components[${index}].modelProjection is unsafe`);
++    if (typeof row.fallback !== "string" || !isSupportRecoveryTextSafe(row.fallback)) fail(`components[${index}].fallback is unsafe`);
++    const key = `${row.id}.${row.lang}`;
++    if (seen.has(key)) fail(`components[${index}] duplicates ${key}`);
++    seen.add(key);
++    return Object.freeze({
++      id: row.id,lang: row.lang,articleSha256: row.articleSha256,
++      modelProjection: row.modelProjection,fallback: row.fallback
++    }) as SupportRecoveryComponent;
++  });
++  const keys = components.map(({ id,lang }) => `${id}.${lang}`);
++  if (keys.some((key,index) => index > 0 && keys[index - 1]!.localeCompare(key,"en") >= 0)) {
++    fail("components must be strictly ordered by id then language");
++  }
++  const canonicalManifest = components.map((component) => [
++    `${component.id}.${component.lang}`,
++    component.articleSha256,
++    sha256(component.modelProjection),
++    sha256(component.fallback)
++  ].join(":" )).join("\n");
++  return Object.freeze({
++    schemaVersion: 1,components:Object.freeze(components),fileSha256:sha256(bytes),canonicalManifest
++  });
++}
++
++export function supportRecoveryTextSha256(value: string): string { return sha256(value); }
+diff --git a/dialectical-engine/tests/integration/support-cases.test.ts b/dialectical-engine/tests/integration/support-cases.test.ts
+index f6e748f04a0ef8e4060f05292f62a00ad66a2623..bfce0b6af31f7cb5284885f93b9ee02969a1aa92 100644
+--- a/dialectical-engine/tests/integration/support-cases.test.ts
++++ b/dialectical-engine/tests/integration/support-cases.test.ts
+@@ -377,7 +377,9 @@ describe("SUP-02 cases", () => {
+ 
+   it("stores a non-authoritative one-paragraph advisory summary within the bound", async () => {
+     const persisted: Array<Readonly<Record<string,unknown>>> = [];
+-    const summary = Array.from({ length: 40 },(_,index) => `word${index}`).join(" ") + ".";
++    const summary = `Change the display name from Settings. ${
++      Array.from({ length: 34 },(_,index) => `word${index}`).join(" ")
++    }.`;
+     const service = createAdvisorySummaryService({
+       complete: async (request) => {
+         expect(request.system).toContain("exactly kind, text, sourceIds, and actionIds");
+@@ -423,6 +425,8 @@ describe("SUP-02 cases", () => {
+       "The advisory summary was omitted because it did not pass Support safety checks."]
+     ,["en","The visitor should use forgot-password to continue.",
+       "The advisory summary was omitted because it did not pass Support safety checks."]
++    ,["en","My password is this synthetic phrase remains secret even when it contains many ordinary words.",
++      "The advisory summary was omitted because it did not pass Support safety checks."]
+   ] as const)("replaces an unsafe %s advisory summary before seal and persistence", async (
+     language,hostile,fallback
+   ) => {
+diff --git a/dialectical-engine/tests/integration/support-degraded.test.ts b/dialectical-engine/tests/integration/support-degraded.test.ts
+index 6eda1d6ce263074c3e9e23bc18b23ab4220d124a..a570ce19f7db71676d5903b564ae69620243428a 100644
+--- a/dialectical-engine/tests/integration/support-degraded.test.ts
++++ b/dialectical-engine/tests/integration/support-degraded.test.ts
+@@ -24,7 +24,8 @@ const ENTRY = Object.freeze({
+   id: "getting-started-debate",lang: "en" as const,title: "Start a debate",
+   status: "shipped" as const,sources: ["test"],verifiedAgainst: "test",
+   ratifiedBy: "V" as const,ratifiedOn: "2026-09-01",
+-  body: "Open the new debate page to start your first debate."
++  body: "Open the new debate page to start your first debate.",
++  modelProjection: "Open the new debate page to start your first debate."
+ });
+ 
+ describe("SUP-06 automatic degraded state", () => {
+diff --git a/dialectical-engine/tests/integration/support-metrics.test.ts b/dialectical-engine/tests/integration/support-metrics.test.ts
+index 0a06c0bdc703581f39037eafe37f9239ae5b25f9..741552254f626456658e8e65669b2101d2ec5a63 100644
+--- a/dialectical-engine/tests/integration/support-metrics.test.ts
++++ b/dialectical-engine/tests/integration/support-metrics.test.ts
+@@ -83,7 +83,9 @@ describe("support outcome metrics", () => {
+       ratingResolution7Days: null,ratingResolution30Days: null
+     });
+ 
+-    await seedSession({ ageMs: 1,rating: "yes" });
++    // A recovered answer deliberately retains ANSWER_GROUNDED and model_called=true;
++    // metrics therefore count it as a rated resolution and as one relay call.
++    await seedSession({ ageMs: 1,rating: "yes",modelCalled: true });
+     await seedSession({ ageMs: 3,outcome: "REFUSE_SAFETY",modelCalled: true });
+     await seedSession({ ageMs: 2,rating: "no",openedCase: true });
+     await seedSession({ ageMs: 10*24*60*60*1_000 });
+@@ -98,7 +100,7 @@ describe("support outcome metrics", () => {
+     });
+     const status = await repository.status();
+     expect(status.relayState).toBe("AVAILABLE");
+-    expect(status.callsToday).toBe(1);
++    expect(status.callsToday).toBe(2);
+     expect((await database.pool.query(
+       "SELECT count(*)::int AS count FROM support.rating AS rating JOIN support.message AS message ON message.message_id=rating.message_id WHERE message.outcome='REFUSE_SAFETY'"
+     )).rows).toEqual([{ count: 0 }]);
+diff --git a/dialectical-engine/tests/integration/support-routes.test.ts b/dialectical-engine/tests/integration/support-routes.test.ts
+index c283cc5a92651dc1540903ecf863a60b871fbecb..21bdc5c4ea424f56024c2084baf5b8ad5ee74435 100644
+--- a/dialectical-engine/tests/integration/support-routes.test.ts
++++ b/dialectical-engine/tests/integration/support-routes.test.ts
+@@ -1972,7 +1972,7 @@ describe("SUP-01 support routes", () => {
+   it.each([
+     ["encoded link","Open https%3A%2F%2Finvalid.example/reset"],
+     ["internal identifier","Select start-debate to continue."]
+-  ])("replaces a rejected %s draft before storage and HTTP while retaining usage and relay health", async (
++  ])("recovers a rejected %s draft from the pinned top source before storage and HTTP", async (
+     _kind,unsafe
+   ) => {
+     const policyClockMs = CLOCK_BASE_MS + 20_000_000;
+@@ -1980,7 +1980,9 @@ describe("SUP-01 support routes", () => {
+       id: "getting-started-debate",lang: "en" as const,title: "Start a debate",
+       status: "shipped" as const,sources: Object.freeze(["test"]),
+       verifiedAgainst: "test",ratifiedBy: "V" as const,ratifiedOn: "2026-09-01",
+-      body: "Open the new debate page to start your first debate."
++      body: "Raw article body is excluded from the model surface.",
++      modelProjection: "The debate form accepts a topic longer than six characters.",
++      fallback: "Choose Start a debate and enter a topic longer than six characters."
+     });
+     const snapshots = createHelpCorpusSnapshotLookup(corpus([article]));
+     const complete = vi.fn(async () => Object.freeze({
+@@ -2005,7 +2007,10 @@ describe("SUP-01 support routes", () => {
+     );
+     expect(response.statusCode).toBe(200);
+     expect(response.json()).toMatchObject({
+-      outcome: "REFUSE_SAFETY",sources: [],actions: []
++      outcome: "ANSWER_GROUNDED",
++      text: article.fallback,
++      sources: [{ id: article.id,label: article.title }],
++      actions: [{ id: "start-debate",href: "/login?next=%2Fnew" }]
+     });
+     expect(JSON.stringify(response.json())).not.toContain(unsafe);
+     expect(response.json()).not.toHaveProperty("case_token");
+@@ -2017,7 +2022,7 @@ describe("SUP-01 support routes", () => {
+         cost_usd::text FROM support.message
+         WHERE session_id=$1 AND role='assistant'`,[opened.body.session_id])).rows[0]!;
+     expect(assistant).toMatchObject({
+-      outcome: "REFUSE_SAFETY",model_called: true,
++      outcome: "ANSWER_GROUNDED",model_called: true,
+       input_tokens: "13",output_tokens: "7",cost_usd: "0.002000"
+     });
+     const stored = await messageCipher.read({
+@@ -2032,7 +2037,7 @@ describe("SUP-01 support routes", () => {
+       headers: { "x-support-session-token": opened.body.session_token },
+       payload: { session_id: opened.body.session_id,rating: "yes" }
+     });
+-    expect(rating.statusCode).toBe(404);
++    expect(rating.statusCode).toBe(200);
+     await server.close();
+   });
+ 
+@@ -2048,7 +2053,9 @@ describe("SUP-01 support routes", () => {
+       verifiedAgainst: "2b670d30",
+       ratifiedBy: "V" as const,
+       ratifiedOn: "2026-09-04",
+-      body: "Open the new debate page to start your first debate."
++      body: "Raw fixture article body.",
++      modelProjection: "Open the new debate page to start your first debate.",
++      fallback: "Choose Start a debate and enter a topic longer than six characters."
+     });
+     const snapshots = createHelpCorpusSnapshotLookup(corpus([article]));
+     const model: SupportModelPort = Object.freeze({
+@@ -2141,7 +2148,9 @@ describe("SUP-01 support routes", () => {
+       id: "export-json",lang: "en" as const,title: "Export a debate as JSON",
+       status: "shipped" as const,sources: Object.freeze(["test"]),
+       verifiedAgainst: "test",ratifiedBy: "V" as const,ratifiedOn: "2026-09-01",
+-      body: "JSON export is available after a served answer and a readable ledger digest."
++      body: "Raw fixture article body.",
++      modelProjection: "JSON export is available after a served answer and a readable ledger digest.",
++      fallback: "Open an eligible owner debate and choose Export."
+     });
+     const snapshots = createHelpCorpusSnapshotLookup(corpus([article]));
+     let system = "";
+@@ -2243,7 +2252,9 @@ describe("SUP-01 support routes", () => {
+         verifiedAgainst: "2b670d30",
+         ratifiedBy: "V" as const,
+         ratifiedOn: "2026-09-04",
+-        body: "Owners publish from the debate page and complete re-authentication."
++        body: "Raw fixture article body.",
++        modelProjection: "Owners publish from the debate page after fresh authentication.",
++        fallback: "Open a debate you own and choose its publish control."
+       })],
+       messages: messageCipher,
+       modelFor: () => model,
+@@ -2686,7 +2697,9 @@ describe("SUP-01 support routes", () => {
+       entries: [{
+         id: "getting-started-debate",lang: "en",title: "Start",status: "shipped",
+         sources: ["test"],verifiedAgainst: "test",ratifiedBy: "V",ratifiedOn: "2026-09-01",
+-        body: "Open the new debate page to start your first debate."
++        body: "Raw fixture article body.",
++        modelProjection: "Open the new debate page to start your first debate.",
++        fallback: "Choose Start a debate and enter a topic longer than six characters."
+       }],messages: messageCipher,
+       modelFor: () => new RelayAdapter({
+         baseUrl: "http://127.0.0.1:8792/v1",authorizationHeader: "Bearer test-relay",
+diff --git a/dialectical-engine/tests/unit/support-answer-context.test.ts b/dialectical-engine/tests/unit/support-answer-context.test.ts
+index 5d140cab06f94e9dddccc98c78ab92279e6e2306..5d7a48a25af86e4aaecc86721d14474cb9254733 100644
+--- a/dialectical-engine/tests/unit/support-answer-context.test.ts
++++ b/dialectical-engine/tests/unit/support-answer-context.test.ts
+@@ -16,7 +16,8 @@ function entry(id: string,body: string): HelpCorpusEntry {
+   return Object.freeze({
+     id,lang: "en",title: "Crosscap article",status: "shipped",
+     sources: Object.freeze(["fixture"]),verifiedAgainst: "fixture",
+-    ratifiedBy: "V",ratifiedOn: "2026-09-01",body
++    ratifiedBy: "V",ratifiedOn: "2026-09-01",body,
++    modelProjection: body,fallback: "Use the reviewed guidance for this topic."
+   });
+ }
+ 
+@@ -43,6 +44,32 @@ function request(snapshot: LoadedHelpCorpus) {
+ }
+ 
+ describe("CP1 composed answer context", () => {
++  it.each(["not-json",JSON.stringify({ kind: "tool",text: "ignored",sourceIds: [],actionIds: [] })])(
++    "recovers every rejected ordinary knowledge envelope from the pinned top source: %s",
++    async (completionText) => {
++      const top = entry("getting-started-debate","create debate topic plan controls");
++      const snapshot = corpus([top],"6".repeat(64));
++      const complete = vi.fn(async () => Object.freeze({
++        text: completionText,usage: { input_tokens: 11,output_tokens: 7,cost_usd: 0.002 }
++      }));
++      const service = createSupportAnswerService({
++        entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
++        modelReferenceFactory,modelFor: () => Object.freeze({ complete }) as never,
++        clock: (() => { let at = Date.parse("2026-09-14T10:00:00.000Z");return () => new Date(++at); })()
++      });
++
++      const result = await service.respond({ ...request(snapshot),text: "How do I create a debate?" });
++
++      expect(complete).toHaveBeenCalledTimes(1);
++      expect(result).toMatchObject({
++        outcome: "ANSWER_GROUNDED",text: top.fallback,
++        sources: [{ id: top.id,label: top.title }],usage: { input_tokens: 11,output_tokens: 7,cost_usd: 0.002 }
++      });
++      expect(messages.write).toHaveBeenLastCalledWith(expect.objectContaining({
++        role: "assistant",outcome: "ANSWER_GROUNDED",text: top.fallback
++      }));
++    }
++  );
+   it("maps request-local model references to canonical response provenance", async () => {
+     const snapshot = corpus([
+       entry("getting-started-debate","create debate topic plan controls")
+@@ -191,7 +218,7 @@ describe("CP1 composed answer context", () => {
+ 
+     const result = await service.respond(request(snapshot));
+ 
+-    expect(result.outcome).toBe("REFUSE_SAFETY");
++    expect(result.outcome).toBe("ANSWER_GROUNDED");
+     expect(reportDraftDiagnostic).toHaveBeenCalledOnce();
+     expect(reportDraftDiagnostic).toHaveBeenCalledWith(expect.objectContaining({
+       code: "JSON_INVALID",predicate: "JSON_SYNTAX",jsonValid: false,fenced: true,
+@@ -221,10 +248,12 @@ describe("CP1 composed answer context", () => {
+ 
+     const result = await service.respond(request(snapshot));
+ 
+-    expect(result).toMatchObject({ outcome: "REFUSE_SAFETY",sources: [],actions: [] });
++    expect(result).toMatchObject({
++      outcome: "ANSWER_GROUNDED",sources: [{ id: "selected-a" }],actions: []
++    });
+     expect(result.text).not.toContain("start-debate");
+     expect(messages.write).toHaveBeenLastCalledWith(expect.objectContaining({
+-      role: "assistant",outcome: "REFUSE_SAFETY"
++      role: "assistant",outcome: "ANSWER_GROUNDED"
+     }));
+   });
+ 
+@@ -244,7 +273,9 @@ describe("CP1 composed answer context", () => {
+ 
+     const result = await service.respond(request(snapshot));
+ 
+-    expect(result).toMatchObject({ outcome: "REFUSE_SAFETY",sources: [],actions: [] });
++    expect(result).toMatchObject({
++      outcome: "ANSWER_GROUNDED",sources: [{ id: "selected-a" }],actions: []
++    });
+     expect(result.text).not.toContain(SOURCE_REFERENCE);
+   });
+ 
+@@ -269,7 +300,7 @@ describe("CP1 composed answer context", () => {
+       outcome: "ANSWER_GROUNDED",sources: [{ id: "selected-a" }]
+     });
+     await expect(service.respond(request(snapshot))).resolves.toMatchObject({
+-      outcome: "REFUSE_SAFETY",sources: [],actions: []
++      outcome: "ANSWER_GROUNDED",sources: [{ id: "selected-a" }],actions: []
+     });
+   });
+ 
+diff --git a/dialectical-engine/tests/unit/support-context.test.ts b/dialectical-engine/tests/unit/support-context.test.ts
+index f4fc2dc1cd1e90a0592cc0f12792322294a4bd5d..7666595de80b03dfdcae9bdba5c27c9dc538f52c 100644
+--- a/dialectical-engine/tests/unit/support-context.test.ts
++++ b/dialectical-engine/tests/unit/support-context.test.ts
+@@ -31,6 +31,8 @@ function entry(
+     ratifiedBy: "",
+     ratifiedOn: "",
+     body,
++    modelProjection: `MODEL PROJECTION: ${body}`,
++    fallback: `FALLBACK: ${body}`,
+   });
+ }
+ 
+@@ -265,4 +267,20 @@ describe("Support knowledge context", () => {
+     expect(result.text).toContain("Start a debate");
+     expect(result.text).toContain("signed-in visitors");
+   });
++
++  it("uses the admitted projection and never exposes the raw title or article body", () => {
++    const candidate = Object.freeze({
++      ...entry("getting-started-debate","en","RAW TITLE /new","RAW BODY /new packages/private/source.ts"),
++      modelProjection: "Choose a topic longer than six characters before starting.",
++      fallback: "Choose a topic longer than six characters, then use Start a debate."
++    });
++    const result = buildSupportKnowledgeContext({
++      entries: [candidate],capabilities: SUPPORT_CAPABILITIES,language: "en",
++      query: "How do I start a debate with a topic?",historyText: "",maxCodePoints: 24_000,
++      availableActionIds: SUPPORT_ACTION_IDS
++    });
++    expect(result.text).toContain(candidate.modelProjection);
++    expect(result.text).not.toContain(candidate.title);
++    expect(result.text).not.toContain(candidate.body);
++  });
+ });
+diff --git a/dialectical-engine/tests/unit/support-credentials.test.ts b/dialectical-engine/tests/unit/support-credentials.test.ts
+index 5ffb1849a216c3611e1daf14e066175a1518a624..8497700c66139973fbeaa9191b13110f0966a9a4 100644
+--- a/dialectical-engine/tests/unit/support-credentials.test.ts
++++ b/dialectical-engine/tests/unit/support-credentials.test.ts
+@@ -47,6 +47,16 @@ describe("Support credential lexical facts", () => {
+       .toContain(secret);
+   });
+ 
++  it.each([
++    ['My recovery code is "inert amber fern',"inert amber fern"],
++    ["My password is amber birch cedar dogwood elm fir grove hazel; keep it private.","amber birch cedar dogwood elm fir grove hazel"],
++    ["My reset token is inert.alpha-beta/gamma; keep it private.","inert.alpha-beta/gamma"]
++  ])("owns the complete supplied-value span without retaining a suffix: %s", (text,secret) => {
++    const facts = analyzeSupportCredentialText(text);
++    expect(facts.credentialValueSpans.map(({ start,end }) => text.slice(start,end)))
++      .toContain(secret);
++  });
++
+   it.each([
+     ["Support does not receive passwords and also asks you to send them here.","solicit"],
+     ["Support does not receive passwords, so send them here.","solicit"],
+@@ -59,6 +69,15 @@ describe("Support credential lexical facts", () => {
+     expect(operations.some(({ negated }) => negated === false)).toBe(true);
+   });
+ 
++  it.each([
++    "Support does not receive passwords and may receive them.",
++    "Support cannot accept security codes, but it could validate them.",
++    "Asistența nu primește parole și poate primi acestea.",
++    "Asistența nu verifică un cod de securitate, dar ar putea să îl primească."
++  ])("starts a separate positive modal or auxiliary operation group: %s", (text) => {
++    expect(analyzeSupportCredentialText(text).operations.some(({ negated }) => !negated)).toBe(true);
++  });
++
+   it("emits only closed lexical facts and numeric spans", () => {
+     const hostile = "Send your passwords and then validate them.";
+     const serialized = JSON.stringify(analyzeSupportCredentialText(hostile));
+diff --git a/dialectical-engine/tests/unit/support-kb.test.ts b/dialectical-engine/tests/unit/support-kb.test.ts
+index a2bdca3bbd8d36de816e5b61f38ef5c6e37e0117..3253ab66c9158eee85cda1e25db498298822852f 100644
+--- a/dialectical-engine/tests/unit/support-kb.test.ts
++++ b/dialectical-engine/tests/unit/support-kb.test.ts
+@@ -111,8 +111,13 @@ describe("Help Corpus loader", () => {
+     const manifestPath = fileURLToPath(
+       new URL("../../packages/support-kb/reviews/manifest.json", import.meta.url),
+     );
++    const componentPath = fileURLToPath(
++      new URL("../../packages/support-kb/recovery/components.json", import.meta.url),
++    );
+     const corpus = loadHelpCorpus(directory, {
+       reviewManifest: JSON.parse(readFileSync(manifestPath,"utf8")) as unknown,
++      recoveryComponents: readFileSync(componentPath),
++      requireReviewedRecovery: true,
+     });
+ 
+     expect(corpus).toMatchObject({
+@@ -120,7 +125,9 @@ describe("Help Corpus loader", () => {
+       ignoredCount: 0,
+       previewReviewedCount: 12,
+       ownerRatifiedCount: 6,
+-      kbVersion: "b6f48a593b500f108e0eed11e0ceccfe8654e684fcdf0bb8284c1ded179867ca",
++      recoveryReviewedCount: 18,
++      recoveryOwnerRatifiedCount: 0,
++      kbVersion: "d674533e89d145bf9203248e2e324b451e57a2f1d3f257614d31678b7ac379df",
+     });
+     expect(corpus.reviewManifest.articles).toHaveLength(24);
+     expect(corpus.entries.filter(({ ratifiedBy }) => ratifiedBy === "")).toHaveLength(24);
+@@ -142,6 +149,27 @@ describe("Help Corpus loader", () => {
+     expect(corpus.kbVersion).toMatch(/^[0-9a-f]{64}$/u);
+   });
+ 
++  it("admits the complete recovery component set after its separate review manifest lands", () => {
++    const directory = fileURLToPath(
++      new URL("../../packages/support-kb/content/", import.meta.url),
++    );
++    const manifestPath = fileURLToPath(
++      new URL("../../packages/support-kb/reviews/manifest.json", import.meta.url),
++    );
++    const componentPath = fileURLToPath(
++      new URL("../../packages/support-kb/recovery/components.json", import.meta.url),
++    );
++
++    const corpus = loadHelpCorpus(directory,{
++      reviewManifest: JSON.parse(readFileSync(manifestPath,"utf8")) as unknown,
++      recoveryComponents: readFileSync(componentPath),requireReviewedRecovery: true
++    });
++
++    expect(corpus.entries).toHaveLength(36);
++    expect(corpus.recoveryReviewedCount).toBe(18);
++    expect(corpus.recoveryOwnerRatifiedCount).toBe(0);
++  });
++
+   it("serves only complete bilingual pairs that are shipped and V-ratified, counting every other id as ignored", () => {
+     // Catches removal of the status, V-ratification, or bilingual completeness gates.
+     const directory = fixtureDirectory();
+diff --git a/dialectical-engine/tests/unit/support-recovery-attestation.test.ts b/dialectical-engine/tests/unit/support-recovery-attestation.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..030d4e980ee1125d1520dce7af111817ccd6491a
+--- /dev/null
++++ b/dialectical-engine/tests/unit/support-recovery-attestation.test.ts
+@@ -0,0 +1,161 @@
++import { createHash } from "node:crypto";
++import { readFileSync } from "node:fs";
++import { join } from "node:path";
++import { fileURLToPath } from "node:url";
++import { describe, expect, it } from "vitest";
++
++import {
++  createHelpCorpusSnapshotLookup,
++  loadHelpCorpus,
++} from "../../packages/support-kb/src/index.js";
++
++const sha256 = (value: string | Buffer): string =>
++  createHash("sha256").update(value).digest("hex");
++
++const corpusDirectory = fileURLToPath(
++  new URL("../../packages/support-kb/content/", import.meta.url),
++);
++const componentPath = fileURLToPath(
++  new URL("../../packages/support-kb/recovery/components.json", import.meta.url),
++);
++const manifestPath = fileURLToPath(
++  new URL("../../packages/support-kb/reviews/manifest.json", import.meta.url),
++);
++
++const REVIEW = Object.freeze({
++  reviewedBy: "SOL",
++  reviewerSession: "01a09ef7-e096-7c31-9b35-806840028cf0",
++  reviewedOn: "2026-09-15",
++  evidence:
++    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
++  ratifiedBy: "",
++  ratifiedOn: "",
++});
++
++const EXPECTED = [
++  ["account-access", "en", "17aac248d75d7ad161fba2a44068d20743a9759ae56c9b30359c7e1d5550c2e7", "c138d4ed2ecd19847cb74b1fd7ad91eb9b047369cb2a391f15563e0915ec192a", "6b5d2dcff5c21d11eae6c6a92cabea39ec253e8e54b5d890d9b25d56f9eab32d"],
++  ["account-access", "ro", "5048de52b22b474fb8185e718fcaf235cd23896eff8fd7e42f4399d5266e9410", "e3ca804d9cd657ec82e9a9f81fd2dc1299997ee59cc4a752e757cd9e67d6ef98", "47d2b4b41acc0d0ef976bab9e08e5f617303612bfeda2b969a2958d6618ad8c0"],
++  ["account-settings", "en", "2cab95047c1c34109794f3fc1ad620784bbb97b9267160d471551454d296f628", "67f5ce1fd18952c94a981f772e32e29c8c526b5591d656c202260486826a0d62", "6d99d7eeb445525b3bf3cf55f4283ee24fec536ff4f9ccc3a3b1f928904091bf"],
++  ["account-settings", "ro", "e2b2834ff96da50a0511b2647ae490f6f99af80e317a74caddb16ee8262bc5d9", "f941492f0a6bed283a0fd70aa6ffeb20304b40c5bdfdd8e01f438cf3094f08f8", "1b7be7bebd1932a4630bea3df60d016218ecedca1ef538ac14510ef66d5f2aad"],
++  ["browse-public-debates", "en", "8059a2e46af231765a80f61854752aa5a9ec49e60c95dc715eb3e82a39618fad", "c5c6d262a33abda6c4cf76024cfaa5f42c2b51f2e3242ae3ed3d3bf157ba1034", "c5294a4cae6fc88b300ec64634fbbb2531e7eef783bed814f387834804f21bb6"],
++  ["browse-public-debates", "ro", "0fb2aa501c0980af4afb52520c10e51ca0814266bd2258b1f727fa52d16e0241", "87cb63222b2a74f1c75e4d25c28e69e35de0673049d4be055f7de201459e0897", "37bd679ea02946cbdcf7948c7d1345376592335f4e8bde3b2e78adf339e0f40d"],
++  ["budget-tier-choice", "en", "a49d563ef7bfec75ed179a70adb54c25947aa9cbe4db557698eacc84d1d3c683", "e6d5adf85f44c3fd1aaa2c70d095f6f2474723a5b72393d4a006f0206fa64104", "cb920483c56311f42b1adf89c581320a4a5344dcc90028fa458ad6028867d601"],
++  ["budget-tier-choice", "ro", "e648150ae607bb98c55059eaea6162ffc2cd09df437721b75c8c7b226ef4984d", "d8648bd28c6eddb018f6508c7c1eed9e0a20941807979d42701e35e4351ea371", "1496048887bc41ba3968fdaf7d0fe17e43feffaba1f1c997f46f0b420d30652f"],
++  ["debate-topic-and-description", "en", "695b7b405e599260acd7c5a51f897f46b52b238f2860a20168cd14cfdc176bad", "290097ca24858424c4bc2a6845182a9c1cbcd0214c6a3109e2b32cf7e0bd0f56", "7234ce24457ad97fe943e93b1caf0e28a8d74e30aa1748f1d29b158cdcba67b7"],
++  ["debate-topic-and-description", "ro", "90f1fff60a4245eeda7b5131b671772b425e8ab682f967c4c31c2ad42c7207a2", "8cd97dedffdf9b059f4d809b73f60f59174007b42a7a99998989c354af93bee8", "c6470bf637f904245f4c5f468c1b33c1d43d03fa0b45d1d3ba32eb47f12840f7"],
++  ["delete-a-private-debate", "en", "7c37881f26d875f87a0177bc35593d9f52a1739b25a848df98ad2d478c7bdb26", "9ae0d23732c129d4b3e3e06b4c81833a5546b214506ecc53c3b531b4856dc49c", "92409ee15ce6ed5f380136ab090d3ce2a82ee355e379e7d068609baf9e92365b"],
++  ["delete-a-private-debate", "ro", "afc631bec586e463df1b217d79fc9ea694f873f5690b028c7b79aa65d83cfaa9", "1f4b3b1719c76d8223159dd73049c47761dd4fd6482103d40cf31d53fd2b54a3", "46037245889b3c11b737e40222ce1c6d1b800020a92ee4e92725ad03d8338727"],
++  ["export-json", "en", "c31c5bd3a2eb80e1352f27431e459f8272ae37605a9988210cff2aa82d6b7ea5", "690569195ed4098fd00b5bf102658f9bd26b2610897ca816163f8abb2a47946d", "6abec339af9fc96715c8964a17341461db4042701acb1f54e1e9deea37421afb"],
++  ["export-json", "ro", "5016b1370fbbd83ed2e647cfdeb8a2c10b4052ef8861807abed2ee4b0ae8f02b", "70c63bd09f0577e45c6c20ab542013cf6caba0e2f0290782f4d6589ef868720f", "78dc48a23f8a2de1e4af205d26f1d743a9000ed2c375437b0cfe2acb66d82cd3"],
++  ["getting-started-debate", "en", "a438b7c7a91342dee7c5edb2efe48e586be2cc33d9a2eafabaadad2882f6f9e8", "059900a11c6ec871145ee61e4aaca7214c76c02e8dab61dbec67eb08e6a3017e", "c844161c3430edcfb0a195df7ffff6bcf82c0826ab454bf817631933649bed48"],
++  ["getting-started-debate", "ro", "f2a848dbaa9131d3165f50ce2004f1fba874032a48d7bdf1ba90f96c8aa205af", "23c930ba398c6bdf4c119b30bae509946ca8a483c9b0cb18e9ac6bd238220d80", "ef982f6420391eeaaf23c475afb230fcee91afc2183c4b945403283802d09e8a"],
++  ["guide-how-it-works", "en", "05316f05e559cd866948ab7f464a681d6875fe8aad5143e956eeb20077bc46c5", "758085d81051393bd3520c43c84a23689a652c5dc6b15e0154a46a1fcf7cd528", "c1ed3a89b00d46ac7f1710280ef768f9d66adec20d20aaa18815596e6a5c2265"],
++  ["guide-how-it-works", "ro", "94acc4db2ccecb9a0d4f5b82350e91d26643b76c6caff879019edc107a3e3000", "65482fb1f90d62942b4e6f87a289c151978250fb385efc10d12c8e239780c195", "cb344a791adc4616c177c993b4f186595725f6ea3de8b1f95fcd8a6f0ff07ed8"],
++  ["privacy-consent", "en", "54cca7dbfb790c9d6aac077b00775e5ac6d5bc277be38733e92047bc63c262d5", "5de30c60b097bc464f12d9aef13fbc67e0c15c6d5aa4ca1a91f82fe77fc394ae", "419fbdd08f1d581b9484d6df1cb6b63077aef93ab627b9ab87c0c6054ce66d49"],
++  ["privacy-consent", "ro", "e9b04331a2aa76d3ed9bd45c2199263dc476ae62d15c33db30ed537fedeb5c5d", "7db208bec972f230adaddf05162305126e6aeeb431fd66bad468886e2c62710e", "940316e6b1a66598baa91183116c92477be57df65885dc22b1ce4954393e11f6"],
++  ["public-answer-disclosure", "en", "e67c271558e6bb5b4100fa735059e781e453c268808d555c6e85af36e3e678ea", "1ee826de541e74d701fd502bfe70e85c009da2b94d3e6d38c1fc98924f251670", "9c733e8f40697f0cd9f15f5984947edaff532a10bc3375d10ca94747e10cc569"],
++  ["public-answer-disclosure", "ro", "6e845c95414ae5b9190cf5917136776d7af931eaf626b2da4a0540b3bf7925f1", "4ee30438ed6e75bb79f2e458bb78a6e8e8b79d3271e59c372dff626ce23a3819", "903906d5fc6d89668a42a2108cf30e21b1ec166a9fdce9e7aeff1bf4882fa45d"],
++  ["publish-a-debate", "en", "9385f0dd00f8014e3445d1ee4c8c5230dc12d0379766d35c9c7845814f288e29", "83119e6803f854c04ad0153b55cc69212563a92f6b7e350ef29f656ff6c90a3c", "b2974fdf83f15e7142380698b7b21a95bd9efe7cbcfaa5d07028f292bcfd53ef"],
++  ["publish-a-debate", "ro", "41858b13ebb6bcec19430b6a63cae6f5854b25ad02e8ac74617d83b087355c3c", "834ec781e6645753549cfca72d8d7bdc70ecb425f1eba125b25c5e04410ea598", "a6f1ef4a94b53df2d77fdd63a14c3f596adaac6b437ab3586424d21815284b26"],
++  ["risk-tier-choice", "en", "3ca67a93a3b159c0b284b2bd75093fd9bc70e20d03c357f4ac1fdcb3df522715", "37a5e399d53e5c284febfd79f40fe36bfc611eddb254ccb9a758469e66557929", "7908d0b36c5c62a863ee064095bc3f528792d9588fba9f88c523ea978dffb7f2"],
++  ["risk-tier-choice", "ro", "f40e8583d9ec012f6510c4f6ae6a6527680bc279f393388dc8cd2a31762f4d96", "0845807a9ba9cc68c608a5be752fdbaa08147fe8aed5a06a61021bb91675a34a", "d35f24c30f5998d0a8945f6efdd97cbebf45c0612b6181ff47c48c81951b02ab"],
++  ["support-cases", "en", "96ea24b2aff54d46beeb25cec255041f335e93c52590829ad64f53ad62fe9aa2", "7560677362565332479dbe8c16b0e4035278a077512c7eeffdb3bbaa4ba0b76d", "bfc3f07ee653c9d9e798fd8468f1bf658a3ef29e72aef75ba93c348c96a50948"],
++  ["support-cases", "ro", "2346f0b14cfd3ac25ccd609d8268809da9975dc2079179778e10df3da7f88aac", "e993e92c67a698c504f3b6bac0eceeb4e47afb56ba02bd10f5c3c5d00274b10c", "dec984e5c9ae5fcf5e0ab7d575aef01339b9300ca42bce94950ab3a39d13ee82"],
++  ["support-status-limits", "en", "7f111d034af0d6ba0765c9bf008d6d8981f8a589e1731695e9bbf7d5f213f15f", "0f18f40c0d5b2985ce4db08f0c8c7555c7a4b235ab86032172913c6ca362ab89", "0dae00645b03d17b120a79cc212696648a9dd76f3f86a2cbab26db710f618534"],
++  ["support-status-limits", "ro", "884956c2b04303c8412a4859746a526d5577e9392e2066843aa977500857511f", "d4163c89dd29974c170da40e39c0f1d34849ac8acec08aa7413d439a0f7dcfbd", "df43c7cccd6017dc7890ba24ceb4255620a3927ca066879fc017f1e508638bb1"],
++  ["unpublish-a-debate", "en", "70e53322f323778974e50ca4f4342a4e8cba5c41d5139d51452530a40c7563a2", "64f871c823dd78f05d18f50ec45373fa07a9ad79f72b4234c8adc9aae443db0b", "db2b5340f4c9089567e0c8b4559cc9ac4749039b91bd3a8b2fbbd5c799991c1f"],
++  ["unpublish-a-debate", "ro", "a741f94571245aadbb6f25d6da5c3c5b87bdf5bf72fa4c5aaf8e03980abce9d0", "9be645d5de8cd8f8c26603966f9e9b8f3d58b7cb7c8a95e9cb7b0fd71289fe25", "b8e1ec1cf886a71658412f2b4bcfdb0dd8c91cd424c94aad3df4c377ecd2af7f"],
++  ["unsupported-capabilities", "en", "6e7f19d6d7c00fe4d10660e4dff7ad52e16ae8ff3d85cea13717780af586ec6f", "784bf45291c975c87dd6bb1a11f5b1812ecbefc7f0f52ee5cfb66dbdb4f6e9bd", "4feec8aa3b78a1d52916a3484adce247fb94a68b2107c1d5816fdc9c29e7f41f"],
++  ["unsupported-capabilities", "ro", "c07bb1a6a85f14a034a134a08250f22721f772ce54bd77d18ff63f7df93d350b", "c9865d48ace58951f1c0c5bf85cd99b50dd6985d276fdeff7d4094e060c9acb5", "48de85c1329b80861e5bc5a7d1e2ce2dee433ec1f7bfd67ce0cd4596644702d2"],
++  ["view-public-debate", "en", "995068c814cec3ba1dd0f0ecf320bea04fc8c66acc9703b8cd70cec72cfca053", "c0185e375681e9d609b041f1e7fbbc1e33bd4c4c6489a3ea715fd52797ba35ab", "6d06676fd87b3c96b5194ea459eec98846f322ef28a7890a1261667a37f71ac5"],
++  ["view-public-debate", "ro", "9faf157365acb8b560208eb822cda7cd42c83e845d2a551853ea5c97ccf9c260", "b084890fbed2cc9e663966f07ddeff0be6c3bef33bbfb9edfb6b8f38d579df40", "a69efa62f629372892e35d12f5d258c93409e4ca585205c7616bb637e01e7de6"],
++] as const;
++
++describe("production Support recovery attestation", () => {
++  it("admits the exact separately reviewed 36-record corpus as a deterministic immutable snapshot", () => {
++    const componentBytes = readFileSync(componentPath);
++    const components = JSON.parse(componentBytes.toString("utf8")) as {
++      components: Array<{
++        id: string;
++        lang: "en" | "ro";
++        articleSha256: string;
++        modelProjection: string;
++        fallback: string;
++      }>;
++    };
++    const reviewManifest = JSON.parse(readFileSync(manifestPath, "utf8")) as unknown;
++
++    const corpus = loadHelpCorpus(corpusDirectory, {
++      reviewManifest,
++      recoveryComponents: componentBytes,
++      requireReviewedRecovery: true,
++    });
++
++    const expectedRows = EXPECTED.map(
++      ([id, lang, articleSha256, modelProjectionSha256, fallbackSha256]) => ({
++        id,
++        lang,
++        articleSha256,
++        modelProjectionSha256,
++        fallbackSha256,
++        ...REVIEW,
++      }),
++    );
++    expect(corpus.reviewManifest).toMatchObject({
++      schemaVersion: 2,
++      recovery: {
++        componentFileSha256:
++          "5ee8d592c3f1b3550c1f2af74c030fbbc12e80e258dc71b57aa28de045f99e8a",
++        components: expectedRows,
++      },
++    });
++    expect(corpus.reviewManifest.articles).toHaveLength(24);
++    expect(corpus.entries.map(({ id, lang }) => `${id}.${lang}`)).toEqual(
++      EXPECTED.map(([id, lang]) => `${id}.${lang}`),
++    );
++    expect(corpus).toMatchObject({
++      shippedCount: 18,
++      ignoredCount: 0,
++      previewReviewedCount: 12,
++      ownerRatifiedCount: 6,
++      recoveryReviewedCount: 18,
++      recoveryOwnerRatifiedCount: 0,
++    });
++
++    for (const [index, expected] of EXPECTED.entries()) {
++      const [id, lang, articleSha256, modelProjectionSha256, fallbackSha256] = expected;
++      const component = components.components[index];
++      const entry = corpus.entries[index];
++      expect(component).toMatchObject({ id, lang, articleSha256 });
++      expect(entry).toMatchObject({
++        id,
++        lang,
++        modelProjection: component?.modelProjection,
++        fallback: component?.fallback,
++        recoveryReview: expectedRows[index],
++      });
++      expect(sha256(readFileSync(join(corpusDirectory, `${id}.${lang}.md`)))).toBe(articleSha256);
++      expect(sha256(component?.modelProjection ?? "")).toBe(modelProjectionSha256);
++      expect(sha256(component?.fallback ?? "")).toBe(fallbackSha256);
++      expect(Object.isFrozen(entry)).toBe(true);
++      expect(Object.isFrozen(entry?.recoveryReview)).toBe(true);
++    }
++
++    const repeated = loadHelpCorpus(corpusDirectory, {
++      reviewManifest,
++      recoveryComponents: componentBytes,
++      requireReviewedRecovery: true,
++    });
++    const lookup = createHelpCorpusSnapshotLookup(corpus);
++    expect(repeated.kbVersion).toBe(corpus.kbVersion);
++    expect(repeated.manifest).toBe(corpus.manifest);
++    expect(lookup.currentVersion).toBe(corpus.kbVersion);
++    expect(lookup.get(corpus.kbVersion)).toBe(corpus);
++    expect(lookup.get("0".repeat(64))).toBeUndefined();
++    expect(Object.isFrozen(corpus)).toBe(true);
++    expect(Object.isFrozen(corpus.entries)).toBe(true);
++    expect(Object.isFrozen(corpus.reviewManifest)).toBe(true);
++    expect(Object.isFrozen(corpus.reviewManifest.recovery)).toBe(true);
++    expect(Object.isFrozen(corpus.reviewManifest.recovery?.components)).toBe(true);
++  });
++});
+diff --git a/dialectical-engine/tests/unit/support-recovery-components.test.ts b/dialectical-engine/tests/unit/support-recovery-components.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..672bb935cf60b18f0fa3cd6dbba04347647ce8ca
+--- /dev/null
++++ b/dialectical-engine/tests/unit/support-recovery-components.test.ts
+@@ -0,0 +1,129 @@
++import { createHash } from "node:crypto";
++import { mkdtempSync,rmSync,writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { afterEach,describe,expect,it } from "vitest";
++
++import { loadHelpCorpus } from "../../packages/support-kb/src/index.js";
++import { SUPPORT_CATALOG_CANONICAL } from "../../packages/support-kb/src/catalog.js";
++
++const directories: string[] = [];
++const sha256 = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
++
++function fixture() {
++  const directory = mkdtempSync(join(tmpdir(),"support-recovery-"));
++  directories.push(directory);
++  const articles = [
++    { id: "alpha-guide",lang: "en" as const,title: "Alpha guide",body: "Raw EN body with /private/route." },
++    { id: "alpha-guide",lang: "ro" as const,title: "Ghid alfa",body: "Corp RO brut cu /ruta/privata." }
++  ];
++  const articleHashes = new Map<string,string>();
++  for (const article of articles) {
++    const bytes = [
++      "---",`id: ${article.id}`,`lang: ${article.lang}`,`title: ${article.title}`,"status: shipped",
++      "sources:","  - fixture.ts:1","verified_against: fixture","ratified_by: V",
++      "ratified_on: 2026-09-01","---","",article.body,""
++    ].join("\n");
++    writeFileSync(join(directory,`${article.id}.${article.lang}.md`),bytes);
++    articleHashes.set(`${article.id}.${article.lang}`,sha256(bytes));
++  }
++  const components = {
++    schemaVersion: 1,
++    components: articles.map((article) => ({
++      id: article.id,lang: article.lang,articleSha256: articleHashes.get(`${article.id}.${article.lang}`)!,
++      modelProjection: article.lang === "en"
++        ? "The reviewed English facts remain complete." : "Faptele românești verificate rămân complete.",
++      fallback: article.lang === "en"
++        ? "Use the reviewed Alpha guidance." : "Folosește îndrumarea Alfa verificată."
++    }))
++  };
++  const componentBytes = Buffer.from(`${JSON.stringify(components,null,2)}\n`);
++  const reviewManifest = {
++    schemaVersion: 2,
++    catalog: {
++      sha256: sha256(SUPPORT_CATALOG_CANONICAL),reviewedBy: "SOL",reviewerSession: "/fixture/editor",
++      reviewedOn: "2026-09-14",evidence: "/fixture/catalog-review.md"
++    },
++    articles: [],
++    recovery: {
++      componentFileSha256: sha256(componentBytes),
++      components: components.components.map((component) => ({
++        id: component.id,lang: component.lang,articleSha256: component.articleSha256,
++        modelProjectionSha256: sha256(component.modelProjection),fallbackSha256: sha256(component.fallback),
++        reviewedBy: "SOL",reviewerSession: "/fixture/editor",reviewedOn: "2026-09-14",
++        evidence: "/fixture/recovery-review.md",ratifiedBy: "",ratifiedOn: ""
++      }))
++    }
++  };
++  return { directory,componentBytes,reviewManifest };
++}
++
++afterEach(() => {
++  for (const directory of directories.splice(0)) rmSync(directory,{ recursive: true,force: true });
++});
++
++describe("reviewed Support recovery components", () => {
++  it("admits a complete exact-hash bilingual component set into an immutable snapshot", () => {
++    const data = fixture();
++    const corpus = loadHelpCorpus(data.directory,{
++      reviewManifest: data.reviewManifest,recoveryComponents: data.componentBytes,
++      requireReviewedRecovery: true
++    } as never);
++
++    expect(corpus.entries).toHaveLength(2);
++    expect(corpus.entries.map(({ modelProjection }) => modelProjection)).toEqual([
++      "The reviewed English facts remain complete.","Faptele românești verificate rămân complete."
++    ]);
++    expect(corpus.recoveryReviewedCount).toBe(1);
++    expect(corpus.recoveryOwnerRatifiedCount).toBe(0);
++    expect(Object.isFrozen(corpus.entries[0])).toBe(true);
++    expect(Object.isFrozen(corpus.entries)).toBe(true);
++  });
++
++  it("fails strict loading when recovery review is missing, malformed, stale, or tampered", () => {
++    const data = fixture();
++    const excluded = loadHelpCorpus(data.directory,{
++      recoveryComponents: data.componentBytes
++    });
++    expect(excluded.entries).toEqual([]);
++    expect(excluded.recoveryReviewedCount).toBe(0);
++    expect(() => loadHelpCorpus(data.directory,{
++      recoveryComponents: data.componentBytes,requireReviewedRecovery: true
++    } as never)).toThrowError(expect.objectContaining({ code: "SUPPORT_KB_RECOVERY_REVIEW_REQUIRED" }));
++
++    const stale = structuredClone(data.reviewManifest);
++    stale.recovery.components[0]!.fallbackSha256 = "f".repeat(64);
++    expect(() => loadHelpCorpus(data.directory,{
++      reviewManifest: stale,recoveryComponents: data.componentBytes,
++      requireReviewedRecovery: true
++    } as never)).toThrowError(expect.objectContaining({ code: "SUPPORT_KB_RECOVERY_REVIEW_INVALID" }));
++
++    const tampered = Buffer.from(data.componentBytes);
++    tampered[tampered.length - 2] = 0x20;
++    expect(() => loadHelpCorpus(data.directory,{
++      reviewManifest: data.reviewManifest,recoveryComponents: tampered,
++      requireReviewedRecovery: true
++    } as never)).toThrowError(expect.objectContaining({
++      code: "SUPPORT_KB_RECOVERY_COMPONENT_INVALID"
++    }));
++  });
++
++  it("changes snapshot identity when exact admitted component bytes change", () => {
++    const first = fixture();
++    const corpusA = loadHelpCorpus(first.directory,{
++      reviewManifest: first.reviewManifest,recoveryComponents: first.componentBytes,
++      requireReviewedRecovery: true
++    } as never);
++    const document = JSON.parse(first.componentBytes.toString("utf8"));
++    document.components[0].fallback = "Use the amended reviewed Alpha guidance.";
++    const bytes = Buffer.from(`${JSON.stringify(document,null,2)}\n`);
++    const review = structuredClone(first.reviewManifest);
++    review.recovery.componentFileSha256 = sha256(bytes);
++    review.recovery.components[0]!.fallbackSha256 = sha256(document.components[0].fallback);
++    const corpusB = loadHelpCorpus(first.directory,{
++      reviewManifest: review,recoveryComponents: bytes,
++      requireReviewedRecovery: true
++    } as never);
++    expect(corpusB.kbVersion).not.toBe(corpusA.kbVersion);
++  });
++});
+diff --git a/dialectical-engine/tests/unit/support-redaction.test.ts b/dialectical-engine/tests/unit/support-redaction.test.ts
+index d11fb4bfd819b92b09a31c8b09a965a950bfda74..1b7bba13a5737308cb98e029e28db5f693d79c55 100644
+--- a/dialectical-engine/tests/unit/support-redaction.test.ts
++++ b/dialectical-engine/tests/unit/support-redaction.test.ts
+@@ -40,6 +40,17 @@ describe("CP1 Support credential redaction", () => {
+     expect(result.text).toContain("[REDACTED_SECRET_LIKE]");
+   });
+ 
++  it.each([
++    ['My recovery code is "inert amber fern',"inert amber fern"],
++    ["My password is amber birch cedar dogwood elm fir grove hazel; keep it private.","amber birch cedar dogwood elm fir grove hazel"],
++    ["My reset token is inert.alpha-beta/gamma; keep it private.","inert.alpha-beta/gamma"]
++  ])("removes the complete supplied value through a safe delimiter or end: %s", (text,secret) => {
++    const result = redactSupportText(text);
++    expect(result.redacted).toBe(true);
++    expect(result.text).not.toContain(secret);
++    expect(result.text).toContain("[REDACTED_SECRET_LIKE]");
++  });
++
+   it("stops an unquoted value at a declared coordinator without consuming benign prose", () => {
+     const result = redactSupportText("My password is inert horse battery and I need help.");
+     expect(result.text).toBe("My password is [REDACTED_SECRET_LIKE] and I need help.");
+diff --git a/dialectical-engine/tests/unit/support-response-policy.test.ts b/dialectical-engine/tests/unit/support-response-policy.test.ts
+index 44eff8ca5996c39c40095a7594e6b6fc194d07a4..1395e9ac3abea1a141dada32622ac4e168c08344 100644
+--- a/dialectical-engine/tests/unit/support-response-policy.test.ts
++++ b/dialectical-engine/tests/unit/support-response-policy.test.ts
+@@ -6,7 +6,7 @@ import {
+   projectSupportDraftReport,
+   validateSupportDraft
+ } from "../../apps/api/src/support/response-policy.js";
+-import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
++import { SUPPORT_ACTION_CATALOG,SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
+ 
+ function raw(text: string, overrides: Readonly<Record<string,unknown>> = {}): string {
+   return JSON.stringify({
+@@ -157,6 +157,35 @@ describe("CP1 support model response policy", () => {
+       .toMatch(/^TEXT_(?:SECRET_LIKE|CREDENTIAL_OR_SECURITY_ACTION)$/u);
+   });
+ 
++  it.each([
++    "Support does not receive passwords and may receive them.",
++    "Support cannot accept a security code, but it could validate it.",
++    "Asistența nu primește parole și poate primi acestea.",
++    "Asistența nu verifică un cod de securitate, dar ar putea să îl primească."
++  ])("rejects a positive credential operation in a new modal group: %s", (text) => {
++    expect(parseSupportDraft(raw(text,{ actionIds: [] }))).toBeNull();
++  });
++
++  it.each([
++    "Support cannot receive passwords. You can change this display name in Settings.",
++    "Support cannot accept recovery codes. You may edit that profile name in Settings.",
++    "Asistența nu primește parole. Poți schimba acest nume afișat în Setări."
++  ])("keeps an explicit noncredential object independent from an older credential: %s", (text) => {
++    expect(parseSupportDraft(raw(text,{ actionIds: [] }))).not.toBeNull();
++  });
++
++  it("keeps all current human labels neutral in factual framing", () => {
++    const labels = [
++      ...SUPPORT_ACTION_CATALOG.flatMap(({ labels }) => [labels.en,labels.ro]),
++      ...SUPPORT_CAPABILITIES.flatMap(({ labels }) => [labels.en,labels.ro])
++    ];
++    expect(labels).toHaveLength(52);
++    for (const label of labels) {
++      expect(parseSupportDraft(raw(`Available feature: ${label}.`,{ actionIds: [] })),label)
++        .not.toBeNull();
++    }
++  });
++
+   it.each([
+     ["action","Select start-debate to continue.",["getting-started-debate"]],
+     ["capability","Use owner-debate to export.",["export-json"]],
+@@ -212,6 +241,12 @@ describe("CP1 support model response policy", () => {
+     ["deeper encoded path", raw("Open %2525252Fsettings")],
+     ["malformed structural escape", raw("Open https%3")],
+     ["path instruction", raw("Go to /settings to continue")],
++    ["root backslash", raw("Open \\settings to continue")],
++    ["relative forward path", raw("Open ../settings to continue")],
++    ["relative backslash path", raw("Open ..\\settings to continue")],
++    ["drive path", raw("Open C:\\settings to continue")],
++    ["UNC path", raw("Open \\\\host\\share to continue")],
++    ["encoded backslash", raw("Open %5Csettings to continue")],
+     ["Markdown link", raw("Use [this link](/new)")],
+     ["HTML", raw("Choose <a href='/new'>Start</a>")],
+     ["credential request", raw("Type your password here so I can check it")],
+diff --git a/dialectical-engine/tests/unit/support-text-views.test.ts b/dialectical-engine/tests/unit/support-text-views.test.ts
+index ca00d6f86d014327d120948f089f2306b4e366e0..353cdfc8371177be36867406c5d726552b494b8e 100644
+--- a/dialectical-engine/tests/unit/support-text-views.test.ts
++++ b/dialectical-engine/tests/unit/support-text-views.test.ts
+@@ -1,6 +1,8 @@
+ import { describe,expect,it } from "vitest";
+ 
+-import { canonicalSupportTextViews } from "../../packages/kernel/src/support-text-views.js";
++import {
++  canonicalSupportTextViews,supportTextHasUnsafePath
++} from "../../packages/kernel/src/support-text-views.js";
+ 
+ describe("CP1 bounded canonical Support text views", () => {
+   it.each([
+@@ -29,4 +31,19 @@ describe("CP1 bounded canonical Support text views", () => {
+       expect(canonicalSupportTextViews(input)).toMatchObject({ unsafeEncoding: false });
+     }
+   );
++
++  it.each([
++    "/settings","../settings",".\\settings","C:\\Users\\visitor\\secret.txt",
++    "\\\\server\\share\\secret.txt","%2Fsettings","..%2Fsettings"
++  ])("recognizes every canonical filesystem and route path form: %s",(input) => {
++    expect(supportTextHasUnsafePath(input)).toBe(true);
++  });
++
++  it.each([
++    "Progress is 50% complete.",
++    "Choose Settings from the account page.",
++    "The ratio is 3/4 when four observations are available."
++  ])("does not classify ordinary prose as a path: %s",(input) => {
++    expect(supportTextHasUnsafePath(input)).toBe(false);
++  });
+ });

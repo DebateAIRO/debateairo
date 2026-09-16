@@ -1,0 +1,19 @@
+5cbfc6d483aae0f56eabfdee00a6829e09e76c3d
+dialectical-engine/tests/integration/support-degraded.test.ts
+non_test_diff_rc=0
+diff --git a/dialectical-engine/tests/integration/support-degraded.test.ts b/dialectical-engine/tests/integration/support-degraded.test.ts
+index 6eda1d6c..a570ce19 100644
+--- a/dialectical-engine/tests/integration/support-degraded.test.ts
++++ b/dialectical-engine/tests/integration/support-degraded.test.ts
+@@ -23,9 +23,10 @@ function messages() {
+ const ENTRY = Object.freeze({
+   id: "getting-started-debate",lang: "en" as const,title: "Start a debate",
+   status: "shipped" as const,sources: ["test"],verifiedAgainst: "test",
+   ratifiedBy: "V" as const,ratifiedOn: "2026-09-01",
+-  body: "Open the new debate page to start your first debate."
++  body: "Open the new debate page to start your first debate.",
++  modelProjection: "Open the new debate page to start your first debate."
+ });
+ 
+ describe("SUP-06 automatic degraded state", () => {
+   it("treats a screened model draft as successful relay transport", async () => {
