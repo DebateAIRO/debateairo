@@ -366,7 +366,18 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
       TEST_DEVELOPMENT_PROVIDER_PANEL
     );
     expect(historicalRows).toHaveLength(14);
-    expect(developmentRows).toHaveLength(47);
+    // W10/3 x T16: 47 -> 49. The development deployment now seals the two
+    // synthesis-role cost rows `synthesizerCallBound` and `evaluatorCallBound`
+    // (migrations/0064_synthesis_role_cost_rows.sql, minted through T16's
+    // mechanism in `buildAlgorithmRegisterRows`), and this pin counts the rows
+    // the publication port actually emits. MEASURED, not inferred: the port
+    // emits 49 with no duplicate keys, and 47 with exactly those two keys
+    // removed — so the two W10 rows are the whole delta and nothing else moved.
+    //
+    // The three neighbouring counts are deliberately UNCHANGED: `historicalRows`
+    // is the bootstrap set and `readLegacyDevelopmentV4Rows` an on-disk legacy
+    // snapshot, neither of which a new deployment row can reach.
+    expect(developmentRows).toHaveLength(49);
     expect(await readLegacyDevelopmentV4Rows()).toHaveLength(32);
     expect(computeRegisterSnapshotSha256(historicalRows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);
     expect(computeRegisterSnapshotSha256(await readLegacyDevelopmentV4Rows()))
