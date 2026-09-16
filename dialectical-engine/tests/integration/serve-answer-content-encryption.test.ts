@@ -104,10 +104,19 @@ async function createLegacyRun(questionLine: string, legacyAskerId: string): Pro
   );
 }
 
-/** Persists one SERVED verdict through the production serve write path. */
-async function persistVerdict(runId: string, answerForm: AnswerForm, segmentText: string): Promise<string> {
+/**
+ * Persists one SERVED verdict through the production serve write path. With
+ * `supersedes`, it takes DR-184's append path instead: the SAME answer id and
+ * work item, one version higher.
+ */
+async function persistVerdict(
+  runId: string,
+  answerForm: AnswerForm,
+  segmentText: string,
+  supersedes?: { readonly answerId: string; readonly workItemId: string }
+): Promise<string> {
   const work = new WorkItemRepository(database.pool);
-  const workItemId = await work.enqueue({
+  const workItemId = supersedes?.workItemId ?? await work.enqueue({
     runId,
     batteryRowId: "Q1",
     nodeSet: [],
@@ -199,9 +208,13 @@ async function persistVerdict(runId: string, answerForm: AnswerForm, segmentText
     compositionRawArtifactRef: compositionArtifactId,
     compositionAttempt: 1,
     conformanceRawArtifactRefs: [compositionArtifactId],
-    servedNumber: null
+    servedNumber: null,
+    ...(supersedes === undefined ? {} : { supersedes: { answerId: supersedes.answerId } })
   });
-  await work.settle({ workItemId, attemptId: randomUUID(), artifactRef: persisted.answerId });
+  // The work item is settled once, on the answer id both versions share.
+  if (supersedes === undefined) {
+    await work.settle({ workItemId, attemptId: randomUUID(), artifactRef: persisted.answerId });
+  }
   return persisted.answerId;
 }
 
@@ -314,13 +327,20 @@ describe("serve.answer verdict text is an encrypted content carrier (L5-F2)", ()
     });
 
     // 4. A direct plaintext write for an encrypted run is refused by the DB guard.
+    //    The copy drops the carrier columns so this probe is on the PLAINTEXT
+    //    guard alone: since F3 the envelope is sealed under
+    //    (answer_id, answer_version), so a copy that keeps them and bumps the
+    //    version is refused one trigger earlier, by the attestation guard
+    //    (CONTENT_ATTESTATION_INVALID) — that arm is proved in its own case.
     await expect(database.pool.query(
       `INSERT INTO serve.answer
        SELECT (jsonb_populate_record(NULL::serve.answer, to_jsonb(source)
          || jsonb_build_object(
               'answer_version', source.answer_version + 1,
               'answer_form', $2::jsonb,
-              'sealed_at_seq', ledger.allocate_sequence()
+              'sealed_at_seq', ledger.allocate_sequence(),
+              'content_ciphertext', NULL,
+              'content_attestation', NULL
             ))).*
        FROM serve.answer AS source
        WHERE source.answer_id=$1
@@ -354,7 +374,10 @@ describe("serve.answer verdict text is an encrypted content carrier (L5-F2)", ()
     // 6. Shred the run key: the stored envelope is unrecoverable and the
     //    projection fails closed, while the legacy row is still readable.
     await cipher.destroyRunKey(runId);
-    await expect(cipher.decrypt(runId, "serve.answer", answerId, envelope as never))
+    // F3: the owner ref carries the version. Here the key is already gone, so
+    // the refusal is about the key, not the ref — the ref is written the real
+    // way so this line does not become the one place that still says otherwise.
+    await expect(cipher.decrypt(runId, "serve.answer", `${answerId}:1`, envelope as never))
       .rejects.toThrow("RUN_CONTENT_KEY_UNRESOLVED");
     await expect(serve.readAnswerProjection(answerId, { ownerRef, legacyAskerId: null }))
       .rejects.toThrow("RUN_CONTENT_KEY_UNRESOLVED");
@@ -363,6 +386,102 @@ describe("serve.answer verdict text is an encrypted content carrier (L5-F2)", ()
     expect(afterShred.answer_form).toEqual(CONTENT_JSON_SENTINEL);
     await expect(serve.readAnswerProjection(legacyAnswerId, { ownerRef: null, legacyAskerId }))
       .resolves.toMatchObject({ answer_form: { kind: "VERDICT", text: legacyVerdict } });
+  }, 120_000);
+
+  // FIX ROUND 1 / F3 (D26 open point (2)). serve.answer is the only VERSIONED
+  // carrier — its key is (answer_id, answer_version) and DR-184 appends new
+  // versions under the same id. Binding the envelope to the id alone therefore
+  // binds it to a SET of rows, not to a row: version n's envelope, copied into
+  // version m's row, verifies and is served as version m. Every other carrier
+  // is keyed by the id the envelope is bound to, so this table is the whole
+  // class. The property: an envelope written for (answer_id, version n) is not
+  // readable as any other version of the same answer.
+  it("does not serve one version's envelope as another version of the same answer", async () => {
+    const marker = randomUUID();
+    const firstText = `B21_VERSION_ONE_VERDICT_${marker}`;
+    const secondText = `B21_VERSION_TWO_VERDICT_${marker}`;
+    const runId = await createEncryptedRun(`b21 versioned question ${marker}`);
+    const serve = new ServeRepository(database.pool);
+
+    const answerId = await persistVerdict(
+      runId, { kind: "VERDICT", text: firstText }, `b21-v1-segment-${marker}`
+    );
+    const owner = await database.pool.query<{ work_item_id: string }>(
+      `SELECT work_item_id FROM serve.answer WHERE answer_id=$1
+       ORDER BY answer_version DESC LIMIT 1`,
+      [answerId]
+    );
+    const superseded = await persistVerdict(
+      runId, { kind: "VERDICT", text: secondText }, `b21-v2-segment-${marker}`,
+      { answerId, workItemId: owner.rows[0]!.work_item_id }
+    );
+    expect(superseded).toBe(answerId);
+    const versions = await database.pool.query<{ answer_version: number }>(
+      "SELECT answer_version FROM serve.answer WHERE answer_id=$1 ORDER BY answer_version",
+      [answerId]
+    );
+    expect(versions.rows.map((row) => Number(row.answer_version))).toEqual([1, 2]);
+
+    // Both versions read back as themselves before anything is tampered with.
+    await expect(serve.readAnswerProjection(answerId, { ownerRef, legacyAskerId: null }, 1))
+      .resolves.toMatchObject({ answer_form: { kind: "VERDICT", text: firstText } });
+    await expect(serve.readAnswerProjection(answerId, { ownerRef, legacyAskerId: null }, 2))
+      .resolves.toMatchObject({ answer_form: { kind: "VERDICT", text: secondText } });
+
+    // MEASURED, and it is not what the review's recipe assumed: serve.answer
+    // cannot be UPDATEd at all. migrations/0000_s00.sql:310 revokes UPDATE and
+    // DELETE on it from PUBLIC and debateai_runtime, and :314-332 puts a
+    // `reject_mutation` BEFORE UPDATE OR DELETE trigger on it, so an in-place
+    // swap of one version's carrier columns for another's raises
+    // `append-only or immutable table answer rejects UPDATE` before any guard
+    // of ours is consulted. The reachable attack on a versioned carrier is
+    // therefore the forged PROMOTION: append a NEW version row that carries an
+    // OLDER version's envelope and attestation. That is what must be refused.
+    await expect(database.pool.query(
+      `UPDATE serve.answer SET content_ciphertext=NULL WHERE answer_id=$1`,
+      [answerId]
+    )).rejects.toThrow("append-only or immutable table answer rejects UPDATE");
+
+    const promoted = database.pool.query(
+      `INSERT INTO serve.answer
+       SELECT (jsonb_populate_record(NULL::serve.answer, to_jsonb(source)
+         || jsonb_build_object(
+              'answer_version', 3,
+              'sealed_at_seq', ledger.allocate_sequence()
+            ))).*
+       FROM serve.answer AS source
+       WHERE source.answer_id=$1 AND source.answer_version=1`,
+      [answerId]
+    );
+    await expect(promoted).rejects.toThrow("CONTENT_ATTESTATION_INVALID");
+    const stillTwo = await database.pool.query<{ answer_version: number }>(
+      "SELECT answer_version FROM serve.answer WHERE answer_id=$1 ORDER BY answer_version",
+      [answerId]
+    );
+    expect(stillTwo.rows.map((row) => Number(row.answer_version))).toEqual([1, 2]);
+
+    // The same binding, one layer lower: the AEAD itself refuses version 1's
+    // envelope under any other version's owner ref. The `${id}:${version}`
+    // shape is the mechanism — 0063's attestation guard derives the identical
+    // string in SQL, so this line and that arm move together or every INSERT
+    // fails with CONTENT_ATTESTATION_INVALID.
+    const firstEnvelope = (await database.pool.query<{ content_ciphertext: unknown }>(
+      "SELECT content_ciphertext FROM serve.answer WHERE answer_id=$1 AND answer_version=1",
+      [answerId]
+    )).rows[0]!.content_ciphertext;
+    await expect(cipher.decrypt(runId, "serve.answer", `${answerId}:1`, firstEnvelope as never))
+      .resolves.toMatchObject({ answerForm: { kind: "VERDICT", text: firstText } });
+    for (const wrongVersion of [2, 3]) {
+      await expect(cipher.decrypt(
+        runId, "serve.answer", `${answerId}:${wrongVersion}`, firstEnvelope as never
+      )).rejects.toThrow("CRYPTO_AUTHENTICATION_FAILED");
+    }
+
+    // Both versions still read back as themselves.
+    await expect(serve.readAnswerProjection(answerId, { ownerRef, legacyAskerId: null }, 1))
+      .resolves.toMatchObject({ answer_form: { kind: "VERDICT", text: firstText } });
+    await expect(serve.readAnswerProjection(answerId, { ownerRef, legacyAskerId: null }, 2))
+      .resolves.toMatchObject({ answer_form: { kind: "VERDICT", text: secondText } });
   }, 120_000);
 
   // FIX ROUND 1 / F1. This migration must not OWN any function an earlier

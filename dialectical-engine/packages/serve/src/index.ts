@@ -9,9 +9,12 @@ import {
   CONTENT_JSON_SENTINEL,
   MAX_OWNER_PRIVATE_HISTORY_SCAN,
   allocateSequence,
+  contentCipherFor,
   decryptContentForRun,
   encryptAttestedContentForRun,
+  encryptAttestedLeasedContentForRun,
   normalizeRunOwnership,
+  prepareLeasedContentEncryptionForRun,
   RunRepository,
   withRunContentLease,
   type CryptoEnvelope,
@@ -1735,6 +1738,25 @@ export async function resolveTrueUnjudgedReasons(
   }));
 }
 
+/**
+ * V-SEC-1 / FL-1 finding F3 (D26 open point (2)). `serve.answer` is the only
+ * VERSIONED content carrier: its key is `(answer_id, answer_version)` and
+ * DR-184 appends new versions under the SAME id. An owner ref of the id alone
+ * therefore binds the envelope to a SET of rows rather than to a row, so one
+ * version's ciphertext and attestation verify on any other version of the same
+ * answer and are served as that version. Every other carrier is keyed by the id
+ * its envelope is already bound to, which is why this table is the whole class.
+ *
+ * `migrations/0063_serve_answer_content_carrier.sql` derives the IDENTICAL
+ * string in SQL (`row_json->>'answer_id' || ':' || row_json->>'answer_version'`)
+ * inside `core.enforce_content_attestation_v2_serve_answer()`. The two
+ * definitions move together or every INSERT is refused with
+ * `CONTENT_ATTESTATION_INVALID`.
+ */
+function serveAnswerContentRef(answerId: string, answerVersion: number): string {
+  return `${answerId}:${answerVersion}`;
+}
+
 export class ServeRepository {
   readonly #liveness: LivenessRepository;
   readonly #memory: MemoryRepository;
@@ -1910,11 +1932,23 @@ export class ServeRepository {
         { segments: storedSegments }
       );
     const answerId = input.supersedes?.answerId ?? randomUUID();
-    const answerContent = await encryptAttestedContentForRun(
-      this.pool, input.runId, "serve.answer", answerId,
-      { answerForm: input.result.answerForm }
-    );
-    return withWriteTransaction(this.pool, async (client) => {
+    // F3, D26's leased-cipher pattern. The answer's envelope is sealed under
+    // (answer_id, answer_version), and the version is only resolved INSIDE the
+    // write transaction — the superseding path reads the prior row there. So the
+    // run's cipher is PREPARED here, outside the transaction, borrowing the
+    // content lease `persist` already holds, and the sealing itself is a
+    // synchronous, database-free call inside it. Preparing inside the
+    // transaction instead would issue a pool-level query while it is open,
+    // which the S6 suite of record forbids outright
+    // (tests/integration/s6-content-encryption-database.test.ts:5154,
+    // `expect(nestedPoolQueries).toEqual([])`). The `contentCipherFor` guard
+    // keeps `encryptAttestedContentForRun`'s exact contract: with no key store
+    // configured the carrier is skipped rather than raising.
+    const answerCipher = contentCipherFor(this.pool) === undefined
+      ? null
+      : await prepareLeasedContentEncryptionForRun(this.pool, input.runId);
+    try {
+    return await withWriteTransaction(this.pool, async (client) => {
       const prior = input.supersedes === undefined ? null : await client.query<{
         answer_id: string;
         answer_version: number;
@@ -1947,6 +1981,14 @@ export class ServeRepository {
       const answerVersion = priorAnswer === undefined
         ? input.factBundleVersion
         : priorAnswer.answer_version + 1;
+      // F3: the version is known only here, so the envelope is sealed here —
+      // synchronously, against the cipher prepared before the transaction. The
+      // two sibling carriers stay outside it: neither is versioned.
+      const answerContent = answerCipher === null ? null : encryptAttestedLeasedContentForRun(
+        answerCipher, "serve.answer",
+        serveAnswerContentRef(answerId, answerVersion),
+        { answerForm: input.result.answerForm }
+      );
       const facts = await client.query<{ fact_bundle_id: string }>(
         `INSERT INTO serve.fact_bundle (
           fact_bundle_id,run_id,facts,residual_objections,content_hash,
@@ -2230,6 +2272,11 @@ export class ServeRepository {
         servedNumberId: servedNumber?.rows[0]!.served_number_id ?? null
       };
     });
+    } finally {
+      // Closes the prepared cipher; the lease itself is BORROWED from the
+      // enclosing withRunContentLease, so this does not release it.
+      await answerCipher?.close();
+    }
     });
   }
 
@@ -2524,7 +2571,8 @@ export class ServeRepository {
           row.composed_content_ciphertext, { segments: row.segments ?? [] }
         ),
       decryptContentForRun<{ answerForm: unknown }>(
-        this.pool, row.run_id, "serve.answer", row.answer_id,
+        this.pool, row.run_id, "serve.answer",
+        serveAnswerContentRef(row.answer_id, Number(row.answer_version)),
         row.answer_content_ciphertext, { answerForm: row.answer_form }
       )
     ]);

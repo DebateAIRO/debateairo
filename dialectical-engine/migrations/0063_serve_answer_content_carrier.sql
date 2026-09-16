@@ -106,8 +106,21 @@ DECLARE
   expected_attestation bytea;
 BEGIN
   target_run_id:=NULLIF(row_json->>'run_id','')::uuid;
-  target_primary_key:=row_json->>'answer_id';
-  IF target_run_id IS NULL OR target_primary_key IS NULL THEN
+  -- FIX ROUND 1 / F3 (D26 open point (2)). serve.answer is the only VERSIONED
+  -- carrier: its key is (answer_id, answer_version) and DR-184 appends new
+  -- versions under the same id. An owner ref of the id alone binds the envelope
+  -- to a SET of rows, so an older version's ciphertext and attestation could be
+  -- appended as a NEW version and served as that version (measured: the forged
+  -- promotion INSERT succeeded). The ref carries the version, and
+  -- packages/serve/src/index.ts's serveAnswerContentRef() builds the IDENTICAL
+  -- string — the two move together or every INSERT fails CONTENT_ATTESTATION_INVALID.
+  -- The parentheses are load-bearing: `->>` and `||` share a precedence level
+  -- and associate left, so the unparenthesised form parses as
+  -- ((text||':')||jsonb)->>'answer_version' and fails with
+  -- `operator does not exist: text ->> unknown`.
+  target_primary_key:=(row_json->>'answer_id')||':'||(row_json->>'answer_version');
+  IF target_run_id IS NULL OR row_json->>'answer_id' IS NULL
+    OR row_json->>'answer_version' IS NULL THEN
     RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='CONTENT_ATTESTATION_SCOPE_UNRESOLVED';
   END IF;
   SELECT COALESCE(run.content_encryption_version=1,false) INTO target_encrypted
