@@ -5781,6 +5781,46 @@ describe("T10/T11 · the served root and its label, through the production runne
   });
 
   /**
+   * F2, the same gate one step in. "Settings built from parsed data" is named by
+   * the claim guard's own comment as a case it must survive, and a policy is
+   * PRESENT-but-unresolved there just as easily as absent: the `=== undefined`
+   * gate does not fire, and the guard's `Math.max` used to dereference a bound
+   * that is not there — a raw `TypeError: Cannot read properties of undefined`
+   * ~80 lines BEFORE the named refusal. Each bound is a member of one class, so
+   * each is checked here.
+   */
+  it.each([
+    ["synthesizerBound"],
+    ["evaluatorBound"]
+  ])("T9 refuses by NAME, not by TypeError, when the policy is present without its %s", async (bound) => {
+    const question = `t09-unresolved-${bound}-${randomUUID()}`;
+    const work = await createRunnerWork(question);
+    const provider = await startProviderDouble([...servedRunResponses("An unsynthesizable position.", 0.8)]);
+    const settings = runnerSettings();
+    // The cast is the point, exactly as in the case above: the TYPE forbids
+    // this, and the RUNTIME gate is what catches a caller who defeats the type.
+    const settingsWithUnresolvedBound = {
+      ...settings,
+      synthesisRolePolicy: { ...settings.synthesisRolePolicy, [bound]: undefined }
+    } as unknown as WalkingSkeletonSettings;
+    try {
+      const rejection = await runnerWithEndpoint(provider.endpoint, settingsWithUnresolvedBound)
+        .executeWorkItem(work.workItemId)
+        .then(() => null, (error: unknown) => error);
+
+      expect(rejection).toBeInstanceOf(Error);
+      expect(
+        (rejection as Error).constructor.name,
+        "a TypeError here is the guard dying, not the deployment being refused"
+      ).not.toBe("TypeError");
+      expect(rejection).toMatchObject({ code: "SYNTHESIS_ROLE_CONTROLS_UNRESOLVED" });
+      expect(String((rejection as Error).message)).toContain(bound);
+      // Refused BEFORE the claim, so the run spends nothing.
+      expect(provider.calls()).toBe(0);
+    } finally { await provider.stop(); }
+  });
+
+  /**
    * THE T10 RED, at run level. The FIRST configured provider authors the WEAKER
    * root; the second authors the stronger one. The served number, the served
    * root's disclosure and the receipt must all name the STRONGER root — under

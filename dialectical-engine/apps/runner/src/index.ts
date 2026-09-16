@@ -2158,8 +2158,24 @@ export class WalkingSkeletonRunner {
       // `SYNTHESIS_ROLE_CONTROLS_UNRESOLVED`, ~80 lines on — instead of dying
       // here on `Cannot read properties of undefined`. Measured: without this,
       // the test that pins that runtime gate reports a raw TypeError.
-      this.settings.synthesisRolePolicy?.synthesizerBound.deadlineMs ?? 0,
-      this.settings.synthesisRolePolicy?.evaluatorBound.deadlineMs ?? 0
+      // F2: `?.` on the POLICY alone was narrower than the case above. A policy
+      // built from parsed data can arrive PRESENT with a bound missing, and
+      // `?? 0` never saw it — the read of `.deadlineMs` died first. An
+      // unresolved bound is refused HERE, under the SAME name, before the claim
+      // and before anything is spent; `0` for an ABSENT family is unchanged, so
+      // that case still reaches the gate below.
+      ...(this.settings.synthesisRolePolicy === undefined
+        ? [0]
+        : (["synthesizerBound", "evaluatorBound"] as const).map((bound) => {
+          const deadlineMs = this.settings.synthesisRolePolicy?.[bound]?.deadlineMs;
+          if (deadlineMs === undefined) {
+            throw new TypedDomainError(
+              "SYNTHESIS_ROLE_CONTROLS_UNRESOLVED",
+              `T9: the sealed ${bound} is a T16 register row (J8); a synthesis-role policy that reached the runner without it is refused by name, never dereferenced (goal 39-40)`
+            );
+          }
+          return deadlineMs;
+        }))
     );
     assertClaimCoversCall({
       claimMs: this.settings.claimMs,
