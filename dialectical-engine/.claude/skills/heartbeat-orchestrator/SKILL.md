@@ -126,6 +126,13 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   (every line the SPEC names sits inside one), and an ADR number is never pre-assigned — "the next
   free number, measured at write time". A section a charge cites is named by its quoted heading, re-grepped at
   write time; every mission file a charge names is also on the `inputs` line (packet-check rule 8).
+  A packet's freeze pair and every line anchor are COMPUTED by the generator, never handed in (a pair
+  typed by the orchestrator covered one commit of twenty — REV-S03-p3r N13); packet-check reads the LANE
+  working tree, so a seat's own commit stales every quote — run `scripts/reanchor-quotes.py <packet>`
+  before the next ruling (14 quotes moved on FIX-S03-p3-F1 RULING 4), and turn a quote of a line the
+  seat deleted into prose. A digest or a row set read from CODE is never named as the state of a
+  sealed store: measure the real database first (RULING 4 — the fixture's `42b90bca…` was version 9,
+  V's sealed v4 was `120bdfea…`; one live attempt and a seat round lost).
   A symbol a packet names (an export, a component, a test id) is a code quote in the checked
   `path:LINE — \`text\`` form, never prose from memory; a packet never restates a list the plan or the
   intake carries (the Screens block, a test list) — it points at it. Every COUNT a packet quotes is re-derived from the file of
@@ -167,6 +174,12 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   (`<seat>-stub-api.mjs`), says kill by PID or port (never `pkill -f` a filename every seat shares — the launch line writes `$!` to
   `logs/<seat>.<proc>.pid` and the kill line reads it) and
   records the listener baseline of every no-touch port at assembly time, so compliance is falsifiable.
+  A "pre-existing" claim in the README carries `git blame -L <n>,<m>` of the failing line AND the
+  slice's diff over that file (REV-S03-p3r N4: a date and a "outside the surface" both wrong); a
+  live-log summary leads with the exit code and the failing stage, never the last six lines. The
+  orchestrator's READING of a measurement — what a frame means — lives in `ORCHESTRATOR-READING.md`
+  beside the package, a file no lens packet names; the package itself carries frames only (N5: a lens
+  that is told the conclusion cannot be blind).
   Re-verify every quoted commit
   and count at assembly time. The package diff is the PRODUCT range only — housekeeping paths
   (`.codex/skills` mirrors, launchers) excluded with `git diff <a>..<b> -- . ':!.codex/skills'` — and the
@@ -217,7 +230,9 @@ escalates to V after ONE failed workaround.
   the lane only when V says so; the slice ticket closes only on V's veto. **WHOLE**: after every
   MERGE(S), post the integrated-suite result and the push command — V pushes. **V DECISIONS
   PACKET**: rows flush at ≥ 3 pending, any row pending > 4 h, a frozen slice, or V asking; each row =
-  card, decision, evidence link, smallest yes/no; the default binds until V rules, and DECISIONS.md is
+  card, decision, evidence link, smallest yes/no; a row written BEFORE a review states the recommended
+  default only — never what the lenses will find (a lens that reads its own conclusion in a V row is
+  not blind: REV-S03-p3r N5); the default binds until V rules, and DECISIONS.md is
   checked before any row is written.
 - **Vertical-slice law (V, 2026-09-01), unchanged:** slice tickets first · Done = V's veto after
   personally testing, never a green gate · sub-tickets in parallel · one worktree per slice, many

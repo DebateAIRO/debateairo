@@ -3084,3 +3084,15 @@ The C1–C3 seats printed `READY — node …` as their first line; the C4 seat 
 
 ## A detached Codex seat does not keep the Mac awake — clamshell sleep suspends its runs and looks like a stall (2026-09-14, FIX-S03-p1-F1, ~10 h wall for ~3 h of work)
 The seat's embedded-Postgres timestamps showed multi-hour suspend gaps; two three-run attempts were BROKEN (not verdicts) and the seat re-ran them under `caffeinate -s -i <cmd>`. Law: every seat launcher runs `exec caffeinate -s -i codex exec …` (the assertion dies with the seat), and a stall diagnosis first asks `pmset -g log | grep -i sleep` for the window.
+
+## A promoted probe may be WRAPPED — run it through its own mutant runner, never bare (2026-09-16, REV-S03-p3r step7)
+The lens's `…-step7.test.ts` asserts the file is ALREADY faulted (S7a expects `api: acme`); run bare it prints 3 RED and looks like a regression. Its `…-mutant-step7-cli.sh` mutates → runs → restores (cmp for the file AND `generated/`). Read the probe README's table before running anything it lists.
+
+## packet-check reads the LANE working tree — a seat's own commit stales every quote; re-anchor before the next ruling (2026-09-16, FIX-S03-p3-F1 RULING 4)
+After ef302060 every `path:LINE — `text`` quote of the pre-fix packet pointed at moved lines (14 of them). `scripts/reanchor-quotes.py <packet>` re-greps each quote and rewrites the LINE; a quote of a line the seat DELETED cannot be re-anchored — turn it into prose. Also: every file a charge names must be on the `inputs` line (rule 8 fires on an amendment too).
+
+## A code digest is not database state — measure the sealed register on the real database before naming a "pre-slice" set (2026-09-16, RULING 4)
+The fixture's `DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 = 42b90bca…` at the slice base was version NINE's content (the five-slot set published 09-12); V's sealed v4 was `120bdfea…` (three providers). `coverage/serve/diag-v4-{rows,sha,diff}.ts` (read-only, the migrator URL read from source, never printed) is the measurement; one live attempt and a seat round were lost to the assumption.
+
+## The harness browser pane refuses a bare `navigate` to localhost — open it with `preview_start {url}` first (2026-09-16)
+`navigate https://localhost:3000/login` and `navigate http://127.0.0.1:8931/nodes.html` both returned "denied or failed"; `preview_start {url: http://127.0.0.1:8931/nodes.html}` opened the pane and the graph pages rendered (the PNG flow in `scripts/graph-png/`). The live stack's proof stayed curl's. SendUserFile of the PNGs is desktop-only (the remote upload returns 400 for 1.4 MB and 8.3 MB alike).
