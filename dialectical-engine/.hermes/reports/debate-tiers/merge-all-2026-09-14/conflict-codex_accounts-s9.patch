@@ -1,0 +1,586 @@
+diff --cc dialectical-engine/apps/api/src/index.ts
+index f41ec7e0,e8c6b71e..00000000
+--- a/dialectical-engine/apps/api/src/index.ts
++++ b/dialectical-engine/apps/api/src/index.ts
+@@@ -74,13 -71,7 +74,16 @@@ import type { AuthenticatedSession, Ses
+  import type { PublicationApplication } from "./publications.js";
+  import type { AccountErasureApplication } from "./account-erasure.js";
+  import type { LegacyRunClaimApplication } from "./legacy-claim.js";
+++<<<<<<< HEAD
+ +import type { RecoveryApplication } from "./recovery.js";
+++=======
+++>>>>>>> codex/accounts-s9
+  import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
+ +import {
+ +  installSupportRoutes,
+ +  type SupportApplication,
+ +  type SupportRoutePath
+ +} from "./support/index.js";
+  
+  type RouteAuthPolicy = "public" | "user" | "operator";
+  type RouteOriginPolicy = "trusted";
+@@@ -255,7 -207,6 +258,10 @@@ export interface ApiOptions 
+    readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
+    readonly evaluatorDevMenuRegisterVersion?: number;
+    readonly evaluatorDevMenuClock?: () => Date;
+++<<<<<<< HEAD
+ +  readonly support?: SupportApplication;
+++=======
+++>>>>>>> codex/accounts-s9
+  }
+  
+  export interface EvaluatorDevMenuApplication {
+diff --cc dialectical-engine/apps/api/src/main.ts
+index ebb97038,9028dad2..00000000
+--- a/dialectical-engine/apps/api/src/main.ts
++++ b/dialectical-engine/apps/api/src/main.ts
+@@@ -13,7 -12,7 +13,11 @@@ import 
+    loadSecretKey,
+    PublicationCipher
+  } from "@debateai/crypto";
+++<<<<<<< HEAD
+ +import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportOwnContextRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
+++=======
++ import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, configureContentEncryption, createPool, PostgresAccountErasureRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresSessionRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
+++>>>>>>> codex/accounts-s9
+  import type { AskRequest } from "@debateai/contract";
+  import type { RiskTier } from "@debateai/kernel";
+  import { readDeploymentMakerCapability } from "@debateai/critique";
+@@@ -494,36 -316,6 +498,39 @@@ const api = buildApi(
+    mfa,
+    sessions,
+    legacyRunClaim,
+++<<<<<<< HEAD
+ +  support: {
+ +    configuration: supportConfiguration,
+ +    sessions: Object.freeze({
+ +      create: supportSessions.create.bind(supportSessions),
+ +      read: supportSessions.read.bind(supportSessions),
+ +      setConsent: supportSessions.setConsent.bind(supportSessions),
+ +      admitMessage: supportSessions.admitMessage.bind(supportSessions),
+ +      admitIpSession: supportSessions.admitIpSession.bind(supportSessions),
+ +      finalizeInjectionLock: supportSessions.finalizeInjectionLock.bind(supportSessions),
+ +      recordRateLimit: supportSessions.recordRateLimit.bind(supportSessions),
+ +      rateMessage: supportSessions.rateMessage.bind(supportSessions),
+ +      status: supportStatus.status.bind(supportStatus)
+ +    }),
+ +    messages: supportMessages,
+ +    cases: supportCases,
+ +    caseAccess: createSupportCaseAccessService({
+ +      repository: supportCaseSummaries,keys: supportKeys
+ +    }),
+ +    answer: supportAnswers,
+ +    ownContext: supportOwnContext,
+ +    incidents: supportIncidents,
+ +    reportDiagnostic: reportSupportDiagnostic,
+ +    knowledge: {
+ +      status: async () => Object.freeze({
+ +        kbVersion: supportKnowledge.kbVersion,
+ +        shipped: supportKnowledge.shippedCount,
+ +        ignored: supportKnowledge.ignoredCount
+ +      })
+ +    }
+ +  },
+++=======
+++>>>>>>> codex/accounts-s9
+    ...(publications === undefined ? {} : { publications }),
+    allowedOrigin: environment.PUBLIC_APP_URL,
+    ...(evaluatorDevMenu === undefined ? {} : {
+diff --cc dialectical-engine/apps/ui/app/settings/page.tsx
+index 9020a847,762dbd88..00000000
+--- a/dialectical-engine/apps/ui/app/settings/page.tsx
++++ b/dialectical-engine/apps/ui/app/settings/page.tsx
+@@@ -39,46 -38,20 +39,61 @@@ export default function SettingsPage() 
+    return <AuthGate>{() => <AccountSettingsScreen />}</AuthGate>;
+  }
+  
+ +/* The document's identity panel. SCOPE and IDENTITY MODEL are ruled facts about
+ +   how sessions work here, so they are stated. ASKER has no source in this
+ +   browser — the session is an HttpOnly cookie and no endpoint returns the
+ +   pseudonym — so it carries typed absence (DR-115) rather than an invented
+ +   handle. */
+ +const IDENTITY_ROWS: readonly { k: string; v: string; absent?: boolean }[] = [
+ +  { k: "ASKER", v: "Not exposed to this browser", absent: true },
+ +  { k: "SCOPE", v: "personal" },
+ +  { k: "IDENTITY MODEL", v: "Server session · HttpOnly cookie · mandatory MFA" }
+ +];
+ +
+  function AccountSettingsScreen() {
+    return (
+++<<<<<<< HEAD
+ +    <div className="screen scroll setScreen">
+ +      <div className="setBody">
+ +        <div className="setInner">
+ +          <p className="setEyebrow">IDENTITY</p>
+ +          <h1 className="setTitle">Your asker scope</h1>
+ +          <p className="setLede">
+ +            Sessions use server-set HttpOnly cookies and mandatory MFA. Browser scripts never receive the session
+ +            credential.
+ +          </p>
+ +
+ +          <div className="setPanel">
+ +            <div className="setPanelCore">
+ +              {IDENTITY_ROWS.map((row) => (
+ +                <div className="setIdentityRow" key={row.k}>
+ +                  <span className="setIdentityKey">{row.k}</span>
+ +                  <span className="setIdentityValue" data-absent={row.absent ? "true" : undefined}>
+ +                    {row.v}
+ +                  </span>
+ +                </div>
+ +              ))}
+ +            </div>
+ +          </div>
+ +
+ +          <SessionControls />
+ +          <ConsentSettingsPanel />
+ +          <LegacyRunClaimControls />
+ +          <AccountErasureControls />
+++=======
++     <div className="screen scroll">
++       <div className="screenInner medium">
++         <h1 className="display sm">Account settings</h1>
++         <p className="lede" style={{ marginTop: 6 }}>
++           Review and revoke your signed-in browser sessions. Deployment and model administration are operator-only.
++         </p>
++         <SessionControls />
++         <LegacyRunClaimControls />
++         <AccountErasureControls />
++         <div className="pill pillGen" style={{ marginTop: 24 }}>
++           <span className="dot" />
++           Deployment controls unavailable for user sessions
+++>>>>>>> codex/accounts-s9
+          </div>
+        </div>
+      </div>
+diff --cc dialectical-engine/apps/ui/components/LegacyRunClaimControls.tsx
+index 06bea8fd,1cfeea9c..00000000
+--- a/dialectical-engine/apps/ui/components/LegacyRunClaimControls.tsx
++++ b/dialectical-engine/apps/ui/components/LegacyRunClaimControls.tsx
+@@@ -40,31 -40,30 +40,54 @@@ export function LegacyRunClaimControls(
+    }
+  
+    return (
+++<<<<<<< HEAD
+ +    <form className="setCard" aria-labelledby="legacy-run-claim-heading" onSubmit={(event) => void claim(event)}>
+ +      <h2 className="setCardTitle" id="legacy-run-claim-heading">Claim legacy debates</h2>
+ +      <p className="setCardHint">
+ +        If you created debates before account sign-in was introduced, enter that old access token once to attach only
+ +        its unclaimed debates to this account. The token is not saved by this browser or the server.
+ +      </p>
+ +      <div className="setCardRow">
+ +        <div className="setField setFieldMono">
+++=======
++     <section className="card" aria-labelledby="legacy-run-claim-heading" style={{ marginTop: 24 }}>
++       <h2 id="legacy-run-claim-heading">Claim legacy debates</h2>
++       <p>
++         If you created debates before account sign-in was introduced, enter that old access token once to attach only
++         its unclaimed debates to this account. The token is not saved by this browser or the server.
++       </p>
++       <form onSubmit={(event) => void claim(event)}>
++         <div className="fieldGroup">
+++>>>>>>> codex/accounts-s9
+            <label htmlFor="legacy-run-token">Old debate access token</label>
+            <input
+              id="legacy-run-token"
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+++<<<<<<< HEAD
+ +            placeholder="Old debate access token"
+++=======
+++>>>>>>> codex/accounts-s9
+              value={legacyToken}
+              onChange={(event) => setLegacyToken(event.target.value)}
+              required
+            />
+          </div>
+++<<<<<<< HEAD
+ +        <button type="submit" className="setBtn" disabled={busy || legacyToken.length === 0}>
+ +          {busy ? "Claiming…" : "Claim legacy debates"}
+ +        </button>
+ +      </div>
+ +      {message ? <p className="setStatus" role="status">{message}</p> : null}
+ +    </form>
+++=======
++         <button type="submit" className="btn" disabled={busy || legacyToken.length === 0}>
++           {busy ? "Claiming…" : "Claim legacy debates"}
++         </button>
++       </form>
++       {message ? <p role="status">{message}</p> : null}
++     </section>
+++>>>>>>> codex/accounts-s9
+    );
+  }
+diff --cc dialectical-engine/apps/ui/lib/serverApi.ts
+index dbc3fb22,ebf74ad4..00000000
+--- a/dialectical-engine/apps/ui/lib/serverApi.ts
++++ b/dialectical-engine/apps/ui/lib/serverApi.ts
+@@@ -49,30 -49,10 +49,35 @@@ export async function listDebatesPageSe
+    client?: ContractClient,
+    userAgent?: string
+  ): Promise<DebateListPage> {
+++<<<<<<< HEAD
+ +  const resolvedClient = client ?? createServerContractClient(fetch, token, userAgent);
+ +  const index = await resolvedClient.readAnswerIndex(HOME_PAGE_SIZE, 0);
+ +  const modelsByAnswerId = new Map<string, string[]>();
+ +  for (const item of index.items) {
+ +    try {
+ +      const answer = await resolvedClient.readAnswer(item.answer_id);
+ +      const models = [...new Set(answer.nodes.flatMap((node) =>
+ +        node.maker_lineage === null ? [] : [node.maker_lineage.model_id]
+ +      ))];
+ +      modelsByAnswerId.set(item.answer_id, models);
+ +    } catch {
+ +      // Model lineage is decorative library metadata. If an individual owned
+ +      // answer becomes unavailable between the index read and this hydration,
+ +      // preserve the usable row and render typed absence instead of failing
+ +      // the entire library page or inventing a model.
+ +      modelsByAnswerId.set(item.answer_id, []);
+ +    }
+ +  }
+ +  const summaries = debateSummariesFromIndex(index).map((summary) => ({
+ +    ...summary,
+ +    models: modelsByAnswerId.get(summary.id) ?? summary.models
+ +  }));
+++=======
++   const index = await (client ?? createServerContractClient(fetch, token, userAgent))
++     .readAnswerIndex(HOME_PAGE_SIZE, 0);
+++>>>>>>> codex/accounts-s9
+    return {
+ -    summaries: debateSummariesFromIndex(index),
+ +    summaries,
+      shown: index.items.length,
+      total: index.total
+    };
+diff --cc dialectical-engine/packages/contract/src/client.ts
+index 5923aa31,5aaaa544..00000000
+--- a/dialectical-engine/packages/contract/src/client.ts
++++ b/dialectical-engine/packages/contract/src/client.ts
+@@@ -99,8 -97,7 +99,12 @@@ async function requestJson<T>
+    path: string,
+    schema: { parse(value: unknown): T },
+    init: RequestInit = {},
+++<<<<<<< HEAD
+ +  auth: ContractClientAuth,
+ +  expectedStatus?: number
+++=======
++   auth: ContractClientAuth
+++>>>>>>> codex/accounts-s9
+  ): Promise<T> {
+    let response: Response;
+    try {
+@@@ -287,7 -237,6 +291,10 @@@ export interface ContractClient 
+    }>;
+    submitAsk(input: AskRequest): Promise<AskAccepted>;
+    readSession(): Promise<Session>;
+++<<<<<<< HEAD
+ +  readPlanTiers(): Promise<PlanTierRosters>;
+++=======
+++>>>>>>> codex/accounts-s9
+    readDeployment(): Promise<Deployment>;
+    readAnswerIndex(limit: number, offset: number): Promise<AnswerIndex>;
+    readAnswer(answerId: string, version?: number): Promise<Answer>;
+@@@ -316,12 -265,8 +323,17 @@@ export function createContractClient
+  ): ContractClient {
+    const root = new URL(baseUrl);
+    const versionQuery = (version?: number) => version === undefined ? "" : `?version=${encodeURIComponent(String(version))}`;
+++<<<<<<< HEAD
+ +  const request = <T>(
+ +    path: string,
+ +    schema: { parse(value: unknown): T },
+ +    init: RequestInit = {},
+ +    expectedStatus?: number
+ +  ) => requestJson(root.href, fetchImplementation, path, schema, init, auth, expectedStatus);
+++=======
++   const request = <T>(path: string, schema: { parse(value: unknown): T }, init: RequestInit = {}) =>
++     requestJson(root.href, fetchImplementation, path, schema, init, auth);
+++>>>>>>> codex/accounts-s9
+    const eventResponse = async (runId: string, signal?: AbortSignal): Promise<Response> => {
+      let response: Response;
+      try {
+@@@ -354,34 -299,6 +366,37 @@@
+      }
+    };
+    return Object.freeze({
+++<<<<<<< HEAD
+ +    register: (
+ +      email: string,
+ +      password: string,
+ +      recoveryEmail: string,
+ +      adultAffirmed: boolean
+ +    ) => request(
+ +      "/v1/auth/register",
+ +      RegistrationPublicResponseSchema,
+ +      { method: "POST", body: JSON.stringify({
+ +          email,
+ +          password,
+ +          recovery_email: recoveryEmail,
+ +          adult_affirmed: adultAffirmed
+ +        }) },
+ +      202
+ +    ),
+ +    resendVerification: (email: string) => request(
+ +      "/v1/auth/resend-verification",
+ +      ResendVerificationPublicResponseSchema,
+ +      { method: "POST", body: JSON.stringify({ email }) },
+ +      202
+ +    ),
+ +    startRecovery: (email: string) => request(
+ +      "/v1/auth/recovery/start",
+ +      RecoveryStartPublicResponseSchema,
+ +      { method: "POST", body: JSON.stringify({ email }) },
+ +      202
+ +    ),
+++=======
+++>>>>>>> codex/accounts-s9
+      beginLogin: (email: string, password: string) => request("/v1/auth/login", {
+        parse(value: unknown) {
+          if (typeof value !== "object" || value === null) throw new TypeError("Invalid login challenge response");
+@@@ -506,7 -423,6 +521,10 @@@
+      ),
+      submitAsk: (input: AskRequest) => request("/v1/asks", AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
+      readSession: () => request("/v1/session", SessionSchema),
+++<<<<<<< HEAD
+ +    readPlanTiers: () => request("/v1/plan-tiers", PlanTierRostersSchema),
+++=======
+++>>>>>>> codex/accounts-s9
+      readDeployment: () => request("/v1/deployment", DeploymentSchema),
+      readAnswerIndex: (limit: number, offset: number) => request(`/v1/answers?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`, AnswerIndexSchema),
+      readAnswer: (answerId: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}${versionQuery(version)}`, AnswerSchema),
+diff --cc dialectical-engine/packages/db/src/index.ts
+index f9da50bd,3b00172e..00000000
+--- a/dialectical-engine/packages/db/src/index.ts
++++ b/dialectical-engine/packages/db/src/index.ts
+@@@ -26,35 -25,6 +26,38 @@@ export 
+  } from "./legacy-claim.js";
+  
+  export {
+++<<<<<<< HEAD
+ +  assertSupportKeyCoverage,
+ +  assertSupportDatabaseRole,
+ +  lockSupportOwners,
+ +  lockSupportSessions,
+ +  PostgresSupportCaseRepository,
+ +  PostgresSupportCaseSummaryRepository,
+ +  PostgresSupportMessageRepository,
+ +  PostgresSupportOwnContextRepository,
+ +  PostgresSupportRelayReservationRepository,
+ +  PostgresSupportShredRepository,
+ +  PostgresSupportSessionRepository,
+ +  PostgresSupportStatusRepository,
+ +  type CreateCaseMaterial,
+ +  type CreateWrappedSessionKey,
+ +  type SupportCaseRecord,
+ +  type SupportCreateKeyFactories,
+ +  type SupportMessageOutcome,
+ +  type SupportMessageRead,
+ +  type SupportMessageRole,
+ +  type SupportMessageWrite,
+ +  type SupportOwnRunStateRow,
+ +  type SupportRepositoryRecord,
+ +  type SupportRepositoryStatus,
+ +  type SupportRelayReservationResult,
+ +  type SupportShredCounts,
+ +  type SupportShredResult
+ +} from "./support.js";
+ +
+ +export {
+++=======
+++>>>>>>> codex/accounts-s9
+    assertPublicationCleanupDatabaseRole,
+    assertPublicationDatabaseRoleSeparation,
+    PostgresPublicationRepository,
+diff --cc dialectical-engine/tests/architecture/s9-dev-token-retirement-contract.test.ts
+index e82115b4,502e0549..00000000
+--- a/dialectical-engine/tests/architecture/s9-dev-token-retirement-contract.test.ts
++++ b/dialectical-engine/tests/architecture/s9-dev-token-retirement-contract.test.ts
+@@@ -54,15 -54,17 +54,28 @@@ describe("S9 dev-token retirement archi
+    });
+  
+    it("exposes a one-shot cookie claim UI and boots acceptance with a real service session", async () => {
+++<<<<<<< HEAD
+ +    const [uiControl, uiSettings, acceptance, packageJson,
+ +      vitestConfig] = await Promise.all([
+ +      read("apps/ui/components/LegacyRunClaimControls.tsx"),
+ +      read("apps/ui/app/settings/page.tsx"),
+++=======
++     const [uiControl, webControl, uiSettings, webSettings, acceptance, packageJson,
++       vitestConfig] = await Promise.all([
++       read("apps/ui/components/LegacyRunClaimControls.tsx"),
++       read("web/components/LegacyRunClaimControls.tsx"),
++       read("apps/ui/app/settings/page.tsx"),
++       read("web/app/settings/page.tsx"),
+++>>>>>>> codex/accounts-s9
+        read("acceptance/main.ts"),
+        read("package.json"),
+        read("vitest.config.ts")
+      ]);
+++<<<<<<< HEAD
+ +    for (const control of [uiControl]) {
+++=======
++     for (const control of [uiControl, webControl]) {
+++>>>>>>> codex/accounts-s9
+        expect(control).toContain("client.claimLegacyRuns(submittedToken)");
+        expect(control.indexOf('setLegacyToken("")')).toBeLessThan(
+          control.indexOf("client.claimLegacyRuns(submittedToken)")
+@@@ -70,6 -72,7 +83,10 @@@
+        expect(control).not.toMatch(/localStorage|sessionStorage|console\./);
+      }
+      expect(uiSettings).toContain("<LegacyRunClaimControls");
+++<<<<<<< HEAD
+++=======
++     expect(webSettings).toContain("<LegacyRunClaimControls");
+++>>>>>>> codex/accounts-s9
+      expect(acceptance).toContain("new PostgresSessionRepository(");
+      expect(acceptance).toContain("acceptanceServiceRequestHeaders");
+      expect(acceptance).toContain("serviceCredential");
+diff --cc dialectical-engine/tests/integration/database.test.ts
+index 09dc8d41,998ea9a2..00000000
+--- a/dialectical-engine/tests/integration/database.test.ts
++++ b/dialectical-engine/tests/integration/database.test.ts
+@@@ -49,10 -47,6 +49,13 @@@ import 
+    TEST_APP_ORIGIN,testHttpIdentity,testSessionApplication,testSessionHeaders,
+    type TestHttpIdentity
+  } from "../support/httpSession.js";
+++<<<<<<< HEAD
+ +import {
+ +  publishReplacementRegisterFixture,
+ +  registerFixtureRow
+ +} from "../support/registerFixtures.js";
+++=======
+++>>>>>>> codex/accounts-s9
+  
+  let database: TestDatabase;
+  const batteryRows = createInitialBatteryRows({ settlementWatchHandle: "settlement-watch:test-layer" });
+diff --cc dialectical-engine/tests/render/s9-legacy-claim-controls.test.tsx
+index 73bcbc80,ff50f985..00000000
+--- a/dialectical-engine/tests/render/s9-legacy-claim-controls.test.tsx
++++ b/dialectical-engine/tests/render/s9-legacy-claim-controls.test.tsx
+@@@ -7,12 -7,14 +7,21 @@@ import { resolve } from "node:path"
+  import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+  import type { ContractClient } from "@debateai/contract";
+  import { LegacyRunClaimControls as UiLegacyRunClaimControls } from "../../apps/ui/components/LegacyRunClaimControls.js";
+++<<<<<<< HEAD
+++=======
++ import { LegacyRunClaimControls as WebLegacyRunClaimControls } from "../../web/components/LegacyRunClaimControls.js";
+++>>>>>>> codex/accounts-s9
+  
+  type ClaimClient = Pick<ContractClient, "claimLegacyRuns">;
+  type ClaimControl = ComponentType<{ readonly client?: ClaimClient }>;
+  
+  const surfaces: ReadonlyArray<readonly [string, ClaimControl]> = [
+++<<<<<<< HEAD
+ +  ["apps/ui", UiLegacyRunClaimControls]
+++=======
++   ["apps/ui", UiLegacyRunClaimControls],
++   ["web", WebLegacyRunClaimControls]
+++>>>>>>> codex/accounts-s9
+  ];
+  
+  let root: Root | null = null;
+@@@ -86,14 -88,15 +95,28 @@@ describe.each(surfaces)("S9 rendered le
+    });
+  });
+  
+++<<<<<<< HEAD
+ +it("mounts the claim control on the settings page without a browser persistence or logging sink", async () => {
+ +  const paths = [
+ +    "apps/ui/components/LegacyRunClaimControls.tsx",
+ +    "apps/ui/app/settings/page.tsx"
+ +  ];
+ +  const [control, settings] = await Promise.all(
+ +    paths.map((path) => readFile(resolve(process.cwd(), path), "utf8"))
+ +  );
+ +  expect(settings).toContain("<LegacyRunClaimControls");
+ +  expect(`${control}\n${settings}`).not.toMatch(/localStorage|sessionStorage|console\./);
+++=======
++ it("mounts the claim control on both settings pages without a browser persistence or logging sink", async () => {
++   const paths = [
++     "apps/ui/components/LegacyRunClaimControls.tsx",
++     "web/components/LegacyRunClaimControls.tsx",
++     "apps/ui/app/settings/page.tsx",
++     "web/app/settings/page.tsx"
++   ];
++   const sources = await Promise.all(paths.map((path) => readFile(resolve(process.cwd(), path), "utf8")));
++   expect(sources[2]).toContain("<LegacyRunClaimControls");
++   expect(sources[3]).toContain("<LegacyRunClaimControls");
++   expect(`${sources[0]}\n${sources[1]}`).not.toMatch(/localStorage|sessionStorage|console\./);
+++>>>>>>> codex/accounts-s9
+  });
+diff --cc dialectical-engine/tests/unit/api.test.ts
+index 1944a8fa,12785ca9..00000000
+--- a/dialectical-engine/tests/unit/api.test.ts
++++ b/dialectical-engine/tests/unit/api.test.ts
+@@@ -1,4 -1,4 +1,8 @@@
+++<<<<<<< HEAD
+ +import { describe, expect, it, vi } from "vitest";
+++=======
++ import { describe, expect, it } from "vitest";
+++>>>>>>> codex/accounts-s9
+  import {
+    AskRefusal,
+    buildApi as buildApiBase,
+@@@ -8,14 -8,9 +12,18 @@@
+    type AskApplication,
+    type RunCreationSettings
+  } from "@debateai/api";
+ -import { createContractClient, type AskRequest, type Session } from "@debateai/contract";
+ +import {
+ +  PLAN_TIER_ROSTERS,
+ +  createContractClient,
+ +  type AskRequest,
+ +  type Session
+ +} from "@debateai/contract";
+  import { TypedDomainError } from "@debateai/kernel";
+++<<<<<<< HEAD
+ +import { configureContentEncryption, RunRepository } from "@debateai/db";
+++=======
++ import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
+++>>>>>>> codex/accounts-s9
+  import {
+    RETIRED_DEV_HEADER,
+    TEST_APP_ORIGIN,
+@@@ -33,19 -28,6 +41,22 @@@ const USER_IDENTITY = testHttpIdentity(
+  const USER_HEADERS = testSessionHeaders(USER_IDENTITY);
+  const USER_MUTATION_HEADERS = testSessionHeaders(USER_IDENTITY, true);
+  
+++<<<<<<< HEAD
+ +function rosterPanel(
+ +  tier: AskRequest["plan_tier"],
+ +  makers: readonly string[] = []
+ +) {
+ +  return PLAN_TIER_ROSTERS[tier].map((modelId, index) => Object.freeze({
+ +    provider_ref: `provider:${tier}:${index + 1}`,
+ +    maker: makers[index] ?? `maker:${tier}:${index + 1}`,
+ +    model_id: modelId,
+ +    probe_evidence_ref: `probe:${tier}:${index + 1}`,
+ +    probed_at: "2026-09-12T00:00:00.000Z"
+ +  }));
+ +}
+ +
+++=======
+++>>>>>>> codex/accounts-s9
+  function buildApi(options: Parameters<typeof buildApiBase>[0]) {
+    return buildApiBase({
+      ...options,
+diff --cc dialectical-engine/tests/unit/s5-session-http.test.ts
+index 017c7eeb,6ec6f5ed..00000000
+--- a/dialectical-engine/tests/unit/s5-session-http.test.ts
++++ b/dialectical-engine/tests/unit/s5-session-http.test.ts
+@@@ -11,6 -11,7 +11,10 @@@ import type 
+  } from "../../apps/api/src/sessions.js";
+  import { createContractClient } from "@debateai/contract";
+  import { createServerContractClient as createUiServerClient } from "../../apps/ui/lib/serverApi.js";
+++<<<<<<< HEAD
+++=======
++ import { createServerContractClient as createWebServerClient } from "../../web/lib/serverApi.js";
+++>>>>>>> codex/accounts-s9
+  import { RETIRED_DEV_HEADER } from "../support/httpSession.js";
+  
+  const SESSION_TOKEN = "s".repeat(43);
+* Unmerged path dialectical-engine/web/app/api/[...path]/route.test.mjs
+* Unmerged path dialectical-engine/web/app/debate/[id]/DebatePageClient.tsx
+* Unmerged path dialectical-engine/web/app/debate/[id]/page.tsx
+* Unmerged path dialectical-engine/web/app/new/NewQuestionForm.tsx
+* Unmerged path dialectical-engine/web/app/page.tsx
+* Unmerged path dialectical-engine/web/app/settings/page.tsx

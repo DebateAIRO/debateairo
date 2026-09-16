@@ -1,0 +1,9 @@
+diff --git a/dialectical-engine/docs/missions/observability-agents/slices/FIX-07/DECISIONS.md b/dialectical-engine/docs/missions/observability-agents/slices/FIX-07/DECISIONS.md
+index 65f98427..281c2955 100644
+--- a/dialectical-engine/docs/missions/observability-agents/slices/FIX-07/DECISIONS.md
++++ b/dialectical-engine/docs/missions/observability-agents/slices/FIX-07/DECISIONS.md
+@@ -16,3 +16,4 @@
+ - 2026-09-01 · Where does the capture OFF switch live? · OPEN — file or register row; ARCH decides and records the path here · OBS-R060 requires runtime disable without redeploy · pending ARCH
+ - 2026-09-01 · Is a deliberately OFF period counted? · YES — `gap_class = DISABLED` rows; silence never passes as health · D4 · REQ-FIX seat
+ - 2026-09-01 · Why after FIX-01? · Same `src/runtime/**` surface — single writer · vertical-slice law · REQ-FIX seat
++- 2026-09-02 · Where does the capture OFF switch live? · Filesystem marker `${OBS_CONTROL_DIR}/CAPTURE_OFF`; in the real dev stack V sets `OBS_CONTROL_DIR="$PWD/.obs-control"`, `touch` means OFF and removing that one marker means ON; FIX-10 `obsctl kill`/`arm` are the only production-facing writers · the switch must work with Postgres down and be identical for every runtime · REQ-FIX rework round 1 (resolves the 2026-09-01 OPEN row)

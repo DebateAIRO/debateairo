@@ -1,0 +1,736 @@
+diff --cc dialectical-engine/apps/api/src/index.ts
+index f41ec7e0,fb547581..00000000
+--- a/dialectical-engine/apps/api/src/index.ts
++++ b/dialectical-engine/apps/api/src/index.ts
+@@@ -69,143 -45,9 +69,147 @@@ import 
+    AuthFlowError,
+    type RegistrationApplication
+  } from "./registration.js";
+++<<<<<<< HEAD
+ +import type { MfaApplication } from "./mfa.js";
+ +import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
+ +import type { PublicationApplication } from "./publications.js";
+ +import type { AccountErasureApplication } from "./account-erasure.js";
+ +import type { LegacyRunClaimApplication } from "./legacy-claim.js";
+ +import type { RecoveryApplication } from "./recovery.js";
+ +import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
+ +import {
+ +  installSupportRoutes,
+ +  type SupportApplication,
+ +  type SupportRoutePath
+ +} from "./support/index.js";
+++=======
++ import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
+++>>>>>>> codex/accounts-t2
+  
+ -type RouteAuthPolicy = "public" | "user";
+ +type RouteAuthPolicy = "public" | "user" | "operator";
+ +type RouteOriginPolicy = "trusted";
+ +type RouteSessionPolicy = "optional";
+ +
+ +export function apiOperationalErrorDiagnostic(error: unknown): string {
+ +  if (error instanceof TypedDomainError) return error.code;
+ +  const record = error !== null && typeof error === "object"
+ +    ? error as Readonly<{ code?: unknown; message?: unknown; name?: unknown }>
+ +    : undefined;
+ +  if (typeof record?.code === "string" && /^[A-Z0-9_]{2,32}$/u.test(record.code)) {
+ +    return `DEPENDENCY_${record.code}`;
+ +  }
+ +  if (typeof record?.message === "string" && /^[A-Z][A-Z0-9_]{2,63}$/u.test(record.message)) {
+ +    return record.message;
+ +  }
+ +  if (typeof record?.name === "string") {
+ +    const classCode = record.name.replace(/([a-z])([A-Z])/gu, "$1_$2").toUpperCase();
+ +    if (/^[A-Z][A-Z0-9_]{2,63}$/u.test(classCode)) return classCode;
+ +  }
+ +  return "UNEXPECTED_ERROR";
+ +}
+ +
+ +export const authorizationPolicyInventory = Object.freeze([
+ +  { route: "POST /v1/auth/register", auth: "public", resource: "identity", action: "register" },
+ +  { route: "POST /v1/auth/verify-email", auth: "public", resource: "identity", action: "verify-email" },
+ +  { route: "POST /v1/auth/resend-verification", auth: "public", resource: "identity", action: "resend-verification" },
+ +  { route: "POST /v1/auth/recovery/start", auth: "public", resource: "identity", action: "start-recovery" },
+ +  { route: "POST /v1/auth/mfa/totp/begin", auth: "public", resource: "identity", action: "begin-totp" },
+ +  { route: "POST /v1/auth/mfa/totp/verify", auth: "public", resource: "identity", action: "verify-totp" },
+ +  { route: "POST /v1/auth/mfa/recovery-codes/generate", auth: "public", resource: "identity", action: "generate-recovery-codes" },
+ +  { route: "POST /v1/auth/mfa/recovery-codes/confirm", auth: "public", resource: "identity", action: "confirm-recovery-code" },
+ +  { route: "POST /v1/auth/login", auth: "public", origin: "trusted", resource: "identity", action: "login" },
+ +  { route: "POST /v1/auth/logout", auth: "user", resource: "session-self", action: "logout" },
+ +  { route: "GET /v1/auth/sessions", auth: "user", resource: "session-owner", action: "list" },
+ +  { route: "DELETE /v1/auth/sessions/{id}", auth: "user", resource: "session-owner", action: "revoke" },
+ +  { route: "DELETE /v1/auth/sessions", auth: "user", resource: "session-owner", action: "revoke-all" },
+ +  { route: "POST /v1/auth/step-up", auth: "user", resource: "session-self", action: "step-up" },
+ +  { route: "DELETE /v1/account", auth: "user", resource: "identity", action: "schedule-erasure" },
+ +  { route: "GET /v1/account/erasure", auth: "user", resource: "identity", action: "read-erasure" },
+ +  { route: "POST /v1/account/erasure/cancel", auth: "user", resource: "identity", action: "cancel-erasure" },
+ +  { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
+ +  { route: "DELETE /v1/debates/{id}", auth: "user", resource: "run-owner", action: "erase-private" },
+ +  { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
+ +  { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
+ +  { route: "POST /v1/support/sessions", auth: "public", session: "optional", resource: "support-session", action: "create" },
+ +  { route: "GET /v1/support/sessions/{id}", auth: "public", session: "optional", resource: "support-session", action: "read" },
+ +  { route: "POST /v1/support/sessions/{id}/consent", auth: "public", session: "optional", resource: "support-session", action: "consent" },
+ +  { route: "POST /v1/support/sessions/{id}/messages", auth: "public", session: "optional", resource: "support-message", action: "create" },
+ +  { route: "POST /v1/support/messages/{id}/rating", auth: "public", session: "optional", resource: "support-message", action: "rate" },
+ +  { route: "POST /v1/support/sessions/{id}/escalate", auth: "public", session: "optional", resource: "support-case", action: "create" },
+ +  { route: "GET /v1/support/cases", auth: "user", resource: "support-case", action: "list" },
+ +  { route: "GET /v1/support/cases/{token}", auth: "public", session: "optional", resource: "support-case", action: "read" },
+ +  { route: "POST /v1/support/cases/{token}/messages", auth: "public", session: "optional", resource: "support-case", action: "reply" },
+ +  { route: "GET /v1/support/status", auth: "public", session: "optional", resource: "support-status", action: "read" },
+ +  { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
+ +  { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
+ +  { route: "GET /v1/plan-tiers", auth: "user", resource: "plan-tier-rosters", action: "read" },
+ +  { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
+ +  { route: "GET /v1/dev/evaluator", auth: "operator", resource: "evaluator", action: "read" },
+ +  { route: "POST /v1/dev/evaluator/consumer-selection", auth: "operator", resource: "evaluator", action: "select-consumer" },
+ +  { route: "GET /v1/answers", auth: "user", resource: "run-owner", action: "list" },
+ +  { route: "GET /v1/answers/{id}", auth: "user", resource: "run-owner", action: "read-answer" },
+ +  { route: "GET /v1/answers/{id}/inspection", auth: "user", resource: "run-owner", action: "read-inspection" },
+ +  { route: "GET /v1/answers/{id}/nodes/{nodeId}", auth: "user", resource: "run-owner", action: "read-node" },
+ +  { route: "GET /v1/answers/{id}/ledger-digest", auth: "user", resource: "run-owner", action: "read-ledger-digest" },
+ +  { route: "POST /v1/answers/{id}/investigations/{gapRef}", auth: "user", resource: "run-owner", action: "investigate" },
+ +  { route: "POST /v1/answers/{id}/memory-link/unlink", auth: "user", resource: "run-owner", action: "unlink-memory" },
+ +  { route: "GET /v1/runs/{id}", auth: "user", resource: "run-owner", action: "read-run" },
+ +  { route: "GET /v1/runs/{id}/visibility", auth: "user", resource: "run-owner", action: "read-visibility" },
+ +  { route: "GET /v1/runs/{id}/events", auth: "user", resource: "run-owner", action: "read-events" },
+ +  { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" },
+ +  { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
+ +  { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" }
+ +] as const satisfies readonly Readonly<{
+ +  route: string;
+ +  auth: RouteAuthPolicy;
+ +  origin?: RouteOriginPolicy;
+ +  session?: RouteSessionPolicy;
+ +  resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" |
+ +    "deployment" | "plan-tier-rosters" | "evaluator" | "support-session" | "support-message" | "support-case" |
+ +    "support-status";
+ +  action: string;
+ +}>[]);
+ +
+ +type AuthorizationRoute = typeof authorizationPolicyInventory[number]["route"];
+ +const authorizationPolicies = new Map<string, typeof authorizationPolicyInventory[number]>(
+ +  authorizationPolicyInventory.map((policy) => [policy.route, policy])
+ +);
+ +
+ +function routePolicy(route: AuthorizationRoute): { readonly config: {
+ +  readonly auth: RouteAuthPolicy;
+ +  readonly origin?: RouteOriginPolicy;
+ +  readonly session?: RouteSessionPolicy;
+ +} } {
+ +  const policy = authorizationPolicies.get(route);
+ +  if (policy === undefined) throw new TypeError(`AUTHORIZATION_POLICY_UNDECLARED:${route}`);
+ +  return Object.freeze({
+ +    config: Object.freeze({
+ +      auth: policy.auth,
+ +      ...("origin" in policy ? { origin: policy.origin } : {}),
+ +      ...("session" in policy ? { session: policy.session } : {})
+ +    })
+ +  });
+ +}
+ +
+ +function canonicalRoute(method: string, url: string): string {
+ +  return `${method.toUpperCase()} ${url.replace(/:([A-Za-z][A-Za-z0-9_]*)/g, "{$1}")}`;
+ +}
+ +
+ +export const SESSION_COOKIE_NAME = "__Host-debateai-session" as const;
+ +export const CSRF_COOKIE_NAME = "__Host-debateai-csrf" as const;
+ +const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
+ +const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+ +const RETIRED_DEV_HEADER=["x","user","dev","token"].join("-");
+ +const ResourceIdSchema = z.uuid();
+ +const SessionIdSchema = ResourceIdSchema;
+ +const SECURITY_HEADERS = Object.freeze({
+ +  "content-security-policy": "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; object-src 'none'",
+ +  "strict-transport-security": "max-age=31536000; includeSubDomains",
+ +  "x-frame-options": "DENY",
+ +  "x-content-type-options": "nosniff",
+ +  "referrer-policy": "no-referrer",
+ +  "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+ +});
+  
+  declare module "fastify" {
+    interface FastifyContextConfig {
+@@@ -357,61 -143,11 +361,67 @@@ function refreshedCookies(input: Readon
+  }
+  
+  export function buildApi(options: ApiOptions): FastifyInstance {
+++<<<<<<< HEAD
+ +  const allowedOrigin = options.allowedOrigin === undefined
+ +    ? undefined : new URL(options.allowedOrigin).origin;
+ +  const api = Fastify({
+ +    logger: false,
+ +    trustProxy: [...TRUSTED_UI_PROXY_NETWORKS],
+ +    exposeHeadRoutes: false
+ +  });
+ +  api.addHook("onRoute", (route) => {
+ +    for (const method of Array.isArray(route.method) ? route.method : [route.method]) {
+ +      const key = canonicalRoute(method, route.url);
+ +      const policy = authorizationPolicies.get(key);
+ +      if (policy === undefined
+ +        || route.config?.auth !== policy.auth
+ +        || route.config?.origin !== ("origin" in policy ? policy.origin : undefined)
+ +        || route.config?.session !== ("session" in policy ? policy.session : undefined)) {
+ +        throw new TypeError(`AUTHORIZATION_POLICY_UNDECLARED:${key}`);
+ +      }
+ +    }
+++=======
++   const api = Fastify({
++     logger: false,
++     trustProxy: [...TRUSTED_UI_PROXY_NETWORKS]
+++>>>>>>> codex/accounts-t2
+    });
+    api.decorateRequest("session");
+ +  api.decorateRequest("authenticatedSession");
+ +  api.decorateRequest("cookieRefresh");
+ +  const sourceFor = (request: {
+ +    readonly ip: string;
+ +    readonly id: string;
+ +    readonly headers: Readonly<Record<string, unknown>>;
+ +    readonly raw: { readonly socket: { readonly remoteAddress: string | undefined } };
+ +  }) => Object.freeze({
+ +    // Registration, MFA and sessions share T2's one canonical public source.
+ +    ip: normalizeClientIp(request.ip)
+ +      ?? normalizeClientIp(request.raw.socket.remoteAddress)
+ +      ?? "unknown",
+ +    userAgent: typeof request.headers["user-agent"] === "string"
+ +      ? request.headers["user-agent"] as string
+ +      : "unknown",
+ +    requestId: request.id
+ +  });
+ +  const ownershipFor = (request: Readonly<{
+ +    session: Session;
+ +    authenticatedSession?: AuthenticatedSession;
+ +  }>): RunOwnershipAccess => request.authenticatedSession === undefined
+ +    ? Object.freeze({ ownerRef: null, legacyAskerId: request.session.asker_id })
+ +    : Object.freeze({ ownerRef: request.authenticatedSession.ownerRef, legacyAskerId: null });
+ +  api.addHook("onSend", async (request, reply, payload) => {
+ +    for (const [name, value] of Object.entries(SECURITY_HEADERS)) reply.header(name, value);
+ +    reply.header("cache-control", "no-store");
+ +    // Reissue the same opaque generation after successful cookie auth so the
+ +    // browser transport observes the ruled sliding 14-day idle lifetime. The
+ +    // conditional database refresh remains the sole authorization decision,
+ +    // and route-level rotation/deletion headers take precedence here.
+ +    if (request.cookieRefresh !== undefined && reply.getHeader("set-cookie") === undefined) {
+ +      reply.header("set-cookie", refreshedCookies(request.cookieRefresh));
+ +    }
+ +    return payload;
+ +  });
+    api.addHook("preHandler", async (request, reply) => {
+      if (request.is404) return;
+      const authPolicy = request.routeOptions.config.auth;
+@@@ -538,252 -207,27 +548,274 @@@
+      });
+    });
+  
+++<<<<<<< HEAD
+ +  if (options.sessions !== undefined) {
+ +    api.post("/v1/auth/login", routePolicy("POST /v1/auth/login"), async (request, reply) => {
+ +      const body = typeof request.body === "object" && request.body !== null
+ +        ? request.body as Record<string, unknown> : {};
+ +      if (typeof body.challenge_token === "string") {
+ +        const result = await options.sessions!.completeLogin({
+ +          challengeToken: body.challenge_token,
+ +          code: typeof body.code === "string" ? body.code : ""
+ +        }, sourceFor(request));
+ +        reply.header("set-cookie", [
+ +          sessionCookie(result.sessionToken, SESSION_IDLE_MAX_AGE_SECONDS),
+ +          csrfCookie(result.csrfToken, SESSION_IDLE_MAX_AGE_SECONDS)
+ +        ]);
+ +        return reply.send({
+ +          status: result.status,
+ +          csrf_token: result.csrfToken,
+ +          session: result.session,
+ +          ...(result.replacementRecoveryCode === undefined
+ +            ? {} : { replacement_recovery_code: result.replacementRecoveryCode })
+ +        });
+ +      }
+ +      const result = await options.sessions!.beginLogin({
+ +        email: typeof body.email === "string" ? body.email : "",
+ +        password: typeof body.password === "string" ? body.password : ""
+ +      }, sourceFor(request));
+ +      return reply.status(202).send({ status: result.status, challenge_token: result.challengeToken });
+++=======
++   if (options.registration !== undefined) {
++     const sourceFor = (request: {
++       readonly ip: string;
++       readonly id: string;
++       readonly headers: Readonly<Record<string, unknown>>;
++       readonly raw: { readonly socket: { readonly remoteAddress: string | undefined } };
++     }) => Object.freeze({
++       // Fastify has already walked XFF right-to-left and stopped at the first
++       // peer outside the pinned loopback proxy set. Canonicalizing here makes
++       // one limiter/audit key for IPv4-mapped and equivalent IPv6 spellings.
++       // If a malformed value somehow crosses the trusted hop, fail safely to
++       // the socket peer rather than hashing attacker-controlled text.
++       ip: normalizeClientIp(request.ip)
++         ?? normalizeClientIp(request.raw.socket.remoteAddress)
++         ?? "unknown",
++       userAgent: typeof request.headers["user-agent"] === "string"
++         ? request.headers["user-agent"] as string
++         : "unknown",
++       requestId: request.id
+++>>>>>>> codex/accounts-t2
+      });
+ -    api.post("/v1/auth/register", { config: { auth: "public" } }, async (request, reply) => {
+ +    api.post("/v1/auth/logout", routePolicy("POST /v1/auth/logout"), async (request, reply) => {
+ +      const authenticated = request.authenticatedSession;
+ +      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+ +      await options.sessions!.logout(authenticated, sourceFor(request));
+ +      reply.header("set-cookie", expiredCookies());
+ +      return reply.status(204).send();
+ +    });
+ +    api.get("/v1/auth/sessions", routePolicy("GET /v1/auth/sessions"), async (request, reply) => {
+ +      const authenticated = request.authenticatedSession;
+ +      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+ +      return reply.send({ sessions: await options.sessions!.listSessions(authenticated) });
+ +    });
+ +    api.delete<{ Params: { id: string } }>("/v1/auth/sessions/:id", routePolicy("DELETE /v1/auth/sessions/{id}"), async (request, reply) => {
+ +      const authenticated = request.authenticatedSession;
+ +      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+ +      const parsedSessionId = SessionIdSchema.safeParse(request.params.id);
+ +      if (!parsedSessionId.success) return reply.status(404).send({ error: "NOT_FOUND" });
+ +      const revoked = await options.sessions!.revokeSession(authenticated, parsedSessionId.data, sourceFor(request));
+ +      if (!revoked) return reply.status(404).send({ error: "NOT_FOUND" });
+ +      if (parsedSessionId.data === authenticated.session.session_id) reply.header("set-cookie", expiredCookies());
+ +      return reply.status(204).send();
+ +    });
+ +    api.delete("/v1/auth/sessions", routePolicy("DELETE /v1/auth/sessions"), async (request, reply) => {
+ +      const authenticated = request.authenticatedSession;
+ +      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+ +      const revoked = await options.sessions!.revokeAllSessions(authenticated, sourceFor(request));
+ +      reply.header("set-cookie", expiredCookies());
+ +      return reply.send({ revoked });
+ +    });
+ +    api.post("/v1/auth/step-up", routePolicy("POST /v1/auth/step-up"), async (request, reply) => {
+ +      const authenticated = request.authenticatedSession;
+ +      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+ +      const body = typeof request.body === "object" && request.body !== null
+ +        ? request.body as Record<string, unknown> : {};
+ +      const authorization = body.authorization === undefined
+ +        ? undefined
+ +        : parseRequest(StepUpAuthorizationRequestSchema, body.authorization);
+ +      const rotated = await options.sessions!.stepUp({
+ +        session: authenticated,
+ +        password: typeof body.password === "string" ? body.password : "",
+ +        code: typeof body.code === "string" ? body.code : "",
+ +        ...(authorization === undefined ? {} : { authorization:
+ +          authorization.action === "DELETE_ACCOUNT"
+ +            ? { action: authorization.action }
+ +            : { action: authorization.action, targetRunId: authorization.target_run_id }
+ +        })
+ +      }, sourceFor(request));
+ +      reply.header("set-cookie", [
+ +        sessionCookie(rotated.sessionToken, SESSION_IDLE_MAX_AGE_SECONDS),
+ +        csrfCookie(rotated.csrfToken, SESSION_IDLE_MAX_AGE_SECONDS)
+ +      ]);
+ +      return reply.send({
+ +        status: "step_up_complete",
+ +        csrf_token: rotated.csrfToken,
+ +        ...(authorization === undefined
+ +          || rotated.grantToken === undefined
+ +          || rotated.grantExpiresAt === undefined
+ +          ? {}
+ +          : { step_up_grant: authorization.action === "DELETE_ACCOUNT"
+ +              ? {
+ +                  token: rotated.grantToken,
+ +                  action: authorization.action,
+ +                  expires_at: rotated.grantExpiresAt.toISOString()
+ +                }
+ +              : {
+ +                  token: rotated.grantToken,
+ +                  action: authorization.action,
+ +                  target_run_id: authorization.target_run_id,
+ +                  expires_at: rotated.grantExpiresAt.toISOString()
+ +                } })
+ +      });
+ +    });
+ +  }
+ +  api.delete("/v1/account",routePolicy("DELETE /v1/account"),async (request,reply)=>{
+ +    const authenticated=request.authenticatedSession;
+ +    if (authenticated===undefined) {
+ +      return reply.status(409).send({ error:"COOKIE_SESSION_REQUIRED" });
+ +    }
+ +    const input=parseRequest(AccountErasureScheduleRequestSchema,request.body);
+ +    if (options.accountErasure===undefined) {
+ +      return reply.status(503).send({ error:"ACCOUNT_ERASURE_UNAVAILABLE" });
+ +    }
+ +    const scheduled=await options.accountErasure.schedule({
+ +      authenticated,grantToken:input.step_up_grant
+ +    });
+ +    if (scheduled==="NOTIFICATION_CHANNEL_REQUIRED") {
+ +      return reply.status(409).send({ error:"ACCOUNT_NOTIFICATION_CHANNEL_REQUIRED" });
+ +    }
+ +    if (scheduled===null || scheduled.status==="NONE" || scheduled.executeAt===undefined) {
+ +      return reply.status(404).send({ error:"NOT_FOUND" });
+ +    }
+ +    return reply.status(202).send(AccountErasureStatusSchema.parse({
+ +      status:scheduled.status,execute_at:scheduled.executeAt.toISOString(),
+ +      cancellation_ref:scheduled.cancellationRef
+ +    }));
+ +  });
+ +  api.get("/v1/account/erasure",routePolicy("GET /v1/account/erasure"),async (request,reply)=>{
+ +    const authenticated=request.authenticatedSession;
+ +    if (authenticated===undefined) {
+ +      return reply.status(409).send({ error:"COOKIE_SESSION_REQUIRED" });
+ +    }
+ +    if (options.accountErasure===undefined) {
+ +      return reply.status(503).send({ error:"ACCOUNT_ERASURE_UNAVAILABLE" });
+ +    }
+ +    const current=await options.accountErasure.current(authenticated);
+ +    return reply.send(AccountErasureStatusSchema.parse(current.status==="NONE"
+ +      ? { status:"NONE" }
+ +      : { status:current.status,execute_at:current.executeAt!.toISOString(),
+ +          cancellation_ref:current.cancellationRef! }
+ +    ));
+ +  });
+ +  api.post(
+ +    "/v1/account/erasure/cancel",
+ +    routePolicy("POST /v1/account/erasure/cancel"),
+ +    async (request,reply)=>{
+ +      const authenticated=request.authenticatedSession;
+ +      if (authenticated===undefined) {
+ +        return reply.status(409).send({ error:"COOKIE_SESSION_REQUIRED" });
+ +      }
+ +      if (options.accountErasure===undefined) {
+ +        return reply.status(503).send({ error:"ACCOUNT_ERASURE_UNAVAILABLE" });
+ +      }
+ +      const input=parseRequest(AccountErasureCancelRequestSchema,request.body);
+ +      if (!await options.accountErasure.cancel({
+ +        authenticated,cancellationRef:input.cancellation_ref
+ +      })) {
+ +        return reply.status(404).send({ error:"NOT_FOUND" });
+ +      }
+ +      return reply.send({ status:"CANCELLED" });
+ +    }
+ +  );
+ +  api.post(
+ +    "/v1/account/legacy-runs/claim",
+ +    routePolicy("POST /v1/account/legacy-runs/claim"),
+ +    async (request,reply)=>{
+ +      const authenticated=request.authenticatedSession;
+ +      if (authenticated===undefined) {
+ +        return reply.status(401).send({ error:"SESSION_REQUIRED" });
+ +      }
+ +      if (options.legacyRunClaim===undefined) {
+ +        return reply.status(503).send({ error:"LEGACY_RUN_CLAIM_UNAVAILABLE" });
+ +      }
+ +      const input=parseRequest(LegacyRunClaimRequestSchema,request.body);
+ +      const outcome=await options.legacyRunClaim.claim({
+ +        authenticated,legacyToken:input.legacy_token,source:sourceFor(request)
+ +      });
+ +      if (outcome.status==="SESSION_INVALID") {
+ +        return reply.status(401).send({ error:"SESSION_REQUIRED" });
+ +      }
+ +      return reply.send(LegacyRunClaimResultSchema.parse({
+ +        status:outcome.status,claimed_count:outcome.claimedCount
+ +      }));
+ +    }
+ +  );
+ +  api.delete<{ Params:{ id:string } }>(
+ +    "/v1/debates/:id",
+ +    routePolicy("DELETE /v1/debates/{id}"),
+ +    async (request,reply)=>{
+ +      const runId=ResourceIdSchema.safeParse(request.params.id);
+ +      const authenticated=request.authenticatedSession;
+ +      if (!runId.success || authenticated===undefined) {
+ +        return reply.status(404).send({ error:"NOT_FOUND" });
+ +      }
+ +      const input=parseRequest(PrivateDebateErasureRequestSchema,request.body);
+ +      if (options.accountErasure===undefined) {
+ +        return reply.status(503).send({ error:"ACCOUNT_ERASURE_UNAVAILABLE" });
+ +      }
+ +      const outcome=await options.accountErasure.deletePrivateDebate({
+ +        runId:runId.data,authenticated,grantToken:input.step_up_grant,
+ +        source:sourceFor(request)
+ +      });
+ +      if (outcome==="NOT_FOUND") return reply.status(404).send({ error:"NOT_FOUND" });
+ +      if (outcome==="PUBLISHED") {
+ +        return reply.status(409).send({ error:"DEBATE_MUST_BE_PRIVATE" });
+ +      }
+ +      if (outcome==="LEGACY_RESIDUAL") {
+ +        return reply.status(409).send({ error:"LEGACY_CONTENT_RETAINED" });
+ +      }
+ +      return reply.status(outcome==="PENDING" ? 202 : 200).send(
+ +        PrivateDebateErasureStatusSchema.parse({ status:outcome })
+ +      );
+ +    }
+ +  );
+ +
+ +  api.get<{ Querystring: { limit?: string; offset?: string } }>(
+ +    "/v1/public/debates",
+ +    routePolicy("GET /v1/public/debates"),
+ +    async (request, reply) => {
+ +      const limit = Number(request.query.limit);
+ +      const offset = Number(request.query.offset);
+ +      if (!Number.isInteger(limit) || limit < 1 || limit > 100
+ +        || !Number.isInteger(offset) || offset < 0) {
+ +        return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+ +      }
+ +      if (options.publications === undefined) {
+ +        return reply.send(PublicDebateListSchema.parse({ items: [], total: 0 }));
+ +      }
+ +      return reply.send(PublicDebateListSchema.parse(
+ +        await options.publications.list(limit, offset)
+ +      ));
+ +    }
+ +  );
+ +
+ +  api.get<{ Params: { id: string } }>(
+ +    "/v1/public/debates/:id",
+ +    routePolicy("GET /v1/public/debates/{id}"),
+ +    async (request, reply) => {
+ +      const publicationRef = ResourceIdSchema.safeParse(request.params.id);
+ +      if (!publicationRef.success || options.publications === undefined) {
+ +        return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
+ +      }
+ +      const debate = await options.publications.readPublicDebate(publicationRef.data);
+ +      return debate === null
+ +        ? reply.status(404).send({ error: "DEBATE_NOT_FOUND" })
+ +        : reply.send(PublicDebateSchema.parse(debate));
+ +    }
+ +  );
+ +  if (options.registration !== undefined) {
+ +    api.post("/v1/auth/register", routePolicy("POST /v1/auth/register"), async (request, reply) => {
+        const body = typeof request.body === "object" && request.body !== null
+          ? request.body as Record<string, unknown>
+          : {};
+diff --cc dialectical-engine/apps/ui/app/api/[...path]/route.ts
+index e22ec875,980b234c..00000000
+--- a/dialectical-engine/apps/ui/app/api/[...path]/route.ts
++++ b/dialectical-engine/apps/ui/app/api/[...path]/route.ts
+@@@ -16,27 -16,9 +16,33 @@@ const REQUEST_HEADER_ALLOWLIST = Object
+    "if-none-match",
+    "if-unmodified-since",
+    "last-event-id",
+++<<<<<<< HEAD
+ +  "origin",
+ +  "range",
+ +  "user-agent",
+ +  "x-csrf-token"
+ +  ,"x-support-session-token"
+ +] as const);
+ +const RESPONSE_HEADER_ALLOWLIST = Object.freeze([
+ +  "accept-ranges",
+ +  "cache-control",
+ +  "content-disposition",
+ +  "content-length",
+ +  "content-range",
+ +  "content-type",
+ +  "etag",
+ +  "last-modified",
+ +  "retry-after",
+ +  "vary"
+ +] as const);
+ +const SESSION_COOKIE_NAME = "__Host-debateai-session";
+ +const CSRF_COOKIE_NAME = "__Host-debateai-csrf";
+ +const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
+++=======
++   "range",
++   "x-user-dev-token"
++ ] as const);
+++>>>>>>> codex/accounts-t2
+  
+  function readApiBase(): URL {
+    const configured = process.env.DIALECTICAL_API_BASE?.trim();
+@@@ -73,65 -55,11 +79,71 @@@ function createUpstreamHeaders(request
+      const value = request.headers.get(name);
+      if (value !== null) headers.set(name, value);
+    }
+++<<<<<<< HEAD
+ +  const cookie = filteredSessionCookies(request.headers.get("cookie"));
+ +  if (cookie !== null) headers.set("cookie", cookie);
+++=======
+++>>>>>>> codex/accounts-t2
+    const clientIp = normalizeClientIp(request.headers.get(TRUSTED_CLIENT_IP_HEADER));
+    if (clientIp !== null) headers.set("x-forwarded-for", clientIp);
+    return headers;
+  }
+  
+++<<<<<<< HEAD
+ +function filteredSessionCookies(raw: string | null): string | null {
+ +  if (raw === null || /[\r\n\0]/.test(raw)) return null;
+ +  const selected = new Map<string, string>();
+ +  for (const member of raw.split(";")) {
+ +    const index = member.indexOf("=");
+ +    if (index < 1) continue;
+ +    const name = member.slice(0, index).trim();
+ +    if (name !== SESSION_COOKIE_NAME && name !== CSRF_COOKIE_NAME) continue;
+ +    const value = member.slice(index + 1).trim();
+ +    if (selected.has(name) || !/^[A-Za-z0-9_-]{43}$/.test(value)) return null;
+ +    selected.set(name, value);
+ +  }
+ +  const pairs = [SESSION_COOKIE_NAME, CSRF_COOKIE_NAME].flatMap((name) => {
+ +    const value = selected.get(name);
+ +    return value === undefined ? [] : [`${name}=${value}`];
+ +  });
+ +  return pairs.length === 0 ? null : pairs.join("; ");
+ +}
+ +
+ +function lawfulSetCookie(value: string): boolean {
+ +  if (/[\r\n\0]/.test(value)) return false;
+ +  const members = value.split(";").map((member) => member.trim());
+ +  const pair = members[0] ?? "";
+ +  const pairSeparator = pair.indexOf("=");
+ +  if (pairSeparator < 1) return false;
+ +  const name = pair.slice(0, pairSeparator);
+ +  if (name !== SESSION_COOKIE_NAME && name !== CSRF_COOKIE_NAME) return false;
+ +  const cookieValue = pair.slice(pairSeparator + 1);
+ +  const attributes = members.slice(1).map((member) => member.toLowerCase());
+ +  const securityAttributes = name === SESSION_COOKIE_NAME ? ["httponly", "secure"] : ["secure"];
+ +  const expected = cookieValue === ""
+ +    ? ["path=/", "max-age=0", "expires=thu, 01 jan 1970 00:00:00 gmt", ...securityAttributes, "samesite=lax"]
+ +    : ["path=/", `max-age=${SESSION_IDLE_MAX_AGE_SECONDS}`, ...securityAttributes, "samesite=lax"];
+ +  return (cookieValue === "" || /^[A-Za-z0-9_-]{43}$/.test(cookieValue))
+ +    && attributes.length === expected.length
+ +    && attributes.every((attribute, index) => attribute === expected[index]);
+ +}
+ +
+ +function createDownstreamHeaders(upstream: Headers): Headers {
+ +  const headers = new Headers();
+ +  for (const name of RESPONSE_HEADER_ALLOWLIST) {
+ +    const value = upstream.get(name);
+ +    if (value !== null) headers.set(name, value);
+ +  }
+ +  const setCookies = typeof upstream.getSetCookie === "function"
+ +    ? upstream.getSetCookie() : [];
+ +  for (const value of setCookies) {
+ +    if (lawfulSetCookie(value)) headers.append("set-cookie", value);
+ +  }
+ +  return headers;
+ +}
+ +
+++=======
+++>>>>>>> codex/accounts-t2
+  async function proxyApi(request: Request, context: ProxyContext): Promise<Response> {
+    const { path } = await context.params;
+    const target = createTargetUrl(request, path);
+diff --cc dialectical-engine/apps/ui/package.json
+index 7d2151e0,aa176c2a..00000000
+--- a/dialectical-engine/apps/ui/package.json
++++ b/dialectical-engine/apps/ui/package.json
+@@@ -5,7 -5,7 +5,11 @@@
+    "type": "module",
+    "scripts": {
+      "dev": "node server.mjs --dev",
+++<<<<<<< HEAD
+ +    "build": "next build && node ../../scripts/assert-auth-front-door-routes.mjs . apps-ui",
+++=======
++     "build": "next build",
+++>>>>>>> codex/accounts-t2
+      "start": "node server.mjs",
+      "lint": "next lint",
+      "typecheck": "tsc --noEmit -p tsconfig.json",
+diff --cc dialectical-engine/tests/unit/t2-real-client-ip.test.ts
+index 35adfab3,718db7d6..00000000
+--- a/dialectical-engine/tests/unit/t2-real-client-ip.test.ts
++++ b/dialectical-engine/tests/unit/t2-real-client-ip.test.ts
+@@@ -8,7 -8,9 +8,13 @@@ import 
+    type RegistrationApplication
+  } from "../../apps/api/src/registration.js";
+  import * as restoredUiRoute from "../../apps/ui/app/api/[...path]/route.js";
+++<<<<<<< HEAD
+ +import { hardenIncomingProxyHeaders as hardenRestoredUiHeaders } from "../../apps/ui/trusted-client-ip.mjs";
+++=======
++ import * as webRoute from "../../web/app/api/[...path]/route.js";
++ import { hardenIncomingProxyHeaders as hardenRestoredUiHeaders } from "../../apps/ui/trusted-client-ip.mjs";
++ import { hardenIncomingProxyHeaders as hardenWebHeaders } from "../../web/trusted-client-ip.mjs";
+++>>>>>>> codex/accounts-t2
+  
+  type ProxyRoute = Readonly<{
+    POST(request: Request, context: {
+@@@ -45,7 -47,7 +51,11 @@@ async function observedAuthSource(input
+      },
+      verifyEmail: async (_request, source) => {
+        observed.push(source.ip);
+++<<<<<<< HEAD
+ +      return { status: "mfa_required" };
+++=======
++       return { status: "active" };
+++>>>>>>> codex/accounts-t2
+      },
+      resendVerification: async (_request, source) => {
+        observed.push(source.ip);
+@@@ -135,7 -137,7 +145,11 @@@ async function forwardedHeaders
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+++<<<<<<< HEAD
+ +      [["x","user","dev","token"].join("-")]: "token:test",
+++=======
++       "x-user-dev-token": "token:test",
+++>>>>>>> codex/accounts-t2
+        "x-debateai-client-ip": trustedClientIp,
+        ...extraHeaders
+      },
+@@@ -147,7 -149,8 +161,12 @@@
+  }
+  
+  describe.each([
+++<<<<<<< HEAD
+ +  ["apps/ui", restoredUiRoute as ProxyRoute]
+++=======
++   ["apps/ui", restoredUiRoute as ProxyRoute],
++   ["web", webRoute as ProxyRoute]
+++>>>>>>> codex/accounts-t2
+  ])("T2 %s proxy header boundary", (_surface, route) => {
+    it("uses an explicit allowlist and replaces every caller forwarding header", async () => {
+      const headers = await forwardedHeaders(route, "203.0.113.9", {
+@@@ -163,7 -166,8 +182,12 @@@
+  
+      expect(Object.fromEntries(headers)).toEqual({
+        "content-type": "application/json",
+++<<<<<<< HEAD
+ +      "x-forwarded-for": "203.0.113.9"
+++=======
++       "x-forwarded-for": "203.0.113.9",
++       "x-user-dev-token": "token:test"
+++>>>>>>> codex/accounts-t2
+      });
+    });
+  
+@@@ -189,7 -193,8 +213,12 @@@
+  
+  describe("T2 Next socket boundary", () => {
+    it.each([
+++<<<<<<< HEAD
+ +    ["apps/ui", hardenRestoredUiHeaders]
+++=======
++     ["apps/ui", hardenRestoredUiHeaders],
++     ["web", hardenWebHeaders]
+++>>>>>>> codex/accounts-t2
+    ])("%s overwrites duplicate/spoofed forwarding metadata with the socket peer", (_surface, harden) => {
+      const headers: Record<string, string | string[] | undefined> = {
+        forwarded: "for=198.51.100.250",
+@@@ -208,7 -213,8 +237,12 @@@
+    });
+  
+    it.each([
+++<<<<<<< HEAD
+ +    ["apps/ui", hardenRestoredUiHeaders]
+++=======
++     ["apps/ui", hardenRestoredUiHeaders],
++     ["web", hardenWebHeaders]
+++>>>>>>> codex/accounts-t2
+    ])("%s fails closed when the socket peer is not an IP literal", (_surface, harden) => {
+      const headers: Record<string, string | string[] | undefined> = {
+        "x-forwarded-for": "198.51.100.250",
+@@@ -218,9 -224,10 +252,16 @@@
+      expect(headers).toEqual({});
+    });
+  
+++<<<<<<< HEAD
+ +  it("the executable UI server replaces caller forwarding metadata before Next sees it", async () => {
+ +    for (const surface of [
+ +      new URL("../../apps/ui/", import.meta.url)
+++=======
++   it("both executable UI servers replace caller forwarding metadata before Next sees it", async () => {
++     for (const surface of [
++       new URL("../../apps/ui/", import.meta.url),
++       new URL("../../web/", import.meta.url)
+++>>>>>>> codex/accounts-t2
+      ]) {
+        const source = await readFile(new URL("server.mjs", surface), "utf8");
+        expect(source).toContain("hardenIncomingProxyHeaders");
+* Unmerged path dialectical-engine/web/app/api/[...path]/route.ts
+* Unmerged path dialectical-engine/web/package.json

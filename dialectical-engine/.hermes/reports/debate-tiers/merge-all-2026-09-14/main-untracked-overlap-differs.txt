@@ -1,0 +1,4 @@
+dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REV1-draft.md (main 09-14 18:50)
+dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REV2-draft.md (main 09-14 18:50)
+dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REV3-draft.md (main 09-14 18:50)
+dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REVIEW-COMMON-draft.md (main 09-14 18:50)

@@ -1,0 +1,52 @@
+diff --git a/dialectical-engine/apps/api/src/index.ts b/dialectical-engine/apps/api/src/index.ts
+index 86e52755..53ef3760 100644
+--- a/dialectical-engine/apps/api/src/index.ts
++++ b/dialectical-engine/apps/api/src/index.ts
+@@ -61,6 +61,7 @@ import type {
+   EvaluatorConsumerSelectionResult,
+   EvaluatorDevMenuView
+ } from "@debateai/evaluator";
++import type { EvaluatorRankingsView } from "../../../packages/evaluator/src/rankings.js";
+ import { Argon2InfrastructureError } from "@debateai/crypto";
+ import {
+   AUTH_RETRYABLE_UNAVAILABLE_CODE,
+@@ -137,6 +138,7 @@ export const authorizationPolicyInventory = Object.freeze([
+   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
+   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
+   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
++  { route: "GET /v1/evaluator/rankings", auth: "user", resource: "evaluator", action: "read-rankings" },
+   { route: "GET /v1/dev/evaluator", auth: "operator", resource: "evaluator", action: "read" },
+   { route: "POST /v1/dev/evaluator/consumer-selection", auth: "operator", resource: "evaluator", action: "select-consumer" },
+   { route: "GET /v1/answers", auth: "user", resource: "run-owner", action: "list" },
+@@ -249,6 +251,7 @@ export interface ApiOptions {
+   readonly legacyRunClaim?: LegacyRunClaimApplication;
+   readonly allowedOrigin?: string;
+   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
++  readonly evaluatorRankings?: EvaluatorRankingsApplication;
+   readonly evaluatorDevMenuRegisterVersion?: number;
+   readonly evaluatorDevMenuClock?: () => Date;
+   readonly support?: SupportApplication;
+@@ -264,6 +267,10 @@ export interface EvaluatorDevMenuApplication {
+   }): Promise<EvaluatorConsumerSelectionResult>;
+ }
+ 
++export interface EvaluatorRankingsApplication {
++  readRankings(): Promise<EvaluatorRankingsView>;
++}
++
+ /**
+  * Marks a domain error that was observed while evaluating whether an ask may
+  * be admitted. Typed errors from deployment reads or persistence deliberately
+@@ -868,6 +875,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
+     return reply.send(DeploymentSchema.parse(await options.application.readDeployment(request.session)));
+   });
+ 
++  if (options.evaluatorRankings !== undefined) {
++    api.get("/v1/evaluator/rankings", routePolicy("GET /v1/evaluator/rankings"), async (_request, reply) => {
++      return reply.send(await options.evaluatorRankings!.readRankings());
++    });
++  }
++
+   if (options.evaluatorDevMenu !== undefined) {
+     if (!Number.isInteger(options.evaluatorDevMenuRegisterVersion)
+       || options.evaluatorDevMenuRegisterVersion! < 1) {

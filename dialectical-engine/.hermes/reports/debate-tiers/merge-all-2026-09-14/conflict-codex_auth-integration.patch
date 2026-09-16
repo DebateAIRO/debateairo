@@ -1,0 +1,1537 @@
+diff --cc dialectical-engine/apps/ui/app/login/page.tsx
+index ffa7ee87,76cb62c5..00000000
+--- a/dialectical-engine/apps/ui/app/login/page.tsx
++++ b/dialectical-engine/apps/ui/app/login/page.tsx
+@@@ -1,20 -1,5 +1,26 @@@
+++<<<<<<< HEAD
+ +import { cookies, headers } from "next/headers";
+ +import { redirect } from "next/navigation";
+ +import { LoginFlow } from "@/components/LoginFlow";
+ +import { createServerContractClient, USER_TOKEN_COOKIE } from "@/lib/serverApi";
+ +
+ +export default async function LoginPage() {
+ +  const token = (await cookies()).get(USER_TOKEN_COOKIE)?.value;
+ +  let sessionConfirmed = false;
+ +  if (token !== undefined) {
+ +    const userAgent = (await headers()).get("user-agent") ?? undefined;
+ +    try {
+ +      await createServerContractClient(fetch, token, userAgent).readSession();
+ +      sessionConfirmed = true;
+ +    } catch {
+ +      // A stale or invalid cookie must not prevent a fresh login attempt.
+ +    }
+ +  }
+ +  if (sessionConfirmed) redirect("/#start-a-debate");
+++=======
++ import { LoginFlow } from "@/components/LoginFlow";
++ 
++ export default function LoginPage() {
+++>>>>>>> codex/auth-integration
+    return <LoginFlow />;
+  }
+diff --cc dialectical-engine/apps/ui/app/page.tsx
+index d004d0fb,5b13067a..00000000
+--- a/dialectical-engine/apps/ui/app/page.tsx
++++ b/dialectical-engine/apps/ui/app/page.tsx
+@@@ -67,12 -51,14 +67,21 @@@ export default async function HomePage(
+          {error ? (
+            <div className="error" style={{ marginTop: 18 }}>
+              <p>{error}</p>
+++<<<<<<< HEAD
+ +            <div className="formActions">
+ +              <Link className="btn" href="/login">{token === null ? "Log in" : "Sign in again"}</Link>
+ +              {token === null ? (
+ +                <Link className="btn btnDark" href="/sign-up">Create account</Link>
+ +              ) : null}
+ +            </div>
+++=======
++             {token === null ? (
++               <div className="formActions">
++                 <Link className="btn" href="/login">Log in</Link>
++                 <Link className="btn btnDark" href="/sign-up">Create account</Link>
++               </div>
++             ) : null}
+++>>>>>>> codex/auth-integration
+            </div>
+          ) : null}
+  
+diff --cc dialectical-engine/apps/ui/components/LoginFlow.tsx
+index 38313a5a,06a30cc1..00000000
+--- a/dialectical-engine/apps/ui/components/LoginFlow.tsx
++++ b/dialectical-engine/apps/ui/components/LoginFlow.tsx
+@@@ -1,39 -1,23 +1,59 @@@
+  "use client";
+  
+  import Link from "next/link";
+++<<<<<<< HEAD
+ +import { FormEvent, useEffect, useState } from "react";
+ +import { ContractHttpError, type ContractClient } from "@debateai/contract";
+ +import { AuthShell } from "@/components/AuthShell";
+ +import { contractClient } from "@/lib/api";
+ +import { setRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
+ +import { safeReturnPath } from "@/lib/returnPath";
+ +
+ +type LoginClient = Pick<ContractClient, "beginLogin" | "completeLogin">;
+ +type VerificationMethod = "authenticator" | "recovery";
+ +
+ +/* The document shows live validity marks under both auth fields (7a, and 8a
+ +   with two rules unmet). These are presentation only — the server remains the
+ +   authority on whether any credential is accepted. */
+ +const PASSWORD_RULES: readonly { readonly label: string; readonly met: (value: string) => boolean }[] = [
+ +  { label: "Eight characters", met: (v) => v.length >= 8 },
+ +  { label: "One capital letter", met: (v) => /[A-Z]/.test(v) },
+ +  { label: "One number", met: (v) => /[0-9]/.test(v) },
+ +  { label: "One special character", met: (v) => /[^A-Za-z0-9]/.test(v) }
+ +];
+ +
+ +function emailValidity(value: string): { state: "idle" | "ok" | "bad"; text: string } {
+ +  const trimmed = value.trim();
+ +  if (trimmed.length === 0) return { state: "idle", text: "Use the address this account was verified with." };
+ +  // Deliberately permissive: the address is checked for shape, not existence.
+ +  const shaped = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(trimmed);
+ +  return shaped
+ +    ? { state: "ok", text: "✓ Valid address" }
+ +    : { state: "bad", text: "✗ That does not look like an email address" };
+ +}
+ +
+ +function navigateHome(): void {
+ +  const next = new URLSearchParams(window.location.search).get("next");
+ +  window.location.assign(safeReturnPath(next));
+++=======
++ import { FormEvent, useState } from "react";
++ import type { ContractClient } from "@debateai/contract";
++ import { AuthShell } from "@/components/AuthShell";
++ import { contractClient } from "@/lib/api";
++ 
++ const HOME_PATH = "/";
++ 
++ function failureMessage(failure: unknown, fallback: string): string {
++   return failure instanceof Error && failure.message.trim().length > 0
++     ? failure.message
++     : fallback;
++ }
++ 
++ type LoginClient = Pick<ContractClient, "beginLogin" | "completeLogin">;
++ 
++ function navigateHome(): void {
++   window.location.assign(HOME_PATH);
+++>>>>>>> codex/auth-integration
+  }
+  
+  export function LoginFlow({
+@@@ -45,19 -29,8 +65,24 @@@
+  }>) {
+    const [challengeToken, setChallengeToken] = useState<string | null>(null);
+    const [replacementRecoveryCode, setReplacementRecoveryCode] = useState<string | null>(null);
+++<<<<<<< HEAD
+ +  const [verificationMethod, setVerificationMethod] = useState<VerificationMethod>("authenticator");
+ +  const [busy, setBusy] = useState(false);
+ +  const [error, setError] = useState<string | null>(null);
+ +  const [signUpHref, setSignUpHref] = useState("/sign-up");
+ +  const [email, setEmail] = useState("");
+ +  const [password, setPassword] = useState("");
+ +  const [code, setCode] = useState("");
+ +
+ +  useEffect(() => {
+ +    const next = new URLSearchParams(window.location.search).get("next");
+ +    if (next !== null) setSignUpHref(`/sign-up?next=${encodeURIComponent(next)}`);
+ +    return () => setRecoveryAcknowledgementPending(false);
+ +  }, []);
+++=======
++   const [busy, setBusy] = useState(false);
++   const [error, setError] = useState<string | null>(null);
+++>>>>>>> codex/auth-integration
+  
+    async function submitCredentials(event: FormEvent<HTMLFormElement>): Promise<void> {
+      event.preventDefault();
+@@@ -69,10 -42,9 +94,16 @@@
+          String(data.get("email") ?? "").trim(),
+          String(data.get("password") ?? "")
+        );
+++<<<<<<< HEAD
+ +      setVerificationMethod("authenticator");
+ +      setChallengeToken(result.challenge_token);
+ +    } catch {
+ +      setError("Sign-in could not be completed.");
+++=======
++       setChallengeToken(result.challenge_token);
++     } catch (failure) {
++       setError(failureMessage(failure, "Sign-in could not be completed."));
+++>>>>>>> codex/auth-integration
+      } finally {
+        setBusy(false);
+      }
+@@@ -88,67 -60,30 +119,87 @@@
+        const result = await client.completeLogin(challengeToken, code);
+        setChallengeToken(null);
+        if (result.replacement_recovery_code !== undefined) {
+++<<<<<<< HEAD
+ +        setRecoveryAcknowledgementPending(true);
+++=======
+++>>>>>>> codex/auth-integration
+          setReplacementRecoveryCode(result.replacement_recovery_code);
+          return;
+        }
+        onAuthenticated();
+      } catch (failure) {
+++<<<<<<< HEAD
+ +      if (failure instanceof ContractHttpError && failure.status === 429) {
+ +        setError("Too many verification attempts. Wait five minutes, then start sign-in again.");
+ +      } else if (failure instanceof ContractHttpError && failure.status === 401
+ +        && verificationMethod === "recovery") {
+ +        setError("That recovery code was not accepted. Start sign-in again if the challenge is more than five minutes old, or use another unused code from this account.");
+ +      } else if (failure instanceof ContractHttpError && failure.status === 401) {
+ +        setError("That authentication code was not accepted. Enter the current 6-digit code, or use an unused recovery code.");
+ +      } else {
+ +        setError("Authenticator verification could not be completed.");
+ +      }
+++=======
++       setError(failureMessage(failure, "Authenticator verification could not be completed."));
+++>>>>>>> codex/auth-integration
+      } finally {
+        setBusy(false);
+      }
+    }
+  
+++<<<<<<< HEAD
+ +  const verificationPending = challengeToken !== null;
+ +  const emailState = emailValidity(email);
+ +  const shellCopy = replacementRecoveryCode !== null
+ +    ? {
+ +        eyebrow: "Recovery access",
+ +        title: "Save your new recovery code.",
+ +        description: "Your session is ready, but this replacement code must be recorded before you continue."
+ +      }
+ +    : verificationPending
+ +      ? verificationMethod === "authenticator"
+ +        ? {
+ +            eyebrow: "Two-step verification",
+ +            title: "Enter your authentication code.",
+ +            description: "Open Google Authenticator or another authenticator app and enter the current 6-digit code."
+ +          }
+ +        : {
+ +            eyebrow: "Two-step verification",
+ +            title: "Enter a recovery code.",
+ +            description: "Use one of the recovery codes you saved when you secured this account. Each code works once."
+ +          }
+ +      : {
+ +          eyebrow: "Welcome back",
+ +          title: "Back to the graph.",
+ +          description: "Sessions follow a fixed security policy. Every sign-in continues with your authenticator or a recovery code."
+ +        };
+ +
+ +  return (
+ +    <AuthShell
+ +      eyebrow={shellCopy.eyebrow}
+ +      title={shellCopy.title}
+ +      description={shellCopy.description}
+ +      footer={replacementRecoveryCode === null && !verificationPending ? (
+ +        <p>No account yet? <Link href={signUpHref}>Create one</Link></p>
+++=======
++   return (
++     <AuthShell
++       eyebrow="Welcome back"
++       title="Back to the graph."
++       description="Sessions follow a fixed security policy. Every sign-in continues with your authenticator or a recovery code."
++       footer={replacementRecoveryCode === null ? (
++         <p>No account yet? <Link href="/sign-up">Create one</Link></p>
+++>>>>>>> codex/auth-integration
+        ) : null}
+      >
+        {error ? <div className="authAlert" role="alert">{error}</div> : null}
+  
+        {replacementRecoveryCode !== null ? (
+          <section className="authSuccessWarning" role="alert" aria-labelledby="replacement-code-title">
+++<<<<<<< HEAD
+ +          <span className="authSuccessAccent" aria-hidden />
+++=======
+++>>>>>>> codex/auth-integration
+            <p className="authNoticeKicker">Signed in securely</p>
+            <h2 id="replacement-code-title">Record your replacement recovery code</h2>
+            <p>Your used recovery code has been replaced. This is the only time this new code will be shown.</p>
+@@@ -157,7 -92,6 +208,10 @@@
+              className="authPrimary"
+              type="button"
+              onClick={() => {
+++<<<<<<< HEAD
+ +              setRecoveryAcknowledgementPending(false);
+++=======
+++>>>>>>> codex/auth-integration
+                setReplacementRecoveryCode(null);
+                onAuthenticated();
+              }}
+@@@ -166,143 -100,33 +220,170 @@@
+            </button>
+          </section>
+        ) : challengeToken === null ? (
+++<<<<<<< HEAD
+ +        <form className="authForm" method="post" action="/login" aria-busy={busy} onSubmit={submitCredentials}>
+ +          <div className="authField">
+ +            <label htmlFor="login-email">Email</label>
+ +            <input
+ +              id="login-email"
+ +              name="email"
+ +              type="email"
+ +              autoComplete="username"
+ +              placeholder="you@institution.edu"
+ +              value={email}
+ +              onChange={(event) => setEmail(event.target.value)}
+ +              aria-describedby="login-email-validity"
+ +              required
+ +              autoFocus
+ +              disabled={busy}
+ +            />
+ +            <p className="authValidity" id="login-email-validity" data-state={emailState.state}>
+ +              {emailState.text}
+ +            </p>
+ +          </div>
+ +          <div className="authField">
+ +            <label htmlFor="login-password">Password</label>
+ +            <input
+ +              id="login-password"
+ +              name="password"
+ +              type="password"
+ +              autoComplete="current-password"
+ +              value={password}
+ +              onChange={(event) => setPassword(event.target.value)}
+ +              aria-describedby="login-password-rules"
+ +              required
+ +              disabled={busy}
+ +            />
+ +            <ul className="authRules" id="login-password-rules">
+ +              {PASSWORD_RULES.map((rule) => {
+ +                const met = rule.met(password);
+ +                return (
+ +                  <li
+ +                    className="authRule"
+ +                    key={rule.label}
+ +                    data-met={password.length === 0 ? undefined : String(met)}
+ +                  >
+ +                    {password.length === 0 ? "·" : met ? "✓" : "✗"} {rule.label}
+ +                  </li>
+ +                );
+ +              })}
+ +            </ul>
+++=======
++         <form className="authForm" aria-busy={busy} onSubmit={submitCredentials}>
++           <div className="authField"><label htmlFor="login-email">Email</label>
++             <input id="login-email" name="email" type="email" autoComplete="username" placeholder="you@institution.edu" required autoFocus disabled={busy} />
++           </div>
++           <div className="authField"><label htmlFor="login-password">Password</label>
++             <input id="login-password" name="password" type="password" autoComplete="current-password" required disabled={busy} />
+++>>>>>>> codex/auth-integration
+            </div>
+            <button className="authPrimary" type="submit" disabled={busy}>
+              {busy ? "Checking…" : "Continue"}
+            </button>
+          </form>
+        ) : (
+++<<<<<<< HEAD
+ +        <form className="authForm authMfaForm" method="post" action="/login" aria-busy={busy} onSubmit={submitMfa}>
+ +          <p className="srOnly" role="status">Password accepted. Complete the required second step to open your session.</p>
+ +          <div className="authField">
+ +            <label htmlFor="login-code">
+ +              {verificationMethod === "authenticator" ? "6-digit authentication code" : "Recovery code"}
+ +            </label>
+ +            {verificationMethod === "authenticator" ? (
+ +              /* Six boxes are the document's presentation; the real control is
+ +                 a single input beneath them, so one-time-code autofill, paste
+ +                 and assistive tech all keep working. */
+ +              <div className="authCodeField">
+ +                <input
+ +                  className="authCodeCapture"
+ +                  id="login-code"
+ +                  name="code"
+ +                  type="text"
+ +                  autoComplete="one-time-code"
+ +                  inputMode="numeric"
+ +                  pattern="[0-9]{6}"
+ +                  maxLength={6}
+ +                  value={code}
+ +                  onChange={(event) => setCode(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+ +                  aria-describedby="login-code-hint"
+ +                  aria-label="6-digit authentication code"
+ +                  spellCheck={false}
+ +                  required
+ +                  autoFocus
+ +                  disabled={busy}
+ +                />
+ +                <div className="authCodeBoxes" aria-hidden="true">
+ +                  {[0, 1, 2, 3, 4, 5].map((slot) => (
+ +                    <span
+ +                      className="authCodeBox"
+ +                      key={slot}
+ +                      data-filled={code.length > slot ? "true" : undefined}
+ +                      data-next={code.length === slot ? "true" : undefined}
+ +                    >
+ +                      {code[slot] ?? ""}
+ +                    </span>
+ +                  ))}
+ +                </div>
+ +              </div>
+ +            ) : (
+ +              <input
+ +                className="authRecoveryInput"
+ +                id="login-code"
+ +                name="code"
+ +                type="text"
+ +                autoComplete="one-time-code"
+ +                inputMode="text"
+ +                placeholder="XXXX-XXXX-XXXX-XXXX"
+ +                aria-describedby="login-code-hint"
+ +                spellCheck={false}
+ +                required
+ +                autoFocus
+ +                disabled={busy}
+ +              />
+ +            )}
+ +            <p className="authFieldHint" id="login-code-hint">
+ +              {verificationMethod === "authenticator"
+ +                ? "Open Google Authenticator, 1Password, or your preferred authenticator."
+ +                : "Enter one unused code exactly as you saved it."}
+ +            </p>
+ +          </div>
+ +          <button className="authPrimary" type="submit" disabled={busy}>
+ +            {busy ? "Verifying…" : "Continue"}
+ +          </button>
+ +          <div className="authMfaAlternatives">
+ +            <button className="authTextButton" type="button" disabled={busy} onClick={() => {
+ +              setVerificationMethod((current) => current === "authenticator" ? "recovery" : "authenticator");
+ +              setCode("");
+ +              setError(null);
+ +            }}>
+ +              {verificationMethod === "authenticator" ? "Use a recovery code" : "Use an authenticator code"}
+ +            </button>
+ +            <button className="authTextButton authBackButton" type="button" disabled={busy} onClick={() => {
+ +              setChallengeToken(null);
+ +              setVerificationMethod("authenticator");
+ +              setCode("");
+ +              setError(null);
+ +            }}>
+ +              Back to sign in
+ +            </button>
+ +          </div>
+++=======
++         <form className="authForm" aria-busy={busy} onSubmit={submitMfa}>
++           <div className="authPhase" role="status">Password accepted. Complete the required second step to open your session.</div>
++           <div className="authField">
++             <label htmlFor="login-code">Authenticator or recovery code</label>
++             <input id="login-code" name="code" type="text" autoComplete="one-time-code" spellCheck={false} required autoFocus disabled={busy} />
++           </div>
++           <button className="authPrimary" type="submit" disabled={busy}>
++             {busy ? "Verifying…" : "Log in"}
++           </button>
++           <button className="authTextButton" type="button" disabled={busy} onClick={() => {
++             setChallengeToken(null);
++             setError(null);
++           }}>
++             Use a different email
++           </button>
+++>>>>>>> codex/auth-integration
+          </form>
+        )}
+      </AuthShell>
+diff --cc dialectical-engine/apps/ui/components/SignUpFlow.tsx
+index 374f8002,68173f5b..00000000
+--- a/dialectical-engine/apps/ui/components/SignUpFlow.tsx
++++ b/dialectical-engine/apps/ui/components/SignUpFlow.tsx
+@@@ -1,96 -1,46 +1,134 @@@
+  "use client";
+  
+  import Link from "next/link";
+++<<<<<<< HEAD
+ +import { FormEvent, MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from "react";
+ +import type { ContractClient } from "@debateai/contract";
+ +import { AuthShell } from "@/components/AuthShell";
+ +import { PrivacyPolicyModal } from "@/components/consent/PrivacyPolicyModal";
+ +import { contractClient } from "@/lib/api";
+ +
+ +type RegistrationClient = Pick<ContractClient, "register" | "resendVerification">;
+ +
+ +type Validity = Readonly<{ state: "idle" | "ok" | "bad"; text: string }>;
+ +
+ +/* The document's ✓/✗ rules under the password field (Turn 8 · 8a). */
+ +const PASSWORD_RULES: ReadonlyArray<{ label: string; met: (value: string) => boolean }> = [
+ +  { label: "At least eight characters", met: (value) => value.length >= 8 },
+ +  { label: "One capital letter", met: (value) => /[A-Z]/.test(value) },
+ +  { label: "One number", met: (value) => /[0-9]/.test(value) },
+ +  { label: "One special character", met: (value) => /[^A-Za-z0-9]/.test(value) }
+ +];
+ +
+ +/* The id the privacy row's input points at with aria-labelledby: its sentence holds an
+ +   interactive control, so the row cannot be a <label> (see the consent group below). */
+ +const PRIVACY_CONSENT_TEXT_ID = "signup-privacy-consent-text";
+ +
+ +// Deliberately permissive: the address is checked for shape, not existence.
+ +const shapedEmail = (value: string) => /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(value);
+ +
+ +function emailValidity(value: string, sent: boolean): Validity {
+ +  const trimmed = value.trim();
+ +  if (trimmed.length === 0) return { state: "idle", text: "" };
+ +  if (!shapedEmail(trimmed)) return { state: "bad", text: "✗ That does not look like an email address" };
+ +  return sent
+ +    ? { state: "ok", text: "✓ Valid address · verification link sent — awaiting confirmation" }
+ +    : { state: "ok", text: "✓ Valid address" };
+ +}
+ +
+ +function recoveryValidity(value: string, primary: string): Validity {
+ +  const trimmed = value.trim();
+ +  if (trimmed.length === 0) return { state: "idle", text: "" };
+ +  if (!shapedEmail(trimmed)) return { state: "bad", text: "✗ That does not look like an email address" };
+ +  if (trimmed.toLowerCase() === primary.trim().toLowerCase()) {
+ +    return { state: "bad", text: "✗ Must differ from the primary email" };
+ +  }
+ +  return { state: "ok", text: "✓ Valid recovery address" };
+ +}
+ +
+ +export function SignUpFlow({
+ +  client = contractClient
+ +}: Readonly<{ client?: RegistrationClient }>) {
+ +  const [email, setEmail] = useState("");
+ +  const [recoveryEmail, setRecoveryEmail] = useState("");
+ +  const [password, setPassword] = useState("");
+++=======
++ import { FormEvent, useState } from "react";
++ import type { ContractClient } from "@debateai/contract";
++ import { AuthShell } from "@/components/AuthShell";
++ import { contractClient } from "@/lib/api";
++ 
++ function failureMessage(failure: unknown, fallback: string): string {
++   return failure instanceof Error && failure.message.trim().length > 0
++     ? failure.message
++     : fallback;
++ }
++ 
++ type RegistrationClient = Pick<ContractClient, "register" | "resendVerification">;
++ 
++ export function SignUpFlow({
++   client = contractClient
++ }: Readonly<{ client?: RegistrationClient }>) {
+++>>>>>>> codex/auth-integration
+    const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
+    const [message, setMessage] = useState<string | null>(null);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+++<<<<<<< HEAD
+ +  const [loginHref, setLoginHref] = useState("/login");
+ +  /* The two consent boxes stay UNCONTROLLED. These mirrors exist for ONE purpose:
+ +     computing the submit button's `disabled`, so it reflects the boxes live.
+ +     FormData is the truth at submit — see submitRegistration. */
+ +  const [adultAffirmed, setAdultAffirmed] = useState(false);
+ +  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+ +  const [policyOpen, setPolicyOpen] = useState(false);
+ +  const privacyInputRef = useRef<HTMLInputElement | null>(null);
+ +
+ +  useEffect(() => {
+ +    const next = new URLSearchParams(window.location.search).get("next");
+ +    if (next !== null) setLoginHref(`/login?next=${encodeURIComponent(next)}`);
+ +  }, []);
+++=======
+++>>>>>>> codex/auth-integration
+  
+    async function submitRegistration(event: FormEvent<HTMLFormElement>): Promise<void> {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const data = new FormData(form);
+++<<<<<<< HEAD
+ +    /* Defence in depth. A bare `new Event("submit")` bypasses HTML constraint
+ +       validation, so `required` alone gates nothing against a scripted submit.
+ +       These are the two FormData reads, never the mirrors above. */
+ +    if (data.get("adult-affirmed") !== "on" || data.get("privacy-accepted") !== "on") return;
+ +    const submitted = String(data.get("email") ?? "").trim();
+++=======
++     const email = String(data.get("email") ?? "").trim();
+++>>>>>>> codex/auth-integration
+      setBusy(true);
+      setError(null);
+      try {
+        const result = await client.register(
+++<<<<<<< HEAD
+ +        submitted,
+++=======
++         email,
+++>>>>>>> codex/auth-integration
+          String(data.get("password") ?? ""),
+          String(data.get("recovery-email") ?? "").trim(),
+          data.get("adult-affirmed") === "on"
+        );
+++<<<<<<< HEAD
+ +      setSubmittedEmail(submitted);
+ +      setMessage(result.message);
+ +    } catch {
+ +      setError("Account creation could not be completed.");
+++=======
++       form.reset();
++       setSubmittedEmail(email);
++       setMessage(result.message);
++     } catch (failure) {
++       setError(failureMessage(failure, "Account creation could not be completed."));
+++>>>>>>> codex/auth-integration
+      } finally {
+        setBusy(false);
+      }
+@@@ -103,247 -53,59 +141,299 @@@
+      try {
+        const result = await client.resendVerification(submittedEmail);
+        setMessage(result.message);
+++<<<<<<< HEAD
+ +    } catch {
+ +      setError("Verification instructions could not be resent.");
+++=======
++     } catch (failure) {
++       setError(failureMessage(failure, "Verification instructions could not be resent."));
+++>>>>>>> codex/auth-integration
+      } finally {
+        setBusy(false);
+      }
+    }
+  
+++<<<<<<< HEAD
+ +  /* THE ONE CLICK RULE for the privacy row. */
+ +  function onPrivacyRowClick(event: ReactMouseEvent<HTMLElement>): void {
+ +    const input = privacyInputRef.current;
+ +    if (input === null) return;
+ +    /* THE PREDICATE READS THE REACT MIRROR, NEVER THE DOM. The pre-click activation steps
+ +       have ALREADY flipped `input.checked` by the time this runs, so `if (input.checked)`
+ +       takes the CHECKED branch on a bare click on an EMPTY box: the policy would never open
+ +       and the box would tick — the one behaviour V's goal forbids. `privacyAccepted` is the
+ +       settled value (ARCH-REV-S02 r3 N12, measured). */
+ +    if (privacyAccepted) {
+ +      /* No preventDefault: the box unchecks directly, with no modal. A click that did not
+ +         originate ON the input toggles nothing natively — the row is a <div>, not a <label>
+ +         — so it is driven through `.click()`, the path React's change detection listens to.
+ +         The `event.target !== input` guard is also what stops that synthesised click, which
+ +         bubbles back through this same handler, from recursing. */
+ +      if (event.target !== input) input.click();
+ +      return;
+ +    }
+ +    event.preventDefault();
+ +    /* The helper returns focus to whatever was focused when the surface opened, so focusing
+ +       the input HERE is what makes focus come back to it from every entry point. */
+ +    input.focus();
+ +    setPolicyOpen(true);
+ +    /* THE TRACKER RESYNC, and it runs AFTER the dispatch, never inside it.
+ +       React's value tracker desynchronises across a cancelled click: the box is toggled
+ +       BEFORE dispatch, React's change extraction records `true`, and the canceled-activation
+ +       steps revert the DOM to `false` AFTER dispatch — leaving tracker `true` over DOM
+ +       `false`, so a later genuine change can go unannounced. A PLAIN instance assignment
+ +       re-syncs it (the prototype setter and a synthesised `.click()` are both measured NOT
+ +       to: probe code-rev-s02-c3c4-r1-recovery.test.tsx, R1 against R2/R3).
+ +       PLACEMENT IS LOAD-BEARING AND IS MEASURED. Assigning inside this handler leaves the
+ +       box CHECKED under jsdom 30.0.1, whose canceled-activation behaviour for a checkbox is
+ +       `this.checked = !this.checked` — a TOGGLE, not the spec's restore-to-pre-click-value
+ +       (jsdom/living/nodes/HTMLInputElement-impl.js:179-182) — so it inverts the `false` this
+ +       line writes. Measured that way round: `the box must stay unticked: expected true to be
+ +       false`. A microtask runs after the activation steps in every environment, and touches
+ +       only the tracker (the DOM value is already `false`), so no frame shows a ticked box. */
+ +    queueMicrotask(() => {
+ +      const box = privacyInputRef.current;
+ +      if (box !== null) box.checked = false;
+ +    });
+ +  }
+ +
+ +  /* `I have read it` is the ONLY route that ticks the box, and it must set BOTH halves.
+ +     The DOM, because `FormData` is the truth at submit and the R18 refusal reads it; and the
+ +     R17 mirror, because the button's live `disabled` is computed from the mirrors. Setting
+ +     only the DOM leaves `Create account` disabled with both boxes visibly ticked; setting
+ +     only the mirror sends an empty box to `FormData` and R18 refuses the registration. */
+ +  function acknowledgePolicy(): void {
+ +    const input = privacyInputRef.current;
+ +    if (input !== null) input.checked = true;
+ +    setPrivacyAccepted(true);
+ +    setPolicyOpen(false);
+ +  }
+ +
+ +  /* Every dismissal route — the close control, Esc and a backdrop click all arrive here.
+ +     The mirror is re-read FROM THE DOM before closing: member 1 (the `onChange` guard on the
+ +     privacy input) already makes every route end `false`, measured, so this changes no
+ +     observable outcome today. It is kept because it makes the invariant structural instead
+ +     of accidental — the mirror cannot outlive the DOM across a close, whatever a later edit
+ +     does to the open path. */
+ +  function closePolicy(): void {
+ +    setPrivacyAccepted(privacyInputRef.current?.checked ?? false);
+ +    setPolicyOpen(false);
+ +  }
+ +
+ +  const sent = submittedEmail !== null;
+ +  const emailState = emailValidity(email, sent);
+ +  const recoveryState = recoveryValidity(recoveryEmail, email);
+ +
+++=======
+++>>>>>>> codex/auth-integration
+    return (
+      <AuthShell
+        eyebrow="Create an account"
+        title="Put a claim to the bench."
+        description="Email verification and authenticator enrolment are required before your account can be used."
+++<<<<<<< HEAD
+ +      footer={null}
+ +    >
+ +      {error ? <div className="authAlert" role="alert">{error}</div> : null}
+ +
+ +      <form className="authForm" data-form="signup" method="post" action="/sign-up" aria-busy={busy} onSubmit={submitRegistration}>
+ +        <div className="authField">
+ +          <label htmlFor="signup-email">Email</label>
+ +          <div className="authEmailRow">
+ +            <input
+ +              id="signup-email"
+ +              name="email"
+ +              type="email"
+ +              autoComplete="section-primary-email email"
+ +              placeholder="you@institution.edu"
+ +              value={email}
+ +              onChange={(event) => setEmail(event.target.value)}
+ +              required
+ +              autoFocus
+ +              disabled={busy || sent}
+ +            />
+ +            {/* Create account is what mails the link; this control resends it,
+ +                so it stays inert until there is something to resend. */}
+ +            <button
+ +              type="button"
+ +              className="authVerifyEmail"
+ +              disabled={busy || !sent}
+ +              title={sent ? "Resend the verification link" : "Create the account to send the verification link"}
+ +              onClick={() => void resendVerification()}
+ +            >
+ +              Verify email
+ +            </button>
+ +          </div>
+ +          <p className="authValidity" data-state={emailState.state}>{emailState.text}</p>
+ +        </div>
+ +
+ +        <div className="authField">
+ +          <label htmlFor="signup-recovery-email">Recovery email</label>
+ +          <input
+ +            id="signup-recovery-email"
+ +            name="recovery-email"
+ +            type="email"
+ +            autoComplete="section-recovery-email email"
+ +            aria-describedby="recovery-email-hint"
+ +            value={recoveryEmail}
+ +            onChange={(event) => setRecoveryEmail(event.target.value)}
+ +            required
+ +            disabled={busy || sent}
+ +          />
+ +          <span className="authFieldHint" id="recovery-email-hint">
+ +            Use a different address reserved for account recovery.
+ +          </span>
+ +          <p className="authValidity" data-state={recoveryState.state}>{recoveryState.text}</p>
+ +        </div>
+ +
+ +        <div className="authField">
+ +          <label htmlFor="signup-password">Password</label>
+ +          <input
+ +            id="signup-password"
+ +            name="password"
+ +            type="password"
+ +            autoComplete="new-password"
+ +            minLength={8}
+ +            value={password}
+ +            onChange={(event) => setPassword(event.target.value)}
+ +            required
+ +            disabled={busy || sent}
+ +          />
+ +          <ul className="authRules" data-stack="true">
+ +            {PASSWORD_RULES.map((rule) => {
+ +              const met = rule.met(password);
+ +              return (
+ +                <li className="authRule" key={rule.label} data-met={password.length === 0 ? undefined : met}>
+ +                  {password.length === 0 ? "·" : met ? "✓" : "✗"} {rule.label}
+ +                </li>
+ +              );
+ +            })}
+ +          </ul>
+ +        </div>
+ +
+ +        {/* Consent group — design artboard 8a (turn-8a-checkbox-group.html:1-10).
+ +            Row 1 is a <label> wrapping its input, so the square, the text and the row
+ +            all toggle it natively. Row 2 cannot be a <label>: its Privacy Policy
+ +            control is interactive content, which the <label> content model forbids —
+ +            so it is a <div> and the input takes its name from aria-labelledby. */}
+ +        <div className="consentGroup">
+ +          <label className="consentRow">
+ +            <input
+ +              className="consentBox"
+ +              name="adult-affirmed"
+ +              type="checkbox"
+ +              required
+ +              disabled={busy || sent}
+ +              onChange={(event) => setAdultAffirmed(event.currentTarget.checked)}
+ +            />
+ +            <span className="consentText">I am 18 or over.</span>
+ +          </label>
+ +          {/* ONE onClick, on the ROW: the check square, the sentence and the Privacy Policy
+ +              control are three entry points onto one behaviour, and a handler placed on any
+ +              one of them covers only that one. */}
+ +          <div className="consentRow" onClick={onPrivacyRowClick}>
+ +            <input
+ +              className="consentBox"
+ +              name="privacy-accepted"
+ +              type="checkbox"
+ +              required
+ +              disabled={busy || sent}
+ +              aria-labelledby={PRIVACY_CONSENT_TEXT_ID}
+ +              ref={privacyInputRef}
+ +              /* The SETTLED value, not the in-flight one: a cancelled change never
+ +                 reaches the DOM, so mirroring its `true` would record a state the box
+ +                 never holds. `adult-affirmed`'s handler is the literal form. */
+ +              onChange={(event) =>
+ +                setPrivacyAccepted(
+ +                  event.currentTarget.checked && !event.nativeEvent.defaultPrevented
+ +                )
+ +              }
+ +            />
+ +            <span className="consentText" id={PRIVACY_CONSENT_TEXT_ID}>
+ +              I agree to the{" "}
+ +              <button type="button" className="consentPolicyLink">Privacy Policy</button>
+ +              , including that my debates may be published publicly.
+ +            </span>
+ +          </div>
+ +        </div>
+ +
+ +        <button
+ +          className="authPrimary"
+ +          type="submit"
+ +          disabled={busy || sent || !adultAffirmed || !privacyAccepted}
+ +        >
+ +          {busy ? "Creating…" : "Create account"}
+ +        </button>
+ +
+ +        <p className="authPanelFooter">Already have one? <Link href={loginHref}>Log in</Link></p>
+ +
+ +        {sent && message !== null ? (
+ +          <p className="authFinePrint" role="status" aria-live="polite">
+ +            {message} The verification page continues into mandatory authenticator setup. No account status is
+ +            revealed here.
+ +          </p>
+ +        ) : null}
+ +      </form>
+ +
+ +      {/* OUTSIDE the sign-up form element (S02-S57) — spelled in prose because
+ +          `authRoutes.source-test.mjs:159-165` counts form OPENING TAGS in this file's source
+ +          text and a grep-based guard does not know what a comment is: the literal tag written
+ +          here took that count from 3 to 4. No control inside the policy can submit the
+ +          registration, whatever its `type` says, and `Enter` inside it cannot register an
+ +          account. Mounted CONDITIONALLY, so every open is a fresh read — the scroll gate
+ +          resets, the reader starts at the top, and `I have read it` is disabled again until
+ +          they reach the end (orchestrator ruling 2026-09-07 from CODE-REV-S02-C5C6 r1 N7). */}
+ +      {policyOpen ? (
+ +        <PrivacyPolicyModal
+ +          open
+ +          mode="consent"
+ +          onClose={closePolicy}
+ +          onAcknowledge={acknowledgePolicy}
+ +        />
+ +      ) : null}
+++=======
++       footer={<p>Already have one? <Link href="/login">Log in</Link></p>}
++     >
++       {error ? <div className="authAlert" role="alert">{error}</div> : null}
++ 
++       {submittedEmail !== null && message !== null ? (
++         <section className="authCheckEmail" role="status" aria-live="polite">
++           <p className="authNoticeKicker">Check your email</p>
++           <h2>Continue with the private verification link</h2>
++           <p>{message}</p>
++           <p className="authFinePrint">
++             The verification page continues into mandatory authenticator setup. No account status is revealed here.
++           </p>
++           <button className="authPrimary" type="button" disabled={busy} onClick={() => void resendVerification()}>
++             {busy ? "Sending…" : "Resend instructions"}
++           </button>
++         </section>
++       ) : (
++         <form className="authForm" aria-busy={busy} onSubmit={submitRegistration}>
++           <div className="authField">
++             <label htmlFor="signup-email">Email</label>
++             <input id="signup-email" name="email" type="email" autoComplete="email" placeholder="you@institution.edu" required autoFocus disabled={busy} />
++           </div>
++           <div className="authField">
++             <label htmlFor="signup-recovery-email">Recovery email</label>
++             <input id="signup-recovery-email" name="recovery-email" type="email" autoComplete="email" aria-describedby="recovery-email-hint" required disabled={busy} />
++             <span className="authFieldHint" id="recovery-email-hint">Use a different address reserved for account recovery.</span>
++           </div>
++           <div className="authField">
++             <label htmlFor="signup-password">Password</label>
++             <input id="signup-password" name="password" type="password" autoComplete="new-password" minLength={8} aria-describedby="signup-password-hint" required disabled={busy} />
++             <span className="authFieldHint" id="signup-password-hint">At least eight characters.</span>
++           </div>
++           <label className="authCheck">
++             <input name="adult-affirmed" type="checkbox" required disabled={busy} />
++             <span>I affirm that I am at least 18 years old.</span>
++           </label>
++           <button className="authPrimary" type="submit" disabled={busy}>
++             {busy ? "Creating…" : "Create account"}
++           </button>
++         </form>
++       )}
+++>>>>>>> codex/auth-integration
+      </AuthShell>
+    );
+  }
+diff --cc dialectical-engine/apps/ui/components/TopBar.tsx
+index 959960e7,9562dcba..00000000
+--- a/dialectical-engine/apps/ui/components/TopBar.tsx
++++ b/dialectical-engine/apps/ui/components/TopBar.tsx
+@@@ -81,7 -51,7 +81,11 @@@ export function TopBar() 
+        )}
+        <div className="topBarActions">
+          <Link className="btn" href="/login">
+++<<<<<<< HEAD
+ +          Account
+++=======
++           Log in
+++>>>>>>> codex/auth-integration
+          </Link>
+          <Link className="btn btnDark" href="/new">
+            + New debate
+diff --cc dialectical-engine/apps/ui/components/authRoutes.source-test.mjs
+index c4eec786,b9ad5614..00000000
+--- a/dialectical-engine/apps/ui/components/authRoutes.source-test.mjs
++++ b/dialectical-engine/apps/ui/components/authRoutes.source-test.mjs
+@@@ -11,7 -11,6 +11,10 @@@ const read = (path) => 
+  };
+  
+  const login = read("./LoginFlow.tsx");
+++<<<<<<< HEAD
+ +const loginPage = read("../app/login/page.tsx");
+++=======
+++>>>>>>> codex/auth-integration
+  const signUp = read("./SignUpFlow.tsx");
+  const shell = read("./AuthShell.tsx");
+  const gate = read("./AuthGate.tsx");
+@@@ -19,21 -18,15 +22,28 @@@ const topBar = read("./TopBar.tsx")
+  const styles = read("../app/globals.css");
+  const home = read("../app/page.tsx");
+  const verifyEmail = read("../app/verify-email/page.tsx");
+++<<<<<<< HEAD
+ +const enrollMfa = read("../app/enroll-mfa/page.tsx");
+++=======
+++>>>>>>> codex/auth-integration
+  const packageJson = read("../package.json");
+  
+  test("dedicated login keeps the two-phase mandatory-MFA contract", () => {
+    assert.match(login, /client\.beginLogin/);
+    assert.match(login, /client\.completeLogin/);
+++<<<<<<< HEAD
+ +  assert.match(login, /authenticator or a recovery code/);
+ +  assert.match(login, /Enter your authentication code\./);
+ +  assert.match(login, /6-digit authentication code/);
+ +  assert.match(login, /Use a recovery code/);
+ +  assert.match(login, /Enter a recovery code\./);
+ +  assert.match(login, /Back to sign in/);
+++=======
++   assert.match(login, /Authenticator or recovery code/);
+++>>>>>>> codex/auth-integration
+    assert.match(login, /replacement_recovery_code/);
+    assert.match(login, /role="alert"/);
+ -  assert.match(login, /window\.location\.assign\(HOME_PATH\)/);
+ +  assert.match(login, /window\.location\.assign\(safeReturnPath\(next\)\)/);
+    assert.doesNotMatch(login, /localStorage|sessionStorage|Bearer|keep me signed|forgot/i);
+  });
+  
+@@@ -64,124 -57,12 +74,135 @@@ test("every public and protected entry 
+    assert.match(topBar, /href="\/login"/);
+    assert.match(home, /href="\/login"/);
+    assert.match(home, /href="\/sign-up"/);
+++<<<<<<< HEAD
+ +  assert.match(login, /useState\("\/sign-up"\)/);
+ +  assert.match(login, /href=\{signUpHref\}/);
+ +  assert.match(signUp, /useState\("\/login"\)/);
+ +  assert.match(signUp, /href=\{loginHref\}/);
+ +  assert.match(gate, /window\.location\.replace\("\/login"\)/);
+ +});
+ +
+ +test("the project home confirms a real session before exposing its debate composer", () => {
+ +  // The Turn 3 design replaced the "you're signed in" banner with the library
+ +  // itself, so the session gate is now proven by the composer's own guard
+ +  // rather than by that copy.
+ +  assert.match(home, /let sessionConfirmed = false/);
+ +  assert.match(home, /sessionConfirmed = true/);
+ +  assert.match(home, /sessionConfirmed \? \([\s\S]*?<LibraryComposer \/>/);
+ +  assert.match(home, /id="start-a-debate"/);
+ +  assert.doesNotMatch(home, /<LibraryComposer \/>[\s\S]*?\{error \?/);
+ +});
+ +
+ +test("the login route sends an already-authenticated browser back to its debate workspace", () => {
+ +  assert.match(loginPage, /USER_TOKEN_COOKIE/);
+ +  assert.match(loginPage, /createServerContractClient/);
+ +  assert.match(loginPage, /\.readSession\(\)/);
+ +  assert.match(loginPage, /redirect\("\/#start-a-debate"\)/);
+ +  assert.match(loginPage, /catch \{/);
+ +  assert.match(loginPage, /return <LoginFlow \/>/);
+ +});
+ +
+ +test("verification remains one canonical mailed-link path and production builds gate every auth route", () => {
+ +  assert.match(verifyEmail, /export \{ default \} from "\.\.\/enroll-mfa\/page"/);
+ +  assert.match(packageJson, /assert-auth-front-door-routes\.mjs/);
+ +});
+ +
+ +test("ordinary top bar compacts without horizontal overflow at phone widths", () => {
+ +  assert.match(
+ +    styles,
+ +    /@media \(max-width: 640px\)[\s\S]*?\.topBar\s*\{[\s\S]*?height:\s*56px;[\s\S]*?padding-inline:\s*12px;[\s\S]*?\}/
+ +  );
+ +  assert.match(
+ +    styles,
+ +    /@media \(max-width: 640px\)[\s\S]*?\.topBar \.brandText,[\s\S]*?\.topBarContext\s*\{[\s\S]*?display:\s*none;[\s\S]*?\}/
+ +  );
+ +  assert.match(
+ +    styles,
+ +    /@media \(max-width: 640px\)[\s\S]*?\.topBarActions\s*\{[\s\S]*?min-width:\s*0;[\s\S]*?gap:\s*6px;[\s\S]*?\}/
+ +  );
+ +  assert.match(
+ +    styles,
+ +    /@media \(max-width: 640px\)[\s\S]*?\.topBarActions \.btn\s*\{[\s\S]*?padding-inline:\s*10px;[\s\S]*?white-space:\s*nowrap;[\s\S]*?\}/
+ +  );
+ +});
+ +
+ +test("auth headline keeps one size the phone breakpoint does not fight", () => {
+ +  // The design document's auth screens are a fixed-width card, not a hero, so
+ +  // the headline has one size rather than a viewport clamp.
+ +  assert.match(styles, /\.authHeadline\s*\{[\s\S]*?font-size:\s*28px;[\s\S]*?\}/);
+ +  const phoneRules = styles.slice(styles.indexOf("@media (max-width: 640px)"));
+ +  const phoneHeadline = phoneRules.match(/\.authHeadline\s*\{([^}]*)\}/)?.[1] ?? "";
+ +  assert.doesNotMatch(phoneHeadline, /font-size:/);
+ +});
+ +
+ +test("desktop auth content is the document's 540px card", () => {
+ +  assert.match(styles, /\.authCard\s*\{[\s\S]*?width:\s*540px;[\s\S]*?max-width:\s*100%;[\s\S]*?\}/);
+ +});
+ +
+ +test("auth failures use stable public copy instead of exception text", () => {
+ +  assert.doesNotMatch(login, /failure\.message/);
+ +  assert.doesNotMatch(signUp, /failure\.message/);
+ +  assert.match(login, /setError\("Sign-in could not be completed\."\)/);
+ +  assert.match(login, /setError\("Authenticator verification could not be completed\."\)/);
+ +  assert.match(login, /That recovery code was not accepted/);
+ +  assert.match(login, /Too many verification attempts/);
+ +  assert.match(signUp, /setError\("Account creation could not be completed\."\)/);
+ +  assert.match(signUp, /setError\("Verification instructions could not be resent\."\)/);
+ +});
+ +
+ +test("primary and recovery emails occupy distinct autocomplete sections", () => {
+ +  assert.match(
+ +    signUp,
+ +    /name="email"[^>]*autoComplete="section-primary-email email"/
+ +  );
+ +  assert.match(
+ +    signUp,
+ +    /name="recovery-email"[^>]*autoComplete="section-recovery-email email"/
+ +  );
+ +});
+ +
+ +test("ordinary top bar exposes a neutral account entry without inventing session state", () => {
+ +  assert.match(topBar, /href="\/login"[\s\S]*?>\s*Account\s*</);
+ +  assert.doesNotMatch(topBar, />\s*Log in\s*</);
+ +  assert.doesNotMatch(topBar, /Signed in|Signed out|authenticated|useSession/);
+ +});
+ +
+ +test("every credential-bearing auth form has an explicit query-free POST fallback", () => {
+ +  const forms = [
+ +    ...(login.match(/<form\b[^>]*>/g) ?? []).map((tag) => ({ route: "/login", tag })),
+ +    ...(signUp.match(/<form\b[^>]*>/g) ?? []).map((tag) => ({ route: "/sign-up", tag }))
+ +  ];
+ +
+ +  assert.equal(forms.length, 3, "expected login credentials, login MFA, and sign-up forms");
+ +  for (const { route, tag } of forms) {
+ +    assert.match(tag, /\bmethod="post"/, `${route} form must never default to GET`);
+ +    assert.match(tag, new RegExp(`\\baction="${route}"`), `${route} form must use a safe same-origin action`);
+ +    assert.doesNotMatch(tag, /\baction="[^"]*\?/, `${route} action must not preserve a sensitive query`);
+ +  }
+ +});
+ +
+ +test("mailed-token enrollment has no native form that could submit secrets before hydration", () => {
+ +  assert.match(enrollMfa, /id="totp-code"/);
+ +  assert.match(enrollMfa, /id="recovery-typeback"/);
+ +  assert.doesNotMatch(enrollMfa, /<form\b/);
+ +  assert.doesNotMatch(verifyEmail, /<form\b/);
+ +});
+ +
+ +test("replacement recovery-code custody synchronously blocks only home navigation", () => {
+ +  assert.match(login, /setRecoveryAcknowledgementPending\(true\)/);
+ +  assert.match(login, /setRecoveryAcknowledgementPending\(false\)[\s\S]*?onAuthenticated\(\)/);
+ +  assert.match(topBar, /useRecoveryAcknowledgementPending\(\)/);
+ +  assert.match(topBar, /homeNavigationAvailable=\{!recoveryAcknowledgementPending\}/);
+ +  assert.match(topBar, /aria-disabled="true"/);
+ +  assert.doesNotMatch(topBar, /href=\{href\}[\s\S]*?aria-disabled="true"/);
+++=======
++   assert.match(login, /href="\/sign-up"/);
++   assert.match(signUp, /href="\/login"/);
++   assert.match(gate, /window\.location\.replace\("\/login"\)/);
++ });
++ 
++ test("verification remains one canonical mailed-link path and production builds gate every auth route", () => {
++   assert.match(verifyEmail, /export \{ default \} from "\.\.\/enroll-mfa\/page"/);
++   assert.match(packageJson, /assert-production-auth-routes\.mjs/);
+++>>>>>>> codex/auth-integration
+  });
+diff --cc dialectical-engine/apps/ui/package.json
+index 7d2151e0,f774cc3f..00000000
+--- a/dialectical-engine/apps/ui/package.json
++++ b/dialectical-engine/apps/ui/package.json
+@@@ -5,7 -5,7 +5,11 @@@
+    "type": "module",
+    "scripts": {
+      "dev": "node server.mjs --dev",
+++<<<<<<< HEAD
+ +    "build": "next build && node ../../scripts/assert-auth-front-door-routes.mjs . apps-ui",
+++=======
++     "build": "next build && node scripts/assert-production-auth-routes.mjs",
+++>>>>>>> codex/auth-integration
+      "start": "node server.mjs",
+      "lint": "next lint",
+      "typecheck": "tsc --noEmit -p tsconfig.json",
+diff --cc dialectical-engine/tests/render/auth-flow-integration.test.tsx
+index 12bc9468,ef84a6a2..00000000
+--- a/dialectical-engine/tests/render/auth-flow-integration.test.tsx
++++ b/dialectical-engine/tests/render/auth-flow-integration.test.tsx
+@@@ -2,13 -2,9 +2,19 @@@
+  
+  import { act } from "react";
+  import { createRoot, type Root } from "react-dom/client";
+++<<<<<<< HEAD
+ +import { renderToStaticMarkup } from "react-dom/server";
+  import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+ +import { ContractHttpError } from "@debateai/contract";
+ +import { setPathname } from "next/navigation";
+  import { LoginFlow } from "../../apps/ui/components/LoginFlow.js";
+  import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
+ +import { TopBar } from "../../apps/ui/components/TopBar.js";
+++=======
+++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+++import { LoginFlow } from "../../apps/ui/components/LoginFlow.js";
+++import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
+++>>>>>>> codex/auth-integration
+  
+  const REGISTRATION_MESSAGE =
+    "If this address can be registered, verification instructions will arrive. Check your spam folder.";
+@@@ -58,8 -54,6 +64,11 @@@ async function click(label: string): Pr
+  describe("rendered auth flow integration", () => {
+    beforeEach(() => {
+      vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+++<<<<<<< HEAD
+ +    window.history.replaceState({}, "", "/");
+ +    setPathname("/");
+++=======
+++>>>>>>> codex/auth-integration
+      const container = document.createElement("div");
+      document.body.append(container);
+      root = createRoot(container);
+@@@ -72,146 -66,6 +81,149 @@@
+      vi.unstubAllGlobals();
+    });
+  
+++<<<<<<< HEAD
+ +  it("raw-renders credential forms with query-free same-origin POST fallbacks", () => {
+ +    const loginHtml = renderToStaticMarkup(
+ +      <LoginFlow client={{ beginLogin: vi.fn(), completeLogin: vi.fn() }} />
+ +    );
+ +    const signUpHtml = renderToStaticMarkup(
+ +      <SignUpFlow client={{ register: vi.fn(), resendVerification: vi.fn() }} />
+ +    );
+ +    const cases = [
+ +      { route: "/login", html: loginHtml },
+ +      { route: "/sign-up", html: signUpHtml }
+ +    ];
+ +
+ +    for (const { route, html } of cases) {
+ +      const parsed = new DOMParser().parseFromString(html, "text/html");
+ +      const forms = parsed.querySelectorAll("form");
+ +      expect(forms, `${route} must raw-render exactly one initial credential form`).toHaveLength(1);
+ +      expect(forms[0]!.getAttribute("method")).toBe("post");
+ +      expect(forms[0]!.getAttribute("action")).toBe(route);
+ +      expect(forms[0]!.getAttribute("action")).not.toContain("?");
+ +    }
+ +  });
+ +
+ +  it("renders the second-step login form with the same safe POST fallback", async () => {
+ +    const beginLogin = vi.fn().mockResolvedValue({
+ +      status: "mfa_required" as const,
+ +      challenge_token: "challenge"
+ +    });
+ +    await act(async () => root!.render(
+ +      <LoginFlow client={{ beginLogin, completeLogin: vi.fn() }} onAuthenticated={vi.fn()} />
+ +    ));
+ +
+ +    field("email").value = "person@example.test";
+ +    field("password").value = "password";
+ +    await submit();
+ +
+ +    const form = document.querySelector<HTMLFormElement>("form");
+ +    expect(form).not.toBeNull();
+ +    expect(form!.getAttribute("method")).toBe("post");
+ +    expect(form!.getAttribute("action")).toBe("/login");
+ +    expect(form!.getAttribute("action")).not.toContain("?");
+ +  });
+ +
+ +  it("moves password success into a dedicated authenticator screen with a recovery alternative", async () => {
+ +    const beginLogin = vi.fn().mockResolvedValue({
+ +      status: "mfa_required" as const,
+ +      challenge_token: "challenge"
+ +    });
+ +    await act(async () => root!.render(
+ +      <LoginFlow client={{ beginLogin, completeLogin: vi.fn() }} onAuthenticated={vi.fn()} />
+ +    ));
+ +
+ +    field("email").value = "person@example.test";
+ +    field("password").value = "password";
+ +    await submit();
+ +
+ +    expect(document.querySelector("h1")?.textContent).toBe("Enter your authentication code.");
+ +    expect(document.body.textContent).not.toContain("Back to the graph.");
+ +    expect(document.querySelector('input[name="email"]')).toBeNull();
+ +    expect(document.querySelector('input[name="password"]')).toBeNull();
+ +    expect(field("code").inputMode).toBe("numeric");
+ +    expect(field("code").maxLength).toBe(6);
+ +    expect(field("code").pattern).toBe("[0-9]{6}");
+ +    expect(document.body.textContent).toContain("Open Google Authenticator");
+ +
+ +    await click("Use a recovery code");
+ +    expect(document.querySelector("h1")?.textContent).toBe("Enter a recovery code.");
+ +    expect(field("code").inputMode).toBe("text");
+ +    expect(field("code").maxLength).toBe(-1);
+ +    expect(field("code").pattern).toBe("");
+ +    expect(document.body.textContent).toContain("Use an authenticator code");
+ +
+ +    await click("Back to sign in");
+ +    expect(document.querySelector("h1")?.textContent).toBe("Back to the graph.");
+ +    expect(document.querySelector('input[name="email"]')).not.toBeNull();
+ +    expect(document.querySelector('input[name="password"]')).not.toBeNull();
+ +  });
+ +
+ +  it("makes recovery-code acknowledgement the only home completion path", async () => {
+ +    setPathname("/login");
+ +    const beginLogin = vi.fn().mockResolvedValue({
+ +      status: "mfa_required" as const,
+ +      challenge_token: "challenge"
+ +    });
+ +    const completeLogin = vi.fn().mockResolvedValue({
+ +      status: "authenticated" as const,
+ +      csrf_token: "c".repeat(43),
+ +      session: SESSION,
+ +      replacement_recovery_code: "AAAA-BBBB-CCCC-DDDD"
+ +    });
+ +    const onAuthenticated = vi.fn();
+ +    await act(async () => root!.render(
+ +      <>
+ +        <TopBar />
+ +        <LoginFlow client={{ beginLogin, completeLogin }} onAuthenticated={onAuthenticated} />
+ +      </>
+ +    ));
+ +
+ +    expect(document.querySelector('.authTopBar a[href="/"]')).not.toBeNull();
+ +    field("email").value = "person@example.test";
+ +    field("password").value = "password";
+ +    await submit();
+ +    field("code").value = "AAAA-BBBB-CCCC-DDDD";
+ +    await submit();
+ +
+ +    expect(document.body.textContent).toContain("AAAA-BBBB-CCCC-DDDD");
+ +    expect(document.querySelectorAll('a[href="/"]')).toHaveLength(0);
+ +    const unavailableBrand = document.querySelector('.authTopBar [aria-disabled="true"]');
+ +    expect(unavailableBrand).not.toBeNull();
+ +    expect(unavailableBrand?.tagName).not.toBe("A");
+ +    expect(onAuthenticated).not.toHaveBeenCalled();
+ +    const completionButtons = document.querySelectorAll(".authSuccessWarning button");
+ +    expect(completionButtons).toHaveLength(1);
+ +    expect(completionButtons[0]!.textContent?.trim()).toBe("I saved it — continue");
+ +
+ +    await click("I saved it — continue");
+ +    expect(onAuthenticated).toHaveBeenCalledTimes(1);
+ +  });
+ +
+ +  it("keeps ordinary login and sign-up auth chrome linked truthfully to home", async () => {
+ +    setPathname("/login");
+ +    await act(async () => root!.render(
+ +      <>
+ +        <TopBar />
+ +        <LoginFlow client={{ beginLogin: vi.fn(), completeLogin: vi.fn() }} />
+ +      </>
+ +    ));
+ +    expect(document.querySelector('.authTopBar a[href="/"]')).not.toBeNull();
+ +    expect(document.querySelector('.authTopBar [aria-disabled="true"]')).toBeNull();
+ +
+ +    setPathname("/sign-up");
+ +    await act(async () => root!.render(
+ +      <>
+ +        <TopBar />
+ +        <SignUpFlow client={{ register: vi.fn(), resendVerification: vi.fn() }} />
+ +      </>
+ +    ));
+ +    expect(document.querySelector('.authTopBar a[href="/"]')).not.toBeNull();
+ +    expect(document.querySelector('.authTopBar [aria-disabled="true"]')).toBeNull();
+ +  });
+ +
+++=======
+++>>>>>>> codex/auth-integration
+    it("keeps recovery-login navigation behind one explicit replacement-code acknowledgement", async () => {
+      const beginLogin = vi.fn().mockResolvedValue({
+        status: "mfa_required" as const,
+@@@ -263,56 -117,6 +275,59 @@@
+      expect(onAuthenticated).toHaveBeenCalledTimes(1);
+    });
+  
+++<<<<<<< HEAD
+ +  it("reads the validated default return path at login completion time", async () => {
+ +    window.history.replaceState({}, "", "/login?next=%2Fsettings");
+ +    const client = {
+ +      beginLogin: vi.fn().mockResolvedValue({ status: "mfa_required" as const, challenge_token: "challenge" }),
+ +      completeLogin: vi.fn().mockResolvedValue({
+ +        status: "authenticated" as const,
+ +        csrf_token: "c".repeat(43),
+ +        session: SESSION
+ +      })
+ +    };
+ +    await act(async () => root!.render(<LoginFlow client={client} />));
+ +    field("email").value = "person@example.test";
+ +    field("password").value = "password";
+ +    await submit();
+ +
+ +    const assign = vi.fn();
+ +    const completionWindow = Object.create(window) as Window;
+ +    Object.defineProperty(completionWindow, "location", {
+ +      configurable: true,
+ +      value: { search: "?next=%2Fnew", assign }
+ +    });
+ +    vi.stubGlobal("window", completionWindow);
+ +    field("code").value = "123456";
+ +    await submit();
+ +
+ +    expect(assign).toHaveBeenCalledTimes(1);
+ +    expect(assign).toHaveBeenCalledWith("/new");
+ +  });
+ +
+ +  it("forwards sign-up next to login only when the parameter is present", async () => {
+ +    window.history.replaceState({}, "", "/sign-up?next=%2Fnew");
+ +    await act(async () => root!.render(
+ +      <SignUpFlow client={{ register: vi.fn(), resendVerification: vi.fn() }} />
+ +    ));
+ +    await settle();
+ +
+ +    expect(document.querySelector('.authPanelFooter a')?.getAttribute("href"))
+ +      .toBe("/login?next=%2Fnew");
+ +  });
+ +
+ +  it("keeps the sign-up login link query-free when next is absent", async () => {
+ +    window.history.replaceState({}, "", "/sign-up");
+ +    await act(async () => root!.render(
+ +      <SignUpFlow client={{ register: vi.fn(), resendVerification: vi.fn() }} />
+ +    ));
+ +    await settle();
+ +
+ +    expect(document.querySelector('.authPanelFooter a')?.getAttribute("href")).toBe("/login");
+ +  });
+ +
+++=======
+++>>>>>>> codex/auth-integration
+    it("renders the non-enumerating registration state and resends only to the submitted email", async () => {
+      const register = vi.fn().mockResolvedValue({ message: REGISTRATION_MESSAGE });
+      const resendVerification = vi.fn().mockResolvedValue({ message: RESEND_MESSAGE });
+@@@ -322,7 -126,6 +337,10 @@@
+      field("recovery-email").value = " recovery@example.test ";
+      field("password").value = "correct horse battery staple";
+      field("adult-affirmed").checked = true;
+++<<<<<<< HEAD
+ +    field("privacy-accepted").checked = true;
+++=======
+++>>>>>>> codex/auth-integration
+      await submit();
+  
+      expect(register).toHaveBeenCalledWith(
+@@@ -334,187 -137,9 +352,194 @@@
+      expect(document.body.textContent).toContain(REGISTRATION_MESSAGE);
+      expect(document.body.textContent).toContain("No account status is revealed here.");
+  
+++<<<<<<< HEAD
+ +    await click("Verify email");
+++=======
++     await click("Resend instructions");
+++>>>>>>> codex/auth-integration
+      expect(resendVerification).toHaveBeenCalledWith("person@example.test");
+      expect(document.body.textContent).toContain(RESEND_MESSAGE);
+      expect(document.body.textContent).not.toMatch(/Google|forgot|keep me signed|model API key/i);
+    });
+++<<<<<<< HEAD
+ +
+ +  it("keeps login failures friendly and does not render transport or server details", async () => {
+ +    const beginLogin = vi.fn().mockRejectedValue(
+ +      new Error("ContractHttpError: EMAIL_NOT_FOUND from http://api.internal:3001")
+ +    );
+ +    const completeLogin = vi.fn();
+ +    await act(async () => root!.render(<LoginFlow client={{ beginLogin, completeLogin }} />));
+ +
+ +    field("email").value = "person@example.test";
+ +    field("password").value = "password";
+ +    await submit();
+ +
+ +    expect(document.querySelector('[role="alert"]')?.textContent)
+ +      .toBe("Sign-in could not be completed.");
+ +    expect(document.body.textContent).not.toMatch(/ContractHttpError|EMAIL_NOT_FOUND|api\.internal/);
+ +  });
+ +
+ +  it("keeps MFA failures friendly and does not render rejected-code details", async () => {
+ +    const beginLogin = vi.fn().mockResolvedValue({
+ +      status: "mfa_required" as const,
+ +      challenge_token: "challenge"
+ +    });
+ +    const completeLogin = vi.fn().mockRejectedValue(
+ +      new Error("ContractHttpError: invalid TOTP for user 81f6")
+ +    );
+ +    await act(async () => root!.render(
+ +      <LoginFlow client={{ beginLogin, completeLogin }} onAuthenticated={vi.fn()} />
+ +    ));
+ +
+ +    field("email").value = "person@example.test";
+ +    field("password").value = "password";
+ +    await submit();
+ +    field("code").value = "123456";
+ +    await submit();
+ +
+ +    expect(document.querySelector('[role="alert"]')?.textContent)
+ +      .toBe("Authenticator verification could not be completed.");
+ +    expect(document.body.textContent).not.toMatch(/ContractHttpError|invalid TOTP|81f6/);
+ +  });
+ +
+ +  it("explains a rejected recovery code without revealing account state", async () => {
+ +    const beginLogin = vi.fn().mockResolvedValue({
+ +      status: "mfa_required" as const,
+ +      challenge_token: "challenge"
+ +    });
+ +    const completeLogin = vi.fn().mockRejectedValue(
+ +      new ContractHttpError(
+ +        "SESSION_REQUIRED",
+ +        401,
+ +        "AUTH_CREDENTIALS_INVALID for owner:secret",
+ +        "AUTH_CREDENTIALS_INVALID"
+ +      )
+ +    );
+ +    await act(async () => root!.render(
+ +      <LoginFlow client={{ beginLogin, completeLogin }} onAuthenticated={vi.fn()} />
+ +    ));
+ +
+ +    field("email").value = "person@example.test";
+ +    field("password").value = "password";
+ +    await submit();
+ +    await click("Use a recovery code");
+ +    field("code").value = "AAAA-BBBB-CCCC-DDDD";
+ +    await submit();
+ +
+ +    expect(document.querySelector('[role="alert"]')?.textContent).toBe(
+ +      "That recovery code was not accepted. Start sign-in again if the challenge is more than five minutes old, or use another unused code from this account."
+ +    );
+ +    expect(document.querySelector("h1")?.textContent).toBe("Enter a recovery code.");
+ +    expect(document.body.textContent).not.toMatch(/AUTH_CREDENTIALS_INVALID|owner:secret/);
+ +  });
+ +
+ +  it("identifies the temporary MFA attempt lock without leaking server detail", async () => {
+ +    const beginLogin = vi.fn().mockResolvedValue({
+ +      status: "mfa_required" as const,
+ +      challenge_token: "challenge"
+ +    });
+ +    const completeLogin = vi.fn().mockRejectedValue(
+ +      new ContractHttpError("RATE_LIMITED", 429, "MFA_RATE_LIMITED internal", "MFA_RATE_LIMITED")
+ +    );
+ +    await act(async () => root!.render(
+ +      <LoginFlow client={{ beginLogin, completeLogin }} onAuthenticated={vi.fn()} />
+ +    ));
+ +
+ +    field("email").value = "person@example.test";
+ +    field("password").value = "password";
+ +    await submit();
+ +    field("code").value = "123456";
+ +    await submit();
+ +
+ +    expect(document.querySelector('[role="alert"]')?.textContent).toBe(
+ +      "Too many verification attempts. Wait five minutes, then start sign-in again."
+ +    );
+ +    expect(document.body.textContent).not.toContain("MFA_RATE_LIMITED");
+ +  });
+ +
+ +  it("keeps registration failures generic and separates primary and recovery autofill", async () => {
+ +    const register = vi.fn().mockRejectedValue(
+ +      new Error("ContractHttpError: duplicate account person@example.test")
+ +    );
+ +    const resendVerification = vi.fn();
+ +    await act(async () => root!.render(<SignUpFlow client={{ register, resendVerification }} />));
+ +
+ +    expect(field("email").autocomplete).toBe("section-primary-email email");
+ +    expect(field("recovery-email").autocomplete).toBe("section-recovery-email email");
+ +    field("email").value = "person@example.test";
+ +    field("recovery-email").value = "recovery@example.test";
+ +    field("password").value = "password";
+ +    field("adult-affirmed").checked = true;
+ +    field("privacy-accepted").checked = true;
+ +    await submit();
+ +
+ +    expect(document.querySelector('[role="alert"]')?.textContent)
+ +      .toBe("Account creation could not be completed.");
+ +    expect(document.body.textContent).not.toMatch(/ContractHttpError|duplicate account/);
+ +  });
+ +
+ +  it("keeps resend failures generic without changing the non-enumerating success message", async () => {
+ +    const register = vi.fn().mockResolvedValue({ message: REGISTRATION_MESSAGE });
+ +    const resendVerification = vi.fn().mockRejectedValue(
+ +      new Error("network ECONNREFUSED api.internal")
+ +    );
+ +    await act(async () => root!.render(<SignUpFlow client={{ register, resendVerification }} />));
+ +
+ +    field("email").value = "person@example.test";
+ +    field("recovery-email").value = "recovery@example.test";
+ +    field("password").value = "password";
+ +    field("adult-affirmed").checked = true;
+ +    field("privacy-accepted").checked = true;
+ +    await submit();
+ +    expect(document.body.textContent).toContain(REGISTRATION_MESSAGE);
+ +
+ +    await click("Verify email");
+ +    expect(document.querySelector('[role="alert"]')?.textContent)
+ +      .toBe("Verification instructions could not be resent.");
+ +    expect(document.body.textContent).not.toMatch(/ECONNREFUSED|api\.internal/);
+ +  });
+ +
+ +  // S02-S31 (SPEC.md S02-R18): a bare `new Event("submit")` bypasses HTML constraint
+ +  // validation, so `required` gates nothing against a scripted submit. The handler
+ +  // refuses from the two FormData reads — never from R17's React mirror, which an
+ +  // assignment never updates.
+ +  it("refuses to register when either consent box is left unticked", async () => {
+ +    const registerWithoutPrivacy = vi.fn();
+ +    await act(async () =>
+ +      root!.render(
+ +        <SignUpFlow client={{ register: registerWithoutPrivacy, resendVerification: vi.fn() }} />
+ +      )
+ +    );
+ +
+ +    field("email").value = "person@example.test";
+ +    field("recovery-email").value = "recovery@example.test";
+ +    field("password").value = "correct horse battery staple";
+ +    field("adult-affirmed").checked = true;
+ +    await submit();
+ +
+ +    expect(registerWithoutPrivacy).not.toHaveBeenCalled();
+ +
+ +    await act(async () => root!.unmount());
+ +    document.body.replaceChildren();
+ +    const container = document.createElement("div");
+ +    document.body.append(container);
+ +    root = createRoot(container);
+ +
+ +    const registerWithoutAdult = vi.fn();
+ +    await act(async () =>
+ +      root!.render(
+ +        <SignUpFlow client={{ register: registerWithoutAdult, resendVerification: vi.fn() }} />
+ +      )
+ +    );
+ +
+ +    field("email").value = "person@example.test";
+ +    field("recovery-email").value = "recovery@example.test";
+ +    field("password").value = "correct horse battery staple";
+ +    field("privacy-accepted").checked = true;
+ +    await submit();
+ +
+ +    expect(registerWithoutAdult).not.toHaveBeenCalled();
+ +  });
+++=======
+++>>>>>>> codex/auth-integration
+  });

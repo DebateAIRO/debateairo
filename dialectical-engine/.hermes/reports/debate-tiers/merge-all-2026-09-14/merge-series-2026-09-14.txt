@@ -1,0 +1,19 @@
+MERGED   slice/tiers-s03 (cd043907) → 8b94c4bb  files=59 files changed, 3302 insertions(+), 411 deletions(-)
+CONFLICT codex/fixagent-integration-1 (74b4d258) — 2 file(s), 4 hunk(s): apps/api/src/index.ts packages/register/src/runtime-environment.ts 
+MERGED   slice/oa-fix-02 (93fa0240) → 4505dfd6  files=8 files changed, 423 insertions(+), 12 deletions(-)
+CONFLICT codex/fix09-c35-admission-v11 (61313a1d) — 1 file(s), 5 hunk(s): tests/unit/fix02-pool-failure.test.ts 
+CONFLICT codex/fix09-c35-admission (c20e38f1) — 1 file(s), 5 hunk(s): tests/unit/fix02-pool-failure.test.ts 
+CONFLICT codex/accounts-t2 (65f52661) — 6 file(s), 15 hunk(s): apps/api/src/index.ts apps/ui/app/api/[...path]/route.ts apps/ui/package.json tests/unit/t2-real-client-ip.test.ts web/app/api/[...path]/route.ts web/package.json 
+CONFLICT codex/accounts-t3 (a19c1cd8) — 2 file(s), 7 hunk(s): apps/api/src/main.ts tests/integration/registration-database.test.ts 
+CONFLICT codex/accounts-s9 (0282dbe6) — 18 file(s), 26 hunk(s): apps/api/src/index.ts apps/api/src/main.ts apps/ui/app/settings/page.tsx apps/ui/components/LegacyRunClaimControls.tsx apps/ui/lib/serverApi.ts packages/contract/src/client.ts packages/db/src/index.ts tests/architecture/s9-dev-token-retirement-contract.test.ts tests/integration/database.test.ts tests/render/s9-legacy-claim-controls.test.tsx tests/unit/api.test.ts tests/unit/s5-session-http.test.ts web/app/api/[...path]/route.test.mjs web/app/debate/[id]/DebatePageClient.tsx web/app/debate/[id]/page.tsx web/app/new/NewQuestionForm.tsx web/app/page.tsx web/app/settings/page.tsx 
+MERGED   codex/accounts-t4 (a92e4241) → 0175edd6  files=
+MERGED   codex/accounts-t6 (0b37615a) → b5792c39  files=
+MERGED   codex/accounts-t7 (ad0a481a) → 577cac0b  files=
+MERGED   codex/accounts-t8 (7f905a57) → bd8ef5f5  files=
+CONFLICT codex/auth-contract (940569a0) — 2 file(s), 8 hunk(s): packages/contract/src/client.ts tests/unit/auth-contract-client.test.ts 
+CONFLICT codex/auth-ui (0a033569) — 9 file(s), 28 hunk(s): apps/ui/app/globals.css apps/ui/app/login/page.tsx apps/ui/app/sign-up/page.tsx apps/ui/components/AuthShell.tsx apps/ui/components/TopBar.tsx apps/ui/components/authRoutes.source-test.mjs apps/ui/scripts/node-test-manifest.json packages/contract/src/client.ts tests/unit/auth-contract-client.test.ts 
+CONFLICT codex/auth-integration (00695aca) — 8 file(s), 33 hunk(s): apps/ui/app/login/page.tsx apps/ui/app/page.tsx apps/ui/components/LoginFlow.tsx apps/ui/components/SignUpFlow.tsx apps/ui/components/TopBar.tsx apps/ui/components/authRoutes.source-test.mjs apps/ui/package.json tests/render/auth-flow-integration.test.tsx 
+CONFLICT codex/auth-ui-qa-fixes (63746a16) — 4 file(s), 11 hunk(s): apps/ui/app/globals.css apps/ui/components/LoginFlow.tsx apps/ui/components/SignUpFlow.tsx tests/render/auth-flow-integration.test.tsx 
+CONFLICT codex/auth-post-fallback (82cc10a4) — 4 file(s), 5 hunk(s): apps/ui/components/LoginFlow.tsx apps/ui/components/SignUpFlow.tsx apps/ui/components/authRoutes.source-test.mjs tests/render/auth-flow-integration.test.tsx 
+CONFLICT codex/auth-recovery-nav-guard (c3907e51) — 3 file(s), 6 hunk(s): apps/ui/components/LoginFlow.tsx apps/ui/components/TopBar.tsx tests/render/auth-flow-integration.test.tsx 
+--- integration/all @ bd8ef5f5 porcelain=0 2026-09-14 11:05:41 EEST

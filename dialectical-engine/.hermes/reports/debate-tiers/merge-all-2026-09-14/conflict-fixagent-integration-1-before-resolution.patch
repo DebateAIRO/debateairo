@@ -1,0 +1,79 @@
+diff --cc dialectical-engine/apps/api/src/index.ts
+index f41ec7e0,19b06759..00000000
+--- a/dialectical-engine/apps/api/src/index.ts
++++ b/dialectical-engine/apps/api/src/index.ts
+@@@ -76,11 -78,7 +81,15 @@@ import type { AccountErasureApplicatio
+  import type { LegacyRunClaimApplication } from "./legacy-claim.js";
+  import type { RecoveryApplication } from "./recovery.js";
+  import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
+++<<<<<<< HEAD
+ +import {
+ +  installSupportRoutes,
+ +  type SupportApplication,
+ +  type SupportRoutePath
+ +} from "./support/index.js";
+++=======
++ import { registerClientReportRoutes } from "./obs-client-report.js";
+++>>>>>>> codex/fixagent-integration-1
+  
+  type RouteAuthPolicy = "public" | "user" | "operator";
+  type RouteOriginPolicy = "trusted";
+@@@ -126,19 -123,10 +135,24 @@@ export const authorizationPolicyInvento
+    { route: "DELETE /v1/debates/{id}", auth: "user", resource: "run-owner", action: "erase-private" },
+    { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
+    { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
+++<<<<<<< HEAD
+ +  { route: "POST /v1/support/sessions", auth: "public", session: "optional", resource: "support-session", action: "create" },
+ +  { route: "GET /v1/support/sessions/{id}", auth: "public", session: "optional", resource: "support-session", action: "read" },
+ +  { route: "POST /v1/support/sessions/{id}/consent", auth: "public", session: "optional", resource: "support-session", action: "consent" },
+ +  { route: "POST /v1/support/sessions/{id}/messages", auth: "public", session: "optional", resource: "support-message", action: "create" },
+ +  { route: "POST /v1/support/messages/{id}/rating", auth: "public", session: "optional", resource: "support-message", action: "rate" },
+ +  { route: "POST /v1/support/sessions/{id}/escalate", auth: "public", session: "optional", resource: "support-case", action: "create" },
+ +  { route: "GET /v1/support/cases", auth: "user", resource: "support-case", action: "list" },
+ +  { route: "GET /v1/support/cases/{token}", auth: "public", session: "optional", resource: "support-case", action: "read" },
+ +  { route: "POST /v1/support/cases/{token}/messages", auth: "public", session: "optional", resource: "support-case", action: "reply" },
+ +  { route: "GET /v1/support/status", auth: "public", session: "optional", resource: "support-status", action: "read" },
+++=======
++   { route: "GET /v1/obs/client-report/enums", auth: "public", resource: "observability", action: "read-client-enums" },
++   { route: "POST /v1/obs/client-report", auth: "public", resource: "observability", action: "write-client-report" },
+++>>>>>>> codex/fixagent-integration-1
+    { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
+    { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
+ +  { route: "GET /v1/plan-tiers", auth: "user", resource: "plan-tier-rosters", action: "read" },
+    { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
+    { route: "GET /v1/dev/evaluator", auth: "operator", resource: "evaluator", action: "read" },
+    { route: "POST /v1/dev/evaluator/consumer-selection", auth: "operator", resource: "evaluator", action: "select-consumer" },
+@@@ -159,10 -147,7 +173,14 @@@
+    route: string;
+    auth: RouteAuthPolicy;
+    origin?: RouteOriginPolicy;
+++<<<<<<< HEAD
+ +  session?: RouteSessionPolicy;
+ +  resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" |
+ +    "deployment" | "plan-tier-rosters" | "evaluator" | "support-session" | "support-message" | "support-case" |
+ +    "support-status";
+++=======
++   resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" | "deployment" | "evaluator" | "observability";
+++>>>>>>> codex/fixagent-integration-1
+    action: string;
+  }>[]);
+  
+diff --cc dialectical-engine/packages/register/src/runtime-environment.ts
+index eb84fbfd,61212528..00000000
+--- a/dialectical-engine/packages/register/src/runtime-environment.ts
++++ b/dialectical-engine/packages/register/src/runtime-environment.ts
+@@@ -46,9 -42,8 +46,14 @@@ export function loadDevelopmentCommandE
+      XDG_CONFIG_HOME: z.string().min(1).optional(),
+      PNPM_EXECUTABLE: z.string().min(1).optional(),
+      DEBATEAI_DEV_DOCKER_BIN: z.string().min(1).optional(),
+++<<<<<<< HEAD
+ +    DEBATEAI_DEV_PROVIDER_TARGETS_JSON: z.string().min(1).optional(),
+ +    DEBATEAI_DEV_SUPPORT_MODEL_TARGET_JSON: z.string().min(1).optional(),
+ +    NODE_ENV: z.enum(["development", "test", "production"]).optional()
+++=======
++     OBS_FLUSH_DEADLINE_MS: z.string().optional(),
++     DEBATEAI_DEV_PROVIDER_TARGETS_JSON: z.string().min(1).optional()
+++>>>>>>> codex/fixagent-integration-1
+    });
+    return Object.freeze(Object.fromEntries(
+      Object.entries(environment).filter((entry): entry is [string, string] => (

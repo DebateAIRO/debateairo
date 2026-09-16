@@ -1,0 +1,173 @@
+diff --cc dialectical-engine/apps/ui/components/LoginFlow.tsx
+index 38313a5a,93220cc3..00000000
+--- a/dialectical-engine/apps/ui/components/LoginFlow.tsx
++++ b/dialectical-engine/apps/ui/components/LoginFlow.tsx
+@@@ -2,38 -2,17 +2,47 @@@
+  
+  import Link from "next/link";
+  import { FormEvent, useEffect, useState } from "react";
+++<<<<<<< HEAD
+ +import { ContractHttpError, type ContractClient } from "@debateai/contract";
+ +import { AuthShell } from "@/components/AuthShell";
+ +import { contractClient } from "@/lib/api";
+ +import { setRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
+ +import { safeReturnPath } from "@/lib/returnPath";
+++=======
++ import type { ContractClient } from "@debateai/contract";
++ import { AuthShell } from "@/components/AuthShell";
++ import { contractClient } from "@/lib/api";
++ import { setRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
++ 
++ const HOME_PATH = "/";
+++>>>>>>> codex/auth-recovery-nav-guard
+  
+  type LoginClient = Pick<ContractClient, "beginLogin" | "completeLogin">;
+ +type VerificationMethod = "authenticator" | "recovery";
+ +
+ +/* The document shows live validity marks under both auth fields (7a, and 8a
+ +   with two rules unmet). These are presentation only — the server remains the
+ +   authority on whether any credential is accepted. */
+ +const PASSWORD_RULES: readonly { readonly label: string; readonly met: (value: string) => boolean }[] = [
+ +  { label: "Eight characters", met: (v) => v.length >= 8 },
+ +  { label: "One capital letter", met: (v) => /[A-Z]/.test(v) },
+ +  { label: "One number", met: (v) => /[0-9]/.test(v) },
+ +  { label: "One special character", met: (v) => /[^A-Za-z0-9]/.test(v) }
+ +];
+ +
+ +function emailValidity(value: string): { state: "idle" | "ok" | "bad"; text: string } {
+ +  const trimmed = value.trim();
+ +  if (trimmed.length === 0) return { state: "idle", text: "Use the address this account was verified with." };
+ +  // Deliberately permissive: the address is checked for shape, not existence.
+ +  const shaped = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(trimmed);
+ +  return shaped
+ +    ? { state: "ok", text: "✓ Valid address" }
+ +    : { state: "bad", text: "✗ That does not look like an email address" };
+ +}
+  
+  function navigateHome(): void {
+ -  window.location.assign(HOME_PATH);
+ +  const next = new URLSearchParams(window.location.search).get("next");
+ +  window.location.assign(safeReturnPath(next));
+  }
+  
+  export function LoginFlow({
+@@@ -45,20 -24,11 +54,22 @@@
+  }>) {
+    const [challengeToken, setChallengeToken] = useState<string | null>(null);
+    const [replacementRecoveryCode, setReplacementRecoveryCode] = useState<string | null>(null);
+ +  const [verificationMethod, setVerificationMethod] = useState<VerificationMethod>("authenticator");
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+ +  const [signUpHref, setSignUpHref] = useState("/sign-up");
+ +  const [email, setEmail] = useState("");
+ +  const [password, setPassword] = useState("");
+ +  const [code, setCode] = useState("");
+ +
+ +  useEffect(() => {
+ +    const next = new URLSearchParams(window.location.search).get("next");
+ +    if (next !== null) setSignUpHref(`/sign-up?next=${encodeURIComponent(next)}`);
+ +    return () => setRecoveryAcknowledgementPending(false);
+ +  }, []);
+  
++   useEffect(() => () => setRecoveryAcknowledgementPending(false), []);
++ 
+    async function submitCredentials(event: FormEvent<HTMLFormElement>): Promise<void> {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget);
+diff --cc dialectical-engine/apps/ui/components/TopBar.tsx
+index 959960e7,e1dacc91..00000000
+--- a/dialectical-engine/apps/ui/components/TopBar.tsx
++++ b/dialectical-engine/apps/ui/components/TopBar.tsx
+@@@ -2,7 -2,6 +2,10 @@@
+  
+  import Link from "next/link";
+  import { usePathname } from "next/navigation";
+++<<<<<<< HEAD
+ +import { ModeToggle } from "@/components/ModeToggle";
+++=======
+++>>>>>>> codex/auth-recovery-nav-guard
+  import { useRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
+  
+  const SCREEN_TITLES: Record<string, string> = {
+@@@ -61,7 -58,6 +64,10 @@@ export function TopBar() 
+      return (
+        <header className="authTopBar">
+          <BrandMark homeNavigationAvailable={!recoveryAcknowledgementPending} />
+++<<<<<<< HEAD
+ +        <ModeToggle />
+++=======
+++>>>>>>> codex/auth-recovery-nav-guard
+        </header>
+      );
+    }
+diff --cc dialectical-engine/tests/render/auth-flow-integration.test.tsx
+index 12bc9468,45b4c8b0..00000000
+--- a/dialectical-engine/tests/render/auth-flow-integration.test.tsx
++++ b/dialectical-engine/tests/render/auth-flow-integration.test.tsx
+@@@ -4,7 -4,6 +4,10 @@@ import { act } from "react"
+  import { createRoot, type Root } from "react-dom/client";
+  import { renderToStaticMarkup } from "react-dom/server";
+  import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+++<<<<<<< HEAD
+ +import { ContractHttpError } from "@debateai/contract";
+++=======
+++>>>>>>> codex/auth-recovery-nav-guard
+  import { setPathname } from "next/navigation";
+  import { LoginFlow } from "../../apps/ui/components/LoginFlow.js";
+  import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
+@@@ -58,7 -57,6 +61,10 @@@ async function click(label: string): Pr
+  describe("rendered auth flow integration", () => {
+    beforeEach(() => {
+      vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+++<<<<<<< HEAD
+ +    window.history.replaceState({}, "", "/");
+++=======
+++>>>>>>> codex/auth-recovery-nav-guard
+      setPathname("/");
+      const container = document.createElement("div");
+      document.body.append(container);
+@@@ -114,41 -112,6 +120,44 @@@
+      expect(form!.getAttribute("action")).not.toContain("?");
+    });
+  
+++<<<<<<< HEAD
+ +  it("moves password success into a dedicated authenticator screen with a recovery alternative", async () => {
+ +    const beginLogin = vi.fn().mockResolvedValue({
+ +      status: "mfa_required" as const,
+ +      challenge_token: "challenge"
+ +    });
+ +    await act(async () => root!.render(
+ +      <LoginFlow client={{ beginLogin, completeLogin: vi.fn() }} onAuthenticated={vi.fn()} />
+ +    ));
+ +
+ +    field("email").value = "person@example.test";
+ +    field("password").value = "password";
+ +    await submit();
+ +
+ +    expect(document.querySelector("h1")?.textContent).toBe("Enter your authentication code.");
+ +    expect(document.body.textContent).not.toContain("Back to the graph.");
+ +    expect(document.querySelector('input[name="email"]')).toBeNull();
+ +    expect(document.querySelector('input[name="password"]')).toBeNull();
+ +    expect(field("code").inputMode).toBe("numeric");
+ +    expect(field("code").maxLength).toBe(6);
+ +    expect(field("code").pattern).toBe("[0-9]{6}");
+ +    expect(document.body.textContent).toContain("Open Google Authenticator");
+ +
+ +    await click("Use a recovery code");
+ +    expect(document.querySelector("h1")?.textContent).toBe("Enter a recovery code.");
+ +    expect(field("code").inputMode).toBe("text");
+ +    expect(field("code").maxLength).toBe(-1);
+ +    expect(field("code").pattern).toBe("");
+ +    expect(document.body.textContent).toContain("Use an authenticator code");
+ +
+ +    await click("Back to sign in");
+ +    expect(document.querySelector("h1")?.textContent).toBe("Back to the graph.");
+ +    expect(document.querySelector('input[name="email"]')).not.toBeNull();
+ +    expect(document.querySelector('input[name="password"]')).not.toBeNull();
+ +  });
+ +
+++=======
+++>>>>>>> codex/auth-recovery-nav-guard
+    it("makes recovery-code acknowledgement the only home completion path", async () => {
+      setPathname("/login");
+      const beginLogin = vi.fn().mockResolvedValue({

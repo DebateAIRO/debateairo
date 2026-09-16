@@ -1,0 +1,25 @@
+SNAP wip/oa-fix-09-2026-09-14 = 53ead7a9 parent 8619b9ab (codex/oa-fix-09) files=22 files changed, 3520 insertions(+)
+   worktree /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-09 porcelain unchanged
+SNAP wip/oa-fix-16-2026-09-14 = 3dc5f130 parent 08eff965 (codex/oa-fix-16) files=11 files changed, 2187 insertions(+)
+   worktree /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-16 porcelain unchanged
+SNAP wip/oa-fix-01-2026-09-14 = 555f6ee9 parent 24d0b3e5 (slice/oa-fix-01) files=17 files changed, 760 insertions(+)
+   worktree /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-01 porcelain unchanged
+SNAP wip/oa-fix-04-2026-09-14 = b4658229 parent 6d55ed4c (slice/oa-fix-04) files=2 files changed, 108 insertions(+)
+   worktree /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-04 porcelain unchanged
+SNAP wip/oa-fix-02-c3-2026-09-14 = 2fb30d91 parent e7b9f681 (codex/oa-fix-02-c3) files=1 file changed, 113 insertions(+)
+   worktree /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-02-c3 porcelain unchanged
+SNAP wip/oa-fix-05-2026-09-14 = 3e19bb94 parent ecbad9d6 (codex/oa-fix-05) files=3 files changed, 398 insertions(+)
+   worktree /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-05 porcelain unchanged
+SNAP wip/oa-fix-08-2026-09-14 = c7536695 parent 8e9442ff (codex/oa-fix-08) files=6 files changed, 488 insertions(+)
+   worktree /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-08 porcelain unchanged
+SNAP wip/oa-sup-01-2026-09-14 = 3c29de16 parent 9c68ceb3 (slice/oa-sup-01) files=104 files changed, 4905 insertions(+), 94 deletions(-)
+   worktree /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-sup-01 porcelain unchanged
+SNAP wip/fix09-c35-admission-v25-2026-09-14 = bcfbe7e4 parent 652beda6 (codex/fix09-c35-admission-v25) files=5 files changed, 566 insertions(+), 5 deletions(-)
+   worktree /Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/fix09-c35-admission-v25 porcelain unchanged
+SNAP wip/fixagent-plan-2026-09-14 = d9e062ba parent d0c578c0 (codex/fixagent-plan) files=19 files changed, 1680 insertions(+)
+   worktree /Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/fixagent-plan porcelain unchanged
+SNAP wip/fix10-c012-v10-2026-09-14 = 33042640 parent 4044f8f1 (codex/fix10-c012-v10) files=1 file changed, 53 insertions(+)
+   worktree /Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/fix10-c012-v10 porcelain unchanged
+SNAP wip/main-checkout-2026-09-14 = 4c377807 parent 446c685e (integration/debate-tiers) files=1265 files changed, 238399 insertions(+), 324 deletions(-)
+   worktree /Users/vladmihaimiron/Documents/DebateAIRO porcelain unchanged
+--- 2026-09-14 11:08:56 EEST

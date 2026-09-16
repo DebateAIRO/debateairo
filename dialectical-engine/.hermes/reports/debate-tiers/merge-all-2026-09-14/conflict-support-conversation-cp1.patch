@@ -1,0 +1,1150 @@
+diff --cc dialectical-engine/apps/runner/src/dev-api-environment.ts
+index 718e8bc4,46864ad8..00000000
+--- a/dialectical-engine/apps/runner/src/dev-api-environment.ts
++++ b/dialectical-engine/apps/runner/src/dev-api-environment.ts
+@@@ -81,7 -83,7 +84,11 @@@ type AssembleDevelopmentApiEnvironmentI
+    providerPanel: DevelopmentProviderPanel;
+    registerReceipt: DevelopmentDeploymentRegisterMachineReceiptV1;
+    supportModelTarget: string;
+++<<<<<<< HEAD
+ +  heldConfiguredProviderSets?: ReadonlyMap<string, readonly string[]>;
+++=======
++   profile?: DevelopmentAuthStackProfile;
+++>>>>>>> codex/support-conversation-cp1
+  }>;
+  
+  function currentUid(): number {
+@@@ -312,7 -314,7 +319,11 @@@ async function publishExactFile
+  function isExactProviderRuntimeRefresh(
+    existing: string,
+    expected: string,
+++<<<<<<< HEAD
+ +  configuredProviders: readonly DevelopmentConfiguredProvider[]
+++=======
++   profile: DevelopmentAuthStackProfile
+++>>>>>>> codex/support-conversation-cp1
+  ): boolean {
+    try {
+      const existingValues = parseExactEnvironment(existing, DEVELOPMENT_API_ENVIRONMENT_KEYS);
+@@@ -322,9 -324,13 +333,19 @@@
+        if (existingValues.get(key) !== expectedValues.get(key)) return false;
+      }
+      parseDevelopmentProviderPanelTargets(
+++<<<<<<< HEAD
+ +      existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!, configuredProviders
+ +    );
+ +    parseDevelopmentSupportModelTargetJson(existingValues.get("SUPPORT_MODEL_TARGET_JSON")!);
+++=======
++       existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!,
++       profile
++     );
++     parseDevelopmentSupportModelTargetJson(
++       existingValues.get("SUPPORT_MODEL_TARGET_JSON")!,
++       profile
++     );
+++>>>>>>> codex/support-conversation-cp1
+      return true;
+    } catch {
+      return false;
+@@@ -344,8 -350,7 +365,12 @@@
+  function isExactPublishedRegisterRefresh(
+    existing: string,
+    expected: string,
+++<<<<<<< HEAD
+ +  configuredProviders: readonly DevelopmentConfiguredProvider[],
+ +  heldConfiguredProviderSets?: ReadonlyMap<string, readonly string[]>
+++=======
++   profile: DevelopmentAuthStackProfile
+++>>>>>>> codex/support-conversation-cp1
+  ): boolean {
+    const receiptKeys = new Set([
+      "REGISTER_VERSION",
+@@@ -364,11 -369,13 +389,16 @@@
+          || receiptKeys.has(key)) continue;
+        if (existingValues.get(key) !== expectedValues.get(key)) return false;
+      }
+ -    // The OUTGOING targets cannot be re-parsed against the new configured set - that set is
+ -    // precisely what changed - so they are held to the rule a publication actually obeys:
+ -    // slots are ADDED, never removed or renamed. An environment naming a provider the
+ -    // deployment does not configure (the retired local-vllm scaffold, say) stays drift.
+ +    // The OUTGOING targets cannot be re-parsed against the new configured set because that
+ +    // set is precisely what changed. An additive publication is admitted directly. A removal
+ +    // is admitted only when the caller proves the exact outgoing set was held by its version.
+      const incoming = parseDevelopmentProviderPanelTargets(
+++<<<<<<< HEAD
+ +      expectedValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!, configuredProviders
+++=======
++       expectedValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!,
++       profile
+++>>>>>>> codex/support-conversation-cp1
+      );
+      const configuredRefs = new Set(incoming.targets.map((target) => target.providerRef));
+      const outgoing: unknown = JSON.parse(existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!);
+@@@ -377,19 -383,12 +407,26 @@@
+      for (const row of outgoing) {
+        if (typeof row !== "object" || row === null) return false;
+        const providerRef = (row as Readonly<Record<string, unknown>>).provider_ref;
+ -      if (typeof providerRef !== "string" || !configuredRefs.has(providerRef)) return false;
+ +      if (typeof providerRef !== "string") return false;
+ +      outgoingRefs.push(providerRef);
+      }
+++<<<<<<< HEAD
+ +    const additive = outgoingRefs.every((providerRef) => configuredRefs.has(providerRef));
+ +    const heldRefs = heldConfiguredProviderSets?.get(existingValues.get("REGISTER_VERSION")!);
+ +    const heldSet = heldRefs === undefined ? undefined : new Set(heldRefs);
+ +    const exactHeldSet = heldSet !== undefined
+ +      && heldSet.size === heldRefs!.length
+ +      && new Set(outgoingRefs).size === outgoingRefs.length
+ +      && outgoingRefs.length === heldSet.size
+ +      && outgoingRefs.every((providerRef) => heldSet.has(providerRef));
+ +    if (!additive && !exactHeldSet) return false;
+ +    parseDevelopmentSupportModelTargetJson(existingValues.get("SUPPORT_MODEL_TARGET_JSON")!);
+++=======
++     parseDevelopmentSupportModelTargetJson(
++       existingValues.get("SUPPORT_MODEL_TARGET_JSON")!,
++       profile
++     );
+++>>>>>>> codex/support-conversation-cp1
+      return true;
+    } catch {
+      return false;
+@@@ -399,20 -398,19 +436,32 @@@
+  function isExactProviderRuntimeRefreshWithLegacyProbeTimeout(
+    existing: string,
+    expected: string,
+++<<<<<<< HEAD
+ +  configuredProviders: readonly DevelopmentConfiguredProvider[]
+++=======
++   profile: DevelopmentAuthStackProfile
+++>>>>>>> codex/support-conversation-cp1
+  ): boolean {
+    const upgraded = existing.replace(
+      "PROVIDER_PROBE_TIMEOUT_MS=5000\n",
+      `PROVIDER_PROBE_TIMEOUT_MS=${DEVELOPMENT_CLI_CALL_TIMEOUT_MS}\n`
+    );
+++<<<<<<< HEAD
+ +  return upgraded !== existing
+ +    && isExactProviderRuntimeRefresh(upgraded, expected, configuredProviders);
+++=======
++   return upgraded !== existing && isExactProviderRuntimeRefresh(upgraded, expected, profile);
+++>>>>>>> codex/support-conversation-cp1
+  }
+  
+  function isExactLegacyEnvironmentWithoutSupportModelTarget(
+    existing: string,
+    expected: string,
+++<<<<<<< HEAD
+ +  configuredProviders: readonly DevelopmentConfiguredProvider[]
+++=======
++   profile: DevelopmentAuthStackProfile
+++>>>>>>> codex/support-conversation-cp1
+  ): boolean {
+    try {
+      const legacyKeys = DEVELOPMENT_API_ENVIRONMENT_KEYS.filter((key) =>
+@@@ -425,9 -423,13 +474,19 @@@
+        if (existingValues.get(key) !== expectedValues.get(key)) return false;
+      }
+      parseDevelopmentProviderPanelTargets(
+++<<<<<<< HEAD
+ +      existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!, configuredProviders
+ +    );
+ +    parseDevelopmentSupportModelTargetJson(expectedValues.get("SUPPORT_MODEL_TARGET_JSON")!);
+++=======
++       existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!,
++       profile
++     );
++     parseDevelopmentSupportModelTargetJson(
++       expectedValues.get("SUPPORT_MODEL_TARGET_JSON")!,
++       profile
++     );
+++>>>>>>> codex/support-conversation-cp1
+      return true;
+    } catch {
+      return false;
+@@@ -518,21 -524,10 +581,28 @@@ export async function assembleDevelopme
+      join(custodyRoot, "api.env"),
+      source,
+      [],
+++<<<<<<< HEAD
+ +    (existing) => isExactProviderRuntimeRefresh(
+ +      existing, source, input.providerPanel.configuredProviders
+ +    )
+ +      || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(
+ +        existing, source, input.providerPanel.configuredProviders
+ +      )
+ +      || isExactPublishedRegisterRefresh(
+ +        existing,
+ +        source,
+ +        input.providerPanel.configuredProviders,
+ +        input.heldConfiguredProviderSets
+ +      )
+ +      || isExactLegacyEnvironmentWithoutSupportModelTarget(
+ +        existing, source, input.providerPanel.configuredProviders
+ +      )
+++=======
++     (existing) => isExactProviderRuntimeRefresh(existing, source, profile)
++       || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(existing, source, profile)
++       || isExactPublishedRegisterRefresh(existing, source, profile)
++       || isExactLegacyEnvironmentWithoutSupportModelTarget(existing, source, profile)
+++>>>>>>> codex/support-conversation-cp1
+    );
+    return Object.freeze({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused });
+  }
+diff --cc dialectical-engine/apps/runner/src/dev-api-process.ts
+index bd443526,4529cbb0..00000000
+--- a/dialectical-engine/apps/runner/src/dev-api-process.ts
++++ b/dialectical-engine/apps/runner/src/dev-api-process.ts
+@@@ -166,10 -169,11 +170,15 @@@ function validateExactEnvironment
+      parseApiEnvironment(values);
+      const providerPanel = parseDevelopmentProviderPanelTargets(
+        values.PROVIDER_DISCOVERY_TARGETS_JSON!,
+++<<<<<<< HEAD
+ +      loadModelConfigConfiguredProviders(repositoryRoot)
+++=======
++       profile
+++>>>>>>> codex/support-conversation-cp1
+      );
+      const supportModelTarget = parseDevelopmentSupportModelTargetJson(
+-       values.SUPPORT_MODEL_TARGET_JSON!
++       values.SUPPORT_MODEL_TARGET_JSON!,
++       profile
+      );
+      const custodyRoot = join(repositoryRoot, ".local", "dev-auth");
+      const exact = new Map<string, string>([
+diff --cc dialectical-engine/apps/runner/src/dev-auth-stack.ts
+index 2cca23d8,fe9efc6a..00000000
+--- a/dialectical-engine/apps/runner/src/dev-auth-stack.ts
++++ b/dialectical-engine/apps/runner/src/dev-auth-stack.ts
+@@@ -28,16 -28,9 +28,20 @@@ import 
+  } from "./dev-cli-provider-panel.js";
+  import {
+    DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
+ +  resolveDevelopmentApiProviderSlots,
+ +  type DevelopmentApiProviderProbe,
+    type DevelopmentProviderPanel
+  } from "./dev-provider-panel.js";
+++<<<<<<< HEAD
+ +import { loadModelConfig, ModelConfigShapeError, type ModelConfig } from "@debateai/model-config";
+ +import { readProviderKeys } from "./dev-provider-keys.js";
+ +import {
+ +  HERMES_SUPPORT_PORT,
+ +  startHermesSupportRelay
+ +} from "../../../acceptance/hermes-relay.js";
+++=======
++ import { startHermesSupportRelay } from "../../../acceptance/hermes-relay.js";
+++>>>>>>> codex/support-conversation-cp1
+  import type { DevelopmentDeploymentRegisterMachineReceiptV1 } from "./dev-deployment-register.js";
+  import {
+    createDevTlsReadinessOperations,
+@@@ -60,14 -56,8 +68,18 @@@ type SupportModelRelayHandle = Stoppabl
+    providerRef: "development:hermes-glm-5.3-flash";
+  }>;
+  
+ +export type DevelopmentApiProviderAvailabilityOperations = Readonly<{
+ +  readProviderKeys(repositoryRoot: string): Promise<ReadonlyMap<string, string>>;
+ +  probe: DevelopmentApiProviderProbe;
+ +  warning(line: string): void;
+ +}>;
+ +
+  export type DevelopmentAuthStackOperations = Readonly<{
+++<<<<<<< HEAD
+ +  checkModelConfig(): Promise<void>;
+++=======
++   profile?: DevelopmentAuthStackProfile;
+++>>>>>>> codex/support-conversation-cp1
+    isPublicPortOccupied(): Promise<boolean>;
+    startProviderPanel(): Promise<DevelopmentCliProviderPanelHandle>;
+    startSupportModelRelay(): Promise<SupportModelRelayHandle>;
+@@@ -149,10 -138,7 +161,14 @@@ async function stopOwned(resources: rea
+  export async function startDevelopmentAuthStack(
+    operations: DevelopmentAuthStackOperations
+  ): Promise<DevelopmentAuthStack> {
+++<<<<<<< HEAD
+ +  await fixedStage(
+ +    "DEV_AUTH_STACK_MODEL_CONFIG_INVALID",
+ +    () => operations.checkModelConfig()
+ +  );
+++=======
++   const profile = operations.profile ?? DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE;
+++>>>>>>> codex/support-conversation-cp1
+    const occupied = await fixedStage(
+      "DEV_AUTH_STACK_PREFLIGHT_FAILED",
+      () => operations.isPublicPortOccupied()
+@@@ -255,74 -238,28 +271,93 @@@ export async function superviseDevelopm
+  export function createDevelopmentAuthStackOperations(
+    repositoryRoot: string,
+    commandEnvironment: Readonly<Record<string, string>>,
+++<<<<<<< HEAD
+ +  apiProviderOperations: DevelopmentApiProviderAvailabilityOperations = Object.freeze({
+ +    readProviderKeys,
+ +    async probe(input) {
+ +      const response = await fetch(`${input.baseUrl.replace(/\/$/u, "")}/chat/completions`, {
+ +        method: "POST",
+ +        headers: {
+ +          authorization: `Bearer ${input.keyValue}`,
+ +          "content-type": "application/json"
+ +        },
+ +        body: JSON.stringify({
+ +          model: input.model,
+ +          messages: [{ role: "user", content: "Reply with OK." }],
+ +          max_tokens: 64
+ +        })
+ +      });
+ +      if (!response.ok) throw new TypeError("DEV_PROVIDER_SLOT_PROBE_FAILED");
+ +      const body = await response.json() as Readonly<{ model?: unknown }>;
+ +      if (typeof body.model !== "string") throw new TypeError("DEV_PROVIDER_SLOT_PROBE_FAILED");
+ +      return Object.freeze({ model: body.model });
+ +    },
+ +    warning: (line) => console.warn(line)
+ +  })
+++=======
++   profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+++>>>>>>> codex/support-conversation-cp1
+  ): DevelopmentAuthStackOperations {
+    const hatchetOperations = createDevelopmentHatchetTokenOperations(
+      repositoryRoot,
+-     commandEnvironment
++     commandEnvironment,
++     profile
+    );
+++<<<<<<< HEAD
+ +  const tlsOperations = createDevTlsReadinessOperations(repositoryRoot);
+ +  let checkedModelConfig: ModelConfig | undefined;
+ +  return Object.freeze({
+ +    async checkModelConfig() {
+ +      try {
+ +        checkedModelConfig = loadModelConfig(repositoryRoot);
+ +      } catch (error) {
+ +        if (error instanceof ModelConfigShapeError) {
+ +          console.error(
+ +            `DEV_AUTH_STACK_MODEL_CONFIG_INVALID tier=${error.tier} model=${error.model} class ${error.classNumber}`
+ +          );
+ +        }
+ +        throw error;
+ +      }
+ +    },
+ +    isPublicPortOccupied: () => tlsOperations.isPublicPortOccupied(),
+ +    async startProviderPanel() {
+ +      const config = checkedModelConfig ?? loadModelConfig(repositoryRoot);
+ +      const cliHandle = await startDevelopmentCliProviderPanel(config);
+ +      try {
+ +        const panel = await resolveDevelopmentApiProviderSlots(
+ +          config,
+ +          cliHandle.panel,
+ +          await apiProviderOperations.readProviderKeys(repositoryRoot),
+ +          apiProviderOperations.probe,
+ +          apiProviderOperations.warning
+ +        );
+ +        return Object.freeze({
+ +          panel,
+ +          healthyProviderRefs: panel.healthyProviderRefs,
+ +          stop: () => cliHandle.stop()
+ +        });
+ +      } catch (error) {
+ +        await cliHandle.stop().catch(() => undefined);
+ +        throw error;
+ +      }
+ +    },
+++=======
++   const tlsOperations = createDevTlsReadinessOperations(repositoryRoot, {
++     publicPort: profile.publicPort,
++     uiPort: profile.uiPort
++   });
++   return Object.freeze({
++     profile,
++     isPublicPortOccupied: () => tlsOperations.isPublicPortOccupied(),
++     startProviderPanel: () => startDevelopmentCliProviderPanel(undefined, profile),
+++>>>>>>> codex/support-conversation-cp1
+      async startSupportModelRelay() {
+        const relay = await startHermesSupportRelay({
+-         port: HERMES_SUPPORT_PORT,
+-         timeoutMs: DEVELOPMENT_CLI_CALL_TIMEOUT_MS
++         port: profile.supportModelPort,
++         timeoutMs: DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
++         ...(profile.name === "support-preview"
++           ? { developmentStackProfile: "support-preview" as const }
++           : {})
+        });
+        return Object.freeze({
+          targetJson: relay.targetJson,
+@@@ -340,21 -278,13 +376,26 @@@
+      async provisionHatchetToken() {
+        await provisionDevelopmentHatchetToken({
+          repositoryRoot,
+-         operations: hatchetOperations
++         operations: hatchetOperations,
++         profile
+        });
+      },
+ -    async assembleApiEnvironment(providerPanel, registerReceipt, supportModelTarget) {
+ +    async assembleApiEnvironment(
+ +      providerPanel,
+ +      registerReceipt,
+ +      supportModelTarget,
+ +      heldConfiguredProviderSets
+ +    ) {
+        await assembleDevelopmentApiEnvironment({
+++<<<<<<< HEAD
+ +        repositoryRoot,
+ +        providerPanel,
+ +        registerReceipt,
+ +        supportModelTarget,
+ +        ...(heldConfiguredProviderSets === undefined ? {} : { heldConfiguredProviderSets })
+++=======
++         repositoryRoot,providerPanel,registerReceipt,supportModelTarget,profile
+++>>>>>>> codex/support-conversation-cp1
+        });
+      },
+      startApi: () => startDevelopmentApiProcess({
+diff --cc dialectical-engine/apps/runner/src/dev-cli-provider-panel.ts
+index 5e033a8e,9e16f9ab..00000000
+--- a/dialectical-engine/apps/runner/src/dev-cli-provider-panel.ts
++++ b/dialectical-engine/apps/runner/src/dev-cli-provider-panel.ts
+@@@ -4,14 -4,19 +4,19 @@@ import { startGrokRelay } from "../../.
+  import { startModelShim } from "../../../acceptance/model-shim.js";
+  import {
+    buildDevelopmentProviderPanel,
++   developmentCliProviderRoster,
+    DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
+ -  DEVELOPMENT_CLI_PROVIDER_ROSTER,
+    DEVELOPMENT_MINIMUM_DISTINCT_MAKERS,
+    DEVELOPMENT_UNAVAILABLE_CLI_MODEL,
+ +  developmentProviderSlots,
+    type DevelopmentProviderPanel
+  } from "./dev-provider-panel.js";
++ import {
++   DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
++   type DevelopmentAuthStackProfile
++ } from "./dev-auth-stack-profile.js";
+  
+ -export { DEVELOPMENT_CLI_PROVIDER_ROSTER } from "./dev-provider-panel.js";
+ +export { DEVELOPMENT_PROVIDER_SLOT_CATALOGUE } from "./dev-provider-panel.js";
+  
+  export type DevelopmentCliRelay = Readonly<{
+    port: number;
+@@@ -41,31 -52,18 +46,45 @@@ async function closeRelays(relays: read
+  }
+  
+  export async function startDevelopmentCliProviderPanel(
+++<<<<<<< HEAD
+ +  config: ModelConfig = loadModelConfig(process.cwd()),
+ +  operations: DevelopmentCliProviderPanelOperations = createDevelopmentCliProviderPanelOperations(config)
+ +): Promise<DevelopmentCliProviderPanelHandle> {
+ +  const slots = developmentProviderSlots(config);
+ +  const cliSlots = slots.filter((slot) => slot.transport === "cli");
+ +  if (operations.starts.length !== cliSlots.length) {
+ +    throw new TypeError("DEV_CLI_PROVIDER_PANEL_START_SET_INVALID");
+ +  }
+ +  const settled = await Promise.allSettled(operations.starts.map((start, index) =>
+ +    start(cliSlots[index]!.port!)
+++=======
++   operations: DevelopmentCliProviderPanelOperations = createDevelopmentCliProviderPanelOperations(),
++   profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
++ ): Promise<DevelopmentCliProviderPanelHandle> {
++   const roster = developmentCliProviderRoster(profile);
++   const settled = await Promise.allSettled(operations.starts.map((start, index) =>
++     start(roster[index]!.port)
+++>>>>>>> codex/support-conversation-cp1
+    ));
+    const relays = settled.flatMap((outcome) => outcome.status === "fulfilled" ? [outcome.value] : []);
+    let panel: DevelopmentProviderPanel;
+    try {
+++<<<<<<< HEAD
+ +    let cliIndex = 0;
+ +    const observations = slots.map((provider) => {
+ +      if (provider.transport === "api") {
+ +        return Object.freeze({
+ +          providerRef: provider.providerRef,
+ +          baseUrl: provider.baseUrl!,
+ +          model: DEVELOPMENT_UNAVAILABLE_CLI_MODEL
+ +        });
+ +      }
+ +      const outcome = settled[cliIndex];
+ +      cliIndex += 1;
+++=======
++     const observations = roster.map((provider, index) => {
++       const outcome = settled[index];
+++>>>>>>> codex/support-conversation-cp1
+        if (outcome?.status === "fulfilled") {
+          if (outcome.value.port !== provider.port
+            || outcome.value.baseUrl !== `http://127.0.0.1:${provider.port}`
+@@@ -86,11 -84,7 +105,15 @@@
+          model: DEVELOPMENT_UNAVAILABLE_CLI_MODEL
+        });
+      });
+++<<<<<<< HEAD
+ +    panel = buildDevelopmentProviderPanel(observations, slots.map((provider) => ({
+ +      providerRef: provider.providerRef,
+ +      adapterKind: provider.adapterKind,
+ +      maker: provider.maker
+ +    })));
+++=======
++     panel = buildDevelopmentProviderPanel(observations, profile);
+++>>>>>>> codex/support-conversation-cp1
+      if (panel.healthyProviderRefs.length < DEVELOPMENT_MINIMUM_DISTINCT_MAKERS) {
+        throw new TypeError("DEV_CLI_PROVIDER_PANEL_INSUFFICIENT_MAKERS");
+      }
+diff --cc dialectical-engine/apps/runner/src/dev-provider-panel.ts
+index 2c594e98,4d13afbf..00000000
+--- a/dialectical-engine/apps/runner/src/dev-provider-panel.ts
++++ b/dialectical-engine/apps/runner/src/dev-provider-panel.ts
+@@@ -2,7 -2,11 +2,15 @@@ import 
+    parseProviderDiscoveryTargets,
+    type ProviderDiscoveryTarget
+  } from "@debateai/providers";
+++<<<<<<< HEAD
+ +import { loadModelConfig, type ModelConfig } from "@debateai/model-config";
+++=======
++ import {
++   DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
++   loadDevelopmentAuthStackProfile,
++   type DevelopmentAuthStackProfile
++ } from "./dev-auth-stack-profile.js";
+++>>>>>>> codex/support-conversation-cp1
+  
+  const REMOVED_SCAFFOLD_PROVIDER_REF = "development:local-vllm";
+  const REMOVED_SCAFFOLD_MODEL = "qa-deterministic-v1";
+@@@ -120,6 -20,60 +128,63 @@@ export const REMOVED_DEVELOPMENT_SCAFFO
+    model: REMOVED_SCAFFOLD_MODEL
+  }]);
+  
+++<<<<<<< HEAD
+++=======
++ /**
++  * One slot per plan-tier roster member (V, 2026-09-12: "Both free and premium need to be
++  * accessible at the same time"). Discovery is 1:1 with the configured provider set — one
++  * target per provider_ref, checked in parseProviderDiscoveryTargets — so a maker that
++  * serves two tiers needs two slots. The order is the order of the discovery targets and
++  * of the sealed configuredProviderSet row; appending is safe, reordering is not.
++  */
++ export const DEVELOPMENT_CLI_PROVIDER_ROSTER = Object.freeze([
++   Object.freeze({
++     providerRef: "development:codex-cli",
++     adapterKind: "openai-compatible-http" as const,
++     maker: "OpenAI",
++     port: 8_791
++   }),
++   Object.freeze({
++     providerRef: "development:codex-premium-cli",
++     adapterKind: "openai-compatible-http" as const,
++     maker: "OpenAI",
++     port: 8_795
++   }),
++   Object.freeze({
++     providerRef: "development:claude-cli",
++     adapterKind: "openai-compatible-http" as const,
++     maker: "Anthropic",
++     port: 8_792
++   }),
++   Object.freeze({
++     providerRef: "development:claude-premium-cli",
++     adapterKind: "openai-compatible-http" as const,
++     maker: "Anthropic",
++     port: 8_796
++   }),
++   Object.freeze({
++     providerRef: "development:grok-cli",
++     adapterKind: "openai-compatible-http" as const,
++     maker: "xAI",
++     port: 8_793
++   })
++ ] as const);
++ 
++ type DevelopmentCliProvider = Omit<(typeof DEVELOPMENT_CLI_PROVIDER_ROSTER)[number], "port"> &
++   Readonly<{ port: number }>;
++ 
++ export function developmentCliProviderRoster(
++   profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
++ ): readonly DevelopmentCliProvider[] {
++   return Object.freeze(DEVELOPMENT_CLI_PROVIDER_ROSTER.map((provider, index) => Object.freeze({
++     providerRef: provider.providerRef,
++     adapterKind: provider.adapterKind,
++     maker: provider.maker,
++     port: profile.providerPorts[index]!
++   })));
++ }
++ 
+++>>>>>>> codex/support-conversation-cp1
+  export type DevelopmentConfiguredProvider = Readonly<{
+    providerRef: string;
+    adapterKind: "openai-compatible-http";
+@@@ -141,18 -95,16 +206,31 @@@ type DevelopmentCliTargetObservation = 
+    authorizationHeader?: string;
+  }>;
+  
+++<<<<<<< HEAD
+ +function configuredProvidersForSlots(
+ +  slots: readonly DevelopmentProviderSlot[]
+ +): readonly DevelopmentConfiguredProvider[] {
+ +  return Object.freeze(slots.map(({ providerRef, adapterKind, maker }) => Object.freeze({
+ +    providerRef, adapterKind, maker
+ +  })));
+ +}
+ +
+ +export function loadModelConfigConfiguredProviders(
+ +  repositoryRoot: string
+ +): readonly DevelopmentConfiguredProvider[] {
+ +  return configuredProvidersForSlots(developmentProviderSlots(loadModelConfig(repositoryRoot)));
+++=======
++ function configuredProvidersFor(
++   roster: readonly DevelopmentCliProvider[]
++ ): readonly DevelopmentConfiguredProvider[] {
++   return Object.freeze(roster.map((provider) =>
++   Object.freeze({
++     providerRef: provider.providerRef,
++     adapterKind: provider.adapterKind,
++     maker: provider.maker
++   })
++   ));
+++>>>>>>> codex/support-conversation-cp1
+  }
+  
+  function expectedBaseUrl(port: number): string {
+@@@ -161,20 -113,17 +239,33 @@@
+  
+  export function buildDevelopmentProviderPanel(
+    observations: readonly DevelopmentCliTargetObservation[],
+++<<<<<<< HEAD
+ +  configuredProviders: readonly DevelopmentConfiguredProvider[]
+++=======
++   profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+++>>>>>>> codex/support-conversation-cp1
+  ): DevelopmentProviderPanel {
++   const roster = developmentCliProviderRoster(profile);
++   const configuredProviders = configuredProvidersFor(roster);
+    const byRef = new Map(observations.map((observation) => [observation.providerRef, observation] as const));
+++<<<<<<< HEAD
+ +  if (byRef.size !== configuredProviders.length) {
+ +    throw new TypeError("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
+ +  }
+ +  const rows = configuredProviders.map((provider) => {
+++=======
++   if (byRef.size !== roster.length) {
++     throw new TypeError("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
++   }
++   const rows = roster.map((provider) => {
+++>>>>>>> codex/support-conversation-cp1
+      const observation = byRef.get(provider.providerRef);
+ -    if (observation === undefined || observation.baseUrl !== expectedBaseUrl(provider.port)) {
+ +    const catalogue = DEVELOPMENT_PROVIDER_SLOT_CATALOGUE.find(({ providerRef }) =>
+ +      providerRef === provider.providerRef
+ +    );
+ +    if (observation === undefined || catalogue === undefined
+ +      || (catalogue.transport === "cli" && observation.baseUrl !== expectedBaseUrl(catalogue.port!))
+ +      || (catalogue.transport === "api" && observation.baseUrl !== catalogue.baseUrl)) {
+        throw new TypeError("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
+      }
+      const healthy = observation.model !== DEVELOPMENT_UNAVAILABLE_CLI_MODEL;
+@@@ -272,29 -162,23 +363,46 @@@ export async function resolveDevelopmen
+   * honest input when publishing the set without standing the CLIs up first.
+   */
+  export function developmentConfiguredProviderPanel(
+++<<<<<<< HEAD
+ +  configuredProviders: readonly DevelopmentConfiguredProvider[]
+ +): DevelopmentProviderPanel {
+ +  return buildDevelopmentProviderPanel(configuredProviders.map((provider) => {
+ +    const catalogue = DEVELOPMENT_PROVIDER_SLOT_CATALOGUE.find(({ providerRef }) =>
+ +      providerRef === provider.providerRef
+ +    );
+ +    if (catalogue === undefined) throw new TypeError("DEV_PROVIDER_SLOT_UNRESOLVED");
+ +    return (
+++=======
++   profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
++ ): DevelopmentProviderPanel {
++   const roster = developmentCliProviderRoster(profile);
++   return buildDevelopmentProviderPanel(roster.map((provider) =>
+++>>>>>>> codex/support-conversation-cp1
+      Object.freeze({
+        providerRef: provider.providerRef,
+ -      baseUrl: expectedBaseUrl(provider.port),
+ +      baseUrl: catalogue.transport === "cli"
+ +        ? expectedBaseUrl(catalogue.port!)
+ +        : catalogue.baseUrl!,
+        model: DEVELOPMENT_UNAVAILABLE_CLI_MODEL
+      })
+++<<<<<<< HEAD
+ +    );
+ +  }), configuredProviders);
+++=======
++   ), profile);
+++>>>>>>> codex/support-conversation-cp1
+  }
+  
+  export function parseDevelopmentProviderPanelTargets(
+    source: string,
+++<<<<<<< HEAD
+ +  configuredProviders: readonly DevelopmentConfiguredProvider[]
+ +): DevelopmentProviderPanel {
+++=======
++   profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
++ ): DevelopmentProviderPanel {
++   const configuredProviders = configuredProvidersFor(developmentCliProviderRoster(profile));
+++>>>>>>> codex/support-conversation-cp1
+    const targets = parseProviderDiscoveryTargets(source, configuredProviders);
+    return buildDevelopmentProviderPanel(targets.map((target) => Object.freeze({
+      providerRef: target.providerRef,
+@@@ -302,7 -186,7 +410,11 @@@
+      model: target.model,
+      ...(target.authorizationHeader === undefined
+        ? {} : { authorizationHeader: target.authorizationHeader })
+++<<<<<<< HEAD
+ +  })), configuredProviders);
+++=======
++   })), profile);
+++>>>>>>> codex/support-conversation-cp1
+  }
+  
+  export function loadDevelopmentProviderPanelFromEnvironment(
+@@@ -313,5 -196,8 +425,12 @@@
+    if (targetsJson === undefined || targetsJson.trim() === "") {
+      throw new TypeError("DEV_CLI_PROVIDER_PANEL_REQUIRED");
+    }
+++<<<<<<< HEAD
+ +  return parseDevelopmentProviderPanelTargets(targetsJson, configuredProviders);
+++=======
++   return parseDevelopmentProviderPanelTargets(
++     targetsJson,
++     loadDevelopmentAuthStackProfile(source)
++   );
+++>>>>>>> codex/support-conversation-cp1
+  }
+diff --cc dialectical-engine/apps/runner/src/dev-runner-process.ts
+index f4ce4889,96a69e35..00000000
+--- a/dialectical-engine/apps/runner/src/dev-runner-process.ts
++++ b/dialectical-engine/apps/runner/src/dev-runner-process.ts
+@@@ -8,9 -8,12 +8,13 @@@ import 
+    DEVELOPMENT_RUN_DEATH_POLICY
+  } from "./dev-deployment-register.js";
+  import {
+ +  loadModelConfigConfiguredProviders,
+    parseDevelopmentProviderPanelTargets
+  } from "./dev-provider-panel.js";
++ import {
++   DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
++   type DevelopmentAuthStackProfile
++ } from "./dev-auth-stack-profile.js";
+  
+  const DEVELOPMENT_CLAIM_MARGIN_MS = 1_000;
+  
+@@@ -56,12 -59,11 +60,20 @@@ export class DevelopmentRunnerProcessEr
+  function createRunnerEnvironment(
+    commandEnvironment: Readonly<Record<string, string>>,
+    apiEnvironment: Readonly<Record<string, string>>,
+++<<<<<<< HEAD
+ +  repositoryRoot: string
+++=======
++   profile: DevelopmentAuthStackProfile
+++>>>>>>> codex/support-conversation-cp1
+  ): Readonly<Record<string, string>> {
+ +  const configuredProviders = loadModelConfigConfiguredProviders(repositoryRoot);
+    const providerPanel = parseDevelopmentProviderPanelTargets(
+      apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON!,
+++<<<<<<< HEAD
+ +    configuredProviders
+++=======
++     profile
+++>>>>>>> codex/support-conversation-cp1
+    );
+    const targets = parseProviderDiscoveryTargets(
+      apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON!,
+@@@ -137,7 -141,7 +151,11 @@@ export async function startDevelopmentR
+      child = input.operations.startRunner(createRunnerEnvironment(
+        input.commandEnvironment,
+        apiEnvironment,
+++<<<<<<< HEAD
+ +      input.repositoryRoot
+++=======
++       profile
+++>>>>>>> codex/support-conversation-cp1
+      ));
+    } catch (error) {
+      throw new DevelopmentRunnerProcessError("DEV_RUNNER_PROCESS_START_FAILED", error);
+diff --cc dialectical-engine/packages/register/src/runtime-environment.ts
+index 4d6bf053,30bea078..00000000
+--- a/dialectical-engine/packages/register/src/runtime-environment.ts
++++ b/dialectical-engine/packages/register/src/runtime-environment.ts
+@@@ -46,7 -46,7 +46,11 @@@ export function loadDevelopmentCommandE
+      XDG_CONFIG_HOME: z.string().min(1).optional(),
+      PNPM_EXECUTABLE: z.string().min(1).optional(),
+      DEBATEAI_DEV_DOCKER_BIN: z.string().min(1).optional(),
+++<<<<<<< HEAD
+ +    OBS_FLUSH_DEADLINE_MS: z.string().optional(),
+++=======
++     DEBATEAI_DEV_AUTH_STACK_PROFILE: z.enum(["default", "support-preview"]).optional(),
+++>>>>>>> codex/support-conversation-cp1
+      DEBATEAI_DEV_PROVIDER_TARGETS_JSON: z.string().min(1).optional(),
+      DEBATEAI_DEV_SUPPORT_MODEL_TARGET_JSON: z.string().min(1).optional(),
+      NODE_ENV: z.enum(["development", "test", "production"]).optional()
+diff --cc dialectical-engine/tests/integration/dev-provider-panel.test.ts
+index fb8223f9,42f95329..00000000
+--- a/dialectical-engine/tests/integration/dev-provider-panel.test.ts
++++ b/dialectical-engine/tests/integration/dev-provider-panel.test.ts
+@@@ -8,16 -4,8 +8,21 @@@ import 
+    loadDevelopmentProviderPanelFromEnvironment,
+    parseDevelopmentProviderPanelTargets
+  } from "../../apps/runner/src/dev-provider-panel.js";
+++<<<<<<< HEAD
+ +
+ +const slots = developmentProviderSlots(loadModelConfig(process.cwd()));
+ +const LIVE_DEVELOPMENT_PROVIDER_PANEL = buildDevelopmentProviderPanel(slots.map((slot) => ({
+ +  providerRef: slot.providerRef,
+ +  baseUrl: slot.transport === "cli"
+ +    ? `http://127.0.0.1:${slot.port}/v1`
+ +    : slot.baseUrl!,
+ +  model: slot.transport === "cli" ? slot.model : DEVELOPMENT_UNAVAILABLE_CLI_MODEL,
+ +  ...(slot.transport === "cli" ? { authorizationHeader: "test-relay-header" } : {})
+ +})), slots.map(({ providerRef, adapterKind, maker }) => ({ providerRef, adapterKind, maker })));
+++=======
++ import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
++ import { SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE } from "../../apps/runner/src/dev-auth-stack-profile.js";
+++>>>>>>> codex/support-conversation-cp1
+  
+  describe("real development CLI provider panel", () => {
+    it("loads the exact live CLI targets without changing the fixed maker order", () => {
+@@@ -48,16 -30,29 +53,31 @@@
+        .toThrow("PROVIDER_DISCOVERY_TARGET_SET_MISMATCH");
+      expect(() => parseDevelopmentProviderPanelTargets(JSON.stringify(rows.map((row, index) =>
+        index === 0 ? { ...row, base_url: "https://external.example/v1" } : row
+ -    )))).toThrow("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
+ +    )), LIVE_DEVELOPMENT_PROVIDER_PANEL.configuredProviders))
+ +      .toThrow("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
+    });
+  
++   it("accepts only the selected support-preview relay ports", () => {
++     const rows = JSON.parse(TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson) as Record<string, unknown>[];
++     const previewRows = rows.map((row, index) => ({
++       ...row,
++       base_url: `http://127.0.0.1:${SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE.providerPorts[index]}/v1`
++     }));
++     const source = JSON.stringify(previewRows);
++     expect(loadDevelopmentProviderPanelFromEnvironment({
++       DEBATEAI_DEV_AUTH_STACK_PROFILE: "support-preview",
++       DEBATEAI_DEV_PROVIDER_TARGETS_JSON: source
++     }).targetsJson).toBe(source);
++     expect(() => parseDevelopmentProviderPanelTargets(source))
++       .toThrow("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
++   });
++ 
+    it("rejects the removed scaffold and healthy-looking targets without relay credentials", () => {
+ -    const rows = JSON.parse(TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson) as Record<string, unknown>[];
+ +    const rows = JSON.parse(LIVE_DEVELOPMENT_PROVIDER_PANEL.targetsJson) as Record<string, unknown>[];
+      expect(() => parseDevelopmentProviderPanelTargets(JSON.stringify(rows.map((row, index) =>
+        index === 0 ? { ...row, model: "qa-deterministic-v1" } : row
+ -    )))).toThrow("DEV_CLI_PROVIDER_PANEL_TARGET_INVALID");
+ +    )), LIVE_DEVELOPMENT_PROVIDER_PANEL.configuredProviders))
+ +      .toThrow("DEV_CLI_PROVIDER_PANEL_TARGET_INVALID");
+      expect(() => parseDevelopmentProviderPanelTargets(JSON.stringify(rows.map((row, index) => {
+        if (index !== 0) return row;
+        const { authorization_header: _removed, ...withoutAuthorization } = row;
+diff --cc dialectical-engine/tests/unit/dev-auth-stack.test.ts
+index 7ed50af4,b7ffb03c..00000000
+--- a/dialectical-engine/tests/unit/dev-auth-stack.test.ts
++++ b/dialectical-engine/tests/unit/dev-auth-stack.test.ts
+@@@ -14,13 -9,7 +14,17 @@@ import 
+  import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
+  import { createDevelopmentDeploymentRegisterMachineReceipt } from "../../apps/runner/src/dev-deployment-register.js";
+  import { parseRegisterVersionText } from "../../packages/register/src/index.js";
+++<<<<<<< HEAD
+ +import {
+ +  buildDevelopmentProviderPanel,
+ +  DEVELOPMENT_UNAVAILABLE_CLI_MODEL,
+ +  developmentProviderSlots,
+ +  type DevelopmentApiProviderProbe,
+ +  type DevelopmentProviderPanel
+ +} from "../../apps/runner/src/dev-provider-panel.js";
+++=======
++ import { SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE } from "../../apps/runner/src/dev-auth-stack-profile.js";
+++>>>>>>> codex/support-conversation-cp1
+  
+  const REGISTER_RECEIPT = createDevelopmentDeploymentRegisterMachineReceipt({
+    registerVersion: parseRegisterVersionText("424242"),
+@@@ -42,52 -31,10 +46,53 @@@ function deferredExit() 
+    return { exited, resolveExit };
+  }
+  
+ +function unavailableApiPanel(config: ModelConfig): DevelopmentProviderPanel {
+ +  const slots = developmentProviderSlots(config);
+ +  return buildDevelopmentProviderPanel(slots.map((slot) => Object.freeze({
+ +    providerRef: slot.providerRef,
+ +    baseUrl: slot.transport === "cli"
+ +      ? `http://127.0.0.1:${slot.port}/v1`
+ +      : slot.baseUrl!,
+ +    model: slot.transport === "cli" ? slot.model : DEVELOPMENT_UNAVAILABLE_CLI_MODEL,
+ +    ...(slot.transport === "cli" ? { authorizationHeader: "test-relay-header" } : {})
+ +  })), slots.map(({ providerRef, adapterKind, maker }) => Object.freeze({
+ +    providerRef, adapterKind, maker
+ +  })));
+ +}
+ +
+ +async function resolveApiAvailability(
+ +  config: ModelConfig,
+ +  providerPanel: DevelopmentProviderPanel,
+ +  providerKeys: ReadonlyMap<string, string>,
+ +  probe: DevelopmentApiProviderProbe,
+ +  warning: (line: string) => void
+ +): Promise<DevelopmentProviderPanel> {
+ +  const module = await import("../../apps/runner/src/dev-provider-panel.js") as Readonly<{
+ +    resolveDevelopmentApiProviderSlots?: (
+ +      config: ModelConfig,
+ +      providerPanel: DevelopmentProviderPanel,
+ +      providerKeys: ReadonlyMap<string, string>,
+ +      probe: DevelopmentApiProviderProbe,
+ +      warning: (line: string) => void
+ +    ) => Promise<DevelopmentProviderPanel>;
+ +  }>;
+ +  expect(module.resolveDevelopmentApiProviderSlots).toBeTypeOf("function");
+ +  return module.resolveDevelopmentApiProviderSlots!(config, providerPanel, providerKeys, probe, warning);
+ +}
+ +
+ +async function providerKeysReader(): Promise<(repositoryRoot: string) => Promise<ReadonlyMap<string, string>>> {
+ +  const module = await import("../../apps/runner/src/dev-provider-keys.js").catch(() => ({})) as Readonly<{
+ +    readProviderKeys?: (repositoryRoot: string) => Promise<ReadonlyMap<string, string>>;
+ +  }>;
+ +  expect(module.readProviderKeys).toBeTypeOf("function");
+ +  return module.readProviderKeys!;
+ +}
+ +
+  function operations(input: Readonly<{
+    occupied?: boolean;
++   preview?: boolean;
+    failAt?: "provider_panel" | "support_model" | "data" | "token" | "environment" | "api" | "runner" | "ui" | "tls";
+ +  apiEnvironmentPath?: string;
+  }> = {}): DevelopmentAuthStackOperations & Readonly<{
+    calls: string[];
+    apiExit: ReturnType<typeof deferredExit>;
+@@@ -428,19 -174,26 +434,26 @@@ describe("DEV-10F bounded local auth st
+      const runtime = operations({ occupied: true });
+      await expect(startDevelopmentAuthStack(runtime))
+        .rejects.toThrow("DEV_AUTH_STACK_PUBLIC_PORT_OCCUPIED");
+ -    expect(runtime.calls).toEqual(["preflight"]);
+ +    expect(runtime.calls).toEqual(["model-config", "preflight"]);
+    });
+  
++   it("reports the selected support-preview origin without changing lifecycle ownership", async () => {
++     const runtime = operations({ preview: true });
++     const stack = await startDevelopmentAuthStack(runtime);
++     expect(stack.receipt.origin).toBe("https://localhost:3100");
++     await stack.stop();
++   });
++ 
+    it.each([
+ -    ["provider_panel", ["preflight", "providers:start"]],
+ -    ["support_model", ["preflight", "providers:start", "support:start", "providers:stop"]],
+ -    ["data", ["preflight", "providers:start", "support:start", "data:start", "support:stop", "providers:stop"]],
+ -    ["token", ["preflight", "providers:start", "support:start", "data:start", "token", "data:stop", "support:stop", "providers:stop"]],
+ -    ["environment", ["preflight", "providers:start", "support:start", "data:start", "token", "environment", "data:stop", "support:stop", "providers:stop"]],
+ -    ["api", ["preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "data:stop", "support:stop", "providers:stop"]],
+ -    ["runner", ["preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "api:stop", "data:stop", "support:stop", "providers:stop"]],
+ -    ["ui", ["preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"]],
+ -    ["tls", ["preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "tls:start", "ui:stop", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"]]
+ +    ["provider_panel", ["model-config", "preflight", "providers:start"]],
+ +    ["support_model", ["model-config", "preflight", "providers:start", "support:start", "providers:stop"]],
+ +    ["data", ["model-config", "preflight", "providers:start", "support:start", "data:start", "support:stop", "providers:stop"]],
+ +    ["token", ["model-config", "preflight", "providers:start", "support:start", "data:start", "token", "data:stop", "support:stop", "providers:stop"]],
+ +    ["environment", ["model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "data:stop", "support:stop", "providers:stop"]],
+ +    ["api", ["model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "data:stop", "support:stop", "providers:stop"]],
+ +    ["runner", ["model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "api:stop", "data:stop", "support:stop", "providers:stop"]],
+ +    ["ui", ["model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"]],
+ +    ["tls", ["model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "tls:start", "ui:stop", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"]]
+    ] as const)("unwinds only the started prefix when %s fails", async (failAt, expected) => {
+      const runtime = operations({ failAt });
+      await expect(startDevelopmentAuthStack(runtime))
+diff --cc dialectical-engine/tests/unit/dev-cli-provider-panel.test.ts
+index 2a55d6de,f9cb0734..00000000
+--- a/dialectical-engine/tests/unit/dev-cli-provider-panel.test.ts
++++ b/dialectical-engine/tests/unit/dev-cli-provider-panel.test.ts
+@@@ -39,11 -11,7 +39,15 @@@ import 
+    type DevelopmentCliProviderPanelOperations,
+    type DevelopmentCliRelay
+  } from "../../apps/runner/src/dev-cli-provider-panel.js";
+++<<<<<<< HEAD
+ +import { developmentProviderSlots } from "../../apps/runner/src/dev-provider-panel.js";
+ +import {
+ +  buildDevelopmentProviderPanel,
+ +  DEVELOPMENT_UNAVAILABLE_CLI_MODEL
+ +} from "../../apps/runner/src/dev-provider-panel.js";
+++=======
++ import { SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE } from "../../apps/runner/src/dev-auth-stack-profile.js";
+++>>>>>>> codex/support-conversation-cp1
+  
+  function relay(port: number, maker: string, model: string): DevelopmentCliRelay & {
+    close: ReturnType<typeof vi.fn>;
+@@@ -242,131 -93,57 +246,150 @@@ describe("development real CLI provide
+    });
+  
+    it("refuses when no real CLI answers", async () => {
+ -    await expect(startDevelopmentCliProviderPanel(operations([
+ -      new Error("logged out"), new Error("logged out"), new Error("logged out"),
+ -      new Error("logged out"), new Error("logged out")
+ +    await expect(startDevelopmentCliProviderPanel(loadModelConfig(process.cwd()), operations([
+ +      new Error("logged out"), new Error("logged out"), new Error("logged out")
+      ]))).rejects.toThrow("DEV_CLI_PROVIDER_PANEL_INSUFFICIENT_MAKERS");
+    });
++ 
++   it("starts every relay on the selected support-preview port", async () => {
++     const ports = SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE.providerPorts;
++     const runtime = operations([
++       relay(ports[0], "OpenAI", "gpt-real"),
++       relay(ports[1], "OpenAI", "gpt-premium-real"),
++       relay(ports[2], "Anthropic", "claude-real"),
++       relay(ports[3], "Anthropic", "claude-premium-real"),
++       relay(ports[4], "xAI", "grok-real")
++     ]);
++     const handle = await startDevelopmentCliProviderPanel(
++       runtime,
++       SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE
++     );
++     for (const [index, start] of runtime.starts.entries()) {
++       expect(start).toHaveBeenCalledWith(ports[index]);
++     }
++     await handle.stop();
++   });
+  });
+  
+ -describe("development CLI model pins", () => {
+ -  it("carries one slot per roster member so BOTH plan tiers are admissible from one panel", () => {
+ -    // V, 2026-09-12: "Both free and premium need to be accessible at the same time."
+ -    // Discovery is 1:1 with the configured provider set, so every roster model of every
+ -    // tier needs its own slot; one slot per maker could only ever serve one tier.
+ -    const rosterModels = [...PLAN_TIER_ROSTERS.free, ...PLAN_TIER_ROSTERS.premium];
+ -    expect(DEVELOPMENT_CLI_PROVIDER_ROSTER).toHaveLength(rosterModels.length);
+ -    expect([...new Set(DEVELOPMENT_CLI_PROVIDER_ROSTER.map(({ port }) => port))])
+ -      .toHaveLength(rosterModels.length);
+ -    expect([...new Set(DEVELOPMENT_CLI_PROVIDER_ROSTER.map(({ providerRef }) => providerRef))])
+ -      .toHaveLength(rosterModels.length);
+ -    expect(DEVELOPMENT_CLI_MODEL_PINS.grokSandboxProfile).toBe("none");
+ -  });
+ -
+ -  it("pins each Codex and Claude slot to the roster model that slot exists to serve", () => {
+ -    expect(PLAN_TIER_ROSTERS.free).toContain(DEVELOPMENT_CLI_MODEL_PINS.codexFreeModel);
+ -    expect(PLAN_TIER_ROSTERS.premium).toContain(DEVELOPMENT_CLI_MODEL_PINS.codexPremiumModel);
+ -    expect(DEVELOPMENT_CLI_MODEL_PINS.codexFreeModel)
+ -      .not.toBe(DEVELOPMENT_CLI_MODEL_PINS.codexPremiumModel);
+ -    const anthropic = (models: readonly string[]) =>
+ -      models.find((modelId) => modelId.startsWith("claude-"))!.split(/[^a-z0-9]+/u);
+ -    expect(anthropic(PLAN_TIER_ROSTERS.free)).toContain(DEVELOPMENT_CLI_MODEL_PINS.claudeFreeAlias);
+ -    expect(anthropic(PLAN_TIER_ROSTERS.premium)).toContain(DEVELOPMENT_CLI_MODEL_PINS.claudePremiumAlias);
+ -    expect(DEVELOPMENT_CLI_MODEL_PINS.claudeFreeAlias)
+ -      .not.toBe(DEVELOPMENT_CLI_MODEL_PINS.claudePremiumAlias);
+ +describe("development CLI full-id starts", () => {
+ +  it("starts the three configured CLI entries with the full Codex model id", async () => {
+ +    relayStarts.codex.mockClear();
+ +    const operations = createDevelopmentCliProviderPanelOperations(loadModelConfig(process.cwd()));
+ +    expect(operations.starts).toHaveLength(3);
+ +    await operations.starts[0]!(8795);
+ +    expect(relayStarts.codex).toHaveBeenCalledWith({
+ +      port: 8795, timeoutMs: 180000, model: "gpt-5.6-sol"
+ +    });
+ +  });
+ +
+ +  it("starts the Claude relay with `--model claude-opus-5`", async () => {
+ +    relayStarts.claude.mockClear();
+ +    const operations = createDevelopmentCliProviderPanelOperations(loadModelConfig(process.cwd()));
+ +    await operations.starts[1]!(8796);
+ +    const panelOptions = relayStarts.claude.mock.calls[0]?.[0];
+ +    expect(panelOptions).toBeDefined();
+ +
+ +    const { startClaudeRelay } = await vi.importActual<
+ +      typeof import("../../acceptance/claude-relay.js")
+ +    >("../../acceptance/claude-relay.js");
+ +    const capturedEnvelopeScript = [
+ +      'console.log(JSON.stringify({',
+ +      '  is_error: false,',
+ +      '  result: JSON.stringify({ argumentList: process.argv }),',
+ +      '  modelUsage: { "claude-opus-5": {} }',
+ +      '}));'
+ +    ].join("");
+ +    const relay = await startClaudeRelay({
+ +      ...panelOptions!,
+ +      port: 0,
+ +      timeoutMs: 1_000,
+ +      testOnlyCommand: {
+ +        binary: process.execPath,
+ +        prefixArguments: ["-e", capturedEnvelopeScript, "--"]
+ +      }
+ +    });
+ +    try {
+ +      const response = await fetch(`${relay.baseUrl}/v1/chat/completions`, {
+ +        method: "POST",
+ +        headers: { "content-type": "application/json", authorization: relay.authorizationHeader },
+ +        body: JSON.stringify({
+ +          model: "ignored-by-relay",
+ +          messages: [{ role: "user", content: "Assert argv." }]
+ +        })
+ +      });
+ +      expect(response.status).toBe(200);
+ +      const completion = await response.json() as {
+ +        choices: readonly { message: { content: string } }[];
+ +      };
+ +      const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+ +        argumentList: readonly string[];
+ +      };
+ +      expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1])
+ +        .toBe("claude-opus-5");
+ +    } finally {
+ +      await relay.close();
+ +    }
+ +  });
+ +
+ +  it("passes the configured Claude id through the typed model option", async () => {
+ +    relayStarts.claude.mockClear();
+ +    const operations = createDevelopmentCliProviderPanelOperations(loadModelConfig(process.cwd()));
+ +    await operations.starts[1]!(8796);
+ +    expect(relayStarts.claude).toHaveBeenCalledWith({
+ +      port: 8796, timeoutMs: 180000, model: "claude-opus-5"
+ +    });
+ +  });
+ +
+ +  it("starts the Grok relay with `--model grok-4.6-build`", async () => {
+ +    relayStarts.grok.mockClear();
+ +    const operations = createDevelopmentCliProviderPanelOperations(loadModelConfig(process.cwd()));
+ +    expect(operations.starts).toHaveLength(3);
+ +    await operations.starts[2]!(8793);
+ +    const panelOptions = relayStarts.grok.mock.calls[0]?.[0];
+ +    expect(panelOptions).toEqual({
+ +      port: 8793, timeoutMs: 180000, model: "grok-4.6-build", sandboxProfile: "none"
+ +    });
+ +
+ +    const { startGrokRelay } = await vi.importActual<
+ +      typeof import("../../acceptance/grok-relay.js")
+ +    >("../../acceptance/grok-relay.js");
+ +    const capturedEnvelopeScript = [
+ +      'console.log(JSON.stringify({',
+ +      '  text: JSON.stringify({ argumentList: process.argv }),',
+ +      '  stopReason: "end_turn",',
+ +      '  modelUsage: { "grok-4.6-build": {} }',
+ +      '}));'
+ +    ].join("");
+ +    const relay = await startGrokRelay({
+ +      ...panelOptions!,
+ +      port: 0,
+ +      timeoutMs: 1_000,
+ +      testOnlyCommand: {
+ +        binary: process.execPath,
+ +        prefixArguments: ["-e", capturedEnvelopeScript, "--"]
+ +      }
+ +    });
+ +    try {
+ +      const response = await fetch(`${relay.baseUrl}/v1/chat/completions`, {
+ +        method: "POST",
+ +        headers: { "content-type": "application/json", authorization: relay.authorizationHeader },
+ +        body: JSON.stringify({
+ +          model: "ignored-by-relay",
+ +          messages: [{ role: "user", content: "Assert argv." }]
+ +        })
+ +      });
+ +      expect(response.status).toBe(200);
+ +      const completion = await response.json() as {
+ +        choices: readonly { message: { content: string } }[];
+ +      };
+ +      const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+ +        argumentList: readonly string[];
+ +      };
+ +      expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1])
+ +        .toBe("grok-4.6-build");
+ +    } finally {
+ +      await relay.close();
+ +    }
+    });
+  });
+  

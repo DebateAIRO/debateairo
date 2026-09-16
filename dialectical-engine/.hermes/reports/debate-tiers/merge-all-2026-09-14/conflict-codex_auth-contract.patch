@@ -1,0 +1,118 @@
+diff --cc dialectical-engine/packages/contract/src/client.ts
+index 5923aa31,39423dc4..00000000
+--- a/dialectical-engine/packages/contract/src/client.ts
++++ b/dialectical-engine/packages/contract/src/client.ts
+@@@ -189,8 -187,6 +189,11 @@@ const REGISTRATION_PUBLIC_MESSAGE 
+    "If this address can be registered, verification instructions will arrive. Check your spam folder." as const;
+  const RESEND_VERIFICATION_PUBLIC_MESSAGE =
+    "If this address is awaiting verification, new instructions will arrive. Check your spam folder." as const;
+++<<<<<<< HEAD
+ +const RECOVERY_START_PUBLIC_MESSAGE =
+ +  "If this account can be recovered, instructions will arrive through an eligible channel." as const;
+++=======
+++>>>>>>> codex/auth-contract
+  
+  function exactPublicMessageSchema<const Message extends string>(message: Message): {
+    parse(value: unknown): Readonly<{ message: Message }>;
+@@@ -211,7 -207,6 +214,10 @@@
+  
+  const RegistrationPublicResponseSchema = exactPublicMessageSchema(REGISTRATION_PUBLIC_MESSAGE);
+  const ResendVerificationPublicResponseSchema = exactPublicMessageSchema(RESEND_VERIFICATION_PUBLIC_MESSAGE);
+++<<<<<<< HEAD
+ +const RecoveryStartPublicResponseSchema = exactPublicMessageSchema(RECOVERY_START_PUBLIC_MESSAGE);
+++=======
+++>>>>>>> codex/auth-contract
+  
+  export interface ContractClient {
+    register(
+@@@ -223,9 -218,6 +229,12 @@@
+    resendVerification(email: string): Promise<Readonly<{
+      message: typeof RESEND_VERIFICATION_PUBLIC_MESSAGE;
+    }>>;
+++<<<<<<< HEAD
+ +  startRecovery(email: string): Promise<Readonly<{
+ +    message: typeof RECOVERY_START_PUBLIC_MESSAGE;
+ +  }>>;
+++=======
+++>>>>>>> codex/auth-contract
+    beginLogin(email: string, password: string): Promise<{ status: "mfa_required"; challenge_token: string }>;
+    completeLogin(challengeToken: string, code: string): Promise<{
+      status: "authenticated";
+@@@ -376,12 -367,6 +385,15 @@@ export function createContractClient
+        { method: "POST", body: JSON.stringify({ email }) },
+        202
+      ),
+++<<<<<<< HEAD
+ +    startRecovery: (email: string) => request(
+ +      "/v1/auth/recovery/start",
+ +      RecoveryStartPublicResponseSchema,
+ +      { method: "POST", body: JSON.stringify({ email }) },
+ +      202
+ +    ),
+++=======
+++>>>>>>> codex/auth-contract
+      beginLogin: (email: string, password: string) => request("/v1/auth/login", {
+        parse(value: unknown) {
+          if (typeof value !== "object" || value === null) throw new TypeError("Invalid login challenge response");
+diff --cc dialectical-engine/tests/unit/auth-contract-client.test.ts
+index 90105c2e,8d6e431b..00000000
+--- a/dialectical-engine/tests/unit/auth-contract-client.test.ts
++++ b/dialectical-engine/tests/unit/auth-contract-client.test.ts
+@@@ -5,8 -5,6 +5,11 @@@ const REGISTRATION_MESSAGE 
+    "If this address can be registered, verification instructions will arrive. Check your spam folder.";
+  const RESEND_MESSAGE =
+    "If this address is awaiting verification, new instructions will arrive. Check your spam folder.";
+++<<<<<<< HEAD
+ +const RECOVERY_START_MESSAGE =
+ +  "If this account can be recovered, instructions will arrive through an eligible channel.";
+++=======
+++>>>>>>> codex/auth-contract
+  
+  describe("auth registration contract client", () => {
+    it("posts only the ruled registration and resend fields and validates the generic responses", async () => {
+@@@ -29,9 -27,7 +32,13 @@@
+        return Response.json(
+          url.pathname.endsWith("/register")
+            ? { message: REGISTRATION_MESSAGE }
+++<<<<<<< HEAD
+ +          : url.pathname.endsWith("/start")
+ +            ? { message: RECOVERY_START_MESSAGE }
+ +            : { message: RESEND_MESSAGE },
+++=======
++           : { message: RESEND_MESSAGE },
+++>>>>>>> codex/auth-contract
+          { status: 202 }
+        );
+      }) as typeof fetch;
+@@@ -45,10 -41,8 +52,15 @@@
+      )).resolves.toEqual({ message: REGISTRATION_MESSAGE });
+      await expect(client.resendVerification("person@example.test"))
+        .resolves.toEqual({ message: RESEND_MESSAGE });
+++<<<<<<< HEAD
+ +    await expect(client.startRecovery("person@example.test"))
+ +      .resolves.toEqual({ message: RECOVERY_START_MESSAGE });
+ +
+ +    expect(calls).toHaveLength(3);
+++=======
++ 
++     expect(calls).toHaveLength(2);
+++>>>>>>> codex/auth-contract
+      expect(calls[0]).toMatchObject({
+        path: "/v1/auth/register",
+        method: "POST",
+@@@ -66,12 -60,6 +78,15 @@@
+        body: { email: "person@example.test" },
+        credentials: "same-origin"
+      });
+++<<<<<<< HEAD
+ +    expect(calls[2]).toMatchObject({
+ +      path: "/v1/auth/recovery/start",
+ +      method: "POST",
+ +      body: { email: "person@example.test" },
+ +      credentials: "same-origin"
+ +    });
+++=======
+++>>>>>>> codex/auth-contract
+      for (const call of calls) {
+        expect(call.headers.get("content-type")).toBe("application/json");
+        expect(call.headers.get("authorization")).toBeNull();

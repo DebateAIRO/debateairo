@@ -1,0 +1,21 @@
+diff --git a/dialectical-engine/apps/ui/app/new/page.tsx b/dialectical-engine/apps/ui/app/new/page.tsx
+index f3a0a1a7..3b3c02bb 100755
+--- a/dialectical-engine/apps/ui/app/new/page.tsx
++++ b/dialectical-engine/apps/ui/app/new/page.tsx
+@@ -1,5 +1,8 @@
+ "use client";
+ 
++import { AiNotice } from "@/components/AiNotice";
++import { AI_NOTICE } from "@/lib/aiDisclosure";
++
+ import { CSSProperties, FormEvent, KeyboardEvent, Suspense, useEffect, useState } from "react";
+ import { useRouter, useSearchParams } from "next/navigation";
+ import { createDebate, contractClient } from "@/lib/api";
+@@ -178,6 +181,7 @@ function NewDebateForm({ token }: { token: string }) {
+       <div className="ndInner">
+         <p className="ndEyebrow">NEW QUESTION</p>
+         <h1 className="ndTitle">What should we debate?</h1>
++        <div className="ndAiDisclosure"><AiNotice body={AI_NOTICE.newDebate} /></div>
+         <form onSubmit={submit} onKeyDown={onKeyDown}>
+           {error ? <div className="error" style={{ marginTop: 16 }}>{error}</div> : null}
+ 
