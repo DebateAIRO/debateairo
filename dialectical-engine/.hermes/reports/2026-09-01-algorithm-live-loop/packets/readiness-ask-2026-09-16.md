@@ -115,8 +115,11 @@ run. The Docker daemon is not running and this seat did not start it.
 **So you have a real choice, and neither arm is a failure:**
 
 - **Run as-is.** Expect one `RELAY DEGRADED xAI SANDBOX-PROFILE-UNAVAILABLE …` line, then a
-  three-maker debate with Grok unsandboxed. The degraded path costs **two** Grok CLI invocations
-  instead of one (the refused probe, then the real handshake) — disclosed by Task 17, not a defect.
+  three-maker debate with Grok unsandboxed. The degraded path costs **three** Grok CLI invocations
+  instead of one (the refused sandboxed probe, a SECOND sandboxed attempt so that a transient failure
+  is never mistaken for an unsupported profile — the whole-branch review's F1, commit `9304d106` — and
+  then the unsandboxed handshake) — disclosed, not a defect. A first failure followed by a sandboxed
+  success keeps the profile and prints nothing.
 - **Start Docker Desktop first**, so `/var/run/docker.sock` resolves and the `read-only` profile
   applies. Then expect **no** `RELAY DEGRADED` line. Starting Docker is yours to do; this seat is
   forbidden to.
