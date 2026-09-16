@@ -68,7 +68,11 @@ test("Turn 5 drawer uses the coded 440px hierarchy and record presentation", () 
 test("Turn 3 library shares one row anatomy and carries real public model metadata", () => {
   assert.match(library, /models=\{debate\.models \?\? \[\]\}/);
   assert.match(library, /modelCount/);
-  assert.match(css, /\.libTab \{[^}]*font-weight: 700;/);
+  // 58ba1376 restored the inactive-link weight to 600 so that
+  // tests/unit/pda-s03-keyboard-accessibility.test.ts:193 — which pins
+  // inactiveStyle.fontWeight to "600" — reads the ruled value. This pin held
+  // the pre-merge 700 and is the same constant, so it follows that ruling.
+  assert.match(css, /\.libTab \{[^}]*font-weight: 600;/);
   assert.match(css, /\.libRow \{[\s\S]*?border-radius: 13px;[\s\S]*?padding: 14px 18px;/);
   assert.match(css, /\.libRow:hover \{ transform: translateX\(4px\);/);
 });
