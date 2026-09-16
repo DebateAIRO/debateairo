@@ -1484,10 +1484,16 @@ export class PostgresAskApplication implements AskApplication {
     });
   }
 
-  async readPlanTierRosters(session: Session): Promise<PlanTierRosters> {
-    const deployment = await this.readDeployment(session);
-    const row = deployment.register.rows.find(({ row_key }) => row_key === "planTierRosters");
-    const value = row?.value as Readonly<{
+  async readPlanTierRosters(_session: Session): Promise<PlanTierRosters> {
+    const registerVersion = this.settings.registerVersion;
+    if (!Number.isSafeInteger(registerVersion) || registerVersion < 1) {
+      throw new TypedDomainError("DEPLOYMENT_REGISTER_UNAVAILABLE", "No sealed V3 deployment register exists");
+    }
+    const result = await this.pool.query<{ value_json: unknown }>(
+      `SELECT value_json FROM register.register_row
+       WHERE register_version=$1 AND row_key='planTierRosters'`, [registerVersion]
+    );
+    const value = result.rows[0]?.value_json as Readonly<{
       free?: unknown;
       premium?: unknown;
     }> | null | undefined;
