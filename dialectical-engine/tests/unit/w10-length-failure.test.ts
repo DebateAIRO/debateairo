@@ -18,6 +18,9 @@ import {
 // The JUDGE's clock read from the row that DECLARES it, never restated here:
 // the whole defect is two numbers that were supposed to relate and did not.
 import { DEVELOPMENT_ORGAN_COST_BOUNDS } from "../../apps/runner/src/dev-deployment-register.js";
+// W10 fix round 1 / F1-F2 class member C: the support relay adapter, whose
+// failure vocabulary is declared in ONE place and sealed by nothing.
+import { RelayAdapter, SupportModelError } from "../../apps/api/src/support/model.js";
 
 /**
  * W10 (`board/W10-call-budget-truthfulness.md`, audit
@@ -371,5 +374,48 @@ describe("W10 F7 · LENGTH_EXCEEDED wins when the strict response schema also fa
     const rejection = await gateway.call(w10Request()).then(() => null, (error: unknown) => error);
     expect(rejection).not.toBeInstanceOf(ProviderContentUnacceptedError);
     expect((rejection as { code?: string }).code).toBe("PROVIDER_CALL_FAILED");
+  });
+});
+
+describe("W10 F1/F2 class member C · the support model refuses a truncated completion", () => {
+  function relayAnswering(body: unknown): RelayAdapter {
+    return new RelayAdapter({
+      baseUrl: "http://127.0.0.1:8000/v1",
+      authorizationHeader: "Bearer test-layer-token",
+      model: "fixture/model",
+      fetchImplementation: async () => new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      })
+    });
+  }
+
+  const ASK = { system: "be brief", messages: [{ role: "user" as const, content: "hello" }] };
+
+  it("refuses a completion cut off at the limit instead of serving the fragment", async () => {
+    // At the base this adapter sets NO `max_tokens` and never reads
+    // `finish_reason`, so a server-side cap produced a truncated answer that
+    // passed every check here and was served as if it were complete.
+    const relay = relayAnswering({
+      id: "support-1",
+      choices: [{ message: { content: "The first half of the answer" }, finish_reason: "length" }]
+    });
+    const rejection = await relay.complete(ASK).then(() => null, (error: unknown) => error);
+    expect(rejection).toBeInstanceOf(SupportModelError);
+    expect((rejection as SupportModelError).code).toBe("SUPPORT_MODEL_LENGTH_EXCEEDED");
+  });
+
+  it("D71 boundary — finish_reason stop still answers, and an unusable body stays UNAVAILABLE", async () => {
+    await expect(relayAnswering({
+      id: "support-2",
+      choices: [{ message: { content: "A complete answer." }, finish_reason: "stop" }]
+    }).complete(ASK)).resolves.toMatchObject({ text: "A complete answer." });
+
+    const rejection = await relayAnswering({
+      id: "support-3",
+      choices: [{ message: { content: "   " }, finish_reason: "stop" }]
+    }).complete(ASK).then(() => null, (error: unknown) => error);
+    expect(rejection).toBeInstanceOf(SupportModelError);
+    expect((rejection as SupportModelError).code).toBe("SUPPORT_MODEL_UNAVAILABLE");
   });
 });

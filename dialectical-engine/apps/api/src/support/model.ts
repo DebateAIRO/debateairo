@@ -34,7 +34,15 @@ export interface SupportModelPort {
 }
 
 export class SupportModelError extends TypedDomainError {
-  constructor(code: "SUPPORT_MODEL_UNAVAILABLE" | "SUPPORT_MODEL_PATH_NOT_RATIFIED" | "SUPPORT_DISABLED") {
+  constructor(code:
+    | "SUPPORT_MODEL_UNAVAILABLE"
+    | "SUPPORT_MODEL_PATH_NOT_RATIFIED"
+    | "SUPPORT_DISABLED"
+    // W10 (F1/F2 class member C): a completion the relay cut off at the token
+    // bound. It is its OWN name, never UNAVAILABLE: the relay was available and
+    // answered, the answer is simply incomplete, and serving its first half as
+    // if it were whole is the failure this code exists to stop.
+    | "SUPPORT_MODEL_LENGTH_EXCEEDED") {
     super(code,code);
     this.name = "SupportModelError";
   }
@@ -42,6 +50,11 @@ export class SupportModelError extends TypedDomainError {
 
 function unavailable(): never {
   throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
+}
+
+/** W10: the completion stopped because it hit the bound, not because it finished. */
+function lengthExceeded(): never {
+  throw new SupportModelError("SUPPORT_MODEL_LENGTH_EXCEEDED");
 }
 
 export function parseSupportModelTargetJson(source: string): SupportModelTarget {
@@ -210,6 +223,14 @@ export class RelayAdapter implements SupportModelPort {
         ? (first as Readonly<Record<string, unknown>>).message : undefined;
       const content = typeof message === "object" && message !== null
         ? (message as Readonly<Record<string, unknown>>).content : undefined;
+      // W10: read BEFORE the content checks. A truncated answer is a non-empty
+      // string of the right length, so every check below passes and the fragment
+      // is served as a complete answer. This adapter also sends no `max_tokens`,
+      // so the cap that produces it is the relay's own and invisible from here —
+      // the finish reason is the only signal that it happened.
+      const finishReason = typeof first === "object" && first !== null
+        ? (first as Readonly<Record<string, unknown>>).finish_reason : undefined;
+      if (finishReason === "length") lengthExceeded();
       if (typeof content !== "string"
         || content.trim() === ""
         || [...content].length > MAX_COMPLETION_CODE_POINTS) unavailable();
