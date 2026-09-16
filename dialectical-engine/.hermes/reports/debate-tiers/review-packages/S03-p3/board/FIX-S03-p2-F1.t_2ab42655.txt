@@ -1,0 +1,70 @@
+Task t_2ab42655: [gpt-5.6-sol] FIX S03 p2 F1 — the published planTierRosters row is read as published: the stack publishes {kind:'PLAN_TIER_ROSTERS',free,premium} (dev-deployment-register.ts:346) and GET /v1/plan-tiers parses it with the .strict() {free,premium} PlanTierRostersSchema (contract/src/index.ts:308-311; api/src/index.ts:1487-1491) → 500 → /new lists zero ids (REV-S03-p2 product-truth B1 t_16070253 = security B1; row V-45 default: fix inside S03). Lane slice/tiers-s03 @ cd043907; one joining test on the real row shape; C4 ×3, route pins ×3, §5 once
+  status:    done
+  assignee:  -
+  workspace: scratch @ /Users/vladmihaimiron/.hermes/kanban/boards/debate-tiers/workspaces/t_2ab42655
+  max-retries: 2 (default)
+  created:   2026-09-16 11:56 by user
+  started:   2026-09-16 11:59
+  completed: 2026-09-16 12:32
+  children:  t_005aaddc, t_08142adf, t_f2e090a2
+
+Result:
+READY 0fe14637 — fix(tiers S03-p2-F1): the published planTierRosters row is read as published; reader-side projection {free,premium} before the strict wire parse (apps/api/src/index.ts:1487-1497); joining case tests/unit/api.test.ts:318-361 RED→GREEN; C4 79/79 ×3, pins 41/41 ×3, §5 186/188 (two inherited titles); SKILLS LOADED 7/7 verified; consumed by the orchestrator 12:34 EEST — orchestrator re-runs on the lane match (C4 79/79, pins 41/41, §5 186/188); the pass-2 probes as promoted: R inverted (fix landing), C/3b fixture-intrinsic, P4 envelope = lane-vs-merged difference (measured at the merged head next). Next: MERGE into integration/all → REV(S03) pass 3.
+
+Comments (4):
+  [2026-09-16 11:59] orchestrator: DISPATCHED FIX-S03-p2-F1 2026-09-16 11:59:05 EEST · packet /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine/.hermes/planning/debate-tiers/packets/FIX-S03-p2-F1.md (packet-check OK at 682b9330) · lane /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/tiers-s03/dialectical-engine, branch slice/tiers-s03, base cd043907 (porcelain 0) · records freeze pair e56063c5..034159a2 (the pass-2 verdicts, union, folds, rows V-45/V-46), packet freeze 682b9330 on integration/all · START frames measured by the orchestrator at cd043907 on 2026-09-16 11:50: C4 five-suite Test Files 5 passed (5) · Tests 78 passed (78); route pins Test Files 2 passed (2) · Tests 41 passed (41); the reviewer's two probes Test Files 2 failed (2) · Tests 4 failed | 6 passed (10) · transport: codex exec gpt-5.6-sol, detached, under caffeinate -s -i · orchestrator session 96555a10-dafb-468d-88b3-f6c3afd4c825
+  [2026-09-16 11:59] FIX-S03-p2-F1: CLAIM FIX-S03-p2-F1 · Codex session id 01a0a970-f30f-7fd3-ad0a-7979cf71df58
+  [2026-09-16 12:01] FIX-S03-p2-F1: CLAIM FIX-S03-p2-F1 · node FIX(S03) pass 2 · start 2026-09-16T11:59:06+03:00 · session 01a0a970-f30f-7fd3-ad0a-7979cf71df58 · transcript /Users/vladmihaimiron/.codex/sessions/2026/09/16/rollout-2026-09-16T11-59-06-01a0a970-f30f-7fd3-ad0a-7979cf71df58.jsonl · HEAD cd043907 · dirty count 0 · comments read through: 1
+  [2026-09-16 12:23] FIX-S03-p2-F1: SKILLS LOADED: superpowers:using-superpowers (references/codex-tools.md) · heartbeat-protocol · heartbeat-worker · superpowers:receiving-code-review · superpowers:test-driven-development (writing-good-tests.md) · superpowers:verification-before-completion · superpowers:systematic-debugging (root-cause-tracing.md)
+2. READY · node FIX(S03) after REV pass 2 of 3 · seat FIX-S03-p2-F1 · ticket t_2ab42655 · session 01a0a970-f30f-7fd3-ad0a-7979cf71df58 · transcript /Users/vladmihaimiron/.codex/sessions/2026/09/16/rollout-2026-09-16T11-59-06-01a0a970-f30f-7fd3-ad0a-7979cf71df58.jsonl
+3. ARTIFACT: branch slice/tiers-s03 · commit 0fe14637c5428395e9121ea08c5735d8f1bb9b3d · `fix(tiers S03-p2-F1): the published planTierRosters row is read as published — /new lists the file's ids` · exactly 2 allowed paths: apps/api/src/index.ts and tests/unit/api.test.ts · temporary probes deleted · lane porcelain empty.
+4. VERIFICATION:
+REVIEWER PROBES RED at cd043907, /tmp/FIX-S03-p2-F1-01a0a970.NPueah/reviewer-probes-red.log:
+× tests/unit/REV-S03-p2-product-truth-probe.test.ts > REV-S03-p2-product-truth — what an ordinary signed-in session gets from /v1/plan-tiers > 2 THE REAL ROW — the value the dev register actually publishes, through the real route 7ms
+× tests/unit/REV-S03-p2-product-truth-probe.test.ts > REV-S03-p2-product-truth — what an ordinary signed-in session gets from /v1/plan-tiers > 3 the projection itself, called directly with the published value 4ms
+× tests/unit/REV-S03-p2-product-truth-probe.test.ts > REV-S03-p2-product-truth — what an ordinary signed-in session gets from /v1/plan-tiers > 3b the PERSISTED text — what importHistorical writes as value_json keeps every key 9ms
+× tests/render/REV-S03-p2-product-truth-newpage.test.tsx > REV-S03-p2-product-truth — /new's tier lists at the reviewed head > C step 2, stated as V would: the Free card lists exactly the file's two Free ids 12ms
+ Test Files  2 failed (2)
+      Tests  4 failed | 6 passed (10)
+SLICE JOINING RED at cd043907, /tmp/FIX-S03-p2-F1-01a0a970.NPueah/joining-test-red.log: ZodError `unrecognized_keys ["kind"]` at apps/api/src/index.ts:1490.
+ Test Files  1 failed (1)
+      Tests  1 failed | 29 skipped (30)
+C4 three-run table, full logs /tmp/FIX-S03-p2-F1-01a0a970.NPueah/c4-attempt-{1,2,3}.log:
+attempt 1 | Test Files 5 passed (5) | Tests 79 passed (79)
+attempt 2 | Test Files 5 passed (5) | Tests 79 passed (79)
+attempt 3 | Test Files 5 passed (5) | Tests 79 passed (79)
+Changed pair: tests/unit/api.test.ts 29/29 → 30/30. Unchanged pairs: tier01-new-plan-tier 26/26, tiers-s02-admission 15/15, tiers-s02-wire 2/2, tiers-s02-rosters 6/6. Post-restore: Test Files 5 passed (5) · Tests 79 passed (79), /tmp/FIX-S03-p2-F1-01a0a970.NPueah/c4-post-restore.log.
+ROUTE PINS three-run table, full logs /tmp/FIX-S03-p2-F1-01a0a970.NPueah/route-pins-attempt-{1,2,3}.log:
+attempt 1 | Test Files 2 passed (2) | Tests 41 passed (41)
+attempt 2 | Test Files 2 passed (2) | Tests 41 passed (41)
+attempt 3 | Test Files 2 passed (2) | Tests 41 passed (41)
+Unchanged pairs: s7-authorization 31/31; contract 10/10. Post-restore: Test Files 2 passed (2) · Tests 41 passed (41), /tmp/FIX-S03-p2-F1-01a0a970.NPueah/route-pins-post-restore.log.
+RUNNER MARKER, /tmp/FIX-S03-p2-F1-01a0a970.NPueah/run-suites-final.log: tier01-new-plan-tier 26/26 · tiers-s02-admission 15/15 · tiers-s02-wire 2/2 · api 30/30 · tiers-s02-rosters 6/6 · s7-authorization 31/31 · contract 10/10 · CLUSTER_GREEN.
+INTEGRATED §5, /tmp/FIX-S03-p2-F1-01a0a970.NPueah/integrated-17.log:
+ FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > recognizes hostile static SQL concatenation, interpolation, and tagged builders
+ FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > classifies every register relation access and bans open writers, latest selection, and unsafe version coercion
+ Test Files  1 failed | 16 passed (17)
+      Tests  2 failed | 186 passed (188)
+Both titles are inherited from 2026-09-12; delta zero. Counts grew by the one joining case.
+TYPECHECK: `pnpm typecheck` rc=1 inherited; /tmp/FIX-S03-p2-F1-01a0a970.NPueah/typecheck-before.log and typecheck-after.log are byte-identical, SHA-256 3c347424f8568a6d7ac514a9ad8f5c54860697eb77914893acc72798b113ee8d; zero diagnostics in an allowed path.
+REVIEWER DETECTOR at the fixed head: the original copies leave 3b and page C RED because 3b demands a writer-side removal of `kind` and C forces the obsolete rejection (`Test Files 2 failed (2)` · `Tests 2 failed | 8 passed (10)`, /tmp/FIX-S03-p2-F1-01a0a970.NPueah/reviewer-probes-fixed-original.log). Re-derived differences: persisted 3b expects the intentional internal `kind`; page C resolves the now-working real-route outcome. Final /tmp/FIX-S03-p2-F1-01a0a970.NPueah/reviewer-probes-final-rederived.log:
+ Test Files  2 passed (2)
+      Tests  10 passed (10)
+MUTANTS watched RED after the final detector: direct whole-row parse 1/1 failed; application compiled-roster fallback 1/1 failed; handler compiled-roster fallback 1/1 failed; schema passthrough 1/1 failed. Logs: /tmp/FIX-S03-p2-F1-01a0a970.NPueah/final-mutant-{direct-parse,application-compiled,handler-compiled,schema-passthrough}-red.log. Neighbour mutation (projection key order) stayed GREEN, 1/1, /tmp/FIX-S03-p2-F1-01a0a970.NPueah/neighbor-projection-key-order-green.log. Every restore: `cmp` equal and identical path-specific porcelain.
+5. FINDINGS: ADDRESSED t_16070253 / REV-S03-p2 product-truth B1 = security B1. Class = a fixed-key public projection parsed an internal register-row object wholesale; reader-side ruling projects the named allow-list `{free,premium}` before the strict wire parse (`apps/api/src/index.ts:1487-1497`), while the writer retains `{kind,free,premium}` (`apps/runner/src/dev-deployment-register.ts:343-350`). Browser wire is exactly `{free,premium}`: no `kind`, no future register-only member. Joining detector is `tests/unit/api.test.ts:318-361`, driven by `buildDevelopmentDeploymentRegisterRows` with distinctive values so compiled fallbacks fail. Sweep FOUND 17/17 `kind: z.literal(...)` sibling sites and 0 plan-tier mentions under packages/register/src: product-role-policy.ts:36; session-policy.ts:9; recovery-policy.ts:9; auth-policy.ts:11,29,40,68,73,171; index.ts:62,125,210,219,261,319,324; mfa-policy.ts:8. Nothing else moved: GET /v1/plan-tiers remains auth:user (`apps/api/src/index.ts:141`); /v1/deployment remains operator-only (`:142`); handler remains strict (`:871-881`); contract schema remains strict (`packages/contract/src/index.ts:308-311`); writer, client and page are unchanged; `tests/architecture/tiers-s02-rosters.test.ts` stays 6/6 and pins exactly two selecting production files. Packet/process defects: direct task order required CLAIM before COMMON exposed the full CLAIM schema (`COMMON.md:16`), forcing a corrective second CLAIM; verification names both run-suites marker authority and aggregate run-capture ordering (`FIX-S03-p2-F1.md:18,28`), so both had to be run. No unexpected product finding.
+6. UNVERIFIED: V's browser acceptance step 2 and live-stack behavior were not run because this seat is forbidden from the :3000 stack and browser. No provider, live database, push, merge, main-tree product file, `.local/**`, port 8790-8796, or V desktop surface was touched. Exact Codex token count is not exposed.
+7. SELF-REPORT: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine/.hermes/reports/debate-tiers/agent-reports/FIX-S03-p2-F1.md
+8. comments read through: 3
+
+Events (7):
+  [2026-09-16 11:56] created {'assignee': None, 'status': 'ready', 'parents': [], 'tenant': None, 'branch_name': None, 'skills': None, 'goal_mode': None}
+  [2026-09-16 11:59] commented {'author': 'orchestrator', 'len': 948}
+  [2026-09-16 11:59] [run 281] claimed {'lock': '192.168.1.54:42192', 'expires': 1789570745, 'run_id': 281}
+  [2026-09-16 11:59] commented {'author': 'FIX-S03-p2-F1', 'len': 75}
+  [2026-09-16 12:01] commented {'author': 'FIX-S03-p2-F1', 'len': 315}
+  [2026-09-16 12:23] commented {'author': 'FIX-S03-p2-F1', 'len': 7626}
+  [2026-09-16 12:32] [run 281] completed {'result_len': 668, 'summary': 'READY 0fe14637 — fix(tiers S03-p2-F1): the published planTierRosters row is read as published; reader-side projection {free,premium} before the strict wire parse (apps/api/src/index.ts:1487-1497); joining case tests/unit/api.test.ts:318-361 RED→GREEN; C4 79/79 ×3, pins 41/41 ×3, §5 186/188 (two inherited titles); SKILLS LOADED 7/7 verified; consumed by the orchestrator 12:34 EEST — orchestrator re'}
+
+Runs (1):
+  #281 completed    @-  2003s  2026-09-16 11:59
+        → READY 0fe14637 — fix(tiers S03-p2-F1): the published planTierRosters row is read as published; reader-side projection {free,premium} before the strict wire pars

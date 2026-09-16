@@ -1,0 +1,349 @@
+diff --git a/dialectical-engine/apps/api/src/index.ts b/dialectical-engine/apps/api/src/index.ts
+index b3145333..62d408cb 100644
+--- a/dialectical-engine/apps/api/src/index.ts
++++ b/dialectical-engine/apps/api/src/index.ts
+@@ -64,6 +64,11 @@ import type {
+   EvaluatorDevMenuView
+ } from "@debateai/evaluator";
+ import { Argon2InfrastructureError } from "@debateai/crypto";
++import {
++  captureHandled,
++  declaredRef,
++  runWithObsContext,
++} from "@debateai/obs-capture";
+ import {
+   AUTH_RETRYABLE_UNAVAILABLE_CODE,
+   AuthFlowError,
+@@ -81,6 +86,7 @@ import {
+   type SupportApplication,
+   type SupportRoutePath
+ } from "./support/index.js";
++import { registerClientReportRoutes } from "./obs-client-report.js";
+ 
+ type RouteAuthPolicy = "public" | "user" | "operator";
+ type RouteOriginPolicy = "trusted";
+@@ -136,6 +142,8 @@ export const authorizationPolicyInventory = Object.freeze([
+   { route: "GET /v1/support/cases/{token}", auth: "public", session: "optional", resource: "support-case", action: "read" },
+   { route: "POST /v1/support/cases/{token}/messages", auth: "public", session: "optional", resource: "support-case", action: "reply" },
+   { route: "GET /v1/support/status", auth: "public", session: "optional", resource: "support-status", action: "read" },
++  { route: "GET /v1/obs/client-report/enums", auth: "public", resource: "observability", action: "read-client-enums" },
++  { route: "POST /v1/obs/client-report", auth: "public", resource: "observability", action: "write-client-report" },
+   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
+   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
+   { route: "GET /v1/plan-tiers", auth: "user", resource: "plan-tier-rosters", action: "read" },
+@@ -162,7 +170,7 @@ export const authorizationPolicyInventory = Object.freeze([
+   session?: RouteSessionPolicy;
+   resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" |
+     "deployment" | "plan-tier-rosters" | "evaluator" | "support-session" | "support-message" | "support-case" |
+-    "support-status";
++    "support-status" | "observability";
+   action: string;
+ }>[]);
+ 
+@@ -191,6 +199,13 @@ function canonicalRoute(method: string, url: string): string {
+   return `${method.toUpperCase()} ${url.replace(/:([A-Za-z][A-Za-z0-9_]*)/g, "{$1}")}`;
+ }
+ 
++const OBS_RUN_SCOPED_ROUTE_TEMPLATES = Object.freeze([
++  "/v1/runs/:id/events",
++  "/v1/runs/:id",
++  "/v1/runs/:id/answer",
++] as const);
++const EMPTY_OBS_REQUEST_CONTEXT = Object.freeze({});
++
+ export const SESSION_COOKIE_NAME = "__Host-debateai-session" as const;
+ export const CSRF_COOKIE_NAME = "__Host-debateai-csrf" as const;
+ const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
+@@ -364,6 +379,22 @@ export function buildApi(options: ApiOptions): FastifyInstance {
+     trustProxy: [...TRUSTED_UI_PROXY_NETWORKS],
+     exposeHeadRoutes: false
+   });
++  api.addHook("onRequest", (request, _reply, done) => {
++    const routeTemplate = request.routeOptions.url;
++    const params = typeof request.params === "object" && request.params !== null
++      ? request.params as Readonly<Record<string, unknown>>
++      : undefined;
++    const runId = params?.id;
++    const verifiedRunId = OBS_RUN_SCOPED_ROUTE_TEMPLATES.some(
++      (candidate) => candidate === routeTemplate,
++    ) && typeof runId === "string" && ResourceIdSchema.safeParse(runId).success
++      ? runId
++      : undefined;
++    const context = verifiedRunId === undefined
++      ? EMPTY_OBS_REQUEST_CONTEXT
++      : Object.freeze({ run_ref: declaredRef("run", verifiedRunId) });
++    runWithObsContext(context, done);
++  });
+   api.addHook("onRoute", (route) => {
+     for (const method of Array.isArray(route.method) ? route.method : [route.method]) {
+       const key = canonicalRoute(method, route.url);
+@@ -483,7 +514,24 @@ export function buildApi(options: ApiOptions): FastifyInstance {
+     }
+     return reply.status(401).send({ error: "SESSION_REQUIRED" });
+   });
++  const obsExcludedCaptureResources = new Set([
++    "identity",
++    "session-self",
++    "session-owner",
++  ]);
+   api.setErrorHandler((error, request, reply) => {
++    const activeRouteTemplate = request.routeOptions.url;
++    const capturePolicy = typeof activeRouteTemplate === "string"
++      ? authorizationPolicies.get(canonicalRoute(request.method, activeRouteTemplate))
++      : undefined;
++    const routeTemplate = capturePolicy !== undefined
++      && !obsExcludedCaptureResources.has(capturePolicy.resource)
++      ? activeRouteTemplate
++      : undefined;
++    const correlationId = captureHandled(error, Object.freeze({
++      capture_point: "http",
++      ...(routeTemplate === undefined ? {} : { route_template: routeTemplate }),
++    }));
+     if (reply.sent || reply.raw.headersSent) {
+       // A streaming response has no lawful error envelope left to send. Abort
+       // the one connection instead of fabricating a terminal SSE event (DR-115)
+@@ -532,10 +580,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
+         diagnostic: apiOperationalErrorDiagnostic(knownError)
+       })));
+     }
+-    return reply.status(statusCode).send({
+-      error: errorCode,
+-      message: statusCode >= 500 ? errorCode : knownError.message
+-    });
++    return reply.status(statusCode).send(statusCode >= 500
++      ? { error: errorCode, correlation_id: correlationId }
++      : { error: errorCode, message: knownError.message });
+   });
+ 
+   if (options.sessions !== undefined) {
+@@ -815,6 +862,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
+     });
+   }
+ 
++  registerClientReportRoutes(api);
++
+   if (options.recovery !== undefined) {
+     api.post("/v1/auth/recovery/start", routePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
+       const body = typeof request.body === "object" && request.body !== null
+diff --git a/dialectical-engine/package.json b/dialectical-engine/package.json
+index 4b94f3a5..039134d5 100644
+--- a/dialectical-engine/package.json
++++ b/dialectical-engine/package.json
+@@ -13,8 +13,9 @@
+     "typecheck": "tsc --noEmit",
+     "test": "vitest run",
+     "test:s00": "vitest run tests/unit tests/integration tests/architecture",
+-    "lint": "pnpm run audit:architecture && pnpm run audit:source",
++    "lint": "pnpm run audit:architecture && pnpm run audit:obs-inventory && pnpm run audit:source",
+     "audit:architecture": "tsx tools/orphan-audit/src/cli.ts architecture",
++    "audit:obs-inventory": "tsx tools/obs-inventory/src/index.ts",
+     "audit:source": "tsx tools/orphan-audit/src/cli.ts source",
+     "audit:text-bytes": "tsx tools/check-text-control-bytes.ts",
+     "audit:orphans": "tsx tools/orphan-audit/src/cli.ts orphans",
+@@ -48,7 +49,8 @@
+     "job:liveness-sweep": "tsx apps/scheduler/src/cli.ts liveness-sweep",
+     "job:settlement-watch": "tsx apps/scheduler/src/cli.ts settlement-watch",
+     "job:review-catch-up": "tsx acceptance/review-catch-up.ts",
+-    "replay:ceremony": "tsx apps/replay/src/cli.ts"
++    "replay:ceremony": "tsx apps/replay/src/cli.ts",
++    "obsctl": "node tools/obs-listener/bin/obsctl.mjs"
+   },
+   "dependencies": {
+     "@debateai/model-config": "workspace:*",
+diff --git a/dialectical-engine/packages/providers/src/index.ts b/dialectical-engine/packages/providers/src/index.ts
+index bc61cee7..ba86a903 100644
+--- a/dialectical-engine/packages/providers/src/index.ts
++++ b/dialectical-engine/packages/providers/src/index.ts
+@@ -1,6 +1,12 @@
+ import { createHash, randomUUID } from "node:crypto";
+ import { z } from "zod";
+ import { TypedDomainError } from "@debateai/kernel";
++import {
++  declaredRef,
++  emit,
++  getObsContext,
++  runWithObsContext,
++} from "@debateai/obs-capture";
+ 
+ export const MODEL_ROLES = ["JUDGE", "COMPOSER", "CONFORMANCE", "CLASSIFIER"] as const;
+ export type TypedRole = typeof MODEL_ROLES[number];
+@@ -295,6 +301,47 @@ function contentParseStatus(content: string): "PARSED" | "UNPARSED" {
+   }
+ }
+ 
++const PROVIDER_INHERITED_CONTEXT_FIELDS = Object.freeze([
++  "run_ref",
++  "work_item_ref",
++  "zone_context",
++] as const);
++
++function emitProviderExhaustion(input: {
++  readonly code: "PROVIDER_CALL_FAILED" | "PROVIDER_CONTENT_UNACCEPTED";
++  readonly attemptId: string;
++  readonly ledgerEntryRef: string;
++  readonly attemptCount: number;
++}): void {
++  try {
++    const context: Record<string, unknown> = {
++      attempt_ref: declaredRef("attempt", input.attemptId),
++      ledger_ref: declaredRef("ledger_entry", input.ledgerEntryRef),
++    };
++    const ambient = getObsContext();
++    if (ambient !== undefined) {
++      for (const field of PROVIDER_INHERITED_CONTEXT_FIELDS) {
++        const descriptor = Object.getOwnPropertyDescriptor(ambient, field);
++        if (descriptor === undefined) continue;
++        if (!Object.prototype.hasOwnProperty.call(descriptor, "value")) {
++          throw new TypeError("PROVIDER_OBS_CONTEXT_ACCESSOR_FORBIDDEN");
++        }
++        context[field] = descriptor.value;
++      }
++    }
++    runWithObsContext(Object.freeze(context), () => emit(Object.freeze({
++      code: input.code,
++      taxonomy_class: "PROVIDER_EXHAUSTED",
++      capture_point: "provider",
++      disposition: "THROWN",
++      source: "first_party",
++      template_parameters: Object.freeze({ attempt_count: input.attemptCount }),
++    })));
++  } catch {
++    // Provider product semantics always win over observability.
++  }
++}
++
+ export class OpenAICompatibleProviderGateway implements ProviderGateway {
+   readonly #options: OpenAICompatibleGatewayOptions;
+ 
+@@ -311,6 +358,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
+     let lastError: unknown;
+     let lastOutcome: "TIMED_OUT" | "FAILED" = "FAILED";
+     let lastLedgerEntryRef = "PROVIDER_LEDGER_ENTRY_UNRESOLVED";
++    let lastAttemptId = "PROVIDER_ATTEMPT_UNRESOLVED";
+     let attemptPacket = request.packet;
+     let lastContentRejection: {
+       attempts: number;
+@@ -323,6 +371,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
+     for (let attempt = 1; attempt <= request.bound.maxAttempts; attempt += 1) {
+       const inputHash = digest(JSON.stringify(attemptPacket));
+       const attemptId = randomUUID();
++      lastAttemptId = attemptId;
+       const startedAt = new Date();
+       let rawArtifactRef: string | null = null;
+       let ledgerRecorded = false;
+@@ -479,6 +528,12 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
+       }
+     }
+     if (lastContentRejection !== null) {
++      emitProviderExhaustion({
++        code: "PROVIDER_CONTENT_UNACCEPTED",
++        attemptId: lastAttemptId,
++        ledgerEntryRef: lastContentRejection.ledgerEntryRef,
++        attemptCount: lastContentRejection.attempts,
++      });
+       throw new ProviderContentUnacceptedError(
+         lastContentRejection.attempts,
+         lastContentRejection.parseStatus,
+@@ -487,6 +542,12 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
+         lastContentRejection.ledgerEntryRef
+       );
+     }
++    emitProviderExhaustion({
++      code: "PROVIDER_CALL_FAILED",
++      attemptId: lastAttemptId,
++      ledgerEntryRef: lastLedgerEntryRef,
++      attemptCount: request.bound.maxAttempts,
++    });
+     throw new ProviderCallFailedError(
+       lastError,
+       request.bound.maxAttempts,
+diff --git a/dialectical-engine/pnpm-lock.yaml b/dialectical-engine/pnpm-lock.yaml
+index c6e0c76d..dd2ad776 100644
+--- a/dialectical-engine/pnpm-lock.yaml
++++ b/dialectical-engine/pnpm-lock.yaml
+@@ -452,6 +452,9 @@ importers:
+       '@debateai/kernel':
+         specifier: workspace:*
+         version: link:../kernel
++      '@debateai/obs-capture':
++        specifier: workspace:*
++        version: link:../obs-capture
+       drizzle-orm:
+         specifier: 0.45.2
+         version: 0.45.2(@types/pg@8.21.0)(pg@8.22.0)
+@@ -616,6 +619,9 @@ importers:
+       '@debateai/ledger':
+         specifier: workspace:*
+         version: link:../ledger
++      '@debateai/obs-capture':
++        specifier: workspace:*
++        version: link:../obs-capture
+       '@debateai/register':
+         specifier: workspace:*
+         version: link:../register
+@@ -736,6 +742,25 @@ importers:
+         specifier: workspace:*
+         version: link:../../packages/register
+ 
++  tools/obs-listener:
++    dependencies:
++      '@debateai/obs-capture':
++        specifier: workspace:*
++        version: link:../../packages/obs-capture
++      pg:
++        specifier: 8.22.0
++        version: 8.22.0
++    devDependencies:
++      '@types/node':
++        specifier: 26.2.0
++        version: 26.2.0
++      '@types/pg':
++        specifier: 8.21.0
++        version: 8.21.0
++      typescript:
++        specifier: 7.0.2
++        version: 7.0.2
++
+   tools/orphan-audit:
+     dependencies:
+       '@debateai/contract':
+diff --git a/dialectical-engine/tests/unit/api.test.ts b/dialectical-engine/tests/unit/api.test.ts
+index 0abe8c69..67198c0d 100644
+--- a/dialectical-engine/tests/unit/api.test.ts
++++ b/dialectical-engine/tests/unit/api.test.ts
+@@ -692,7 +692,9 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
+     expect(submitResponse.statusCode).toBe(500);
+     expect(submitResponse.json()).toEqual({
+       error: "INTERNAL_ERROR",
+-      message: "INTERNAL_ERROR"
++      correlation_id: expect.stringMatching(
++        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
++      )
+     });
+     expect(submitResponse.body).not.toContain("Database and domain match predicates disagree");
+     await submitApi.close();
+@@ -708,7 +710,9 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
+     expect(typedResponse.statusCode).toBe(500);
+     expect(typedResponse.json()).toEqual({
+       error: "INTERNAL_ERROR",
+-      message: "INTERNAL_ERROR"
++      correlation_id: expect.stringMatching(
++        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
++      )
+     });
+     expect(typedResponse.body).not.toContain("No sealed V3 deployment register exists");
+     await typedApi.close();
+@@ -720,7 +724,12 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
+       method: "GET", url: "/v1/answers?limit=1&offset=0", headers: USER_HEADERS
+     });
+     expect(crashedResponse.statusCode).toBe(500);
+-    expect(crashedResponse.json()).toEqual({ error: "INTERNAL_ERROR", message: "INTERNAL_ERROR" });
++    expect(crashedResponse.json()).toEqual({
++      error: "INTERNAL_ERROR",
++      correlation_id: expect.stringMatching(
++        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
++      )
++    });
+     expect(crashedResponse.body).not.toContain("database connection lost");
+     await crashedApi.close();
+   });

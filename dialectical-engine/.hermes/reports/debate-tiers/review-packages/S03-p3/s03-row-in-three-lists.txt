@@ -1,0 +1,13 @@
+# S03's own route in the three lists at 3f488b3f (the RED pin cannot say this — pass-2 correctness B1)
+
+## apps/api/src/index.ts (the governed table)
+149:  { route: "GET /v1/plan-tiers", auth: "user", resource: "plan-tier-rosters", action: "read" },
+920:  api.get("/v1/plan-tiers", routePolicy("GET /v1/plan-tiers"), async (request, reply) => {
+## packages/contract/src/index.ts (contractInventory.routes)
+685:    "GET /v1/plan-tiers",
+## tests/unit/s7-authorization.test.ts (EXPECTED_AUTHORIZATION_MATRIX)
+51:  { route: "GET /v1/plan-tiers", auth: "user", resource: "plan-tier-rosters", action: "read" },
+
+## the observability pair (inherited, absent from the contract list and the matrix)
+apps/api/src/index.ts:145:  { route: "GET /v1/obs/client-report/enums", auth: "public", resource: "observability", action: "read-client-enums" },
+apps/api/src/index.ts:146:  { route: "POST /v1/obs/client-report", auth: "public", resource: "observability", action: "write-client-report" },

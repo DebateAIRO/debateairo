@@ -1,0 +1,14 @@
+# Pass-2 promoted probes, carried into pass 3 (each names the head it was written against: d35a9634; the review tree is now 3f488b3f)
+
+- /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S03-p2-product-truth
+- /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S03-p2-security-data-safety
+- /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S03-p2-correctness-tests-probe.test.ts
+- /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S03-p2-correctness-tests-f2-crosscheck.test.ts
+- /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S03-p2-correctness-tests-mutants.sh
+- /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S03-p2-correctness-tests-mutant-f.sh
+- /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S03-p2-correctness-tests-run-probe.sh
+- /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S03-p2-correctness-tests-repl.py
+
+Measurements at d35a9634 (from the three pass-2 artifacts): product-truth P1 — the REAL published row ⇒ 500 (ZodError unrecognized_keys ["kind"]), a control row ⇒ 200; P2 — the page renders 0 ids (step 2 RED); at cd043907 (lane) the orchestrator measured the two fixtures Test Files 2 failed (2) · Tests 4 failed | 6 passed (10) — cases 2, 3, 3b, C RED. security probe R — producer→consumer→route 500, 200 once kind is dropped; its argv probes: eight hostile grok model values reach argv (N8, residue). correctness — mutants A–F all bite at d35a9634; mutant E (supplying the obs pair) turns the pins 41/41 GREEN; F1 shows the RED pin masks S03's own row drift.
+
+Measurements at 3f488b3f (the orchestrator's gate, unchanged copies; the frames verbatim in reverify-gate-s03-probes-pt-3f488b3f.log and reverify-gate-s03-probes-sec-3f488b3f.log): product-truth — Tests  2 failed | 8 passed (10) — RED: 3b the PERSISTED text — what importHistorical writes as value_json k;C step 2, stated as V would: the Free card lists exactly the file's tw;; security — Tests  2 failed | 13 passed (15) — RED: feeds that exact value to PostgresAskApplication.readPlanTierRosters;drives GET /v1/plan-tiers against that same published value;. Why each RED case is RED is stated in README.md (case C mocks the 500 at :127 — RED at every head; 3b asserts the writer-side remedy; R inverted by design; P4's envelope keys as the gate log prints them).

@@ -1,0 +1,85 @@
+GATE S03 at lane HEAD 3f488b3f, 2026-09-16 12:33:31 EEST, porcelain=0
+=== 1. the integrated 17-file run, three times (expected Test Files: 17; failures: only the two register-support-publication titles)
+rc=1 log=/private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/96555a10-dafb-468d-88b3-f6c3afd4c825/scratchpad/gate-s03-int-1.log cmd=env LANG=en_US.UTF-8 npx vitest run tests/architecture/tier01-roster.test.ts tests/architecture/tiers-s02-rosters.test.ts tests/unit/tiers-s02-admission.test.ts tests/unit/tiers-s02-wire.test.ts tests/render/tier01-new-plan-tier.test.tsx tests/unit/dev-cli-provider-panel.test.ts tests/unit/dev-auth-stack.test.ts tests/integration/dev-deployment-register.test.ts tests/integration/dev-api-environment.test.ts tests/architecture/dev-real-provider-only.test.ts tests/architecture/register-support-publication.test.ts tests/unit/api.test.ts tests/integration/dev-provider-panel.test.ts tests/architecture/dev-deployment-register.test.ts tests/architecture/dev-runner-provider-set.test.ts tests/unit/provider.test.ts tests/unit/api-provider-discovery.test.ts
+ Test Files  1 failed | 16 passed (17)
+      Tests  2 failed | 186 passed (188)
+rc=1 log=/private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/96555a10-dafb-468d-88b3-f6c3afd4c825/scratchpad/gate-s03-int-2.log cmd=env LANG=en_US.UTF-8 npx vitest run tests/architecture/tier01-roster.test.ts tests/architecture/tiers-s02-rosters.test.ts tests/unit/tiers-s02-admission.test.ts tests/unit/tiers-s02-wire.test.ts tests/render/tier01-new-plan-tier.test.tsx tests/unit/dev-cli-provider-panel.test.ts tests/unit/dev-auth-stack.test.ts tests/integration/dev-deployment-register.test.ts tests/integration/dev-api-environment.test.ts tests/architecture/dev-real-provider-only.test.ts tests/architecture/register-support-publication.test.ts tests/unit/api.test.ts tests/integration/dev-provider-panel.test.ts tests/architecture/dev-deployment-register.test.ts tests/architecture/dev-runner-provider-set.test.ts tests/unit/provider.test.ts tests/unit/api-provider-discovery.test.ts
+ Test Files  1 failed | 16 passed (17)
+      Tests  2 failed | 186 passed (188)
+rc=1 log=/private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/96555a10-dafb-468d-88b3-f6c3afd4c825/scratchpad/gate-s03-int-3.log cmd=env LANG=en_US.UTF-8 npx vitest run tests/architecture/tier01-roster.test.ts tests/architecture/tiers-s02-rosters.test.ts tests/unit/tiers-s02-admission.test.ts tests/unit/tiers-s02-wire.test.ts tests/render/tier01-new-plan-tier.test.tsx tests/unit/dev-cli-provider-panel.test.ts tests/unit/dev-auth-stack.test.ts tests/integration/dev-deployment-register.test.ts tests/integration/dev-api-environment.test.ts tests/architecture/dev-real-provider-only.test.ts tests/architecture/register-support-publication.test.ts tests/unit/api.test.ts tests/integration/dev-provider-panel.test.ts tests/architecture/dev-deployment-register.test.ts tests/architecture/dev-runner-provider-set.test.ts tests/unit/provider.test.ts tests/unit/api-provider-discovery.test.ts
+ Test Files  1 failed | 16 passed (17)
+      Tests  2 failed | 186 passed (188)
+--- per-suite counts from run 1 (passed ✓ / failed × by file):
+tests/architecture/tier01-roster.test.ts                         2/2  
+tests/architecture/tiers-s02-rosters.test.ts                     6/6  
+tests/unit/tiers-s02-admission.test.ts                          15/15 
+tests/unit/tiers-s02-wire.test.ts                                2/2  
+tests/render/tier01-new-plan-tier.test.tsx                      26/26 
+tests/unit/dev-cli-provider-panel.test.ts                       12/12 
+tests/unit/dev-auth-stack.test.ts                               24/24 
+tests/integration/dev-deployment-register.test.ts               14/14 
+tests/integration/dev-api-environment.test.ts                   12/12 
+tests/architecture/dev-real-provider-only.test.ts                4/4  
+tests/architecture/register-support-publication.test.ts         12/14 
+tests/unit/api.test.ts                                          30/30 
+tests/integration/dev-provider-panel.test.ts                     3/3  
+tests/architecture/dev-deployment-register.test.ts               3/3  
+tests/architecture/dev-runner-provider-set.test.ts               5/5  
+tests/unit/provider.test.ts                                      9/9  
+tests/unit/api-provider-discovery.test.ts                        7/7  
+--- failing titles (run 1):
+× tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > recognizes hostile static SQL concatenation, interpolation, and tagged builders 4ms
+× tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > classifies every register relation access and bans open writers, latest selection, an
+=== 1c. the route-contract pins (REV-S03-p2 correctness B1: the two suites S03 wrote that no slice command ran; at the merged head the observability pair makes :151 RED — inherited, recorded, never S03s)
+rc=1 log=/private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/96555a10-dafb-468d-88b3-f6c3afd4c825/scratchpad/gate-s03-pins.log cmd=env LANG=en_US.UTF-8 npx vitest run tests/unit/s7-authorization.test.ts tests/unit/contract.test.ts
+× tests/unit/s7-authorization.test.ts > S7 deny-by-default authorization > keeps one complete, duplicate-free policy row per contract route 5ms
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 40 passed (41)
+=== 1d. the product-truth pass-2 fixtures at HEAD (temporary copies; they assert the PROMISE — GREEN at a head that fixes B1)
+rc=1 log=/private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/96555a10-dafb-468d-88b3-f6c3afd4c825/scratchpad/gate-s03-probes-pt.log cmd=env LANG=en_US.UTF-8 npx vitest run tests/unit/REV-S03-p2-product-truth-probe.test.ts tests/render/REV-S03-p2-product-truth-newpage.test.tsx
+× tests/unit/REV-S03-p2-product-truth-probe.test.ts > REV-S03-p2-product-truth — what an ordinary signed-in session gets from /v1/plan-tiers > 3b the PERSISTED text — what importHistorical writes as value_json keeps every key 10ms
+× tests/render/REV-S03-p2-product-truth-newpage.test.tsx > REV-S03-p2-product-truth — /new's tier lists at the reviewed head > C step 2, stated as V would: the Free card lists exactly the file's two Free ids 12ms
+ Test Files  2 failed (2)
+      Tests  2 failed | 8 passed (10)
+porcelain after 1d: 0
+=== 1e. the security pass-2 probes at HEAD (temporary copies into tests/unit/)
+rc=1 log=/private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/96555a10-dafb-468d-88b3-f6c3afd4c825/scratchpad/gate-s03-probes-sec.log cmd=env LANG=en_US.UTF-8 npx vitest run tests/unit/rev-s03-p2-security-probe.test.ts tests/unit/rev-s03-p2-security-rowshape-probe.test.ts
+× tests/unit/rev-s03-p2-security-rowshape-probe.test.ts > PROBE R — the producer's row shape against the consumer's strict schema > feeds that exact value to PostgresAskApplication.readPlanTierRosters 6ms
+× tests/unit/rev-s03-p2-security-rowshape-probe.test.ts > PROBE R — the producer's row shape against the consumer's strict schema > drives GET /v1/plan-tiers against that same published value 41ms
+ Test Files  1 failed | 1 passed (2)
+      Tests  2 failed | 13 passed (15)
+porcelain after 1e: 0
+=== 1b. the two embedded-postgres snapshot suites
+rc=0 log=/private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/96555a10-dafb-468d-88b3-f6c3afd4c825/scratchpad/gate-s03-1b.log cmd=env LANG=en_US.UTF-8 npx vitest run tests/integration/register-support-publication.test.ts tests/integration/production-database-principals.test.ts
+ Test Files  2 passed (2)
+      Tests  57 passed (57)
+=== 2. the generator mount: generated/ moved away, generate:contract, tier01-roster
+generate:contract rc=0 (generated present: 4 files)
+rc=0 log=/private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/96555a10-dafb-468d-88b3-f6c3afd4c825/scratchpad/gate-s03-tier01.log cmd=env LANG=en_US.UTF-8 npx vitest run tests/architecture/tier01-roster.test.ts
+      Tests  2 passed (2)
+=== 2b. loadModelConfig over the committed file = the five slots; PLAN_TIER_ROSTERS deep-equals the file
+rc=0 log=/private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/96555a10-dafb-468d-88b3-f6c3afd4c825/scratchpad/gate-s03-mount.log cmd=env LANG=en_US.UTF-8 npx vitest run tests/unit/model-config-file.test.ts tests/unit/model-config-tiers.test.ts tests/architecture/model-config-no-secret.test.ts
+      Tests  8 passed (8)
+=== 4. typecheck at HEAD (delta vs BASELINE is read by hand)
+typecheck rc=1 diagnostics=69
+  15 tests/architecture/register-support-publication.test.ts
+   9 tests/architecture/sup-04-mounts.test.ts
+   8 tests/unit/s14-ui.test.ts
+   8 tests/unit/obs-agent-01-discovery.test.ts
+   5 tests/unit/obs-agent-05-lifecycle.test.ts
+   4 tests/integration/obs-agent-04-not-wired.test.ts
+   3 tests/integration/obs-agent-06-status.test.ts
+   2 tests/unit/obs-agent-05-postgres.test.ts
+   2 tests/unit/fix09-capture-gate.test.ts
+   2 tests/integration/obs-agent-01-delivery.test.ts
+   2 tests/acceptance/obs-agent-04-fixture.ts
+   1 tests/unit/obs-agent-01-status-projections.test.ts
+   1 tests/integration/obs-agent-06-views.test.ts
+   1 tests/integration/obs-agent-05-docker.test.ts
+   1 tests/integration/obs-agent-05-connection-drill.test.ts
+   1 tests/integration/obs-agent-04-gap-drill.test.ts
+   1 tests/integration/obs-agent-03-fixture.test.ts
+   1 tests/architecture/obs-agent-06-copy.test.ts
+   1 tests/acceptance/obs-agent-06-fixture.ts
+   1 tests/acceptance/obs-agent-03-fixture.ts
+=== porcelain after the gate (must be empty)
