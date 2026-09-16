@@ -4483,3 +4483,64 @@ byte-identical with `git diff --stat HEAD -- <paths>` returning empty.
 name used for read-only work in another checkout, and make the first line of every edit script
 assert its own location (`assert os.getcwd().endswith("/.worktrees/lane-<name>/dialectical-engine")`).
 An edit script that cannot say where it is standing is one variable away from editing dev.**
+
+## A class member can be stale by ABSENCE, and a sweep that greps the SYMPTOM cannot see it (2026-09-16, BUILD(CONT-T8))
+`F-PG-STUB-QUERY-TEXT-CLASS` was chartered as a sweep of "every fake-client `sql.includes(`
+dispatch under `tests/`" — a grep over the wrong branch text. Its third member,
+`tests/integration/obs-l3-s06-runner-binding.test.ts`, has **no** advisory-lock dispatch at all:
+that client modelled `BEGIN`/`COMMIT`/`ROLLBACK`, `ledger.allocate_sequence` and
+`INSERT INTO ledger.ledger_entry` and nothing else, so the lease's first query walked straight
+into its `throw` at `:290`. A grep for the stale STRING finds every member that has the wrong
+branch and ZERO members that have no branch. The verifier's own §10 item 4 inherited the error
+and wrote that `:290` "dispatches on pg_advisory_lock"; `:290` is the throw, and §7 row 4 of the
+same document says so correctly — one document, two sections, two answers.
+Also: `pg_advisory_lock` in a stub is NOT automatically stale. The product still issues the
+BLOCKING form at six sites (`packages/db/src/index.ts:938`, `account-erasure.ts:138, :333`,
+`publication-lease.ts:57`, `production-database-principals.ts:235, :239`) and the try-lock at two
+(`db/index.ts:331`, `evaluator/index.ts:656`). Which form is stale depends on which lease the
+test's code path takes, never on the string alone.
+**Rule: enumerate a sweep over the PRODUCT's surface, not over the tests' text.** Start from the
+query the product issues, find every fake client standing in front of that code path, and ask of
+each whether it answers. One direction finds absences; the other cannot.
+
+## Removing a cast costs one compile run per nesting level, not one (2026-09-16, BUILD(CONT-T8))
+Refines `## The error count that under-reports: TypeScript stops at the FIRST excess property`
+(`:587`) for the REMOVAL direction. Deleting the two `as never` casts from
+`tests/integration/s8-publication-database.test.ts` took THREE full `pnpm run typecheck` runs,
+because the compiler reports the first structural mismatch per object and then stops:
+`(1709,25)` composed segment → `(1703,9)` `session` fields → `(1708,7)` top-level `tokenHash`,
+`csrfTokenHash`, `authKind`. The ticket's own codex qualification predicted `answer_id` and
+`answer_version` would appear; they did not appear until the mutant run, which made a correct
+prediction read as wrong when it was merely early.
+**Rule: budget depth-of-nesting + 1 compile runs per cast removed, and never quote a first-run
+diagnostic count as the size of the job.** The size is visible only from the other end: with the
+cast restored and a two-field literal, the compiler says NOTHING (rc 0); with the cast gone it
+says `TS2740 … missing answer_id, answer_version, question_line, verdict_state, and 30 more`.
+34 required fields, and the cast showed the compiler none of them.
+
+## A parsed builder catches an illegal COMBINATION; a required-field audit never will (2026-09-16, BUILD(CONT-T8))
+The s8 transport-ambiguous row carried `confidence_band: "moderate"` with no `band_ceiling`.
+`AnswerSchema` refuses that pair (`packages/contract/src/index.ts:647-648`, "confidence_band and
+band_ceiling must be present together"), so the row's authored answer had been contract-INVALID
+since it was written — under `as never` it was never parsed, and every review of it asked only
+"which required fields are missing". No field was missing from that pair; the pair itself was
+illegal. Only `AnswerSchema.parse`, via `buildFairShapedAnswer`, found it.
+**Rule: a fixture built by a parsing builder is checked by the CONTRACT's refinements, not just
+its field list. Prefer the builder over a literal even when the literal looks complete — and when
+a builder rejects your override, read the refinement before you invent a value to satisfy it.**
+(Here the honest move was to DROP `confidence_band`, because supplying a real `band_ceiling`
+means inventing a `register_row_key`/`register_version`/`source_ref` triple for a row that
+asserts nothing about the band.)
+
+## A brief can dictate a command the machine cannot run, and rc=127 reads exactly like the RED it predicted (2026-09-16, BUILD(CONT-T8))
+`task-8-brief.md:14` dictates `timeout 200 pnpm exec vitest run tests/unit/load01-run-projection.test.ts`
+and predicts "the 120 s timeout". Run as written: **rc 127**, `timeout: command not found`, 0 s,
+and NO `Test Files` line at all. `command -v timeout` rc 1, `command -v gtimeout` rc 1. The trap
+was already in this file at `:2398`, written by the orchestrator on 2026-09-02.
+The danger is not the missing binary; it is that the expected outcome of this command was a
+FAILURE, so a non-zero exit is exactly what the reader is braced for. A 0-second "reproduction"
+of a 120-second hang would have gone into the report unchallenged.
+**Rule: a runner must treat an ABSENT summary line as BROKEN, never as RED** (print
+`(no summary line — BROKEN, not RED)`), and a packet linter should `command -v` every executable
+a brief names before dispatch. The traps that constrain COMMAND SHAPES belong in a linted list,
+not in 4 000 lines of prose every author skims.
