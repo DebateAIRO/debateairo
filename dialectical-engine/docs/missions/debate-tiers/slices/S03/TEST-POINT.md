@@ -1,10 +1,10 @@
 # S03 — V's test point (TEST(S03) = ticket `t_f14b0ca0`, READY on the board 2026-09-16 19:0x EEST)
 
-The slice ticket closes only on V's veto. Everything below is the state at the FINAL S03 head **544cbf5c** (`integration/all` in `.worktrees/all/dialectical-engine`; slice head f43b3f8b on `slice/tiers-s03`; slice base 9a000c37). Nothing is pushed; the main checkout is still at 446c685e until V runs `ff-main.sh`.
+The slice ticket closes only on V's veto. Everything below is the state at the FINAL S03 head **8a1d738c** (544cbf5c + RULING 7 after V's first finding) (`integration/all` in `.worktrees/all/dialectical-engine`; slice head 1a1c4ede on `slice/tiers-s03`; slice base 9a000c37). Nothing is pushed; the main checkout is still at 446c685e until V runs `ff-main.sh`.
 
 ## 1. What is served, and how to restart it
 
-- **The stack:** https://localhost:3000 (front door) → UI :3001 → API :8790 → runner; CLI relays 8794 (support GLM), 8795 (codex-premium), 8796 (claude-premium). Served from the merged tree by `bash .hermes/reports/debate-tiers/logs/serve-merged.sh` (idempotent; stop with `serve-merged-stop.sh`). Sign in, click **Use a recovery code** before pasting, then open `/new`.
+- **The stack:** https://localhost:3000 (front door) → UI :3001 → API :8790 → runner; CLI relays 8794 (support GLM), 8795 (codex-premium), 8796 (claude-premium). Served from the merged tree at 8a1d738c by `bash .hermes/reports/debate-tiers/logs/serve-merged.sh` (idempotent; stop with `serve-merged-stop.sh`). Sign in, click **Use a recovery code** before pasting, then open `/new`.
 - **Register on the dev database:** v10 — 33 rows: the five-slot `configuredProviderSet` and the `planTierRosters` row {free: `gpt-5.6-luna`, `glm-5.3-flash`; premium: `gpt-5.6-sol`, `claude-opus-5`, `grok-4.6-build`}, published by the product's own `pnpm dev:auth:up` from the merged tree (attempts 4 and 6 in `review-packages/S03-p3r/live/`).
 - **The restart after an edit of `config/models.yaml` is TWO commands until V rules V-51** (row V-53): from `.worktrees/all/dialectical-engine`, `pnpm dev:auth:up` — it validates the file (a broken file is refused by name: `DEV_AUTH_STACK_MODEL_CONFIG_INVALID tier=… model=… class N`), regenerates the compiled rosters, seeds, publishes the new register version, rewrites api.env, starts the API, **then exits 1 at the runner stage** (`DEV_AUTH_STACK_RUNNER_FAILED:DEV_RUNNER_PROCESS_READINESS_INVALID`, the pre-existing gate) and stops its stages — then `bash .hermes/reports/debate-tiers/logs/serve-merged.sh` brings the stack up on the new version.
 - **Keys:** `.local/dev-auth/provider-keys.env` does not exist → both Free slots are configured but absent from the healthy panel (`DEV_PROVIDER_SLOT_UNAVAILABLE class (a)` — R31a); the stack starts anyway (R32). Steps 3, 4 and 10b wait on V's keys (row V-34: `OPENAI_API_KEY=`, `ZAI_API_KEY=`, mode 600).
@@ -15,7 +15,7 @@ The slice ticket closes only on V's veto. Everything below is the state at the F
 | Step | What | Needs a key? | Status before V |
 |---|---|---|---|
 | 1 | `config/models.yaml` reads as two tiers, five entries, two `api:` entries, no key in the file | no | file committed (`config/models.yaml`) |
-| 2 | `/new`: Free lists exactly `gpt-5.6-luna` + `glm-5.3-flash`; Premium exactly `gpt-5.6-sol`, `claude-opus-5`, `grok-4.6-build`; `claude-sonnet-5` nowhere; a dot and a name per id | no | measured by product-truth on V's own v10 row (rendered DOM) |
+| 2 | `/new`: Free lists exactly `gpt-5.6-luna` + `glm-5.3-flash`; Premium exactly `gpt-5.6-sol`, `claude-opus-5`, `grok-4.6-build`; `claude-sonnet-5` nowhere; a dot and a name per id | no | V's first run showed `ASK_PLAN_TIER_ROSTERS_UNAVAILABLE: INTERNAL_ERROR` (the route reused a read the API's role may not run — fixed under RULING 7 `t_1af1f40a`, re-served from 8a1d738c); V reloads |
 | 3 | Free debate runs on both models | **V-34** | UNVERIFIED (no keys) |
 | 4 | `discovered_panel` for that run names the two | **V-34** | UNVERIFIED |
 | 5 | Premium debate runs on the three CLI models | no | not run by any seat (real CLI turns are V's) |
@@ -32,7 +32,7 @@ V-34 (keys) · V-41 · V-42 · V-48 = NO (residue) · **V-50** (RULING 4 = the s
 
 ## 4. Residue (ticketed; shown, not hidden)
 
-Pass 1 — 17 tickets · pass 2 — 10 (`reviews/REV-S03-p2-UNION.md`) · pass 3 — `t_f0767487` `t_ff8a497d` `t_d2f82945` `t_6f44048e` `t_1f84c179` `t_39fcc4d4` (`reviews/REV-S03-p3-UNION.md`) · the re-check (`reviews/REV-S03-p3r-UNION.md`) — correctness N12 `t_6c5ed985`, N13 `t_8f9c2e92`, N14 `t_90c036f2`, N15 `t_06e3b004`; product-truth N2 `t_8d8a1151`, N3 `t_8106e863`, N4 `t_d99b6ae0`, N5 `t_415cee4b` · today's — `t_14d21a1a` (pre-S03: the seed replayed v4 with the live panel's set), `t_657958bd` (the CLI drops non-DEV codes), `t_7fac45e5` (no retry on the support-relay handshake).
+Pass 1 — 17 tickets · pass 2 — 10 (`reviews/REV-S03-p2-UNION.md`) · pass 3 — `t_f0767487` `t_ff8a497d` `t_d2f82945` `t_6f44048e` `t_1f84c179` `t_39fcc4d4` (`reviews/REV-S03-p3-UNION.md`) · the re-check (`reviews/REV-S03-p3r-UNION.md`) — correctness N12 `t_6c5ed985`, N13 `t_8f9c2e92`, N14 `t_90c036f2`, N15 `t_06e3b004`; product-truth N2 `t_8d8a1151`, N3 `t_8106e863`, N4 `t_d99b6ae0`, N5 `t_415cee4b` · today's — `t_14d21a1a` (pre-S03: the seed replayed v4 with the live panel's set), `t_657958bd` (the CLI drops non-DEV codes), `t_7fac45e5` (no retry on the support-relay handshake), `t_b1926a72` (V's finding, fixed) → `t_7830f09e` (the operator route `/v1/deployment` broken live since 08-25 — the accounts mission's).
 
 ## 5. The evidence trail
 
