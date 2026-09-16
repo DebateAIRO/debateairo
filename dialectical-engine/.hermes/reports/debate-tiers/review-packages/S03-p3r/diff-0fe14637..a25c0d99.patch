@@ -1,0 +1,850 @@
+diff --git a/dialectical-engine/apps/runner/src/dev-auth-data-plane.ts b/dialectical-engine/apps/runner/src/dev-auth-data-plane.ts
+index 3c01c176..a5882016 100644
+--- a/dialectical-engine/apps/runner/src/dev-auth-data-plane.ts
++++ b/dialectical-engine/apps/runner/src/dev-auth-data-plane.ts
+@@ -371,7 +371,7 @@ export function createDevelopmentAuthDataPlaneOperations(
+       );
+     },
+     async seedRegister() {
+-      const output = await runPnpm(
++      const seedOutput = await runPnpm(
+         ["dev:auth:seed-register"],
+         "DEV_AUTH_DATA_PLANE_REGISTER_FAILED",
+         {
+@@ -379,7 +379,13 @@ export function createDevelopmentAuthDataPlaneOperations(
+           DEBATEAI_DEV_PROVIDER_TARGETS_JSON: providerPanel.targetsJson
+         }
+       );
+-      return parseDevelopmentDeploymentRegisterCliOutput(output, cwd);
++      await parseDevelopmentDeploymentRegisterCliOutput(seedOutput, cwd);
++      const publishOutput = await runPnpm(
++        ["dev:auth:publish-provider-set"],
++        "DEV_AUTH_DATA_PLANE_REGISTER_PUBLICATION_FAILED",
++        migrationEnvironment
++      );
++      return parseDevelopmentDeploymentRegisterCliOutput(publishOutput, cwd);
+     },
+     async initializeSupportConfiguration(registerReceipt) {
+       const credentials = await loadDevelopmentSupportConfigCliCredentials(
+diff --git a/dialectical-engine/apps/runner/src/dev-auth-stack.ts b/dialectical-engine/apps/runner/src/dev-auth-stack.ts
+index 2cca23d8..1103a69c 100644
+--- a/dialectical-engine/apps/runner/src/dev-auth-stack.ts
++++ b/dialectical-engine/apps/runner/src/dev-auth-stack.ts
+@@ -1,3 +1,5 @@
++import { execFile } from "node:child_process";
++import { promisify } from "node:util";
+ import {
+   createDevelopmentAuthDataPlaneOperations,
+   startDevelopmentAuthDataPlane
+@@ -67,6 +69,7 @@ export type DevelopmentApiProviderAvailabilityOperations = Readonly<{
+ }>;
+ 
+ export type DevelopmentAuthStackOperations = Readonly<{
++  generateContract(): Promise<void>;
+   checkModelConfig(): Promise<void>;
+   isPublicPortOccupied(): Promise<boolean>;
+   startProviderPanel(): Promise<DevelopmentCliProviderPanelHandle>;
+@@ -149,6 +152,10 @@ async function stopOwned(resources: readonly Stoppable[]): Promise<void> {
+ export async function startDevelopmentAuthStack(
+   operations: DevelopmentAuthStackOperations
+ ): Promise<DevelopmentAuthStack> {
++  await fixedStage(
++    "DEV_AUTH_STACK_CONTRACT_GENERATION_FAILED",
++    () => operations.generateContract()
++  );
+   await fixedStage(
+     "DEV_AUTH_STACK_MODEL_CONFIG_INVALID",
+     () => operations.checkModelConfig()
+@@ -278,6 +285,7 @@ export function createDevelopmentAuthStackOperations(
+     warning: (line) => console.warn(line)
+   })
+ ): DevelopmentAuthStackOperations {
++  const execFileAsync = promisify(execFile);
+   const hatchetOperations = createDevelopmentHatchetTokenOperations(
+     repositoryRoot,
+     commandEnvironment
+@@ -285,6 +293,17 @@ export function createDevelopmentAuthStackOperations(
+   const tlsOperations = createDevTlsReadinessOperations(repositoryRoot);
+   let checkedModelConfig: ModelConfig | undefined;
+   return Object.freeze({
++    async generateContract() {
++      await execFileAsync(
++        commandEnvironment.PNPM_EXECUTABLE?.trim() || "pnpm",
++        ["generate:contract"],
++        {
++          cwd: repositoryRoot,
++          env: { ...commandEnvironment },
++          maxBuffer: 128 * 1024
++        }
++      );
++    },
+     async checkModelConfig() {
+       try {
+         checkedModelConfig = loadModelConfig(repositoryRoot);
+diff --git a/dialectical-engine/apps/runner/src/dev-deployment-register-cli.ts b/dialectical-engine/apps/runner/src/dev-deployment-register-cli.ts
+index e2ce881e..d995fb17 100644
+--- a/dialectical-engine/apps/runner/src/dev-deployment-register-cli.ts
++++ b/dialectical-engine/apps/runner/src/dev-deployment-register-cli.ts
+@@ -1,9 +1,7 @@
+ import { createPool } from "@debateai/db";
+-import { loadModelConfig } from "@debateai/model-config";
+ import { loadDevelopmentCommandEnvironment, loadMigrationEnvironment } from "@debateai/register";
+ import {
+   DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX,
+-  developmentPlanTierRosters,
+   seedDevelopmentDeploymentRegister,
+   serializeDevelopmentDeploymentRegisterReceipt
+ } from "./dev-deployment-register.js";
+@@ -15,12 +13,9 @@ import {
+ const environment = loadMigrationEnvironment();
+ const pool = createPool(environment.MIGRATION_DATABASE_URL);
+ try {
+-  const modelConfig = loadModelConfig(process.cwd());
+-  const providerPanel = loadDevelopmentProviderPanelFromEnvironment(loadDevelopmentCommandEnvironment(), loadModelConfigConfiguredProviders(process.cwd()));
++  loadDevelopmentProviderPanelFromEnvironment(loadDevelopmentCommandEnvironment(), loadModelConfigConfiguredProviders(process.cwd()));
+   const receipt = await seedDevelopmentDeploymentRegister({
+     adminPool: pool,
+-    planTierRosters: developmentPlanTierRosters(modelConfig),
+-    providerPanel,
+     repositoryRoot: process.cwd()
+   });
+   console.log(`${DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX}${
+diff --git a/dialectical-engine/apps/runner/src/dev-deployment-register.ts b/dialectical-engine/apps/runner/src/dev-deployment-register.ts
+index ce41846e..63dcf10b 100644
+--- a/dialectical-engine/apps/runner/src/dev-deployment-register.ts
++++ b/dialectical-engine/apps/runner/src/dev-deployment-register.ts
+@@ -326,6 +326,40 @@ const DEVELOPMENT_DEPLOYMENT_REGISTER_STATIC_ROWS = Object.freeze([
+   })
+ ] satisfies readonly DevelopmentDeploymentRegisterRow[]);
+ 
++const DEVELOPMENT_HISTORICAL_V4_CONFIGURED_PROVIDER_SET_ROW = Object.freeze({
++  rowKey: "configuredProviderSet",
++  value: Object.freeze({
++    kind: "CONFIGURED_PROVIDER_SET" as const,
++    requiredDistinctMakers: 1,
++    providers: Object.freeze([
++      Object.freeze({
++        adapterKind: "openai-compatible-http" as const,
++        maker: "OpenAI",
++        providerRef: "development:codex-cli"
++      }),
++      Object.freeze({
++        adapterKind: "openai-compatible-http" as const,
++        maker: "Anthropic",
++        providerRef: "development:claude-cli"
++      }),
++      Object.freeze({
++        adapterKind: "openai-compatible-http" as const,
++        maker: "xAI",
++        providerRef: "development:grok-cli"
++      })
++    ])
++  }),
++  sourceRef: DEVELOPMENT_SOURCE_REF
++} satisfies DevelopmentDeploymentRegisterRow);
++
++export function buildDevelopmentDeploymentRegisterHistoricalRows(
++): readonly DevelopmentDeploymentRegisterRow[] {
++  return Object.freeze([
++    DEVELOPMENT_HISTORICAL_V4_CONFIGURED_PROVIDER_SET_ROW,
++    ...DEVELOPMENT_DEPLOYMENT_REGISTER_STATIC_ROWS
++  ]);
++}
++
+ export function buildDevelopmentDeploymentRegisterRows(
+   providerPanel: DevelopmentProviderPanel,
+   planTierRosters: DevelopmentPlanTierRosters
+@@ -475,8 +509,6 @@ export async function buildDevelopmentRunnerRegisterRows(): Promise<readonly Dev
+ 
+ type SeedDevelopmentDeploymentRegisterInput = Readonly<{
+   adminPool: Pool;
+-  planTierRosters: DevelopmentPlanTierRosters;
+-  providerPanel: DevelopmentProviderPanel;
+   repositoryRoot: string;
+ }>;
+ 
+@@ -523,6 +555,31 @@ function developmentRows(
+   return Object.freeze(rows.map((row) => Object.freeze(row)));
+ }
+ 
++function historicalDevelopmentRows(
++  bootstrap: BootstrapRegister
++): readonly DevelopmentDeploymentRegisterRow[] {
++  const bootstrapRows = Object.entries(bootstrap.values).map(([rowKey, value]) =>
++    Object.freeze({
++      rowKey,
++      value,
++      sourceRef: bootstrap.resolution[rowKey as keyof typeof bootstrap.resolution]
++    })
++  );
++  const rows = [
++    ...bootstrapRows,
++    ...AUTH_POLICY_REGISTER_ROWS,
++    MFA_POLICY_REGISTER_ROW,
++    SESSION_POLICY_REGISTER_ROW,
++    RECOVERY_POLICY_REGISTER_ROW,
++    PRODUCT_ROLE_POLICY_REGISTER_ROW,
++    ...buildDevelopmentDeploymentRegisterHistoricalRows()
++  ];
++  if (new Set(rows.map(({ rowKey }) => rowKey)).size !== rows.length) {
++    throw new TypeError("DEV_DEPLOYMENT_REGISTER_DEFINITION_INVALID");
++  }
++  return Object.freeze(rows.map((row) => Object.freeze(row)));
++}
++
+ async function expectedRunnerRows(
+   bootstrap: BootstrapRegister,
+   providerPanel: DevelopmentProviderPanel,
+@@ -538,22 +595,45 @@ async function expectedRunnerRows(
+   return Object.freeze(rows.map((row) => Object.freeze(row)));
+ }
+ 
++async function expectedHistoricalRunnerRows(
++  bootstrap: BootstrapRegister
++): Promise<readonly DevelopmentDeploymentRegisterRow[]> {
++  const rows = [
++    ...historicalDevelopmentRows(bootstrap),
++    ...await buildDevelopmentRunnerRegisterRows()
++  ];
++  if (new Set(rows.map(({ rowKey }) => rowKey)).size !== rows.length) {
++    throw new TypeError("DEV_RUNNER_REGISTER_DEFINITION_INVALID");
++  }
++  return Object.freeze(rows.map((row) => Object.freeze(row)));
++}
++
++function publicationRows(
++  rows: readonly DevelopmentDeploymentRegisterRow[]
++): readonly RegisterPublicationRow[] {
++  return Object.freeze(rows.map((row) => Object.freeze({
++    rowKey: row.rowKey,
++    valueJsonText: canonicalRegisterJson(
++      "valueAst" in row
++        ? (row.valueAst as CanonicalJsonAst)
++        : developmentValueAst(row.value)
++    ),
++    sourceRef: row.sourceRef
++  })));
++}
++
++export async function buildDevelopmentDeploymentRegisterHistoricalPublicationRows(
++  bootstrap: BootstrapRegister
++): Promise<readonly RegisterPublicationRow[]> {
++  return publicationRows(await expectedHistoricalRunnerRows(bootstrap));
++}
++
+ export async function buildDevelopmentDeploymentRegisterPublicationRows(
+   bootstrap: BootstrapRegister,
+   providerPanel: DevelopmentProviderPanel,
+   planTierRosters: DevelopmentPlanTierRosters
+ ): Promise<readonly RegisterPublicationRow[]> {
+-  return Object.freeze((await expectedRunnerRows(bootstrap, providerPanel, planTierRosters)).map((row) =>
+-    Object.freeze({
+-      rowKey: row.rowKey,
+-      valueJsonText: canonicalRegisterJson(
+-        "valueAst" in row
+-          ? (row.valueAst as CanonicalJsonAst)
+-          : developmentValueAst(row.value)
+-      ),
+-      sourceRef: row.sourceRef
+-    })
+-  ));
++  return publicationRows(await expectedRunnerRows(bootstrap, providerPanel, planTierRosters));
+ }
+ 
+ async function assertAdmin(client: PoolClient): Promise<void> {
+@@ -606,6 +686,38 @@ async function persistOrAcceptSealedHistoricalBootstrap(
+   }
+ }
+ 
++async function readDevelopmentDeploymentRegisterReceiptIfPresent(
++  repositoryRoot: string
++): Promise<DevelopmentDeploymentRegisterMachineReceiptV1 | undefined> {
++  try {
++    return await readDevelopmentDeploymentRegisterReceipt(repositoryRoot);
++  } catch (error) {
++    if (error instanceof TypeError
++      && error.message === "DEV_DEPLOYMENT_REGISTER_RECEIPT_REQUIRED") {
++      return undefined;
++    }
++    throw error;
++  }
++}
++
++async function assertReceiptMatchesRegister(
++  pool: Pool,
++  receipt: DevelopmentDeploymentRegisterMachineReceiptV1
++): Promise<void> {
++  const state = (await pool.query<{
++    row_count: number;
++    snapshot_sha256: string;
++  }>(`
++    SELECT row_count,register._snapshot_sha256(register_version) AS snapshot_sha256
++    FROM register.register_version WHERE register_version=$1
++  `, [receipt.registerVersion])).rows[0];
++  if (state === undefined
++    || Number(state.row_count) !== receipt.rowCount
++    || state.snapshot_sha256 !== receipt.snapshotSha256) {
++    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_REGISTER_MISMATCH");
++  }
++}
++
+ /**
+  * Source of the deployment's provider set when it is published rather than bootstrapped.
+  */
+@@ -668,6 +780,18 @@ export async function publishDevelopmentDeploymentRegisterProviderSet(
+     input.planTierRosters
+   );
+   const snapshotSha256 = computeRegisterSnapshotSha256(rows);
++  const current = await readDevelopmentDeploymentRegisterReceiptIfPresent(
++    resolve(input.repositoryRoot)
++  );
++  if (current !== undefined) {
++    if (current.registerVersion !== input.baseRegisterVersion) {
++      throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_BASE_MISMATCH");
++    }
++    await assertReceiptMatchesRegister(input.adminPool, current);
++    if (current.rowCount === rows.length && current.snapshotSha256 === snapshotSha256) {
++      return current;
++    }
++  }
+   const operations = input.operations
+     ?? createPostgresRegisterPublicationPort(input.adminPool);
+   const published = await operations.publishGeneral({
+@@ -705,10 +829,8 @@ export async function seedDevelopmentDeploymentRegister(
+   if (DEVELOPMENT_REGISTER_VERSION <= bootstrap.registerVersion) {
+     throw new TypeError("DEV_DEPLOYMENT_REGISTER_VERSION_INVALID");
+   }
+-  const publicationRows = await buildDevelopmentDeploymentRegisterPublicationRows(
+-    bootstrap,
+-    input.providerPanel,
+-    input.planTierRosters
++  const publicationRows = await buildDevelopmentDeploymentRegisterHistoricalPublicationRows(
++    bootstrap
+   );
+   const imported = await createPostgresRegisterPublicationPort(input.adminPool).importHistorical({
+     registerVersion: parseRegisterVersionText(String(DEVELOPMENT_REGISTER_VERSION)),
+@@ -719,6 +841,14 @@ export async function seedDevelopmentDeploymentRegister(
+     rowCount: imported.rowCount,
+     snapshotSha256: imported.snapshotSha256
+   });
++  const current = await readDevelopmentDeploymentRegisterReceiptIfPresent(
++    resolve(input.repositoryRoot)
++  );
++  if (current !== undefined
++    && BigInt(current.registerVersion) >= BigInt(receipt.registerVersion)) {
++    await assertReceiptMatchesRegister(input.adminPool, current);
++    return current;
++  }
+   await writeDevelopmentDeploymentRegisterReceipt(resolve(input.repositoryRoot), receipt);
+   return receipt;
+ }
+diff --git a/dialectical-engine/tests/architecture/dev-deployment-register.test.ts b/dialectical-engine/tests/architecture/dev-deployment-register.test.ts
+index 81dc9269..e0ba5b7c 100644
+--- a/dialectical-engine/tests/architecture/dev-deployment-register.test.ts
++++ b/dialectical-engine/tests/architecture/dev-deployment-register.test.ts
+@@ -8,6 +8,7 @@ describe("DEV-05 development deployment register source contract", () => {
+     };
+     const cli = await readFile("apps/runner/src/dev-deployment-register-cli.ts", "utf8");
+     const source = await readFile("apps/runner/src/dev-deployment-register.ts", "utf8");
++    const dataPlane = await readFile("apps/runner/src/dev-auth-data-plane.ts", "utf8");
+     expect(packageJson.scripts?.["dev:auth:seed-register"])
+       .toBe("tsx apps/runner/src/dev-deployment-register-cli.ts");
+     expect(cli).toContain("loadMigrationEnvironment()");
+@@ -17,6 +18,10 @@ describe("DEV-05 development deployment register source contract", () => {
+     expect(cli).toContain("DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX");
+     expect(cli).toContain("serializeDevelopmentDeploymentRegisterReceipt(receipt)");
+     expect(source).toContain("DEV_DEPLOYMENT_REGISTER_ADMIN_REQUIRED");
++    const seed = dataPlane.indexOf('["dev:auth:seed-register"]');
++    const publish = dataPlane.indexOf('["dev:auth:publish-provider-set"]');
++    expect(seed).toBeGreaterThan(-1);
++    expect(publish).toBeGreaterThan(seed);
+     expect(source).not.toMatch(/acceptance\/|seedAcceptanceRegister/);
+   });
+ 
+@@ -35,6 +40,7 @@ describe("DEV-05 development deployment register source contract", () => {
+     expect(source).toContain("RECOVERY_POLICY_REGISTER_ROW");
+     expect(source).toContain("PRODUCT_ROLE_POLICY_REGISTER_ROW");
+     expect(source).toContain("createPostgresRegisterPublicationPort(input.adminPool).importHistorical");
++    expect(source).toContain("buildDevelopmentDeploymentRegisterHistoricalPublicationRows");
+     expect(source).toContain("buildDevelopmentDeploymentRegisterPublicationRows");
+     expect(source).not.toMatch(/INSERT\s+INTO\s+register[.]register_(?:row|version)/iu);
+     expect(source).not.toContain('await client.query("BEGIN")');
+diff --git a/dialectical-engine/tests/architecture/register-support-publication.test.ts b/dialectical-engine/tests/architecture/register-support-publication.test.ts
+index b4b6d8a5..3c33562b 100644
+--- a/dialectical-engine/tests/architecture/register-support-publication.test.ts
++++ b/dialectical-engine/tests/architecture/register-support-publication.test.ts
+@@ -16,13 +16,11 @@ import {
+   computeRegisterSnapshotSha256,
+   loadBootstrapRegister
+ } from "../../packages/register/src/index.js";
+-import { buildDevelopmentDeploymentRegisterPublicationRows } from
++import { buildDevelopmentDeploymentRegisterHistoricalPublicationRows } from
+   "../../apps/runner/src/dev-deployment-register.js";
+-import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
+ import {
+   DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256,
+-  LEGACY_REGISTER_V1_SNAPSHOT_SHA256,
+-  TEST_PLAN_TIER_ROSTERS
++  LEGACY_REGISTER_V1_SNAPSHOT_SHA256
+ } from "../support/registerFixtures.js";
+ 
+ const migrationPath = "migrations/0055_register_support_publication.sql";
+@@ -228,7 +226,7 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
+     ]) expect(developmentSchedule, `development initializer bypass: ${binding}`).toContain(binding);
+     expect(developmentSchedule).not.toMatch(/register[.]publish_support_configuration|database[.]pool[.]connect/u);
+     for (const binding of [
+-      "buildDevelopmentDeploymentRegisterPublicationRows",
++      "buildDevelopmentDeploymentRegisterHistoricalPublicationRows",
+       "DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256",
+       "rows: deterministicV4Rows",
+       "createPostgresRegisterPublicationPort(heldPool)",
+@@ -355,19 +353,17 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
+     expect(LEGACY_REGISTER_V1_SNAPSHOT_SHA256)
+       .toBe("8fde270cae50e99ea7ff723f50c26a64833a72347838ed4aee0eb9cbfea3104b");
+     expect(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256)
+-      .toBe("f02c8c003c75c2513672fc4380d4302d5dd18e576fcb498d968c61ba5cb32cf9");
++      .toBe("120bdfea9776cff519113d915694f02b1e4302a14a4282c8e6272a0bf09a5e96");
+   });
+ 
+   it("preserves the exact legacy hashes while the actual port input owns all 248 policy decimals", async () => {
+     const bootstrap = await loadBootstrapRegister();
+     const historicalRows = buildBootstrapRegisterPublicationRows(bootstrap);
+-    const developmentRows = await buildDevelopmentDeploymentRegisterPublicationRows(
+-      bootstrap,
+-      TEST_DEVELOPMENT_PROVIDER_PANEL,
+-      TEST_PLAN_TIER_ROSTERS
++    const developmentRows = await buildDevelopmentDeploymentRegisterHistoricalPublicationRows(
++      bootstrap
+     );
+     expect(historicalRows).toHaveLength(14);
+-    expect(developmentRows).toHaveLength(33);
++    expect(developmentRows).toHaveLength(32);
+     expect(computeRegisterSnapshotSha256(historicalRows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);
+     expect(computeRegisterSnapshotSha256(developmentRows))
+       .toBe(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256);
+diff --git a/dialectical-engine/tests/integration/dev-deployment-register.test.ts b/dialectical-engine/tests/integration/dev-deployment-register.test.ts
+index 4597bc13..03d75cc8 100644
+--- a/dialectical-engine/tests/integration/dev-deployment-register.test.ts
++++ b/dialectical-engine/tests/integration/dev-deployment-register.test.ts
+@@ -29,6 +29,7 @@ import {
+ } from "../../packages/register/src/index.js";
+ import {
+   buildDevelopmentDeploymentRegisterRows,
++  buildDevelopmentDeploymentRegisterHistoricalRows,
+   buildDevelopmentDeploymentRegisterPublicationRows,
+   createDevelopmentDeploymentRegisterMachineReceipt,
+   DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX,
+@@ -53,7 +54,8 @@ import {
+   buildDevelopmentProviderPanel,
+   DEVELOPMENT_UNAVAILABLE_CLI_MODEL,
+   developmentProviderSlots,
+-  loadModelConfigConfiguredProviders
++  loadModelConfigConfiguredProviders,
++  type DevelopmentProviderPanel
+ } from "../../apps/runner/src/dev-provider-panel.js";
+ import {
+   importHistoricalRegisterFixture,
+@@ -84,6 +86,35 @@ const DEVELOPMENT_SUPPORT_VALUE_TEXT = Object.freeze<Record<string, string>>({
+   support_retention_ratified_by: "null"
+ });
+ 
++const PRE_S03_DEVELOPMENT_PROVIDER_PANEL = Object.freeze({
++  requiredDistinctMakers: 1,
++  configuredProviders: Object.freeze([
++    Object.freeze({
++      adapterKind: "openai-compatible-http" as const,
++      maker: "OpenAI",
++      providerRef: "development:codex-cli"
++    }),
++    Object.freeze({
++      adapterKind: "openai-compatible-http" as const,
++      maker: "Anthropic",
++      providerRef: "development:claude-cli"
++    }),
++    Object.freeze({
++      adapterKind: "openai-compatible-http" as const,
++      maker: "xAI",
++      providerRef: "development:grok-cli"
++    })
++  ])
++}) as DevelopmentProviderPanel;
++
++async function preS03DevelopmentV4Rows() {
++  return Object.freeze((await buildDevelopmentDeploymentRegisterPublicationRows(
++    await loadBootstrapRegister(),
++    PRE_S03_DEVELOPMENT_PROVIDER_PANEL,
++    TEST_PLAN_TIER_ROSTERS
++  )).filter(({ rowKey }) => rowKey !== "planTierRosters"));
++}
++
+ function developmentOperatorUrl(credentialSource: string): string {
+   const rows = new Map(credentialSource.trim().split("\n").map((line) => {
+     const separator = line.indexOf("=");
+@@ -163,6 +194,78 @@ afterEach(async () => {
+ });
+ 
+ describe("DEV-05 complete development deployment register", () => {
++  it("accepts the exact pre-S03 sealed v4 without replay drift or byte changes", async () => {
++    // Property: a correct historical v4 remains immutable and valid after S03 is installed.
++    // Break caught: feeding today's provider/roster rows back through importHistorical(version 4).
++    const historicalRows = await preS03DevelopmentV4Rows();
++    expect(historicalRows).toHaveLength(32);
++    expect(computeRegisterSnapshotSha256(historicalRows))
++      .toBe("120bdfea9776cff519113d915694f02b1e4302a14a4282c8e6272a0bf09a5e96");
++    await createPostgresRegisterPublicationPort(database.pool).importHistorical({
++      registerVersion: parseRegisterVersionText("4"),
++      rows: historicalRows
++    });
++    const before = await database.pool.query(
++      "SELECT row_key,value_json,source_ref FROM register.register_row WHERE register_version=4 ORDER BY row_key"
++    );
++
++    await expect(seedDevelopmentDeploymentRegister({
++      adminPool: database.pool,
++      repositoryRoot
++    })).resolves.toMatchObject({
++      registerVersion: "4",
++      rowCount: 32,
++      snapshotSha256: "120bdfea9776cff519113d915694f02b1e4302a14a4282c8e6272a0bf09a5e96"
++    });
++    expect((await database.pool.query(
++      "SELECT row_key,value_json,source_ref FROM register.register_row WHERE register_version=4 ORDER BY row_key"
++    )).rows).toEqual(before.rows);
++  });
++
++  it("publishes the current provider and roster rows once across an identical second restart", async () => {
++    // Property: current file-owned rows supersede v4 by publication, and an equal restart is a no-op.
++    // Break caught: allocating a new GENERAL version when the latest receipt already has the snapshot.
++    const historicalRows = await preS03DevelopmentV4Rows();
++    const historical = await createPostgresRegisterPublicationPort(database.pool).importHistorical({
++      registerVersion: parseRegisterVersionText("4"),
++      rows: historicalRows
++    });
++    await writeDevelopmentDeploymentRegisterReceipt(
++      repositoryRoot,
++      createDevelopmentDeploymentRegisterMachineReceipt(historical)
++    );
++    const first = await publishDevelopmentDeploymentRegisterProviderSet({
++      adminPool: database.pool,
++      planTierRosters: TEST_PLAN_TIER_ROSTERS,
++      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
++      repositoryRoot,
++      baseRegisterVersion: parseRegisterVersionText("4")
++    });
++    expect(first.registerVersion).toBe("5");
++    expect((await database.pool.query<{ row_key: string }>(
++      "SELECT row_key FROM register.register_row WHERE register_version=$1 AND row_key IN ('configuredProviderSet','planTierRosters') ORDER BY row_key",
++      [first.registerVersion]
++    )).rows).toEqual([
++      { row_key: "configuredProviderSet" },
++      { row_key: "planTierRosters" }
++    ]);
++    const countAfterFirst = await database.pool.query(
++      "SELECT count(*)::int AS count FROM register.register_version"
++    );
++
++    const second = await publishDevelopmentDeploymentRegisterProviderSet({
++      adminPool: database.pool,
++      planTierRosters: TEST_PLAN_TIER_ROSTERS,
++      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
++      repositoryRoot,
++      baseRegisterVersion: first.registerVersion
++    });
++    expect(second).toEqual(first);
++    expect((await database.pool.query(
++      "SELECT count(*)::int AS count FROM register.register_version"
++    )).rows).toEqual(countAfterFirst.rows);
++  });
++
+   it("adds exactly one plan-tier roster row from the file model ids", () => {
+     const config = loadModelConfig(process.cwd());
+     const planTierRosters = Object.freeze({
+@@ -289,8 +392,6 @@ describe("DEV-05 complete development deployment register", () => {
+   it("initializes the complete 16-key development support snapshot enabled from the explicit deployed receipt", async () => {
+     const deployed = await seedDevelopmentDeploymentRegister({
+       adminPool: database.pool,
+-      planTierRosters: TEST_PLAN_TIER_ROSTERS,
+-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+       repositoryRoot
+     });
+     const publicationId = randomUUID();
+@@ -458,8 +559,6 @@ describe("DEV-05 complete development deployment register", () => {
+ 
+     await expect(seedDevelopmentDeploymentRegister({
+       adminPool: database.pool,
+-      planTierRosters: TEST_PLAN_TIER_ROSTERS,
+-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+       repositoryRoot
+     })).resolves.toMatchObject({ registerVersion: String(DEVELOPMENT_REGISTER_VERSION) });
+     expect((await database.pool.query(
+@@ -527,16 +626,11 @@ describe("DEV-05 complete development deployment register", () => {
+     const bootstrap = await loadBootstrapRegister();
+     const first = await seedDevelopmentDeploymentRegister({
+       adminPool: database.pool,
+-      planTierRosters: TEST_PLAN_TIER_ROSTERS,
+-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+       repositoryRoot
+     });
+     expect(first.registerVersion).toBe(String(DEVELOPMENT_REGISTER_VERSION));
+     expect(first.rowCount).toBeGreaterThan(
+-      buildDevelopmentDeploymentRegisterRows(
+-        TEST_DEVELOPMENT_PROVIDER_PANEL,
+-        TEST_PLAN_TIER_ROSTERS
+-      ).length
++      buildDevelopmentDeploymentRegisterHistoricalRows().length
+     );
+ 
+     await expect(assertBootstrapEquality(database.pool, bootstrap)).resolves.toBeUndefined();
+@@ -567,13 +661,11 @@ describe("DEV-05 complete development deployment register", () => {
+     expect(roles.roles.slice(2).every((role) => role.grants.length === 0)).toBe(true);
+     expect(makers).toMatchObject({
+       deploymentMakerCapability: true,
+-      configuredMakers: ["Anthropic", "OpenAI", "Z.AI", "xAI"],
++      configuredMakers: ["Anthropic", "OpenAI", "xAI"],
+       configuredProviders: [
+-        { providerRef: "development:codex-premium-cli", maker: "OpenAI" },
+-        { providerRef: "development:claude-premium-cli", maker: "Anthropic" },
+-        { providerRef: "development:grok-cli", maker: "xAI" },
+-        { providerRef: "development:openai-free-api", maker: "OpenAI" },
+-        { providerRef: "development:zai-free-api", maker: "Z.AI" }
++        { providerRef: "development:codex-cli", maker: "OpenAI" },
++        { providerRef: "development:claude-cli", maker: "Anthropic" },
++        { providerRef: "development:grok-cli", maker: "xAI" }
+       ]
+     });
+     expect(discovery).toMatchObject({ probeFreshnessMs: 600_000, probeMaxAttempts: 1 });
+@@ -613,8 +705,6 @@ describe("DEV-05 complete development deployment register", () => {
+     `,[first.registerVersion]);
+     await expect(seedDevelopmentDeploymentRegister({
+       adminPool: database.pool,
+-      planTierRosters: TEST_PLAN_TIER_ROSTERS,
+-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+       repositoryRoot
+     }))
+       .resolves.toEqual(first);
+@@ -688,8 +778,6 @@ describe("DEV-05 complete development deployment register", () => {
+     )).rows).toEqual([{ row_key: "riskTier" }]);
+     await expect(seedDevelopmentDeploymentRegister({
+       adminPool: database.pool,
+-      planTierRosters: TEST_PLAN_TIER_ROSTERS,
+-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+       repositoryRoot
+     }))
+       .rejects.toThrow("REGISTER_PUBLICATION_SEAL_INVALID");
+@@ -717,8 +805,6 @@ describe("DEV-05 complete development deployment register", () => {
+     try {
+       await expect(seedDevelopmentDeploymentRegister({
+         adminPool: attackerPool,
+-        planTierRosters: TEST_PLAN_TIER_ROSTERS,
+-        providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+         repositoryRoot
+       }))
+         .rejects.toThrow("DEV_DEPLOYMENT_REGISTER_ADMIN_REQUIRED");
+@@ -732,8 +818,6 @@ describe("DEV-05 complete development deployment register", () => {
+     const receipts = await Promise.all(Array.from({ length: 12 }, () =>
+       seedDevelopmentDeploymentRegister({
+         adminPool: database.pool,
+-        planTierRosters: TEST_PLAN_TIER_ROSTERS,
+-        providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+         repositoryRoot
+       })
+     ));
+diff --git a/dialectical-engine/tests/integration/production-database-principals.test.ts b/dialectical-engine/tests/integration/production-database-principals.test.ts
+index 9d325a4a..c6412ad5 100644
+--- a/dialectical-engine/tests/integration/production-database-principals.test.ts
++++ b/dialectical-engine/tests/integration/production-database-principals.test.ts
+@@ -26,7 +26,7 @@ import {
+   parseRegisterVersionText,
+   SUPPORT_CONFIGURATION_KEYS
+ } from "../../packages/register/src/index.js";
+-import { buildDevelopmentDeploymentRegisterPublicationRows } from
++import { buildDevelopmentDeploymentRegisterHistoricalPublicationRows } from
+   "../../apps/runner/src/dev-deployment-register.js";
+ import {
+   PRODUCTION_DATABASE_PRINCIPAL_CREDENTIAL_FORMAT,
+@@ -38,10 +38,8 @@ import {
+   withProductionSupportConfigCliConnection
+ } from "../../apps/runner/src/support-config-cli-credentials.js";
+ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+-import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
+ import {
+-  DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256,
+-  TEST_PLAN_TIER_ROSTERS
++  DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256
+ } from "../support/registerFixtures.js";
+ 
+ const MANIFEST_PATH =
+@@ -2749,10 +2747,8 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
+       ({ principalId }) => principalId === "support-config-operator"
+     )!.databaseUrl;
+     const adminRegister = createPostgresRegisterPublicationPort(adminPool);
+-    const deterministicV4Rows = await buildDevelopmentDeploymentRegisterPublicationRows(
+-      await loadBootstrapRegister(),
+-      TEST_DEVELOPMENT_PROVIDER_PANEL,
+-      TEST_PLAN_TIER_ROSTERS
++    const deterministicV4Rows = await buildDevelopmentDeploymentRegisterHistoricalPublicationRows(
++      await loadBootstrapRegister()
+     );
+     expect(computeRegisterSnapshotSha256(deterministicV4Rows))
+       .toBe(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256);
+diff --git a/dialectical-engine/tests/integration/register-support-publication.test.ts b/dialectical-engine/tests/integration/register-support-publication.test.ts
+index c52b42ea..964c0f08 100644
+--- a/dialectical-engine/tests/integration/register-support-publication.test.ts
++++ b/dialectical-engine/tests/integration/register-support-publication.test.ts
+@@ -15,13 +15,11 @@ import {
+   type SupportConfigurationKey
+ } from "../../packages/register/src/index.js";
+ import { createSupportConfigurationPort } from "../../packages/register/src/support-config.js";
+-import { buildDevelopmentDeploymentRegisterPublicationRows } from
++import { buildDevelopmentDeploymentRegisterHistoricalPublicationRows } from
+   "../../apps/runner/src/dev-deployment-register.js";
+-import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
+ import {
+   DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256,
+-  LEGACY_REGISTER_V1_SNAPSHOT_SHA256,
+-  TEST_PLAN_TIER_ROSTERS
++  LEGACY_REGISTER_V1_SNAPSHOT_SHA256
+ } from "../support/registerFixtures.js";
+ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+ 
+@@ -314,11 +312,7 @@ describe("REGISTER-SUPPORT-PUBLICATION database contract", () => {
+ 
+     const bootstrap = await loadBootstrapRegister();
+     const v1Rows = buildBootstrapRegisterPublicationRows(bootstrap);
+-    const v4Rows = await buildDevelopmentDeploymentRegisterPublicationRows(
+-      bootstrap,
+-      TEST_DEVELOPMENT_PROVIDER_PANEL,
+-      TEST_PLAN_TIER_ROSTERS
+-    );
++    const v4Rows = await buildDevelopmentDeploymentRegisterHistoricalPublicationRows(bootstrap);
+     expect(computeRegisterSnapshotSha256(v1Rows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);
+     expect(computeRegisterSnapshotSha256(v4Rows))
+       .toBe(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256);
+diff --git a/dialectical-engine/tests/support/registerFixtures.ts b/dialectical-engine/tests/support/registerFixtures.ts
+index 75ad20c2..1629962d 100644
+--- a/dialectical-engine/tests/support/registerFixtures.ts
++++ b/dialectical-engine/tests/support/registerFixtures.ts
+@@ -19,10 +19,11 @@ export const LEGACY_REGISTER_V1_SNAPSHOT_SHA256 =
+ 
+ export const TEST_PLAN_TIER_ROSTERS = PLAN_TIER_ROSTERS;
+ 
+-// Moved 2026-09-13 when the five live slots and file-owned plan-tier rosters reached v4.
+-// The previous intermediate snapshot was 1f3c42c4eeb5588e144aff775ef59fd15bdf50b4f5c5064e6bc806333fa14457.
++// The database-sealed v4 has one CLI provider per maker. The later five-slot set has digest
++// 42b90bca671d96d6e1c53de5c3115ca2ab7a5e11b33ad0d9eb0437f44a32c6eb and arrives by
++// GENERAL publication; it was never part of historical v4.
+ export const DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 =
+-  "f02c8c003c75c2513672fc4380d4302d5dd18e576fcb498d968c61ba5cb32cf9" as const;
++  "120bdfea9776cff519113d915694f02b1e4302a14a4282c8e6272a0bf09a5e96" as const;
+ 
+ function fixtureValueAst(value: unknown): CanonicalJsonAst {
+   if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+diff --git a/dialectical-engine/tests/unit/dev-auth-stack.test.ts b/dialectical-engine/tests/unit/dev-auth-stack.test.ts
+index 7ed50af4..59855a7f 100644
+--- a/dialectical-engine/tests/unit/dev-auth-stack.test.ts
++++ b/dialectical-engine/tests/unit/dev-auth-stack.test.ts
+@@ -106,6 +106,9 @@ function operations(input: Readonly<{
+     apiExit,
+     uiExit,
+     runnerExit,
++    generateContract: vi.fn(async () => {
++      calls.push("contract:generate");
++    }),
+     checkModelConfig: vi.fn(async () => {
+       calls.push("model-config");
+     }),
+@@ -183,6 +186,37 @@ function operations(input: Readonly<{
+ }
+ 
+ describe("DEV-10F bounded local auth stack supervisor", () => {
++  it("generates the contract before checking model config or starting the data plane", async () => {
++    // Property: every stack start regenerates admission rosters before any consumer can seed them.
++    // Break caught: omitting or moving the generator after model-config validation/data startup.
++    const runtime = operations();
++    const withGenerator = Object.assign(runtime, {
++      generateContract: vi.fn(async () => { runtime.calls.push("contract:generate"); })
++    });
++    const stack = await startDevelopmentAuthStack(withGenerator);
++    expect(runtime.calls.slice(0, 2)).toEqual(["contract:generate", "model-config"]);
++    expect(runtime.calls.indexOf("contract:generate"))
++      .toBeLessThan(runtime.calls.indexOf("data:start"));
++    await stack.stop();
++  });
++
++  it("stops before model config and data startup when contract generation fails", async () => {
++    // Property: a failed roster generation is a named, fail-closed startup stage.
++    // Break caught: continuing with a stale generated PLAN_TIER_ROSTERS artifact.
++    const runtime = operations();
++    const withGenerator = Object.assign(runtime, {
++      generateContract: vi.fn(async () => {
++        throw new Error("sensitive generator failure");
++      })
++    });
++    const outcome = await startDevelopmentAuthStack(withGenerator).then(async (stack) => {
++      await stack.stop();
++      return "STARTED";
++    }, (error: unknown) => error instanceof Error ? error.message : "UNKNOWN");
++    expect(outcome).toBe("DEV_AUTH_STACK_CONTRACT_GENERATION_FAILED");
++    expect(runtime.calls).toEqual([]);
++  });
++
+   it("refuses a world-readable provider key file", async () => {
+     const repositoryRoot = await mkdtemp(join(tmpdir(), "debateai-provider-keys-mode-"));
+     const custodyRoot = join(repositoryRoot, ".local", "dev-auth");
+@@ -368,7 +402,7 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
+       expect(message).toContain("broken-shape-model");
+       expect(message).toContain("class 2");
+       expect(message).not.toMatch(/sk-|Bearer|OPENAI_API_KEY=/u);
+-      expect(runtime.calls).toEqual([]);
++      expect(runtime.calls).toEqual(["contract:generate"]);
+     } finally {
+       stderr.mockRestore();
+       await rm(repositoryRoot, { recursive: true, force: true });
+@@ -403,7 +437,7 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
+       runner: "REGISTERED"
+     });
+     expect(runtime.calls).toEqual([
+-      "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment",
++      "contract:generate", "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment",
+       "api:start", "runner:start", "ui:start", "tls:start"
+     ]);
+     expect(runtime.startDataPlane).toHaveBeenCalledWith(TEST_DEVELOPMENT_PROVIDER_PANEL);
+@@ -418,7 +452,7 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
+     await Promise.all([stack.stop(), stack.stop()]);
+     await stack.stop();
+     expect(runtime.calls).toEqual([
+-      "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment",
++      "contract:generate", "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment",
+       "api:start", "runner:start", "ui:start", "tls:start",
+       "tls:stop", "ui:stop", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"
+     ]);
+@@ -428,19 +462,19 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
+     const runtime = operations({ occupied: true });
+     await expect(startDevelopmentAuthStack(runtime))
+       .rejects.toThrow("DEV_AUTH_STACK_PUBLIC_PORT_OCCUPIED");
+-    expect(runtime.calls).toEqual(["model-config", "preflight"]);
++    expect(runtime.calls).toEqual(["contract:generate", "model-config", "preflight"]);
+   });
+ 
+   it.each([
+-    ["provider_panel", ["model-config", "preflight", "providers:start"]],
+-    ["support_model", ["model-config", "preflight", "providers:start", "support:start", "providers:stop"]],
+-    ["data", ["model-config", "preflight", "providers:start", "support:start", "data:start", "support:stop", "providers:stop"]],
+-    ["token", ["model-config", "preflight", "providers:start", "support:start", "data:start", "token", "data:stop", "support:stop", "providers:stop"]],
+-    ["environment", ["model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "data:stop", "support:stop", "providers:stop"]],
+-    ["api", ["model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "data:stop", "support:stop", "providers:stop"]],
+-    ["runner", ["model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "api:stop", "data:stop", "support:stop", "providers:stop"]],
+-    ["ui", ["model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"]],
+-    ["tls", ["model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "tls:start", "ui:stop", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"]]
++    ["provider_panel", ["contract:generate", "model-config", "preflight", "providers:start"]],
++    ["support_model", ["contract:generate", "model-config", "preflight", "providers:start", "support:start", "providers:stop"]],
++    ["data", ["contract:generate", "model-config", "preflight", "providers:start", "support:start", "data:start", "support:stop", "providers:stop"]],
++    ["token", ["contract:generate", "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "data:stop", "support:stop", "providers:stop"]],
++    ["environment", ["contract:generate", "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "data:stop", "support:stop", "providers:stop"]],
++    ["api", ["contract:generate", "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "data:stop", "support:stop", "providers:stop"]],
++    ["runner", ["contract:generate", "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "api:stop", "data:stop", "support:stop", "providers:stop"]],
++    ["ui", ["contract:generate", "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"]],
++    ["tls", ["contract:generate", "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "tls:start", "ui:stop", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"]]
+   ] as const)("unwinds only the started prefix when %s fails", async (failAt, expected) => {
+     const runtime = operations({ failAt });
+     await expect(startDevelopmentAuthStack(runtime))

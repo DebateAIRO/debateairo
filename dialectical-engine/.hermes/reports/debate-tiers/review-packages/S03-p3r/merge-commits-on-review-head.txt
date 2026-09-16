@@ -1,0 +1,12 @@
+b97985a8 2026-09-16 17:34:45 merge: slice/tiers-s03 @ a25c0d99 into integration/all — FIX-S03-p3-F1 RULING 4 landed landed
+a49d9734 2026-09-16 16:45:41 merge: slice/tiers-s03 @ ef302060 into integration/all — FIX-S03-p3-F1 landed
+3f488b3f 2026-09-16 12:33:07 merge: slice/tiers-s03 @ 0fe14637 into integration/all — FIX-S03-p2-F1 landed
+5c7bd1a2 2026-09-16 10:26:22 merge: codex/support-conversation-mission into integration/all — all-worktrees consolidation, 2026-09-16 pass (tip 743c5151)
+5621afa2 2026-09-14 11:07:41 merge: codex/fixagent-integration-1 into integration/all — all-worktrees consolidation 2026-09-14 (tip 74b4d258)
+bd8ef5f5 2026-09-14 11:05:39 merge: codex/accounts-t8 into integration/all — all-worktrees consolidation 2026-09-14 (tip 7f905a57)
+577cac0b 2026-09-14 11:05:39 merge: codex/accounts-t7 into integration/all — all-worktrees consolidation 2026-09-14 (tip ad0a481a)
+b5792c39 2026-09-14 11:05:39 merge: codex/accounts-t6 into integration/all — all-worktrees consolidation 2026-09-14 (tip 0b37615a)
+0175edd6 2026-09-14 11:05:39 merge: codex/accounts-t4 into integration/all — all-worktrees consolidation 2026-09-14 (tip a92e4241)
+4505dfd6 2026-09-14 11:05:37 merge: slice/oa-fix-02 into integration/all — all-worktrees consolidation 2026-09-14 (tip 93fa0240)
+8b94c4bb 2026-09-14 11:05:36 merge: slice/tiers-s03 into integration/all — all-worktrees consolidation 2026-09-14 (tip cd043907)
+74b4d258 2026-09-08 12:12:39 merge: record reviewed FIX-07 provenance

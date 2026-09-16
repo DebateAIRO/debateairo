@@ -1,0 +1,6 @@
+ dialectical-engine/apps/api/src/index.ts           | 59 +++++++++++++++++++--
+ dialectical-engine/package.json                    |  6 ++-
+ dialectical-engine/packages/providers/src/index.ts | 61 ++++++++++++++++++++++
+ dialectical-engine/pnpm-lock.yaml                  | 25 +++++++++
+ dialectical-engine/tests/unit/api.test.ts          | 15 ++++--
+ 5 files changed, 156 insertions(+), 10 deletions(-)

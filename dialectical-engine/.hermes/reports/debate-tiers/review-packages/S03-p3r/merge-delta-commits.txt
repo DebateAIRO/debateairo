@@ -1,0 +1,33 @@
+# Per-file authorship of the merge delta on the files S03 wrote (a25c0d99..b97985a8): non-merge commits from git log --no-merges -- <file>, beside the NET numstat
+
+## Files with a net delta
+### apps/api/src/index.ts (+54/-5)
+- 350609c2 2026-09-16 revert: the half-done evaluator-integration edits that codex/support-conversation-mission swept up from the main checkout
+- b7ca2c41 2026-09-14 chore(support): snapshot current CP1 baseline
+- 8efd8951 2026-09-08 feat(api): FIX-06 C1 — closed client reports and counted drops
+- 2b0daaf9 2026-09-08 feat(api): FIX-04 C3 — request-scoped context, run declared on three templates
+- 12eeb857 2026-09-08 feat(api): FIX-04 C2 — installer import, emit-before-write, correlation id
+
+### package.json (+4/-2)
+- 4044f8f1 2026-09-08 feat(obs): implement FIX-10 C0-C2 controls
+- 39030e98 2026-09-08 feat(tools): FIX-16 C2 — wire inventory gate into lint
+
+### packages/providers/src/index.ts (+61/-0)
+- dceea45e 2026-09-04 feat(providers): FIX-05 C1 — one occurrence per exhausted call with declared attempt and ledger refs
+
+### pnpm-lock.yaml (+25/-0)
+- 4044f8f1 2026-09-08 feat(obs): implement FIX-10 C0-C2 controls
+- ab20ba50 2026-09-05 fix(providers): declare obs-capture dependency
+- f943c29e 2026-09-04 feat(db): FIX-02 C2 — capture fixed pool failures
+- 3ad12104 2026-09-04 feat(db): FIX-02 C2 — capture fixed pool failures
+- 93fa0240 2026-09-04 feat(db): FIX-02 C2 — capture fixed pool failures
+
+### tests/unit/api.test.ts (+12/-3)
+- c26302eb 2026-09-08 test(api): align legacy 500 assertions with FIX-04
+
+## Files touched by commits in the range whose net delta is ZERO — not part of the delta
+### tests/integration/dev-api-environment.test.ts (net 0, 3 commits)
+- 350609c2 2026-09-16 revert: the half-done evaluator-integration edits that codex/support-conversation-mission swept up from the main checkout
+- b7ca2c41 2026-09-14 chore(support): snapshot current CP1 baseline
+- 4df0b2b5 2026-09-13 fix(debate-tiers): restore the evaluator-menu assertion that 6a05a0d0 swept in from another session's in-flight edit
+

@@ -1,0 +1,2 @@
+ef302060 2026-09-16 16:35:56 fix(tiers S03-p3-F1): the roster row and the provider set arrive by publication, never by replaying the sealed v4; dev:auth:up regenerates the compiled rosters before it seeds
+a25c0d99 2026-09-16 17:32:04 fix(tiers S03-p3-F1 RULING 4): the historical v4 set is the database's sealed v4 — the three-provider set; the five-slot set arrives by publication

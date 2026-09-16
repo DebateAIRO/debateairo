@@ -1,0 +1,12 @@
+ .../apps/runner/src/dev-auth-data-plane.ts         |  10 +-
+ .../apps/runner/src/dev-auth-stack.ts              |  19 +++
+ .../apps/runner/src/dev-deployment-register-cli.ts |   7 +-
+ .../apps/runner/src/dev-deployment-register.ts     | 164 ++++++++++++++++++---
+ .../architecture/dev-deployment-register.test.ts   |   6 +
+ .../register-support-publication.test.ts           |  18 +--
+ .../integration/dev-deployment-register.test.ts    | 134 +++++++++++++----
+ .../production-database-principals.test.ts         |  12 +-
+ .../register-support-publication.test.ts           |  12 +-
+ .../tests/support/registerFixtures.ts              |   7 +-
+ .../tests/unit/dev-auth-stack.test.ts              |  60 ++++++--
+ 11 files changed, 355 insertions(+), 94 deletions(-)

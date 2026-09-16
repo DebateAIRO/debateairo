@@ -1,0 +1,6 @@
+2026-09-16 17:47:25 EEST
+COMMAND     PID           USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+node      48515 vladmihaimiron   16u  IPv4 0xd52dd7ce6c981d16      0t0  TCP 127.0.0.1:8795 (LISTEN)
+node      48515 vladmihaimiron   17u  IPv4 0xbe004fcc7e6e4108      0t0  TCP 127.0.0.1:8796 (LISTEN)
+com.docke 58423 vladmihaimiron  152u  IPv4 0xca13bba6a42005ce      0t0  TCP 127.0.0.1:55432 (LISTEN)
+(end of listener list)
