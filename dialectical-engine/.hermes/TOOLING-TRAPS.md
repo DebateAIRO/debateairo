@@ -4968,3 +4968,46 @@ not in 4 000 lines of prose every author skims.
 - **Rule: `ls migrations | tail -3` at write time is the number; a number in a brief is a timestamp.**
   Check both directions afterwards: the collision you were avoiding (`ls migrations | grep -c '^0057_'`
   still 2) AND the slot you took (`grep -c '^0063_'` = 1).
+
+## `numTotalTestSuites` is NOT the file count — the anti-drop assertion reads the wrong field (2026-09-16, FIX(CONT-T10) round 1)
+- The multi-path `vitest run` silent-drop family (`:2462`, `:4441`, `:4843`) is normally defended by
+  asserting the file count in the JSON report. A packet spelled that as *"assert `numTotalTestSuites`
+  8"*. Measured on a run of exactly 8 files: `numTotalTestSuites` = **22**, `testResults.length` = **8**.
+  vitest 4 counts SUITES — the file-level suite plus every `describe` — not files.
+- Same run, same JSON: 1 file gave `numTotalTestSuites` 2; 3 files gave 6. The number tracks
+  `describe` blocks, so it moves whenever someone adds or removes one, with no change to coverage.
+- **Rule: the file count is `testResults.length`. Never `numTotalTestSuites`.** A seat that obeys the
+  wrong field literally either voids a good gate or deletes the assertion that protects it.
+
+## `git checkout -- <file>` is not a mutant restore — it is a revert to a different revision (same seat, same day)
+- Trap `:4854` says restore a mutant from a byte-identical BACKUP. Obeyed four times, then broken once
+  with `git checkout -- migrations/0063_…sql`, which restored the file to the last COMMIT — at that
+  moment the F1 commit — silently deleting the uncommitted F3 half of the same file.
+- It looks like a restore and it is green afterwards, because the tests for the DELETED work were not
+  in that run. `git status --porcelain` is what catches it: the file drops OUT of the modified list.
+- **Rule: a mutant restore is a file copy from the backup you took before applying it. If the file
+  also carries uncommitted work, `git checkout --` destroys it. Always `git status --porcelain`
+  after a restore and check the file is still listed as modified.**
+
+## PostgreSQL `->>` and `||` share a precedence level and associate LEFT (same seat, same day)
+- `row_json->>'answer_id'||':'||row_json->>'answer_version'` does NOT mean what the equivalent
+  TypeScript template does. It parses as `((( (row_json->>'answer_id') || ':') || row_json) ->> 'answer_version')`
+  and fails at runtime with `operator does not exist: text ->> unknown`.
+- It typechecks nowhere and the migration applies fine; the failure appears only when the trigger
+  FIRES, as a red in every suite that writes that table.
+- **Rule: parenthesise every `->>` you concatenate: `(row_json->>'a')||':'||(row_json->>'b')`.**
+
+## serve.answer cannot be UPDATEd at all, and an in-transaction pool query hangs the S6 suite (same seat, same day)
+- Two independent layers forbid `UPDATE serve.answer`: `migrations/0000_s00.sql:310` REVOKEs UPDATE and
+  DELETE from PUBLIC **and** `debateai_runtime`, and `:314-332` installs a `reject_mutation` BEFORE
+  UPDATE OR DELETE trigger on 19 tables including it. A probe that tampers with a stored answer row
+  must INSERT a new version; the error is `append-only or immutable table answer rejects UPDATE`.
+- `tests/integration/s6-content-encryption-database.test.ts:5154` asserts `nestedPoolQueries` is empty,
+  backed by a spy at `:4431` that throws `S6_NESTED_POOL_CHECKOUT_INSIDE_WRITE_TRANSACTION`. Any
+  pool-level query issued while a write transaction is open violates it — including
+  `encryptAttestedContentForRun(this.pool, …)`, which prepares a lease. The symptom is a HANG, not a
+  fast failure: a 600 s tool timeout with an empty log.
+- **Rule: prepare the run cipher OUTSIDE the transaction and seal INSIDE it with
+  `encryptAttestedLeasedContentForRun` (`packages/memory/src/index.ts:764` is the worked example).
+  Before writing code against a suite named as an ORACLE, grep its `expect(` lines for invariants —
+  they are architecture, not test detail.**
