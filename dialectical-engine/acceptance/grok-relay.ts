@@ -171,9 +171,20 @@ function failureCodeOf(error: unknown): string {
  * the profile is exonerated and the ORIGINAL failure is re-thrown — an absent
  * maker is never quietly traded for an unprotected one.
  *
- * Both handshakes are the GROK-01 no-op prompt, which asks for a single word.
+ * ONE failure is not that evidence (F1). A vendor rate limit, a 5xx or a
+ * `GROK_CLI_TIMEOUT` fails the sandboxed handshake while saying nothing about
+ * the profile, and — because the vendor's words are discarded — it arrives here
+ * as the same `GROK_CLI_FAILED` an unsupported profile does. So the SANDBOXED
+ * handshake is re-run first, and `SANDBOX-PROFILE-UNAVAILABLE` is concluded only
+ * on a REPRODUCIBLE sandboxed failure. A transient failure followed by a
+ * sandboxed success keeps the profile and degrades nothing.
+ *
+ * Every handshake is the GROK-01 no-op prompt, which asks for a single word.
  * A cheaper probe would need a flag combination no test on this host can
- * exercise, and the degraded path is the only one that pays for the second call.
+ * exercise. The ADMITTED path still costs ONE invocation; the degraded path now
+ * costs THREE — two sandboxed, then the unsandboxed probe — and only a host
+ * that refuses the profile twice ever pays for the third. (The readiness packet
+ * still says two: a records line for the orchestrator, not an edit here.)
  */
 async function handshakeWithProbedSandbox(
   command: CommandSpec,
@@ -184,28 +195,43 @@ async function handshakeWithProbedSandbox(
   readonly sandboxProfile: typeof GROK_SANDBOX_PROFILE | null;
   readonly degradation: typeof SANDBOX_PROFILE_UNAVAILABLE | null;
 }> {
-  try {
-    const handshake = await invokeCli(
+  const sandboxedHandshake = async (): Promise<ReturnType<typeof parseGrokEnvelope>> =>
+    await invokeCli(
       command, grokAdapter, GROK_HANDSHAKE_PROMPT, timeoutMs
     ) as ReturnType<typeof parseGrokEnvelope>;
-    return { handshake, adapter: grokAdapter, sandboxProfile: GROK_SANDBOX_PROFILE, degradation: null };
+  const kept = (handshake: ReturnType<typeof parseGrokEnvelope>) => ({
+    handshake, adapter: grokAdapter, sandboxProfile: GROK_SANDBOX_PROFILE, degradation: null
+  });
+
+  let originalFailure: unknown;
+  try {
+    return kept(await sandboxedHandshake());
   } catch (sandboxedFailure) {
-    const unsandboxedAdapter = grokAdapterFor(null);
-    const handshake = await invokeCli(
-      command, unsandboxedAdapter, GROK_HANDSHAKE_PROMPT, timeoutMs
-    ).catch(() => { throw sandboxedFailure; }) as ReturnType<typeof parseGrokEnvelope>;
-    // Loud on the ceremony's own stdout: protections were removed, by whom,
-    // and under which failure. Never a silent downgrade.
-    process.stdout.write(
-      `RELAY DEGRADED ${XAI_MAKER} ${SANDBOX_PROFILE_UNAVAILABLE} ${failureCodeOf(sandboxedFailure)}\n`
-    );
-    return {
-      handshake,
-      adapter: unsandboxedAdapter,
-      sandboxProfile: null,
-      degradation: SANDBOX_PROFILE_UNAVAILABLE
-    };
+    originalFailure = sandboxedFailure;
   }
+  try {
+    // The retry is the discriminator between "unlucky once" and "this host".
+    return kept(await sandboxedHandshake());
+  } catch {
+    // REPRODUCED. Only now is the profile a candidate, and the ORIGINAL failure
+    // stays the one reported: it is what the run was actually refused with.
+  }
+
+  const unsandboxedAdapter = grokAdapterFor(null);
+  const handshake = await invokeCli(
+    command, unsandboxedAdapter, GROK_HANDSHAKE_PROMPT, timeoutMs
+  ).catch(() => { throw originalFailure; }) as ReturnType<typeof parseGrokEnvelope>;
+  // Loud on the ceremony's own stdout: protections were removed, by whom,
+  // and under which failure. Never a silent downgrade.
+  process.stdout.write(
+    `RELAY DEGRADED ${XAI_MAKER} ${SANDBOX_PROFILE_UNAVAILABLE} ${failureCodeOf(originalFailure)}\n`
+  );
+  return {
+    handshake,
+    adapter: unsandboxedAdapter,
+    sandboxProfile: null,
+    degradation: SANDBOX_PROFILE_UNAVAILABLE
+  };
 }
 
 export async function startGrokRelay(options: GrokRelayOptions): Promise<GrokRelayHandle> {

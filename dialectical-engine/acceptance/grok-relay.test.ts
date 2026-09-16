@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { isAbsolute, join, relative } from "node:path";
@@ -392,13 +392,39 @@ describe("F-GROK-SANDBOX-PROFILE the sandbox profile is probed, never assumed", 
     readonly rejectsSandbox: boolean;
     /** How the SAME binary behaves once the profile is gone: serve, exit 1, or hang past the deadline. */
     readonly withoutSandbox: "serves" | "fails" | "hangs";
+    /**
+     * F1. One line per invocation — `S` when the child was spawned WITH the
+     * profile, `U` when it was not — so the number and the ORDER of the calls
+     * the probe spends is measured rather than argued. Every invocation is its
+     * own process, so a file is the only place that count can live.
+     */
+    readonly attemptLogPath?: string;
+    /**
+     * F1. Makes the sandboxed refusal TRANSIENT: only the first N SANDBOXED
+     * invocations refuse and every later one serves — a rate limit or a 5xx,
+     * not a host that cannot apply the profile. Counted from the attempt log,
+     * so it requires `attemptLogPath`.
+     */
+    readonly sandboxFailuresBeforeSuccess?: number;
   }): readonly string[] {
     const script = [
       'const argumentList = process.argv.slice(1);',
       'const sandboxed = argumentList.includes("--sandbox");',
       `const rejectsSandbox = ${String(options.rejectsSandbox)};`,
       `const withoutSandbox = ${JSON.stringify(options.withoutSandbox)};`,
-      'if (sandboxed && rejectsSandbox) {',
+      `const attemptLogPath = ${JSON.stringify(options.attemptLogPath ?? null)};`,
+      `const failuresBeforeSuccess = ${JSON.stringify(options.sandboxFailuresBeforeSuccess ?? null)};`,
+      'let sandboxedBefore = 0;',
+      'if (attemptLogPath !== null) {',
+      '  const fs = require("node:fs");',
+      '  let log = "";',
+      '  try { log = fs.readFileSync(attemptLogPath, "utf8"); } catch { log = ""; }',
+      '  sandboxedBefore = log.split("\\n").filter((line) => line === "S").length;',
+      '  fs.appendFileSync(attemptLogPath, (sandboxed ? "S" : "U") + "\\n");',
+      '}',
+      'const refusesThisCall = rejectsSandbox',
+      '  && (failuresBeforeSuccess === null || sandboxedBefore < failuresBeforeSuccess);',
+      'if (sandboxed && refusesThisCall) {',
       '  process.stderr.write("warning: sandbox could not be applied: runtime-socket deny resolution failed: could not resolve runtime-socket deny path /var/run/docker.sock: endpoint is a symlink\\n");',
       '  process.stderr.write("error: could not apply the \'read-only\' sandbox profile. Refusing to start with its protections missing.\\n");',
       '  process.exit(1);',
@@ -434,6 +460,18 @@ describe("F-GROK-SANDBOX-PROFILE the sandbox profile is probed, never assumed", 
     } finally {
       process.stdout.write = original;
     }
+  }
+
+  /** F1. A fresh attempt-log path in a scratch directory the suite already cleans up. */
+  async function newAttemptLogPath(): Promise<string> {
+    const directory = await mkdtemp(join(tmpdir(), "grok-sandbox-attempts-"));
+    temporaryDirectories.push(directory);
+    return join(directory, "attempts");
+  }
+
+  /** F1. The invocations the double actually saw, in order: `S` sandboxed, `U` not. */
+  async function attemptLog(path: string): Promise<readonly string[]> {
+    return (await readFile(path, "utf8")).split("\n").filter((line) => line !== "");
   }
 
   async function relayArgumentList(relay: GrokRelayHandle): Promise<readonly string[]> {
@@ -492,6 +530,64 @@ describe("F-GROK-SANDBOX-PROFILE the sandbox profile is probed, never assumed", 
       "--single", "--output-format", "--verbatim",
       "--no-memory", "--no-subagents", "--disable-web-search", "--tools"
     ]);
+  });
+
+  it("keeps the profile when ONE sandboxed handshake fails and the retry succeeds (transient)", async () => {
+    // F1. A vendor rate limit, a 5xx or a GROK_CLI_TIMEOUT fails the sandboxed
+    // handshake while saying nothing about the PROFILE, and the relay cannot
+    // read the vendor's reason (`relay-core.ts` drains stderr). One failure is
+    // therefore not evidence: the SANDBOXED handshake is re-run first, and only
+    // a REPRODUCIBLE sandboxed failure is allowed to reach the unsandboxed probe.
+    const logPath = await newAttemptLogPath();
+    const [relay, stdout] = await capturingStdout(() => startGrokRelay({
+      port: 0,
+      timeoutMs: 2_000,
+      testOnlyCommand: {
+        binary: process.execPath,
+        prefixArguments: sandboxDouble({
+          rejectsSandbox: true,
+          withoutSandbox: "serves",
+          attemptLogPath: logPath,
+          sandboxFailuresBeforeSuccess: 1
+        })
+      }
+    }));
+    handles.push(relay);
+
+    expect(
+      await attemptLog(logPath),
+      "the retry is SANDBOXED, and a transient failure never reaches the unsandboxed probe"
+    ).toEqual(["S", "S"]);
+    expect(
+      relay.sandboxProfile,
+      "one unlucky attempt is not a host that cannot apply the profile, so the profile is kept"
+    ).toBe(GROK_SANDBOX_PROFILE);
+    expect(relay.degradation).toBeNull();
+    expect(stdout).not.toContain(SANDBOX_PROFILE_UNAVAILABLE);
+    expect(await relayArgumentList(relay)).toContain("--sandbox");
+  });
+
+  it("spends THREE CLI invocations on the degraded path — two sandboxed, then the probe", async () => {
+    // F1, the price of the retry, measured instead of claimed in prose: only a
+    // host that refuses the profile TWICE pays for the third invocation.
+    const logPath = await newAttemptLogPath();
+    const [relay] = await capturingStdout(() => startGrokRelay({
+      port: 0,
+      timeoutMs: 2_000,
+      testOnlyCommand: {
+        binary: process.execPath,
+        prefixArguments: sandboxDouble({
+          rejectsSandbox: true,
+          withoutSandbox: "serves",
+          attemptLogPath: logPath
+        })
+      }
+    }));
+    handles.push(relay);
+
+    expect(await attemptLog(logPath)).toEqual(["S", "S", "U"]);
+    expect(relay.degradation).toBe(SANDBOX_PROFILE_UNAVAILABLE);
+    expect(relay.sandboxProfile).toBeNull();
   });
 
   it("re-throws the ORIGINAL failure rather than trading an absent maker for an unprotected one", async () => {
