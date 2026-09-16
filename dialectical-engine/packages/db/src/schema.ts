@@ -513,7 +513,9 @@ export const answer = serve.table("answer", {
   composedTextId: uuid("composed_text_id"),
   conformanceRecordId: uuid("conformance_record_id"),
   sealedAtSeq: bigint("sealed_at_seq", { mode: "number" }).notNull(),
-  relevantAsOf: timestamp("relevant_as_of", { withTimezone: true }).notNull()
+  relevantAsOf: timestamp("relevant_as_of", { withTimezone: true }).notNull(),
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
 });
 
 export const segmentSuppression = serve.table("segment_suppression", {

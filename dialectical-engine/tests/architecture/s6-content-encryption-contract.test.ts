@@ -72,6 +72,18 @@ describe("S6 content-encryption architecture contract", () => {
       }
     }
 
+    // FIX ROUND 1 / F2 (D26 open point (3)). The drizzle mirror of the fifteenth
+    // carrier declares both carrier columns, in the same form as the other
+    // fourteen — a mirror that is stale by ABSENCE compiles and passes every
+    // other suite, so only a pin on the block's text can see it.
+    const schema = await read("packages/db/src/schema.ts");
+    const answerMirror = schema.slice(
+      schema.indexOf('export const answer = serve.table("answer", {'),
+      schema.indexOf("export const segmentSuppression")
+    );
+    expect(answerMirror).toContain('contentCiphertext: jsonb("content_ciphertext"),');
+    expect(answerMirror).toContain('contentAttestation: bytea("content_attestation")');
+
     const crypto = await read("packages/crypto/src/index.ts");
     const carriers = crypto.slice(
       crypto.indexOf("export const CONTENT_CARRIERS"), crypto.indexOf("export type ContentCarrier")
