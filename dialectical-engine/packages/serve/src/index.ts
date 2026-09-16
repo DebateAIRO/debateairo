@@ -592,6 +592,56 @@ export type AnswerForm =
       readonly researchPlan: string;
     };
 
+/**
+ * W2 / F-VS11-1 — the kernel vocabulary member that says two synthesis seats
+ * collapsed onto one provider identity. It has been declared in
+ * `CONDITION_MARKS` and rendered by the UI as "Model diversity degraded" since
+ * before this chain existed, and until now NOTHING emitted it: the only trace
+ * of a collapsed identity was `SYNTHESIS_ROLE_REFS_IDENTICAL`, a `console.warn`
+ * an operator sees once at seeding time (`packages/register/src/algorithm-policy.ts`).
+ * That warning STAYS — it tells the operator at the moment the row is sealed.
+ * This mark tells the READER of the answer, which is a different duty.
+ */
+export const DEGRADED_DIVERSITY_MARK = "DEGRADED-DIVERSITY" as const;
+
+/** The two synthesis seats, named once so a disclosure cannot name only one. */
+export const SYNTHESIS_ROLE_NAMES = Object.freeze(["SYNTHESIZER", "EVALUATOR"] as const);
+
+/**
+ * WHICH roles collapsed onto WHICH identity. A bare mark would tell a reader
+ * that diversity is degraded without telling them how, and V-S11-1 requires the
+ * provenance to be RECORDED, not merely flagged.
+ */
+export interface DegradedDiversityDisclosure {
+  readonly roles: typeof SYNTHESIS_ROLE_NAMES;
+  readonly identity: string;
+}
+
+/**
+ * The emission RULE, kept separate from the chain so the condition is one
+ * expression and can be read on its own.
+ *
+ * Same-identity operation is LEGITIMATE (V-S11-1, V-S11-GRADER): a deployment
+ * with one available model runs the whole debate on it, and a grader sharing an
+ * identity with the candidate is not contamination, because every step is a
+ * fresh instance that never learns who produced what. So this does not refuse,
+ * downgrade or warn — it DISCLOSES, which under those rulings is the whole
+ * safeguard, and under goal line 26 is what every degradation owes a reader.
+ *
+ * The identity is read off the sealed refs. It is never "the first configured
+ * provider" or any other positional guess — the same law J8 states one layer
+ * down, where the ref is resolved to a gateway by lookup.
+ */
+export function deriveDegradedDiversity(
+  controls: Pick<SynthesisLoopControls, "synthesizerRoleRef" | "evaluatorRoleRef">
+): DegradedDiversityDisclosure | null {
+  if (controls.synthesizerRoleRef !== controls.evaluatorRoleRef) return null;
+  return Object.freeze({
+    roles: SYNTHESIS_ROLE_NAMES,
+    identity: controls.synthesizerRoleRef
+  });
+}
+
 export interface ServeGateResult {
   readonly terminal: "SERVED" | "DOWNGRADED" | "BLOCKED" | "COMPONENTS_ONLY";
   readonly answerForm: AnswerForm | null;
@@ -610,6 +660,22 @@ export interface ServeGateResult {
   readonly loopRounds: readonly SynthesisLoopRound[];
   /** T9: the objection still standing when the loop ended, or null. */
   readonly standingObjection: string | null;
+  /**
+   * W2 / F-VS11-1: the roles that collapsed onto one provider identity, set
+   * exactly when `conditionMarks` carries `DEGRADED-DIVERSITY`. This is the
+   * mark's detail, carried beside it the way `standingObjection` carries the
+   * objection mark's and `bandCeiling` carries the band marks'.
+   *
+   * OPTIONAL, deliberately. Two fixtures outside this package construct a whole
+   * `ServeGateResult` literal for answers sealed before the synthesis chain
+   * existed (`tests/support/settledRun.ts`,
+   * `tests/integration/serve-answer-content-encryption.test.ts`, whose comment
+   * records the same collision when T9 added four required fields). A required
+   * field here would make both a typecheck failure for a disclosure those
+   * pre-T9 answers cannot have. Absent and null mean the same thing: no
+   * collapse. Every result this module returns sets it explicitly.
+   */
+  readonly degradedDiversity?: DegradedDiversityDisclosure | null;
   /** T9: the crash class, when and only when the terminal is COMPONENTS_ONLY. */
   readonly crashClass: ServeCrashClass | null;
   readonly projections: {
@@ -695,6 +761,10 @@ export function createEnvelopeExhaustedResult(input: {
     digest: null,
     loopRounds: Object.freeze([]),
     standingObjection: null,
+    // W2: the envelope terminal never receives the sealed role refs — it is
+    // built from a budget verdict, not from `ServeGateInput` — so there is no
+    // identity here to disclose, and inventing one would be the guess J8 forbids.
+    degradedDiversity: null,
     crashClass: "ENVELOPE_EXHAUSTED",
     projections: Object.freeze({
       reversalPoint: input.factBundle.reversalPoint,
@@ -734,6 +804,12 @@ function componentsOnly(
     digest,
     loopRounds: Object.freeze([]),
     standingObjection: null,
+    // W2: a crash answer's mark set is the fact bundle's plus the crash class's,
+    // by construction — the chain's own marks do not survive here (a compressed
+    // digest loses `DIGEST-COMPRESSED` on this path too). The diversity
+    // disclosure follows that existing rule rather than becoming its exception:
+    // it is a property of the SERVED answer, and this terminal serves none.
+    degradedDiversity: null,
     crashClass,
     projections: Object.freeze({
       reversalPoint: input.factBundle.reversalPoint,
@@ -1056,6 +1132,17 @@ export async function runServeGateChain(
   for (const mark of [...digestOutcome.marks, ...loop.marks]) {
     if (!conditionMarks.includes(mark)) conditionMarks.push(mark);
   }
+  /**
+   * W2 / F-VS11-1. The two identities were resolved for this run above, where
+   * `input.synthesisRoleControls` was handed to the loop; this is the same
+   * sealed pair, and the served answer is where a reader can see it. Emitted
+   * from the CONTROLS, never from the console warning — a log line is not a
+   * disclosure to anyone but an operator reading startup output.
+   */
+  const degradedDiversity = deriveDegradedDiversity(input.synthesisRoleControls);
+  if (degradedDiversity !== null && !conditionMarks.includes(DEGRADED_DIVERSITY_MARK)) {
+    conditionMarks.push(DEGRADED_DIVERSITY_MARK);
+  }
   return Object.freeze({
     terminal,
     answerForm,
@@ -1071,6 +1158,7 @@ export async function runServeGateChain(
     digest,
     loopRounds: loop.rounds,
     standingObjection: loop.standingObjection,
+    degradedDiversity,
     crashClass: null,
     projections: Object.freeze({
       reversalPoint: input.factBundle.reversalPoint,
