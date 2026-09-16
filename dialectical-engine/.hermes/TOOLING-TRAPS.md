@@ -5116,3 +5116,57 @@ not in 4 000 lines of prose every author skims.
 - **Rule for reviewers: before auditing a coupling class, ask whether a sibling already solved it and
   why THIS caller cannot use the solution. That question is cheaper than the audit and it finds the
   real root cause** — here, "a prompt that cannot be imported" rather than "prose used as a key".
+
+## A double can READ a payload field as well as key on it, and a case-sensitive grep for the field name will not find the reader (2026-09-16, BUILD(CONT-T12))
+- My packet asserted, as a measured fact I was told not to re-derive, that "no double keys on
+  `roleRef`, `round`, `stage` or `registerVersion`" over four named files. **False at b37263e4.**
+  `tests/integration/t17-envelope-ledger.test.ts:126-141` defines `evaluatorRound(body)`, which
+  JSON-parses the last message's content and reads `.round` — and THROWS
+  (`T17_EVALUATOR_ROUND_UNREADABLE`) when it is absent.
+- The grep that "found none" looked for `body.includes` / `classify`-shaped DISPATCH. This reader is
+  not a dispatcher: it classifies first and then reads a field out of the packet to decide WHAT TO
+  ANSWER. Worse, a case-sensitive search for `round` misses the identifier `evaluatorRound`, and a
+  search for `"round"` misses `.round`. Two independent reasons for the same blind spot.
+- **Rule: sweep a withheld field with `grep -rniE '\.(field|…)\b' tests acceptance | grep -iE
+  'body|packet|content|messages|JSON.parse'` — case-INSENSITIVE, and anchored on the PARSE rather
+  than on the dispatch.** A double consumes a payload in two distinct ways and only one of them
+  looks like a discriminator. Cost here: one full integration-suite failure discovered after the
+  first green unit gate, plus a root-cause hunt through a discarded error.
+
+## A provider double that THROWS inside its HTTP handler reports as TRANSPORT_DEATH — the fixture's defect wears the product's costume (same seat, same day)
+- When `evaluatorRound` threw, the `request.on("end")` handler died, no response was written, the
+  socket closed, every attempt at that site burned, and the serve chain classified the leg
+  `TRANSPORT_DEATH` with `gateTrace: ["DIGEST_BUILT","COMPONENTS_ONLY_DEFECT"]`. Read naively that is
+  "my product change broke the transport", which is the wrong file, the wrong layer and the wrong
+  question. It is a fixture that cannot answer.
+- The real cause was two levels down and only visible after (a) an ABLATION dated the failure to my
+  diff, and (b) a temporary diagnostic recovered the error that `runnerStage` discards.
+- **Rule: a provider double's handler wraps its body in try/catch and answers 500 with the thrown
+  message in the body, so a fixture defect arrives NAMED instead of as a dead socket.** Until it
+  does, treat every TRANSPORT_DEATH in a suite you just touched as "the double refused", not as
+  "the transport failed", and prove which before editing product code.
+
+## `runnerStage` throws away the cause, so `ANSWER_PERSIST_FAILED` names nothing (same seat, same day)
+- `apps/runner/src/index.ts:1981`: `throw new TypedDomainError(code, code)` — the original error is
+  discarded, and every `runnerStage`-wrapped failure surfaces as its own code twice over. The real
+  error here was `new row for relation "conformance_record" violates check constraint
+  "conformance_record_coverage_mode_check"`, which points straight at the defect; the code alone
+  points nowhere.
+- Recovering it cost one temporary edit and one suite run. `String(error)` appended to the message
+  would have cost nothing and is what I used.
+- This refines `:1934` ("fixing a DISCARDED error makes the failure readable") from the runner's
+  side: **the discarded-cause pattern is in a helper that wraps ~every stage, so it is not one lost
+  error, it is a class of them.** Filed as a finding, not fixed here (out of contract).
+
+## RED-first against a symbol that does not exist yet yields a MISSING-SYMBOL red, not the defect's red (same seat, same day)
+- The guard renders the shipped projection, so at the true base it failed with
+  `toSynthesisPromptPayload is not a function` on 12 of 14 rows — which per `:2076` is a missing
+  symbol, not evidence that the machinery leaks. Only the two SOURCE-level rows (the site count, the
+  instructions text) produced a real base RED.
+- The fix is an ordering, not a weaker claim: land a BEHAVIOUR-PRESERVING extraction first
+  (`toSynthesisPromptPayload` returning `JSON.stringify(request)`), re-run, and the same 12 rows now
+  fail with `expected [ 'roleRef', 'round', 'registerVersion', 'stage' ] to deeply equal []` — the
+  defect, in the product's own bytes. Then project, and they go green.
+- **Rule: when a guard must import a symbol the fix introduces, take TWO reds and report both — the
+  true-base red (whatever it proves, usually only the source rows) and the defect red after the
+  extraction. Reporting only the first overstates; reporting only the second skips the base.**
