@@ -102,11 +102,13 @@ run. The Docker daemon is not running and this seat did not start it.
 **What Task 17 changed** (`acceptance/grok-relay.ts`, landed and closed on this branch):
 
 - The relay now **probes** `--sandbox read-only` first. If the host refuses that profile, it starts
-  the relay **without the flag** and prints `RELAY DEGRADED xAI SANDBOX-PROFILE-UNAVAILABLE <code>`
-  to stderr. The profile string is `read-only` (`grok-relay.ts:87`), the degradation code
-  `SANDBOX-PROFILE-UNAVAILABLE` (`:102`), the maker `xAI` (`:24`).
+  the relay **without the flag** and writes `RELAY DEGRADED xAI SANDBOX-PROFILE-UNAVAILABLE <code>`
+  to **stdout** — `process.stdout.write` at `acceptance/grok-relay.ts:199-201`, whose own comment
+  reads "Loud on the ceremony's own stdout". The profile string is `read-only` (`grok-relay.ts:87`),
+  the degradation code `SANDBOX-PROFILE-UNAVAILABLE` (`:102`), the maker `xAI` (`:24`).
 - `acceptance/absent-makers.ts:65` prints `MAKER ABSENT <maker> <code>` on every relay-start path, so
-  a maker that fails to start is now **loud on stdout** instead of being recorded only in the
+  a maker that fails to start is now **loud on stdout** (`absent-makers.ts:49` — `emit` defaults to
+  `process.stdout.write`) instead of being recorded only in the
   ceremony's temporary database and thrown away with it. That silent-witness defect was the real
   cause of Grok's unexplained absence from the 2026-09-08 lineage, not Docker.
 
