@@ -234,3 +234,86 @@
 - 09:26: D64 ADDENDUM 8 written (known reds derived; confirmatory gates). Next lane after known-reds lands: F-PG-STUB-QUERY-TEXT-CLASS + F-S8-FIXTURE-CONTRACT-PARSED + F-DIAG-TAIL-N.
 - 09:41: KNOWN-REDS LANDED (dev e2adf68b; codex r1 APPROVE first round). #56. lane/stub-class provisioning; packet from the draft next.
 - 09:47: STUB-CLASS seat dispatched (Agent, opus) on lane/stub-class from dev e2adf68b; baselines sealed; watchdog armed. V: Grok re-run + tooling row pending. Worktrees: 44 (38 lane branches merged into dev; t1-oracle-loginfp and w4 not merged) — cleanup ask ready for V.
+
+## 2026-09-16 18:2x — NEWEST ENTRY WINS
+
+**Where this stands.** The 2026-09-16 continuation is COMPLETE through Task 19. Nineteen tasks ran
+serially on the Mac mini in worktree
+`/Users/stefannour/DebateAIRO/debateairo/.claude/worktrees/algo-loop-2026-09-16`, branch
+`mission/2026-09-16-algorithm-live-loop-continuation`. **Nothing is pushed and nothing is merged**
+(D70/D73 e/9 — the operator does both). Tip when this entry was written: `c1c08bd7` plus this seat's
+records commits. **PRODUCT FINAL at `35dc4c15`** — every commit after it is docs.
+
+**The gate of record for this branch, as of this line.** The FINAL GATE at `6cdc14b2` (product files
+identical to Task 17's tip `5ace5d7c`), instrument validated by reproducing `96e3c91c` → 170/1/0/1 and
+`78e89ea4` → 142/0/0/1 exactly:
+
+```
+FOUR-COUNT  failures=141  suite-load=0  skips=0  unhandled=1
+TOTALS(json)  tests=5271  passed=5130  failedTests=141  files=425  failedFiles=32
+```
+
+plus **the one NEW red it found, fixed at `35dc4c15`** (`register-support-publication.test.ts:369`, the
+policy-row count pin 47 → 49, entailed to Task 15's two new sealed cost rows). Every remaining name is
+attributed in the SDD ledger's `FINAL GATE ATTRIBUTION` entry.
+
+**The full-suite RE-RUN at the tip `c1c08bd7` is IN FLIGHT.** Checked by name at the moment this entry
+was written: `/private/tmp/claude-501/-Users-stefannour-DebateAIRO/45ab9500-0991-4dbd-89ec-f04cc3082e67/scratchpad/logs/final-gate/full-c1c08bd7.four-count.txt`
+**does not exist** (only `.start` and a growing `.log`). **Its numbers are NOT predicted here and must not
+be predicted anywhere** — the orchestrator appends the four-count when the file appears. Do not read
+`.start` as completion; it is written in the first second.
+
+**THE EXACT NEXT ACTION: read `full-c1c08bd7.four-count.txt` when it exists, append it verbatim to
+`PROGRESS.md` and `LEDGER.md` beside the `6cdc14b2` row, and diff its failure list against
+`full-6cdc14b2-failures.txt`.** Expect exactly one name to have cleared (the `35dc4c15` fix) and F22's
+load-coupled rows to move either way; attribute anything else before believing it.
+
+**What this seat wrote (one commit per record family, all docs):** the self-report
+`agent-reports/cont-t19-records.md`; **D73** + three addenda in `DECISIONS.md`; the
+`## 2026-09-16 — continuation on the Mac mini` section in `PROGRESS.md`; **34 seat-exit rows and 14
+`Ruling:` lines** in `LEDGER.md`; the `## 2026-09-16 continuation — rows for V` section in
+`V-DECISIONS-PACKET.md`; the board reconcile (**26 tickets moved, 43 filed**); and
+`agent-reports/w12-closure-audit-2026-09-16.md`.
+
+**Two verification facts that must not be quoted without their caveats.**
+1. `bash tools/board-lint.sh board/*.md` exits **1**, on exactly one row:
+   `W10-call-budget-truthfulness.md: floor trigger present but risk_tier=medium (must be high)`. The
+   lint is RIGHT — W10 landed a migration and two sealed rows and was mis-tiered from the start; its own
+   tier comment says *"sealed cost rows"*, which the floor pattern misses by one word. `risk_tier` is
+   outside the records seat's write contract, so **the one-word correction to `high` is owed by the
+   board's owner.** It was left visible rather than reworded around.
+2. `board-lint` **skips every `F*-*.md`** (`tools/board-lint.sh:8`) — **130 of 183** board files,
+   enumerated this pass — and its success line prints `$#`, the number of files **handed** to it, not
+   checked (`:35`). So "board-lint: OK (N files)" has never meant what it looks like. The 43 new tickets
+   were therefore re-linted under non-skipped names: **OK (43 files), rc=0**.
+
+**Owed by the OPERATOR — no seat can do these.** (a) A **Node 22.23.1** run: this host is 26.5.0, which
+is why ~100 `localStorage` rows in `tests/render` are red and why **4 real `t1-canvas` reds are hidden**;
+expect the name set to shift by both. (b) The **Grok re-run** with Docker Desktop up — Task 17 has made
+absence loud and the sandbox degradable, so it can no longer fail silently either way. (c) The **M≥2
+ceremony re-run**, (d) the **mono-maker run** and (e) the **δ/ε refit** — all three need the credential
+and the go (D18/D72). (f) The peer security branch `origin/security/2026-09-01-hardening` (`35bd80c4`),
+**130 commits not in `origin/dev`, 379 not in `origin/main`** — reported, untouched, needs its own
+decision.
+
+**Read BEFORE any closure ceremony:** `agent-reports/w12-closure-audit-2026-09-16.md`. Its conclusion in
+one line — **the judge's whole-goal verdict cannot be issued from this branch**, because six of the nine
+flagship sub-clauses (panel-reduced τ, a root's final strength ≠ τ, the synthesizer's acknowledgement,
+the evaluator loop record, the code-derived label, the band over cited nodes) are recorded **nowhere**.
+They are absences, not failures: the ceremony computes them and does not print them. **So step 1 is a
+reporting change to the ceremony's phase report, BEFORE spending a credential** — otherwise a re-run buys
+an artifact with identical holes. The seven-step path is §6 of that audit.
+
+**Still un-decided by V, now re-presented in `V-DECISIONS-PACKET.md` (2026-09-16 section):** nine
+defaults applied on V's behalf, each with a veto window (the two `support-kb` edges; F31's three rows
+left red; grok degrade-with-mark; `0062` amended while unlanded; `priorCandidateRef` withheld; the
+diversity detail unpersisted; two grading marks retired with `gradersPerCell` 1 superseding the goal's
+two-grader clause; the sorted-first grader; the LENGTH_EXCEEDED retry and its 12 288-token worst case),
+plus nine questions only V can answer — among them whether the anonymous landing branch of
+`apps/ui/app/page.tsx` was removed on purpose (**measured: HEAD == V's own parent**, so V's change, not
+merge damage), T3B (never authorized), and F-TOOL-MUTATE-3 (still at the rework cap).
+
+**Housekeeping.** Three abandoned lane worktrees from the failed parallel attempt —
+`lane-cont-t2`, `lane-cont-t3`, `lane-cont-t8` — hold only untracked packet copies. Remove them with
+`git worktree remove`; never reuse them. Subagents inherit the parent session's worktree pin, so lanes
+are not available in this harness (D73 d).
