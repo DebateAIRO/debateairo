@@ -29,9 +29,36 @@ export type ContentClassification =
   | { readonly parseStatus: "PARSED"; readonly parseError: null }
   | { readonly parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED"; readonly parseError: string };
 
+/**
+ * W10/1 (`board/W10-call-budget-truthfulness.md`, audit
+ * `audits/token-budget-reasoning.md`): the OpenAI-compatible completion that
+ * was cut off at `max_tokens` reports it, and until this row existed nobody
+ * read it. A truncated body fails the contract classifier exactly as bad JSON
+ * does, so the two were recorded under one name and a length failure looked
+ * like a model that cannot follow a schema.
+ */
+export const PROVIDER_FINISH_REASON_LENGTH = "length" as const;
+export const PROVIDER_CONTENT_LENGTH_EXCEEDED = "LENGTH_EXCEEDED" as const;
+
+/**
+ * How a provider's content was REFUSED. `LENGTH_EXCEEDED` is its own member and
+ * is never collapsed into `PARSE_FAILED`.
+ *
+ * It is deliberately NOT a `raw_artifact.parse_status` value: that column's
+ * CHECK constraint seals four names (`migrations/0004_s04.sql:14-21`) and the
+ * erasure-redaction constraint pins their `parse_error` pairs
+ * (`migrations/0040_account_erasure.sql:338-340`). Widening the column is a
+ * migration this ticket does not own, so the truncation travels on the typed
+ * refusal and in the artifact's unconstrained `metadata.finish_reason`.
+ */
+export type ProviderContentRejectionStatus =
+  | "PARSE_FAILED"
+  | "SCHEMA_FAILED"
+  | typeof PROVIDER_CONTENT_LENGTH_EXCEEDED;
+
 export interface RejectedProviderContent {
   readonly rawText: string;
-  readonly parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED";
+  readonly parseStatus: ProviderContentRejectionStatus;
   readonly parseError: string;
 }
 
@@ -70,7 +97,7 @@ export class ProviderContentUnacceptedError extends TypedDomainError {
 
   constructor(
     readonly attempts: number,
-    readonly lastParseStatus: "PARSE_FAILED" | "SCHEMA_FAILED",
+    readonly lastParseStatus: ProviderContentRejectionStatus,
     readonly lastParseError: string,
     readonly lastRawArtifactRef: string,
     readonly lastLedgerEntryRef: string
@@ -287,9 +314,27 @@ const responseSchema = z.object({
   model: z.string().min(1),
   usage: usageSchema.nullable().optional(),
   choices: z.array(z.object({
-    message: z.object({ content: z.string() })
+    message: z.object({ content: z.string() }),
+    // W10/1: carried, never required — a provider that omits it is still a
+    // lawful response, and its absence is recorded as absent rather than as
+    // "not truncated".
+    finish_reason: z.string().nullable().optional()
   })).min(1)
 });
+
+/**
+ * W10/1: the finish reason read LENIENTLY, off the decoded body, so a response
+ * the strict schema rejects still records why it was cut off. The strict parse
+ * happens later and throws; this read must survive it.
+ */
+const observedFinishReasonSchema = z.object({
+  choices: z.array(z.object({ finish_reason: z.string().nullable().optional() }).passthrough()).min(1)
+}).passthrough();
+
+function observedFinishReason(decoded: unknown): string | null {
+  const parsed = observedFinishReasonSchema.safeParse(decoded);
+  return parsed.success ? parsed.data.choices[0]!.finish_reason ?? null : null;
+}
 
 function digest(value: string): string {
   return createHash("sha256").update(value).digest("hex");
@@ -323,7 +368,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     let attemptPacket = request.packet;
     let lastContentRejection: {
       attempts: number;
-      parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED";
+      parseStatus: ProviderContentRejectionStatus;
       parseError: string;
       rawArtifactRef: string;
       ledgerEntryRef: string;
@@ -361,6 +406,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         const observedUsage = z.object({ usage: usageSchema.nullable().optional() })
           .passthrough().safeParse(decoded);
         const strict = responseSchema.safeParse(decoded);
+        const finishReason = observedFinishReason(decoded);
         const content = strict.success ? strict.data.choices[0]!.message.content : null;
         let classifiedContent: ContentClassification | {
           readonly parseStatus: "UNPARSED";
@@ -392,7 +438,11 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           metadata: {
             status: response.status,
             attempt,
-            usage: observedUsage.success ? observedUsage.data.usage ?? null : null
+            usage: observedUsage.success ? observedUsage.data.usage ?? null : null,
+            // W10/1: the reason this completion stopped, recorded on EVERY
+            // attempt. `raw_artifact.metadata` is unconstrained jsonb, so the
+            // truncation is durable even though `parse_status` cannot name it.
+            finish_reason: finishReason
           },
           parseStatus: classifiedContent.parseStatus,
           parseError: classifiedContent.parseError,
@@ -402,10 +452,23 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         });
         if (!response.ok) throw new Error(`PROVIDER_HTTP_STATUS_${response.status}`);
         const responseJson = responseSchema.parse(decoded);
-        if (
-          request.classifyContent !== undefined
-          && (classifiedContent.parseStatus === "PARSE_FAILED" || classifiedContent.parseStatus === "SCHEMA_FAILED")
-        ) {
+        // W10/1: a refusal that arrived with `finish_reason: "length"` is a
+        // TRUNCATION, and it is named as one. The classifier's own verdict
+        // (PARSE_FAILED on a half-written object) describes the symptom; the
+        // finish reason describes the cause, and only the cause is actionable.
+        const contentRejection: {
+          readonly parseStatus: ProviderContentRejectionStatus;
+          readonly parseError: string;
+        } | null =
+          classifiedContent.parseStatus === "PARSE_FAILED" || classifiedContent.parseStatus === "SCHEMA_FAILED"
+            ? {
+                parseStatus: finishReason === PROVIDER_FINISH_REASON_LENGTH
+                  ? PROVIDER_CONTENT_LENGTH_EXCEEDED
+                  : classifiedContent.parseStatus,
+                parseError: classifiedContent.parseError
+              }
+            : null;
+        if (request.classifyContent !== undefined && contentRejection !== null) {
           const ledgerEntryRef = await this.#options.appendLedgerEntry({
             attemptId,
             runId: request.runId,
@@ -424,16 +487,16 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           ledgerRecorded = true;
           lastContentRejection = {
             attempts: attempt,
-            parseStatus: classifiedContent.parseStatus,
-            parseError: classifiedContent.parseError,
+            parseStatus: contentRejection.parseStatus,
+            parseError: contentRejection.parseError,
             rawArtifactRef,
             ledgerEntryRef
           };
           if (attempt < request.bound.maxAttempts && request.buildRepairPacket !== undefined) {
             attemptPacket = request.buildRepairPacket({
               rawText: responseJson.choices[0]!.message.content,
-              parseStatus: classifiedContent.parseStatus,
-              parseError: classifiedContent.parseError
+              parseStatus: contentRejection.parseStatus,
+              parseError: contentRejection.parseError
             });
           }
           continue;
