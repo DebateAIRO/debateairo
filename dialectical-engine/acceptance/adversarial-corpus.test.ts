@@ -34,6 +34,7 @@ interface Observation {
   readonly cwd: string;
   readonly argv: readonly string[];
   readonly environment: Readonly<Record<string, string>>;
+  readonly environmentKeyNames: readonly string[];
   readonly prompt: string;
   readonly requestedCapabilities: readonly ("DATABASE" | "FILESYSTEM")[];
 }
@@ -77,10 +78,10 @@ async function startObservationRelay(
   // into the model content that `ledger.raw_artifact` persists. Same projection
   // shape as the product's own `buildCliChildEnvironment` (`relay-core.ts:81-84`).
   // Every key is here because an assertion below reads it:
-  //   asserted PRESENT — `:432-438` (SECRET-01 exact-set toEqual) and `:483`
+  //   asserted PRESENT — `:437-443` (SECRET-01 exact-set toEqual) and `:503`
   //   (DB-01 exact key set);
-  //   asserted ABSENT  — the SECRET-01 sentinels set at `:409-414` and DB-01's
-  //   DATABASE_URL at `:465`, both of which those exact-set assertions read as
+  //   asserted ABSENT  — the SECRET-01 sentinels set at `:414-419` and DB-01's
+  //   DATABASE_URL at `:480`, both of which those exact-set assertions read as
   //   an absence. An absence assertion is evidence only if the key WOULD be
   //   echoed when the relay admits it, so those keys stay named. Anything
   //   unnamed — the W6 canary included — is dropped.
@@ -92,7 +93,11 @@ async function startObservationRelay(
     "const echoedEnvironmentKeys = ['HOME','LANG','OLDPWD','P4_ALLOWED_MAKER_KEY','PATH','PWD','TMPDIR','ANTHROPIC_API_KEY','DATABASE_URL','OPENAI_API_KEY','SSH_AUTH_SOCK','UNRELATED_SECRET','XAI_API_KEY'];",
     "const environment = {};",
     "for (const key of echoedEnvironmentKeys) { if (process.env[key] !== undefined) environment[key] = process.env[key]; }",
-    "const observation = { pid: process.pid, cwd: process.cwd(), argv: process.argv.slice(1), environment, prompt, requestedCapabilities };",
+    // F3: the key NAMES restore the reach the allow-list removed — a name is not
+    // a credential, a value is — so a key the relay wrongly admits is still
+    // caught. Read by `:445-453` (SECRET-01) and `:501-503` (DB-01).
+    "const environmentKeyNames = Object.keys(process.env).sort();",
+    "const observation = { pid: process.pid, cwd: process.cwd(), argv: process.argv.slice(1), environment, environmentKeyNames, prompt, requestedCapabilities };",
     "process.stdout.write(JSON.stringify(observation));"
   ].join("");
   const adapter: CliRelayAdapter = {
@@ -437,6 +442,16 @@ describe("P4-13 approved adversarial relay corpus", () => {
         PWD: expect.stringMatching(/[/\\]relay-p4-local-corpus-fixture-[^/\\]+$/),
         TMPDIR: "/tmp"
       });
+      // W6 fix round 1 / F3. The exact-set assertion above reads the fixture's
+      // allow-listed PROJECTION, so on its own it can only catch a wrongly
+      // admitted key the FIXTURE happens to name. The fixture also emits the
+      // full key-NAME list — names are not credentials — and this assertion
+      // holds `buildCliChildEnvironment` to the exact set again, for every key.
+      // `__CF_USER_TEXT_ENCODING` is injected into every macOS child regardless
+      // of the env passed (measured), so it is filtered here exactly as above.
+      expect(relay.observations[0]!.environmentKeyNames.filter((key) =>
+        key !== "__CF_USER_TEXT_ENCODING"
+      )).toEqual(["HOME", "LANG", "OLDPWD", "P4_ALLOWED_MAKER_KEY", "PATH", "PWD", "TMPDIR"]);
       expect(relay.observations[0]!.argv).toEqual([relay.observations[0]!.prompt]);
       for (const sentinel of [...sentinels, "P4_SENTINEL_ALLOWED_MAKER_KEY"]) {
         expect(responseContent).not.toContain(sentinel);
@@ -478,9 +493,14 @@ describe("P4-13 approved adversarial relay corpus", () => {
       }]);
       expect(response.status).toBe(200);
       expect(relay.observations[0]!.requestedCapabilities).toEqual(["DATABASE"]);
-      expect(Object.keys(relay.observations[0]!.environment).filter((key) =>
+      // W6 fix round 1 / F3. This assertion was always a key-SET assertion, and
+      // once `environment` became an allow-listed projection it could only have
+      // reported the fixture's own list back. It now reads the key-NAME list, so
+      // it means again exactly what it was written to mean: the relay admitted
+      // these six keys and no others.
+      expect(relay.observations[0]!.environmentKeyNames.filter((key) =>
         key !== "__CF_USER_TEXT_ENCODING"
-      ).sort()).toEqual(["HOME", "LANG", "OLDPWD", "PATH", "PWD", "TMPDIR"]);
+      )).toEqual(["HOME", "LANG", "OLDPWD", "PATH", "PWD", "TMPDIR"]);
       expect(relay.observations[0]!.argv).toEqual([relay.observations[0]!.prompt]);
       expect(await completionContent(response)).not.toContain("P4_SENTINEL_DATABASE_URL");
     } finally {

@@ -28,6 +28,21 @@ import { afterAll, describe, expect, it } from "vitest";
 const CANARY_KEY = "W6_CANARY_SECRET";
 const CANARY_VALUE = "canary-9c1e";
 
+/**
+ * FIX ROUND 1, F3. Projecting over an allow-list cost the consumers' exact-set
+ * assertions the ability to see a key `buildCliChildEnvironment` wrongly admits:
+ * they can now only catch keys the fixture NAMES. Every member therefore also
+ * emits the full sorted list of its environment's key NAMES. A key name is not a
+ * credential; a key value is. So the reach comes back at zero risk — a wrongly
+ * admitted key is caught by NAME while its VALUE is still never echoed unless
+ * the allow-list carries it.
+ *
+ * This canary's name is deliberately NOT credential-shaped, so it exercises the
+ * names list independently of the digest rule below.
+ */
+const UNLISTED_KEY = "W6_UNLISTED_CANARY";
+const UNLISTED_VALUE = "canary-b7d3";
+
 const execFileAsync = promisify(execFile);
 
 const acceptanceFile = (name: string): string =>
@@ -62,9 +77,25 @@ async function emit(
 ): Promise<string> {
   const { stdout } = await execFileAsync(process.execPath, [...binaryArguments], {
     cwd,
-    env: { ...environment, [CANARY_KEY]: CANARY_VALUE }
+    env: { ...environment, [CANARY_KEY]: CANARY_VALUE, [UNLISTED_KEY]: UNLISTED_VALUE }
   });
   return stdout;
+}
+
+/**
+ * The F3 boundary, asserted on every member: an unnamed key is visible by NAME
+ * and invisible by VALUE. `emitted` is the raw text the member produced — stdout
+ * for five members, the written file for `relay-core`.
+ */
+function expectUnlistedKeyVisibleByNameOnly(echo: Echo, emitted: string): void {
+  // Labelled so the RED frame names the owed emission. Without it the first
+  // failure is `toContain` complaining that it was handed `undefined` — a
+  // MISSING-SYMBOL red that describes the assertion's plumbing rather than the
+  // defect (TOOLING-TRAPS `:5161`).
+  expect(echo.environmentKeyNames, "member must emit environmentKeyNames (F3)").toBeInstanceOf(Array);
+  expect(echo.environmentKeyNames).toContain(UNLISTED_KEY);
+  expect(echo.environment[UNLISTED_KEY]).toBeUndefined();
+  expect(emitted).not.toContain(UNLISTED_VALUE);
 }
 
 /**
@@ -107,6 +138,7 @@ function inlineScript(
 
 interface Echo {
   readonly environment: Readonly<Record<string, string>>;
+  readonly environmentKeyNames: readonly string[];
 }
 
 describe("W6 fake-CLI fixtures echo allow-listed variables only", () => {
@@ -122,6 +154,7 @@ describe("W6 fake-CLI fixtures echo allow-listed variables only", () => {
     expect(echo.environment.ANTHROPIC_API_KEY).toBe("w6-admitted-anthropic-locator");
     expect(echo.environment[CANARY_KEY]).toBeUndefined();
     expect(stdout).not.toContain(CANARY_VALUE);
+    expectUnlistedKeyVisibleByNameOnly(echo, stdout);
   });
 
   it("fake-grok-cli.mjs echoes the admitted maker locator and not the unnamed canary", async () => {
@@ -136,6 +169,7 @@ describe("W6 fake-CLI fixtures echo allow-listed variables only", () => {
     expect(echo.environment.XAI_API_KEY).toBe("w6-admitted-xai-locator");
     expect(echo.environment[CANARY_KEY]).toBeUndefined();
     expect(stdout).not.toContain(CANARY_VALUE);
+    expectUnlistedKeyVisibleByNameOnly(echo, stdout);
   });
 
   it("fake-hermes-cli.mjs echoes the admitted maker locator and not the unnamed canary", async () => {
@@ -151,6 +185,7 @@ describe("W6 fake-CLI fixtures echo allow-listed variables only", () => {
     expect(echo.environment.GLM_API_KEY).toBe("w6-admitted-glm-locator");
     expect(echo.environment[CANARY_KEY]).toBeUndefined();
     expect(stdout).not.toContain(CANARY_VALUE);
+    expectUnlistedKeyVisibleByNameOnly(echo, stdout);
   });
 
   it("the adversarial-corpus inline fixture echoes the admitted maker locator and not the unnamed canary", async () => {
@@ -167,6 +202,7 @@ describe("W6 fake-CLI fixtures echo allow-listed variables only", () => {
     expect(observation.environment.P4_ALLOWED_MAKER_KEY).toBe("w6-admitted-maker-locator");
     expect(observation.environment[CANARY_KEY]).toBeUndefined();
     expect(stdout).not.toContain(CANARY_VALUE);
+    expectUnlistedKeyVisibleByNameOnly(observation, stdout);
   });
 
   // FIX ROUND 1, F1: the fifth member of the class. Its payload becomes the model
@@ -191,6 +227,7 @@ describe("W6 fake-CLI fixtures echo allow-listed variables only", () => {
     expect(probe.environment.CODEX_HOME).toBe("/tmp/w6-admitted-codex-home");
     expect(probe.environment[CANARY_KEY]).toBeUndefined();
     expect(stdout).not.toContain(CANARY_VALUE);
+    expectUnlistedKeyVisibleByNameOnly(probe, stdout);
   });
 
   // FIX ROUND 1, F2: the sixth member. It writes its observation to a FILE under
@@ -213,5 +250,6 @@ describe("W6 fake-CLI fixtures echo allow-listed variables only", () => {
     expect(observation.environment.HOME).toBe("/tmp/w6-admitted-relay-home");
     expect(observation.environment[CANARY_KEY]).toBeUndefined();
     expect(written).not.toContain(CANARY_VALUE);
+    expectUnlistedKeyVisibleByNameOnly(observation, written);
   });
 });

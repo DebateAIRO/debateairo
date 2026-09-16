@@ -183,6 +183,7 @@ describe("GROK-01 Grok Build CLI relay", () => {
         prompt: string;
         argumentList: readonly string[];
         environment: Readonly<Record<string, string>>;
+        environmentKeyNames: readonly string[];
       };
       expect(JSON.parse(relayed.prompt)).toEqual({
         format: "debateai.relay-messages.v1",
@@ -215,6 +216,16 @@ describe("GROK-01 Grok Build CLI relay", () => {
       ]) {
         expect(relayed.environment[key]).toBeUndefined();
       }
+      // W6 fix round 1 / F3. The exact-set assertion above reads the fixture's
+      // allow-listed PROJECTION, so on its own it can only catch a wrongly
+      // admitted key the FIXTURE happens to name. The fixture also emits the
+      // full key-NAME list of the child environment — names are not credentials
+      // — and this assertion holds `buildCliChildEnvironment` to the exact set
+      // again, for every key, whether or not the allow-list carries it.
+      // `__CF_USER_TEXT_ENCODING` is injected into every macOS child regardless
+      // of the env passed (measured), so it is filtered here exactly as above.
+      expect(relayed.environmentKeyNames.filter((key) => key !== "__CF_USER_TEXT_ENCODING"))
+        .toEqual(["HOME", "LANG", "OLDPWD", "PATH", "PWD", "TMPDIR", "XAI_API_KEY"]);
     } finally {
       for (const key of environmentKeys) {
         const value = previousEnvironment[key];

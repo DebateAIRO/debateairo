@@ -11,8 +11,8 @@ const REPORTED_MODEL = "grok-fake-cli-model";
 // `ledger.raw_artifact` persists. Same projection shape as the product's own
 // `buildCliChildEnvironment` (`acceptance/relay-core.ts:81-84`).
 // Every key is here because an acceptance assertion reads it:
-//   asserted PRESENT — grok-relay.test.ts:204-210 (exact-set toEqual);
-//   asserted ABSENT  — grok-relay.test.ts:212-217. An absence assertion is
+//   asserted PRESENT — grok-relay.test.ts:205-211 (exact-set toEqual);
+//   asserted ABSENT  — grok-relay.test.ts:213-218. An absence assertion is
 //   evidence only if the key WOULD be echoed when the relay admits it, so those
 //   keys stay named. Anything unnamed — the W6 canary included — is dropped.
 const ECHOED_ENVIRONMENT_KEYS = [
@@ -44,7 +44,16 @@ function echoedEnvironment() {
 // No credential, private prompt, or raw provider payload is retained; only the
 // observed public field shape and a test-controlled verbatim model key.
 const envelope = (overrides = {}) => JSON.stringify({
-  text: JSON.stringify({ prompt, argumentList, environment: echoedEnvironment() }),
+  text: JSON.stringify({
+    prompt,
+    argumentList,
+    environment: echoedEnvironment(),
+    // W6 fix round 1 / F3: the allow-list above cost the consumer's exact-set
+    // assertion the ability to see a key `buildCliChildEnvironment` wrongly
+    // admits. The key NAMES give that reach back at zero risk — a name is not a
+    // credential, a value is. Read by `grok-relay.test.ts:227-228`.
+    environmentKeyNames: Object.keys(process.env).sort()
+  }),
   stopReason: "end_turn",
   sessionId: "redacted-session",
   requestId: "redacted-request",

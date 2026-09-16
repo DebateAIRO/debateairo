@@ -315,7 +315,11 @@ describe("P4-10 loopback relay authentication", () => {
         "const echoedEnvironmentKeys = ['HOME','LANG','OLDPWD','PATH','PWD','TMPDIR'];",
         'const environment = {};',
         'for (const key of echoedEnvironmentKeys) { if (process.env[key] !== undefined) environment[key] = process.env[key]; }',
-        `writeFileSync(${JSON.stringify(childObservation)}, JSON.stringify({ argv: process.argv, environment }));`,
+        // F3: this member's assertions name no key, so the allow-list alone left
+        // nothing able to see a wrongly admitted one. The key NAMES restore that
+        // at zero risk — a name is not a credential, a value is. Read by `:392-394`.
+        "const environmentKeyNames = Object.keys(process.env).sort();",
+        `writeFileSync(${JSON.stringify(childObservation)}, JSON.stringify({ argv: process.argv, environment, environmentKeyNames }));`,
         'process.stdout.write("OK");'
       ].join("");
       const handle = await startCliRelayServer({
@@ -371,6 +375,23 @@ describe("P4-10 loopback relay authentication", () => {
     const observedChild = await readFile(primary.childObservation, "utf8");
     expect(observedChild).not.toContain(primary.handle.authorizationHeader);
     expect(observedChild).not.toContain(primary.handle.authorizationHeader.slice("Bearer ".length));
+    // W6 fix round 1 / F3. The two assertions above search the written text for
+    // the relay's own Bearer credential. Once the fixture projected over an
+    // allow-list they could no longer see a credential admitted under a key the
+    // allow-list omits — its value would simply not be written. The fixture also
+    // emits the full key-NAME list, and this assertion refuses any key beyond
+    // what the product admits for an adapter with empty auth and test key lists
+    // (`acceptance/relay-core.ts:69` plus the two fixed keys at `:93-94`), so a
+    // leak is caught by NAME even when no value is echoed.
+    // This suite does not own the parent environment, so the complement is
+    // refused rather than an exact set pinned — the same reasoning as the DB-01
+    // LANG note in `adversarial-corpus.test.ts`, from the other direction.
+    const observedChildEnvironment = JSON.parse(observedChild) as {
+      readonly environmentKeyNames: readonly string[];
+    };
+    expect(observedChildEnvironment.environmentKeyNames.filter((key) => ![
+      "HOME", "LANG", "OLDPWD", "PATH", "PWD", "TMPDIR", "__CF_USER_TEXT_ENCODING"
+    ].includes(key))).toEqual([]);
   });
 });
 

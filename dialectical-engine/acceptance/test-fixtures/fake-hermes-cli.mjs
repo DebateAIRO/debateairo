@@ -49,6 +49,11 @@ if (process.env.FAKE_HERMES_FAIL === "1") {
   process.stdout.write(`${JSON.stringify({
     prompt,
     argumentList,
-    environment: echoedEnvironment()
+    environment: echoedEnvironment(),
+    // W6 fix round 1 / F3: the allow-list above narrows what this fixture can
+    // emit, so a key the relay wrongly admits under an unlisted name would be
+    // invisible. The key NAMES restore that reach at zero risk — a name is not a
+    // credential, a value is. Read by `hermes-relay.test.ts:85-88`.
+    environmentKeyNames: Object.keys(process.env).sort()
   })}\n`);
 }

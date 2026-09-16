@@ -50,6 +50,7 @@ describe("Support-only Hermes GLM relay",() => {
       prompt: string;
       argumentList: readonly string[];
       environment: Readonly<Record<string,string>>;
+      environmentKeyNames: readonly string[];
     };
     expect(observed.argumentList).toEqual([
       "--provider","zai",
@@ -71,6 +72,20 @@ describe("Support-only Hermes GLM relay",() => {
     expect(observed.environment.DATABASE_URL).toBeUndefined();
     expect(observed.environment.ANTHROPIC_API_KEY).toBeUndefined();
     await expect(lstat(observed.environment.HERMES_HOME!)).rejects.toMatchObject({ code: "ENOENT" });
+    // W6 fix round 1 / F3. The assertions above read the fixture's allow-listed
+    // PROJECTION, so alone they can only see keys the fixture NAMES. The fixture
+    // also emits the full key-NAME list — names are not credentials — and this
+    // assertion refuses any key the relay admits beyond the permitted set.
+    // Unlike the claude, grok and corpus cases this suite does not OWN the
+    // parent environment: `HOME`, `PATH`, `TMPDIR` and `LANG` are copied from
+    // the operator's shell when present (`acceptance/relay-core.ts:69`), so an
+    // exact-set assertion here would pass or fail on the host rather than on the
+    // relay. Refusing the complement is host-independent and still catches a
+    // leak, which an exact set pinned to a superset would not.
+    expect(observed.environmentKeyNames.filter((key) => ![
+      "GLM_API_KEY","HERMES_HOME","HOME","LANG","OLDPWD","PATH","PWD","TMPDIR",
+      "FAKE_HERMES_FAIL","FAKE_HERMES_BAD_HANDSHAKE","__CF_USER_TEXT_ENCODING"
+    ].includes(key))).toEqual([]);
   });
 
   it("exposes one support-only identity without joining the debate provider roster",async () => {

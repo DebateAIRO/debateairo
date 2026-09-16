@@ -17,8 +17,8 @@ const REPORTED_MODEL = "claude-fake-cli-model";
 // `ledger.raw_artifact` persists. Same projection shape as the product's own
 // `buildCliChildEnvironment` (`acceptance/relay-core.ts:81-84`).
 // Every key is here because an acceptance assertion reads it:
-//   asserted PRESENT — claude-relay.test.ts:230-239 (exact-set toEqual);
-//   asserted ABSENT  — claude-relay.test.ts:241-243. An absence assertion is
+//   asserted PRESENT — claude-relay.test.ts:231-240 (exact-set toEqual);
+//   asserted ABSENT  — claude-relay.test.ts:242-244. An absence assertion is
 //   evidence only if the key WOULD be echoed when the relay admits it, so those
 //   keys stay named. Anything unnamed — the W6 canary included — is dropped.
 const ECHOED_ENVIRONMENT_KEYS = [
@@ -96,6 +96,15 @@ if (process.env.FAKE_CLAUDE_ALWAYS_FAIL === "1") {
   process.stdout.write("this is not a JSON envelope\n");
 } else {
   process.stdout.write(`${envelope({
-    result: JSON.stringify({ prompt, argumentList, environment: echoedEnvironment() })
+    result: JSON.stringify({
+      prompt,
+      argumentList,
+      environment: echoedEnvironment(),
+      // W6 fix round 1 / F3: the allow-list above cost the consumer's exact-set
+      // assertion the ability to see a key `buildCliChildEnvironment` wrongly
+      // admits. The key NAMES give that reach back at zero risk — a name is not
+      // a credential, a value is. Read by `claude-relay.test.ts:253-257`.
+      environmentKeyNames: Object.keys(process.env).sort()
+    })
   })}\n`);
 }
