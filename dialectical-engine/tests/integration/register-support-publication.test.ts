@@ -15,13 +15,11 @@ import {
   type SupportConfigurationKey
 } from "../../packages/register/src/index.js";
 import { createSupportConfigurationPort } from "../../packages/register/src/support-config.js";
-import { buildDevelopmentDeploymentRegisterPublicationRows } from
+import { buildDevelopmentDeploymentRegisterHistoricalPublicationRows } from
   "../../apps/runner/src/dev-deployment-register.js";
-import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 import {
   DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256,
-  LEGACY_REGISTER_V1_SNAPSHOT_SHA256,
-  TEST_PLAN_TIER_ROSTERS
+  LEGACY_REGISTER_V1_SNAPSHOT_SHA256
 } from "../support/registerFixtures.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -314,11 +312,7 @@ describe("REGISTER-SUPPORT-PUBLICATION database contract", () => {
 
     const bootstrap = await loadBootstrapRegister();
     const v1Rows = buildBootstrapRegisterPublicationRows(bootstrap);
-    const v4Rows = await buildDevelopmentDeploymentRegisterPublicationRows(
-      bootstrap,
-      TEST_DEVELOPMENT_PROVIDER_PANEL,
-      TEST_PLAN_TIER_ROSTERS
-    );
+    const v4Rows = await buildDevelopmentDeploymentRegisterHistoricalPublicationRows(bootstrap);
     expect(computeRegisterSnapshotSha256(v1Rows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);
     expect(computeRegisterSnapshotSha256(v4Rows))
       .toBe(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256);
