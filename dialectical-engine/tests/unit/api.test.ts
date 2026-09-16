@@ -315,6 +315,42 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     });
   });
 
+  // Property: the public roster read has the register row's exact database capability footprint.
+  // Production break: delegate to the deployment projection and inherit its scorecard or identity reads.
+  it("issues exactly one register-row query for plan-tier rosters", async () => {
+    const query = vi.fn(async (statement: string) => ({
+      rows: statement.includes("FROM register.register_row")
+        ? [{
+            row_key: "planTierRosters",
+            value_json: {
+              free: ["free-register-a", "free-register-b"],
+              premium: ["premium-register-a", "premium-register-b", "premium-register-c"]
+            },
+            source_ref: "config/models.yaml"
+          }]
+        : []
+    }));
+    const application = new PostgresAskApplication(
+      { query } as never,
+      { dispatch: async () => undefined },
+      admissionSettings({ registerVersion: 7 }),
+      undefined,
+      {} as never,
+      { server: {} as never, legacy: {} as never }
+    );
+
+    await expect(
+      application.readPlanTierRosters(USER_IDENTITY.authenticated.session)
+    ).resolves.toEqual({
+      free: ["free-register-a", "free-register-b"],
+      premium: ["premium-register-a", "premium-register-b", "premium-register-c"]
+    });
+    expect(query).toHaveBeenCalledTimes(1);
+    const statements = query.mock.calls.map(([statement]) => statement);
+    expect(statements[0]).toContain("FROM register.register_row");
+    expect(statements.join("\n")).not.toMatch(/\b(?:identity|scorecard)\./u);
+  });
+
   // Property: the application accepts the discriminated row emitted by the production publisher,
   // while projecting only the two public roster lists.
   // Production break: parse the published value directly with the strict wire schema or leak its kind.
