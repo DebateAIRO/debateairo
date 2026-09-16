@@ -5170,3 +5170,51 @@ not in 4 000 lines of prose every author skims.
 - **Rule: when a guard must import a symbol the fix introduces, take TWO reds and report both — the
   true-base red (whatever it proves, usually only the source rows) and the defect red after the
   extraction. Reporting only the first overstates; reporting only the second skips the base.**
+
+## A vocabulary member with a UI label and NO producer is invisible to every gate we run (2026-09-16, BUILD(CONT-T13))
+- `DEGRADED-DIVERSITY` sat in `packages/kernel/src/index.ts:126` and in `apps/ui/lib/v3/labels.ts:27`
+  ("Model diversity degraded") for the whole mission with nothing anywhere emitting it. Typecheck is
+  happy (the `case` arm is well-typed), the suite is happy (no row reaches it), the UI test is happy
+  (it renders the marks an answer HAS), and `s14-live-projections` pins the vocabulary's COUNT at 37,
+  which a member with no producer satisfies perfectly.
+- The instrument that would have found it is not a test: it is a SWEEP — for each member of
+  `CONDITION_MARKS`, grep for a site that PUSHES it, not one that mentions it. Mentions are the noise
+  (declaration + label + test assertions); a push is the signal.
+- **Rule: a count pin over a vocabulary proves membership, never producer-hood. If a vocabulary is
+  reader-facing, the producer sweep is a separate obligation and nothing else will raise it.**
+
+## `grep -rln '<MARK>' tests apps/ui` can resolve to a NON-test, and then "run it if it is a test" names nothing (same seat, same day)
+- The packet's UI gate was "the UI test that renders marks (`grep -rln 'DEGRADED-DIVERSITY' tests apps/ui`)
+  — run it if it is a test". The only hit was `apps/ui/lib/v3/labels.ts`: product code. Taken literally
+  the step is a no-op, and a seat that reports "no UI test exists" has absorbed a packet defect.
+- The owed OUTCOME — prove the label module still answers with the mark now that answers carry it — is
+  reached from the other direction: `grep -rln 'v3/labels' tests apps` names the suites that IMPORT the
+  renderer (`tests/unit/s14-live-projections.test.ts`, `tests/unit/t11-verdict-label.test.ts`,
+  `tests/unit/v2ui-data-layer.test.ts`, `tests/render/t11-verdict-banner.test.tsx`). Three of those never
+  mention the mark, which is exactly why grepping for the LITERAL cannot find them.
+- **Rule: to gate a renderer, grep for importers of the RENDERER, not for the datum it renders. A datum
+  that was never produced appears in no test by construction.**
+
+## Adding a REQUIRED field to a result interface is a change to fixtures in OTHER packages, and vitest cannot see it (same seat, same day)
+- `ServeGateResult` is constructed as a whole literal in at least two places outside `packages/serve`:
+  `tests/support/settledRun.ts:83` and `tests/integration/serve-answer-content-encryption.test.ts:162`.
+  Both describe PRE-T9 sealed answers. The second one already carries a comment recording the identical
+  collision when T9 added `digest`, `loopRounds`, `standingObjection` and `crashClass`.
+- Neither file is in this seat's write contract, and a required field would have made both a TS2739 that
+  NO vitest run reports (vitest transpiles without typechecking, `:4934`). The first honest signal is
+  `pnpm run typecheck`, at the end.
+- The fix is a design decision, not a workaround: the field is OPTIONAL, absent and `null` mean the same
+  thing, and every result the module itself returns sets it explicitly.
+- **Rule: before widening a shared result interface, `grep -rn '<Interface>' tests acceptance apps packages`
+  and count the LITERAL construction sites. Each one is either in your contract or a reason the field is
+  optional. Decide before writing, not after typecheck.**
+
+## The packet's own grep can name the wrong FILE for a symbol it is certain exists (same seat, same day)
+- The read-surface step was `grep -n 'SYNTHESIS-OBJECTION-STANDING\|condition_marks\|conditionMarks'
+  packages/serve/src/index.ts`. The first alternative matches nothing there: that mark is declared in
+  `packages/serve/src/synthesis.ts:127`. The other two alternatives matched, so the command exits 0 and
+  prints 30 lines — the miss is silent, and a seat skimming the output never learns the packet was wrong.
+- Related to `:5045` (a ticket's site COUNT has an expiry) but distinct: nothing moved here. The packet was
+  wrong when it was written, and a MULTI-ALTERNATIVE grep is what hid it.
+- **Rule: when a packet's grep ORs several patterns as evidence for one claim, run each alternative
+  separately once. A zero-hit alternative inside an OR is indistinguishable from a satisfied one.**
