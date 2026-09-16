@@ -4602,3 +4602,62 @@ not in 4 000 lines of prose every author skims.
   `CREATE ROLE …`) **and print the mutated line back before running anything.** A mutant you have
   not SEEN land is not a mutant; and in a codebase whose comments quote their own invariants,
   every prose citation is a decoy for a text-substitution mutator.
+
+## A REMEDY inherited from the archive can be wrong in the opposite direction, and it costs nothing to check (2026-09-16, BUILD(CONT-T6))
+- `board/F18-scaffold-edge-rows.md:20-21` prescribed the fix for the `packages/serve/src/synthesis.ts`
+  source-purity row: the file *"owes a `GOAL_RULED_LAW_CARRIERS` entry"*. Two records repeated it.
+  One `git grep` showed the symbol it names, `DIGEST_EMPHASIS_OBJECTION_COUNT`, has exactly TWO
+  occurrences in the whole repository — its declaration and its single call site, both in that file.
+  Nothing imports it. The prescribed remedy would have widened a deliberately narrow exemption to
+  admit a symbol that never needed to be exported; the correct fix was the opposite one, and smaller:
+  stop exporting it.
+- The prescription would also have falsified a live pin nobody had connected to it:
+  `tests/unit/s1-1-depth-contract.test.ts:2153` is named *"exempts exactly the two ruled depth exports,
+  in exactly one file"*, and its assertions (a 400-character window around the map) would have stayed
+  GREEN while its name and stated PROPERTY became false. A test that keeps passing while its subject
+  changes is worse than one that breaks.
+- Generating condition: the archive recorded a DIAGNOSIS (`this row is the law-carrier class`) and a
+  REMEDY (`add the map entry`) in one breath, and every later reader carried the remedy forward as if
+  it had been measured. **Rule: a remedy quoted from a record is a hypothesis. Before implementing it,
+  measure the one fact it rests on — here, "who imports this?" — which is one `git grep` and decides
+  between two opposite fixes.** Cost avoided: an out-of-contract edit to a file this seat could only
+  touch in two named regions, plus a silently-falsified test.
+
+## The source-purity law is defeated by a TYPE ANNOTATION, and by wrapping (2026-09-16, BUILD(CONT-T6))
+- The rule at `tools/orphan-audit/src/index.ts:656` is
+  `/export\s+const\s+([A-Z][A-Z0-9_]*)\s*=\s*-?\d+(?:\.\d+)?\s*[;\n]/`. MEASURED with a mutant:
+  `export const DIGEST_EMPHASIS_OBJECTION_COUNT: number = 2;` — a fully exported numeric literal —
+  produces NO blocking row, because the regex leaves no room for `: number`. `Object.freeze([...])`
+  and a lower-case name evade it the same way; `DIGEST_COMPRESSION_LEVELS` (five exported numbers,
+  same file, same species) has always been invisible to it for exactly that reason.
+- So the law's verdict is a statement about DECLARATION SYNTAX, not about exported numbers. It is
+  still worth obeying — but a seat fixing one of its rows must not conclude the file is now clean,
+  and a seat *satisfying* it must not reach for the annotation, which passes while changing nothing.
+- **Rule: before treating an audit row as the measure of a property, mutate the property in a way the
+  rule's TEXT cannot see. If the audit stays green, you have measured the regex, not the law.** Same
+  family as `## Do not invent the assertion you are auditing` and `## Before claiming "no real code
+  exercises this rule", prove your instrument can SEE the difference`.
+
+## The dependency-edge table checks `actual ⊆ allowed` only — an OVER-declared edge is invisible (2026-09-16, BUILD(CONT-T6))
+- `auditArchitecture` walks each row's real manifest and reports every dependency not in `allowed`.
+  Nothing walks the other direction. MEASURED: adding `"no-such-package"` to `apps/api`'s allowed
+  list changed the verdict by nothing — not a violation, not a warning, not a count.
+- The consequence for anyone DECLARING an edge (as this task did for the two shipped `support-kb`
+  dependencies): the audit can confirm you did not under-declare, and can never tell you that you
+  over-declared. A row that quietly permits an edge the product does not have looks exactly like a
+  correct row forever, and the table is the only record of the intended architecture.
+- **Rule: when you add a name to an `allowed` list, the manifest is the evidence, not the audit
+  going green — read the dependency out of the `package.json` and cite the commit that put it
+  there.** An unused-declaration check belongs in the audit; until it exists, this is manual.
+
+## A JSON dependency probe must not assume the manifest's FORMATTING (2026-09-16, BUILD(CONT-T6))
+- `grep -o '"@debateai/support-kb":"[^"]*"'` over `apps/api/package.json apps/runner/package.json`
+  printed one hit and read as "the runner does not depend on it" — which directly contradicted the
+  audit, whose violation list named `apps/runner -> support-kb`. The cause: `apps/api/package.json`
+  is minified onto one line (`":"`), `apps/runner/package.json` is pretty-printed (`": "`). The
+  pattern encoded the first file's whitespace.
+- The tell was that the probe disagreed with a verdict already measured. **Rule: never grep a
+  key-value pair out of JSON with a pattern that spans the colon; grep the KEY alone, or parse it.
+  And when a cheap probe contradicts a gate you have already run, the probe is wrong until proved
+  otherwise.** Cost here: one minute, because the contradiction was loud; in a case where the probe
+  had merely *agreed* with an expectation, it would have been invisible.
