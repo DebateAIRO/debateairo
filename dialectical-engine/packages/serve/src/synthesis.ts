@@ -106,7 +106,7 @@ export const DIGEST_COMPRESSION_LEVELS: readonly (number | null)[] =
  * selection below), and no surface outside this file has ever imported it. A
  * deployment must not be able to reseal it, which is what a register row would
  * mean. The audit's GOAL_RULED_LAW_CARRIERS reconciliation is for constants the
- * goal ORDERS to be exported and imported elsewhere (T1's 1-5 depth bound);
+ * goal ORDERS to be exported and imported elsewhere (T1's EXPANSION_DEPTH_MAX);
  * naming this one there would widen a deliberately narrow exemption for a
  * symbol nothing imports. The file's real policy value is the evaluator loop
  * bound, and it is a sealed register row (`evaluatorLoopMaxRounds`), never a
