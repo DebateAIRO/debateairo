@@ -5011,3 +5011,47 @@ not in 4 000 lines of prose every author skims.
   `encryptAttestedLeasedContentForRun` (`packages/memory/src/index.ts:764` is the worked example).
   Before writing code against a suite named as an ORACLE, grep its `expect(` lines for invariants —
   they are architecture, not test detail.**
+
+## A prompt SENTENCE is a dispatch key in four provider doubles — rewording it re-routes them, silently (2026-09-16, BUILD(CONT-T11))
+- W7 changed one clause of the panel prompt (`Assess an existing debate node authored by another
+  maker` → `… by another participant`). Four doubles classify a request by that exact sentence:
+  `tests/integration/database.test.ts:463`, `tests/integration/t17-envelope-ledger.test.ts:185`,
+  `acceptance/ceremony.test.ts:63`, `acceptance/panel-multi-maker.test.ts:120`. None is reachable
+  from the judgement gate, and none fails loudly: t17's `classify` chain ends in a bare
+  `return "JUDGE"`, so a panel assess call is now counted and answered as a JUDGE call.
+- This is the `:1545` family (a double that dispatches by RESPONSE CLASS serves the wrong organ)
+  from a direction that entry does not cover: the key is PRODUCT PROSE, so the break is caused by an
+  edit that is correct, reviewed, and green in its own package. The sibling branch
+  `body.includes("Review an existing debate node")` survived only because the reworded clause is in
+  the sentence's TAIL.
+- **Rule: a double keys on the shortest ORGAN-DISTINGUISHING prefix (`Assess an existing debate
+  node`), never on a full sentence — and any change to a prompt literal is preceded by
+  `grep -rn "<the literal>" tests acceptance apps packages`, with the output pasted into the
+  report.** The durable fix is a stable organ marker in the request (an `organ` field in the
+  `debateai.untrusted-prompt-fields.v1` envelope) so prose becomes editable at zero blast radius.
+
+## A prompt guard that captures only the FIRST packet cannot see a repair-time leak (same seat, same day)
+- Every judgement call passes `buildRepairPacket`, and `buildContentRepairPacket` re-sends the whole
+  original message list plus a repair instruction. So (a) a leak in the first packet leaks again on
+  every retry, and (b) a leak added ONLY inside a `buildRepairPacket` closure is invisible to a
+  guard that inspects `request.packet`.
+- Measured: mutant M6 appended `The node was authored by ${input.authorMaker}.` to the review
+  builder's repair packet only. The guard is RED (`Judge.review … no withheld routing or provenance
+  value`) because the fake gateway calls `request.buildRepairPacket?.({…})` and captures the result;
+  the same mutant is GREEN under a first-packet-only guard.
+- **Rule: a prompt guard renders every PACKET-PRODUCING path of a call — the initial packet and each
+  repair closure — and asserts the property over all of them.**
+
+## A ticket's site COUNT is a measurement with an expiry, and it outlives the sites (same seat, same day)
+- W7 (minted 2026-09-03) names three leaking sites in `packages/judgement/src/index.ts`
+  (`:219`+`:225`, `:372`+`:376`, `:462`+`:466`). Measured at `e6477f64` there are TWO payload sites
+  (`:379`, `:469` with their system prompts at `:373`, `:463`), and the first pair carries no payload
+  field at the mission tip `e2adf68b` either. A seat that trusts the count either hunts a third site
+  or reports two and looks wrong.
+- **Rule: a ticket that quotes a count or a line writes it as `as of <sha>: N`. A seat re-measures
+  before acting, and the guard ENUMERATES the surface (render every builder) so the authoritative
+  count comes from the code, not from the ticket.**
+- Corollary that made the removal stick: the payload field name also lived in a closed union
+  (`UntrustedPromptFieldName`). Deleting the union member with the sites turns a re-add into a
+  compile error instead of a one-line edit — vitest still transpiles the mutant, so the guard and the
+  compiler both speak.
