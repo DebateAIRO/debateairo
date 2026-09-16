@@ -167,3 +167,75 @@ renderer omits the model token.
    exact-optional mismatches are cheap to catch before the heavy database matrix.
 5. Preserve a reusable stage-order fixture whose mutant moves generation ahead of validation. That
    single detector should become part of C3 so future startup-stage additions cannot mask R22 again.
+
+## RULING 7
+
+### Cause
+
+The public plan-tier read inherited an operator projection's database capability footprint.
+`readPlanTierRosters` reused `readDeployment`, so one user-facing request launched three queries:
+the sealed register, scorecards, and the account-erasure identity ledger. The production API role
+may read the first two but deliberately has no `SELECT` on `identity.run_execution_binding`; the
+whole `Promise.all` therefore failed with SQLSTATE `42501` even though the roster row itself was
+available. Every earlier database test used a privileged pool, and the unit fake explicitly
+returned empty rows for the two unrelated queries, so both test layers encoded away the production
+role boundary.
+
+The repair makes the public read issue one version-pinned query to `register.register_row`, then
+keeps the existing `{free, premium}` projection and schema parse. The operator deployment read is
+unchanged and remains the separately tracked pre-existing defect `t_7830f09e`.
+
+### Price
+
+- One merged landing passed repository verification but failed V's served-stack acceptance step 2:
+  `/new` showed `ASK_PLAN_TIER_ROSTERS_UNAVAILABLE`, and neither tier card listed its models.
+- The defect required another continuation ticket, one real-role RED/GREEN cycle, a focused unit
+  detector, a production mutant, a neighboring mutant, three embedded-PostgreSQL runs, C4, §5, and
+  before/after typecheck. The RULING 7 continuation cost roughly 20 minutes; the integrated frame
+  dominated wall time.
+- The test gap was more expensive than the code change: the production rewrite is one bounded
+  query, while proving the missing privilege assumption required a new database fixture and the
+  full inherited matrix.
+
+### What nearly went wrong
+
+- Granting `debateai_runtime` access to `identity.run_execution_binding` would have hidden the route
+  design error and weakened the account-erasure ledger boundary. The relation was not needed for
+  the public roster response.
+- Fixing `readDeployment` would have crossed the ruling and conflated this acceptance failure with
+  `t_7830f09e`. The integration test intentionally proves that operator read still returns `42501`.
+- Reusing an ordinary embedded admin pool would have repeated the original false green. The new
+  fixture uses a one-connection pool and executes `SET ROLE debateai_runtime` on that session before
+  constructing the application.
+- Reading the latest register would have made the privilege test pass while violating the API's
+  configured-version boundary. The query remains pinned to `this.settings.registerVersion`.
+
+### Dead ends not to re-derive
+
+- Do not broaden runtime grants to the identity ledger for `/v1/plan-tiers`.
+- Do not reuse the deployment aggregate, even if scorecard and identity queries are made serial or
+  caught individually; unrelated dependencies do not belong on the public roster path.
+- Do not repair `/v1/deployment` in this change. Its `42501` is pre-existing and separately owned by
+  `t_7830f09e`.
+- Do not test this boundary with a privileged pool or a query fake that accepts unrelated schemas.
+
+### What must improve
+
+1. Derive a route-to-relation capability manifest and compare every route's query set with the
+   deployed role before dispatch. A response that needs one register row should declare one
+   relation, not inherit an aggregate reader implicitly.
+2. Require at least one least-privilege database test for each user-facing read. Migration success
+   and admin-pool integration tests are not evidence that the served principal can execute it.
+3. Make test pools name their effective role. A helper such as `withDatabaseRole("debateai_runtime")`
+   should own the single-session guarantee and expose the current role in failure output.
+4. Add a static query-capability check that flags a public method calling a broader operator method
+   when the callee touches relations outside the caller's declared capability set.
+
+### Toward a one-prompt machine
+
+Before freezing a packet, the orchestrator should compile the acceptance route into a small
+machine-checkable table: route → application method → exact SQL relations → deployed principal →
+required grants. It should then execute one generated embedded-postgres probe under that role. For
+this case the table would have shown `GET /v1/plan-tiers → readPlanTierRosters → register.register_row
+→ debateai_runtime → SELECT` and rejected the extra identity edge before any review pass or live
+restart. That turns role truth from a late V-only observation into dispatch-time evidence.
