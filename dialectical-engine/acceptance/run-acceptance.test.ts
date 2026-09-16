@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { announceAbsentMakers, parseAcceptanceArguments } from "./run-acceptance.js";
+import { parseAcceptanceArguments } from "./run-acceptance.js";
+import { announceAbsentMakers } from "./absent-makers.js";
 
 describe("ACC-01 one-shot ceremony arguments", () => {
   const serviceCredential = "s".repeat(43);
@@ -79,9 +80,9 @@ describe("ACC-01 an absent configured maker is LOUD before the debate starts", (
     ).toBe("function");
     const absent = announceAbsentMakers(
       [
-        { status: "fulfilled", value: {} },
-        { status: "rejected", reason: new Error("CLAUDE_CLI_FAILED") },
-        { status: "rejected", reason: new Error("GROK_CLI_FAILED") }
+        { providerRef: "acceptance:codex-cli", start: { status: "fulfilled", value: {} } },
+        { providerRef: "acceptance:claude-cli", start: { status: "rejected", reason: new Error("CLAUDE_CLI_FAILED") } },
+        { providerRef: "acceptance:grok-cli", start: { status: "rejected", reason: new Error("GROK_CLI_FAILED") } }
       ],
       providers,
       (line) => { emitted.push(line); }
@@ -102,7 +103,10 @@ describe("ACC-01 an absent configured maker is LOUD before the debate starts", (
   it("says nothing at all when every configured relay started (the admitted boundary)", () => {
     const emitted: string[] = [];
     const absent = announceAbsentMakers(
-      providers.map(() => ({ status: "fulfilled", value: {} }) as const),
+      providers.map((provider) => ({
+        providerRef: provider.providerRef,
+        start: { status: "fulfilled", value: {} } as const
+      })),
       providers,
       (line) => { emitted.push(line); }
     );
@@ -115,9 +119,9 @@ describe("ACC-01 an absent configured maker is LOUD before the debate starts", (
     const emitted: string[] = [];
     announceAbsentMakers(
       [
-        { status: "rejected", reason: new Error("   ") },
-        { status: "rejected", reason: "not an Error" },
-        { status: "fulfilled", value: {} }
+        { providerRef: "acceptance:codex-cli", start: { status: "rejected", reason: new Error("   ") } },
+        { providerRef: "acceptance:claude-cli", start: { status: "rejected", reason: "not an Error" } },
+        { providerRef: "acceptance:grok-cli", start: { status: "fulfilled", value: {} } }
       ],
       providers,
       (line) => { emitted.push(line); }
@@ -138,7 +142,7 @@ describe("ACC-01 an absent configured maker is LOUD before the debate starts", (
     } as typeof process.stdout.write;
     try {
       announceAbsentMakers(
-        [{ status: "rejected", reason: new Error("GROK_CLI_FAILED") }],
+        [{ providerRef: "acceptance:grok-cli", start: { status: "rejected", reason: new Error("GROK_CLI_FAILED") } }],
         [{ providerRef: "acceptance:grok-cli", maker: "xAI" }]
       );
     } finally {
@@ -152,8 +156,8 @@ describe("ACC-01 an absent configured maker is LOUD before the debate starts", (
     const emitted: string[] = [];
     const absent = announceAbsentMakers(
       [
-        { status: "rejected", reason: new Error("GROK_CLI_FAILED") },
-        { status: "rejected", reason: new Error("UNCONFIGURED_CLI_FAILED") }
+        { providerRef: "acceptance:grok-cli", start: { status: "rejected", reason: new Error("GROK_CLI_FAILED") } },
+        { providerRef: "acceptance:mystery-cli", start: { status: "rejected", reason: new Error("UNCONFIGURED_CLI_FAILED") } }
       ],
       [{ providerRef: "acceptance:grok-cli", maker: "xAI" }],
       (line) => { emitted.push(line); }
@@ -162,4 +166,5 @@ describe("ACC-01 an absent configured maker is LOUD before the debate starts", (
     expect(emitted).toEqual(["MAKER ABSENT xAI GROK_CLI_FAILED"]);
     expect(absent).toHaveLength(1);
   });
+
 });

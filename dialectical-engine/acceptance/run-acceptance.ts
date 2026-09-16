@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { AskAcceptedSchema, AskRequestSchema, AnswerSchema, type AskRequest } from "@debateai/contract";
 import { ProviderProbeRepository } from "@debateai/db";
+import { announceAbsentMakers } from "./absent-makers.js";
 import { startClaudeRelay, type ClaudeRelayHandle } from "./claude-relay.js";
 import { startGrokRelay, type GrokRelayHandle } from "./grok-relay.js";
 import { assertFairDebate, type FairDebateReport } from "./fair-debate.js";
@@ -152,48 +153,6 @@ async function closeAll(
   await database?.stop().catch(() => undefined);
 }
 
-/** One configured maker that did not reach the debate, and why. */
-export interface AbsentMaker {
-  readonly providerRef: string;
-  readonly maker: string;
-  readonly failureCode: string;
-}
-
-/**
- * F-GROK-SANDBOX-PROFILE outcome (1). The closing run of 2026-09-08 debated on
- * two of three configured makers and its own log could not say so: a rejected
- * relay start became an ABSENT provider probe in a TEMPORARY database and
- * printed nothing at all.
- *
- * This is the announcement AND the derivation of that record, in one call, so
- * the ceremony cannot keep the row while losing the line — a run's log must
- * never pass silently on a maker it was configured to use. It runs where the
- * probes are recorded, before the runtime is built and therefore before any
- * debate starts.
- */
-export function announceAbsentMakers(
-  relayStarts: readonly PromiseSettledResult<unknown>[],
-  configuredProviders: readonly { readonly providerRef: string; readonly maker: string }[],
-  emit: (line: string) => void = (line) => { process.stdout.write(`${line}\n`); }
-): readonly AbsentMaker[] {
-  const absent: AbsentMaker[] = [];
-  for (const [index, result] of relayStarts.entries()) {
-    if (result.status === "fulfilled") continue;
-    const configured = configuredProviders[index];
-    if (configured === undefined) continue;
-    const failureCode = result.reason instanceof Error && result.reason.message.trim() !== ""
-      ? result.reason.message
-      : "PROVIDER_RELAY_START_FAILED";
-    emit(`MAKER ABSENT ${configured.maker} ${failureCode}`);
-    absent.push(Object.freeze({
-      providerRef: configured.providerRef,
-      maker: configured.maker,
-      failureCode
-    }));
-  }
-  return Object.freeze(absent);
-}
-
 export async function runAcceptanceCeremony(
   parsed: AcceptanceArguments,
   source: NodeJS.ProcessEnv = process.env,
@@ -229,8 +188,16 @@ export async function runAcceptanceCeremony(
     const probes = new ProviderProbeRepository(database.pool);
     // F-GROK-SANDBOX-PROFILE outcome (1). The announcement and the ABSENT
     // provider probe come from ONE call, so the ceremony cannot keep the
-    // database record while losing the line its own log is read from.
-    for (const absent of announceAbsentMakers(relayStarts, policy.providers)) {
+    // database record while losing the line its own log is read from. The
+    // provider refs are named here rather than indexed out of `policy.providers`
+    // — only this call site knows which relay sits at which position, and the
+    // refs below are the same ones `makerRelays` is built from.
+    const namedStarts = (["acceptance:codex-cli", "acceptance:claude-cli", "acceptance:grok-cli"] as const)
+      .flatMap((providerRef, index) => {
+        const start = relayStarts[index];
+        return start === undefined ? [] : [{ providerRef, start }];
+      });
+    for (const absent of announceAbsentMakers(namedStarts, policy.providers)) {
       await probes.record({
         probeEvidenceRef: randomUUID(),
         providerRef: absent.providerRef,
