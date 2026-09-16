@@ -1,12 +1,9 @@
 #!/bin/bash
 # D15 batch suite on the integration worktree, with set-equality classification vs T0's authority.
 # Usage: d15-suite.sh <batch-label>   (bash, not zsh — word-splitting traps)
-# SUPERSEDED ARCHIVE — kept for provenance; d15-suite.sh is the live tool. Its two laptop-absolute roots
-# were replaced on 2026-09-16 (Task 18) by the same location-and-git resolution the live tool now uses, so
-# no file under tools/ names a machine that no longer exists. Nothing else in this archive was touched.
 set -u
-M="$(cd "$(dirname "$0")/.." && pwd)"
-W="${W:-$(git -C "$(cd "$M/../../.." && pwd)" rev-parse --show-toplevel)/.worktrees/integration/dialectical-engine}"
+M=/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop
+W=/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/integration/dialectical-engine
 L=${1:?batch label}; OUT="$M/logs/integration-suite-$L.log"; CL="$M/logs/integration-suite-$L.CLASSIFICATION.txt"
 cd "$W" || exit 2
 tip=$(git rev-parse --short HEAD); dirty=$(git status --porcelain | wc -l | tr -d ' ')

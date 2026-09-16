@@ -5612,3 +5612,25 @@ not in 4 000 lines of prose every author skims.
   `dirname "$0"` is `tools`, so `cd "$(dirname "$0")/.." && pwd` is still the mission dir.
 - Related to `:1477` (OneDrive exec-bit flips get COMMITTED) — this is that trap's end state, now
   uniform across the directory.
+
+## A host-portability sweep must stop at the `*-superseded` ARCHIVES — they are records of what ran (2026-09-16, FIX(CONT-T18) round 1)
+- Task 18 removed one operator's absolute home from the mission's tools. The packet's write surface
+  was "every file your grep names", and `grep -l 'stefan.nour' tools/*` names **seven** files — five
+  live tools and **two `*-superseded` archives**. Porting the archives makes them describe a machine
+  the archived version never ran on, which is the one thing an archive must not do.
+- The disagreement was silent in both directions, because the stated GREEN command is
+  `grep -c 'stefan.nour' tools/*.sh` and **that glob does not match `d15-suite.sh.v1-superseded`**
+  (nor `tools/*.py` the `.py.v1-superseded`). So the prose file list and the gate covered different
+  sets: port the archives and the gate cannot tell; skip them and the gate still says GREEN.
+- **The criterion, restated and now the standing one: 0 laptop mentions across the LIVE tools
+  (`tools/*.sh`, `tools/*.py`), while `*-superseded` archives KEEP theirs by design, as records.**
+  A sweep over `tools/` should therefore assert *exactly the expected archive hits*, by name, rather
+  than asserting zero — a bare zero cannot distinguish "clean" from "I rewrote the evidence".
+- Reverting is the cheap half; proving the revert is the half with a trap in it. `git diff <sha> --
+  <path>` is empty **and exit 0 when the pathspec matches nothing** (`:1447`), so an empty diff alone
+  does not prove byte-identity. Prove it by blob hash — `git rev-parse <base>:./<path>` against
+  `git hash-object <path>` — and show a NON-empty control diff (`git diff <base> <tip> -- <path>`) so
+  the pathspec is demonstrably resolving.
+- **Rule: a mechanical sweep defined by a grep is defined over file CONTENT; the write contract has to
+  be defined over file ROLE. Before editing anything whose name says `superseded`, `archive`, `.orig`
+  or `-v1`, ask what would be false about it afterwards.**
