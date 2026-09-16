@@ -315,7 +315,18 @@ describe("P4-13 approved adversarial relay corpus", () => {
       format: "debateai.untrusted-prompt-fields.v1",
       fields: [
         { name: "question_line", content },
-        { name: "author_maker", content },
+        // W7 / V-BLIND-CONTEXT (2026-09-03, commit abb6b21b): `author_maker` is
+        // gone from the payload. `authorMaker` is still PASSED to `review` above
+        // (`:287`) and still recorded — that is the ruling's other half: RECORDED
+        // in the database, WITHHELD from the model. The forged label this case is
+        // about now arrives only in `statement`, where the envelope fences it, so
+        // DELIM-01 still measures exactly what it was written to measure.
+        // `tests/unit/judgement.test.ts:263-270` carries the same correction for
+        // the unit-layer twin; `tests/unit/prompt-surface-guard.test.ts` owns the
+        // withholding property for the whole prompt surface.
+        // Task 11 collateral: this suite reads the packet through the CLI fixture
+        // rather than through the Judge directly, so it was outside that task's
+        // reader set and has been red since abb6b21b. Fixed in Task 16 fix round 1.
         { name: "statement", content },
         // T5/S3-1: the edges a review is asked to measure are model-authored
         // material too, so they are fenced in the SAME versioned untrusted-data
