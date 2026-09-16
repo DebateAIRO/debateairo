@@ -260,7 +260,13 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
         format: "debateai.untrusted-prompt-fields.v1",
         fields: [
           { name: "question_line", content: questionLine },
-          { name: "author_maker", content: authorMaker },
+          // W7 / V-BLIND-CONTEXT (2026-09-03): `author_maker` is gone from the
+          // payload. `authorMaker` is still PASSED to `review` above and still
+          // recorded — that is the ruling's other half: RECORDED in the
+          // database, WITHHELD from the model. The forged label this case is
+          // about now arrives only in `statement`, where the envelope fences it.
+          // `tests/unit/prompt-surface-guard.test.ts` owns the withholding
+          // property for the whole prompt surface.
           { name: "statement", content: statement },
           // T5/S3-1: the edge material the reviewer measures is model-authored
           // too, so it is fenced in the same versioned untrusted-data envelope
