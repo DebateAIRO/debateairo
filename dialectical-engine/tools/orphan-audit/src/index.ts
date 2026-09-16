@@ -52,6 +52,41 @@ function workspaceName(dependency: string): string | null {
   return dependency.slice("@debateai/".length);
 }
 
+/**
+ * The manifest read behind every edge row, and the guard on it.
+ *
+ * A declared row whose directory ships no `package.json` is a VIOLATION, never
+ * a throw. This audit spent the whole merge window dying on `ENOENT …
+ * web/package.json` here, and a crashed audit does not report zero violations —
+ * it reports NOTHING, so every count taken from that state was a guess. Three
+ * separate records predicted three `obs-capture` violations; the first finished
+ * run produced five. The row's absence must be readable IN the verdict.
+ *
+ * Only file absence is absorbed. A manifest that exists but does not parse is a
+ * different defect and stays loud: reporting a corrupt manifest as "no manifest"
+ * would be the same class of lie this guard exists to end.
+ */
+export async function auditEdgeManifest(name: string, directory: string): Promise<{
+  readonly dependencies: readonly string[];
+  readonly violations: readonly string[];
+}> {
+  let text: string;
+  try {
+    text = await readFile(join(root, directory, "package.json"), "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    return { dependencies: [], violations: [`${name} has no manifest at ${directory}`] };
+  }
+  const manifest = JSON.parse(text) as {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+  const dependencies = Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })
+    .map(workspaceName)
+    .filter((value): value is string => value !== null);
+  return { dependencies, violations: [] };
+}
+
 export async function auditArchitecture(): Promise<{
   readonly edgeRowsChecked: number;
   readonly violations: readonly string[];
@@ -59,14 +94,10 @@ export async function auditArchitecture(): Promise<{
   const violations: string[] = [];
   const graph = new Map<string, string[]>();
   for (const [name, directory, allowed] of rows) {
-    const manifest = JSON.parse(await readFile(join(root, directory, "package.json"), "utf8")) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    };
-    const actual = Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })
-      .map(workspaceName)
-      .filter((value): value is string => value !== null);
-    graph.set(name, actual);
+    const manifest = await auditEdgeManifest(name, directory);
+    violations.push(...manifest.violations);
+    const actual = manifest.dependencies;
+    graph.set(name, [...actual]);
     for (const dependency of actual) {
       if (!allowed.includes(dependency)) violations.push(`${name} -> ${dependency} is not a declared edge`);
     }

@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { LEDGER_OUTCOMES } from "@debateai/kernel";
 import {
   auditArchitecture,
+  auditEdgeManifest,
   auditMigrationReplaySafety,
   auditOrphans,
   auditSurfaceAttachmentLiterals,
@@ -26,6 +27,21 @@ describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
     const report = await auditArchitecture();
     expect(report.edgeRowsChecked).toBe(27);
     expect(report.violations).toEqual([]);
+  });
+
+  // PROPERTY: a declared edge row whose directory ships no package.json is
+  // REPORTED as a violation and never thrown. A crashed audit does not report
+  // zero violations, it reports NOTHING — that is exactly how the retired `web`
+  // row hid five real edge violations for the whole merge window, and why the
+  // records that counted three were guessing. The second half pins the other
+  // direction: a row that DOES ship a manifest must stay silent, so a guard
+  // that reports every row cannot pass.
+  it("reports a declared edge row with no manifest instead of throwing", async () => {
+    const missing = await auditEdgeManifest("bogus", "packages/does-not-exist");
+    expect(missing.violations).toEqual(["bogus has no manifest at packages/does-not-exist"]);
+    expect(missing.dependencies).toEqual([]);
+    const present = await auditEdgeManifest("kernel", "packages/kernel");
+    expect(present.violations).toEqual([]);
   });
 
   it("enforces purity, one provider gateway, source-constant, exhaustive-switch and labeled-number gates", async () => {
