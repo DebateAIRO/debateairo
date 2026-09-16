@@ -30,13 +30,16 @@ describe("S14 / AC-59..61 / W19 — native UI contract", () => {
     expect(localEnv).toContain("NEXT_PUBLIC_API_BASE=/api");
   });
 
-  it("FX-ORPH-04 walks web consumers in both directions and rejects the death-list inventory", async () => {
+  it("FX-ORPH-04 pins the generated contract version and the closed event vocabulary's consumers", async () => {
+    // The two-direction WEB-consumer walk and the death-list sweep retired with
+    // their subject: `web/` is retired in favour of apps/ui
+    // (.hermes/reports/2026-09-01-algorithm-live-loop/PROGRESS.md:32,
+    // DECISIONS.md:810), and apps/ui ships no equivalent of
+    // web/lib/v3Presentation.ts, so those three assertions are not re-pointed by
+    // analogy. The contract-derived half of FX-ORPH-04 is unchanged.
     const report = await auditS14TypeGraph();
     expect(report.contractVersion).toBe("v1");
-    expect(report.servedWithoutConsumer).toEqual([]);
-    expect(report.consumedWithoutServed).toEqual([]);
     expect(report.eventsWithoutConsumer).toEqual([]);
-    expect(report.deathListReachable).toEqual([]);
   });
 
   it("carries the S04 orphan-audit wording fix and deterministic locale tiebreak", async () => {

@@ -18,9 +18,13 @@ describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
     ]);
   });
 
-  it("matches all 28 dependency-edge rows and structural rules 1–5", async () => {
+  // 28 -> 27: the `web` edge row retired with its surface (apps/ui replaces it —
+  // .hermes/reports/2026-09-01-algorithm-live-loop/PROGRESS.md:32,
+  // DECISIONS.md:810), and its unguarded manifest read was what made this audit
+  // throw ENOENT instead of reporting.
+  it("matches all 27 dependency-edge rows and structural rules 1–5", async () => {
     const report = await auditArchitecture();
-    expect(report.edgeRowsChecked).toBe(28);
+    expect(report.edgeRowsChecked).toBe(27);
     expect(report.violations).toEqual([]);
   });
 

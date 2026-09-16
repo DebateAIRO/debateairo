@@ -32,7 +32,11 @@ const rows: readonly Row[] = [
   ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget", "contract"]],
   ["apps/replay", "apps/replay", ["published-arithmetic"]],
   ["apps/scheduler", "apps/scheduler", ["kernel", "db", "ledger", "register", "propagation", "serve", "battery", "settlement", "liveness"]],
-  ["web", "web", ["contract"]],
+  // The `web` row retired with its surface: `web/` is retired in favour of
+  // apps/ui (.hermes/reports/2026-09-01-algorithm-live-loop/PROGRESS.md:32,
+  // DECISIONS.md:810). It is not a pnpm workspace member and ships no
+  // package.json on either merge parent, so the unguarded manifest read below
+  // threw ENOENT and the architecture audit crashed instead of reporting.
   ["tools/orphan-audit", "tools/orphan-audit", ["kernel", "contract"]],
   ["tools/acceptance-bundle", "tools/acceptance-bundle", ["kernel", "contract", "register", "db"]]
 ];
@@ -115,47 +119,35 @@ function withoutUiSurface(paths: readonly string[]): string[] {
   return paths.filter((path) => !path.startsWith(uiSurfaceDirectory));
 }
 
+/**
+ * FX-ORPH-04, after the `web/` retirement.
+ *
+ * This walk used to read the legacy Next app's presentation projection
+ * (`web/lib/v3Presentation.ts`) to derive the fields the UI consumes, and to
+ * sweep the same app's routed sources for death-list markers. `web/` is retired
+ * in favour of apps/ui (.hermes/reports/2026-09-01-algorithm-live-loop/
+ * PROGRESS.md:32, DECISIONS.md:810), and apps/ui ships no equivalent artifact —
+ * measured: no `= answer;` destructuring exists anywhere under apps/ui — so the
+ * served-vs-consumed field walk and the death-list reachability sweep retire
+ * with their subject instead of being re-pointed by analogy.
+ *
+ * What never depended on `web/` stays, and is still asserted: the generated
+ * contract version, and the closed event vocabulary's declared consumers, both
+ * read from @debateai/contract.
+ */
 export async function auditS14TypeGraph(): Promise<{
   readonly contractVersion: string;
-  readonly servedWithoutConsumer: readonly string[];
-  readonly consumedWithoutServed: readonly string[];
   readonly eventsWithoutConsumer: readonly string[];
-  readonly deathListReachable: readonly string[];
 }> {
   const inventory = JSON.parse(await readFile(join(root, "packages/contract/generated/field-inventory.json"), "utf8")) as {
     contractVersion: string;
-    resources: { AnswerSchema: string[] };
   };
-  const projection = await readFile(join(root, "web/lib/v3Presentation.ts"), "utf8");
-  const destructuring = projection.match(/const\s*\{([\s\S]*?)\}\s*=\s*answer;/)?.[1] ?? "";
-  const consumed = [...destructuring.matchAll(/\b([a-z][a-z0-9_]*)\b/g)].map((match) => match[1]!);
-  const served = inventory.resources.AnswerSchema;
-  const servedWithoutConsumer = served.filter((field) => !consumed.includes(field));
-  const consumedWithoutServed = [...new Set(consumed.filter((field) => !served.includes(field)))];
   const eventsWithoutConsumer = Object.entries(EVENT_CONSUMERS)
     .filter(([, consumers]) => consumers.length === 0)
     .map(([event]) => event);
-
-  const webFiles = await sourceFiles(join(root, "web"));
-  const sources = await Promise.all(webFiles.map(async (path) => ({
-    path: relative(join(root, "web"), path),
-    source: await readFile(path, "utf8")
-  })));
-  const reachableText = sources
-    .filter(({ path }) => path.startsWith("app/") || path === "lib/api.ts" || path === "lib/serverApi.ts" || path === "lib/v3Presentation.ts")
-    .map(({ source }) => source)
-    .join("\n");
-  const deathMarkers = [
-    "DebateTree", "ArgumentFocusView", "DebateOutline", "listDebates", "ScoringRefreshState",
-    "indexScoringResponse", "force_refresh", "DIALECTICAL_COORDINATOR_URL", "/api/debates"
-  ];
-  const deathListReachable = deathMarkers.filter((marker) => reachableText.includes(marker));
   return {
     contractVersion: inventory.contractVersion,
-    servedWithoutConsumer,
-    consumedWithoutServed,
-    eventsWithoutConsumer,
-    deathListReachable
+    eventsWithoutConsumer
   };
 }
 
