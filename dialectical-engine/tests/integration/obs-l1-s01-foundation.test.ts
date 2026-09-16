@@ -903,6 +903,71 @@ describe("S01 obs store foundation on real PostgreSQL", () => {
       { grantee: "debateai_obs_view_owner", columns: safeColumns }
     ]);
 
+    // The pin above guards `core.run` only, and `core.run` was one member of a class of
+    // four. `debateai_obs_view_owner` owns five views, none of which declares
+    // `security_invoker`, so it defaults to false and PostgreSQL checks the OWNER's
+    // base-table privileges — its grant IS the chokepoint floor for every one of them.
+    // Three landed statements had raised that floor to whole tables:
+    // `migrations/0058_observation_safe_views.sql:23` (core.work_item,
+    // core.run_progress_event) and `migrations/0060_observation_throughput_views.sql:23`
+    // (core.run, core.work_item, ledger.raw_artifact), the latter superseding the column
+    // grant of `migrations/0034_obs_foundation.sql:274-275`.
+    // `migrations/0062_obs_view_owner_column_floor.sql` revokes all four table-level
+    // grants and re-issues, per table, exactly the columns the owner's own views read —
+    // measured from `pg_depend`, not from the migration text:
+    //   core.run                -> obs.run_correlation_v, obs.run_throughput_v
+    //   core.work_item          -> obs.run_throughput_v, obs.work_item_liveness_v
+    //   ledger.raw_artifact     -> obs.provider_call_v
+    //   core.run_progress_event -> obs.run_progress_v
+    // This pin is exact on BOTH fields, so the next widening of ANY member fails it: a
+    // table-level grant flips `table_select`, and a wider column list fails the array.
+    const ownerFloor = await database.pool.query<{
+      target: string; table_select: boolean; columns: string[] | null;
+    }>(`
+      SELECT t AS target,
+        has_table_privilege('debateai_obs_view_owner', t, 'SELECT') AS table_select,
+        (SELECT array_agg(column_name ORDER BY column_name)::text[]
+         FROM information_schema.column_privileges
+         WHERE grantee = 'debateai_obs_view_owner' AND privilege_type = 'SELECT'
+           AND table_schema = split_part(t, '.', 1)
+           AND table_name = split_part(t, '.', 2)) AS columns
+      FROM unnest(ARRAY[
+        'core.run', 'core.run_progress_event', 'core.work_item', 'ledger.raw_artifact'
+      ]) AS t
+      ORDER BY t
+    `);
+    expect(ownerFloor.rows).toEqual([
+      { target: "core.run", table_select: false, columns: safeColumns },
+      {
+        target: "core.run_progress_event",
+        table_select: false,
+        columns: ["at_seq", "kind", "run_id"]
+      },
+      {
+        target: "core.work_item",
+        table_select: false,
+        columns: [
+          "claim_deadline", "claimed_by", "created_at_seq", "run_id",
+          "settled_artifact_ref", "state", "work_item_id"
+        ]
+      },
+      {
+        target: "ledger.raw_artifact",
+        table_select: false,
+        columns: ["at_seq", "model_id", "parse_status", "provider_ref"]
+      }
+    ]);
+
+    // Every view the owner owns must still SELECT through that floor. Without this, a
+    // column list that is too NARROW is invisible: it breaks a view at query time while
+    // every privilege pin above stays green.
+    for (const view of [
+      "obs.run_correlation_v", "obs.run_throughput_v", "obs.provider_call_v",
+      "obs.work_item_liveness_v", "obs.run_progress_v"
+    ]) {
+      await expect(database.pool.query(`SELECT 1 FROM ${view} LIMIT 1`)).resolves.toBeDefined();
+    }
+
     await withRole("debateai_obs_human", async (human) => {
       await expect(human.query("SELECT * FROM obs.occurrence_detail LIMIT 0"))
         .resolves.toBeDefined();
