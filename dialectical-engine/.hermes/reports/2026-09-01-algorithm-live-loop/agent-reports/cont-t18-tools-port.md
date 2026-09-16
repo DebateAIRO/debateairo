@@ -195,3 +195,76 @@ reviewer discover that the GREEN proves less than it looks like it proves.
   not correct. Named by CONT-T17 as well; still standing after two tickets. The readiness packet
   works around it by setting both keys explicitly.
 - **No mission tool gates the mission's tools** — the class behind this whole ticket. See §5.1.
+
+---
+
+## Fix round 1 — addendum to the case file
+
+Round 1 of 5 on the orchestrator's review of `6cdc14b2..d47452e1`. Commits `c83c2f54` (F1),
+`02d812a4` (F2), plus this docs commit. Full evidence in the SDD report's `## Fix round 1`.
+
+### The thing I got wrong was a boundary, and I had already seen it
+
+F1 reverts the two `*-superseded` archives I ported. I am not surprised by the finding — I wrote it
+myself as round-0 concern §9.3, and even measured that the brief's own GREEN glob (`tools/*.sh`)
+does not match them. **I had the evidence, I named the tension, and then I resolved it the wrong
+way: toward the explicit file list rather than toward what the files are.**
+
+That is worth being precise about, because "flag it and proceed" felt like the disciplined move and
+it was the cheaper half of the discipline. The packet says a defect is reported, never absorbed. I
+reported it *and* absorbed it. The rule I was missing:
+
+> **A mechanical sweep defined by a grep is defined over file CONTENT. A write contract has to be
+> defined over file ROLE.** `grep -l` cannot tell a tool from a record. Before editing anything whose
+> name says `superseded`, `archive`, `.orig` or `-v1`, ask what would be false about that file
+> afterwards — and if the answer is "it would describe a machine it never ran on", that is not a
+> judgement call, it is a stop.
+
+*Price:* one revert, one traps entry, one round. *Price had nobody caught it:* two archives in the
+mission's permanent record silently claiming provenance they do not have — the exact failure class
+this mission's stamping and set-equality rules exist to prevent, arriving through a portability
+sweep instead of through a log.
+
+*What I nearly got wrong in the fix itself:* proving a revert with `git diff <base> -- <path>`, which
+is empty **and exit 0 when the pathspec matches nothing** (`TOOLING-TRAPS:1447`). An empty diff would
+have "proved" the revert even if I had fat-fingered the path. Proved it by blob hash
+(`git rev-parse <base>:./<path>` vs `git hash-object`) **and** showed a non-empty control diff
+against `d47452e1`, so the pathspec is demonstrably resolving. Cost: three extra lines of gate.
+
+### F2 — the stream was wrong, and the place it was wrong is the place it matters
+
+The readiness packet told the operator to expect `RELAY DEGRADED xAI SANDBOX-PROFILE-UNAVAILABLE` on
+**stderr**. It is `process.stdout.write` (`acceptance/grok-relay.ts:199-201`), and the code's own
+comment two lines up says so: "Loud on the ceremony's own stdout".
+
+The instructive part is *why the error was survivable and therefore invisible*: `closing-run.sh`
+captures with `>> "$LOG" 2>&1`, so both streams land in one file and no log would ever have exposed
+the mistake. It would only bite an operator watching a live terminal or filtering one stream — the
+one reader who cannot check the source. **A fact that only a human consumer depends on is a fact no
+gate will ever catch; those sentences need a citation at the moment they are written, not a review.**
+I wrote `grok-relay.ts:87`, `:102` and `:24` for the three constants in that same paragraph and then
+asserted the stream with no line at all. The citations I took were exactly the ones that were easy.
+
+*Generalisable, and cheap:* **any claim about behaviour in an operator-facing document carries a
+`file:line`, or it is a guess.** Round 0 already applied that rule to every value in the table; it
+should apply to every verb in the prose too.
+
+### What this says about the machine
+
+1. **"I flagged it" is not the same as "I stopped".** The heartbeat protocol's §3.7 is *say what you
+   cannot do* — but a contract that names a file whose role forbids the edit is a packet defect that
+   should have produced a question, not a concern paragraph filed after the fact. One question, one
+   round-trip, versus one review round: the question is an order of magnitude cheaper, and I had the
+   information to ask it before I made the edit.
+2. **Two of round 0's three near-misses and both of this round's findings share one shape:** a check
+   that reports success over a thing it never examined — `perl -0pi` exiting 0 on no-match, porcelain
+   blind to gitignored residue, `git diff` empty on an unmatched pathspec, a merged `2>&1` hiding a
+   stream error. **The house rule that would catch all four: every instrument must be shown able to
+   say NO on this exact input before its YES is worth anything.** That is `TOOLING-TRAPS:4787`
+   ("Prove the instrument can still say YES before reporting eight NOs") run in the other direction,
+   and it is the single highest-value habit in this mission's tooling.
+3. **The four tools findings are drafted as ticket lines** in the SDD report rather than fixed, per
+   the review: `closing-run.sh:20` (`mkdir` before the refusal — ruled harmless, left as is),
+   the uniform `100644` modes (`tools/x.sh` exits 126), `closing-run.sh:23` (bare-PATH `--version`
+   reads, untestable from this seat without executing a real CLI), and `d15-classify.py:39-45`
+   (an unresolvable `INT` subtracts nothing, silently).
