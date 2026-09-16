@@ -484,7 +484,13 @@ describe("T1 database ordering — no KDF after connect/BEGIN", () => {
     expect(main).toMatch(/new AuditContextHasher\(\s*argon2Pool,/);
     expect(main).toMatch(/argon2:\s*argon2Pool/);
     // Close is wired to the T3 lifecycle, with no duplicate signal owner here.
-    expect(main).toMatch(/installGracefulShutdown\(\{/);
+    // 9c68ceb3 ("feat(support): SUP-01 C1") moved the direct installGracefulShutdown
+    // call behind installStartupResourceOwner, so the boot script names the owner and
+    // the owner is the one — and only — caller of the T3 installer.
+    const startupOwner = readFileSync(join(repoRoot, "apps/api/src/startup-resource-owner.ts"), "utf8");
+    expect(main).toMatch(/installStartupResourceOwner\(\{/);
+    expect(startupOwner).toMatch(/from "\.\/graceful-shutdown\.js"/);
+    expect(startupOwner).toMatch(/installGracefulShutdown\(options\)/);
     expect(main).not.toMatch(/process\.on\(\s*["']SIG/);
   });
 });
@@ -690,7 +696,12 @@ describe("T1 rework2 R4 — shutdown drains post-response work before closing Ar
   it("keeps process signals in the T3 lifecycle module rather than the boot script", () => {
     const main = readFileSync(mainPath, "utf8");
     const lifecycle = readFileSync(join(repoRoot, "apps/api/src/graceful-shutdown.ts"), "utf8");
-    expect(main).toMatch(/installGracefulShutdown\(\{/);
+    // The boot script reaches the T3 lifecycle through the startup resource owner
+    // added by 9c68ceb3; the owner installs it, and nothing else may.
+    const startupOwner = readFileSync(join(repoRoot, "apps/api/src/startup-resource-owner.ts"), "utf8");
+    expect(main).toMatch(/installStartupResourceOwner\(\{/);
+    expect(startupOwner).toMatch(/installGracefulShutdown\(options\)/);
+    expect(main).not.toMatch(/installGracefulShutdown\(/);
     expect(main).not.toMatch(/process\.on\(\s*["']SIG/);
     expect(main).not.toMatch(/process\.once\(\s*["']SIG/);
     expect(lifecycle).toMatch(/\.on\("SIGTERM", signalHandler\)/);
