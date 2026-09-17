@@ -163,6 +163,71 @@ describe("CP1 composed answer context", () => {
   });
 
   it.each([
+    ["en" as const,"Pricing"],
+    ["ro" as const,"Cum funcționează secțiunea Prețuri?"],
+  ])("keeps a reviewed %s prose-only guide answer actionless in the actual service",async (
+    language,text
+  ) => {
+    const drafted = authorDraftCorpus();
+    const snapshot = corpus(
+      drafted.entries.filter((candidate) => candidate.id === "app-navigation"),
+      `pricing-${language}`
+    );
+    const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
+      kind:"answer",text:"Pricing is currently a placeholder in the public navigation.",
+      sourceIds:[SOURCE_REFERENCE],actionIds:[]
+    }) }));
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-17T13:30:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({
+      ...request(snapshot),text,language,detectedLanguage:language
+    });
+
+    expect(complete).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      outcome:"ANSWER_GROUNDED",sources:[{ id:"app-navigation" }],actions:[]
+    });
+    const system = complete.mock.calls[0]?.[0].system;
+    expect(system).toContain("actionIds=none");
+  });
+
+  it.each([
+    ["en" as const,"Where can I read the Method section?","method","/#method"],
+    ["ro" as const,"Unde pot citi secțiunea Transcrieri?","sample-transcript","/#transcripts"],
+  ])("keeps a genuine %s menu request bound to its relevant closed action",async (
+    language,text,actionId,href
+  ) => {
+    const drafted = authorDraftCorpus();
+    const snapshot = corpus(
+      drafted.entries.filter((candidate) => candidate.id === "app-navigation"),
+      `landing-${language}`
+    );
+    const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
+      kind:"answer",text:"Use the reviewed landing-page section.",
+      sourceIds:[SOURCE_REFERENCE],actionIds:[ACTION_REFERENCE]
+    }) }));
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-17T13:45:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({
+      ...request(snapshot),text,language,detectedLanguage:language
+    });
+
+    expect(complete).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      outcome:"ANSWER_GROUNDED",sources:[{ id:"app-navigation" }],
+      actions:[{ id:actionId,href }]
+    });
+  });
+
+  it.each([
     "Is Dialectical Engine a reasoning instrument?",
     "Give me an overview of dialecticalengine."
   ])("grounds a reviewed identity paraphrase through the actual service on the admitted corpus: %s", async (

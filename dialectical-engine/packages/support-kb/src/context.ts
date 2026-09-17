@@ -62,6 +62,28 @@ const GENERIC_EVIDENCE_WORDS = new Set([
   "nou","noua","noi","poate","pot","produs","produsul","sectiune","spune","suport","unde",
   "dezbatere","dezbaterea","dezbateri","dezbaterii","asistenta","modelul","modele"
 ]);
+const ACTION_QUERY_TERMS: Readonly<Record<
+  SupportActionId,Readonly<Record<SupportLanguage,readonly string[]>>
+>> = Object.freeze({
+  "home":{ en:["home"],ro:["acasă"] },
+  "start-debate":{ en:["start a debate","create a debate"],ro:["pornește o dezbatere","creează o dezbatere"] },
+  "sign-in":{ en:["sign in","login"],ro:["autentificare"] },
+  "sign-up":{ en:["sign up","create account","register"],ro:["creează cont","înregistrare"] },
+  "help":{ en:["help","help conversation"],ro:["ajutor","conversația ajutor"] },
+  "support-status":{ en:["support status","service status"],ro:["starea serviciului","starea asistenței"] },
+  "method":{ en:["method"],ro:["metodă"] },
+  "sample-transcript":{ en:["transcript","transcripts"],ro:["transcriere","transcrieri"] },
+  "settings":{ en:["settings","account settings"],ro:["setări","account"] },
+  "active-sessions":{ en:["active sessions"],ro:["sesiuni active"] },
+  "privacy-preferences":{ en:["privacy preferences"],ro:["preferințe de confidențialitate"] },
+  "claim-legacy":{ en:["claim legacy debates"],ro:["revendică dezbaterile vechi"] },
+  "delete-account":{ en:["account deletion","delete account"],ro:["ștergere a contului","șterge contul"] },
+  "public-catalog":{ en:["public debate library","browse public debates"],ro:["biblioteca publică","dezbateri publice"] },
+  "your-debates":{ en:["my debates","your debates"],ro:["dezbaterile mele","dezbaterile tale"] },
+  "owner-debate":{ en:["open your debate","owner debate"],ro:["deschide dezbaterea ta","dezbaterea proprietarului"] },
+  "public-debate":{ en:["open public debate"],ro:["deschide dezbaterea publică"] },
+  "forgot-password":{ en:["forgot password"],ro:["am uitat parola"] },
+});
 const ARTICLE_EVIDENCE_TEXT: Readonly<Record<string,string>> = Object.freeze({
   "app-navigation":"pricing preturi functioneaza account settings theme tema method transcript home library acasa biblioteca public compact help ajutor conversatie varianta",
   "browse-public-debates":"browse browsing anonymous visitor rasfoire rasfoi anonim biblioteca public",
@@ -141,6 +163,29 @@ function inflectedMatch(left: string,right: string): boolean {
   let common = 0;
   while (common < shorter && left[common] === right[common]) common += 1;
   return common >= 4 && common / shorter >= 0.75;
+}
+
+function semanticWords(value: string): readonly string[] {
+  return normalizedText(value).split(/[^\p{L}\p{N}]+/u).filter((word) => word.length >= 2);
+}
+
+function actionEvidenceScore(
+  query: string,actionId: SupportActionId,language: SupportLanguage
+): number {
+  const queryWords = semanticWords(query);
+  return Math.max(0,...ACTION_QUERY_TERMS[actionId][language].map((term) => {
+    const termWords = semanticWords(term);
+    let cursor = 0;
+    const matched = termWords.length > 0 && termWords.every((termWord) => {
+      const offset = queryWords.slice(cursor).findIndex((queryWord) =>
+        queryWord === termWord || inflectedMatch(queryWord,termWord)
+      );
+      if (offset === -1) return false;
+      cursor += offset + 1;
+      return true;
+    });
+    return matched ? termWords.length : 0;
+  }));
 }
 
 function baseSection(
@@ -260,19 +305,20 @@ export function buildSupportKnowledgeContext(input: Readonly<{
       catalogScore,articleScore,catalogComplete,
     }))
     .sort((left, right) => right.score - left.score || left.item.id.localeCompare(right.item.id, "en")));
+  const directActionCandidates = matchedCapabilities.flatMap(({ item }) => item.actionIds
+    .filter((actionId) => availableActionIds.has(actionId))
+    .map((actionId) => Object.freeze({
+      actionId,score:actionEvidenceScore(input.query,actionId,input.language)
+    }))
+    .filter(({ score }) => score > 0));
   const actionIds: SupportActionId[] = [];
   const seen = new Set<SupportActionId>();
-  const bestCapabilityScore = matchedCapabilities[0]?.score ?? 0;
-  for (const { item,score } of matchedCapabilities) {
-    if (score !== bestCapabilityScore) break;
-    for (const actionId of item.actionIds) {
-      if (seen.has(actionId) || !availableActionIds.has(actionId)) continue;
-      seen.add(actionId);
-      actionIds.push(actionId);
-      if (actionIds.length === 3) break;
-    }
-    if (actionIds.length === 3) break;
-  }
+  const addAction = (actionId: SupportActionId) => {
+    if (seen.has(actionId) || !availableActionIds.has(actionId) || actionIds.length >= 3) return;
+    seen.add(actionId);
+    actionIds.push(actionId);
+  };
+  for (const { actionId } of directActionCandidates) addAction(actionId);
   const actionReferences = actionIds.map((canonicalId,index) => Object.freeze({
     reference:input.referenceFor("action",index),canonicalId
   }));
