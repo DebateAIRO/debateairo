@@ -225,13 +225,29 @@ ACCEPTANCE_BATTERY_VERSION=acceptance-v1
 ACCEPTANCE_SETTLEMENT_WATCH_HANDLE=acceptance:standing-watch
 ```
 
-Run with a dedicated 43-character service credential. The harness derives a
-real server-side session from it; the credential itself is never sent as an
-HTTP header, cookie, URL, or request body:
+Run with a dedicated 43-character service credential, which the operator exports
+in their own shell before the command. The harness derives a real server-side
+session from it; the credential itself is never sent as an HTTP header, cookie,
+URL, or request body:
 
 ```text
-./node_modules/.bin/tsx acceptance/run-acceptance.ts --service-credential <43-character-service-credential>
+export ACCEPTANCE_SERVICE_CREDENTIAL=REPLACE_WITH_THE_43_CHARACTER_CREDENTIAL
+./node_modules/.bin/tsx acceptance/run-acceptance.ts
 ```
+
+The credential is read from that environment variable and from nowhere else, and
+it is never a command-line argument, because a process's arguments are visible to
+every user of the machine through the process list for the whole of the run while
+its environment is not (`F-CREDENTIAL-ON-ARGV`, 2026-09-18). Offering
+`--service-credential` on the command line is refused by name with
+`ACCEPTANCE_SERVICE_CREDENTIAL_ON_ARGV_REFUSED`, before the unknown-argument and
+missing-value checks and without repeating the offered value, so the old shape
+cannot survive by habit. An absent or blank variable is
+`ACCEPTANCE_SERVICE_CREDENTIAL_REQUIRED`; one that is not 43 characters of
+`[A-Za-z0-9_-]` is `ACCEPTANCE_SERVICE_CREDENTIAL_INVALID`. The same exported
+variable supplies the three live proofs
+(`pro01-depth2-proof.ts`, `panel01-depth1-proof.ts`, `xrev01-depth1-proof.ts`),
+which no longer carry a placeholder credential of their own.
 
 By default the ceremony settles, verifies the FAIR-01 fair-debate gate,
 prints the run id / answer id / graph and maker report / definition-of-done
