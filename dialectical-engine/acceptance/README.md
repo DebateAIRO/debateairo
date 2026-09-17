@@ -104,7 +104,7 @@ from a plain terminal (the claude CLI needs its own keychain login —
 `claude /login` first if expired):
 
 ```text
-ACCEPTANCE_DB_PORT=<port> ./node_modules/.bin/tsx acceptance/dual-maker-proof.ts
+ACCEPTANCE_DB_PORT=REPLACE_WITH_A_FREE_PORT ./node_modules/.bin/tsx acceptance/dual-maker-proof.ts
 ```
 
 **Multi-maker depth-driven debate (FAIR-01 + PRO-01 + PANEL-01, DR-140(b),
@@ -206,11 +206,12 @@ PRO-01's one authorized live depth-2 proof is isolated from the sealed standing
 database and runs with:
 
 ```text
-ACCEPTANCE_DB_PORT=<free port> \
+export ACCEPTANCE_SERVICE_CREDENTIAL=REPLACE_WITH_THE_43_CHARACTER_CREDENTIAL
+ACCEPTANCE_DB_PORT=REPLACE_WITH_A_FREE_PORT \
 ACCEPTANCE_API_HOST=127.0.0.1 \
-ACCEPTANCE_API_PORT=<free port> \
-ACCEPTANCE_SHIM_PORT=<free port> \
-ACCEPTANCE_GROK_RELAY_PORT=<V/operator-supplied port> \
+ACCEPTANCE_API_PORT=REPLACE_WITH_A_FREE_PORT \
+ACCEPTANCE_SHIM_PORT=REPLACE_WITH_A_FREE_PORT \
+ACCEPTANCE_GROK_RELAY_PORT=REPLACE_WITH_A_FREE_PORT \
 ACCEPTANCE_STRANGER_SAMPLE_RATE=1 \
 ACCEPTANCE_BATTERY_VERSION=acceptance-v1 \
 ACCEPTANCE_SETTLEMENT_WATCH_HANDLE=acceptance:pro01-depth2 \
@@ -221,12 +222,28 @@ PANEL-01's one authorized live depth-1 proof is likewise isolated and evaluates
 the complete discovered panel rather than assuming M=2:
 
 ```text
-ACCEPTANCE_DB_PORT=<free port> ACCEPTANCE_API_PORT=<free port> \
-ACCEPTANCE_SHIM_PORT=<free port> \
+export ACCEPTANCE_SERVICE_CREDENTIAL=REPLACE_WITH_THE_43_CHARACTER_CREDENTIAL
+ACCEPTANCE_DB_PORT=REPLACE_WITH_A_FREE_PORT ACCEPTANCE_API_PORT=REPLACE_WITH_A_FREE_PORT \
+ACCEPTANCE_SHIM_PORT=REPLACE_WITH_A_FREE_PORT \
 ./node_modules/.bin/tsx acceptance/panel01-depth1-proof.ts
 ```
 
-The proof prints the run/answer IDs, total model attempts (including failed or
+XREV-01's one authorized live depth-1 proof reads the cross-maker review lineage
+off the same kind of isolated run, and is launched the same way:
+
+```text
+export ACCEPTANCE_SERVICE_CREDENTIAL=REPLACE_WITH_THE_43_CHARACTER_CREDENTIAL
+ACCEPTANCE_DB_PORT=REPLACE_WITH_A_FREE_PORT ACCEPTANCE_API_PORT=REPLACE_WITH_A_FREE_PORT \
+ACCEPTANCE_SHIM_PORT=REPLACE_WITH_A_FREE_PORT \
+./node_modules/.bin/tsx acceptance/xrev01-depth1-proof.ts
+```
+
+All three proofs read the credential from `ACCEPTANCE_SERVICE_CREDENTIAL` in the
+environment, exactly as the ceremony does, and none of them accepts one on the
+command line (`F-CREDENTIAL-ON-ARGV`). The export belongs in the operator's own
+shell; the first line of each block is shown only so the block is complete.
+
+Each proof prints the run/answer IDs, total model attempts (including failed or
 timed-out attempts) against the run's computed structural ceiling, the probe
 evidence count, and every node's persisted maker/model/provider lineage, then
 removes only its caller-owned temporary database. Depth 3 remains reserved for
@@ -235,11 +252,11 @@ V's acceptance run.
 The runtime environment is strict and contains no Hatchet keys:
 
 ```text
-ACCEPTANCE_DB_PORT=<V/operator-supplied fixed local port>
+ACCEPTANCE_DB_PORT=REPLACE_WITH_THE_FIXED_LOCAL_DATABASE_PORT
 ACCEPTANCE_API_HOST=127.0.0.1
-ACCEPTANCE_API_PORT=<V/operator-supplied API port>
-ACCEPTANCE_SHIM_PORT=<V/operator-supplied shim port>
-ACCEPTANCE_STRANGER_SAMPLE_RATE=<V/operator-supplied 0..1 rate>
+ACCEPTANCE_API_PORT=REPLACE_WITH_THE_API_PORT
+ACCEPTANCE_SHIM_PORT=REPLACE_WITH_THE_SHIM_PORT
+ACCEPTANCE_STRANGER_SAMPLE_RATE=REPLACE_WITH_A_RATE_BETWEEN_0_AND_1
 ACCEPTANCE_BATTERY_VERSION=acceptance-v1
 ACCEPTANCE_SETTLEMENT_WATCH_HANDLE=acceptance:standing-watch
 ```
@@ -259,14 +276,28 @@ it is never a command-line argument, because a process's arguments are visible t
 every user of the machine through the process list for the whole of the run while
 its environment is not (`F-CREDENTIAL-ON-ARGV`, 2026-09-18). Offering
 `--service-credential` on the command line is refused by name with
-`ACCEPTANCE_SERVICE_CREDENTIAL_ON_ARGV_REFUSED`, before the unknown-argument and
-missing-value checks and without repeating the offered value, so the old shape
-cannot survive by habit. An absent or blank variable is
-`ACCEPTANCE_SERVICE_CREDENTIAL_REQUIRED`; one that is not 43 characters of
-`[A-Za-z0-9_-]` is `ACCEPTANCE_SERVICE_CREDENTIAL_INVALID`. The same exported
+`ACCEPTANCE_SERVICE_CREDENTIAL_ON_ARGV_REFUSED` — both the space-separated and
+the `=`-joined spelling, before the unknown-argument and missing-value checks and
+without repeating the offered value, so the old shape cannot survive by habit.
+`.hermes/reports/2026-09-01-algorithm-live-loop/tools/closing-run.sh` refuses the
+same two spellings at its own first statement, with exit 7, because its header
+block writes its arguments into the ceremony log before the ceremony could refuse
+them. An absent or blank variable is `ACCEPTANCE_SERVICE_CREDENTIAL_REQUIRED`; one
+that is not exactly 43 characters of `[A-Za-z0-9_-]` is
+`ACCEPTANCE_SERVICE_CREDENTIAL_INVALID` — including a 43-character credential that
+carries a trailing newline, which is what an operator gets from
+`ACCEPTANCE_SERVICE_CREDENTIAL=$(cat some-file)` without stripping it, so strip
+the newline when you build the variable from a file. The refusal is deliberately
+not a trim: a credential is used exactly as given or not at all. The same exported
 variable supplies the three live proofs
 (`pro01-depth2-proof.ts`, `panel01-depth1-proof.ts`, `xrev01-depth1-proof.ts`),
 which no longer carry a placeholder credential of their own.
+
+Every fenced block in this file is safe to paste as written: the placeholders are
+`REPLACE_WITH_…` words and carry no `<` or `>`. That is not a style choice. On
+2026-09-17 a documentation line of the form `name <value>` was pasted into a
+shell, where `>` is a redirection, and it truncated three CLI binaries. A pasted
+block here fails loudly on a placeholder instead, and writes to nothing.
 
 By default the ceremony settles, verifies the FAIR-01 fair-debate gate,
 prints the run id / answer id / graph and maker report / definition-of-done
@@ -337,8 +368,8 @@ Ask-input defaults (all overrideable by the named CLI flag) are:
 Point both browser and server-side web clients at the acceptance API:
 
 ```text
-NEXT_PUBLIC_API_BASE=http://127.0.0.1:<ACCEPTANCE_API_PORT>
-DIALECTICAL_API_BASE=http://127.0.0.1:<ACCEPTANCE_API_PORT>
+NEXT_PUBLIC_API_BASE=http://127.0.0.1:REPLACE_WITH_THE_API_PORT
+DIALECTICAL_API_BASE=http://127.0.0.1:REPLACE_WITH_THE_API_PORT
 ```
 
 The fake CLIs (codex and claude) and blanket-INACTIVE terminal evaluator exist
