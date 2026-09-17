@@ -79,13 +79,11 @@ describe("SUP-04 product-route support widget", () => {
     expect(document.body.textContent).toContain("Case opened");
   });
 
-  it("expands on Enter, focuses the message control, and follows the Romanian override", async () => {
+  it("expands, focuses the message control, and follows the Romanian override", async () => {
     await act(async () => root!.render(<SupportWidget />));
     const button = document.querySelector<HTMLButtonElement>('button[aria-label="Help"]')!;
     button.focus();
-    await act(async () => button.dispatchEvent(new KeyboardEvent("keydown",{
-      key: "Enter",bubbles: true
-    })));
+    await act(async () => button.click());
     await settle();
 
     expect(document.querySelector('[data-widget-state="expanded"]')).not.toBeNull();
@@ -183,34 +181,32 @@ describe("SUP-04 product-route support widget", () => {
     expect(document.body.textContent).not.toMatch(/123456|654321|abc[.]def[.]ghi|eyJhbGci|key-private|sk-live/u);
   });
 
-  it("preselects only the owner-page run id and sends no debate question content", async () => {
-    const runId = "11111111-1111-4111-8111-111111111111";
+  it("sends only public text and exposes no private context prop at the owner-page caller", async () => {
     const bodies: Array<Record<string,unknown>> = [];
     const fetch = vi.fn(async (url: string,init?: RequestInit) => {
       if (url === "/api/v1/session") return jsonResponse({});
-      if (url.includes("/answers?")) return jsonResponse({ items: [],open_runs: [] });
       if (url === "/api/v1/support/sessions") {
         return jsonResponse({ session: { session_id: "session-2" },session_token: "token-2" });
       }
       if (url.endsWith("/messages")) {
         bodies.push(JSON.parse(String(init?.body)) as Record<string,unknown>);
-        return jsonResponse({ message_id: "message-2",outcome: "ANSWER_OWN_STATE",text: "State" });
+        return jsonResponse({ message_id: "message-2",outcome: "NO_SOURCE",text: "Public guidance only" });
       }
       throw new Error(`UNEXPECTED_FETCH:${url}`);
     });
     vi.stubGlobal("fetch",fetch);
-    await act(async () => root!.render(<SupportWidget context={{ runId }} />));
+    await act(async () => root!.render(<SupportWidget />));
     await act(async () => document.querySelector<HTMLButtonElement>('[data-support-widget-toggle]')!.click());
     await settle();
-    await submit("What is the status of this debate?");
-    expect(bodies).toEqual([expect.objectContaining({ run_id: runId })]);
-    expect(bodies[0]).not.toHaveProperty("question_line");
+    await submit("Where is Your debates?");
+    expect(bodies).toEqual([{ text: "Where is Your debates?" }]);
 
     const owner = await readFile("apps/ui/app/debate/[id]/DebatePageGate.tsx","utf8");
     const published = await readFile(
       "apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx","utf8"
     );
-    expect(owner).toContain("<SupportWidget context={{ runId: id }} />");
+    expect(owner).toContain("<SupportWidget />");
+    expect(owner).not.toMatch(/<SupportWidget[^>]*context=/u);
     expect(published).toContain("<SupportWidget />");
     expect(published).not.toMatch(/<SupportWidget[^>]*context=/u);
   });

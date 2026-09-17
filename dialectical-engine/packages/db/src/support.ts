@@ -9,7 +9,6 @@ export type SupportRepositoryRecord = Readonly<{
   state: "OPEN" | "LOCKED" | "CLOSED";
   kbVersion: string;
   createdAt: Date;
-  consentOwnContextAt: Date | null;
   shreddedAt?: Date | null;
 }>;
 
@@ -75,143 +74,6 @@ export type SupportRelayQueueEntryResult =
   | Readonly<{ kind: "DAILY_CAP" }>
   | Readonly<{ kind: "WAITING";waiterId: string;ticket: number;position: number }>
   | Extract<SupportRelayReservationResult,{ kind: "ACQUIRED" }>;
-
-export type SupportOwnRunStateRow = Readonly<{
-  run_id: string;
-  created_at: Date;
-  run_state: "generating" | "failed" | "served";
-  terminal_state: string | null;
-  staleness_state: string | null;
-  visibility: "PRIVATE" | "PUBLISHED";
-  public_ref: string | null;
-  progress_stage: string | null;
-  last_event_at: Date;
-  failure_code: string | null;
-}>;
-
-export class PostgresSupportOwnContextRepository {
-  constructor(readonly corePool: Pool,readonly supportPool: Pool) {}
-
-  async read(input: Readonly<{
-    ownerRef: string;
-    legacyAskerId: null;
-    runId: string;
-    latest: boolean;
-  }>): Promise<SupportOwnRunStateRow | null> {
-    const result = await this.corePool.query<SupportOwnRunStateRow>(`
-      WITH candidate AS (
-        SELECT run.run_id,run.as_of,run.created_at_seq
-        FROM core.run AS run
-        WHERE (($4::boolean AND $1::uuid='00000000-0000-4000-8000-000000000000'::uuid)
-            OR (NOT $4::boolean AND run.run_id=$1::uuid))
-          AND core.run_is_owned_by(run.run_id,$2,$3)
-        ORDER BY run.created_at_seq DESC
-        LIMIT 1
-      ), projected AS (
-        SELECT run.run_id,
-          COALESCE((SELECT event.occurred_at FROM core.question_liveness_event AS event
-            WHERE event.run_id=run.run_id ORDER BY event.at_seq LIMIT 1),run.as_of) AS created_at,
-          CASE
-            WHEN EXISTS (SELECT 1 FROM serve.answer AS answer WHERE answer.run_id=run.run_id)
-              THEN 'served'
-            WHEN EXISTS (SELECT 1 FROM core.work_item AS work
-              WHERE work.run_id=run.run_id AND work.state='FAILED') THEN 'failed'
-            ELSE 'generating'
-          END AS run_state,
-          (SELECT COALESCE(event.value_json->>'state',event.value_json#>>'{}')
-            FROM core.run_progress_event AS event
-            WHERE event.run_id=run.run_id AND event.kind='TERMINAL'
-            ORDER BY event.at_seq DESC LIMIT 1) AS terminal_state,
-          (SELECT stale.state FROM core.staleness_state AS stale
-            WHERE stale.run_id=run.run_id ORDER BY stale.at_seq DESC LIMIT 1) AS staleness_state,
-          COALESCE((SELECT visibility.state FROM core.run_visibility_event AS visibility
-            WHERE visibility.run_id=run.run_id ORDER BY visibility.at_seq DESC LIMIT 1),'PRIVATE')
-            AS visibility,
-          (SELECT CASE WHEN visibility.state='PUBLISHED' THEN visibility.publication_ref END
-            FROM core.run_visibility_event AS visibility
-            WHERE visibility.run_id=run.run_id ORDER BY visibility.at_seq DESC LIMIT 1) AS public_ref,
-          (SELECT COALESCE(event.value_json->>'stage',event.value_json#>>'{}')
-            FROM core.run_progress_event AS event
-            WHERE event.run_id=run.run_id AND event.kind='PHASE'
-            ORDER BY event.at_seq DESC LIMIT 1) AS progress_stage,
-          GREATEST(run.as_of,
-            (SELECT event.occurred_at FROM core.question_liveness_event AS event
-              WHERE event.run_id=run.run_id ORDER BY event.at_seq DESC LIMIT 1),
-            (SELECT visibility.occurred_at FROM core.run_visibility_event AS visibility
-              WHERE visibility.run_id=run.run_id ORDER BY visibility.at_seq DESC LIMIT 1))
-            AS last_event_at,
-          (SELECT work.terminal_reason FROM core.work_item AS work
-            WHERE work.run_id=run.run_id AND work.state='FAILED'
-            ORDER BY work.created_at_seq DESC LIMIT 1) AS failure_code
-        FROM candidate AS selected
-        JOIN core.run AS run ON run.run_id=selected.run_id
-      )
-      SELECT run_id,created_at,run_state,terminal_state,staleness_state,visibility,
-        public_ref,progress_stage,last_event_at,failure_code
-      FROM projected
-    `,[input.runId,input.ownerRef,input.legacyAskerId,input.latest]);
-    return result.rows[0] ?? null;
-  }
-
-  async list(input: Readonly<{
-    ownerRef: string;
-    legacyAskerId: null;
-  }>): Promise<readonly SupportOwnRunStateRow[]> {
-    const result = await this.corePool.query<SupportOwnRunStateRow>(`
-      SELECT run.run_id,run.as_of AS created_at,
-        CASE WHEN EXISTS (SELECT 1 FROM serve.answer AS answer WHERE answer.run_id=run.run_id)
-          THEN 'served'
-          WHEN EXISTS (SELECT 1 FROM core.work_item AS work
-            WHERE work.run_id=run.run_id AND work.state='FAILED') THEN 'failed'
-          ELSE 'generating' END AS run_state,
-        NULL::text AS terminal_state,NULL::text AS staleness_state,
-        COALESCE((SELECT visibility.state FROM core.run_visibility_event AS visibility
-          WHERE visibility.run_id=run.run_id ORDER BY visibility.at_seq DESC LIMIT 1),'PRIVATE')
-          AS visibility,
-        (SELECT CASE WHEN visibility.state='PUBLISHED' THEN visibility.publication_ref END
-          FROM core.run_visibility_event AS visibility
-          WHERE visibility.run_id=run.run_id ORDER BY visibility.at_seq DESC LIMIT 1) AS public_ref,
-        (SELECT COALESCE(event.value_json->>'stage',event.value_json#>>'{}')
-          FROM core.run_progress_event AS event WHERE event.run_id=run.run_id AND event.kind='PHASE'
-          ORDER BY event.at_seq DESC LIMIT 1) AS progress_stage,
-        run.as_of AS last_event_at,
-        (SELECT work.terminal_reason FROM core.work_item AS work
-          WHERE work.run_id=run.run_id AND work.state='FAILED'
-          ORDER BY work.created_at_seq DESC LIMIT 1) AS failure_code
-      FROM core.run AS run
-      WHERE core.run_is_owned_by(run.run_id,$1,$2)
-      ORDER BY run.created_at_seq DESC
-      LIMIT 20
-    `,[input.ownerRef,input.legacyAskerId]);
-    return Object.freeze(result.rows);
-  }
-
-  async recordToolCall(input: Readonly<{
-    sessionId: string;
-    argsSha256: string;
-    result: Readonly<Record<string,unknown>> | "NOT_OWNED";
-    at: Date;
-  }>): Promise<void> {
-    await this.supportPool.query(`
-      INSERT INTO support.tool_call(tool_call_id,session_id,name,args_sha256,result,at)
-      VALUES($1,$2,'read_own_run_state',$3,$4::jsonb,$5)
-    `,[randomUUID(),input.sessionId,input.argsSha256,JSON.stringify(input.result),input.at]);
-  }
-
-  async listToolCalls(sessionId: string): Promise<readonly Readonly<{
-    name: string;at: Date;result: SupportOwnRunStateRow | "NOT_OWNED";
-  }>[]> {
-    const rows = await this.supportPool.query<{
-      name: string;at: Date;result: SupportOwnRunStateRow | "NOT_OWNED";
-    }>(`
-      SELECT name,at,result
-      FROM support.tool_call
-      WHERE session_id=$1
-      ORDER BY at,tool_call_id
-    `,[sessionId]);
-    return Object.freeze(rows.rows.map((row) => Object.freeze(row)));
-  }
-}
 
 export type SupportMessageRole = "user" | "assistant";
 export type SupportMessageOutcome =
@@ -304,7 +166,6 @@ type SupportSessionRow = Readonly<{
   state: "OPEN" | "LOCKED" | "CLOSED";
   kb_version: string;
   created_at: Date;
-  consent_own_context_at: Date | null;
   shredded_at?: Date | null;
 }>;
 
@@ -316,7 +177,6 @@ function record(row: SupportSessionRow): SupportRepositoryRecord {
     state: row.state,
     kbVersion: row.kb_version,
     createdAt: row.created_at,
-    consentOwnContextAt: row.consent_own_context_at,
     ...(row.shredded_at === undefined ? {} : { shreddedAt: row.shredded_at })
   });
 }
@@ -402,8 +262,7 @@ export class PostgresSupportSessionRepository {
           INSERT INTO support.session(
             session_id,session_token_sha256,identity_owner_ref,language,state,kb_version,created_at
           ) VALUES($1,$2,$3,$4,'OPEN',$5,$6)
-          RETURNING session_id,identity_owner_ref,language,state,kb_version,created_at,
-            consent_own_context_at
+          RETURNING session_id,identity_owner_ref,language,state,kb_version,created_at
         `, [
           input.sessionId,input.tokenSha256,input.identityOwnerRef,input.language,
           input.kbVersion,input.createdAt
@@ -437,29 +296,10 @@ export class PostgresSupportSessionRepository {
           ) >= $3::integer THEN 'LOCKED'
           ELSE state
         END AS state,
-        kb_version,created_at,
-        consent_own_context_at,shredded_at
+        kb_version,created_at,shredded_at
       FROM support.session
       WHERE session_id=$1 AND session_token_sha256=$2
     `, [input.sessionId, input.tokenSha256, input.lockAfterInjections ?? null]);
-    return result.rows[0] === undefined ? null : record(result.rows[0]);
-  }
-
-  async setConsent(input: Readonly<{
-    sessionId: string;
-    tokenSha256: string;
-    identityOwnerRef: string;
-    on: boolean;
-    at: Date;
-  }>): Promise<SupportRepositoryRecord | null> {
-    const result = await this.pool.query<SupportSessionRow>(`
-      UPDATE support.session
-      SET consent_own_context_at=CASE WHEN $4::boolean THEN $5::timestamptz ELSE NULL END
-      WHERE session_id=$1 AND session_token_sha256=$2 AND identity_owner_ref=$3
-        AND shredded_at IS NULL
-      RETURNING session_id,identity_owner_ref,language,state,kb_version,created_at,
-        consent_own_context_at,shredded_at
-    `,[input.sessionId,input.tokenSha256,input.identityOwnerRef,input.on,input.at]);
     return result.rows[0] === undefined ? null : record(result.rows[0]);
   }
 

@@ -93,7 +93,7 @@ describe("SUP-01 /help assistant", () => {
     expect(parsed.querySelector('[aria-label="Support shortcuts"]')?.textContent)
       .toContain("Cookie preferences");
     expect(parsed.body.textContent).toContain("New conversation");
-    expect(parsed.body.textContent).toContain("Attach a debate");
+    expect(parsed.body.textContent).not.toContain("Attach a debate");
     expect(parsed.body.textContent).toContain("Escalate to a human");
   });
 
@@ -154,7 +154,7 @@ describe("SUP-01 /help assistant", () => {
 
     expect(transport.createSession).toHaveBeenCalledWith("en");
     expect(transport.sendMessage).toHaveBeenCalledWith(
-      SESSION,"What does a condition mark mean?","en"
+      SESSION,"What does a condition mark mean?"
     );
     expect(document.querySelector<HTMLInputElement>('#support-message')?.value)
       .toBe("");
@@ -216,8 +216,32 @@ describe("SUP-01 /help assistant", () => {
     await submit("Cum funcționează dezbaterile?");
     expect(transport.createSession).toHaveBeenCalledWith("ro");
     expect(transport.sendMessage).toHaveBeenCalledWith(
-      SESSION,"Cum funcționează dezbaterile?","ro"
+      SESSION,"Cum funcționează dezbaterile?"
     );
+  });
+
+  it("invalidates the active session when language changes and sends text only", async () => {
+    const enSession = Object.freeze({ sessionId: "session-en",token: "token-en",identityBound: false });
+    const roSession = Object.freeze({ sessionId: "session-ro",token: "token-ro",identityBound: false });
+    const transport: SupportAssistantClient = Object.freeze({
+      createSession: vi.fn()
+        .mockResolvedValueOnce(enSession)
+        .mockResolvedValueOnce(roSession),
+      sendMessage: vi.fn().mockResolvedValue({
+        messageId: "answer",outcome: "NO_SOURCE",text: "answer"
+      }),
+      rate: vi.fn(),escalate: vi.fn()
+    });
+    await render(<Assistant client={transport} />);
+    await submit("Pricing");
+    await act(async () => ([...document.querySelectorAll<HTMLButtonElement>("button")]
+      .find((button) => button.textContent === "RO")!).click());
+    await submit("Account");
+
+    expect(transport.createSession).toHaveBeenNthCalledWith(1,"en");
+    expect(transport.createSession).toHaveBeenNthCalledWith(2,"ro");
+    expect(transport.sendMessage).toHaveBeenNthCalledWith(1,enSession,"Pricing");
+    expect(transport.sendMessage).toHaveBeenNthCalledWith(2,roSession,"Account");
   });
 
   it("renders conversation content as text and never links external response URLs", async () => {
@@ -291,7 +315,7 @@ describe("SUP-01 /help assistant", () => {
       case_token: token,sla_hours: 48,link,case_acknowledgement: acknowledgement
     }),{ status: 200,headers: { "content-type": "application/json" } })));
     await expect(supportAssistantClient.sendMessage(
-      SESSION,"ordinary safety request","en"
+      SESSION,"ordinary safety request"
     )).resolves.toMatchObject({
       caseAcknowledgement: { text: acknowledgement,token,slaHours: 48,link }
     });
@@ -304,7 +328,7 @@ describe("SUP-01 /help assistant", () => {
     }),{ status: 429,headers: { "content-type": "application/json" } })));
 
     await expect(supportAssistantClient.sendMessage(
-      SESSION,"one request too many","en"
+      SESSION,"one request too many"
     )).resolves.toMatchObject({ outcome: "RATE_LIMITED",text });
   });
 
@@ -335,8 +359,7 @@ describe("SUP-01 /help assistant", () => {
     sessionStorage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY,JSON.stringify({
       language: "en",
       session: { sessionId: "anonymous-session",token: "anonymous-token",identityBound: false },
-      messages: [{ id: "disclosure",role: "assistant",text: "Prior disclosure." }],
-      ownContext: { latest: true }
+      messages: [{ id: "disclosure",role: "assistant",text: "Prior disclosure." }]
     }));
     const calls: Array<Readonly<{ url: string;headers: Headers }>> = [];
     vi.stubGlobal("fetch",vi.fn(async (url: string,init: RequestInit = {}) => {
@@ -385,7 +408,7 @@ describe("SUP-01 /help assistant", () => {
     expect(document.querySelector<HTMLAnchorElement>(`a[href="${link}"]`)).not.toBeNull();
   });
 
-  it("renders SHREDDED returned by consent, rating, and escalation mutations", async () => {
+  it("renders SHREDDED returned by rating and escalation mutations", async () => {
     const text = "This conversation was erased at the owner's request.";
     const terminal = Object.freeze({ messageId: "",outcome: "SHREDDED" as const,text });
     const transport: SupportAssistantClient = Object.freeze({
@@ -393,14 +416,11 @@ describe("SUP-01 /help assistant", () => {
       sendMessage: vi.fn().mockResolvedValue({
         messageId: "rateable",outcome: "NO_SOURCE",text: "No source."
       }),
-      setConsent: vi.fn().mockResolvedValue(terminal),
       rate: vi.fn().mockResolvedValue(terminal),
       escalate: vi.fn().mockResolvedValue(terminal)
     });
     await render(<Assistant client={transport} signedIn />);
 
-    await act(async () => document.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
-    await settle();
     await submit("unknown detail");
     await act(async () => ([...document.querySelectorAll("button")]
       .find((button) => button.textContent === "No") as HTMLButtonElement).click());
@@ -409,17 +429,15 @@ describe("SUP-01 /help assistant", () => {
       .find((button) => button.textContent === "Talk to a human") as HTMLButtonElement).click());
     await settle();
 
-    expect(document.body.textContent?.split(text)).toHaveLength(4);
+    expect(document.body.textContent?.split(text)).toHaveLength(3);
   });
 
-  it("preserves the structured SHREDDED envelope on every browser mutation client", async () => {
+  it("preserves the structured SHREDDED envelope on rating and escalation clients", async () => {
     const text = "This conversation was erased at the owner's request.";
     vi.stubGlobal("fetch",vi.fn().mockImplementation(async () => new Response(JSON.stringify({
       kind: "SHREDDED",outcome: "SHREDDED",text
     }),{ status: 200,headers: { "content-type": "application/json" } })));
 
-    await expect(supportAssistantClient.setConsent!(SESSION,true))
-      .resolves.toMatchObject({ outcome: "SHREDDED",text });
     await expect(supportAssistantClient.rate(SESSION,"message-id","no"))
       .resolves.toMatchObject({ outcome: "SHREDDED",text });
     await expect(supportAssistantClient.escalate(SESSION,"en"))
@@ -442,7 +460,6 @@ describe("SUP-01 /help assistant", () => {
       if (url.endsWith("/messages")) return new Response(JSON.stringify({
         message_id: "message-csrf",outcome: "NO_SOURCE",text: "No source."
       }),{ status: 200,headers: { "content-type": "application/json" } });
-      if (url.endsWith("/consent")) return new Response("{}",{ status: 200 });
       if (url.endsWith("/rating")) return new Response("{}",{ status: 200 });
       if (url.endsWith("/escalate")) return new Response(JSON.stringify({
         case_token: "A".repeat(43),text: "Case opened."
@@ -452,16 +469,14 @@ describe("SUP-01 /help assistant", () => {
 
     const session = await supportAssistantClient.createSession("en");
     if (!("sessionId" in session)) throw new Error("EXPECTED_SUPPORT_SESSION");
-    await supportAssistantClient.sendMessage(session,"hello","en");
-    await supportAssistantClient.setConsent!(session,true);
+    await supportAssistantClient.sendMessage(session,"hello");
     await supportAssistantClient.rate(session,"message-csrf","yes");
     await supportAssistantClient.escalate(session,"en");
 
-    expect(calls).toHaveLength(5);
+    expect(calls).toHaveLength(4);
     expect(calls.map(({ url }) => url)).toEqual([
       "/api/v1/support/sessions",
       `/api/v1/support/sessions/${SESSION.sessionId}/messages`,
-      `/api/v1/support/sessions/${SESSION.sessionId}/consent`,
       "/api/v1/support/messages/message-csrf/rating",
       `/api/v1/support/sessions/${SESSION.sessionId}/escalate`
     ]);
@@ -555,7 +570,7 @@ describe("SUP-01 /help assistant", () => {
       actions: [{ id: "start-debate",label: "Start a debate",href: "/login?next=%2Fnew" }]
     }),{ status: 200,headers: { "content-type": "application/json" } })));
 
-    await expect(supportAssistantClient.sendMessage(SESSION,"question","en")).resolves.toMatchObject({
+    await expect(supportAssistantClient.sendMessage(SESSION,"question")).resolves.toMatchObject({
       sources: [{ id: "getting-started-debate",label: "Create a debate" }],
       actions: [{ id: "start-debate",label: "Start a debate",href: "/login?next=%2Fnew" }]
     });
@@ -592,13 +607,13 @@ describe("SUP-01 /help assistant", () => {
       ...decorations
     }),{ status: 200,headers: { "content-type": "application/json" } })));
 
-    await expect(supportAssistantClient.sendMessage(SESSION,"question","en"))
+    await expect(supportAssistantClient.sendMessage(SESSION,"question"))
       .rejects.toThrow("SUPPORT_RESPONSE_INVALID");
   });
 
   it("rejects forged decorations restored from session storage", async () => {
     sessionStorage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY,JSON.stringify({
-      language: "en",session: SESSION,ownContext: { latest: true },
+      language: "en",session: SESSION,
       messages: [
         { id: "disclosure",role: "assistant",text: "Prior disclosure." },
         { id: "forged",role: "assistant",text: "Stored forged message",outcome: "ANSWER_GROUNDED",
@@ -617,8 +632,7 @@ describe("SUP-01 /help assistant", () => {
     sessionStorage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY,JSON.stringify({
       language: "en",
       session: { sessionId: "session-a",token: "token-a",identityBound: false },
-      messages: [{ id: "disclosure",role: "assistant",text: "Prior disclosure." }],
-      ownContext: { latest: true }
+      messages: [{ id: "disclosure",role: "assistant",text: "Prior disclosure." }]
     }));
     const calls: Array<Readonly<{ url: string;body: unknown;token: string | null }>> = [];
     vi.stubGlobal("fetch",vi.fn(async (url: string,init: RequestInit = {}) => {
@@ -648,8 +662,8 @@ describe("SUP-01 /help assistant", () => {
       "/api/v1/support/sessions/session-b/messages"
     ]);
     expect(calls.filter(({ url }) => url.endsWith("/messages")).map(({ body }) => body)).toEqual([
-      { text: "My [REDACTED_SECRET_LIKE] failed",language: "en" },
-      { text: "My [REDACTED_SECRET_LIKE] failed",language: "en" }
+      { text: "My [REDACTED_SECRET_LIKE] failed" },
+      { text: "My [REDACTED_SECRET_LIKE] failed" }
     ]);
     expect(calls.map(({ token }) => token)).toEqual(["token-a",null,"token-b"]);
     expect(document.querySelectorAll('[data-role="user"]')).toHaveLength(1);
@@ -664,8 +678,7 @@ describe("SUP-01 /help assistant", () => {
     sessionStorage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY,JSON.stringify({
       language: "en",
       session: { sessionId: "session-a",token: "token-a",identityBound: false },
-      messages: [{ id: "disclosure",role: "assistant",text: "Prior disclosure." }],
-      ownContext: { latest: true }
+      messages: [{ id: "disclosure",role: "assistant",text: "Prior disclosure." }]
     }));
     const urls: string[] = [];
     vi.stubGlobal("fetch",vi.fn(async (url: string) => {
@@ -701,8 +714,7 @@ describe("SUP-01 /help assistant", () => {
     sessionStorage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY,JSON.stringify({
       language: "en",
       session: { sessionId: "session-a",token: "token-a",identityBound: false },
-      messages: [{ id: "disclosure",role: "assistant",text: "Prior disclosure." }],
-      ownContext: { latest: true }
+      messages: [{ id: "disclosure",role: "assistant",text: "Prior disclosure." }]
     }));
     const urls: string[] = [];
     vi.stubGlobal("fetch",vi.fn(async (url: string) => {

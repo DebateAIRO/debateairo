@@ -23,7 +23,6 @@ export type SupportSessionRecord = Readonly<{
   state: "OPEN" | "LOCKED" | "CLOSED";
   kbVersion: string;
   createdAt: Date;
-  consentOwnContextAt: Date | null;
   shreddedAt?: Date | null;
 }>;
 
@@ -59,13 +58,6 @@ export interface SupportSessionPort {
     sessionId: string;
     tokenSha256: string;
     lockAfterInjections?: number;
-  }>): Promise<SupportSessionRecord | null>;
-  setConsent?(input: Readonly<{
-    sessionId: string;
-    tokenSha256: string;
-    identityOwnerRef: string;
-    on: boolean;
-    at: Date;
   }>): Promise<SupportSessionRecord | null>;
   admitMessage(input: Readonly<{
     sessionId: string;

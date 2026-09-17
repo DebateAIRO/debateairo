@@ -33,11 +33,7 @@ const FULL_PAGE_ARROW = <svg
   aria-hidden="true"
 ><path d="M5 11l6-6" /><path d="M6 5h5v5" /></svg>;
 
-export type SupportWidgetProps = Readonly<{
-  context?: Readonly<{ runId: string }>;
-}>;
-
-export function SupportWidget({ context }: SupportWidgetProps) {
+export function SupportWidget() {
   const [expanded,setExpanded] = useState(false);
   const [closing,setClosing] = useState(false);
   const [language,setLanguage] = useState<SupportAssistantLanguage>("en");
@@ -100,7 +96,6 @@ export function SupportWidget({ context }: SupportWidgetProps) {
       {expanded || closing ? (
         <section className="supportWidgetPanel scroll" data-support-widget-panel>
           <Assistant
-            {...(context === undefined ? {} : { initialContext: context })}
             onLanguageChange={setLanguage}
             onClose={close}
           />

@@ -37,7 +37,7 @@ export default function DebatePageGate({
         />
       )}
       </AuthGate>
-      <SupportWidget context={{ runId: id }} />
+      <SupportWidget />
     </>
   );
 }

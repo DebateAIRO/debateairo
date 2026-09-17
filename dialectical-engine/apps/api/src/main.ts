@@ -14,7 +14,7 @@ import {
   loadSecretKey,
   PublicationCipher
 } from "@debateai/crypto";
-import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportOwnContextRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
+import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
 import type { RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -70,7 +70,6 @@ import {
   SupportModelReservationLedger,createReservedSupportModelPort
 } from "./support/model-reservation.js";
 import { createAdvisorySummaryService,createSupportCaseAccessService,createSupportSummarySealer } from "./support/cases.js";
-import { createSupportOwnContextService } from "./support/own-context.js";
 import { PostgresSupportIncidentRepository } from "./support/incidents.js";
 import { readLimits } from "./support/limits.js";
 import { SupportRelayQueue } from "./support/queue.js";
@@ -497,9 +496,6 @@ const supportAnswers = createSupportAnswerService({
   modelFor: () => supportAdmittedModel
 });
 const supportStatus = new PostgresSupportStatusRepository(supportPool);
-const supportOwnContext = createSupportOwnContextService(
-  new PostgresSupportOwnContextRepository(pool,supportPool)
-);
 const api = buildApi({
   application,
   accountErasure:erasureApplication,
@@ -513,7 +509,6 @@ const api = buildApi({
     sessions: Object.freeze({
       create: supportSessions.create.bind(supportSessions),
       read: supportSessions.read.bind(supportSessions),
-      setConsent: supportSessions.setConsent.bind(supportSessions),
       admitMessage: supportSessions.admitMessage.bind(supportSessions),
       admitIpSession: supportSessions.admitIpSession.bind(supportSessions),
       finalizeInjectionLock: supportSessions.finalizeInjectionLock.bind(supportSessions),
@@ -527,7 +522,6 @@ const api = buildApi({
       repository: supportCaseSummaries,keys: supportKeys
     }),
     answer: supportAnswers,
-    ownContext: supportOwnContext,
     incidents: supportIncidents,
     reportDiagnostic: reportSupportDiagnostic,
     knowledge: {
