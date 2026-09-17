@@ -4,15 +4,70 @@ import { parseAcceptanceArguments } from "./run-acceptance.js";
 import { announceAbsentMakers } from "./absent-makers.js";
 import { DEFINITION_OF_DONE_TOKENS } from "./dod-facts.js";
 
+/**
+ * F-CREDENTIAL-ON-ARGV. The service credential is read from the ceremony
+ * process's ENVIRONMENT and from nowhere else, and an operator who still offers
+ * it on the command line is refused by name. A process's arguments are readable
+ * by every user of the machine through the process list for the whole of the
+ * run; its environment is not.
+ *
+ * Every case below hands the parser an explicit third argument, so no test in
+ * this file ever reads — or depends on — the real `process.env`. The values used
+ * here are fabricated 43-character strings.
+ */
 describe("ACC-01 one-shot ceremony arguments", () => {
   const serviceCredential = "s".repeat(43);
+  const environment: NodeJS.ProcessEnv = { ACCEPTANCE_SERVICE_CREDENTIAL: serviceCredential };
+  const asOf = new Date("2026-08-09T00:00:00.000Z");
+  /** A credential an operator might still type on the command line. Never real. */
+  const offeredOnArgv = "z".repeat(43);
 
-  it("requires the service credential", () => {
-    expect(() => parseAcceptanceArguments([])).toThrow("ACCEPTANCE_SERVICE_CREDENTIAL_REQUIRED");
+  it("reads the service credential from the environment and returns it", () => {
+    expect(parseAcceptanceArguments([], asOf, environment).serviceCredential).toBe(serviceCredential);
+  });
+
+  it("requires the service credential when the environment does not carry it", () => {
+    expect(() => parseAcceptanceArguments([], asOf, {})).toThrow("ACCEPTANCE_SERVICE_CREDENTIAL_REQUIRED");
+  });
+
+  it("requires the service credential when the environment carries only blanks", () => {
+    expect(() => parseAcceptanceArguments([], asOf, { ACCEPTANCE_SERVICE_CREDENTIAL: "   " }))
+      .toThrow("ACCEPTANCE_SERVICE_CREDENTIAL_REQUIRED");
+  });
+
+  it("refuses an environment credential of 42 characters", () => {
+    expect(() => parseAcceptanceArguments([], asOf, { ACCEPTANCE_SERVICE_CREDENTIAL: "s".repeat(42) }))
+      .toThrow("ACCEPTANCE_SERVICE_CREDENTIAL_INVALID");
+  });
+
+  /**
+   * The old shape must not survive by habit. The refusal is decided BEFORE the
+   * unknown-argument and missing-value checks, so `--service-credential` alone
+   * reads as the credential refusal and not as `ACCEPTANCE_ARGUMENT_VALUE_REQUIRED`.
+   */
+  it.each([
+    { position: "alone", argv: ["--service-credential"] },
+    { position: "with a value", argv: ["--service-credential", offeredOnArgv] },
+    { position: "before other arguments", argv: ["--service-credential", offeredOnArgv, "--risk-tier", "casual"] },
+    { position: "after --serve", argv: ["--serve", "--service-credential", offeredOnArgv] }
+  ])("refuses a credential offered on argv, $position", ({ argv }) => {
+    expect(() => parseAcceptanceArguments(argv, asOf, environment))
+      .toThrow("ACCEPTANCE_SERVICE_CREDENTIAL_ON_ARGV_REFUSED");
+  });
+
+  it("never repeats the offered value in the argv refusal", () => {
+    let message = "";
+    try {
+      parseAcceptanceArguments(["--service-credential", offeredOnArgv], asOf, environment);
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toContain("ACCEPTANCE_SERVICE_CREDENTIAL_ON_ARGV_REFUSED");
+    expect(message).not.toContain(offeredOnArgv);
   });
 
   it("documents and applies only asker-input defaults — the default question is self-contained (ACC-01 N1)", () => {
-    const parsed = parseAcceptanceArguments(["--service-credential", serviceCredential], new Date("2026-08-09T00:00:00.000Z"));
+    const parsed = parseAcceptanceArguments([], asOf, environment);
     expect(parsed.serviceCredential).toBe(serviceCredential);
     expect(parsed.serve).toBe(false);
     expect(parsed.ask).toEqual({
@@ -30,28 +85,28 @@ describe("ACC-01 one-shot ceremony arguments", () => {
   });
 
   it("rejects unknown arguments rather than silently ignoring them", () => {
-    expect(() => parseAcceptanceArguments(["--service-credential", serviceCredential, "--mystery", "value"]))
+    expect(() => parseAcceptanceArguments(["--mystery", "value"], asOf, environment))
       .toThrow("UNKNOWN_ACCEPTANCE_ARGUMENT:--mystery");
   });
 
   it.each(["--decision-owner", "--action-owner"])(
     "rejects retired ownership input %s instead of silently dropping it",
     (argument) => {
-      expect(() => parseAcceptanceArguments(["--service-credential", serviceCredential, argument, "acceptance-user"]))
+      expect(() => parseAcceptanceArguments([argument, "acceptance-user"], asOf, environment))
         .toThrow(`UNKNOWN_ACCEPTANCE_ARGUMENT:${argument}`);
     }
   );
 
   it("parses the --serve standing flag anywhere in the argument list", () => {
-    expect(parseAcceptanceArguments(["--serve", "--service-credential", serviceCredential]).serve).toBe(true);
-    expect(parseAcceptanceArguments(["--service-credential", serviceCredential, "--serve"]).serve).toBe(true);
-    const withValueArguments = parseAcceptanceArguments(["--service-credential", serviceCredential, "--serve", "--risk-tier", "casual"]);
+    expect(parseAcceptanceArguments(["--serve"], asOf, environment).serve).toBe(true);
+    expect(parseAcceptanceArguments(["--risk-tier", "casual", "--serve"], asOf, environment).serve).toBe(true);
+    const withValueArguments = parseAcceptanceArguments(["--serve", "--risk-tier", "casual"], asOf, environment);
     expect(withValueArguments.serve).toBe(true);
     expect(withValueArguments.ask.risk_tier).toBe("casual");
   });
 
   it("rejects a duplicated --serve flag", () => {
-    expect(() => parseAcceptanceArguments(["--serve", "--serve", "--service-credential", serviceCredential]))
+    expect(() => parseAcceptanceArguments(["--serve", "--serve"], asOf, environment))
       .toThrow("DUPLICATE_ACCEPTANCE_ARGUMENT:--serve");
   });
 });

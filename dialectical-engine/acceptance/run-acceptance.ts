@@ -30,8 +30,20 @@ export interface AcceptanceArguments {
   readonly serve: boolean;
 }
 
+/**
+ * F-CREDENTIAL-ON-ARGV. The argument name that carries the service credential is
+ * deliberately ABSENT from this set and must never return to it: the credential
+ * is read from the environment and from nowhere else. The name is refused by
+ * `parseAcceptanceArguments` before any other check, so an operator who still
+ * types the old shape reads the specific reason rather than a generic
+ * unknown-argument line.
+ */
+const credentialArgument = "--service-credential";
+
+/** The environment key the operator exports in their own shell before the run. */
+const credentialEnvironmentKey = "ACCEPTANCE_SERVICE_CREDENTIAL";
+
 const supportedArguments = new Set([
-  "--service-credential",
   "--question",
   "--risk-tier",
   "--tier-provenance-ref",
@@ -68,13 +80,27 @@ function parseJson(value: string, label: string): unknown {
 
 export function parseAcceptanceArguments(
   arguments_: readonly string[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  environment: NodeJS.ProcessEnv = process.env
 ): AcceptanceArguments {
+  /**
+   * F-CREDENTIAL-ON-ARGV, decided FIRST — before the unknown-argument check and
+   * before the missing-value check — so the operator reads this reason and not a
+   * generic one. A process's arguments are readable by every user of the machine
+   * through the process list for the whole of the run; its environment is not.
+   * The offered value is never repeated in the message, in any form.
+   */
+  if (arguments_.includes(credentialArgument)) {
+    throw new Error(
+      `ACCEPTANCE_SERVICE_CREDENTIAL_ON_ARGV_REFUSED:${credentialArgument} is no longer read from the ` +
+      `command line; export ${credentialEnvironmentKey} in your own shell instead`
+    );
+  }
   // "--serve" is the one value-less flag; extract it before pair parsing.
   const serveCount = arguments_.filter((argument) => argument === "--serve").length;
   if (serveCount > 1) throw new Error("DUPLICATE_ACCEPTANCE_ARGUMENT:--serve");
   const values = argumentMap(arguments_.filter((argument) => argument !== "--serve"));
-  const serviceCredential = values.get("--service-credential");
+  const serviceCredential = environment[credentialEnvironmentKey];
   if (serviceCredential === undefined || serviceCredential.trim().length === 0) {
     throw new Error("ACCEPTANCE_SERVICE_CREDENTIAL_REQUIRED");
   }
