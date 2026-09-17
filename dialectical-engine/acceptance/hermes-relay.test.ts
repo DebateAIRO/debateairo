@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach,describe,expect,it } from "vitest";
+import { CliRelayFailure } from "./relay-core.js";
 import {
   HERMES_BINARY_NAME,
   HERMES_GLM_MODEL,
@@ -188,7 +189,7 @@ describe("D10 Hermes support relay binary resolution",() => {
    * The default command must become LAZY with this change. A resolver that can
    * throw, evaluated eagerly, would let a blank key — or simply a host with no
    * `hermes` — pre-empt `resolveTestGuardedCommand`'s own authority over the
-   * test seam, exactly as `relay-core.ts:108-116` states for the other makers.
+   * test seam; that function's own doc block states the rule for every maker.
    */
   it("keeps the NODE_ENV=test command seam ahead of a blank override",async () => {
     process.env.ACCEPTANCE_HERMES_BINARY = "  ";
@@ -196,5 +197,39 @@ describe("D10 Hermes support relay binary resolution",() => {
     const relay = await start();
 
     expect(relay.model).toBe(HERMES_GLM_MODEL);
+  });
+
+  /**
+   * This maker's START path has a caller outside `acceptance/` —
+   * `startSupportModelRelay` in the dev auth stack — which supplies no test seam,
+   * so the default thunk runs there. Before the resolver could refuse at all, an
+   * unresolvable hermes reached `spawn` and failed as
+   * `CliRelayFailure("FAILED", HERMES_CLI_FAILED)`. `discovery.ts`'s probe
+   * RE-THROWS anything that is not a `CliRelayFailure` instead of recording an
+   * ABSENT probe, so changing the failure CLASS here would turn a graceful
+   * degradation into an unhandled error on a host with no hermes installed. The
+   * class is preserved; the typed resolver message rides inside it, so the reason
+   * and the path still reach the log.
+   */
+  it("refuses the START path as a CliRelayFailure carrying the typed resolver message",async () => {
+    delete process.env.ACCEPTANCE_HERMES_BINARY;
+    const empty = await temporaryDirectory();
+    const previousPath = process.env.PATH;
+    process.env.PATH = empty;
+    try {
+      const rejection: unknown = await startHermesSupportRelay({
+        port: 0,
+        timeoutMs: 1_000,
+        testOnlyGlmApiKey: "zai-test-only"
+      }).then(() => null,(error: unknown) => error);
+
+      expect(rejection).toBeInstanceOf(CliRelayFailure);
+      expect((rejection as CliRelayFailure).kind).toBe("FAILED");
+      expect((rejection as Error).message)
+        .toBe("HERMES_CLI_BINARY_UNRESOLVED:NOT_ON_PATH:hermes");
+    } finally {
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+    }
   });
 });

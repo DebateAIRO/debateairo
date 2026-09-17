@@ -157,10 +157,31 @@ export async function startHermesSupportRelay(
   const glmApiKey = options.testOnlyGlmApiKey ?? await readGlmCredential();
   // LAZY, like the other three makers: the resolver can refuse on its own
   // account now, and an eagerly built default would let a configuration error
-  // pre-empt resolveTestGuardedCommand's authority over the test seam
-  // (`relay-core.ts:108-116` states the rule once).
+  // pre-empt `resolveTestGuardedCommand`'s authority over the test seam — that
+  // function's own doc block states the rule once.
+  //
+  // The refusal is re-thrown as a CliRelayFailure because this maker's START
+  // path has a caller outside `acceptance/` (`startSupportModelRelay` in the dev
+  // auth stack) that supplies no test seam, and because `probeProvider` in
+  // `discovery.ts` RE-THROWS anything that is not a CliRelayFailure instead of
+  // recording an ABSENT probe. Before the resolver could refuse, an unresolvable
+  // hermes reached `spawn` and failed as CliRelayFailure(FAILED,
+  // HERMES_CLI_FAILED); keeping that CLASS keeps a host with no hermes degrading
+  // as it did, while the typed message carries the reason and the path into the
+  // log.
   const command = resolveTestGuardedCommand(
-    () => ({ binary: resolveHermesBinary(),prefixArguments: Object.freeze([]) }),
+    () => {
+      try {
+        return { binary: resolveHermesBinary(),prefixArguments: Object.freeze([]) };
+      } catch (error) {
+        throw new CliRelayFailure(
+          "FAILED",
+          error instanceof Error && error.message.trim() !== ""
+            ? error.message
+            : HERMES_BINARY_UNRESOLVED
+        );
+      }
+    },
     options.testOnlyCommand,
     "TEST_ONLY_HERMES_COMMAND_FORBIDDEN"
   );
