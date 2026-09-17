@@ -80,7 +80,7 @@ export function TopBar() {
         <div className="topBarContext" />
       )}
       <div className="topBarActions">
-        <Link className="btn" href="/login">
+        <Link className="btn" href="/settings">
           Account
         </Link>
         <Link className="btn btnDark" href="/new">
