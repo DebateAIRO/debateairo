@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
+  SUPPORT_ACTION_CATALOG,
   SUPPORT_CAPABILITIES,
   SUPPORT_PAGE_ROUTES,
   SUPPORT_PROXY_ROUTES,
@@ -72,6 +73,33 @@ describe("Support catalog route coverage", () => {
     expect(SUPPORT_CAPABILITIES.find(({ id }) => id === "product-identity")).toMatchObject({
       availability: "public",actionIds: [],articleIds: ["product-identity"]
     });
+  });
+
+  it("maps the public-guide families to bilingual articles and only closed Settings actions", () => {
+    const capabilities = new Map(SUPPORT_CAPABILITIES.map((item) => [item.id,item]));
+    expect(capabilities.get("home-library")?.articleIds).toContain("app-navigation");
+    expect(capabilities.get("owner-debate")?.articleIds).toContain("debate-workspace-menus");
+    expect(capabilities.get("settings")).toMatchObject({
+      articleIds: expect.arrayContaining(["settings-help-menus"]),
+      actionIds: expect.arrayContaining(["active-sessions","claim-legacy","delete-account"])
+    });
+    expect(capabilities.get("help-desk")?.articleIds).toEqual(expect.arrayContaining([
+      "app-navigation","settings-help-menus","support-status-limits"
+    ]));
+
+    const actions = new Map(SUPPORT_ACTION_CATALOG.map((item) => [item.id,item]));
+    expect(actions.get("active-sessions")).toMatchObject({
+      availability:"signed-in",href:"/settings#active-sessions-heading"
+    });
+    expect(actions.get("claim-legacy")).toMatchObject({
+      availability:"signed-in",href:"/settings#legacy-run-claim-heading"
+    });
+    expect(actions.get("delete-account")).toMatchObject({
+      availability:"signed-in",href:"/settings#account-deletion-heading"
+    });
+    expect(actions.has("pricing")).toBe(false);
+    expect(actions.has("theme")).toBe(false);
+    expect(actions.has("replay")).toBe(false);
   });
 
   it("keeps the browser-safe catalog free of Node-only imports and exports it as a subpath", () => {

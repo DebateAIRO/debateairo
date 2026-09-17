@@ -104,7 +104,7 @@ afterEach(() => {
 });
 
 describe("Help Corpus loader", () => {
-  it("loads the exact separate editorial manifest for preview eligibility", () => {
+  it("keeps the prior editorial manifest visibly stale after public-guide authoring", () => {
     const directory = fileURLToPath(
       new URL("../../packages/support-kb/content/", import.meta.url),
     );
@@ -114,23 +114,18 @@ describe("Help Corpus loader", () => {
     const componentPath = fileURLToPath(
       new URL("../../packages/support-kb/recovery/components.json", import.meta.url),
     );
-    const corpus = loadHelpCorpus(directory, {
-      reviewManifest: JSON.parse(readFileSync(manifestPath,"utf8")) as unknown,
-      recoveryComponents: readFileSync(componentPath),
-      requireReviewedRecovery: true,
-    });
+    const manifest = JSON.parse(readFileSync(manifestPath,"utf8")) as {
+      articles: unknown[];recovery:{ componentFileSha256:string };
+    };
+    const componentBytes = readFileSync(componentPath);
 
-    expect(corpus).toMatchObject({
-      shippedCount: 19,
-      ignoredCount: 0,
-      previewReviewedCount: 13,
-      ownerRatifiedCount: 6,
-      recoveryReviewedCount: 19,
-      recoveryOwnerRatifiedCount: 0,
-      kbVersion: "23f8131ced441159be735d779ff4d863c9b0b77cf79a7eb513df49e7711f9f3e",
-    });
-    expect(corpus.reviewManifest.articles).toHaveLength(26);
-    expect(corpus.entries.filter(({ ratifiedBy }) => ratifiedBy === "")).toHaveLength(26);
+    expect(manifest.articles).toHaveLength(26);
+    expect(manifest.recovery.componentFileSha256).not.toBe(sha256(componentBytes));
+    expect(() => loadHelpCorpus(directory,{
+      reviewManifest:manifest,recoveryComponents:componentBytes,requireReviewedRecovery:true
+    } as never)).toThrowError(expect.objectContaining({
+      code:"SUPPORT_KB_RECOVERY_COMPONENT_INVALID"
+    }));
   });
 
   it("keeps changed and new real corpus drafts excluded until separate editorial review", () => {
@@ -142,15 +137,18 @@ describe("Help Corpus loader", () => {
 
     expect(corpus.entries).toHaveLength(12);
     expect(corpus.shippedCount).toBe(6);
-    expect(corpus.ignoredCount).toBe(13);
+    expect(corpus.ignoredCount).toBe(16);
     expect(corpus.entries.some(({ id }) => id === "product-identity")).toBe(false);
+    for (const id of [
+      "app-navigation","debate-workspace-menus","settings-help-menus","support-status-limits"
+    ]) expect(corpus.entries.some((entry) => entry.id === id)).toBe(false);
     expect(corpus.previewReviewedCount).toBe(0);
     expect(corpus.ownerRatifiedCount).toBe(6);
     expect(corpus.manifest.split("\n")).toHaveLength(25);
     expect(corpus.kbVersion).toMatch(/^[0-9a-f]{64}$/u);
   });
 
-  it("admits the complete recovery component set after its separate review manifest lands", () => {
+  it("does not admit the changed component set before its separate review manifest lands", () => {
     const directory = fileURLToPath(
       new URL("../../packages/support-kb/content/", import.meta.url),
     );
@@ -161,14 +159,10 @@ describe("Help Corpus loader", () => {
       new URL("../../packages/support-kb/recovery/components.json", import.meta.url),
     );
 
-    const corpus = loadHelpCorpus(directory,{
+    expect(() => loadHelpCorpus(directory,{
       reviewManifest: JSON.parse(readFileSync(manifestPath,"utf8")) as unknown,
       recoveryComponents: readFileSync(componentPath),requireReviewedRecovery: true
-    });
-
-    expect(corpus.entries).toHaveLength(38);
-    expect(corpus.recoveryReviewedCount).toBe(19);
-    expect(corpus.recoveryOwnerRatifiedCount).toBe(0);
+    })).toThrowError(expect.objectContaining({ code:"SUPPORT_KB_RECOVERY_COMPONENT_INVALID" }));
   });
 
   it("serves only complete bilingual pairs that are shipped and V-ratified, counting every other id as ignored", () => {

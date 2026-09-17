@@ -18,7 +18,15 @@ const ACTIONS_BY_ID = new Map<SupportActionId, SupportActionDefinition>(
 );
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const ALLOWED_QUERIES = new Set(["next=%2Fnew", "tab=public", "tab=yours"]);
-const ALLOWED_FRAGMENTS = new Set(["service-status", "method", "transcripts", "consent-privacy-heading"]);
+const ALLOWED_FRAGMENTS = new Set([
+  "service-status",
+  "method",
+  "transcripts",
+  "active-sessions-heading",
+  "consent-privacy-heading",
+  "legacy-run-claim-heading",
+  "account-deletion-heading",
+]);
 const TOKEN_PARAMETER = /(?:^|&)(?:token|code|secret|key|case)=/iu;
 
 function isSafeHref(href: string): boolean {

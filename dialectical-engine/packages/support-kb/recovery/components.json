@@ -30,6 +30,20 @@
       "fallback": "După autentificare, alege Setări pentru revizuirea sau revocarea sesiunilor, consimțământul din browser, revendicarea dezbaterilor vechi ori ștergerea contului. Controalele sensibile cer autentificare recentă în pagină. Pagina nu oferă schimbarea emailului, înlocuirea parolei, regenerarea MFA activă sau modificarea rutării implementării. Asistența poate explica aceste controale, dar nu le poate executa și nu poate primi date de autentificare."
     },
     {
+      "id": "app-navigation",
+      "lang": "en",
+      "articleSha256": "0530c272ad7309caa39be93583a5c2b4d09eb995ec77a784b0f2fe3e39e06a09",
+      "modelProjection": "The landing page links to Method and a Sample debate; Pricing is informational, not checkout. Start a round and New debate open the debate creator after authentication. Home is the library: Your debates is private to the authenticated visitor and Public debates is the published catalog. Account and Settings open account settings. Theme, Compact Help, and cookie preferences are local page or browser controls. Help accepts free text; topic buttons and suggested questions are optional shortcuts. Support can explain and offer fixed navigation but cannot read visitor lists or invent debate links.",
+      "fallback": "Use Home for the debate library, Public debates for the published catalog, and Help for a free-text Support conversation. Sign in before opening New debate, Your debates, Account, or Settings. Pricing is informational; theme, Compact Help, and cookie preferences are local controls. Support cannot read private lists or invent a debate link."
+    },
+    {
+      "id": "app-navigation",
+      "lang": "ro",
+      "articleSha256": "af6e9b4926c71a27c0672fd3433a6ef5986b64fb4ed8c3736b9e90616d03204d",
+      "modelProjection": "Pagina de prezentare oferă Method și Sample debate; Pricing este informativ, nu o pagină de plată. Start a round și New debate deschid creatorul după autentificare. Acasă este biblioteca: Your debates este lista privată a vizitatorului autentificat, iar Public debates este catalogul publicat. Account și Settings deschid setările contului. Tema, Compact Help și preferințele cookie sunt controale locale. Help acceptă text liber; butoanele de subiect și întrebările sugerate sunt scurtături opționale. Asistența poate explica și oferi navigare fixă, dar nu poate citi listele vizitatorului sau inventa legături către dezbateri.",
+      "fallback": "Folosește Acasă pentru bibliotecă, Public debates pentru catalogul publicat și Help pentru o conversație liberă cu Asistența. Autentifică-te înainte de New debate, Your debates, Account sau Settings. Pricing este informativ; tema, Compact Help și preferințele cookie sunt controale locale. Asistența nu poate citi liste private sau inventa o legătură către o dezbatere."
+    },
+    {
       "id": "browse-public-debates",
       "lang": "en",
       "articleSha256": "8059a2e46af231765a80f61854752aa5a9ec49e60c95dc715eb3e82a39618fad",
@@ -70,6 +84,20 @@
       "articleSha256": "90f1fff60a4245eeda7b5131b671772b425e8ab682f967c4c31c2ad42c7207a2",
       "modelProjection": "Câmpul Topic conține întrebarea sau afirmația examinată și cere mai mult de șase caractere. Premium permite și câte o selecție de îndrumare pe linie plus adnotări libere. Free golește și dezactivează aceste câmpuri. Formularul curent nu are un câmp separat pentru descriere.",
       "fallback": "Scrie întrebarea sau afirmația în Topic folosind mai mult de șase caractere. Premium poate adăuga câte o selecție de îndrumare pe linie și adnotări libere; Free golește și dezactivează aceste câmpuri. Formularul curent nu are un câmp separat pentru descriere."
+    },
+    {
+      "id": "debate-workspace-menus",
+      "lang": "en",
+      "articleSha256": "dd5673e995acba7c108c52ff31080880206bdf0d51b2ca9f0113b0828e7be607",
+      "modelProjection": "When a debate has a tree, Thread shows a sequence, Split compares branches, Tree shows hierarchy, and Map shows relationships. Scoring appears when available; Library returns Home. Replay, Workspace, Honesty, Export, and How it works are controls for the debate already open, with Export available only for an exportable answer and public debates exposing a smaller read-only set. Support can explain these controls but cannot read a private debate, choose its identifier, replay it, inspect artifacts, or operate owner controls.",
+      "fallback": "Use Thread, Split, Tree, or Map after the debate tree exists. Replay, Workspace, Honesty, Export, and How it works act on the debate already open; some require an owner workspace or a completed answer. Support can explain them but cannot inspect or operate a private debate."
+    },
+    {
+      "id": "debate-workspace-menus",
+      "lang": "ro",
+      "articleSha256": "3cd8b0cdabe438779873f8f940cdff4bb2039ff55742f9400f8805320c8cbc39",
+      "modelProjection": "Când dezbaterea are un arbore, Thread arată o succesiune, Split compară ramurile, Tree arată ierarhia, iar Map arată relațiile. Evaluarea apare când este disponibilă; Library revine Acasă. Replay, Workspace, Honesty, Export și How it works sunt controale pentru dezbaterea deja deschisă; Export apare numai pentru un răspuns exportabil, iar dezbaterile publice oferă un set mai mic, numai pentru citire. Asistența poate explica aceste controale, dar nu poate citi o dezbatere privată, alege identificatorul ei, reporni generarea, inspecta artefactele sau opera controalele proprietarului.",
+      "fallback": "Folosește Thread, Split, Tree sau Map după apariția arborelui dezbaterii. Replay, Workspace, Honesty, Export și How it works acționează asupra dezbaterii deja deschise; unele necesită spațiul proprietarului sau un răspuns finalizat. Asistența le poate explica, dar nu poate inspecta sau opera o dezbatere privată."
     },
     {
       "id": "delete-a-private-debate",
@@ -198,6 +226,20 @@
       "fallback": "În formularul dezbaterii, Free fixează riscul la Standard. Cu Premium selectat, alege Casual, Standard sau High stakes înainte de pornirea rulării. Rularea trimisă înregistrează selecția efectivă, iar Asistența nu o poate schimba ulterior."
     },
     {
+      "id": "settings-help-menus",
+      "lang": "en",
+      "articleSha256": "13ad6a9d637a972f1231ad9c07f3fd6c935d1a0d7438205a824244b5e125792e",
+      "modelProjection": "Account or Settings opens signed-in account settings. Active sessions lets the visitor review or revoke sessions; Privacy opens cookie preferences; Claim legacy debates accepts an old access token; Delete account shows scheduling and cancellation controls. Support can offer these fixed section links and explain prerequisites, but cannot read private sessions, tokens, account or deletion state, receive credentials or security codes, or perform any account operation. Help uses public product guidance; optional topic pills are separate from human escalation, bug reporting, and email support.",
+      "fallback": "Sign in and open the relevant Settings section for Active sessions, Privacy, Claim legacy debates, or Delete account. Support can navigate and explain, but it cannot inspect private records, receive credentials or codes, revoke sessions, claim debates, or operate deletion controls. Human escalation, bug reporting, and email support remain separate from the public guide."
+    },
+    {
+      "id": "settings-help-menus",
+      "lang": "ro",
+      "articleSha256": "eca1fff36e680fc23768b9728aca8f52f7f0737357dfd458d084f5c173267146",
+      "modelProjection": "Account sau Settings deschide setările contului autentificat. Active sessions permite examinarea sau revocarea sesiunilor; Privacy deschide preferințele cookie; Claim legacy debates acceptă un token vechi de acces; Delete account arată controalele de programare și anulare. Asistența poate oferi legături fixe către secțiuni și explica cerințele, dar nu poate citi sesiuni private, tokenuri, contul sau starea ștergerii, primi credențiale sau coduri de securitate ori executa operații asupra contului. Help folosește ghidul public; pastilele opționale sunt separate de escaladarea umană, raportarea erorilor și email.",
+      "fallback": "Autentifică-te și deschide secțiunea relevantă din Settings pentru Active sessions, Privacy, Claim legacy debates sau Delete account. Asistența poate naviga și explica, dar nu poate inspecta date private, primi credențiale sau coduri, revoca sesiuni, revendica dezbateri ori opera ștergerea. Escaladarea umană, raportarea erorilor și emailul rămân separate de ghidul public."
+    },
+    {
       "id": "support-cases",
       "lang": "en",
       "articleSha256": "96ea24b2aff54d46beeb25cec255041f335e93c52590829ad64f53ad62fe9aa2",
@@ -214,16 +256,16 @@
     {
       "id": "support-status-limits",
       "lang": "en",
-      "articleSha256": "7f111d034af0d6ba0765c9bf008d6d8981f8a589e1731695e9bbf7d5f213f15f",
-      "modelProjection": "The Help status block describes information published for Support and can be limited or stale. It does not prove the health of every debate engine, model, provider, or deployment. With consent and ownership checks, signed-in Support can read only the approved status projection for the visitor's debate, not the question, claims, answer, another user's debate, or account-security state.",
-      "fallback": "Choose Support status on Help for the published Support information, which can be limited or stale and does not prove every engine, model, provider, or deployment is healthy. With consent and ownership checks, signed-in Support can read only the approved status projection for your debate, not its content, another person's debate, or account-security state."
+      "articleSha256": "f5344e3c0e5f0bec3bb3b5b10dff77b12a85d90233a6d7a7cf8a31f38cc7bfe7",
+      "modelProjection": "The Help Service status block publishes three limited indicators: Debate engine, Scoring queue, and Model fleet. Debate engine reflects public status-request availability, Scoring queue points to status in the app, and Model fleet shows the Support relay state or CHECKING. These indicators can be unavailable, incomplete, or stale and do not prove every debate, job, model, provider, or deployment is healthy. Support cannot inspect private debate, queue, account, or provider records.",
+      "fallback": "Open Support status on Help for the public Debate engine, Scoring queue, and Model fleet indicators. They can be unavailable, incomplete, or stale and do not prove every debate, job, model, provider, or deployment is healthy. Support cannot inspect private status records."
     },
     {
       "id": "support-status-limits",
       "lang": "ro",
-      "articleSha256": "884956c2b04303c8412a4859746a526d5577e9392e2066843aa977500857511f",
-      "modelProjection": "Blocul de stare din Ajutor descrie informațiile publicate pentru Asistență și poate fi limitat sau învechit. El nu dovedește starea fiecărui motor de dezbatere, model, furnizor sau implementare. Cu verificarea consimțământului și a proprietății, Asistența autentificată poate citi numai proiecția aprobată de stare pentru dezbaterea vizitatorului, nu întrebarea, afirmațiile, răspunsul, dezbaterea altei persoane sau starea de securitate a contului.",
-      "fallback": "Alege Starea serviciului de asistență din Ajutor pentru informațiile publicate, care pot fi limitate sau învechite și nu dovedesc starea fiecărui motor, model, furnizor ori implementare. Cu verificarea consimțământului și proprietății, Asistența autentificată poate citi numai proiecția aprobată de stare pentru dezbaterea ta, nu conținutul ei, dezbaterea altei persoane sau securitatea contului."
+      "articleSha256": "0ba2909d0b6bf0dbb731e6c19ceff73cd99babbfed69949aec3b28d57f732bfa",
+      "modelProjection": "Blocul Service status din Ajutor publică trei indicatori limitați: Debate engine, Scoring queue și Model fleet. Debate engine reflectă disponibilitatea cererii publice de stare, Scoring queue indică starea din aplicație, iar Model fleet arată starea releului Asistenței sau CHECKING. Indicatorii pot fi indisponibili, incompleți sau învechiți și nu dovedesc starea fiecărei dezbateri, sarcini, model, furnizor sau implementare. Asistența nu poate inspecta înregistrări private despre dezbatere, coadă, cont sau furnizor.",
+      "fallback": "Deschide Support status în Ajutor pentru indicatorii publici Debate engine, Scoring queue și Model fleet. Ei pot fi indisponibili, incompleți sau învechiți și nu dovedesc starea fiecărei dezbateri, sarcini, model, furnizor sau implementare. Asistența nu poate inspecta înregistrări private de stare."
     },
     {
       "id": "unpublish-a-debate",

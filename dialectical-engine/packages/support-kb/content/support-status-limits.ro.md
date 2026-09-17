@@ -4,11 +4,13 @@ lang: ro
 title: "Înțelege starea Asistenței"
 status: shipped
 sources:
-  - apps/ui/components/support/Assistant.tsx:700
-  - apps/api/src/support/own-context.ts:10
-verified_against: "b7ca2c41"
+  - apps/ui/components/support/Assistant.tsx:706
+  - apps/ui/components/support/Assistant.tsx:748
+verified_against: "714c7aa9"
 ratified_by: ""
 ratified_on: ""
 ---
 
-Blocul de stare de la `/help` descrie informațiile publicate pentru Asistență și poate fi limitat sau învechit. El nu dovedește starea fiecărui motor de dezbatere, model, furnizor sau implementare. Cu verificarea consimțământului și a proprietății, Asistența autentificată poate citi numai proiecția de stare aprobată pentru dezbaterea ta; nu poate citi întrebarea, afirmațiile, răspunsul, dezbaterea altui utilizator sau starea de securitate a contului.
+Blocul Service status din Ajutor publică trei indicatori limitați: Debate engine, Scoring queue și Model fleet. Debate engine reflectă disponibilitatea cererii publice de stare, Scoring queue îndrumă vizitatorul către starea din aplicație, iar Model fleet arată starea releului Asistenței sau faptul că verificarea este încă în curs.
+
+Aceste etichete pot fi indisponibile, incomplete sau învechite. Ele nu dovedesc starea fiecărei dezbateri, sarcini de evaluare, model, furnizor sau implementare. Asistența poate explica indicatorii publici și poate naviga la ei, dar nu poate inspecta dezbaterea, sarcina din coadă, contul, înregistrarea furnizorului sau altă stare privată a vizitatorului.

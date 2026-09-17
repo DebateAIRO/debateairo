@@ -63,6 +63,29 @@ afterEach(() => {
 });
 
 describe("reviewed Support recovery components", () => {
+  it("carries the exact eight public-guide drafts without review metadata", () => {
+    const document = JSON.parse(readFileSync(new URL(
+      "../../packages/support-kb/recovery/components.json",import.meta.url
+    ),"utf8")) as { components: Array<Readonly<{ id:string;lang:string;articleSha256:string;
+      modelProjection:string;fallback:string }>> };
+    const expected = ["app-navigation","debate-workspace-menus","settings-help-menus","support-status-limits"];
+    const drafts = document.components.filter(({ id }) => expected.includes(id));
+
+    expect(drafts.map(({ id,lang }) => `${id}.${lang}`)).toEqual(expected.flatMap((id) => [
+      `${id}.en`,`${id}.ro`
+    ]));
+    for (const component of drafts) {
+      const article = readFileSync(new URL(
+        `../../packages/support-kb/content/${component.id}.${component.lang}.md`,import.meta.url
+      ));
+      expect(component.articleSha256).toBe(sha256(article));
+      expect(component.modelProjection).not.toBe("");
+      expect(component.fallback).not.toBe("");
+      expect(component).not.toHaveProperty("reviewedBy");
+      expect(component).not.toHaveProperty("ratifiedBy");
+    }
+  });
+
   it("carries an exact bilingual product-identity draft for separate review", () => {
     const document = JSON.parse(readFileSync(new URL(
       "../../packages/support-kb/recovery/components.json",import.meta.url

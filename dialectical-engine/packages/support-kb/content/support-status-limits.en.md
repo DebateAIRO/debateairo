@@ -4,11 +4,13 @@ lang: en
 title: "Understand Support status"
 status: shipped
 sources:
-  - apps/ui/components/support/Assistant.tsx:700
-  - apps/api/src/support/own-context.ts:10
-verified_against: "b7ca2c41"
+  - apps/ui/components/support/Assistant.tsx:706
+  - apps/ui/components/support/Assistant.tsx:748
+verified_against: "714c7aa9"
 ratified_by: ""
 ratified_on: ""
 ---
 
-The status block on `/help` describes information published for Support and may be limited or stale. It does not prove the health of every debate engine, model, provider, or deployment. With consent and ownership checks, signed-in Support can read only the approved status projection for your debate; it cannot read the question, claims, answer, another user's debate, or account-security state.
+The Service status block on Help publishes three limited indicators: Debate engine, Scoring queue, and Model fleet. Debate engine reflects whether the public status request is available, Scoring queue points the visitor back to in-app status, and Model fleet shows the Support relay state or that it is still checking.
+
+These labels can be unavailable, incomplete, or stale. They do not prove the health of every debate, scoring job, model, provider, or deployment. Support can explain the public indicators and navigate to them, but it cannot inspect a visitor's debate, queue item, account, provider record, or other private status.

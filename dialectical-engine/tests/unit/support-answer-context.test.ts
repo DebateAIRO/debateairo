@@ -4,7 +4,7 @@ import { describe,expect,it,vi } from "vitest";
 
 import { createSupportAnswerService } from "../../apps/api/src/support/answer.js";
 import {
-  createHelpCorpusSnapshotLookup,loadHelpCorpus,type HelpCorpusEntry,type LoadedHelpCorpus
+  createHelpCorpusSnapshotLookup,type HelpCorpusEntry,type LoadedHelpCorpus
 } from "../../packages/support-kb/src/index.js";
 import type { SupportMessageCipherPort } from "../../apps/api/src/support/session.js";
 import { createSupportModelReferenceFactory } from "../../apps/api/src/support/model-references.js";
@@ -12,6 +12,7 @@ import { createSupportModelReferenceFactory } from "../../apps/api/src/support/m
 const REFERENCE_REQUEST_ID = "10000000-0000-4000-8000-000000000001";
 const SOURCE_REFERENCE = "s-10000000000040008000000000000001-1";
 const ACTION_REFERENCE = "a-10000000000040008000000000000001-1";
+const SECOND_ACTION_REFERENCE = "a-10000000000040008000000000000001-2";
 const modelReferenceFactory = () => createSupportModelReferenceFactory(REFERENCE_REQUEST_ID);
 
 function entry(id: string,body: string): HelpCorpusEntry {
@@ -27,13 +28,16 @@ function corpus(entries: readonly HelpCorpusEntry[],kbVersion: string): LoadedHe
   return Object.freeze({ entries: Object.freeze([...entries]),kbVersion }) as LoadedHelpCorpus;
 }
 
-function admittedCorpus(): LoadedHelpCorpus {
+function authorDraftCorpus(): LoadedHelpCorpus {
   const root = resolve(process.cwd(),"packages/support-kb");
-  return loadHelpCorpus(resolve(root,"content"),{
-    reviewManifest: JSON.parse(readFileSync(resolve(root,"reviews/manifest.json"),"utf8")) as unknown,
-    recoveryComponents: readFileSync(resolve(root,"recovery/components.json")),
-    requireReviewedRecovery: true
-  });
+  const document = JSON.parse(readFileSync(resolve(root,"recovery/components.json"),"utf8")) as {
+    components: Array<Readonly<{ id:string;lang:"en"|"ro";modelProjection:string;fallback:string }>>;
+  };
+  return corpus(document.components.map((component) => Object.freeze({
+    ...entry(component.id,component.modelProjection),lang:component.lang,
+    title:component.id.replaceAll("-"," "),modelProjection:component.modelProjection,
+    fallback:component.fallback,ratifiedBy:"",ratifiedOn:""
+  })),"author-draft-corpus");
 }
 
 const messages = Object.freeze({
@@ -131,13 +135,40 @@ describe("CP1 composed answer context", () => {
     expect(complete).not.toHaveBeenCalled();
   });
 
+  it("grounds a Settings menu question and returns only the server-resolved section action", async () => {
+    const guide = entry(
+      "settings-help-menus",
+      "Settings contains Active sessions, Privacy, Claim legacy debates, and Delete account."
+    );
+    const snapshot = corpus([guide],"5".repeat(64));
+    const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
+      kind:"answer",text:"Open Active sessions in Settings.",
+      sourceIds:[SOURCE_REFERENCE],actionIds:[SECOND_ACTION_REFERENCE]
+    }) }));
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-17T13:00:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({
+      ...request(snapshot),signedIn:true,text:"Where are Active sessions in Settings?"
+    });
+
+    expect(complete).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      outcome:"ANSWER_GROUNDED",sources:[{ id:"settings-help-menus" }],
+      actions:[{ id:"active-sessions",href:"/settings#active-sessions-heading" }]
+    });
+  });
+
   it.each([
     "Is Dialectical Engine a reasoning instrument?",
     "Give me an overview of dialecticalengine."
   ])("grounds a reviewed identity paraphrase through the actual service on the admitted corpus: %s", async (
     text
   ) => {
-    const snapshot = admittedCorpus();
+    const snapshot = authorDraftCorpus();
     const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
       kind:"answer",text:"Dialectical Engine is a reasoning instrument.",
       sourceIds:[SOURCE_REFERENCE],actionIds:[]
@@ -164,7 +195,7 @@ describe("CP1 composed answer context", () => {
   ])("keeps an unsupported branded claim out of the actual service on the admitted corpus: %s", async (
     text
   ) => {
-    const snapshot = admittedCorpus();
+    const snapshot = authorDraftCorpus();
     const complete = vi.fn(async () => Object.freeze({ text: JSON.stringify({
       kind:"answer",text:"Unsupported synthetic claim.",sourceIds:[SOURCE_REFERENCE],actionIds:[]
     }) }));

@@ -60,6 +60,16 @@ describe("Support navigation", () => {
     ]);
   });
 
+  it("resolves the three static Settings sections only for signed-in visitors", () => {
+    const ids = ["active-sessions","claim-legacy","delete-account"] as const;
+    expect(resolveSupportActions(ids,{ signedIn:false,language:"en" })).toEqual([]);
+    expect(resolveSupportActions(ids,{ signedIn:true,language:"ro" })).toEqual([
+      { id:"active-sessions",label:"Sesiuni active",href:"/settings#active-sessions-heading" },
+      { id:"claim-legacy",label:"Revendică dezbaterile vechi",href:"/settings#legacy-run-claim-heading" },
+      { id:"delete-account",label:"Șterge contul",href:"/settings#account-deletion-heading" }
+    ]);
+  });
+
   it.each([
     ["unknown-action", {}],
     ["forgot-password", {}],
@@ -67,6 +77,7 @@ describe("Support navigation", () => {
     ["owner-debate", { ownerDebateId: "https://evil.example" }],
     ["public-debate", { publicDebateRef: "//evil.example/path" }],
     ["public-debate", { publicDebateRef: "safe?token=secret" }],
+    ["active-sessions", { signedIn: false }],
   ] as const)("drops unknown, unresolved, malformed, external, and token-bearing %s requests", (id, projection) => {
     // Property: no untrusted identifier can cross the closed resolver into an href.
     expect(resolveSupportActions([id as SupportActionId], {
