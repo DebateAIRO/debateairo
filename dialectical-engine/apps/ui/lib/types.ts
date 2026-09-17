@@ -597,6 +597,17 @@ export type DebateConfig = Record<string, unknown> & {
 
 export type VerdictBand = "supported" | "contested" | "unsupported" | "unavailable" | "insufficient_scoring" | "suppressed";
 
+/**
+ * The live verdict state the engine's three-state label maps onto, in the
+ * engine's own words (V's ruling D77 of 2026-09-18, confirm-item 4: "rename
+ * now"). The retired words -- "endorsed", "endorsed_with_caveat",
+ * "suppressed_no_evidence" -- belonged to the OLDER EVIDENCE GATE, which lives
+ * on unchanged as Synthesis["verdict_gate"]["state"]; they made the banner say
+ * something false about a label that is derived from propagated strength, not
+ * from whether evidence was looked up.
+ */
+export type LiveVerdictState = "supported" | "contested" | "unsupported";
+
 export type VerdictSummary = {
   verdictBand: VerdictBand;
   claimLanguage: string;
@@ -610,7 +621,7 @@ export type VerdictSummary = {
     tauSourceMajority?: "judge_strength" | "default";
   };
   verdictThresholdsVersion: string;
-  verdictState?: "endorsed" | "endorsed_with_caveat" | "suppressed_no_evidence";
+  verdictState?: LiveVerdictState;
   evidencePresence?: "none" | "extracted_unresolved";
   suppressionReason?: VerdictSuppressionReason | null;
   caveats?: {

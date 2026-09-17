@@ -357,12 +357,15 @@ describe("T11 · the three-state label ladder", () => {
   });
 
   describe("live-UI vocabulary wiring (confirm-item 4)", () => {
-    it("maps each engine label to the banner's own vocabulary", async () => {
+    // V ruled RENAME NOW (D77 of 2026-09-18): the live UI speaks the engine's
+    // own three words, lower-cased. The retired words belonged to the older
+    // evidence gate and made the banner say something false for UNSUPPORTED.
+    it("maps each engine label to its own word, lower-cased", async () => {
       const { liveVerdictState } = await import("../../apps/ui/lib/v3/labels.js");
 
-      expect(liveVerdictState("SUPPORTED")).toBe("endorsed");
-      expect(liveVerdictState("CONTESTED")).toBe("endorsed_with_caveat");
-      expect(liveVerdictState("UNSUPPORTED")).toBe("suppressed_no_evidence");
+      expect(liveVerdictState("SUPPORTED")).toBe("supported");
+      expect(liveVerdictState("CONTESTED")).toBe("contested");
+      expect(liveVerdictState("UNSUPPORTED")).toBe("unsupported");
     });
   });
 });
