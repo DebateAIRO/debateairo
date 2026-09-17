@@ -51,18 +51,79 @@ The env-key names are read verbatim from the relays: `CLAUDE_BINARY_ENV_KEY` at
 `acceptance/claude-relay.ts:34`, `GROK_BINARY_ENV_KEY` at `acceptance/grok-relay.ts:18`,
 `CODEX_BINARY_ENV_KEY` at `acceptance/model-shim.ts:23`.
 
-**The first two keys are not optional here.** Unset, the relay falls back to a path that does not
-exist on this machine and the run dies at the provider probe. A **present-but-blank** key is a loud
-typed refusal by design (D10) — never a silent default — so a typo fails loudly rather than quietly.
+**Since 2026-09-17 evening (D75; ticket `F-RELAY-BINARY-HOST-DEFAULT`) the keys are optional.** Unset,
+each relay finds its CLI **by name on PATH** — the first PATH entry that exists under that name, which
+is then admitted only if it is a regular, non-empty, executable file whose first bytes are a program
+header; otherwise the relay refuses with `<MAKER>_CLI_BINARY_UNRESOLVED:<REASON>:<path>` (reasons
+`NOT_ON_PATH`, `NOT_FOUND`, `EMPTY`, `NOT_EXECUTABLE`, `NOT_A_PROGRAM`), which the ceremony prints as
+`MAKER ABSENT <maker> <code>`. A key that is set names the binary instead (a path, or a bare name to
+look up). A **present-but-blank** key is still a loud typed refusal (D10) — never a silent default — so
+a typo fails loudly rather than quietly. No compiled-in path remains in the relays. The keys are still
+the right way to point a run at a specific build (the two overrides below).
 
-Discovered with `command -v` today (the binaries were **not executed**; the versions are read from
-the symlink targets and the package manifest, not from `--version`):
+**Re-measured 2026-09-17 20:08 (orchestrator), after V reported the versions had moved.** The
+2026-09-16 transcription (claude 2.1.216, codex 0.144.6, grok 1.0.30) is superseded by this one, and
+`--version` WAS run this time for codex and grok (a version print, not a model call):
 
 ```
-command -v claude -> /Users/stefannour/.local/bin/claude -> …/.local/share/claude/versions/2.1.216
-command -v codex  -> /opt/homebrew/bin/codex  -> …/@openai/codex/bin/codex.js   (package.json: 0.144.6)
-command -v grok   -> /Users/stefannour/.local/bin/grok   -> …/.grok/downloads/grok-1.0.30-macos-aarch64
+command -v claude -> /Users/stefannour/.local/bin/claude -> …/.local/share/claude/versions/2.1.274
+                     *** BROKEN: that file is 0 bytes (an interrupted CLI update, 20:05 today);
+                     *** 2.1.216 and 2.1.178 beside it are complete. See the pre-flight below.
+command -v codex  -> /opt/homebrew/bin/codex   · codex --version -> codex-cli 0.154.0
+command -v grok   -> /Users/stefannour/.local/bin/grok -> …/.grok/bin/grok · grok --version -> grok 1.0.34
+node v26.5.0 · pnpm 11.20.0 (unchanged)
 ```
+
+A table like this goes stale within a day — that is why the tool never uses these values. It
+re-measures with `command -v` at run time and, since 2026-09-17, refuses to start unless every
+discovered maker binary actually runs (see the pre-flight below).
+
+### Pre-flight: the error V hit on 2026-09-17, and what to do
+
+`zsh: no such file or directory: …/.local/share/claude/versions/2.1.274` means the `claude`
+launcher is a symlink to a version file that is **empty** — the CLI's self-update wrote the link
+and never finished writing the binary. `command -v` still finds the launcher, so a naive script
+would have started a ceremony with the Claude maker dead and burned the run on two makers.
+
+**What was found on this Mac on the evening of 2026-09-17, in order.** At 19:29 the ChatGPT desktop
+app with Codex was started, and in the same minute new "update" files appeared for two other CLIs:
+`~/.grok/downloads/grok-1.0.34-macos-aarch64` (born 19:29:16) and
+`~/.local/share/claude/versions/2.1.274` (born 19:29:22), each with the launcher symlink re-pointed at
+it. At **20:10:44 both files were truncated to 0 bytes in the same second** — one actor, not two
+installers. In the same minutes the codex launcher `…/@openai/codex/bin/codex.js` was overwritten with
+four lines of plain text (its own path, a dash, twice). A shell that cannot execute a file runs it as a
+script, so the first `codex --version` after that (the orchestrator's pre-flight, ~20:12) re-ran the
+launcher inside itself without end: ~2,400 processes in four minutes, the per-user limit of 2,666
+reached, every command on the machine failing with `fork: Resource temporarily unavailable`, the
+Claude updater writing another empty file while reporting success. The chain ended when V replaced
+the corrupted file with a two-line program that exits (a shell-builtin write, no new process needed)
+and reinstalled codex (`npm install -g @openai/codex@0.154.0`, 20:31). The old engine's tmux workers
+were not involved (one tmux process, four days old). What wrote the garbage is not proven; the
+timeline points at another agent updating CLIs on the same machine.
+
+**The working configuration today (pre-flight 3 of 3 at 20:35), using the untouched older builds:**
+
+```bash
+export ACCEPTANCE_CLAUDE_BINARY="$HOME/.local/share/claude/versions/2.1.216"
+export ACCEPTANCE_GROK_BINARY="$HOME/.grok/downloads/grok-1.0.30-macos-aarch64"
+```
+
+`codex` is the reinstalled 0.154.0 and needs no override. Or repair the two installs instead
+(`curl -fsSL https://claude.ai/install.sh | bash`; grok's own installer) and then verify each with
+`--version` — but only AFTER the pre-flight says they are programs.
+
+Then **prove readiness without spending**: `PREFLIGHT_ONLY=1 bash …/tools/closing-run.sh` runs
+only the checks — each discovered binary must resolve to a non-empty, executable file whose first
+bytes are a program header (a `#!` shebang or a Mach-O magic number; a text file is refused as
+NOT A PROGRAM and never run) and must answer `--version`, and at least two makers must be runnable —
+and exits 0 when the ceremony may start, 5 when it may not, naming the binary and the reason. It needs
+no credential.
+
+**Rule (V, 2026-09-17): no computer-specific path is ever written down as a value to use.** The
+tool and this packet deduce every binary (`command -v`, or the `ACCEPTANCE_*_BINARY` key you set);
+the absolute paths above are what the deduction found on this Mac on this day, shown so you can
+recognise them, never something to copy. The relays' own compiled-in defaults (paths in another
+operator's home) are being replaced by the same PATH discovery — ticket `F-RELAY-BINARY-HOST-DEFAULT`.
 
 Each CLI uses **its own login** (Claude: the keychain login of the user who runs the ceremony; Codex
 and Grok: their own). No API keys are required, and none should be set. Confirm each is logged in
@@ -166,9 +227,9 @@ ACCEPTANCE_GROK_RELAY_PORT=58091 \
 ACCEPTANCE_STRANGER_SAMPLE_RATE=0 \
 ACCEPTANCE_BATTERY_VERSION=acceptance-v1 \
 ACCEPTANCE_SETTLEMENT_WATCH_HANDLE=acceptance:standing-watch \
-ACCEPTANCE_CLAUDE_BINARY=/Users/stefannour/.local/bin/claude \
-ACCEPTANCE_CODEX_BINARY=/opt/homebrew/bin/codex \
-ACCEPTANCE_GROK_BINARY=/Users/stefannour/.local/bin/grok \
+ACCEPTANCE_CLAUDE_BINARY="${ACCEPTANCE_CLAUDE_BINARY:-$(command -v claude)}" \
+ACCEPTANCE_CODEX_BINARY="${ACCEPTANCE_CODEX_BINARY:-$(command -v codex)}" \
+ACCEPTANCE_GROK_BINARY="${ACCEPTANCE_GROK_BINARY:-$(command -v grok)}" \
 ./node_modules/.bin/tsx acceptance/run-acceptance.ts --service-credential "$ACCEPTANCE_SERVICE_CREDENTIAL" --depth-params '{"depth":2}'
 ```
 

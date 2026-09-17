@@ -262,3 +262,17 @@ verbatim so the presentation can be made.
 - `tests/architecture/s7-authorization-contract.test.ts:98` is red at the base and at every tip since
   the gate of record (`recordQuestionAndMatch` no longer carries `ORDER BY run_id FOR UPDATE`) — an
   owned red of the continuation, not of this task.
+
+### E. The evening of 2026-09-17 — one question for you, and two defaults
+
+- **Question.** At 19:29 the ChatGPT desktop app with Codex started, and in the same minute new
+  builds of the Claude and Grok command lines were created; at 20:10:44 both were emptied to zero
+  bytes in the same second, and the Codex launcher was overwritten with text in the same minutes
+  (D75 b). **Did you ask another AI tool to update the CLIs that evening?** If yes, that is the
+  writer; if no, something else on this Mac is altering executables and needs looking at (the
+  NordVPN "Shield" protection extension is running; its logs were not readable from here).
+- **Default 7.** The run uses the untouched older builds as overrides (`claude` 2.1.216,
+  `grok` 1.0.30) until you repair the two installs; pre-flight 3 of 3 with them (D75 d/3). Veto =
+  "repair first" — then run `PREFLIGHT_ONLY=1` again before spending.
+- **Default 8.** Nothing in the old engine (`main`, tmux workers) was changed: the evidence shows it
+  was not involved (D75 d/4). Veto = a separate task on the V2 code, with its own review.

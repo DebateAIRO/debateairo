@@ -374,7 +374,18 @@ line, typed block on the ceremony, content law in the log, shape-vs-outcome boun
 **Operator's next actions (unchanged in kind, shorter in list).** (1) The ceremony re-run per
 `packets/readiness-ask-2026-09-16.md` — with `--depth-params '{"depth":2}'` — then read the seven
 `DOD-*` lines; (2) the Node 22.23.1 run; (3) the V packet's 2026-09-17 rows; (4) W12 §6 steps 4–7
-after the re-run. The `lane-cont-t2/t3/t8` worktrees were removed at V's word later the same evening
+after the re-run.
+
+**Added 20:4x the same evening (D75).** Before (1): run `PREFLIGHT_ONLY=1 bash …/tools/closing-run.sh`
+first — it refuses anything that is not a program. On this Mac the newest claude (2.1.274) and grok
+(1.0.34) installs are 0-byte files (zeroed 20:10:44 by an unknown actor; the codex launcher was
+overwritten with text in the same minutes and, run under bash, became a fork bomb that froze the
+machine until V's stub write); export `ACCEPTANCE_CLAUDE_BINARY="$HOME/.local/share/claude/versions/2.1.216"`
+and `ACCEPTANCE_GROK_BINARY="$HOME/.grok/downloads/grok-1.0.30-macos-aarch64"` (pre-flight 3 of 3) or
+repair the installs. The relay resolver task (`F-RELAY-BINARY-HOST-DEFAULT`, plan
+`2026-09-17-relay-binaries-deduced.md`) landed at `fbb8cde5` — reviewed APPROVED after one fix round,
+gate green (D75 ADDENDUM 1); the V packet §E carries the one question for V (who updated the CLIs at
+19:29 / 20:10?). The `lane-cont-t2/t3/t8` worktrees were removed at V's word later the same evening
 (PROGRESS, 19:3x) — nothing else of this mission's lives outside `algo-loop-2026-09-16`.
 
 **Known reds, unchanged.** The gate of record's 140 (100 Node-26 `localStorage`, 40 owned); among
