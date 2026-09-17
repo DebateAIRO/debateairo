@@ -9,53 +9,56 @@
 # exactly as vitest prints it. `#` lines are comments. Every active entry is followed
 # by a `# source:` comment.
 #
-# Provenance of the two sources cited below:
-#   - "dev baseline b5a6b6eb (2026-09-02 full-suite classification)" — measured on this
-#     branch and classified in docs/missions/2026-09-01-security-hardening/VERIFICATION.md
-#     ("Full-suite runs"); names re-measured file-by-file on this worktree 2026-09-02.
-#   - "live-mission authority at dev@1c9578a, three full runs (seed file above)" — the
-#     Algorithm Live Loop mission's T0 baseline pin, failed in all three full runs, scope
-#     filtered to tests/unit + tests/architecture. Seed file:
-#     dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/ci-known-red-mission-seed.txt
+# RE-BASELINED at DEV-SYNC 2026-09-18 (docs/missions/2026-09-01-security-hardening/
+# DEV-SYNC-2026-09-18.md §4). The one source cited below:
+#   - "pristine dev@7bae9806, 2026-09-18" — `vitest run tests/unit tests/architecture` on an
+#     untouched worktree of origin/dev at 7bae9806, same host, same day: 3 705 tests, 18
+#     failed. Every entry below fails there under the identical name, so none of them is
+#     caused by this branch. (s13-contract, s10-carrier-erasure-red, s04-contract and one
+#     s14-contract case also fail there and are GREEN here through B20's pins.)
 #
-# Deliberately NOT listed: the two load-coupled `registration-database` cases
-# ("deep-queue slack", "post-hash RSS tripwire"). They pass solo; listing them would hide
-# a real regression. They are integration tests and outside this job's directories anyway.
+# What the re-baseline removed (of the 12 entries of 2026-09-02, 3 are carried; 9 are inherited from dev):
+#   - green on the merged tree, deleted: load01-run-projection, obs-l2-s04-zone "15 mutants",
+#     pro01-runner-tree, s6-content-encryption, t9-mode-tokens, xrev01-node-review;
+#   - scaffold "enforces purity…": green since ccbbe77f. Its entry had been hiding a row this
+#     branch itself introduced (apps/replay read process.env) — the reason an entry must be
+#     deleted the moment it can be, and never outlive the defect it was written for;
+#   - s14-contract "deterministic locale tiebreak": green since 057b05b3 (B30);
+#   - obs-l2-s04-zone "calls the resolver…": green since the zone base re-baseline the
+#     live-loop mission ruled for this sync (DECISIONS.md:870-871, :1340);
+#   - scaffold "matches all 28 dependency-edge rows": the case is named "27" on dev
+#     (4fdf48ba retired the web row); carried below under its present name.
+#
+# Deliberately NOT listed:
+#   - the two load-coupled `registration-database` cases ("deep-queue slack", "post-hash RSS
+#     tripwire"): they pass solo; listing them would hide a real regression. Integration
+#     tests, outside this job's directories anyway.
+#   - registration.test.ts "S3c B4 keeps the isolated production RSS curve…": sealed for
+#     node_v22.23.1_darwin_arm64. CI (ubuntu) skips it loudly. On a darwin_arm64 host that
+#     runs another Node (the Mac mini: v26.5.0) its child measurement hits the 60 s budget —
+#     on pristine dev as well. Run the gate under the pinned Node 22.23.1 (.nvmrc); V-25.
 
-tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > carries the S04 orphan-audit wording fix and deterministic locale tiebreak
-#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification). Left RED on purpose by B20 (379dca7a): `localeCompare` in apps/ui/lib/recommendation.ts is a real defect owned by the apps/ lane.
+tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > 'DebateCanvas agreed review mark' binds its 'agreed review verdict' role
+#   source: pristine dev@7bae9806, 2026-09-18. UI design-token pin owned by the apps/ui lane.
+tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > 'DebateCanvas disputed review mark' binds its 'disputed review verdict' role
+#   source: pristine dev@7bae9806, 2026-09-18. UI design-token pin owned by the apps/ui lane.
+tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > 'DebateMap root hub' binds its 'reasoning accent' role
+#   source: pristine dev@7bae9806, 2026-09-18. UI design-token pin owned by the apps/ui lane.
 tests/architecture/s7-authorization-contract.test.ts > Accounts S7 ownership architecture > hardens every immutable memory scope carrier and derives it from run ownership
-#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification); live-mission authority at dev@1c9578a, three full runs (seed file above)
-tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > matches all 28 dependency-edge rows and structural rules 1–5
-#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification); live-mission authority at dev@1c9578a, three full runs (seed file above)
-tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > enforces purity, one provider gateway, source-constant, exhaustive-switch and labeled-number gates
-#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification); live-mission authority at dev@1c9578a, three full runs (seed file above). Ruled must stay RED (three obs-capture env-read purity violations).
-tests/unit/load01-run-projection.test.ts > LOAD-01 persisted run projection > reads the state only through the owning asker and prioritizes terminal failure
-#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification); live-mission authority at dev@1c9578a, three full runs (seed file above)
-tests/unit/obs-l2-s04-zone.test.ts > S04 semantic zone boundary > calls the resolver over the real mount-list source and runs ZI-1..ZI-4
-#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification); live-mission authority at dev@1c9578a, three full runs (seed file above)
-tests/unit/obs-l2-s04-zone.test.ts > S04 semantic zone boundary > passes all 15 required falsification mutants
-#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification); live-mission authority at dev@1c9578a, three full runs (seed file above)
-tests/unit/pro01-runner-tree.test.ts > PRO-01 depth-driven pro/con expansion > stops a defender call loudly on the pinned RUN_COST_ENVELOPE_EXHAUSTED path
-#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification); live-mission authority at dev@1c9578a, three full runs (seed file above)
-tests/unit/s6-content-encryption.test.ts > S6 per-run private content encryption > defaults content encryption off, retires the v1 blind-index path, and requires wrapping-key paths
-#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification); live-mission authority at dev@1c9578a, three full runs (seed file above). The runner stub omits REGISTER_VERSION, so the register schema parse throws.
-tests/unit/t9-mode-tokens.test.ts > T9-C3 mode control and document guard > leaves no mode-inert colour literal in the four Wave-0 product files
-#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification)
+#   source: pristine dev@7bae9806, 2026-09-18; carried from the 2026-09-02 list (dev baseline b5a6b6eb; live-mission authority at dev@1c9578a).
+tests/architecture/s8-publication-contract.test.ts > Accounts S8 publication architecture > ships the deliberate controls and public-only reader in the UI composition
+#   source: pristine dev@7bae9806, 2026-09-18. Source pin on a UI page (expects PublicAnswerDisclosure) that dev's UI rework moved.
+tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > matches all 27 dependency-edge rows and structural rules 1–5
+#   source: pristine dev@7bae9806, 2026-09-18; carried from the 2026-09-02 list under its old name ("28"). Exactly three rows, all dev's: apps/{api,runner,scheduler} -> obs-capture undeclared.
+tests/unit/text-control-bytes.test.ts > HYG-01 tracked text control-byte guard > finds no forbidden raw control bytes in cached or untracked repository text sources
+#   source: pristine dev@7bae9806, 2026-09-18. Two of dev's own tracked files: .claude/skills/heartbeat-orchestrator/scripts/graph-png/mermaid.min.js and .hermes/reports/debate-tiers/probes/REV-S01-p1-security--probe-a-contract-edge.test.ts.
+tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps > kills MUT-A: deleting the V3ScoreBadges JSX render site
+#   source: pristine dev@7bae9806, 2026-09-18. UI source pin owned by the apps/ui lane.
+tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps > kills MUT-C: deleting the maker meta line from the contentful node header
+#   source: pristine dev@7bae9806, 2026-09-18. UI source pin owned by the apps/ui lane.
 tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps > uses DR-160 content-aware overflow instead of a fixed collapse breakpoint
-#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification)
-tests/unit/xrev01-node-review.test.ts > XREV-01 cross-maker node review > stops a review loudly when the ratified model-call envelope is exhausted
-#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification); live-mission authority at dev@1c9578a, three full runs (seed file above)
-
-# --- From the live-mission seed, NOT active here: the exact name still exists on this
-# --- branch but the test is GREEN on it, so an active entry would warn on every run.
-# --- Measured file-by-file on this worktree, 2026-09-02 (21/21 passed).
-#
-# tests/architecture/s04-contract.test.ts > S04 DDL and runtime attachment contract > DR-128 mints only the claim-type composition structure and wires a loud register read
-#   source: live-mission authority at dev@1c9578a, three full runs (seed file above) — GREEN here: B20 re-pointed the pin at readDevelopmentRunnerPolicy (2c4485a4).
-# tests/architecture/s10-carrier-erasure-red.test.ts > S10 carrier erasure — RED acceptance contracts > filters completed private tombstones before any external key load
-#   source: live-mission authority at dev@1c9578a, three full runs (seed file above) — GREEN here: B20 re-pointed the pin at core.run_private_content_is_live (3862706d).
-# tests/architecture/s13-contract.test.ts > S13 / cross-run memory architecture > lands append-only memory carriers without a closure job or embedding dependency
-#   source: live-mission authority at dev@1c9578a, three full runs (seed file above) — GREEN here: B20 re-pointed the pin at core.lock_owned_live_runs (12175123).
-# tests/unit/v2ui-node-runner.test.ts > HYG-01 v2-ui Node test gate > keeps every active .test.mjs file in the explicit runner manifest
-#   source: live-mission authority at dev@1c9578a, three full runs (seed file above) — GREEN here and absent from the b5a6b6eb classification; fixed in the 1c9578a→b5a6b6eb range.
+#   source: pristine dev@7bae9806, 2026-09-18; carried from the 2026-09-02 list (dev baseline b5a6b6eb).
+tests/unit/v2ui-pages.test.ts > UI-02d — every non-canvas maker surface preserves its recorded maker prop > pins tree, thread, outline, split, map, and drawer at all eight call sites
+#   source: pristine dev@7bae9806, 2026-09-18. UI source pin owned by the apps/ui lane.
+tests/unit/v2ui-pages.test.ts > XREV-01 — node review uses the existing V2 card and drawer vocabulary > shows typed review outcome and reviewer house on cards, including honest absence
+#   source: pristine dev@7bae9806, 2026-09-18. UI source pin owned by the apps/ui lane.
