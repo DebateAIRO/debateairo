@@ -388,16 +388,6 @@ export async function runAcceptanceCeremony(
       reviewerProviderRef: row.reviewer_provider_ref,
       reviewArtifactRef: row.review_artifact_ref
     })));
-    /**
-     * The definition-of-done facts, from the run's own relations plus the
-     * answer just read through the API. The loop bound is the register row this
-     * deployment already resolved — never a literal restated here.
-     */
-    const definitionOfDone = await readDefinitionOfDoneFacts(database.pool, {
-      runId: accepted.run_ref,
-      answer,
-      sealedEvaluatorLoopMaxRounds: policy.synthesisRolePolicy.evaluatorLoopMaxRounds
-    });
     const uiUrl = `http://localhost:3000/debate/${accepted.run_ref}`;
     console.info(`ACC-01 run id: ${accepted.run_ref}`);
     console.info(`ACC-01 answer id: ${answer.answer_id}`);
@@ -415,12 +405,33 @@ export async function runAcceptanceCeremony(
       `T17 envelope at terminal: ${terminalEnvelopeState} · ` +
       `${modelCallCount}/${structuralCeilingMaxModelAttempts} model attempts (panel included)`
     );
-    // The remaining Global-DoD sub-clauses, one line each, on the same stream
-    // `tools/closing-run.sh` captures verbatim.
-    for (const line of renderDefinitionOfDoneLines(definitionOfDone)) console.info(line);
     console.info(`PRO-01 per-node maker lineage: ${JSON.stringify(nodeMakerLineage)}`);
     console.info(`XREV-01 per-node review lineage: ${JSON.stringify(nodeReviewLineage)}`);
     console.info(`ACC-01 UI: ${uiUrl}`);
+    /**
+     * The definition-of-done facts, from the run's own relations plus the answer
+     * just read through the API. The loop bound is the register row this
+     * deployment already resolved — never a literal restated here.
+     *
+     * READ LAST, AND DELIBERATELY SO. This is the only work the ceremony does
+     * after its report could have been printed: three more queries, plus four
+     * typed refusals of its own. A throw here reaches the `catch` below, which
+     * closes the stack and rethrows — so if this ran first, one transient `pg`
+     * error on a closing run that had already settled WITHIN would leave
+     * `logs/closing-run/ceremony-*.log` with not one line in it, and the W12
+     * judge with less evidence than before this block existed. Every
+     * established line is above; the new ones follow. O3's refusals are
+     * unchanged — they now cost their own lines and nothing else.
+     */
+    const definitionOfDone = await readDefinitionOfDoneFacts(database.pool, {
+      runId: accepted.run_ref,
+      answer,
+      sealedEvaluatorLoopMaxRounds: policy.synthesisRolePolicy.evaluatorLoopMaxRounds
+    });
+    // The remaining Global-DoD sub-clauses, one line each, on the same stream
+    // `.hermes/reports/2026-09-01-algorithm-live-loop/tools/closing-run.sh`
+    // captures verbatim.
+    for (const line of renderDefinitionOfDoneLines(definitionOfDone)) console.info(line);
     const liveDatabase = database;
     const liveShim = shim;
     const liveClaudeRelay = claudeRelay;

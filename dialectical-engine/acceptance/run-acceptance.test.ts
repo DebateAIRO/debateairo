@@ -200,19 +200,28 @@ describe("ACC-01 an absent configured maker is LOUD before the debate starts", (
   });
 
   /**
-   * The same SOURCE-ORDER floor, for the Global-DoD facts. The only end-to-end
-   * witness is `runAcceptanceCeremony` itself (embedded PostgreSQL, an API and
-   * three vendor CLIs), so what is reachable here is the ORDER of the three
-   * symbols inside the ceremony's own body, anchored on the symbols and never
-   * on line numbers: the reader is called, its lines are rendered onto the
-   * report's own `console.info` stream, and only then does the ceremony return.
+   * The SOURCE-ORDER floor for the Global-DoD facts. The only end-to-end witness
+   * is `runAcceptanceCeremony` itself (embedded PostgreSQL, an API and three
+   * vendor CLIs), so what is reachable here is the ORDER of the statements
+   * inside the ceremony's own body, anchored on symbols and printed literals,
+   * never on line numbers (TOOLING-TRAPS `:329`).
    *
-   * The token SET is pinned in the same test rather than in a second one: a
-   * ceremony that prints `renderDefinitionOfDoneLines` before returning prints
-   * exactly the tokens that function emits, so the two halves together are the
-   * claim "every documented token is printed before the report returns".
+   * THE THING THIS TEST EXISTS FOR (fix round 1, C-1). The reader issues three
+   * queries and can refuse by a typed code. Whatever it does, it must not be
+   * able to cost the closing run the report the 2026-09-08 run already produced:
+   * a throw inside it reaches the ceremony's `catch`, which closes the stack and
+   * rethrows, so anything not yet printed is lost. Every established line is
+   * therefore printed FIRST, and the reader runs after the last of them. That
+   * order is the assertion below — not a style preference.
+   *
+   * Each of the other two halves is anchored so that it can FAIL:
+   *   · the render call's OWN statement must print each line, so a loop that
+   *     renders and discards cannot satisfy it (review mutant MX1);
+   *   · the returned object literal — not the whole body before it — must carry
+   *     the block, so the local `const definitionOfDone` cannot satisfy it
+   *     (review mutant MX2).
    */
-  it("calls the DoD reader and prints every documented token before it returns the report", async () => {
+  it("prints every established report line before the DoD reader can throw, then prints and returns the facts", async () => {
     const source = await readFile(new URL("./run-acceptance.ts", import.meta.url), "utf8");
     const ceremonyAt = source.indexOf("export async function runAcceptanceCeremony(");
     expect(ceremonyAt, "runAcceptanceCeremony must exist to have an order at all").toBeGreaterThan(-1);
@@ -224,21 +233,57 @@ describe("ACC-01 an absent configured maker is LOUD before the debate starts", (
     expect(readerAt, "the ceremony must CALL the DoD reader").toBeGreaterThan(-1);
     expect(renderAt, "the ceremony must render the DoD lines").toBeGreaterThan(-1);
     expect(returnAt, "the ceremony must return a report to have an order against").toBeGreaterThan(-1);
+
+    /**
+     * C-1. Every report line that existed at base `5c9c4678`, by the literal it
+     * prints. All ten are asserted PRESENT first: an ordering claim over a line
+     * that has been deleted would pass vacuously and would quietly bless the
+     * very loss this test is about.
+     */
+    const establishedReportLines = [
+      "`ACC-01 run id: ",
+      "`ACC-01 answer id: ",
+      "`FAIR-01 graph: ",
+      "`FAIR-01 makers: ",
+      "`PRO-01 model calls (all outcomes): ",
+      "`DISC-01 panel/ceiling/probe evidence: ",
+      "`T17 envelope at terminal: ",
+      "`PRO-01 per-node maker lineage: ",
+      "`XREV-01 per-node review lineage: ",
+      "`ACC-01 UI: "
+    ] as const;
+    for (const printed of establishedReportLines) {
+      const printedAt = body.indexOf(printed);
+      expect(printedAt, `the ceremony still prints ${printed.trim()}`).toBeGreaterThan(-1);
+      expect(
+        printedAt,
+        `${printed.trim()} is printed BEFORE the DoD reader, which can refuse and lose the log`
+      ).toBeLessThan(readerAt);
+    }
+
     expect(readerAt, "the facts are read before they are rendered").toBeLessThan(renderAt);
     expect(renderAt, "the lines are printed BEFORE the ceremony returns its report").toBeLessThan(returnAt);
+
+    // I-1. The statement that renders must itself print. A slice that runs to
+    // the return is satisfied by any later `console.info` in the report.
+    const renderStatement = body.slice(renderAt, body.indexOf(";", renderAt) + 1);
     expect(
-      body.slice(renderAt, returnAt),
-      "the rendered lines go to the report's own console.info stream"
-    ).toContain("console.info(");
+      renderStatement,
+      "the statement that renders the DoD lines is the statement that prints them"
+    ).toContain("console.info(line)");
+
+    // I-2. The RETURNED OBJECT carries the block — not merely the body above it,
+    // where the local declaration already spells the name.
+    const returnedObject = body.slice(returnAt, body.indexOf("});", returnAt));
     expect(
-      body.slice(0, returnAt),
-      "the typed facts block rides the returned report"
+      returnedObject,
+      "the typed facts block rides the RETURNED report, not just a local const"
     ).toContain("definitionOfDone");
 
     const { renderDefinitionOfDoneLines, deriveDefinitionOfDoneFacts } = await import("./dod-facts.js");
     const lines = renderDefinitionOfDoneLines(deriveDefinitionOfDoneFacts({
       nodes: [{ nodeId: "n1", depth: 0, tau: 0.5, finalStrength: 0.7, panel: { voiceCount: 2, nonAuthorVoiceCount: 1 } }],
-      edges: [],
+      edges: [{ sourceNodeId: "n1", polarity: "support", targetKind: "NODE", magnitudeStatus: "MEASURED" }],
       loopRounds: [{ round: 1, synthesizerStage: "INITIAL", evaluatorSatisfied: true }],
       sealedEvaluatorLoopMaxRounds: 3,
       conditionMarks: [],
