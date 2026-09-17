@@ -590,9 +590,11 @@ export type DebateConfig = Record<string, unknown> & {
 // Phase 9 Task 1/2: verdict-first UI (feature-flagged, NEXT_PUBLIC_VERDICT_FIRST_UI).
 //
 // VerdictSummary matches coordinator/app/scoring/verdict.py's verdict_summary()
-// wire shape exactly (camelCase, additive). Older cached debate-detail payloads
-// may lack the "verdict" key entirely, so it is an optional field here -- the
-// UI must render nothing (honest absence), never a fabricated verdict.
+// wire shape exactly (camelCase, additive) except verdictState, which carries
+// the engine's own three words since V's ruling D77 of 2026-09-18. Older cached
+// debate-detail payloads may lack the "verdict" key entirely, so it is an
+// optional field here -- the UI must render nothing (honest absence), never a
+// fabricated verdict.
 // ---------------------------------------------------------------------------
 
 export type VerdictBand = "supported" | "contested" | "unsupported" | "unavailable" | "insufficient_scoring" | "suppressed";

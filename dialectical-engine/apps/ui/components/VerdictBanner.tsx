@@ -20,18 +20,24 @@ const BAND_LABELS: Record<VerdictSummary["verdictBand"], string> = {
  *   positions were within the tie margin OR the judges disagreed at the
  *   threshold, or the winner sat in the middle band. The sentence names all of
  *   them as alternatives, because the summary does not carry which one fired.
+ *   Their ORDER is deliberate: the tie-adjacent case is tested before the high
+ *   cut is, so a winner far above the high cut still prints "contested" when
+ *   its margin is narrow -- the run of 2026-09-17 is exactly that. "Not strong
+ *   enough" would be false for that reader, so it does not lead.
  * - "unsupported" is reached exactly one way: the winning position's propagated
  *   strength fell below the low cut. It is a weak case, NOT a refuted one, and
  *   NOT a statement about whether evidence was looked up -- the sentence this
  *   replaced said exactly that, and it was false.
  * - "supported" needs no sentence: the band label already says it.
  *
- * A state with no entry renders no sentence rather than a fabricated one.
+ * The record is total over the union, so every state the mapping can produce
+ * has an entry. A value from OUTSIDE the union -- a retired word arriving in an
+ * older stored payload -- renders no sentence rather than a fabricated one.
  */
 const STATE_SENTENCES: Record<LiveVerdictState, string | null> = {
   supported: null,
   contested:
-    "The run did not settle this either way: the leading position was not strong enough, the positions were too close, the judges disagreed, or part of the comparison was missing.",
+    "The run did not settle this either way: the positions were too close, the judges disagreed, the leading position was not strong enough, or part of the comparison was missing.",
   unsupported:
     "Even the leading position here came out weak once the arguments were weighed against each other — a weak case, not a disproved one."
 };

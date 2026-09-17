@@ -20,9 +20,16 @@ import type { VerdictSummary } from "../../apps/ui/lib/types.js";
  * evidence was ever looked up. The banner must never say them again.
  */
 
-/** Rungs 0, 2 and 4 of the label ladder all print CONTESTED; this covers all three. */
+/**
+ * Rungs 0, 2 and 4 of the label ladder all print CONTESTED; this covers all
+ * three. ORDER MATTERS: rung 2 is tested before rung 3's high cut, so a winner
+ * well above the high cut still prints CONTESTED when its margin is
+ * tie-adjacent — the real run of 2026-09-17 is exactly that. The tie-adjacent
+ * alternative therefore leads; "not strong enough" must not be the first thing
+ * that reader sees, because for that debate it is false.
+ */
 const CONTESTED_SENTENCE =
-  "The run did not settle this either way: the leading position was not strong enough, the positions were too close, the judges disagreed, or part of the comparison was missing.";
+  "The run did not settle this either way: the positions were too close, the judges disagreed, the leading position was not strong enough, or part of the comparison was missing.";
 /** Rung 1 — and only rung 1 — prints UNSUPPORTED. */
 const UNSUPPORTED_SENTENCE =
   "Even the leading position here came out weak once the arguments were weighed against each other — a weak case, not a disproved one.";
