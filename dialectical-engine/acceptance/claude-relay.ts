@@ -15,8 +15,10 @@ import {
  * FAIR-02 (DR-140): the SECOND real maker — an OpenAI-compatible relay to the
  * local Claude Code CLI, maker Anthropic.
  *
- * Empirically verified on this machine (2026-08-10, claude 2.1.221 resolved by
- * CLAUDE_BINARY_NAME): `claude -p <prompt> --output-format json` prints exactly one
+ * Empirically verified on this machine (2026-08-10, claude 2.1.221 — at the
+ * compiled-in absolute path this module carried until 2026-09-17; discovery by
+ * name did not exist on that date and this record makes no claim about it):
+ * `claude -p <prompt> --output-format json` prints exactly one
  * JSON envelope on stdout with `is_error`, `result` (the reply text) and
  * `modelUsage` keyed by the model id the CLI actually used, and exits nonzero
  * on failure (observed: expired OAuth => exit 1, is_error true). The prompt

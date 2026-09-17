@@ -345,8 +345,9 @@ describe("D10 Codex shim binary resolution", () => {
 
     expect(resolveCodexBinary({ PATH: directory })).toBe(program);
 
-    // This IS the 2026-09-17 file: `/opt/homebrew/bin/codex` whose contents had
-    // been overwritten with four lines of plain text. It is read, never run.
+    // The same SHAPE as the 2026-09-17 file — `/opt/homebrew/bin/codex`, whose
+    // contents had been overwritten with four lines of plain text. This suite
+    // never opened the host's own copy. It is read, never run.
     await writeFile(program, "codex\nupdate interrupted\nretry the install\nnot a program\n");
     expect(() => resolveCodexBinary({ PATH: directory }))
       .toThrow(`CODEX_CLI_BINARY_UNRESOLVED:NOT_A_PROGRAM:${program}`);

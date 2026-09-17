@@ -57,17 +57,31 @@ here, never written down. For each maker the relay asks, in this order:
    operator who set the key meant to decide, and the harness never guesses on
    their behalf.
 2. with no key set, the maker's NAME — `claude`, `codex`, `grok`, `hermes` — is
-   looked up across the directories of `PATH` in order, first match wins, the
-   rule `command -v` follows. A match that turns out to be broken is REPORTED,
-   not skipped over in favour of the next directory.
+   looked up across the directories of `PATH` in order. **The first entry that
+   exists under the name is the match, and it is then admitted or refused; a
+   broken entry is never stepped over.** That is deliberately unlike `command -v`,
+   which skips a non-executable entry and keeps searching: silently running a
+   different install than the one at the front of your `PATH` is a lineage hazard
+   in an engine whose whole output is model attribution, and a loud refusal
+   naming the file is recoverable in seconds. The cost is real — a stale,
+   non-executable launcher early on `PATH` now stops the ceremony where your
+   shell would have answered cheerfully. A `PATH` entry that is empty or
+   relative is skipped entirely.
 
 Whatever that produces must then pass one check before anything is started:
 with symlinks followed it has to be a regular file, non-empty, executable by
-this user, and a program by its first bytes — a `#!` line naming an interpreter,
-or a Mach-O / universal-binary magic number. A candidate that fails refuses
-loudly as `<MAKER>_CLI_BINARY_UNRESOLVED:<REASON>:<path>`, where REASON is one of
-`NOT_ON_PATH`, `NOT_FOUND`, `EMPTY`, `NOT_EXECUTABLE` or `NOT_A_PROGRAM`, and
-the ceremony prints that whole string as `MAKER ABSENT <maker> <code>`.
+this user, readable, and a program by its first bytes — a `#!` line naming an
+interpreter, or a Mach-O / universal-binary / ELF magic number. A candidate that
+fails refuses loudly as `<MAKER>_CLI_BINARY_UNRESOLVED:<REASON>:<path>`, where
+REASON is one of `NOT_ON_PATH`, `NOT_FOUND`, `EMPTY`, `NOT_EXECUTABLE`,
+`UNREADABLE` or `NOT_A_PROGRAM`, and the ceremony prints that whole string as
+`MAKER ABSENT <maker> <code>`.
+
+The path that is checked is always ABSOLUTE, and it is the exact string that is
+spawned — a relative value in the key is resolved against the harness's working
+directory first. Anything else would be re-resolved by the child, which starts in
+a fresh empty scratch directory with its own `PATH`, so the file that ran need
+not have been the file that was checked.
 
 The relays start the resolved program DIRECTLY and never through a command
 interpreter, and a refused candidate is never started at all. Both halves of
