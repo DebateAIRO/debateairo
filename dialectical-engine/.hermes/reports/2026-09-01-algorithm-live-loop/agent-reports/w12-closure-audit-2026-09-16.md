@@ -262,3 +262,17 @@ says `depth≥2` (`slices/S12-closure/SPEC.md:37`). Both command forms now carry
 `--depth-params '{"depth":2}'` (D74 e). A run without it would fail the bullet whatever it printed.
 
 **§6 stands otherwise:** steps 2–7 remain the operator's, in that order.
+
+## ADDENDUM 2, 2026-09-17 23:5x (orchestrator as judge) — §6 step 3 done: the re-run witnessed the flagship bullet in full
+
+`closing-runs/ceremony-20260917-222858.log` (D76): V's run on `4f83405f`, three makers, depth 2, exit 0
+in 79 minutes. Against the §2.3 table: row 1 `DOD-1` 27/27 non-self-graded, none single-voice;
+row 2 `DOD-2` 30/30 measured (15/15 by FAIR-01's rule) — the partial row is closed; row 3 `DOD-3` all
+three roots moved (witness `716ea8d3`); row 4 the ceiling 396 with 114 consumed; row 5 `DOD-5` the
+strongest survivor `11464564` acknowledged (final round satisfied, no standing mark); row 6 `DOD-6`
+2 of 3 rounds with one retry; row 7 `DOD-7` CONTESTED (DOWNGRADED, RECOMPOSED_ONCE); row 8 `DOD-8`
+CAPPED over a 0/0/5 basis; row 9 WITHIN. **Nine of nine recorded. The verdict on the flagship bullet:
+WITNESSED.** The whole-goal verdict (§5) now rests only on §6 steps 4–6: the mono-maker run, the δ/ε
+refit (114 calls / 79 minutes / ceiling 396 are the inputs), and the seven confirm-items presented to
+V; the post-ceremony four-count runs detached on the run's tree. Step 2 (Node 22.23.1) is still owed
+and does not block the verdict on this bullet.

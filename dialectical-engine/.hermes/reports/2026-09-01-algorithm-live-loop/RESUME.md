@@ -385,7 +385,27 @@ and `ACCEPTANCE_GROK_BINARY="$HOME/.grok/downloads/grok-1.0.30-macos-aarch64"` (
 repair the installs. The relay resolver task (`F-RELAY-BINARY-HOST-DEFAULT`, plan
 `2026-09-17-relay-binaries-deduced.md`) landed at `fbb8cde5` — reviewed APPROVED after one fix round,
 gate green (D75 ADDENDUM 1); the V packet §E carries the one question for V (who updated the CLIs at
-19:29 / 20:10?). The `lane-cont-t2/t3/t8` worktrees were removed at V's word later the same evening
+19:29 / 20:10?).
+
+## 2026-09-17 23:5x — NEWEST ENTRY WINS
+
+**THE REAL RUN COMPLETED (D76).** V ran the ceremony at 22:28:58 on `4f83405f` (three real makers,
+depth 2); exit 0 at 23:47:58; `closing-runs/ceremony-20260917-222858.log` holds all nine facts of the
+flagship bullet — judge's finding: WITNESSED IN FULL. The cause of the evening's emptied CLIs was
+this mission's own readiness packet (its measurement block, pasted, was a shell redirection — D75
+ADDENDUM 3; fixed, the rule recorded). The first attempt died on an expired Claude sign-in; the tool
+now checks sign-in (exit 6). The post-ceremony four-count gate runs detached on `4f83405f`
+(`scratchpad/logs/final-gate/full-4f83405f.*`); record its four-count in LEDGER/PROGRESS when it lands.
+
+**Operator's next actions, in order (W12 audit §6 steps 4–7; V packet §F):** (1) the mono-maker
+run (M=1) — write the exact one-line form into the readiness packet first (the tool with one
+configured maker), then V runs it; (2) the δ/ε refit from the measured spend (114 calls / 79 min /
+ceiling 396) — a V ruling; (3) present the seven confirm-items (audit §3) to V; (4) the judge's
+whole-goal verdict; (5) `F-CREDENTIAL-ON-ARGV` (high, V's review) before the next run if V wants the
+credential off the command line; (6) the Node 22.23.1 run still owed.
+
+**Read first, for humans:** `PLAIN-STATUS.md`. **Read before any closure ceremony:** the W12 audit
+and its addenda. The `lane-cont-t2/t3/t8` worktrees were removed at V's word later the same evening
 (PROGRESS, 19:3x) — nothing else of this mission's lives outside `algo-loop-2026-09-16`.
 
 **Known reds, unchanged.** The gate of record's 140 (100 Node-26 `localStorage`, 40 owned); among

@@ -2,6 +2,10 @@
 
 *Written 2026-09-17 for the project owner. This page explains the state of the V3 debate engine work without the code names the other files in this folder use. Every claim links to the file that holds the details. When the detailed records change, this page is updated in the same commit.*
 
+## The big news of 2026-09-17, late evening: the real run happened, and it passed
+
+At 22:28 you started the full real debate with all three AI services, and at 23:47 it finished cleanly. Three positions, 27 arguments, 15 independent attacks between them, 114 model calls of a 396 ceiling, and every one of the nine facts on the finish-line checklist is in the log: every argument scored by a panel that never included its own author, every link carrying a measured weight, all three top-level scores moved by the counter-arguments, the final statement accepted by its evaluator on the second attempt after a first rejection, a code-derived verdict of CONTESTED, and a confidence band capped because all five cited arguments rest on reasoning alone (no looked-up evidence, which is honest for a four-day-workweek question). The judge's finding: the flagship item of the checklist is witnessed in full. The log is kept in the project under `closing-runs/`. What still separates this from "mission complete" is in item 4 below; the biggest blocker is gone.
+
 ## The picture in one paragraph
 
 DebateAI has two generations. **V2** is the older Python system that runs the live site (dezbatere.ro) from the `main` branch. **V3** is the rewrite on the `dev` branch: several AI models argue a question against each other, a panel of AI judges scores every argument, the scores are propagated through the argument tree, and a final written answer comes out with a label (supported / contested / unsupported) and a confidence band. The work of the last weeks was about proving that this V3 machinery really works end to end with real AI services, and about fixing what that proof turned up. As of this evening, **all of that work is on `dev` on GitHub**, and the one thing that still has to happen is a **full real run**, which only you can start because it needs your paid API credential.
@@ -34,7 +38,7 @@ While building, I sometimes had to choose between two reasonable options without
 
 ### 4. After the run: the last steps to declare the mission finished (mostly agents, with your go)
 
-Once the real run's log exists: a second run with a single AI model (to prove the machine still works when only one provider is available), fitting two tuning numbers from the measured spend (how much the system may spend before it stops), presenting seven remaining questions to you, and then the final sign-off, where the reviewer role declares the mission complete against the checklist. The list, in order, is section 6 of [agent-reports/w12-closure-audit-2026-09-16.md](agent-reports/w12-closure-audit-2026-09-16.md); its addendum at the bottom says what today's fix changed.
+The real run's log now exists (see the top of this page). What remains: a second run with a single AI model (to prove the machine still works when only one provider is available, about as long as tonight's run), fitting two tuning numbers from the measured spend (now possible: 114 calls in 79 minutes against a ceiling of 396), presenting seven remaining questions to you, and then the final sign-off, where the reviewer role declares the mission complete against the checklist. A full automated test pass was started right after the run, as the instructions require, and its result goes into the records when it finishes. The list, in order, is section 6 of [agent-reports/w12-closure-audit-2026-09-16.md](agent-reports/w12-closure-audit-2026-09-16.md); its addenda at the bottom say what today changed.
 
 ### 5. Two loose ends that are not part of this mission (for your awareness)
 

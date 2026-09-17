@@ -271,6 +271,22 @@ verbatim so the presentation can be made.
   Codex launcher. The packet is corrected (a table with a warning), the tool prints Unicode arrows,
   and the rule "a fenced block is a pasteable command or it is not a fenced block" is now in the
   orchestrator's memory. `claude update` was innocent. Nothing is asked of you on this point.
+- **New, high, needs your yes (ticket `F-CREDENTIAL-ON-ARGV`, filed 22:30 during the second run):** the
+  ceremony takes your service credential as a command-line argument, so every process listing on the
+  Mac shows it for the run's ~25 minutes; the fix is to read it from the environment (the tool already
+  has it there) or stdin and refuse it on argv. It changes the operator's command line, hence your
+  review. Until then, treat `ps` output during a run as sensitive.
+### F. 23:47 — the real run completed; what the whole-goal verdict now rests on (D76)
+
+- **Done:** `closing-runs/ceremony-20260917-222858.log` — exit 0, 79 minutes, three makers, all nine
+  facts of the flagship bullet witnessed (D76 b). No credential was spent by any seat; you ran it.
+- **Yours, in order, for the whole-goal verdict (W12 audit §6 steps 4–7):** (4) the mono-maker run
+  — the same tool with a single configured maker (the seat will write the exact one-line form into
+  the readiness packet on your word); (5) the δ/ε refit from tonight's measured spend — a ruling for
+  you, the numbers are in D76 (c)–(d); (6) the seven confirm-items presented to you (the audit §3
+  quotes all seven); (7) then the judge issues the verdict.
+- **Default 9.** The post-ceremony full test pass runs on `4f83405f` (the tree of the run); its
+  four-count goes beside the gate of record. Veto = none needed.
 - **For the old engine's to-do list (not this mission's):** `com.dialectical.watchdog` runs every
   120 s with `--invoke-codex` (an unattended Codex agent repairing the host, hourly at most) and
   `com.dialectical.worker.codex-2` calls `codex` for jobs; both turned the broken launcher into a
