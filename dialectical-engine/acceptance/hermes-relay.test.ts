@@ -1,16 +1,27 @@
 import { createHash } from "node:crypto";
-import { lstat } from "node:fs/promises";
+import { lstat,mkdtemp,rm,writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach,describe,expect,it } from "vitest";
 import {
+  HERMES_BINARY_NAME,
   HERMES_GLM_MODEL,
   HERMES_SUPPORT_PROVIDER_REF,
+  resolveHermesBinary,
   startHermesSupportRelay,
   type HermesSupportRelayHandle
 } from "./hermes-relay.js";
 
 const fakeCli = fileURLToPath(new URL("./test-fixtures/fake-hermes-cli.mjs",import.meta.url));
 const handles: HermesSupportRelayHandle[] = [];
+const temporaryDirectories: string[] = [];
+
+async function temporaryDirectory(): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(),"relay-hermes-path-"));
+  temporaryDirectories.push(directory);
+  return directory;
+}
 
 /**
  * W6 fix round 1 / F4: a credential-shaped key's VALUE is never echoed by the
@@ -36,7 +47,11 @@ async function start(): Promise<HermesSupportRelayHandle> {
 afterEach(async () => {
   delete process.env.FAKE_HERMES_FAIL;
   delete process.env.FAKE_HERMES_BAD_HANDSHAKE;
+  delete process.env.ACCEPTANCE_HERMES_BINARY;
   await Promise.all(handles.splice(0).map((handle) => handle.close()));
+  await Promise.all(temporaryDirectories.splice(0).map((path) =>
+    rm(path,{ recursive: true,force: true })
+  ));
 });
 
 describe("Support-only Hermes GLM relay",() => {
@@ -125,5 +140,61 @@ describe("Support-only Hermes GLM relay",() => {
     delete process.env.FAKE_HERMES_FAIL;
     process.env.FAKE_HERMES_BAD_HANDSHAKE = "1";
     await expect(start()).rejects.toThrow("HERMES_CLI_HANDSHAKE_INVALID");
+  });
+});
+
+/**
+ * D10, 2026-09-17. Hermes was the ONE maker with no resolver at all: its binary
+ * was `join(homedir(),".local","bin","hermes")`, computed once at module load
+ * and handed to `resolveTestGuardedCommand` EAGERLY. It now goes through the
+ * same resolver as the other three — by NAME over the PATH it is handed, with
+ * the operator's key ahead of that. Resolution only: nothing below runs a
+ * candidate, and the refusals are read off the thrown code.
+ */
+describe("D10 Hermes support relay binary resolution",() => {
+  it("carries no compiled-in path: this maker is found by the NAME `hermes`",() => {
+    expect(HERMES_BINARY_NAME).toBe("hermes");
+    expect(() => resolveHermesBinary({}))
+      .toThrow("HERMES_CLI_BINARY_UNRESOLVED:NOT_ON_PATH:hermes");
+  });
+
+  it("discovers `hermes` on the PATH it is handed, and refuses a corrupted launcher there",async () => {
+    const directory = await temporaryDirectory();
+    const program = join(directory,"hermes");
+    await writeFile(program,"#!/bin/sh\nexit 0\n",{ mode: 0o755 });
+
+    expect(resolveHermesBinary({ PATH: directory })).toBe(program);
+
+    await writeFile(program,"hermes\nupdate interrupted\nretry the install\n");
+    expect(() => resolveHermesBinary({ PATH: directory }))
+      .toThrow(`HERMES_CLI_BINARY_UNRESOLVED:NOT_A_PROGRAM:${program}`);
+  });
+
+  it("resolves this host's binary from ACCEPTANCE_HERMES_BINARY, ahead of PATH",async () => {
+    const onPath = await temporaryDirectory();
+    await writeFile(join(onPath,"hermes"),"#!/bin/sh\nexit 0\n",{ mode: 0o755 });
+    const chosen = join(await temporaryDirectory(),"hermes-host");
+    await writeFile(chosen,"#!/bin/sh\nexit 0\n",{ mode: 0o755 });
+
+    expect(resolveHermesBinary({ PATH: onPath,ACCEPTANCE_HERMES_BINARY: chosen })).toBe(chosen);
+  });
+
+  it("fails loudly with the bare typed code when ACCEPTANCE_HERMES_BINARY is present but blank",() => {
+    expect(() => resolveHermesBinary({ ACCEPTANCE_HERMES_BINARY: "  " }))
+      .toThrow(/^HERMES_CLI_BINARY_UNRESOLVED$/u);
+  });
+
+  /**
+   * The default command must become LAZY with this change. A resolver that can
+   * throw, evaluated eagerly, would let a blank key — or simply a host with no
+   * `hermes` — pre-empt `resolveTestGuardedCommand`'s own authority over the
+   * test seam, exactly as `relay-core.ts:108-116` states for the other makers.
+   */
+  it("keeps the NODE_ENV=test command seam ahead of a blank override",async () => {
+    process.env.ACCEPTANCE_HERMES_BINARY = "  ";
+
+    const relay = await start();
+
+    expect(relay.model).toBe(HERMES_GLM_MODEL);
   });
 });
