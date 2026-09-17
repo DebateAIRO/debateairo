@@ -135,8 +135,18 @@ on a **clean** tracked tree, in the shell where you exported the credential.
 **The short form — the mission tool, which captures everything before anything else touches it (D60):**
 
 ```bash
-bash /Users/stefannour/DebateAIRO/debateairo/.claude/worktrees/algo-loop-2026-09-16/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/tools/closing-run.sh
+bash /Users/stefannour/DebateAIRO/debateairo/.claude/worktrees/algo-loop-2026-09-16/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/tools/closing-run.sh --depth-params '{"depth":2}'
 ```
+
+**Amended 2026-09-17 (orchestrator): the depth argument is not optional.** The Global definition
+of done's flagship bullet reads "Full multi-maker acceptance run (M≥2, **depth≥2**)"
+(`slices/S12-closure/SPEC.md:37`), and the ceremony's default is `{"depth":1}`
+(`acceptance/README.md`, `--depth-params`; `acceptance/run-acceptance.ts:88`). The 2026-09-16
+version of this packet carried no depth argument, so a run from it would have settled at depth 1
+and failed the bullet before any of its facts were read. `closing-run.sh` passes every extra
+argument through to the ceremony (`"$@"`), so the flag rides on the short form unchanged. The
+structural ceiling the T17 line prints is computed for the depth requested, so expect a larger
+`N/ceiling` pair than the 2026-09-08 run's `30/106`.
 
 It now resolves the repo root and all three binaries itself — nothing to edit. It refuses a dirty
 tracked tree (exit 3), writes a stamped log under
@@ -159,10 +169,11 @@ ACCEPTANCE_SETTLEMENT_WATCH_HANDLE=acceptance:standing-watch \
 ACCEPTANCE_CLAUDE_BINARY=/Users/stefannour/.local/bin/claude \
 ACCEPTANCE_CODEX_BINARY=/opt/homebrew/bin/codex \
 ACCEPTANCE_GROK_BINARY=/Users/stefannour/.local/bin/grok \
-./node_modules/.bin/tsx acceptance/run-acceptance.ts --service-credential "$ACCEPTANCE_SERVICE_CREDENTIAL"
+./node_modules/.bin/tsx acceptance/run-acceptance.ts --service-credential "$ACCEPTANCE_SERVICE_CREDENTIAL" --depth-params '{"depth":2}'
 ```
 
-`--service-credential` is the only required argument and `--serve` the only value-less flag
+`--service-credential` is the only required argument, `--depth-params '{"depth":2}'` the one the
+definition of done makes mandatory (amendment above), and `--serve` the only value-less flag
 (`acceptance/run-acceptance.ts:29,68-72`). **There is no `--approve-spend` on the ceremony** — that
 flag belongs to T15's evaluation harness. The ceremony's only spend gate is that you start it.
 

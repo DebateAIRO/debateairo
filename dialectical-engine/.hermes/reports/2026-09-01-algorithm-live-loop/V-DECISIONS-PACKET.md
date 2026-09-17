@@ -222,3 +222,43 @@ The line at `:48` — *"(Items 1 and 7 text to be quoted verbatim from goal-v4 a
 true: **the acceptance presentation itself is unfinished**, and all seven confirm-items have run as
 operative defaults under R7-3 without ever being presented to you. The W12 audit quotes all seven
 verbatim so the presentation can be made.
+
+## 2026-09-17 — the push happened, the report prints the facts, the re-run's depth
+
+### A. Done at your word
+
+- **`origin/dev` = `5c9c4678`** (the continuation tip), pushed after your message of 2026-09-17 (D74 a–c).
+  The local `dev` on this host was the V2 line and now tracks the V3 one. The two `claude/*` V2
+  branches were left alone, as you said.
+- **The ceremony prints the definition-of-done facts** — the W12 audit's §6 step 1, ticket
+  `F-CEREMONY-REPORT-DOD-FACTS`, product tip `9540cb9b`, review spec PASS · quality APPROVED after one
+  fix round, gate green (D74 ADDENDUM 1). Seven lines `DOD-1 … DOD-8`, documented in
+  `acceptance/README.md` under "The definition-of-done report".
+
+### B. Defaults the orchestrator applied on your behalf — each has a veto window
+
+| # | default | where | veto = |
+|---|---|---|---|
+| 1 | No debate content in the ceremony log — ids, numbers, booleans, marks, register row keys only (V-SEC-1's content law reaches the log) | D74 ADDENDUM 1 f/1 | "print the statement text too" → a ruling on where the log may carry content |
+| 2 | Only a SHAPE violation refuses the ceremony; every DoD OUTCOME is reported, never thrown | D74 ADDENDUM 1 f/2 | "an unmet sub-clause must fail the run" → the refusals move into the reader |
+| 3 | `DOD-2` prints both counts (every edge; attack edges by FAIR-01's rule) | D74 ADDENDUM 1 f/4 | "one count only" → say which |
+| 4 | The surviving-objection population keeps the runner's predicate (EDGE targets included) | D74 ADDENDUM 1 f/5 | "match FAIR-01's rule" → the synthesizer's emphasis and the report would then disagree; ruled against for that reason |
+| 5 | The re-run runs at depth 2 (`--depth-params '{"depth":2}'` in both command forms) | D74 e | none — the bullet requires it |
+| 6 | The seat's commits carry the Opus 5 trailer; the orchestrator's carry Fable 5.1 | D74 ADDENDUM 1 f/8 | "amend before the next push" |
+
+### C. What is now yours, in order (W12 audit §6, steps 2–7)
+
+1. **The ceremony re-run** — `packets/readiness-ask-2026-09-16.md` (amended 2026-09-17: depth 2). Mint
+   the credential in your own shell; run the short form; read the seven `DOD-*` lines in the captured
+   log. `DOD-2`'s first pair and `DOD-3`'s boolean are the two facts no fixture can witness.
+2. **The Node 22.23.1 run** (D73 e/7).
+3. **The mono-maker run**, then the δ/ε refit, then the seven confirm-items (audit §3), then the
+   judge's whole-goal verdict.
+
+### D. Named facts, out of scope, for you
+
+- The remote answered the push with *"GitHub found 12 vulnerabilities on the default branch (2
+  critical, 5 high, 5 moderate)"* — `main` is V2 production; nothing here touches it (D74 d).
+- `tests/architecture/s7-authorization-contract.test.ts:98` is red at the base and at every tip since
+  the gate of record (`recordQuestionAndMatch` no longer carries `ORDER BY run_id FOR UPDATE`) — an
+  owned red of the continuation, not of this task.

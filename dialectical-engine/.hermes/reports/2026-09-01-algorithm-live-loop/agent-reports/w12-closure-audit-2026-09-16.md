@@ -231,3 +231,34 @@ direction. STRENGTH: entailed.
 
 Steps 2–4 need the operator's credential and go (D18 / D72). Step 1 does not, and it is the one that
 decides whether steps 3 and 4 are worth their spend.
+
+---
+
+## ADDENDUM 2026-09-17 (orchestrator) — §6 step 1 is done; the re-run's depth was missing
+
+**Step 1 landed** (V's order of 2026-09-17; ticket `F-CEREMONY-REPORT-DOD-FACTS`; D74 ADDENDUM 1;
+product tip `9540cb9b`). The ceremony now prints, below its last established line, one fixed line
+per absent sub-clause: `DOD-1 panel-reduced-tau` (τ per node with its voice counts; whether every τ
+had a non-author voice; single-voice node ids), `DOD-2 measured-edges` (PRESENT magnitudes over every
+edge, and over attack edges by FAIR-01's rule), `DOD-3 root-final-vs-tau` (each root's τ and final;
+whether one differs; the witness), `DOD-5 surviving-objection` (the strongest surviving objection's
+node id and strength; whether the final evaluator round was satisfied; whether
+`SYNTHESIS-OBJECTION-STANDING` is on the answer), `DOD-6 evaluator-loop` (rounds recorded against the
+sealed `evaluatorLoopMaxRounds`, each round's stage and verdict), `DOD-7 verdict-label` (the label or
+the unavailability reason ref, terminal, serve state), `DOD-8 confidence-band` (the band, its
+`LOOKED_UP/RAN/REASONING` basis over the cited set, the ceiling's register row key). Sub-clauses 4 and 9
+keep the `T17 envelope at terminal` line. No debate content enters the log. The same facts ride the
+returned ceremony as the typed `definitionOfDone` block.
+
+**What the §2.3 table becomes on the next log.** Rows 1, 3, 5, 6, 7, 8 read their line; row 2 reads
+`DOD-2`'s first pair (the clause's words) and reconciles the second with `FAIR-01 graph`. The judge's
+whole-goal verdict (§5) can then rest on the log alone. **Two of those rows are only witnessable
+live:** the dry-run fixture's attack arrows are all placeholders and its roots keep their τ, so on it
+`DOD-2` reads `0/…` and `DOD-3` reads `false` — an unmet sub-clause on a fixture, not a broken reader.
+
+**A second hole in the re-run, found while filing.** The readiness packet's command carried no
+`--depth-params`; the ceremony defaults to depth 1 (`acceptance/run-acceptance.ts:88`) and the bullet
+says `depth≥2` (`slices/S12-closure/SPEC.md:37`). Both command forms now carry
+`--depth-params '{"depth":2}'` (D74 e). A run without it would fail the bullet whatever it printed.
+
+**§6 stands otherwise:** steps 2–7 remain the operator's, in that order.

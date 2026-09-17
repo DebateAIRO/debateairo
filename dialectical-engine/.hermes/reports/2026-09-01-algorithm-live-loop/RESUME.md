@@ -356,3 +356,29 @@ nothing new, two cleared. The rows are in `PROGRESS.md` (§ THE FINAL GATE — `
 5. the V packet's 2026-09-16 rows — every default binds until V says otherwise.
 Residual tickets on the board: F-T1-FX-ORPH-04-NO-LIVE-SUBJECT (+ the review's F4), F-PACKET-LINT-COUNT-HANDED,
 F-RELAY-BINARY-HOST-DEFAULT, and the 43 filed by RECORDS(CONT-T19).
+
+## 2026-09-17 19:0x — NEWEST ENTRY WINS
+
+**Where this stands.** `origin/dev` = `5c9c4678` since this morning (V's word; D74 a–c). On top of it,
+on the mission branch, the ceremony-report fix landed at product tip `9540cb9b` (eight commits under
+`acceptance/`, review spec PASS · quality APPROVED, gate green — D74 ADDENDUM 1), followed by the
+records commit that carries this entry; `dev` is fast-forwarded to that commit and pushed right after
+this entry is written (V's 2026-09-17 ask covers it). The local `dev` on this host is the V3 line now.
+
+**What changed today, in one line each.** The push (D74 a–c) · the re-run packet now says depth 2
+(D74 e) · `F-CEREMONY-REPORT-DOD-FACTS` done: seven `DOD-*` lines below the last established report
+line, typed block on the ceremony, content law in the log, shape-vs-outcome boundary (D74 ADDENDUM 1)
+· the W12 audit's addendum (§6 step 1 done) · the V packet's 2026-09-17 section.
+
+**Operator's next actions (unchanged in kind, shorter in list).** (1) The ceremony re-run per
+`packets/readiness-ask-2026-09-16.md` — with `--depth-params '{"depth":2}'` — then read the seven
+`DOD-*` lines; (2) the Node 22.23.1 run; (3) the V packet's 2026-09-17 rows; (4) remove the
+`lane-cont-t2/t3/t8` worktrees; (5) W12 §6 steps 4–7 after the re-run.
+
+**Known reds, unchanged.** The gate of record's 140 (100 Node-26 `localStorage`, 40 owned); among
+them s7 `:98`. F31's 3+3 audit rows.
+
+**Where the seat records are.** `agent-reports/dod-facts-seat-2026-09-17.md` (the seat's account,
+RED frames, both mutant matrices), `agent-reports/dod-facts-review-2026-09-17.md` (the verdict and the
+scoped re-check); the SDD ledger `.superpowers/sdd/2026-09-17-ceremony-report-six-facts/progress.md`
+(ignored by version control, on this host).
