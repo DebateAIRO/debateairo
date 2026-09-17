@@ -59,6 +59,29 @@ if [ "$RUNNABLE" -lt 2 ]; then
   echo "PREFLIGHT: only $RUNNABLE of 3 maker binaries run; the definition of done needs M>=2 makers. Fix the binary named above (or export its ACCEPTANCE_*_BINARY) and re-run. Nothing was started."
   exit 5
 fi
+# LOGIN (2026-09-17 22:2x, after the first real run died in ten seconds on `MAKER ABSENT Anthropic
+# CLAUDE_CLI_FAILED` — the CLI's OAuth session had expired): a binary that runs but is not signed in
+# still costs the whole run, because the synthesis roles are pinned to a provider. Claude and Codex
+# report their login state without a model call; Grok has no status command, so its own handshake at
+# run start is the check. Neither command below spends anything or prints a secret.
+LOGGED_IN=1
+if [ -n "$CLAUDE_BIN" ] && "$CLAUDE_BIN" auth status </dev/null 2>/dev/null | grep -q '"loggedIn": *true'; then
+  echo "PREFLIGHT CLAUDE LOGIN: OK"
+else
+  echo "PREFLIGHT CLAUDE LOGIN: NOT LOGGED IN (the relay's handshake will fail with CLAUDE_CLI_FAILED) — run, in your own terminal:  claude auth login"
+  LOGGED_IN=0
+fi
+if [ -n "$CODEX_BIN" ] && "$CODEX_BIN" login status </dev/null 2>&1 | grep -qi 'logged in'; then
+  echo "PREFLIGHT CODEX LOGIN: OK"
+else
+  echo "PREFLIGHT CODEX LOGIN: NOT LOGGED IN (the shim's handshake will fail) — run, in your own terminal:  codex login"
+  LOGGED_IN=0
+fi
+echo "PREFLIGHT GROK LOGIN: not checkable without a call (grok has login/logout, no status); the run's own handshake decides — a failure prints MAKER ABSENT xAI"
+if [ "$LOGGED_IN" != "1" ]; then
+  echo "PREFLIGHT: a maker is not signed in; the run would die at the first role pinned to it. Sign in as printed above and re-run. Nothing was started."
+  exit 6
+fi
 if [ "${PREFLIGHT_ONLY:-0}" = "1" ]; then
   echo "PREFLIGHT: $RUNNABLE of 3 maker binaries run; the ceremony may start (PREFLIGHT_ONLY=1 — nothing started, no credential read)."
   exit 0

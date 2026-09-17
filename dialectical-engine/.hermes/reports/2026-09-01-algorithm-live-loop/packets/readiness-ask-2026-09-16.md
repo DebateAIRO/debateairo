@@ -130,9 +130,14 @@ export ACCEPTANCE_GROK_BINARY="$HOME/.grok/downloads/grok-1.0.30-macos-aarch64"
 Then **prove readiness without spending**: `PREFLIGHT_ONLY=1 bash …/tools/closing-run.sh` runs
 only the checks — each discovered binary must resolve to a non-empty, executable file whose first
 bytes are a program header (a `#!` shebang or a Mach-O magic number; a text file is refused as
-NOT A PROGRAM and never run) and must answer `--version`, and at least two makers must be runnable —
-and exits 0 when the ceremony may start, 5 when it may not, naming the binary and the reason. It needs
-no credential.
+NOT A PROGRAM and never run) and must answer `--version`, at least two makers must be runnable, and
+**Claude and Codex must be signed in** (`claude auth status`, `codex login status` — no model call;
+Grok has no status command, its own handshake at run start decides). Exit 0 = the ceremony may start;
+5 = a binary is not a program; 6 = a maker is signed out, with the sign-in command printed. It needs
+no credential. **The first real run of 2026-09-17 (22:22:48) died in ten seconds on
+`MAKER ABSENT Anthropic CLAUDE_CLI_FAILED` → `SYNTHESIS_ROLE_PROVIDER_UNRESOLVED`: the Claude CLI's
+OAuth session had expired ("Failed to authenticate: OAuth session expired and could not be
+refreshed"). `claude auth login` in your own terminal fixes it; the pre-flight now catches it first.**
 
 **Rule (V, 2026-09-17): no computer-specific path is ever written down as a value to use.** The
 tool and this packet deduce every binary (`command -v`, or the `ACCEPTANCE_*_BINARY` key you set);
