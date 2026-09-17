@@ -28,9 +28,14 @@ function sortUsableRecommendations(
   if (usable.length === 0) return [];
   return [...usable].sort((left, right) => {
     if (left.priority !== right.priority) return left.priority - right.priority;
-    if (left.action !== right.action) return left.action.localeCompare(right.action);
-    return left.reason.localeCompare(right.reason);
+    if (left.action !== right.action) return compareCodeUnits(left.action, right.action);
+    return compareCodeUnits(left.reason, right.reason);
   });
+}
+
+/** UTF-16 code-unit order: the same on every host, whatever its locale (B30). */
+function compareCodeUnits(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 export function formatRecommendationAction(action: InvestigationAction): string {
