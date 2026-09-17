@@ -27,7 +27,9 @@ import {
   seedDevelopmentDeploymentRegister
 } from "../../apps/runner/src/dev-deployment-register.js";
 import {
+  ACCEPTANCE_ALGORITHM_SOURCE_REF,
   ACCEPTANCE_REGISTER_VERSION,
+  buildAcceptanceRegisterPublicationRows,
   buildAcceptanceRegisterRows,
   seedAcceptanceRegister
 } from "../../acceptance/seed-register.js";
@@ -50,6 +52,13 @@ const DEVELOPMENT_ALGORITHM_SOURCE_REF = "DEV-T16-algorithm-register.md#goal-v4:
  * source_ref is asserted for EXACT equality, never containment.
  */
 const RULING_GOAL = "goal-v4-2026-09-01:80-96";
+/**
+ * D77 (c): V refitted the two adaptive-stopping thresholds from the first real
+ * M>=2 run — delta 0.02 -> 0.01, epsilon 0.01 -> 0.005. The goal SEEDED the
+ * coarse pair; D77 CHOSE the values these two rows now carry, so these two rows
+ * — and only these two — cite D77 instead of the goal.
+ */
+const RULING_D77 = "algorithm-live-loop-DECISIONS.md#D77";
 const RULING_J1 = "algorithm-live-loop-DECISIONS.md#J1";
 const RULING_J8 = "algorithm-live-loop-DECISIONS.md#J8+configured-provider-set-derivation";
 const RULING_BANDS =
@@ -68,13 +77,14 @@ const loadAlgorithmPolicy = async (): Promise<AlgorithmPolicyModule> =>
 
 /**
  * T16 · every new sealed row, its ruled default, and the family it belongs to.
- * Values: goal-v4 lines 80-96 (δ, ε, γ, high, low, evaluator-loop max) and mission
- * DECISIONS.md J1 (dispersion scale, disagreement threshold, repeated-family
- * multiplier, downgrade bands, provider/model→family map).
+ * Values: goal-v4 lines 80-96 (γ, high, low, evaluator-loop max — and the SEEDS
+ * for δ and ε), mission DECISIONS.md J1 (dispersion scale, disagreement
+ * threshold, repeated-family multiplier, downgrade bands, provider/model→family
+ * map), and D77 (c), which REFITTED δ and ε from the first real M≥2 run.
  */
 const T16_EXPECTED_ROWS = [
-  { family: "stopping", rowKey: "globalStopDelta", rulingRef: RULING_GOAL, value: { kind: "GLOBAL_STOP_DELTA", delta: 0.02 } },
-  { family: "stopping", rowKey: "branchFreezeEpsilon", rulingRef: RULING_GOAL, value: { kind: "BRANCH_FREEZE_EPSILON", epsilon: 0.01 } },
+  { family: "stopping", rowKey: "globalStopDelta", rulingRef: RULING_D77, value: { kind: "GLOBAL_STOP_DELTA", delta: 0.01 } },
+  { family: "stopping", rowKey: "branchFreezeEpsilon", rulingRef: RULING_D77, value: { kind: "BRANCH_FREEZE_EPSILON", epsilon: 0.005 } },
   { family: "verdictLabel", rowKey: "verdictMarginGamma", rulingRef: RULING_GOAL, value: { kind: "VERDICT_MARGIN_GAMMA", gamma: 0.05 } },
   { family: "verdictLabel", rowKey: "verdictHighCut", rulingRef: RULING_GOAL, value: { kind: "VERDICT_HIGH_CUT", highCut: 0.7 } },
   { family: "verdictLabel", rowKey: "verdictLowCut", rulingRef: RULING_GOAL, value: { kind: "VERDICT_LOW_CUT", lowCut: 0.35 } },
@@ -293,6 +303,30 @@ describe("T16 algorithm register rows + seeding", () => {
     expect(citesJ8).toEqual(["evaluatorRoleRef", "synthesizerRoleRef"]);
   });
 
+  it("cites D77 on exactly the two thresholds it refitted and leaves the goal on the rest", async () => {
+    await seedDevelopmentDeploymentRegister({
+      adminPool: database.pool,
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      repositoryRoot
+    });
+    const persisted = await database.pool.query<{ row_key: string; source_ref: string }>(
+      `SELECT row_key,source_ref FROM register.register_row
+       WHERE register_version=$1 AND row_key=ANY($2::text[])`,
+      [DEVELOPMENT_REGISTER_VERSION, T16_EXPECTED_ROWS.map((row) => row.rowKey)]
+    );
+    const citing = (ruling: string): readonly string[] => persisted.rows
+      .filter((row) => row.source_ref.endsWith(`+${ruling}`))
+      .map((row) => row.row_key)
+      .sort();
+    // D77 (c) refitted TWO values and nothing else. A row citing a ruling that
+    // never chose its value is audit poison (J8), in both directions.
+    expect(citing(RULING_D77)).toEqual(["branchFreezeEpsilon", "globalStopDelta"]);
+    expect(citing(RULING_GOAL)).toEqual([
+      "disagreementQuantity", "evaluatorLoopMaxRounds",
+      "verdictHighCut", "verdictLowCut", "verdictMarginGamma"
+    ]);
+  });
+
   it("refuses to seal a register version that omits any algorithm row family", async () => {
     for (const omitted of T16_FAMILIES) {
       const before = (await database.pool.query("SELECT count(*)::int AS count FROM register.required_row_version")).rows;
@@ -349,7 +383,7 @@ describe("T16 algorithm register rows + seeding", () => {
       repositoryRoot
     });
     await expect(policy.readAdaptiveStoppingControls(database.pool, DEVELOPMENT_REGISTER_VERSION))
-      .resolves.toMatchObject({ delta: 0.02, epsilon: 0.01 });
+      .resolves.toMatchObject({ delta: 0.01, epsilon: 0.005 });
     await expect(policy.readVerdictLabelControls(database.pool, DEVELOPMENT_REGISTER_VERSION))
       .resolves.toMatchObject({ gamma: 0.05, highCut: 0.7, lowCut: 0.35, disagreementThreshold: 0.25 });
     await expect(policy.readPanelWeightingControls(database.pool, DEVELOPMENT_REGISTER_VERSION))
@@ -485,6 +519,42 @@ describe("T16 sealed-version identity — historical versions are never re-opene
     for (const rowKey of ALGORITHM_REGISTER_ROW_KEYS) {
       expect(current.rows.map((row) => row.row_key), rowKey).toContain(rowKey);
     }
+  }, 120_000);
+
+  /**
+   * D77 (c) · O2 — what a STANDING ceremony database does with the refit.
+   *
+   * `seedAcceptanceRegister` imports the ceremony rows into a PINNED version
+   * (`ACCEPTANCE_REGISTER_VERSION`) through `importHistorical`, and that path
+   * is replay-only: a version that already exists must match the supplied
+   * snapshot byte for byte (`migrations/0055_register_support_publication.sql:1343-1372`).
+   * So the seed NEVER overwrites a sealed row. A standing `.pgdata` holding the
+   * pre-refit delta/epsilon refuses the refit LOUDLY and keeps its sealed rows —
+   * the operator resets the standing data directory (acceptance/README.md:44-46,163-165)
+   * or the pinned version is raised. This test is the measurement that claim rests on.
+   */
+  it("refuses the refit on a standing ceremony version sealed with the pre-refit thresholds", async () => {
+    const supersededRef = `${ACCEPTANCE_ALGORITHM_SOURCE_REF}+${RULING_GOAL}`;
+    const standingRows = (await buildAcceptanceRegisterPublicationRows()).map((row) => {
+      if (row.rowKey === "globalStopDelta") {
+        return registerFixtureRow(row.rowKey, { kind: "GLOBAL_STOP_DELTA", delta: 0.02 }, supersededRef);
+      }
+      if (row.rowKey === "branchFreezeEpsilon") {
+        return registerFixtureRow(row.rowKey, { kind: "BRANCH_FREEZE_EPSILON", epsilon: 0.01 }, supersededRef);
+      }
+      return row;
+    });
+    await importHistoricalRegisterFixture(database.pool, ACCEPTANCE_REGISTER_VERSION, standingRows);
+    const before = await readVersionSnapshot(ACCEPTANCE_REGISTER_VERSION);
+
+    await expect(seedAcceptanceRegister(database.pool)).rejects.toThrow(/historical replay drift/u);
+
+    // Sealed means sealed: the standing rows are untouched, and the run that
+    // would follow still reads the OLD pair until the operator acts.
+    expect(await readVersionSnapshot(ACCEPTANCE_REGISTER_VERSION)).toEqual(before);
+    const policy = await loadAlgorithmPolicy();
+    await expect(policy.readAdaptiveStoppingControls(database.pool, ACCEPTANCE_REGISTER_VERSION))
+      .resolves.toMatchObject({ delta: 0.02, epsilon: 0.01 });
   }, 120_000);
 });
 
