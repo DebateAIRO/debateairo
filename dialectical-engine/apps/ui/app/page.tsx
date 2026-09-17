@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AiNotice } from "@/components/AiNotice";
 import { cookies, headers } from "next/headers";
 import { createServerContractClient, USER_TOKEN_COOKIE, listDebatesPageServer } from "@/lib/serverApi";
 import { LibraryComposer } from "@/components/LibraryComposer";
@@ -83,6 +84,8 @@ export default async function HomePage({
             <LibraryComposer />
           </section>
         ) : null}
+
+        <div className="libAiDisclosure"><AiNotice /></div>
 
         <div className="libTabs sectionHead" aria-label="Debate library">
           <Link

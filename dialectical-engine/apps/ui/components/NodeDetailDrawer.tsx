@@ -244,9 +244,9 @@ export function NodeDetailDrawer({
               <p>{pathDecisionCopy(lifecycleDecision)}</p>
             </div>
           ) : null}
-          <div className="drawerClaim">{node.claim}</div>
+          <div className="drawerClaim" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</div>
           {generation?.argument ? (
-            <div className="drawerProse" onMouseUp={onChallenge ? selectProse : undefined}>
+            <div className="drawerProse" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"} onMouseUp={onChallenge ? selectProse : undefined}>
               {generation.argument}
             </div>
           ) : null}
@@ -297,13 +297,13 @@ export function NodeDetailDrawer({
                     <ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} className="modelPill metaLine" />
                   ) : null}
                 </div>
-                <div className="compareClaim">{node.claim}</div>
+                <div className="compareClaim" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</div>
               </div>
               <div className="compareCell">
                 <div className="compareCellHead">
                   <ModelMetaLine modelId={current.model_id} className="compareTag metaLine" />
                 </div>
-                <div className="compareClaim muted">{current.argument.slice(0, 200)}</div>
+                <div className="compareClaim muted" data-ai-generated="true">{current.argument.slice(0, 200)}</div>
               </div>
             </div>
           ) : null}
@@ -330,7 +330,7 @@ export function NodeDetailDrawer({
                       <ModelMetaLine modelId={item.model_id} className="modelPill metaLine" />
                       <span className="historyTag">{item.is_active ? "active" : "archived"}</span>
                     </div>
-                    <div className="historyCardBody">{item.argument}</div>
+                    <div className="historyCardBody" data-ai-generated="true">{item.argument}</div>
                   </button>
                 );
               })
@@ -403,7 +403,7 @@ function NodeHonestyDetails({ v3 }: { v3: ContractNode }) {
         Freshness {v3.staleness_state} · relevant as of {v3.relevant_as_of}
       </div>
 
-      <div className="drawerReviewLine" data-node-review={v3.review?.outcome ?? "absent"}>
+      <div className="drawerReviewLine" data-node-review={v3.review?.outcome ?? "absent"} data-ai-generated={v3.review === null ? undefined : "true"}>
         {reviewLabel === null ? (
           <span className="drawerFindingText">
             No completed second-maker review is recorded for this node.
@@ -424,14 +424,16 @@ function NodeHonestyDetails({ v3 }: { v3: ContractNode }) {
           </>
         )}
       </div>
-      {v3.review === null ? null : <div className="drawerFindingText">{v3.review.reasons.join(" ")}</div>}
+      {v3.review === null ? null : <div className="drawerFindingText" data-ai-generated="true">{v3.review.reasons.join(" ")}</div>}
 
       <table className="drawerRecordTable" data-drawer-section-table>
         <tbody>
           {rows.map((row) => (
             <tr key={row.key} data-drawer-section-row>
               <th scope="row" data-drawer-section-key>{row.key}</th>
-              <td data-drawer-section-value title={row.title}>{row.value}</td>
+              <td data-drawer-section-value title={row.title}
+                data-ai-generated={row.key === "BASE SCORE" || (row.key === "FINAL STRENGTH" && v3.final_strength !== null) ? "true" : undefined}
+              >{row.value}</td>
             </tr>
           ))}
         </tbody>

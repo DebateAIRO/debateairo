@@ -9,6 +9,7 @@ const SCREEN_TITLES: Record<string, string> = {
   "/": "Library",
   "/new": "New debate",
   "/settings": "Settings",
+  "/ai-transparency": "AI transparency",
   "/admin/workers": "Workers"
 };
 

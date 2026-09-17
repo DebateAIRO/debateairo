@@ -156,7 +156,7 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
           <div className="mapReadout" data-reference-map-readout>
             <span className="referenceStanceTab" style={{ background: readoutRole === "root" ? "var(--ink)" : readoutPal.line }} aria-hidden />
             <div className="nodeEyebrow">{readoutRole === "root" ? "Root claim" : readoutRole}</div>
-            <div className="mapReadoutClaim">{readoutNode.claim}</div>
+            <div className="mapReadoutClaim" data-ai-generated={readoutRole === "root" ? undefined : "true"}>{readoutNode.claim}</div>
             <div className="mapReadoutFooter">
               <span>Hover a wedge to inspect · click to focus</span>
               <span style={{ flex: 1 }} />

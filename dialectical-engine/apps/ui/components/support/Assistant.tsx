@@ -4,6 +4,7 @@ import { useEffect,useRef,useState,type FormEvent,type ReactNode } from "react";
 import { redactSupportText } from "@debateai/kernel";
 import { BrandMark } from "../TopBar.js";
 import { ModeToggle } from "../ModeToggle.js";
+import { AiNotice } from "../AiNotice";
 import { ConsentToggle } from "./ConsentToggle.js";
 import { DebatePicker } from "./DebatePicker.js";
 import { supportPost } from "./http.js";
@@ -535,13 +536,16 @@ export function Assistant({
   const conversation = <div className="supportConversation" aria-label="Support conversation" aria-live="polite">
     {messages.map((message) => {
       const link = safeFirstPartyLink(message.link);
-      return <article className={`supportMessage supportMessage--${message.role}`} key={message.id} data-role={message.role}>
+      const generated = message.role === "assistant" && message.outcome === "ANSWER_GROUNDED";
+      return <article className={`supportMessage supportMessage--${message.role}`} key={message.id} data-role={message.role}
+        data-ai-generated={generated ? "true" : undefined}
+        data-content-origin={message.role === "user" ? "user" : generated ? "ai" : "automated"}>
         {message.role === "assistant" ? <div className="supportMessageShell">
           <div className="supportMessageTab" aria-hidden />
           <div className="supportMessageCore">
             <p>{message.text}</p>
             {link === null ? null : <footer className="supportCitation">
-              <span>DOCS · PRODUCT GUIDE</span>
+              <span>{generated ? "AI · " : ""}DOCS · PRODUCT GUIDE</span>
               <a href={link}>View source →</a>
             </footer>}
           </div>
@@ -588,7 +592,7 @@ export function Assistant({
         aria-expanded={contextOpen}
         onClick={() => setContextOpen((open) => !open)}
       >⌁ <span>Attach a debate</span></button>
-      <span className="supportComposerHint">Your session and device details are attached automatically.</span>
+      <span className="supportComposerHint">Session and device details attached automatically · replies are AI-generated.</span>
       <button className="supportSend" type="submit" disabled={busy}>{WORDS[language].send}</button>
     </div> : <div className="supportComposerBar supportComposerBar--compact">
       <button className="supportSend" type="submit" disabled={busy}>{WORDS[language].send}</button>
@@ -606,6 +610,7 @@ export function Assistant({
         >{CLOSE_ARROW}</button>}
         {languageControls}
       </div>
+      <AiNotice variant="banner" language={language} />
       {conversation}
       {contextControls}
       {ratingControls}
@@ -681,12 +686,13 @@ export function Assistant({
           <div className="supportAgentAvatar" aria-hidden>◆</div>
           <div className="supportAgentIdentity">
             <div><h1>Support agent</h1><span className={`supportOnline supportOnline--${statusLabel.toLowerCase()}`}>{statusLabel}</span></div>
-            <p>Answers from the product docs and your account — cites its source, and hands off to a person when it cannot.</p>
+            <p><strong>You are talking to an AI, not a person.</strong> It answers from the product docs and your account, cites its source, and hands off to a human when it cannot.</p>
           </div>
           <button className="supportNewConversation" type="button" onClick={beginNewConversation}>New conversation</button>
         </header>
 
         <div className="supportChatScroll">
+          <AiNotice variant="banner" language={language} />
           <p className="supportTimestamp">Today · Support conversation</p>
           {conversation}
           {ratingControls}

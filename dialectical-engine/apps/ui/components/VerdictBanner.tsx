@@ -35,7 +35,7 @@ export function VerdictBanner({ verdict }: { verdict: VerdictSummary | undefined
   const suppressed = verdict.verdictState === "suppressed_no_evidence";
 
   return (
-    <section className="verdictBanner" aria-label="Verdict" data-verdict-band={verdict.verdictBand}>
+    <section className="verdictBanner" aria-label="Verdict" data-verdict-band={verdict.verdictBand} data-ai-generated="true">
       <div className="verdictBannerHead">
         <span className="verdictBadge" data-verdict-band={verdict.verdictBand}>
           {bandLabel}
