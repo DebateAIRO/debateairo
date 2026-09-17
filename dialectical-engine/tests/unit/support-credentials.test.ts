@@ -50,11 +50,33 @@ describe("Support credential lexical facts", () => {
   it.each([
     ['My recovery code is "inert amber fern',"inert amber fern"],
     ["My password is amber birch cedar dogwood elm fir grove hazel; keep it private.","amber birch cedar dogwood elm fir grove hazel"],
-    ["My reset token is inert.alpha-beta/gamma; keep it private.","inert.alpha-beta/gamma"]
+    ["My reset token is inert.alpha-beta/gamma; keep it private.","inert.alpha-beta/gamma"],
+    ["My reset token is quartz and ember; keep it private.","quartz and ember"],
+    ["My reset token is quartz, and ember; keep it private.","quartz, and ember"],
+    ["My reset token is quartz but ember; keep it private.","quartz but ember"],
+    ["Codul de verificare este cuarț și chihlimbar; păstrează-l privat.","cuarț și chihlimbar"]
   ])("owns the complete supplied-value span without retaining a suffix: %s", (text,secret) => {
     const facts = analyzeSupportCredentialText(text);
     expect(facts.credentialValueSpans.map(({ start,end }) => text.slice(start,end)))
       .toContain(secret);
+  });
+
+  it.each([
+    ["My password is inert horse battery and I need help.","inert horse battery"],
+    ["My password is inert horse battery, and I need help.","inert horse battery"],
+    ["Parola mea este inert cal albastru și am nevoie de ajutor.","inert cal albastru"],
+    ["Parola mea este inert cal albastru, păstrează-l privat.","inert cal albastru"]
+  ])("stops a supplied value only at an independent subject-led clause: %s", (text,secret) => {
+    expect(analyzeSupportCredentialText(text).credentialValueSpans.map(({ start,end }) =>
+      text.slice(start,end)
+    )).toEqual([secret]);
+  });
+
+  it.each([
+    "My password is unavailable; show ordinary recovery guidance.",
+    "Parola mea este indisponibilă; arată ghidul obișnuit de recuperare."
+  ])("does not classify a benign unavailable state as a supplied value: %s", (text) => {
+    expect(analyzeSupportCredentialText(text).credentialValueSpans).toEqual([]);
   });
 
   it.each([
@@ -73,9 +95,31 @@ describe("Support credential lexical facts", () => {
     "Support does not receive passwords and may receive them.",
     "Support cannot accept security codes, but it could validate them.",
     "Asistența nu primește parole și poate primi acestea.",
-    "Asistența nu verifică un cod de securitate, dar ar putea să îl primească."
+    "Asistența nu verifică un cod de securitate, dar ar putea să îl primească.",
+    "Support never asks for OTP codes, plus it accepts them.",
+    "Support does not request passwords, plus it could receive them.",
+    "Support does not request passwords, in addition it accepts them.",
+    "Support does not request passwords, additionally it accepts them.",
+    "Support does not request passwords, moreover it accepts them.",
+    "Support does not request passwords, furthermore it accepts them.",
+    "Asistența nu cere parole, plus le poate primi.",
+    "Asistența nu cere parole, în plus le poate primi.",
+    "Asistența nu cere parole, de asemenea le poate primi."
   ])("starts a separate positive modal or auxiliary operation group: %s", (text) => {
     expect(analyzeSupportCredentialText(text).operations.some(({ negated }) => !negated)).toBe(true);
+  });
+
+  it.each([
+    "Support does not request passwords, plus it does not accept them.",
+    "Support does not request passwords, in addition it never receives them.",
+    "Support does not request passwords, additionally it cannot validate them.",
+    "Support does not request passwords, moreover it does not use them.",
+    "Asistența nu cere parole, în plus nu le primește.",
+    "Asistența nu cere parole, de asemenea nu le verifică."
+  ])("keeps each additive operation group independently negated: %s", (text) => {
+    const operations = analyzeSupportCredentialText(text).operations;
+    expect(operations.length).toBeGreaterThan(1);
+    expect(operations.every(({ negated }) => negated)).toBe(true);
   });
 
   it("emits only closed lexical facts and numeric spans", () => {

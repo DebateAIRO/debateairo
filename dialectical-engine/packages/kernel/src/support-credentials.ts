@@ -80,20 +80,21 @@ const OPERATION_PATTERNS: readonly Readonly<{
 const NEGATION = /\b(?:never|do\s+not|does\s+not|did\s+not|cannot|can\s+not|can't|must\s+not|will\s+not|should\s+not|nu|niciodata|nu\s+poate|nu\s+pot|nu\s+trebuie)\b/giu;
 const REFERENCE = /(?:\b(?:it|them|this|that|these|those|acesta|aceasta|acestea|acestora|il|le|lor)\b|-o\b|-le\b)/giu;
 const NON_CREDENTIAL_OBJECT = /\b(?:display\s+name|account\s+name|profile\s+name|nume(?:le)?\s+(?:afisat|contului|profilului))\b/giu;
-const SCOPE_BOUNDARY = /(?:[.!?;\n]+|,?\s*\b(?:but|however|instead|except|unless|then|therefore|thus|so|as\s+a\s+result|because|while|although|yet|which\s+means|and\s+(?:also|then|generally|sometimes|later|still)|dar|insa|apoi|deci|asa\s+ca|prin\s+urmare|deoarece|fiindca|desi|totusi|ceea\s+ce\s+inseamna|si\s+de\s+asemenea)\b|\b(?:and|si)\s+(?=(?:you|the\s+visitor|support|i|we|they|may|might|should|must|will|would|can|could|is|are|please|send|share|provide|give|submit|enter|paste|upload|tell|show|receive|accept|repeat|transform|validate|decode|encode|reset|change|replace|regenerate|tu|vizitator|asistenta|poate|pot|ar|este|sunt|trebuie|poti|vei|va|vor|trim|partaj|furniz|introduc|lip|incarc|spun|arat|prim|accept|repet|transform|valid|verific|decod|encod|reset|schimb|inlocu|regener)))/giu;
+const SCOPE_BOUNDARY = /(?:[.!?;\n]+|,?\s*\b(?:but|however|instead|except|unless|then|therefore|thus|so|as\s+a\s+result|because|while|although|yet|which\s+means|and\s+(?:also|then|generally|sometimes|later|still)|plus|in\s+addition|additionally|moreover|furthermore|dar|insa|apoi|deci|asa\s+ca|prin\s+urmare|deoarece|fiindca|desi|totusi|ceea\s+ce\s+inseamna|si\s+de\s+asemenea|in\s+plus|de\s+asemenea)\b|\b(?:and|si)\s+(?=(?:you|the\s+visitor|support|i|we|they|may|might|should|must|will|would|can|could|is|are|please|send|share|provide|give|submit|enter|paste|upload|tell|show|receive|accept|repeat|transform|validate|decode|encode|reset|change|replace|regenerate|tu|vizitator|asistenta|poate|pot|ar|este|sunt|trebuie|poti|vei|va|vor|trim|partaj|furniz|introduc|lip|incarc|spun|arat|prim|accept|repet|transform|valid|verific|decod|encod|reset|schimb|inlocu|regener)))/giu;
 const SENTENCE_BOUNDARY = /[.!?;\n]+/gu;
-const LABEL_CONNECTOR = /^\s*(?:(?:my|your|his|her|our|their|visitor(?:'s)?|meu|mea|mele|ta|tau|dvs|dumneavoastra|utilizatorului)\s+){0,2}(?:(?:is|are|este|e|sunt)\b|:|=)\s*/iu;
+const LABEL_CONNECTOR = /^\s*(?:(?:my|your|his|her|our|their|visitor(?:'s)?|meu|mea|mele|ta|tau|dvs|dumneavoastra|utilizatorului)\b\s*){0,2}(?:(?:is|are|este|e|sunt)\b|:|=)\s*/iu;
 const VALUE_STOP_WORDS = new Set([
   "and","but","because","keep","please","so","then","therefore","which","while",
   "asa","apoi","dar","deci","iar","pastreaza","pentru","si"
 ]);
 const QUOTE_PAIRS = new Map([["\"","\""],["'","'"],["„","”"],["“","”"],["«","»"]]);
-const VALUE_HARD_DELIMITER = /[;\n]|[.!?](?=\s|$)|,(?=\s*(?:and|but|because|keep|please|so|then|therefore|which|while|asa|apoi|dar|deci|iar|pastreaza|pentru|si)\b)/giu;
-const VALUE_COORDINATOR = /\s+\b(?:and|but|because|keep|please|so|then|therefore|which|while|asa|apoi|dar|deci|iar|pastreaza|pentru|si)\b/giu;
+const VALUE_HARD_DELIMITER = /[;\n]|[.!?](?=\s|$)/giu;
+const VALUE_BENIGN_FOLLOWUP_BOUNDARY = /(?:,?\s+\b(?:and|but|because|so|then|therefore|which|while|asa|apoi|dar|deci|iar|pentru|si)\b\s+(?=(?:i\s+(?:need|want|forgot|cannot|can't|have)|we\s+(?:need|want|cannot|have)|(?:eu\s+)?(?:am\s+nevoie|vreau|am\s+uitat|nu\s+pot))\b)|,\s*(?=(?:keep|please|pastreaza)\b))/giu;
 const NON_VALUE_WORDS = new Set([
   "available","disponibil","disponibile","encrypted","forgotten","invalid","missing","never","not","private","protected",
   "required","safe","secure","unavailable","unknown","niciodata","nu","necesara",
-  "necesar","protejata","protejat","sigura","sigur","uitata","uitat"
+  "necesar","protejata","protejat","sigura","sigur","uitata","uitat",
+  "indisponibil","indisponibila","indisponibile"
 ]);
 const VALUE_ARTICLES = new Set(["a","an","o","un","una"]);
 
@@ -172,10 +173,10 @@ function labelledValueSpan(text: string,start: number): Readonly<{ start: number
   }
   const remainder = text.slice(start);
   VALUE_HARD_DELIMITER.lastIndex = 0;
-  VALUE_COORDINATOR.lastIndex = 0;
+  VALUE_BENIGN_FOLLOWUP_BOUNDARY.lastIndex = 0;
   const hard = VALUE_HARD_DELIMITER.exec(remainder)?.index ?? remainder.length;
-  const coordinator = VALUE_COORDINATOR.exec(remainder)?.index ?? remainder.length;
-  const end = start + Math.min(hard,coordinator);
+  const followup = VALUE_BENIGN_FOLLOWUP_BOUNDARY.exec(remainder)?.index ?? remainder.length;
+  const end = start + Math.min(hard,followup);
   const trimmedEnd = start + remainder.slice(0,end-start).trimEnd().length;
   const words = remainder.slice(0,trimmedEnd-start).trimStart().split(/\s+/u);
   const firstWord = words[0] ?? "";

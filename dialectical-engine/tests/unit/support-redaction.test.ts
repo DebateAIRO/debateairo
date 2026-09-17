@@ -43,12 +43,52 @@ describe("CP1 Support credential redaction", () => {
   it.each([
     ['My recovery code is "inert amber fern',"inert amber fern"],
     ["My password is amber birch cedar dogwood elm fir grove hazel; keep it private.","amber birch cedar dogwood elm fir grove hazel"],
-    ["My reset token is inert.alpha-beta/gamma; keep it private.","inert.alpha-beta/gamma"]
+    ["My reset token is inert.alpha-beta/gamma; keep it private.","inert.alpha-beta/gamma"],
+    ["My reset token is quartz and ember; keep it private.","quartz and ember"],
+    ["My reset token is quartz, and ember; keep it private.","quartz, and ember"],
+    ["My reset token is quartz but ember; keep it private.","quartz but ember"],
+    ["Codul de verificare este cuarț și chihlimbar; păstrează-l privat.","cuarț și chihlimbar"]
   ])("removes the complete supplied value through a safe delimiter or end: %s", (text,secret) => {
     const result = redactSupportText(text);
     expect(result.redacted).toBe(true);
     expect(result.text).not.toContain(secret);
     expect(result.text).toContain("[REDACTED_SECRET_LIKE]");
+  });
+
+  it.each([
+    ["My reset token is quartz and ember; keep it private.",["quartz","ember"]],
+    ["My reset token is quartz, and ember; keep it private.",["quartz","ember"]],
+    ["My reset token is quartz but ember; keep it private.",["quartz","ember"]],
+    ["Codul de verificare este cuarț și chihlimbar; păstrează-l privat.",["cuarț","chihlimbar"]]
+  ] as const)("leaves no coordinated supplied-value fragment at any redaction sink: %s", async (
+    text,fragments
+  ) => {
+    const observed: string[] = [];
+    const cipher = createSupportMessageCipher({
+      unwrapDataKey: vi.fn(async () => Buffer.alloc(32,1)),
+      sealContent: vi.fn((_aad: unknown,_key: Uint8Array,plaintext: Uint8Array) => {
+        observed.push(Buffer.from(plaintext).toString("utf8"));
+        return Buffer.from(plaintext);
+      }),openContent: vi.fn()
+    } as never,{
+      readSessionKey: vi.fn(async () => Buffer.from("wrapped")),
+      write: vi.fn(async (input) => { observed.push(Buffer.from(input.contentCiphertext).toString("utf8")); }),
+      read: vi.fn(async () => null),listSession: vi.fn(async () => [])
+    });
+
+    const stored = await cipher.writeAndTransit({
+      messageId: "41000000-0000-4000-8000-000000000001",
+      sessionId: "41000000-0000-4000-8000-000000000002",
+      role: "user",text,outcome: "REFUSE_ZONE",language: "en",detectedLanguage: "en",
+      overrideLanguage: null,receivedAt: new Date("2026-09-17T10:00:00.000Z"),
+      firstTokenAt: null,completedAt: null
+    },async (safeText) => { observed.push(safeText); });
+
+    observed.push(stored.text);
+    for (const value of observed) {
+      for (const fragment of fragments) expect(value).not.toContain(fragment);
+      expect(value).toContain("[REDACTED_SECRET_LIKE]");
+    }
   });
 
   it("stops an unquoted value at a declared coordinator without consuming benign prose", () => {
@@ -59,6 +99,8 @@ describe("CP1 Support credential redaction", () => {
   it.each([
     "I forgot my password",
     "Am uitat parola",
+    "My password is unavailable; show ordinary recovery guidance.",
+    "Parola mea este indisponibilă; arată ghidul obișnuit de recuperare.",
     "Try again at 14:30 on 2026-09-14 with public error SUPPORT_MODEL_UNAVAILABLE."
   ])("preserves benign guidance, dates, times, and public error IDs: %s", (text) => {
     expect(redactSupportText(text)).toEqual({ text,redacted: false });

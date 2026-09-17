@@ -36,10 +36,15 @@ export function canonicalSupportTextViews(value: string): CanonicalSupportTextVi
   });
 }
 
-const UNSAFE_PATH = /(?:^|[\s('"`])(?:\/{1,2}(?=\S)|\\{1,2}(?=\S)|\.{1,2}[\\/](?=\S)|[a-z]:[\\/](?=\S))/iu;
+const UNSAFE_PATH = /(?:^|[\s('"`=,:;])(?:\/{1,2}(?=\S)|\\{1,2}(?=\S)|\.{1,2}[\\/](?=\S)|[a-z]:[\\/](?=\S))/iu;
+
+/** True when this already-canonical text view contains a URL-independent path form. */
+export function supportTextViewHasUnsafePath(value: string): boolean {
+  return UNSAFE_PATH.test(value);
+}
 
 /** True when any bounded canonical view contains a URL-independent path form. */
 export function supportTextHasUnsafePath(value: string): boolean {
   const canonical = canonicalSupportTextViews(value);
-  return canonical.unsafeEncoding || canonical.views.some((candidate) => UNSAFE_PATH.test(candidate));
+  return canonical.unsafeEncoding || canonical.views.some(supportTextViewHasUnsafePath);
 }

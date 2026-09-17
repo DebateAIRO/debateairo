@@ -161,9 +161,58 @@ describe("CP1 support model response policy", () => {
     "Support does not receive passwords and may receive them.",
     "Support cannot accept a security code, but it could validate it.",
     "Asistența nu primește parole și poate primi acestea.",
-    "Asistența nu verifică un cod de securitate, dar ar putea să îl primească."
+    "Asistența nu verifică un cod de securitate, dar ar putea să îl primească.",
+    "Support never asks for OTP codes, plus it accepts them.",
+    "Support does not request passwords, plus it could receive them.",
+    "Support does not request passwords, in addition it accepts them.",
+    "Support does not request passwords, additionally it accepts them.",
+    "Support does not request passwords, moreover it accepts them.",
+    "Support does not request passwords, furthermore it accepts them.",
+    "Asistența nu cere parole, plus le poate primi.",
+    "Asistența nu cere parole, în plus le poate primi.",
+    "Asistența nu cere parole, de asemenea le poate primi."
   ])("rejects a positive credential operation in a new modal group: %s", (text) => {
     expect(parseSupportDraft(raw(text,{ actionIds: [] }))).toBeNull();
+    expect(parseSupportCaseSummaryDraft(JSON.stringify({
+      kind: "case_summary",text,sourceIds: [],actionIds: []
+    }))).toBeNull();
+  });
+
+  it.each([
+    "Support does not request passwords, plus it does not accept them.",
+    "Support does not request passwords, in addition it never receives them.",
+    "Support does not request passwords, additionally it cannot validate them.",
+    "Support does not request passwords, moreover it does not use them.",
+    "Asistența nu cere parole, în plus nu le primește.",
+    "Asistența nu cere parole, de asemenea nu le verifică."
+  ])("accepts independently negated additive operation groups: %s", (text) => {
+    expect(parseSupportDraft(raw(text,{ actionIds: [] }))).not.toBeNull();
+    expect(parseSupportCaseSummaryDraft(JSON.stringify({
+      kind: "case_summary",text,sourceIds: [],actionIds: []
+    }))).not.toBeNull();
+  });
+
+  it.each(["=",":",",",";"] .flatMap((delimiter) => [
+    [`root backslash after ${delimiter}`,`Target${delimiter}%5Csettings`],
+    [`drive path after ${delimiter}`,`Target${delimiter}C:%5Csettings`],
+    [`UNC path after ${delimiter}`,`Target${delimiter}%5C%5Cserver%5Cshare`]
+  ]))("rejects a decoded structural %s boundary in answer and summary text", (_name,text) => {
+    expect(parseSupportDraft(raw(text,{ actionIds: [] }))).toBeNull();
+    expect(parseSupportCaseSummaryDraft(JSON.stringify({
+      kind: "case_summary",text,sourceIds: [],actionIds: []
+    }))).toBeNull();
+  });
+
+  it.each([
+    "Progress=84% complete.",
+    "Ratio=3/4 with four observations.",
+    "Time=14:30 local.",
+    "Version=1.2.3 is available."
+  ])("keeps benign assignment text usable in answer and summary text: %s", (text) => {
+    expect(parseSupportDraft(raw(text,{ actionIds: [] }))).not.toBeNull();
+    expect(parseSupportCaseSummaryDraft(JSON.stringify({
+      kind: "case_summary",text,sourceIds: [],actionIds: []
+    }))).not.toBeNull();
   });
 
   it.each([

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   analyzeSupportCredentialText,canonicalSupportTextViews,supportTextContainsCredentialOperation,
-  supportTextHasUnsafePath
+  supportTextViewHasUnsafePath
 } from "@debateai/kernel";
 import {
   SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,type SupportActionId
@@ -147,7 +147,7 @@ function linkPredicate(value: string): SupportDraftPredicate | null {
   const canonical = canonicalSupportTextViews(value);
   if (canonical.unsafeEncoding) return "ENCODED_LINK_OR_PATH";
   for (const candidate of canonical.views) {
-    if (!MARKUP_OR_LINK.test(candidate) && !supportTextHasUnsafePath(candidate)) continue;
+    if (!MARKUP_OR_LINK.test(candidate) && !supportTextViewHasUnsafePath(candidate)) continue;
     if (candidate !== canonical.views[0]) return "ENCODED_LINK_OR_PATH";
     if (/(?:\[[^\]]+\]\s*\(|<\/?[a-z][^>]*>)/iu.test(candidate)) return "MARKUP";
     if (/(?:https?:\/\/|www\.|(?:^|\s)\/\/)/iu.test(candidate)) return "RAW_LINK_OR_PROTOCOL";

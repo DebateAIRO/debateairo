@@ -34,7 +34,15 @@ describe("CP1 bounded canonical Support text views", () => {
 
   it.each([
     "/settings","../settings",".\\settings","C:\\Users\\visitor\\secret.txt",
-    "\\\\server\\share\\secret.txt","%2Fsettings","..%2Fsettings"
+    "\\\\server\\share\\secret.txt","%2Fsettings","..%2Fsettings",
+    ...["=",":",",",";"].flatMap((delimiter) => [
+      `Target${delimiter}\\settings`,
+      `Target${delimiter}C:\\settings`,
+      `Target${delimiter}\\\\server\\share`,
+      `Target${delimiter}%5Csettings`,
+      `Target${delimiter}C:%5Csettings`,
+      `Target${delimiter}%5C%5Cserver%5Cshare`
+    ])
   ])("recognizes every canonical filesystem and route path form: %s",(input) => {
     expect(supportTextHasUnsafePath(input)).toBe(true);
   });
@@ -42,7 +50,11 @@ describe("CP1 bounded canonical Support text views", () => {
   it.each([
     "Progress is 50% complete.",
     "Choose Settings from the account page.",
-    "The ratio is 3/4 when four observations are available."
+    "The ratio is 3/4 when four observations are available.",
+    "Progress=84% complete.",
+    "Ratio=3/4 with four observations.",
+    "Time=14:30 local.",
+    "Version=1.2.3 is available."
   ])("does not classify ordinary prose as a path: %s",(input) => {
     expect(supportTextHasUnsafePath(input)).toBe(false);
   });

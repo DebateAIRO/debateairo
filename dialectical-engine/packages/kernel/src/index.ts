@@ -294,9 +294,6 @@ export class TypedDomainError extends Error {
 
 const SUPPORT_SECRET_LIKE_PATTERN =
   /(?:\b(?:sk|key)-[A-Za-z0-9_-]+\b|\b(?:code|cod(?:ul)?)\s+\d{6}\b|\b\d{6}\b|\b[A-Za-z0-9_-]+[.][A-Za-z0-9_-]+[.][A-Za-z0-9_-]+\b|\b[A-Za-z0-9_-]{32,}\b)/giu;
-const SUPPORT_LABELLED_SECRET_PATTERN =
-  /(\b(?:(?:my\s+)?password\s*(?:is|:|=)|parola\s+mea\s*(?:este|e|:|=))\s*)([^\s,;]+)/giu;
-
 /** Browser-safe and server-safe canonical support-message redaction. */
 export function redactSupportText(text: string): Readonly<{ text: string;redacted: boolean }> {
   const spans = analyzeSupportCredentialText(text).credentialValueSpans;
@@ -307,10 +304,6 @@ export function redactSupportText(text: string): Readonly<{ text: string;redacte
     cursor = end;
   }
   labelled += text.slice(cursor);
-  labelled = labelled.replace(
-    SUPPORT_LABELLED_SECRET_PATTERN,
-    (_match,prefix: string) => `${prefix}[REDACTED_SECRET_LIKE]`
-  );
   const redactedText = labelled.replace(SUPPORT_SECRET_LIKE_PATTERN,"[REDACTED_SECRET_LIKE]");
   return Object.freeze({ text: redactedText,redacted: redactedText !== text });
 }

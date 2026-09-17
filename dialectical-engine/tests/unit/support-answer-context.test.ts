@@ -304,6 +304,50 @@ describe("CP1 composed answer context", () => {
     });
   });
 
+  it.each([
+    "Support does not request passwords, plus it could receive them.",
+    "Support does not request passwords, in addition it accepts them.",
+    "Asistența nu cere parole, plus le poate primi.",
+    "Asistența nu cere parole, în plus le poate primi.",
+    "Network=%5C%5Cserver%5Cshare to continue."
+  ])("keeps a rejected transformed completion out of assistant storage and return: %s", async (
+    hostile
+  ) => {
+    const top = entry("selected-a","alpha crosscap selected marker");
+    const snapshot = corpus([top],"4".repeat(64));
+    const stored: string[] = [];
+    const localMessages = Object.freeze({
+      write: vi.fn(async (input) => {
+        stored.push(input.text);
+        return Object.freeze({ ...input,redacted: false });
+      }),
+      writeAndTransit: vi.fn(async (input,transit) => {
+        await transit(input.text);
+        stored.push(input.text);
+        return Object.freeze({ ...input,redacted: false });
+      }),read: vi.fn(async () => null),listSession: vi.fn(async () => [])
+    }) as unknown as SupportMessageCipherPort;
+    const complete = vi.fn(async () => Object.freeze({ text: JSON.stringify({
+      kind: "answer",text: hostile,sourceIds: [SOURCE_REFERENCE],actionIds: []
+    }) }));
+    const service = createSupportAnswerService({
+      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),
+      messages: localMessages,modelReferenceFactory,
+      modelFor: () => Object.freeze({ complete }) as never,
+      clock: (() => { let at = Date.parse("2026-09-17T10:00:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond(request(snapshot));
+
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      outcome: "ANSWER_GROUNDED",text: top.fallback,sources: [{ id: top.id }]
+    });
+    expect(result.text).not.toContain(hostile);
+    expect(stored).not.toContain(hostile);
+    expect(stored).toContain(top.fallback!);
+  });
+
   it("assigns distinct opaque identities to separate rejected model attempts", async () => {
     const snapshot = corpus([entry("selected-a","alpha crosscap selected-a-end")],"f".repeat(64));
     const reports: Array<Readonly<{ attemptId: string }>> = [];
