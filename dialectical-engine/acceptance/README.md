@@ -45,6 +45,38 @@ DR-137. Seed freshness stays loud: a standing `.pgdata` seeded before FAIR-02
 stops with `ACCEPTANCE_REGISTER_CONFLICT:configuredProviderSet` — reset the
 standing data directory rather than mutating sealed rows.
 
+**Which CLI a maker relay runs (D10).** Nothing in this directory names a path
+to a binary; where a maker's CLI lives is a fact about THIS host and is deduced
+here, never written down. For each maker the relay asks, in this order:
+
+1. the maker's own environment key — `ACCEPTANCE_CLAUDE_BINARY`,
+   `ACCEPTANCE_CODEX_BINARY`, `ACCEPTANCE_GROK_BINARY`,
+   `ACCEPTANCE_HERMES_BINARY` — which may hold a full path or a bare name to
+   look up. A key that is present but blank stops the relay with the maker's
+   bare code (`CLAUDE_CLI_BINARY_UNRESOLVED` and its three siblings): an
+   operator who set the key meant to decide, and the harness never guesses on
+   their behalf.
+2. with no key set, the maker's NAME — `claude`, `codex`, `grok`, `hermes` — is
+   looked up across the directories of `PATH` in order, first match wins, the
+   rule `command -v` follows. A match that turns out to be broken is REPORTED,
+   not skipped over in favour of the next directory.
+
+Whatever that produces must then pass one check before anything is started:
+with symlinks followed it has to be a regular file, non-empty, executable by
+this user, and a program by its first bytes — a `#!` line naming an interpreter,
+or a Mach-O / universal-binary magic number. A candidate that fails refuses
+loudly as `<MAKER>_CLI_BINARY_UNRESOLVED:<REASON>:<path>`, where REASON is one of
+`NOT_ON_PATH`, `NOT_FOUND`, `EMPTY`, `NOT_EXECUTABLE` or `NOT_A_PROGRAM`, and
+the ceremony prints that whole string as `MAKER ABSENT <maker> <code>`.
+
+The relays start the resolved program DIRECTLY and never through a command
+interpreter, and a refused candidate is never started at all. Both halves of
+that rule were bought on 2026-09-17: one maker's launcher was a 0-byte file left
+behind by an interrupted update, and another's had been overwritten with four
+lines of plain text — and that second file, handed to an interpreter which could
+not execute it and so re-read it as a script, re-entered itself until the host's
+process table was full.
+
 Ceremony boot handshakes all three providers independently. Healthy relays form
 the discovered panel; no caller supplies a maker count and no panel-size
 ceiling refuses a lawful nonempty debate. Grok's fixed relay port is
