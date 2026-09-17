@@ -1,0 +1,27 @@
+Merge branch 'lane/demo-path' into mission/2026-09-01-algorithm-live-loop
+
+F-T17T9-1 + F-SEALEDROWS-B: the three acceptance suites reach the served answer.
+
+A shared evaluator double (acceptance/test-fixtures/evaluator-double.ts) whose
+discriminator IS the shipped EVALUATOR_CONTRACT_TEXT and whose satisfied verdict
+passes the runner's own evaluatorVerdictSchema.parse, so the next protocol move
+fails by name. mono-panel seals both synthesis roles to the one provider it
+configures via the existing ACCEPTANCE_*_ROLE_REF overrides before seeding
+(restored in afterAll; precedent in t16-algorithm-register.test.ts); its retired
+three-response tail is one evaluator verdict. panel-multi-maker's conforms/pass
+branches are one EVALUATOR branch. ceremony's evaluator entry moved to the
+provider that actually receives it, and its unrecognised-request fallback now
+refuses across classes — the repair of a hole this round found in its own work:
+mutant M3 (a drifted discriminator) survived on ceremony because the FIFO
+fallback served the evaluator entry anyway; after the fix it dies.
+
+mono-panel 1/1, panel-multi-maker 2/2, ceremony 2/2, three runs each; no
+assertion weakened; every mutant through tools/mutate.sh. Four files, all under
+acceptance/, no product file. F-DEMOPATH-A/B/C filed (mono-panel's double still
+answers by position; the shared fixture has no test of its own; two doubles
+surface an unanswered call as a bare ANSWER_PERSIST_FAILED).
+
+With this merge the acceptance path has no known test-only wall left. Reviewed
+by codex on gpt-6-astra (D65).
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>

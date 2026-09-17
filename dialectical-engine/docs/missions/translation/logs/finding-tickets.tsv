@@ -1,0 +1,19 @@
+tr-B1	t_ad4018f5	B1 — I11 writes 16 files owned by I03–I10 while scheduled concurrently with them (SINGLE WRITER violated by construction)
+tr-B2	t_bb118c65	B2 — Mission requirements R10 and R12 are traced by no slice; coverage is 54/56, reported as 56/56
+tr-B3	t_5069ab45	B3 — Two frozen SPECs both claim components/NodeDetailDrawer.tsx:637 (I07-R12 vs I11-R03)
+tr-B4	t_e7eb235f	B4 — 15 machine-code invariant strings counted as copy; R23 makes translating them mandatory; 8 test assertions depend on them
+tr-N1	t_01760733	N1 — census.md:157-159 lists 11 of the 18 zero-string files and one is not a scanned file; 8 files have no owner
+tr-N2	t_8a1af688	N2 — census.json counts two CSSProperties transformOrigin values as copy (LandingSample.tsx:51 x2)
+tr-N3	t_71d38fa0	N3 — two of the '16 formatting sites' are an import line and a function signature (census.md:198,212)
+tr-N4	t_f33a3cbe	N4 — nine test files carry English owned by 2+ slices of the same parallel wave
+tr-N5	t_210f7226	N5 — apps/ui/lib/scoringResponse.test.mjs asserts copy-module return values, covered by no requirement and no oracle
+tr-N6	t_339cd9de	N6 — R41 (no number/date/plural assembled by concatenation) has no closing set and no owner; LandingSample.tsx:70 violates it
+tr-N7	t_5f0282a8	N7 — key-identity policy unstated: 1371 sites but 1113 distinct texts; 16 seats will each decide alone
+tr-N8	t_a3bf0ab8	N8 — LANG-TEMPLATE/SPEC.md is unreadable under English self-substitution (R01 names a non-existent en column; R05 tautology; R11/R14 contradict R03)
+tr-N9	t_3052d748	N9 — slices/I01/SPEC.md:84-98 calls its owned-files table exhaustive and omits globals.css and t9-mode-tokens.test.ts that I01-R18 may require
+tr-N10	t_35172c70	N10 — self-report REQ-01.md §2.2/§6.3 state TOOLING-TRAPS as 905 lines; it was 862
+tr-N11	t_e9b20492	N11 — glossary.md:49 defines replay with the banned word 'handle' as a noun
+tr-N12	t_4393b4d2	N12 — R13 is silent on HttpOnly while R09+R17 force a non-HttpOnly cookie
+tr-P8	t_942277ff	P8 (packet defect, orchestrator's) — 00-intake-H0.md:18 cited TopBar.tsx:57; the statement is at :58
+tr-P9	t_4fd1fb08	P9 (packet defect, orchestrator's) — the census classifier has no repo path in any allowed list, while O2.2 requires the scanner and census to share ONE definition file
+tr-P10	t_cd3bc0a7	P10 (packet defect, orchestrator's) — the REQ-01 output skeleton jumps Q4 to Q6 to Q8 with no line saying Q5/Q7/Q9 are separate files

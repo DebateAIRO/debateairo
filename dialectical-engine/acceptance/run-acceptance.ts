@@ -2,7 +2,13 @@ import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { AskAcceptedSchema, AskRequestSchema, AnswerSchema, type AskRequest } from "@debateai/contract";
 import { ProviderProbeRepository } from "@debateai/db";
+import { announceAbsentMakers } from "./absent-makers.js";
 import { startClaudeRelay, type ClaudeRelayHandle } from "./claude-relay.js";
+import {
+  readDefinitionOfDoneFacts,
+  renderDefinitionOfDoneLines,
+  type DefinitionOfDoneFacts
+} from "./dod-facts.js";
 import { startGrokRelay, type GrokRelayHandle } from "./grok-relay.js";
 import { assertFairDebate, type FairDebateReport } from "./fair-debate.js";
 import {
@@ -103,6 +109,25 @@ export interface LiveAcceptanceCeremony {
   readonly modelCallCount: number;
   readonly discoveredPanelSize: number;
   readonly structuralCeilingMaxModelAttempts: number;
+  /**
+   * T17: the ENVELOPE_STATE standing at the terminal, read from the same run's
+   * progress stream. The Global DoD requires WITHIN; EXHAUSTED is the only
+   * other value the runner can leave behind, and the live proofs refuse it.
+   */
+  readonly terminalEnvelopeState: "WITHIN" | "EXHAUSTED";
+  /**
+   * The Global definition of done's remaining sub-clauses, read off this same
+   * settled run: the panel-reduced taus and their voice counts, the measured
+   * attack edges, each root's final strength against its tau, the strongest
+   * surviving objection, the evaluator loop record against its sealed bound,
+   * the code-derived label, and the band with its basis. Sub-clauses 4 and 9
+   * are `structuralCeilingMaxModelAttempts` and `terminalEnvelopeState` above.
+   *
+   * A DoD OUTCOME (no root differs, an objection standing, a single-voice
+   * panel, an UNKNOWN magnitude, no surviving objection) rides this block and
+   * the printed report; only a SHAPE violation refuses the ceremony.
+   */
+  readonly definitionOfDone: DefinitionOfDoneFacts;
   /** Append-only probe evidence rows for this isolated ceremony (boot/admission/claim). */
   readonly providerProbeEvidenceCount: number;
   readonly nodeMakerLineage: readonly {
@@ -179,19 +204,25 @@ export async function runAcceptanceCeremony(
     claudeRelay = relayStarts[1]?.status === "fulfilled" ? relayStarts[1].value : null;
     grokRelay = relayStarts[2]?.status === "fulfilled" ? relayStarts[2].value : null;
     const probes = new ProviderProbeRepository(database.pool);
-    for (const [index, result] of relayStarts.entries()) {
-      if (result.status === "fulfilled") continue;
-      const configured = policy.providers[index];
-      if (configured === undefined) continue;
+    // F-GROK-SANDBOX-PROFILE outcome (1). The announcement and the ABSENT
+    // provider probe come from ONE call, so the ceremony cannot keep the
+    // database record while losing the line its own log is read from. The
+    // provider refs are named here rather than indexed out of `policy.providers`
+    // — only this call site knows which relay sits at which position, and the
+    // refs below are the same ones `makerRelays` is built from.
+    const namedStarts = (["acceptance:codex-cli", "acceptance:claude-cli", "acceptance:grok-cli"] as const)
+      .flatMap((providerRef, index) => {
+        const start = relayStarts[index];
+        return start === undefined ? [] : [{ providerRef, start }];
+      });
+    for (const absent of announceAbsentMakers(namedStarts, policy.providers)) {
       await probes.record({
         probeEvidenceRef: randomUUID(),
-        providerRef: configured.providerRef,
-        maker: configured.maker,
+        providerRef: absent.providerRef,
+        maker: absent.maker,
         state: "ABSENT",
         modelId: null,
-        failureCode: result.reason instanceof Error && result.reason.message.trim() !== ""
-          ? result.reason.message
-          : "PROVIDER_RELAY_START_FAILED",
+        failureCode: absent.failureCode,
         probedAt: new Date()
       });
     }
@@ -262,7 +293,7 @@ export async function runAcceptanceCeremony(
     // more than one node, more than one persisted maker, a real attack edge,
     // and a proven independence receipt, all read from the recorded run.
     const fairDebate = await assertFairDebate(database.pool, accepted.run_ref);
-    const [modelCalls, lineage, reviewLineage, runFacts, probeEvidence] = await Promise.all([
+    const [modelCalls, lineage, reviewLineage, runFacts, probeEvidence, envelopeState] = await Promise.all([
       database.pool.query<{ count: string }>(
         `SELECT count(*)::text AS count FROM ledger.ledger_entry
          WHERE run_id=$1 AND action_kind='MODEL_CALL'`,
@@ -312,12 +343,30 @@ export async function runAcceptanceCeremony(
       ),
       database.pool.query<{ count: string }>(
         "SELECT count(*)::text AS count FROM core.provider_probe"
+      ),
+      /**
+       * T17 (goal 285-295 DoD, Global DoD "envelope WITHIN at terminal"): the
+       * envelope state as it stands at the TERMINAL, read from the same run's
+       * progress stream that `readCurrentState` reads. `DISTINCT ON (kind)
+       * ... ORDER BY at_seq DESC` is the last value written, so this is the
+       * terminal value and not the WITHIN the run head was seeded with.
+       */
+      database.pool.query<{ envelope_state: string }>(
+        `SELECT DISTINCT ON (kind) value_json #>> '{}' AS envelope_state
+         FROM core.run_progress_event
+         WHERE run_id=$1 AND kind='ENVELOPE_STATE'
+         ORDER BY kind, at_seq DESC`,
+        [accepted.run_ref]
       )
     ]);
     const modelCallCount = Number(modelCalls.rows[0]?.count ?? 0);
     const discoveredPanelSize = Number(runFacts.rows[0]?.panel_size);
     const structuralCeilingMaxModelAttempts = Number(runFacts.rows[0]?.structural_ceiling);
     const providerProbeEvidenceCount = Number(probeEvidence.rows[0]?.count ?? 0);
+    const terminalEnvelopeState = envelopeState.rows[0]?.envelope_state;
+    if (terminalEnvelopeState !== "WITHIN" && terminalEnvelopeState !== "EXHAUSTED") {
+      throw new Error(`ACCEPTANCE_TERMINAL_ENVELOPE_STATE_INVALID:${String(terminalEnvelopeState)}`);
+    }
     if (!Number.isInteger(discoveredPanelSize) || discoveredPanelSize < 1
       || !Number.isInteger(structuralCeilingMaxModelAttempts) || structuralCeilingMaxModelAttempts < 1) {
       throw new Error("ACCEPTANCE_RUN_DISCOVERY_FACTS_INVALID");
@@ -352,9 +401,37 @@ export async function runAcceptanceCeremony(
       `DISC-01 panel/ceiling/probe evidence: ${discoveredPanelSize} / ` +
       `${structuralCeilingMaxModelAttempts} / ${providerProbeEvidenceCount}`
     );
+    console.info(
+      `T17 envelope at terminal: ${terminalEnvelopeState} · ` +
+      `${modelCallCount}/${structuralCeilingMaxModelAttempts} model attempts (panel included)`
+    );
     console.info(`PRO-01 per-node maker lineage: ${JSON.stringify(nodeMakerLineage)}`);
     console.info(`XREV-01 per-node review lineage: ${JSON.stringify(nodeReviewLineage)}`);
     console.info(`ACC-01 UI: ${uiUrl}`);
+    /**
+     * The definition-of-done facts, from the run's own relations plus the answer
+     * just read through the API. The loop bound is the register row this
+     * deployment already resolved — never a literal restated here.
+     *
+     * READ LAST, AND DELIBERATELY SO. This is the only work the ceremony does
+     * after its report could have been printed: three more queries, plus four
+     * typed refusals of its own. A throw here reaches the `catch` below, which
+     * closes the stack and rethrows — so if this ran first, one transient `pg`
+     * error on a closing run that had already settled WITHIN would leave
+     * `logs/closing-run/ceremony-*.log` with not one line in it, and the W12
+     * judge with less evidence than before this block existed. Every
+     * established line is above; the new ones follow. O3's refusals are
+     * unchanged — they now cost their own lines and nothing else.
+     */
+    const definitionOfDone = await readDefinitionOfDoneFacts(database.pool, {
+      runId: accepted.run_ref,
+      answer,
+      sealedEvaluatorLoopMaxRounds: policy.synthesisRolePolicy.evaluatorLoopMaxRounds
+    });
+    // The remaining Global-DoD sub-clauses, one line each, on the same stream
+    // `.hermes/reports/2026-09-01-algorithm-live-loop/tools/closing-run.sh`
+    // captures verbatim.
+    for (const line of renderDefinitionOfDoneLines(definitionOfDone)) console.info(line);
     const liveDatabase = database;
     const liveShim = shim;
     const liveClaudeRelay = claudeRelay;
@@ -368,6 +445,8 @@ export async function runAcceptanceCeremony(
       modelCallCount,
       discoveredPanelSize,
       structuralCeilingMaxModelAttempts,
+      terminalEnvelopeState,
+      definitionOfDone,
       providerProbeEvidenceCount,
       nodeMakerLineage,
       nodeReviewLineage,

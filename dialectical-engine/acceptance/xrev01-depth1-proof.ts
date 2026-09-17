@@ -29,10 +29,26 @@ try {
       `XREV01_STRUCTURAL_CEILING_EXCEEDED:${ceremony.modelCallCount}/${ceremony.structuralCeilingMaxModelAttempts}`
     );
   }
+  /**
+   * T17 (goal 285-295 DoD; Global DoD "envelope WITHIN at terminal"). Both
+   * halves are read from the SAME run's ledger as the count above: the
+   * observed MODEL_CALL attempts (panel calls included — they are ledgered in
+   * the `PANEL:` call-site namespace like every other provider call) and the
+   * terminal ENVELOPE_STATE. A run that stayed under a DR-184-v3 ceiling and
+   * still ended EXHAUSTED would mean the ceiling and the consumption meter
+   * disagree, which is the defect this assertion exists to catch.
+   */
+  if (ceremony.terminalEnvelopeState !== "WITHIN") {
+    throw new Error(
+      `XREV01_ENVELOPE_NOT_WITHIN_AT_TERMINAL:${ceremony.terminalEnvelopeState}:` +
+      `${ceremony.modelCallCount}/${ceremony.structuralCeilingMaxModelAttempts}`
+    );
+  }
   console.info(
     `XREV-01 DEPTH-1 PROOF: ${ceremony.runId} ${ceremony.answerId} ` +
     `${authored.length}/${reviews.length} authored/reviewed nodes ` +
     `${ceremony.modelCallCount}/${ceremony.structuralCeilingMaxModelAttempts} model calls ` +
+    `envelope ${ceremony.terminalEnvelopeState} at terminal ` +
     `${ceremony.providerProbeEvidenceCount} probe evidence rows`
   );
   console.info(`XREV-01 REVIEW LINEAGE: ${JSON.stringify(reviews)}`);

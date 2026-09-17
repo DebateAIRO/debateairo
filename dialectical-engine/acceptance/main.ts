@@ -30,21 +30,25 @@ import {
   type ReadableUserDekStore
 } from "@debateai/crypto";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
-import { resolveEffectiveRiskTier } from "@debateai/register";
+import {
+  resolveEffectiveRiskTier
+} from "@debateai/register";
 import {
   RUNNER_MAX_RECOMPOSE,
   createPostgresProviderGateway,
   WalkingSkeletonRunner,
   type RunnerExecutionResult
 } from "@debateai/runner";
-import { startClaudeRelay } from "./claude-relay.js";
+import { announceAbsentMakers, type AbsentMaker } from "./absent-makers.js";
+import { startClaudeRelay, type ClaudeRelayHandle } from "./claude-relay.js";
 import {
   probeRelay,
   resolveFreshDiscovery,
   toDiscoveredPanel,
   type DiscoveredProvider
 } from "./discovery.js";
-import { startGrokRelay } from "./grok-relay.js";
+import { startGrokRelay, type GrokRelayHandle } from "./grok-relay.js";
+import type { CommandSpec } from "./relay-core.js";
 import { ACCEPTANCE_REGISTER_SOURCE_REF, ACCEPTANCE_REGISTER_VERSION } from "./seed-register.js";
 import {
   computeAcceptanceStructuralCeiling,
@@ -503,6 +507,19 @@ export async function createAcceptanceRuntime(input: {
       judgeWeightVersion: "acceptance:single-judge:v1",
       reducerVersion: "acceptance:DR-133:v1"
     },
+    // S2-2 / T3, S3-2/S5-1 / T7, S6-1 / T11, S6-2 / T9 (board F33 class): every
+    // sealed T16 family the run reads is LOADED by `readAcceptanceRuntimePolicy`
+    // — which checks all five against this deployment's own provenance — and
+    // PASSED here whole. Nothing is read a second time and no value is restated
+    // at this call site, exactly as the shipped dev entry point does it.
+    //
+    // Without the last of these lines the claim-time gate refuses every work
+    // item and no statement is ever synthesized, which is what every acceptance
+    // path that reached synthesis did before this lane.
+    panelPolicy: policy.panelPolicy,
+    stoppingPolicy: policy.stoppingPolicy,
+    verdictLabelPolicy: policy.verdictLabelPolicy,
+    synthesisRolePolicy: policy.synthesisRolePolicy,
     // FAIR-01 (DR-140(b)): the first non-primary maker retains the critique
     // leg for M=2 compatibility. Every further configured maker is carried by
     // additionalMakers; each artifact persists its maker/provider lineage.
@@ -669,6 +686,68 @@ export async function createAcceptanceRuntime(input: {
   }
 }
 
+export interface BootRelayOptions {
+  readonly grokRelayPort: number;
+  readonly timeoutMs: number;
+  /** Test-only process seams, under the relays' own DR-115 law. */
+  readonly testOnlyClaudeCommand?: CommandSpec;
+  readonly testOnlyGrokCommand?: CommandSpec;
+  /** Defaults to the process's stdout; injected only so a test can read the lines. */
+  readonly emit?: (line: string) => void;
+}
+
+export interface BootRelays {
+  readonly claudeRelay: ClaudeRelayHandle | null;
+  readonly grokRelay: GrokRelayHandle | null;
+  readonly absent: readonly AbsentMaker[];
+}
+
+/**
+ * F-GROK-SANDBOX-PROFILE fix round 1 / F1. The standalone boot is the SECOND
+ * entry path that starts the relays, and it used to map a rejected start to
+ * `null` with no probe and no line — the maker simply vanished from
+ * `makerRelays` and the API served without it. It now announces through the
+ * same one announcer the ceremony uses, before anything is served.
+ *
+ * The refs are named here, never indexed out of the provider list: this path
+ * starts TWO relays against a THREE-row configured provider set, so a
+ * positional lookup would name `providers[0]` — OpenAI — for a failed claude.
+ */
+export async function startBootRelays(
+  configuredProviders: readonly { readonly providerRef: string; readonly maker: string }[],
+  options: BootRelayOptions
+): Promise<BootRelays> {
+  const relayStarts = await Promise.allSettled([
+    startClaudeRelay({
+      port: 0,
+      timeoutMs: options.timeoutMs,
+      ...(options.testOnlyClaudeCommand === undefined
+        ? {}
+        : { testOnlyCommand: options.testOnlyClaudeCommand })
+    }),
+    startGrokRelay({
+      port: options.grokRelayPort,
+      timeoutMs: options.timeoutMs,
+      ...(options.testOnlyGrokCommand === undefined
+        ? {}
+        : { testOnlyCommand: options.testOnlyGrokCommand })
+    })
+  ]);
+  const namedStarts = (["acceptance:claude-cli", "acceptance:grok-cli"] as const)
+    .flatMap((providerRef, index) => {
+      const start = relayStarts[index];
+      return start === undefined ? [] : [{ providerRef, start }];
+    });
+  const absent = options.emit === undefined
+    ? announceAbsentMakers(namedStarts, configuredProviders)
+    : announceAbsentMakers(namedStarts, configuredProviders, options.emit);
+  return Object.freeze({
+    claudeRelay: relayStarts[0]?.status === "fulfilled" ? relayStarts[0].value : null,
+    grokRelay: relayStarts[1]?.status === "fulfilled" ? relayStarts[1].value : null,
+    absent
+  });
+}
+
 async function main(): Promise<void> {
   const environment = loadAcceptanceEnvironment();
   const pool = createPool(environment.DATABASE_URL);
@@ -677,12 +756,10 @@ async function main(): Promise<void> {
   // model id before the API accepts any ask (DR-143(3)).
   const policy = await readAcceptanceRuntimePolicy(pool);
   const grokRelayPort = z.coerce.number().int().positive().max(65_535).parse(process.env.GROK_RELAY_PORT);
-  const relayStarts = await Promise.allSettled([
-    startClaudeRelay({ port: 0, timeoutMs: policy.bounds.JUDGE.deadlineMs }),
-    startGrokRelay({ port: grokRelayPort, timeoutMs: policy.bounds.JUDGE.deadlineMs })
-  ]);
-  const claudeRelay = relayStarts[0]?.status === "fulfilled" ? relayStarts[0].value : null;
-  const grokRelay = relayStarts[1]?.status === "fulfilled" ? relayStarts[1].value : null;
+  const { claudeRelay, grokRelay } = await startBootRelays(policy.providers, {
+    grokRelayPort,
+    timeoutMs: policy.bounds.JUDGE.deadlineMs
+  });
   const runtime = await createAcceptanceRuntime({
     pool,
     environment,

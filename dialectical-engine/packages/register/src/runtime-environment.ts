@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  parseRegisterVersionText,
+  registerVersionToSafeLegacyNumber
+} from "./register-publication.js";
 
 function parseEnvironmentSource<T extends z.ZodRawShape>(
   shape: T,
@@ -50,7 +54,14 @@ export function loadDevelopmentCommandEnvironment(): Readonly<Record<string, str
     PNPM_EXECUTABLE: z.string().min(1).optional(),
     DEBATEAI_DEV_DOCKER_BIN: z.string().min(1).optional(),
     DEBATEAI_DEV_PROVIDER_TARGETS_JSON: z.string().min(1).optional(),
-    DEBATEAI_DEV_CUSTODY_ROOT: z.string().min(1).optional()
+    DEBATEAI_DEV_CUSTODY_ROOT: z.string().min(1).optional(),
+    // T16 · operator overrides for the sealed synthesizer/evaluator role
+    // identities. Goal 84-85 permits identical refs; without an override the
+    // permitted case is unreachable and its startup warning is dead code.
+    DEBATEAI_DEV_SYNTHESIZER_ROLE_REF: z.string().min(1).optional(),
+    DEBATEAI_DEV_EVALUATOR_ROLE_REF: z.string().min(1).optional(),
+    DEBATEAI_DEV_SUPPORT_MODEL_TARGET_JSON: z.string().min(1).optional(),
+    NODE_ENV: z.enum(["development", "test", "production"]).optional()
   });
   return Object.freeze(Object.fromEntries(
     Object.entries(environment).filter((entry): entry is [string, string] => (
@@ -86,6 +97,9 @@ export function loadSettlementEnvironment() {
 const positiveInteger = z.coerce.number().int().positive();
 const nonNegativeInteger = z.coerce.number().int().nonnegative();
 const boundedRate = z.coerce.number().min(0).max(1);
+const legacyRegisterVersion = z.string().regex(/^[1-9][0-9]*$/u).transform((value) => (
+  registerVersionToSafeLegacyNumber(parseRegisterVersionText(value))
+));
 export const ACCOUNT_ERASURE_GRACE_MS = 604_800_000 as const;
 const hatchetShape = {
   HATCHET_CLIENT_TOKEN: z.string().min(1), HATCHET_HOST_PORT: z.string().min(1),
@@ -95,6 +109,7 @@ const hatchetShape = {
 
 const apiEnvironmentShape = {
     KEK_PATH: kekPath,
+    SUPPORT_KEK_PATH: kekPath,
     BLIND_INDEX_KEY_PATH: z.string().min(1),
     AUDIT_KEY_STORE_PATH: z.string().min(1),
     AUDIT_SOURCE_IP_SALT_PATH: z.string().min(1),
@@ -113,10 +128,13 @@ const apiEnvironmentShape = {
     MAIL_SENDMAIL_PATH: z.string().min(1),
     MAIL_FROM: z.string().regex(/^noreply@[A-Za-z0-9.-]+$/),
     PUBLIC_APP_URL: z.string().url().refine((value) => value.startsWith("https://")),
-    DATABASE_URL: z.string().url(), API_HOST: z.string().min(1), API_PORT: positiveInteger,
-    STRANGER_SAMPLE_RATE: boundedRate, REGISTER_VERSION: positiveInteger,
+    DATABASE_URL: z.string().url(),
+    SUPPORT_DATABASE_URL: z.string().url(),
+    API_HOST: z.string().min(1), API_PORT: positiveInteger,
+    STRANGER_SAMPLE_RATE: boundedRate, REGISTER_VERSION: legacyRegisterVersion,
     BATTERY_VERSION: z.string().min(1), SETTLEMENT_WATCH_HANDLE: z.string().min(1),
     PROVIDER_DISCOVERY_TARGETS_JSON: z.string().min(1).optional(),
+    SUPPORT_MODEL_TARGET_JSON: z.string().min(1).optional(),
     PROVIDER_PROBE_TIMEOUT_MS: positiveInteger.default(5_000),
     NODE_ENV: z.enum(["development", "test", "production"]).optional(),
     EVALUATOR_DEV_MENU_ENABLED: z.enum(["true", "false"]).default("false"),
@@ -242,6 +260,23 @@ function validateApiEnvironment(
   if (environment.AUTHORIZATION_DATABASE_URL === environment.DATABASE_URL) {
     throw new TypeError("AUTHORIZATION_DATABASE_URL_MUST_BE_SEPARATE");
   }
+  const supportConflicts = [
+    environment.DATABASE_URL,
+    environment.AUTHORIZATION_DATABASE_URL,
+    environment.CONTENT_PROVISION_DATABASE_URL,
+    environment.PUBLICATION_CLEANUP_DATABASE_URL,
+    environment.ERASURE_DATABASE_URL,
+    environment.EVALUATOR_DEV_MENU_DATABASE_URL
+  ];
+  if (supportConflicts.includes(environment.SUPPORT_DATABASE_URL)) {
+    throw new TypeError("SUPPORT_DATABASE_URL_MUST_BE_SEPARATE");
+  }
+  if (environment.SUPPORT_KEK_PATH === environment.KEK_PATH
+    || environment.SUPPORT_KEK_PATH === environment.CORPUS_KEK_PATH
+    || environment.SUPPORT_KEK_PATH === environment.BLIND_INDEX_KEY_PATH
+    || environment.SUPPORT_KEK_PATH === environment.AUDIT_SOURCE_IP_SALT_PATH) {
+    throw new TypeError("SUPPORT_KEK_PATH_MUST_BE_SEPARATE");
+  }
   if (environment.PUBLICATION_ENABLED === "true"
     && (environment.CORPUS_KEK_PATH === environment.KEK_PATH
       || environment.PUBLICATION_KEY_STORE_PATH === environment.USER_DEK_STORE_PATH)) {
@@ -268,7 +303,7 @@ export function loadRunnerEnvironment() {
 export function parseRunnerEnvironment(source: EnvironmentSource) {
   const environment = parseEnvironmentSource({
     KEK_PATH: kekPath, DATABASE_URL: z.string().url(), RUNNER_WORKER_ID: z.string().min(1),
-    REGISTER_VERSION: positiveInteger, NODE_ENV: nodeEnvironment,
+    REGISTER_VERSION: legacyRegisterVersion, NODE_ENV: nodeEnvironment,
     CONTENT_ENCRYPTION_ENABLED: z.enum(["true", "false"]).default("false"),
     CONTENT_BLIND_INDEX_KEY_PATH: z.string().min(1).optional(),
     USER_DEK_STORE_PATH: z.string().min(1).optional(),
@@ -286,6 +321,10 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
     VLLM_BASE_URL: z.string().url(), VLLM_MODEL: z.string().min(1), VLLM_MAKER: z.string().min(1),
     VLLM_AUTHORIZATION: z.string().min(1).optional(),
     PROVIDER_DISCOVERY_TARGETS_JSON: z.string().min(1).optional(),
+    // T3C / F34: the runner re-probes each pinned panel member at claim time
+    // (DR-182 VROW-5), so it needs the same probe timeout the API already reads.
+    // Same key, same shape, same default — one knob, two entry points.
+    PROVIDER_PROBE_TIMEOUT_MS: positiveInteger.default(5_000),
     ...hatchetShape
   }, source);
   if (environment.CONTENT_BLIND_INDEX_KEY_PATH !== undefined) {
@@ -297,4 +336,17 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
   }
   assertProductionFloors(environment);
   return environment;
+}
+
+export function loadObservationAgentEnvironment() {
+  const observationEnvironment = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => key.startsWith("OBSERVATION_"))
+  );
+  const absolutePath = z.string().min(1).regex(/^\//u);
+  return Object.freeze(z.object({
+    OBSERVATION_DATABASE_URL: z.string().url(),
+    OBSERVATION_STATE_DIR: absolutePath,
+    OBSERVATION_TARGETS_PATH: absolutePath,
+    OBSERVATION_HATCHET_TOKEN_PATH: z.string().min(1).optional()
+  }).strict().parse(observationEnvironment));
 }

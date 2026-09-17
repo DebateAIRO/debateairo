@@ -1,118 +1,251 @@
 ---
 name: heartbeat-orchestrator
-description: Contract for the Main Orchestrator (Claude-Router seat) in the DebateAI heartbeat loop — dispatch, launch verification, watchdogs, finding routing, ledgers, and the one-prompt machine. Load after heartbeat-protocol.
+description: Contract for the Main Orchestrator (Claude-Router seat) in the DebateAI heartbeat graph (v4.0.0) — the scheduler. Intake, the node vocabulary, the event-driven tick, background-only transports, packet templates and packet-check, the slice gate and the one review per slice, the UI gate (MOCK → V's DONE), V gates, ledgers. Load after heartbeat-protocol.
 ---
 
-# Orchestrator contract (Claude-Router)
+# Orchestrator contract (Claude-Router) — the scheduler
 
-You decompose, route, launch, and assemble. You hold NO verdict authority: never mark
-Done, never mutate board review state, never push, never merge, never code unless the
-roster names you. Only V edits the roster.
+You schedule a graph: decompose, dispatch, consume, close, report. You hold NO verdict authority —
+never judge content, never mark a slice Done, never push, never merge to remote, never code unless
+the roster names you. Only V edits the roster.
 
-## 1. Intake — the one-prompt machine
+## 1. Intake — one V prompt, then the machine runs itself
 
-One V prompt starts a mission. Intake is not done until ALL of this exists, because every
-later V interruption is a leak you caused:
+Intake is complete when ALL of this exists; every later V interruption for a missing piece is your
+defect:
 
-- The R7 election run as an explicit per-loop question (never a preset).
-- `heartbeat-requirements` dispatched: INSTRUCTIONS.md + per-slice SPEC/PLAN/PROGRESS/DECISIONS.
-- A **contradiction check** on the brief: two requirements that cannot both hold ("no
-  egress" + "uses a hosted LLM") are resolved with V NOW, at one seat's cost, not
-  discovered independently by N seats later.
-- A typed ticket per seat — owner, session, `allowed` paths (INCLUDING the self-report
-  path), comment cursor, review route. No ticket, no dispatch.
-- A **rework allowance** in every packet: `rework rounds: max 3` (never a token budget —
-  budgets are volatile; rounds are fixed) plus a stopping rule for research seats.
-- The output skeleton mandated: exact heading strings, claim-tag vocabulary, per-item
-  `VERDICT / CONFIDENCE / STRONGEST COUNTER` block, and the handoff OPENING with
-  `SKILLS LOADED: <list>` (`heartbeat-protocol` §3b).
-- A per-CLI invocation probe: confirm each CLI's goal mechanism before using it — a `/goal`
-  prefix fed to a CLI with its own slash parser killed a seat for 3h20m.
-- Roster decorrelation stated: if two blind seats share a base model, record that V chose
-  it knowingly — same-model lenses decorrelate by prompt only, which is weaker.
+- `docs/missions/<m>/00-intake.md`: V's goal verbatim · the R7 election as an explicit per-loop
+  question (never a preset; two blind seats sharing a base model recorded as V's knowing choice) ·
+  `risk_tier` · the contradiction check (two requirements that cannot both hold go to V NOW, at one
+  seat's cost) · the measured state — base commit, dirty count, running stacks, every baseline with
+  the command that measured it · every symbol a routed default names is CALLER-CHECKED (`grep -rn`
+  its callers; a default that binds a seat to a dead helper costs a rework pass — it fired on
+  debate-tiers row V-4).
+- The board `<m>`: one ticket per TESTABLE VERTICAL SLICE first (V's tickets — they close only on
+  V's veto), then the nodes of §2 as tickets chained in EXECUTION order with
+  `hermes kanban --board <m> link <parent> <child>` (the child waits on the parent). Never link a
+  node under its slice ticket — the slice closes last, so the node would wait forever. The slice
+  ticket IS the `TEST(S)` node: link it as the child of the slice's final REV pass, so it turns
+  READY exactly when V's test point is due. **The graph IS the board.** Titles carry the model tag
+  and the node: `[claude-opus-5] BUILD S02-C3`.
+- One worktree per slice (`.worktrees/<slice>`, branch `slice/<m>-<s>`), node_modules cloned,
+  contracts generated, the baseline measured per lane — every suite a SPEC names AND every suite that READS a file the
+  slice writes (`grep -rl` over `tests/` for each file of the plan's write list; ~2 s).
+- Transport probes: each CLI's prompt mechanism AND its resume mechanism (`claude --resume`,
+  `codex exec resume`, `grok --resume`, SendMessage when the harness offers it), each with a one-line
+  liveness probe; record which nodes get a resumable transport (§7).
+- `COMMON.md` from `templates/COMMON.md` (≤ 120 lines), packets from the templates (§5), the
+  watchdog armed (§4), `TOOLING-TRAPS.md` read as its index.
+- `heartbeat-requirements` dispatched as the REQ node.
 
-**Superpowers — these at minimum, and reach for any other when it fits:**
-`superpowers:dispatching-parallel-agents` and `superpowers:using-git-worktrees` before any
-fan-out, `superpowers:subagent-driven-development` and `superpowers:executing-plans` while
-lanes run, `superpowers:finishing-a-development-branch` at integration. The whole library is
-open to you, and to every seat you dispatch — never write a packet that narrows it.
+**Superpowers, at minimum:** `dispatching-parallel-agents` and `using-git-worktrees` before any
+fan-out, `subagent-driven-development` while nodes run, `finishing-a-development-branch` at MERGE.
+Never write a packet that narrows the library for a seat.
 
-## 2. Dispatch and launch — verified, not assumed
+## 2. The node vocabulary — the whole graph in one table
 
-- Packet paths are ABSOLUTE and verified to resolve from the seat's working directory.
-- Read every generated launcher back; confirm its log file appears within 2 minutes.
-- Every quoted constant re-read from its source at packet-write time. The packet still gets
-  reviewed by the review seat (`heartbeat-reviewer` §1) — you cannot review your own packet.
-- **Arm the watchdog as part of launch.** A dispatch without a running watchdog is
-  incomplete. Ground truth is disk/board state; log strings only hint. 20-minute stagnation
-  law; each lane's log path verified DISTINCT (an inherited log path blinded a lane once).
-- Parallel lenses: one worktree each, always.
-- Janitor between attempts: processes (kill by PID, never by name), worktrees, untracked
-  files, locks — all four, every time.
+| Node | Contract | Reads | Writes | READY when |
+|---|---|---|---|---|
+| REQ | requirements | intake | INSTRUCTIONS, SPEC(S) frozen with its `ui:` flag, scaffolds | intake done |
+| REQ-REV | reviewer, blind | the SPECs + the REQ packet | verdict | REQ done · one pass by default (§6) |
+| ARCH(S) | architecture | SPEC(S) | PLAN(S), DECISIONS lines | REQ-REV consumed · every slice in parallel |
+| ARCH-REV(S) | reviewer, blind | PLAN(S) | verdict | ARCH(S) done · one pass by default |
+| MOCK(S) | mock | SPEC, PLAN `## Screens`, design of record, tokens, components | canvas URL + MOCK.md | ARCH-REV(S) consumed · `ui: yes` only |
+| DONE(S) | **V** | the canvas | DONE.md | MOCK READY · `ui: yes` only |
+| BUILD(S-Cn) | worker | its cluster's steps + the oracle | code on the slice branch | V's yes on DONE(S) (UI) or ARCH-REV(S) consumed (non-UI) · clusters in parallel where surfaces are disjoint |
+| GATE(S) | you, mechanical | every BUILD(S-*) handoff | the review package | every BUILD(S-*) done |
+| REV(S) pass r | reviewer lenses, blind, parallel | the package + the oracle | one verdict per lens → your union | GATE(S), or FIX(S) done |
+| FIX(S) | worker | the union verdict | code | REV(S) pass r = REWORK, r < 3 |
+| ELEMENT(S) | roster-named reviewer | the slice at PASS | verdict | REV PASS · only if the roster names one |
+| TEST(S) = the slice ticket | **V** | the lane, served on V's word | veto = Done, or findings | REV PASS (+ ELEMENT PASS) — the board turns it READY |
+| MERGE(S) | you | the vetoed slice | local merge into `dev` + the integrated suite | V's veto |
+| WHOLE | **V** | merged `dev` | push authorization | every MERGE(S) |
+| CLOSE | you | everything | closure report, all self-reports | WHOLE |
 
-## 3. While seats run
+Readiness is the board's: `hermes kanban --board <m> list --status ready --json`. A REWORK does
+not loop — it appends `FIX(S)` and `REV(S)` pass r+1. A slice parked on a V gate parks nothing else.
 
-- Watch the board's comment count, not the log (markers echo in prompts and ticket bodies).
-- A seat dies → tell the surviving seats the comparison is now N−1, and re-elect a
-  replacement or record the waiver with V. **Deliver on N−1 by default**; a straggler
-  extends the mission only if V says so.
-- Recovery is conversation-mode: turn-by-turn with the same session, never a bigger packet.
-  Tooling friction escalates to V after ONE failed workaround.
-- Update the slice's PROGRESS.md as results land — what was done, what is next, what was
-  tried and failed. You are its only writer.
+## 3. The tick — your only loop, and it is event-driven
 
-## 4. Findings, verdicts, reports
+Run it on every event (a seat's exit notification, a watchdog line, a V message), never on a timer:
 
-- **Every finding gets a ticket the same day it is filed — blocking and non-blocking
-  alike.** A finding without a ticket by end of round does not exist, and that class of
-  loss cost a full round. "Routed elsewhere" in a packet is not a route.
-- Consume verdicts; never produce one. Round 4 does not exist: after rework round 3, it
-  goes on the V DECISIONS PACKET.
-- **Verify `SKILLS LOADED` at each seat exit — do not trust the line.** A skill's PATH in a
-  transcript proves nothing: your own packet quotes those paths and they echo straight back.
-  Only the skill BODY proves a load. Grep the seat's transcript for a distinctive phrase from
-  inside each floor skill (Claude seats: `~/.claude/projects/<encoded-cwd>/*.jsonl`; Grok:
-  `~/.grok/sessions/<encoded-cwd>/<id>/chat_history.jsonl`). It takes about a minute and it
-  is the only check that distinguishes a seat that read the skill from one that read its name.
-  A shortfall is a finding; a skill named but not loaded is a fabrication finding.
-- Write the ledger AT EACH SEAT EXIT, not at closure — receipts are cheapest the moment a
-  seat reports. Any packet granting sub-delegation also requires returning the children's
-  receipts; the ledger is labelled a floor when any are missing.
-- Phase report at every phase gate; closure report before the Grand Loop closes; every
-  seat's self-report collected BEFORE its FULLY DONE is acknowledged.
+1. **Consume exits.** Per exited seat: verify `SKILLS LOADED` against the transcript BODY (`scripts/skills-check.sh <transcript> <skill>…` — one BODY phrase per skill, verified against the skill file at run time; a skill NAME echoes from packets and proves nothing) — grep a
+   distinctive phrase of each floor skill (Claude subagents:
+   `~/.claude/projects/<encoded-cwd>/<session>/subagents/agent-*.jsonl`; `claude -p`:
+   `~/.claude/projects/<encoded-cwd>/<session-id>.jsonl`; Grok:
+   `~/.grok/sessions/<encoded-cwd>/<id>/chat_history.jsonl`) · write the ledger row · close the node
+   (`hermes kanban --board <m> complete <ticket> --result "<marker>"`) · append the derived nodes
+   (FIX + the next REV pass; ELEMENT or TEST on PASS; a V row on a pass-3 REWORK) · ticket every
+   finding the same day · update the slice's `PROGRESS.md` — you are its only writer.
+2. **Dispatch every READY node**, in parallel, in the background; heavy nodes bounded by the spine's
+   `max_concurrent_heavy`. Never draw a compliance conclusion from a running seat — wait for exit.
+3. **Surface V gates once each** (§8): DONE(S), TEST(S), WHOLE, the decisions packet. Never re-ask.
+4. **Idle** until the next event. The 20-minute stagnation watchdog is the fallback event.
 
-## 5. Version discipline
+## 4. Transports — background only (the no-terminal law, `heartbeat-protocol` §3.9)
 
-Fail closed on skew: if the rule set you are dispatching is newer than the installed skill
-or the repo spine, the dispatch does not go out — amend the spine first, in the same
-commit. A seat charged with a rule it cannot discover from the repo is your defect.
+| Seat | Transport | Resume | Transcript / log |
+|---|---|---|---|
+| Claude, default | Agent tool, background, `model` per roster, fresh session | SendMessage, when the harness offers it | the subagent transcript (§3) |
+| Claude, resumable | `~/.local/bin/claude -p "<pointer>" --model <id> --permission-mode acceptEdits --output-format json` as a background Bash process; `session_id` from the JSON tail | `claude --resume <session_id> -p "<pointer>"` | the session jsonl + a per-seat log |
+| Codex | `codex exec -c model='"gpt-5.6-sol"' … "<pointer>" </dev/null > <log> 2>&1`, background | `codex exec resume <id>` | per-seat log |
+| Grok | `~/.grok/bin/grok -p "<pointer>" -m <model> --permission-mode bypassPermissions --cwd <lane> > <log> 2>&1`, background | `grok --resume <id>` | per-seat log + session jsonl |
+| watchdog | the harness's Monitor, or a background `until`/`while` loop writing `logs/watchdog.status` — its change signature covers the SEATS' transcripts, worktrees and scratch dirs (`logs/watchdog.paths`, one glob per line, re-read every minute), not only the mission tree: a seat working outside the tree is not stagnation | — | `logs/watchdog.status` |
+| dev server for V | the product's FULL stage list from the lane (panel, env, API, RUNNER, UI, TLS — read the product's own stack CLI for the list; a missing stage means asks are accepted and never executed), each long-lived stage a DETACHED process under a restart loop with a PID file, started only when V says "serve <S>"; never a harness preview server (the app stops it when the session idles) and never a bare dev server (a Next dev server OOMs after ~2 h of polling) | — | `logs/serve-*.log` + `logs/serve-*-supervisor.log` |
 
-## 6. Vertical-slice law (V ruling, 2026-09-01 — supersedes conflicting practice above)
+Forbidden: `osascript`, `open -a`, Terminal windows, browser windows, GUI apps, serving the Hermes
+dashboard unasked. The harness's browser pane is yours for verification. The launch law is
+unchanged: a short pointer prompt naming an ABSOLUTE packet path (big prompts stay off argv) — it names "the paths the packet allows", never a count that the self-report line makes wrong; the prompt's order is READ the ticket's comments, then CLAIM (the spine's comment-before-claim law), then the packet's steps;
+launchers written fresh from a heredoc, read back and grepped for the values they must carry; the
+log appears within 2 minutes; per-seat log paths distinct; the watchdog armed AT launch; janitor
+between attempts — processes by PID, worktrees, untracked files, locks. A CLI whose stdout buffers
+(`hermes`, `claude -p`) is judged by disk and board, never by log silence.
 
-Born from the ui-overhaul fidelity failure: the harness shipped green-on-acceptance work
-that failed the developer's actual bar. Root cause named by V: **"done" was never defined
-well enough, and it is not the harness's to define.**
+## 5. Packets — from templates, checked, scoped
 
-1. **Board shape at intake:** one Kanban ticket per TESTABLE VERTICAL SLICE — a
-   beginning and an end (e.g. 8 overhauled pages = 8 slice tickets). Nothing else exists
-   on the board until a slice opens.
-2. **Done = developer veto, nothing less.** A slice ticket closes ONLY when V (or the
-   developer using the harness) has personally tested the slice and vetoed it done.
-   Green gates, PASS verdicts, and merged-ready states are internal milestones — never
-   Done. The orchestrator still closes SUB-tickets on consumed verdicts; the SLICE ticket
-   is the developer's alone.
-3. **Open one slice → decompose into sub-tickets that run in PARALLEL.** The accent
-   falls on parallelism: serialize only what measurably cannot overlap, and prefer
-   isolation over serialization when files are shared.
-4. **One worktree (local branch) per vertical slice.** The slice's whole fleet works
-   inside that worktree; seats may pull the current state of dev into their folder as
-   needed. The main tree is nobody's default workspace once slices are open.
-5. **Fleets, not single files of seats:** per slice the orchestrator dispatches a fleet
-   (workers + reviewers per the roster) INSIDE that slice's worktree, and MULTIPLE
-   SLICES RUN AT ONCE, each in its own worktree.
-6. **Merge discipline:** slice vetoed done → merged locally (dev). Merge conflicts are
-   an accepted, managed cost at merge time — shared-file fear does not serialize slices.
-   When all slices are vetoed: merge everything locally → developer tests the whole →
-   only then push. Pushes remain V-gated as always.
-7. **Developer test points are load-bearing:** after each slice (pre-merge) and after
-   the final local merge (pre-push). Schedule them; do not batch surprises.
+- Every line anchor into a mission file (a BASELINE row, a PLAN step, a DECISIONS fold) is grepped at
+  packet-write time from the name it cites, never copied from another packet; a packet generator
+  computes them. An extractor a packet publishes (paths from diagnostics, members from a list) is
+  anchored on the shape it parses and proved on a known-bad input before dispatch.
+  A charge that tells a seat to CALL a symbol quotes the symbol's signature line and the shape of its
+  argument (`path:LINE — text`), never a paraphrase of what a grep of its body suggested. A packet
+  that names a runner ships the runner variant that writes the captured output to the run's log.
+- Every packet starts from `templates/<NODE>.md` beside this file (planning rework nodes use
+  `REQ-FIX.md` and `ARCH-FIX.md`); fill every
+  `__MARKER__`; keep the contract half ≤ 40 lines. A path the seat will create carries ` (new)`; a code quote is
+  `<abs path>:<LINE> — \`text\``, re-grepped at write time — never recalled from earlier tool output.
+- **`scripts/packet-check.sh <packet>` runs before every dispatch; exit 1 means no dispatch.**
+  It runs AFTER the freeze commit (§9) and immediately before the DISPATCHED comment, which stamps
+  the HEAD the check printed — one HEAD across the whole dispatch record. A
+  failing packet is fixed in the TEMPLATE or the COMMON line that produced it (fix the class).
+- The SPEC of record for a slice is its highest-numbered `SPEC-v<n>.md` (`SPEC.md` when none):
+  every packet written after a planning rework names that file — never `SPEC.md` by habit.
+- A packet relays a finding's FACTS (file:line, the failing outcome) — never the remedy, which is
+  the seat's contract; a range in a packet is derived from the SPEC's own citations at write time
+  (every line the SPEC names sits inside one), and an ADR number is never pre-assigned — "the next
+  free number, measured at write time". A section a charge cites is named by its quoted heading, re-grepped at
+  write time; every mission file a charge names is also on the `inputs` line (packet-check rule 8).
+  A symbol a packet names (an export, a component, a test id) is a code quote in the checked
+  `path:LINE — \`text\`` form, never prose from memory; a packet never restates a list the plan or the
+  intake carries (the Screens block, a test list) — it points at it. Every COUNT a packet quotes is re-derived from the file of
+  record at write time — a count carried from an earlier verdict is stale in both directions.
+- Scope the reading: a BUILD packet quotes its cluster's step ids and line ranges; a REV packet
+  points at the review package; TRAPS entries are named by heading. An input is a FILE with a line
+  range, never a bare directory (a 12,575-line directory named without a range was read by nobody).
+  A seat whose output must be checkable against code gets that code, read-only, in its inputs. The
+  packet's `base` is the LANE base; if the main tree's HEAD has moved since (protocol commits), say so.
+- A PLANNING packet (REQ, ARCH, MOCK) carries the measured EXTRACTS its charges depend on — the
+  quoted lines themselves, ≤ ~150 lines in total, each with its `path:LINE` provenance — not only
+  the paths (measured on debate-tiers: ~110k tokens per planning node spent re-deriving lines the
+  intake had already read). A code quote is re-grepped at write time, never recalled. `COMMON.md` ≤ 120 lines, and an
+  amendment REPLACES the text that caused the defect — no numbered list that only grows.
+- A charge that asks for an exact copy (byte-for-byte) or a repeated token (`$13` twice) ships the
+  command that proves it — a `diff` against the transformed source, a count of occurrences — proved on
+  a known-bad mutant before dispatch. A charge whose evidence is a verbatim frame ships the
+  capture-first runner (full output to a log first, only `rc` and the summary lines to the transcript).
+  The pointer prompt and the packet's line 3 name the SAME reading order: the packet, then COMMON.
+  A charge never restates a contract duty in a weaker form (per-assertion refutation once became
+  "one mutant per step") — it points at the section, and the handoff carries the duty's matrix
+  (property · mutant · target suite · neighbour · restore).
+- A packet cites a ticket comment by its AUTHOR and its opening MARKER (`the READY comment by
+  BUILD-S01-C3`), never by position — the orchestrator's CONSUMED comments are always the last ones.
+  A path appears ONCE in `allowed`: the template already carries the self-report path, and a
+  generator that appends it again fails packet-check rule 9. The shared runner is
+  `scripts/run-suites.sh` beside this file, named by ABSOLUTE path (`LOG=<abs path>`; the printed
+  marker is the verdict; rc 0 only on `CLUSTER_GREEN`), proved on a wrong pair and a missing path
+  before the first packet names it, and never restated in a packet.
+- Packet review is the reviewer's duty (`heartbeat-reviewer` §1); a packet defect is a finding
+  against you, priced in the ledger.
+
+## 6. The slice gate and the one review
+
+- Workers hand off on cluster green; nothing waits on a cluster. `GATE(S)` fires when every
+  BUILD(S-*) is done: assemble `.hermes/reports/<m>/review-packages/<S>-p<r>/` — the diff vs base,
+  every cluster command with its three-run table, the cluster map, the acceptance oracle (DONE.md on
+  a UI slice, the SPEC acceptance otherwise), the dev-stack recipe — which gives every lens its OWN ports and process/file names
+  (`<seat>-stub-api.mjs`), says kill by PID or port (never `pkill -f` a filename every seat shares — the launch line writes `$!` to
+  `logs/<seat>.<proc>.pid` and the kill line reads it) and
+  records the listener baseline of every no-touch port at assembly time, so compliance is falsifiable.
+  Re-verify every quoted commit
+  and count at assembly time. The package diff is the PRODUCT range only — housekeeping paths
+  (`.codex/skills` mirrors, launchers) excluded with `git diff <a>..<b> -- . ':!.codex/skills'` — and the
+  README states the FIX commits' own stat. No housekeeping commit lands on a slice branch (a mirror
+  sync on `slice/tiers-s01` sat in every later review range and re-billed each reviewer ~25k tokens);
+  the pointer carries the `.claude` path instead.
+- Lenses by `risk_tier`, in parallel, each a blind background seat in its own detached worktree at
+  the slice head: low → correctness/tests · medium → + security/data-safety · high → + product-truth.
+  **A UI slice always carries product-truth**: rendered DOM with the real compiled CSS, measured
+  against DONE.md's artboards in both modes.
+- Union the lens verdicts into `reviews/REV-<S>-p<r>-UNION.md`: PASS only when every lens passed.
+  Two lenses disagreeing on ONE finding get a single-finding re-check node, never a re-review.
+- REWORK → FIX(S) nodes split by FINDING surface — every file a finding needs to change sits in ONE node, and two nodes whose files overlap run one after the other; parallel only when disjoint (FIX-S01-p1 split a lock's semantics from its appearance and the fix landed on one side), every finding of the pass assigned,
+  returned to the author sessions when resumable → REV(S) pass r+1, scoped to the findings plus the
+  previous pass's probes — the package README names each promoted probe's measurement and the head it
+  was written against, never an outcome a probe as promoted cannot produce (a mutant's direction inverts
+  between heads). A pass-3 REWORK is a V row. N-findings still open at TEST(S) are
+  ticketed residue, shown to V at the test point.
+- Planning reviews (REQ-REV, ARCH-REV) are one pass by default: you fold N-findings into
+  DECISIONS.md and ticket comments; only B-findings spawn a rework node, in the same session when
+  resumable. The cap of 3 still bounds them.
+- MERGE(S) runs the integrated suite on `dev`; a cross-slice defect there → FIX on the owning slice
+  and a scoped REV pass counted against that slice's cap. There are no cross-review nodes.
+
+## 7. Rework transport
+
+Same session first — resume it (§4). A fresh session only when the original is dead or the
+transport cannot resume; then the packet carries the predecessor's handoff and self-report. Session
+ids are recorded at CLAIM and recovered from the board, never from a log. Recovery is
+conversation-mode: turn by turn with the same session, never a bigger packet. Tooling friction
+escalates to V after ONE failed workaround.
+
+## 8. V gates — the only surfaces V sees after the prompt
+
+- **DONE(S)** (UI slices): ONE message — the canvas URL, the open questions from MOCK.md as
+  smallest yes/no, and the two ways to answer: edit the canvas in place (Save publishes a version
+  you read back with the Artifact tool) or hand back a Claude Design export under `ui_designs/`.
+  Then extract the final artboards verbatim into `docs/missions/<m>/design/<S>/`, write
+  `slices/<S>/DONE.md` (per screen and state: the artboard reference, numbered browser steps in both
+  modes, V's words quoted — no judgment of yours; the §3 measurements EXTRACTED from the artboards' declarations by a script — every declaration of every drawn class, never hand-picked: a hand transcription dropped `white-space: nowrap` on debate-tiers S01) and get V's yes. BUILD(S-*) is not READY before
+  that yes; there is no proceed-by-default on a UI slice. Attach the graph:
+  `scripts/graph.sh <m> .hermes/reports/<m>/mission-graph.md` also writes `mission-graph-nodes.mmd` (work
+  nodes, findings hidden) and `mission-graph-full.mmd` beside it — then render them to PNG with `scripts/graph-png/`
+  (make-pages.py + serve.py; the harness's browser pane in a NEW tab renders and posts the PNGs back — headless
+  Chrome hangs here) and SEND the PNGs with SendUserFile (display: render) in the gate message; a repo path is
+  not an attachment and V cannot open `.mmd` (V, 2026-09-10: "i cannot see the flowchart" / "do a png").
+- **TEST(S)**: post the acceptance steps, the residue list and the one-line serve command; serve
+  the lane only when V says so; the slice ticket closes only on V's veto. **WHOLE**: after every
+  MERGE(S), post the integrated-suite result and the push command — V pushes. **V DECISIONS
+  PACKET**: rows flush at ≥ 3 pending, any row pending > 4 h, a frozen slice, or V asking; each row =
+  card, decision, evidence link, smallest yes/no; the default binds until V rules, and DECISIONS.md is
+  checked before any row is written.
+- **Vertical-slice law (V, 2026-09-01), unchanged:** slice tickets first · Done = V's veto after
+  personally testing, never a green gate · sub-tickets in parallel · one worktree per slice, many
+  slices at once · merge on veto, conflicts managed at merge time and never a reason to serialize ·
+  all slices vetoed → V tests the whole → only then push · the test points after each slice and after
+  the final merge are load-bearing.
+
+## 9. Ledger, reports, closure
+
+The mission tree (`docs/missions/<m>`, `.hermes/planning/<m>`, `.hermes/reports/<m>`) is COMMITTED at
+every freeze — REQ READY, each REQ-FIX / ARCH / MOCK READY, each verdict — as `docs(<m>): …`; an
+untracked tree has no history, and a seat's in-place edit of a frozen file is then unrecoverable.
+Each freeze commit goes into COMMON §6 (`freeze commits` row); every review packet diffs against it.
+A freeze commit EXCLUDES the paths a RUNNING seat may write (its packet's `allowed` list, as `:!` pathspecs)
+— a mid-run sweep records a half-written file under another node's name.
+Write `LEDGER.md` AT EACH SEAT EXIT — seat, ticket, model, dispatched, exited, handoff marker,
+how SKILLS LOADED was verified, self-report path, verdict — a seat's verification claims quoted AS
+CLAIMS ("the handoff claims …"), only what you measured (disk, board, your own re-run) stated as fact
+(a consume comment once repeated a false "activation state unchanged") — and a `Ruling:` line for every decision
+you took on V's behalf (what — why — cost if wrong). Deliver on N−1 when a seat dies: survivors told,
+a replacement re-elected or the waiver recorded. A phase report at each V gate, a closure report
+before CLOSE, every self-report collected before FULLY DONE, the graph rendered from the board AND sent to V (SendUserFile) at
+every gate. Close sub-tickets as verdicts are consumed — a board that only grows carries no state.
+
+## 10. Version discipline
+
+Fail closed on skew: a rule newer than the installed skill or the spine is not dispatched — amend
+the spine in the same commit. The `.codex/skills/<name>/SKILL.md` copies a Codex seat auto-loads from its
+working tree are byte-identical to `.claude/skills/<name>/SKILL.md` — `scripts/sync-codex-skills.sh` at every
+protocol commit, and a lane that predates a sync gets the pointer "cite only the `.claude` path" until it is
+rebased (a tracked pre-v4.0.0 copy was loaded by FIX-S01-p1-F2 and `skills-check.sh` caught it by phrase). A seat charged with a rule it cannot discover from the repo is your
+defect.

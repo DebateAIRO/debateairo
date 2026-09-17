@@ -94,6 +94,69 @@ describe("P2-04 enumeration-resistant recovery start", () => {
     expect(now).toBe(600);
   });
 
+  /**
+   * F-SESSIONS-BARE-CATCH's standing pin for recovery. The infrastructure-failure case
+   * above throws inside `repository.start()`, so the `if(outcome.status==="created")`
+   * block holding the risk-signal catch is never reached and its recorder stub is dead.
+   * These cases make `start()` return a created outcome first, so the catch is actually
+   * entered, and assert on WHAT THE OBSERVER RECEIVED.
+   */
+  function serviceRecording(
+    recordForRecovery: () => Promise<"recorded" | "scope_unresolved">,
+    received: unknown[],
+    clock: Readonly<{ read: () => number; advance: (ms: number) => void }>
+  ): RecoveryStartService {
+    return new RecoveryStartService({
+      repository: {
+        async start() {
+          clock.advance(31);
+          return { status: "created" as const, publicHandle: "recovery-public-handle" };
+        }
+      },
+      riskSignals: { recordForRecovery },
+      // Deliberately NON-THROWING, so the generic response and its floor stay observable.
+      onRiskSignalFailure: (error: unknown) => { received.push(error); },
+      blindIndexKey: Buffer.alloc(32, 0x54),
+      enumerationFloorMs: 600,
+      publicResponsePolicy: "ENUMERATION_RESISTANT_GENERIC",
+      monotonicNow: () => clock.read(),
+      sleep: async (milliseconds) => { clock.advance(milliseconds); }
+    });
+  }
+
+  it("hands the observer a TypeError naming RECOVERY_RISK_SIGNAL_SCOPE_UNRESOLVED when the scope does not resolve", async () => {
+    let now = 0;
+    const received: unknown[] = [];
+    const clock = { read: () => now, advance: (ms: number) => { now += ms; } };
+    const service = serviceRecording(async () => "scope_unresolved", received, clock);
+
+    const startedAt = now;
+    await expect(service.start({ email: "person@example.test" }, source))
+      .resolves.toEqual(RECOVERY_START_PUBLIC_RESPONSE);
+
+    expect(received).toHaveLength(1);
+    expect(received[0]).toBeInstanceOf(TypeError);
+    expect((received[0] as Error).message).toBe("RECOVERY_RISK_SIGNAL_SCOPE_UNRESOLVED");
+    // A pending signal must not change the public response or shorten its floor.
+    expect(now - startedAt).toBe(600);
+  });
+
+  it("hands the observer the recorder's own rejection, unwrapped and unreplaced", async () => {
+    let now = 0;
+    const received: unknown[] = [];
+    const sentinel = new Error("RECORDER_REJECTED");
+    const clock = { read: () => now, advance: (ms: number) => { now += ms; } };
+    const service = serviceRecording(async () => { throw sentinel; }, received, clock);
+
+    const startedAt = now;
+    await expect(service.start({ email: "person@example.test" }, source))
+      .resolves.toEqual(RECOVERY_START_PUBLIC_RESPONSE);
+
+    expect(received).toHaveLength(1);
+    expect(received[0]).toBe(sentinel);
+    expect(now - startedAt).toBe(600);
+  });
+
   it("publishes only the exact 202 generic response at the public HTTP boundary", async () => {
     const inputs: string[] = [];
     const recovery: RecoveryApplication = {

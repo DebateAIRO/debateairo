@@ -1,0 +1,71 @@
+Task t_cd5642d0: [gpt-5.6-sol] BUILD S01-C4 — the stylesheet: the selector's rules + the disabled treatment of the four locked control families, before the ADR-0023 fence; no new token (DONE.md M13) — S01-40…S01-43 — beside C3
+  status:    done
+  assignee:  build-s01-c4
+  workspace: scratch
+  max-retries: 2 (default)
+  created:   2026-09-10 00:14 by user
+  completed: 2026-09-10 02:21
+  parents:   t_085d4fa4
+  children:  t_6e2413b7
+
+Body:
+Worker node (Codex Sol). Inputs: packets/BUILD-S01-C4.md (written at C2's exit) · PLAN.md:452-482 · DONE.md M2-M8, M13 · ADR-0023. Carries MOCK-S01 F1 (the .ndSelect OUTER box is what the lock reaches), ARCH-REV-S01 N2 (one scoped colour-literal assertion in the suite C4 creates), N3 (S01-42's criterion = DONE.md M8), N8 (per-seat typecheck-delta output path + extractor). Scheduled beside C3 (the plan's designed pair, PLAN.md:662-671): parent C2 so both become READY together.
+
+Result:
+READY: 5e3e4bcf on slice/tiers-s01 (2 allowed paths; no token added); 3 runs CLUSTER_GREEN + orchestrator re-run CLUSTER_GREEN; SKILLS 6/6 (script); RED frames verified in the rollout; 3 findings ticketed
+
+Comments (4):
+  [2026-09-10 01:45] orchestrator: DISPATCHED 2026-09-10 01:48 EEST — seat BUILD-S01-C4, model gpt-5.6-sol via codex exec (background, danger-full-access inside the S01 lane only). Packet: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/debate-tiers/packets/BUILD-S01-C4.md (packet-check OK at main-tree HEAD 633f0f35; the LANE base is b866191f = BUILD(S01-C2)'s commit). Parent BUILD(S01-C2) t_085d4fa4 completed READY. RUNS BESIDE the other cluster in the same lane (C3 ∥ C4, disjoint write surfaces; each packet names the other's paths). Comment cursor at dispatch: 1 (this comment). Expected: CLAIM → RED frames from the log per step → refutation matrix → three-run table (marker is the verdict) → one commit feat(tiers S01-C4) → self-report → READY.
+  [2026-09-10 01:49] BUILD-S01-C4: CLAIM:
+- seat: BUILD-S01-C4
+- node: BUILD(S01-C4), pass 1 of 3
+- start time: 2026-09-09T22:48:50Z
+- session id: 01a08858-be1f-74a2-9d5f-875c83e65c18
+- lane: slice/tiers-s01 @ b866191f
+- git status --porcelain: 0 lines
+- comments read through: dispatch cursor 1
+- next action: read every ticket comment, then execute S01-40 through S01-43 tests-first
+  [2026-09-10 02:16] BUILD-S01-C4: SKILLS LOADED: /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/SKILL.md, /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/references/codex-tools.md, /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-protocol/SKILL.md, /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md, /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/agent-protocols/debateai-heartbeat-protocol.md, /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/SKILL.md, /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/writing-good-tests.md, /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/verification-before-completion/SKILL.md, /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/SKILL.md
+2 READY: node BUILD(S01-C4), pass 1 of 3, ticket t_cd5642d0, session 01a08858-be1f-74a2-9d5f-875c83e65c18.
+3 ARTIFACT: branch slice/tiers-s01, commit 5e3e4bcf3f72504801e041da56f61d67f5ed0229 (`feat(tiers S01-C4): style plan tier selector and locks`); commit paths only `apps/ui/app/globals.css` and `tests/unit/tier01-style-contract.test.ts`. Post-commit `git status --porcelain` contains only C3 paths: `apps/ui/app/new/page.tsx`, `tests/unit/v2ui-pages.test.ts`, `tests/render/tier01-new-plan-tier.test.tsx`.
+4 VERIFICATION:
+  Three-run table — worst run is GREEN; full logs remain at the named paths:
+  | run | verdict | full log |
+  | final1 | CLUSTER_GREEN | /tmp/debate-tiers-build-s01-c4-01a08858/cluster-final1.log |
+  | final2 | CLUSTER_GREEN | /tmp/debate-tiers-build-s01-c4-01a08858/cluster-final2.log |
+  | final3 | CLUSTER_GREEN | /tmp/debate-tiers-build-s01-c4-01a08858/cluster-final3.log |
+  Every final run, verbatim pairs: `tier01-style-contract` 1/1; `t9-mode-tokens` 7/9; `consent-bar` 7/7; `consent-s02-style-contract` 10/10; `consent-card` 11/11; `consent-cross-slice` 7/7; `consent-guards` 7/7; `consent-policy-link` 14/14; `t3-library` 11/15; `role-token-map` 46/49; `pda-s03-keyboard-accessibility` 3/5.
+  Inherited failures, all pre-existing at base on 2026-09-09: `t9-mode-tokens` — `renders one accessible toggle that reads the document mode, flips it, and persists it`; `leaves no mode-inert colour literal in the four Wave-0 product files`. `t3-library` — `renders recased native selectors and a live count for the four Your debates rows`; `renders a live count for the three Public debates rows`; `renders every library row as a shell/core bezel`; `renders the public search-indexing disclosure once under the list and never on Yours`. `role-token-map` — `'DebateMap root hub' binds its 'reasoning accent' role`; `'DebateCanvas agreed review mark' binds its 'agreed review verdict' role`; `'DebateCanvas disputed review mark' binds its 'disputed review verdict' role`. `pda-s03-keyboard-accessibility` — `computes a grouped control treatment and a non-colour-only current state for tab=yours`; `computes a grouped control treatment and a non-colour-only current state for tab=public`.
+  RED frames, verbatim from retained logs except the two overwrite disclosures in line 6:
+  `FAIL  tests/unit/tier01-style-contract.test.ts > S01-C4 debate tier stylesheet contract > keeps the selector contract scoped beside the existing /new rules`
+  `Tests  1 failed (1)`
+  `FAIL  tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S59 · appends exactly one delimited S02 block and ends the file with it`
+  `Tests  1 failed | 9 passed (10)`
+  `FAIL  tests/render/consent-bar.test.tsx > S01-C3 the cookie bar (10a) > ships R09's geometry inside ONE delimited S01 block, followed only by whitespace or S02's delimited block`
+  `Tests  1 failed | 6 passed (7)`
+  `tests/unit/tier01-style-contract.test.ts(27,18): error TS2532: Object is possibly 'undefined'.`
+  Refutation matrix:
+  | property | target mutant → RED | target suite/log | neighbouring mutant not caught → GREEN | restore status |
+  | S01-40: exactly one scoped block after `.ndKeyHint`, before reduced motion | markers absent on first test; end-of-file `.s01EndFenceMutant` also REDs both tail guards | `s01-40-red.log`; original console frames above | in-scope padding-only rule → 1/1 (`s01-40-neighbor-green.log`) | `git status --porcelain` printed only my paths plus then-present C3 paths |
+  | S01-41: no literal colour; every actual colour token-backed, except `background: transparent` | `color: #fff` → RED; `border-color: transparent` → RED | `s01-41-red-literal-colour.log`; `s01-41-red-nontoken-border.log` | padding-only rule → 1/1 (`s01-41-neighbor-green.log`) | same scoped status result |
+  | S01-42a: M1-M7/M15 geometry and token roles | missing rules → RED; `.ndTier` `gap: 11px` → RED | `s01-42-red.log`; `s01-42a-red-gap.log` | unasserted `appearance: none` → 1/1 (`s01-42a-neighbor-green.log`) | same scoped status result; an under-scoped first mutant touched `.supportWidget`, was detected by diff and restored before testing |
+  | S01-42b: four locks share only opacity/cursor and lock the outer select | `.ndSelect select:disabled` replacing `.ndSelect:has(select:disabled)` → RED (`expected '' to be 'opacity: 0.45; cursor: not-allowed;'`) | `s01-42b-red-outer-select.log` | unused `.ndLockNeighbor` rule → 1/1 (`s01-42b-neighbor-green.log`) | same scoped status result |
+  S01-43 fresh typecheck: `pnpm typecheck rc=1` inherited; corrected diagnostic-path delta is `added diagnostic paths: 0`; exact packet extractor emits one inherited non-path continuation line described below. `git diff --check` emitted 0 lines. No `t9-mode-tokens` map row or new token was added.
+5 FINDINGS / PACKET DEFECTS: (a) `BUILD-S01-C4.md:29` typecheck extractor treats indented `Property 'repoRoot'... (` as a filename; VERDICT patch extractor / CONFIDENCE high / STRONGEST COUNTER repository paths with leading whitespace are not expected. (b) `BUILD-S01-C4.md:10` BASELINE anchors drifted; current C4 rows are `BASELINE.md:205-248` and `:329-372`; VERDICT resolve names at dispatch / CONFIDENCE high / STRONGEST COUNTER frozen sources make line anchors cheaper. (c) CLAIM-first conflicts with the comment-before-claim law at `debateai-heartbeat-protocol.md:871-875`; VERDICT comments-before-CLAIM / CONFIDENCE high / STRONGEST COUNTER immediate CLAIM is faster liveness. (d) no out-of-contract product-code finding was fixed.
+6 UNVERIFIED: the literal `comm -13` criterion is not empty because its sole added entry is the inherited non-path continuation `  Property 'repoRoot' is missing...`; the actual added diagnostic-path set is empty and no allowed path has a diagnostic. The original full tail-mutant RED logs and first typecheck RED log were overwritten by later GREEN/final runs through fixed scratch filenames; their exact RED frames remain in this session transcript, but filesystem-level full-log access is UNVERIFIED and was not reconstructed. Browser/computed-style acceptance was not run; the live `:3000` stack was untouched as required.
+7 SELF-REPORT: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/agent-reports/BUILD-S01-C4.md
+8 comments read through: 2
+  [2026-09-10 02:21] orchestrator: CONSUMED 2026-09-10 02:26 EEST (orchestrator): SKILLS LOADED verified 6/6 by scripts/skills-check.sh against the Codex rollout body (session 01a08858-be1f…). Disk: slice/tiers-s01 @ 5e3e4bcf, exactly two of the allowed paths (globals.css +64 as ONE delimited block /* === debate-tiers S01 === */ at :6208-6270, after .ndKeyHint and before the reduced-motion block; tier01-style-contract.test.ts +119; t9-mode-tokens untouched — no token added, DONE.md M13); the post-commit dirt is C3's three in-flight paths only. Handoff: three runs CLUSTER_GREEN with every pair; refutation matrix per property incl. the outer-select lock; typecheck: 0 added diagnostic PATHS (the literal comm -13 line is my extractor's defect, F1). The two RED frames whose full logs were overwritten (the end-of-file fence mutant, the TS2532) are verified by the orchestrator in the rollout body (6 occurrences each). Orchestrator re-run of the cluster command once in the lane, with C3's files in flight (logs/verify-S01-C4.log): CLUSTER_GREEN, every row at its pair. Three findings ticketed (F14_F1…F3): the extractor (mine), the BASELINE anchors (mine), the CLAIM order vs the spine (protocol) — classes fixed in the protocol. Ticket closed READY. C5 waits for C3.
+
+Events (7):
+  [2026-09-10 00:14] created {'assignee': 'build-s01-c4', 'status': 'todo', 'parents': ['t_085d4fa4'], 'tenant': None, 'branch_name': None, 'skills': None, 'goal_mode': None}
+  [2026-09-10 01:41] promoted
+  [2026-09-10 01:45] commented {'author': 'orchestrator', 'len': 750}
+  [2026-09-10 01:49] commented {'author': 'BUILD-S01-C4', 'len': 349}
+  [2026-09-10 02:16] commented {'author': 'BUILD-S01-C4', 'len': 7460}
+  [2026-09-10 02:21] commented {'author': 'orchestrator', 'len': 1239}
+  [2026-09-10 02:21] [run 92] completed {'result_len': 204, 'summary': 'READY: 5e3e4bcf on slice/tiers-s01 (2 allowed paths; no token added); 3 runs CLUSTER_GREEN + orchestrator re-run CLUSTER_GREEN; SKILLS 6/6 (script); RED frames verified in the rollout; 3 findings ticketed'}
+
+Runs (1):
+  #92  completed    @build-s01-c4  0s  2026-09-10 02:21
+        → READY: 5e3e4bcf on slice/tiers-s01 (2 allowed paths; no token added); 3 runs CLUSTER_GREEN + orchestrator re-run CLUSTER_GREEN; SKILLS 6/6 (script); RED frames 

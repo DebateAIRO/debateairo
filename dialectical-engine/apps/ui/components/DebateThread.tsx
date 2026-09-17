@@ -1,9 +1,10 @@
 "use client";
 
 import type { CSSProperties, MouseEvent } from "react";
+import type { Node as ContractNode } from "@debateai/contract";
 import type { DebateNode } from "@/lib/types";
 import { ROLE_PALETTES, renderStateOf, roleLabel, roleOf } from "@/lib/debatePresentation";
-import { ModelMetaLine } from "@/components/ModelPresentation";
+import { ReferenceAuthorPill, ReferenceReviewLine, ReferenceScoreBadges } from "@/components/ReferenceNodeMeta";
 import { SCRUTINY_STATUS } from "@/lib/scrutiny";
 import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
 
@@ -21,6 +22,7 @@ type DebateThreadProps = ThreadCallbacks & {
   expanded: Set<string>;
   collapsed: Set<string>;
   scrutiny?: Record<string, string>;
+  v3NodesById?: ReadonlyMap<string, ContractNode>;
   meta: { nodes: number; depth: number };
 };
 
@@ -52,6 +54,7 @@ export function DebateThread({
   expanded,
   collapsed,
   scrutiny = {},
+  v3NodesById,
   meta,
   onOpenNode,
   onChallengeNode,
@@ -65,15 +68,18 @@ export function DebateThread({
   return (
     <div className="thread scroll">
       <div className="threadInner">
-        <div className="threadRoot">
-          <div className="nodeEyebrow">Root claim</div>
-          <div className="threadRootClaim">{root.claim}</div>
-          <div className="nodeRootMeta">
-            <span>{meta.nodes} nodes</span>
-            <span className="sep">/</span>
-            <span>depth {meta.depth}</span>
-            <span className="sep">/</span>
-            <span>scroll down to follow each line of argument</span>
+        <div className="threadRootShell">
+          <div className="threadRoot">
+            <span className="referenceStanceTab root" aria-hidden />
+            <div className="nodeEyebrow">Root claim</div>
+            <div className="threadRootClaim">{root.claim}</div>
+            <div className="nodeRootMeta">
+              <span>{meta.nodes} claims</span>
+              <span className="sep">/</span>
+              <span>depth {meta.depth}</span>
+              <span className="sep">/</span>
+              <span>scroll down to follow each line of argument</span>
+            </div>
           </div>
         </div>
 
@@ -86,6 +92,7 @@ export function DebateThread({
             expanded={expanded.has(row.node.id)}
             collapsed={collapsed.has(row.node.id)}
             scrutinyStatus={scrutiny[row.node.id]}
+            v3Node={v3NodesById?.get(row.node.id)}
             onOpenNode={onOpenNode}
             onChallengeNode={onChallengeNode}
             onRegenNode={onRegenNode}
@@ -104,6 +111,7 @@ type ThreadRowCardProps = ThreadCallbacks & {
   expanded: boolean;
   collapsed: boolean;
   scrutinyStatus?: string;
+  v3Node?: ContractNode;
 };
 
 function ThreadRowCard({
@@ -111,6 +119,7 @@ function ThreadRowCard({
   expanded,
   collapsed,
   scrutinyStatus,
+  v3Node,
   onOpenNode,
   onChallengeNode,
   onRegenNode,
@@ -130,10 +139,10 @@ function ThreadRowCard({
   const lanes = trail.slice(0, -1);
 
   const cardStyle: CSSProperties = scrutiny
-    ? { background: "var(--surface)", borderColor: scrutiny.color, borderLeftColor: pal.line }
+    ? { background: "var(--surface)", borderColor: scrutiny.color }
     : empty
-      ? { background: "var(--surface-sunken)", borderColor: "var(--line-2)", borderLeftColor: "var(--line-2)" }
-      : { background: "var(--surface)", borderColor: pal.border, borderLeftColor: pal.line };
+      ? { background: "var(--surface-sunken)", borderColor: "var(--line-2)" }
+      : { background: "var(--surface)", borderColor: "var(--line)" };
 
   const canOpen = state === "done";
 
@@ -151,19 +160,21 @@ function ThreadRowCard({
       </span>
 
       <div className="threadCardWrap">
-        <div
-          className="threadCard"
-          style={cardStyle}
-          role={canOpen ? "button" : undefined}
-          tabIndex={canOpen ? 0 : undefined}
-          onClick={canOpen ? () => onOpenNode(node.id) : undefined}
-          onKeyDown={(event) => {
-            if (canOpen && (event.key === "Enter" || event.key === " ")) {
-              event.preventDefault();
-              onOpenNode(node.id);
-            }
-          }}
-        >
+        <div className="threadCardShell" data-reference-thread-card>
+          <div
+            className="threadCard"
+            style={cardStyle}
+            role={canOpen ? "button" : undefined}
+            tabIndex={canOpen ? 0 : undefined}
+            onClick={canOpen ? () => onOpenNode(node.id) : undefined}
+            onKeyDown={(event) => {
+              if (canOpen && (event.key === "Enter" || event.key === " ")) {
+                event.preventDefault();
+                onOpenNode(node.id);
+              }
+            }}
+          >
+          <span className="referenceStanceTab" style={{ background: pal.line }} aria-hidden />
           {scrutiny ? (
             <span className="scrutinyBadge" style={{ borderColor: scrutiny.color }}>
               <span className="scrutinyDot" style={{ background: scrutiny.color }} />
@@ -171,14 +182,15 @@ function ThreadRowCard({
             </span>
           ) : null}
 
-          <div className="nodeHeader">
+          <div className="threadMetaRow">
             <span className="roleBadge" style={{ color: pal.text, background: pal.bg, borderColor: pal.border }}>
               {pal.arrow} {roleLabel(node)}
             </span>
-            {generation || node.maker !== undefined ? (
-              <ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} />
-            ) : null}
+            <ReferenceScoreBadges node={node} v3Node={v3Node} onOpenNode={onOpenNode} />
+            <span style={{ flex: 1 }} />
+            <ReferenceAuthorPill node={node} />
           </div>
+          <ReferenceReviewLine review={v3Node?.review} />
 
           {empty ? (
             <div className="nodeEmpty">
@@ -208,19 +220,7 @@ function ThreadRowCard({
                   {generation.argument}
                 </div>
               ) : null}
-              <div className="nodeControls">
-                {onChallengeNode ? (
-                  <button
-                    type="button"
-                    className="nodeCtrl challenge"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onChallengeNode(node, event.currentTarget);
-                    }}
-                  >
-                    ⚐ Challenge
-                  </button>
-                ) : null}
+              <div className="nodeControls nodeReferenceFooter" data-reference-thread-footer>
                 <button
                   type="button"
                   className="nodeCtrl"
@@ -230,35 +230,22 @@ function ThreadRowCard({
                 >
                   ↻ Regenerate
                 </button>
-                {generation?.argument ? (
-                  <button
-                    type="button"
-                    className="nodeCtrl"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onToggleExpand(node.id);
-                    }}
-                  >
-                    {expanded ? "Show less" : "Read"}
-                  </button>
-                ) : null}
                 <span style={{ flex: 1 }} />
-                {childCount > 0 ? (
-                  <button
-                    type="button"
-                    className="threadCollapse"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onToggleCollapse(node.id);
-                    }}
-                  >
-                    <span className="threadCollapseSign">{collapsed ? "+" : "–"}</span>
-                    {collapsed ? `${childCount}` : "Hide"}
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  className="nodeCtrl"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (generation?.argument) onToggleExpand(node.id);
+                    else onOpenNode(node.id);
+                  }}
+                >
+                  {expanded ? "Show less" : "Read"} <span aria-hidden>{expanded ? "▴" : "▾"}</span>
+                </button>
               </div>
             </>
           )}
+          </div>
         </div>
       </div>
     </div>

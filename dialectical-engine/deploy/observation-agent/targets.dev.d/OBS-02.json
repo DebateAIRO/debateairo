@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "targets": [
+    {
+      "component": "api",
+      "kind": "http",
+      "live_url": "http://127.0.0.1:8790/v1/session",
+      "expected": "when_dev_stack"
+    },
+    {
+      "component": "ui",
+      "kind": "http",
+      "live_url": "http://127.0.0.1:3001/login",
+      "expected": "when_dev_stack"
+    },
+    {
+      "component": "tls_front_door",
+      "kind": "http",
+      "live_url": "https://localhost:3000/login",
+      "expected": "when_dev_stack"
+    },
+    {
+      "component": "runner",
+      "kind": "process",
+      "command_contains": "apps/runner/src/main.ts",
+      "expected": "when_dev_stack"
+    },
+    {
+      "component": "kanban",
+      "kind": "http",
+      "live_url": "http://127.0.0.1:9119/",
+      "expected": "always"
+    },
+    {
+      "component": "evaluator_worker",
+      "kind": "fact",
+      "fact": "UNBOUND_BY_REGISTER",
+      "expected": "never"
+    }
+  ]
+}

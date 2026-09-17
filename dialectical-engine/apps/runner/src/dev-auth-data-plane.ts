@@ -9,6 +9,14 @@ import {
   ensureDevelopmentComposeSecrets
 } from "./dev-compose-secrets.js";
 import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
+import {
+  parseDevelopmentDeploymentRegisterCliOutput,
+  type DevelopmentDeploymentRegisterMachineReceiptV1
+} from "./dev-deployment-register.js";
+import { createSupportControlPlanePool } from "@debateai/db";
+import { createPostgresRegisterPublicationPort } from "@debateai/register";
+import { loadDevelopmentSupportConfigCliCredentials } from "./support-config-cli-credentials.js";
+import { initializeDevelopmentSupportConfiguration } from "./dev-support-config.js";
 
 const DATA_PLANE_SERVICES = Object.freeze(["postgres", "hatchet-lite"] as const);
 const LOCAL_MIGRATOR_DATABASE_URL =
@@ -20,7 +28,8 @@ export type DevelopmentAuthDataPlaneReceipt = Readonly<{
   hatchet: "READY";
   migrations: "APPLIED";
   principals: "ATTESTED";
-  register: "SEALED";
+  register: DevelopmentDeploymentRegisterMachineReceiptV1;
+  supportConfiguration: "HERMES_GLM_5_3_FLASH";
   secrets: "ATTESTED";
   mailCapture: "ATTESTED";
 }>;
@@ -42,7 +51,10 @@ export type DevelopmentAuthDataPlaneOperations = Readonly<{
   waitForPostgres(dockerExecutable: string): Promise<void>;
   migrate(): Promise<void>;
   provisionPrincipals(): Promise<void>;
-  seedRegister(): Promise<void>;
+  seedRegister(): Promise<DevelopmentDeploymentRegisterMachineReceiptV1>;
+  initializeSupportConfiguration(
+    registerReceipt: DevelopmentDeploymentRegisterMachineReceiptV1
+  ): Promise<void>;
   generateSecrets(): Promise<void>;
   verifyMailCapture(): Promise<void>;
   stopDependencies(dockerExecutable: string, services: readonly string[]): Promise<void>;
@@ -95,7 +107,14 @@ export async function startDevelopmentAuthDataPlane(
       "DEV_AUTH_DATA_PLANE_PRINCIPAL_FAILED",
       () => operations.provisionPrincipals()
     );
-    await fixedStep("DEV_AUTH_DATA_PLANE_REGISTER_FAILED", () => operations.seedRegister());
+    const registerReceipt = await fixedStep(
+      "DEV_AUTH_DATA_PLANE_REGISTER_FAILED",
+      () => operations.seedRegister()
+    );
+    await fixedStep(
+      "DEV_AUTH_DATA_PLANE_SUPPORT_CONFIG_FAILED",
+      () => operations.initializeSupportConfiguration(registerReceipt)
+    );
     await fixedStep("DEV_AUTH_DATA_PLANE_SECRET_FAILED", () => operations.generateSecrets());
     await fixedStep("DEV_AUTH_DATA_PLANE_MAIL_FAILED", () => operations.verifyMailCapture());
     const receipt = Object.freeze({
@@ -103,7 +122,8 @@ export async function startDevelopmentAuthDataPlane(
       hatchet: "READY",
       migrations: "APPLIED",
       principals: "ATTESTED",
-      register: "SEALED",
+      register: registerReceipt,
+      supportConfiguration: "HERMES_GLM_5_3_FLASH",
       secrets: "ATTESTED",
       mailCapture: "ATTESTED"
     } as const);
@@ -201,7 +221,7 @@ function runCommand(input: CommandInput): Promise<string> {
       if (settled) return;
       if (code === 0 && signal === null && !outputOverflow) {
         settled = true;
-        resolvePromise(Buffer.concat(standardOutput).toString("utf8").trim());
+        resolvePromise(Buffer.concat(standardOutput).toString("utf8"));
       } else {
         settleFailure();
       }
@@ -308,7 +328,7 @@ export function createDevelopmentAuthDataPlaneOperations(
         failureCode: "DEV_AUTH_DATA_PLANE_DOCKER_ENGINE_UNAVAILABLE",
         timeoutMs: 15_000
       });
-      if (!/^\d+\.\d+(?:\.\d+)?$/u.test(version)) {
+      if (!/^\d+\.\d+(?:\.\d+)?$/u.test(version.trim())) {
         throw new DevelopmentAuthDataPlaneError(
           "DEV_AUTH_DATA_PLANE_DOCKER_ENGINE_UNAVAILABLE"
         );
@@ -368,7 +388,7 @@ export function createDevelopmentAuthDataPlaneOperations(
       );
     },
     async seedRegister() {
-      await runPnpm(
+      const output = await runPnpm(
         ["dev:auth:seed-register"],
         "DEV_AUTH_DATA_PLANE_REGISTER_FAILED",
         {
@@ -376,6 +396,21 @@ export function createDevelopmentAuthDataPlaneOperations(
           DEBATEAI_DEV_PROVIDER_TARGETS_JSON: providerPanel.targetsJson
         }
       );
+      return parseDevelopmentDeploymentRegisterCliOutput(output, cwd);
+    },
+    async initializeSupportConfiguration(registerReceipt) {
+      const credentials = await loadDevelopmentSupportConfigCliCredentials(
+        join(custodyRoot, "database-principals.env")
+      );
+      const pool = createSupportControlPlanePool(credentials.databaseUrl);
+      try {
+        await initializeDevelopmentSupportConfiguration({
+          publication: createPostgresRegisterPublicationPort(pool),
+          baseRegisterVersion: registerReceipt.registerVersion
+        });
+      } finally {
+        await pool.end();
+      }
     },
     async generateSecrets() {
       await runPnpm(["dev:auth:generate-secrets"], "DEV_AUTH_DATA_PLANE_SECRET_FAILED");

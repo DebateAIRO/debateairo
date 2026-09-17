@@ -1,0 +1,5 @@
+ dialectical-engine/apps/ui/app/globals.css         |  1 +
+ dialectical-engine/apps/ui/app/new/page.tsx        | 66 ++++++++++++-------
+ .../tests/render/tier01-new-plan-tier.test.tsx     | 76 ++++++++++++++++++----
+ .../tests/unit/tier01-style-contract.test.ts       | 71 +++++++++++---------
+ 4 files changed, 148 insertions(+), 66 deletions(-)

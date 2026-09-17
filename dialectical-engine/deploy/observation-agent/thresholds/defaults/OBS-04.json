@@ -1,0 +1,21 @@
+{
+  "routing": {
+    "CAPTURE_NOT_WIRED": "INFO",
+    "BLIND_PERIOD": "DEGRADED",
+    "CAPTURE_GAP": "DEGRADED",
+    "SPOOL_STRANDED": "DEGRADED"
+  },
+  "modules": {
+    "capture-health": {
+      "detector_interval_ms": 15000,
+      "blind_window_s": 120,
+      "gap_window_s": 300,
+      "gap_severe_lost_count": 100,
+      "expected_runtimes": ["runner"]
+    },
+    "spool-health": {
+      "detector_interval_ms": 15000,
+      "spool_age_s": 600
+    }
+  }
+}

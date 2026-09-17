@@ -1,0 +1,7 @@
+ dialectical-engine/apps/api/src/index.ts           |  30 ++-
+ .../tests/architecture/tiers-s02-rosters.test.ts   | 118 +++++++++
+ .../tests/integration/evaluator-database.test.ts   |   4 +-
+ dialectical-engine/tests/unit/api.test.ts          |  26 +-
+ .../tests/unit/tiers-s02-admission.test.ts         | 290 +++++++++++++++++++++
+ .../tests/unit/tiers-s02-wire.test.ts              | 167 ++++++++++++
+ 6 files changed, 625 insertions(+), 10 deletions(-)

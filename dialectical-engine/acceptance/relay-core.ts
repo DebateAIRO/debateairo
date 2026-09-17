@@ -2,9 +2,12 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypt
 import { spawn } from "node:child_process";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { once } from "node:events";
+import {
+  accessSync, closeSync, constants, lstatSync, openSync, readSync, statSync
+} from "node:fs";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, isAbsolute, join, resolve } from "node:path";
 import { z } from "zod";
 
 /**
@@ -59,6 +62,8 @@ export interface CliRelayAdapter {
   readonly failureCode: string;
   /** Loud code for a deadline kill (e.g. CODEX_CLI_TIMEOUT). */
   readonly timeoutCode: string;
+  /** Maker-specific fixed values applied after the ambient allowlist. */
+  childEnvironment?(scratchDirectory: string): Readonly<Record<string,string>>;
   buildArguments(prompt: string): readonly string[];
   /** Throws CliRelayFailure instead of ever inventing content or lineage. */
   parseCompletion(stdout: string, prompt: string): CliCompletion | Promise<CliCompletion>;
@@ -81,6 +86,13 @@ export function buildCliChildEnvironment(
     const value = source[key];
     if (value !== undefined) environment[key] = value;
   }
+  const fixed = adapter.childEnvironment?.(scratchDirectory) ?? {};
+  for (const [key,value] of Object.entries(fixed)) {
+    if (!/^[A-Z][A-Z0-9_]*$/u.test(key) || value.length === 0 || /[\u0000]/u.test(value)) {
+      throw new TypeError("CLI_RELAY_CHILD_ENVIRONMENT_INVALID");
+    }
+    environment[key] = value;
+  }
   environment.PWD = scratchDirectory;
   environment.OLDPWD = scratchDirectory;
   return environment;
@@ -96,8 +108,17 @@ export function renderPromptTranscript(messages: readonly {
   });
 }
 
+/**
+ * The default may be supplied LAZILY. A default that reads configuration can
+ * fail on its own account (see resolveConfiguredBinary), and eager evaluation
+ * of such a default would let a configuration error pre-empt this guard's own
+ * typed-loud codes — selecting or rejecting the test seam must not depend on
+ * whether an unrelated environment key happens to be well formed. This
+ * function therefore stays the sole authority for both, and only reaches for
+ * the default once no test seam is in play.
+ */
 export function resolveTestGuardedCommand(
-  defaultCommand: CommandSpec,
+  defaultCommand: CommandSpec | (() => CommandSpec),
   testOnlyCommand: CommandSpec | undefined,
   forbiddenCode: string
 ): CommandSpec {
@@ -107,7 +128,201 @@ export function resolveTestGuardedCommand(
     }
     return testOnlyCommand;
   }
-  return defaultCommand;
+  return typeof defaultCommand === "function" ? defaultCommand() : defaultCommand;
+}
+
+/**
+ * Why a resolved candidate was refused. Each reason is distinct, and the path
+ * it refers to always travels with it (see {@link resolveConfiguredBinary}).
+ */
+export const BINARY_REFUSAL_REASONS = Object.freeze([
+  "NOT_ON_PATH", "NOT_FOUND", "EMPTY", "NOT_EXECUTABLE", "UNREADABLE", "NOT_A_PROGRAM"
+] as const);
+export type BinaryRefusalReason = typeof BINARY_REFUSAL_REASONS[number];
+
+/**
+ * The first bytes that make a file a PROGRAM this host can start directly: a
+ * `#!` line naming an interpreter, a Mach-O header in either width and either
+ * byte order, a universal ("fat") archive of those, or an ELF header. The last
+ * one is not decoration — this harness is meant to run on more than one
+ * computer, and a resolver that refused every Linux binary would refuse all four
+ * makers there while blaming a corruption that does not exist.
+ *
+ * Anything else is data wearing an executable bit. That distinction is not
+ * academic: a process launcher that cannot EXECUTE a file falls back to reading
+ * it as a script, and on 2026-09-17 a `codex` launcher whose contents had been
+ * replaced by four lines of plain text was read back as a script that re-ran
+ * itself, forking until this Mac's process table was full. A candidate is
+ * therefore read four bytes deep and NEVER started to find out what it is.
+ */
+const PROGRAM_HEADERS: readonly (readonly number[])[] = Object.freeze([
+  [0x23, 0x21],
+  [0xcf, 0xfa, 0xed, 0xfe],
+  [0xce, 0xfa, 0xed, 0xfe],
+  [0xfe, 0xed, 0xfa, 0xcf],
+  [0xfe, 0xed, 0xfa, 0xce],
+  [0xca, 0xfe, 0xba, 0xbe],
+  [0xbe, 0xba, 0xfe, 0xca],
+  [0x7f, 0x45, 0x4c, 0x46]
+].map((header) => Object.freeze(header)));
+
+/**
+ * The first four bytes, or null when the file could not be READ at all — which
+ * is a different fact from "these bytes are not a program". A mode-0111 script
+ * passes the executable check and then refuses to open; it is a perfectly good
+ * program, and calling it corrupt would send an operator hunting for damage that
+ * is not there.
+ */
+function readProgramHeader(path: string): Buffer | null {
+  const header = Buffer.alloc(4);
+  let descriptor: number | undefined;
+  let read = 0;
+  try {
+    descriptor = openSync(path, "r");
+    read = readSync(descriptor, header, 0, header.byteLength, 0);
+  } catch {
+    return null;
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
+  return header.subarray(0, read);
+}
+
+function isProgramHeader(header: Buffer): boolean {
+  return PROGRAM_HEADERS.some((magic) =>
+    magic.length <= header.byteLength && magic.every((byte, index) => header[index] === byte)
+  );
+}
+
+/**
+ * The single admission gate every resolved candidate passes, whichever route
+ * named it. `path` is ALWAYS absolute by the time it arrives here, because the
+ * string admitted is the string spawned (see resolveConfiguredBinary).
+ *
+ * `statSync` FOLLOWS symlinks on purpose: nearly every real launcher is one —
+ * a Homebrew or npm global bin, or the `~/.local/bin/claude` of 2026-09-17 that
+ * pointed at a 0-byte `…/versions/<v>`. The defect to catch lives in the target,
+ * while the path kept is the LINK, which is the name the operator installed and
+ * the argv[0] the CLI will see.
+ *
+ * The order of the checks is the order an operator can act on: what is there at
+ * all, then whether an interrupted install left nothing in it, then whether this
+ * user may run it, then whether the header could be read, then whether it is a
+ * program rather than data.
+ */
+function admitProgram(path: string, unresolvedCode: string): string {
+  const refuse = (reason: BinaryRefusalReason): never => {
+    throw new Error(`${unresolvedCode}:${reason}:${path}`);
+  };
+  let metadata;
+  try {
+    metadata = statSync(path);
+  } catch {
+    return refuse("NOT_FOUND");
+  }
+  if (!metadata.isFile()) return refuse("NOT_A_PROGRAM");
+  if (metadata.size === 0) return refuse("EMPTY");
+  try {
+    accessSync(path, constants.X_OK);
+  } catch {
+    return refuse("NOT_EXECUTABLE");
+  }
+  const header = readProgramHeader(path);
+  if (header === null) return refuse("UNREADABLE");
+  if (!isProgramHeader(header)) return refuse("NOT_A_PROGRAM");
+  return path;
+}
+
+/**
+ * THE FIRST PATH ENTRY THAT EXISTS UNDER THE NAME IS THE MATCH, and it is then
+ * admitted or refused; a broken entry is never stepped over. Unlike `command -v`,
+ * which skips a non-executable entry and keeps searching, this resolver names it.
+ * The difference between the two is only ever "refuse loudly, naming the file"
+ * versus "silently run a different install" — and for a debate engine whose whole
+ * output is model attribution, silently running some other `claude` than the one
+ * at the front of the operator's PATH is a lineage hazard, not an ergonomic one.
+ * The cost is real and is the trade taken knowingly: a stale, non-executable
+ * launcher in an early PATH directory now stops the ceremony where the operator's
+ * own shell would have answered cheerfully.
+ *
+ * A match is therefore an entry that EXISTS under that name — `lstatSync`, so a
+ * dangling symlink counts and is reported as NOT_FOUND rather than skipped.
+ *
+ * Directories are searched in PATH order, and an entry that is EMPTY or RELATIVE
+ * is skipped: a shell reads both as "the directory this process happens to be
+ * sitting in", which is not a deduction, and a candidate found that way could
+ * not be spawned as the same file anyway (see resolveConfiguredBinary).
+ */
+function discoverOnPath(
+  binaryName: string,
+  unresolvedCode: string,
+  source: NodeJS.ProcessEnv
+): string {
+  for (const directory of (source.PATH ?? "").split(delimiter)) {
+    if (!isAbsolute(directory)) continue;
+    const candidate = join(directory, binaryName);
+    try {
+      lstatSync(candidate);
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+  throw new Error(`${unresolvedCode}:NOT_ON_PATH:${binaryName}`);
+}
+
+/**
+ * D10, rewritten 2026-09-17. WHICH executable a maker relay spawns is a HOST
+ * fact, and a host fact is DEDUCED — never written into the source. The
+ * previous defaults were one developer's home directory and one installed app
+ * bundle; a checkout carried them onto every other machine.
+ *
+ * Order, for every maker:
+ *  1. the maker's `ACCEPTANCE_*_BINARY` key, when present and non-blank, names
+ *     the binary — a path, or a bare name to look up;
+ *  2. a key that is PRESENT BUT BLANK is a loud typed configuration failure
+ *     carrying the maker's bare code and nothing else. It never falls through
+ *     to discovery: an operator who set the key meant to decide, and guessing
+ *     on their behalf is the defect this whole seam exists to remove;
+ *  3. an absent key means discovery by the maker's NAME over the PATH of the
+ *     environment this resolver is HANDED (never `process.env` behind the
+ *     caller's back), first match wins.
+ *
+ * Whatever 1 or 3 resolves is then admitted or refused as a program. A refusal
+ * is `<UNRESOLVED_CODE>:<REASON>:<path>` on a plain Error, matching
+ * resolveTestGuardedCommand above: `run-acceptance.ts` records that message
+ * verbatim as the provider probe's failureCode and `absent-makers.ts` prints it
+ * as `MAKER ABSENT <maker> <code>`, so the operator reads the reason and the
+ * path off the run's own log. Nothing here ever starts a candidate.
+ *
+ * THE STRING RETURNED IS ALWAYS ABSOLUTE, and it is the same string `invokeCli`
+ * hands to `spawn`. That is a safety property, not tidiness: the child is
+ * started with `cwd` pointed at a fresh empty scratch directory and an
+ * environment carrying PATH, so a relative candidate would be re-resolved
+ * against a directory holding nothing, and a candidate that `join(".", name)`
+ * had collapsed to a BARE name would re-enter a PATH search INSIDE THE CHILD —
+ * starting a file this gate never examined. On macOS such a file, if it returns
+ * ENOEXEC, is retried through a command interpreter, which is the 2026-09-17
+ * fork-bomb path exactly. A relative key value is therefore resolved against the
+ * process cwd here, where it can still be checked; a relative PATH entry is not
+ * resolved at all, it is skipped.
+ */
+export function resolveConfiguredBinary(
+  binaryName: string,
+  environmentKey: string,
+  unresolvedCode: string,
+  source: NodeJS.ProcessEnv = process.env
+): string {
+  const configured = source[environmentKey];
+  if (configured === undefined) {
+    return admitProgram(discoverOnPath(binaryName, unresolvedCode, source), unresolvedCode);
+  }
+  const named = configured.trim();
+  if (named === "") throw new Error(unresolvedCode);
+  return admitProgram(
+    /[\\/]/u.test(named) ? resolve(named) : discoverOnPath(named, unresolvedCode, source),
+    unresolvedCode
+  );
 }
 
 export async function invokeCli(

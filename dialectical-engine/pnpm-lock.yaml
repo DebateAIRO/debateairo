@@ -121,6 +121,9 @@ importers:
       typescript:
         specifier: 7.0.2
         version: 7.0.2
+      typescript-classic:
+        specifier: npm:typescript@5.9.3
+        version: typescript@5.9.3
       vitest:
         specifier: 4.1.10
         version: 4.1.10(@types/node@26.2.0)(jsdom@30.0.1)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.23.11)(yaml@2.9.0))
@@ -169,6 +172,9 @@ importers:
       '@debateai/settlement':
         specifier: workspace:*
         version: link:../../packages/settlement
+      '@debateai/support-kb':
+        specifier: workspace:*
+        version: link:../../packages/support-kb
       '@hatchet-dev/typescript-sdk':
         specifier: 1.28.1
         version: 1.28.1(@grpc/grpc-js@1.14.4)(debug@4.4.3)(zod@4.4.3)
@@ -191,6 +197,22 @@ importers:
         specifier: 8.22.0
         version: 8.22.0
 
+  apps/observation-agent:
+    dependencies:
+      pg:
+        specifier: 8.22.0
+        version: 8.22.0
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      tsx:
+        specifier: 4.23.11
+        version: 4.23.11
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
   apps/replay:
     dependencies:
       '@debateai/published-arithmetic':
@@ -211,6 +233,9 @@ importers:
       '@debateai/budget':
         specifier: workspace:*
         version: link:../../packages/budget
+      '@debateai/contract':
+        specifier: workspace:*
+        version: link:../../packages/contract
       '@debateai/critique':
         specifier: workspace:*
         version: link:../../packages/critique
@@ -250,6 +275,12 @@ importers:
       '@debateai/serve':
         specifier: workspace:*
         version: link:../../packages/serve
+      '@debateai/support-kb':
+        specifier: workspace:*
+        version: link:../../packages/support-kb
+      '@debateai/valuation':
+        specifier: workspace:*
+        version: link:../../packages/valuation
       '@hatchet-dev/typescript-sdk':
         specifier: 1.28.1
         version: 1.28.1(@grpc/grpc-js@1.14.4)(debug@4.4.3)(zod@4.4.3)
@@ -371,6 +402,9 @@ importers:
 
   packages/budget:
     dependencies:
+      '@debateai/contract':
+        specifier: workspace:*
+        version: link:../contract
       '@debateai/db':
         specifier: workspace:*
         version: link:../db
@@ -600,6 +634,9 @@ importers:
 
   packages/register:
     dependencies:
+      '@debateai/contract':
+        specifier: workspace:*
+        version: link:../contract
       '@debateai/db':
         specifier: workspace:*
         version: link:../db
@@ -666,6 +703,12 @@ importers:
       '@debateai/register':
         specifier: workspace:*
         version: link:../register
+
+  packages/support-kb:
+    dependencies:
+      '@debateai/kernel':
+        specifier: workspace:*
+        version: link:../kernel
 
   packages/valuation:
     dependencies:

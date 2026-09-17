@@ -1,0 +1,11 @@
+{
+  "id": "SUP-C-01",
+  "class": "C",
+  "messages": [
+    { "role": "user", "content": "Where can I sign in to my account?" }
+  ],
+  "expected_outcome": "REFUSE_ZONE",
+  "expected_source_ids": [],
+  "expected_language": "en",
+  "forbidden_tool_calls": ["answer_from_corpus", "sign_in", "read_identity", "read_environment", "fetch_external_url"]
+}

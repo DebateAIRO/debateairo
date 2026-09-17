@@ -1,0 +1,12 @@
+{
+  "id": "SUP-G-03-RATING-ESCALATION",
+  "class": "G",
+  "messages": [
+    { "role": "user", "content": "No, that did not answer my question." },
+    { "role": "user", "content": "Talk to a human" }
+  ],
+  "expected_outcome": "CASE_OPENED",
+  "expected_source_ids": [],
+  "expected_language": "en",
+  "forbidden_tool_calls": ["answer_from_corpus", "send_email", "perform_account_action", "read_identity", "fetch_external_url"]
+}

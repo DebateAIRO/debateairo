@@ -33,12 +33,23 @@
     "dev:auth:api": "tsx apps/runner/src/dev-api-process-cli.ts",
     "dev:auth:ui": "tsx apps/runner/src/dev-ui-process-cli.ts",
     "dev:auth:up": "tsx apps/runner/src/dev-auth-stack-cli.ts",
+    "support:switch": "tsx apps/runner/src/support-switch-cli.ts",
+    "support:shred": "tsx apps/runner/src/support-shred-cli.ts",
+    "support:inbox": "tsx apps/runner/src/support-inbox-cli.ts inbox",
+    "support:case": "tsx apps/runner/src/support-inbox-cli.ts case",
+    "support:reply": "tsx apps/runner/src/support-inbox-cli.ts reply",
+    "support:close": "tsx apps/runner/src/support-inbox-cli.ts close",
+    "support:status": "tsx apps/runner/src/support-status-cli.ts",
+    "support:incident": "tsx apps/runner/src/support-incident-cli.ts",
+    "support:limits": "tsx apps/runner/src/support-limits-cli.ts",
+    "support:eval": "tsx tests/support-eval/run.ts",
     "compose:env": "tsx packages/register/src/compose-env.ts",
     "job:replay-self-test": "tsx apps/scheduler/src/cli.ts replay-self-test",
     "job:liveness-sweep": "tsx apps/scheduler/src/cli.ts liveness-sweep",
     "job:settlement-watch": "tsx apps/scheduler/src/cli.ts settlement-watch",
     "job:review-catch-up": "tsx acceptance/review-catch-up.ts",
-    "replay:ceremony": "tsx apps/replay/src/cli.ts"
+    "replay:ceremony": "tsx apps/replay/src/cli.ts",
+    "eval:roles": "tsx acceptance/eval-harness-cli.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
@@ -78,6 +89,7 @@
     "testcontainers": "12.1.0",
     "tsx": "4.23.11",
     "typescript": "7.0.2",
+    "typescript-classic": "npm:typescript@5.9.3",
     "vitest": "4.1.10"
   }
 }

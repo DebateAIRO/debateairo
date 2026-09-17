@@ -17,7 +17,7 @@ try {
   );
   console.log(
     `DEV_AUTH_DATA_PLANE_READY=${receipt.postgres}:${receipt.hatchet}:`
-      + `${receipt.migrations}:${receipt.principals}:${receipt.register}:`
+      + `${receipt.migrations}:${receipt.principals}:${receipt.register.receiptSha256}:`
       + `${receipt.secrets}:${receipt.mailCapture}`
   );
 } catch (error) {

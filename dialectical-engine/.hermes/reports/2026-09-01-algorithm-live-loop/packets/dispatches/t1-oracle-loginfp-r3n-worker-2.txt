@@ -1,0 +1,13 @@
+# DISPATCH t1-oracle-loginfp-r3n-worker-2 · 2026-09-06 08:23 · records round 2 (AMENDMENT 1) · same seat resumed
+
+# ---- AMENDMENT 1 (08:23 2026-09-06) — round 2 of 3 · after codex records-r3n r1 (B-B1, B-B2 blocking) ----
+verdict (final snapshot): /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/records-r3n/codex-r1-verdict.final-snapshot.md — read B-B1 and B-B2 whole, and the "preservation" section.
+B-B1: demonstrated counterexamples remain classified as unresolved possibilities. Append explicit dispositions in BOTH reports: retire "an unlisted
+operation costs a false positive, never a miss" as REFUTED by the recorded B1 evidence (not "undetermined"); state that terminal-selection
+counterexamples are ESTABLISHED; supersede "not widened" with the B3 distinction between inherited lexer limitations and a new observable
+use/regression. Preserve the original historical sentences.
+B-B2: the strength index still certifies inferences and leaves claims without an applicable label. Append atomic, addressable labels for the
+members the verdict names and sweep BOTH full reports including the records append itself; separate recorded fields/results (entailed) from
+execution/history/causal accounts (consistent-with where supported, otherwise undetermined); correct the five-case taxonomy as the verdict says
+(temporal staleness vs scope gaps vs the rest). Lane and logs untouched. Append only; `comments read through: records-r3n-codex-r1-2026-09-06`;
+end with `REWORK READY FOR REVIEW`.

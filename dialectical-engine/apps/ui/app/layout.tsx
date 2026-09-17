@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { Fraunces, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import { TopBar } from "@/components/TopBar";
+import { CookieConsent } from "@/components/consent/CookieConsent";
 import { NONCE_REQUEST_HEADER } from "../content-security-policy.mjs";
 import "./globals.css";
 
@@ -21,7 +22,7 @@ const sans = Plus_Jakarta_Sans({
 
 const mono = JetBrains_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-mono-src",
   display: "swap"
 });
@@ -52,6 +53,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <div className="appShell">
           <TopBar />
           {children}
+          <CookieConsent />
         </div>
       </body>
     </html>

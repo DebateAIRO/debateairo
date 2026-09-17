@@ -141,7 +141,14 @@ const EXECUTE_GRANTS: Readonly<Record<string, readonly string[]>> = {
   // role holding INSERT there (debateai_runtime, 0000:301) keeps EXECUTE — mirrors
   // 0040:6285 for serve.conformance_segment_results_are_valid. The only current
   // INSERT path (persistBootstrapRegister via the dev register CLI) runs as the owner.
-  "register.claim_type_composition_map_is_valid(jsonb)": ["debateai_runtime"],
+  // DEV-SYNC 2026-09-18: migration 0055_register_support_publication moved register
+  // INSERTs to the dedicated `debateai_register_publication_owner` role (0055:2010-2016)
+  // and grants it this CHECK function for the same executor-init reason; 0055 also revokes
+  // INSERT on register.register_row from debateai_runtime (0055:2019), so the runtime
+  // grant 0056 keeps is now surplus — a candidate for the post-sync guard migration.
+  "register.claim_type_composition_map_is_valid(jsonb)": [
+    "debateai_runtime", "debateai_register_publication_owner"
+  ],
   // trigger functions: fired by the trigger machinery, no application caller.
   "evidence.validate_instrument_certification()": [],
   "evidence.validate_citation_route_record()": [],

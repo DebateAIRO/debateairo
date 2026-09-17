@@ -1,0 +1,30 @@
+C1 x3  tests/architecture/s7-authorization-contract.test.ts > Accounts S7 ownership architecture > hardens every immutable memory scope carrier and derives it from run ownership
+C1 x3  tests/architecture/s8-publication-contract.test.ts > Accounts S8 publication architecture > ships the deliberate controls and public-only reader in the UI composition
+C2 x3  tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > FX-ORPH-04 walks web consumers in both directions and rejects the death-list inventory
+C2 x3  tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > carries the S04 orphan-audit wording fix and deterministic locale tiebreak
+C2 x3  tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > uses the generated contract client for both browser and SSR with no V2 wire mirror
+C3 x3  tests/architecture/sup-04-mounts.test.ts > SUP-04 widget mount boundary > admits exactly the four product-route importers
+C3 x3  tests/architecture/sup-04-mounts.test.ts > SUP-04 widget mount boundary > keeps the root layout and every zone route structurally support-free
+C3 x3  tests/render/ux01-new-debate-form.test.tsx > UX-01 DR-181 discovery-owned rendered /new flow > R3 exposes aria-controls exactly while the rendered Options panel exists
+C3 x3  tests/render/ux01-new-debate-form.test.tsx > UX-01 DR-181 discovery-owned rendered /new flow > carries the two steering fields into the ask as trimmed non-empty lines
+C3 x3  tests/render/ux01-new-debate-form.test.tsx > UX-01 DR-181 discovery-owned rendered /new flow > does not emit caller-supplied owner or privilege claims for any authenticated token
+C3 x3  tests/render/ux01-new-debate-form.test.tsx > UX-01 DR-181 discovery-owned rendered /new flow > keeps the visible risk choice asker-owned through the real page
+C3 x3  tests/render/ux01-new-debate-form.test.tsx > UX-01 DR-181 discovery-owned rendered /new flow > renders depth 1..5 while keeping retired apparatus and all machine-owned fields out of the DOM
+C3 x3  tests/render/ux01-new-debate-form.test.tsx > UX-01 DR-181 discovery-owned rendered /new flow > sends empty steering lists when the asker steers nothing
+C3 x3  tests/render/ux01-new-debate-form.test.tsx > UX-01 DR-181 discovery-owned rendered /new flow > submits the complete discovery-owned ask without an agent-count field
+C3 x3  tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps > kills MUT-A: deleting the V3ScoreBadges JSX render site
+C3 x3  tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps > kills MUT-C: deleting the maker meta line from the contentful node header
+C3 x3  tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps > uses DR-160 content-aware overflow instead of a fixed collapse breakpoint
+C3 x3  tests/unit/v2ui-pages.test.ts > UI-02d — every non-canvas maker surface preserves its recorded maker prop > pins tree, thread, outline, split, map, and drawer at all eight call sites
+C3 x3  tests/unit/v2ui-pages.test.ts > XREV-01 — node review uses the existing V2 card and drawer vocabulary > shows typed review outcome and reviewer house on cards, including honest absence
+C4 x3  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > 'DebateCanvas agreed review mark' binds its 'agreed review verdict' role
+C4 x3  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > 'DebateCanvas disputed review mark' binds its 'disputed review verdict' role
+C4 x3  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > 'DebateMap root hub' binds its 'reasoning accent' role
+C4 x3  tests/render/t3-library.test.tsx > lists > renders a live count for the three Public debates rows
+C4 x3  tests/render/t3-library.test.tsx > lists > renders every library row as a shell/core bezel
+C4 x3  tests/render/t3-library.test.tsx > lists > renders recased native selectors and a live count for the four Your debates rows
+C4 x3  tests/render/t3-library.test.tsx > lists > renders the public search-indexing disclosure once under the list and never on Yours
+C4 x3  tests/unit/pda-s03-keyboard-accessibility.test.ts > public debate navigation keyboard accessibility > computes a grouped control treatment and a non-colour-only current state for tab=public
+C4 x3  tests/unit/pda-s03-keyboard-accessibility.test.ts > public debate navigation keyboard accessibility > computes a grouped control treatment and a non-colour-only current state for tab=yours
+C4 x3  tests/unit/t9-mode-tokens.test.ts > T9-C3 mode control and document guard > leaves no mode-inert colour literal in the four Wave-0 product files
+C4 x3  tests/unit/t9-mode-tokens.test.ts > T9-C3 mode control and document guard > renders one accessible toggle that reads the document mode, flips it, and persists it

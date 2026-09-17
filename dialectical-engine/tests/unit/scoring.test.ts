@@ -10,7 +10,7 @@ import {
   type SnapshotArrow,
   type SnapshotNode
 } from "@debateai/propagation";
-import { agg, product, σ } from "@debateai/published-arithmetic";
+import { agg, σ } from "@debateai/published-arithmetic";
 
 const node = (nodeId: string, baseStrength: number | null, rest: Partial<SnapshotNode> = {}): SnapshotNode => ({
   nodeId,
@@ -34,13 +34,13 @@ const arrow = (
   kind: polarity === "attack" ? "rebutting" : null,
   strength: 1,
   magnitudeStatus: "MEASURED",
-  strengthSource: "EVIDENCE_VERIFIER",
+  strengthSource: "REVIEWER",
   ...rest
 });
 
 const resolution = (
   parentNodeId: string,
-  operator: "accumulate" | "strict-and" = "accumulate",
+  operator: "accumulate" = "accumulate",
   suppliedBy: "parent" | "run" | "deployment" = "deployment"
 ): OperatorResolution => ({ parentNodeId, operator, suppliedBy });
 
@@ -61,12 +61,10 @@ const strengths = (input: EvaluationSnapshot): Map<string, number> => new Map(
 );
 
 describe("AC-80 — published DF-QuAD arithmetic", () => {
-  it("FX-LV-09 publishes probabilistic aggregation, the tie-safe mediator, and strict product", () => {
+  it("FX-LV-09 publishes probabilistic aggregation and the tie-safe mediator", () => {
     expect(agg([])).toBe(0);
     expect(agg([0.4, 0.4, 0.4])).toBeCloseTo(0.784, 12);
     expect(σ(0.37, 0.4, 0.4)).toBe(0.37);
-    expect(product([0.95, 0.6, 0.35, 0.5])).toBeCloseTo(0.09975, 12);
-    expect(() => product([])).toThrow("no identity");
   });
 
   it("FX-LV-01 reproduces literature vector 1", () => {
@@ -232,37 +230,51 @@ describe("S03 ruled graph behavior", () => {
     expect(Object.is(root, agg([0.3, 1e-16, 1e-16]))).toBe(false);
   });
 
-  it("FX-HR-H4 computes the same tree under both operators and records a rival reading", () => {
+  // T8 / S5-2: the paired-operator reading is repealed. What survives is the
+  // accumulate arm and the receipt that names WHICH register level supplied the
+  // operator — the strength and the provenance, without a counterfactual.
+  it("FX-HR-H4 scores the tree under the single operator and records its supplying level", () => {
     const nodes = [node("root", 0.5), ...["a", "b", "c", "d"].map((id) => node(id, 0.5))];
     const arrows = ["a", "b", "c", "d"].map((id) => arrow(`${id}-root`, id, "root", "support"));
     const accumulate = evaluate(snapshot(nodes, arrows, [resolution("root", "accumulate", "run")]));
-    const strict = evaluate(snapshot(nodes, arrows, [resolution("root", "strict-and", "parent")]));
-    expect(accumulate.strengths.find((item) => item.nodeId === "root")).toMatchObject({
+    const record = accumulate.strengths.find((item) => item.nodeId === "root");
+    expect(record).toMatchObject({
       strength: 0.96875,
       operatorUsed: "accumulate",
-      operatorLevel: "run",
-      rivalOperator: "strict-and",
-      rivalStrength: 0.53125
+      operatorLevel: "run"
     });
-    expect(strict.strengths.find((item) => item.nodeId === "root")).toMatchObject({
-      strength: 0.53125,
-      operatorUsed: "strict-and",
-      operatorLevel: "parent",
-      rivalOperator: "accumulate",
-      rivalStrength: 0.96875
-    });
+    // The repealed pair is absent from the receipt, not merely null.
+    expect(Object.keys(record!)).not.toContain("rivalOperator");
+    expect(Object.keys(record!)).not.toContain("rivalStrength");
   });
 
   it("FX-PT-D2 resolves operator rows parent then run then mandatory deployment", () => {
+    // Precedence is proved by the supplying LEVEL, since the vocabulary is now
+    // a single member and cannot distinguish the levels by value.
     expect(resolveScoringOperator({
-      parent: { scoringOperator: "strict-and" as const },
+      parent: { scoringOperator: "accumulate" as const },
       run: { scoringOperator: "accumulate" as const },
       deployment: { scoringOperator: "accumulate" as const }
-    })).toEqual({ value: "strict-and", suppliedBy: "parent" });
+    })).toEqual({ value: "accumulate", suppliedBy: "parent" });
+    expect(resolveScoringOperator({
+      parent: {}, run: { scoringOperator: "accumulate" as const },
+      deployment: { scoringOperator: "accumulate" as const }
+    })).toEqual({ value: "accumulate", suppliedBy: "run" });
     expect(resolveScoringOperator({
       parent: {}, run: {}, deployment: { scoringOperator: "accumulate" as const }
     })).toEqual({ value: "accumulate", suppliedBy: "deployment" });
     expect(() => resolveScoringOperator({ parent: {}, run: {}, deployment: {} })).toThrow("Mandatory deployment register row");
+  });
+
+  it("T8 rejects the repealed operator at the register door", () => {
+    expect(() => resolveScoringOperator({
+      parent: { scoringOperator: "strict-and" },
+      run: {},
+      deployment: { scoringOperator: "accumulate" as const }
+    })).toThrow("Invalid scoringOperator register value at parent");
+    expect(() => resolveScoringOperator({
+      parent: {}, run: {}, deployment: { scoringOperator: "strict-and" }
+    })).toThrow("Invalid scoringOperator register value at deployment");
   });
 
   it("FX-PT-D3 collapses shared provenance on both polarities and keeps keyless arrows singleton", () => {
@@ -329,14 +341,20 @@ describe("S03 ruled graph behavior", () => {
     expect(output.strengths.find((record) => record.nodeId === "root")?.strength).toBe(0.75);
   });
 
-  it("AC-26 withholds strict-and when a conjunct is unjudged and does not fabricate tau", () => {
+  // T8 / S5-2 replaces AC-26. The withholding branch is repealed: an unjudged
+  // conjunct is still reported as unjudged and still contributes nothing, but it
+  // no longer suppresses the parent's number, and there is no withheld channel.
+  it("AC-26 reports the unjudged conjunct and scores the parent from what was judged", () => {
     const output = evaluate(snapshot([
       node("root", 0.5),
       node("pending", null)
-    ], [arrow("pending-root", "pending", "root", "support")], [resolution("root", "strict-and")]));
+    ], [arrow("pending-root", "pending", "root", "support")], [resolution("root")]));
     expect(output.unjudgedNodeIds).toEqual(["pending"]);
-    expect(output.withheld).toEqual([{ nodeId: "root", reason: "STRICT_AND_CONJUNCT_UNJUDGED_OR_ABSTAINED" }]);
-    expect(output.strengths.some((item) => item.nodeId === "root")).toBe(false);
+    expect(output).not.toHaveProperty("withheld");
+    // tau is not fabricated: the unjudged support contributes nothing, so the
+    // parent keeps its own base strength.
+    expect(output.strengths.find((item) => item.nodeId === "root")?.strength).toBe(0.5);
+    expect(output.strengths.some((item) => item.nodeId === "pending")).toBe(false);
   });
 
   it("DR-071 / DR-127 subtracts the undercut reduction with zero clamp and serves 0.75", () => {
@@ -371,14 +389,29 @@ describe("S03 ruled graph behavior", () => {
     expect(relabeled.strengths.find((item) => item.nodeId === "root")?.strength).toBeCloseTo(0.7, 12);
     expect(evaluate({ ...left, nodes: [node("root", 0.6, { positionLabel: "opposes" }), node("source", 0.4)] }).graphFingerprintMaterial)
       .not.toBe(leftResult.graphFingerprintMaterial);
-    expect(evaluate({ ...left, operatorResolutions: [resolution("root", "strict-and")] }).graphFingerprintMaterial)
+    expect(evaluate({ ...left, operatorResolutions: [resolution("root", "accumulate", "parent")] }).graphFingerprintMaterial)
       .not.toBe(leftResult.graphFingerprintMaterial);
   });
 
   it("FX-C52-09 names the carrying piece after K=1", () => {
-    expect(resolveLeverage({ completedRounds: 1, carryingNodeId: "node:carrying" })).toEqual({
-      kind: "LEVERAGE_UNRESOLVED",
-      carryingNodeId: "node:carrying"
+    // T7 / mission ruling J3: the stub that answered LEVERAGE_UNRESOLVED is
+    // implemented — it now RESOLVES the root-scoped leverage of the named
+    // carrying node. The K=1 floor it always guarded is unchanged; the exact
+    // root-scoping arithmetic is pinned in tests/unit/t07-adaptive-stopping.test.ts.
+    const outcome = evaluate(snapshot([
+      node("root", 0.5), node("node:carrying", 0.5)
+    ], [arrow("carry-root", "node:carrying", "root", "support", { strength: 0.5 })], [resolution("root")]));
+
+    expect(resolveLeverage({
+      completedRounds: 1,
+      carryingNodeId: "node:carrying",
+      sensitivityRecords: outcome.sensitivityRecords,
+      rootNodeIds: ["root"]
+    })).toEqual({
+      kind: "LEVERAGE_RESOLVED",
+      carryingNodeId: "node:carrying",
+      leverage: 0.125,
+      rootNodeIds: ["root"]
     });
   });
 

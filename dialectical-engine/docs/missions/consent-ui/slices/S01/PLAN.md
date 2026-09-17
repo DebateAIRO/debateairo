@@ -1,0 +1,1193 @@
+# S01 — PLAN v1 (scaffold REQ-01; steps, clusters, boundaries and refutation by ARCH-S01, 2026-09-06) · rework round 1 applied 2026-09-06 by ARCH-S01-REWORK-R1 · rework round 2 applied 2026-09-06 by ARCH-S01-REWORK-R2; PASSED ARCH-REV-S01 round 3 at 22:14
+
+**Status: FILLED, rework round 1 applied; rework round 2 applied 2026-09-06 by ARCH-S01-REWORK-R2; PASSED ARCH-REV-S01 round 3 at 22:14 (`reviews/ARCH-REV-S01-r3.md`).** REQ-01 created the trace skeleton, the law below and the table
+headers. ARCH-S01 authored `## Steps`, `## Clusters`, the `## Refutation table`, and the additions to
+`## Boundaries`. Requirements does not author steps; architecture does not edit `SPEC.md`.
+
+**What rework rounds 1 and 2 changed** (round 1 answers `reviews/ARCH-REV-S01-r1.md`, round 2 answers
+`reviews/ARCH-REV-S01-r2.md`; every change is recorded in `DECISIONS.md` under `## ARCHITECTURE rework round 1`
+and `## ARCHITECTURE rework round 2`, and no step was renumbered — the one new step, in round 1, is `S01-S47`):
+
+| Finding | What moved in this file |
+|---|---|
+| **B1** glyph-matching guard terms | `n_inv`, `n_keep`, `n_mount` re-anchored on the test NAME; all seven commands re-run from a `.sh` file AND inline, both verdicts in §A9; per-term mutant table added |
+| **B2** the colour-literal delta counted the pin, not the hit list | every command that runs `t9-mode-tokens` gains `n_hits` (the received-array elements); **`CMD-C5` gains the `t9` run and both terms** |
+| **B3** `S01-S16`'s unowned wiring clause | deleted; the behaviour is `S01-S29`'s. `S01-S16` no longer serves `S01-R04`, and `R04`'s trace row drops it |
+| **B4** `S01-S35`/`S01-S36` wrote `PROGRESS.md` | both now read `files: none — this step writes nothing`; the instruction is a report on the ticket |
+| **B5** a count pasted from a command that outputs `0` | the counting rule is replaced and **every** pasted count in this file was re-run |
+| **B6** one step in no trace row, seven one-directional gaps | rows corrected and the trace is now proved by a **both-ways script**, output pasted |
+| **N1** vacuous typecheck term | `tt=$?` captured and `n_tcran` asserted in all seven commands |
+| **N2** the A9 row called `CMD-C1` RED while its guard passes | the row now says both, and says which one a coding seat may use as reproduce-first evidence |
+| **N3** two wrong line pointers | `:433` / `:426`, measured; DECISIONS correction appended |
+| **N4** §Concurrency ↔ mission graph disagreed | `C1 → C3` added here; `C2 → C3` removed from the graph (it was B3's clause) |
+| **N5** "placed LAST" | "last before the slice-wide guards", with the reason C7 still follows |
+| **N6** `CMD-C5` pinned another mission's failure count | monotone `n_newfail` delta; proved to survive a repair of that mission's tests |
+| **N7** four guard steps with no mutant | `S01-S42 … S01-S45` each carry a one-line mutant recipe |
+| orchestrator | S02's exported helper surface cited in `S01-S38`/`S01-S39`; the ADR is step `S01-S47` in `C2` |
+| **N3** (round 2, re-raised blocking) §Boundaries still carried the two line pointers round 1 measured wrong, so this file contradicted §A9 about them | the wrong pair is gone, and §Boundaries now attaches each pointer to the assertion it claims: `tests/unit/t9-mode-tokens.test.ts:433` = `expect(measuredRows).toBe(34)`, `:426` = `rows` has exactly `names.length` entries — the same two numbers §A9's pasted `grep` prints |
+| **N9** (round 2) `CMD-C6`'s working-tree `s02` term cannot see a COMMITTED edit to an S02-owned file, while three places claimed it can | `CMD-C6` gains the commit-range arm — `st` (the `slice/consent-s02` ref resolved, its exit code asserted so a missing ref cannot pass the arm vacuously) and `n_s02c` (`git log <recorded S02 tip>..HEAD` over the four S02-owned paths must count **0**); the working-tree `s02` term is KEPT as the second arm. The three claims are corrected in `S01-S36`'s `accept:`, `S01-S36`'s refutation row, and §A9(c), where the single BY CONSTRUCTION `s02` row became two MEASURED rows (§A9(c)'s headline moves **12 → 14** mutants built and flipped) |
+| orchestrator (round 2) ADR number reallocated (`COMMON.md` §10.23) | every site that named `ADR-0019` — `S01-S47`'s `files:`, the `S01-C2` cluster row, `CMD-C2`'s `adr=$(cat …)` capture, and §Boundaries' one-`docs/`-file rule — now names **`ADR-0021-consent-storage-contract.md`**; `S01-S47` keeps one mention of the old number, in the sentence recording that the halted `translation` mission holds it |
+
+**Tracking `SPEC.md` v3 (REQ-01 rework round 2, 2026-09-06).** `SPEC.md` is **v3**; the frozen v1 and v2 are
+archived beside it as `SPEC-v1.md` and `SPEC-v2.md`. **Read `SPEC.md`, never an archive.** No R-id was
+renumbered in either round, so every trace row below still resolves; the rows whose short description changed in
+v2 are marked **v2** and are R14, R17, R18, R20, R21, R24 and R28. The v2 changes that reach this file: the
+Boundaries section names `apps/ui/components/consent/modalSemantics.ts` as S02-owned and S01-consumed
+(`COMMON.md` §10.7), and the "must stay green" list is unchanged. **v3 changed two things in `SPEC.md` and
+NEITHER reaches this file:** R08's hook now points at R24 instead of R21 for the token single-writer rule
+(REQ-REV-01 N10 — a cross-reference fix, no requirement moved), and §Copy's escape counts are now measured
+rather than estimated (N11). No trace row changes.
+
+**Identity of the SPEC this plan was written against, verified before planning** (against
+`reviews/REQ-REV-01-r3.md`'s `## Pins for the next round`, which is the last lens's own record):
+
+```
+$ md5 -q docs/missions/consent-ui/slices/S01/SPEC.md docs/missions/consent-ui/slices/S02/SPEC.md docs/missions/consent-ui/INSTRUCTIONS.md
+ebb223421b5f9fd872c0f13dabcbb533
+ad060bda81db71f00f4c70b1dbf63f2f
+82d9cdf691e8fac95e9000fa31dbfbca
+```
+
+All three match the r3 pins byte for byte. This plan is against v3.
+
+## Quantifiability law
+
+> A stranger can mark every step done or not-done with no judgement call.
+>
+> - WRONG: "improve error handling"
+> - RIGHT: "requests with a missing id return 400 with a message, and the test asserting
+>   this passes"
+>
+> A step nobody can verify mechanically is not a step; split it until it is. Each step names
+> its cluster, its acceptance test, and its file surface.
+
+Binding additions for this mission:
+
+- **Banned in any step or acceptance criterion:** improve, better, robust, handle,
+  appropriate. They mean the deciding is not finished.
+- **Every pinned number carries its derivation** in the same step (the SPEC does this for
+  720px, 680px, 8px and 92vh — steps inherit the obligation for any new number).
+- **Three-run law:** each cluster's ONE verification command runs three times and the WORST
+  run is the verdict. Green-green-red is RED. Re-running until green is falsification.
+- **`UNVERIFIED` is a legal, respected step outcome.** A guess presented as a result is not.
+- Report suites as `passed/total`, name every failure, and state whether it predates the
+  slice. **The baseline authority is `docs/missions/consent-ui/BASELINE.md`** — read it before
+  reporting any suite. Three baselines are already red and must be inherited, never claimed:
+  `pnpm typecheck` (8 diagnostics in `tests/unit/s14-ui.test.ts`; run
+  `pnpm run generate:contract` first), `tests/architecture/auth-front-door-parity.test.ts`
+  (exit 1, `Tests 2 failed (2)`, ENOENT on deleted `web/` files), and — the one that matters
+  most here — **`tests/unit/t9-mode-tokens.test.ts` itself** (exit 1,
+  `Tests 2 failed | 6 passed (8)`), which is the file S01 must edit. Its gate is the delta in
+  S01-R24: the inventory test GREEN, the failure set unchanged at exactly two, and the
+  colour-literal hit list unchanged at exactly one line.
+- **A FOURTH red baseline, measured by ARCH-S01 on 2026-09-06 and NOT in `BASELINE.md`:**
+  `tests/render/t3-library.test.tsx` is red at base — exit 1, `Tests 4 failed | 11 passed (15)`, all four
+  failures inside its `lists` describe. **Both tests this slice must keep green are GREEN at base**
+  (`chrome > keeps the real layout TopBar as a direct appShell child` and
+  `chrome > pins the real signed-in render to zero landing markers`). `SPEC.md` §Tests and this file's
+  Boundaries both say the file "must stay GREEN", which is true of the two tests S01 depends on and false of
+  the file. **S01-C5's guard therefore names those two tests and freezes the failure set at the four `lists`
+  names; a whole-file pass count could never be satisfied and would send a seat chasing another mission's
+  failures.** `tests/render/t9-landing.test.tsx` IS green at base (exit 0, `Tests 16 passed (16)`).
+  Filed as a finding against `BASELINE.md` in the ARCH-S01 handoff.
+- **Every count in this file carries the command that produced it and that command's pasted output**
+  (`COMMON.md` §10.10 corollary, from REQ-REV-01 N13). No count here was typed from memory.
+
+## SPEC trace (R-id · step ids · cluster)
+
+Every requirement in `SPEC.md` has a row, and every step below appears in at least one row.
+Read the other way: `## Steps` lists 47 steps `S01-S01 … S01-S47`, and every one names at least one R-id.
+
+**This claim is now proved by a script that checks BOTH directions, not by a pair of `grep -c`**
+(ARCH-REV-S01 **B6** — a count of rows proves nothing about the contents of the step column). The script is
+`scratchpad/arch-s01-rework-r1/trace_both_ways.py`; its output is pasted under the table.
+
+| R-id | Requirement (short) | PLAN steps | Cluster |
+|---|---|---|---|
+| S01-R01 | Storage key `debateai.consent`, five-member JSON, `v:1` | S01-S05, S01-S06, S01-S47 | C2 |
+| S01-R02 | Version mismatch re-asks; no migration code | S01-S07, S01-S47 | C2 |
+| S01-R03 | Absent / corrupt / throwing storage re-asks; nothing throws | S01-S08, S01-S47 | C2 |
+| S01-R04 | What each of the four controls writes | S01-S09, S01-S23, S01-S29 | C2, C4, C5 |
+| S01-R05 | Clearing site data restores first-visit | S01-S05, S01-S08, S01-S28, S01-S47 | C2, C5 |
+| S01-R06 | Server renders nothing; read after mount; no pre-paint script | S01-S25, S01-S26 | C5 |
+| S01-R07 | Mounted once in `layout.tsx` after `{children}`; every route | S01-S27 | C5 |
+| S01-R08 | Five z-index tokens against the measured ladder | S01-S01, S01-S02 | C1 |
+| S01-R09 | Bar geometry, quantified | S01-S16 | C3 |
+| S01-R10 | Bar stacks below 720px (derived) | S01-S17 | C3 |
+| S01-R11 | Bar copy byte-exact | S01-S12, S01-S13 | C3 |
+| S01-R12 | Bar is a labelled region, in tab order, no focus trap | S01-S14 | C3 |
+| S01-R13 | Bar offers no dismissal that is not a decision | S01-S15 | C3 |
+| S01-R14 | **v2** Card opens as a centred dialog on `--scrim`; bar hidden; on close with no decision the bar returns **iff no valid stored decision exists, from either entry** (B1) | S01-S29, S01-S30, S01-S31, S01-S32 | C5 |
+| S01-R15 | Card geometry | S01-S22 | C4 |
+| S01-R16 | Three categories verbatim | S01-S10, S01-S19, S01-S20 | C2, C4 |
+| S01-R17 | **v2** Toggle semantics, Essential locked; defaults apply whenever no valid decision is stored, **from either entry** (B1 class) | S01-S20, S01-S21, S01-S34 | C4, C5 |
+| S01-R18 | **v2** Card is a modal dialog with focus trap, no `×`; Esc only while topmost; semantics come from the S02-owned shared helper | S01-S24, S01-S36, S01-S41, S01-S45 | C4, C6, C7 |
+| S01-R19 | Footer actions write and close | S01-S23 | C4 |
+| S01-R20 | **v2** **`PrivacyPolicyModal` interface — byte-identical to S02-R14**, now carrying the read-mode `Close` button (N9) and the Esc-stack rule (B3) | S01-S36, S01-S37, S01-S38, S01-S39, S01-S40, S01-S45 | C6, C7 |
+| S01-R21 | **v2** Settings → Privacy panel with `Cookie preferences`; pre-filled from a valid stored decision, else R17's defaults (B1 class) | S01-S11, S01-S31, S01-S33, S01-S34 | C2, C5 |
+| S01-R22 | Settings is auth-gated; anonymous visitors are redirected | S01-S35 | C5 |
+| S01-R23 | Honesty: the choice loads, unloads and gates nothing | S01-S44 | C7 |
+| S01-R24 | **v2** Sole writer of both token blocks + the token test; ten new tokens (set-equality citation corrected to `:376-377`, N2) | S01-S01, S01-S02, S01-S03, S01-S04 | C1 |
+| S01-R25 | No colour literal; one delimited CSS block | S01-S04, S01-S16, S01-S22, S01-S42 | C1, C3, C4, C7 |
+| S01-R26 | Both modes, live | S01-S02, S01-S46 | C1, C7 |
+| S01-R27 | `prefers-reduced-motion` block for its own selectors | S01-S43 | C7 |
+| S01-R28 | **v2** Category copy lives in one exported constant — **moved into `## Requirements` in R-order, number unchanged** (N4) | S01-S10, S01-S47 | C2 |
+| S01-R29 | The bar overlays only the debate token dock, blocking no control | S01-S18 | C3 |
+
+**Every count below was re-run after this rework and pasted from the run** (ARCH-REV-S01 **B5**: a count in
+v1 was pasted as `46` from a pipeline that can only ever emit `0`). **Counting rules are ASCII-only**: the
+`· serves:` bullet is U+00B7, two bytes, so a pattern that stands a bare `.` in for it returns 0 under BSD
+`grep` in the C locale and the right answer under the tool shell's `ugrep` — B1's defect wearing B5's hat.
+Every command here was run from a `.sh` file under `/bin/bash` **and** inline; both agree.
+
+```
+$ grep -cE '^\*\*S01-R[0-9]{2} ' docs/missions/consent-ui/slices/S01/SPEC.md
+29
+$ grep -cE '^\| S01-R[0-9]{2} \|' docs/missions/consent-ui/slices/S01/PLAN.md
+29
+$ grep -cE '^\*\*S01-S[0-9]{2}' docs/missions/consent-ui/slices/S01/PLAN.md
+47
+$ grep -A1 -E '^\*\*S01-S[0-9]{2}' docs/missions/consent-ui/slices/S01/PLAN.md | grep -cE 'serves: S01-R'
+47
+$ grep -cE '^\| S01-S[0-9]{2} \|' docs/missions/consent-ui/slices/S01/PLAN.md      # refutation rows
+47
+```
+
+**Rows: 29. Requirements in SPEC.md: 29. Steps: 47. Steps carrying a `serves:` field: 47. Refutation rows: 47.**
+Requirements with no step: 0. Steps with no R-id: 0.
+
+**The both-ways proof** — `python3 scratchpad/arch-s01-rework-r1/trace_both_ways.py PLAN.md SPEC.md`,
+which exits 0 only when direction 1 (every R-id a step claims lists that step), direction 2 (every step a
+row lists claims that R-id) and "every step in ≥ 1 row" are all clean:
+
+```
+steps defined                 : 47   (min S01-S01 .. max S01-S47; contiguous=True; duplicates=False)
+trace rows                    : 29
+requirements in SPEC.md       : 29
+requirements with no row      : none
+rows with no requirement      : none
+steps named in >=1 row        : 47
+steps in NO row               : none
+steps with no serves:         : none
+rows with no step             : none
+step ids named in a row but not defined: []
+
+DIRECTION 1  steps -> rows : 0 gap(s)
+DIRECTION 2  rows -> steps : 0 gap(s)
+
+BOTH-WAYS VERDICT: CLEAN
+script exit=0
+```
+
+## Steps
+
+Every path below is absolute inside the lane
+`/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/consent-s01/dialectical-engine/`,
+written from here as `LANE/`. Every command runs from `LANE/` (the level holding `package.json`) —
+`COMMON.md` §3: running at the worktree root yields `No test files found` for every command.
+
+**RED-first is structural, not advisory.** Every step that adds behaviour names the test that is RED before
+it and GREEN after, and the RED must be *watched*: `superpowers:test-driven-development` — a test you did not
+see fail has not been shown to test anything. A step whose test passes the moment it is written is a defect
+in that step, not a shortcut: stop and fix the test.
+
+**Field order in every step:** `serves:` the R-id(s) · `files:` created/edited · `test:` the file and the
+PROPERTY its assertion establishes, in one sentence · `accept:` what a stranger observes · `cluster:`.
+
+---
+
+### Cluster S01-C1 — the token contract
+
+**S01-S01 — Register the ten new tokens of R24 in the token test's three maps, and watch the inventory test go RED.**
+· serves: S01-R24, S01-R08
+· files: edit `LANE/tests/unit/t9-mode-tokens.test.ts` — add `--ok-soft`, `--ok-edge`, `--muted-bg`, `--muted-border` to `TERRACOTTA` (`:42-150`) and to `CHAMBER` (`:152-260`), and add `--scrim`, `--z-consent-bar`, `--z-consent-scrim`, `--z-consent-card`, `--z-policy-scrim`, `--z-policy-card` to `MODE_INDEPENDENT` (`:262-299`). Values byte-identical to R24's table, comma-tight, alpha in the leading-dot form (`rgba(62,122,78,.28)`, never `0.28`).
+· test: `LANE/tests/unit/t9-mode-tokens.test.ts` → `T9-C3 token contract > declares the complete inventory and the same mode-bearing key set in both modes`. PROPERTY: the map key set and the set of custom properties actually declared in `globals.css` are the same set, so no token can be registered in one place and forgotten in the other.
+· accept: that test, GREEN at base, is now FAILING, and its diff names all ten added keys as present in `expectedRoot`/`expectedChamber` and absent from `rootNames`/`chamberNames`. **This is the required RED.** Nothing else in the file changed its result.
+· cluster: S01-C1
+
+**S01-S02 — Declare the ten tokens inside the two EXISTING token blocks, and watch the inventory test go GREEN.**
+· serves: S01-R24, S01-R08, S01-R26
+· files: edit `LANE/apps/ui/app/globals.css` — the four mode-bearing tokens into `:root` (measured at `:5-97`) AND into `html[data-mode="chamber"]` (measured at `:99-158`); the six mode-independent tokens into `:root` only. **Never a second `:root` block:** `tests/unit/t9-mode-tokens.test.ts:341-345` locates each block with `lines.findIndex`, so only the first is ever seen, and a token declared in a second block is invisible to the guard AND its line is scanned by the colour-literal test.
+· test: same test as S01-S01. PROPERTY unchanged; the derivation of each value is pinned in the same step — the four tint-derived values reproduce from `design-data.js:22-25`'s own `tint(hex,a)` applied to `okC` `#3E7A4E`/`#86B58D` (`:28`) and to `tA.mute` `#6E675C`/`#9C907A` (`:5,:10`); `--scrim` is `rgba(10,8,6,.42)` copied from `turn-10-cookie-consent.html:49`; the five z-index integers are R08's table.
+· accept: the inventory test passes; `pnpm exec vitest run tests/unit/t9-mode-tokens.test.ts` reports exactly two failures and both are the pinned pair (the ModeToggle label, the one `.drawerScrim` colour literal).
+· cluster: S01-C1
+
+**S01-S03 — Add the composite-contrast pin the SPEC hands over as UNVERIFIED, RED first.**
+· serves: S01-R24
+· files: edit `LANE/tests/unit/t9-mode-tokens.test.ts` — one new `it()` inside `describe("T9-C3 token contract")`, plus a local `composite(rgba, hexSurface)` helper in the same file.
+· test: the new `it("clears 4.5:1 for --muted on --muted-bg over --core, and 3:1 for the toggle's ON-vs-OFF state, in both modes")`. PROPERTY: a translucent tint's readability is measured against the colour a reader actually sees — the tint composited over its opaque surface — not against the tint's own unrenderable rgba string. **`tests/support/contrast.ts:3-5` throws `TypeError` on any argument that is not `#RRGGBB`**, so `contrastRatio("rgba(110,103,92,.1)", …)` cannot be called at all; that is why this stayed unmeasured through three review rounds. The composite rule, stated so the number is reproducible: `c = round(alpha*fg + (1-alpha)*bg)` per channel.
+· accept: the new test is RED before the helper exists (`TypeError: Expected an #RRGGBB colour, received rgba(110,103,92,.1)`) and GREEN after, printing four ratios that match these values measured by ARCH-S01 on 2026-09-06: Terracotta `--muted-bg` over `--core` = `#EFECE7`, `--muted` `#6E675C` against it = **4.743** (≥ 4.5); Chamber `rgba(156,144,122,.14)` over `#181410` = `#2A251F`, `--muted` `#9C907A` against it = **4.833** (≥ 4.5); toggle ON track `--ok-dot` vs OFF track `--shell` = **4.246** Terracotta / **7.171** Chamber (≥ 3, WCAG 1.4.11). **The ten values of R24 therefore stand and no token is changed.**
+· cluster: S01-C1
+
+**S01-S04 — Confirm the colour-literal hit list is unchanged at exactly one entry.**
+· serves: S01-R24, S01-R25
+· files: none — this step changes nothing and exists so the coding seat reads the hit list rather than the exit code.
+· test: `LANE/tests/unit/t9-mode-tokens.test.ts` → `leaves no mode-inert colour literal in the four Wave-0 product files`. PROPERTY: every colour outside the two token blocks is a `var(--token)` reference and can therefore respond to mode. The test is RED at base and is read as a HIT LIST, never as a colour.
+· accept: the received array printed by that failure has exactly one element and it is `apps/ui/app/globals.css:<n>:background: color-mix(in srgb, #0a0806 32%, transparent);` — the `.drawerScrim[data-drawer-scrim]` line, whose number shifts as later clusters append CSS. Measured at base in this lane: `globals.css:6096`. A second element is this slice's finding, not another mission's.
+· cluster: S01-C1
+
+---
+
+### Cluster S01-C2 — the consent domain module
+
+**S01-S05 — Write the R01 storage-shape test first; watch it fail on a missing module.**
+· serves: S01-R01, S01-R05
+· files: create `LANE/tests/render/consent-storage.test.tsx` with `// @vitest-environment jsdom` on line 1 and `beforeEach`/`afterEach` that both call `localStorage.clear()` — mandatory, because `vitest.config.ts:19` sets `fileParallelism: false`, so a leaked key persists into later files in the same worker. Precedent: `tests/render/t1-canvas.test.tsx:105,133`.
+· test: the new file. PROPERTY: a written decision round-trips as an object with exactly the five members R01 names and no others, and its `decidedAt` is an ISO-8601 UTC instant. The assertions are `JSON.parse(localStorage.getItem("debateai.consent"))` deep-equal against the expected object with `decidedAt` matched by `/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/`, and `Object.keys(...).sort()` equal to `["analytics","decidedAt","essential","quality","v"]`.
+· accept: `pnpm exec vitest run tests/render/consent-storage.test.tsx` exits non-zero with a module-resolution failure naming `apps/ui/lib/consent.ts`. **This is the required RED.**
+· cluster: S01-C2
+
+**S01-S06 — Create the module with the read/write codec; watch S05 go GREEN.**
+· serves: S01-R01
+· files: create `LANE/apps/ui/lib/consent.ts` exporting `CONSENT_KEY = "debateai.consent"`, `CONSENT_VERSION = 1`, the `ConsentDecision` type, `readConsent(): ConsentDecision | null` and `writeConsent(d): void`.
+· test: as S05. PROPERTY unchanged.
+· accept: S05's assertions pass; the key set assertion passes; nothing else in the file is asserted yet.
+· cluster: S01-C2
+
+**S01-S07 — Version mismatch re-asks, with no migration code, RED first.**
+· serves: S01-R02
+· files: edit `LANE/tests/render/consent-storage.test.tsx`, then `LANE/apps/ui/lib/consent.ts`.
+· test: the case seeding `{"v":0,"essential":true,"quality":true,"analytics":true,"decidedAt":"2026-01-01T00:00:00.000Z"}`. PROPERTY: a stored value whose `v` is not the integer `1` is indistinguishable from no decision, so `readConsent()` returns `null` and the caller re-asks.
+· accept: `readConsent()` returns `null` for that seed; a source-text assertion in the same file confirms `apps/ui/lib/consent.ts` contains no branch on any version other than `1` (`grep -c 'v === 0'` over the module returns 0), because R02's reason is that migration code for a case that cannot occur would be untested.
+· cluster: S01-C2
+
+**S01-S08 — Absent, unparseable, non-object and short-of-five values all re-ask, and no access throws, RED first.**
+· serves: S01-R03, S01-R05
+· files: edit `LANE/tests/render/consent-storage.test.tsx`, then `LANE/apps/ui/lib/consent.ts`.
+· test: six cases — `null`, `"not json"`, `"[]"`, `'{"v":1}'`, a `getItem` stub that throws, and a `setItem` stub that throws. PROPERTY: every `localStorage` access is inside `try/catch` (house precedent `apps/ui/components/ModeToggle.tsx:23-27`, `apps/ui/app/layout.tsx:39-42`), so a read failure is reported as "no decision" and a write failure is swallowed, and neither propagates an exception to a caller.
+· accept: the first four cases return `null`; the throwing-`getItem` case returns `null` and raises nothing; the throwing-`setItem` case returns normally and raises nothing. `localStorage.clear()` followed by `readConsent()` returns `null` — R05's jsdom half.
+· cluster: S01-C2
+
+**S01-S09 — The four control rows of R04 as a pure function, RED first.**
+· serves: S01-R04
+· files: edit `LANE/tests/render/consent-storage.test.tsx`, then `LANE/apps/ui/lib/consent.ts` adding `decisionFor(control, toggles)`.
+· test: four cases, one per row of R04's table. PROPERTY: `Accept all` writes `true/true/true`; both `Essential only` entry points write the byte-identical object `true/false/false`; `Save choices` writes `true` plus the two current toggle values; and every one sets `v` to `1` and `decidedAt` to the moment of the call.
+· accept: the four parsed objects match R04 exactly, and the bar's `Essential only` and the card's `Essential only` produce objects that are equal after removing `decidedAt` — R04's own sentence, asserted rather than assumed.
+· cluster: S01-C2
+
+**S01-S10 — `COOKIE_CATEGORIES`, the twelve strings byte-exact, RED first.**
+· serves: S01-R28, S01-R16
+· files: edit `LANE/tests/render/consent-storage.test.tsx`, then `LANE/apps/ui/lib/consent.ts` adding the exported constant, three records of `{ id, name, tag, description, detail, locked, defaultOn }` in `cookieCats` order.
+· test: the new case. PROPERTY: the three category records carry the twelve strings of §Copy verbatim, in the design's order, and they live in exactly one place so the contested cookie-name ruling (row Q7-01) is a one-line data edit.
+· accept: the twelve strings deep-equal §Copy's table. **The escape rule, because this is where the mission has already paid twice:** `design-data.js:89` holds the six-character ASCII escape `’`, not the character. Copying that escape into a TypeScript string literal is correct — the language decodes it. Copying it into JSON, a raw template literal or JSX text ships six visible characters. **The assertion compares DECODED characters** (`debates’ text`), so it fails either way round if the transcription is wrong. §Copy is the authority; the extract is not.
+· cluster: S01-C2
+
+**S01-S11 — The cross-tree preference-request store, RED first.**
+· serves: S01-R21
+· files: edit `LANE/tests/render/consent-storage.test.tsx`, then `LANE/apps/ui/lib/consent.ts` adding `requestPreferences(opener: HTMLElement | null): void` and `subscribeToPreferenceRequests(fn): () => void`.
+· test: the new case. PROPERTY: a caller that holds no reference to the consent component can still ask it to open the card, and the opener element travels with the request so focus can be returned to it. **Why a store and not React context:** R07 pins the mount as a SIBLING placed after `{children}`, and a sibling cannot provide context to `{children}` — the mechanism is forced by the requirement, not chosen for taste (DECISIONS, ARCH-S01).
+· accept: a subscriber registered before `requestPreferences(el)` receives exactly one call carrying `el`; the returned unsubscribe stops further calls; a `requestPreferences` with no subscriber raises nothing.
+· cluster: S01-C2
+
+**S01-S47 — Write the repo-wide ADR for the `debateai.consent` storage contract.** *(NEW in rework round 1. No step was renumbered; a new step takes the next free id and is placed in the cluster it serves — here `S01-C2`, whose module IS the contract.)*
+· serves: S01-R01, S01-R02, S01-R03, S01-R05, S01-R28
+· files: create `LANE/docs/architecture/01-decisions/ADR-0021-consent-storage-contract.md`. **0021 is the number the ORCHESTRATOR allocated** (`COMMON.md` §10.23, ORCHESTRATOR CORRECTION on `t_5490215a`): `ADR-0019` and `ADR-0020` are held by the halted `translation` mission, and `ADR-0022-shared-modal-semantics.md` is S02's. The bare `ls docs/architecture/01-decisions/` — which ends at `ADR-0018-deployment-topology.md`, and is what rework round 1 reasoned from — is **not** the allocation rule: a number on disk is only the last one WRITTEN, never the last one CLAIMED, and 0019 is claimed in a mission folder no `ls` of that directory can see (`docs/missions/translation/INSTRUCTIONS.md:62`). Numbers are allocated by the orchestrator against a repo-wide grep and recorded in the ledger; the measured reference counts, and the one I could not reproduce, are in `DECISIONS.md`. Follow the house shape measured across all 18 existing ADRs: an `# ADR-0021 — …` title, then a `| Field | Value |` table whose first row is **`| **Status** | **Proposed** — V ratifies. |`**, then `## Context`, `## Decision`, `## Consequences`. The content is TRANSCRIBED, not re-decided: the key, the five members and the `v` integer from `SPEC.md` R01; the not-1-re-asks rule with no migration code from R02; the corrupt/throwing/absent behaviour from R03; the clear-site-data property from R05; the one-exported-constant rule from R28; and the reasons already recorded in `DECISIONS.md` §Storage. **It proposes nothing new** — an ADR that decides something the SPEC did not is a SPEC change wearing an ADR's clothes.
+· test: `CMD-C2` asserts the file mechanically (`n_adrst` = 1 over `^\| \*\*Status\*\* \| \*\*Proposed\*\*`, `n_adrkey` ≥ 1 over `debateai\.consent`). PROPERTY: the localStorage contract has a repo-wide record with a ratifiable status, so the first consumer months from now does not meet a schema documented only inside a closed mission's folder.
+· accept: the file exists at that exact path; `CMD-C2` reports `ADR Status:Proposed lines: 1` and `debateai.consent mentions: ≥ 1`; and every value in the ADR appears verbatim in `SPEC.md` or `DECISIONS.md` — a reviewer diffs it against those two and finds no third source. **RED first:** the step's own guard is failing before the file exists (measured at base: `n_adrst`=0, `n_adrkey`=0), which is the required RED for a step whose deliverable is a document.
+· cluster: S01-C2
+
+---
+
+### Cluster S01-C3 — the bar (10a)
+
+**S01-S12 — Write the R11 byte-exact copy test first; watch it fail on a missing component.**
+· serves: S01-R11
+· files: create `LANE/tests/render/consent-bar.test.tsx` (`// @vitest-environment jsdom`, `createRoot` + `act`, `localStorage.clear()` in both hooks; precedent `tests/render/auth-flow-integration.test.tsx:1-70`).
+· test: the new file. PROPERTY: the eyebrow, the Fraunces title, the body paragraph and the three button labels equal §Copy's strings by `textContent`, so a paraphrase fails.
+· accept: the run exits non-zero on a missing `apps/ui/components/consent/CookieBar.tsx`. **Required RED.**
+· cluster: S01-C3
+
+**S01-S13 — Create `CookieBar.tsx` as a presentational component; watch S12 go GREEN.**
+· serves: S01-R11
+· files: create `LANE/apps/ui/components/consent/CookieBar.tsx` — `"use client"`, props `{ onAcceptAll, onEssentialOnly, onChoose }`, no storage access of its own.
+· test: as S12. PROPERTY unchanged.
+· accept: the five strings match; the component reads and writes no storage (a source-text assertion that the file contains no `localStorage`).
+· cluster: S01-C3
+
+**S01-S14 — The bar is a labelled region in natural tab order and traps no focus, RED first.**
+· serves: S01-R12
+· files: edit `LANE/tests/render/consent-bar.test.tsx`, then `LANE/apps/ui/components/consent/CookieBar.tsx`.
+· test: the new case. PROPERTY: the bar exposes `role="region"` with `aria-label="Cookie consent"`, and its focusable descendants appear in DOM order `Essential only`, `Choose what to store`, `Accept all` — the design's order, which is also the order in which a reader meets the least-committing option first.
+· accept: the role and label assert equal; `[...bar.querySelectorAll("button")].map(b => b.textContent.trim())` equals that three-element array; and the component contains no `.focus()` call and no `addEventListener` — the bar must never pull focus, because a visitor has to be able to read the page before deciding.
+· cluster: S01-C3
+
+**S01-S15 — The bar offers no dismissal that is not a decision, RED first.**
+· serves: S01-R13
+· files: edit `LANE/tests/render/consent-bar.test.tsx`, then `LANE/apps/ui/components/consent/CookieBar.tsx`.
+· test: the new case. PROPERTY: pressing Escape with the bar showing leaves the bar in the document and writes nothing, and the bar renders no close control.
+· accept: after dispatching a `keydown` with `key: "Escape"` on `document`, the bar element is still in the document and `localStorage.getItem("debateai.consent")` is still `null`; the rendered button labels are exactly the three of R11 — there is no fourth control and no `×`.
+· cluster: S01-C3
+
+**S01-S16 — Open the ONE delimited `globals.css` block and add the bar's rules at R09's quantified values.**
+· serves: S01-R09, S01-R25
+· files: edit `LANE/apps/ui/app/globals.css` — append `/* === consent-ui S01 === */` … `/* === end consent-ui S01 === */` at the END of the file, below every existing rule, and put the bar's selectors inside it: `.consentBar` (`position: fixed; left: 22px; right: 22px; bottom: calc(22px + var(--safe-b)); z-index: var(--z-consent-bar)`), `.consentBarBezel` (`background: var(--shell); border: 1px solid var(--line-strong); border-radius: var(--r-panel); padding: 7px; box-shadow: var(--shadow-pop)`), `.consentBarCore` (`background: var(--core); border: 1px solid var(--line); border-radius: 10px; padding: 17px 20px 16px; overflow: hidden; position: relative; display: flex; align-items: center; gap: 24px`), `.consentTab` (`position: absolute; top: 0; left: 20px; width: 52px; height: 4px; border-radius: var(--r-tab); background: var(--gold)`), `.consentBody { max-width: 560px }`, `.consentActions { display: flex; gap: 9px }`, `.consentGhost`/`.consentPrimary` with `white-space: nowrap`. **This step writes CSS and nothing else.** (v1 ended here with "Also wire the bar's three buttons to `writeConsent(decisionFor(...))` through their props' call sites" — **deleted in rework round 1**, ARCH-REV-S01 **B3**: it named no file, had no acceptance, and its only lawful home is `CookieConsent.tsx`, which C5 creates. `S01-S29` already owns that behaviour with a file, a test and an observation.)
+· test: `LANE/tests/render/consent-bar.test.tsx` — a source-text assertion over `globals.css`. PROPERTY: every one of R09's numbers appears in the shipped stylesheet, and every colour in the block is a `var(--token)` reference. **jsdom computes no layout, so this asserts the declared rule text, not a rendered pixel** — the pixels are V's, acceptance steps 1-2.
+· accept: the block exists exactly once (`grep -c '=== consent-ui S01 ===' globals.css` returns 1), it is the last block in the file, R09's values are present as written, and no line inside it matches `#[0-9a-f]{3,8}|rgba?\(|oklch\(`.
+· cluster: S01-C3
+
+**S01-S17 — The 720px stack rule, RED first, with its derivation restated.**
+· serves: S01-R10
+· files: edit `LANE/tests/render/consent-bar.test.tsx`, then `LANE/apps/ui/app/globals.css` inside the S01 block.
+· test: the new case, a source-text assertion. PROPERTY: a `@media (max-width: 719.98px)` rule exists inside the S01 block and sets the core to `flex-direction: column; align-items: stretch; gap: 14px`, the button group to `flex-wrap: wrap` with `flex: 1 1 auto; min-width: 0`, and the bar's three insets to 12px. **720 is derived, not conventional** (restated per the law): three button labels at the designed 11.5-12px/600-700 measure ≈ 118 + 155 + 100 = 373px, plus two 9px gaps = ~391px; a readable copy column needs ~260px; the row gap is 24px and the core's horizontal padding is 40px — 391 + 260 + 24 + 40 = 715px, so the designed row stops fitting just under 720, and 720 also sits below the 768px tablet-portrait width so tablets keep the designed layout.
+· accept: the media query and all six declarations are present in the block; `white-space: nowrap` is still set on the buttons inside it.
+· cluster: S01-C3
+
+**S01-S18 — The bar carries no route-conditional offset, RED first.**
+· serves: S01-R29
+· files: edit `LANE/tests/render/consent-bar.test.tsx`, then confirm `LANE/apps/ui/app/globals.css`.
+· test: the new case. PROPERTY: the bar's bottom offset is the same expression on every route, so no layout-level component learns which route it is on. The overlap it accepts is with `.tokenDock` (`globals.css:3396-3403`, `z-index: 40`, rendered only on the owner debate view at `apps/ui/app/debate/[id]/DebatePageClient.tsx:1525-1529`), which holds exactly one NON-interactive status pill — so the bar at `--z-consent-bar: 45` covers a status indicator and never a control.
+· accept: the S01 block contains exactly one `bottom:` declaration for `.consentBar`, it is `calc(22px + var(--safe-b))`, and the block contains no selector matching `debate` or `tokenDock`.
+· cluster: S01-C3
+
+---
+
+### Cluster S01-C4 — the preferences card body (10b)
+
+**S01-S19 — Write the R16 twelve-string test first; watch it fail on a missing component.**
+· serves: S01-R16
+· files: create `LANE/tests/render/consent-card.test.tsx` (jsdom, `createRoot` + `act`, `localStorage.clear()` in both hooks).
+· test: the new file. PROPERTY: the card renders the three categories in `cookieCats` order, each with its name, tag pill, description and mono detail line, and every one of the twelve strings comes from `COOKIE_CATEGORIES` — so a component that inlines a string fails.
+· accept: the run exits non-zero on a missing `apps/ui/components/consent/CookiePreferencesCard.tsx`. **Required RED.**
+· cluster: S01-C4
+
+**S01-S20 — Create `CookiePreferencesCard.tsx`; watch S19 go GREEN.**
+· serves: S01-R16, S01-R17
+· files: create `LANE/apps/ui/components/consent/CookiePreferencesCard.tsx` — `"use client"`, props `{ initial: {quality, analytics}, onSave, onEssentialOnly, onDismiss, onRequestPolicy }`. It holds only the two toggle booleans in local state; it reads and writes no storage.
+· test: as S19. PROPERTY unchanged, plus: the eyebrow `CHOOSE WHAT TO STORE`, title `Cookie preferences` and lede `Asked once. Revisit any time from Settings → Privacy.` match §Copy by `textContent`.
+· accept: the twelve category strings and the four card strings assert equal; a source-text assertion confirms the file contains no `localStorage`; `onRequestPolicy` is accepted and not yet called by anything but the `Privacy notice` control (its modal is wired in C6).
+· cluster: S01-C4
+
+**S01-S21 — Toggle semantics, including the Essential lock, RED first.**
+· serves: S01-R17
+· files: edit `LANE/tests/render/consent-card.test.tsx`, then `LANE/apps/ui/components/consent/CookiePreferencesCard.tsx`.
+· test: five cases. PROPERTY: each category row carries one `role="switch"` control whose `aria-checked` is the single source of truth for its state; Essential is permanently `true` and inert; the other two respond identically to click, `Space` and `Enter`.
+· accept: on a fresh open with nothing stored the three `aria-checked` values are `true`, `true`, `false` in category order; the Essential switch also carries `aria-disabled="true"` and `cursor: not-allowed`, and after a click, a `Space` keydown and an `Enter` keydown it is still `aria-checked="true"`; `Space` and `Enter` and click each flip the other two; and mounting with `initial={{quality:false, analytics:true}}` (the seeded-decision case of R17's hook) yields `true`, `false`, `true`.
+· cluster: S01-C4
+
+**S01-S22 — Card geometry at R15's quantified values, inside the same delimited block.**
+· serves: S01-R15, S01-R25
+· files: edit `LANE/apps/ui/app/globals.css` — append the card's selectors INSIDE the existing `/* === consent-ui S01 === */` block opened by S01-S16 (never a second block); edit `LANE/tests/render/consent-card.test.tsx`.
+· test: a source-text assertion. PROPERTY: R15's numbers appear in the shipped stylesheet as written, and the card's layer comes from tokens rather than from a literal.
+· accept: the block contains `.consentCard { width: min(520px, calc(100vw - 32px)); max-height: 92vh; … }` with bezel `background: var(--shell); padding: 7px; border-radius: 18px`, core `background: var(--core); border: 1px solid var(--line); border-radius: 12px; padding: 22px 24px 20px; position: relative; overflow: hidden`, `.consentTab` reused at `left: 24px`, `.consentCatRow { padding: 14px 0; border-bottom: 1px solid var(--line) }`, `.consentSwitch { width: 38px; height: 22px; padding: 2px }` with a 16px knob, `.consentScrim { background: var(--scrim); z-index: var(--z-consent-scrim) }` and `.consentCard { z-index: var(--z-consent-card) }`; the category list is the scrolling element under `max-height: 92vh`. **jsdom computes no layout — the rendered 520px width, the 92vh cap and the 38×22 toggle are V's, acceptance steps 6 and 14.**
+· cluster: S01-C4
+
+**S01-S23 — Footer actions write per R04 and close both surfaces, RED first.**
+· serves: S01-R19, S01-R04
+· files: edit `LANE/tests/render/consent-card.test.tsx`, then `LANE/apps/ui/components/consent/CookiePreferencesCard.tsx`.
+· test: two cases. PROPERTY: `Essential only` and `Save choices` each invoke exactly one callback carrying the decision R04's table names, and neither leaves a surface behind.
+· accept: clicking `Save choices` with quality OFF and analytics ON calls `onSave` once with `{essential:true, quality:false, analytics:true}`; clicking `Essential only` calls `onEssentialOnly` once; the footer renders exactly three controls in DOM order `Privacy notice`, `Essential only`, `Save choices` and no `×` — the design gives 10b no close glyph (`turn-10-cookie-consent.html:126-131`).
+· cluster: S01-C4
+
+**S01-S24 — The card's dialog ARIA, RED first. (The trap itself arrives in C6.)**
+· serves: S01-R18
+· files: edit `LANE/tests/render/consent-card.test.tsx`, then `LANE/apps/ui/components/consent/CookiePreferencesCard.tsx`.
+· test: the new case. PROPERTY: the card announces itself to assistive technology as a modal dialog named by its own visible title, so a screen-reader user is told what the surface is before its contents.
+· accept: the card element carries `role="dialog"`, `aria-modal="true"` and an `aria-labelledby` whose value is the `id` of the element whose `textContent` is `Cookie preferences`. **The file still contains no `addEventListener`, no `.focus()` and no `keydown` listener of its own** — asserted here so C6's helper is the only source of those, per §Out of scope's ban on a second focus trap or Esc listener.
+· cluster: S01-C4
+
+---
+
+### Cluster S01-C5 — mount, the state machine, and the Settings re-entry
+
+**S01-S25 — Write the R06 no-server-render test first; watch it fail on a missing component.**
+· serves: S01-R06
+· files: create `LANE/tests/render/consent-mount.test.tsx` (jsdom, `createRoot` + `act`, `localStorage.clear()` in both hooks).
+· test: the new file. PROPERTY: the surface contributes nothing to server-rendered markup and nothing to the first client render, so a returning visitor never sees the bar flash and the server and client markup cannot disagree.
+· accept: the run exits non-zero on a missing `apps/ui/components/consent/CookieConsent.tsx`. **Required RED.**
+· cluster: S01-C5
+
+**S01-S26 — Create `CookieConsent.tsx`, the ONE state machine; watch S25 go GREEN.**
+· serves: S01-R06
+· files: create `LANE/apps/ui/components/consent/CookieConsent.tsx` — `"use client"`, first render returns `null`, a `useEffect` calls `readConsent()` and only then may the bar render; it owns the surface state (`silent | bar | card`), the opener element for focus return, and the subscription from S01-S11.
+· test: as S25. PROPERTY unchanged.
+· accept: `renderToStaticMarkup(<CookieConsent />)` equals the empty string `""`; in jsdom the bar is absent on the first render pass and present after effects flush; and a source-text assertion confirms `apps/ui/app/layout.tsx` gained **no** second inline `<script>` — `tests/unit/t9-mode-tokens.test.ts` → `keeps the pre-paint storage guard inside head and before body` stays green, because the mode guard is still the only pre-paint reader.
+· cluster: S01-C5
+
+**S01-S27 — Mount it once in `layout.tsx` after `{children}`, RED first, without moving `<TopBar />`.**
+· serves: S01-R07
+· files: edit `LANE/tests/render/consent-mount.test.tsx`, then `LANE/apps/ui/app/layout.tsx` — ONE import and ONE `<CookieConsent />` element placed after `{children}` and inside `<div className="appShell">` (measured today at `:45-48`).
+· test: the new case, a source-text assertion over `layout.tsx`. PROPERTY: the consent surface is mounted exactly once, app-wide, in a position that leaves `<TopBar />` the immediately adjacent first child of `.appShell`.
+· accept: `layout.tsx` matches `/\{children\}\s*<CookieConsent \/>/`; it contains exactly one `<CookieConsent` occurrence; and **`tests/render/t3-library.test.tsx > chrome > keeps the real layout TopBar as a direct appShell child` (which asserts `/<div className="appShell">\s*<TopBar \/>/` at `:236`) is still GREEN** — it was green at base and mounting between `.appShell` and `<TopBar />` is the one placement that would break it. The consent surface carries no `data-landing-section` attribute, so `t3-library.test.tsx:244` and `t9-landing.test.tsx:121-125` also stay green.
+· cluster: S01-C5
+
+**S01-S28 — Clearing site data restores the first-visit state, RED first.**
+· serves: S01-R05
+· files: edit `LANE/tests/render/consent-mount.test.tsx`.
+· test: the new case. PROPERTY: the bar's presence is a function of storage alone, so removing the key and remounting reproduces a first visit exactly.
+· accept: seed a valid `v:1` decision, mount, assert the bar is absent; then `localStorage.clear()`, unmount and remount, and assert the bar is in the document.
+· cluster: S01-C5
+
+**S01-S29 — Opening the card hides the bar and shows the scrim, and the bar's own buttons write per R04, RED first.**
+· serves: S01-R14, S01-R04
+· files: edit `LANE/tests/render/consent-mount.test.tsx`, then `LANE/apps/ui/components/consent/CookieConsent.tsx`.
+· test: four cases. PROPERTY: the machine's three states are mutually exclusive — with the card open the bar is not rendered anywhere in the app — and each terminal control writes the object R04 names and lands in `Silent`.
+· accept: clicking `Choose what to store` leaves zero elements with the bar's role/label in the document and exactly one `.consentScrim`; clicking `Accept all` on the bar stores `{"v":1,"essential":true,"quality":true,"analytics":true,…}` and removes the bar; clicking `Essential only` on the bar stores `…"quality":false,"analytics":false…`; and `Save choices` from the card stores the current toggles. Each parsed object satisfies S01-S05's key-set assertion.
+· cluster: S01-C5
+
+**S01-S30 — Esc from the first-visit entry returns the bar and writes nothing, RED first.**
+· serves: S01-R14
+· files: edit `LANE/tests/render/consent-mount.test.tsx`, then `LANE/apps/ui/components/consent/CookieConsent.tsx`.
+· test: the new case. PROPERTY: dismissing the card without deciding is not a decision — it restores the state the visitor was in, and storage is untouched.
+· accept: with nothing stored, open the card from the bar, press Esc, then assert the bar IS in the document, the card is NOT, and `localStorage.getItem("debateai.consent")` is `null`.
+· cluster: S01-C5
+
+**S01-S31 — The B1 pin: nothing stored, Settings entry, Esc — the bar returns HERE TOO. RED first.**
+· serves: S01-R14, S01-R21
+· files: edit `LANE/tests/render/consent-mount.test.tsx`, then `LANE/apps/ui/components/consent/CookieConsent.tsx`.
+· test: the case REQ-REV-01 **B1** created and which v1 had no hook for. PROPERTY: **the discriminator is the stored decision, never the entry point.** A signed-in visitor who has deleted `debateai.consent` in DevTools still holds an HttpOnly session cookie, so they can reach `/settings` → Privacy → `Cookie preferences` with nothing stored; under v1's entry-point rule one keystroke made a consent gate disappear.
+· accept: seed NOTHING; mount the Settings panel together with `CookieConsent`; open the card via the panel's `Cookie preferences` button; press Esc; assert **the bar IS in the document** and `localStorage.getItem("debateai.consent")` is still `null`. **This assertion must be watched RED against an implementation that branches on the entry point** — write that branch, see the test fail, then delete it. A pin that has only ever been green against the correct code has not been shown to catch the defect it exists for.
+· cluster: S01-C5
+
+**S01-S32 — Esc from the Settings entry WITH a valid decision leaves everything silent, RED first.**
+· serves: S01-R14
+· files: edit `LANE/tests/render/consent-mount.test.tsx`.
+· test: the complementary case. PROPERTY: the same rule read the other way — a valid stored decision means no surface returns, from any entry point.
+· accept: seed `{"v":1,"essential":true,"quality":true,"analytics":true,"decidedAt":"2026-01-01T00:00:00.000Z"}`; open the card from the Settings panel; press Esc; assert neither bar nor card is in the document and the stored string is byte-for-byte what was seeded.
+· cluster: S01-C5
+
+**S01-S33 — The Settings `Privacy` panel, RED first.**
+· serves: S01-R21
+· files: edit `LANE/tests/render/consent-mount.test.tsx`; create `LANE/apps/ui/components/consent/ConsentSettingsPanel.tsx`; edit `LANE/apps/ui/app/settings/page.tsx` — ONE import and ONE `<ConsentSettingsPanel />` element inside `AccountSettingsScreen` (today at `:52-84`), beside `<SessionControls />`.
+· test: the new cases. PROPERTY: the promise the 10b lede makes — `Revisit any time from Settings → Privacy` — is kept by a real surface, and the panel exists whether or not a decision is stored. **The panel is its own component and not inline JSX** because `AccountSettingsScreen` is a non-exported local function inside a page wrapped in `<AuthGate>`; an inline panel could only be tested by mounting the whole page through the auth gate, and a cluster whose test needs the whole app is not independently verifiable.
+· accept: the panel renders `setSectionHead` / `setSectionTitle` `Privacy` / `setSectionHint` `Choose what this browser stores. Asked once; change it here any time.` / a `setBtn` labelled `Cookie preferences`, following `apps/ui/components/SessionControls.tsx:166-171`'s vocabulary; clicking the button opens the card with `aria-checked` reflecting a seeded decision; `settings/page.tsx` contains exactly one `<ConsentSettingsPanel` occurrence.
+· cluster: S01-C5
+
+**S01-S34 — Defaults from EITHER entry when nothing is stored, RED first.**
+· serves: S01-R17, S01-R21
+· files: edit `LANE/tests/render/consent-mount.test.tsx`.
+· test: the second member of B1's class, swept by REQ-01 rather than reported. PROPERTY: with no valid stored decision the card opens at R17's defaults regardless of which control opened it.
+· accept: with nothing stored, the card opened from the Settings panel shows `aria-checked` `true`, `true`, `false` in category order — the same three values as the card opened from the bar, asserted in the same test against both openers.
+· cluster: S01-C5
+
+**S01-S35 — Record R22's auth gate as a read fact, and mark it UNVERIFIED by test.**
+· serves: S01-R22
+· files: none.
+· test: **none, and that is the honest answer.** PROPERTY: an anonymous visitor never reaches the Privacy panel because `apps/ui/app/settings/page.tsx:37-39` is `<AuthGate>{() => <AccountSettingsScreen />}</AuthGate>` and `apps/ui/components/AuthGate.tsx:21-23` redirects with `window.location.replace("/login")`. This slice changes neither line, so there is no new behaviour to pin; asserting a redirect this slice did not write would be a test of another component.
+· accept: the coding seat reads both citations and **REPORTS on its ticket** — it writes no file — that neither line was edited by this slice: it pastes `git diff --stat HEAD -- apps/ui/components/AuthGate.tsx` (empty) and `git diff --stat HEAD -- apps/ui/app/settings/page.tsx` (changed by exactly the two lines of S01-S33), and records the step as **UNVERIFIED by test — V acceptance step 10b** (signed out, open `/settings`, observe the redirect). **`PROGRESS.md` is the orchestrator's file** (`COMMON.md` §4) and `docs/missions/**` is in no cluster's file surface; v1's wording sent the seat to write it (ARCH-REV-S01 **B4**).
+· cluster: S01-C5
+
+---
+
+### Cluster S01-C6 — modal semantics and the `Privacy notice` link (the cross-slice cluster)
+
+> **This cluster starts only after the ORCHESTRATOR has merged `slice/consent-s02` into this lane.**
+> A coding seat never runs `merge`, `push`, `checkout` or `branch` — `COMMON.md` §3. The two files this
+> cluster consumes, `apps/ui/components/consent/modalSemantics.ts` and
+> `apps/ui/components/consent/PrivacyPolicyModal.tsx`, are S02's and are edited by nobody here.
+
+**S01-S36 — Record which commit of `slice/consent-s02` this lane contains.**
+· serves: S01-R20, S01-R18
+· files: **none — this step writes nothing.** (v1 named `PROGRESS.md` here and then said in the same sentence that the seat only reports; the `files:` field is the one a coding seat reads as its write list, so the two halves contradicted each other — ARCH-REV-S01 **B4**. `COMMON.md` §4: the orchestrator is `PROGRESS.md`'s sole writer, and `docs/missions/**` is in no cluster's file surface.)
+· test: none — this is a provenance step, not a behaviour step.
+· accept: **all four observations are REPORTED on the ticket, verbatim, and no file is written.** `git log -1 --format=%h slice/consent-s02` is run in the lane and its output pasted; `test -f apps/ui/components/consent/modalSemantics.ts` and `test -f apps/ui/components/consent/PrivacyPolicyModal.tsx` both succeed; `git diff --stat HEAD -- apps/ui/components/consent/modalSemantics.ts apps/ui/components/consent/PrivacyPolicyModal.tsx` is empty **in the working tree at the moment it is run**. That diff is a WORKING-TREE query, not a history query: the instant an offending edit is committed, `HEAD` contains it and the diff goes empty again (ARCH-REV-S01-r2 **N9**, measured in a throwaway repo). The COMMITTED case is what `CMD-C6`'s first S02 arm asserts — `git log --oneline <the %h this step pasted>..HEAD -- <the four S02-owned paths>` must count **0** — and because this step writes no file, **that `%h` lives in this step's ticket comment**; `CMD-C6` re-derives the same commit from the `slice/consent-s02` ref (`git rev-parse --verify -q`, whose exit code is asserted so a missing ref cannot pass the arm vacuously), and the seat pastes both so a reader sees they are the same commit. Both arms are asserted, neither replaces the other. And **the seat re-reads `modalSemantics.ts` in the lane and pastes its exported signatures**, because the surface quoted in `S01-S38` is a copy taken from S02's PLAN and a copy can go stale. **The `globals.css` end-of-file blocks (`S01` then `S02`) conflict trivially at merge time; that is accepted (vertical-slice law §6), not a reason to serialize.**
+· cluster: S01-C6
+
+**S01-S37 — Write the R20 read-mode test first; watch it fail.**
+· serves: S01-R20
+· files: create `LANE/tests/render/consent-policy-link.test.tsx` (jsdom, `createRoot` + `act`, `localStorage.clear()` in both hooks).
+· test: the new file. PROPERTY: `Privacy notice` opens S02's modal in the read-only shape S01's states table depends on — **a `Close` button and no `I have read it` button** — so S01 can catch the absence of a control only S02's tests otherwise pin (REQ-REV-01 **N9**).
+· accept: the run fails because the card does not yet render the modal. **Required RED.**
+· cluster: S01-C6
+
+**S01-S38 — Wire `Privacy notice` to `PrivacyPolicyModal` in `mode="read"`; watch S37 go GREEN.**
+· serves: S01-R20
+· files: edit `LANE/apps/ui/components/consent/CookiePreferencesCard.tsx` (or `CookieConsent.tsx`, whichever holds the card's open state) — pass `open`, `mode="read"`, `onClose`, and **no** `onAcknowledge`.
+· **the S02-owned surface this cluster calls, quoted from `docs/missions/consent-ui/slices/S02/PLAN.md:162-172` and consumed UNCHANGED** (S01 writes neither file):
+
+```ts
+export type ModalSurface = Readonly<{
+  containerRef: React.RefObject<HTMLElement | null>;
+  initialFocusRef: React.RefObject<HTMLElement | null>;
+  onClose: () => void;
+}>;
+export function useModalSurface(open: boolean, surface: ModalSurface): void;
+export function backdropCloseHandler(
+  scrim: HTMLElement | null, onClose: () => void
+): (event: { target: EventTarget | null }) => void;
+export function prefersReducedMotion(): boolean;
+export function openSurfaceCount(): number;   // test-visible depth of the Esc stack
+```
+
+  **This is a COPY, and a copy can go stale.** If S02's own rework renames any of the four, the merge step `S01-S36` re-reads `apps/ui/components/consent/modalSemantics.ts` in the lane and pastes the real signatures on the ticket, and the C6 coding packet is cut from what is in the lane — never from this quotation. `PrivacyPolicyModal`'s own props are the `S01-R20` interface paragraph, which is byte-identical in both SPECs and is the one text neither slice can change alone.
+· test: as S37. PROPERTY unchanged.
+· accept: after clicking `Privacy notice`, a `[role="dialog"]` other than the card is in the document; it contains a button whose `textContent` is `Close`; it contains **no** button whose `textContent` is `I have read it`; the props passed are exactly `{ open, mode: "read", onClose }` — asserted by a source-text assertion so an accidental `onAcknowledge` cannot ship.
+· cluster: S01-C6
+
+**S01-S39 — Closing the policy modal changes nothing behind it, RED first.**
+· serves: S01-R20
+· files: edit `LANE/tests/render/consent-policy-link.test.tsx`.
+· test: the new case. PROPERTY: the read-only modal owns no consent state and touches no storage, so the card it came from is byte-identical after it closes.
+· accept: capture the three `aria-checked` values and `localStorage.getItem("debateai.consent")` before opening; click `Close`; assert all four are unchanged and the card is still in the document. The close path is S02's `backdropCloseHandler(scrim, onClose)` and `useModalSurface`'s Esc arm (signatures quoted in `S01-S38`) — **S01 passes `onClose` and asserts the effect; it implements neither.**
+· cluster: S01-C6
+
+**S01-S40 — The B3 Esc-stack pin: one Esc moves the visitor exactly one surface. RED first.**
+· serves: S01-R20
+· files: edit `LANE/tests/render/consent-policy-link.test.tsx`.
+· test: the pin REQ-REV-01 **B3** created. PROPERTY: **the topmost open surface consumes Esc and no other surface acts on the same event.** With two independently written document-level keydown listeners — which is what two parallel lanes on a codebase with zero precedent would produce — both fire on one Esc and the visitor is thrown two surfaces back.
+· accept: with the card open and the policy modal open over it, dispatch ONE `keydown` with `key: "Escape"`, then assert (a) the policy dialog is gone, (b) **the preferences card is STILL in the document** with its toggle values unchanged, and (c) the bar is still absent. **Watch this RED against a card that registers its own Esc listener** — add the listener, see the card also close, delete it. The reviewer's own prediction is that this is where the next defect in this slice lands (`REQ-REV-01-r3.md` §Predictions 2); this step is the receipt.
+· cluster: S01-C6
+
+**S01-S41 — The card's focus trap, initial focus and focus return come from the ONE shared helper, RED first.**
+· serves: S01-R18
+· files: edit `LANE/tests/render/consent-policy-link.test.tsx`; edit `LANE/apps/ui/components/consent/CookiePreferencesCard.tsx` to import `modalSemantics.ts` unchanged.
+· test: the new cases. PROPERTY: exactly one focus-trap implementation and exactly one document-level Esc listener exist across the two slices, and the card gets its semantics by consuming them rather than by writing a second copy.
+· accept: on open, `document.activeElement` is the first operable toggle (Model quality telemetry); Tab from the last focusable descendant returns focus to the first; on close, focus returns to the control that opened the card — `Choose what to store` from the bar, `Cookie preferences` from Settings, asserted in both directions; and a source-text assertion confirms `CookiePreferencesCard.tsx` contains **no** `addEventListener`, **no** `.focus()` and **no** `Escape`, importing them all from `modalSemantics.ts`. **This codebase has none of that machinery today** — `createPortal`, `Escape`, `focusTrap`, `.focus()`, `document.body` and `addEventListener("keydown"` are each 0 hits under `apps/ui`, and all seven existing overlays declare `aria-modal` without implementing it (exemplar `apps/ui/components/GuideModal.tsx:32-45`). Retrofitting those seven is ticket `A11Y-OVERLAYS` (`t_8962842f`), **outside this mission**.
+· cluster: S01-C6
+
+---
+
+### Cluster S01-C7 — slice-wide guards
+
+**S01-S42 — Every colour in every file this slice added is a `var(--token)` reference, RED first.**
+· serves: S01-R25
+· files: create `LANE/tests/render/consent-guards.test.tsx`.
+· test: the new file. PROPERTY: the design-system law reaches the files the shipped gate does not scan. `tests/unit/t9-mode-tokens.test.ts:546` scans exactly `globals.css`, `layout.tsx`, `ModeToggle.tsx` and `debatePresentation.ts`; **components under `apps/ui/components/consent/` are not scanned by anything**, so this slice supplies the scan for its own files.
+· accept: for each of `apps/ui/lib/consent.ts`, `apps/ui/components/consent/CookieBar.tsx`, `CookiePreferencesCard.tsx`, `CookieConsent.tsx`, `ConsentSettingsPanel.tsx`, no line matches `/oklch\(|#[0-9a-f]{3,8}\b|\brgba?\(/i`. The list of scanned files is derived at run time from the directory, so a sixth file added later is scanned without editing the test. **S02's two files are excluded by name** — S01 does not gate another slice's source.
+· **MUTANT to watch the RED against** (ARCH-REV-S01 **N7** — this guard is written in C7, after the files it scans are already compliant, so it passes the moment it is typed and a stranger cannot mark its RED done): add `style={{ borderColor: "#A8823E" }}` to the bezel element in `CookieBar.tsx`, run `CMD-C7`, watch this case fail naming `CookieBar.tsx` and the literal, then remove the attribute and watch it pass. **Both observations are pasted on the ticket** — a guard seen only green has not been shown to guard anything.
+· cluster: S01-C7
+
+**S01-S43 — A `prefers-reduced-motion` block naming this slice's own selectors, RED first.**
+· serves: S01-R27
+· files: edit `LANE/tests/render/consent-guards.test.tsx`, then `LANE/apps/ui/app/globals.css` inside the S01 block.
+· test: the new case. PROPERTY: motion this slice introduces can be switched off by the visitor's own operating-system setting. **There is no global reduced-motion reset in this codebase** — the four existing blocks (`globals.css:269,3663,4681,5244`) are each scoped to their own component, and neither `.modalCard`'s `de-popin` nor `.drawer`'s `de-slidein` is covered by any of them, so the house convention is a scoped block and this slice writes its own.
+· accept: either the S01 block contains no `animation:` / `transition:` declaration at all, **or** it contains a `@media (prefers-reduced-motion: reduce)` rule whose selector list names every `consent*` selector that carries one. Asserted mechanically: the set of `consent*` selectors carrying animation or transition inside the block minus the set named inside its reduced-motion rule is empty.
+· **MUTANT to watch the RED against** (N7): add `transition: opacity .18s ease;` to `.consentBar` inside the S01 block and add NO counterpart to the reduced-motion rule; run `CMD-C7`; watch this case fail naming `.consentBar` as the unmatched selector; then either delete the transition or add `.consentBar` to the reduced-motion rule, and watch it pass. Both observations pasted on the ticket.
+· cluster: S01-C7
+
+**S01-S44 — Honesty: the stored choice loads nothing, unloads nothing and gates nothing, RED first.**
+· serves: S01-R23
+· files: edit `LANE/tests/render/consent-guards.test.tsx`.
+· test: the new case. PROPERTY: no file this slice adds references an analytics or telemetry SDK, and no code path is conditioned on the stored `quality` or `analytics` booleans — so the UI never claims a capability the product lacks (standing V law; intake C10).
+· accept: across the five files of S01-S42, zero matches for `/gtag|googletagmanager|analytics\.|segment|mixpanel|posthog|amplitude|plausible|datadog|sentry|<script/i`, and zero occurrences of a conditional whose test is `decision.quality` or `decision.analytics` outside the card's own toggle rendering and the R04 write. **A future consumer will read the stored decision; until then the record is a record.**
+· **MUTANT to watch the RED against** (N7), one per arm: (a) add `if (readConsent()?.analytics) { document.body.dataset.consentAnalytics = "on"; }` inside `CookieConsent.tsx`'s effect — the honest-gate arm must fail naming that line; (b) add `const plausibleReady = true;` to the same file — the SDK-name arm must fail on `plausible`. Run `CMD-C7` after each, watch the named failure, remove the line, watch it pass. Both pairs pasted on the ticket. **(b) is deliberately a bare identifier and not a comment:** a grep-based test cannot see a comment (`COMMON.md` §8), so a commented-out mutant would prove nothing.
+· cluster: S01-C7
+
+**S01-S45 — No second Esc listener and no second focus trap anywhere in the two slices, RED first.**
+· serves: S01-R18, S01-R20
+· files: edit `LANE/tests/render/consent-guards.test.tsx`.
+· test: the new case. PROPERTY: `SPEC.md` §Out of scope bans "a second document-level Esc listener and a second focus-trap implementation of any kind — the shared helper is the only one", and a ban with no assertion is a comment.
+· accept: across every file under `apps/ui/components/consent/` **except `modalSemantics.ts`**, zero occurrences of `addEventListener("keydown"`, `addEventListener('keydown'`, `"Escape"` or `'Escape'`, and zero `.focus()` calls; and `modalSemantics.ts` itself contains at least one of each — so the test fails both if a second implementation appears AND if the only one disappears.
+· **MUTANT to watch the RED against** (N7): add `useEffect(() => { document.addEventListener("keydown", onKey); return () => document.removeEventListener("keydown", onKey); }, []);` to `CookiePreferencesCard.tsx`; run `CMD-C7`; watch this case fail naming that file; remove it and watch it pass. **The SECOND arm cannot be mutated by this slice, and that is stated rather than implied:** proving "the only implementation disappeared" means editing `modalSemantics.ts`, which is S02's file and is in S01's forbidden set. That arm is watched RED **only** by S02's own C1 cluster, whose TDD-first test creates the helper — before it exists, this arm is failing for that exact reason, which is the same RED read from the other side. Recorded as `UNVERIFIED by mutation from S01`.
+· cluster: S01-C7
+
+**S01-S46 — The whole-slice, three-run gate.**
+· serves: S01-R26, and every R-id above by transitivity
+· files: none.
+· test: the S01-C7 verification command below, which runs all six `consent-*` test files together.
+· accept: the command is run **three times** and the WORST run is the verdict — green-green-red is RED, and re-running until green is falsification (`heartbeat-protocol` §2.6). Each run's summary line is pasted verbatim into the handoff as `passed/total`. Then, and only then, does the slice meet the "UI element fully done" bar and the Grok 4.6 seat may be fired. **R26 (both surfaces follow the mode toggle live) has no jsdom half beyond C1's token registration and is V's**: acceptance steps 2 and 6 in both modes, and step 18 flips the mode with the card open.
+· cluster: S01-C7
+
+## Clusters (id · steps · ONE verification command · file surface · mutant class)
+
+A cluster is the smallest group of steps verifiable together, independently of the rest of the
+slice. It is also the review unit: a reviewer probes a cluster, never a whole-slice diff. The
+`mutant class` column names the defect the cluster's command would catch if introduced —
+a cluster whose command passes under its own mutant is not a verification.
+
+> **THE COMMANDS ARE NOT IN THE TABLE, AND THAT IS DELIBERATE.** A markdown table cell forces every
+> `|` to be escaped as `\|`. `TOOLING-TRAPS.md:483-497` measures what that costs: the shell then passes
+> `|`, `grep`, `-E` and the pattern to `printf` as plain arguments, **no pipeline is built at all**, the
+> guard term is permanently `1`, and the cluster's acceptance **can never pass in any state of the code**.
+> It happened to the previous mission *inside the capture-first pattern adopted to prevent exactly this*.
+> The table below carries only each command's id; the commands live verbatim, unescaped, in the fenced
+> blocks under it. **Copy them from the fenced blocks, never from the table.**
+
+| Cluster | Steps | ONE verification command | File surface (this becomes the coding seat's `allowed` list) | Mutant class the command detects |
+|---|---|---|---|---|
+| **S01-C1** | S01-S01 … S01-S04 | `CMD-C1` | `apps/ui/app/globals.css` (**both token blocks only** — `:root` `:5-97`, `html[data-mode="chamber"]` `:99-158`), `tests/unit/t9-mode-tokens.test.ts` | A token declared in CSS but not registered in the map, or the reverse; a token value that drifts by one byte (spacing, `0.28` vs `.28`, a wrong channel); a token declared in a SECOND `:root` block, which the guard cannot see; a colour literal introduced outside the two blocks; the inventory test broken by the additions. |
+| **S01-C2** | S01-S05 … S01-S11, **S01-S47** | `CMD-C2` | `apps/ui/lib/consent.ts`, `tests/render/consent-storage.test.tsx`, `docs/architecture/01-decisions/ADR-0021-consent-storage-contract.md` (**the only `docs/**` path any cluster may write, and only this file**) | A sixth member or a missing member in the stored object; a non-ISO `decidedAt`; a `v:0` value silently accepted; an uncaught throw from a corrupt read or a refused write; `Essential only` writing different objects from the two entry points; a category string paraphrased or shipped as the literal escape `’`; a preference request that reaches no subscriber; the ADR absent, or shipped without a ratifiable `Status` row. |
+| **S01-C3** | S01-S12 … S01-S18 | `CMD-C3` | `apps/ui/components/consent/CookieBar.tsx`, `apps/ui/app/globals.css` (**the S01 delimited block only**), `tests/render/consent-bar.test.tsx` | Bar copy paraphrased; the three buttons in the wrong DOM order; a close control or an Esc dismissal added; focus forced into or trapped in the bar; a missing `@media (max-width: 719.98px)` rule; a route-conditional bottom offset; a colour literal or a second delimited block in `globals.css`. |
+| **S01-C4** | S01-S19 … S01-S24 | `CMD-C4` | `apps/ui/components/consent/CookiePreferencesCard.tsx`, `apps/ui/app/globals.css` (**the same S01 block**), `tests/render/consent-card.test.tsx` | A category string inlined in the component instead of read from `COOKIE_CATEGORIES`; the Essential switch made operable by click, `Space` or `Enter`; a toggle that answers click but not `Space`; a seeded decision not reflected on open; `Save choices` writing the wrong booleans; a `×` added to a footer the design gives three controls; a missing `aria-labelledby`; the card growing its own keydown handler. |
+| **S01-C5** | S01-S25 … S01-S35 | `CMD-C5` | `apps/ui/components/consent/CookieConsent.tsx`, `apps/ui/components/consent/ConsentSettingsPanel.tsx`, `apps/ui/app/layout.tsx` (**one import + one element**), `apps/ui/app/settings/page.tsx` (**one import + one element**), `tests/render/consent-mount.test.tsx` | Any server-rendered output from the surface; a second pre-paint script; the mount placed between `.appShell` and `<TopBar />`, or mounted twice; a `data-landing-section` attribute on the consent surface; the bar still rendered while the card is open; **the entry point used as the discriminator instead of the stored decision (B1)** — including the Settings-entry-with-nothing-stored bypass; defaults that differ between the two openers; **a colour literal added to `layout.tsx` by the mount edit** (ARCH-REV-S01 **B2** — `layout.tsx` is one of the four files `t9-mode-tokens` scans, so `CMD-C5` runs that test and counts its hit list). |
+| **S01-C6** | S01-S36 … S01-S41 | `CMD-C6` | `tests/render/consent-policy-link.test.tsx`, and the wiring lines only of `apps/ui/components/consent/CookiePreferencesCard.tsx` / `CookieConsent.tsx`. **`modalSemantics.ts` and `PrivacyPolicyModal.tsx` are S02's and are READ-ONLY here.** | An `I have read it` button reaching read mode; a missing `Close` button; `onAcknowledge` passed in read mode; the modal writing or reading consent storage; a toggle value changed by opening the policy; **one Esc closing both surfaces (B3)**; a focus trap, Esc listener or focus restore written a second time in S01 instead of imported. |
+| **S01-C7** | S01-S42 … S01-S46 | `CMD-C7` | `tests/render/consent-guards.test.tsx`, `apps/ui/app/globals.css` (**the reduced-motion rule inside the same S01 block**) | A colour literal in any consent component (which no shipped test scans); an animation with no reduced-motion counterpart; an analytics or telemetry SDK reference, or a script tag, introduced by this slice; a code path gated on the stored booleans; a second Esc listener or focus trap anywhere under `apps/ui/components/consent/`; the shared helper losing its own implementation. |
+
+### Concurrency statement
+
+**Every edge is stated here, and `mission-graph-S01.md` carries the same set** (ARCH-REV-S01 **N4**: the two
+artifacts disagreed; **the PLAN is the binding one**, and the graph was corrected to match it).
+
+- **`S01-C1` ∥ `S01-C2` — the one concurrent pair.** Their file sets are disjoint (`globals.css` token blocks + `t9-mode-tokens.test.ts` versus `apps/ui/lib/consent.ts` + `consent-storage.test.tsx` + the ADR), so two coding seats may hold them at once.
+- **`S01-C1` is committed FIRST regardless**, because S02 declares no token and consumes the five S01 declares for it (`COMMON.md` §10.8); until S01's token block lands, S02's CSS resolves to nothing. This is the orchestrator's ruling (packet §4), recorded, not re-decided.
+- **`S01-C1` → `S01-C3` — ADDED in rework round 1 (N4).** C3's delimited block references `--z-consent-bar` and the other tokens C1 declares; without C1 those declarations do not exist and the bar's layer resolves to `auto`. No test catches this (an undeclared custom property is not a failure anywhere), which is exactly why the edge has to be written down.
+- **`S01-C2` → `S01-C3` is NOT an edge.** The mission graph declared one, justified as "its buttons call the codec C2 exports" — that was `S01-S16`'s wiring clause, which **B3** deletes. Measured: `CookieBar.tsx` is prop-driven (`S01-S13`: "no storage access of its own"), imports nothing from `apps/ui/lib/consent.ts`, and `consent-bar.test.tsx` asserts on the literal key string. C2's real consumer is **C5**. The graph's edge is removed.
+- **`S01-C3` → `S01-C4` are strictly serial, and only for one reason:** both write the ONE delimited block at the end of `globals.css`. `C3` opens the block; `C4` appends inside it. Nothing else couples them.
+- **`S01-C5` follows `C2`, `C3` and `C4`** — it wires components those clusters build (`CookieConsent.tsx` calls `readConsent`, `writeConsent`, `decisionFor` and `subscribeToPreferenceRequests`, all C2's exports).
+- **`S01-C6` follows the orchestrator's `git merge slice/consent-s02` into this lane**, which follows S02-C1 being committed. **The coding seat performs no merge**; it reports `git log -1 --format=%h slice/consent-s02`.
+- **`S01-C7` is last** — its assertions range over every file the slice added and cannot be complete before they exist.
+- **Every cluster is independently verifiable by its own single command**, and each fits one coding seat in one sitting: the largest, `S01-C5`, is eleven steps across two new components and two one-line edits.
+
+### The verification commands, verbatim and unescaped
+
+Run every one from
+`/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/consent-s01/dialectical-engine`
+— the level holding `package.json`. Run `pnpm run generate:contract` once before the first `pnpm typecheck`
+of a session and say that you did (`BASELINE.md` rule 1); `packages/contract/generated/**` is gitignored and
+absent from a fresh worktree checkout.
+
+Every command follows the capture-first shape: **capture into a variable, then assert on the captured
+text — never pipe a live test run into `grep`**, which crashes during the run and steals the exit status
+(`TOOLING-TRAPS.md`, variant 3). Every summary match is ANCHORED to the summary line, because an unanchored
+`grep` matches a test's own TITLE and passes a run that executed nothing (variant 4).
+
+**Four laws these commands now obey, each one bought with a finding** (all seven were re-run from a `.sh`
+file under `/bin/bash` AND inline after every change; §A9 carries both verdicts and the per-term mutants):
+
+1. **No term matches a status glyph** (ARCH-REV-S01 **B1**). `✓` is three bytes and `×` is two; `.` matches
+   ONE byte under BSD `grep` in the C locale, so a term written `^[[:space:]]*. tests/…` is 0 forever in any
+   script, CI run or three-run loop, and non-zero only in the tool shell whose `grep` is a `ugrep` shim.
+   Every term here anchors on the test NAME. Swept mechanically over all seven blocks: raw non-ASCII bytes
+   **0**, glyph-placeholder idiom **0**.
+2. **A delta guard counts the HIT LIST, never the pinned line** (**B2**, `COMMON.md` §10.18). `n_hits` counts
+   the received-array elements `^\+   "/.*:[0-9]+:` and must equal the baseline **1**; `n_lit` keeps the pin
+   itself so it cannot silently vanish. **Any cluster that edits a file `t9-mode-tokens` scans runs that
+   test** — which is why `CMD-C5` runs it: C5 edits `apps/ui/app/layout.tsx`.
+3. **Every captured sub-command captures its exit code, and proves it ran** (**N1**). `tt=$?` plus
+   `n_tcran` — the count of the `$ tsc --noEmit` line pnpm echoes on every real run — so a script that never
+   executed cannot satisfy `n_tc -eq 0` vacuously.
+4. **Delta terms, never standing gates** (`COMMON.md` §10.20). §10.20 forbids folding in an arm that asserts
+   a base-RED gate PASSES. No arm here does: `n_tokfail -eq 2` is the pinned failure set, `n_hits -eq 1` and
+   `n_lit -eq 1` the pinned hit list, `n_tc -eq 0` the diagnostics **outside** the pin. Proof that this is a
+   delta and not a gate: **`CMD-C1`'s verdict at base is 0**, with every one of those arms active.
+
+**`CMD-C1` — the token contract. This is a DELTA guard, not a pass guard.**
+`tests/unit/t9-mode-tokens.test.ts` is RED at base by two failures another mission owns, so
+`COMMON.md` §8's "no `failed` in the summary" form can never be satisfied here. It asserts a named
+failure SET instead.
+
+```bash
+out=$(pnpm exec vitest run tests/unit/t9-mode-tokens.test.ts 2>&1); vt=$?
+tc=$(pnpm typecheck 2>&1); tt=$?
+sum=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*Tests[[:space:]]+' | tail -1)
+n_fail=$(printf '%s\n' "$out" | grep -cE '^[[:space:]]*FAIL[[:space:]]')
+n_pin=$(printf '%s\n' "$out" | grep -cE '^[[:space:]]*FAIL[[:space:]].*> (renders one accessible toggle that reads the document mode, flips it, and persists it|leaves no mode-inert colour literal in the four Wave-0 product files)$')
+n_hits=$(printf '%s\n' "$out" | grep -cE '^\+   "/.*:[0-9]+:')
+n_lit=$(printf '%s\n' "$out" | grep -cE 'globals\.css:[0-9]+:background: color-mix\(in srgb, #0a0806')
+n_inv=$(printf '%s\n' "$out" | grep -cE 'tests/unit/t9-mode-tokens\.test\.ts > T9-C3 token contract > declares the complete inventory and the same mode-bearing key set in both modes( [0-9]+ms)?$')
+n_invfail=$(printf '%s\n' "$out" | grep -cE '^[[:space:]]*FAIL[[:space:]].*> declares the complete inventory')
+n_tcran=$(printf '%s\n' "$tc" | grep -cE '^\$ tsc --noEmit$')
+n_tc=$(printf '%s\n' "$tc" | grep -E 'error TS[0-9]+' | grep -vc 'tests/unit/s14-ui.test.ts')
+[ "$vt" -eq 1 ] \
+  && printf '%s' "$sum" | grep -qE '^[[:space:]]*Tests[[:space:]]+2 failed \| [1-9][0-9]* passed' \
+  && [ "$n_fail" -eq 2 ] && [ "$n_pin" -eq 2 ] \
+  && [ "$n_hits" -eq 1 ] && [ "$n_lit" -eq 1 ] \
+  && [ "$n_inv" -eq 1 ] && [ "$n_invfail" -eq 0 ] \
+  && [ "$n_tcran" -eq 1 ] && [ "$tt" -le 1 ] && [ "$n_tc" -eq 0 ]
+echo "S01-C1 verdict=$?   summary:$sum   hit-list: $n_hits (pinned .drawerScrim line: $n_lit)   tsc ran: $n_tcran exit $tt, diagnostics outside the pin: $n_tc"
+```
+
+**`CMD-C2`** — the domain module and the ADR of `S01-S47`. The two ADR terms are file-content counts, so
+they are `cat`-then-`grep`: `grep -c` on a missing file writes nothing to stdout and the guard would then
+compare an empty string, which is an error rather than a verdict.
+
+```bash
+out=$(pnpm exec vitest run tests/render/consent-storage.test.tsx 2>&1); vt=$?
+tc=$(pnpm typecheck 2>&1); tt=$?
+adr=$(cat docs/architecture/01-decisions/ADR-0021-consent-storage-contract.md 2>/dev/null)
+sum=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*Tests[[:space:]]+' | tail -1)
+files=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*Test Files[[:space:]]+' | tail -1)
+n_adrst=$(printf '%s\n' "$adr" | grep -cE '^\| \*\*Status\*\* \| \*\*Proposed\*\*')
+n_adrkey=$(printf '%s\n' "$adr" | grep -cE 'debateai\.consent')
+n_tcran=$(printf '%s\n' "$tc" | grep -cE '^\$ tsc --noEmit$')
+n_tc=$(printf '%s\n' "$tc" | grep -E 'error TS[0-9]+' | grep -vc 'tests/unit/s14-ui.test.ts')
+[ "$vt" -eq 0 ] \
+  && printf '%s' "$sum" | grep -qE '^[[:space:]]*Tests[[:space:]]+[1-9][0-9]* passed' \
+  && ! printf '%s' "$sum" | grep -q 'failed' \
+  && printf '%s' "$files" | grep -qE '^[[:space:]]*Test Files[[:space:]]+1 passed \(1\)' \
+  && [ "$n_adrst" -eq 1 ] && [ "$n_adrkey" -ge 1 ] \
+  && [ "$n_tcran" -eq 1 ] && [ "$tt" -le 1 ] && [ "$n_tc" -eq 0 ]
+echo "S01-C2 verdict=$?   summary:$sum  files:$files   ADR Status:Proposed lines: $n_adrst, debateai.consent mentions: $n_adrkey   tsc ran: $n_tcran exit $tt, diagnostics outside the pin: $n_tc"
+```
+
+**`CMD-C3`** — `consent-bar.test.tsx` green, plus the `t9` delta, because C3 appends to `globals.css` and
+the colour-literal hit list can grow:
+
+```bash
+out=$(pnpm exec vitest run tests/render/consent-bar.test.tsx 2>&1); vt=$?
+tok=$(pnpm exec vitest run tests/unit/t9-mode-tokens.test.ts 2>&1)
+tc=$(pnpm typecheck 2>&1); tt=$?
+sum=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*Tests[[:space:]]+' | tail -1)
+files=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*Test Files[[:space:]]+' | tail -1)
+n_hits=$(printf '%s\n' "$tok" | grep -cE '^\+   "/.*:[0-9]+:')
+n_lit=$(printf '%s\n' "$tok" | grep -cE 'globals\.css:[0-9]+:background: color-mix\(in srgb, #0a0806')
+n_tokfail=$(printf '%s\n' "$tok" | grep -cE '^[[:space:]]*FAIL[[:space:]]')
+n_blocks=$(grep -c '=== consent-ui S01 ===' apps/ui/app/globals.css)
+n_tcran=$(printf '%s\n' "$tc" | grep -cE '^\$ tsc --noEmit$')
+n_tc=$(printf '%s\n' "$tc" | grep -E 'error TS[0-9]+' | grep -vc 'tests/unit/s14-ui.test.ts')
+[ "$vt" -eq 0 ] \
+  && printf '%s' "$sum" | grep -qE '^[[:space:]]*Tests[[:space:]]+[1-9][0-9]* passed' \
+  && ! printf '%s' "$sum" | grep -q 'failed' \
+  && printf '%s' "$files" | grep -qE '^[[:space:]]*Test Files[[:space:]]+1 passed \(1\)' \
+  && [ "$n_hits" -eq 1 ] && [ "$n_lit" -eq 1 ] && [ "$n_tokfail" -eq 2 ] && [ "$n_blocks" -eq 1 ] \
+  && [ "$n_tcran" -eq 1 ] && [ "$tt" -le 1 ] && [ "$n_tc" -eq 0 ]
+echo "S01-C3 verdict=$?   summary:$sum  files:$files   hit-list: $n_hits (pinned: $n_lit)  t9 failures: $n_tokfail  S01 css blocks: $n_blocks   tsc ran: $n_tcran exit $tt, outside the pin: $n_tc"
+```
+
+**`CMD-C4`** — the same shape as `CMD-C3` with `tests/render/consent-card.test.tsx` in place of
+`consent-bar`; every other term is unchanged, because C4 writes into the same `globals.css` block.
+
+```bash
+out=$(pnpm exec vitest run tests/render/consent-card.test.tsx 2>&1); vt=$?
+tok=$(pnpm exec vitest run tests/unit/t9-mode-tokens.test.ts 2>&1)
+tc=$(pnpm typecheck 2>&1); tt=$?
+sum=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*Tests[[:space:]]+' | tail -1)
+files=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*Test Files[[:space:]]+' | tail -1)
+n_hits=$(printf '%s\n' "$tok" | grep -cE '^\+   "/.*:[0-9]+:')
+n_lit=$(printf '%s\n' "$tok" | grep -cE 'globals\.css:[0-9]+:background: color-mix\(in srgb, #0a0806')
+n_tokfail=$(printf '%s\n' "$tok" | grep -cE '^[[:space:]]*FAIL[[:space:]]')
+n_blocks=$(grep -c '=== consent-ui S01 ===' apps/ui/app/globals.css)
+n_tcran=$(printf '%s\n' "$tc" | grep -cE '^\$ tsc --noEmit$')
+n_tc=$(printf '%s\n' "$tc" | grep -E 'error TS[0-9]+' | grep -vc 'tests/unit/s14-ui.test.ts')
+[ "$vt" -eq 0 ] \
+  && printf '%s' "$sum" | grep -qE '^[[:space:]]*Tests[[:space:]]+[1-9][0-9]* passed' \
+  && ! printf '%s' "$sum" | grep -q 'failed' \
+  && printf '%s' "$files" | grep -qE '^[[:space:]]*Test Files[[:space:]]+1 passed \(1\)' \
+  && [ "$n_hits" -eq 1 ] && [ "$n_lit" -eq 1 ] && [ "$n_tokfail" -eq 2 ] && [ "$n_blocks" -eq 1 ] \
+  && [ "$n_tcran" -eq 1 ] && [ "$tt" -le 1 ] && [ "$n_tc" -eq 0 ]
+echo "S01-C4 verdict=$?   summary:$sum  files:$files   hit-list: $n_hits (pinned: $n_lit)  t9 failures: $n_tokfail  S01 css blocks: $n_blocks   tsc ran: $n_tcran exit $tt, outside the pin: $n_tc"
+```
+
+**`CMD-C5` — a MONOTONE delta guard.** Two reasons it cannot be a pass guard: `tests/render/t3-library.test.tsx`
+is RED at base (exit 1, `Tests 4 failed | 11 passed (15)`, all four in its `lists` describe, and
+**`BASELINE.md` does not carry this file**), and the four failing names belong to another mission. v1 pinned
+`n_fail -eq 4` against that set; **ARCH-REV-S01 N6** is that the day the owning mission repairs its tests,
+C5 becomes un-passable through no act of S01's — and a coding seat may not edit `PLAN.md` to unblock itself.
+So the shape is monotone: `n_newfail` counts `FAIL` lines whose name is **not** in `$PIN` and must be 0;
+the two tests S01 must keep green are named; `n_fail` is reported, not asserted. **Proved:** a capture in
+which all four `lists` failures are repaired (exit 0, `Tests 30 passed (30)`, `Test Files 3 passed (3)`)
+still gives verdict **0**.
+
+```bash
+out=$(pnpm exec vitest run tests/render/consent-mount.test.tsx tests/render/t3-library.test.tsx tests/render/t9-landing.test.tsx 2>&1); vt=$?
+tok=$(pnpm exec vitest run tests/unit/t9-mode-tokens.test.ts 2>&1)
+tc=$(pnpm typecheck 2>&1); tt=$?
+PIN='renders recased native selectors and a live count for the four Your debates rows|renders a live count for the three Public debates rows|renders every library row as a shell/core bezel|renders the public search-indexing disclosure once under the list and never on Yours'
+KEEP='keeps the real layout TopBar as a direct appShell child|pins the real signed-in render to zero landing markers'
+sum=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*Tests[[:space:]]+' | tail -1)
+files=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*Test Files[[:space:]]+' | tail -1)
+n_fail=$(printf '%s\n' "$out" | grep -cE '^[[:space:]]*FAIL[[:space:]]')
+n_newfail=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*FAIL[[:space:]]' | grep -cvE "> ($PIN)\$")
+n_keep=$(printf '%s\n' "$out" | grep -cE "tests/render/t3-library\.test\.tsx > chrome > ($KEEP)( [0-9]+ms)?\$")
+n_keepfail=$(printf '%s\n' "$out" | grep -cE "^[[:space:]]*FAIL[[:space:]].*> ($KEEP)\$")
+n_mount=$(printf '%s\n' "$out" | grep -cE 'tests/render/consent-mount\.test\.tsx > ')
+n_mountfail=$(printf '%s\n' "$out" | grep -cE '^[[:space:]]*FAIL[[:space:]]+tests/render/consent-mount\.test\.tsx > ')
+n_hits=$(printf '%s\n' "$tok" | grep -cE '^\+   "/.*:[0-9]+:')
+n_lit=$(printf '%s\n' "$tok" | grep -cE 'globals\.css:[0-9]+:background: color-mix\(in srgb, #0a0806')
+n_tokfail=$(printf '%s\n' "$tok" | grep -cE '^[[:space:]]*FAIL[[:space:]]')
+n_tcran=$(printf '%s\n' "$tc" | grep -cE '^\$ tsc --noEmit$')
+n_tc=$(printf '%s\n' "$tc" | grep -E 'error TS[0-9]+' | grep -vc 'tests/unit/s14-ui.test.ts')
+[ "$vt" -le 1 ] \
+  && printf '%s' "$files" | grep -qE '^[[:space:]]*Test Files[[:space:]]+.*\(3\)$' \
+  && [ "$n_newfail" -eq 0 ] \
+  && [ "$n_keep" -eq 2 ] && [ "$n_keepfail" -eq 0 ] \
+  && [ "$n_mount" -ge 1 ] && [ "$n_mountfail" -eq 0 ] \
+  && [ "$n_hits" -eq 1 ] && [ "$n_lit" -eq 1 ] && [ "$n_tokfail" -eq 2 ] \
+  && [ "$n_tcran" -eq 1 ] && [ "$tt" -le 1 ] && [ "$n_tc" -eq 0 ]
+echo "S01-C5 verdict=$?   summary:$sum  files:$files   failures: $n_fail (unpinned: $n_newfail)  guarded-green: $n_keep  consent-mount lines: $n_mount (failing: $n_mountfail)  hit-list: $n_hits   tsc ran: $n_tcran exit $tt, outside the pin: $n_tc"
+```
+
+**`CMD-C6`**
+
+```bash
+out=$(pnpm exec vitest run tests/render/consent-policy-link.test.tsx 2>&1); vt=$?
+tc=$(pnpm typecheck 2>&1); tt=$?
+s02tip=$(git rev-parse --verify -q slice/consent-s02); st=$?
+s02c=$(git log --oneline "$s02tip"..HEAD -- apps/ui/components/consent/modalSemantics.ts apps/ui/components/consent/PrivacyPolicyModal.tsx apps/ui/lib/privacyPolicy.ts apps/ui/components/SignUpFlow.tsx)
+n_s02c=$(printf '%s\n' "$s02c" | grep -cE '^[0-9a-f]{7,}')
+s02=$(git diff --stat HEAD -- apps/ui/components/consent/modalSemantics.ts apps/ui/components/consent/PrivacyPolicyModal.tsx apps/ui/lib/privacyPolicy.ts apps/ui/components/SignUpFlow.tsx)
+sum=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*Tests[[:space:]]+' | tail -1)
+files=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*Test Files[[:space:]]+' | tail -1)
+n_tcran=$(printf '%s\n' "$tc" | grep -cE '^\$ tsc --noEmit$')
+n_tc=$(printf '%s\n' "$tc" | grep -E 'error TS[0-9]+' | grep -vc 'tests/unit/s14-ui.test.ts')
+[ "$vt" -eq 0 ] \
+  && printf '%s' "$sum" | grep -qE '^[[:space:]]*Tests[[:space:]]+[1-9][0-9]* passed' \
+  && ! printf '%s' "$sum" | grep -q 'failed' \
+  && printf '%s' "$files" | grep -qE '^[[:space:]]*Test Files[[:space:]]+1 passed \(1\)' \
+  && [ "$st" -eq 0 ] && [ "$n_s02c" -eq 0 ] \
+  && [ -z "$s02" ] \
+  && [ "$n_tcran" -eq 1 ] && [ "$tt" -le 1 ] && [ "$n_tc" -eq 0 ]
+echo "S01-C6 verdict=$?   summary:$sum  files:$files   S02-files: ref resolved $st, commits in ${s02tip:-UNRESOLVED}..HEAD touching them: $n_s02c, working-tree diff: '${s02:-none}'   tsc ran: $n_tcran exit $tt, outside the pin: $n_tc"
+```
+
+**`CMD-C7` — the whole-slice gate. Run it THREE times; the WORST run is the verdict.**
+
+```bash
+out=$(pnpm exec vitest run tests/render/consent-storage.test.tsx tests/render/consent-bar.test.tsx tests/render/consent-card.test.tsx tests/render/consent-mount.test.tsx tests/render/consent-policy-link.test.tsx tests/render/consent-guards.test.tsx 2>&1); vt=$?
+tok=$(pnpm exec vitest run tests/unit/t9-mode-tokens.test.ts 2>&1)
+tc=$(pnpm typecheck 2>&1); tt=$?
+sum=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*Tests[[:space:]]+' | tail -1)
+files=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*Test Files[[:space:]]+' | tail -1)
+n_hits=$(printf '%s\n' "$tok" | grep -cE '^\+   "/.*:[0-9]+:')
+n_lit=$(printf '%s\n' "$tok" | grep -cE 'globals\.css:[0-9]+:background: color-mix\(in srgb, #0a0806')
+n_tokfail=$(printf '%s\n' "$tok" | grep -cE '^[[:space:]]*FAIL[[:space:]]')
+n_blocks=$(grep -c '=== consent-ui S01 ===' apps/ui/app/globals.css)
+n_tcran=$(printf '%s\n' "$tc" | grep -cE '^\$ tsc --noEmit$')
+n_tc=$(printf '%s\n' "$tc" | grep -E 'error TS[0-9]+' | grep -vc 'tests/unit/s14-ui.test.ts')
+[ "$vt" -eq 0 ] \
+  && printf '%s' "$sum" | grep -qE '^[[:space:]]*Tests[[:space:]]+[1-9][0-9]* passed' \
+  && ! printf '%s' "$sum" | grep -q 'failed' \
+  && printf '%s' "$files" | grep -qE '^[[:space:]]*Test Files[[:space:]]+6 passed \(6\)' \
+  && [ "$n_hits" -eq 1 ] && [ "$n_lit" -eq 1 ] && [ "$n_tokfail" -eq 2 ] && [ "$n_blocks" -eq 1 ] \
+  && [ "$n_tcran" -eq 1 ] && [ "$tt" -le 1 ] && [ "$n_tc" -eq 0 ]
+echo "S01-C7 verdict=$?   summary:$sum  files:$files   hit-list: $n_hits (pinned: $n_lit)  t9 failures: $n_tokfail  S01 css blocks: $n_blocks   tsc ran: $n_tcran exit $tt, outside the pin: $n_tc"
+```
+
+> **The `Test Files … passed (n)` term is load-bearing in every multi-path command.** Measured by ARCH-S01:
+> when a vitest invocation lists several paths and some do not exist, **it runs the ones that do and silently
+> drops the rest — no `No test files found` is printed.** A multi-path command therefore cannot announce a
+> typo'd path on its own; only an explicit file count can (`COMMON.md` §10.13, found independently by both
+> architecture seats). `CMD-C7` requires `6 passed (6)`; `CMD-C5` requires `(3)` in a form that survives the
+> other mission repairing its file; `CMD-C2`, `CMD-C3`, `CMD-C4` and `CMD-C6` require `1 passed (1)`.
+
+### A9 — a SATISFIABILITY proof, not a "does it run" check
+
+`COMMON.md` §10.16, written after this plan's round 1: A9 requires, per command, **(a)** one run inline and
+one from a `.sh` file executed by `/bin/bash`, both verdicts reported; **(b)** a run against a known-GOOD
+synthetic input showing the guard returns 0; **(c)** per guard term, the mutant that flips it. v1 did (b)
+and (c) for two commands and did (a) for none — and (a) is what B1 was hiding in.
+
+**Where.** `.worktrees/consent-s01/dialectical-engine` at `2b670d30`, branch `slice/consent-s01`,
+`git status --porcelain | wc -l` = **0** before and after every run below. Rework round 1, 2026-09-06.
+
+**Classification by CAUSE** (`COMMON.md` §10.17): **BROKEN** = the command itself cannot run
+(`startup error|unexpected argument|failed to load|usage:|command not found`, or `no test files found` for a
+file that EXISTS). **RED-by-design** = `No test files found` / `cannot find module` / `Failed to resolve
+import` for a file this PLAN creates — declared, and not BROKEN. **GREEN** = the summary line.
+
+#### (a) Both environments, at base
+
+The two environments differ in one thing that matters: the tool shell's `grep` is a **`ugrep` shim installed
+by the user's shell snapshot**; a `.sh` file under `/bin/bash` gets **BSD grep 2.6.0-FreeBSD with `LC_ALL`
+and `LANG` unset**, i.e. the C locale. That is the environment CI, a `Makefile`, another machine and the
+three-run loop `S01-S46` asks for all use.
+
+| Command | vitest exit | Summary line, verbatim | Classification | guard verdict **as a `.sh` under `/bin/bash`** | guard verdict **inline** |
+|---|---|---|---|---|---|
+| `CMD-C1` | 1 | `Tests  2 failed \| 6 passed (8)` | **RED — the `BASELINE.md` pin, reproduced.** Not BROKEN | **0** | **0** |
+| `CMD-C2` | 1 | *(none — `No test files found`, `filter: tests/render/consent-storage.test.tsx`)* | **RED, declared** — `S01-S05` creates it; the ADR terms are 0 because `S01-S47` creates the ADR | **1** | **1** |
+| `CMD-C3` | 1 | *(none — `No test files found`, `filter: tests/render/consent-bar.test.tsx`)* | **RED, declared** — `S01-S12` creates it | **1** | **1** |
+| `CMD-C4` | 1 | *(none — `No test files found`, `filter: tests/render/consent-card.test.tsx`)* | **RED, declared** — `S01-S19` creates it | **1** | **1** |
+| `CMD-C5` | 1 | `Tests  4 failed \| 27 passed (31)`, `Test Files  1 failed \| 1 passed (2)` | **RED.** The 4 are `t3-library`'s pre-existing `lists` failures (`n_newfail`=0); `consent-mount.test.tsx` does not exist yet and was silently dropped, so `Test Files` reads `(2)` not `(3)` and `n_mount`=0 | **1** | **1** |
+| `CMD-C6` | 1 | *(none — `No test files found`, `filter: tests/render/consent-policy-link.test.tsx`)* | **RED, declared** — `S01-S37` creates it | **1** | **1** |
+| `CMD-C7` | 1 | *(none — `No test files found`)* | **RED, declared** — all six files are created by steps above | **1** | **1** |
+
+**BROKEN: 0 of 7. Environment disagreements: 0 of 7.** Every verdict is identical in both shells — which is
+the property v1 lacked and the reason B1 was invisible to its own A9.
+
+**`CMD-C1` is GREEN at base by design, and that is not a contradiction** (ARCH-REV-S01 **N2** — v1's table
+said "RED" while the same document said the guard passes). Both are true and they describe different things:
+**vitest exits 1** because the file carries the two `BASELINE.md` failures, and **the guard's verdict is 0**
+because the guard asserts that DELTA, which base satisfies. The consequence a coding seat must know:
+**`CMD-C1` is a delta guard, not a reproduce-first oracle** — C1's RED-before evidence is at STEP level
+(`S01-S01`'s inventory failure, `S01-S03`'s `TypeError`), and a seat that waits for `CMD-C1` to be red before
+starting will wait forever.
+
+**The B1 measurement, before and after, same input files, same machine:**
+
+```
+                          as a .sh under /bin/bash        inline (ugrep shim)
+OLD n_inv   (CMD-C1)                    0                          1
+OLD n_keep  (CMD-C5)                    0                          2
+NEW n_inv                               1                          1
+NEW n_keep                              2                          2
+NEW n_hits                              1                          1
+$ grep --version   (script)  grep (BSD grep, GNU compatible) 2.6.0-FreeBSD
+$ grep --version   (inline)  ugrep 7.8.4 aarch64-apple-macosx
+$ sed -n '4p' t9.out | head -c 8 | xxd     20e2 9c93 2074 6573      # " ✓ tes" -> U+2713 is e2 9c 93
+```
+
+**The CLASS was swept mechanically, not by eye** (`heartbeat-protocol` §2.2 — a reported finding is a SAMPLE):
+
+~~~
+$ awk '/^`​`​`bash$/{f=1;next} /^`​`​`$/{f=0} f{print FILENAME":"NR":"$0}' PLAN.md > blocks
+     (the awk fence markers above are three backticks each; they carry a zero-width joiner here
+      only so this block does not close itself. The script is scratchpad/.../glyph-sweep.sh.)
+$ LC_ALL=C grep -n '[^ -~<a literal TAB>]' blocks   -> exit 1   (no raw non-ASCII byte in any command block)
+$ grep -nE "\[\[:space:\]\]\*\. " blocks            -> exit 1   (no glyph-placeholder idiom left)
+~~~
+Before the fix that second sweep returned exactly three hits — `PLAN.md:558`, `:633`, `:635`, the three the
+review named. **There was no fourth**, and that is a measurement rather than a hope.
+
+#### (b) Known-GOOD synthetic input — every guard returns 0
+
+A command whose files do not exist yet has never been seen to PASS, so "it runs" says nothing about whether
+it CAN pass. Each command was therefore run against a synthetic capture of the state its cluster is supposed
+to reach. **The harness differs from the shipped command in the capture lines and nothing else** — proved by
+`diff cmd-cN.sh cmd-cN-synth.sh`, which shows only `out=`/`tok=`/`tc=`/`adr=`/`s02=`/the `globals.css` path.
+
+| Known-GOOD input | Command | verdict |
+|---|---|---|
+| the real base capture of `t9-mode-tokens` | `CMD-C1` | **0** |
+| post-fix `t9`: S01's three new tests pass → `Tests  2 failed \| 9 passed (11)` | `CMD-C1` | **0** |
+| `consent-storage` green (6 tests, `Test Files 1 passed (1)`) + the ADR present | `CMD-C2` | **0** |
+| `consent-bar` green + base `t9` + one `=== consent-ui S01 ===` block | `CMD-C3` | **0** |
+| `consent-card` green + base `t9` + one block | `CMD-C4` | **0** |
+| `consent-mount` green (8 cases), `t3-library` still 4 red, `t9-landing` green, `Test Files 1 failed \| 2 passed (3)` | `CMD-C5` | **0** |
+| **the same, after the owning mission repairs `t3-library`** → exit 0, `Tests 30 passed (30)`, `Test Files 3 passed (3)`, `n_fail`=0 | `CMD-C5` | **0** ← N6's monotone requirement, measured |
+| `consent-policy-link` green + no S02 file touched | `CMD-C6` | **0** |
+| all six consent files green, `Test Files 6 passed (6)` + base `t9` + one block | `CMD-C7` | **0** |
+
+#### (c) Per term, the mutant that flips it
+
+MEASURED = a fixture was built and the command run against it, verdict 1 observed. BY CONSTRUCTION = the term
+is a plain comparison whose mutant is stated but was not synthesised; said plainly rather than implied.
+
+| Term | Asserts | Mutant that flips it | Evidence |
+|---|---|---|---|
+| `vt` | vitest's own exit (`-eq 1` C1, `-eq 0` C2/C3/C4/C6/C7, `-le 1` C5) | the suite crashes, or a file this slice owns starts failing | MEASURED at base (C2…C7 = 1) |
+| `sum` anchored arm | the summary LINE, not a test title | a run that executed nothing; C1's `2 failed \| N passed` shape changing | MEASURED (`c1-mut-invbroken` → `3 failed \| 5 passed`) |
+| `files` anchored arm | every named path was actually found | a typo'd or forgotten path, silently dropped by vitest | MEASURED (`c7-mut-5files`: `(5)` → verdict 1) |
+| `n_fail` (C1 `-eq 2`) | the pinned failure COUNT | a third failure anywhere in the file | MEASURED (`c1-mut-invbroken`) |
+| `n_pin` (C1 `-eq 2`) | the failure NAMES are the pinned pair | a pinned failure repaired, or a different test failing in its place | MEASURED (`c1-mut-invbroken`: 3 fails, 2 pinned) |
+| **`n_hits` (`-eq 1`)** | the received-array HIT LIST is the baseline length | **any second colour literal in any of the four scanned files** — the C5 mount edit being the likeliest | **MEASURED, five commands** (`*-mut2hits` → verdict 1 on C1, C3, C4, C5, C7) |
+| `n_lit` (`-eq 1`) | the pinned `.drawerScrim` element is still THERE | the pin silently disappears and a different literal takes its place (hit list still 1) | MEASURED (`c1-mut-pinvanished`: `n_hits`=1, `n_lit`=0 → verdict 1) |
+| `n_inv` (`-eq 1`) / `n_invfail` (`-eq 0`) | the inventory test ran and passed | a token declared in CSS and not registered in the map, or the reverse | MEASURED (`c1-mut-invbroken`) |
+| `n_tokfail` (`-eq 2`) | `t9`'s failure set is unchanged | S01 breaking a third test in that file | MEASURED (`c1-mut-invbroken` shape) |
+| `n_blocks` (`-eq 1`) | ONE delimited `globals.css` block | a second `/* === consent-ui S01 === */` opened by C4 or C7 | MEASURED (`c3-mut-2blocks`: 2 → verdict 1) |
+| `n_newfail` (`-eq 0`) | no failure OUTSIDE the pinned four | any new failure, in any of the three files | MEASURED (`c5-mut-mountfail`: 1 → verdict 1) |
+| `n_keep` (`-eq 2`) | the two must-stay-green tests ran | either renamed, deleted, or not reached | MEASURED as the B1 case (0 as a script before the fix) |
+| `n_keepfail` (`-eq 0`) | neither of them failed | the mount placed between `.appShell` and `<TopBar />` | BY CONSTRUCTION (it is `n_newfail`'s shape restricted to two names, and `n_newfail` is measured) |
+| `n_mount` (`-ge 1`) | `consent-mount.test.tsx` actually ran | the file missing or dropped from the invocation | MEASURED at base (0 → verdict 1) |
+| `n_mountfail` (`-eq 0`) | none of its cases failed | any consent-mount case red | MEASURED (`c5-mut-mountfail`) |
+| `n_adrst` (`-eq 1`) | the ADR carries a ratifiable `Status` row | the ADR shipped without one, or not shipped | MEASURED (`c2-mut-adrnostatus`, and base = 0) |
+| `n_adrkey` (`-ge 1`) | the ADR is about THIS contract | an empty or placeholder ADR | MEASURED at base (0 → verdict 1) |
+| **`st` (`-eq 0`) / `n_s02c` (`-eq 0`)** | the `slice/consent-s02` ref RESOLVED, and **no COMMIT in `<recorded S02 tip>..HEAD` touches any of the four S02-owned paths** | an "obvious" one-line fix inside `modalSemantics.ts` that the seat then **commits** — the case the working-tree diff below is blind to | **MEASURED in a throwaway repo** (`scratchpad/arch-s01-rework-r2/n9-proof.sh`, never the lane; real merge commit, two parents): unmodified `n_s02c`=0 → arm passes; the same edit committed `n_s02c`=1 → arm fails. The merge commit itself is not a false hit (control = 0) |
+| `s02` (`-z`) | no UNCOMMITTED edit to an S02-owned file is sitting in the working tree | the same one-line fix, **before** it is committed | **MEASURED in the same throwaway repo**: uncommitted → `s02`=`apps/ui/components/consent/modalSemantics.ts \| 1 +` → arm fails; once committed the diff is EMPTY again, which is the whole reason the range arm above exists (ARCH-REV-S01-r2 **N9**) |
+| **`n_tcran` (`-eq 1`)** | `pnpm typecheck` actually RAN | the script renamed or removed — v1's vacuous pass | **MEASURED** (`pnpm typechek` → `n_tcran`=0 while `n_tc`=0 satisfied the old term) |
+| `tt` (`-le 1`) | tsc did not crash | a config error exiting 2 | BY CONSTRUCTION |
+| `n_tc` (`-eq 0`) | no diagnostic OUTSIDE the `s14-ui.test.ts` pin | a type error introduced by any S01 file | MEASURED (`c2-mut-newtserror`: 1 → verdict 1) |
+
+**14 mutants built, 14 flipped their guard to 1. 9 known-good inputs, 9 gave verdict 0.** The fixtures and
+both script families are in `scratchpad/arch-s01-rework-r1/{cmds,synth}/`; `runsynth.sh` is the runner.
+Twelve of the fourteen are round 1's; the two added in rework round 2 are `n_s02c`'s committed mutant and
+`s02`'s uncommitted one, both built in `scratchpad/arch-s01-rework-r2/n9-proof.sh` — a throwaway git repo,
+never the lane — because they need a merge and a commit that this lane cannot be made to perform.
+
+**Supporting measurements, each with its command** (re-run this round, not carried over):
+
+```
+$ pnpm exec vitest run tests/render/t3-library.test.tsx        -> exit 1   Tests  4 failed | 11 passed (15)
+$ pnpm exec vitest run tests/render/t9-landing.test.tsx        -> exit 0   Tests  16 passed (16)
+$ pnpm typecheck                                               -> exit 1   8 diagnostics, all tests/unit/s14-ui.test.ts, 0 outside the pin
+$ pnpm typechek                                                -> exit 1   "undefined" + [ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command "typechek" not found
+$ grep -nE '^:root \{|^html\[data-mode="chamber"\] \{|^\}' apps/ui/app/globals.css | head -4
+5::root {   97:}   99:html[data-mode="chamber"] {   158:}
+$ grep -nE 'expect\(measuredRows\)\.toBe\(34\)|expect\(rows\)\.toHaveLength\(names\.length\)' tests/unit/t9-mode-tokens.test.ts
+426:        expect(rows).toHaveLength(names.length);
+433:    expect(measuredRows).toBe(34);
+```
+
+**The two numbers the review recorded as un-re-derived (`ARCH-REV-S01-r1.md` §What I did NOT verify 2 and 3)
+were re-derived this round, from the design data rather than from the earlier text:** `--muted` on
+`--muted-bg` over `--core` = **4.743** Terracotta / **4.833** Chamber (≥ 4.5); toggle ON-vs-OFF track =
+**4.246** / **7.171** (≥ 3, WCAG 1.4.11); and all eight `tint()`-derived values of R24 reproduce from
+`design-data.js`'s own formula with **0 mismatches**. R24's ten values stand and no token changes.
+
+## Boundaries (allowed / forbidden)
+
+**Allowed — S01's exclusive write surface** (from `SPEC.md` §Parallel-safety):
+`apps/ui/components/consent/CookieConsent.tsx`, `.../CookiePreferencesCard.tsx` and other new
+files under `apps/ui/components/consent/` **except `PrivacyPolicyModal.tsx` and
+`modalSemantics.ts`, both of which S02 owns and writes** (`COMMON.md` §10.7) ·
+`apps/ui/lib/consent.ts` · ONE delimited block `/* === consent-ui S01 === */ … /* === end
+consent-ui S01 === */` at the end of `apps/ui/app/globals.css` · **both token blocks** in
+`globals.css` (`:root` 5-97, `html[data-mode="chamber"]` 99-158) ·
+`tests/unit/t9-mode-tokens.test.ts` · ONE mount line in `apps/ui/app/layout.tsx` after
+`{children}` · ONE panel in `apps/ui/app/settings/page.tsx` · new tests under `tests/render/` ·
+**ONE file under `docs/`: `docs/architecture/01-decisions/ADR-0021-consent-storage-contract.md`**, written
+by the `S01-C2` coding seat at step `S01-S47` (orchestrator ruling, rework round 1). **That path is the only
+`docs/**` write any cluster of this slice may make.** In particular `docs/missions/consent-ui/slices/S01/PROGRESS.md`
+is **forbidden to every cluster** — the orchestrator is its sole writer (`COMMON.md` §4), and `S01-S35` /
+`S01-S36` REPORT on the ticket instead of writing it (ARCH-REV-S01 **B4**).
+
+**Forbidden:** `apps/api/**` · `packages/**` (including
+`packages/contract/src/client.ts` — the registration request keeps its exact shape) ·
+`migrations/**` · `tools/**` · `apps/runner/**` · `apps/scheduler/**` · MFA / verify-email /
+login / recovery flows · `tests/unit/registration*.test.ts` · `tests/integration/**` ·
+`apps/ui/components/SignUpFlow.tsx`, `apps/ui/components/consent/PrivacyPolicyModal.tsx`,
+**`apps/ui/components/consent/modalSemantics.ts`** and `apps/ui/lib/privacyPolicy.ts` (S02
+owns all four; S01 consumes the S01-R20 interface and imports the helper unchanged) · **any
+second focus trap, Esc listener, focus-restore or scroll-lock implementation — the shared
+helper is the only one in this mission** · any
+protocol document · `~/.claude/skills` and `.claude/skills` · a new npm dependency without a
+DECISIONS line and a V row.
+
+**Added by ARCH-S01 — `tests/support/contrast.ts` is FORBIDDEN.** S01-S03 needs a composite helper because
+`tests/support/contrast.ts:3-5` throws on any non-`#RRGGBB` argument, and the file is not in the allowed set.
+The helper is local to `tests/unit/t9-mode-tokens.test.ts`, which S01 does own. A shared-helper change would
+alter the meaning of the 34 contrast rows other missions depend on.
+
+**Added by ARCH-S01 — `TEXT_TOKENS` and `LINE_TOKENS` are FORBIDDEN to extend.**
+`tests/unit/t9-mode-tokens.test.ts:433` asserts `expect(measuredRows).toBe(34)` and `:426` asserts
+`rows` has exactly `names.length` entries; 34 = (12 TEXT + 5 LINE) × 2 modes is hard-pinned. Adding any of
+the ten new tokens to either array breaks a test that is GREEN at base, which R24's delta rule makes this
+slice's failure. New contrast evidence goes in its own `it()`.
+
+**Per-cluster `allowed` sets** are the "File surface" column of the cluster table above — that column is
+written to be copied verbatim into each coding seat's packet. **A cluster may write no file outside its own
+row**, even a file another S01 cluster owns: `globals.css` is written by C1 (token blocks only), C3 (opens
+the delimited block), C4 (appends inside it) and C7 (the reduced-motion rule inside it), and by nothing else.
+
+**Single-writer rule against S02.** The ONLY shared files are:
+1. **`apps/ui/app/globals.css`** — S01 appends ONE delimited block `/* === consent-ui S01 === */` at the
+   file's END and **touches nothing above it except the two token blocks it solely owns**; S02 appends its
+   own `/* === consent-ui S02 === */` block after S01's. The two end-of-file blocks conflict trivially at
+   merge time; that is accepted (vertical-slice law §6), not a reason to serialize.
+2. **`apps/ui/components/consent/modalSemantics.ts` and `PrivacyPolicyModal.tsx`** — S02 writes them, S01
+   consumes them unchanged. The exclusion is worded identically for both files so no seat has to decide it.
+
+**Cross-slice dependency and its mechanics.** It runs BOTH ways, so neither lane finishes alone:
+- **S02 needs S01's tokens.** S02 declares no token and consumes the five S01 declares for it. Until
+  `S01-C1` is committed on `slice/consent-s01`, S02's CSS resolves to nothing.
+- **S01 needs S02's helper and modal.** `S01-R20` opens `PrivacyPolicyModal` in read-only mode and
+  `S01-R18`'s focus trap is the ONE shared helper S02 builds.
+- **The mechanism, placed LAST BEFORE THE SLICE-WIDE GUARDS, as step `S01-S36`** (ARCH-REV-S01 **N5** —
+  v1 said "placed LAST" and ten steps follow it): after `slice/consent-s02`'s C1 is committed, the
+  **ORCHESTRATOR** runs `git merge slice/consent-s02` into this lane. **A coding seat never runs `merge`**;
+  it reports which commit of the other branch its lane contains, measured with
+  `git log -1 --format=%h slice/consent-s02`, and `CMD-C6` asserts `git diff --stat HEAD` is empty for all
+  four S02-owned paths.
+- **Why `C7` still follows the merge step, and why that is not a contradiction of "last".** `S01-S45` asserts
+  over `apps/ui/components/consent/modalSemantics.ts` — a file this lane only holds AFTER the merge — and
+  `S01-S46` is the whole-slice three-run gate over all six `consent-*` test files, the last of which C7
+  itself creates. So the merge is the last step that CHANGES WHAT THE LANE CONTAINS; the five steps after it
+  are guards over that content. Stated because v1's "placed LAST" was read as a claim about step order and is
+  false as one (ARCH-REV-S01 **N5**).
+
+**Must stay green, not be changed:** `tests/render/t3-library.test.tsx:231-237` (the
+`appShell > TopBar` direct-child shape — the mount goes after `{children}` precisely so this
+keeps passing) and `:244` / `tests/render/t9-landing.test.tsx:121-125` (the consent surface
+carries no `data-landing-section` attribute). **Read this together with the fourth-baseline note in
+`## Quantifiability law`: the two named TESTS are green at base, the t3-library FILE is not.**
+
+**Git:** coding seats commit only on `slice/consent-s01`, inside `.worktrees/consent-s01`,
+only when their owned clusters are GREEN on the worst of three runs, and never amend a
+reviewed commit. No push, no merge, no Done — V performs every merge and every Done.
+
+## DDD / module statement
+
+**Bounded contexts this slice touches — three, and it owns exactly one.**
+
+| Context | Owned? | What S01 does to it |
+|---|---|---|
+| **Browser-local consent preferences** | **OWNED** | Introduces it. `apps/ui/lib/consent.ts` is its whole model: the decision record, its codec, its defaults, and the request channel that lets a distant component ask for the card. Nothing outside `apps/ui/components/consent/` reads it. |
+| **Privacy-policy content as data** | Not owned — S02's | Consumed read-only through the `PrivacyPolicyModal` interface of R20, `mode="read"`. S01 never imports `apps/ui/lib/privacyPolicy.ts`. |
+| **The sign-up gate** | **Not owned — S02's, and untouched** | S01 changes no line of `SignUpFlow.tsx` and no field of the registration request. `packages/contract/src/client.ts:215-220` keeps its exact shape: `email, password, recovery_email, adult_affirmed`. |
+
+**Invariants this slice owns**, each with the step that pins it:
+
+1. `essential` is always `true` and is stored explicitly, never omitted — S01-S05, S01-S09.
+2. The stored object has exactly five members and no others — S01-S05.
+3. **`Silent` is reachable only when a valid `v: 1` decision is in storage** — the discriminator is the stored decision, never the entry point. S01-S30, S01-S31, S01-S32. This is REQ-REV-01 **B1**, and it is the invariant a one-keystroke bypass of a consent gate would violate.
+4. Exactly one consent surface is rendered at a time, and the bar is not rendered while the card is open — S01-S29.
+5. **Exactly one focus trap and exactly one document-level Esc listener exist across both slices**, and the topmost open surface consumes Esc — S01-S40, S01-S41, S01-S45.
+6. Storing a preference loads nothing, unloads nothing and gates nothing — S01-S44.
+7. Every colour in every file this slice adds is a `var(--token)` reference — S01-S04, S01-S42.
+
+**Domain terms introduced** (use these names, do not invent synonyms): *consent decision* (the stored
+record), *schema version* (`v`), *valid stored decision* (parses, `v === 1`, all five members present),
+*first-visit state* (no valid stored decision), *Silent* (neither bar nor card rendered anywhere),
+*entry point* (the control that opened the card — carried only for focus return, **never a discriminator
+of behaviour**), *category* (one of the three `COOKIE_CATEGORIES` records), *locked category* (Essential).
+
+**What this slice must NOT touch** — the mission's no-touch surface (`COMMON.md` §3): `apps/api/**`,
+`packages/**`, `migrations/**`, `tools/**`, `apps/runner/**`, `apps/scheduler/**`, every MFA / verify-email
+/ login / recovery flow, `tests/unit/registration*.test.ts`, `tests/integration/**`; plus the four S02-owned
+files, `tests/support/contrast.ts`, and the `TEXT_TOKENS` / `LINE_TOKENS` arrays.
+
+**ADR — one is warranted, and it is not mine to create.** The `debateai.consent` localStorage contract
+(the key, the integer `v`, the five members, and the re-ask-on-mismatch rule) **outlives this mission**: R23
+guarantees nothing reads it today, so the first consumer to arrive — an analytics or telemetry feature
+months from now — will meet a schema with no repo-wide record. Everything else here is mission-local and
+belongs in `DECISIONS.md`. **Proposed path: `docs/architecture/01-decisions/ADR-consent-storage-contract.md`.**
+`docs/architecture/**` is outside ARCH-S01's `allowed` list, so **the file is not created here**; it is
+recorded as a DECISIONS line and routed to the orchestrator as a ticket.
+
+## Refutation table (step · failure caught · failure NOT caught)
+
+Every step owes an honest second column. The SPEC already concedes three places where jsdom
+cannot observe the thing and V must: the bar's and card's pixel geometry (S01-R09, S01-R15),
+the layering against a real drawer (S01-R08), and the narrow-viewport stack (S01-R10). Those
+belong in the right-hand column, not in a test that pretends to cover them.
+
+| Step | Failure this step's test CATCHES | Failure it does NOT catch |
+|---|---|---|
+| S01-S01 | A token registered in the map with no CSS declaration, or spelled differently in the two places. | Whether the registered VALUE is the one the design specifies — the map is the expectation, so a wrong value agreed on in both places passes. S01-S02's derivation and S01-S03's ratios are what catch that. |
+| S01-S02 | A missing declaration in either block; a value that differs by one byte from the map (`0.28` vs `.28`, a space after a comma, a wrong channel); a token put in a second `:root` block, which the guard cannot see. | Whether `45 / 75 / 76 / 77 / 78` are the RIGHT layers against a real drawer, popover and toast. jsdom computes no stacking — **V acceptance step 13** opens a debate route and the node drawer and observes the drawer above the bar. |
+| S01-S03 | A tint token whose composited contrast falls under its floor; a future edit to `--muted`, `--muted-bg`, `--core`, `--ok-dot` or `--shell` that breaks readability in either mode. | Anything about text SIZE or weight — WCAG's 3:1 large-text allowance is not modelled, and the design's 9px mono detail line is measured here at the 4.5:1 small-text floor only through `--muted`. Nor does it catch a colour a reader sees through a stacked translucency this slice did not model. |
+| S01-S04 | A colour literal introduced anywhere in `globals.css` outside the two token blocks, in `layout.tsx`, `ModeToggle.tsx` or `debatePresentation.ts`. | A colour literal in any file the slice ADDS — **the shipped scan does not cover `apps/ui/components/consent/`** (`t9-mode-tokens.test.ts:546`). That is exactly why S01-S42 exists. |
+| S01-S05 | A sixth member, a missing member, a renamed key, a non-ISO `decidedAt`, a value stored under a different key. | Whether `decidedAt` is the RIGHT instant — the regex accepts any well-formed UTC timestamp, so a clock read once and cached would pass. |
+| S01-S06 | A codec that cannot round-trip its own output. | Nothing about the four control rows; S01-S09 owns those. |
+| S01-S07 | A `v: 0` value silently accepted, or migration code written for a case that cannot occur. | A future `v: 2` written by a later mission and then read by this code — the rule is "not 1 → re-ask", which is correct here and will need revisiting when a v2 exists. |
+| S01-S08 | An uncaught throw from a corrupt read, a refused read, or a refused write; a visitor trapped behind a browser that refuses storage. | Whether the decision genuinely survives in React state for the lifetime of the page after a failed write — the unit case asserts no throw, not the in-memory lifetime. **V would see this only by disabling storage in DevTools**; it is not in the numbered acceptance steps and is recorded here as **UNVERIFIED beyond the no-throw property**. |
+| S01-S09 | Any of the four control rows writing the wrong booleans; the two `Essential only` entry points diverging. | Whether the right control is WIRED to the right row — that is S01-S16, S01-S23 and S01-S29. A perfect `decisionFor` behind a miswired button passes here. |
+| S01-S10 | A paraphrased category string; a string shipped as the six visible characters `’`; the three categories in the wrong order; a copy string inlined in a component. | Whether the five cookie names (`de_session`, `de_mfa`, `de_device`, `de_quality`, `de_analytics`) are TRUE. They are pinned verbatim as the packet requires and **name five cookies the product does not set** — the product sets `__Host-debateai-session` and `__Host-debateai-csrf` (`apps/api/src/index.ts:169-170`). Routed as contested row **Q7-01**; R28 is what makes V's ruling a one-line data edit. |
+| S01-S11 | A request that reaches no subscriber; an unsubscribe that does not stop delivery; a lost opener reference. | **Whether Next.js gives the two client components the SAME module instance in the real bundle.** jsdom mounts both in one module registry, so a double-instance failure is invisible to every test in this slice. Handed to **V acceptance steps 9-10**, which cross the real bundle boundary. This is the single largest thing this plan cannot prove. |
+| S01-S12 | The RED is watched: the run must fail on a missing `CookieBar.tsx`, not on an assertion — a test that errors for the wrong reason has not been shown to test the right thing. | Anything about the component, which does not exist yet. Its only property is that the oracle is wired to the right path. |
+| S01-S13 | Any paraphrase of the five bar strings; a component that reaches `localStorage` itself instead of through its props. | Whether the strings are rendered in the design's typography, sizes or colours — `textContent` sees none of that. **V acceptance steps 1-2, both modes.** |
+| S01-S14 | A missing role or label; the three buttons in the wrong DOM order; focus pulled into or trapped inside the bar. | Whether the focus RING is visible — `--focus` is applied by CSS and jsdom computes no styles. **V acceptance step 15.** |
+| S01-S15 | A close control added; an Esc dismissal; a write triggered by Esc. | Hiding on scroll or on navigation, which R13 also forbids: the jsdom mount has no scroll and no router. **V acceptance step 16** covers Esc; scroll and navigation are UNVERIFIED by test. |
+| S01-S16 | A missing or mistyped geometry declaration; a colour literal in the block; a second delimited block. | **Every rendered pixel.** jsdom computes no layout, so 22px insets, the 7px bezel, the 52×4 gold tab and the 560px copy column are asserted as declared TEXT only. **V acceptance steps 1-2.** And — since rework round 1 — **anything about the bar's buttons writing a decision**: that clause is deleted from this step and belongs to `S01-S29` (ARCH-REV-S01 **B3**). |
+| S01-S17 | A missing `@media (max-width: 719.98px)` rule or any of its six declarations. | Whether the bar actually stacks, whether anything overlaps, and whether a horizontal scrollbar appears. **V acceptance step 14** narrows the window below 720px. |
+| S01-S18 | A route-conditional bottom offset; a debate-route selector inside the S01 block. | Whether the token dock's status pill is genuinely non-interactive on every future debate view — measured once at `DebatePageClient.tsx:1525-1529`, not asserted continuously. **V acceptance step 13** confirms every bar button stays clickable. |
+| S01-S19 | The RED is watched: the run must fail on a missing `CookiePreferencesCard.tsx`. | Anything about the component, which does not exist yet. |
+| S01-S20 | Any paraphrase of the twelve category strings or the four card strings; the categories out of order; a string inlined instead of read from `COOKIE_CATEGORIES`; a card that reaches `localStorage` itself. | The rendered tag-pill colours, the 38×22 toggle and the 520px card width. **V acceptance step 6.** |
+| S01-S21 | The Essential switch made operable by click, `Space` or `Enter`; a toggle that answers click but not `Space`; a seeded decision not reflected on open; a missing `aria-checked`. | Whether `cursor: not-allowed` is visible, and whether a mouse user perceives Essential as locked — the attribute is asserted, the affordance is not. **V acceptance step 6.** |
+| S01-S22 | A missing or mistyped card geometry declaration; a scrim or card layer taken from a literal instead of a token. | The 520px width, the `92vh` cap, whether the category list actually scrolls on a short viewport, and the 38×22 toggle. **V acceptance steps 6 and 14.** |
+| S01-S23 | `Save choices` or `Essential only` invoking the wrong callback or the wrong booleans; a `×` added to the footer; the three controls in the wrong order. | Whether the primary button READS as primary. Visual only. **V acceptance step 6.** |
+| S01-S24 | A missing `role`, `aria-modal` or `aria-labelledby`; an `aria-labelledby` pointing at an element that does not exist; the card growing its own `keydown` listener. | Whether a screen reader announces it correctly — the attributes are necessary, not sufficient. Not in the numbered acceptance steps; **UNVERIFIED by anyone**, and stated as such. |
+| S01-S25 | The RED is watched: the run must fail on a missing `CookieConsent.tsx`. | Anything about the state machine, which does not exist yet. |
+| S01-S26 | Any server-rendered output from the surface; a bar visible on the first client render; a second pre-paint script added to `layout.tsx`. | **A flash of the bar for a returning visitor in a real browser** — the thing R06 exists to prevent. jsdom has no paint. **V acceptance step 1** ("No flash of the bar before the page paints"). |
+| S01-S27 | The mount placed between `.appShell` and `<TopBar />`; the surface mounted twice; a `data-landing-section` attribute added. | Whether the bar appears on every ROUTE. The assertion is source text over one file. **V acceptance step 12** visits `/`, `/sign-up` and `/settings`. |
+| S01-S28 | A bar whose presence depends on anything other than storage — a session flag, a module-level "already shown" boolean. | Whether a real browser's "Clear site data" removes the key; jsdom's `localStorage.clear()` is a stand-in. **V acceptance step 5.** |
+| S01-S29 | The bar still rendered while the card is open; a terminal control writing the wrong object or leaving a surface behind. | The z-order between scrim and card, and whether the scrim actually dims. **V acceptance step 6.** |
+| S01-S30 | An Esc that writes; an Esc that leaves the visitor in `Silent` with nothing stored. | Whether a BACKDROP click does the same — R14 gives both routes and this step exercises Esc. A backdrop click is covered by the shared helper's own tests in C6 and by **V acceptance step 11**. |
+| S01-S31 | **The B1 defect exactly**: the entry point used as the discriminator, letting a signed-in visitor with nothing stored dismiss a consent gate with one keystroke. | Whether the SESSION cookie really survives deleting `debateai.consent` — that is the reachability argument, measured once by REQ-01, not re-asserted here. **V acceptance step 11a** performs it end to end. |
+| S01-S32 | A stored decision mutated or cleared by an Esc that should change nothing. | Whether `decidedAt` is preserved byte-for-byte through a real reload. **V acceptance step 11b.** |
+| S01-S33 | A missing panel; a panel whose button does not open the card; a panel that renders only when a decision is stored; a second panel occurrence in `settings/page.tsx`. | Whether the panel LOOKS like the rest of the settings page — the `.set*` class names are asserted, their rendering is not. **V acceptance step 9.** |
+| S01-S34 | Defaults that differ between the bar opener and the Settings opener — the second member of B1's class. | Nothing beyond the three `aria-checked` values; it does not assert that the defaults are the RIGHT ones (S01-S21 does). |
+| S01-S35 | Nothing — **this step has no test, and says so.** It writes no file either (`files: none`), so it also cannot collide with the orchestrator's `PROGRESS.md`. | Everything. R22 is a stated fact about two lines this slice does not edit. **V acceptance step 10b**, signed out, is the only observation. Recorded as `UNVERIFIED by test`. |
+| S01-S36 | An S01 edit to an S02-owned file after the merge, in **both** of its forms: **uncommitted**, by `CMD-C6`'s working-tree `s02` term; **committed**, by its `n_s02c` commit-range term over `<recorded S02 tip>..HEAD`. The `s02` term ALONE catches only the uncommitted form — `git diff HEAD` goes empty the moment the edit is committed (ARCH-REV-S01-r2 **N9**, measured). | Whether the merge itself was clean, and whether the `globals.css` block conflict was resolved correctly — the orchestrator performs and inspects the merge. Nor whether the helper's exported names still match the surface quoted in `S01-S38`: the step orders a re-read and a paste, which a human reads, not a test. |
+| S01-S37 | The RED is watched: the run must fail because the card renders no policy dialog yet, not because the file is missing. | Anything about the wiring, which does not exist yet. |
+| S01-S38 | An `I have read it` button reaching read mode; a missing `Close` button; `onAcknowledge` passed in read mode. | Whether the modal's own internals are correct — those are S02's tests. S01 asserts only the interface R20 states. |
+| S01-S39 | The policy modal mutating a toggle or the stored decision. | Whether the modal's scroll position, jump pills or content are right. S02's. |
+| S01-S40 | **The B3 defect exactly**: two document-level keydown listeners both firing on one Esc and throwing the visitor two surfaces back. | **The Esc stack in a real browser.** jsdom dispatches a synthetic event to a synthetic tree; a real browser's event ordering, a native `<dialog>`, or a browser-level Esc could still differ. Unmeasured by anyone across three review rounds. **V acceptance step 17b**, which presses Esc once and then twice. |
+| S01-S41 | A focus trap, Esc listener or focus restore written a second time in S01; initial focus on the wrong control; focus not returned to the opener. | Whether focus is VISIBLE where it lands, and whether the trap holds against a real browser's own sequential Tab navigation — jsdom does not implement sequential focus navigation natively, so the assertion exercises the helper's own cycling, not the browser's. **V acceptance step 15** and step 17. |
+| S01-S42 | A colour literal in any file the slice adds — the gap the shipped scan leaves open. | A colour reaching the DOM through an inline `style` computed at run time from a non-literal expression. Source scanning cannot see a value that does not exist until render. |
+| S01-S43 | An animation or transition in the S01 block with no reduced-motion counterpart. | Whether reduced motion actually suppresses the animation in a browser, and whether any animation remains perceptible. **Not in the numbered acceptance steps — UNVERIFIED**, and it is worth V adding one step with the OS setting on. |
+| S01-S44 | An analytics or telemetry SDK reference, a `<script>` tag, or a code path gated on the stored booleans, introduced by this slice. | A future consumer added by a LATER mission. The assertion is a snapshot of this slice's files, and R23's promise is about today. |
+| S01-S45 | A second Esc listener or focus trap anywhere under `apps/ui/components/consent/`; the shared helper losing its own implementation. | The seven EXISTING overlays, which declare `aria-modal` without implementing modal semantics. That retrofit is ticket `A11Y-OVERLAYS` (`t_8962842f`), **outside this mission**, and this test deliberately does not reach them. |
+| S01-S46 | A cluster that is green in isolation and red beside its siblings — cross-file storage leakage being the likeliest cause, which is why every consent test file clears `debateai.consent` in both hooks under `fileParallelism: false`. | Flakiness rarer than one run in three; and everything in the right-hand column above. **The three-run law bounds this, it does not eliminate it.** |
+| S01-S47 | An ADR that is absent, that carries no ratifiable `Status` row, or that is not about the `debateai.consent` key at all (`CMD-C2`'s `n_adrst` / `n_adrkey`). | Whether the ADR's PROSE matches the SPEC — the two terms are existence checks, not a diff. A reviewer reads it against `SPEC.md` R01-R05/R28 and `DECISIONS.md` §Storage; that comparison is human and is stated as such. It also does not catch an ADR that decides something new: **an ADR here transcribes, and a new decision inside one is a SPEC change wearing an ADR's clothes.** |
+
+### The mutant class per cluster, restated in one line each
+
+- **S01-C1** — a token whose CSS declaration and map registration disagree, in name, in value, or in block placement.
+- **S01-C2** — a decision record that is not exactly R01's five members, a control that writes the wrong one, or a storage contract with no repo-wide record (`S01-S47`).
+- **S01-C3** — a bar that can be dismissed without deciding, that traps focus, or whose copy has been paraphrased.
+- **S01-C4** — a preferences card whose locked category is operable, or whose state does not come from `aria-checked`.
+- **S01-C5** — **the entry point used as a discriminator instead of the stored decision**, in any of its three forms.
+- **S01-C6** — a second focus trap or Esc listener, or a read-mode modal that can grant consent.
+- **S01-C7** — a colour literal, an unguarded animation, or a telemetry reference in a file no shipped test scans.
+
+### What no step in this plan can prove, collected in one place
+
+1. **Every rendered pixel** — 720px stack, 520px width, 92vh, 38×22 toggles, the 22px insets, the gold tab. jsdom computes no layout. → V steps 1-2, 6, 14.
+2. **Stacking against real surfaces** — the drawer above the bar, the policy modal above the card. → V step 13, 17b.
+3. **The Esc stack in a real browser.** → V step 17b.
+4. **Module identity across the Next.js client bundle** (S01-S11). → V steps 9-10.
+5. **A flash of the bar before paint.** → V step 1.
+6. **Live mode switching with a surface open.** → V steps 2, 6, 18.
+7. **Whether the five cookie names in the detail lines are true.** They are not; contested row **Q7-01** is V's.
+8. **Reduced motion actually suppressing the animation**, and screen-reader announcement of the card. UNVERIFIED by anyone; stated rather than implied.
+9. **The OFF toggle track's BORDER against the card surface.** Measured this round while re-deriving the
+   contrast numbers: `--line-strong` composited over `--shell`, against `--core`, is **1.714** Terracotta /
+   **1.839** Chamber — under WCAG 1.4.11's 3:1 for a UI-component boundary. The ON-vs-OFF **state**
+   discrimination the SPEC asks for passes comfortably (4.246 / 7.171) and `S01-S03` pins it; this is a
+   different property and **no step asserts it**. It is not fixed here because the ten token VALUES are
+   `S01-R24` in a frozen SPEC — changing one is a SPEC question, not a HOW question
+   (`heartbeat-architecture` §4) — so it is recorded in `DECISIONS.md` and **routed to the orchestrator as a
+   candidate contested row**. Stated rather than left in a scratch file for the next lens to re-derive.
+10. **That the four `tint()` sources are still what `design-data.js` holds** at coding time. The eight values
+   reproduced with 0 mismatches when measured (twice now, in two sessions), but the derivation is a
+   measurement of a file the slice does not own; `S01-S02` pins the RESULT, not the source.

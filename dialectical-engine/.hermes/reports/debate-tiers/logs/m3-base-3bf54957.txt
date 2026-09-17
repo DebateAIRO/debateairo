@@ -1,0 +1,19 @@
+# S02-M3 item 4 — the C2/C3/C4 cluster commands re-measured ONCE each, as written, in the S02 lane at 3bf54957 on 2026-09-12 10:18 EEST (full vitest output: m3-base-{C2,C3,C4}.log beside this file, gitignored)
+
+## C3
+ Test Files  1 failed (1)
+      Tests  3 failed | 2 passed (5)
+   Duration  232ms (transform 79ms, setup 0ms, import 128ms, tests 13ms, environment 0ms)
+ × tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > uses the generated contract client for both browser and SSR with no V2 wire mirror 5ms
+ × tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > FX-ORPH-04 walks web consumers in both directions and rejects the death-list inventory 2ms
+ × tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > carries the S04 orphan-audit wording fix and deterministic locale tiebreak 3ms
+
+## C2
+ Test Files  2 passed (2)
+      Tests  46 passed (46)
+   Duration  12.98s (transform 570ms, setup 0ms, import 1.76s, tests 11.05s, environment 0ms)
+
+## C4
+ Test Files  3 passed (3)
+      Tests  40 passed (40)
+   Duration  1.69s (transform 399ms, setup 0ms, import 1.24s, tests 206ms, environment 0ms)

@@ -1,10 +1,11 @@
 "use client";
 
 import type { CSSProperties, MouseEvent } from "react";
+import type { Node as ContractNode } from "@debateai/contract";
 import type { DebateNode } from "@/lib/types";
 import { ROLE_PALETTES, renderStateOf, roleLabel, roleOf } from "@/lib/debatePresentation";
 import { findNodePathById, partitionArgumentChildren, perspectiveChildren } from "@/lib/debateTreeUtils";
-import { ModelMetaLine } from "@/components/ModelPresentation";
+import { ReferenceAuthorPill, ReferenceReviewLine, ReferenceScoreBadges } from "@/components/ReferenceNodeMeta";
 import { SCRUTINY_STATUS } from "@/lib/scrutiny";
 
 export type SplitCallbacks = {
@@ -20,6 +21,7 @@ type DebateSplitProps = SplitCallbacks & {
   focusNodeId: string | null;
   expanded: Set<string>;
   scrutiny?: Record<string, string>;
+  v3NodesById?: ReadonlyMap<string, ContractNode>;
 };
 
 function subtreeLean(node: DebateNode): { pro: number; con: number } {
@@ -44,6 +46,7 @@ export function DebateSplit({
   focusNodeId,
   expanded,
   scrutiny = {},
+  v3NodesById,
   onFocus,
   onOpenNode,
   onChallengeNode,
@@ -68,27 +71,19 @@ export function DebateSplit({
   return (
     <div className="split scroll">
       <div className="splitInner">
-        {ancestors.length > 0 ? (
-          <div className="splitPath">
-            <div className="splitPathHead">
-              <span>Path from root</span>
-              <span className="splitPathRule" />
-              <span>click a level to step back up</span>
-            </div>
-            {path.map((node, index) => {
+        <div className="splitPath">
+          <div className="splitPathHead">
+            <span>Path from root</span>
+            <div className="splitPathChips">
+            {(ancestors.length > 0 ? path.slice(0, -1) : [root]).map((node, index) => {
               const role = roleOf(node);
               const pal = role === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[role];
-              const isLeaf = index === path.length - 1;
               return (
-                <div key={node.id} className="splitChip" style={{ marginLeft: index * 16 }}>
-                  <span className="splitChipArrow" aria-hidden>
-                    ↳
-                  </span>
+                <div key={node.id} className="splitChip">
                   <button
                     type="button"
                     className="splitChipBtn"
                     style={{ borderLeftColor: pal.line }}
-                    disabled={isLeaf}
                     onClick={() => onFocus(node.id)}
                   >
                     <span
@@ -102,30 +97,35 @@ export function DebateSplit({
                 </div>
               );
             })}
+            </div>
+            <span className="splitPathHint">click a level to step back up</span>
           </div>
-        ) : null}
+        </div>
 
         {isRootFocus ? (
-          <div className="splitFocusRoot">
-            <div className="nodeEyebrow">Root claim</div>
-            <div className="splitFocusRootClaim">{root.claim}</div>
+          <div className="splitFocusShell">
+            <div className="splitFocusRoot">
+              <span className="referenceStanceTab root" aria-hidden />
+              <div className="nodeEyebrow">Root claim</div>
+              <div className="splitFocusRootClaim">{root.claim}</div>
+            </div>
           </div>
         ) : (
-          <div
-            className="splitFocusMain"
-            style={{ borderColor: focusPal?.border, borderLeftColor: focusPal?.line }}
-          >
-            <div className="splitFocusHead">
+          <div className="splitFocusShell" data-reference-split-focus>
+            <div className="splitFocusMain" style={{ borderColor: "var(--line)" }}>
+            <span className="referenceStanceTab" style={{ background: focusPal?.line }} aria-hidden />
+            <div className="splitFocusHead referenceMetaRow">
               <span
                 className="roleBadge"
                 style={{ color: focusPal?.text, background: focusPal?.bg, borderColor: focusPal?.border }}
               >
                 {focusPal?.arrow} {roleLabel(focus)}
               </span>
-              {focus.active_generation || focus.maker !== undefined ? (
-                <ModelMetaLine modelId={focus.active_generation?.model_id ?? null} maker={focus.maker} />
-              ) : null}
+              <ReferenceScoreBadges node={focus} v3Node={v3NodesById?.get(focus.id)} onOpenNode={onOpenNode} />
+              <span style={{ flex: 1 }} />
+              <ReferenceAuthorPill node={focus} />
             </div>
+            <ReferenceReviewLine review={v3NodesById?.get(focus.id)?.review} />
             <div className="splitFocusClaim">{focus.claim}</div>
             {focus.active_generation?.argument ? (
               <div className="splitFocusBody" onMouseUp={(event) => onProseSelect?.(focus, event)}>
@@ -145,9 +145,14 @@ export function DebateSplit({
                   ⚐ Challenge
                 </button>
               ) : null}
+              <button type="button" className="nodeCtrl" disabled aria-disabled="true">
+                ↻ Regenerate
+              </button>
+              <span style={{ flex: 1 }} />
               <button type="button" className="nodeCtrl link" onClick={() => onOpenNode(focus.id)}>
                 Open full analysis ▸
               </button>
+            </div>
             </div>
           </div>
         )}
@@ -197,6 +202,8 @@ export function DebateSplit({
                     node={node}
                     expanded={expanded.has(node.id)}
                     scrutinyStatus={scrutiny[node.id]}
+                    v3Node={v3NodesById?.get(node.id)}
+                    onOpenNode={onOpenNode}
                     onFocus={onFocus}
                     onChallengeNode={onChallengeNode}
                     onToggleExpand={onToggleExpand}
@@ -219,6 +226,8 @@ export function DebateSplit({
                     node={node}
                     expanded={expanded.has(node.id)}
                     scrutinyStatus={scrutiny[node.id]}
+                    v3Node={v3NodesById?.get(node.id)}
+                    onOpenNode={onOpenNode}
                     onFocus={onFocus}
                     onChallengeNode={onChallengeNode}
                     onToggleExpand={onToggleExpand}
@@ -258,7 +267,9 @@ type SplitCardProps = {
   node: DebateNode;
   expanded: boolean;
   scrutinyStatus?: string;
+  v3Node?: ContractNode;
   onFocus: (id: string) => void;
+  onOpenNode: (id: string) => void;
   onChallengeNode?: (node: DebateNode, anchor: HTMLElement) => void;
   onToggleExpand: (id: string) => void;
   onProseSelect?: (node: DebateNode, event: MouseEvent) => void;
@@ -268,7 +279,9 @@ function SplitCard({
   node,
   expanded,
   scrutinyStatus,
+  v3Node,
   onFocus,
+  onOpenNode,
   onChallengeNode,
   onToggleExpand,
   onProseSelect
@@ -281,27 +294,29 @@ function SplitCard({
   const rebuttals = node.children || [];
 
   const cardStyle: CSSProperties = scrutiny
-    ? { background: "var(--surface)", borderColor: scrutiny.color, borderLeftColor: pal.line }
+    ? { background: "var(--surface)", borderColor: scrutiny.color }
     : empty
-      ? { background: "var(--surface-sunken)", borderColor: "var(--line-2)", borderLeftColor: "var(--line-2)" }
-      : { background: "var(--surface)", borderColor: pal.border, borderLeftColor: pal.line };
+      ? { background: "var(--surface-sunken)", borderColor: "var(--line-2)" }
+      : { background: "var(--surface)", borderColor: "var(--line)" };
 
   return (
     <div className="splitCardWrap">
+      <div className="splitCardShell">
       <div className="splitCard" style={cardStyle}>
+        <span className="referenceStanceTab" style={{ background: pal.line }} aria-hidden />
         {scrutiny ? (
           <span className="scrutinyBadge" style={{ borderColor: scrutiny.color }}>
             <span className="scrutinyDot" style={{ background: scrutiny.color }} />
             <span style={{ color: scrutiny.color }}>{scrutiny.label}</span>
           </span>
         ) : null}
-        <div className="nodeHeader">
+        <div className="splitCardMeta referenceMetaRow">
           <span className="roleBadge" style={{ color: pal.text, background: pal.bg, borderColor: pal.border }}>
             {pal.arrow} {roleLabel(node)}
           </span>
-          {node.active_generation || node.maker !== undefined ? (
-            <ModelMetaLine modelId={node.active_generation?.model_id ?? null} maker={node.maker} />
-          ) : null}
+          <ReferenceScoreBadges node={node} v3Node={v3Node} onOpenNode={onOpenNode} condensed />
+          <span style={{ flex: 1 }} />
+          <ReferenceAuthorPill node={node} />
         </div>
         {empty ? (
           <div className="nodeEmpty">
@@ -323,22 +338,11 @@ function SplitCard({
                 {node.active_generation.argument}
               </div>
             ) : null}
-            <div className="nodeControls">
+            <div className="nodeControls nodeReferenceFooter">
               <button type="button" className="nodeCtrl focus" onClick={() => onFocus(node.id)}>
                 Focus ▸
               </button>
-              {onChallengeNode ? (
-                <button
-                  type="button"
-                  className="nodeCtrl challenge"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onChallengeNode(node, event.currentTarget);
-                  }}
-                >
-                  ⚐ Challenge
-                </button>
-              ) : null}
+              <span style={{ flex: 1 }} />
               {node.active_generation?.argument ? (
                 <button type="button" className="nodeCtrl" onClick={() => onToggleExpand(node.id)}>
                   {expanded ? "Show less" : "Read"}
@@ -347,6 +351,7 @@ function SplitCard({
             </div>
           </>
         )}
+      </div>
       </div>
       {rebuttals.length > 0 ? (
         <div className="splitRebuttals">

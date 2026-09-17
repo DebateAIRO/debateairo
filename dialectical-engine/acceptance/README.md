@@ -45,6 +45,52 @@ DR-137. Seed freshness stays loud: a standing `.pgdata` seeded before FAIR-02
 stops with `ACCEPTANCE_REGISTER_CONFLICT:configuredProviderSet` — reset the
 standing data directory rather than mutating sealed rows.
 
+**Which CLI a maker relay runs (D10).** Nothing in this directory names a path
+to a binary; where a maker's CLI lives is a fact about THIS host and is deduced
+here, never written down. For each maker the relay asks, in this order:
+
+1. the maker's own environment key — `ACCEPTANCE_CLAUDE_BINARY`,
+   `ACCEPTANCE_CODEX_BINARY`, `ACCEPTANCE_GROK_BINARY`,
+   `ACCEPTANCE_HERMES_BINARY` — which may hold a full path or a bare name to
+   look up. A key that is present but blank stops the relay with the maker's
+   bare code (`CLAUDE_CLI_BINARY_UNRESOLVED` and its three siblings): an
+   operator who set the key meant to decide, and the harness never guesses on
+   their behalf.
+2. with no key set, the maker's NAME — `claude`, `codex`, `grok`, `hermes` — is
+   looked up across the directories of `PATH` in order. **The first entry that
+   exists under the name is the match, and it is then admitted or refused; a
+   broken entry is never stepped over.** That is deliberately unlike `command -v`,
+   which skips a non-executable entry and keeps searching: silently running a
+   different install than the one at the front of your `PATH` is a lineage hazard
+   in an engine whose whole output is model attribution, and a loud refusal
+   naming the file is recoverable in seconds. The cost is real — a stale,
+   non-executable launcher early on `PATH` now stops the ceremony where your
+   shell would have answered cheerfully. A `PATH` entry that is empty or
+   relative is skipped entirely.
+
+Whatever that produces must then pass one check before anything is started:
+with symlinks followed it has to be a regular file, non-empty, executable by
+this user, readable, and a program by its first bytes — a `#!` line naming an
+interpreter, or a Mach-O / universal-binary / ELF magic number. A candidate that
+fails refuses loudly as `<MAKER>_CLI_BINARY_UNRESOLVED:<REASON>:<path>`, where
+REASON is one of `NOT_ON_PATH`, `NOT_FOUND`, `EMPTY`, `NOT_EXECUTABLE`,
+`UNREADABLE` or `NOT_A_PROGRAM`, and the ceremony prints that whole string as
+`MAKER ABSENT <maker> <code>`.
+
+The path that is checked is always ABSOLUTE, and it is the exact string that is
+spawned — a relative value in the key is resolved against the harness's working
+directory first. Anything else would be re-resolved by the child, which starts in
+a fresh empty scratch directory with its own `PATH`, so the file that ran need
+not have been the file that was checked.
+
+The relays start the resolved program DIRECTLY and never through a command
+interpreter, and a refused candidate is never started at all. Both halves of
+that rule were bought on 2026-09-17: one maker's launcher was a 0-byte file left
+behind by an interrupted update, and another's had been overwritten with four
+lines of plain text — and that second file, handed to an interpreter which could
+not execute it and so re-read it as a script, re-entered itself until the host's
+process table was full.
+
 Ceremony boot handshakes all three providers independently. Healthy relays form
 the discovered panel; no caller supplies a maker count and no panel-size
 ceiling refuses a lawful nonempty debate. Grok's fixed relay port is
@@ -74,11 +120,25 @@ actually ran. Call sites name their leg, round, and parent index
 The synthetic question remains neutral and outside the graph. Each maker also
 authors one cross-root response, represented by a support edge to its own root
 and an attack edge to the other root, with magnitude `UNKNOWN`. Serve remains
-the ruled single-primary-root B2-A shape. DR-161 makes that choice explicit as
-`first-configured-provider`: the selected root and rule travel on the required
-`UNSERVED-MAKER-POSITION` record, which names both makers and both root ids.
+the ruled single-primary-root B2-A shape, but T10 (goal 188-195, rulings
+S6-1/S6-3) repeals DR-161's provider-order choice: **the served root is the one
+carrying the maximum PROPAGATED strength** among the servable maker roots, so
+reordering the configured providers cannot change which answer is served. An
+exact strength tie is broken by lexicographic node id compared on code units
+(never locale collation, which would move with the host). The selected root and
+the rule travel on the required `UNSERVED-MAKER-POSITION` record — which names
+both makers and both root ids — under the recorded rule
+`max-propagated-strength-lexicographic-tiebreak`; the margin to the runner-up is
+recorded on the propagation receipt
+(`ledger.propagation_run.served_root_selection`).
 The other root remains graph-visible but is not composed into the served
-answer. Every node is still judged, recorded, and propagated. Each child carries its own stranger restatement, reduced judgement,
+answer.
+
+**Diagnosing a two-maker ceremony:** do NOT expect the first configured provider
+to win. Read the served root off the recorded per-node strengths, or off that
+receipt. Answers sealed before migration 0055 keep the retired
+`first-configured-provider` value on their own records — preserved history, not
+a live rule, and never relabelled. Every node is still judged, recorded, and propagated. Each child carries its own stranger restatement, reduced judgement,
 and per-node strength record citing its own artifact. Edge magnitude remains
 honestly `UNKNOWN` where no evidence verifier measured it. Classification uses
 the debate's one claim frame (the run question), not a child position's wording.
@@ -174,11 +234,53 @@ HTTP header, cookie, URL, or request body:
 ```
 
 By default the ceremony settles, verifies the FAIR-01 fair-debate gate,
-prints the run id / answer id / graph and maker report / UI URL, and shuts
-the whole stack down cleanly. Pass the value-less **`--serve`** flag to keep
+prints the run id / answer id / graph and maker report / definition-of-done
+report / UI URL, and shuts the whole stack down cleanly. Pass the value-less
+**`--serve`** flag to keep
 the database, model shim, claude relay and API standing after settle so the
 UI at `http://localhost:3000/debate/<run-id>` can browse the settled debate
 (Ctrl-C stops the stack). This replaces the earlier ad-hoc standing script.
+
+#### The definition-of-done report
+
+The Global definition of done
+(`.hermes/reports/2026-09-01-algorithm-live-loop/slices/S12-closure/SPEC.md:37-41`)
+names nine sub-clauses. The ceremony prints **one line per sub-clause**, each led by a
+stable, unique token. Sub-clauses 4 and 9 — the recorded ceiling and the
+envelope state at terminal — keep the `T17 envelope at terminal` line they have
+always had; the rest are read by `acceptance/dod-facts.ts` and printed on the
+same `console.info` stream, which
+`.hermes/reports/2026-09-01-algorithm-live-loop/tools/closing-run.sh:20,36`
+captures verbatim into `logs/closing-run/ceremony-*.log`. The tokens are fixed:
+a token that moved would invalidate every log captured before it moved.
+
+The DoD lines are printed **last, after every other report line**, and the
+reader that produces them runs only once those lines are on the log. That order
+is deliberate and is pinned by `acceptance/run-acceptance.test.ts`: the reader
+issues three queries and can refuse by a typed code, and the ceremony's `catch`
+closes the stack and rethrows, so a reader that ran first could cost a settled
+closing run its entire report.
+
+| Token | Sub-clause | What the line carries |
+| --- | --- | --- |
+| `DOD-1 panel-reduced-tau` | panel-reduced τ, non-self-graded | node count, whether every τ had a non-author voice, the node ids of any single-voice panel |
+| `DOD-2 measured-edges` | measured edges | **two counts**: how many of *every* `core.edge` of the run carry a PRESENT magnitude (the clause's own reading), then the same over the attack edges **FAIR-01 counts** — `polarity='attack' AND target_kind='NODE'` (`fair-debate.ts:122`). The `FAIR-01 graph` line six lines earlier prints that second population, so one log never carries two attack-edge counts by unstated rules. Nothing mints an EDGE-targeted arrow today, so the two agree; the day an undercutting arrow is minted they will not, and the line says which is which. |
+| `DOD-3 root-final-vs-tau` | a root's final strength ≠ τ | root count, whether one differs, the witness node id, and each root's τ / final |
+| `DOD-5 surviving-objection` | the statement acknowledging the strongest surviving objection | the strongest survivor's node id and final strength (or `none`), whether the last evaluator round was satisfied, and whether `SYNTHESIS-OBJECTION-STANDING` rides the answer |
+| `DOD-6 evaluator-loop` | the evaluator loop record | rounds recorded / the sealed `evaluatorLoopMaxRounds`, and each round's number, stage and verdict |
+| `DOD-7 verdict-label` | the code-derived three-state label | the label (or the unavailability reason ref), the terminal and the serve state |
+| `DOD-8 confidence-band` | the band counted over cited nodes | the band, its `LOOKED_UP/RAN/REASONING` basis counts, and the ceiling's register row key |
+
+Only a SHAPE violation refuses the ceremony — a node with no τ, rounds numbered
+other than 1..n, more rounds than the register sealed, or a label that is
+neither a state nor an unavailability reason
+(`ACCEPTANCE_DOD_*`). A definition-of-done OUTCOME — no root differing, an
+objection still standing, a single-voice panel, an UNKNOWN magnitude, no
+surviving objection — is **reported, never thrown**: the closing run's judge
+decides what it means, and a reader that threw would destroy the evidence.
+
+The same facts ride the returned ceremony as the typed, frozen
+`definitionOfDone` block, so the live proofs can assert on them directly.
 
 Ask-input defaults (all overrideable by the named CLI flag) are:
 

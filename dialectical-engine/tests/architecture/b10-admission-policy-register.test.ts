@@ -74,8 +74,16 @@ describe("B10 sealed admission-policy register row", () => {
     const apiIndex = await readFile("apps/api/src/index.ts", "utf8");
     const devSeed = await readFile("apps/runner/src/dev-deployment-register.ts", "utf8");
     expect(registerSource).toContain("ADMISSION_POLICY_REGISTER_ROW");
-    // The bootstrap register grows by exactly one row (extends the +4 pin).
-    expect(registerSource).toContain("AUTH_POLICY_REGISTER_ROWS.length + 5");
+    // pin updated 2026-09-18 (DEV-SYNC): dev's register-publication port seals the
+    // historical bootstrap set by snapshot hash (14 rows, LEGACY_REGISTER_V1_SNAPSHOT_SHA256),
+    // so the admission row is NOT a bootstrap row any more. It ships in the deployment
+    // publication snapshot, which the allocator seals as a fresh register version.
+    const historicalRows = registerSource.slice(
+      registerSource.indexOf("export function buildBootstrapRegisterPublicationRows("),
+      registerSource.indexOf("export async function assertBootstrapEquality(")
+    );
+    expect(historicalRows).toContain("PRODUCT_ROLE_POLICY_REGISTER_ROW");
+    expect(historicalRows).not.toContain("ADMISSION_POLICY_REGISTER_ROW");
     expect(devSeed).toContain("ADMISSION_POLICY_REGISTER_ROW");
     const readIndex = apiMain.indexOf("await readAdmissionPolicy(pool, environment.REGISTER_VERSION)");
     const limiterIndex = apiMain.indexOf("new AdmissionLimiter(");

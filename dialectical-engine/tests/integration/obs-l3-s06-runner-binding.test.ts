@@ -13,6 +13,8 @@ import {
   type CaptureQueueEntry,
 } from "@debateai/obs-capture";
 import { TypedDomainError } from "@debateai/kernel";
+import { parseCostEnvelopeBasis } from "@debateai/budget";
+import { SERVE_LEG } from "@debateai/register";
 import {
   createPostgresProviderGateway,
   declareHatchetWalkingSkeletonTask,
@@ -20,6 +22,35 @@ import {
 } from "@debateai/runner";
 
 const ROOT = process.cwd();
+
+/**
+ * The run head basis this gateway test hands to the real runner. It is an
+ * ORDINARY SUCCESS-PATH SETUP — the point of the test is provider exhaustion,
+ * not a stale-receipt refusal — so it must be a receipt the shipped parser
+ * accepts, and the ceiling stays deliberately small (10) so a handful of
+ * provider attempts reaches it.
+ *
+ * F-T17T9-3 (codex r1 B2): it used to supply `serve: 7`, the three retired
+ * composition fields and `selected: "COMPOSITION"`. The v4 parser refuses that
+ * shape, so the test would have died at RUN_COST_ENVELOPE_UNRESOLVED before
+ * reaching the behaviour it exists to check — hidden, at the time, behind an
+ * inherited advisory-lock stub failure that stops the run earlier still. Hoisted
+ * out of the pool stub and pinned by its own parse test below, so it cannot rot
+ * silently again while a different failure masks it.
+ */
+const S06_ENVELOPE_BASIS = Object.freeze({
+  kind: "COMPUTED_STRUCTURAL_CEILING",
+  max_model_attempts: 10,
+  panel_size: 1,
+  depth: 1,
+  per_site_attempts: { judge: 2, organ: 2, panel_member: 2, cooldown_site: 5 },
+  call_sites: { author: 1, panel: 0, reviewer: 0, serve: 6 },
+  serve_leg: { synthesis_loop_sites: 6, selected: "SYNTHESIS_LOOP" },
+  hold_cap: 1,
+  final_retry_attempts: 1,
+  formula_version: "s06-test",
+  bounds_source_ref: "register:s06",
+});
 
 function installRecordingEmitter(order: string[] = []): CaptureQueueEntry[] {
   const captured: CaptureQueueEntry[] = [];
@@ -222,10 +253,25 @@ describe("S06 runner task binding", () => {
 });
 
 describe("S06 provider gateway binding", () => {
+  /**
+   * B2's proof, and it runs INDEPENDENTLY of the gateway test below — that test
+   * still stops at the inherited advisory-lock stub (F3), so a green suite there
+   * would not have told anyone whether this receipt is still parseable. This
+   * asserts it directly against the shipped parser.
+   */
+  it("supplies a receipt the shipped run-head parser accepts", () => {
+    expect(parseCostEnvelopeBasis(S06_ENVELOPE_BASIS)).toMatchObject({
+      maxModelAttempts: 10,
+      panelSize: 1,
+      depth: 1,
+      serveLeg: { synthesisLoopSites: 6, selected: SERVE_LEG.chain }
+    });
+  });
+
   it("captures one provider occurrence after the real gateway exhausts all attempts", async () => {
     let sequence = 0;
     const client = {
-      async query(sql: string) {
+      async query(sql: string, values?: readonly unknown[]) {
         if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") return { rows: [] };
         if (sql.includes("ledger.allocate_sequence")) {
           sequence += 1;
@@ -241,6 +287,25 @@ describe("S06 provider gateway binding", () => {
             }],
           };
         }
+        // `acquireRunContentLease` acquires with pg_TRY_advisory_lock and reads
+        // `acquired` off the row (packages/db/src/index.ts:331, :334). That form is
+        // pinned by tests/architecture/s6-content-encryption-contract.test.ts:52-57,
+        // which also forbids the blocking `pg_advisory_lock(hashtextextended($1,0))`.
+        // Any row without `acquired: true` reads as CONTENTION and sends the lease
+        // into an unbounded unlock-and-retry loop. This client modelled the lease not
+        // at all, so the try-lock reached the throw below — the third member of
+        // F-PG-STUB-QUERY-TEXT-CLASS, stale by ABSENCE rather than by a stale branch.
+        if (sql.includes("pg_try_advisory_lock")) return { rows: [{ acquired: true }] };
+        if (sql.includes("run_private_content_is_live")) {
+          // `assertLive` compares the row COUNT against the leased run ids and
+          // requires every `live` to be true (packages/db/src/index.ts:377-384),
+          // so the answer is tied to the run actually requested rather than to a
+          // constant. Same shape as tests/unit/pro01-runner-tree.test.ts:207.
+          return {
+            rows: [{ run_id: String((values?.[0] as readonly string[])[0]), live: true }],
+          };
+        }
+        if (sql.includes("pg_advisory_unlock")) return { rows: [{ unlocked: true }] };
         throw new Error(`UNEXPECTED_CLIENT_QUERY:${sql}`);
       },
       release() {},
@@ -251,21 +316,7 @@ describe("S06 provider gateway binding", () => {
       },
       async query(sql: string) {
         if (sql.includes("SELECT envelope_basis")) {
-          return {
-            rows: [{
-              envelope_basis: {
-                kind: "COMPUTED_STRUCTURAL_CEILING",
-                max_model_attempts: 10,
-                panel_size: 1,
-                depth: 1,
-                per_site_attempts: { judge: 2, organ: 2 },
-                hold_cap: 1,
-                final_retry_attempts: 1,
-                formula_version: "s06-test",
-                bounds_source_ref: "register:s06",
-              },
-            }],
-          };
+          return { rows: [{ envelope_basis: S06_ENVELOPE_BASIS }] };
         }
         if (sql.includes("SELECT count(*)::text")) return { rows: [{ count: "0" }] };
         throw new Error(`UNEXPECTED_POOL_QUERY:${sql}`);

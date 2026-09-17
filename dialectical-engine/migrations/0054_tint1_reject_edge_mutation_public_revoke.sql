@@ -1,0 +1,34 @@
+-- TINT1 (codex r1 B1) — revoke PUBLIC EXECUTE on T5's edge-measurement guard.
+--
+-- THE DEFECT. `0040_account_erasure.sql:6273` swept
+-- `REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA core FROM PUBLIC` — once, at that
+-- migration. PostgreSQL grants EXECUTE on every newly created function to
+-- PUBLIC by default, so a function minted after 0040 keeps that grant unless it
+-- revokes for itself. `0052_t5_reviewer_measured_edges.sql` minted
+-- `core.reject_edge_mutation_except_measurement()` and did not, which put a
+-- SEVENTH core function inside the content-provision role's reach.
+-- `assertContentProvisionDatabaseRole` (packages/db/src/index.ts:92-99,174-177,239)
+-- counts the core functions that role may execute and requires EXACTLY the six
+-- ruled provision signatures, so the isolation attestation failed and the nine
+-- SCRAM LOGIN test with it.
+--
+-- WHY THIS IS A NEW FILE AND NOT AN EDIT TO 0052. The production migrator keys
+-- its ledger on the file NAME and skips any name already recorded
+-- (`packages/db/src/index.ts:730-731`). A database that already applied 0052 —
+-- which is every database carrying T5 — would never re-execute that file, so an
+-- amendment to it is INERT exactly where the exposure lives. The repair has to
+-- arrive as a forward migration. Repository precedent says the same:
+-- `0005_s04_rework.sql` and `0009_s06_rework.sql` are both forward corrections
+-- to already-landed files.
+--
+-- WHY 0054 AND NOT 0053. T6's lane holds
+-- `0053_t06_review_outcome_disclosure.sql` (commit b479f7e), unlanded at this
+-- base. 0053 is spoken for; taking it would collide on merge.
+--
+-- SCOPE. Signature-specific and nothing more. A blanket re-sweep of the schema
+-- would also strip grants other lanes may have placed deliberately since 0040,
+-- which is not this repair's business. Idempotent: REVOKE on a privilege that
+-- is already absent is a no-op, so a database that has run this file converges
+-- unchanged.
+
+REVOKE ALL ON FUNCTION core.reject_edge_mutation_except_measurement() FROM PUBLIC;

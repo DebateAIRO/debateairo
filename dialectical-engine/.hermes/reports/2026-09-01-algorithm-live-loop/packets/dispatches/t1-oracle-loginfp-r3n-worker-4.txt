@@ -1,0 +1,15 @@
+# DISPATCH t1-oracle-loginfp-r3n-worker-4 · 2026-09-06 09:18 · V-AUTHORISED records round 4 (AMENDMENT 3) · same seat resumed
+
+# ---- AMENDMENT 3 (09:18 2026-09-06) — V-AUTHORISED FOURTH RECORDS ROUND (V's ruling, V-DECISIONS-PACKET) · after codex records-r3n r3 ----
+verdict (final snapshot): /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/records-r3n/codex-r3-verdict.final-snapshot.md — read B-R3-B1's table, B-R3-B2 and B-R3-N1 whole.
+- **B-R3-B1** (three rows): report :720 / self :922 — "rewrote no historical logs" is an AUTHOR ATTESTATION (consistent-with), not entailed
+  conduct; self :848 vs W1.4 :811 — remove the exclusive aggregate "only rows 2 and 3 are entailed" or enumerate class and evidence strength
+  separately (row 1 IS classified as an unsupported assertion); self :287–288 — "the single most informative artifact in either round" gets its
+  own atomic label (undetermined as a comparative fact, or withdrawn).
+- **B-R3-B2**: keep the REFUTED disposition at :910–912, but replace "grep cannot match across a line break" with the demonstrated limit of that
+  exact cross-line phrase search — the sweep tool DOES list the candidate; it does not ensure the author disposes of it. Your re-read attestation
+  may be labelled as an attestation.
+- **B-R3-N1**: append the six address corrections codex lists; use THREE source verdicts for the displayed enumeration (or identify the fourth
+  and its actual contribution); recheck the quoted text at each final address before asserting location accuracy.
+- Then D67 ADDENDUM 3 once more: state each rule, re-read both records for the same decision.
+Same grants. Append only. Markers with `comments read through: records-r3n-codex-r3-2026-09-06`; end with `REWORK READY FOR REVIEW`.

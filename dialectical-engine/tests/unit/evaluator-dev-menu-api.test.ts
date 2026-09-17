@@ -35,6 +35,7 @@ describe("dev-only evaluator API", () => {
   it("refuses to enable the surface in a production composition", () => {
     for (const [name, value] of Object.entries({
       KEK_PATH: "/run/secrets/debateai-kek",
+      SUPPORT_KEK_PATH: "/run/secrets/debateai-support-kek",
       BLIND_INDEX_KEY_PATH: "/run/secrets/email-blind-index",
       AUDIT_KEY_STORE_PATH: "/run/secrets/audit-users",
       AUDIT_SOURCE_IP_SALT_PATH: "/run/secrets/audit-source-ip-salt",
@@ -43,6 +44,7 @@ describe("dev-only evaluator API", () => {
       MAIL_FROM: "noreply@debateai.test",
       PUBLIC_APP_URL: "https://debateai.test",
       DATABASE_URL: "postgresql://runtime:runtime@localhost/debateai",
+      SUPPORT_DATABASE_URL: "postgresql://support:fixture@localhost/debateai",
       AUTHORIZATION_DATABASE_URL: "postgresql://authorization:fixture@localhost/debateai",
       CONTENT_PROVISION_DATABASE_URL: "postgresql://content:fixture@localhost/debateai",
       ERASURE_DATABASE_URL: "postgresql://erasure:fixture@localhost/debateai",

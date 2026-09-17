@@ -1,0 +1,19 @@
+RECONSTRUCTED — copied from the orchestrator's transcript 2026-09-05 after codex H-P2 found no filed original; not filed at send time. Sent ~10:50 EEST to the h-diag seat (session a19096e…), promoting it from diagnosis to writer.
+
+Both of your diagnoses were accepted, verified, and routed; F-H-2 was raised to HIGH on blast radius, and your "no behaviour change commit" observation is now ruling D62. Lane/sealedrows has merged, so the fix lane you diagnosed for can start. You are now a WORKER seat with WRITE authority, in the same worktree.
+
+Packet: /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/packets/f-h-fix-worker.md — read it in full first. Then load superpowers:test-driven-development and superpowers:verification-before-completion before you write code.
+
+Working directory, unchanged: /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-h-diag/dialectical-engine — fast-forwarded to the merged integration tip. FIRST ACTION: `git rev-parse HEAD` must be d08ee9283244dcfb76d68820360810c7749940d6. If not, STOP. The packet's line citations were re-derived against this tree: liveness :144 and :205 unchanged; the ARCHIVED_REVIVED assertion is now at database.test.ts:4035 and the lifecycle test starts at :3906.
+
+Why one lane: the lifecycle test has two stacked causes. Fix the label alone and it stays red on staleness; fix staleness alone and it stays red on the label. Neither can be PROVEN green without the other, so both land here and the deliverable is that test green for the right reasons.
+
+F-H-2 first (the older, product-side cause): recordQuery treats a run with no private content as live, consistently with its eleven guarded siblings, and a re-asked archived run reaches ARCHIVED_REVIVED with its QUERY liveness event written. Mechanism is yours under D58 — guard the call at :144 as :205 does, or restore the explicit NOT EXISTS clauses 970870f3 wrote, or make the helper honest about its precondition; say which and why. Cover the blast radius you found, not just the test: add or extend a test proving that with encryption OFF a query refreshes liveness, since that feeds sweep and decideRetirement. RED first — the three-run RED exists; capture it before touching anything.
+
+F-H-1 second: only after staleness is green, replace verdict_state 'SUPPORTED' with the ladder's actual output for a one-maker, one-judge fixture — CONTESTED with the LABEL-BASIS-INCOMPLETE mark — and say in the assertion WHY (rung 0, both limbs absent, by design under T11, goal 196-221). Do not touch the fixture to manufacture a runner-up.
+
+Contract is in the packet: packages/liveness/src/**, tests/integration/database.test.ts, tests/unit/**, tests/integration/liveness*.test.ts, logs/h-fix/**, agent-reports/h-fix.md and h-fix-self.md, and TOOLING-TRAPS.md append-only per D61. packages/db/src/index.ts:485 (assertPrivateContentLive, unguarded, zero callers) is NOT in your contract — name it if you touch its neighbourhood, do not fix it.
+
+Hard constraints unchanged: never push, merge, self-Done, or edit board/DECISIONS; never mint, read, or pass a credential value. Stall guard: -t "claims, judges through the HTTP gateway" for the lifecycle test, single files otherwise, logs under logs/h-fix/, nothing over a few minutes in one call, never two gate-runs in one worktree writing one log — you caught that one yourself. Max 3 rework rounds. Use the packet's heading skeleton; self-report before FULLY DONE.
+
+[Orchestrator note on H-P1, added at reconstruction: the sentence "or restore the explicit NOT EXISTS clauses 970870f3 wrote" listed an unsafe mechanism without its invariant — defect #12.]

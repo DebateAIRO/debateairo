@@ -18,19 +18,31 @@ describe("DEV-03 development database principal provisioning source contract", (
     expect(cli).not.toMatch(/console\.(?:log|error)\([^)]*(?:DATABASE_URL|password)/s);
   });
 
-  it("keeps all nine fixed wrappers least-privileged and file-backed", async () => {
+  it("keeps all eleven fixed wrappers least-privileged and file-backed", async () => {
     const source = await readFile("apps/runner/src/dev-database-principals.ts", "utf8");
-    expect(source.match(/roleName: "debateai_dev_[a-z_]+"/g)).toHaveLength(9);
+    expect(source.match(/roleName: "debateai_dev_[a-z_]+"/g)).toHaveLength(11);
+    expect(source).toContain(`roleName: "debateai_dev_support",
+    capabilityRole: "debateai_support",
+    environmentKey: "SUPPORT_DATABASE_URL"`);
+    expect(source).toContain(`roleName: "debateai_dev_support_config_operator",
+    capabilityRole: "debateai_support_config_operator",
+    environmentKey: "SUPPORT_CONFIG_OPERATOR_DATABASE_URL"`);
     expect(source).toContain("LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS");
     expect(source).toContain("SET LOCAL password_encryption='scram-sha-256'");
     expect(source).toContain("DEV_DATABASE_PRINCIPAL_ADMIN_REQUIRED");
     expect(source).toContain("DEV_DATABASE_PRINCIPAL_DRIFT");
     expect(source).toContain("pg_advisory_xact_lock(hashtextextended('debateai:dev-database-principals',0))");
     expect(source).toContain("isExistingFileError(createError)");
-    expect(source).toContain("open(resolvedPath, \"wx\", 0o600)");
-    // L7-F10: the custody-root policy moved to the B4 resolver, which refuses a
-    // drifted mode rather than narrowing it back and hiding the exposure.
+    // L7-F10: the shared custody-root policy (B4 resolver) refuses a drifted
+    // mode rather than narrowing it back and hiding the exposure.
     expect(source).toContain("await assertDevCustodyDirectory(credentialRoot)");
+    expect(source).toContain("constants.O_NOFOLLOW");
+    expect(source).toContain("metadata.nlink !== 1");
+    expect(source).toContain("(metadata.mode & 0o777) !== PRIVATE_FILE_MODE");
+    expect(source).toContain("(metadata.mode & 0o777) !== PRIVATE_DIRECTORY_MODE");
+    expect(source).toContain("metadata.uid !== currentUid");
+    expect(source).not.toContain("chmod(");
+    expect(source).toContain("DEV_DATABASE_PRINCIPAL_MEMBERS_INVALID");
     expect(source).not.toMatch(/password:\s*["'][^"']+["']/);
   });
 });

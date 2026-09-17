@@ -15,6 +15,10 @@ import {
 } from "../../packages/critique/src/index.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
+import {
+  importHistoricalRegisterFixture,
+  registerFixtureRow
+} from "../support/registerFixtures.js";
 
 let database: TestDatabase;
 
@@ -47,17 +51,17 @@ afterAll(async () => database?.stop());
 describe("S08 A-06 raw PostgreSQL carriers", () => {
   it("records the casual trigger basis, blinded packet, receipt, symmetry diff, and objection ledger", async () => {
     const { runId, nodeId } = await createRunAndNode("s08-carriers");
-    await database.pool.query(`
-      INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
-      VALUES (1, 'configuredProviderSet', $1::jsonb, 'fixture:s08-provider-register')
-      ON CONFLICT (register_version, row_key) DO UPDATE SET value_json=EXCLUDED.value_json, source_ref=EXCLUDED.source_ref
-    `, [JSON.stringify({
+    await importHistoricalRegisterFixture(database.pool, 1, [registerFixtureRow(
+      "configuredProviderSet",
+      {
       kind: "CONFIGURED_PROVIDER_SET", requiredDistinctMakers: 2,
       providers: [
         { providerRef: "provider:a", adapterKind: "openai-compatible-http", maker: "maker:a" },
         { providerRef: "provider:b", adapterKind: "vllm-openai-compatible-http", maker: "maker:b" }
       ]
-    })]);
+      },
+      "fixture:s08-provider-register"
+    )]);
     await expect(readDeploymentMakerCapability(database.pool, 1)).resolves.toMatchObject({
       deploymentMakerCapability: true,
       configuredMakers: ["maker:a", "maker:b"]

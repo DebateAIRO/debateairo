@@ -7,6 +7,7 @@ import {
   withWriteTransaction
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
+import { parseRegisterVersionText, registerVersionToSafeLegacyNumber } from "@debateai/register";
 
 export const SCORECARD_BASES = [
   "MEASURED_OUTCOME",
@@ -487,7 +488,9 @@ function databaseScore(row: {
     total: Number(row.proper_score_total),
     definition: Object.freeze({
       rowKey: row.proper_score_row_key,
-      registerVersion: Number(row.proper_score_register_version),
+      registerVersion: registerVersionToSafeLegacyNumber(
+        parseRegisterVersionText(row.proper_score_register_version)
+      ),
       sourceRef: row.proper_score_source_ref
     })
   });
@@ -642,7 +645,9 @@ export class SettlementRepository {
           || verified.proper_score_decomposition.resolution !== score.resolution
           || verified.proper_score_decomposition.uncertainty !== score.uncertainty
           || verified.proper_score_row_key !== score.definition.rowKey
-          || Number(verified.proper_score_register_version) !== score.definition.registerVersion
+          || registerVersionToSafeLegacyNumber(
+            parseRegisterVersionText(verified.proper_score_register_version)
+          ) !== score.definition.registerVersion
           || verified.proper_score_source_ref !== score.definition.sourceRef
         ))) {
         throw new TypedDomainError("SETTLEMENT_READ_BACK_FAILED", "Q60 could not read back the settlement record byte-for-byte");
@@ -847,7 +852,13 @@ export class SettlementRepository {
       decomposition: row.proper_score_decomposition,
       derivationInput: Object.freeze([...row.derivation_input]),
       derivationHash: row.derivation_hash,
-      strategy: Object.freeze({ rowKey: row.strategy_row_key, registerVersion: Number(row.strategy_register_version), sourceRef: row.strategy_source_ref })
+      strategy: Object.freeze({
+        rowKey: row.strategy_row_key,
+        registerVersion: registerVersionToSafeLegacyNumber(
+          parseRegisterVersionText(row.strategy_register_version)
+        ),
+        sourceRef: row.strategy_source_ref
+      })
     })));
   }
 }

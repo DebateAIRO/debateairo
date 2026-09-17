@@ -1,9 +1,10 @@
 "use client";
 
 import type { JSX } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
+import { transitionDocumentMode, type Mode } from "./modeTransition";
 
-export type Mode = "terracotta" | "chamber";
+export type { Mode } from "./modeTransition";
 
 export function ModeToggle({ compact = false }: { compact?: boolean } = {}): JSX.Element {
   const [mode, setMode] = useState<Mode>("terracotta");
@@ -14,15 +15,18 @@ export function ModeToggle({ compact = false }: { compact?: boolean } = {}): JSX
 
   const chamber = mode === "chamber";
 
-  function toggleMode(): void {
-    const next: Mode = chamber ? "terracotta" : "chamber";
-    document.documentElement.dataset.mode = next;
-    try {
-      localStorage.setItem("debateai.mode", next);
-    } catch {
-      // Storage can be unavailable; the live document mode still changes.
-    }
-    setMode(next);
+  function toggleMode(event: MouseEvent<HTMLButtonElement>): void {
+    const current: Mode = document.documentElement.dataset.mode === "chamber" ? "chamber" : "terracotta";
+    const next: Mode = current === "chamber" ? "terracotta" : "chamber";
+
+    transitionDocumentMode(document, event.currentTarget, next, () => {
+      try {
+        localStorage.setItem("debateai.mode", next);
+      } catch {
+        // Storage can be unavailable; the live document mode still changes.
+      }
+      setMode(next);
+    });
   }
 
   return (

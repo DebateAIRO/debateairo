@@ -1509,7 +1509,8 @@ export const CONTENT_CARRIERS = Object.freeze([
   "evidence.query_set",
   "evidence.query_amendment",
   "evidence.evidence_item",
-  "evidence.absence_row"
+  "evidence.absence_row",
+  "serve.answer"
 ] as const);
 
 export type ContentCarrier = typeof CONTENT_CARRIERS[number];

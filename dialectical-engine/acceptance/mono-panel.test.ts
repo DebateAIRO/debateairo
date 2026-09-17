@@ -8,10 +8,30 @@ import type { StandingDatabase } from "./standing-db.js";
 import { startStandingDatabase } from "./standing-db.js";
 import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main.js";
 import { seedAcceptanceRegister } from "./seed-register.js";
+import { evaluatorSatisfied } from "./test-fixtures/evaluator-double.js";
+
+/**
+ * F-T17T9-1 — THE identity this mono-lineage fixture configures, named once.
+ *
+ * The defect this closes: the fixture configured only `acceptance:codex-cli`
+ * while the register sealed the DEFAULT roles, whose evaluator is the second
+ * configured FAMILY's provider (`acceptance:claude-cli`). The run then died at
+ * `SYNTHESIS_ROLE_PROVIDER_UNRESOLVED` — a CORRECT refusal under J24, because a
+ * sealed identity is never substituted. The roster was the defect, not the
+ * refusal.
+ *
+ * Both the sealed roles and the maker relay are derived from this one constant,
+ * so a fixture that seals a role it does not configure is no longer expressible
+ * here. Identical synthesizer and evaluator refs are lawful (goal 84-85); the
+ * seeder warns and proceeds, and a mono-lineage day is exactly the case the
+ * allowance exists for.
+ */
+const MONO_PROVIDER_REF = "acceptance:codex-cli";
 
 let database: StandingDatabase;
 let dataDirectory: string;
 let provider: { readonly endpoint: string; stop(): Promise<void> };
+let priorRoleRefOverrides: Readonly<{ synthesizer: string | undefined; evaluator: string | undefined }>;
 
 async function reservePort(): Promise<number> {
   const server = createServer();
@@ -49,9 +69,12 @@ async function startProviderDouble(): Promise<{ readonly endpoint: string; stop(
       { segment_id: "segment:verdict", text: "A mono-lineage acceptance answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
       { segment_id: "segment:next", text: "Seek an independent model lineage.", node_refs: [], served_number_refs: [] }
     ] }),
-    JSON.stringify({ conforms: true, findings: [] }),
-    JSON.stringify({ conforms: true, findings: [] }),
-    JSON.stringify({ pass: true })
+    // F-SEALEDROWS-B: T9 replaced the two `{conforms,findings}` conformance
+    // responses and the `{pass}` R9 response that stood here with ONE evaluator
+    // verdict. Both sealed roles resolve to this fixture's single provider, so
+    // the synthesizer's segments above and this verdict are answered by the
+    // same double, in that order.
+    evaluatorSatisfied()
   ];
   let cursor = 0;
   const server: Server = createServer((request, response) => {
@@ -84,10 +107,27 @@ beforeAll(async () => {
   dataDirectory = await mkdtemp(join(tmpdir(), "debateai-acc-mono-"));
   database = await startStandingDatabase({ port: await reservePort(), dataDirectory });
   provider = await startProviderDouble();
+  // The overrides are read by `resolveAcceptanceSynthesisRoleRefs` at seed
+  // time, so they must precede the seed; the runtime then reads the SEALED ROW
+  // rather than the environment, which is why nothing sets them again below.
+  priorRoleRefOverrides = Object.freeze({
+    synthesizer: process.env.ACCEPTANCE_SYNTHESIZER_ROLE_REF,
+    evaluator: process.env.ACCEPTANCE_EVALUATOR_ROLE_REF
+  });
+  process.env.ACCEPTANCE_SYNTHESIZER_ROLE_REF = MONO_PROVIDER_REF;
+  process.env.ACCEPTANCE_EVALUATOR_ROLE_REF = MONO_PROVIDER_REF;
   await seedAcceptanceRegister(database.pool);
 });
 
 afterAll(async () => {
+  // Restored rather than deleted: this process is shared with whatever else the
+  // runner imports, and a leaked override would seal another fixture's roles.
+  const restore = (name: string, value: string | undefined): void => {
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  };
+  restore("ACCEPTANCE_SYNTHESIZER_ROLE_REF", priorRoleRefOverrides?.synthesizer);
+  restore("ACCEPTANCE_EVALUATOR_ROLE_REF", priorRoleRefOverrides?.evaluator);
   await provider?.stop();
   await database?.stop();
   await rm(dataDirectory, { recursive: true, force: true });
@@ -109,7 +149,7 @@ describe("DR-182 live mono-panel composition", () => {
       },
       makerRelays: [
         {
-          providerRef: "acceptance:codex-cli",baseUrl: provider.endpoint,model: "test-layer/model",
+          providerRef: MONO_PROVIDER_REF,baseUrl: provider.endpoint,model: "test-layer/model",
           authorizationHeader: "Bearer test-mono-relay"
         }
       ]

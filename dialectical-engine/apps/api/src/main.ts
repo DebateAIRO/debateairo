@@ -1,5 +1,6 @@
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
 import {
   Argon2WorkerPool,
   AuditContextHasher,
@@ -12,18 +13,16 @@ import {
   loadSecretKey,
   PublicationCipher
 } from "@debateai/crypto";
-import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, configureContentEncryption, createPool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
+import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportOwnContextRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
 import type { RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
   loadApiEnvironment,
+  createSupportConfigurationPort,
   readDeploymentRiskTier,
   computeStructuralCeilingBasis,
-  ENGINE_BRANCHING_FACTOR,
-  ENGINE_COMPOSITION_SEGMENT_CAP,
-  ENGINE_FIXED_ORGANS_PER_COMPOSITION,
-  ENGINE_MAX_RECOMPOSE,
+  readEnvelopeFormulaInputs,
   readPanelDiscoveryPolicy,
   readAdmissionPolicy,
   readAuthPolicy,
@@ -34,6 +33,7 @@ import {
   readStructuralCeilingPolicyInputs,
   resolveEffectiveRiskTier,
 } from "@debateai/register";
+import { loadHelpCorpus } from "@debateai/support-kb";
 import {
   buildApi,
   HatchetDispatcher,
@@ -42,6 +42,7 @@ import {
 } from "./index.js";
 import { InProcessAuthRateLimiter, RegistrationService } from "./registration.js";
 import { AdmissionLimiter } from "./admission.js";
+import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
 import { PostgresPublicationApplication } from "./publications.js";
@@ -52,7 +53,7 @@ import {
   createSingleFlightErasureReconciler,
   PostgresAccountErasureApplication
 } from "./account-erasure.js";
-import { installGracefulShutdown } from "./graceful-shutdown.js";
+import { installStartupResourceOwner } from "./startup-resource-owner.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 import { RecoveryStartService } from "./recovery.js";
 import {
@@ -60,8 +61,22 @@ import {
   createProviderDiscoveryResolver,
   parseProviderDiscoveryTargets
 } from "./provider-discovery.js";
+import { riskSignalFailureIdentity } from "./risk-signal-identity.js";
+import { createSupportKeyPort } from "./support/keys.js";
+import { createSupportAnswerService } from "./support/answer.js";
+import { RelayAdapter,parseSupportModelTargetJson } from "./support/model.js";
+import {
+  SupportModelReservationLedger,createReservedSupportModelPort
+} from "./support/model-reservation.js";
+import { createAdvisorySummaryService,createSupportCaseAccessService,createSupportSummarySealer } from "./support/cases.js";
+import { createSupportOwnContextService } from "./support/own-context.js";
+import { PostgresSupportIncidentRepository } from "./support/incidents.js";
+import { readLimits } from "./support/limits.js";
+import { SupportRelayQueue } from "./support/queue.js";
+import { SupportDegradedState } from "./support/degraded.js";
 
 const environment = loadApiEnvironment();
+const supportKnowledge = loadHelpCorpus(resolve("packages/support-kb/content"));
 const kek = loadKek(environment.KEK_PATH);
 const corpusKek = environment.PUBLICATION_ENABLED === "true"
   ? loadKek(environment.CORPUS_KEK_PATH!) : undefined;
@@ -161,14 +176,23 @@ if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
   throw new TypeError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
 }
 const structuralInputs = await readStructuralCeilingPolicyInputs(pool, environment.REGISTER_VERSION);
+/**
+ * T17: the sealed `envelopeFormulaInputs` row (T16). The reader is the loud
+ * stop — a deployment that never sealed the row cannot boot the API, so no ask
+ * is ever admitted against an envelope this file invented. The engine shape
+ * constants that used to be re-declared at the call site below now come from
+ * this row, which seeds them from the same `engine-shape.ts` exports.
+ */
+const envelopeFormulaInputs = await readEnvelopeFormulaInputs(pool, environment.REGISTER_VERSION);
 const probes = new ProviderProbeRepository(pool);
-assertProductionProviderTargets(parseProviderDiscoveryTargets(environment.PROVIDER_DISCOVERY_TARGETS_JSON, deploymentMakers.configuredProviders), environment.NODE_ENV);
+const providerDiscoveryTargets = parseProviderDiscoveryTargets(
+  environment.PROVIDER_DISCOVERY_TARGETS_JSON,
+  deploymentMakers.configuredProviders
+);
+assertProductionProviderTargets(providerDiscoveryTargets, environment.NODE_ENV);
 const resolveProviderPanel = createProviderDiscoveryResolver({
   configuredProviders: deploymentMakers.configuredProviders,
-  targets: parseProviderDiscoveryTargets(
-    environment.PROVIDER_DISCOVERY_TARGETS_JSON,
-    deploymentMakers.configuredProviders
-  ),
+  targets: providerDiscoveryTargets,
   probes,
   probeFreshnessMs: discoveryPolicy.probeFreshnessMs,
   probeTimeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS
@@ -182,7 +206,9 @@ const authenticationRiskSignals = new PostgresAuthenticationRiskSignalRepository
 const recovery = new RecoveryStartService({
   repository: new PostgresRecoveryStartRepository(pool,auditContextHasher,dekStore),
   riskSignals:authenticationRiskSignals,
-  onRiskSignalFailure:()=>console.error("[RECOVERY_RISK_SIGNAL_PENDING]"),
+  onRiskSignalFailure:(error)=>console.error(
+    "[RECOVERY_RISK_SIGNAL_PENDING]",riskSignalFailureIdentity(error)
+  ),
   blindIndexKey,
   enumerationFloorMs: authPolicy.verification.enumerationResponseFloorMs,
   publicResponsePolicy: recoveryPolicy.publicResponse
@@ -231,7 +257,9 @@ const mfa = new MfaEnrollmentService({
 const sessions = await SessionService.create({
   repository: new PostgresSessionRepository(authorizationPool, auditContextHasher),
   riskSignals:authenticationRiskSignals,
-  onRiskSignalFailure:()=>console.error("[LOGIN_RISK_SIGNAL_PENDING]"),
+  onRiskSignalFailure:(error)=>console.error(
+    "[LOGIN_RISK_SIGNAL_PENDING]",riskSignalFailureIdentity(error)
+  ),
   dekStore,
   argon2: argon2Pool,
   authPolicy,
@@ -252,10 +280,14 @@ const application = new PostgresAskApplication(pool, dispatcher, {
     ...structuralInputs,
     panelSize: input.panelSize,
     depth: Number(input.depthParams.depth),
-    maxRecompose: ENGINE_MAX_RECOMPOSE,
-    branchingFactor: ENGINE_BRANCHING_FACTOR,
-    compositionSegmentCap: ENGINE_COMPOSITION_SEGMENT_CAP,
-    fixedOrgansPerComposition: ENGINE_FIXED_ORGANS_PER_COMPOSITION
+    maxRecompose: envelopeFormulaInputs.maxRecompose,
+    branchingFactor: envelopeFormulaInputs.branchingFactor,
+    compositionSegmentCap: envelopeFormulaInputs.compositionSegmentCap,
+    fixedOrgansPerComposition: envelopeFormulaInputs.fixedOrgansPerComposition,
+    reviewerCallsPerNode: envelopeFormulaInputs.reviewerCallsPerNode,
+    synthesizerMaxRounds: envelopeFormulaInputs.synthesizerMaxRounds,
+    evaluatorMaxRounds: envelopeFormulaInputs.evaluatorMaxRounds,
+    maxDepth: envelopeFormulaInputs.maxDepth
   }),
   resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
     const resolved = resolveEffectiveRiskTier({
@@ -355,6 +387,135 @@ const evaluatorDevMenuPool = environment.EVALUATOR_DEV_MENU_ENABLED === "true"
 const evaluatorDevMenu = evaluatorDevMenuPool !== undefined
   ? new PostgresEvaluatorDevMenuRepository(evaluatorDevMenuPool)
   : undefined;
+const supportPool = createPool(environment.SUPPORT_DATABASE_URL);
+const supportRelayLeasePool = createPool(environment.SUPPORT_DATABASE_URL,{ max: 18 });
+const supportKeys = await createSupportKeyPort({
+  supportKekPath: environment.SUPPORT_KEK_PATH,
+  protectedKeyPaths: [
+    environment.KEK_PATH,
+    environment.CORPUS_KEK_PATH,
+    environment.BLIND_INDEX_KEY_PATH,
+    environment.AUDIT_SOURCE_IP_SALT_PATH
+  ].filter((path): path is string => path !== undefined)
+});
+const supportSessions = new PostgresSupportSessionRepository(
+  supportPool,
+  createWrappedSupportSessionKey(supportKeys)
+);
+const supportMessages = createSupportMessageCipher(
+  supportKeys,
+  new PostgresSupportMessageRepository(supportPool)
+);
+const supportConfiguration = createSupportConfigurationPort(
+  createSupportControlPlanePool(environment.DATABASE_URL)
+);
+const reportSupportDiagnostic = (diagnostic: Readonly<{ code: string }> | string): void => {
+  console.error({ code: typeof diagnostic === "string" ? diagnostic : diagnostic.code });
+};
+const supportRelayReservations = new PostgresSupportRelayReservationRepository(supportRelayLeasePool);
+const supportRelayCallRecords = new PostgresSupportRelayReservationRepository(supportPool);
+const supportRelayQueue = new SupportRelayQueue({
+  readLimits: () => readLimits(supportConfiguration),
+  reservations: supportRelayReservations,
+  reportCleanupFailure: reportSupportDiagnostic
+});
+const supportDegraded = new SupportDegradedState();
+const supportModelTarget = environment.SUPPORT_MODEL_TARGET_JSON === undefined
+  ? undefined : parseSupportModelTargetJson(environment.SUPPORT_MODEL_TARGET_JSON);
+const supportModels = new Map<string,RelayAdapter>(supportModelTarget === undefined ? [] : [[
+  supportModelTarget.providerRef,
+  new RelayAdapter({
+    baseUrl: supportModelTarget.baseUrl,
+    authorizationHeader: supportModelTarget.authorizationHeader,
+    model: supportModelTarget.model,
+    timeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS
+  })
+] as const]);
+const supportModelReservations = new SupportModelReservationLedger({
+  processId: `support-api-${process.pid}`,
+  processPid: process.pid,
+  ordinaryPoolId: "support-runtime",
+  controlPoolId: "support-control"
+});
+const supportAdmittedModel = createReservedSupportModelPort({
+  configuration: supportConfiguration,
+  ledger: supportModelReservations,
+  durableCalls: supportRelayCallRecords,
+  modelFor: (modelRef) => supportModels.get(modelRef)
+});
+const supportCaseSummaries = new PostgresSupportCaseSummaryRepository(supportPool);
+const supportSummaryService = createAdvisorySummaryService({
+  complete: async (request) => {
+    return (await supportRelayQueue.execute({
+      modelBacked: true,language: request.language,signal: request.signal
+    },(signal) => supportAdmittedModel.complete({
+      ...request,...(signal === undefined ? {} : { signal })
+    }))).text;
+  },
+  seal: createSupportSummarySealer(
+    supportKeys,supportCaseSummaries.readCaseKey.bind(supportCaseSummaries)
+  ),
+  persist: supportCaseSummaries.updateCaseSummary.bind(supportCaseSummaries)
+});
+const supportCases = createSupportCaseService({
+  messages: supportMessages,
+  summaries: supportSummaryService,
+  reportSummaryFailure: reportSupportDiagnostic,
+  createOnce: async (input) => {
+    let snapshot: Uint8Array | undefined;
+    const repository = new PostgresSupportCaseRepository(
+      supportPool,
+      async (caseId) => {
+        if (snapshot === undefined) throw new TypeError("SUPPORT_CASE_SNAPSHOT_UNAVAILABLE");
+        return createSupportCaseMaterial(supportKeys,snapshot)(caseId);
+      }
+    );
+    return repository.createCaseOnce({
+      sessionId: input.sessionId,identityOwnerRef: input.identityOwnerRef,
+      language: input.language,createdAt: input.createdAt,
+      triggerPredicate: input.triggerPredicate,triggerGeneration: input.triggerGeneration,
+      toolCalls: input.toolCalls,kbVersion: input.kbVersion,slaHours: input.slaHours,
+      prepare: async () => {
+        const prepared = await input.prepare();
+        snapshot = prepared.transcriptSnapshot;
+        return Object.freeze({
+          caseId: prepared.caseId,token: prepared.token,tokenSha256: prepared.tokenSha256
+        });
+      }
+    });
+  },
+  create: async (input) => {
+    const repository = new PostgresSupportCaseRepository(
+      supportPool,
+      createSupportCaseMaterial(supportKeys,input.transcriptSnapshot)
+    );
+    return repository.createCase({
+      caseId: input.caseId,
+      tokenSha256: input.tokenSha256,
+      sessionId: input.sessionId,
+      language: input.language,
+      createdAt: input.createdAt,
+      identityOwnerRef: input.identityOwnerRef,
+      triggerPredicate: input.triggerPredicate,
+      toolCalls: input.toolCalls,
+      kbVersion: input.kbVersion,
+      slaHours: input.slaHours
+    });
+  }
+});
+const supportIncidents = new PostgresSupportIncidentRepository(supportPool as never);
+const supportAnswers = createSupportAnswerService({
+  entries: supportKnowledge.entries,
+  messages: supportMessages,
+  incidents: supportIncidents,
+  queue: supportRelayQueue,
+  degraded: supportDegraded,
+  modelFor: () => supportAdmittedModel
+});
+const supportStatus = new PostgresSupportStatusRepository(supportPool);
+const supportOwnContext = createSupportOwnContextService(
+  new PostgresSupportOwnContextRepository(pool,supportPool)
+);
 const api = buildApi({
   application,
   accountErasure:erasureApplication,
@@ -365,6 +526,36 @@ const api = buildApi({
   legacyRunClaim,
   // B10: the sealed admission budgets are always composed in production.
   admission: new AdmissionLimiter(admissionPolicy),
+  support: {
+    configuration: supportConfiguration,
+    sessions: Object.freeze({
+      create: supportSessions.create.bind(supportSessions),
+      read: supportSessions.read.bind(supportSessions),
+      setConsent: supportSessions.setConsent.bind(supportSessions),
+      admitMessage: supportSessions.admitMessage.bind(supportSessions),
+      admitIpSession: supportSessions.admitIpSession.bind(supportSessions),
+      finalizeInjectionLock: supportSessions.finalizeInjectionLock.bind(supportSessions),
+      recordRateLimit: supportSessions.recordRateLimit.bind(supportSessions),
+      rateMessage: supportSessions.rateMessage.bind(supportSessions),
+      status: supportStatus.status.bind(supportStatus)
+    }),
+    messages: supportMessages,
+    cases: supportCases,
+    caseAccess: createSupportCaseAccessService({
+      repository: supportCaseSummaries,keys: supportKeys
+    }),
+    answer: supportAnswers,
+    ownContext: supportOwnContext,
+    incidents: supportIncidents,
+    reportDiagnostic: reportSupportDiagnostic,
+    knowledge: {
+      status: async () => Object.freeze({
+        kbVersion: supportKnowledge.kbVersion,
+        shipped: supportKnowledge.shippedCount,
+        ignored: supportKnowledge.ignoredCount
+      })
+    }
+  },
   ...(publications === undefined ? {} : { publications }),
   allowedOrigin: environment.PUBLIC_APP_URL,
   ...(evaluatorDevMenu === undefined ? {} : {
@@ -377,7 +568,7 @@ if (publicationCleanupTimer !== undefined) {
 }
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
 api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer));
-const shutdown = installGracefulShutdown({
+const startup = installStartupResourceOwner({
   api,
   registration,
   auditContextHasher,
@@ -398,7 +589,11 @@ const shutdown = installGracefulShutdown({
         || erasurePool === publicationCleanupPool
         || erasurePool === contentProvisionPool
       ? [] : [erasurePool]),
-    ...(evaluatorDevMenuPool === undefined ? [] : [evaluatorDevMenuPool])
+    ...(evaluatorDevMenuPool === undefined ? [] : [evaluatorDevMenuPool]),
+    supportPool,
+    supportRelayLeasePool,
+    { end: () => supportKeys.close() },
+    { end: () => supportConfiguration.close() }
   ],
   // L2-F7: zeroed after every pool that borrows from them has closed.
   kekHandles: [kek, ...(corpusKek === undefined ? [] : [corpusKek])]
@@ -412,18 +607,18 @@ announceArgon2BreakerTrip = (): void => {
     event: "argon2.breaker.tripped", action: "graceful-shutdown", exit_code: 75
   }));
   process.exitCode = 75;
-  void shutdown.close("ARGON2_BREAKER_TRIPPED").catch(() => undefined);
+  void startup.close("ARGON2_BREAKER_TRIPPED").catch(() => undefined);
 };
-try {
+await startup.run("support-attestation", async () => {
+  await assertSupportDatabaseRole(pool, supportPool);
+  await assertSupportDatabaseRole(pool, supportRelayLeasePool);
+  await assertSupportKeyCoverage(supportPool);
+});
+await startup.run("listen", async () => {
   await api.listen({ host: environment.API_HOST, port: environment.API_PORT });
-  // Queue draining is deliberately background-only. A bounded sendmail
-  // timeout can never hold readiness hostage, while the SQL ACK gate still
-  // prevents any user-key destruction before completion delivery succeeds.
-  triggerErasureReconciliation();
-  triggerAuthenticationRiskCleanup();
-} catch (error) {
-  // A listen failure still owns every worker, secret cache, and DB handle built
-  // above. Reuse the exact shutdown graph before surfacing the startup failure.
-  await shutdown.close("listen-failure").catch(() => undefined);
-  throw error;
-}
+});
+// Queue draining is deliberately background-only. A bounded sendmail timeout
+// can never hold readiness hostage, while the SQL ACK gate still prevents any
+// user-key destruction before completion delivery succeeds.
+triggerErasureReconciliation();
+triggerAuthenticationRiskCleanup();

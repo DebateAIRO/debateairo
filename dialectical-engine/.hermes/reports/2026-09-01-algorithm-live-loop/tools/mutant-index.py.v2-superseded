@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""mutant-index.py v2 — DERIVES a campaign index from raw tools/mutate.sh transcripts (D46, D50).
+
+usage: mutant-index.py <transcript-glob-prefix> [expected-manifest]
+
+Reads ONLY the raw transcripts. For each: the custody gates, the command's exit, and whether the
+run FAILED AN ASSERTION or THREW BEFORE ANY ASSERTION — decided by the presence of a vitest
+assertion frame in the captured output, never by prose.
+
+THREE DEFECTS IN v1, all fixed here:
+  1. v1's usage advertised an optional expected file and never read a second argument, so one
+     product mutant turning GREEN while one neighbour turned RED left the tally identical and
+     the tool still printed its confirmation. The manifest is REAL and mismatches FAIL.
+  2. v1 counted ANY nonzero exit as a kill. Exit 127 is "command not found" — the mutant never
+     ran — and v1 scored it as a dead mutant. Exits are CLASSIFIED; anything that is not a
+     genuine test failure is INVALID, never a kill.
+  3. v1 was a bash script using an associative array, which macOS bash 3.2 does not support:
+     the manifest would have silently done nothing. That is the same defect as (1) wearing a
+     different hat, which is why this is Python.
+
+Expected-manifest format: `<transcript-basename> <KILLED|SURVIVED>` per line; blank lines and
+lines starting with # ignored.
+
+Exit 0 only when every transcript is well-formed AND (with a manifest) every observed outcome
+matches its expectation. Exit 1 on any problem. Exit 2 on unusable input.
+"""
+import glob, os, re, sys
+
+if len(sys.argv) < 2:
+    print(__doc__); raise SystemExit(2)
+prefix = sys.argv[1]
+manifest_path = sys.argv[2] if len(sys.argv) > 2 else None
+
+expect = {}
+if manifest_path:
+    if not os.path.isfile(manifest_path):
+        print(f"REFUSING: expected manifest '{manifest_path}' does not exist"); raise SystemExit(2)
+    for raw in open(manifest_path):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) < 2 or parts[1] not in ("KILLED", "SURVIVED"):
+            print(f"REFUSING: manifest line {line!r} must be '<name> KILLED|SURVIVED'"); raise SystemExit(2)
+        expect[parts[0]] = parts[1]
+    print(f"EXPECTED MANIFEST: {manifest_path} ({len(expect)} entries)")
+
+files = [f for f in sorted(glob.glob(prefix + "*"))
+         if os.path.isfile(f) and "INDEX" not in os.path.basename(f) and not f.endswith(".md")]
+if not files:
+    print(f"REFUSING: the glob '{prefix}*' matched no transcript — an empty result is not a pass")
+    raise SystemExit(2)
+
+def first(pat, text, grp=1):
+    m = re.search(pat, text, re.M)
+    return m.group(grp) if m else None
+
+print(f"{'TRANSCRIPT':<44}{'EXIT':<6}{'GATES':<9}{'OUTCOME':<11}FIRST FAILING FRAME")
+killed = survived = invalid = 0
+problems = []
+seen = set()
+for f in files:
+    b = os.path.basename(f); seen.add(b)
+    text = open(f, errors="replace").read()
+    ex = first(r"^EXIT = (\d+)", text)
+    pre = first(r"GATE pre\s+= (\d+)", text)
+    app = first(r"GATE applied\s+= (\d+)", text)
+    res = first(r"GATE restored\s+= (\d+)", text)
+    gates = f"{pre or '?'}/{app or '?'}/{res or '?'}"
+    # D42 custody contract: token absent, then applied, then gone again
+    if pre != "0" or res != "0" or not app or int(app) < 1:
+        problems.append(f"{b}: malformed custody gates {gates} (D42 requires pre=0, applied>=1, restored=0)")
+    fm = re.search(r"^.*(?:AssertionError|expected .* to |Error:|error TS\d+).*$", text, re.M)
+    frame = fm.group(0).strip()[:70] if fm else "(none captured)"
+    asserted = re.search(r"AssertionError|expected .* to ", text) is not None
+    if ex is None:
+        outcome, got = "NO-EXIT", "INVALID"; invalid += 1
+        problems.append(f"{b}: transcript carries no EXIT line")
+    elif ex == "0":
+        outcome, got = "SURVIVED", "SURVIVED"; survived += 1
+    elif ex == "1":
+        outcome, got = ("ASSERTION" if asserted else "THREW"), "KILLED"; killed += 1
+    elif ex in ("126", "127"):
+        outcome, got = "INVALID", "INVALID"; invalid += 1
+        problems.append(f"{b}: exit {ex} means the command never ran (not found / not executable) — this is NOT a kill")
+    else:
+        outcome, got = "SUSPECT", "INVALID"; invalid += 1
+        problems.append(f"{b}: exit {ex} is neither a clean pass nor a vitest failure — classify it before crediting it")
+    print(f"{b:<44}{ex or 'MISSING':<6}{gates:<9}{outcome:<11}{frame}")
+    if manifest_path:
+        want = expect.get(b)
+        if want is None:
+            problems.append(f"{b}: no entry in the expected manifest")
+        elif want != got:
+            problems.append(f"{b}: expected {want}, observed {got}")
+
+for name in expect:
+    if name not in seen:
+        problems.append(f"{name}: in the manifest but no transcript found")
+
+print()
+print(f"TALLY: transcripts={len(files)}  killed={killed}  survived={survived}  invalid={invalid}")
+print("DERIVED BY: tools/mutant-index.py v2 reading raw transcripts only — no prose input")
+if problems:
+    print(f"\nPROBLEMS ({len(problems)}) — this index is NOT a clean derivation:")
+    for p in problems:
+        print(f"  - {p}")
+    raise SystemExit(1)
+print("CLEAN: every transcript well-formed" + (", every outcome matches the manifest" if manifest_path else ""))

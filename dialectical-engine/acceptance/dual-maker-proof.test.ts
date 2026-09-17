@@ -6,11 +6,23 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startStandingDatabase, type StandingDatabase } from "./standing-db.js";
-import { seedAcceptanceRegister } from "./seed-register.js";
+import {
+  ACCEPTANCE_REGISTER_VERSION,
+  buildAcceptanceRegisterPublicationRows,
+  seedAcceptanceRegister
+} from "./seed-register.js";
 import { runDualMakerProof } from "./dual-maker-proof.js";
+import {
+  importHistoricalRegisterFixture,
+  registerFixtureRow
+} from "../tests/support/registerFixtures.js";
 
 const fakeCodexCli = fileURLToPath(new URL("./test-fixtures/fake-codex-cli.mjs", import.meta.url));
 const fakeClaudeCli = fileURLToPath(new URL("./test-fixtures/fake-claude-cli.mjs", import.meta.url));
+// The rollout tree the FAKE codex CLI belongs to. Its one rollout is keyed by the
+// thread id that CLI prints, so the model id under test is READ from this store —
+// never from the operator's real ~/.codex/sessions, which no fake ever writes to.
+const fakeCodexSessions = fileURLToPath(new URL("./test-fixtures/codex-sessions", import.meta.url));
 
 let database: StandingDatabase;
 let dataDirectory: string;
@@ -44,6 +56,7 @@ describe("FAIR-02 dual-maker proof", () => {
     const report = await runDualMakerProof({
       pool: database.pool,
       testOnlyCodexCommand: { binary: process.execPath, prefixArguments: [fakeCodexCli] },
+      testOnlyCodexSessionsRoot: fakeCodexSessions,
       testOnlyClaudeCommand: { binary: process.execPath, prefixArguments: [fakeClaudeCli] }
     });
 
@@ -94,18 +107,31 @@ describe("FAIR-02 dual-maker proof", () => {
       dataDirectory: staleDataDirectory
     });
     try {
-      await staleDatabase.pool.query(
-        `INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
-         VALUES (1, 'configuredProviderSet', $1::jsonb, $2)`,
-        [JSON.stringify({
-          kind: "CONFIGURED_PROVIDER_SET",
-          requiredDistinctMakers: 1,
-          providers: [{ providerRef: "acceptance:codex-cli", adapterKind: "openai-compatible-http", maker: "OpenAI" }]
-        }), "acceptance:DR-133:V-approved"]
-      );
+      // The staleness this arm is about lives in ONE ROW's VALUE, not in the row
+      // count. A one-row seal of version 2 is now rejected at the seal itself by
+      // `register.assert_required_rows`
+      // (`migrations/0050_t16_algorithm_register_rows.sql:58-91`), which declares
+      // version 2 to carry all fifteen mandatory rows — the first missing one being
+      // `envelope:envelopeFormulaInputs`. That guard is correct and the manifest is
+      // correct: `buildAlgorithmRegisterRows` (`packages/register/src/algorithm-policy.ts:241`)
+      // already mints the envelope row and the ceremony seeder already carries it.
+      // It was this FIXTURE's seed that was incomplete, so it now seals the SAME
+      // complete set the seeder seals and overrides only `configuredProviderSet`
+      // with the pre-FAIR-02 one-provider value.
+      const stale = registerFixtureRow("configuredProviderSet", {
+        kind: "CONFIGURED_PROVIDER_SET",
+        requiredDistinctMakers: 1,
+        providers: [{ providerRef: "acceptance:codex-cli", adapterKind: "openai-compatible-http", maker: "OpenAI" }]
+      }, "acceptance:DR-133:V-approved");
+      const standingRows = (await buildAcceptanceRegisterPublicationRows())
+        .map((row) => (row.rowKey === stale.rowKey ? stale : row));
+      if (!standingRows.includes(stale)) {
+        throw new Error("FAIR_02_FIXTURE: configuredProviderSet is not part of the sealed acceptance set");
+      }
+      await importHistoricalRegisterFixture(staleDatabase.pool, ACCEPTANCE_REGISTER_VERSION, standingRows);
 
       await expect(seedAcceptanceRegister(staleDatabase.pool))
-        .rejects.toThrow("ACCEPTANCE_REGISTER_CONFLICT:configuredProviderSet");
+        .rejects.toThrow("REGISTER_PUBLICATION_SEAL_INVALID");
     } finally {
       await staleDatabase.stop();
       await rm(staleDataDirectory, { recursive: true, force: true });

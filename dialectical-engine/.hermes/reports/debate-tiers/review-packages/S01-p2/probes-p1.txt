@@ -1,0 +1,17 @@
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S01-p1-correctness-tests-clusters.sh
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S01-p1-correctness-tests-evidence.txt
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S01-p1-correctness-tests-mutants.py
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S01-p1-correctness-tests-probe.test.ts
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S01-p1-correctness-tests-stub-api.mjs
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S01-p1-product-truth
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S01-p1-security--cluster-rerun-3x.log
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S01-p1-security--mutant-A-guard-deleted.log
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S01-p1-security--mutant-B-roster-extra-model.log
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S01-p1-security--probe-a-contract-edge.test.ts
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S01-p1-security--probe-b-proto.test.ts
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S01-p1-security--probe-c-api-route.test.ts
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S01-p1-security--probe-d-preexisting.test.ts
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S01-p1-security--probe-e-tierless-paths.test.ts
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S01-p1-security--stub-api.mjs
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S01-p1-security--vitest.probe.config.ts
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/probes/REV-S01-p1-security--wire.log

@@ -2,9 +2,11 @@
 
 import { CSSProperties, FormEvent, KeyboardEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
 import { createDebate, contractClient } from "@/lib/api";
 import { SCRUTINY_DEPTH_OPTIONS, ScrutinyDepth } from "@/lib/scrutinyDepth";
 import { AuthGate } from "@/components/AuthGate";
+import { SupportWidget } from "@/components/support/SupportWidget";
 import {
   buildNewDebateAskConfig,
   DECISION_SCOPE_DEFAULT,
@@ -36,13 +38,10 @@ const BUDGET_TIER_OPTIONS: ReadonlyArray<{ value: CompositionBudgetTier; label: 
   { value: "high", label: "High" }
 ];
 
-const DEPTH_MIN = 1;
-const DEPTH_MAX = 5;
-
 /* The document draws every text field at its resting height — one line for the
-   question, two for each steering box — so the fields grow with their content
-   instead of scrolling inside a fixed frame. A ref callback rather than a hook,
-   because it also has to run for a topic arriving in the query string. */
+   question — so the field grows with its content instead of scrolling inside a
+   fixed frame. A ref callback rather than a hook, because it also has to run for
+   a topic arriving in the query string. */
 function grow(field: HTMLTextAreaElement | null): void {
   if (field === null) return;
   field.style.height = "auto";
@@ -74,8 +73,6 @@ function NewDebateForm({ token }: { token: string }) {
   const [riskTier, setRiskTier] = useState("");
   const [riskTierWasEdited, setRiskTierWasEdited] = useState(false);
   const [budgetTier, setBudgetTier] = useState<CompositionBudgetTier>(PROVISIONAL_COMPOSITION_BUDGET_DEFAULT);
-  const [steeringPresets, setSteeringPresets] = useState("");
-  const [steeringAnnotations, setSteeringAnnotations] = useState("");
   const [decisionScope, setDecisionScope] = useState<string>(DECISION_SCOPE_DEFAULT);
   const [asOf, setAsOf] = useState(() => dateTimeLocalValue(new Date()));
   const [sessionDefaultsError, setSessionDefaultsError] = useState<string | null>(null);
@@ -102,7 +99,7 @@ function NewDebateForm({ token }: { token: string }) {
   // UX-01 makes machine-derived values visible and editable rather than hidden.
   const ready =
     topic.trim().length > 6 &&
-    depth >= DEPTH_MIN && depth <= DEPTH_MAX &&
+    depth >= EXPANSION_DEPTH_MIN && depth <= EXPANSION_DEPTH_MAX &&
     riskTier.length > 0 &&
     budgetTier.length > 0 &&
     decisionScope.trim().length > 0 &&
@@ -123,8 +120,6 @@ function NewDebateForm({ token }: { token: string }) {
         decisionScope,
         asOf,
         depth,
-        steeringPresets,
-        steeringAnnotations,
         asOfWasEdited: false,
         riskTierWasEdited
       }, submitTime);
@@ -202,46 +197,17 @@ function NewDebateForm({ token }: { token: string }) {
               id="treeDepth"
               label="Tree depth"
               hint="How far the debate expands when cross-maker review is available"
-              min={DEPTH_MIN}
-              max={DEPTH_MAX}
+              min={EXPANSION_DEPTH_MIN}
+              max={EXPANSION_DEPTH_MAX}
               value={depth}
               onChange={setDepth}
             />
-            <div className="ndRow ndRowSteering">
-              <div className="ndSteerField">
-                <label className="ndLabel" htmlFor="steeringPresets">Steering menu selections</label>
-                <div className="ndHint">One per line</div>
-                <textarea
-                  id="steeringPresets"
-                  className="ndSteerInput"
-                  ref={grow}
-                  rows={2}
-                  value={steeringPresets}
-                  onChange={(event) => {
-                    setSteeringPresets(event.target.value);
-                    grow(event.currentTarget);
-                  }}
-                  placeholder={"Prefer primary sources\nSurface the strongest counter-case early"}
-                />
-              </div>
-              <div className="ndSteerField">
-                <label className="ndLabel" htmlFor="steeringAnnotations">Steering annotations</label>
-                <div className="ndHint">Free text · logged verbatim, one per line</div>
-                <textarea
-                  id="steeringAnnotations"
-                  className="ndSteerInput"
-                  data-italic="true"
-                  ref={grow}
-                  rows={2}
-                  value={steeringAnnotations}
-                  onChange={(event) => {
-                    setSteeringAnnotations(event.target.value);
-                    grow(event.currentTarget);
-                  }}
-                  placeholder="Add a note the run will carry…"
-                />
-              </div>
-            </div>
+            {/* S1-2 · V ruling 2026-09-03: the two steering textareas that stood
+                here are removed. Their values were collected and discarded — no
+                consumer downstream reads steering_presets or steering_annotations —
+                and a control that appears to steer a debate it cannot steer is
+                worse than none. The contract fields stay, sent as empty arrays, so
+                stored asks remain valid. Pinned by ux01-new-debate-form.test.tsx. */}
             <p className="ndProvenance">
               Tier source, provenance, and machine as-of are recorded automatically with the run contract.
             </p>
@@ -325,7 +291,7 @@ function NewDebateForm({ token }: { token: string }) {
           ) : null}
 
           <div className="ndActions">
-            <button type="submit" className="ndStart" disabled={!ready || submitting}>
+            <button data-support-primary-control type="submit" className="ndStart" disabled={!ready || submitting}>
               {submitting ? "Starting" : "Start run"} <span aria-hidden>→</span>
             </button>
             <button type="button" className="ndCancel" onClick={() => router.push("/")}>
@@ -336,6 +302,7 @@ function NewDebateForm({ token }: { token: string }) {
           </div>
         </form>
       </div>
+      <SupportWidget />
     </div>
   );
 }

@@ -1,0 +1,5 @@
+ .../migrations/0061_plan_tier_on_run.sql           | 103 ++++++++++++
+ dialectical-engine/packages/db/src/index.ts        |  13 +-
+ dialectical-engine/packages/db/src/schema.ts       |   1 +
+ .../integration/tiers-s02-run-plan-tier.test.ts    | 180 +++++++++++++++++++++
+ 4 files changed, 292 insertions(+), 5 deletions(-)

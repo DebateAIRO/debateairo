@@ -1,5 +1,27 @@
 # Claude Heartbeat Adapter
 
+
+## v4.0.0 — graph mode (read this first; it supersedes the per-ticket review flow and the visible-launch text below)
+
+The law is the spine's `## v4.0.0 amendments` (`docs/agent-protocols/debateai-heartbeat-protocol.md`)
+and the role contracts under `.claude/skills/heartbeat-*/SKILL.md`, read as markdown; this adapter
+is the CLI's mechanics. What changed for a seat on this CLI:
+
+- **You are a node in a graph**, not a stage in a chain. Your packet names your node (REQ, ARCH(S),
+  MOCK(S), BUILD(S-Cn), a REV(S) lens, FIX(S), ELEMENT(S)), its inputs by absolute path and line,
+  its one output and its handoff marker. You never read the board or the route.
+- **No review waits on a ticket.** A BUILD node hands off `READY` on cluster green (three runs, worst
+  wins) and stops; the slice is reviewed once at REV(S) by parallel blind lenses. The per-ticket
+  markers `READY FOR PEER REVIEW`, `PEER REVIEW APPROVED` and `READY FOR HERMES REVIEW` are retired;
+  a reviewer posts one PASS / REWORK / BLOCKED per pass.
+- **A UI slice is built only after V's DONE(S)** — the mock gate (`heartbeat-mock`); `DONE.md` is
+  the oracle you measure against.
+- **No terminals.** This seat runs as a background process launched by the orchestrator — stdin
+  closed, stdout to its per-seat log — and opens nothing on V's desktop. The rework law's "same
+  terminal" means the same SESSION: `claude --resume <session-id> -p "<pointer>"`.
+- The handoff has one eight-line shape (`heartbeat-protocol` §5), `SKILLS LOADED` first, the
+  self-report filed before it.
+
 Read this after `docs/agent-protocols/debateai-heartbeat-protocol.md`.
 
 ## v3.3.0 — role contracts and the laws that moved (read this first)

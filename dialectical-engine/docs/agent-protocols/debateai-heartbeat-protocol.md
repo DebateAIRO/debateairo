@@ -1,7 +1,7 @@
 ---
 name: debateai-graph-spine
 title: DebateAI Graph Spine v2
-version: 3.3.0
+version: 4.0.0
 supersedes: debateai-heartbeat-protocol (pre-3.0.0), heartbeat-protocol-lite, debateai-kanban-heartbeat-review-loop
 ---
 
@@ -12,6 +12,12 @@ of nodes, edges, routers, and typed state. Hermes, Codex, Claude, and Grok load
 this spine first, then their own thin node contract. Where an older per-agent
 skill or the Hermes AppData FULL body disagrees with this spine, this spine wins;
 those documents are demoted to implementation notes.
+
+**v4.0.0 (V order, 2026-09-09): graph mode.** Seats read the role contracts under
+`.claude/skills/heartbeat-*/SKILL.md`; this spine is the archive of law they point into. The
+`## v4.0.0 amendments` section supersedes the four loops, per-ticket review, the H0–H9 chain as a
+dispatch order, the hand-drawn graph gate and the visible-launch law; where older text below
+conflicts with it, v4.0.0 wins.
 
 ## Table of contents
 
@@ -1744,6 +1750,161 @@ parser (Hermes) was consumed locally and killed the seat for 3h20m.
    lane/ticket orchestrator with `/goal`; that orchestrator may launch only its
    authorized descendants, each also via its goal mechanism. A handoff parks an
    unfinished worker; it does not terminate it.
+
+## v4.0.0 amendments — graph mode (V order, 2026-09-09)
+
+V's order, in substance: the heartbeat family is too slow and too verbose; it must behave like a
+graph, not a series of loops; in the code loop, reviews happen only when a vertical slice is done —
+no more reviews per ticket; after the plan, a task that features a UI gets a mock UI built with the
+`/taste` skill from the repo's existing designs, styles and components, V works on it in Claude
+Design and defines "what done looks like", and only then does the action start; and no terminals
+are opened on the desktop — everything runs in the harness's own PTY/background processes, and a
+terminal or UI element opens only on demand. Design record:
+`docs/superpowers/specs/2026-09-09-heartbeat-v4-graph-mode-design.md`. Where older text in this
+spine conflicts with the items below, the items below win. Measured basis — the consent-ui mission,
+2026-09-06/07: ~15 h wall-clock for two UI elements, ~6 h of it three-round planning loops, 17 blind
+per-cluster reviews at ~300k tokens each, 76 packet amendments every seat had to read, and the
+orchestrator's own case file naming its packets as the weapon.
+
+1. **THE GRAPH, NOT LOOPS.** A mission is a DAG of board tickets. A node is one ticket with one
+   job, typed inputs (absolute paths), one output artifact and one handoff marker; an edge is a
+   parent→child link (`hermes kanban --board <m> link <parent> <child>`, the child waits on the parent);
+   a node is READY when every parent is done, and the board computes that (`list --status ready`).
+   Nodes are chained in execution order; a node is never linked under its slice ticket (the slice
+   closes last). The slice ticket is itself the TEST(S) node, a child of the slice's final REV pass. The orchestrator is a
+   scheduler: on every event it consumes exits, dispatches every READY node in parallel, surfaces V
+   gates once, and idles. Nothing loops — a REWORK appends a FIX node and the next REV pass; the cap
+   is a node count. The vocabulary — REQ, REQ-REV, ARCH(S), ARCH-REV(S), MOCK(S), DONE(S),
+   BUILD(S-Cn), GATE(S), REV(S), FIX(S), ELEMENT(S), TEST(S), MERGE(S), WHOLE, CLOSE — is
+   `heartbeat-orchestrator` §2. Superseded as dispatch order: "The Four Loops and the Grand Loop"
+   (§7) and the H0–H9 stage chain (§6); the REQUIREMENTS SATISFIED / ARCHITECTURE SATISFIED markers
+   are no longer required for closure — CLOSE follows WHOLE. `planning_tier` survives only as "Tier
+   0 docs-only missions may skip ARCH-REV"; `risk_tier` keeps selecting the lens count (item 2). The
+   graph is rendered FROM the board by `.claude/skills/heartbeat-orchestrator/scripts/graph.sh`,
+   never drawn by hand; v3.2.0 item 5's hand-drawn SVG gate is superseded, and its approval folds
+   into DONE(S) on UI slices or the decisions packet otherwise, proceed-by-default as V ruled on
+   consent-ui (row V-8).
+
+2. **ONE REVIEW PER VERTICAL SLICE (V: "no more reviews per ticket").** Workers hand off on
+   cluster green; nothing waits on a cluster. GATE(S) fires when every BUILD of the slice is done and
+   assembles one review package: the diff vs base, every cluster command with its three-run table,
+   the cluster map, the acceptance oracle, the dev-stack recipe. REV(S) runs the risk tier's lenses
+   in parallel — low: correctness/tests · medium: + security/data-safety · high: + product-truth —
+   each a blind background seat in its own detached worktree at the slice head, each probing the
+   WHOLE slice; a UI slice always carries product-truth (rendered DOM with the real compiled CSS,
+   measured against DONE.md in both modes). The orchestrator unions the lens verdicts; two lenses
+   disagreeing on one finding get a single-finding re-check node, never a re-review. REWORK →
+   FIX(S) nodes split by file surface, every finding of the pass assigned, returned to the author
+   sessions when resumable → REV(S) pass r+1 scoped to the findings plus the previous pass's probes.
+   Three passes per slice is the cap (v3.3.0 item 2, unchanged); a pass-3 REWORK is a V DECISIONS
+   PACKET row. Cross-slice defects surface at MERGE(S), which runs the integrated suite; there are
+   no cross-review nodes. Planning reviews (REQ-REV, ARCH-REV) are one blind pass by default,
+   fold-don't-loop: the orchestrator folds non-blocking findings into DECISIONS.md and ticket
+   comments; only blocking findings spawn a rework node. Superseded: the per-ticket review diamond
+   (§7), §9 review-lane applicability as a per-ticket rule, and the sentence "Clusters are also the
+   review unit" in v3.3.0 item 12 — clusters are BUILD units; the review unit is the slice.
+
+3. **THE UI GATE — MOCK(S) → V's DONE(S).** The requirements seat marks each slice `ui: yes|no`
+   (the first line under the SPEC title; yes when the slice adds or changes a surface the user sees —
+   something a mock can draw; a slice whose only browser step is watching existing components render
+   stays `ui: no`). For a
+   `ui: yes` slice, after ARCH-REV(S), a mock seat under `heartbeat-mock` loads
+   `design-taste-frontend` (the `/taste` skill, dials pinned to redesign — preserve) and `design`
+   (the Claude Design canvas inside Claude Code) and produces one canvas — one artboard per screen
+   and state, both modes — composed from the repo's real token values (`apps/ui/app/globals.css`),
+   the real components' class vocabulary and geometry, and the design of record; nothing invented,
+   every value traced in a provenance table in `slices/<S>/MOCK.md`, open questions written as
+   smallest yes/no. The orchestrator posts ONE message to V; V edits the canvas in place (Save
+   publishes a version the harness reads back with the Artifact tool) or hands back a Claude Design
+   export under `ui_designs/`, and defines what done looks like. The orchestrator extracts the final
+   artboards verbatim into `docs/missions/<m>/design/<S>/` and writes `slices/<S>/DONE.md` — per
+   screen and state: the artboard reference, numbered browser steps in both modes, V's words
+   quoted. **BUILD(S-*) is READY only after V's yes on DONE.md; there is no proceed-by-default on
+   a UI slice.** DONE.md is the oracle every BUILD, REV and ELEMENT node measures against. A
+   `ui: no` slice has no MOCK or DONE node: its oracle is the SPEC acceptance, and BUILD follows
+   ARCH-REV(S).
+
+4. **THE NO-TERMINAL LAW.** Nothing is opened on V's desktop: no `osascript`, no
+   `tell application "Terminal"`, no Terminal window, no browser window, no GUI app, no Hermes
+   dashboard served unasked. Every seat and every watchdog runs inside the orchestrator's own
+   process tree — Claude seats as background Agent-tool subagents or background
+   `claude -p … --output-format json` processes; Codex and Grok as background processes with stdin
+   closed and stdout to a per-seat log; watchdogs as the harness's Monitor or a background loop
+   writing a status file; the board through the `hermes kanban` CLI store. The harness's in-app
+   browser pane is its own PTY and is allowed for verification. A terminal or UI element is opened
+   only when V asks, and then exactly the one asked for; at TEST(S) the lane is served from a
+   `.claude/launch.json` entry only on V's word, and the orchestrator posts the URL and the steps.
+   Launch verification is unchanged — launchers written fresh, read back and grepped; the log within
+   2 minutes; distinct log paths; the watchdog armed at launch. REVOKED: v3.2.0 item 2 (the
+   visible-launch law and its window hygiene), the "Visible-launch law" paragraph of
+   `codex-heartbeat-orchestrator.md`, the visible-seat line of `grok-heartbeat-orchestrator.md`,
+   and V's 2026-08-03 authorization of macOS Terminal windows.
+
+5. **REWORK RETURNS TO THE SAME SESSION WHEN THE TRANSPORT CAN RESUME IT** — `claude --resume`,
+   `codex exec resume`, `grok --resume`, SendMessage when the harness offers it. A fresh session
+   only when the original is dead or cannot be resumed, and then the packet carries the
+   predecessor's handoff and self-report. The orchestrator probes each transport's resume mechanism
+   at intake, beside the prompt-mechanism probe of v3.3.0 item 9. Session ids are recorded at CLAIM
+   on the board and recovered from the board, never from a log.
+
+6. **THE VERBOSITY LAW — the reading floor.** A seat reads `superpowers:using-superpowers`,
+   `heartbeat-protocol`, its role contract, its role floor, `INSTRUCTIONS.md`, its packet, and the
+   files the packet names AT THE LINES IT NAMES: a BUILD node reads its cluster's steps, never the
+   whole PLAN (PLAN.md stays uncapped); `TOOLING-TRAPS.md` is read as its index
+   (`grep -n '^## ' .hermes/TOOLING-TRAPS.md`) plus the headings the packet names. `COMMON.md`
+   is at most 120 lines, and an amendment REPLACES the text that caused the defect — no append-only
+   numbered list. Packets come from the templates in
+   `.claude/skills/heartbeat-orchestrator/templates/` (fill markers `__UPPERCASE__`; a path the seat
+   will create carries ` (new)`; a code quote is `<abs path>:<LINE> — `text``, re-grepped at write
+   time, never recalled from earlier tool output), and every packet passes
+   `.claude/skills/heartbeat-orchestrator/scripts/packet-check.sh` before dispatch. Every handoff
+   has one eight-line shape (`heartbeat-protocol` §5). Role contracts are imperative — one sentence
+   of rule, at most one of why; the measured anecdotes live in this spine. The v3.3.0 item 1 target
+   of ~100 lines per contract stands as a target: padding is the offence, never length.
+
+7. **WHAT STAYS, unchanged and binding:** the rework cap of 3, now counted as REV passes per slice
+   · the murder-case self-report — installed at intake, verbatim in every packet, path inside
+   `allowed` (R8 item 6) · the SKILLS-LOADED gate (v3.3.0 item 15) · fix the class (item 16) · SPEC
+   frozen, PLAN uncapped, PROGRESS orchestrator-only, DECISIONS append-only (item 11) · three runs,
+   worst wins (item 12, minus its review-unit sentence) · the refutation duty (item 5) · watchdog at
+   launch (item 6) · ledger at seat exit (item 7) · deliver on N−1 (item 8) · intake completeness
+   (item 9) · version skew fails closed (item 10) · Superpowers mandatory and open to every seat
+   (item 14) · the vertical-slice law (v3.4.0, all seven items) · Done = V's veto · no push, no
+   remote merge · every finding ticketed the same day · the One-Prompt Machine's V surfaces, which
+   are now exactly: the intake prompt, DONE(S) on UI slices, TEST(S) per slice, WHOLE, and the V
+   DECISIONS PACKET.
+
+## v3.4.0 amendments — V-ordered vertical-slice law (ui-overhaul fidelity failure, 2026-09-01)
+
+Ruled by V on 2026-09-01 and first encoded in `heartbeat-orchestrator` §6; mirrored here so the
+spine and the installed skill carry the same rule set (version-skew law, v3.3.0 item 15). Born
+from the ui-overhaul fidelity failure: the harness shipped green-on-acceptance work that failed
+the developer's actual bar. Root cause named by V: **"done" was never defined well enough, and it
+is not the harness's to define.** Where older text in this spine conflicts with the items below
+(board shape, Done authority, worktree isolation, merge order), the items below win.
+
+1. **Board shape at intake:** one Kanban ticket per TESTABLE VERTICAL SLICE — a beginning and an
+   end (e.g. 8 overhauled pages = 8 slice tickets). Nothing else exists on the board until a slice
+   opens. Seat tickets for intake seats (requirements, audits) are permitted as sub-tickets.
+2. **Done = developer veto, nothing less.** A slice ticket closes ONLY when V (or the developer
+   using the harness) has personally tested the slice and vetoed it done. Green gates, PASS
+   verdicts, and merged-ready states are internal milestones — never Done. The orchestrator still
+   closes SUB-tickets on consumed verdicts; the SLICE ticket is the developer's alone.
+3. **Open one slice → decompose into sub-tickets that run in PARALLEL.** The accent falls on
+   parallelism: serialize only what measurably cannot overlap, and prefer isolation over
+   serialization when files are shared.
+4. **One worktree (local branch) per vertical slice.** The slice's whole fleet works inside that
+   worktree; seats may pull the current state of `dev` into their folder as needed. The main tree
+   is nobody's default workspace once slices are open.
+5. **Fleets, not single files of seats:** per slice the orchestrator dispatches a fleet (workers +
+   reviewers per the roster) INSIDE that slice's worktree, and MULTIPLE SLICES RUN AT ONCE, each
+   in its own worktree.
+6. **Merge discipline:** slice vetoed done → merged locally (`dev`). Merge conflicts are an
+   accepted, managed cost at merge time — shared-file fear does not serialize slices. When all
+   slices are vetoed: merge everything locally → developer tests the whole → only then push.
+   Pushes remain V-gated as always.
+7. **Developer test points are load-bearing:** after each slice (pre-merge) and after the final
+   local merge (pre-push). Schedule them; do not batch surprises.
 
 ## v3.3.0 amendments — V-ordered, from the 100-report post-mortem ("The Round Two Problem", 2026-08-28)
 

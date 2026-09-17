@@ -16,13 +16,23 @@ import { AUTH_POLICY_REGISTER_ROWS } from "./auth-policy.js";
 import { MFA_POLICY_REGISTER_ROW } from "./mfa-policy.js";
 import { PRODUCT_ROLE_POLICY_REGISTER_ROW } from "./product-role-policy.js";
 import { RECOVERY_POLICY_REGISTER_ROW } from "./recovery-policy.js";
-import { ADMISSION_POLICY_REGISTER_ROW, SESSION_POLICY_REGISTER_ROW } from "./session-policy.js";
+import { SESSION_POLICY_REGISTER_ROW } from "./session-policy.js";
+import {
+  canonicalRegisterJson,
+  createPostgresRegisterPublicationPort,
+  parseRegisterVersionText,
+  type CanonicalJsonAst,
+  type RegisterPublicationRow
+} from "./register-publication.js";
 
 export const CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY = "claimTypeCompositionMap" as const;
-export const ENGINE_BRANCHING_FACTOR = 2 as const;
-export const ENGINE_COMPOSITION_SEGMENT_CAP = 2 as const;
-export const ENGINE_FIXED_ORGANS_PER_COMPOSITION = 1 + ENGINE_COMPOSITION_SEGMENT_CAP + 1;
-export const ENGINE_MAX_RECOMPOSE = 2 as const;
+export {
+  ENGINE_BAND_ORDER,
+  ENGINE_BRANCHING_FACTOR,
+  ENGINE_COMPOSITION_SEGMENT_CAP,
+  ENGINE_FIXED_ORGANS_PER_COMPOSITION,
+  ENGINE_MAX_RECOMPOSE
+} from "./engine-shape.js";
 
 const unitIntervalSchema = z.number().finite().min(0).max(1);
 const compositionMetricSchema = z.enum([
@@ -166,35 +176,227 @@ export interface StructuralCeilingInput {
   readonly branchingFactor: number;
   readonly compositionSegmentCap: number;
   readonly fixedOrgansPerComposition: number;
+  /**
+   * T17 — the sealed `envelopeFormulaInputs` row's terms. Every one of them is
+   * READ from the register (`readEnvelopeFormulaInputs`) and passed by the
+   * entry point; none is a code constant and none is re-declared here.
+   */
+  readonly reviewerCallsPerNode: number;
+  readonly synthesizerMaxRounds: number;
+  readonly evaluatorMaxRounds: number;
+  /**
+   * T17/B2 — the SEALED maximum depth. Admission refuses ABOVE it rather than
+   * minting a ceiling the run head's parser would reject later, after the ask
+   * was already admitted.
+   */
+  readonly maxDepth: number;
 }
 
-/** DR-181/182: an invisible bug tripwire derived from the engine's exported facts. */
+/**
+ * The DECLARED members, checked by name. Iterating `Object.entries(input)`
+ * instead — as DR-184-v2 did — validates only the members a caller happened to
+ * pass, so an omitted term reached the arithmetic as `undefined` and minted a
+ * `NaN` ceiling in silence. A missing term is now as loud as an invalid one.
+ */
+const STRUCTURAL_CEILING_MEMBERS: readonly (keyof StructuralCeilingInput)[] = Object.freeze([
+  "panelSize", "depth", "judgeMaxAttempts", "organMaxAttempts", "maxRecompose",
+  "maxCooldownHoldsPerRun", "finalRetryAttempts", "branchingFactor",
+  "compositionSegmentCap", "fixedOrgansPerComposition",
+  "reviewerCallsPerNode", "synthesizerMaxRounds", "evaluatorMaxRounds", "maxDepth"
+]);
+
+/**
+ * THE SERVE-LEG RULE — stated ONCE, here, and READ by everything that needs it.
+ *
+ * Two things used to state it independently and on purpose: this package's
+ * `computeStructuralCeilingBasis` (which MINTS a basis) and
+ * `parseCostEnvelopeBasis` in @debateai/budget (which RE-READS a persisted one
+ * and refused anything the constructor would not have minted). The duplication
+ * was deliberate — a receipt is a claim, and a claim deserves an independent
+ * check — but it made the rule unchangeable one file at a time: correcting the
+ * constructor alone produced bases the parser rejected at the run head
+ * (F-T17T9-3, .hermes/reports/2026-09-01-algorithm-live-loop/logs/t17t9-3/04).
+ *
+ * The independence is KEPT and the restatement is removed: the parser still
+ * checks the receipt against the rule, but it now READS the rule from here
+ * instead of re-typing it, so the two cannot disagree again.
+ */
+export const SERVE_LEG = Object.freeze({
+  /**
+   * The serve chain that ships after T9. The composition chain is retired, so
+   * there is no longer an arm to select BETWEEN — the field survives on the
+   * receipt as the discriminator that makes a pre-T9 basis fail loudly.
+   */
+  chain: "SYNTHESIS_LOOP",
+  /**
+   * One call site per synthesis role per round, at the sealed loop bound. The
+   * sealed row carries the bound once per role, so the two must agree: the
+   * runner has ONE `evaluatorLoopMaxRounds` and TWO roles, and a row sealing
+   * 5 and 1 would describe a runner that does not exist.
+   */
+  sites(input: { readonly synthesizerMaxRounds: number; readonly evaluatorMaxRounds: number }): number {
+    if (input.synthesizerMaxRounds !== input.evaluatorMaxRounds) {
+      throw new TypedDomainError(
+        "STRUCTURAL_CEILING_SYNTHESIS_ROUNDS_INCOHERENT",
+        `synthesizerMaxRounds ${input.synthesizerMaxRounds} and evaluatorMaxRounds `
+        + `${input.evaluatorMaxRounds} must be the one sealed loop bound`
+      );
+    }
+    return input.synthesizerMaxRounds + input.evaluatorMaxRounds;
+  },
+  /** The site count a DISCLOSED leg bills, for a reader of a persisted receipt. */
+  billed(leg: { readonly synthesis_loop_sites: number }): number {
+    return leg.synthesis_loop_sites;
+  }
+} as const);
+
+/**
+ * DR-181/182 + T17 (DR-184-v4): an invisible bug tripwire derived from the
+ * engine's exported facts and T16's sealed envelope row.
+ *
+ * The ceiling counts CALL SITES and multiplies each by the attempts that site
+ * can spend. Four legs, each one measured off the shipped runner:
+ *
+ *  · AUTHOR — one call per materialized node, wrapped in `withCooldownRetry`
+ *    (apps/runner/src/index.ts:250). That helper runs TWO provider sequences,
+ *    but they do NOT each get a fresh allowance: the shipped gateway counts
+ *    attempts CUMULATIVELY per call-site key off the ledger and passes
+ *    `remaining = bound.maxAttempts - consumed` (apps/runner/src/index.ts
+ *    :3565-3577, `remainingProviderAttempts`). So sequence 1 spends
+ *    `judgeMaxAttempts` and sequence 2 spends only the `finalRetryAttempts`
+ *    that remain: `judgeMaxAttempts + finalRetryAttempts` for the SITE.
+ *    (An earlier draft of this formula read the second sequence as a fresh
+ *    allowance and provisioned `2*judge + final`. The maximum-path ledger test
+ *    in tests/integration/t17-envelope-ledger.test.ts measured 4 attempts at a
+ *    site it had modelled as 7 and refuted it — the reason that test reads a
+ *    real ledger instead of a second in-memory model of this same file.)
+ *  · PANEL — the sealed row's `panelCallsPerNodeBasis` NAMES this leg's basis
+ *    (`PANEL_SIZE_MINUS_ONE`) and its own zod literal is the loud stop for any
+ *    other basis, so the derivation below is the row's, never this file's.
+ *    `runNodePanel` hands every configured maker to `runJudgePanel`,
+ *    which skips the author (PRODUCER_GRADING_FORBIDDEN) and calls the rest:
+ *    `panelSize - 1` calls per materialized node, at every node, not just the
+ *    roots. Not cooldown-wrapped, so `judgeMaxAttempts` each. DR-184-v2
+ *    counted this leg at ZERO — the defect F36 exists to close.
+ *  · REVIEWER — `reviewerCallsPerNode` cross-maker reviews per materialized
+ *    node, deduped by node and cooldown-wrapped like the author leg.
+ *  · SERVE — the SYNTHESIS LOOP, and only it. T9 retired the composer,
+ *    per-segment conformance and post-compose R9 organs into the
+ *    synthesizer/evaluator pair, and the shipped runner wires none of them
+ *    (apps/runner/src/index.ts:1083 `conformance: []`; it mints no `COMPOSER:`
+ *    or `CONFORMANCE:` call-site key at all). The runner opens ONE site per
+ *    synthesis role per round — `synthesize` at :4076 and `evaluate` at :4154,
+ *    each keyed by `request.round` — so the leg is `roles x rounds`, which is
+ *    what `SERVE_LEG.sites` states. The runner says so itself at :1162-1172:
+ *    "the real count is `rounds x 2 roles`… Refitting that formula is T17's."
+ *    (F-T17T9-3. Until then the leg was `max(compositionSites, synthesisLoop)`,
+ *    which billed the retired chain's SEVEN sites and sealed a ceiling of 109
+ *    against a true maximum of 106 — measured from a real ledger in
+ *    tests/integration/t17-envelope-ledger.test.ts. V ruled on 2026-09-05 to
+ *    seal the true number rather than keep the difference as padding.)
+ *    `maxRecompose` and `fixedOrgansPerComposition` remain on the sealed row
+ *    because the deployment still declares them and `apps/api/src/main.ts`
+ *    still passes them; they are CHECKED for coherence below and BILLED
+ *    nowhere. `compositionSegmentCap` is NOT retired — it still caps the
+ *    synthesizer's segment array (apps/runner/src/index.ts:135).
+ *
+ * Repair attempts are NOT a separate term: `buildRepairPacket` is consumed
+ * inside the per-site attempt loop (packages/providers/src/index.ts:326-427),
+ * so a repair is one of the `maxAttempts` the site already provisions.
+ */
 export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Readonly<Record<string, unknown>> & {
   readonly max_model_attempts: number;
 } {
-  for (const [name, value] of Object.entries(input)) {
-    if (!Number.isInteger(value) || value < 1) throw new TypeError(`STRUCTURAL_CEILING_${name.toUpperCase()}_INVALID`);
+  for (const name of STRUCTURAL_CEILING_MEMBERS) {
+    const value = input[name];
+    if (!Number.isInteger(value) || value < 1) {
+      throw new TypedDomainError(
+        `STRUCTURAL_CEILING_${name.toUpperCase()}_INVALID`,
+        `The structural ceiling input ${name} must be a positive integer`
+      );
+    }
+  }
+  if (input.depth > input.maxDepth) {
+    // B2: the refusal belongs HERE, at admission. `evaluateAskAdmission` wraps
+    // this call and `markAskRefusal` turns a TypedDomainError into an
+    // AskRefusal, so an over-bound ask is refused on the 422 face before any
+    // provider spend — instead of minting a positive ceiling that only stops
+    // later when the runner resolves the depth or parses the stored basis.
+    throw new TypedDomainError(
+      "STRUCTURAL_CEILING_DEPTH_ABOVE_SEALED_MAXIMUM",
+      `Requested depth ${input.depth} exceeds the sealed maximum depth ${input.maxDepth}`
+    );
   }
   const nodesPerRoot = input.panelSize === 1
     ? 1
     : (input.branchingFactor ** (input.depth + 1) - 1) / (input.branchingFactor - 1);
-  if (!Number.isInteger(nodesPerRoot)) throw new TypeError("STRUCTURAL_CEILING_TREE_INVALID");
-  const authored = input.panelSize === 1
+  if (!Number.isInteger(nodesPerRoot)) {
+    throw new TypedDomainError("STRUCTURAL_CEILING_TREE_INVALID", "The expansion tree is not integral");
+  }
+  // S2-2: the walking-skeleton literal is reachable at M=1 only — one node, no
+  // panel, no cross-maker review.
+  const materializedNodes = input.panelSize === 1
     ? 1
     : input.panelSize * nodesPerRoot + input.panelSize * (input.panelSize - 1);
-  const reviews = input.panelSize === 1 ? 0 : authored;
-  const fixedSites = input.maxRecompose * input.fixedOrgansPerComposition;
-  const maxModelAttempts = (authored + reviews) * (input.judgeMaxAttempts + input.finalRetryAttempts)
-    + fixedSites * input.organMaxAttempts;
+  const cooldownSiteAttempts = input.judgeMaxAttempts + input.finalRetryAttempts;
+  const authorSites = materializedNodes;
+  const panelSites = input.panelSize === 1 ? 0 : (input.panelSize - 1) * materializedNodes;
+  const reviewerSites = input.panelSize === 1 ? 0 : input.reviewerCallsPerNode * materializedNodes;
+  // THE RETIRED COMPOSITION TOPOLOGY — declared, checked, and BILLED NOWHERE.
+  // The sealed row still carries `fixedOrgansPerComposition`, `maxRecompose`
+  // and `compositionSegmentCap`, and `apps/api/src/main.ts` still passes all
+  // three, so a deployment that declares an incoherent shape must still be
+  // refused. What changed in F-T17T9-3 is that the shape no longer produces a
+  // competing serve arm: `maxRecompose * (1 + segmentCap) + 1` used to bind the
+  // leg at seven sites, and the leg is now the synthesis loop unconditionally.
+  // (`compositionSegmentCap` is NOT retired either way — it still caps the
+  // synthesizer's segment array at apps/runner/src/index.ts:135.)
+  const compositionSitesPerRound = 1 + input.compositionSegmentCap;
+  const postComposeSitesPerRun = 1;
+  if (input.fixedOrgansPerComposition !== compositionSitesPerRound + postComposeSitesPerRun) {
+    throw new TypedDomainError(
+      "STRUCTURAL_CEILING_COMPOSITION_SHAPE_INCOHERENT",
+      `fixedOrgansPerComposition ${input.fixedOrgansPerComposition} does not equal `
+      + `1 composer + ${input.compositionSegmentCap} conformance + 1 post-compose organ`
+    );
+  }
+  // F-T17T9-3: the serve leg is the SHIPPED chain, read from the one rule.
+  const synthesisLoopSites = SERVE_LEG.sites(input);
+  const serveSites = synthesisLoopSites;
+  const maxModelAttempts = (authorSites + reviewerSites) * cooldownSiteAttempts
+    + panelSites * input.judgeMaxAttempts
+    + serveSites * input.organMaxAttempts;
   return Object.freeze({
     kind: "COMPUTED_STRUCTURAL_CEILING",
     max_model_attempts: maxModelAttempts,
     panel_size: input.panelSize,
     depth: input.depth,
-    per_site_attempts: Object.freeze({ judge: input.judgeMaxAttempts, organ: input.organMaxAttempts }),
+    per_site_attempts: Object.freeze({
+      judge: input.judgeMaxAttempts,
+      organ: input.organMaxAttempts,
+      panel_member: input.judgeMaxAttempts,
+      cooldown_site: cooldownSiteAttempts
+    }),
+    call_sites: Object.freeze({
+      author: authorSites,
+      panel: panelSites,
+      reviewer: reviewerSites,
+      serve: serveSites
+    }),
+    /**
+     * Which serve chain bound the leg, so a reader of a stored receipt can see
+     * WHICH topology the run was admitted under. A basis that reports
+     * COMPOSITION is a basis minted against the chain T9 retired, and both the
+     * literal here and the parser's accepted value come from `SERVE_LEG.chain`
+     * — one constant, so a stale receipt fails loudly instead of parsing.
+     */
+    serve_leg: Object.freeze({
+      synthesis_loop_sites: synthesisLoopSites,
+      selected: SERVE_LEG.chain
+    }),
     hold_cap: input.maxCooldownHoldsPerRun,
     final_retry_attempts: input.finalRetryAttempts,
-    formula_version: "DR-184-v2",
+    formula_version: "DR-184-v4",
     bounds_source_ref: "engine-exports+register"
   });
 }
@@ -475,75 +677,51 @@ export async function persistBootstrapRegister(pool: Pool, bootstrap: BootstrapR
     MFA_POLICY_REGISTER_ROW,
     SESSION_POLICY_REGISTER_ROW,
     RECOVERY_POLICY_REGISTER_ROW,
-    PRODUCT_ROLE_POLICY_REGISTER_ROW,
-    ADMISSION_POLICY_REGISTER_ROW
+    PRODUCT_ROLE_POLICY_REGISTER_ROW
   ];
-  const expectedRowCount = bootstrapKeys.length + AUTH_POLICY_REGISTER_ROWS.length + 5;
-  const canonicalJson = (value: unknown): string => {
-    if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-    if (typeof value === "object" && value !== null) {
-      return `{${Object.entries(value)
-        .sort(([left], [right]) => left === right ? 0 : left < right ? -1 : 1)
-        .map(([key, member]) => `${JSON.stringify(key)}:${canonicalJson(member)}`)
-        .join(",")}}`;
-    }
-    return JSON.stringify(value);
-  };
-  const client = await pool.connect();
+  const publicationRows = buildBootstrapRegisterPublicationRowsFromRows(rows);
   try {
-    await client.query("BEGIN");
-    await client.query(
-      "SELECT pg_advisory_xact_lock(hashtextextended('debateai:bootstrap-register',0))"
-    );
-    const version = (await client.query<{ row_count: number; sealed: boolean }>(
-      "SELECT row_count,sealed FROM register.register_version WHERE register_version=$1",
-      [bootstrap.registerVersion]
-    )).rows[0];
-    const persisted = await client.query<{
-      row_key: string;
-      value_json: unknown;
-      source_ref: string;
-    }>(`
-      SELECT row_key,value_json,source_ref FROM register.register_row
-      WHERE register_version=$1 ORDER BY row_key
-    `, [bootstrap.registerVersion]);
-    if (version !== undefined || persisted.rows.length > 0) {
-      if (version === undefined || !version.sealed || Number(version.row_count) !== expectedRowCount
-        || persisted.rows.length !== expectedRowCount) {
-        throw new TypeError("FX-REG-SEALED_VERSION_MISMATCH");
-      }
-      const expected = new Map<string, (typeof rows)[number]>(
-        rows.map((row) => [row.rowKey, row])
-      );
-      for (const row of persisted.rows) {
-        const wanted = expected.get(row.row_key);
-        if (wanted === undefined || row.source_ref !== wanted.sourceRef
-          || canonicalJson(row.value_json) !== canonicalJson(wanted.value)) {
-          throw new TypeError("FX-REG-SEALED_VERSION_MISMATCH");
-        }
-      }
-      await client.query("COMMIT");
-      return;
-    }
-    for (const row of rows) {
-      await client.query(
-        `INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
-         VALUES ($1, $2, $3::jsonb, $4)`,
-        [bootstrap.registerVersion, row.rowKey, JSON.stringify(row.value), row.sourceRef]
-      );
-    }
-    await client.query(
-      `INSERT INTO register.register_version (register_version, row_count, sealed)
-       VALUES ($1, $2, true)`,
-      [bootstrap.registerVersion, expectedRowCount]
-    );
-    await client.query("COMMIT");
+    await createPostgresRegisterPublicationPort(pool).importHistorical({
+      registerVersion: parseRegisterVersionText(String(bootstrap.registerVersion)),
+      rows: publicationRows
+    });
   } catch (error) {
-    await client.query("ROLLBACK");
+    if (error instanceof Error && /REGISTER_PUBLICATION_SEAL_INVALID/u.test(error.message)) {
+      throw new TypeError("FX-REG-SEALED_VERSION_MISMATCH", { cause: error });
+    }
     throw error;
-  } finally {
-    client.release();
   }
+}
+
+function buildBootstrapRegisterPublicationRowsFromRows(
+  rows: readonly Readonly<{ rowKey: string; value: unknown; sourceRef: string; valueAst?: CanonicalJsonAst }>[]
+): readonly RegisterPublicationRow[] {
+  return Object.freeze(rows.map((row) =>
+    Object.freeze({
+      rowKey: row.rowKey,
+      valueJsonText: canonicalRegisterJson(
+        ("valueAst" in row ? row.valueAst : row.value) as CanonicalJsonAst
+      ),
+      sourceRef: row.sourceRef
+    })
+  ));
+}
+
+export function buildBootstrapRegisterPublicationRows(
+  bootstrap: BootstrapRegister
+): readonly RegisterPublicationRow[] {
+  return buildBootstrapRegisterPublicationRowsFromRows([
+    ...bootstrapKeys.map((rowKey) => Object.freeze({
+      rowKey,
+      value: bootstrap.values[rowKey],
+      sourceRef: bootstrap.resolution[rowKey]
+    })),
+    ...AUTH_POLICY_REGISTER_ROWS,
+    MFA_POLICY_REGISTER_ROW,
+    SESSION_POLICY_REGISTER_ROW,
+    RECOVERY_POLICY_REGISTER_ROW,
+    PRODUCT_ROLE_POLICY_REGISTER_ROW
+  ]);
 }
 
 export async function assertBootstrapEquality(pool: Pool, bootstrap: BootstrapRegister): Promise<void> {
@@ -562,6 +740,35 @@ export async function assertBootstrapEquality(pool: Pool, bootstrap: BootstrapRe
     }
   }
 }
+
+export {
+  ADAPTIVE_STOPPING_ROW_KEYS,
+  ALGORITHM_REGISTER_ROW_FAMILIES,
+  ALGORITHM_REGISTER_ROW_KEYS,
+  ENVELOPE_FORMULA_ROW_KEYS,
+  PANEL_WEIGHTING_ROW_KEYS,
+  SYNTHESIS_ROLE_ROW_KEYS,
+  SYNTHESIS_ROLE_REFS_IDENTICAL_WARNING,
+  T16_ROLE_RULING_REF,
+  VERDICT_LABEL_ROW_KEYS,
+  buildAlgorithmRegisterRows,
+  buildOneStepDownBands,
+  warnOnIdenticalSynthesisRoleRefs,
+  readAdaptiveStoppingControls,
+  readEnvelopeFormulaInputs,
+  readPanelWeightingControls,
+  readSynthesisRoleControls,
+  readVerdictLabelControls,
+  type AdaptiveStoppingControls,
+  type AlgorithmRegisterRow,
+  type AlgorithmRegisterRowFamily,
+  type AlgorithmRegisterRowsInput,
+  type EnvelopeFormulaInputs,
+  type PanelWeightingControls,
+  type ProviderFamilyEntry,
+  type SynthesisRoleControls,
+  type VerdictLabelControls
+} from "./algorithm-policy.js";
 
 export {
   assertProductionFloors,
@@ -632,3 +839,43 @@ export {
   type ProductRolePolicy,
   type ProductRolePolicyRegisterRow
 } from "./product-role-policy.js";
+
+export {
+  SUPPORT_CONFIGURATION_KEYS,
+  canonicalDecimal,
+  canonicalRegisterJson,
+  computeGeneralPublicationRequestSha256,
+  computeRegisterSnapshotSha256,
+  computeSupportPublicationRequestSha256,
+  createPostgresRegisterPublicationPort,
+  parseCanonicalRegisterJson,
+  parseRegisterVersionText,
+  registerVersionToSafeLegacyNumber,
+  validateSupportConfigurationValue,
+  type CanonicalDecimalText,
+  type CanonicalJsonAst,
+  type CanonicalRegisterJson,
+  type GeneralRegisterPublication,
+  type HistoricalRegisterImport,
+  type HistoricalRegisterImportReceipt,
+  type RegisterPublicationPort,
+  type RegisterPublicationReceipt,
+  type RegisterPublicationRow,
+  type RegisterVersionText,
+  type SupportConfigurationKey,
+  type SupportConfigurationPatchRow,
+  type SupportConfigurationPublication,
+  type SupportConfigurationStatus,
+  type SupportPublicationReceipt
+} from "./register-publication.js";
+
+export {
+  SUPPORT_CONFIG_CACHE_MAX_AGE_MS,
+  SUPPORT_CONFIG_REFRESH_DEADLINE_MS,
+  createSupportConfigurationPort,
+  type SupportConfigurationPort,
+  type SupportConfigurationPortOptions,
+  type SupportConfigurationSnapshot,
+  type SupportConfigurationState,
+  type SupportConfigurationValues
+} from "./support-config.js";

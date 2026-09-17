@@ -7,7 +7,16 @@ describe("LOAD-01 persisted run projection", () => {
     const calls: Array<{ text: string; values: readonly unknown[] }> = [];
     const query = async (text: string, values: readonly unknown[] = []) => {
         calls.push({ text, values });
-        if (text.includes("pg_advisory_lock")) return { rows: [] };
+        // `acquireRunContentLease` acquires with pg_TRY_advisory_lock and reads
+        // `acquired` off the row. That form is pinned by
+        // tests/architecture/s6-content-encryption-contract.test.ts, which also
+        // forbids the blocking `pg_advisory_lock(hashtextextended($1,0))` this
+        // stub used to answer. Any row without `acquired: true` reads as
+        // CONTENTION and sends the lease into an unbounded unlock-and-retry loop
+        // (packages/db/src/index.ts:302, :305-314) — which is what the stale
+        // branch caused here, because the try-lock fell through to the run row
+        // below and that row carries no `acquired` field.
+        if (text.includes("pg_try_advisory_lock")) return { rows: [{ acquired: true }] };
         if (text.includes("pg_advisory_unlock")) return { rows: [{ unlocked: true }] };
         if (text.includes("run_private_content_is_live")) {
           return { rows: [{ run_id: "run:failed", live: true }] };
@@ -15,15 +24,22 @@ describe("LOAD-01 persisted run projection", () => {
         if (text.includes("information_schema.columns")) {
           return { rows: [{ applied: false }] };
         }
-        return {
-          rows: [{
-            run_id: "run:failed",
-            question_line: "Messi or Ronaldo?",
-            content_ciphertext: null,
-            state: "FAILED",
-            terminal_reason: "TOTAL_REVIEW_COVERAGE_UNSATISFIED"
-          }]
-        };
+        // The projection read is dispatched by name rather than served by a
+        // catch-all default: a catch-all is what let the changed lease query be
+        // answered silently with a run row. A query this stub does not model now
+        // fails loudly instead.
+        if (text.includes("core.run_is_owned_by")) {
+          return {
+            rows: [{
+              run_id: "run:failed",
+              question_line: "Messi or Ronaldo?",
+              content_ciphertext: null,
+              state: "FAILED",
+              terminal_reason: "TOTAL_REVIEW_COVERAGE_UNSATISFIED"
+            }]
+          };
+        }
+        throw new Error(`UNEXPECTED_QUERY:${text}`);
       };
     const pool = {
       query,

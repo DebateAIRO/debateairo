@@ -87,6 +87,8 @@ rule.
 | [**0016**](ADR-0016-repository-layout-no-fence.md) | **Repository layout: kept UI as a plain in-repo package, no fence** | *not in the planned set* — records **DR-068 + DR-069** |
 | [**0017**](ADR-0017-durable-execution-hatchet.md) | **Durable execution: Hatchet as dispatcher** — self-hosted, Postgres-first, dispatcher only | *not in the planned set* — minted by **DR-118** |
 | [**0018**](ADR-0018-deployment-topology.md) | **Deployment topology: Docker Compose on Hetzner behind Cloudflare, with vLLM as a provider adapter** | *not in the planned set* — minted by **DR-117** |
+| [**0021**](ADR-0021-consent-storage-contract.md) | **The browser-local consent record: one key, one versioned object, re-ask on anything else** | *not in the planned set* — minted by the **`consent-ui`** mission (slice S01) |
+| [**0022**](ADR-0022-shared-modal-semantics.md) | **One shared modal-semantics module, and the Esc stack** | *not in the planned set* — minted by the **`consent-ui`** mission (slice S02) |
 
 ---
 

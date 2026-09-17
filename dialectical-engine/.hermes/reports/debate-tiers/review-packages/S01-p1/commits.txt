@@ -1,0 +1,5 @@
+f6c147cc 2026-09-10 03:09 feat(tiers S01-C5): map done measurements
+e57624a8 2026-09-10 02:31 feat(tiers S01-C3): add plan tier selector and locks
+5e3e4bcf 2026-09-10 02:10 feat(tiers S01-C4): style plan tier selector and locks
+b866191f 2026-09-10 01:23 feat(tiers S01-C2): wire plan tier into asks
+7658e997 2026-09-10 00:50 feat(tiers S01-C1): add plan tier ask contract

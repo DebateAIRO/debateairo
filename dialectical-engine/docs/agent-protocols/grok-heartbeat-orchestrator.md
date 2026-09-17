@@ -1,5 +1,18 @@
 # Grok Node Contract (Orchestrator) — roster-scoped
 
+
+## v4.0.0 — graph mode (read this first; it supersedes the visible-launch text below)
+
+The law is the spine's `## v4.0.0 amendments` and `.claude/skills/heartbeat-orchestrator/SKILL.md`
+(the scheduler contract, read as markdown). For this seat: the mission is a DAG of board tickets
+linked with `hermes kanban link`; you dispatch every READY node in parallel and consume exits; the
+code loop has ONE review per vertical slice (REV(S) after every cluster is green — no per-ticket or
+per-cluster reviews); a UI slice is built only after V's DONE(S) (the mock gate); packets come from
+the templates and pass `packet-check.sh`. **The "Visible-launch law" below is REVOKED**: no
+`osascript`, no Terminal windows, nothing opened on V's desktop — every seat is a background process
+with stdin closed and stdout to a per-seat log, watchdogs are background loops, and the transports
+table in `heartbeat-orchestrator` §4 is the launch law. Rework resumes the same session (`grok --resume <id>`).
+
 Thin. Source of truth is the repo Graph Spine v2
 (`docs/agent-protocols/debateai-heartbeat-protocol.md`). This contract exists for two
 cases, both roster-gated (only V edits the roster, ruling R4):
@@ -89,3 +102,7 @@ unless the roster names this seat as a coding agent · no product/database delet
 fake runtime data, no secret disclosure, no file-contract crossing, no ignored ticket
 comments. Board custody is Hermes-Verifier's where the roster seats one; otherwise ticket
 comments carry the live record and this seat writes only routing metadata and comments.
+
+## v3.4.0 — vertical-slice law binds this seat (V ruling 2026-09-01)
+
+One Kanban ticket per TESTABLE VERTICAL SLICE at intake; Done on a slice ticket is the developer's veto after personally testing, never a green gate; one worktree per slice with a whole fleet inside it and multiple slices running at once; merge on veto, conflicts managed at merge time; push only after the developer tests the whole local merge. Law text: spine "v3.4.0 amendments" and `heartbeat-orchestrator` §6.

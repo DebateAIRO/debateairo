@@ -25,6 +25,35 @@ export {
 } from "./legacy-claim.js";
 
 export {
+  assertSupportKeyCoverage,
+  assertSupportDatabaseRole,
+  lockSupportOwners,
+  lockSupportSessions,
+  PostgresSupportCaseRepository,
+  PostgresSupportCaseSummaryRepository,
+  PostgresSupportMessageRepository,
+  PostgresSupportOwnContextRepository,
+  PostgresSupportRelayReservationRepository,
+  PostgresSupportShredRepository,
+  PostgresSupportSessionRepository,
+  PostgresSupportStatusRepository,
+  type CreateCaseMaterial,
+  type CreateWrappedSessionKey,
+  type SupportCaseRecord,
+  type SupportCreateKeyFactories,
+  type SupportMessageOutcome,
+  type SupportMessageRead,
+  type SupportMessageRole,
+  type SupportMessageWrite,
+  type SupportOwnRunStateRow,
+  type SupportRepositoryRecord,
+  type SupportRepositoryStatus,
+  type SupportRelayReservationResult,
+  type SupportShredCounts,
+  type SupportShredResult
+} from "./support.js";
+
+export {
   assertPublicationCleanupDatabaseRole,
   assertPublicationDatabaseRoleSeparation,
   PostgresPublicationRepository,
@@ -656,8 +685,15 @@ function wrapClientQueries(client: PoolClient): PoolClient {
   return client;
 }
 
-export function createPool(connectionString: string): Pool {
-  const pool = new PgPool({ connectionString });
+export function createPool(
+  connectionString: string,
+  options: Readonly<{ max?: number }> = {}
+): Pool {
+  if (options.max !== undefined
+    && (!Number.isSafeInteger(options.max) || options.max < 1 || options.max > 100)) {
+    throw new TypeError("DATABASE_POOL_MAX_INVALID");
+  }
+  const pool = new PgPool({ connectionString,...options });
   let terminalFailure: TypedDomainError | undefined;
 
   pool.on("error", (error: Error) => {
@@ -711,6 +747,20 @@ export function createPool(connectionString: string): Pool {
     }
   };
 
+  return pool;
+}
+
+export function createSupportControlPlanePool(connectionString: string): Pool {
+  const pool = new PgPool({
+    connectionString,
+    max: 2,
+    connectionTimeoutMillis: 200,
+    statement_timeout: 700,
+    query_timeout: 750
+  });
+  pool.on("error", (error: Error) => {
+    console.error(`[${DATABASE_POOL_FAILED}] ${typedPoolFailure(error).message}`);
+  });
   return pool;
 }
 
@@ -996,7 +1046,11 @@ export interface RunLoadingProjection {
   readonly holdUntil: Date | null;
 }
 
-export interface RunLifecycleEventValue {
+/**
+ * The COOLDOWN-shaped lifecycle value: a leg that was attempted, held and
+ * eventually halted. Every field here is a MEASUREMENT of that attempt.
+ */
+export interface RunCooldownLifecycleValue {
   readonly state: "COOLDOWN_HOLD" | "COOLDOWN_RETRY" | "MAKER_POSITION_HALTED" | "EXPANSION_HALTED" | "REVIEW_HALTED";
   readonly call_site_key: string;
   readonly parent_node_ref: string | null;
@@ -1006,6 +1060,29 @@ export interface RunLifecycleEventValue {
   readonly transport_outcome: "TIMED_OUT" | "FAILED";
   readonly planned_leg_count: number;
 }
+
+/**
+ * T9 / J24 / J26(c) — a sealed synthesis role whose provider is not
+ * claim-eligible. This is a REFUSAL, not an attempt: nothing was held, nothing
+ * was spent, no transport was touched. It gets its own shape rather than
+ * borrowing the cooldown one, because writing `hold_ms: 0`,
+ * `attempts_spent: 0`, `planned_leg_count: 0` would state three measurements
+ * that were never taken, and a reader sees zeros as measurements. Same standard
+ * as J15 ADDENDUM-2's false freeze marks: a record may not state a quantity it
+ * did not measure.
+ */
+export interface RunSynthesisRoleRefusalValue {
+  readonly state: "SYNTHESIS_ROLE_PROVIDER_ABSENT";
+  /** `<ROLE>:<sealed provider ref>` — the role that could not be resolved. */
+  readonly call_site_key: string;
+  /** The sealed role ref, named on its own so a reader need not parse the key. */
+  readonly role_ref: string;
+  readonly role: "SYNTHESIZER" | "EVALUATOR";
+  /** Why the provider was not claim-eligible, or null when it was never probed. */
+  readonly absent_failure_code: string | null;
+}
+
+export type RunLifecycleEventValue = RunCooldownLifecycleValue | RunSynthesisRoleRefusalValue;
 
 export interface CompletionActivationResolution {
   readonly batteryRowId: string;
@@ -1242,31 +1319,56 @@ export class RunRepository {
       transactionStarted = false;
       return runId;
     } catch (error) {
-      if (commitAttempted) {
-        throw new TypedDomainError(
+      // F-DIAG-ROLLBACK-COLLAPSE. Three distinguishable failures used to throw one
+      // code with one message and nothing to tell them apart: a COMMIT whose
+      // outcome is unknown, a failed ROLLBACK, and a failed external content-key
+      // destroy. Each now carries a bounded category as the thrown error's
+      // `cause` — a literal declared right here, never the caught cause, which
+      // stays discarded exactly as before. The public code and the message are
+      // unchanged, byte for byte, because both are the outward classification
+      // (tests/integration/s6-content-encryption-database.test.ts asserts them).
+      const ROLLBACK_FAILURE_CATEGORIES = {
+        commitAmbiguous: "COMMIT_OUTCOME_AMBIGUOUS",
+        rollbackFailed: "ROLLBACK_FAILED",
+        contentKeyDestroyFailed: "CONTENT_KEY_DESTROY_FAILED",
+        bothFailed: "ROLLBACK_AND_CONTENT_KEY_DESTROY_FAILED"
+      } as const;
+      const incomplete = (
+        category: (typeof ROLLBACK_FAILURE_CATEGORIES)[keyof typeof ROLLBACK_FAILURE_CATEGORIES]
+      ): TypedDomainError => {
+        const failure = new TypedDomainError(
           "RUN_CONTENT_ROLLBACK_INCOMPLETE",
           "Run rollback or external content-key cleanup did not complete"
         );
+        failure.cause = category;
+        return failure;
+      };
+      if (commitAttempted) {
+        throw incomplete(ROLLBACK_FAILURE_CATEGORIES.commitAmbiguous);
       }
-      let rollbackIncomplete = false;
+      let rollbackFailed = false;
+      let contentKeyDestroyFailed = false;
       if (client !== undefined && transactionStarted) {
         try {
           await client.query("ROLLBACK");
         } catch {
-          rollbackIncomplete = true;
+          rollbackFailed = true;
         }
       }
       if (contentKeyProvisioned) {
         try {
           await cipher!.destroyRunKey(runId);
         } catch {
-          rollbackIncomplete = true;
+          contentKeyDestroyFailed = true;
         }
       }
-      if (rollbackIncomplete) {
-        throw new TypedDomainError(
-          "RUN_CONTENT_ROLLBACK_INCOMPLETE",
-          "Run rollback or external content-key cleanup did not complete"
+      if (rollbackFailed || contentKeyDestroyFailed) {
+        throw incomplete(
+          rollbackFailed && contentKeyDestroyFailed
+            ? ROLLBACK_FAILURE_CATEGORIES.bothFailed
+            : rollbackFailed
+              ? ROLLBACK_FAILURE_CATEGORIES.rollbackFailed
+              : ROLLBACK_FAILURE_CATEGORIES.contentKeyDestroyFailed
         );
       }
       throw error;

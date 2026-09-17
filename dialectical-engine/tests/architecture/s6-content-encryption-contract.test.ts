@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 const root = new URL("../../", import.meta.url);
@@ -17,6 +17,123 @@ describe("S6 content-encryption architecture contract", () => {
     expect(migration).toContain("content_ciphertext");
     expect(migration).toContain("CONTENT_PLAINTEXT_WRITE_FORBIDDEN");
     expect(migration).toContain("IF NOT EXISTS");
+  });
+
+  it("declares serve.answer as the fifteenth carrier through the B21 forward migration (L5-F2)", async () => {
+    // The migration number is provisional until fold time, so locate it by suffix.
+    const names = (await readdir(new URL("migrations/", root)))
+      .filter((name) => /^\d+_serve_answer_content_carrier\.sql$/.test(name));
+    expect(names).toHaveLength(1);
+    const migration = await read(`migrations/${names[0]}`);
+    expect(migration).toContain("ALTER TABLE serve.answer");
+    expect(migration).toContain("ADD COLUMN IF NOT EXISTS content_ciphertext jsonb");
+    expect(migration).toContain("ADD COLUMN IF NOT EXISTS content_attestation bytea");
+    expect(migration).toContain("CONTENT_PLAINTEXT_WRITE_FORBIDDEN: serve.answer");
+    expect(migration).toContain(
+      "target_primary_key:=(row_json->>'answer_id')||':'||(row_json->>'answer_version');"
+    );
+    for (const trigger of [
+      "aaa_enforce_content_attestation_v2", "enforce_content_ciphertext", "enforce_erasure_barrier"
+    ]) {
+      expect(migration).toContain(`DROP TRIGGER IF EXISTS ${trigger} ON serve.answer`);
+      expect(migration).toContain(`CREATE TRIGGER ${trigger}\nBEFORE INSERT ON serve.answer`);
+    }
+    // FIX ROUND 1 / F1. The two guards serve.answer needs are its OWN functions,
+    // and its triggers execute those. Reaching them by CREATE OR REPLACE-ing
+    // 0038's or 0040's function is what the sweep below forbids.
+    expect(migration).toContain(
+      "CREATE TRIGGER aaa_enforce_content_attestation_v2\nBEFORE INSERT ON serve.answer\n"
+      + "FOR EACH ROW EXECUTE FUNCTION core.enforce_content_attestation_v2_serve_answer();"
+    );
+    expect(migration).toContain(
+      "CREATE TRIGGER enforce_content_ciphertext\nBEFORE INSERT ON serve.answer\n"
+      + "FOR EACH ROW EXECUTE FUNCTION core.enforce_content_ciphertext_serve_answer();"
+    );
+
+    // The CLASS, swept mechanically: no function this migration defines may be
+    // defined by any other migration. An earlier migration is replayed on its
+    // own — the S6 suite of record replays 0040 over the applied chain — and a
+    // replay restores the OWNER's body, deleting any arm a later migration
+    // grafted on while that later migration's triggers keep firing. Calling
+    // another migration's function is safe; redefining it is not.
+    const defined = (sql: string): readonly string[] => [
+      ...sql.matchAll(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+([a-z_][a-z0-9_]*\.[a-z0-9_]+)\s*\(/gi)
+    ].map((match) => match[1]!.toLowerCase());
+    const definedHere = defined(migration);
+    expect(definedHere).toEqual([
+      "core.enforce_content_ciphertext_serve_answer",
+      "core.enforce_content_attestation_v2_serve_answer"
+    ]);
+    const others = (await readdir(new URL("migrations/", root)))
+      .filter((name) => name.endsWith(".sql") && name !== names[0]);
+    expect(others.length).toBeGreaterThan(50);
+    for (const other of others) {
+      for (const owned of defined(await read(`migrations/${other}`))) {
+        expect({ migration: other, function: owned, alsoDefinedByB21: definedHere.includes(owned) })
+          .toEqual({ migration: other, function: owned, alsoDefinedByB21: false });
+      }
+    }
+
+    // FIX ROUND 1 / F2 (D26 open point (3)). The drizzle mirror of the fifteenth
+    // carrier declares both carrier columns, in the same form as the other
+    // fourteen — a mirror that is stale by ABSENCE compiles and passes every
+    // other suite, so only a pin on the block's text can see it.
+    const schema = await read("packages/db/src/schema.ts");
+    const answerMirror = schema.slice(
+      schema.indexOf('export const answer = serve.table("answer", {'),
+      schema.indexOf("export const segmentSuppression")
+    );
+    expect(answerMirror).toContain('contentCiphertext: jsonb("content_ciphertext"),');
+    expect(answerMirror).toContain('contentAttestation: bytea("content_attestation")');
+
+    const crypto = await read("packages/crypto/src/index.ts");
+    const carriers = crypto.slice(
+      crypto.indexOf("export const CONTENT_CARRIERS"), crypto.indexOf("export type ContentCarrier")
+    );
+    expect(carriers).toContain('"serve.answer"');
+
+    const serve = await read("packages/serve/src/index.ts");
+    // FIX ROUND 1 / F3. Both carrier sites address the envelope by
+    // (answer_id, answer_version), through the one helper whose template must
+    // equal the SQL concatenation pinned above.
+    expect(serve).toContain(
+      "function serveAnswerContentRef(answerId: string, answerVersion: number): string {\n"
+      + "  return `${answerId}:${answerVersion}`;\n}"
+    );
+    expect(serve).toMatch(
+      /encryptAttestedLeasedContentForRun\(\s*answerCipher, "serve\.answer",\s*serveAnswerContentRef\(answerId, answerVersion\),\s*\{ answerForm: input\.result\.answerForm \}/
+    );
+    expect(serve).toContain(
+      "JSON.stringify(answerContent === null ? input.result.answerForm : CONTENT_JSON_SENTINEL)"
+    );
+    expect(serve).toMatch(
+      /decryptContentForRun<\{ answerForm: unknown \}>\(\s*this\.pool, row\.run_id, "serve\.answer",\s*serveAnswerContentRef\(row\.answer_id, Number\(row\.answer_version\)\),\s*row\.answer_content_ciphertext, \{ answerForm: row\.answer_form \}/
+    );
+    // D26's leased-cipher pattern, pinned as an ORDER, because both halves are
+    // load-bearing: the cipher is PREPARED before the write transaction (a
+    // pool-level query inside one is forbidden — the S6 suite of record asserts
+    // `nestedPoolQueries` is empty), and the envelope is SEALED inside it,
+    // because only there is answerVersion resolved for the superseding path.
+    // Sealing outside is how the id-only owner ref arose in the first place.
+    const persistBody = serve.slice(
+      serve.indexOf("  async persist(input: PersistServeInput)"),
+      serve.indexOf("INSERT INTO serve.answer")
+    );
+    const prepareAt = persistBody.indexOf(
+      "await prepareLeasedContentEncryptionForRun(this.pool, input.runId);"
+    );
+    const transactionAt = persistBody.indexOf(
+      "return await withWriteTransaction(this.pool, async (client) => {"
+    );
+    const sealAt = persistBody.indexOf(
+      'encryptAttestedLeasedContentForRun(\n        answerCipher, "serve.answer"'
+    );
+    expect({ prepared: prepareAt >= 0, transaction: transactionAt >= 0, sealed: sealAt >= 0 })
+      .toEqual({ prepared: true, transaction: true, sealed: true });
+    expect(prepareAt).toBeLessThan(transactionAt);
+    expect(transactionAt).toBeLessThan(sealAt);
+    expect(serve).toContain("answer_form: hasEviction ? null : answerContent.answerForm");
+    expect(serve).not.toContain("answer_form: hasEviction ? null : row.answer_form");
   });
 
   it("keeps irreversible enablement default-off and wires both API and runner through the external key store", async () => {

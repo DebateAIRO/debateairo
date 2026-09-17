@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 // Test-layer fake of Grok Build's single-turn JSON mode. It is reachable only
 // through the NODE_ENV=test guarded command seam (DR-115).
 const argumentList = process.argv.slice(2);
@@ -5,11 +7,74 @@ const singleIndex = argumentList.indexOf("--single");
 const prompt = singleIndex >= 0 ? argumentList[singleIndex + 1] ?? "" : "";
 const REPORTED_MODEL = "grok-fake-cli-model";
 
+// W6 (SECURITY): the echo below is a PROJECTION over this allow-list, never
+// `process.env`. Serialising the whole environment put every variable the relay
+// admits — a real maker credential among them — into the model content that
+// `ledger.raw_artifact` persists. Same projection shape as the product's own
+// `buildCliChildEnvironment` (`acceptance/relay-core.ts:81-84`).
+// Every key is here because an acceptance assertion reads it:
+//   asserted PRESENT — grok-relay.test.ts:205-211 (exact-set toEqual);
+//   asserted ABSENT  — grok-relay.test.ts:213-218. An absence assertion is
+//   evidence only if the key WOULD be echoed when the relay admits it, so those
+//   keys stay named. Anything unnamed — the W6 canary included — is dropped.
+const ECHOED_ENVIRONMENT_KEYS = [
+  "HOME",
+  "LANG",
+  "OLDPWD",
+  "PATH",
+  "PWD",
+  "TMPDIR",
+  "XAI_API_KEY",
+  "ANTHROPIC_API_KEY",
+  "CLAUDE_CODE_OAUTH_TOKEN",
+  "DATABASE_URL",
+  "OPENAI_API_KEY",
+  "SSH_AUTH_SOCK",
+  "UNRELATED_SECRET"
+];
+
+// W6 fix round 1 / F4 — the CREDENTIAL-SHAPE rule, stated identically in all six
+// members of the class: a key is credential-shaped when a SEGMENT of its name is
+// one of KEY, TOKEN, SECRET, PASSWORD, PASSWD, OAUTH, AUTH, CREDENTIAL(S), URL,
+// URI or DSN. A pattern over the NAME rather than an explicit list, because a
+// list maintained in six places silently misses the next maker's locator — which
+// is how this leak survived. Segment-anchored so HOME, PATH, TMPDIR, LANG, PWD
+// and OLDPWD, which the assertions need in clear, do not match. URL/URI/DSN are
+// included because a connection string such as DATABASE_URL embeds a password.
+// A credential-shaped key's VALUE is never emitted; presence and identity travel
+// as a truncated one-way digest. Full reasoning in `fake-claude-cli.mjs:44-58`.
+const CREDENTIAL_SHAPED_NAME =
+  /(?:^|_)(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|OAUTH|AUTH|CREDENTIAL|CREDENTIALS|URL|URI|DSN)(?:_|$)/u;
+
+function echoedValue(key, value) {
+  return CREDENTIAL_SHAPED_NAME.test(key)
+    ? `sha256:${createHash("sha256").update(value).digest("hex").slice(0, 16)}`
+    : value;
+}
+
+function echoedEnvironment() {
+  const echoed = {};
+  for (const key of ECHOED_ENVIRONMENT_KEYS) {
+    const value = process.env[key];
+    if (value !== undefined) echoed[key] = echoedValue(key, value);
+  }
+  return echoed;
+}
+
 // Redacted Grok Build 1.0.0 envelope captured by the rev1 product-truth lens.
 // No credential, private prompt, or raw provider payload is retained; only the
 // observed public field shape and a test-controlled verbatim model key.
 const envelope = (overrides = {}) => JSON.stringify({
-  text: JSON.stringify({ prompt, argumentList, environment: process.env }),
+  text: JSON.stringify({
+    prompt,
+    argumentList,
+    environment: echoedEnvironment(),
+    // W6 fix round 1 / F3: the allow-list above cost the consumer's exact-set
+    // assertion the ability to see a key `buildCliChildEnvironment` wrongly
+    // admits. The key NAMES give that reach back at zero risk — a name is not a
+    // credential, a value is. Read by `grok-relay.test.ts:227-228`.
+    environmentKeyNames: Object.keys(process.env).sort()
+  }),
   stopReason: "end_turn",
   sessionId: "redacted-session",
   requestId: "redacted-request",
