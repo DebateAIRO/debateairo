@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { SYNTHESIS_OBJECTION_STANDING_MARK } from "@debateai/serve";
 import {
@@ -27,7 +28,7 @@ function baseInput(overrides: Partial<DefinitionOfDoneFactsInput> = {}): Definit
       { nodeId: "n1", depth: 0, tau: 0.5, finalStrength: 0.7, panel: { voiceCount: 2, nonAuthorVoiceCount: 1 } },
       { nodeId: "n2", depth: 1, tau: 0.4, finalStrength: 0.4, panel: { voiceCount: 2, nonAuthorVoiceCount: 1 } }
     ],
-    edges: [{ sourceNodeId: "n2", polarity: "attack", magnitudeStatus: "MEASURED" }],
+    edges: [{ sourceNodeId: "n2", polarity: "attack", targetKind: "NODE", magnitudeStatus: "MEASURED" }],
     loopRounds: [{ round: 1, synthesizerStage: "INITIAL", evaluatorSatisfied: true }],
     sealedEvaluatorLoopMaxRounds: 3,
     conditionMarks: [],
@@ -84,17 +85,52 @@ describe("the definition-of-done facts the ceremony report prints", () => {
 
   /* ------------------------------------------------- sub-clause 2: measured edges */
 
-  it("counts the attack edges and how many of them carry a present magnitude", () => {
+  it("counts every edge's magnitude, and separately the attack edges FAIR-01 counts", () => {
     const facts = deriveDefinitionOfDoneFacts(baseInput({
       edges: [
-        { sourceNodeId: "n2", polarity: "attack", magnitudeStatus: "MEASURED" },
-        { sourceNodeId: "n2", polarity: "attack", magnitudeStatus: "UNKNOWN" },
-        { sourceNodeId: "n1", polarity: "support", magnitudeStatus: "MEASURED" }
+        { sourceNodeId: "n2", polarity: "attack", targetKind: "NODE", magnitudeStatus: "MEASURED" },
+        { sourceNodeId: "n2", polarity: "attack", targetKind: "NODE", magnitudeStatus: "UNKNOWN" },
+        { sourceNodeId: "n1", polarity: "support", targetKind: "NODE", magnitudeStatus: "MEASURED" }
       ]
     }));
 
-    expect(facts.attackEdgeCount).toBe(2);
-    expect(facts.attackEdgePresentMagnitudeCount).toBe(1);
+    expect(facts.edgeCount).toBe(3);
+    expect(facts.edgePresentMagnitudeCount).toBe(2);
+    expect(facts.fairDebateAttackEdgeCount).toBe(2);
+    expect(facts.fairDebateAttackEdgePresentMagnitudeCount).toBe(1);
+  });
+
+  /**
+   * The divergence the two counts exist for. Nothing mints an EDGE-targeted
+   * arrow today, so on every run the repo can currently produce the two rules
+   * agree — which is exactly why a test, not a run, has to hold the difference.
+   * `acceptance/fair-debate.ts:122` counts `polarity='attack' AND
+   * target_kind='NODE'`; the ceremony prints that number six lines above
+   * `DOD-2`, and the two must be reconcilable without arithmetic.
+   */
+  it("keeps an undercutting attack edge out of the FAIR-01 count and inside the total", () => {
+    const facts = deriveDefinitionOfDoneFacts(baseInput({
+      edges: [
+        { sourceNodeId: "n2", polarity: "attack", targetKind: "NODE", magnitudeStatus: "MEASURED" },
+        { sourceNodeId: "n2", polarity: "attack", targetKind: "EDGE", magnitudeStatus: "MEASURED" }
+      ]
+    }));
+
+    expect(facts.edgeCount).toBe(2);
+    expect(facts.edgePresentMagnitudeCount).toBe(2);
+    expect(facts.fairDebateAttackEdgeCount).toBe(1);
+    expect(facts.fairDebateAttackEdgePresentMagnitudeCount).toBe(1);
+  });
+
+  it("still counts an EDGE-targeted attacker as a surviving objection, as the runner does", () => {
+    const facts = deriveDefinitionOfDoneFacts(baseInput({
+      edges: [{ sourceNodeId: "n2", polarity: "attack", targetKind: "EDGE", magnitudeStatus: "MEASURED" }]
+    }));
+
+    // The runner's predicate is any attack-polarity arrow — the emphasis the
+    // synthesizer was handed was built from that, not from FAIR-01's narrowing.
+    expect(facts.fairDebateAttackEdgeCount).toBe(0);
+    expect(facts.strongestSurvivingObjection).toEqual({ nodeId: "n2", finalStrength: 0.4 });
   });
 
   /* -------------------------------------------- sub-clause 3: a root's final != tau */
@@ -147,8 +183,8 @@ describe("the definition-of-done facts the ceremony report prints", () => {
         { nodeId: "n3", depth: 1, tau: 0.4, finalStrength: 0.6, panel: { voiceCount: 2, nonAuthorVoiceCount: 1 } }
       ],
       edges: [
-        { sourceNodeId: "n2", polarity: "attack", magnitudeStatus: "MEASURED" },
-        { sourceNodeId: "n3", polarity: "attack", magnitudeStatus: "MEASURED" }
+        { sourceNodeId: "n2", polarity: "attack", targetKind: "NODE", magnitudeStatus: "MEASURED" },
+        { sourceNodeId: "n3", polarity: "attack", targetKind: "NODE", magnitudeStatus: "MEASURED" }
       ]
     }));
 
@@ -163,8 +199,8 @@ describe("the definition-of-done facts the ceremony report prints", () => {
         { nodeId: "na", depth: 1, tau: 0.4, finalStrength: 0.6, panel: { voiceCount: 2, nonAuthorVoiceCount: 1 } }
       ],
       edges: [
-        { sourceNodeId: "nb", polarity: "attack", magnitudeStatus: "MEASURED" },
-        { sourceNodeId: "na", polarity: "attack", magnitudeStatus: "MEASURED" }
+        { sourceNodeId: "nb", polarity: "attack", targetKind: "NODE", magnitudeStatus: "MEASURED" },
+        { sourceNodeId: "na", polarity: "attack", targetKind: "NODE", magnitudeStatus: "MEASURED" }
       ]
     }));
 
@@ -179,8 +215,8 @@ describe("the definition-of-done facts the ceremony report prints", () => {
         { nodeId: "n3", depth: 1, tau: 0.1, finalStrength: 0.1, panel: { voiceCount: 2, nonAuthorVoiceCount: 1 } }
       ],
       edges: [
-        { sourceNodeId: "n2", polarity: "attack", magnitudeStatus: "MEASURED" },
-        { sourceNodeId: "n3", polarity: "attack", magnitudeStatus: "MEASURED" }
+        { sourceNodeId: "n2", polarity: "attack", targetKind: "NODE", magnitudeStatus: "MEASURED" },
+        { sourceNodeId: "n3", polarity: "attack", targetKind: "NODE", magnitudeStatus: "MEASURED" }
       ]
     }));
 
@@ -193,7 +229,7 @@ describe("the definition-of-done facts the ceremony report prints", () => {
         { nodeId: "n1", depth: 0, tau: 0.5, finalStrength: 0.7, panel: { voiceCount: 2, nonAuthorVoiceCount: 1 } },
         { nodeId: "n2", depth: 1, tau: 0.4, finalStrength: 0.9, panel: { voiceCount: 2, nonAuthorVoiceCount: 1 } }
       ],
-      edges: [{ sourceNodeId: "n2", polarity: "support", magnitudeStatus: "MEASURED" }]
+      edges: [{ sourceNodeId: "n2", polarity: "support", targetKind: "NODE", magnitudeStatus: "MEASURED" }]
     }));
 
     expect(facts.strongestSurvivingObjection).toBeNull();
@@ -405,28 +441,157 @@ describe("the definition-of-done facts the ceremony report prints", () => {
     expect(byToken(DEFINITION_OF_DONE_TOKENS.panelReducedTau)).toContain("n2");
     expect(byToken(DEFINITION_OF_DONE_TOKENS.rootFinalVersusTau)).toContain("n1");
     expect(byToken(DEFINITION_OF_DONE_TOKENS.survivingObjection)).toContain("n2");
-    expect(byToken(DEFINITION_OF_DONE_TOKENS.measuredEdges)).toContain("1/1");
+    // Both counting rules on the one line: the clause's reading over every
+    // edge, then FAIR-01's, so the judge can reconcile with the FAIR-01 line.
+    expect(byToken(DEFINITION_OF_DONE_TOKENS.measuredEdges)).toContain("1/1 edge(s)");
+    expect(byToken(DEFINITION_OF_DONE_TOKENS.measuredEdges)).toContain("FAIR-01 rule");
     expect(byToken(DEFINITION_OF_DONE_TOKENS.verdictLabel)).toContain("CONTESTED");
     expect(byToken(DEFINITION_OF_DONE_TOKENS.confidenceBand)).toContain("wayOfKnowingCeiling");
   });
 
-  it("prints no free text beyond ids, numbers, booleans, marks and register row keys", () => {
-    const lines = renderDefinitionOfDoneLines(deriveDefinitionOfDoneFacts(baseInput({
+  /* ------------------------------------------------------- O2: the content law */
+
+  /**
+   * THE CONTENT LAW, AND WHY IT NEEDS THREE GUARDS.
+   *
+   * No debate content may reach a printed line or the typed block: ids,
+   * numbers, booleans, condition marks and register row keys only. This is the
+   * one law here whose violation is irreversible — once a closing run's log is
+   * captured with a claim in it, the log is the leak.
+   *
+   * The first version of this test asserted that no rendered line contained the
+   * words "claim" or "statement". The blind review was right that it could not
+   * fail: the hand-built input carries no free text, so only the module's own
+   * literals could ever have tripped it. A guard that cannot fail is not a
+   * guard. These three can, and each catches a different route in:
+   *
+   *   G1  free text spliced into a RENDERED LINE          → the word vocabulary
+   *   G2  free text carried onto a DERIVED FACT           → the string-leaf pin
+   *   G3  a text COLUMN pulled into the reader's SQL      → the SELECT-list pin
+   *
+   * G3 is a source-text pin because the reader needs a database; it is the same
+   * floor `run-acceptance.test.ts` uses for the ceremony's statement order.
+   */
+
+  /** Every string the input below supplies — the only strings a line may echo. */
+  const SUPPLIED_STRINGS = [
+    "410fafeb-f575-4d8b-97dd-5a2d52f004fd",
+    "31bfcf9d-f832-4cd9-8ac8-f9adcb533d31",
+    "serve:verdict-unavailable:no-basis",
+    "wayOfKnowingCeiling",
+    SYNTHESIS_OBJECTION_STANDING_MARK
+  ] as const;
+
+  /**
+   * The module's OWN vocabulary — every alphabetic word its fixed prose, its
+   * tokens and its JSON field names may contribute to a line. Adding a word
+   * here is the review point: a new word must be prose, never data.
+   */
+  const PINNED_VOCABULARY = new Set([
+    // tokens
+    "DOD", "panel", "reduced", "tau", "measured", "edges", "root", "final", "vs",
+    "surviving", "objection", "evaluator", "loop", "verdict", "label", "confidence", "band",
+    // fixed prose
+    "node", "s", "every", "has", "a", "non", "author", "voice", "single", "ids", "none",
+    "edge", "carry", "PRESENT", "magnitude", "by", "the", "FAIR", "rule", "attack",
+    "polarity", "NODE", "target", "roots", "strength", "differs", "from", "its", "witness", "id",
+    "strongest", "round", "satisfied", "within", "sealed", "evaluatorLoopMaxRounds",
+    "rounds", "unavailable", "terminal", "serve", "state", "basis", "ceiling",
+    "register", "row", "key",
+    // JSON field names and enum values the two stringified rows contribute
+    "nodeId", "finalStrength", "finalDiffersFromTau", "synthesizerStage",
+    "evaluatorSatisfied", "true", "false", "INITIAL", "RETRY",
+    "LOOKED", "UP", "RAN", "REASONING",
+    // the mark and the label vocabulary
+    "SYNTHESIS", "OBJECTION", "STANDING", "SUPPORTED", "CONTESTED", "UNSUPPORTED",
+    "SERVED", "DOWNGRADED", "BLOCKED", "COMPONENTS", "ONLY", "COMPOSED", "RECOMPOSED", "ONCE",
+    "CAPPED", "FULL"
+  ]);
+
+  function contentLawInput(): DefinitionOfDoneFactsInput {
+    return baseInput({
+      nodes: [
+        { nodeId: "410fafeb-f575-4d8b-97dd-5a2d52f004fd", depth: 0, tau: 0.72, finalStrength: 0.5, panel: { voiceCount: 2, nonAuthorVoiceCount: 1 } },
+        { nodeId: "31bfcf9d-f832-4cd9-8ac8-f9adcb533d31", depth: 1, tau: 0.72, finalStrength: 0.4, panel: { voiceCount: 1, nonAuthorVoiceCount: 0 } }
+      ],
+      edges: [{ sourceNodeId: "31bfcf9d-f832-4cd9-8ac8-f9adcb533d31", polarity: "attack", targetKind: "NODE", magnitudeStatus: "UNKNOWN" }],
       conditionMarks: [SYNTHESIS_OBJECTION_STANDING_MARK],
       verdictState: null,
       verdictUnavailableReasonRef: "serve:verdict-unavailable:no-basis",
       confidenceBand: null,
-      bandCeiling: null
-    })));
+      bandCeiling: { basis: { LOOKED_UP: 1, RAN: 0, REASONING: 2 }, registerRowKey: "wayOfKnowingCeiling" }
+    });
+  }
 
-    // The only strings that may reach a line are the ones the input supplied as
-    // ids/refs/marks plus the module's own vocabulary; a claim, a statement or a
-    // reason would show up here as an unknown word.
+  it("G1: every alphabetic word on a printed line is pinned vocabulary or a string the input supplied", () => {
+    const lines = renderDefinitionOfDoneLines(deriveDefinitionOfDoneFacts(contentLawInput()));
+
     for (const line of lines) {
-      expect(line).not.toContain("claim");
-      expect(line).not.toContain("statement");
+      // The character class first: anything outside it is not an id, a number,
+      // a boolean, a mark or a row key.
+      expect(line, `line carries a character no id/number/mark/row-key can produce: ${line}`)
+        .toMatch(/^[A-Za-z0-9 ·:/,.\-_{}[\]"@()]+$/u);
+      let residue = line;
+      for (const supplied of SUPPLIED_STRINGS) residue = residue.split(supplied).join(" ");
+      const words = residue.replace(/[^A-Za-z]+/gu, " ").trim().split(/\s+/u).filter(Boolean);
+      for (const word of words) {
+        expect(
+          PINNED_VOCABULARY.has(word),
+          `unpinned word "${word}" reached a printed line — if it is data, the content law is broken;`
+          + ` if it is prose, pin it: ${line}`
+        ).toBe(true);
+      }
     }
+    // The line the guard is about must actually have been rendered.
     expect(lines.join("\n")).toContain("serve:verdict-unavailable:no-basis");
     expect(lines.join("\n")).toContain(SYNTHESIS_OBJECTION_STANDING_MARK);
+  });
+
+  it("G2: every string in the derived block is a string the input supplied", () => {
+    const facts = deriveDefinitionOfDoneFacts(contentLawInput());
+    const allowed = new Set<string>([
+      ...SUPPLIED_STRINGS,
+      // the enum values the input supplied on its own typed fields
+      "INITIAL", "COMPONENTS_ONLY", "DOWNGRADED", "SERVED", "COMPOSED"
+    ]);
+
+    const strings: string[] = [];
+    const walk = (value: unknown): void => {
+      if (typeof value === "string") { strings.push(value); return; }
+      if (Array.isArray(value)) { for (const item of value) walk(item); return; }
+      if (value !== null && typeof value === "object") {
+        for (const item of Object.values(value)) walk(item);
+      }
+    };
+    walk(JSON.parse(JSON.stringify(facts)));
+
+    expect(strings.length, "the block must carry strings at all for this to mean anything").toBeGreaterThan(0);
+    for (const value of strings) {
+      expect(
+        allowed.has(value),
+        `the derived block carries a string the input never supplied: "${value}" —`
+        + " a text column or a free-text field has reached the facts"
+      ).toBe(true);
+    }
+  });
+
+  it("G3: the reader selects exactly the pinned, text-free columns", async () => {
+    const source = await readFile(new URL("./dod-facts.ts", import.meta.url), "utf8");
+    const readerAt = source.indexOf("export async function readDefinitionOfDoneFacts(");
+    expect(readerAt, "the reader must exist to have a SELECT list at all").toBeGreaterThan(-1);
+    const body = source.slice(readerAt);
+
+    const selected = [...body.matchAll(/SELECT([\s\S]*?)FROM/gu)]
+      .flatMap((match) => (match[1] ?? "").match(/[A-Za-z_][A-Za-z_0-9]*/gu) ?? []);
+
+    // Pinned as a SORTED MULTISET, not a subset check: a new column of ANY name
+    // reds this test, and whoever adds it must state here that it carries no
+    // debate content. `claim_text`, `reasons`, `question_line`, `statement` and
+    // every other text carrier on these relations is refused by construction.
+    expect([...new Set(selected)].sort()).toEqual([
+      "AS", "depth", "disagreement", "evaluator_satisfied", "int", "judgement",
+      "magnitude_status", "node", "node_id", "polarity", "record", "round",
+      "source_node_id", "strength", "synthesizer_stage", "target_kind", "tau", "text"
+    ]);
   });
 });

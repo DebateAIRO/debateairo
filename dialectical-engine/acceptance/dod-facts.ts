@@ -5,7 +5,7 @@ import { SYNTHESIS_OBJECTION_STANDING_MARK } from "@debateai/serve";
 /**
  * The Global definition of done, read off a settled run and printed by the
  * acceptance ceremony
- * (`.hermes/reports/2026-09-01-algorithm-live-loop/slices/S12-closure/SPEC.md:36-40`):
+ * (`.hermes/reports/2026-09-01-algorithm-live-loop/slices/S12-closure/SPEC.md:37-41`):
  *
  *   Full multi-maker acceptance run (M>=2, depth>=2) completes with: panel-reduced
  *   tau (non-self-graded), measured edges, at least one root's final strength != tau,
@@ -79,6 +79,10 @@ export type VerdictState = "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
 export type AnswerTerminal = "SERVED" | "DOWNGRADED" | "BLOCKED" | "COMPONENTS_ONLY";
 export type AnswerServeState = "COMPOSED" | "RECOMPOSED_ONCE" | "COMPONENTS_ONLY";
 export type EdgeMagnitudeStatus = "MEASURED" | "UNKNOWN";
+/** `core.edge.polarity`'s CHECK (`migrations/0002_s02.sql:86`). */
+export type EdgePolarity = "support" | "attack";
+/** `core.edge.target_kind`'s CHECK (`migrations/0002_s02.sql:82`). */
+export type EdgeTargetKind = "NODE" | "EDGE";
 
 /**
  * The panel that produced a node's tau, as the runner wrote it onto
@@ -105,8 +109,8 @@ export interface DefinitionOfDoneNodeInput {
 
 export interface DefinitionOfDoneEdgeInput {
   readonly sourceNodeId: string;
-  /** `core.edge.polarity`; `attack` is the arrow the clause counts. */
-  readonly polarity: string;
+  readonly polarity: EdgePolarity;
+  readonly targetKind: EdgeTargetKind;
   readonly magnitudeStatus: EdgeMagnitudeStatus;
 }
 
@@ -164,20 +168,35 @@ export interface DefinitionOfDoneObjectionFact {
   readonly finalStrength: number;
 }
 
-export interface DefinitionOfDoneRoundFact {
-  readonly round: number;
-  readonly synthesizerStage: SynthesizerStage;
-  readonly evaluatorSatisfied: boolean;
-}
+/**
+ * A round record is carried through unchanged, so it is ONE type under two
+ * names rather than two identical declarations that can drift apart (review
+ * M-7). The alias keeps `…RoundFact` readable at the block's field.
+ */
+export type DefinitionOfDoneRoundFact = DefinitionOfDoneRoundInput;
 
 export interface DefinitionOfDoneFacts {
   /* (1) panel-reduced tau, non-self-graded */
   readonly panelNodes: readonly DefinitionOfDoneNodeFact[];
   readonly everyNodeHasNonAuthorVoice: boolean;
   readonly singleVoicePanelNodeIds: readonly string[];
-  /* (2) measured edges */
-  readonly attackEdgeCount: number;
-  readonly attackEdgePresentMagnitudeCount: number;
+  /**
+   * (2) measured edges.
+   *
+   * TWO COUNTS, ON PURPOSE. The clause says "measured edges" without narrowing
+   * to a polarity, so the first pair is every `core.edge` of the run and how
+   * many carry a magnitude. The second pair is the SAME population FAIR-01
+   * counts — `polarity='attack' AND target_kind='NODE'`
+   * (`acceptance/fair-debate.ts:122`) — because the ceremony's own
+   * `FAIR-01 graph` line prints that number six lines earlier in the very same
+   * log. Nothing mints an EDGE-targeted arrow today, so the two agree; the day
+   * an undercutting arrow is minted they will not, and a judge reading one log
+   * must not have to work out which rule produced which number.
+   */
+  readonly edgeCount: number;
+  readonly edgePresentMagnitudeCount: number;
+  readonly fairDebateAttackEdgeCount: number;
+  readonly fairDebateAttackEdgePresentMagnitudeCount: number;
   /* (3) at least one root's final strength != tau */
   readonly roots: readonly DefinitionOfDoneRootFact[];
   readonly aRootFinalDiffersFromTau: boolean;
@@ -205,8 +224,9 @@ export interface DefinitionOfDoneFacts {
 
 /**
  * Strongest first, node id breaking a tie — the SAME total order the digest's
- * emphasis selection uses (`packages/serve/src/synthesis.ts:186-190`), so the
- * objection this report names is the one the synthesizer was told to stress.
+ * emphasis selection uses (`packages/serve/src/synthesis.ts:187-191`, the
+ * tie-break itself on `:191`), so the objection this report names is the one the
+ * synthesizer was told to stress.
  */
 function byStrengthThenId(
   left: DefinitionOfDoneObjectionFact,
@@ -216,17 +236,23 @@ function byStrengthThenId(
 }
 
 export function deriveDefinitionOfDoneFacts(input: DefinitionOfDoneFactsInput): DefinitionOfDoneFacts {
-  const panelNodes = input.nodes.map((node) => {
-    if (node.tau === null) {
-      throw new Error(`${ACCEPTANCE_DOD_NODE_TAU_MISSING}:${node.nodeId}`);
-    }
+  // The tau refusal runs FIRST and over every node, and it is what narrows
+  // `tau` to a number for everything below — the compiler is shown, not told
+  // (review M-7: this replaces an `as number` on the root fact).
+  const judged = input.nodes.map((node) => {
+    const tau = node.tau;
+    if (tau === null) throw new Error(`${ACCEPTANCE_DOD_NODE_TAU_MISSING}:${node.nodeId}`);
+    return { node, tau };
+  });
+
+  const panelNodes = judged.map(({ node, tau }) => {
     // A panel-less judgement is the M=1 skeleton selecting the author's own
     // number: one voice, zero of them non-author. Reported, never thrown.
     const voiceCount = node.panel?.voiceCount ?? 1;
     const nonAuthorVoiceCount = node.panel?.nonAuthorVoiceCount ?? 0;
     return Object.freeze({
       nodeId: node.nodeId,
-      tau: node.tau,
+      tau,
       voiceCount,
       nonAuthorVoiceCount,
       singleVoicePanel: nonAuthorVoiceCount === 0
@@ -237,16 +263,20 @@ export function deriveDefinitionOfDoneFacts(input: DefinitionOfDoneFactsInput): 
     .map((node) => node.nodeId)
     .sort();
 
-  const attackEdges = input.edges.filter((edge) => edge.polarity === "attack");
+  const carriesMagnitude = (edge: DefinitionOfDoneEdgeInput): boolean =>
+    edge.magnitudeStatus === "MEASURED";
+  // FAIR-01's population, by FAIR-01's rule (`acceptance/fair-debate.ts:122`).
+  const fairDebateAttackEdges = input.edges.filter(
+    (edge) => edge.polarity === "attack" && edge.targetKind === "NODE"
+  );
 
-  const roots = input.nodes
-    .filter((node) => node.depth === 0)
-    .map((node) => Object.freeze({
+  const roots = judged
+    .filter(({ node }) => node.depth === 0)
+    .map(({ node, tau }) => Object.freeze({
       nodeId: node.nodeId,
-      // Non-null by construction: the tau refusal above ran over every node.
-      tau: node.tau as number,
+      tau,
       finalStrength: node.finalStrength,
-      finalDiffersFromTau: node.finalStrength !== null && node.finalStrength !== node.tau
+      finalDiffersFromTau: node.finalStrength !== null && node.finalStrength !== tau
     }));
   const rootFinalDiffersWitnessNodeId = roots
     .filter((root) => root.finalDiffersFromTau)
@@ -255,12 +285,18 @@ export function deriveDefinitionOfDoneFacts(input: DefinitionOfDoneFactsInput): 
 
   // A SURVIVING objection: it attacks something AND it still carries a
   // propagated number at the end of the debate
-  // (apps/runner/src/index.ts:3925-3928). A node without a number is excluded
-  // outright rather than sorted to the back.
-  const attackerNodeIds = new Set(attackEdges.map((edge) => edge.sourceNodeId));
+  // (apps/runner/src/index.ts:3925-3928). This is the RUNNER's population —
+  // any attack-polarity arrow, EDGE targets included — not FAIR-01's, because
+  // it is the runner's predicate the synthesizer's emphasis was built from.
+  // A node without a number is excluded outright rather than sorted to the back;
+  // the `flatMap` is what narrows `finalStrength` here (review M-7).
+  const attackerNodeIds = new Set(
+    input.edges.filter((edge) => edge.polarity === "attack").map((edge) => edge.sourceNodeId)
+  );
   const strongestSurvivingObjection = input.nodes
-    .filter((node) => node.finalStrength !== null && attackerNodeIds.has(node.nodeId))
-    .map((node) => Object.freeze({ nodeId: node.nodeId, finalStrength: node.finalStrength as number }))
+    .flatMap((node) => node.finalStrength !== null && attackerNodeIds.has(node.nodeId)
+      ? [Object.freeze({ nodeId: node.nodeId, finalStrength: node.finalStrength })]
+      : [])
     .sort(byStrengthThenId)[0] ?? null;
 
   const loopRounds = input.loopRounds.map((round) => Object.freeze({
@@ -290,8 +326,10 @@ export function deriveDefinitionOfDoneFacts(input: DefinitionOfDoneFactsInput): 
     panelNodes: Object.freeze(panelNodes),
     everyNodeHasNonAuthorVoice: panelNodes.every((node) => node.nonAuthorVoiceCount >= 1),
     singleVoicePanelNodeIds: Object.freeze(singleVoicePanelNodeIds),
-    attackEdgeCount: attackEdges.length,
-    attackEdgePresentMagnitudeCount: attackEdges.filter((edge) => edge.magnitudeStatus === "MEASURED").length,
+    edgeCount: input.edges.length,
+    edgePresentMagnitudeCount: input.edges.filter(carriesMagnitude).length,
+    fairDebateAttackEdgeCount: fairDebateAttackEdges.length,
+    fairDebateAttackEdgePresentMagnitudeCount: fairDebateAttackEdges.filter(carriesMagnitude).length,
     roots: Object.freeze(roots),
     aRootFinalDiffersFromTau: roots.some((root) => root.finalDiffersFromTau),
     rootFinalDiffersWitnessNodeId,
@@ -327,11 +365,16 @@ export function renderDefinitionOfDoneLines(facts: DefinitionOfDoneFacts): reado
     + ` · single-voice panel node ids: ${facts.singleVoicePanelNodeIds.join(",") || NONE}`,
 
     `${DEFINITION_OF_DONE_TOKENS.measuredEdges}:`
-    + ` ${facts.attackEdgePresentMagnitudeCount}/${facts.attackEdgeCount}`
-    + " attack edge(s) carry a PRESENT magnitude",
+    + ` ${facts.edgePresentMagnitudeCount}/${facts.edgeCount}`
+    + " edge(s) carry a PRESENT magnitude"
+    + " · by the FAIR-01 rule (attack polarity, NODE target):"
+    + ` ${facts.fairDebateAttackEdgePresentMagnitudeCount}/${facts.fairDebateAttackEdgeCount}`,
 
     `${DEFINITION_OF_DONE_TOKENS.rootFinalVersusTau}: ${facts.roots.length} root(s)`
-    + ` · a root's final strength left its tau: ${String(facts.aRootFinalDiffersFromTau)}`
+    // No apostrophe, deliberately: the content-law guard holds every printed
+    // line to the character set an id, a number, a mark or a row key can
+    // produce, and prose is not allowed to widen it.
+    + ` · a root final strength differs from its tau: ${String(facts.aRootFinalDiffersFromTau)}`
     + ` · witness node id: ${facts.rootFinalDiffersWitnessNodeId ?? NONE}`
     + ` · roots: ${JSON.stringify(facts.roots)}`,
 
@@ -376,7 +419,8 @@ interface NodeRow {
 
 interface EdgeRow {
   readonly source_node_id: string;
-  readonly polarity: string;
+  readonly polarity: EdgePolarity;
+  readonly target_kind: EdgeTargetKind;
   readonly magnitude_status: EdgeMagnitudeStatus;
 }
 
@@ -434,7 +478,7 @@ export async function readDefinitionOfDoneFacts(
       [request.runId]
     ),
     pool.query<EdgeRow>(
-      `SELECT source_node_id::text AS source_node_id, polarity, magnitude_status
+      `SELECT source_node_id::text AS source_node_id, polarity, target_kind, magnitude_status
        FROM core.edge WHERE run_id=$1 ORDER BY created_at_seq`,
       [request.runId]
     ),
@@ -455,6 +499,7 @@ export async function readDefinitionOfDoneFacts(
     edges: edgeRows.rows.map((row) => Object.freeze({
       sourceNodeId: row.source_node_id,
       polarity: row.polarity,
+      targetKind: row.target_kind,
       magnitudeStatus: row.magnitude_status
     })),
     loopRounds: roundRows.rows.map((row) => Object.freeze({
