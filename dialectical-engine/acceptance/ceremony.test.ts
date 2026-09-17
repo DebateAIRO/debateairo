@@ -658,12 +658,28 @@ describe("ACC-01 dry-run ceremony", () => {
     /* ------------------------------------------------------------------------
      * The Global definition of done, read off THIS settled run.
      *
-     * Every expectation below is against INDEPENDENT SQL over the four
-     * relations the clause names — never against a literal, and never against
-     * the reader's own query. A reader that agreed with itself would prove
-     * nothing; a reader that agrees with a hand-written join over
-     * `ledger.reduced_judgement`, `ledger.node_strength_record`,
-     * `serve.synthesis_round` and `core.edge` is reading the run.
+     * WHAT EACH ASSERTION BELOW IS WORTH — stated exactly, because the previous
+     * header claimed more than the block delivers (review M-4).
+     *
+     *   Sub-clauses (1), (2), (3), (5) and (6) are checked against INDEPENDENT
+     *   SQL: hand-written joins over `ledger.reduced_judgement`, `core.edge`,
+     *   `ledger.node_strength_record` + `ledger.propagation_run`, and
+     *   `serve.synthesis_round`, written here and not shared with the reader. A
+     *   reader that agreed with itself would prove nothing; a reader that agrees
+     *   with these is reading the run.
+     *
+     *   Sub-clauses (7) and (8) are PASSTHROUGH RESTATEMENTS, not SQL: they
+     *   compare `facts.*` against the same parsed `answer` the reader was
+     *   handed. What they can catch is the reader dropping, hardcoding or
+     *   mis-wiring a field — which is what mutants D5 and D6 exercise — not
+     *   whether serve derived the label and the band correctly. That is serve's
+     *   own suite's job, and re-deriving it here would be a second
+     *   implementation of a rule.
+     *
+     *   Six assertions are DELIBERATE FIXTURE LITERALS, each labelled at its
+     *   site: the edge counts, the "no root differs" pair, and the
+     *   non-self-graded pin. They record what THIS fixture does, so a change in
+     *   it is seen; they are not claims about the clause.
      * ---------------------------------------------------------------------- */
     const answer = AnswerSchema.parse(owned.json());
 
@@ -726,22 +742,36 @@ describe("ACC-01 dry-run ceremony", () => {
     // vacuous on a run whose every node were self-graded.
     expect(facts.everyNodeHasNonAuthorVoice).toBe(true);
 
-    // (2) measured edges — core.edge magnitudes on the attack arrows.
-    const edgeCounts = await database.pool.query<{ attacks: string; measured: string }>(
-      `SELECT count(*)::text AS attacks,
-              count(*) FILTER (WHERE magnitude_status='MEASURED')::text AS measured
-       FROM core.edge WHERE run_id=$1 AND polarity='attack'`,
+    // (2) measured edges — core.edge magnitudes, under BOTH counting rules the
+    // log now carries: every edge of the run, and FAIR-01's attack population
+    // (`acceptance/fair-debate.ts:122`), so the two lines can be reconciled.
+    const edgeCounts = await database.pool.query<{
+      edges: string; measured: string; fair_attacks: string; fair_measured: string;
+    }>(
+      `SELECT count(*)::text AS edges,
+              count(*) FILTER (WHERE magnitude_status='MEASURED')::text AS measured,
+              count(*) FILTER (WHERE polarity='attack' AND target_kind='NODE')::text AS fair_attacks,
+              count(*) FILTER (
+                WHERE polarity='attack' AND target_kind='NODE' AND magnitude_status='MEASURED'
+              )::text AS fair_measured
+       FROM core.edge WHERE run_id=$1`,
       [runId]
     );
-    expect(facts.attackEdgeCount).toBe(Number(edgeCounts.rows[0]?.attacks));
-    expect(facts.attackEdgePresentMagnitudeCount).toBe(Number(edgeCounts.rows[0]?.measured));
-    // THIS FIXTURE'S OUTCOME, pinned so a change in it is seen: every arrow in
-    // the dry run is a placeholder, so four attack edges carry ZERO present
-    // magnitudes. The reader REPORTS that and returns; an UNKNOWN magnitude is
-    // a definition-of-done outcome for the closing run's judge to weigh, never
-    // a shape violation this reader may refuse.
-    expect(facts.attackEdgeCount).toBe(4);
-    expect(facts.attackEdgePresentMagnitudeCount).toBe(0);
+    expect(facts.edgeCount).toBe(Number(edgeCounts.rows[0]?.edges));
+    expect(facts.edgePresentMagnitudeCount).toBe(Number(edgeCounts.rows[0]?.measured));
+    expect(facts.fairDebateAttackEdgeCount).toBe(Number(edgeCounts.rows[0]?.fair_attacks));
+    expect(facts.fairDebateAttackEdgePresentMagnitudeCount).toBe(Number(edgeCounts.rows[0]?.fair_measured));
+    // FIXTURE LITERALS, pinned so a change in them is seen: every arrow in the
+    // dry run is a placeholder, so NO edge carries a present magnitude, and the
+    // FAIR-01 population is the four attack edges `assertFairDebate` counted
+    // twenty lines above — the two rules agree on this run, as they must until
+    // something mints an EDGE-targeted arrow. The reader REPORTS all of it and
+    // returns; an UNKNOWN magnitude is a definition-of-done outcome for the
+    // closing run's judge to weigh, never a shape violation it may refuse.
+    expect(facts.edgeCount).toBe(8);
+    expect(facts.edgePresentMagnitudeCount).toBe(0);
+    expect(facts.fairDebateAttackEdgeCount).toBe(4);
+    expect(facts.fairDebateAttackEdgePresentMagnitudeCount).toBe(0);
 
     // (3) a root's final strength apart from its tau — depth 0 against the
     // latest propagation run, the LATERAL the served projection uses.

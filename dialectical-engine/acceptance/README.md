@@ -198,19 +198,27 @@ UI at `http://localhost:3000/debate/<run-id>` can browse the settled debate
 #### The definition-of-done report
 
 The Global definition of done
-(`.hermes/reports/2026-09-01-algorithm-live-loop/slices/S12-closure/SPEC.md:36-40`)
+(`.hermes/reports/2026-09-01-algorithm-live-loop/slices/S12-closure/SPEC.md:37-41`)
 names nine sub-clauses. The ceremony prints **one line per sub-clause**, each led by a
 stable, unique token. Sub-clauses 4 and 9 — the recorded ceiling and the
 envelope state at terminal — keep the `T17 envelope at terminal` line they have
 always had; the rest are read by `acceptance/dod-facts.ts` and printed on the
-same `console.info` stream, which `tools/closing-run.sh` captures verbatim into
-`logs/closing-run/ceremony-*.log`. The tokens are fixed: a token that moved
-would invalidate every log captured before it moved.
+same `console.info` stream, which
+`.hermes/reports/2026-09-01-algorithm-live-loop/tools/closing-run.sh:20,36`
+captures verbatim into `logs/closing-run/ceremony-*.log`. The tokens are fixed:
+a token that moved would invalidate every log captured before it moved.
+
+The DoD lines are printed **last, after every other report line**, and the
+reader that produces them runs only once those lines are on the log. That order
+is deliberate and is pinned by `acceptance/run-acceptance.test.ts`: the reader
+issues three queries and can refuse by a typed code, and the ceremony's `catch`
+closes the stack and rethrows, so a reader that ran first could cost a settled
+closing run its entire report.
 
 | Token | Sub-clause | What the line carries |
 | --- | --- | --- |
 | `DOD-1 panel-reduced-tau` | panel-reduced τ, non-self-graded | node count, whether every τ had a non-author voice, the node ids of any single-voice panel |
-| `DOD-2 measured-edges` | measured edges | attack-edge count and how many carry a PRESENT magnitude |
+| `DOD-2 measured-edges` | measured edges | **two counts**: how many of *every* `core.edge` of the run carry a PRESENT magnitude (the clause's own reading), then the same over the attack edges **FAIR-01 counts** — `polarity='attack' AND target_kind='NODE'` (`fair-debate.ts:122`). The `FAIR-01 graph` line six lines earlier prints that second population, so one log never carries two attack-edge counts by unstated rules. Nothing mints an EDGE-targeted arrow today, so the two agree; the day an undercutting arrow is minted they will not, and the line says which is which. |
 | `DOD-3 root-final-vs-tau` | a root's final strength ≠ τ | root count, whether one differs, the witness node id, and each root's τ / final |
 | `DOD-5 surviving-objection` | the statement acknowledging the strongest surviving objection | the strongest survivor's node id and final strength (or `none`), whether the last evaluator round was satisfied, and whether `SYNTHESIS-OBJECTION-STANDING` rides the answer |
 | `DOD-6 evaluator-loop` | the evaluator loop record | rounds recorded / the sealed `evaluatorLoopMaxRounds`, and each round's number, stage and verdict |
