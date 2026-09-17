@@ -575,10 +575,16 @@ describe("SUP-01 deterministic support classifier", () => {
     ["Where is the password reset page?","en"],
     ["Where can I find the link to recover my password?","en"],
     ["Can you show me the recovery page for my password?","en"],
+    ["Can you check where the password reset page is?","en"],
+    ["I do not want to validate a reset token; show me the password recovery page.","en"],
+    ["Where is the password reset page? Support cannot perform the reset.","en"],
     ["Show the p%61ssword recovery link.","en"],
     ["Vreau linkul de recuperare a parolei","ro"],
     ["Unde este pagina pentru resetarea parolei?","ro"],
     ["Unde găsesc linkul pentru a-mi recupera parola?","ro"],
+    ["Verifică unde este pagina de resetare a parolei.","ro"],
+    ["Nu vreau să validez tokenul de resetare; arată pagina de recuperare a parolei.","ro"],
+    ["Unde este pagina de resetare a parolei? Asistența nu poate efectua resetarea.","ro"],
     ["Arată pagina pentru recuperarea p%61rolei.","ro"]
   ] as const)("classifies deterministic Forgot password before generic rules: %s", (message,language) => {
     expect(classifySupportMessage(message)).toEqual({
@@ -611,7 +617,8 @@ describe("SUP-01 deterministic support classifier", () => {
     "Use the password reset button to submit a reset for me",
     "Where is the page to validate my password reset token?",
     "Poate pagina de resetare a parolei să valideze tokenul meu de resetare?",
-    "Unde este pagina pentru validarea tokenului de resetare a parolei?"
+    "Unde este pagina pentru validarea tokenului de resetare a parolei?",
+    "Unde este pagina pentru validarea codului de recuperare a parolei?"
   ])("keeps reset execution and token validation out of navigation: %s", (message) => {
     expect(classifySupportMessage(message)).toMatchObject({
       outcome:"REFUSE_ZONE",link:"/settings"

@@ -131,7 +131,12 @@ describe("CP1 composed answer context", () => {
     expect(complete).not.toHaveBeenCalled();
   });
 
-  it("grounds a reviewed identity-fact paraphrase through the actual service on the admitted corpus", async () => {
+  it.each([
+    "Is Dialectical Engine a reasoning instrument?",
+    "Give me an overview of dialecticalengine."
+  ])("grounds a reviewed identity paraphrase through the actual service on the admitted corpus: %s", async (
+    text
+  ) => {
     const snapshot = admittedCorpus();
     const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
       kind:"answer",text:"Dialectical Engine is a reasoning instrument.",
@@ -144,7 +149,7 @@ describe("CP1 composed answer context", () => {
     });
 
     const result = await service.respond({
-      ...request(snapshot),text:"Is Dialectical Engine a reasoning instrument?"
+      ...request(snapshot),text
     });
 
     expect(complete).toHaveBeenCalledOnce();

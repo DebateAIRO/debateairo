@@ -1938,19 +1938,24 @@ describe("SUP-01 support routes", () => {
     await server.close();
   });
 
-  it.each([
+  it.each(([
     ["Forgot password","en"],
     ["Am uitat parola","ro"],
     ["Give me the password recovery link","en"],
     ["Where is the password reset page?","en"],
     ["Where can I find the link to recover my password?","en"],
+    ["Can you check where the password reset page is?","en"],
+    ["I do not want to validate a reset token; show me the password recovery page.","en"],
     ["Show the p%61ssword recovery link.","en"],
     ["Vreau linkul de recuperare a parolei","ro"],
     ["Unde este pagina pentru resetarea parolei?","ro"],
     ["Unde găsesc linkul pentru a-mi recupera parola?","ro"],
+    ["Verifică unde este pagina de resetare a parolei.","ro"],
+    ["Nu vreau să validez tokenul de resetare; arată pagina de recuperare a parolei.","ro"],
     ["Arată pagina pentru recuperarea p%61rolei.","ro"]
-  ] as const)("returns canonical deterministic unresolved Forgot password guidance without a model: %s", async (
-    requestText,language
+  ] as const).map((item,index) => [...item,`203.0.113.${100 + index}`] as const))(
+  "returns canonical deterministic unresolved Forgot password guidance without a model: %s", async (
+    requestText,language,clientIp
   ) => {
     const respond = vi.fn<SupportAnswerPort["respond"]>();
     const write = vi.fn(async (input: Parameters<SupportMessageCipherPort["write"]>[0]) =>
@@ -1962,9 +1967,9 @@ describe("SUP-01 support routes", () => {
         writeAndTransit: vi.fn(),read: vi.fn(async () => null),listSession: vi.fn(async () => [])
       }) as never
     });
-    const opened = await openSession(server,language === "en" ? "203.0.113.211" : "203.0.113.212");
+    const opened = await openSession(server,clientIp);
     const response = await sendMessage(
-      server,opened.body,requestText,language === "en" ? "203.0.113.211" : "203.0.113.212"
+      server,opened.body,requestText,clientIp
     );
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
@@ -1977,17 +1982,19 @@ describe("SUP-01 support routes", () => {
     await server.close();
   });
 
-  it.each([
+  it.each(([
     ["Where is the page to validate my password reset token?","en"],
-    ["Unde este pagina pentru validarea tokenului de resetare a parolei?","ro"]
-  ] as const)("keeps reset-token operations in the fixed security refusal: %s", async (
-    requestText,language
+    ["Unde este pagina pentru validarea tokenului de resetare a parolei?","ro"],
+    ["Unde este pagina pentru validarea codului de recuperare a parolei?","ro"]
+  ] as const).map((item,index) => [...item,`203.0.113.${180 + index}`] as const))(
+  "keeps reset-token operations in the fixed security refusal: %s", async (
+    requestText,language,clientIp
   ) => {
     const respond = vi.fn<SupportAnswerPort["respond"]>();
     const server = api(true,{ answerPort:Object.freeze({ respond }) });
-    const opened = await openSession(server,language === "en" ? "203.0.113.215" : "203.0.113.216");
+    const opened = await openSession(server,clientIp);
     const response = await sendMessage(
-      server,opened.body,requestText,language === "en" ? "203.0.113.215" : "203.0.113.216"
+      server,opened.body,requestText,clientIp
     );
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({

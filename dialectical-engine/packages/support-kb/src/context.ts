@@ -40,7 +40,7 @@ const STOP_WORDS = new Set([
 
 const PRODUCT_ALIAS_SOURCE = String.raw`\b(?:dialectical(?:[\s-]*engine)|debate\s*airo)\b`;
 const PRODUCT_OVERVIEW_WORDS = new Set([
-  "about","agent","answer","cannot","cant","define","describe","does","explain","feature","features",
+  "about","agent","answer","cannot","cant","define","describe","does","explain","feature","features","give",
   "identity","mean","meaning","overview","product","purpose","question","questions","support",
   "tell","use","used","what","why",
   "asistent","asistentul","capabilitati","despre","explica","face","folosit","folosita",

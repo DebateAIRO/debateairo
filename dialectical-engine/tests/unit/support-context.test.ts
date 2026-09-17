@@ -358,6 +358,7 @@ describe("Support knowledge context", () => {
   it.each([
     ["en" as const,"Is Dialectical Engine a reasoning instrument?","product-identity"],
     ["en" as const,"Is DebateAIRO an AI debate tool?","product-identity"],
+    ["en" as const,"Give me an overview of dialecticalengine.","product-identity"],
     ["ro" as const,"Este Dialectical Engine un instrument de raționament?","product-identity"],
     ["en" as const,"What does Dialectical Engine Support status show?","support-status-limits"],
     ["en" as const,"How do I view a public debate in DebateAIRO?","view-public-debate"],
