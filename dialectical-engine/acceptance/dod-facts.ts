@@ -4,7 +4,8 @@ import { SYNTHESIS_OBJECTION_STANDING_MARK } from "@debateai/serve";
 
 /**
  * The Global definition of done, read off a settled run and printed by the
- * acceptance ceremony (`slices/S12-closure/SPEC.md:33-45`):
+ * acceptance ceremony
+ * (`.hermes/reports/2026-09-01-algorithm-live-loop/slices/S12-closure/SPEC.md:36-40`):
  *
  *   Full multi-maker acceptance run (M>=2, depth>=2) completes with: panel-reduced
  *   tau (non-self-graded), measured edges, at least one root's final strength != tau,
@@ -408,7 +409,7 @@ function readPanel(disagreement: Readonly<Record<string, unknown>> | null): Defi
  *
  * "Latest" is the served definition in both cases: the judgement is the last by
  * `at_seq`, and the strength is the last propagation run's
- * (`packages/serve/src/index.ts:3336-3342`).
+ * (`packages/serve/src/index.ts:3331-3336`).
  */
 export async function readDefinitionOfDoneFacts(
   pool: Pool,

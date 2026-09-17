@@ -197,8 +197,9 @@ UI at `http://localhost:3000/debate/<run-id>` can browse the settled debate
 
 #### The definition-of-done report
 
-The Global definition of done (`slices/S12-closure/SPEC.md:33-45`) names nine
-sub-clauses. The ceremony prints **one line per sub-clause**, each led by a
+The Global definition of done
+(`.hermes/reports/2026-09-01-algorithm-live-loop/slices/S12-closure/SPEC.md:36-40`)
+names nine sub-clauses. The ceremony prints **one line per sub-clause**, each led by a
 stable, unique token. Sub-clauses 4 and 9 — the recorded ceiling and the
 envelope state at terminal — keep the `T17 envelope at terminal` line they have
 always had; the rest are read by `acceptance/dod-facts.ts` and printed on the
