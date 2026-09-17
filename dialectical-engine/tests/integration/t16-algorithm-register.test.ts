@@ -525,15 +525,21 @@ describe("T16 sealed-version identity — historical versions are never re-opene
    * D77 (c) · O2 — what a STANDING ceremony database does with the refit.
    *
    * `seedAcceptanceRegister` imports the ceremony rows into a PINNED version
-   * (`ACCEPTANCE_REGISTER_VERSION`) through `importHistorical`, and that path
-   * is replay-only: a version that already exists must match the supplied
-   * snapshot byte for byte (`migrations/0055_register_support_publication.sql:1343-1372`).
-   * So the seed NEVER overwrites a sealed row. A standing `.pgdata` holding the
-   * pre-refit delta/epsilon refuses the refit LOUDLY and keeps its sealed rows —
-   * the operator resets the standing data directory (acceptance/README.md:44-46,163-165)
-   * or the pinned version is raised. This test is the measurement that claim rests on.
+   * (`ACCEPTANCE_REGISTER_VERSION`) through `importHistorical`, and that path is
+   * replay-only: a version that already exists must match the supplied snapshot
+   * byte for byte (`migrations/0055_register_support_publication.sql:1343-1374`).
+   * Sealed therefore means immutable PER VERSION — the seed can neither
+   * overwrite nor merge — so a refit IS a new version. The pin moves and the
+   * owner's standing version is left exactly as their run left it, instead of
+   * the standing data directory being reset and the run database destroyed.
+   *
+   * The version below is a LITERAL, never the pin: it is the version the
+   * owner's standing database holds (the 2026-09-17 run `d7b73d79`), and it
+   * must keep saying 2 the next time the pin moves.
    */
-  it("refuses the refit on a standing ceremony version sealed with the pre-refit thresholds", async () => {
+  const STANDING_ACCEPTANCE_REGISTER_VERSION = 2;
+
+  it("mints the refit beside a standing version sealed with the pre-refit thresholds", async () => {
     const supersededRef = `${ACCEPTANCE_ALGORITHM_SOURCE_REF}+${RULING_GOAL}`;
     const standingRows = (await buildAcceptanceRegisterPublicationRows()).map((row) => {
       if (row.rowKey === "globalStopDelta") {
@@ -544,17 +550,49 @@ describe("T16 sealed-version identity — historical versions are never re-opene
       }
       return row;
     });
-    await importHistoricalRegisterFixture(database.pool, ACCEPTANCE_REGISTER_VERSION, standingRows);
-    const before = await readVersionSnapshot(ACCEPTANCE_REGISTER_VERSION);
+    await importHistoricalRegisterFixture(
+      database.pool, STANDING_ACCEPTANCE_REGISTER_VERSION, standingRows
+    );
+    const before = await readVersionSnapshot(STANDING_ACCEPTANCE_REGISTER_VERSION);
 
-    await expect(seedAcceptanceRegister(database.pool)).rejects.toThrow(/historical replay drift/u);
+    const receipt = await seedAcceptanceRegister(database.pool);
 
-    // Sealed means sealed: the standing rows are untouched, and the run that
-    // would follow still reads the OLD pair until the operator acts.
-    expect(await readVersionSnapshot(ACCEPTANCE_REGISTER_VERSION)).toEqual(before);
+    // The refit lands in a NEW sealed version beside the standing one.
+    expect(ACCEPTANCE_REGISTER_VERSION).toBeGreaterThan(STANDING_ACCEPTANCE_REGISTER_VERSION);
+    const current = await readVersionSnapshot(ACCEPTANCE_REGISTER_VERSION);
+    expect(current.version).toEqual({ row_count: receipt.rowCount, sealed: true });
+    // Never re-opened: the owner's run database keeps the pair its run used.
+    expect(await readVersionSnapshot(STANDING_ACCEPTANCE_REGISTER_VERSION)).toEqual(before);
+
+    const policy = await loadAlgorithmPolicy();
+    await expect(
+      policy.readAdaptiveStoppingControls(database.pool, STANDING_ACCEPTANCE_REGISTER_VERSION)
+    ).resolves.toMatchObject({ delta: 0.02, epsilon: 0.01 });
+    const refitted = await policy.readAdaptiveStoppingControls(database.pool, ACCEPTANCE_REGISTER_VERSION);
+    expect(refitted).toMatchObject({ delta: 0.01, epsilon: 0.005 });
+    expect(refitted.sourceRefs).toEqual({
+      globalStopDelta: `${ACCEPTANCE_ALGORITHM_SOURCE_REF}+${RULING_D77}`,
+      branchFreezeEpsilon: `${ACCEPTANCE_ALGORITHM_SOURCE_REF}+${RULING_D77}`
+    });
+  }, 120_000);
+
+  it("seeds a FRESH ceremony database at the pin alone, inventing no earlier version", async () => {
+    const receipt = await seedAcceptanceRegister(database.pool);
+
+    const current = await readVersionSnapshot(ACCEPTANCE_REGISTER_VERSION);
+    expect(current.version).toEqual({ row_count: receipt.rowCount, sealed: true });
+    // `import_historical_register_version` creates exactly the version it is
+    // given: no base, no contiguity requirement, nothing below it imported
+    // (`migrations/0055_register_support_publication.sql:1343-1409`). So on a
+    // fresh database the versions under the pin simply never exist.
+    for (const absent of [1, STANDING_ACCEPTANCE_REGISTER_VERSION]) {
+      const snapshot = await readVersionSnapshot(absent);
+      expect(snapshot.version, `version ${absent}`).toBeUndefined();
+      expect(snapshot.rows, `version ${absent}`).toEqual([]);
+    }
     const policy = await loadAlgorithmPolicy();
     await expect(policy.readAdaptiveStoppingControls(database.pool, ACCEPTANCE_REGISTER_VERSION))
-      .resolves.toMatchObject({ delta: 0.02, epsilon: 0.01 });
+      .resolves.toMatchObject({ delta: 0.01, epsilon: 0.005 });
   }, 120_000);
 });
 

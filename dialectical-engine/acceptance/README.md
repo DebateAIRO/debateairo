@@ -42,8 +42,9 @@ choices. `configuredProviderSet` now lists all three providers
 provenance `acceptance:DR-177:V-approved`, so the deployment maker-capability
 read honestly reports 3 configured makers; `requiredDistinctMakers` stays 1 per
 DR-137. Seed freshness stays loud: a standing `.pgdata` seeded before FAIR-02
-stops with `ACCEPTANCE_REGISTER_CONFLICT:configuredProviderSet` — reset the
-standing data directory rather than mutating sealed rows.
+stops with `ACCEPTANCE_REGISTER_CONFLICT:configuredProviderSet`. Sealed rows are
+never mutated — see **The ceremony register version** below for what to do
+instead.
 
 **Which CLI a maker relay runs (D10).** Nothing in this directory names a path
 to a binary; where a maker's CLI lives is a fact about THIS host and is deduced
@@ -161,8 +162,26 @@ A runner composed for the fair debate WITHOUT the ruled row still stops
 loudly with `SCORING_OPERATOR_UNRESOLVED` before any claim or model call
 (AC-76/DR-039 — never invented). NOTE: the seed's row count changed, so a
 standing `.pgdata` sealed before DR-144 stops with
-`ACCEPTANCE_REGISTER_VERSION_CONFLICT` — reset the standing acceptance data
-directory before the live gate.
+`ACCEPTANCE_REGISTER_VERSION_CONFLICT` — see **The ceremony register version**
+below.
+
+**The ceremony register version.** `ACCEPTANCE_REGISTER_VERSION`
+(`seed-register.ts`) is the version the ceremony seeds and reads, and it is
+**3** since ruling D77 (c) refitted `globalStopDelta` to 0.01 and
+`branchFreezeEpsilon` to 0.005. `seedAcceptanceRegister` carries the rows in
+through `importHistorical`, which is replay-only: a version that already exists
+must match the supplied snapshot byte for byte, or the seed stops with
+`REGISTER_PUBLICATION_SEAL_INVALID: historical replay drift`. **Sealed means
+immutable per version, so a changed row-set is a NEW version, not an edit and
+not a reset** — raising the pin mints the new version beside the old ones and a
+standing `.pgdata` keeps every earlier version exactly as the run that used it
+left it. (Version 2 is what the 2026-09-17 run `d7b73d79` read; version 1
+predates the T16 lane.) Resetting the standing acceptance data directory is
+therefore **no longer the only way** past a seed-freshness stop, and it destroys
+the run database — prefer raising the pin. Reset only when you actually want a
+database with no history. One caveat: `importHistorical` refuses any version
+above 4, so after 3 exactly one rung is left before the seeding path itself has
+to change.
 
 DR-182 makes every nonempty discovered panel lawful at every risk tier. A mono
 answer serves with `SINGLE-LINEAGE` / `CRITIQUE-UNAVAILABLE`, the ruled lower
