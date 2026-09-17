@@ -295,6 +295,7 @@ apps/ui/lib/observability/suspiciousScoring.ts
 apps/ui/lib/privacyPolicy.ts
 apps/ui/lib/publicDebatePresentation.test.mjs
 apps/ui/lib/publicDebatePresentation.ts
+apps/ui/lib/recommendation.test.mjs
 apps/ui/lib/recommendation.ts
 apps/ui/lib/returnPath.ts
 apps/ui/lib/scoring/scoringResponseSpecification.ts
