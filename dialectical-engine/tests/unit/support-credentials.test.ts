@@ -3,6 +3,31 @@ import { describe,expect,it } from "vitest";
 import { analyzeSupportCredentialText } from "../../packages/kernel/src/support-credentials.js";
 
 describe("Support credential lexical facts", () => {
+  const romanianCodeNouns = ["cod","codul","codului","coduri","codurile","codurilor"] as const;
+  const romanianNamedCodeKinds = [
+    ["recuperare","recovery-code"],
+    ["verificare","verification-code"],
+    ["securitate","security-code"],
+    ["autentificare","authentication-code"]
+  ] as const;
+
+  it.each(romanianCodeNouns.flatMap((noun) => romanianNamedCodeKinds.map(([category,kind]) => [
+    `${noun} de ${category}`,kind
+  ] as const)))("recognizes the shipped Romanian code category %s", (text,kind) => {
+    expect(analyzeSupportCredentialText(text).credentialTerms).toEqual([
+      expect.objectContaining({ kind,start: 0,end: text.length })
+    ]);
+  });
+
+  it.each([
+    ["coduri TOTP","totp"],
+    ["codurilor MFA","mfa"],
+    ["codului OTP","otp"]
+  ] as const)("recognizes the Romanian code noun in acronym category %s", (text,kind) => {
+    expect(analyzeSupportCredentialText(text).credentialTerms)
+      .toEqual([expect.objectContaining({ kind })]);
+  });
+
   it.each([
     ["password","My password is inert-orchid-7","inert-orchid-7"],
     ["password","Passwordul meu este inert-stejar-7","inert-stejar-7"],
@@ -105,8 +130,11 @@ describe("Support credential lexical facts", () => {
     "Asistența nu cere parole, plus le poate primi.",
     "Asistența nu cere parole, în plus le poate primi.",
     "Asistența nu cere parole, de asemenea le poate primi."
+    ,"Asistența nu cere coduri de autentificare; de asemenea le poate valida."
   ])("starts a separate positive modal or auxiliary operation group: %s", (text) => {
-    expect(analyzeSupportCredentialText(text).operations.some(({ negated }) => !negated)).toBe(true);
+    const facts = analyzeSupportCredentialText(text);
+    expect(facts.credentialTerms.length).toBeGreaterThan(0);
+    expect(facts.operations.some(({ negated }) => !negated)).toBe(true);
   });
 
   it.each([
@@ -116,6 +144,7 @@ describe("Support credential lexical facts", () => {
     "Support does not request passwords, moreover it does not use them.",
     "Asistența nu cere parole, în plus nu le primește.",
     "Asistența nu cere parole, de asemenea nu le verifică."
+    ,"Asistența nu cere coduri de autentificare; de asemenea nu le poate valida."
   ])("keeps each additive operation group independently negated: %s", (text) => {
     const operations = analyzeSupportCredentialText(text).operations;
     expect(operations.length).toBeGreaterThan(1);

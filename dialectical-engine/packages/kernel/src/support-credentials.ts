@@ -48,20 +48,36 @@ type NormalizedText = Readonly<{
 
 type Scope = Readonly<{ start: number;end: number;sentence: number }>;
 
+const ROMANIAN_CODE_NOUN_PATTERN = String.raw`cod(?:ul|ului|uri|urile|urilor)?`;
+
 const TERM_PATTERNS: readonly Readonly<{
   kind: SupportCredentialKind;pattern: RegExp;
 }>[] = Object.freeze([
-  { kind: "recovery-code",pattern: /\b(?:recovery\s+codes?|cod(?:ul|urile)?\s+de\s+recuperare)\b/giu },
-  { kind: "verification-code",pattern: /\b(?:verification\s+codes?|cod(?:ul|urile)?\s+de\s+verificare)\b/giu },
-  { kind: "security-code",pattern: /\b(?:security\s+codes?|cod(?:ul|urile)?\s+de\s+securitate)\b/giu },
-  { kind: "authentication-code",pattern: /\b(?:authentication\s+codes?|cod(?:ul|urile)?\s+de\s+autentificare)\b/giu },
+  { kind: "recovery-code",pattern: new RegExp(
+    String.raw`\b(?:recovery\s+codes?|${ROMANIAN_CODE_NOUN_PATTERN}\s+de\s+recuperare)\b`,"giu"
+  ) },
+  { kind: "verification-code",pattern: new RegExp(
+    String.raw`\b(?:verification\s+codes?|${ROMANIAN_CODE_NOUN_PATTERN}\s+de\s+verificare)\b`,"giu"
+  ) },
+  { kind: "security-code",pattern: new RegExp(
+    String.raw`\b(?:security\s+codes?|${ROMANIAN_CODE_NOUN_PATTERN}\s+de\s+securitate)\b`,"giu"
+  ) },
+  { kind: "authentication-code",pattern: new RegExp(
+    String.raw`\b(?:authentication\s+codes?|${ROMANIAN_CODE_NOUN_PATTERN}\s+de\s+autentificare)\b`,"giu"
+  ) },
   { kind: "reset-token",pattern: /\b(?:reset\s+tokens?|token(?:ul|urile)?\s+de\s+resetare)\b/giu },
   { kind: "credentials",pattern: /\b(?:credentials?|date(?:le)?\s+de\s+autentificare)\b/giu },
   { kind: "authenticator",pattern: /\b(?:authenticator(?:\s+codes?)?|autentificator(?:ul|ele|ului)?(?:\s+codes?)?)\b/giu },
   { kind: "passcode",pattern: /\bpasscodes?\b/giu },
-  { kind: "totp",pattern: /\b(?:(?:cod(?:ul|urile)?\s+)?totp(?:\s+codes?)?)\b/giu },
-  { kind: "mfa",pattern: /\b(?:(?:cod(?:ul|urile)?\s+)?mfa(?:\s+codes?)?)\b/giu },
-  { kind: "otp",pattern: /\b(?:(?:cod(?:ul|urile)?\s+)?otp(?:s|ul|urile)?(?:\s+codes?)?)\b/giu },
+  { kind: "totp",pattern: new RegExp(
+    String.raw`\b(?:(?:${ROMANIAN_CODE_NOUN_PATTERN}\s+)?totp(?:\s+codes?)?)\b`,"giu"
+  ) },
+  { kind: "mfa",pattern: new RegExp(
+    String.raw`\b(?:(?:${ROMANIAN_CODE_NOUN_PATTERN}\s+)?mfa(?:\s+codes?)?)\b`,"giu"
+  ) },
+  { kind: "otp",pattern: new RegExp(
+    String.raw`\b(?:(?:${ROMANIAN_CODE_NOUN_PATTERN}\s+)?otp(?:s|ul|urile)?(?:\s+codes?)?)\b`,"giu"
+  ) },
   { kind: "password",pattern: /\b(?:password(?:s|ul|urile)?|parol(?:a|e|ele|ei|elor)?)\b/giu }
 ]);
 

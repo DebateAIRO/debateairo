@@ -27,6 +27,9 @@ describe("CP1 Support credential redaction", () => {
     ["My pass\u200Bword is inert-birch-7","inert-birch-7"],
     ["Paro\u200Bla mea este inert-fag-7","inert-fag-7"],
     ["Codurile de recuperare sunt INERTRECOVERY","INERTRECOVERY"],
+    ["Coduri de autentificare: INERTAUTHCODES","INERTAUTHCODES"],
+    ["Codului de verificare = INERTVERIFY","INERTVERIFY"],
+    ["Codurilor de securitate: INERTSECURITY","INERTSECURITY"],
     ["Datele de autentificare sunt INERTAUTH","INERTAUTH"]
     ,['My password is "inert horse battery".',"inert horse battery"]
     ,["Parola mea este „inert cal albastru”.","inert cal albastru"]

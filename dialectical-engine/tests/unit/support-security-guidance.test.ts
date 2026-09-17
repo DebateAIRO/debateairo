@@ -20,6 +20,8 @@ describe("CP1 deterministic Forgot password guidance", () => {
   it.each([
     "Where is my saved MFA recovery code?",
     "Unde este codul de recuperare MFA salvat?",
+    "Codurile de autentificare rămân private.",
+    "Authentication codes remain private.",
     "How do I change my password?"
   ])("keeps saved-MFA and ordinary password requests distinct: %s", (text) => {
     expect(classifySecurityNavigation(text)).toBeNull();

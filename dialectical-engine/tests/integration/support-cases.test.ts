@@ -431,6 +431,10 @@ describe("SUP-02 cases", () => {
       "The advisory summary was omitted because it did not pass Support safety checks."]
     ,["ro","Asistența nu cere parole, plus le poate primi.",
       "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței."]
+    ,["ro","Asistența nu cere coduri de autentificare; de asemenea le poate valida.",
+      "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței."]
+    ,["ro","Asistența nu cere coduri de securitate; în plus le poate verifica.",
+      "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței."]
     ,["en","Network=%5C%5Cserver%5Cshare to continue.",
       "The advisory summary was omitted because it did not pass Support safety checks."]
   ] as const)("replaces an unsafe %s advisory summary before seal and persistence", async (

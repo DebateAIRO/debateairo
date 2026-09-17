@@ -309,6 +309,8 @@ describe("CP1 composed answer context", () => {
     "Support does not request passwords, in addition it accepts them.",
     "Asistența nu cere parole, plus le poate primi.",
     "Asistența nu cere parole, în plus le poate primi.",
+    "Asistența nu cere coduri de autentificare; de asemenea le poate valida.",
+    "Asistența nu cere coduri de securitate; în plus le poate verifica.",
     "Network=%5C%5Cserver%5Cshare to continue."
   ])("keeps a rejected transformed completion out of assistant storage and return: %s", async (
     hostile

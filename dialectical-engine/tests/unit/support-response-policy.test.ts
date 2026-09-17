@@ -171,6 +171,10 @@ describe("CP1 support model response policy", () => {
     "Asistența nu cere parole, plus le poate primi.",
     "Asistența nu cere parole, în plus le poate primi.",
     "Asistența nu cere parole, de asemenea le poate primi."
+    ,"Asistența nu cere coduri de recuperare; de asemenea le poate valida."
+    ,"Asistența nu cere coduri de verificare; de asemenea le poate valida."
+    ,"Asistența nu cere coduri de securitate; de asemenea le poate valida."
+    ,"Asistența nu cere coduri de autentificare; de asemenea le poate valida."
   ])("rejects a positive credential operation in a new modal group: %s", (text) => {
     expect(parseSupportDraft(raw(text,{ actionIds: [] }))).toBeNull();
     expect(parseSupportCaseSummaryDraft(JSON.stringify({
@@ -185,6 +189,10 @@ describe("CP1 support model response policy", () => {
     "Support does not request passwords, moreover it does not use them.",
     "Asistența nu cere parole, în plus nu le primește.",
     "Asistența nu cere parole, de asemenea nu le verifică."
+    ,"Asistența nu cere coduri de recuperare; de asemenea nu le poate valida."
+    ,"Asistența nu cere coduri de verificare; de asemenea nu le poate valida."
+    ,"Asistența nu cere coduri de securitate; de asemenea nu le poate valida."
+    ,"Asistența nu cere coduri de autentificare; de asemenea nu le poate valida."
   ])("accepts independently negated additive operation groups: %s", (text) => {
     expect(parseSupportDraft(raw(text,{ actionIds: [] }))).not.toBeNull();
     expect(parseSupportCaseSummaryDraft(JSON.stringify({
