@@ -43,13 +43,13 @@ check_bin() {
   local name=$1 path=$2 real rc version
   if [ -z "$path" ]; then echo "PREFLIGHT $name: NOT FOUND on PATH and no ACCEPTANCE_${name}_BINARY exported"; return 1; fi
   real=$(readlink -f "$path" 2>/dev/null || echo "$path")
-  if [ ! -e "$real" ]; then echo "PREFLIGHT $name: $path -> $real does not exist (dangling launcher)"; return 1; fi
-  if [ ! -s "$real" ]; then echo "PREFLIGHT $name: $path -> $real is EMPTY (an interrupted install or update; reinstall, or export ACCEPTANCE_${name}_BINARY=<a complete build>)"; return 1; fi
-  if [ ! -x "$real" ]; then echo "PREFLIGHT $name: $path -> $real is not executable"; return 1; fi
-  if ! is_program "$real"; then echo "PREFLIGHT $name: $path -> $real is NOT A PROGRAM (no shebang, no Mach-O header) — NOT executed; its content was overwritten, reinstall it"; return 1; fi
+  if [ ! -e "$real" ]; then echo "PREFLIGHT $name: $path → $real does not exist (dangling launcher)"; return 1; fi
+  if [ ! -s "$real" ]; then echo "PREFLIGHT $name: $path → $real is EMPTY (an interrupted install or update; reinstall, or export ACCEPTANCE_${name}_BINARY=<a complete build>)"; return 1; fi
+  if [ ! -x "$real" ]; then echo "PREFLIGHT $name: $path → $real is not executable"; return 1; fi
+  if ! is_program "$real"; then echo "PREFLIGHT $name: $path → $real is NOT A PROGRAM (no shebang, no Mach-O header) — NOT executed; its content was overwritten, reinstall it"; return 1; fi
   version=$("$path" --version </dev/null 2>&1 | head -1); rc=${PIPESTATUS[0]}
   if [ "$rc" -ge 126 ]; then echo "PREFLIGHT $name: $path cannot be executed (exit $rc): $version"; return 1; fi
-  echo "PREFLIGHT $name: OK $path -> $real · ${version:-<no version line>}"; return 0
+  echo "PREFLIGHT $name: OK $path → $real · ${version:-<no version line>}"; return 0
 }
 RUNNABLE=0
 check_bin CLAUDE "$CLAUDE_BIN" && RUNNABLE=$((RUNNABLE + 1))

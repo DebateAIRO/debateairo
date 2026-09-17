@@ -61,22 +61,31 @@ look up). A **present-but-blank** key is still a loud typed refusal (D10) — ne
 a typo fails loudly rather than quietly. No compiled-in path remains in the relays. The keys are still
 the right way to point a run at a specific build (the two overrides below).
 
-**Re-measured 2026-09-17 20:08 (orchestrator), after V reported the versions had moved.** The
-2026-09-16 transcription (claude 2.1.216, codex 0.144.6, grok 1.0.30) is superseded by this one, and
-`--version` WAS run this time for codex and grok (a version print, not a model call):
+> **WARNING — the block that used to stand here destroyed three CLIs on 2026-09-17 (D75 ADDENDUM 3).**
+> The 2026-09-16 packet, and this packet until 22:1x on 2026-09-17, showed the measurements as lines
+> that LOOKED like commands: `command -v claude`, then an ASCII arrow (a dash and a greater-than sign),
+> the launcher path, another ASCII arrow, an abbreviated target. That was never a command — but pasted
+> into a shell, a greater-than sign is a redirection: the shell opened the launcher path for writing,
+> which truncates the real binary behind the symlink, then failed on the abbreviated path and never ran
+> anything. V pasted those lines three times (19:29, 20:10, 21:58) and each time the Claude and Grok
+> binaries became 0-byte files and the Codex launcher became four lines of text — the fork bomb of that
+> evening. **Nothing in this section is a command.** Every fenced block in this packet that IS a command
+> starts with `bash`, `export`, `curl`, `ln`, `ls` or `./node_modules`, and none of them contains a
+> greater-than sign.
 
-```
-command -v claude -> /Users/stefannour/.local/bin/claude -> …/.local/share/claude/versions/2.1.274
-                     *** BROKEN: that file is 0 bytes (an interrupted CLI update, 20:05 today);
-                     *** 2.1.216 and 2.1.178 beside it are complete. See the pre-flight below.
-command -v codex  -> /opt/homebrew/bin/codex   · codex --version -> codex-cli 0.154.0
-command -v grok   -> /Users/stefannour/.local/bin/grok -> …/.grok/bin/grok · grok --version -> grok 1.0.34
-node v26.5.0 · pnpm 11.20.0 (unchanged)
-```
+**Measured 2026-09-17 22:1x (orchestrator), a table, not commands** — the launcher each tool resolves
+to and the version it answered (`--version`, a version print, not a model call):
+
+| tool | launcher on PATH | resolves to (symlinks followed) | answered |
+|---|---|---|---|
+| claude | `~/.local/bin/claude` | `~/.local/share/claude/versions/2.1.274` (214,149,552 bytes, from the install script at 22:09) | 2.1.274 (Claude Code) |
+| codex | `/opt/homebrew/bin/codex` | `/opt/homebrew/lib/node_modules/@openai/codex/bin/codex.js` (reinstalled 20:31) | codex-cli 0.154.0 |
+| grok | `~/.local/bin/grok` | `~/.grok/downloads/grok-1.0.34-macos-aarch64` (143,016,096 bytes, installed 21:57) | grok 1.0.34 |
+| node / pnpm | `/opt/homebrew/bin` | — | v26.5.0 / 11.20.0 |
 
 A table like this goes stale within a day — that is why the tool never uses these values. It
 re-measures with `command -v` at run time and, since 2026-09-17, refuses to start unless every
-discovered maker binary actually runs (see the pre-flight below).
+discovered maker binary is a real program that actually runs (see the pre-flight below).
 
 ### Pre-flight: the error V hit on 2026-09-17, and what to do
 
@@ -98,13 +107,14 @@ reached, every command on the machine failing with `fork: Resource temporarily u
 Claude updater writing another empty file while reporting success. The chain ended when V replaced
 the corrupted file with a two-line program that exits (a shell-builtin write, no new process needed)
 and reinstalled codex (`npm install -g @openai/codex@0.154.0`, 20:31). The old engine's tmux workers
-were not involved (one tmux process, four days old). **Measured later (D75 ADDENDUM 2):** the empty
-claude and grok files are what their own built-in updaters left behind — `claude update` run from
-2.1.216 writes a 0-byte file and prints "Successfully updated" (proved at 21:58 against a complete
-install from 21:56; the CDN serves the file fine) — so on this Mac install Claude with
-`curl -fsSL https://claude.ai/install.sh | bash`, never `claude update` from 2.1.216. The codex.js
-plain-text overwrite is still unattributed. The old engine's launchd watchdog (every 120 s, with an
-unattended Codex escalation) and its codex worker kept re-triggering the chain by calling `codex`.
+were not involved (one tmux process, four days old). **The cause, proven at 22:1x (D75 ADDENDUM 3),
+was THIS PACKET:** its "discovered with command -v" block was written in a shape a shell executes as a
+redirection (see the WARNING in §3), and V pasted those lines from the packet at 19:29, 20:10 and
+21:58 — each paste emptied the Claude and Grok binaries and overwrote the Codex launcher with the
+command's own output. The `claude update` blamed in ADDENDUM 2 was innocent. The block is now a table,
+and no fenced block in this packet contains a greater-than sign. The old engine's launchd watchdog
+(every 120 s, with an unattended Codex escalation) and its codex worker kept re-triggering the chain
+by calling `codex` once the launcher was broken.
 
 **The working configuration today (pre-flight 3 of 3 at 20:35), using the untouched older builds:**
 

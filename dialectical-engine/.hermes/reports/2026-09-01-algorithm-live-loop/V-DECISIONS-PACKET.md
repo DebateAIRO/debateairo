@@ -265,13 +265,12 @@ verbatim so the presentation can be made.
 
 ### E. The evening of 2026-09-17 — one question for you, and two defaults
 
-- **Question (narrowed at 22:0x — D75 ADDENDUM 2).** The empty Claude files are what `claude update`
-  run from 2.1.216 leaves behind on this Mac (measured at 21:58; the download server is fine). Two
-  things remain yours to confirm: **did you run Grok's updater at ~20:10 as well** (its file and
-  Claude's were emptied in the same second), and **did anything of yours edit the Codex launcher
-  between 20:08 and 20:12** (the plain-text overwrite is still unattributed)? Until the updater's
-  fault is understood: install Claude with the official script, never `claude update` from 2.1.216,
-  and let the pre-flight verify before a run.
+- **Question withdrawn (22:1x — D75 ADDENDUM 3).** The cause was this mission's own readiness packet:
+  its measurement block was written in a shape a shell executes as a redirection, and pasting it —
+  which you did, in good faith, three times — emptied the Claude and Grok binaries and overwrote the
+  Codex launcher. The packet is corrected (a table with a warning), the tool prints Unicode arrows,
+  and the rule "a fenced block is a pasteable command or it is not a fenced block" is now in the
+  orchestrator's memory. `claude update` was innocent. Nothing is asked of you on this point.
 - **For the old engine's to-do list (not this mission's):** `com.dialectical.watchdog` runs every
   120 s with `--invoke-codex` (an unattended Codex agent repairing the host, hourly at most) and
   `com.dialectical.worker.codex-2` calls `codex` for jobs; both turned the broken launcher into a
