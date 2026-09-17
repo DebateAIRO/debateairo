@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { loadObservationAgentEnvironment } from "../../packages/register/src/runtime-environment.js";
 import {
   parseApiEnvironment,
   parseLivenessEnvironment,
@@ -216,6 +217,48 @@ describe("production provider targets refuse cleartext off-box (L4-F7)", () => {
       const source = await readFile(new URL(path, import.meta.url), "utf8");
       expect(source).toContain("assertProductionProviderTargets(");
       expect(source).toContain("environment.NODE_ENV");
+    }
+  });
+});
+
+// DEV-SYNC 2026-09-18: the observation agent's loader landed on dev after C1 and read
+// its database URL past the floor. The rule is C1's — EVERY loader floors every
+// `*_DATABASE_URL` in production — and the agent's pg_monitor login is no exception.
+describe("production floors reach the observation agent's loader (C1, L5-F3)", () => {
+  const REMOTE_PLAIN = "postgresql://observation:secret@db.internal:5432/debateai";
+  const REMOTE_VERIFIED = `${REMOTE_PLAIN}?sslmode=verify-full&sslrootcert=/etc/debateai/postgres-tls/ca.crt`;
+  const LOOPBACK = "postgresql://observation:secret@127.0.0.1:5432/debateai";
+
+  function stubAgentEnvironment(databaseUrl: string, nodeEnvironment: string | undefined): void {
+    vi.stubEnv("OBSERVATION_DATABASE_URL", databaseUrl);
+    vi.stubEnv("OBSERVATION_STATE_DIR", "/var/lib/debateai/observation");
+    vi.stubEnv("OBSERVATION_TARGETS_PATH", "/etc/debateai/observation-targets.json");
+    vi.stubEnv("NODE_ENV", nodeEnvironment);
+  }
+
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("refuses a remote observation database without verified TLS in production", () => {
+    stubAgentEnvironment(REMOTE_PLAIN, "production");
+    expect(() => loadObservationAgentEnvironment())
+      .toThrow("DATABASE_URL_TLS_REQUIRED:OBSERVATION_DATABASE_URL");
+  });
+
+  it("accepts verified-TLS and loopback targets in production, and returns only the agent's own keys", () => {
+    stubAgentEnvironment(REMOTE_VERIFIED, "production");
+    expect(loadObservationAgentEnvironment()).toEqual({
+      OBSERVATION_DATABASE_URL: REMOTE_VERIFIED,
+      OBSERVATION_STATE_DIR: "/var/lib/debateai/observation",
+      OBSERVATION_TARGETS_PATH: "/etc/debateai/observation-targets.json"
+    });
+    stubAgentEnvironment(LOOPBACK, "production");
+    expect(loadObservationAgentEnvironment().OBSERVATION_DATABASE_URL).toBe(LOOPBACK);
+  });
+
+  it("applies nothing outside production", () => {
+    for (const nodeEnvironment of ["development", "test", undefined]) {
+      stubAgentEnvironment(REMOTE_PLAIN, nodeEnvironment);
+      expect(loadObservationAgentEnvironment().OBSERVATION_DATABASE_URL, String(nodeEnvironment)).toBe(REMOTE_PLAIN);
     }
   });
 });
