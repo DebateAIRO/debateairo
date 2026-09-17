@@ -211,7 +211,7 @@ ACCEPTANCE_DB_PORT=REPLACE_WITH_A_FREE_PORT \
 ACCEPTANCE_API_HOST=127.0.0.1 \
 ACCEPTANCE_API_PORT=REPLACE_WITH_A_FREE_PORT \
 ACCEPTANCE_SHIM_PORT=REPLACE_WITH_A_FREE_PORT \
-ACCEPTANCE_GROK_RELAY_PORT=REPLACE_WITH_A_FREE_PORT \
+ACCEPTANCE_GROK_RELAY_PORT=REPLACE_WITH_THE_PORT_V_SUPPLIED \
 ACCEPTANCE_STRANGER_SAMPLE_RATE=1 \
 ACCEPTANCE_BATTERY_VERSION=acceptance-v1 \
 ACCEPTANCE_SETTLEMENT_WATCH_HANDLE=acceptance:pro01-depth2 \
@@ -252,11 +252,11 @@ V's acceptance run.
 The runtime environment is strict and contains no Hatchet keys:
 
 ```text
-ACCEPTANCE_DB_PORT=REPLACE_WITH_THE_FIXED_LOCAL_DATABASE_PORT
+ACCEPTANCE_DB_PORT=REPLACE_WITH_THE_FIXED_LOCAL_DB_PORT_V_SUPPLIED
 ACCEPTANCE_API_HOST=127.0.0.1
-ACCEPTANCE_API_PORT=REPLACE_WITH_THE_API_PORT
-ACCEPTANCE_SHIM_PORT=REPLACE_WITH_THE_SHIM_PORT
-ACCEPTANCE_STRANGER_SAMPLE_RATE=REPLACE_WITH_A_RATE_BETWEEN_0_AND_1
+ACCEPTANCE_API_PORT=REPLACE_WITH_THE_API_PORT_V_SUPPLIED
+ACCEPTANCE_SHIM_PORT=REPLACE_WITH_THE_SHIM_PORT_V_SUPPLIED
+ACCEPTANCE_STRANGER_SAMPLE_RATE=REPLACE_WITH_THE_0_TO_1_RATE_V_SUPPLIED
 ACCEPTANCE_BATTERY_VERSION=acceptance-v1
 ACCEPTANCE_SETTLEMENT_WATCH_HANDLE=acceptance:standing-watch
 ```
@@ -298,6 +298,14 @@ Every fenced block in this file is safe to paste as written: the placeholders ar
 2026-09-17 a documentation line of the form `name <value>` was pasted into a
 shell, where `>` is a redirection, and it truncated three CLI binaries. A pasted
 block here fails loudly on a placeholder instead, and writes to nothing.
+
+A placeholder must also keep the MEANING of the value it stands for, because the
+name is the whole instruction. `_V_SUPPLIED` means V or the operator supplies that
+number and the reader does not invent one — the ceremony's own ports and sample
+rate, and Grok's relay port, which GROK-01 may not seed before V ratifies it (see
+above). `A_FREE_PORT` means the opposite, and is correct only for the isolated
+proofs, which take any free port precisely so they cannot collide with the
+standing ceremony. Do not simplify one into the other.
 
 By default the ceremony settles, verifies the FAIR-01 fair-debate gate,
 prints the run id / answer id / graph and maker report / definition-of-done
@@ -368,8 +376,8 @@ Ask-input defaults (all overrideable by the named CLI flag) are:
 Point both browser and server-side web clients at the acceptance API:
 
 ```text
-NEXT_PUBLIC_API_BASE=http://127.0.0.1:REPLACE_WITH_THE_API_PORT
-DIALECTICAL_API_BASE=http://127.0.0.1:REPLACE_WITH_THE_API_PORT
+NEXT_PUBLIC_API_BASE=http://127.0.0.1:REPLACE_WITH_THE_SAME_ACCEPTANCE_API_PORT
+DIALECTICAL_API_BASE=http://127.0.0.1:REPLACE_WITH_THE_SAME_ACCEPTANCE_API_PORT
 ```
 
 The fake CLIs (codex and claude) and blanket-INACTIVE terminal evaluator exist

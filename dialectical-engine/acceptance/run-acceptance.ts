@@ -59,11 +59,18 @@ const supportedArguments = new Set([
 const credentialPattern = /^[A-Za-z0-9_-]{43}$/;
 
 /**
- * No argument name this tool supports is longer than this, so a token past it is
- * either a typo or a value in a name's place — and a value is the thing that must
- * never be quoted.
+ * The length past which a token stops being quoted: the longest name this parser
+ * actually supports, DEDUCED from the set above rather than written down (V's
+ * rule, 2026-09-17 — "if it needs to be set to something local, it needs to be
+ * deduced first, never set in stone"). A literal drifts in both directions: above
+ * the longest name it quotes tokens it should redact, and the day a longer flag is
+ * added it redacts the operator's own flag instead of naming it. A token longer
+ * than every supported name is either a typo or a value in a name's place, and a
+ * value is the thing that must never be quoted.
  */
-const longestSupportedArgumentLength = 32;
+const longestSupportedArgumentLength = Math.max(
+  ...[...supportedArguments].map((argument) => argument.length)
+);
 
 /**
  * F-CREDENTIAL-ON-ARGV, the second mouth of the leak. A refusal has to name the
@@ -91,9 +98,12 @@ function argumentMap(arguments_: readonly string[]): ReadonlyMap<string, string>
     if (name === undefined || !supportedArguments.has(name)) {
       throw new Error(`UNKNOWN_ACCEPTANCE_ARGUMENT:${name === undefined ? "undefined" : describeToken(name)}`);
     }
+    // Every refusal that names a token names it through the same gate, so the
+    // derived bound is what guarantees a SUPPORTED name is always reported in
+    // full — rather than that guarantee resting on which throw happens to redact.
     const value = arguments_[index + 1];
-    if (value === undefined) throw new Error(`ACCEPTANCE_ARGUMENT_VALUE_REQUIRED:${name}`);
-    if (output.has(name)) throw new Error(`DUPLICATE_ACCEPTANCE_ARGUMENT:${name}`);
+    if (value === undefined) throw new Error(`ACCEPTANCE_ARGUMENT_VALUE_REQUIRED:${describeToken(name)}`);
+    if (output.has(name)) throw new Error(`DUPLICATE_ACCEPTANCE_ARGUMENT:${describeToken(name)}`);
     output.set(name, value);
   }
   return output;

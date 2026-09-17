@@ -125,6 +125,50 @@ describe("ACC-01 one-shot ceremony arguments", () => {
     expect(refusalMessage(["--mystery", "value"])).toContain("UNKNOWN_ACCEPTANCE_ARGUMENT:--mystery");
   });
 
+  /**
+   * V's rule, 2026-09-17: deduce, never set in stone. The length at which a token
+   * stops being quoted must BE the longest argument name the parser supports,
+   * read off the supported set itself. A literal bound drifts: set above the
+   * longest name it quotes tokens it should redact, and the day a longer flag is
+   * added it redacts the operator's own flag instead of naming it.
+   *
+   * Twenty-eight characters is the discriminating length — longer than every
+   * name the parser supports today, shorter than the literal this replaced — so
+   * only a DERIVED bound redacts it.
+   */
+  it("redacts any token longer than the longest argument name it supports", () => {
+    const justOverTheBound = "--".padEnd(28, "x");
+    expect(justOverTheBound).toHaveLength(28);
+    const message = refusalMessage([justOverTheBound]);
+    expect(message).toContain("UNKNOWN_ACCEPTANCE_ARGUMENT");
+    expect(message).not.toContain(justOverTheBound);
+  });
+
+  /**
+   * The other side of the same bound, and the one that protects the operator: a
+   * name the parser DOES support is reported in full, whatever its length, in
+   * every refusal that names it. Enumerated from the source so the assertion
+   * cannot go stale when the set grows — and anchored on the symbol, never on a
+   * line number (TOOLING-TRAPS `:329`). This adds nothing to production: the set
+   * stays private.
+   */
+  it("names every argument it supports in full, in the missing-value and duplicate refusals", async () => {
+    const source = await readFile(new URL("./run-acceptance.ts", import.meta.url), "utf8");
+    const setAt = source.indexOf("const supportedArguments = new Set([");
+    expect(setAt, "the supported-argument set must exist to be enumerated").toBeGreaterThan(-1);
+    const literal = source.slice(setAt, source.indexOf("]);", setAt));
+    const supportedNames = [...literal.matchAll(/"(--[a-z-]+)"/g)].map((match) => match[1] ?? "");
+    expect(
+      supportedNames.length,
+      "the set must have members, or every assertion below passes vacuously"
+    ).toBeGreaterThan(0);
+
+    for (const name of supportedNames) {
+      expect(refusalMessage([name])).toBe(`ACCEPTANCE_ARGUMENT_VALUE_REQUIRED:${name}`);
+      expect(refusalMessage([name, "a", name, "b"])).toBe(`DUPLICATE_ACCEPTANCE_ARGUMENT:${name}`);
+    }
+  });
+
   it("documents and applies only asker-input defaults — the default question is self-contained (ACC-01 N1)", () => {
     const parsed = parseAcceptanceArguments([], asOf, environment);
     expect(parsed.serviceCredential).toBe(serviceCredential);
