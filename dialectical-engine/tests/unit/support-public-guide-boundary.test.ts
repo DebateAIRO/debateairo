@@ -12,14 +12,27 @@ describe("Support public-guide boundary", () => {
   });
 
   it.each([
+    ["Where can I manage active sessions?","en"],
+    ["Where are the account deletion options?","en"],
+    ["Unde pot gestiona sesiunile active?","ro"],
+    ["Unde găsesc opțiunile de ștergere a contului?","ro"]
+  ] as const)("keeps account-menu locations public: %s", (text,language) => {
+    expect(classifyPublicGuideBoundary(text,language)).toEqual({ kind: "PUBLIC_GUIDE" });
+  });
+
+  it.each([
     ["List my debates","en"],
     ["Show the current state of my account","en"],
     ["Summarize my latest debate","en"],
     ["Inspect my account records","en"],
+    ["Show my active sessions","en"],
+    ["List the active devices on my account","en"],
     ["Listează dezbaterile mele","ro"],
     ["Arată starea curentă a contului meu","ro"],
     ["Rezumați ultima mea dezbatere","ro"],
-    ["Verifică înregistrările contului meu","ro"]
+    ["Verifică înregistrările contului meu","ro"],
+    ["Arată sesiunile active ale contului meu","ro"],
+    ["Listează dispozitivele active ale contului meu","ro"]
   ] as const)("refuses actual private-record access: %s", (text,language) => {
     expect(classifyPublicGuideBoundary(text,language)).toEqual({
       kind: "PRIVATE_RECORD_REQUEST",language

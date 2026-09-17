@@ -613,6 +613,34 @@ describe("SUP-01 deterministic support classifier", () => {
   });
 
   it.each([
+    ["en", "Where can I manage active sessions?"],
+    ["en", "Please tell me where the account deletion options are."],
+    ["en", "Do not delete my account; where can I find the account deletion options?"],
+    ["ro", "Unde pot gestiona sesiunile active?"],
+    ["ro", "Unde găsesc opțiunile de ștergere a contului?"],
+    ["ro", "Nu îmi șterge contul; unde găsesc opțiunile de ștergere a contului?"]
+  ] as const)("keeps public %s account-menu location guidance on the answer path: %s",(
+    language,message
+  ) => {
+    expect(classifySupportMessage(message)).toEqual({ outcome:null,language,link:null });
+  });
+
+  it.each([
+    ["Sign out every active session now.","en"],
+    ["Where are active sessions, and sign out every active session now.","en"],
+    ["Delete my account now.","en"],
+    ["Where are the account options, and delete my account now.","en"],
+    ["Deconectează toate sesiunile active acum.","ro"],
+    ["Unde sunt sesiunile active, apoi deconectează-le pe toate.","ro"],
+    ["Șterge-mi contul acum.","ro"],
+    ["Unde sunt opțiunile contului, apoi șterge-mi contul.","ro"]
+  ] as const)("keeps account operations in deterministic zone refusal: %s",(message,language) => {
+    expect(classifySupportMessage(message)).toMatchObject({
+      outcome:"REFUSE_ZONE",language,link:"/settings"
+    });
+  });
+
+  it.each([
     "Can the password reset page validate my reset token?",
     "Use the password reset button to submit a reset for me",
     "Where is the page to validate my password reset token?",

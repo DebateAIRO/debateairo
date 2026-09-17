@@ -1,6 +1,7 @@
 import type { SupportLanguage, SupportOutcome } from "./templates.js";
 import { analyzePreparedRecoverySemanticsViews } from "./recovery-intent.js";
 import { classifySecurityRecoveryViews } from "./security-guidance.js";
+import { isPreparedPublicAccountLocationGuide } from "./public-guide-boundary.js";
 
 export type SupportClassification = Readonly<{
   outcome: Extract<SupportOutcome,
@@ -16,6 +17,7 @@ type ZoneRule = Readonly<{
   pattern: RegExp;
   link: ZoneLink;
   recoveryPassword?: true;
+  publicLocationGuide?: true;
 }>;
 
 export type SupportSensitiveIntentFamily =
@@ -56,11 +58,13 @@ const ZONE_RULES: readonly ZoneRule[] = Object.freeze([
   }),
   Object.freeze({
     pattern: /(?:\bsign[ -]?out\b|\blog[ -]?out\b|\b(?:active |other |account )?sessions?\b|\bdeconect\w*\b|\bsesiun\w*\b)/u,
-    link: "/settings"
+    link: "/settings",
+    publicLocationGuide: true
   }),
   Object.freeze({
     pattern: ACCOUNT_ERASURE_PATTERN,
-    link: "/settings"
+    link: "/settings",
+    publicLocationGuide: true
   }),
   Object.freeze({
     pattern: /(?:\bdoes (?:an |the )?account\b.{0,32}\bexist\b|\baccount\b.{0,32}\bexist\b|(?<!\p{L})(?:există|exista)(?!\p{L}).{0,32}(?<!\p{L})cont\p{L}*(?!\p{L}))/u,
@@ -378,8 +382,10 @@ export function classifySupportMessage(message: string): SupportClassification {
   }
   const solelyNegatedRecovery = recoverySemantics.navigation !== "AFFIRMATIVE"
     && recoverySemantics.credentialOperation === "NEGATED";
+  const publicAccountLocation = isPreparedPublicAccountLocationGuide(views);
   const zone = ZONE_RULES.find((rule) =>
     !(solelyNegatedRecovery && rule.recoveryPassword === true)
+    && !(publicAccountLocation && rule.publicLocationGuide === true)
     && views.some((text) => rule.pattern.test(text)));
   if (zone !== undefined) {
     return Object.freeze({ outcome: "REFUSE_ZONE", language, link: zone.link });

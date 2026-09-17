@@ -910,6 +910,50 @@ describe("SUP-01 support routes", () => {
     await server.close();
   });
 
+  it.each([
+    ["Where can I manage active sessions?","en","203.0.113.229","settings-help-menus"],
+    ["Unde pot gestiona sesiunile active?","ro","203.0.113.230","settings-help-menus"],
+    ["Unde găsesc opțiunile de ștergere a contului?","ro","203.0.113.231","settings-help-menus"]
+  ] as const)("routes a public account-menu location through bounded answer context: %s", async (
+    text,language,ip,sourceId
+  ) => {
+    const respond = vi.fn<SupportAnswerPort["respond"]>(async () => Object.freeze({
+      messageId:randomUUID(),outcome:"ANSWER_GROUNDED" as const,
+      text:language === "ro" ? "Deschide Setări." : "Open Settings.",canEscalate:false,
+      sources:Object.freeze([{
+        id:sourceId,label:language === "ro" ? "Setări și ajutor" : "Settings and help"
+      }]),
+      actions:Object.freeze([])
+    }));
+    const server = api(true,{ answerPort:Object.freeze({ respond }) });
+    const opened = await openSession(server,ip,language);
+    const response = await sendMessage(server,opened.body,text,ip);
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      outcome:"ANSWER_GROUNDED",sources:[{ id:sourceId }],actions:[]
+    });
+    expect(respond).toHaveBeenCalledOnce();
+    expect(respond).toHaveBeenCalledWith(expect.objectContaining({ text,language }));
+    await server.close();
+  });
+
+  it.each([
+    ["Show my active sessions","en","203.0.113.232"],
+    ["Șterge-mi contul acum.","ro","203.0.113.233"],
+    ["Where are the account options, and delete my account now.","en","203.0.113.234"]
+  ] as const)("keeps private records and account operations off the answer path: %s", async (
+    text,language,ip
+  ) => {
+    const respond = vi.fn<SupportAnswerPort["respond"]>();
+    const server = api(true,{ answerPort:Object.freeze({ respond }) });
+    const opened = await openSession(server,ip,language);
+    const response = await sendMessage(server,opened.body,text,ip);
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ outcome:"REFUSE_ZONE" });
+    expect(respond).not.toHaveBeenCalled();
+    await server.close();
+  });
+
   it("keeps injection refusal precedence over private-record intent", async () => {
     const respond = vi.fn<SupportAnswerPort["respond"]>();
     const server = api(true,{ answerPort: Object.freeze({ respond }) });
