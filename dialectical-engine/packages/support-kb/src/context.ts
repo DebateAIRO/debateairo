@@ -41,8 +41,8 @@ const STOP_WORDS = new Set([
 const PRODUCT_ALIAS_SOURCE = String.raw`\b(?:dialectical(?:[\s-]*engine)|debate\s*airo)\b`;
 const PRODUCT_OVERVIEW_WORDS = new Set([
   "about","agent","answer","cannot","cant","define","describe","does","explain","feature","features","give",
-  "identity","mean","meaning","overview","product","purpose","question","questions","support",
-  "tell","use","used","what","why",
+  "debate","identity","mean","meaning","overview","product","purpose","question","questions","support",
+  "tell","tool","use","used","what","why",
   "asistent","asistentul","capabilitati","despre","explica","face","folosit","folosita",
   "identitate","intrebare","intrebari","poate","prezentare","produs","raspund","raspunde",
   "scop","spune"
@@ -53,6 +53,34 @@ const GENERIC_BRANDED_WORDS = new Set([
   "service","services","tool","tools",
   "ajuta","ajutor","asistenta","ofera","serviciu","servicii"
 ]);
+const GENERIC_EVIDENCE_WORDS = new Set([
+  ...STOP_WORDS,
+  "about","after","before","does","every","exactly","explain","give","here","many","new","next",
+  "open","please","product","products","read","section","should","support","that","what","where","which",
+  "debate","debates","model","models",
+  "acest","aceasta","anumita","care","ce","cum","deschid","dupa","explica","gasesc","mai",
+  "nou","noua","noi","poate","pot","produs","produsul","sectiune","spune","suport","unde",
+  "dezbatere","dezbaterea","dezbateri","dezbaterii","asistenta","modelul","modele"
+]);
+const ARTICLE_EVIDENCE_TEXT: Readonly<Record<string,string>> = Object.freeze({
+  "app-navigation":"pricing preturi functioneaza account settings theme tema method transcript home library acasa biblioteca public compact help ajutor conversatie varianta",
+  "browse-public-debates":"browse browsing anonymous visitor rasfoire rasfoi anonim biblioteca public",
+  "budget-tier-choice":"budget buget tier nivel",
+  "debate-topic-and-description":"topic description subiect descriere informatii",
+  "delete-a-private-debate":"delete deletion stergere sterg private privata",
+  "getting-started-debate":"start first begin beginning inceput pornesc prima",
+  "debate-workspace-menus":"thread split tree map scoring replay workspace honesty fir impartit arbore harta evaluare repeta spatiu transparenta work functioneaza",
+  "guide-how-it-works":"process workflow happens submit works work intampla trimit proces functioneaza",
+  "public-answer-disclosure":"before reading read public answer disclosure inainte citesc raspuns",
+  "publish-a-debate":"publish publishing publica publicare public",
+  "risk-tier-choice":"risk risc tier nivel",
+  "settings-help-menus":"account settings active sessions privacy preferences legacy claim deletion human case guide different setari sesiuni confidentialitate revendica vechi stergere persoana ghid diferenta umana caz",
+  "support-cases":"support case human separate email escalation guide different asistenta caz uman separat email escaladare ghid diferenta",
+  "support-status-limits":"public service status indicators limits answer stare serviciu indicatori limite raspunde",
+  "unpublish-a-debate":"unpublish private again retragere retrage privata fac",
+  "unsupported-capabilities":"cannot unavailable unsupported limitations limits not yet things nu indisponibil limitari limite lucruri face inca",
+  "view-public-debate":"view open shared link public vad deschid distribuit legatura"
+});
 
 function normalizedText(value: string): string {
   return value.normalize("NFKD").replace(/\p{M}/gu,"").toLocaleLowerCase("en");
@@ -64,6 +92,10 @@ function normalizeWords(value: string): Set<string> {
       .split(/[^\p{L}\p{N}]+/u)
       .filter((word) => word.length >= 3 && !STOP_WORDS.has(word)),
   );
+}
+
+function evidenceWords(value: string): Set<string> {
+  return new Set([...normalizeWords(value)].filter((word) => !GENERIC_EVIDENCE_WORDS.has(word)));
 }
 
 function productQuery(value: string): Readonly<{
@@ -178,8 +210,27 @@ export function buildSupportKnowledgeContext(input: Readonly<{
     && identityEntryScore >= Math.max(1,product.substantiveWords.size - 1);
   const identityRequest = product.identityOverview || identityFactQuestion;
   const scoringWords = product.branded ? product.substantiveWords : queryWords;
+  const directWords = product.branded ? product.substantiveWords : evidenceWords(input.query);
+  const articleEvidence = new Map(eligibleEntries.map((entry) => {
+    const titleScore = overlapScore(directWords,entry.title);
+    const projectionScore = overlapScore(directWords,entry.modelProjection ?? "");
+    const aliasScore = overlapScore(directWords,ARTICLE_EVIDENCE_TEXT[entry.id] ?? "");
+    const coverage = directWords.size === 0 ? 0
+      : Math.max(titleScore,projectionScore) / directWords.size;
+    const meaningful = aliasScore >= 2 || aliasScore >= 1 && titleScore >= 1
+      || aliasScore >= 1 && directWords.size <= 2 || titleScore >= 2
+      || directWords.size === 1 && projectionScore === 1
+      || projectionScore >= 2 && coverage >= 0.6;
+    return [entry.id,Object.freeze({
+      titleScore,projectionScore,aliasScore,
+      meaningful,
+      score:aliasScore * 1_000_000 + titleScore * 1_000 + projectionScore
+    })] as const;
+  }));
   const matchedCapabilities = (identityRequest
-    ? input.capabilities.filter(({ id }) => id === "product-identity").map((item) => ({ item,score:1 }))
+    ? input.capabilities.filter(({ id }) => id === "product-identity").map((item) => ({
+      item,score:1,catalogScore:0,articleScore:1,catalogComplete:false
+    }))
     : input.capabilities
     .map((item) => ({
       item,
@@ -189,18 +240,24 @@ export function buildSupportKnowledgeContext(input: Readonly<{
       ),
       articleScore: Math.max(0,...eligibleEntries
         .filter(({ id }) => item.articleIds.includes(id))
-        .map((entry) => overlapScore(scoringWords,entry.title) * 100
-          + overlapScore(scoringWords,entry.modelProjection ?? "") * 10)),
+        .map((entry) => {
+          const evidence = articleEvidence.get(entry.id);
+          return evidence?.meaningful === true ? evidence.score : 0;
+        })),
+      catalogComplete:(() => {
+        const required = normalizeWords(
+          `${item.labels[input.language]} ${item.searchTerms[input.language].join(" ")}`
+        );
+        return required.size > 0 && overlapScore(required,input.query) === required.size;
+      })(),
     }))
-    .filter(({ catalogScore,articleScore }) => catalogScore > 0
-      && (!product.branded || articleScore > 0))
-    .map(({ item,catalogScore,articleScore }) => ({
+    .filter(({ catalogScore,articleScore }) => catalogScore >= 2 || articleScore > 0)
+    .map(({ item,catalogScore,articleScore,catalogComplete }) => ({
       item,
-      score: product.branded
-        ? articleScore * 1_000 + catalogScore
-          + (product.preferredArticleId !== null
-            && item.articleIds.includes(product.preferredArticleId) ? 1_000_000 : 0)
-        : catalogScore,
+      score: articleScore * 1_000 + catalogScore
+        + (product.preferredArticleId !== null
+          && item.articleIds.includes(product.preferredArticleId) ? 1_000_000_000 : 0),
+      catalogScore,articleScore,catalogComplete,
     }))
     .sort((left, right) => right.score - left.score || left.item.id.localeCompare(right.item.id, "en")));
   const actionIds: SupportActionId[] = [];
@@ -224,25 +281,41 @@ export function buildSupportKnowledgeContext(input: Readonly<{
     throw new Error("SUPPORT_KB_CONTEXT_LIMIT_TOO_SMALL");
   }
 
-  const capabilityArticleScore = new Map<string,number>();
-  for (const { item,score } of matchedCapabilities) {
+  const capabilityArticleScore = new Map<string,Readonly<{
+    score:number;strong:boolean;completeOrder:number
+  }>>();
+  const hasCompleteCatalogMatch = matchedCapabilities.some(({ catalogComplete }) => catalogComplete);
+  for (const { item,score,catalogScore,catalogComplete } of matchedCapabilities) {
     item.articleIds.forEach((id,index) => {
       const weighted = score * 1_000 + item.articleIds.length - index;
-      capabilityArticleScore.set(id,Math.max(capabilityArticleScore.get(id) ?? 0,weighted));
+      const current = capabilityArticleScore.get(id);
+      capabilityArticleScore.set(id,Object.freeze({
+        score:Math.max(current?.score ?? 0,weighted),
+        strong:current?.strong === true
+          || identityRequest && item.id === "product-identity" || catalogScore >= 2,
+        completeOrder:Math.max(
+          current?.completeOrder ?? 0,catalogComplete ? item.articleIds.length - index : 0
+        )
+      }));
     });
   }
   const ranked = eligibleEntries
     .map((entry) => ({
       entry,
-      score: (capabilityArticleScore.get(entry.id) ?? 0)
+      evidence:articleEvidence.get(entry.id)!,
+      capability:capabilityArticleScore.get(entry.id),
+      score: (capabilityArticleScore.get(entry.id)?.score ?? 0)
+        + (capabilityArticleScore.get(entry.id)?.completeOrder ?? 0) * 10_000_000_000_000
         + (entry.id === product.preferredArticleId ? 1_000_000_000 : 0)
-        + (product.branded
-          ? overlapScore(scoringWords,entry.title) * 100
-            + overlapScore(scoringWords,entry.modelProjection ?? "") * 10
-          : overlapScore(queryWords, `${entry.title}\n${entry.body}`)),
+        + (articleEvidence.get(entry.id)?.score ?? 0) * 1_000_000,
     }))
-    .filter(({ entry,score }) => score > 0
-      && (!product.branded || capabilityArticleScore.has(entry.id)))
+    .filter(({ entry,evidence,capability }) => {
+      if (!hasCompleteCatalogMatch && product.preferredArticleId !== null
+        && entry.id !== product.preferredArticleId) {
+        return evidence.aliasScore >= 2 || evidence.titleScore >= 2;
+      }
+      return evidence.meaningful || capability?.strong === true;
+    })
     .sort((left, right) => right.score - left.score || left.entry.id.localeCompare(right.entry.id, "en"));
 
   let text = base;

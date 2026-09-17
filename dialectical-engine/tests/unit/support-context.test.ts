@@ -1,10 +1,10 @@
-import { readFileSync } from "node:fs";
+import { readdirSync,readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
 import { buildSupportKnowledgeContext as buildContext } from "../../packages/support-kb/src/context.js";
-import { type HelpCorpusEntry } from "../../packages/support-kb/src/index.js";
+import { loadHelpCorpus,type HelpCorpusEntry } from "../../packages/support-kb/src/index.js";
 
 type ContextInput = Parameters<typeof buildContext>[0];
 function buildSupportKnowledgeContext(
@@ -49,6 +49,15 @@ function authorDraftCorpus() {
   }))) });
 }
 
+function productionReviewedCorpus() {
+  const root = resolve(process.cwd(),"packages/support-kb");
+  return loadHelpCorpus(resolve(root,"content"),{
+    reviewManifest:JSON.parse(readFileSync(resolve(root,"reviews/manifest.json"),"utf8")) as unknown,
+    recoveryComponents:readFileSync(resolve(root,"recovery/components.json")),
+    requireReviewedRecovery:true
+  });
+}
+
 describe("Support knowledge context", () => {
   const entries = [
     entry("creation", "en", "Create a debate", "Open the new debate page and choose the plan controls."),
@@ -73,6 +82,43 @@ describe("Support knowledge context", () => {
       expect(result.text).toContain(capability.labels.en);
     }
     expect(result.text).toContain("Never request, receive, repeat, or submit credentials or security codes");
+  });
+
+  it("meets the exact public answerable and unsupported case matrix from the immutable production corpus", () => {
+    const corpus = productionReviewedCorpus();
+    expect(corpus.kbVersion).toBe("fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278");
+    expect(Object.isFrozen(corpus)).toBe(true);
+    expect(Object.isFrozen(corpus.entries)).toBe(true);
+
+    const directory = resolve(process.cwd(),"tests/support-eval/cases");
+    const cases = readdirSync(directory).sort().map((name) =>
+      JSON.parse(readFileSync(resolve(directory,name),"utf8")) as {
+        id:string;
+        class:string;
+        messages:readonly Readonly<{ content:string }>[];
+        expected_source_ids:readonly string[];
+        expected_language:"en"|"ro";
+      }
+    ).filter(({ class:className }) => className === "A" || className === "B");
+    expect(cases).toHaveLength(26);
+
+    for (const testCase of cases) {
+      const query = testCase.messages.at(-1)?.content;
+      expect(query,`${testCase.id} query`).toBeTypeOf("string");
+      const result = buildSupportKnowledgeContext({
+        entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,
+        availableActionIds:SUPPORT_ACTION_IDS,language:testCase.expected_language,
+        query:query!,historyText:"",maxCodePoints:24_000
+      });
+      if (testCase.class === "A") {
+        expect.soft(result.sourceIds,`${testCase.id} required sources`).toEqual(
+          expect.arrayContaining(testCase.expected_source_ids)
+        );
+      } else {
+        expect.soft(result.sourceIds,`${testCase.id} unsupported sources`).toEqual([]);
+        expect.soft(result.requestedActionIds,`${testCase.id} unsupported actions`).toEqual([]);
+      }
+    }
   });
 
   it("selects newly reviewed knowledge lexically without a hard-coded intent list", () => {

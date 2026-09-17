@@ -3,7 +3,9 @@ import { tmpdir } from "node:os";
 import { join,resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FastifyInstance } from "fastify";
-import { loadHelpCorpus } from "../../packages/support-kb/src/index.js";
+import {
+  createHelpCorpusSnapshotLookup,loadHelpCorpus
+} from "../../packages/support-kb/src/index.js";
 import { buildApi,type AskApplication } from "../../apps/api/src/index.js";
 import { createSupportAnswerService } from "../../apps/api/src/support/answer.js";
 import { createSupportKeyPort } from "../../apps/api/src/support/keys.js";
@@ -338,12 +340,29 @@ const EVAL_CONFIGURATION = Object.freeze({
   })
 }) as SupportConfigurationState;
 
+function outputReferences(system: string,key: "sourceIds"|"actionIds"): readonly string[] {
+  const value = new RegExp(`^${key}=([^\\n]+)$`,"mu").exec(system)?.[1];
+  if (value === undefined || value === "none") return Object.freeze([]);
+  return Object.freeze(value.split(","));
+}
+
+export function createDeterministicStructuralCompletion(input: Readonly<{
+  system:string;
+  language:"en"|"ro";
+}>): Readonly<{ text:string }> {
+  return Object.freeze({ text:JSON.stringify({
+    kind:"answer",
+    text:input.language === "ro"
+      ? "Răspuns bazat numai pe ajutorul public verificat."
+      : "Answer based only on the reviewed public help.",
+    sourceIds:outputReferences(input.system,"sourceIds"),
+    actionIds:outputReferences(input.system,"actionIds")
+  }) });
+}
+
 const DETERMINISTIC_STRUCTURAL_RELAY: SupportModelPort = Object.freeze({
-  complete: async (input: Parameters<SupportModelPort["complete"]>[0]) => Object.freeze({
-    text: input.language === "ro"
-      ? "Iată explicația bazată exclusiv pe ajutorul verificat."
-      : "Here is the explanation based only on the verified help entry."
-  })
+  complete: async (input: Parameters<SupportModelPort["complete"]>[0]) =>
+    createDeterministicStructuralCompletion(input)
 });
 
 const EVAL_IDENTITY = testHttpIdentity("support-eval-public-guide");
@@ -352,6 +371,7 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
   mode?: SupportEvalMode;
   realRelay?: SupportModelPort;
 }> = {}): Promise<Readonly<{
+  kbVersion: string;
   executeCase: (testCase: SupportEvalCase,run: number) => Promise<SupportEvalObservation>;
   close: () => Promise<void>;
 }>> {
@@ -379,7 +399,15 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
       keys,new PostgresSupportMessageRepository(database.pool)
     );
     const status = new PostgresSupportStatusRepository(database.pool);
-    const corpus = loadHelpCorpus("packages/support-kb/content");
+    const [reviewManifestBytes,recoveryComponents] = await Promise.all([
+      readFile("packages/support-kb/reviews/manifest.json"),
+      readFile("packages/support-kb/recovery/components.json")
+    ]);
+    const corpus = loadHelpCorpus("packages/support-kb/content",{
+      reviewManifest:JSON.parse(reviewManifestBytes.toString("utf8")) as unknown,
+      recoveryComponents,requireReviewedRecovery:true
+    });
+    const corpusSnapshots = createHelpCorpusSnapshotLookup(corpus);
     const evalIncident: SupportIncidentRecord = Object.freeze({
       incidentId: "eval-active",startedAt: new Date("2026-09-07T08:30:00.000Z"),
       endedAt: null,severity: "major",affectedSurface: "whole-site",
@@ -393,7 +421,8 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
         ? Object.freeze([evalIncident]) : Object.freeze([])
     });
     const answer = createSupportAnswerService({
-      entries: corpus.entries,messages,modelFor: () => relay,incidents
+      entries:corpus.entries,snapshots:corpusSnapshots,requireStructuredDraft:true,
+      messages,modelFor: () => relay,incidents
     });
     const cases = createSupportCaseService({
       messages,
@@ -424,7 +453,7 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
         status: async () => Object.freeze({
           kbVersion: corpus.kbVersion,shipped: corpus.shippedCount,ignored: corpus.ignoredCount
         }),
-        snapshot: (version: string) => version === corpus.kbVersion ? corpus : undefined
+        snapshot: corpusSnapshots.get
       })
     });
     server = buildApi({
@@ -434,6 +463,7 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
     let address = 0;
     const activeServer = server;
     return Object.freeze({
+      kbVersion: corpus.kbVersion,
       executeCase: async (testCase: SupportEvalCase) => {
         currentEvalCase = testCase;
         address += 1;
