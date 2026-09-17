@@ -4,6 +4,11 @@ import { AskAcceptedSchema, AskRequestSchema, AnswerSchema, type AskRequest } fr
 import { ProviderProbeRepository } from "@debateai/db";
 import { announceAbsentMakers } from "./absent-makers.js";
 import { startClaudeRelay, type ClaudeRelayHandle } from "./claude-relay.js";
+import {
+  readDefinitionOfDoneFacts,
+  renderDefinitionOfDoneLines,
+  type DefinitionOfDoneFacts
+} from "./dod-facts.js";
 import { startGrokRelay, type GrokRelayHandle } from "./grok-relay.js";
 import { assertFairDebate, type FairDebateReport } from "./fair-debate.js";
 import {
@@ -110,6 +115,19 @@ export interface LiveAcceptanceCeremony {
    * other value the runner can leave behind, and the live proofs refuse it.
    */
   readonly terminalEnvelopeState: "WITHIN" | "EXHAUSTED";
+  /**
+   * The Global definition of done's remaining sub-clauses, read off this same
+   * settled run: the panel-reduced taus and their voice counts, the measured
+   * attack edges, each root's final strength against its tau, the strongest
+   * surviving objection, the evaluator loop record against its sealed bound,
+   * the code-derived label, and the band with its basis. Sub-clauses 4 and 9
+   * are `structuralCeilingMaxModelAttempts` and `terminalEnvelopeState` above.
+   *
+   * A DoD OUTCOME (no root differs, an objection standing, a single-voice
+   * panel, an UNKNOWN magnitude, no surviving objection) rides this block and
+   * the printed report; only a SHAPE violation refuses the ceremony.
+   */
+  readonly definitionOfDone: DefinitionOfDoneFacts;
   /** Append-only probe evidence rows for this isolated ceremony (boot/admission/claim). */
   readonly providerProbeEvidenceCount: number;
   readonly nodeMakerLineage: readonly {
@@ -370,6 +388,16 @@ export async function runAcceptanceCeremony(
       reviewerProviderRef: row.reviewer_provider_ref,
       reviewArtifactRef: row.review_artifact_ref
     })));
+    /**
+     * The definition-of-done facts, from the run's own relations plus the
+     * answer just read through the API. The loop bound is the register row this
+     * deployment already resolved — never a literal restated here.
+     */
+    const definitionOfDone = await readDefinitionOfDoneFacts(database.pool, {
+      runId: accepted.run_ref,
+      answer,
+      sealedEvaluatorLoopMaxRounds: policy.synthesisRolePolicy.evaluatorLoopMaxRounds
+    });
     const uiUrl = `http://localhost:3000/debate/${accepted.run_ref}`;
     console.info(`ACC-01 run id: ${accepted.run_ref}`);
     console.info(`ACC-01 answer id: ${answer.answer_id}`);
@@ -387,6 +415,9 @@ export async function runAcceptanceCeremony(
       `T17 envelope at terminal: ${terminalEnvelopeState} · ` +
       `${modelCallCount}/${structuralCeilingMaxModelAttempts} model attempts (panel included)`
     );
+    // The remaining Global-DoD sub-clauses, one line each, on the same stream
+    // `tools/closing-run.sh` captures verbatim.
+    for (const line of renderDefinitionOfDoneLines(definitionOfDone)) console.info(line);
     console.info(`PRO-01 per-node maker lineage: ${JSON.stringify(nodeMakerLineage)}`);
     console.info(`XREV-01 per-node review lineage: ${JSON.stringify(nodeReviewLineage)}`);
     console.info(`ACC-01 UI: ${uiUrl}`);
@@ -404,6 +435,7 @@ export async function runAcceptanceCeremony(
       discoveredPanelSize,
       structuralCeilingMaxModelAttempts,
       terminalEnvelopeState,
+      definitionOfDone,
       providerProbeEvidenceCount,
       nodeMakerLineage,
       nodeReviewLineage,

@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { parseAcceptanceArguments } from "./run-acceptance.js";
 import { announceAbsentMakers } from "./absent-makers.js";
+import { DEFINITION_OF_DONE_TOKENS } from "./dod-facts.js";
 
 describe("ACC-01 one-shot ceremony arguments", () => {
   const serviceCredential = "s".repeat(43);
@@ -196,5 +197,60 @@ describe("ACC-01 an absent configured maker is LOUD before the debate starts", (
       announcerAt,
       "a configured maker's absence is announced BEFORE the runtime that runs the debate is built"
     ).toBeLessThan(runtimeAt);
+  });
+
+  /**
+   * The same SOURCE-ORDER floor, for the Global-DoD facts. The only end-to-end
+   * witness is `runAcceptanceCeremony` itself (embedded PostgreSQL, an API and
+   * three vendor CLIs), so what is reachable here is the ORDER of the three
+   * symbols inside the ceremony's own body, anchored on the symbols and never
+   * on line numbers: the reader is called, its lines are rendered onto the
+   * report's own `console.info` stream, and only then does the ceremony return.
+   *
+   * The token SET is pinned in the same test rather than in a second one: a
+   * ceremony that prints `renderDefinitionOfDoneLines` before returning prints
+   * exactly the tokens that function emits, so the two halves together are the
+   * claim "every documented token is printed before the report returns".
+   */
+  it("calls the DoD reader and prints every documented token before it returns the report", async () => {
+    const source = await readFile(new URL("./run-acceptance.ts", import.meta.url), "utf8");
+    const ceremonyAt = source.indexOf("export async function runAcceptanceCeremony(");
+    expect(ceremonyAt, "runAcceptanceCeremony must exist to have an order at all").toBeGreaterThan(-1);
+    const body = source.slice(ceremonyAt);
+
+    const readerAt = body.indexOf("readDefinitionOfDoneFacts(");
+    const renderAt = body.indexOf("renderDefinitionOfDoneLines(");
+    const returnAt = body.indexOf("return Object.freeze({");
+    expect(readerAt, "the ceremony must CALL the DoD reader").toBeGreaterThan(-1);
+    expect(renderAt, "the ceremony must render the DoD lines").toBeGreaterThan(-1);
+    expect(returnAt, "the ceremony must return a report to have an order against").toBeGreaterThan(-1);
+    expect(readerAt, "the facts are read before they are rendered").toBeLessThan(renderAt);
+    expect(renderAt, "the lines are printed BEFORE the ceremony returns its report").toBeLessThan(returnAt);
+    expect(
+      body.slice(renderAt, returnAt),
+      "the rendered lines go to the report's own console.info stream"
+    ).toContain("console.info(");
+    expect(
+      body.slice(0, returnAt),
+      "the typed facts block rides the returned report"
+    ).toContain("definitionOfDone");
+
+    const { renderDefinitionOfDoneLines, deriveDefinitionOfDoneFacts } = await import("./dod-facts.js");
+    const lines = renderDefinitionOfDoneLines(deriveDefinitionOfDoneFacts({
+      nodes: [{ nodeId: "n1", depth: 0, tau: 0.5, finalStrength: 0.7, panel: { voiceCount: 2, nonAuthorVoiceCount: 1 } }],
+      edges: [],
+      loopRounds: [{ round: 1, synthesizerStage: "INITIAL", evaluatorSatisfied: true }],
+      sealedEvaluatorLoopMaxRounds: 3,
+      conditionMarks: [],
+      verdictState: "CONTESTED",
+      verdictUnavailableReasonRef: null,
+      terminal: "SERVED",
+      serveState: "COMPOSED",
+      confidenceBand: "FULL",
+      bandCeiling: { basis: { LOOKED_UP: 0, RAN: 0, REASONING: 1 }, registerRowKey: "wayOfKnowingCeiling" }
+    }));
+    for (const token of Object.values(DEFINITION_OF_DONE_TOKENS)) {
+      expect(lines.filter((line) => line.startsWith(`${token}:`))).toHaveLength(1);
+    }
   });
 });
