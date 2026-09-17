@@ -98,8 +98,13 @@ reached, every command on the machine failing with `fork: Resource temporarily u
 Claude updater writing another empty file while reporting success. The chain ended when V replaced
 the corrupted file with a two-line program that exits (a shell-builtin write, no new process needed)
 and reinstalled codex (`npm install -g @openai/codex@0.154.0`, 20:31). The old engine's tmux workers
-were not involved (one tmux process, four days old). What wrote the garbage is not proven; the
-timeline points at another agent updating CLIs on the same machine.
+were not involved (one tmux process, four days old). **Measured later (D75 ADDENDUM 2):** the empty
+claude and grok files are what their own built-in updaters left behind — `claude update` run from
+2.1.216 writes a 0-byte file and prints "Successfully updated" (proved at 21:58 against a complete
+install from 21:56; the CDN serves the file fine) — so on this Mac install Claude with
+`curl -fsSL https://claude.ai/install.sh | bash`, never `claude update` from 2.1.216. The codex.js
+plain-text overwrite is still unattributed. The old engine's launchd watchdog (every 120 s, with an
+unattended Codex escalation) and its codex worker kept re-triggering the chain by calling `codex`.
 
 **The working configuration today (pre-flight 3 of 3 at 20:35), using the untouched older builds:**
 

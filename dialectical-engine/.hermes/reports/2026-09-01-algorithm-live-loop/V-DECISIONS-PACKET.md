@@ -265,12 +265,18 @@ verbatim so the presentation can be made.
 
 ### E. The evening of 2026-09-17 — one question for you, and two defaults
 
-- **Question.** At 19:29 the ChatGPT desktop app with Codex started, and in the same minute new
-  builds of the Claude and Grok command lines were created; at 20:10:44 both were emptied to zero
-  bytes in the same second, and the Codex launcher was overwritten with text in the same minutes
-  (D75 b). **Did you ask another AI tool to update the CLIs that evening?** If yes, that is the
-  writer; if no, something else on this Mac is altering executables and needs looking at (the
-  NordVPN "Shield" protection extension is running; its logs were not readable from here).
+- **Question (narrowed at 22:0x — D75 ADDENDUM 2).** The empty Claude files are what `claude update`
+  run from 2.1.216 leaves behind on this Mac (measured at 21:58; the download server is fine). Two
+  things remain yours to confirm: **did you run Grok's updater at ~20:10 as well** (its file and
+  Claude's were emptied in the same second), and **did anything of yours edit the Codex launcher
+  between 20:08 and 20:12** (the plain-text overwrite is still unattributed)? Until the updater's
+  fault is understood: install Claude with the official script, never `claude update` from 2.1.216,
+  and let the pre-flight verify before a run.
+- **For the old engine's to-do list (not this mission's):** `com.dialectical.watchdog` runs every
+  120 s with `--invoke-codex` (an unattended Codex agent repairing the host, hourly at most) and
+  `com.dialectical.worker.codex-2` calls `codex` for jobs; both turned the broken launcher into a
+  machine-wide outage within minutes. A "must be a program" check before those calls, like the one
+  now in the V3 relays, would have contained it.
 - **Default 7.** The run uses the untouched older builds as overrides (`claude` 2.1.216,
   `grok` 1.0.30) until you repair the two installs; pre-flight 3 of 3 with them (D75 d/3). Veto =
   "repair first" — then run `PREFLIGHT_ONLY=1` again before spending.
