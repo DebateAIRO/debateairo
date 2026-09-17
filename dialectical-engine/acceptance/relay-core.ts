@@ -7,7 +7,7 @@ import {
 } from "node:fs";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, isAbsolute, join, resolve } from "node:path";
 import { z } from "zod";
 
 /**
@@ -136,14 +136,17 @@ export function resolveTestGuardedCommand(
  * it refers to always travels with it (see {@link resolveConfiguredBinary}).
  */
 export const BINARY_REFUSAL_REASONS = Object.freeze([
-  "NOT_ON_PATH", "NOT_FOUND", "EMPTY", "NOT_EXECUTABLE", "NOT_A_PROGRAM"
+  "NOT_ON_PATH", "NOT_FOUND", "EMPTY", "NOT_EXECUTABLE", "UNREADABLE", "NOT_A_PROGRAM"
 ] as const);
 export type BinaryRefusalReason = typeof BINARY_REFUSAL_REASONS[number];
 
 /**
  * The first bytes that make a file a PROGRAM this host can start directly: a
  * `#!` line naming an interpreter, a Mach-O header in either width and either
- * byte order, or a universal ("fat") archive of those.
+ * byte order, a universal ("fat") archive of those, or an ELF header. The last
+ * one is not decoration — this harness is meant to run on more than one
+ * computer, and a resolver that refused every Linux binary would refuse all four
+ * makers there while blaming a corruption that does not exist.
  *
  * Anything else is data wearing an executable bit. That distinction is not
  * academic: a process launcher that cannot EXECUTE a file falls back to reading
@@ -159,10 +162,18 @@ const PROGRAM_HEADERS: readonly (readonly number[])[] = Object.freeze([
   [0xfe, 0xed, 0xfa, 0xcf],
   [0xfe, 0xed, 0xfa, 0xce],
   [0xca, 0xfe, 0xba, 0xbe],
-  [0xbe, 0xba, 0xfe, 0xca]
+  [0xbe, 0xba, 0xfe, 0xca],
+  [0x7f, 0x45, 0x4c, 0x46]
 ].map((header) => Object.freeze(header)));
 
-function hasProgramHeader(path: string): boolean {
+/**
+ * The first four bytes, or null when the file could not be READ at all — which
+ * is a different fact from "these bytes are not a program". A mode-0111 script
+ * passes the executable check and then refuses to open; it is a perfectly good
+ * program, and calling it corrupt would send an operator hunting for damage that
+ * is not there.
+ */
+function readProgramHeader(path: string): Buffer | null {
   const header = Buffer.alloc(4);
   let descriptor: number | undefined;
   let read = 0;
@@ -170,21 +181,34 @@ function hasProgramHeader(path: string): boolean {
     descriptor = openSync(path, "r");
     read = readSync(descriptor, header, 0, header.byteLength, 0);
   } catch {
-    return false;
+    return null;
   } finally {
     if (descriptor !== undefined) closeSync(descriptor);
   }
+  return header.subarray(0, read);
+}
+
+function isProgramHeader(header: Buffer): boolean {
   return PROGRAM_HEADERS.some((magic) =>
-    magic.length <= read && magic.every((byte, index) => header[index] === byte)
+    magic.length <= header.byteLength && magic.every((byte, index) => header[index] === byte)
   );
 }
 
 /**
  * The single admission gate every resolved candidate passes, whichever route
- * named it. Symlinks are followed; the order of the checks is the order an
- * operator can act on — what is there at all, then whether an interrupted
- * install left nothing in it, then whether this user may run it, then whether
- * it is a program rather than data.
+ * named it. `path` is ALWAYS absolute by the time it arrives here, because the
+ * string admitted is the string spawned (see resolveConfiguredBinary).
+ *
+ * `statSync` FOLLOWS symlinks on purpose: nearly every real launcher is one —
+ * a Homebrew or npm global bin, or the `~/.local/bin/claude` of 2026-09-17 that
+ * pointed at a 0-byte `…/versions/<v>`. The defect to catch lives in the target,
+ * while the path kept is the LINK, which is the name the operator installed and
+ * the argv[0] the CLI will see.
+ *
+ * The order of the checks is the order an operator can act on: what is there at
+ * all, then whether an interrupted install left nothing in it, then whether this
+ * user may run it, then whether the header could be read, then whether it is a
+ * program rather than data.
  */
 function admitProgram(path: string, unresolvedCode: string): string {
   const refuse = (reason: BinaryRefusalReason): never => {
@@ -203,19 +227,31 @@ function admitProgram(path: string, unresolvedCode: string): string {
   } catch {
     return refuse("NOT_EXECUTABLE");
   }
-  if (!hasProgramHeader(path)) return refuse("NOT_A_PROGRAM");
+  const header = readProgramHeader(path);
+  if (header === null) return refuse("UNREADABLE");
+  if (!isProgramHeader(header)) return refuse("NOT_A_PROGRAM");
   return path;
 }
 
 /**
- * The `command -v` rule: the directories of PATH in order, first match wins.
+ * THE FIRST PATH ENTRY THAT EXISTS UNDER THE NAME IS THE MATCH, and it is then
+ * admitted or refused; a broken entry is never stepped over. Unlike `command -v`,
+ * which skips a non-executable entry and keeps searching, this resolver names it.
+ * The difference between the two is only ever "refuse loudly, naming the file"
+ * versus "silently run a different install" — and for a debate engine whose whole
+ * output is model attribution, silently running some other `claude` than the one
+ * at the front of the operator's PATH is a lineage hazard, not an ergonomic one.
+ * The cost is real and is the trade taken knowingly: a stale, non-executable
+ * launcher in an early PATH directory now stops the ceremony where the operator's
+ * own shell would have answered cheerfully.
  *
- * A match is an entry that EXISTS under that name (lstat, so a dangling symlink
- * counts), not one that is already known good. A search that skipped a broken
- * entry and kept looking would hide exactly the corruption this resolver exists
- * to report; admission happens afterwards, loudly, against the entry that was
- * actually found. An EMPTY PATH field — which a shell reads as the current
- * directory — is skipped: whatever the process is sitting in is not a deduction.
+ * A match is therefore an entry that EXISTS under that name — `lstatSync`, so a
+ * dangling symlink counts and is reported as NOT_FOUND rather than skipped.
+ *
+ * Directories are searched in PATH order, and an entry that is EMPTY or RELATIVE
+ * is skipped: a shell reads both as "the directory this process happens to be
+ * sitting in", which is not a deduction, and a candidate found that way could
+ * not be spawned as the same file anyway (see resolveConfiguredBinary).
  */
 function discoverOnPath(
   binaryName: string,
@@ -223,7 +259,7 @@ function discoverOnPath(
   source: NodeJS.ProcessEnv
 ): string {
   for (const directory of (source.PATH ?? "").split(delimiter)) {
-    if (directory === "") continue;
+    if (!isAbsolute(directory)) continue;
     const candidate = join(directory, binaryName);
     try {
       lstatSync(candidate);
@@ -258,6 +294,18 @@ function discoverOnPath(
  * verbatim as the provider probe's failureCode and `absent-makers.ts` prints it
  * as `MAKER ABSENT <maker> <code>`, so the operator reads the reason and the
  * path off the run's own log. Nothing here ever starts a candidate.
+ *
+ * THE STRING RETURNED IS ALWAYS ABSOLUTE, and it is the same string `invokeCli`
+ * hands to `spawn`. That is a safety property, not tidiness: the child is
+ * started with `cwd` pointed at a fresh empty scratch directory and an
+ * environment carrying PATH, so a relative candidate would be re-resolved
+ * against a directory holding nothing, and a candidate that `join(".", name)`
+ * had collapsed to a BARE name would re-enter a PATH search INSIDE THE CHILD —
+ * starting a file this gate never examined. On macOS such a file, if it returns
+ * ENOEXEC, is retried through a command interpreter, which is the 2026-09-17
+ * fork-bomb path exactly. A relative key value is therefore resolved against the
+ * process cwd here, where it can still be checked; a relative PATH entry is not
+ * resolved at all, it is skipped.
  */
 export function resolveConfiguredBinary(
   binaryName: string,
@@ -272,7 +320,7 @@ export function resolveConfiguredBinary(
   const named = configured.trim();
   if (named === "") throw new Error(unresolvedCode);
   return admitProgram(
-    /[\\/]/u.test(named) ? named : discoverOnPath(named, unresolvedCode, source),
+    /[\\/]/u.test(named) ? resolve(named) : discoverOnPath(named, unresolvedCode, source),
     unresolvedCode
   );
 }

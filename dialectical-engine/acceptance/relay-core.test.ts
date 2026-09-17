@@ -1,9 +1,13 @@
 import { existsSync } from "node:fs";
-import { chmod, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, isAbsolute, join, relative } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { resolveClaudeBinary } from "./claude-relay.js";
+import { resolveGrokBinary } from "./grok-relay.js";
+import { resolveHermesBinary } from "./hermes-relay.js";
+import { resolveCodexBinary } from "./model-shim.js";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   CLI_RELAY_STDOUT_MAX_BYTES,
@@ -418,35 +422,37 @@ describe("P4-10 loopback relay authentication", () => {
  * ticket: on 2026-09-17 a `codex` launcher whose contents had been overwritten
  * with four lines of plain text was handed to a shell, which — unable to
  * execute it — re-read it as a script and re-entered itself until this Mac's
- * process table was full. The NOT_A_PROGRAM arm below IS that file. It is read
- * four bytes deep and never executed.
+ * process table was full. The NOT_A_PROGRAM arm below has the same SHAPE as that
+ * file (this suite never opened the host's own copy). It is read four bytes deep
+ * and never executed.
  */
+const NAME = "fixture-cli";
+const KEY = "ACCEPTANCE_FIXTURE_BINARY";
+const CODE = "FIXTURE_CLI_BINARY_UNRESOLVED";
+const SHEBANG = "#!/bin/sh\nexit 0\n";
+/** The same shape as the launcher that had been overwritten with plain text. */
+const CORRUPTED_LAUNCHER = "codex\nupdate interrupted\nretry the install\nnot a program\n";
+
+async function pathDirectory(): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), "relay-path-"));
+  temporaryDirectories.push(directory);
+  return directory;
+}
+
+/** `mode` is applied with an explicit chmod so no ambient umask can move it. */
+async function place(
+  directory: string,
+  contents: string | Uint8Array,
+  mode = 0o755,
+  name = NAME
+): Promise<string> {
+  const path = join(directory, name);
+  await writeFile(path, contents);
+  await chmod(path, mode);
+  return path;
+}
+
 describe("D10 maker CLI binary resolution", () => {
-  const NAME = "fixture-cli";
-  const KEY = "ACCEPTANCE_FIXTURE_BINARY";
-  const CODE = "FIXTURE_CLI_BINARY_UNRESOLVED";
-  const SHEBANG = "#!/bin/sh\nexit 0\n";
-  /** The shape of the launcher that had been overwritten with plain text. */
-  const CORRUPTED_LAUNCHER = "codex\nupdate interrupted\nretry the install\nnot a program\n";
-
-  async function pathDirectory(): Promise<string> {
-    const directory = await mkdtemp(join(tmpdir(), "relay-path-"));
-    temporaryDirectories.push(directory);
-    return directory;
-  }
-
-  /** `mode` is applied with an explicit chmod so no ambient umask can move it. */
-  async function place(
-    directory: string,
-    contents: string | Uint8Array,
-    mode = 0o755,
-    name = NAME
-  ): Promise<string> {
-    const path = join(directory, name);
-    await writeFile(path, contents);
-    await chmod(path, mode);
-    return path;
-  }
 
   it("finds the maker's CLI by NAME in the PATH of the environment it is handed", async () => {
     const directory = await pathDirectory();
@@ -495,6 +501,47 @@ describe("D10 maker CLI binary resolution", () => {
       .toThrow(`${CODE}:EMPTY:${path}`);
   });
 
+  /**
+   * A LIVE symlink whose TARGET is the broken thing. This is the shape of nearly
+   * every real launcher — Homebrew's `bin`, npm global bins, and the
+   * `~/.local/bin/claude` of 2026-09-17 that pointed at a 0-byte
+   * `…/versions/2.1.274`. A gate that stopped at the link would refuse every
+   * symlinked install on the machine, or admit every broken one.
+   */
+  it("follows a live symlink into an EMPTY target", async () => {
+    const directory = await pathDirectory();
+    await place(directory, "", 0o755, "target");
+    const link = join(directory, NAME);
+    await symlink(join(directory, "target"), link);
+
+    expect(() => resolveConfiguredBinary(NAME, KEY, CODE, { PATH: directory }))
+      .toThrow(`${CODE}:EMPTY:${link}`);
+  });
+
+  it("follows a live symlink into a target that is not a program", async () => {
+    const directory = await pathDirectory();
+    await place(directory, CORRUPTED_LAUNCHER, 0o755, "target");
+    const link = join(directory, NAME);
+    await symlink(join(directory, "target"), link);
+
+    expect(() => resolveConfiguredBinary(NAME, KEY, CODE, { PATH: directory }))
+      .toThrow(`${CODE}:NOT_A_PROGRAM:${link}`);
+  });
+
+  it("admits a live symlink to a good program and keeps the LINK as the resolved path", async () => {
+    const directory = await pathDirectory();
+    await place(directory, SHEBANG, 0o755, "target");
+    const link = join(directory, NAME);
+    await symlink(join(directory, "target"), link);
+
+    // The link, not the target: the launcher's own name is the argv[0] the CLI
+    // sees and the path the operator installed. Resolving through to
+    // `…/versions/<v>` would spawn a path nobody configured and would change
+    // what the relay reports it ran, for no gain — the target's own defects are
+    // already caught above, because the checks follow the link.
+    expect(resolveConfiguredBinary(NAME, KEY, CODE, { PATH: directory })).toBe(link);
+  });
+
   it("refuses with NOT_EXECUTABLE when the resolved file cannot be executed by this user", async () => {
     const directory = await pathDirectory();
     const path = await place(directory, SHEBANG, 0o644);
@@ -511,6 +558,32 @@ describe("D10 maker CLI binary resolution", () => {
       .toThrow(`${CODE}:NOT_A_PROGRAM:${path}`);
   });
 
+  it("refuses a DIRECTORY carrying the maker's name, which command -v would have skipped", async () => {
+    const directory = await pathDirectory();
+    const path = join(directory, NAME);
+    await mkdir(path);
+
+    expect(() => resolveConfiguredBinary(NAME, KEY, CODE, { PATH: directory }))
+      .toThrow(`${CODE}:NOT_A_PROGRAM:${path}`);
+  });
+
+  /**
+   * An execute-only program IS a program. Saying "not a program" about a file
+   * this user may run, but may not read, sends an operator hunting for a
+   * corruption that is not there; the two facts get two reasons.
+   * Skipped as root, for whom `open(2)` succeeds regardless of the mode.
+   */
+  it.skipIf(process.getuid?.() === 0)(
+    "says the header could not be READ, not that the file is not a program",
+    async () => {
+      const directory = await pathDirectory();
+      const path = await place(directory, SHEBANG, 0o111);
+
+      expect(() => resolveConfiguredBinary(NAME, KEY, CODE, { PATH: directory }))
+        .toThrow(`${CODE}:UNREADABLE:${path}`);
+    }
+  );
+
   it("reads only the FIRST bytes: a shebang further down the file is not a program header", async () => {
     const directory = await pathDirectory();
     const path = await place(directory, `not a launcher\n${SHEBANG}`);
@@ -519,11 +592,15 @@ describe("D10 maker CLI binary resolution", () => {
       .toThrow(`${CODE}:NOT_A_PROGRAM:${path}`);
   });
 
-  it("accepts a Mach-O or universal executable, not only a shebang script", async () => {
+  it("accepts a Mach-O, universal or ELF executable, not only a shebang script", async () => {
     for (const magic of [
       [0xcf, 0xfa, 0xed, 0xfe], [0xce, 0xfa, 0xed, 0xfe],
       [0xfe, 0xed, 0xfa, 0xcf], [0xfe, 0xed, 0xfa, 0xce],
-      [0xca, 0xfe, 0xba, 0xbe], [0xbe, 0xba, 0xfe, 0xca]
+      [0xca, 0xfe, 0xba, 0xbe], [0xbe, 0xba, 0xfe, 0xca],
+      // ELF. This harness is meant to run on more than one computer, and a
+      // resolver that refused every Linux binary would say NOT_A_PROGRAM about
+      // a file that is perfectly fine — the most misleading refusal available.
+      [0x7f, 0x45, 0x4c, 0x46]
     ]) {
       const directory = await pathDirectory();
       const path = await place(directory, Uint8Array.from([...magic, 0x0c, 0x00, 0x00, 0x01]));
@@ -587,6 +664,47 @@ describe("D10 maker CLI binary resolution", () => {
     })).toBe(program);
   });
 
+  /**
+   * C-1. The path that is ADMITTED must be the path that is SPAWNED, and only an
+   * absolute one can be. `invokeCli` spawns with `cwd` pointed at a fresh empty
+   * scratch directory and a child env carrying PATH, so a relative candidate
+   * would be re-resolved against a directory that holds nothing, and a candidate
+   * that `join(".", name)` had collapsed to a BARE name would re-enter a PATH
+   * search inside the child — landing on a file this gate never saw, which on
+   * macOS an ENOEXEC retry can then feed to a command interpreter. That is the
+   * 2026-09-17 path exactly.
+   */
+  it("resolves a relative value in the operator's key to an absolute path", async () => {
+    const directory = await pathDirectory();
+    const program = await place(directory, SHEBANG);
+    const relativeToCwd = relative(process.cwd(), program);
+
+    expect(isAbsolute(relativeToCwd)).toBe(false);
+    expect(resolveConfiguredBinary(NAME, KEY, CODE, { [KEY]: relativeToCwd })).toBe(program);
+  });
+
+  it("names the ABSOLUTE path when it refuses a relative value in the key", async () => {
+    // Nothing is created: `./probe-cli` does not exist under this process's cwd,
+    // and the refusal must still say WHICH file it looked for.
+    expect(() => resolveConfiguredBinary(NAME, KEY, CODE, { [KEY]: "./probe-cli" }))
+      .toThrow(`${CODE}:NOT_FOUND:${join(process.cwd(), "probe-cli")}`);
+  });
+
+  it("skips a relative PATH entry exactly as it skips an empty one", async () => {
+    const directory = await pathDirectory();
+    const program = await place(directory, SHEBANG);
+    const relativeDirectory = relative(process.cwd(), directory);
+
+    expect(() => resolveConfiguredBinary(NAME, KEY, CODE, { PATH: "." }))
+      .toThrow(`${CODE}:NOT_ON_PATH:${NAME}`);
+    expect(() => resolveConfiguredBinary(NAME, KEY, CODE, { PATH: relativeDirectory }))
+      .toThrow(`${CODE}:NOT_ON_PATH:${NAME}`);
+    // …and an absolute entry standing behind a relative one is still searched.
+    expect(resolveConfiguredBinary(NAME, KEY, CODE, {
+      PATH: [".", "", directory].join(delimiter)
+    })).toBe(program);
+  });
+
   it("resolves a program WITHOUT running it", async () => {
     const directory = await pathDirectory();
     const marker = join(directory, "ran");
@@ -597,9 +715,14 @@ describe("D10 maker CLI binary resolution", () => {
   });
 
   it("never routes a candidate binary through a shell anywhere in acceptance/", async () => {
-    const directory = fileURLToPath(new URL(".", import.meta.url));
-    const sources = (await readdir(directory))
-      .filter((entry) => entry.endsWith(".ts") && !entry.endsWith(".test.ts"))
+    const root = fileURLToPath(new URL(".", import.meta.url));
+    // RECURSIVE, and every file kind, so the name of this test is the truth:
+    // fixtures and subdirectories are scanned too. Only `*.test.ts` is excluded,
+    // because a suite must be able to WRITE a shebang fixture and to name the
+    // patterns it forbids.
+    const sources = (await readdir(root, { recursive: true, withFileTypes: true }))
+      .filter((entry) => entry.isFile() && !entry.name.endsWith(".test.ts"))
+      .map((entry) => relative(root, join(entry.parentPath, entry.name)))
       .sort();
     // A shell that cannot EXECUTE a file re-reads it as a script; that is how a
     // corrupted launcher became a fork bomb on 2026-09-17. The relays spawn the
@@ -610,13 +733,47 @@ describe("D10 maker CLI binary resolution", () => {
     ];
     const offenders: string[] = [];
     for (const source of sources) {
-      const text = await readFile(join(directory, source), "utf8");
+      const text = await readFile(join(root, source), "utf8");
       for (const pattern of forbidden) {
         if (text.includes(pattern)) offenders.push(`${source}: ${pattern}`);
       }
     }
 
     expect(sources).toContain("relay-core.ts");
+    expect(sources).toContain(join("test-fixtures", "evaluator-double.ts"));
+    expect(sources).toContain(join("test-fixtures", "fake-claude-cli.mjs"));
     expect(offenders).toEqual([]);
+  });
+});
+
+/**
+ * C-1. `invokeCli` spawns `command.binary` from a scratch `cwd` with a child env
+ * that carries PATH, so anything short of an absolute path is re-resolved
+ * somewhere else — and the file that runs need not be the file that was
+ * admitted. Each maker's CommandSpec takes its `binary` straight from the
+ * resolver below (`() => ({ binary: resolve*Binary(), … })` in each start
+ * function), so pinning the resolvers pins every CommandSpec the harness builds.
+ */
+describe("D10 every maker resolves to an ABSOLUTE path", () => {
+  const makers = [
+    { name: "claude", key: "ACCEPTANCE_CLAUDE_BINARY", resolve: resolveClaudeBinary },
+    { name: "grok", key: "ACCEPTANCE_GROK_BINARY", resolve: resolveGrokBinary },
+    { name: "codex", key: "ACCEPTANCE_CODEX_BINARY", resolve: resolveCodexBinary },
+    { name: "hermes", key: "ACCEPTANCE_HERMES_BINARY", resolve: resolveHermesBinary }
+  ] as const;
+
+  it("from PATH discovery and from a relative key alike, for all four", async () => {
+    for (const maker of makers) {
+      const directory = await pathDirectory();
+      const program = await place(directory, SHEBANG, 0o755, maker.name);
+
+      const discovered = maker.resolve({ PATH: directory });
+      expect(isAbsolute(discovered), `${maker.name} via PATH`).toBe(true);
+      expect(discovered).toBe(program);
+
+      const viaKey = maker.resolve({ [maker.key]: relative(process.cwd(), program) });
+      expect(isAbsolute(viaKey), `${maker.name} via a relative key`).toBe(true);
+      expect(viaKey).toBe(program);
+    }
   });
 });
