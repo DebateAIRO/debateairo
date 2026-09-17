@@ -104,7 +104,7 @@ afterEach(() => {
 });
 
 describe("Help Corpus loader", () => {
-  it("keeps the prior editorial manifest visibly stale after public-guide authoring", () => {
+  it("binds the separately reviewed public-guide corpus in the editorial manifest", () => {
     const directory = fileURLToPath(
       new URL("../../packages/support-kb/content/", import.meta.url),
     );
@@ -119,13 +119,12 @@ describe("Help Corpus loader", () => {
     };
     const componentBytes = readFileSync(componentPath);
 
-    expect(manifest.articles).toHaveLength(26);
-    expect(manifest.recovery.componentFileSha256).not.toBe(sha256(componentBytes));
-    expect(() => loadHelpCorpus(directory,{
+    expect(manifest.articles).toHaveLength(32);
+    expect(manifest.recovery.componentFileSha256).toBe(sha256(componentBytes));
+    const corpus = loadHelpCorpus(directory,{
       reviewManifest:manifest,recoveryComponents:componentBytes,requireReviewedRecovery:true
-    } as never)).toThrowError(expect.objectContaining({
-      code:"SUPPORT_KB_RECOVERY_COMPONENT_INVALID"
-    }));
+    } as never);
+    expect(corpus.recoveryReviewedCount).toBe(22);
   });
 
   it("keeps changed and new real corpus drafts excluded until separate editorial review", () => {
@@ -148,7 +147,7 @@ describe("Help Corpus loader", () => {
     expect(corpus.kbVersion).toMatch(/^[0-9a-f]{64}$/u);
   });
 
-  it("does not admit the changed component set before its separate review manifest lands", () => {
+  it("admits the changed component set after its separate review manifest lands", () => {
     const directory = fileURLToPath(
       new URL("../../packages/support-kb/content/", import.meta.url),
     );
@@ -159,10 +158,12 @@ describe("Help Corpus loader", () => {
       new URL("../../packages/support-kb/recovery/components.json", import.meta.url),
     );
 
-    expect(() => loadHelpCorpus(directory,{
+    const corpus = loadHelpCorpus(directory,{
       reviewManifest: JSON.parse(readFileSync(manifestPath,"utf8")) as unknown,
       recoveryComponents: readFileSync(componentPath),requireReviewedRecovery: true
-    })).toThrowError(expect.objectContaining({ code:"SUPPORT_KB_RECOVERY_COMPONENT_INVALID" }));
+    });
+    expect(corpus.entries).toHaveLength(44);
+    expect(corpus.recoveryReviewedCount).toBe(22);
   });
 
   it("serves only complete bilingual pairs that are shipped and V-ratified, counting every other id as ignored", () => {

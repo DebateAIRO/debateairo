@@ -42,17 +42,38 @@ const IDENTITY_REVIEW = Object.freeze({
   ratifiedOn: "",
 });
 
+const GUIDE_REVIEW = Object.freeze({
+  reviewedBy: "SOL",
+  reviewerSession: "01a09ef7-e096-7c31-9b35-806840028cf0",
+  reviewedOn: "2026-09-17",
+  evidence:
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_EDITORIAL_RECHECK.md",
+  ratifiedBy: "",
+  ratifiedOn: "",
+});
+
+const GUIDE_IDS = new Set([
+  "app-navigation",
+  "debate-workspace-menus",
+  "settings-help-menus",
+  "support-status-limits",
+]);
+
 const EXPECTED = [
   ["account-access", "en", "17aac248d75d7ad161fba2a44068d20743a9759ae56c9b30359c7e1d5550c2e7", "c138d4ed2ecd19847cb74b1fd7ad91eb9b047369cb2a391f15563e0915ec192a", "6b5d2dcff5c21d11eae6c6a92cabea39ec253e8e54b5d890d9b25d56f9eab32d"],
   ["account-access", "ro", "5048de52b22b474fb8185e718fcaf235cd23896eff8fd7e42f4399d5266e9410", "e3ca804d9cd657ec82e9a9f81fd2dc1299997ee59cc4a752e757cd9e67d6ef98", "47d2b4b41acc0d0ef976bab9e08e5f617303612bfeda2b969a2958d6618ad8c0"],
   ["account-settings", "en", "2cab95047c1c34109794f3fc1ad620784bbb97b9267160d471551454d296f628", "67f5ce1fd18952c94a981f772e32e29c8c526b5591d656c202260486826a0d62", "6d99d7eeb445525b3bf3cf55f4283ee24fec536ff4f9ccc3a3b1f928904091bf"],
   ["account-settings", "ro", "e2b2834ff96da50a0511b2647ae490f6f99af80e317a74caddb16ee8262bc5d9", "f941492f0a6bed283a0fd70aa6ffeb20304b40c5bdfdd8e01f438cf3094f08f8", "1b7be7bebd1932a4630bea3df60d016218ecedca1ef538ac14510ef66d5f2aad"],
+  ["app-navigation", "en", "a92e96c24c3df6d7a9b3e73a3fafde79321cd7445612588024ea205fb5c6e6db", "3f17d7323fcd88f34b6f9f1a4da904b0da28a18a09f6fa7f814e6333f4b83b29", "4264551f61745540e92932ee99a99405152e94edf8b167e0ee19c5463526411d"],
+  ["app-navigation", "ro", "a6f79cd55e0856780bff01ec3134df02a068b41453f44a8847c5c58050af8a23", "04001a0ddc6b3f743946fec81d2d3d5caed672f5f14d430eb3af74dc1421e3a3", "e6a00272d90624b8367c54d60b8ecad42ee69ddf8155729b972eb8463a2d1cde"],
   ["browse-public-debates", "en", "8059a2e46af231765a80f61854752aa5a9ec49e60c95dc715eb3e82a39618fad", "c5c6d262a33abda6c4cf76024cfaa5f42c2b51f2e3242ae3ed3d3bf157ba1034", "c5294a4cae6fc88b300ec64634fbbb2531e7eef783bed814f387834804f21bb6"],
   ["browse-public-debates", "ro", "0fb2aa501c0980af4afb52520c10e51ca0814266bd2258b1f727fa52d16e0241", "87cb63222b2a74f1c75e4d25c28e69e35de0673049d4be055f7de201459e0897", "37bd679ea02946cbdcf7948c7d1345376592335f4e8bde3b2e78adf339e0f40d"],
   ["budget-tier-choice", "en", "a49d563ef7bfec75ed179a70adb54c25947aa9cbe4db557698eacc84d1d3c683", "e6d5adf85f44c3fd1aaa2c70d095f6f2474723a5b72393d4a006f0206fa64104", "cb920483c56311f42b1adf89c581320a4a5344dcc90028fa458ad6028867d601"],
   ["budget-tier-choice", "ro", "e648150ae607bb98c55059eaea6162ffc2cd09df437721b75c8c7b226ef4984d", "d8648bd28c6eddb018f6508c7c1eed9e0a20941807979d42701e35e4351ea371", "1496048887bc41ba3968fdaf7d0fe17e43feffaba1f1c997f46f0b420d30652f"],
   ["debate-topic-and-description", "en", "695b7b405e599260acd7c5a51f897f46b52b238f2860a20168cd14cfdc176bad", "290097ca24858424c4bc2a6845182a9c1cbcd0214c6a3109e2b32cf7e0bd0f56", "7234ce24457ad97fe943e93b1caf0e28a8d74e30aa1748f1d29b158cdcba67b7"],
   ["debate-topic-and-description", "ro", "90f1fff60a4245eeda7b5131b671772b425e8ab682f967c4c31c2ad42c7207a2", "8cd97dedffdf9b059f4d809b73f60f59174007b42a7a99998989c354af93bee8", "c6470bf637f904245f4c5f468c1b33c1d43d03fa0b45d1d3ba32eb47f12840f7"],
+  ["debate-workspace-menus", "en", "dd5673e995acba7c108c52ff31080880206bdf0d51b2ca9f0113b0828e7be607", "7577c504c4b671b0027e49b37f64f0d2a456df9412a9349e58a98e631f8494bf", "4028dd08b5d16d4ab54fba253595f758273d5d8dc9f8d6784ccf9b5c47d70618"],
+  ["debate-workspace-menus", "ro", "3cd8b0cdabe438779873f8f940cdff4bb2039ff55742f9400f8805320c8cbc39", "e24fe21a32ba3cadd4539cc77afe806630b38b67dce8e33815665017cc3b03ef", "7d0c57c3f8bb32eee70788195fe3d9971cbcb7ee4548249ea9a600207ac9ac0f"],
   ["delete-a-private-debate", "en", "7c37881f26d875f87a0177bc35593d9f52a1739b25a848df98ad2d478c7bdb26", "9ae0d23732c129d4b3e3e06b4c81833a5546b214506ecc53c3b531b4856dc49c", "92409ee15ce6ed5f380136ab090d3ce2a82ee355e379e7d068609baf9e92365b"],
   ["delete-a-private-debate", "ro", "afc631bec586e463df1b217d79fc9ea694f873f5690b028c7b79aa65d83cfaa9", "1f4b3b1719c76d8223159dd73049c47761dd4fd6482103d40cf31d53fd2b54a3", "46037245889b3c11b737e40222ce1c6d1b800020a92ee4e92725ad03d8338727"],
   ["export-json", "en", "c31c5bd3a2eb80e1352f27431e459f8272ae37605a9988210cff2aa82d6b7ea5", "690569195ed4098fd00b5bf102658f9bd26b2610897ca816163f8abb2a47946d", "6abec339af9fc96715c8964a17341461db4042701acb1f54e1e9deea37421afb"],
@@ -71,10 +92,12 @@ const EXPECTED = [
   ["publish-a-debate", "ro", "41858b13ebb6bcec19430b6a63cae6f5854b25ad02e8ac74617d83b087355c3c", "834ec781e6645753549cfca72d8d7bdc70ecb425f1eba125b25c5e04410ea598", "a6f1ef4a94b53df2d77fdd63a14c3f596adaac6b437ab3586424d21815284b26"],
   ["risk-tier-choice", "en", "3ca67a93a3b159c0b284b2bd75093fd9bc70e20d03c357f4ac1fdcb3df522715", "37a5e399d53e5c284febfd79f40fe36bfc611eddb254ccb9a758469e66557929", "7908d0b36c5c62a863ee064095bc3f528792d9588fba9f88c523ea978dffb7f2"],
   ["risk-tier-choice", "ro", "f40e8583d9ec012f6510c4f6ae6a6527680bc279f393388dc8cd2a31762f4d96", "0845807a9ba9cc68c608a5be752fdbaa08147fe8aed5a06a61021bb91675a34a", "d35f24c30f5998d0a8945f6efdd97cbebf45c0612b6181ff47c48c81951b02ab"],
+  ["settings-help-menus", "en", "2f1fd92ebe1f560f631a0990b8883e0aa857783114751f9532cabcf97ba86ede", "3677572a1b6fe513930ad82259a89b985f0c3ce023c57be4489794be27147a79", "ea5720fab4e9755c489c63daec5e85d0cf6b3a0fa9d30a97827dadc7d0e166b5"],
+  ["settings-help-menus", "ro", "57b5e6f5d34327177b504261fcc2b4f24e1e7693093f2d42cfd3348fc17872f7", "4c8e8ab9af79965af5234b0da312f2970bf9d36f3b131765c4ac31353c5d2495", "574aef1c82b5203dcab7fd229ad3c6b9bcaa13c64a55924e7ffc49c5bab2d3cc"],
   ["support-cases", "en", "96ea24b2aff54d46beeb25cec255041f335e93c52590829ad64f53ad62fe9aa2", "7560677362565332479dbe8c16b0e4035278a077512c7eeffdb3bbaa4ba0b76d", "bfc3f07ee653c9d9e798fd8468f1bf658a3ef29e72aef75ba93c348c96a50948"],
   ["support-cases", "ro", "2346f0b14cfd3ac25ccd609d8268809da9975dc2079179778e10df3da7f88aac", "e993e92c67a698c504f3b6bac0eceeb4e47afb56ba02bd10f5c3c5d00274b10c", "dec984e5c9ae5fcf5e0ab7d575aef01339b9300ca42bce94950ab3a39d13ee82"],
-  ["support-status-limits", "en", "7f111d034af0d6ba0765c9bf008d6d8981f8a589e1731695e9bbf7d5f213f15f", "0f18f40c0d5b2985ce4db08f0c8c7555c7a4b235ab86032172913c6ca362ab89", "0dae00645b03d17b120a79cc212696648a9dd76f3f86a2cbab26db710f618534"],
-  ["support-status-limits", "ro", "884956c2b04303c8412a4859746a526d5577e9392e2066843aa977500857511f", "d4163c89dd29974c170da40e39c0f1d34849ac8acec08aa7413d439a0f7dcfbd", "df43c7cccd6017dc7890ba24ceb4255620a3927ca066879fc017f1e508638bb1"],
+  ["support-status-limits", "en", "f5344e3c0e5f0bec3bb3b5b10dff77b12a85d90233a6d7a7cf8a31f38cc7bfe7", "932f33969c279c6e7db4dc9d0d47fee7eb535b0d1cb593f9b9e9ccc743913385", "3aafc3b34626b517e8827a8ff0ab9fa6deadf978dee235bd6d78936f37354375"],
+  ["support-status-limits", "ro", "0ba2909d0b6bf0dbb731e6c19ceff73cd99babbfed69949aec3b28d57f732bfa", "05ede1015a5f66f5a5e2e564d061353d433c3af82ea2871bf9489764a27915f0", "b14e495dcccbcf8d01c1e6213e28ee4c738ee405c6ea8eb4cc572d79f7a73b5e"],
   ["unpublish-a-debate", "en", "70e53322f323778974e50ca4f4342a4e8cba5c41d5139d51452530a40c7563a2", "64f871c823dd78f05d18f50ec45373fa07a9ad79f72b4234c8adc9aae443db0b", "db2b5340f4c9089567e0c8b4559cc9ac4749039b91bd3a8b2fbbd5c799991c1f"],
   ["unpublish-a-debate", "ro", "a741f94571245aadbb6f25d6da5c3c5b87bdf5bf72fa4c5aaf8e03980abce9d0", "9be645d5de8cd8f8c26603966f9e9b8f3d58b7cb7c8a95e9cb7b0fd71289fe25", "b8e1ec1cf886a71658412f2b4bcfdb0dd8c91cd424c94aad3df4c377ecd2af7f"],
   ["unsupported-capabilities", "en", "6e7f19d6d7c00fe4d10660e4dff7ad52e16ae8ff3d85cea13717780af586ec6f", "784bf45291c975c87dd6bb1a11f5b1812ecbefc7f0f52ee5cfb66dbdb4f6e9bd", "4feec8aa3b78a1d52916a3484adce247fb94a68b2107c1d5816fdc9c29e7f41f"],
@@ -84,7 +107,7 @@ const EXPECTED = [
 ] as const;
 
 describe("production Support recovery attestation", () => {
-  it("admits the exact separately reviewed 38-record corpus as a deterministic immutable snapshot", () => {
+  it("admits the exact separately reviewed 44-record corpus as a deterministic immutable snapshot", () => {
     const componentBytes = readFileSync(componentPath);
     const components = JSON.parse(componentBytes.toString("utf8")) as {
       components: Array<{
@@ -110,27 +133,39 @@ describe("production Support recovery attestation", () => {
         articleSha256,
         modelProjectionSha256,
         fallbackSha256,
-        ...(id === "product-identity" ? IDENTITY_REVIEW : REVIEW),
+        ...(GUIDE_IDS.has(id)
+          ? GUIDE_REVIEW
+          : id === "product-identity"
+            ? IDENTITY_REVIEW
+            : REVIEW),
       }),
     );
     expect(corpus.reviewManifest).toMatchObject({
       schemaVersion: 2,
+      catalog: {
+        sha256:
+          "fab7050104b5cab6f861c59a9e72e824ace40a27278573c09dddbe71e1b51acc",
+        reviewedBy: GUIDE_REVIEW.reviewedBy,
+        reviewerSession: GUIDE_REVIEW.reviewerSession,
+        reviewedOn: GUIDE_REVIEW.reviewedOn,
+        evidence: GUIDE_REVIEW.evidence,
+      },
       recovery: {
         componentFileSha256:
-          "8934293e862387fd3e6e83527780640e8497bdc50704854e43eb1d2db24fcae6",
+          "0c06363ee4409efe96807786ad96ed73e46659481f61c56e957eeb340fff3b94",
         components: expectedRows,
       },
     });
-    expect(corpus.reviewManifest.articles).toHaveLength(26);
+    expect(corpus.reviewManifest.articles).toHaveLength(32);
     expect(corpus.entries.map(({ id, lang }) => `${id}.${lang}`)).toEqual(
       EXPECTED.map(([id, lang]) => `${id}.${lang}`),
     );
     expect(corpus).toMatchObject({
-      shippedCount: 19,
+      shippedCount: 22,
       ignoredCount: 0,
-      previewReviewedCount: 13,
+      previewReviewedCount: 16,
       ownerRatifiedCount: 6,
-      recoveryReviewedCount: 19,
+      recoveryReviewedCount: 22,
       recoveryOwnerRatifiedCount: 0,
     });
 
