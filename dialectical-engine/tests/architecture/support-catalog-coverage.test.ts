@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   SUPPORT_ACTION_CATALOG,
   SUPPORT_CAPABILITIES,
+  SUPPORT_GUIDE_LABELS,
   SUPPORT_PAGE_ROUTES,
   SUPPORT_PROXY_ROUTES,
 } from "../../packages/support-kb/src/catalog.js";
@@ -102,6 +103,22 @@ describe("Support catalog route coverage", () => {
     expect(actions.has("pricing")).toBe(false);
     expect(actions.has("theme")).toBe(false);
     expect(actions.has("replay")).toBe(false);
+  });
+
+  it("binds every public guide label to reviewed content and a closed action", () => {
+    const contentDirectory = fileURLToPath(new URL("../../packages/support-kb/content/", import.meta.url));
+    const filenames = new Set(readdirSync(contentDirectory));
+    const actionIds = new Set(SUPPORT_ACTION_CATALOG.map(({ id }) => id));
+
+    for (const label of SUPPORT_GUIDE_LABELS) {
+      expect(filenames.has(`${label.articleId}.en.md`),label.articleId).toBe(true);
+      expect(filenames.has(`${label.articleId}.ro.md`),label.articleId).toBe(true);
+      if (label.actionId !== null) expect(actionIds.has(label.actionId),label.actionId).toBe(true);
+      expect(label.labels.en.length,label.articleId).toBeGreaterThan(0);
+      expect(label.labels.ro.length,label.articleId).toBeGreaterThan(0);
+      expect(label.sourceBinding || label.capabilityBinding || label.actionId !== null,label.articleId)
+        .toBe(true);
+    }
   });
 
   it("keeps the browser-safe catalog free of Node-only imports and exports it as a subpath", () => {

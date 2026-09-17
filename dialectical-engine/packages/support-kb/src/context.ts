@@ -1,6 +1,7 @@
 import type { HelpCorpusEntry } from "./index.js";
 import {
-  SUPPORT_ACTION_CATALOG,type SupportActionId,type SupportCapability,type SupportLanguage
+  SUPPORT_ACTION_CATALOG,SUPPORT_GUIDE_LABELS,
+  type SupportActionDefinition,type SupportActionId,type SupportCapability,type SupportLanguage
 } from "./catalog.js";
 
 export type SupportKnowledgeReference<CanonicalId extends string = string> = Readonly<{
@@ -62,28 +63,6 @@ const GENERIC_EVIDENCE_WORDS = new Set([
   "nou","noua","noi","poate","pot","produs","produsul","sectiune","spune","suport","unde",
   "dezbatere","dezbaterea","dezbateri","dezbaterii","asistenta","modelul","modele"
 ]);
-const ACTION_QUERY_TERMS: Readonly<Record<
-  SupportActionId,Readonly<Record<SupportLanguage,readonly string[]>>
->> = Object.freeze({
-  "home":{ en:["home"],ro:["acasă"] },
-  "start-debate":{ en:["start a debate","create a debate"],ro:["pornește o dezbatere","creează o dezbatere"] },
-  "sign-in":{ en:["sign in","login"],ro:["autentificare"] },
-  "sign-up":{ en:["sign up","create account","register"],ro:["creează cont","înregistrare"] },
-  "help":{ en:["help","help conversation"],ro:["ajutor","conversația ajutor"] },
-  "support-status":{ en:["support status","service status"],ro:["starea serviciului","starea asistenței"] },
-  "method":{ en:["method"],ro:["metodă"] },
-  "sample-transcript":{ en:["transcript","transcripts"],ro:["transcriere","transcrieri"] },
-  "settings":{ en:["settings","account settings"],ro:["setări","account"] },
-  "active-sessions":{ en:["active sessions"],ro:["sesiuni active"] },
-  "privacy-preferences":{ en:["privacy preferences"],ro:["preferințe de confidențialitate"] },
-  "claim-legacy":{ en:["claim legacy debates"],ro:["revendică dezbaterile vechi"] },
-  "delete-account":{ en:["account deletion","delete account"],ro:["ștergere a contului","șterge contul"] },
-  "public-catalog":{ en:["public debate library","browse public debates"],ro:["biblioteca publică","dezbateri publice"] },
-  "your-debates":{ en:["my debates","your debates"],ro:["dezbaterile mele","dezbaterile tale"] },
-  "owner-debate":{ en:["open your debate","owner debate"],ro:["deschide dezbaterea ta","dezbaterea proprietarului"] },
-  "public-debate":{ en:["open public debate"],ro:["deschide dezbaterea publică"] },
-  "forgot-password":{ en:["forgot password"],ro:["am uitat parola"] },
-});
 const ARTICLE_EVIDENCE_TEXT: Readonly<Record<string,string>> = Object.freeze({
   "app-navigation":"pricing preturi functioneaza account settings theme tema method transcript home library acasa biblioteca public compact help ajutor conversatie varianta",
   "browse-public-debates":"browse browsing anonymous visitor rasfoire rasfoi anonim biblioteca public",
@@ -169,23 +148,82 @@ function semanticWords(value: string): readonly string[] {
   return normalizedText(value).split(/[^\p{L}\p{N}]+/u).filter((word) => word.length >= 2);
 }
 
+const NEGATED_TAIL = /\b(?:do\s+not|don['’]?t|not|never|ignore|avoid|without|nu|niciodat[ăa]|ignor[ăa]|evit[ăa]|f[ăa]r[ăa])\b/u;
+const CLAUSE_BOUNDARY = /[.!?;,\n]+|\b(?:but|dar|îns[ăa])\b/u;
+const ACTION_INTENT = /\b(?:where|find|open|read|link|page|tab|browse|navigate|manage|go|see|unde|g[ăa]sesc|deschid|citi|leg[ăa]tur[ăa]|pagin[ăa]|fil[ăa]|r[ăa]sfoi|gestiona|v[ăa]d)\b/u;
+const GENERIC_SINGLE_ACTION_LABEL = /^(?:help|ajutor)$/u;
+
+function affirmativeQuery(value: string): string {
+  return normalizedText(value).split(CLAUSE_BOUNDARY).flatMap((clause) => {
+    const trimmed = clause.trim();
+    if (trimmed === "") return [];
+    const negated = NEGATED_TAIL.exec(trimmed);
+    const affirmative = (negated === null ? trimmed : trimmed.slice(0,negated.index)).trim();
+    return affirmative === "" ? [] : [affirmative];
+  }).join(" ");
+}
+
+function phraseScore(value: string,term: string): number {
+  const valueWords = semanticWords(value);
+  const termWords = semanticWords(term);
+  if (termWords.length === 0 || valueWords.length < termWords.length) return 0;
+  for (let start = 0;start <= valueWords.length - termWords.length;start += 1) {
+    if (termWords.every((termWord,index) => valueWords[start + index] === termWord)) {
+      return termWords.length;
+    }
+  }
+  return 0;
+}
+
+function orderedPhraseScore(value: string,term: string): number {
+  const valueWords = semanticWords(value);
+  const termWords = semanticWords(term);
+  let cursor = 0;
+  const matched = termWords.length > 0 && termWords.every((termWord) => {
+    const offset = valueWords.slice(cursor).findIndex((valueWord) =>
+      valueWord === termWord || inflectedMatch(valueWord,termWord));
+    if (offset === -1) return false;
+    cursor += offset + 1;
+    return true;
+  });
+  return matched ? termWords.length : 0;
+}
+
+function endsWithPhrase(value: string,term: string): boolean {
+  const valueWords = semanticWords(value);
+  const termWords = semanticWords(term);
+  return termWords.length > 0 && valueWords.length >= termWords.length
+    && termWords.every((word,index) =>
+      valueWords[valueWords.length - termWords.length + index] === word);
+}
+
 function actionEvidenceScore(
-  query: string,actionId: SupportActionId,language: SupportLanguage
+  query: string,definition: SupportActionDefinition,language: SupportLanguage
 ): number {
-  const queryWords = semanticWords(query);
-  return Math.max(0,...ACTION_QUERY_TERMS[actionId][language].map((term) => {
-    const termWords = semanticWords(term);
-    let cursor = 0;
-    const matched = termWords.length > 0 && termWords.every((termWord) => {
-      const offset = queryWords.slice(cursor).findIndex((queryWord) =>
-        queryWord === termWord || inflectedMatch(queryWord,termWord)
-      );
-      if (offset === -1) return false;
-      cursor += offset + 1;
-      return true;
-    });
-    return matched ? termWords.length : 0;
+  const hasIntent = ACTION_INTENT.test(query);
+  const guideAliases = SUPPORT_GUIDE_LABELS
+    .filter(({ actionId }) => actionId === definition.id)
+    .filter(({ requiresNavigationIntent }) => !requiresNavigationIntent || hasIntent)
+    .flatMap(({ labels }) => labels[language]);
+  return Math.max(0,...[definition.labels[language],...guideAliases].map((term) => {
+    const score = orderedPhraseScore(query,term);
+    if (definition.id === "method"
+      && /^(?:how\s+it\s+works|cum\s+functioneaza)$/u.test(normalizedText(term))
+      && (!hasIntent || !endsWithPhrase(query,term))) return 0;
+    return score === 1 && GENERIC_SINGLE_ACTION_LABEL.test(normalizedText(term)) && !hasIntent
+      ? 0 : score;
   }));
+}
+
+function isParentDestination(
+  parent: SupportActionDefinition,child: SupportActionDefinition
+): boolean {
+  if (parent.href === null || child.href === null || parent.href === child.href) return false;
+  const parentUrl = new URL(parent.href,"https://support.invalid");
+  const childUrl = new URL(child.href,"https://support.invalid");
+  return parentUrl.pathname === childUrl.pathname
+    && parentUrl.search === "" && parentUrl.hash === ""
+    && (childUrl.search !== "" || childUrl.hash !== "");
 }
 
 function baseSection(
@@ -243,6 +281,8 @@ export function buildSupportKnowledgeContext(input: Readonly<{
   const base = baseSection(input.capabilities,input.language,availableActionIds);
 
   const product = productQuery(input.query);
+  const affirmative = affirmativeQuery(input.query);
+  const hasActionIntent = ACTION_INTENT.test(affirmative);
   const queryWords = product.words;
   const eligibleEntries = input.entries.filter(({ lang,modelProjection }) =>
     lang === input.language && modelProjection !== undefined
@@ -254,27 +294,55 @@ export function buildSupportKnowledgeContext(input: Readonly<{
     && /(?:^|\s)(?:what|why|is|este|define|defineste|definește|describe|descrie|explain|explica|explică)\b/u.test(product.normalized)
     && identityEntryScore >= Math.max(1,product.substantiveWords.size - 1);
   const identityRequest = product.identityOverview || identityFactQuestion;
-  const scoringWords = product.branded ? product.substantiveWords : queryWords;
+  const scoringWords = product.branded ? product.substantiveWords : normalizeWords(affirmative);
   const directWords = product.branded ? product.substantiveWords : evidenceWords(input.query);
+  const guideMatches = SUPPORT_GUIDE_LABELS.map((item) => {
+    if (item.requiresNavigationIntent && !hasActionIntent) return Object.freeze({ item,score:0 });
+    const score = Math.max(0,...item.labels[input.language].map((label) => {
+      const matched = phraseScore(affirmative,label);
+      return item.actionId !== null && matched === 1
+        && GENERIC_SINGLE_ACTION_LABEL.test(normalizedText(label)) && !hasActionIntent
+        ? 0 : matched;
+    }));
+    return Object.freeze({ item,score });
+  }).filter(({ score }) => score > 0);
+  const guideArticleEvidence = new Map<string,number>();
+  for (const { item,score } of guideMatches) {
+    if (item.sourceBinding) guideArticleEvidence.set(
+      item.articleId,Math.max(guideArticleEvidence.get(item.articleId) ?? 0,score)
+    );
+  }
   const articleEvidence = new Map(eligibleEntries.map((entry) => {
     const titleScore = overlapScore(directWords,entry.title);
     const projectionScore = overlapScore(directWords,entry.modelProjection ?? "");
     const aliasScore = overlapScore(directWords,ARTICLE_EVIDENCE_TEXT[entry.id] ?? "");
     const coverage = directWords.size === 0 ? 0
       : Math.max(titleScore,projectionScore) / directWords.size;
-    const meaningful = aliasScore >= 2 || aliasScore >= 1 && titleScore >= 1
+    const guideScore = guideArticleEvidence.get(entry.id) ?? 0;
+    const meaningful = guideScore > 0 || aliasScore >= 2 || aliasScore >= 1 && titleScore >= 1
       || aliasScore >= 1 && directWords.size <= 2 || titleScore >= 2
       || directWords.size === 1 && projectionScore === 1
       || projectionScore >= 2 && coverage >= 0.6;
     return [entry.id,Object.freeze({
-      titleScore,projectionScore,aliasScore,
+      titleScore,projectionScore,aliasScore,guideScore,
       meaningful,
-      score:aliasScore * 1_000_000 + titleScore * 1_000 + projectionScore
+      score:guideScore * 100 + aliasScore * 1_000_000
+        + titleScore * 1_000 + projectionScore
     })] as const;
   }));
+  const actionEvidence = SUPPORT_ACTION_CATALOG
+    .filter(({ id }) => availableActionIds.has(id))
+    .map((definition) => Object.freeze({
+      definition,score:actionEvidenceScore(affirmative,definition,input.language),
+      sourceArticleIds:Object.freeze(guideMatches
+        .filter(({ item }) => item.capabilityBinding && item.actionId === definition.id)
+        .map(({ item }) => item.articleId))
+    }))
+    .filter(({ score }) => score > 0);
+  const matchedActionIds = new Set(actionEvidence.map(({ definition }) => definition.id));
   const matchedCapabilities = (identityRequest
     ? input.capabilities.filter(({ id }) => id === "product-identity").map((item) => ({
-      item,score:1,catalogScore:0,articleScore:1,catalogComplete:false
+      item,score:1,catalogScore:0,articleScore:1,actionScore:0,catalogComplete:false
     }))
     : input.capabilities
     .map((item) => ({
@@ -289,6 +357,9 @@ export function buildSupportKnowledgeContext(input: Readonly<{
           const evidence = articleEvidence.get(entry.id);
           return evidence?.meaningful === true ? evidence.score : 0;
         })),
+      actionScore: Math.max(0,...item.actionIds.map((id) =>
+        actionEvidence.find(({ definition,sourceArticleIds }) => definition.id === id
+          && sourceArticleIds.some((articleId) => item.articleIds.includes(articleId)))?.score ?? 0)),
       catalogComplete:(() => {
         const required = normalizeWords(
           `${item.labels[input.language]} ${item.searchTerms[input.language].join(" ")}`
@@ -296,21 +367,24 @@ export function buildSupportKnowledgeContext(input: Readonly<{
         return required.size > 0 && overlapScore(required,input.query) === required.size;
       })(),
     }))
-    .filter(({ catalogScore,articleScore }) => catalogScore >= 2 || articleScore > 0)
-    .map(({ item,catalogScore,articleScore,catalogComplete }) => ({
+    .filter(({ catalogScore,articleScore,actionScore }) =>
+      catalogScore >= 2 || articleScore > 0 || actionScore > 0)
+    .map(({ item,catalogScore,articleScore,actionScore,catalogComplete }) => ({
       item,
-      score: articleScore * 1_000 + catalogScore
+      score: actionScore * 1_000_000_000_000 + articleScore * 1_000 + catalogScore
         + (product.preferredArticleId !== null
           && item.articleIds.includes(product.preferredArticleId) ? 1_000_000_000 : 0),
-      catalogScore,articleScore,catalogComplete,
+      catalogScore,articleScore,actionScore,catalogComplete,
     }))
     .sort((left, right) => right.score - left.score || left.item.id.localeCompare(right.item.id, "en")));
-  const directActionCandidates = matchedCapabilities.flatMap(({ item }) => item.actionIds
-    .filter((actionId) => availableActionIds.has(actionId))
-    .map((actionId) => Object.freeze({
-      actionId,score:actionEvidenceScore(input.query,actionId,input.language)
-    }))
-    .filter(({ score }) => score > 0));
+  const matchedCapabilityActionIds = new Set(matchedCapabilities
+    .flatMap(({ item }) => item.actionIds));
+  const directActionCandidates = actionEvidence
+    .filter(({ definition }) => matchedCapabilityActionIds.has(definition.id))
+    .filter(({ definition }) => !actionEvidence.some(({ definition: other }) =>
+      other.id !== definition.id && matchedActionIds.has(other.id)
+        && isParentDestination(definition,other)))
+    .map(({ definition,score }) => Object.freeze({ actionId:definition.id,score }));
   const actionIds: SupportActionId[] = [];
   const seen = new Set<SupportActionId>();
   const addAction = (actionId: SupportActionId) => {
@@ -331,14 +405,15 @@ export function buildSupportKnowledgeContext(input: Readonly<{
     score:number;strong:boolean;completeOrder:number
   }>>();
   const hasCompleteCatalogMatch = matchedCapabilities.some(({ catalogComplete }) => catalogComplete);
-  for (const { item,score,catalogScore,catalogComplete } of matchedCapabilities) {
+  for (const { item,score,catalogScore,actionScore,catalogComplete } of matchedCapabilities) {
     item.articleIds.forEach((id,index) => {
       const weighted = score * 1_000 + item.articleIds.length - index;
       const current = capabilityArticleScore.get(id);
       capabilityArticleScore.set(id,Object.freeze({
         score:Math.max(current?.score ?? 0,weighted),
         strong:current?.strong === true
-          || identityRequest && item.id === "product-identity" || catalogScore >= 2,
+          || identityRequest && item.id === "product-identity"
+          || catalogScore >= 2 || actionScore > 0,
         completeOrder:Math.max(
           current?.completeOrder ?? 0,catalogComplete ? item.articleIds.length - index : 0
         )

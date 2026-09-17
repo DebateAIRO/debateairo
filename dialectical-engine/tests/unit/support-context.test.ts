@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
 import { buildSupportKnowledgeContext as buildContext } from "../../packages/support-kb/src/context.js";
 import { loadHelpCorpus,type HelpCorpusEntry } from "../../packages/support-kb/src/index.js";
+import { resolveSupportActions } from "../../packages/support-kb/src/navigation.js";
 
 type ContextInput = Parameters<typeof buildContext>[0];
 function buildSupportKnowledgeContext(
@@ -457,6 +458,71 @@ describe("Support knowledge context", () => {
     });
     expect(result.sourceIds.length).toBeGreaterThan(0);
     expect(result.requestedActionIds).toEqual(expectedActionIds);
+  });
+
+  it.each([
+    ["en" as const,"Where is Home?",false,["home"]],
+    ["ro" as const,"Unde este Acasă?",false,["home"]],
+    ["en" as const,"Where is New debate?",true,["start-debate"]],
+    ["ro" as const,"Unde este Dezbatere nouă?",true,["start-debate"]],
+    ["en" as const,"Open the Account page.",true,["settings"]],
+    ["ro" as const,"Deschide pagina Cont.",true,["settings"]],
+    ["en" as const,"Where is How it works?",false,["method"]],
+    ["ro" as const,"Unde este Cum funcționează?",false,["method"]],
+    ["en" as const,"Which link opens the Sample debate?",false,["sample-transcript"]],
+    ["ro" as const,"Ce link deschide Exemplu de dezbatere?",false,["sample-transcript"]],
+    ["en" as const,"Where is the Public debates tab?",true,["public-catalog"]],
+    ["ro" as const,"Unde este fila Dezbateri publice?",true,["public-catalog"]],
+    ["en" as const,"Where can I find Your debates?",true,["your-debates"]],
+    ["ro" as const,"Unde găsesc Dezbaterile tale?",true,["your-debates"]],
+    ["en" as const,"Where is Privacy in Settings?",true,["privacy-preferences"]],
+    ["ro" as const,"Unde este Confidențialitate în Setări?",true,["privacy-preferences"]],
+  ])("uses a closed EN/RO menu label as source and action evidence: %s %s",(
+    language,query,signedIn,expectedActionIds
+  ) => {
+    const corpus = productionReviewedCorpus();
+    const availableActionIds = resolveSupportActions(SUPPORT_ACTION_IDS,{ signedIn,language })
+      .map(({ id }) => id);
+    const result = buildSupportKnowledgeContext({
+      entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,
+      availableActionIds,language,query,historyText:"",maxCodePoints:24_000
+    });
+    expect(result.sourceIds.length).toBeGreaterThan(0);
+    expect(result.requestedActionIds).toEqual(expectedActionIds);
+  });
+
+  it.each([
+    ["en" as const,"Where are Privacy preferences? Do not open Active sessions.",true,["privacy-preferences"]],
+    ["en" as const,"Where can I find Settings? Do not open account deletion controls.",true,["settings"]],
+    ["en" as const,"Tell me about Pricing, not the Method section.",false,[]],
+    ["en" as const,"Where is Help? Do not open service status.",false,["help"]],
+    ["en" as const,"Where is the Method section? Ignore the Transcripts section.",false,["method"]],
+    ["en" as const,"Where can I browse the public debate library? Do not open my debates.",true,["public-catalog"]],
+    ["ro" as const,"Unde sunt preferințele de confidențialitate? Nu deschide Sesiuni active.",true,["privacy-preferences"]],
+    ["ro" as const,"Prețuri, nu secțiunea Metodă.",false,[]],
+  ])("keeps negated unrelated menu labels out of the closed action set: %s %s",(
+    language,query,signedIn,expectedActionIds
+  ) => {
+    const corpus = productionReviewedCorpus();
+    const availableActionIds = resolveSupportActions(SUPPORT_ACTION_IDS,{ signedIn,language })
+      .map(({ id }) => id);
+    const result = buildSupportKnowledgeContext({
+      entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,
+      availableActionIds,language,query,historyText:"",maxCodePoints:24_000
+    });
+    expect(result.sourceIds.length).toBeGreaterThan(0);
+    expect(result.requestedActionIds).toEqual(expectedActionIds);
+  });
+
+  it("binds a single Romanian prose-only menu label to its reviewed article",() => {
+    const corpus = productionReviewedCorpus();
+    const result = buildSupportKnowledgeContext({
+      entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,
+      availableActionIds:SUPPORT_ACTION_IDS,language:"ro",
+      query:"Ce arată vizualizarea Fir?",historyText:"",maxCodePoints:24_000
+    });
+    expect(result.sourceIds).toContain("debate-workspace-menus");
+    expect(result.requestedActionIds).toEqual([]);
   });
 
   it.each([

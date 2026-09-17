@@ -229,6 +229,39 @@ describe("CP1 composed answer context", () => {
   });
 
   it.each([
+    ["en" as const,"Where are Privacy preferences? Do not open Active sessions."],
+    ["ro" as const,"Unde sunt preferințele de confidențialitate? Nu deschide Sesiuni active."],
+  ])("keeps a negated unrelated %s destination out of the model and response action sinks",async (
+    language,text
+  ) => {
+    const snapshot = authorDraftCorpus();
+    let system = "";
+    const complete = vi.fn<SupportModelPort["complete"]>(async (input) => {
+      system = input.system;
+      return Object.freeze({ text:JSON.stringify({
+        kind:"answer",text:"Use the reviewed Privacy section.",
+        sourceIds:[SOURCE_REFERENCE],actionIds:[ACTION_REFERENCE]
+      }) });
+    });
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-17T13:50:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({
+      ...request(snapshot),signedIn:true,text,language,detectedLanguage:language
+    });
+
+    expect(complete).toHaveBeenCalledOnce();
+    expect(system).toContain(`actionIds=${ACTION_REFERENCE}`);
+    expect(system).not.toContain(SECOND_ACTION_REFERENCE);
+    expect(result).toMatchObject({
+      outcome:"ANSWER_GROUNDED",actions:[{ id:"privacy-preferences" }]
+    });
+  });
+
+  it.each([
     "Is Dialectical Engine a reasoning instrument?",
     "Give me an overview of dialecticalengine."
   ])("grounds a reviewed identity paraphrase through the actual service on the admitted corpus: %s", async (

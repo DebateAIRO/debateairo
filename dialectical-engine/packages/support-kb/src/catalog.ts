@@ -58,6 +58,15 @@ export type SupportCapability = Readonly<{
   searchTerms: Readonly<Record<SupportLanguage, readonly string[]>>;
 }>;
 
+export type SupportGuideLabel = Readonly<{
+  articleId: string;
+  actionId: SupportActionId | null;
+  sourceBinding: boolean;
+  capabilityBinding: boolean;
+  requiresNavigationIntent: boolean;
+  labels: Readonly<Record<SupportLanguage, readonly string[]>>;
+}>;
+
 function labels(en: string, ro: string): Readonly<Record<SupportLanguage, string>> {
   return Object.freeze({ en, ro });
 }
@@ -83,6 +92,16 @@ function action(value: SupportActionDefinition): SupportActionDefinition {
   return Object.freeze({ ...value, labels: Object.freeze({ ...value.labels }) });
 }
 
+function guideLabel(
+  articleId: string,actionId: SupportActionId | null,
+  en: readonly string[],ro: readonly string[],sourceBinding = true,
+  capabilityBinding = sourceBinding,requiresNavigationIntent = false
+): SupportGuideLabel {
+  return Object.freeze({
+    articleId,actionId,sourceBinding,capabilityBinding,requiresNavigationIntent,labels:terms(en,ro)
+  });
+}
+
 export const SUPPORT_ACTION_CATALOG: readonly SupportActionDefinition[] = Object.freeze([
   action({ id: "home", labels: labels("Home", "Acasă"), availability: "public", href: "/" }),
   action({ id: "start-debate", labels: labels("Start a debate", "Pornește o dezbatere"), availability: "public", href: null }),
@@ -102,6 +121,41 @@ export const SUPPORT_ACTION_CATALOG: readonly SupportActionDefinition[] = Object
   action({ id: "owner-debate", labels: labels("Open your debate", "Deschide dezbaterea ta"), availability: "owner", href: null }),
   action({ id: "public-debate", labels: labels("Open public debate", "Deschide dezbaterea publică"), availability: "public-reference", href: null }),
   action({ id: "forgot-password", labels: labels("Forgot password", "Am uitat parola"), availability: "unresolved", href: null }),
+]);
+
+/** Closed visitor-visible labels copied from the reviewed public menu inventory. */
+export const SUPPORT_GUIDE_LABELS: readonly SupportGuideLabel[] = Object.freeze([
+  guideLabel("app-navigation","home",["Home","Library"],["Acasă","Bibliotecă"]),
+  guideLabel("app-navigation","start-debate",["Start a debate","New debate","Start a round"],["Pornește o dezbatere","Dezbatere nouă","Pornește o rundă"]),
+  guideLabel("settings-help-menus","settings",["Settings","Account","Account settings"],["Setări","Cont","Account","Setările contului"]),
+  guideLabel("app-navigation","help",["Help","Help conversation"],["Ajutor","Conversație de ajutor"]),
+  guideLabel("support-status-limits","support-status",["Support status","Service status"],["Starea serviciului de asistență","Starea serviciului","Starea publică a serviciului"]),
+  guideLabel("app-navigation","method",["How it works","Method"],["Cum funcționează","Metodă"]),
+  guideLabel("app-navigation","sample-transcript",["Sample debate","Transcript","Transcripts"],["Exemplu de dezbatere","Transcriere","Transcrieri"]),
+  guideLabel("settings-help-menus","active-sessions",["Active sessions"],["Sesiuni active","Sesiunile active"]),
+  guideLabel("settings-help-menus","privacy-preferences",["Privacy preferences","Privacy"],["Preferințe de confidențialitate","Preferințele de confidențialitate","Confidențialitate"]),
+  guideLabel("settings-help-menus","claim-legacy",["Claim legacy debates"],["Revendică dezbaterile vechi"]),
+  guideLabel("settings-help-menus","delete-account",["Delete account","Account deletion","Account deletion controls"],["Șterge contul","Ștergere a contului","Opțiunile de ștergere a contului"]),
+  guideLabel("app-navigation","public-catalog",["Public debates","Public debate library","Browse public debates"],["Dezbateri publice","Biblioteca publică","Biblioteca de dezbateri publice"]),
+  guideLabel("app-navigation","your-debates",["Your debates","My debates"],["Dezbaterile tale","Dezbaterile mele"],true,true,true),
+  guideLabel("account-access","sign-in",["Sign in","Login"],["Autentificare"]),
+  guideLabel("account-access","sign-up",["Create account","Sign up","Register"],["Creează un cont","Înregistrare"]),
+  guideLabel("guide-how-it-works","owner-debate",["Open your debate","Owner debate"],["Deschide dezbaterea ta","Dezbaterea proprietarului"]),
+  guideLabel("view-public-debate","public-debate",["Open public debate"],["Deschide dezbaterea publică"]),
+  guideLabel("account-access","forgot-password",["Forgot password"],["Am uitat parola"]),
+  guideLabel("getting-started-debate","start-debate",["Create a debate"],["Creez o dezbatere","Creează o dezbatere"],false),
+  guideLabel("getting-started-debate","start-debate",["New debate"],["Dezbatere nouă"],false,true),
+  guideLabel("app-navigation",null,["Pricing","Theme","Identity chip","Compact Help","Topic primers","Cookie preferences"],["Prețuri","Temă","Indicator de identitate","Ajutor compact","Sugestii de subiect","Preferințe cookie"]),
+  guideLabel("debate-topic-and-description",null,["Topic"],["Subiect"]),
+  guideLabel("getting-started-debate",null,["Free or Premium plan","Depth","Steering"],["Plan Gratuit sau Premium","Adâncime","Dirijare"]),
+  guideLabel("risk-tier-choice",null,["Risk tier"],["Nivel de risc"]),
+  guideLabel("budget-tier-choice",null,["Budget tier"],["Nivel de buget"]),
+  guideLabel("debate-workspace-menus",null,["Thread","Split","Tree","Map","Scoring diagnostics","Replay","Workspace","Honesty"],["Fir","Împărțit","Arbore","Hartă","Diagnostic de evaluare","Repetă generarea","Spațiu de lucru","Transparență"]),
+  guideLabel("export-json",null,["Export"],["Exportă"]),
+  guideLabel("guide-how-it-works",null,["How it works"],["Cum funcționează"]),
+  guideLabel("support-cases",null,["Report a bug","Email support"],["Raportează o eroare","Asistență prin email"]),
+  guideLabel("settings-help-menus",null,["Human support cases"],["Cazuri de asistență umană"]),
+  guideLabel("account-access",null,["Verify email","Enroll MFA"],["Verifică emailul","Configurează MFA"]),
 ]);
 
 export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze([
