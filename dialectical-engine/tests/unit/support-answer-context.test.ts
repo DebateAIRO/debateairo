@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe,expect,it,vi } from "vitest";
 
 import { createSupportAnswerService } from "../../apps/api/src/support/answer.js";
+import type { SupportModelPort } from "../../apps/api/src/support/model.js";
 import {
   createHelpCorpusSnapshotLookup,type HelpCorpusEntry,type LoadedHelpCorpus
 } from "../../packages/support-kb/src/index.js";
@@ -173,7 +174,7 @@ describe("CP1 composed answer context", () => {
       drafted.entries.filter((candidate) => candidate.id === "app-navigation"),
       `pricing-${language}`
     );
-    const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
+    const complete = vi.fn<SupportModelPort["complete"]>(async () => Object.freeze({ text:JSON.stringify({
       kind:"answer",text:"Pricing is currently a placeholder in the public navigation.",
       sourceIds:[SOURCE_REFERENCE],actionIds:[]
     }) }));
