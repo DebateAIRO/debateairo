@@ -121,16 +121,16 @@ describe("Help Corpus loader", () => {
     });
 
     expect(corpus).toMatchObject({
-      shippedCount: 18,
+      shippedCount: 19,
       ignoredCount: 0,
-      previewReviewedCount: 12,
+      previewReviewedCount: 13,
       ownerRatifiedCount: 6,
-      recoveryReviewedCount: 18,
+      recoveryReviewedCount: 19,
       recoveryOwnerRatifiedCount: 0,
-      kbVersion: "d674533e89d145bf9203248e2e324b451e57a2f1d3f257614d31678b7ac379df",
+      kbVersion: "23f8131ced441159be735d779ff4d863c9b0b77cf79a7eb513df49e7711f9f3e",
     });
-    expect(corpus.reviewManifest.articles).toHaveLength(24);
-    expect(corpus.entries.filter(({ ratifiedBy }) => ratifiedBy === "")).toHaveLength(24);
+    expect(corpus.reviewManifest.articles).toHaveLength(26);
+    expect(corpus.entries.filter(({ ratifiedBy }) => ratifiedBy === "")).toHaveLength(26);
   });
 
   it("keeps changed and new real corpus drafts excluded until separate editorial review", () => {
@@ -166,8 +166,8 @@ describe("Help Corpus loader", () => {
       recoveryComponents: readFileSync(componentPath),requireReviewedRecovery: true
     });
 
-    expect(corpus.entries).toHaveLength(36);
-    expect(corpus.recoveryReviewedCount).toBe(18);
+    expect(corpus.entries).toHaveLength(38);
+    expect(corpus.recoveryReviewedCount).toBe(19);
     expect(corpus.recoveryOwnerRatifiedCount).toBe(0);
   });
 

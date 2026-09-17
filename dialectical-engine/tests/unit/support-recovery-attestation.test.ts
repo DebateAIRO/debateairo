@@ -32,6 +32,16 @@ const REVIEW = Object.freeze({
   ratifiedOn: "",
 });
 
+const IDENTITY_REVIEW = Object.freeze({
+  reviewedBy: "SOL",
+  reviewerSession: "01a09ef7-e096-7c31-9b35-806840028cf0",
+  reviewedOn: "2026-09-17",
+  evidence:
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/PRODUCT-IDENTITY-EDITORIAL.md",
+  ratifiedBy: "",
+  ratifiedOn: "",
+});
+
 const EXPECTED = [
   ["account-access", "en", "17aac248d75d7ad161fba2a44068d20743a9759ae56c9b30359c7e1d5550c2e7", "c138d4ed2ecd19847cb74b1fd7ad91eb9b047369cb2a391f15563e0915ec192a", "6b5d2dcff5c21d11eae6c6a92cabea39ec253e8e54b5d890d9b25d56f9eab32d"],
   ["account-access", "ro", "5048de52b22b474fb8185e718fcaf235cd23896eff8fd7e42f4399d5266e9410", "e3ca804d9cd657ec82e9a9f81fd2dc1299997ee59cc4a752e757cd9e67d6ef98", "47d2b4b41acc0d0ef976bab9e08e5f617303612bfeda2b969a2958d6618ad8c0"],
@@ -53,6 +63,8 @@ const EXPECTED = [
   ["guide-how-it-works", "ro", "94acc4db2ccecb9a0d4f5b82350e91d26643b76c6caff879019edc107a3e3000", "65482fb1f90d62942b4e6f87a289c151978250fb385efc10d12c8e239780c195", "cb344a791adc4616c177c993b4f186595725f6ea3de8b1f95fcd8a6f0ff07ed8"],
   ["privacy-consent", "en", "54cca7dbfb790c9d6aac077b00775e5ac6d5bc277be38733e92047bc63c262d5", "5de30c60b097bc464f12d9aef13fbc67e0c15c6d5aa4ca1a91f82fe77fc394ae", "419fbdd08f1d581b9484d6df1cb6b63077aef93ab627b9ab87c0c6054ce66d49"],
   ["privacy-consent", "ro", "e9b04331a2aa76d3ed9bd45c2199263dc476ae62d15c33db30ed537fedeb5c5d", "7db208bec972f230adaddf05162305126e6aeeb431fd66bad468886e2c62710e", "940316e6b1a66598baa91183116c92477be57df65885dc22b1ce4954393e11f6"],
+  ["product-identity", "en", "3841870d3e2310a8fbee6325e59b4c25e92437b644b6a311910ade1e304ef4aa", "797d3ca04d545f868a633dd67d7f52a9758ddb86fa26aaf87d3d87ee5ff32d64", "0f08312a2f6fcd13a67f7694dfefe1ac084bbda210df900eda65ec589cc4c032"],
+  ["product-identity", "ro", "d05337815983d83f075964b6db5063dfbff40721a720013aaeeff19c98262391", "5ca60396146b9390d5f2848c703a221d75e0f3e2c88740cc44d1abde6c77ae40", "d2102ff844843efc368e4458e7928fbb6ccd64675cb3c8d4b1657ff015acf812"],
   ["public-answer-disclosure", "en", "e67c271558e6bb5b4100fa735059e781e453c268808d555c6e85af36e3e678ea", "1ee826de541e74d701fd502bfe70e85c009da2b94d3e6d38c1fc98924f251670", "9c733e8f40697f0cd9f15f5984947edaff532a10bc3375d10ca94747e10cc569"],
   ["public-answer-disclosure", "ro", "6e845c95414ae5b9190cf5917136776d7af931eaf626b2da4a0540b3bf7925f1", "4ee30438ed6e75bb79f2e458bb78a6e8e8b79d3271e59c372dff626ce23a3819", "903906d5fc6d89668a42a2108cf30e21b1ec166a9fdce9e7aeff1bf4882fa45d"],
   ["publish-a-debate", "en", "9385f0dd00f8014e3445d1ee4c8c5230dc12d0379766d35c9c7845814f288e29", "83119e6803f854c04ad0153b55cc69212563a92f6b7e350ef29f656ff6c90a3c", "b2974fdf83f15e7142380698b7b21a95bd9efe7cbcfaa5d07028f292bcfd53ef"],
@@ -72,7 +84,7 @@ const EXPECTED = [
 ] as const;
 
 describe("production Support recovery attestation", () => {
-  it("admits the exact separately reviewed 36-record corpus as a deterministic immutable snapshot", () => {
+  it("admits the exact separately reviewed 38-record corpus as a deterministic immutable snapshot", () => {
     const componentBytes = readFileSync(componentPath);
     const components = JSON.parse(componentBytes.toString("utf8")) as {
       components: Array<{
@@ -98,27 +110,27 @@ describe("production Support recovery attestation", () => {
         articleSha256,
         modelProjectionSha256,
         fallbackSha256,
-        ...REVIEW,
+        ...(id === "product-identity" ? IDENTITY_REVIEW : REVIEW),
       }),
     );
     expect(corpus.reviewManifest).toMatchObject({
       schemaVersion: 2,
       recovery: {
         componentFileSha256:
-          "5ee8d592c3f1b3550c1f2af74c030fbbc12e80e258dc71b57aa28de045f99e8a",
+          "8934293e862387fd3e6e83527780640e8497bdc50704854e43eb1d2db24fcae6",
         components: expectedRows,
       },
     });
-    expect(corpus.reviewManifest.articles).toHaveLength(24);
+    expect(corpus.reviewManifest.articles).toHaveLength(26);
     expect(corpus.entries.map(({ id, lang }) => `${id}.${lang}`)).toEqual(
       EXPECTED.map(([id, lang]) => `${id}.${lang}`),
     );
     expect(corpus).toMatchObject({
-      shippedCount: 18,
+      shippedCount: 19,
       ignoredCount: 0,
-      previewReviewedCount: 12,
+      previewReviewedCount: 13,
       ownerRatifiedCount: 6,
-      recoveryReviewedCount: 18,
+      recoveryReviewedCount: 19,
       recoveryOwnerRatifiedCount: 0,
     });
 
