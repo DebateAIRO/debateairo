@@ -570,7 +570,11 @@ describe("SUP-01 deterministic support classifier", () => {
     ["I forgot my password","en"],
     ["Can't remember my password","en"],
     ["Am uitat parola","ro"],
-    ["Am uitat parola and I need a replacement password","ro"]
+    ["Am uitat parola and I need a replacement password","ro"],
+    ["Give me the password recovery link","en"],
+    ["Where is the password reset page?","en"],
+    ["Vreau linkul de recuperare a parolei","ro"],
+    ["Unde este pagina pentru resetarea parolei?","ro"]
   ] as const)("classifies deterministic Forgot password before generic rules: %s", (message,language) => {
     expect(classifySupportMessage(message)).toEqual({
       outcome: "REFUSE_ZONE",language,link: null,

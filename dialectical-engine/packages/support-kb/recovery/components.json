@@ -142,6 +142,20 @@
       "fallback": "Autentifică-te, alege Setări, apoi Preferințe de confidențialitate. Preferința este locală browserului și nu dovedește singură starea fiecărui sistem de analiză sau cookie. Textul politicii se deschide în fereastra existentă a produsului acolo unde este disponibilă; nu există o pagină independentă verificată pentru Confidențialitate sau Termeni."
     },
     {
+      "id": "product-identity",
+      "lang": "en",
+      "articleSha256": "3841870d3e2310a8fbee6325e59b4c25e92437b644b6a311910ade1e304ef4aa",
+      "modelProjection": "Dialectical Engine is the product name for a reasoning instrument in which several AI models argue a claim in a structured debate tree. Support can explain reviewed product behavior and point to verified pages, but it cannot sign visitors in, change accounts, or perform password resets.",
+      "fallback": "Dialectical Engine is a reasoning instrument where several AI models argue a claim in a structured debate tree. Support can explain reviewed product behavior and point to verified pages. It cannot sign you in, change your account, or perform a password reset."
+    },
+    {
+      "id": "product-identity",
+      "lang": "ro",
+      "articleSha256": "d05337815983d83f075964b6db5063dfbff40721a720013aaeeff19c98262391",
+      "modelProjection": "Dialectical Engine este numele produsului pentru un instrument de raționament în care mai multe modele AI argumentează o afirmație într-un arbore structurat de dezbatere. Asistența poate explica funcționarea verificată a produsului și poate indica pagini verificate, dar nu poate autentifica vizitatori, modifica conturi sau efectua resetări de parolă.",
+      "fallback": "Dialectical Engine este un instrument de raționament în care mai multe modele AI argumentează o afirmație într-un arbore structurat de dezbatere. Asistența poate explica funcționarea verificată a produsului și poate indica pagini verificate. Nu te poate autentifica, nu îți poate modifica contul și nu poate efectua o resetare de parolă."
+    },
+    {
       "id": "public-answer-disclosure",
       "lang": "en",
       "articleSha256": "e67c271558e6bb5b4100fa735059e781e453c268808d555c6e85af36e3e678ea",

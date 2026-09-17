@@ -68,6 +68,12 @@ describe("Support catalog route coverage", () => {
     }
   });
 
+  it("keeps product identity public, actionless, and backed by one bilingual article", () => {
+    expect(SUPPORT_CAPABILITIES.find(({ id }) => id === "product-identity")).toMatchObject({
+      availability: "public",actionIds: [],articleIds: ["product-identity"]
+    });
+  });
+
   it("keeps the browser-safe catalog free of Node-only imports and exports it as a subpath", () => {
     // Property: UI consumers can share the authority without bundling filesystem or crypto modules.
     const packageDirectory = fileURLToPath(new URL("../../packages/support-kb/", import.meta.url));

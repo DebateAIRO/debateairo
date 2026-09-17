@@ -1940,7 +1940,11 @@ describe("SUP-01 support routes", () => {
 
   it.each([
     ["Forgot password","en"],
-    ["Am uitat parola","ro"]
+    ["Am uitat parola","ro"],
+    ["Give me the password recovery link","en"],
+    ["Where is the password reset page?","en"],
+    ["Vreau linkul de recuperare a parolei","ro"],
+    ["Unde este pagina pentru resetarea parolei?","ro"]
   ] as const)("returns canonical deterministic unresolved Forgot password guidance without a model: %s", async (
     requestText,language
   ) => {

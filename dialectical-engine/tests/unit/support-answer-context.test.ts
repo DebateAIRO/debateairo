@@ -44,6 +44,82 @@ function request(snapshot: LoadedHelpCorpus) {
 }
 
 describe("CP1 composed answer context", () => {
+  it.each([
+    "What is Dialectical-Engine?",
+    "What is Dialectical Engine?",
+    "What is DebateAIRO?",
+    "What is Debate AIRO?",
+    "Why can't Support answer questions about Dialectical-Engine?"
+  ])("grounds a product identity variant only in the identity article: %s", async (text) => {
+    const identity = entry("product-identity","Dialectical Engine is a reasoning instrument for structured AI debates.");
+    const unrelated = entry("support-status-limits","Support status can be stale.");
+    const snapshot = corpus([identity,unrelated],"1".repeat(64));
+    const complete = vi.fn(async () => Object.freeze({ text: JSON.stringify({
+      kind:"answer",text:"Dialectical Engine is a reasoning instrument for structured AI debates.",
+      sourceIds:[SOURCE_REFERENCE],actionIds:[]
+    }) }));
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-17T12:00:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({ ...request(snapshot),text });
+
+    expect(complete).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      outcome:"ANSWER_GROUNDED",sources:[{ id:"product-identity" }],actions:[]
+    });
+  });
+
+  it("grounds the Romanian identity surface in the Romanian identity article", async () => {
+    const identity = Object.freeze({
+      ...entry("product-identity","Dialectical Engine este un instrument de raționament."),
+      lang:"ro" as const,title:"Despre Dialectical Engine"
+    });
+    const snapshot = corpus([identity],"3".repeat(64));
+    const complete = vi.fn(async () => Object.freeze({ text: JSON.stringify({
+      kind:"answer",text:"Dialectical Engine este un instrument de raționament.",
+      sourceIds:[SOURCE_REFERENCE],actionIds:[]
+    }) }));
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-17T12:00:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({
+      ...request(snapshot),text:"Ce este Dialectical-Engine?",
+      language:"ro",detectedLanguage:"ro"
+    });
+
+    expect(complete).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      outcome:"ANSWER_GROUNDED",sources:[{ id:"product-identity" }],actions:[]
+    });
+  });
+
+  it.each([
+    "Does Dialectical Engine offer medical diagnosis?",
+    "Does DebateAIRO provide investment advice?"
+  ])("keeps an unsupported branded topic at NO_SOURCE without a model call: %s", async (text) => {
+    const snapshot = corpus([
+      entry("product-identity","Dialectical Engine is a reasoning instrument for structured AI debates."),
+      entry("account-settings","Settings contains account controls.")
+    ],"2".repeat(64));
+    const complete = vi.fn();
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-17T12:00:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({ ...request(snapshot),text });
+
+    expect(result).toMatchObject({ outcome:"NO_SOURCE",sources:[],actions:[] });
+    expect(complete).not.toHaveBeenCalled();
+  });
+
   it.each(["not-json",JSON.stringify({ kind: "tool",text: "ignored",sourceIds: [],actionIds: [] })])(
     "recovers every rejected ordinary knowledge envelope from the pinned top source: %s",
     async (completionText) => {

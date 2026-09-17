@@ -142,7 +142,8 @@ describe("Help Corpus loader", () => {
 
     expect(corpus.entries).toHaveLength(12);
     expect(corpus.shippedCount).toBe(6);
-    expect(corpus.ignoredCount).toBe(12);
+    expect(corpus.ignoredCount).toBe(13);
+    expect(corpus.entries.some(({ id }) => id === "product-identity")).toBe(false);
     expect(corpus.previewReviewedCount).toBe(0);
     expect(corpus.ownerRatifiedCount).toBe(6);
     expect(corpus.manifest.split("\n")).toHaveLength(25);

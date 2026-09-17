@@ -10,7 +10,11 @@ describe("CP1 deterministic Forgot password guidance", () => {
     ["I forgot my password", "en"],
     ["Can't remember my password", "en"],
     ["Am uitat parola", "ro"],
-    ["Am uitat parola and I need a replacement password", "ro"]
+    ["Am uitat parola and I need a replacement password", "ro"],
+    ["Give me the password recovery link", "en"],
+    ["Where is the password reset page?", "en"],
+    ["Vreau linkul de recuperare a parolei", "ro"],
+    ["Unde este pagina pentru resetarea parolei?", "ro"]
   ] as const)("recognizes %s before generic security routing", (text,language) => {
     expect(classifySecurityNavigation(text)).toEqual({
       kind: "FORGOT_PASSWORD",language,actionId: "forgot-password"
@@ -22,7 +26,9 @@ describe("CP1 deterministic Forgot password guidance", () => {
     "Unde este codul de recuperare MFA salvat?",
     "Codurile de autentificare rămân private.",
     "Authentication codes remain private.",
-    "How do I change my password?"
+    "How do I change my password?",
+    "Reset my password now",
+    "Validate my password reset token"
   ])("keeps saved-MFA and ordinary password requests distinct: %s", (text) => {
     expect(classifySecurityNavigation(text)).toBeNull();
   });

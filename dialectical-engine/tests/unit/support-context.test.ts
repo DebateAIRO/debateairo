@@ -283,4 +283,64 @@ describe("Support knowledge context", () => {
     expect(result.text).not.toContain(candidate.title);
     expect(result.text).not.toContain(candidate.body);
   });
+
+  const identityEntries = [
+    entry("product-identity","en","About Dialectical Engine","Dialectical Engine is a reasoning instrument."),
+    entry("product-identity","ro","Despre Dialectical Engine","Dialectical Engine este un instrument de raționament."),
+    entry("getting-started-debate","en","Start a debate","Choose a topic and plan controls."),
+    entry("getting-started-debate","ro","Pornește o dezbatere","Alege un subiect și opțiunile planului."),
+    entry("export-json","en","Export a debate as JSON","Export a served answer and ledger digest as JSON."),
+    entry("export-json","ro","Exportă o dezbatere ca JSON","Exportă răspunsul servit și registrul ca JSON."),
+    entry("publish-a-debate","en","Publish a debate","Publish a debate from its owner workspace."),
+    entry("publish-a-debate","ro","Publică o dezbatere","Publică o dezbatere din spațiul proprietarului.")
+  ];
+
+  it.each([
+    ["en" as const,"What is Dialectical-Engine?"],
+    ["en" as const,"What is Dialectical Engine?"],
+    ["en" as const,"What is DialecticalEngine?"],
+    ["en" as const,"What is DebateAIRO?"],
+    ["en" as const,"What is Debate AIRO?"],
+    ["en" as const,"Why can't Support answer questions about Dialectical-Engine?"],
+    ["ro" as const,"Ce este Dialectical-Engine?"],
+    ["ro" as const,"Ce este Dialectical Engine?"],
+    ["ro" as const,"Ce este DebateAIRO?"],
+    ["ro" as const,"De ce nu poate asistentul răspunde la întrebări despre Dialectical Engine?"]
+  ])("selects only reviewed product identity for %s overview %s", (language,query) => {
+    const result = buildSupportKnowledgeContext({
+      entries:identityEntries,capabilities:SUPPORT_CAPABILITIES,
+      availableActionIds:SUPPORT_ACTION_IDS,language,query,historyText:"",maxCodePoints:24_000
+    });
+    expect(result.sourceIds).toEqual(["product-identity"]);
+    expect(result.requestedActionIds).toEqual([]);
+  });
+
+  it.each([
+    ["en" as const,"How do I export JSON in Dialectical-Engine?","export-json"],
+    ["en" as const,"How do I publish a debate in DebateAIRO?","publish-a-debate"],
+    ["ro" as const,"Cum export JSON din Dialectical Engine?","export-json"],
+    ["ro" as const,"Cum public o dezbatere în DebateAIRO?","publish-a-debate"]
+  ])("keeps the named feature ahead of the product alias for %s: %s", (
+    language,query,expected
+  ) => {
+    const result = buildSupportKnowledgeContext({
+      entries:identityEntries,capabilities:SUPPORT_CAPABILITIES,
+      availableActionIds:SUPPORT_ACTION_IDS,language,query,historyText:"",maxCodePoints:24_000
+    });
+    expect(result.sourceIds[0]).toBe(expected);
+    expect(result.sourceIds).not.toContain("product-identity");
+    expect(result.requestedActionIds).toEqual(["owner-debate"]);
+  });
+
+  it.each([
+    ["en" as const,"Does Dialectical Engine offer medical diagnosis?"],
+    ["ro" as const,"Dialectical Engine oferă diagnostic medical?"]
+  ])("does not grant an unsupported product topic a source in %s: %s", (language,query) => {
+    const result = buildSupportKnowledgeContext({
+      entries:identityEntries,capabilities:SUPPORT_CAPABILITIES,
+      availableActionIds:SUPPORT_ACTION_IDS,language,query,historyText:"",maxCodePoints:24_000
+    });
+    expect(result.sourceIds).toEqual([]);
+    expect(result.requestedActionIds).toEqual([]);
+  });
 });

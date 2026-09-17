@@ -100,6 +100,20 @@ export const SUPPORT_ACTION_CATALOG: readonly SupportActionDefinition[] = Object
 
 export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze([
   capability({
+    id: "product-identity",
+    route: "/",
+    labels: labels("About Dialectical Engine", "Despre Dialectical Engine"),
+    audience: "any",
+    availability: "public",
+    disposition: "action",
+    actionIds: [],
+    articleIds: ["product-identity"],
+    searchTerms: terms(
+      ["product", "identity", "overview", "purpose"],
+      ["produs", "identitate", "prezentare", "scop"]
+    ),
+  }),
+  capability({
     id: "home-library",
     route: "/",
     labels: labels("Home and debate library", "Pagina principală și biblioteca de dezbateri"),
@@ -223,7 +237,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
 ]);
 
 export const SUPPORT_PAGE_ROUTES: readonly string[] = Object.freeze(
-  SUPPORT_CAPABILITIES.map(({ route }) => route).sort(),
+  [...new Set(SUPPORT_CAPABILITIES.map(({ route }) => route))].sort(),
 );
 
 export const SUPPORT_PROXY_ROUTES: readonly string[] = Object.freeze(["/api/[...path]"]);

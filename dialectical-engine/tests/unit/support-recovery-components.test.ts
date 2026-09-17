@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync,rmSync,writeFileSync } from "node:fs";
+import { mkdtempSync,readFileSync,rmSync,writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach,describe,expect,it } from "vitest";
@@ -63,6 +63,23 @@ afterEach(() => {
 });
 
 describe("reviewed Support recovery components", () => {
+  it("carries an exact bilingual product-identity draft for separate review", () => {
+    const document = JSON.parse(readFileSync(new URL(
+      "../../packages/support-kb/recovery/components.json",import.meta.url
+    ),"utf8")) as { components: Array<Readonly<{ id:string;lang:string;articleSha256:string;
+      modelProjection:string;fallback:string }>> };
+    const identity = document.components.filter(({ id }) => id === "product-identity");
+    expect(identity.map(({ lang }) => lang).sort()).toEqual(["en","ro"]);
+    for (const component of identity) {
+      const article = readFileSync(new URL(
+        `../../packages/support-kb/content/product-identity.${component.lang}.md`,import.meta.url
+      ));
+      expect(component.articleSha256).toBe(sha256(article));
+      expect(component.modelProjection).not.toBe("");
+      expect(component.fallback).not.toBe("");
+    }
+  });
+
   it("admits a complete exact-hash bilingual component set into an immutable snapshot", () => {
     const data = fixture();
     const corpus = loadHelpCorpus(data.directory,{

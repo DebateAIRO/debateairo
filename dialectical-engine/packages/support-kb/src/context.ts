@@ -38,15 +38,42 @@ const STOP_WORDS = new Set([
   "care", "cum", "din", "este", "pentru", "prin", "sau", "unui",
 ]);
 
+const PRODUCT_ALIAS_SOURCE = String.raw`\b(?:dialectical(?:[\s-]*engine)|debate\s*airo)\b`;
+const PRODUCT_OVERVIEW_WORDS = new Set([
+  "about","agent","answer","cannot","cant","describe","does","explain","feature","features",
+  "identity","mean","meaning","overview","product","purpose","question","questions","support",
+  "tell","use","used","what","why",
+  "asistent","asistentul","capabilitati","despre","explica","face","folosit","folosita",
+  "identitate","intrebare","intrebari","poate","prezentare","produs","raspund","raspunde",
+  "scop","spune"
+]);
+
+function normalizedText(value: string): string {
+  return value.normalize("NFKD").replace(/\p{M}/gu,"").toLocaleLowerCase("en");
+}
+
 function normalizeWords(value: string): Set<string> {
   return new Set(
-    value
-      .normalize("NFKD")
-      .replace(/\p{M}/gu, "")
-      .toLocaleLowerCase("en")
+    normalizedText(value)
       .split(/[^\p{L}\p{N}]+/u)
       .filter((word) => word.length >= 3 && !STOP_WORDS.has(word)),
   );
+}
+
+function productQuery(value: string): Readonly<{
+  branded: boolean;
+  identityOverview: boolean;
+  words: Set<string>;
+}> {
+  const normalized = normalizedText(value);
+  const branded = new RegExp(PRODUCT_ALIAS_SOURCE,"u").test(normalized);
+  const withoutBrand = branded
+    ? normalized.replace(new RegExp(PRODUCT_ALIAS_SOURCE,"gu")," ") : normalized;
+  const words = normalizeWords(withoutBrand);
+  const identityOverview = branded && (
+    words.size === 0 || [...words].every((word) => PRODUCT_OVERVIEW_WORDS.has(word))
+  );
+  return Object.freeze({ branded,identityOverview,words });
 }
 
 function overlapScore(query: Set<string>, value: string): number {
@@ -123,17 +150,32 @@ export function buildSupportKnowledgeContext(input: Readonly<{
   const availableActionIds = new Set(input.availableActionIds);
   const base = baseSection(input.capabilities,input.language,availableActionIds);
 
-  const queryWords = normalizeWords(input.query);
-  const matchedCapabilities = input.capabilities
+  const product = productQuery(input.query);
+  const queryWords = product.words;
+  const eligibleEntries = input.entries.filter(({ lang,modelProjection }) =>
+    lang === input.language && modelProjection !== undefined
+  );
+  const matchedCapabilities = (product.identityOverview
+    ? input.capabilities.filter(({ id }) => id === "product-identity").map((item) => ({ item,score:1 }))
+    : input.capabilities
     .map((item) => ({
       item,
-      score: overlapScore(
+      catalogScore: overlapScore(
         queryWords,
         `${item.labels[input.language]} ${item.searchTerms[input.language].join(" ")}`,
       ),
     }))
-    .filter(({ score }) => score > 0)
-    .sort((left, right) => right.score - left.score || left.item.id.localeCompare(right.item.id, "en"));
+    .filter(({ catalogScore }) => catalogScore > 0)
+    .map(({ item,catalogScore }) => ({
+      item,
+      score: product.branded
+        ? Math.max(0,...eligibleEntries
+          .filter(({ id }) => item.articleIds.includes(id))
+          .map((entry) => overlapScore(queryWords,entry.title) * 100
+            + overlapScore(queryWords,entry.body) * 10)) * 1_000 + catalogScore
+        : catalogScore,
+    }))
+    .sort((left, right) => right.score - left.score || left.item.id.localeCompare(right.item.id, "en")));
   const actionIds: SupportActionId[] = [];
   const seen = new Set<SupportActionId>();
   const bestCapabilityScore = matchedCapabilities[0]?.score ?? 0;
@@ -162,14 +204,16 @@ export function buildSupportKnowledgeContext(input: Readonly<{
       capabilityArticleScore.set(id,Math.max(capabilityArticleScore.get(id) ?? 0,weighted));
     });
   }
-  const ranked = input.entries
-    .filter(({ lang,modelProjection }) => lang === input.language && modelProjection !== undefined)
+  const ranked = eligibleEntries
     .map((entry) => ({
       entry,
       score: (capabilityArticleScore.get(entry.id) ?? 0)
-        + overlapScore(queryWords, `${entry.title}\n${entry.body}`),
+        + (product.branded
+          ? overlapScore(queryWords,entry.title) * 100 + overlapScore(queryWords,entry.body) * 10
+          : overlapScore(queryWords, `${entry.title}\n${entry.body}`)),
     }))
-    .filter(({ score }) => score > 0)
+    .filter(({ entry,score }) => score > 0
+      && (!product.branded || capabilityArticleScore.has(entry.id)))
     .sort((left, right) => right.score - left.score || left.entry.id.localeCompare(right.entry.id, "en"));
 
   let text = base;
