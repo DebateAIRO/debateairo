@@ -919,7 +919,7 @@ describe("SUP-01 support routes", () => {
   ) => {
     const respond = vi.fn<SupportAnswerPort["respond"]>(async () => Object.freeze({
       messageId:randomUUID(),outcome:"ANSWER_GROUNDED" as const,
-      text:language === "ro" ? "Deschide Setări." : "Open Settings.",canEscalate:false,
+      text:language === "ro" ? "Deschide Setări." : "Open Settings.",canEscalate:true,
       sources:Object.freeze([{
         id:sourceId,label:language === "ro" ? "Setări și ajutor" : "Settings and help"
       }]),

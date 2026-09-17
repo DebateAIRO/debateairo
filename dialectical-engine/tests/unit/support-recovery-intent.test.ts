@@ -19,39 +19,39 @@ const FORMS: Readonly<Record<Language,Readonly<{
 }>>> = Object.freeze({
   en:Object.freeze({
     subjects:Object.freeze(["my password","a forgotten password"]),
-    navigation:(subject) => Object.freeze([
+    navigation:(subject: string) => Object.freeze([
       `show me the recovery page for ${subject}`,
       `where can I find the recovery link for ${subject}`
     ]),
-    affirmativeOperation:(subject) => Object.freeze([
+    affirmativeOperation:(subject: string) => Object.freeze([
       `reset ${subject} for me`,
       `Support must validate the reset token for ${subject}`
     ]),
-    negatedOperation:(subject) => Object.freeze([
+    negatedOperation:(subject: string) => Object.freeze([
       `do not reset ${subject}`,
       `Support must not validate the reset token for ${subject}`,
       `I don’t want Support to submit the reset for ${subject}`
     ]),
-    join:(left,right,reverse) => reverse
+    join:(left: string,right: string,reverse: boolean) => reverse
       ? `${right}; but ${left}.`
       : `${left}, and then ${right}.`
   }),
   ro:Object.freeze({
     subjects:Object.freeze(["parola mea","o parolă uitată"]),
-    navigation:(subject) => Object.freeze([
+    navigation:(subject: string) => Object.freeze([
       `arată-mi pagina de recuperare pentru ${subject}`,
       `unde găsesc linkul de recuperare pentru ${subject}`
     ]),
-    affirmativeOperation:(subject) => Object.freeze([
+    affirmativeOperation:(subject: string) => Object.freeze([
       `resetează ${subject} în locul meu`,
       `Asistența trebuie să valideze tokenul de resetare pentru ${subject}`
     ]),
-    negatedOperation:(subject) => Object.freeze([
+    negatedOperation:(subject: string) => Object.freeze([
       `nu reseta ${subject}`,
       `Asistența nu trebuie să valideze tokenul de resetare pentru ${subject}`,
       `nu vreau ca Asistența să trimită resetarea pentru ${subject}`
     ]),
-    join:(left,right,reverse) => reverse
+    join:(left: string,right: string,reverse: boolean) => reverse
       ? `${right}; dar ${left}.`
       : `${left}, iar apoi ${right}.`
   })

@@ -87,7 +87,9 @@ describe("Support catalog route coverage", () => {
       "app-navigation","settings-help-menus","support-status-limits"
     ]));
 
-    const actions = new Map(SUPPORT_ACTION_CATALOG.map((item) => [item.id,item]));
+    const actions = new Map<string,(typeof SUPPORT_ACTION_CATALOG)[number]>(
+      SUPPORT_ACTION_CATALOG.map((item) => [item.id,item])
+    );
     expect(actions.get("active-sessions")).toMatchObject({
       availability:"signed-in",href:"/settings#active-sessions-heading"
     });

@@ -145,7 +145,7 @@ function analyzeRecoverySemanticsInput(
     if (!hasSubject) continue;
     const operationIndexes = credentialOperationIndexes(clause.words);
     for (const index of navigationIndexes(clause.words,operationIndexes)) {
-      const word = clause.words[index];
+      const word = clause.words[index] ?? "";
       const difficulty = ["amintesc","find","gasesc","găsesc","remember"].includes(word)
         && clause.words.slice(Math.max(0,index - 3),index).some((candidate) =>
           candidate === "cannot" || candidate === "can't" || candidate === "nu");

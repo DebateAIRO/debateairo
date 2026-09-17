@@ -13,9 +13,12 @@ describe("SUP-03 no private Support projection", () => {
 
   it("contains no live ownership query, consent SQL, port, or composition", async () => {
     const [api,main,database,index,contract] = await Promise.all([
-      "apps/api/src/support/index.ts","apps/api/src/main.ts","packages/db/src/support.ts",
-      "packages/db/src/index.ts","packages/contract/src/index.ts"
-    ].map((path) => readFile(path,"utf8")));
+      readFile("apps/api/src/support/index.ts","utf8"),
+      readFile("apps/api/src/main.ts","utf8"),
+      readFile("packages/db/src/support.ts","utf8"),
+      readFile("packages/db/src/index.ts","utf8"),
+      readFile("packages/contract/src/index.ts","utf8")
+    ]);
     const sources = [api,main,database,index,contract].join("\n");
     expect(sources).not.toMatch(/SupportOwnContext|PostgresSupportOwnContext|setConsent|read_own_run_state/iu);
     expect([api,main,database].join("\n"))

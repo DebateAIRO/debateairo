@@ -112,7 +112,7 @@ describe("Support knowledge context", () => {
       });
       if (testCase.class === "A") {
         expect.soft(result.sourceIds,`${testCase.id} required sources`).toEqual(
-          expect.arrayContaining(testCase.expected_source_ids)
+          expect.arrayContaining([...testCase.expected_source_ids])
         );
       } else {
         expect.soft(result.sourceIds,`${testCase.id} unsupported sources`).toEqual([]);
