@@ -30,7 +30,14 @@ import {
 const ROOT = process.cwd();
 const INDEX_PATH = resolve(ROOT, "apps/api/src/index.ts");
 const INDEX_SOURCE = readFileSync(INDEX_PATH, "utf8");
-const BASE_REF = "9d0c8e309e8da79199b508a9ec5f5cbe9545684e";
+// Re-baselined at DEV-SYNC 2026-09-18, as the live-loop mission ruled in advance
+// (.hermes/reports/2026-09-01-algorithm-live-loop/DECISIONS.md:870-871, :1340): the
+// security hardening changed the registration mount region on purpose — B5's route-level
+// request bounds, then B25b's constant MALFORMED_REQUEST envelope — so the region no longer
+// equals its 9d0c8e30 text. 1eb623e7 (B25b) is the FIRST commit carrying the region's
+// present bytes (measured: every later commit on the branch hashes the same, every earlier
+// one differs); from here on the gate again refuses any edit to the zone, by anyone.
+const BASE_REF = "1eb623e7426987c1bc43cfb55bf10d7e293413c1";
 
 function syntheticError(
   repoRelativeFrames: readonly string[],
