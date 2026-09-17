@@ -1,10 +1,10 @@
 # Security work — where we stand, in plain words
 
-*Written 2026-09-18 for the owner. This is the easy-to-read companion to the technical records in this folder. Every item links to the file that holds the detail.*
+*Written 2026-09-18 for the owner, updated the same night after the merge. This is the easy-to-read companion to the technical records in this folder. Every item links to the file that holds the detail.*
 
 ## The one-paragraph version
 
-On 1–2 September a full security check-up of the new engine (V3) was done: seven parallel reviews found about 84 weak spots (2 serious, 25 medium, the rest small). Fixes for almost all of them were written and tested — but they were parked on a side branch waiting for your answers to 26 questions, and they were **never merged into the main V3 line (`dev`)**. Since then `dev` moved on by 656 commits. So today the main line still has the weak spots, the fixes sit on the side, and the side branch has fallen out of date. Nothing is lost; it needs to be brought up to date, your answers recorded, and then merged.
+On 1–2 September a full security check-up of the new engine (V3) was done: seven parallel reviews found about 84 weak spots (2 serious, 25 medium, the rest small). Fixes for almost all of them were written and tested — but they were parked on a side branch waiting for your answers to 26 questions, and they were **never merged into the main V3 line (`dev`)**. Since then `dev` moved on by 656 commits. So today the main line still has the weak spots, the fixes sit on the side, and the side branch has fallen out of date. Nothing is lost; it needs to be brought up to date, your answers recorded, and then merged. **Update, 18 September:** the bringing-up-to-date is done, locally and unpushed — see "What was done on 18 September" below.
 
 ## The two branches
 
@@ -29,26 +29,41 @@ Think of it as a house inspection followed by repairs. The repairs done, by room
 
 Full list of findings and what happened to each: [findings/CONSOLIDATED.md](findings/CONSOLIDATED.md). Test evidence: [VERIFICATION.md](VERIFICATION.md).
 
+## What was done on 18 September
+
+**The security branch is now up to date with `dev`, on this Mac, and nothing has been pushed.** All of it sits on a local work branch called `security/dev-sync-2026-09-18`, so the published branch and pull request #8 are exactly as they were until you say "push".
+
+| Step | In plain words | Proof |
+|---|---|---|
+| The merge | The 656 newer commits from `dev` were combined with the 130 security commits. 25 files needed combining by hand (38 spots). The rule I followed: keep what *both* sides meant; a security protection never gives way to a tidy-up — it gets re-fitted inside the tidied code. | The whole codebase compiles with zero errors. Of 3,700+ fast tests, every test that fails on the merged code *also fails on untouched `dev`* — none is caused by the merge. |
+| A hidden mistake found and fixed | The old security work had itself broken one of the project's own building rules (a small checking tool is supposed to stay independent of everything else; the security fix made it depend on a big module). Nobody saw it because that test was parked on the "known failures" list. Fixed properly, and the test is off the list. | Failing test first, then the fix. |
+| One of the three "never built" fixes | The sorting bug (items could appear in a different order on computers with different language settings). | Proven both ways: fails without the fix, passes with it. |
+| A gap in `dev`'s newer code | The new monitoring agent would have accepted an unencrypted connection to a remote database in production. Every other part of the system refuses that; now this one does too. | Failing test first, then the fix. |
+| The "known failures" list | Cleaned: 9 of its 12 old entries are gone because those tests pass now. 9 failures inherited from `dev` (mostly visual-design checks owned by the UI work) were added, each with a written source. The list may only shrink from here. | The automatic check reports zero stale entries. |
+| Server kit | The database access list for the future server now includes the three new logins `dev` introduced (support chat ×2, monitoring agent). | The kit's test passes. |
+
+Eight local commits of work, from `6fb99707` (the merge) to `979e009f`, plus the update of these two documents. The technical record of every decision is [DEV-SYNC-2026-09-18.md](DEV-SYNC-2026-09-18.md).
+
+**Two honest notes.** (1) I made one slip along the way — a test I added in the wrong place broke the compile check; I caught it on the next check and repaired it in the following commit. (2) This Mac runs Node 26, while the project pins Node 22.23.1. One measurement test times out here because of that (it does the same on untouched `dev`). Installing Node 22.23.1 on this Mac — already on your owed list — would make local results match GitHub's.
+
 ## What is still open
 
-### 1. Bring the side branch up to date (no decision needed — just work)
-`dev` gained 656 commits since the security branch split off. A trial merge shows 25 files where both sides changed the same place and a person has to combine them by hand — including the core files of the API and the runner. After combining, every test has to be run again.
+### 1. Finish the quiet clean-up after the merge (no decision needed)
+- **13 spots in `dev`'s newer tools still assume the old location of the key folder.** The security work made that folder movable, precisely so keys never end up in a cloud-synced directory. The support command-line tools and the monitoring agent were written later and ignore that; with the safety setting on, they would look in the wrong place — or write a secret into the synced folder. Mechanical to fix.
+- **Two small proxy hardening items** from the original plan (findings L3-F6, L3-F7) and the **tamper check on database upgrade files** (task B28).
+- **Tables created after the inspection have no wipe-protection.** The security work protected 78 history tables against being emptied by a single command, from a fixed list. Tables added since are not on it. Needs one more database step, and a test that *discovers* such tables instead of listing them.
+- **The slower test suites** (those needing a real database and a browser) still have to be run on the merged code, and the website needs a browser pass to confirm the strict browser rules do not block the new cookie banner and support widget. (A first reading of their code found nothing that would be blocked.)
 
-### 2. Three small planned fixes that never got built
-- Two small hardening items on the website's internal proxy (findings L3-F6 and L3-F7).
-- A sorting bug that can order things differently depending on the computer's language setting (task B30).
-- A tamper check on database upgrade files (task B28, deliberately postponed until after the merge).
+### 2. New code nobody has security-checked yet — now with a clear first target
+The 656 new commits arrived after the inspection. The biggest piece by far is the **support chat**: about 5,400 lines, ten web addresses that *anyone on the internet* can call without logging in, which pass visitors' text to an AI model and store the conversation encrypted under its own master key. It was built carefully (its key handling already meets the strict standard), but it has never had a security review, and "anonymous visitor → paid AI model" is exactly the kind of door the first inspection flagged as serious elsewhere. Then: the monitoring agent, the algorithm changes, eight database upgrades.
 
-### 3. New code nobody has security-checked yet
-The 656 new commits on `dev` (the observation module, the support widget, the algorithm work, eight new database upgrades) arrived *after* the inspection. To be "as secure as possible", the same seven reviews should be re-run on just what changed.
+### 3. GitHub's own scanner left four notes on pull request #8
+Three are marked "high: missing rate limiting" on login, e-mail verification and the MFA code check. The audit's own table shows all three **are** rate-limited — by the project's built-in limiter, which the scanner cannot recognise. They are false alarms and should be dismissed on GitHub with that reason written down (that changes something on GitHub, so it waits for your OK). The fourth is a loose text pattern in a test file — trivial to tidy.
 
-### 4. GitHub's own scanner left four notes on pull request #8
-Three are marked "high: missing rate limiting" on login, e-mail verification and the MFA code check. The audit's own table shows all three **are** rate-limited — by the project's built-in limiter, which the scanner cannot recognise. They are false alarms and should be dismissed on GitHub with that reason written down. The fourth is a loose text pattern in a test file — trivial to tidy.
+### 4. Your 26 decisions — see the next section
 
-### 5. Your 26 decisions — see the next section
-
-### 6. Then: the move to the new server
-The deployment kit exists, but three of your decisions block go-live (marked **blocks go-live** below), and I will need the server's details.
+### 5. Then: the move to the new server
+The deployment kit exists but was written before the support chat and the monitoring agent. It needs a refresh: their settings, a fifth master key in the backup-and-escrow list (without it, backed-up support conversations could never be decrypted), a service definition for the monitoring agent, and the step that publishes the settings register on the server (without the "usage caps" setting the API deliberately refuses to start). Three of your decisions block go-live (marked **blocks go-live** below), and I will need the server's details.
 
 ## Your decisions
 
@@ -100,7 +115,7 @@ All of the above is about the **new engine (V3)**. The site that is live today a
 
 ## Suggested order of work
 
-1. Bring the security branch up to date with `dev` and re-run all tests (in progress, 2026-09-18).
+1. ~~Bring the security branch up to date with `dev`~~ — done locally on 2026-09-18; the slower test suites and the clean-up items above remain.
 2. Record your answers; build the items from Group C you approve; finish the three small leftovers.
 3. Re-inspect the code that arrived after 1 September.
 4. Merge pull request #8 into `dev`; flip the GitHub switches from Group B.
