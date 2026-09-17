@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { isAbsolute, relative } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  CODEX_BINARY,
+  CODEX_BINARY_NAME,
   parseCodexCompletion,
   resolveCodexBinary,
   startModelShim,
@@ -14,6 +16,13 @@ import {
 const fakeCli = fileURLToPath(new URL("./test-fixtures/fake-codex-cli.mjs", import.meta.url));
 const fakeSessionsRoot = fileURLToPath(new URL("./test-fixtures/codex-sessions", import.meta.url));
 const handles: ModelShimHandle[] = [];
+const temporaryDirectories: string[] = [];
+
+async function temporaryDirectory(): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), "relay-codex-path-"));
+  temporaryDirectories.push(directory);
+  return directory;
+}
 
 /**
  * W6 fix round 1 / F4: a credential-shaped key's VALUE is never echoed by the
@@ -42,6 +51,9 @@ async function start(timeoutMs = 1_000): Promise<ModelShimHandle> {
 
 afterEach(async () => {
   await Promise.all(handles.splice(0).map((handle) => handle.close()));
+  await Promise.all(temporaryDirectories.splice(0).map((path) =>
+    rm(path, { recursive: true, force: true })
+  ));
 });
 
 describe("ACC-01 model shim", () => {
@@ -303,23 +315,51 @@ describe("ACC-01 model shim", () => {
 
 /**
  * There is deliberately NO spawn-level test of the codex DEFAULT command here,
- * and none may be added. Unlike the Claude and Grok defaults — which point into
- * an absent `/Users/vladmihaimiron` home and therefore fail with ENOENT — the
- * compiled-in CODEX_BINARY is a real, installed, executable path on developer
- * machines. A test that reaches the default command would make a live provider
- * call. The override is pinned here at the resolver, and its wiring into
- * startModelShim is the same three lines proven end-to-end for the other two
- * makers in claude-relay.test.ts and grok-relay.test.ts.
+ * and none may be added. The rule PREDATES discovery by name and is STRONGER
+ * after it: the default used to be one installed app bundle that happened to
+ * exist on developer machines, and it is now whatever `codex` this host carries
+ * on PATH — a real, logged-in CLI on any machine that has one. A test allowed
+ * to reach the default command would make a LIVE provider call. Every arm below
+ * therefore either hands the resolver an environment it built itself, or keeps
+ * `testOnlyCommand` supplied so `resolveTestGuardedCommand` never forces the
+ * default thunk. The wiring of the resolver into startModelShim is the same
+ * three lines proven end-to-end for the other two makers in
+ * claude-relay.test.ts and grok-relay.test.ts, where the maker's key is set to
+ * a fixture before the default path is taken.
  */
 describe("D10 Codex shim binary resolution", () => {
-  it("keeps the compiled-in default when ACCEPTANCE_CODEX_BINARY is absent", () => {
-    expect(CODEX_BINARY).toBe("/Applications/ChatGPT.app/Contents/Resources/codex");
-    expect(resolveCodexBinary({})).toBe("/Applications/ChatGPT.app/Contents/Resources/codex");
+  it("carries no compiled-in path: this maker is found by the NAME `codex`", () => {
+    // REPEALS the 2026-08 pin on "/Applications/ChatGPT.app/Contents/Resources/codex"
+    // — see claude-relay.test.ts for the rule this states once. These arms
+    // RESOLVE only; nothing here spawns, so the standing no-live-call rule for
+    // this maker (note above) is untouched.
+    expect(CODEX_BINARY_NAME).toBe("codex");
+    expect(() => resolveCodexBinary({}))
+      .toThrow("CODEX_CLI_BINARY_UNRESOLVED:NOT_ON_PATH:codex");
   });
 
-  it("resolves this host's binary from ACCEPTANCE_CODEX_BINARY", () => {
-    expect(resolveCodexBinary({ ACCEPTANCE_CODEX_BINARY: "/host/bin/codex" }))
-      .toBe("/host/bin/codex");
+  it("discovers `codex` on the PATH it is handed, and refuses a corrupted launcher there", async () => {
+    const directory = await temporaryDirectory();
+    const program = join(directory, "codex");
+    await writeFile(program, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+
+    expect(resolveCodexBinary({ PATH: directory })).toBe(program);
+
+    // This IS the 2026-09-17 file: `/opt/homebrew/bin/codex` whose contents had
+    // been overwritten with four lines of plain text. It is read, never run.
+    await writeFile(program, "codex\nupdate interrupted\nretry the install\nnot a program\n");
+    expect(() => resolveCodexBinary({ PATH: directory }))
+      .toThrow(`CODEX_CLI_BINARY_UNRESOLVED:NOT_A_PROGRAM:${program}`);
+  });
+
+  it("resolves this host's binary from ACCEPTANCE_CODEX_BINARY, ahead of PATH", async () => {
+    const onPath = await temporaryDirectory();
+    await writeFile(join(onPath, "codex"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    const chosen = join(await temporaryDirectory(), "codex-host");
+    await writeFile(chosen, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+
+    expect(resolveCodexBinary({ PATH: onPath, ACCEPTANCE_CODEX_BINARY: chosen }))
+      .toBe(chosen);
   });
 
   it("fails loudly with a typed code when ACCEPTANCE_CODEX_BINARY is present but blank", () => {

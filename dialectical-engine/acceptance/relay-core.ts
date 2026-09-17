@@ -2,9 +2,12 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypt
 import { spawn } from "node:child_process";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { once } from "node:events";
+import {
+  accessSync, closeSync, constants, lstatSync, openSync, readSync, statSync
+} from "node:fs";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { z } from "zod";
 
 /**
@@ -129,30 +132,149 @@ export function resolveTestGuardedCommand(
 }
 
 /**
- * D10: WHICH executable a maker relay spawns is a HOST fact, not a source
- * constant. Each maker keeps its compiled-in absolute path as the default, so
- * an absent key leaves behavior byte-identical to before this seam existed;
- * an operator points the relay at this host's own CLI through the maker's
- * ACCEPTANCE_*_BINARY key.
+ * Why a resolved candidate was refused. Each reason is distinct, and the path
+ * it refers to always travels with it (see {@link resolveConfiguredBinary}).
+ */
+export const BINARY_REFUSAL_REASONS = Object.freeze([
+  "NOT_ON_PATH", "NOT_FOUND", "EMPTY", "NOT_EXECUTABLE", "NOT_A_PROGRAM"
+] as const);
+export type BinaryRefusalReason = typeof BINARY_REFUSAL_REASONS[number];
+
+/**
+ * The first bytes that make a file a PROGRAM this host can start directly: a
+ * `#!` line naming an interpreter, a Mach-O header in either width and either
+ * byte order, or a universal ("fat") archive of those.
  *
- * A key that is PRESENT BUT BLANK is a loud typed configuration failure, never
- * a silent fall back to the compiled-in path — silently spawning another
- * machine's home directory is precisely the defect this seam exists to remove.
- * The throw is a plain Error carrying the maker's code, matching
- * resolveTestGuardedCommand above; run-acceptance records that message
- * verbatim as the provider probe's failureCode.
+ * Anything else is data wearing an executable bit. That distinction is not
+ * academic: a process launcher that cannot EXECUTE a file falls back to reading
+ * it as a script, and on 2026-09-17 a `codex` launcher whose contents had been
+ * replaced by four lines of plain text was read back as a script that re-ran
+ * itself, forking until this Mac's process table was full. A candidate is
+ * therefore read four bytes deep and NEVER started to find out what it is.
+ */
+const PROGRAM_HEADERS: readonly (readonly number[])[] = Object.freeze([
+  [0x23, 0x21],
+  [0xcf, 0xfa, 0xed, 0xfe],
+  [0xce, 0xfa, 0xed, 0xfe],
+  [0xfe, 0xed, 0xfa, 0xcf],
+  [0xfe, 0xed, 0xfa, 0xce],
+  [0xca, 0xfe, 0xba, 0xbe],
+  [0xbe, 0xba, 0xfe, 0xca]
+].map((header) => Object.freeze(header)));
+
+function hasProgramHeader(path: string): boolean {
+  const header = Buffer.alloc(4);
+  let descriptor: number | undefined;
+  let read = 0;
+  try {
+    descriptor = openSync(path, "r");
+    read = readSync(descriptor, header, 0, header.byteLength, 0);
+  } catch {
+    return false;
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
+  return PROGRAM_HEADERS.some((magic) =>
+    magic.length <= read && magic.every((byte, index) => header[index] === byte)
+  );
+}
+
+/**
+ * The single admission gate every resolved candidate passes, whichever route
+ * named it. Symlinks are followed; the order of the checks is the order an
+ * operator can act on — what is there at all, then whether an interrupted
+ * install left nothing in it, then whether this user may run it, then whether
+ * it is a program rather than data.
+ */
+function admitProgram(path: string, unresolvedCode: string): string {
+  const refuse = (reason: BinaryRefusalReason): never => {
+    throw new Error(`${unresolvedCode}:${reason}:${path}`);
+  };
+  let metadata;
+  try {
+    metadata = statSync(path);
+  } catch {
+    return refuse("NOT_FOUND");
+  }
+  if (!metadata.isFile()) return refuse("NOT_A_PROGRAM");
+  if (metadata.size === 0) return refuse("EMPTY");
+  try {
+    accessSync(path, constants.X_OK);
+  } catch {
+    return refuse("NOT_EXECUTABLE");
+  }
+  if (!hasProgramHeader(path)) return refuse("NOT_A_PROGRAM");
+  return path;
+}
+
+/**
+ * The `command -v` rule: the directories of PATH in order, first match wins.
+ *
+ * A match is an entry that EXISTS under that name (lstat, so a dangling symlink
+ * counts), not one that is already known good. A search that skipped a broken
+ * entry and kept looking would hide exactly the corruption this resolver exists
+ * to report; admission happens afterwards, loudly, against the entry that was
+ * actually found. An EMPTY PATH field — which a shell reads as the current
+ * directory — is skipped: whatever the process is sitting in is not a deduction.
+ */
+function discoverOnPath(
+  binaryName: string,
+  unresolvedCode: string,
+  source: NodeJS.ProcessEnv
+): string {
+  for (const directory of (source.PATH ?? "").split(delimiter)) {
+    if (directory === "") continue;
+    const candidate = join(directory, binaryName);
+    try {
+      lstatSync(candidate);
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+  throw new Error(`${unresolvedCode}:NOT_ON_PATH:${binaryName}`);
+}
+
+/**
+ * D10, rewritten 2026-09-17. WHICH executable a maker relay spawns is a HOST
+ * fact, and a host fact is DEDUCED — never written into the source. The
+ * previous defaults were one developer's home directory and one installed app
+ * bundle; a checkout carried them onto every other machine.
+ *
+ * Order, for every maker:
+ *  1. the maker's `ACCEPTANCE_*_BINARY` key, when present and non-blank, names
+ *     the binary — a path, or a bare name to look up;
+ *  2. a key that is PRESENT BUT BLANK is a loud typed configuration failure
+ *     carrying the maker's bare code and nothing else. It never falls through
+ *     to discovery: an operator who set the key meant to decide, and guessing
+ *     on their behalf is the defect this whole seam exists to remove;
+ *  3. an absent key means discovery by the maker's NAME over the PATH of the
+ *     environment this resolver is HANDED (never `process.env` behind the
+ *     caller's back), first match wins.
+ *
+ * Whatever 1 or 3 resolves is then admitted or refused as a program. A refusal
+ * is `<UNRESOLVED_CODE>:<REASON>:<path>` on a plain Error, matching
+ * resolveTestGuardedCommand above: `run-acceptance.ts` records that message
+ * verbatim as the provider probe's failureCode and `absent-makers.ts` prints it
+ * as `MAKER ABSENT <maker> <code>`, so the operator reads the reason and the
+ * path off the run's own log. Nothing here ever starts a candidate.
  */
 export function resolveConfiguredBinary(
-  defaultBinary: string,
+  binaryName: string,
   environmentKey: string,
   unresolvedCode: string,
   source: NodeJS.ProcessEnv = process.env
 ): string {
   const configured = source[environmentKey];
-  if (configured === undefined) return defaultBinary;
-  const binary = configured.trim();
-  if (binary === "") throw new Error(unresolvedCode);
-  return binary;
+  if (configured === undefined) {
+    return admitProgram(discoverOnPath(binaryName, unresolvedCode, source), unresolvedCode);
+  }
+  const named = configured.trim();
+  if (named === "") throw new Error(unresolvedCode);
+  return admitProgram(
+    /[\\/]/u.test(named) ? named : discoverOnPath(named, unresolvedCode, source),
+    unresolvedCode
+  );
 }
 
 export async function invokeCli(

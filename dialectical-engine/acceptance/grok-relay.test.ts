@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { isAbsolute, join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  GROK_BINARY,
+  GROK_BINARY_NAME,
   GROK_SANDBOX_PROFILE,
   SANDBOX_PROFILE_UNAVAILABLE,
   resolveGrokBinary,
@@ -31,10 +31,15 @@ function posixQuote(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
+async function temporaryDirectory(prefix = "relay-host-binary-"): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), prefix));
+  temporaryDirectories.push(directory);
+  return directory;
+}
+
 /** A real executable at a path this test chooses (see claude-relay.test.ts). */
 async function hostBinary(name: string, fixture: string): Promise<string> {
-  const directory = await mkdtemp(join(tmpdir(), "relay-host-binary-"));
-  temporaryDirectories.push(directory);
+  const directory = await temporaryDirectory();
   const path = join(directory, name);
   await writeFile(
     path,
@@ -291,14 +296,33 @@ describe("GROK-01 Grok Build CLI relay", () => {
 });
 
 describe("D10 Grok relay binary resolution", () => {
-  it("keeps the compiled-in default when ACCEPTANCE_GROK_BINARY is absent", () => {
-    expect(GROK_BINARY).toBe("/Users/vladmihaimiron/.grok/bin/grok");
-    expect(resolveGrokBinary({})).toBe("/Users/vladmihaimiron/.grok/bin/grok");
+  it("carries no compiled-in path: this maker is found by the NAME `grok`", () => {
+    // REPEALS the 2026-08 pin on "/Users/vladmihaimiron/.grok/bin/grok" —
+    // see claude-relay.test.ts for the rule this states once.
+    expect(GROK_BINARY_NAME).toBe("grok");
+    expect(() => resolveGrokBinary({}))
+      .toThrow("GROK_CLI_BINARY_UNRESOLVED:NOT_ON_PATH:grok");
   });
 
-  it("resolves this host's binary from ACCEPTANCE_GROK_BINARY", () => {
-    expect(resolveGrokBinary({ ACCEPTANCE_GROK_BINARY: "/host/bin/grok" }))
-      .toBe("/host/bin/grok");
+  it("discovers `grok` on the PATH it is handed, and refuses a corrupted launcher there", async () => {
+    const directory = await temporaryDirectory("relay-grok-path-");
+    const program = join(directory, "grok");
+    await writeFile(program, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+
+    expect(resolveGrokBinary({ PATH: directory })).toBe(program);
+
+    await writeFile(program, "grok\nupdate interrupted\nretry the install\n");
+    expect(() => resolveGrokBinary({ PATH: directory }))
+      .toThrow(`GROK_CLI_BINARY_UNRESOLVED:NOT_A_PROGRAM:${program}`);
+  });
+
+  it("resolves this host's binary from ACCEPTANCE_GROK_BINARY, ahead of PATH", async () => {
+    const onPath = await temporaryDirectory("relay-grok-path-");
+    await writeFile(join(onPath, "grok"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    const chosen = await hostBinary("grok", fakeCli);
+
+    expect(resolveGrokBinary({ PATH: onPath, ACCEPTANCE_GROK_BINARY: chosen }))
+      .toBe(chosen);
   });
 
   it("fails loudly with a typed code when ACCEPTANCE_GROK_BINARY is present but blank", () => {
@@ -349,13 +373,15 @@ describe("D10 Grok relay binary resolution", () => {
     }
   });
 
-  it("spawns the binary named by ACCEPTANCE_GROK_BINARY rather than the compiled-in default", async () => {
+  it("spawns the binary named by ACCEPTANCE_GROK_BINARY rather than anything found on PATH", async () => {
     const binary = await hostBinary("grok", fakeCli);
     const previous = process.env.ACCEPTANCE_GROK_BINARY;
     process.env.ACCEPTANCE_GROK_BINARY = binary;
     try {
       // No testOnlyCommand: the DEFAULT command path, the one the ceremony
-      // takes. The compiled-in default is another machine's home directory.
+      // takes. A relay that ignored the key would discover this machine's own
+      // `grok` on PATH and make a LIVE call, so the fake model id below is the
+      // proof that the key, not PATH, decided.
       const relay = await startGrokRelay({ port: 0, timeoutMs: 10_000 });
       handles.push(relay);
 

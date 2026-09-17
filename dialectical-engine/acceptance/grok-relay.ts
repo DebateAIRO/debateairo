@@ -10,16 +10,23 @@ import {
   type CommandSpec
 } from "./relay-core.js";
 
-export const GROK_BINARY = "/Users/vladmihaimiron/.grok/bin/grok" as const;
+/** The NAME this maker's CLI is looked up by; never a path (D10, 2026-09-17). */
+export const GROK_BINARY_NAME = "grok" as const;
 /**
- * D10 host override for {@link GROK_BINARY}. Unset ⇒ the constant above,
- * byte-identical to the behavior before this key existed.
+ * D10 host override for {@link GROK_BINARY_NAME}. Unset ⇒ this host's own
+ * `grok`, deduced from PATH. See `relay-core.ts` for the order and for the
+ * refusal vocabulary a resolved file is held to.
  */
 const GROK_BINARY_ENV_KEY = "ACCEPTANCE_GROK_BINARY" as const;
 const GROK_BINARY_UNRESOLVED = "GROK_CLI_BINARY_UNRESOLVED" as const;
 
 export function resolveGrokBinary(source: NodeJS.ProcessEnv = process.env): string {
-  return resolveConfiguredBinary(GROK_BINARY, GROK_BINARY_ENV_KEY, GROK_BINARY_UNRESOLVED, source);
+  return resolveConfiguredBinary(
+    GROK_BINARY_NAME,
+    GROK_BINARY_ENV_KEY,
+    GROK_BINARY_UNRESOLVED,
+    source
+  );
 }
 export const XAI_MAKER = "xAI" as const;
 export const GROK_HANDSHAKE_PROMPT =

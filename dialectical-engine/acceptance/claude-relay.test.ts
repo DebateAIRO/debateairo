@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { isAbsolute, join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  CLAUDE_BINARY,
+  CLAUDE_BINARY_NAME,
   preflightClaudeCli,
   resolveClaudeBinary,
   startClaudeRelay,
@@ -40,9 +40,14 @@ function posixQuote(value: string): string {
  * The relay takes no argument seam for the default command, so the fixture has
  * to arrive as an executable file rather than as `node <fixture>`.
  */
-async function hostBinary(name: string, fixture: string): Promise<string> {
-  const directory = await mkdtemp(join(tmpdir(), "relay-host-binary-"));
+async function temporaryDirectory(prefix = "relay-host-binary-"): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), prefix));
   temporaryDirectories.push(directory);
+  return directory;
+}
+
+async function hostBinary(name: string, fixture: string): Promise<string> {
+  const directory = await temporaryDirectory();
   const path = join(directory, name);
   await writeFile(
     path,
@@ -368,17 +373,37 @@ describe("FAIR-02 Claude Code CLI relay", () => {
 });
 
 describe("D10 Claude relay binary resolution", () => {
-  it("keeps the compiled-in default when ACCEPTANCE_CLAUDE_BINARY is absent", () => {
-    // The literal is pinned here, not read from the constant, so that moving
-    // the default is a deliberate edit to this expectation (D10: unset ⇒
-    // byte-identical to the behavior before the override existed).
-    expect(CLAUDE_BINARY).toBe("/Users/vladmihaimiron/.local/bin/claude");
-    expect(resolveClaudeBinary({})).toBe("/Users/vladmihaimiron/.local/bin/claude");
+  it("carries no compiled-in path: this maker is found by the NAME `claude`", () => {
+    // REPEALS the 2026-08 pin on "/Users/vladmihaimiron/.local/bin/claude".
+    // Owner's rule, 2026-09-17: a host fact is DEDUCED, never set in stone.
+    // What is pinned now is the name searched for and the typed code an absent
+    // CLI refuses with; there is no path left to fall back to.
+    expect(CLAUDE_BINARY_NAME).toBe("claude");
+    expect(() => resolveClaudeBinary({}))
+      .toThrow("CLAUDE_CLI_BINARY_UNRESOLVED:NOT_ON_PATH:claude");
   });
 
-  it("resolves this host's binary from ACCEPTANCE_CLAUDE_BINARY", () => {
-    expect(resolveClaudeBinary({ ACCEPTANCE_CLAUDE_BINARY: "/host/bin/claude" }))
-      .toBe("/host/bin/claude");
+  it("discovers `claude` on the PATH it is handed, and refuses a corrupted launcher there", async () => {
+    const directory = await temporaryDirectory("relay-claude-path-");
+    const program = join(directory, "claude");
+    await writeFile(program, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+
+    expect(resolveClaudeBinary({ PATH: directory })).toBe(program);
+
+    // The refusal is read off the resolver's thrown code. This file is never
+    // run — that is the whole point of the check (2026-09-17 fork bomb).
+    await writeFile(program, "claude\nupdate interrupted\nretry the install\n");
+    expect(() => resolveClaudeBinary({ PATH: directory }))
+      .toThrow(`CLAUDE_CLI_BINARY_UNRESOLVED:NOT_A_PROGRAM:${program}`);
+  });
+
+  it("resolves this host's binary from ACCEPTANCE_CLAUDE_BINARY, ahead of PATH", async () => {
+    const onPath = await temporaryDirectory("relay-claude-path-");
+    await writeFile(join(onPath, "claude"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    const chosen = await hostBinary("claude", fakeCli);
+
+    expect(resolveClaudeBinary({ PATH: onPath, ACCEPTANCE_CLAUDE_BINARY: chosen }))
+      .toBe(chosen);
   });
 
   it("fails loudly with a typed code when ACCEPTANCE_CLAUDE_BINARY is present but blank", () => {
@@ -432,15 +457,15 @@ describe("D10 Claude relay binary resolution", () => {
     }
   });
 
-  it("spawns the binary named by ACCEPTANCE_CLAUDE_BINARY rather than the compiled-in default", async () => {
+  it("spawns the binary named by ACCEPTANCE_CLAUDE_BINARY rather than anything found on PATH", async () => {
     const binary = await hostBinary("claude", fakeCli);
     const previous = process.env.ACCEPTANCE_CLAUDE_BINARY;
     process.env.ACCEPTANCE_CLAUDE_BINARY = binary;
     try {
       // No testOnlyCommand: this is the DEFAULT command path, the one the
-      // ceremony takes. The compiled-in default is another machine's home
-      // directory, so a relay that ignores the override cannot hand back a
-      // model id at all.
+      // ceremony takes. A relay that ignored the key would discover this
+      // machine's own `claude` on PATH and make a LIVE call, so the fake
+      // model id below is the proof that the key, not PATH, decided.
       const relay = await startClaudeRelay({ port: 0, timeoutMs: 10_000 });
       handles.push(relay);
 

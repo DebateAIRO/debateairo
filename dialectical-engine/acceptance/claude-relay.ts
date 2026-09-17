@@ -15,8 +15,8 @@ import {
  * FAIR-02 (DR-140): the SECOND real maker — an OpenAI-compatible relay to the
  * local Claude Code CLI, maker Anthropic.
  *
- * Empirically verified on this machine (2026-08-10, claude 2.1.221 at
- * CLAUDE_BINARY): `claude -p <prompt> --output-format json` prints exactly one
+ * Empirically verified on this machine (2026-08-10, claude 2.1.221 resolved by
+ * CLAUDE_BINARY_NAME): `claude -p <prompt> --output-format json` prints exactly one
  * JSON envelope on stdout with `is_error`, `result` (the reply text) and
  * `modelUsage` keyed by the model id the CLI actually used, and exits nonzero
  * on failure (observed: expired OAuth => exit 1, is_error true). The prompt
@@ -26,17 +26,19 @@ import {
  * can report helper-model usage alongside the requested model; in that case
  * exactly one reported lineage must match the requested model family.
  */
-export const CLAUDE_BINARY = "/Users/vladmihaimiron/.local/bin/claude" as const;
+/** The NAME this maker's CLI is looked up by; never a path (D10, 2026-09-17). */
+export const CLAUDE_BINARY_NAME = "claude" as const;
 /**
- * D10 host override for {@link CLAUDE_BINARY}. Unset ⇒ the constant above,
- * byte-identical to the behavior before this key existed.
+ * D10 host override for {@link CLAUDE_BINARY_NAME}. Unset ⇒ this host's own
+ * `claude`, deduced from PATH. See `relay-core.ts` for the order and for the
+ * refusal vocabulary a resolved file is held to.
  */
 const CLAUDE_BINARY_ENV_KEY = "ACCEPTANCE_CLAUDE_BINARY" as const;
 const CLAUDE_BINARY_UNRESOLVED = "CLAUDE_CLI_BINARY_UNRESOLVED" as const;
 
 export function resolveClaudeBinary(source: NodeJS.ProcessEnv = process.env): string {
   return resolveConfiguredBinary(
-    CLAUDE_BINARY,
+    CLAUDE_BINARY_NAME,
     CLAUDE_BINARY_ENV_KEY,
     CLAUDE_BINARY_UNRESOLVED,
     source

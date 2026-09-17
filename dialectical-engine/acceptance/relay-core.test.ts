@@ -1,8 +1,9 @@
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { chmod, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   CLI_RELAY_STDOUT_MAX_BYTES,
@@ -404,29 +405,218 @@ describe("P4-10 loopback relay authentication", () => {
   });
 });
 
+/**
+ * D10, rewritten 2026-09-17. WHICH executable a maker relay spawns is a HOST
+ * fact that must be DEDUCED, never written into the source. The compiled-in
+ * defaults these assertions used to pin — one developer's home directory, one
+ * installed app bundle — are gone; the resolver now searches the PATH of the
+ * environment it is HANDED, so every assertion here builds its own PATH out of
+ * temporary directories and none of them can read this machine's real one.
+ *
+ * NOTHING HERE EVER RUNS A CANDIDATE. Each refusal is proven by the resolver's
+ * return value or by the code it throws. That rule is the whole point of the
+ * ticket: on 2026-09-17 a `codex` launcher whose contents had been overwritten
+ * with four lines of plain text was handed to a shell, which — unable to
+ * execute it — re-read it as a script and re-entered itself until this Mac's
+ * process table was full. The NOT_A_PROGRAM arm below IS that file. It is read
+ * four bytes deep and never executed.
+ */
 describe("D10 maker CLI binary resolution", () => {
-  const DEFAULT = "/compiled/in/default/fixture-cli";
+  const NAME = "fixture-cli";
   const KEY = "ACCEPTANCE_FIXTURE_BINARY";
   const CODE = "FIXTURE_CLI_BINARY_UNRESOLVED";
+  const SHEBANG = "#!/bin/sh\nexit 0\n";
+  /** The shape of the launcher that had been overwritten with plain text. */
+  const CORRUPTED_LAUNCHER = "codex\nupdate interrupted\nretry the install\nnot a program\n";
 
-  it("returns the compiled-in default when the maker's key is absent", () => {
-    expect(resolveConfiguredBinary(DEFAULT, KEY, CODE, {})).toBe(DEFAULT);
+  async function pathDirectory(): Promise<string> {
+    const directory = await mkdtemp(join(tmpdir(), "relay-path-"));
+    temporaryDirectories.push(directory);
+    return directory;
+  }
+
+  /** `mode` is applied with an explicit chmod so no ambient umask can move it. */
+  async function place(
+    directory: string,
+    contents: string | Uint8Array,
+    mode = 0o755,
+    name = NAME
+  ): Promise<string> {
+    const path = join(directory, name);
+    await writeFile(path, contents);
+    await chmod(path, mode);
+    return path;
+  }
+
+  it("finds the maker's CLI by NAME in the PATH of the environment it is handed", async () => {
+    const directory = await pathDirectory();
+    const program = await place(directory, SHEBANG);
+
+    expect(resolveConfiguredBinary(NAME, KEY, CODE, { PATH: directory })).toBe(program);
   });
 
-  it("returns the host binary named by the maker's key, surrounding whitespace removed", () => {
-    expect(resolveConfiguredBinary(DEFAULT, KEY, CODE, {
-      [KEY]: "  /host/bin/fixture-cli\n"
-    })).toBe("/host/bin/fixture-cli");
+  it("takes the first PATH directory that carries the name, in PATH order", async () => {
+    const first = await pathDirectory();
+    const second = await pathDirectory();
+    const firstProgram = await place(first, SHEBANG);
+    const secondProgram = await place(second, SHEBANG);
+
+    expect(resolveConfiguredBinary(NAME, KEY, CODE, {
+      PATH: [first, second].join(delimiter)
+    })).toBe(firstProgram);
+    expect(resolveConfiguredBinary(NAME, KEY, CODE, {
+      PATH: [second, first].join(delimiter)
+    })).toBe(secondProgram);
   });
 
-  it("fails loudly on a present-but-blank key instead of falling back to another machine's path", () => {
-    expect(() => resolveConfiguredBinary(DEFAULT, KEY, CODE, { [KEY]: "" })).toThrow(CODE);
-    expect(() => resolveConfiguredBinary(DEFAULT, KEY, CODE, { [KEY]: " \t " })).toThrow(CODE);
+  it("refuses with NOT_ON_PATH when nothing on PATH carries the name, and when there is no PATH", async () => {
+    const empty = await pathDirectory();
+
+    expect(() => resolveConfiguredBinary(NAME, KEY, CODE, { PATH: empty }))
+      .toThrow(`${CODE}:NOT_ON_PATH:${NAME}`);
+    expect(() => resolveConfiguredBinary(NAME, KEY, CODE, {}))
+      .toThrow(`${CODE}:NOT_ON_PATH:${NAME}`);
   });
 
-  it("reads only its own maker's key", () => {
-    expect(resolveConfiguredBinary(DEFAULT, KEY, CODE, {
+  it("refuses with NOT_FOUND when the name on PATH is a dangling symlink", async () => {
+    const directory = await pathDirectory();
+    const path = join(directory, NAME);
+    await symlink(join(directory, "gone"), path);
+
+    expect(() => resolveConfiguredBinary(NAME, KEY, CODE, { PATH: directory }))
+      .toThrow(`${CODE}:NOT_FOUND:${path}`);
+  });
+
+  it("refuses with EMPTY for the 0-byte launcher an interrupted update leaves behind", async () => {
+    const directory = await pathDirectory();
+    const path = await place(directory, "");
+
+    expect(() => resolveConfiguredBinary(NAME, KEY, CODE, { PATH: directory }))
+      .toThrow(`${CODE}:EMPTY:${path}`);
+  });
+
+  it("refuses with NOT_EXECUTABLE when the resolved file cannot be executed by this user", async () => {
+    const directory = await pathDirectory();
+    const path = await place(directory, SHEBANG, 0o644);
+
+    expect(() => resolveConfiguredBinary(NAME, KEY, CODE, { PATH: directory }))
+      .toThrow(`${CODE}:NOT_EXECUTABLE:${path}`);
+  });
+
+  it("refuses with NOT_A_PROGRAM when the executable bit sits on plain text", async () => {
+    const directory = await pathDirectory();
+    const path = await place(directory, CORRUPTED_LAUNCHER);
+
+    expect(() => resolveConfiguredBinary(NAME, KEY, CODE, { PATH: directory }))
+      .toThrow(`${CODE}:NOT_A_PROGRAM:${path}`);
+  });
+
+  it("reads only the FIRST bytes: a shebang further down the file is not a program header", async () => {
+    const directory = await pathDirectory();
+    const path = await place(directory, `not a launcher\n${SHEBANG}`);
+
+    expect(() => resolveConfiguredBinary(NAME, KEY, CODE, { PATH: directory }))
+      .toThrow(`${CODE}:NOT_A_PROGRAM:${path}`);
+  });
+
+  it("accepts a Mach-O or universal executable, not only a shebang script", async () => {
+    for (const magic of [
+      [0xcf, 0xfa, 0xed, 0xfe], [0xce, 0xfa, 0xed, 0xfe],
+      [0xfe, 0xed, 0xfa, 0xcf], [0xfe, 0xed, 0xfa, 0xce],
+      [0xca, 0xfe, 0xba, 0xbe], [0xbe, 0xba, 0xfe, 0xca]
+    ]) {
+      const directory = await pathDirectory();
+      const path = await place(directory, Uint8Array.from([...magic, 0x0c, 0x00, 0x00, 0x01]));
+
+      expect(resolveConfiguredBinary(NAME, KEY, CODE, { PATH: directory })).toBe(path);
+    }
+  });
+
+  it("lets the operator's key win over a PATH that carries the same name", async () => {
+    const onPath = await pathDirectory();
+    const chosen = await pathDirectory();
+    await place(onPath, SHEBANG);
+    const program = await place(chosen, SHEBANG);
+
+    expect(resolveConfiguredBinary(NAME, KEY, CODE, {
+      PATH: onPath,
+      [KEY]: `  ${program}\n`
+    })).toBe(program);
+  });
+
+  it("looks a BARE name in the operator's key up on PATH", async () => {
+    const directory = await pathDirectory();
+    const program = await place(directory, SHEBANG, 0o755, "other-cli");
+
+    expect(resolveConfiguredBinary(NAME, KEY, CODE, {
+      PATH: directory,
+      [KEY]: "other-cli"
+    })).toBe(program);
+  });
+
+  it("holds the key's own path to the same program check as a discovered one", async () => {
+    const directory = await pathDirectory();
+    const text = await place(directory, CORRUPTED_LAUNCHER, 0o755, "corrupt-cli");
+    const missing = join(directory, "absent-cli");
+
+    expect(() => resolveConfiguredBinary(NAME, KEY, CODE, { [KEY]: text }))
+      .toThrow(`${CODE}:NOT_A_PROGRAM:${text}`);
+    expect(() => resolveConfiguredBinary(NAME, KEY, CODE, { [KEY]: missing }))
+      .toThrow(`${CODE}:NOT_FOUND:${missing}`);
+  });
+
+  it("fails loudly with the BARE code on a present-but-blank key, never discovering instead", async () => {
+    const directory = await pathDirectory();
+    await place(directory, SHEBANG);
+
+    // Anchored: a blank key is a configuration failure with no path to name, and
+    // `run-acceptance` records this message verbatim as the probe's failureCode.
+    expect(() => resolveConfiguredBinary(NAME, KEY, CODE, { PATH: directory, [KEY]: "" }))
+      .toThrow(new RegExp(`^${CODE}$`, "u"));
+    expect(() => resolveConfiguredBinary(NAME, KEY, CODE, { PATH: directory, [KEY]: " \t " }))
+      .toThrow(new RegExp(`^${CODE}$`, "u"));
+  });
+
+  it("reads only its own maker's key", async () => {
+    const directory = await pathDirectory();
+    const program = await place(directory, SHEBANG);
+
+    expect(resolveConfiguredBinary(NAME, KEY, CODE, {
+      PATH: directory,
       ACCEPTANCE_OTHER_BINARY: "/host/bin/other-cli"
-    })).toBe(DEFAULT);
+    })).toBe(program);
+  });
+
+  it("resolves a program WITHOUT running it", async () => {
+    const directory = await pathDirectory();
+    const marker = join(directory, "ran");
+    const program = await place(directory, `#!/bin/sh\n: > ${JSON.stringify(marker)}\n`);
+
+    expect(resolveConfiguredBinary(NAME, KEY, CODE, { PATH: directory })).toBe(program);
+    expect(existsSync(marker)).toBe(false);
+  });
+
+  it("never routes a candidate binary through a shell anywhere in acceptance/", async () => {
+    const directory = fileURLToPath(new URL(".", import.meta.url));
+    const sources = (await readdir(directory))
+      .filter((entry) => entry.endsWith(".ts") && !entry.endsWith(".test.ts"))
+      .sort();
+    // A shell that cannot EXECUTE a file re-reads it as a script; that is how a
+    // corrupted launcher became a fork bomb on 2026-09-17. The relays spawn the
+    // resolved program directly and nothing in this directory may undo that.
+    const forbidden = [
+      "shell: true", "shell:true", "sh -c", "execSync", "spawnSync", "execFile",
+      "/bin/sh", "/bin/bash", "/bin/zsh"
+    ];
+    const offenders: string[] = [];
+    for (const source of sources) {
+      const text = await readFile(join(directory, source), "utf8");
+      for (const pattern of forbidden) {
+        if (text.includes(pattern)) offenders.push(`${source}: ${pattern}`);
+      }
+    }
+
+    expect(sources).toContain("relay-core.ts");
+    expect(offenders).toEqual([]);
   });
 });
