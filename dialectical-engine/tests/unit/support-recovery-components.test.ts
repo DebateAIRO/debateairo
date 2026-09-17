@@ -63,6 +63,48 @@ afterEach(() => {
 });
 
 describe("reviewed Support recovery components", () => {
+  it("uses the visible Transcripts label in both navigation drafts", () => {
+    const document = JSON.parse(readFileSync(new URL(
+      "../../packages/support-kb/recovery/components.json",import.meta.url
+    ),"utf8")) as { components: Array<Readonly<{ id:string;lang:string;modelProjection:string }>> };
+    for (const lang of ["en","ro"] as const) {
+      const article = readFileSync(new URL(
+        `../../packages/support-kb/content/app-navigation.${lang}.md`,import.meta.url
+      ),"utf8");
+      const component = document.components.find(({ id,lang: candidate }) =>
+        id === "app-navigation" && candidate === lang)!;
+      expect(article).toContain("Transcripts");
+      expect(component.modelProjection).toContain("Transcripts");
+      expect(article).not.toMatch(/links to Method and a Sample debate|legături către Method și Sample debate/u);
+      expect(component.modelProjection).not.toMatch(/links to Method and a Sample debate|oferă Method și Sample debate/u);
+    }
+  });
+
+  it("keeps the bug-report composer primer distinct from human escalation and email", () => {
+    const document = JSON.parse(readFileSync(new URL(
+      "../../packages/support-kb/recovery/components.json",import.meta.url
+    ),"utf8")) as { components: Array<Readonly<{
+      id:string;lang:string;modelProjection:string;fallback:string
+    }>> };
+    const expectations = {
+      en:["Report a bug primes ordinary public-guide text","does not create a human case"],
+      ro:["Report a bug completează text obișnuit pentru ghidul public","nu creează un caz uman"]
+    } as const;
+    for (const id of ["app-navigation","settings-help-menus"] as const) {
+      for (const lang of ["en","ro"] as const) {
+        const article = readFileSync(new URL(
+          `../../packages/support-kb/content/${id}.${lang}.md`,import.meta.url
+        ),"utf8");
+        const component = document.components.find(({ id: candidate,lang: candidateLang }) =>
+          candidate === id && candidateLang === lang)!;
+        for (const phrase of expectations[lang]) {
+          expect(article).toContain(phrase);
+          expect(`${component.modelProjection} ${component.fallback}`).toContain(phrase);
+        }
+      }
+    }
+  });
+
   it("carries the exact eight public-guide drafts without review metadata", () => {
     const document = JSON.parse(readFileSync(new URL(
       "../../packages/support-kb/recovery/components.json",import.meta.url
