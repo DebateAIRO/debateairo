@@ -4,7 +4,9 @@ import { once } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { AnswerSchema } from "@debateai/contract";
 import { WalkingSkeletonRunner } from "@debateai/runner";
+import { readDefinitionOfDoneFacts } from "./dod-facts.js";
 import type { StandingDatabase } from "./standing-db.js";
 import { startStandingDatabase } from "./standing-db.js";
 import { assertFairDebate } from "./fair-debate.js";
@@ -652,6 +654,184 @@ describe("ACC-01 dry-run ceremony", () => {
       distinctMakers: ["Anthropic", "OpenAI"],
       independentAttackEdgeCount: 4
     });
+
+    /* ------------------------------------------------------------------------
+     * The Global definition of done, read off THIS settled run.
+     *
+     * Every expectation below is against INDEPENDENT SQL over the four
+     * relations the clause names — never against a literal, and never against
+     * the reader's own query. A reader that agreed with itself would prove
+     * nothing; a reader that agrees with a hand-written join over
+     * `ledger.reduced_judgement`, `ledger.node_strength_record`,
+     * `serve.synthesis_round` and `core.edge` is reading the run.
+     * ---------------------------------------------------------------------- */
+    const answer = AnswerSchema.parse(owned.json());
+
+    // MEASUREMENT (the brief's step 1): does the OWNER read carry the panel
+    // record, or must the facts come from the ledger row? Pinned here so the
+    // day it changes, the reader's source of record is re-decided on evidence.
+    const disagreementOnOwnerRead = answer.nodes.map((node) => node.disagreement);
+    expect(disagreementOnOwnerRead.every((value) => value !== null && typeof value === "object")).toBe(true);
+    expect(disagreementOnOwnerRead[0]).toHaveProperty("panel");
+
+    const sealedBoundRow = await database.pool.query<{ max_rounds: number }>(
+      `SELECT (value_json->>'maxRounds')::int AS max_rounds FROM register.register_row
+       WHERE register_version=$1 AND row_key='evaluatorLoopMaxRounds'`,
+      [ACCEPTANCE_REGISTER_VERSION]
+    );
+    const sealedEvaluatorLoopMaxRounds = sealedBoundRow.rows[0]?.max_rounds;
+    expect(sealedEvaluatorLoopMaxRounds, "the acceptance register seals the loop bound").toBeGreaterThan(0);
+
+    const facts = await readDefinitionOfDoneFacts(database.pool, {
+      runId,
+      answer,
+      sealedEvaluatorLoopMaxRounds: sealedEvaluatorLoopMaxRounds!
+    });
+
+    // (1) panel-reduced tau, non-self-graded — the ledger's panel record.
+    const judgementRows = await database.pool.query<{
+      node_id: string; depth: number; tau: number; disagreement: Record<string, unknown> | null;
+    }>(
+      `SELECT node.node_id::text AS node_id, node.depth::int AS depth, judgement.tau, judgement.disagreement
+       FROM core.node AS node
+       JOIN LATERAL (
+         SELECT tau, disagreement FROM ledger.reduced_judgement
+         WHERE node_id = node.node_id ORDER BY at_seq DESC LIMIT 1
+       ) AS judgement ON true
+       WHERE node.run_id=$1 ORDER BY node.created_at_seq`,
+      [runId]
+    );
+    const panelOf = (row: { disagreement: Record<string, unknown> | null }): {
+      voiceCount: number; nonAuthorVoiceCount: number;
+    } => {
+      const panel = row.disagreement?.["panel"] as
+        { voiceCount: number; nonAuthorVoiceCount: number } | undefined;
+      return panel === undefined ? { voiceCount: 1, nonAuthorVoiceCount: 0 } : panel;
+    };
+    expect(facts.panelNodes).toEqual(judgementRows.rows.map((row) => ({
+      nodeId: row.node_id,
+      tau: Number(row.tau),
+      voiceCount: panelOf(row).voiceCount,
+      nonAuthorVoiceCount: panelOf(row).nonAuthorVoiceCount,
+      singleVoicePanel: panelOf(row).nonAuthorVoiceCount === 0
+    })));
+    expect(facts.everyNodeHasNonAuthorVoice).toBe(
+      judgementRows.rows.every((row) => panelOf(row).nonAuthorVoiceCount >= 1)
+    );
+    expect(facts.singleVoicePanelNodeIds).toEqual(
+      judgementRows.rows.filter((row) => panelOf(row).nonAuthorVoiceCount === 0)
+        .map((row) => row.node_id).sort()
+    );
+    // This two-maker run is genuinely panel-judged: the whole clause would be
+    // vacuous on a run whose every node were self-graded.
+    expect(facts.everyNodeHasNonAuthorVoice).toBe(true);
+
+    // (2) measured edges — core.edge magnitudes on the attack arrows.
+    const edgeCounts = await database.pool.query<{ attacks: string; measured: string }>(
+      `SELECT count(*)::text AS attacks,
+              count(*) FILTER (WHERE magnitude_status='MEASURED')::text AS measured
+       FROM core.edge WHERE run_id=$1 AND polarity='attack'`,
+      [runId]
+    );
+    expect(facts.attackEdgeCount).toBe(Number(edgeCounts.rows[0]?.attacks));
+    expect(facts.attackEdgePresentMagnitudeCount).toBe(Number(edgeCounts.rows[0]?.measured));
+    // THIS FIXTURE'S OUTCOME, pinned so a change in it is seen: every arrow in
+    // the dry run is a placeholder, so four attack edges carry ZERO present
+    // magnitudes. The reader REPORTS that and returns; an UNKNOWN magnitude is
+    // a definition-of-done outcome for the closing run's judge to weigh, never
+    // a shape violation this reader may refuse.
+    expect(facts.attackEdgeCount).toBe(4);
+    expect(facts.attackEdgePresentMagnitudeCount).toBe(0);
+
+    // (3) a root's final strength apart from its tau — depth 0 against the
+    // latest propagation run, the LATERAL the served projection uses.
+    const strengthRows = await database.pool.query<{ node_id: string; strength: number | null }>(
+      `SELECT node.node_id::text AS node_id, strength.strength
+       FROM core.node AS node
+       LEFT JOIN LATERAL (
+         SELECT record.strength FROM ledger.node_strength_record AS record
+         JOIN ledger.propagation_run AS propagation
+           ON propagation.propagation_run_id = record.propagation_run_id
+         WHERE record.node_id = node.node_id ORDER BY propagation.at_seq DESC LIMIT 1
+       ) AS strength ON true
+       WHERE node.run_id=$1 AND node.depth=0 ORDER BY node.created_at_seq`,
+      [runId]
+    );
+    const tauByNodeId = new Map(judgementRows.rows.map((row) => [row.node_id, Number(row.tau)]));
+    expect(facts.roots).toEqual(strengthRows.rows.map((row) => ({
+      nodeId: row.node_id,
+      tau: tauByNodeId.get(row.node_id),
+      finalStrength: row.strength === null ? null : Number(row.strength),
+      finalDiffersFromTau: row.strength !== null && Number(row.strength) !== tauByNodeId.get(row.node_id)
+    })));
+    expect(facts.aRootFinalDiffersFromTau).toBe(facts.roots.some((root) => root.finalDiffersFromTau));
+    expect(facts.rootFinalDiffersWitnessNodeId).toBe(
+      facts.roots.filter((root) => root.finalDiffersFromTau)
+        .map((root) => root.nodeId).sort()[0] ?? null
+    );
+    // THIS FIXTURE'S OUTCOME, and the O3 boundary proven on real data: with no
+    // measured magnitude on any arrow, propagation leaves both roots on their
+    // own tau, so NO root differs. The reader returned these facts rather than
+    // throwing — reaching this line at all is the proof.
+    expect(facts.aRootFinalDiffersFromTau).toBe(false);
+    expect(facts.rootFinalDiffersWitnessNodeId).toBeNull();
+
+    // (5) the strongest surviving objection — attacks something AND still
+    // carries a propagated number (apps/runner/src/index.ts:3925-3928).
+    const survivorRows = await database.pool.query<{ node_id: string; strength: number }>(
+      `SELECT DISTINCT ON (node.node_id) node.node_id::text AS node_id, strength.strength
+       FROM core.node AS node
+       JOIN core.edge AS attack ON attack.source_node_id = node.node_id AND attack.polarity='attack'
+       JOIN LATERAL (
+         SELECT record.strength FROM ledger.node_strength_record AS record
+         JOIN ledger.propagation_run AS propagation
+           ON propagation.propagation_run_id = record.propagation_run_id
+         WHERE record.node_id = node.node_id ORDER BY propagation.at_seq DESC LIMIT 1
+       ) AS strength ON true
+       WHERE node.run_id=$1 ORDER BY node.node_id`,
+      [runId]
+    );
+    const strongestBySql = survivorRows.rows
+      .map((row) => ({ nodeId: row.node_id, finalStrength: Number(row.strength) }))
+      .sort((left, right) => right.finalStrength - left.finalStrength
+        || left.nodeId.localeCompare(right.nodeId))[0] ?? null;
+    expect(facts.strongestSurvivingObjection).toEqual(strongestBySql);
+    // The dry run DOES carry a surviving objection: an attacker that still has
+    // a propagated number. The independent SQL above is the same definition.
+    expect(facts.strongestSurvivingObjection).not.toBeNull();
+
+    // (5/6) the evaluator loop record, and its bound read from this database.
+    const roundRows = await database.pool.query<{
+      round: number; synthesizer_stage: "INITIAL" | "RETRY"; evaluator_satisfied: boolean;
+    }>(
+      `SELECT round, synthesizer_stage, evaluator_satisfied FROM serve.synthesis_round
+       WHERE answer_id=$1 AND answer_version=$2 ORDER BY round`,
+      [answer.answer_id, answer.answer_version]
+    );
+    expect(facts.loopRounds).toEqual(roundRows.rows.map((row) => ({
+      round: row.round,
+      synthesizerStage: row.synthesizer_stage,
+      evaluatorSatisfied: row.evaluator_satisfied
+    })));
+    expect(facts.loopRoundCount).toBe(roundRows.rowCount);
+    expect(facts.loopRoundCount).toBeGreaterThan(0);
+    expect(facts.loopRoundCount).toBeLessThanOrEqual(sealedEvaluatorLoopMaxRounds!);
+    expect(facts.sealedEvaluatorLoopMaxRounds).toBe(sealedEvaluatorLoopMaxRounds);
+    expect(facts.finalRoundSatisfied).toBe(roundRows.rows.at(-1)?.evaluator_satisfied ?? false);
+    expect(facts.objectionStandingMarkPresent).toBe(
+      answer.condition_marks.includes("SYNTHESIS-OBJECTION-STANDING")
+    );
+
+    // (7) the code-derived three-state label, off the parsed answer.
+    expect(facts.verdictState).toBe(answer.verdict_state);
+    expect(facts.verdictUnavailableReasonRef).toBe(answer.verdict_unavailable?.reason_ref ?? null);
+    expect(facts.terminal).toBe(answer.terminal);
+    expect(facts.serveState).toBe(answer.serve_state);
+
+    // (8) the band counted over the CITED nodes, with its ceiling's row key.
+    expect(facts.confidenceBand).toBe(answer.confidence_band);
+    expect(facts.bandBasis).toEqual(answer.band_ceiling?.basis ?? null);
+    expect(facts.bandCeilingRegisterRowKey).toBe(answer.band_ceiling?.register_row_key ?? null);
 
     const foreign = await runtime.api.inject({
       method: "GET",
