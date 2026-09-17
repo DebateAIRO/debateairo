@@ -464,7 +464,12 @@ describe("Support knowledge context", () => {
     ["en" as const,"Where do I find my debates and the public debate library?"],
     ["en" as const,"How can I open Your debates together with Public debates?"],
     ["ro" as const,"Unde găsesc dezbaterile mele și biblioteca publică?"],
-    ["ro" as const,"Cum deschid Dezbaterile tale împreună cu Dezbateri publice?"]
+    ["ro" as const,"Cum deschid Dezbaterile tale împreună cu Dezbateri publice?"],
+    ["ro" as const,"Deschide Dezbaterile mele și Biblioteca de dezbateri publice."],
+    ["ro" as const,"Deschide Biblioteca de dezbateri publice și Dezbaterile mele."],
+    ["ro" as const,"Deschizi Dezbaterile mele și Biblioteca de dezbateri publice?"],
+    ["ro" as const,"Deschidem Dezbaterile mele și Biblioteca de dezbateri publice."],
+    ["ro" as const,"Deschideți Dezbaterile mele și Biblioteca de dezbateri publice."]
   ])("binds the compound private/public library guide to a required reviewed source in %s: %s",(
     language,query
   ) => {

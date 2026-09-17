@@ -8,9 +8,18 @@ describe("Support public-guide boundary", () => {
     ["Where is Your debates?","en"],
     ["How do I use the debate workspace?","en"],
     ["Unde găsesc Dezbaterile tale?","ro"],
-    ["Cum folosesc meniul dezbaterii?","ro"]
+    ["Cum folosesc meniul dezbaterii?","ro"],
+    ["Open Your debates and Browse public debates.","en"],
+    ["Deschide Dezbaterile mele și Biblioteca de dezbateri publice.","ro"]
   ] as const)("keeps public product guidance public: %s", (text,language) => {
     expect(classifyPublicGuideBoundary(text,language)).toEqual({ kind: "PUBLIC_GUIDE" });
+  });
+
+  it.each([
+    ["Where can I browse public debates? Do not open my debates.","en"],
+    ["Unde găsesc dezbaterile publice? Nu deschide dezbaterile mele.","ro"]
+  ] as const)("keeps a negated private-list half as public navigation: %s",(text,language) => {
+    expect(classifyPublicGuideBoundary(text,language)).toEqual({ kind:"PUBLIC_GUIDE" });
   });
 
   it.each([

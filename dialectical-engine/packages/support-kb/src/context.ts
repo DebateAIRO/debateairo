@@ -152,7 +152,7 @@ function semanticWords(value: string): readonly string[] {
 
 const NEGATED_TAIL = /\b(?:do\s+not|don['’]?t|not|never|ignore|avoid|without|nu|niciodat[ăa]|ignor[ăa]|evit[ăa]|f[ăa]r[ăa])\b/u;
 const CLAUSE_BOUNDARY = /[.!?;,\n]+|\b(?:but|dar|îns[ăa])\b/u;
-const ACTION_INTENT = /\b(?:where|find|open|read|link|page|tab|browse|navigate|manage|go|see|unde|g[ăa]sesc|deschid|citi|leg[ăa]tur[ăa]|pagin[ăa]|fil[ăa]|r[ăa]sfoi|gestiona|v[ăa]d)\b/u;
+const ACTION_INTENT = /\b(?:where|find|open|read|link|page|tab|browse|navigate|manage|go|see|unde|g[ăa]sesc|deschi(?:d(?:e|em|eti)?|zi)|citi|leg[ăa]tur[ăa]|pagin[ăa]|fil[ăa]|r[ăa]sfoi|gestiona|v[ăa]d)\b/u;
 const GENERIC_SINGLE_ACTION_LABEL = /^(?:help|ajutor)$/u;
 
 function affirmativeQuery(value: string): string {

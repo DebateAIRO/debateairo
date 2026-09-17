@@ -167,7 +167,8 @@ describe("CP1 composed answer context", () => {
 
   it.each([
     ["en" as const,"Where do I find my debates and the public debate library?"],
-    ["ro" as const,"Unde găsesc dezbaterile mele și biblioteca publică?"]
+    ["ro" as const,"Unde găsesc dezbaterile mele și biblioteca publică?"],
+    ["ro" as const,"Deschide Dezbaterile mele și Biblioteca de dezbateri publice."]
   ])("recovers a rejected compound %s answer from the required app-navigation source",async (
     language,text
   ) => {
