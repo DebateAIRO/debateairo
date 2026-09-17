@@ -40,12 +40,18 @@ const STOP_WORDS = new Set([
 
 const PRODUCT_ALIAS_SOURCE = String.raw`\b(?:dialectical(?:[\s-]*engine)|debate\s*airo)\b`;
 const PRODUCT_OVERVIEW_WORDS = new Set([
-  "about","agent","answer","cannot","cant","describe","does","explain","feature","features",
+  "about","agent","answer","cannot","cant","define","describe","does","explain","feature","features",
   "identity","mean","meaning","overview","product","purpose","question","questions","support",
   "tell","use","used","what","why",
   "asistent","asistentul","capabilitati","despre","explica","face","folosit","folosita",
   "identitate","intrebare","intrebari","poate","prezentare","produs","raspund","raspunde",
   "scop","spune"
+]);
+const GENERIC_BRANDED_WORDS = new Set([
+  ...PRODUCT_OVERVIEW_WORDS,
+  "allow","allows","assist","assistance","help","helps","offer","offers","provide","provides",
+  "service","services","tool","tools",
+  "ajuta","ajutor","asistenta","ofera","serviciu","servicii"
 ]);
 
 function normalizedText(value: string): string {
@@ -63,6 +69,9 @@ function normalizeWords(value: string): Set<string> {
 function productQuery(value: string): Readonly<{
   branded: boolean;
   identityOverview: boolean;
+  normalized: string;
+  preferredArticleId: string | null;
+  substantiveWords: Set<string>;
   words: Set<string>;
 }> {
   const normalized = normalizedText(value);
@@ -70,10 +79,16 @@ function productQuery(value: string): Readonly<{
   const withoutBrand = branded
     ? normalized.replace(new RegExp(PRODUCT_ALIAS_SOURCE,"gu")," ") : normalized;
   const words = normalizeWords(withoutBrand);
+  const substantiveWords = new Set([...words].filter((word) => !GENERIC_BRANDED_WORDS.has(word)));
   const identityOverview = branded && (
     words.size === 0 || [...words].every((word) => PRODUCT_OVERVIEW_WORDS.has(word))
   );
-  return Object.freeze({ branded,identityOverview,words });
+  const preferredArticleId = /\b(?:publish|publishing)\b/u.test(normalized)
+    || /\bcum\s+public\p{L}*\b/u.test(normalized)
+    ? "publish-a-debate" : null;
+  return Object.freeze({
+    branded,identityOverview,normalized,preferredArticleId,substantiveWords,words
+  });
 }
 
 function overlapScore(query: Set<string>, value: string): number {
@@ -155,24 +170,36 @@ export function buildSupportKnowledgeContext(input: Readonly<{
   const eligibleEntries = input.entries.filter(({ lang,modelProjection }) =>
     lang === input.language && modelProjection !== undefined
   );
-  const matchedCapabilities = (product.identityOverview
+  const identityEntryScore = Math.max(0,...eligibleEntries
+    .filter(({ id }) => id === "product-identity")
+    .map((entry) => overlapScore(product.substantiveWords,`${entry.title}\n${entry.modelProjection}`)));
+  const identityFactQuestion = product.branded
+    && /(?:^|\s)(?:what|why|is|este|define|defineste|definește|describe|descrie|explain|explica|explică)\b/u.test(product.normalized)
+    && identityEntryScore >= Math.max(1,product.substantiveWords.size - 1);
+  const identityRequest = product.identityOverview || identityFactQuestion;
+  const scoringWords = product.branded ? product.substantiveWords : queryWords;
+  const matchedCapabilities = (identityRequest
     ? input.capabilities.filter(({ id }) => id === "product-identity").map((item) => ({ item,score:1 }))
     : input.capabilities
     .map((item) => ({
       item,
       catalogScore: overlapScore(
-        queryWords,
+        scoringWords,
         `${item.labels[input.language]} ${item.searchTerms[input.language].join(" ")}`,
       ),
+      articleScore: Math.max(0,...eligibleEntries
+        .filter(({ id }) => item.articleIds.includes(id))
+        .map((entry) => overlapScore(scoringWords,entry.title) * 100
+          + overlapScore(scoringWords,entry.modelProjection ?? "") * 10)),
     }))
-    .filter(({ catalogScore }) => catalogScore > 0)
-    .map(({ item,catalogScore }) => ({
+    .filter(({ catalogScore,articleScore }) => catalogScore > 0
+      && (!product.branded || articleScore > 0))
+    .map(({ item,catalogScore,articleScore }) => ({
       item,
       score: product.branded
-        ? Math.max(0,...eligibleEntries
-          .filter(({ id }) => item.articleIds.includes(id))
-          .map((entry) => overlapScore(queryWords,entry.title) * 100
-            + overlapScore(queryWords,entry.body) * 10)) * 1_000 + catalogScore
+        ? articleScore * 1_000 + catalogScore
+          + (product.preferredArticleId !== null
+            && item.articleIds.includes(product.preferredArticleId) ? 1_000_000 : 0)
         : catalogScore,
     }))
     .sort((left, right) => right.score - left.score || left.item.id.localeCompare(right.item.id, "en")));
@@ -208,8 +235,10 @@ export function buildSupportKnowledgeContext(input: Readonly<{
     .map((entry) => ({
       entry,
       score: (capabilityArticleScore.get(entry.id) ?? 0)
+        + (entry.id === product.preferredArticleId ? 1_000_000_000 : 0)
         + (product.branded
-          ? overlapScore(queryWords,entry.title) * 100 + overlapScore(queryWords,entry.body) * 10
+          ? overlapScore(scoringWords,entry.title) * 100
+            + overlapScore(scoringWords,entry.modelProjection ?? "") * 10
           : overlapScore(queryWords, `${entry.title}\n${entry.body}`)),
     }))
     .filter(({ entry,score }) => score > 0

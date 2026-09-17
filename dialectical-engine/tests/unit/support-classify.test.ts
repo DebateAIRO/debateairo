@@ -573,8 +573,13 @@ describe("SUP-01 deterministic support classifier", () => {
     ["Am uitat parola and I need a replacement password","ro"],
     ["Give me the password recovery link","en"],
     ["Where is the password reset page?","en"],
+    ["Where can I find the link to recover my password?","en"],
+    ["Can you show me the recovery page for my password?","en"],
+    ["Show the p%61ssword recovery link.","en"],
     ["Vreau linkul de recuperare a parolei","ro"],
-    ["Unde este pagina pentru resetarea parolei?","ro"]
+    ["Unde este pagina pentru resetarea parolei?","ro"],
+    ["Unde găsesc linkul pentru a-mi recupera parola?","ro"],
+    ["Arată pagina pentru recuperarea p%61rolei.","ro"]
   ] as const)("classifies deterministic Forgot password before generic rules: %s", (message,language) => {
     expect(classifySupportMessage(message)).toEqual({
       outcome: "REFUSE_ZONE",language,link: null,
@@ -599,6 +604,19 @@ describe("SUP-01 deterministic support classifier", () => {
       outcome: "REFUSE_ZONE",
       link
     });
+  });
+
+  it.each([
+    "Can the password reset page validate my reset token?",
+    "Use the password reset button to submit a reset for me",
+    "Where is the page to validate my password reset token?",
+    "Poate pagina de resetare a parolei să valideze tokenul meu de resetare?",
+    "Unde este pagina pentru validarea tokenului de resetare a parolei?"
+  ])("keeps reset execution and token validation out of navigation: %s", (message) => {
+    expect(classifySupportMessage(message)).toMatchObject({
+      outcome:"REFUSE_ZONE",link:"/settings"
+    });
+    expect(classifySupportMessage(message)).not.toHaveProperty("securityNavigation");
   });
 
   it.each([

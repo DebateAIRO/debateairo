@@ -8,11 +8,31 @@ export type SupportSecurityNavigation = Readonly<{
 
 const FORGOT_PASSWORD_RO = /(?:\bam\s+uitat\s+parol(?:a|ă)\b|\bnu(?:-mi)?\s+(?:mai\s+)?amintesc\s+parol(?:a|ă)\b)/u;
 const FORGOT_PASSWORD_EN = /(?:\bforgot(?:ten)?\s+(?:my\s+)?password\b|\b(?:can(?:not|'t)|do\s+not|don't)\s+remember\s+(?:my\s+)?password\b)/u;
-const RECOVERY_NAVIGATION_EN = /(?:(?:password\s+(?:recovery|reset)|(?:recovery|reset)\s+(?:my\s+)?password).{0,40}\b(?:link|page|option|button|screen|opener)\b|\b(?:link|page|option|button|screen|opener)\b.{0,40}(?:password\s+(?:recovery|reset)|(?:recovery|reset)\s+(?:my\s+)?password))/u;
-const RECOVERY_NAVIGATION_RO = /(?:(?:recuperarea|resetarea|recuperare(?:a)?|resetare(?:a)?)\s+(?:a\s+)?parol(?:ei|a|ă).{0,40}\b(?:link(?:ul)?|pagin(?:a|ă)|opțiun(?:ea|e)|optiun(?:ea|e)|buton(?:ul)?|ecran(?:ul)?|deschidere)\b|\b(?:link(?:ul)?|pagin(?:a|ă)|opțiun(?:ea|e)|optiun(?:ea|e)|buton(?:ul)?|ecran(?:ul)?|deschidere)\b.{0,40}(?:recuperarea|resetarea|recuperare(?:a)?|resetare(?:a)?)\s+(?:a\s+)?parol(?:ei|a|ă))/u;
+const RECOVERY_SUBJECT_EN = /(?:\bpassword\b.{0,32}\b(?:recovery|reset)\b|\b(?:recover\w*|recovery|reset)\b.{0,32}\bpassword\b)/u;
+const RECOVERY_NAVIGATION_NOUN_EN = /\b(?:link|page|option|button|screen|opener)\b/u;
+const RECOVERY_SUBJECT_RO = /(?:(?:recuper\p{L}*|reset\p{L}*).{0,32}(?<!\p{L})parol\p{L}*|(?<!\p{L})parol\p{L}*.{0,32}(?:recuper\p{L}*|reset\p{L}*))/u;
+const RECOVERY_NAVIGATION_NOUN_RO = /(?<!\p{L})(?:link\p{L}*|pagin\p{L}*|opțiun\p{L}*|optiun\p{L}*|buton\p{L}*|ecran\p{L}*|deschidere)(?!\p{L})/u;
+const RECOVERY_OPERATION_EN = /(?:(?:\bvalidate|\bverify|\bcheck|\bsubmit|\bexecute|\bperform|\bapply|\bchange|\breplace|\bset)\w*.{0,56}\b(?:reset\s+token|password\s+reset|reset)\b|\b(?:reset\s+token|password\s+reset|reset)\b.{0,56}(?:\bvalidate|\bverify|\bcheck|\bsubmit|\bexecute|\bperform|\bapply|\bchange|\breplace|\bset)\w*)/u;
+const RECOVERY_OPERATION_RO = /(?:(?:valid\p{L}*|verific\p{L}*|trimit\p{L}*|execut\p{L}*|efectu\p{L}*|schimb\p{L}*|înlocu\p{L}*|inlocu\p{L}*).{0,56}(?:token\p{L}*|reset\p{L}*)|(?:token\p{L}*|reset\p{L}*).{0,56}(?:valid\p{L}*|verific\p{L}*|trimit\p{L}*|execut\p{L}*|efectu\p{L}*|schimb\p{L}*|înlocu\p{L}*|inlocu\p{L}*))/u;
 
 function normalized(value: string): string {
   return value.normalize("NFKC").toLocaleLowerCase("en-US");
+}
+
+function normalizedViews(values: readonly string[]): readonly string[] {
+  return Object.freeze(Array.from(new Set(values.flatMap((value) => {
+    const plain = value.toLocaleLowerCase("en-US");
+    const decoded = plain.replace(/%([0-7][0-9a-f])/giu,(_match,hex: string) =>
+      String.fromCharCode(Number.parseInt(hex,16)));
+    return decoded === plain ? [plain] : [plain,decoded];
+  }))));
+}
+
+function recoveryNavigation(value: string,language: SupportLanguage): boolean {
+  if (language === "ro") {
+    return RECOVERY_SUBJECT_RO.test(value) && RECOVERY_NAVIGATION_NOUN_RO.test(value);
+  }
+  return RECOVERY_SUBJECT_EN.test(value) && RECOVERY_NAVIGATION_NOUN_EN.test(value);
 }
 
 export function classifySecurityNavigation(text: string): SupportSecurityNavigation | null {
@@ -22,10 +42,14 @@ export function classifySecurityNavigation(text: string): SupportSecurityNavigat
 export function classifySecurityNavigationViews(
   values: readonly string[]
 ): SupportSecurityNavigation | null {
-  if (values.some((value) => FORGOT_PASSWORD_RO.test(value) || RECOVERY_NAVIGATION_RO.test(value))) {
+  const views = normalizedViews(values);
+  if (views.some((value) => RECOVERY_OPERATION_EN.test(value) || RECOVERY_OPERATION_RO.test(value))) {
+    return null;
+  }
+  if (views.some((value) => FORGOT_PASSWORD_RO.test(value) || recoveryNavigation(value,"ro"))) {
     return Object.freeze({ kind: "FORGOT_PASSWORD",language: "ro",actionId: "forgot-password" });
   }
-  if (values.some((value) => FORGOT_PASSWORD_EN.test(value) || RECOVERY_NAVIGATION_EN.test(value))) {
+  if (views.some((value) => FORGOT_PASSWORD_EN.test(value) || recoveryNavigation(value,"en"))) {
     return Object.freeze({ kind: "FORGOT_PASSWORD",language: "en",actionId: "forgot-password" });
   }
   return null;

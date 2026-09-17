@@ -1,8 +1,10 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe,expect,it,vi } from "vitest";
 
 import { createSupportAnswerService } from "../../apps/api/src/support/answer.js";
 import {
-  createHelpCorpusSnapshotLookup,type HelpCorpusEntry,type LoadedHelpCorpus
+  createHelpCorpusSnapshotLookup,loadHelpCorpus,type HelpCorpusEntry,type LoadedHelpCorpus
 } from "../../packages/support-kb/src/index.js";
 import type { SupportMessageCipherPort } from "../../apps/api/src/support/session.js";
 import { createSupportModelReferenceFactory } from "../../apps/api/src/support/model-references.js";
@@ -23,6 +25,15 @@ function entry(id: string,body: string): HelpCorpusEntry {
 
 function corpus(entries: readonly HelpCorpusEntry[],kbVersion: string): LoadedHelpCorpus {
   return Object.freeze({ entries: Object.freeze([...entries]),kbVersion }) as LoadedHelpCorpus;
+}
+
+function admittedCorpus(): LoadedHelpCorpus {
+  const root = resolve(process.cwd(),"packages/support-kb");
+  return loadHelpCorpus(resolve(root,"content"),{
+    reviewManifest: JSON.parse(readFileSync(resolve(root,"reviews/manifest.json"),"utf8")) as unknown,
+    recoveryComponents: readFileSync(resolve(root,"recovery/components.json")),
+    requireReviewedRecovery: true
+  });
 }
 
 const messages = Object.freeze({
@@ -112,6 +123,50 @@ describe("CP1 composed answer context", () => {
       entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-17T12:00:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({ ...request(snapshot),text });
+
+    expect(result).toMatchObject({ outcome:"NO_SOURCE",sources:[],actions:[] });
+    expect(complete).not.toHaveBeenCalled();
+  });
+
+  it("grounds a reviewed identity-fact paraphrase through the actual service on the admitted corpus", async () => {
+    const snapshot = admittedCorpus();
+    const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
+      kind:"answer",text:"Dialectical Engine is a reasoning instrument.",
+      sourceIds:[SOURCE_REFERENCE],actionIds:[]
+    }) }));
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-17T12:45:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({
+      ...request(snapshot),text:"Is Dialectical Engine a reasoning instrument?"
+    });
+
+    expect(complete).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      outcome:"ANSWER_GROUNDED",sources:[{ id:"product-identity" }],actions:[]
+    });
+  });
+
+  it.each([
+    "Does Dialectical Engine support investment advice?",
+    "Can DebateAIRO help diagnose medical conditions?"
+  ])("keeps an unsupported branded claim out of the actual service on the admitted corpus: %s", async (
+    text
+  ) => {
+    const snapshot = admittedCorpus();
+    const complete = vi.fn(async () => Object.freeze({ text: JSON.stringify({
+      kind:"answer",text:"Unsupported synthetic claim.",sourceIds:[SOURCE_REFERENCE],actionIds:[]
+    }) }));
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-17T12:30:00.000Z");return () => new Date(++at); })()
     });
 
     const result = await service.respond({ ...request(snapshot),text });

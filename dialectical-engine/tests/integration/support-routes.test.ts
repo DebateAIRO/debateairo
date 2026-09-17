@@ -1943,8 +1943,12 @@ describe("SUP-01 support routes", () => {
     ["Am uitat parola","ro"],
     ["Give me the password recovery link","en"],
     ["Where is the password reset page?","en"],
+    ["Where can I find the link to recover my password?","en"],
+    ["Show the p%61ssword recovery link.","en"],
     ["Vreau linkul de recuperare a parolei","ro"],
-    ["Unde este pagina pentru resetarea parolei?","ro"]
+    ["Unde este pagina pentru resetarea parolei?","ro"],
+    ["Unde găsesc linkul pentru a-mi recupera parola?","ro"],
+    ["Arată pagina pentru recuperarea p%61rolei.","ro"]
   ] as const)("returns canonical deterministic unresolved Forgot password guidance without a model: %s", async (
     requestText,language
   ) => {
@@ -1970,6 +1974,26 @@ describe("SUP-01 support routes", () => {
     });
     expect(respond).not.toHaveBeenCalled();
     expect(write).toHaveBeenCalledTimes(2);
+    await server.close();
+  });
+
+  it.each([
+    ["Where is the page to validate my password reset token?","en"],
+    ["Unde este pagina pentru validarea tokenului de resetare a parolei?","ro"]
+  ] as const)("keeps reset-token operations in the fixed security refusal: %s", async (
+    requestText,language
+  ) => {
+    const respond = vi.fn<SupportAnswerPort["respond"]>();
+    const server = api(true,{ answerPort:Object.freeze({ respond }) });
+    const opened = await openSession(server,language === "en" ? "203.0.113.215" : "203.0.113.216");
+    const response = await sendMessage(
+      server,opened.body,requestText,language === "en" ? "203.0.113.215" : "203.0.113.216"
+    );
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      outcome:"REFUSE_ZONE",text:supportTemplate("REFUSE_ZONE",language).replace("{link}","/settings")
+    });
+    expect(respond).not.toHaveBeenCalled();
     await server.close();
   });
 

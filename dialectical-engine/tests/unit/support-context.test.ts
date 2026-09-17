@@ -1,8 +1,10 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
 import { buildSupportKnowledgeContext as buildContext } from "../../packages/support-kb/src/context.js";
-import type { HelpCorpusEntry } from "../../packages/support-kb/src/index.js";
+import { loadHelpCorpus,type HelpCorpusEntry } from "../../packages/support-kb/src/index.js";
 
 type ContextInput = Parameters<typeof buildContext>[0];
 function buildSupportKnowledgeContext(
@@ -33,6 +35,15 @@ function entry(
     body,
     modelProjection: `MODEL PROJECTION: ${body}`,
     fallback: `FALLBACK: ${body}`,
+  });
+}
+
+function admittedCorpus() {
+  const root = resolve(process.cwd(),"packages/support-kb");
+  return loadHelpCorpus(resolve(root,"content"),{
+    reviewManifest: JSON.parse(readFileSync(resolve(root,"reviews/manifest.json"),"utf8")) as unknown,
+    recoveryComponents: readFileSync(resolve(root,"recovery/components.json")),
+    requireReviewedRecovery: true
   });
 }
 
@@ -339,6 +350,45 @@ describe("Support knowledge context", () => {
     const result = buildSupportKnowledgeContext({
       entries:identityEntries,capabilities:SUPPORT_CAPABILITIES,
       availableActionIds:SUPPORT_ACTION_IDS,language,query,historyText:"",maxCodePoints:24_000
+    });
+    expect(result.sourceIds).toEqual([]);
+    expect(result.requestedActionIds).toEqual([]);
+  });
+
+  it.each([
+    ["en" as const,"Is Dialectical Engine a reasoning instrument?","product-identity"],
+    ["en" as const,"Is DebateAIRO an AI debate tool?","product-identity"],
+    ["ro" as const,"Este Dialectical Engine un instrument de raționament?","product-identity"],
+    ["en" as const,"What does Dialectical Engine Support status show?","support-status-limits"],
+    ["en" as const,"How do I view a public debate in DebateAIRO?","view-public-debate"],
+    ["ro" as const,"Cum public o dezbatere în DebateAIRO?","publish-a-debate"],
+    ["ro" as const,"Cum public o dezbatere în Debate AIRO?","publish-a-debate"]
+  ])("selects the intended reviewed article from the admitted corpus for %s: %s", (
+    language,query,expected
+  ) => {
+    const snapshot = admittedCorpus();
+    const result = buildSupportKnowledgeContext({
+      entries:snapshot.entries,capabilities:SUPPORT_CAPABILITIES,
+      availableActionIds:SUPPORT_ACTION_IDS,language,query,historyText:"",maxCodePoints:24_000
+    });
+    expect(snapshot).toMatchObject({ entries:expect.arrayContaining([
+      expect.objectContaining({ id:"product-identity",lang:language })
+    ]) });
+    expect(result.sourceIds[0]).toBe(expected);
+    if (expected === "product-identity") expect(result.sourceIds).not.toContain("support-status-limits");
+    if (expected === "publish-a-debate") expect(result.sourceIds).not.toContain("view-public-debate");
+    if (expected === "product-identity") expect(result.requestedActionIds).toEqual([]);
+  });
+
+  it.each([
+    "Does Dialectical Engine support investment advice?",
+    "Can DebateAIRO help diagnose medical conditions?",
+    "Can Dialectical-Engine support insider trading questions?"
+  ])("does not treat generic help wording as reviewed authority in the admitted corpus: %s", (query) => {
+    const snapshot = admittedCorpus();
+    const result = buildSupportKnowledgeContext({
+      entries:snapshot.entries,capabilities:SUPPORT_CAPABILITIES,
+      availableActionIds:SUPPORT_ACTION_IDS,language:"en",query,historyText:"",maxCodePoints:24_000
     });
     expect(result.sourceIds).toEqual([]);
     expect(result.requestedActionIds).toEqual([]);
