@@ -1,5 +1,6 @@
 import type { SupportLanguage, SupportOutcome } from "./templates.js";
-import { classifySecurityNavigationViews } from "./security-guidance.js";
+import { analyzePreparedRecoverySemanticsViews } from "./recovery-intent.js";
+import { classifySecurityRecoveryViews } from "./security-guidance.js";
 
 export type SupportClassification = Readonly<{
   outcome: Extract<SupportOutcome,
@@ -7,10 +8,15 @@ export type SupportClassification = Readonly<{
   language: SupportLanguage;
   link: "/login" | "/sign-up" | "/settings" | null;
   securityNavigation?: "FORGOT_PASSWORD";
+  securityOperation?: "CREDENTIAL_OPERATION";
 }>;
 
 type ZoneLink = Exclude<SupportClassification["link"], null>;
-type ZoneRule = Readonly<{ pattern: RegExp; link: ZoneLink }>;
+type ZoneRule = Readonly<{
+  pattern: RegExp;
+  link: ZoneLink;
+  recoveryPassword?: true;
+}>;
 
 export type SupportSensitiveIntentFamily =
   | "account-erasure"
@@ -33,7 +39,8 @@ const ZONE_RULES: readonly ZoneRule[] = Object.freeze([
   }),
   Object.freeze({
     pattern: /(?:\bpasswords?\b|(?<!\p{L})parol(?:a|ă|e|ei|ele|elor)(?!\p{L}))/u,
-    link: "/settings"
+    link: "/settings",
+    recoveryPassword: true
   }),
   Object.freeze({
     pattern: /(?:\bverification (?:codes?|links?)\b|\bverify (?:my )?(?:email|account)\b|\bcod(?:ul|uri)? de verificare\b|\blink(?:ul|uri)? de verificare\b)/u,
@@ -356,16 +363,24 @@ export function classifySupportMessage(message: string): SupportClassification {
   const prepared = prepareMessage(message);
   const views = prepared.ordinaryViews;
   const language = detectPreparedLanguage(prepared);
-  const securityNavigation = classifySecurityNavigationViews(views);
-  if (securityNavigation !== null) {
+  const recoverySemantics = analyzePreparedRecoverySemanticsViews(views,language);
+  const securityRecovery = classifySecurityRecoveryViews(views,language);
+  if (securityRecovery !== null) {
     return Object.freeze({
       outcome: "REFUSE_ZONE",
-      language: securityNavigation.language,
+      language: securityRecovery.language,
       link: null,
-      securityNavigation: securityNavigation.kind
+      ...(securityRecovery.kind === "CREDENTIAL_OPERATION"
+        ? {} : { securityNavigation:"FORGOT_PASSWORD" as const }),
+      ...(securityRecovery.kind === "FORGOT_PASSWORD"
+        ? {} : { securityOperation:"CREDENTIAL_OPERATION" as const })
     });
   }
-  const zone = ZONE_RULES.find((rule) => views.some((text) => rule.pattern.test(text)));
+  const solelyNegatedRecovery = recoverySemantics.navigation !== "AFFIRMATIVE"
+    && recoverySemantics.credentialOperation === "NEGATED";
+  const zone = ZONE_RULES.find((rule) =>
+    !(solelyNegatedRecovery && rule.recoveryPassword === true)
+    && views.some((text) => rule.pattern.test(text)));
   if (zone !== undefined) {
     return Object.freeze({ outcome: "REFUSE_ZONE", language, link: zone.link });
   }

@@ -1,7 +1,9 @@
 import { describe,expect,it } from "vitest";
 import {
   classifySecurityNavigation,
-  forgotPasswordGuidance
+  classifySecurityRecovery,
+  forgotPasswordGuidance,
+  recoverySecurityGuidance
 } from "../../apps/api/src/support/security-guidance.js";
 
 describe("CP1 deterministic Forgot password guidance", () => {
@@ -39,13 +41,7 @@ describe("CP1 deterministic Forgot password guidance", () => {
     "Authentication codes remain private.",
     "How do I change my password?",
     "Reset my password now",
-    "Validate my password reset token",
-    "Can the password reset page validate my reset token?",
-    "Use the password reset button to submit a reset for me",
-    "Where is the page to validate my password reset token?",
-    "Poate pagina de resetare a parolei să valideze tokenul meu de resetare?",
-    "Unde este pagina pentru validarea tokenului de resetare a parolei?",
-    "Unde este pagina pentru validarea codului de recuperare a parolei?"
+    "Validate my password reset token"
   ])("keeps saved-MFA and ordinary password requests distinct: %s", (text) => {
     expect(classifySecurityNavigation(text)).toBeNull();
   });
@@ -59,5 +55,40 @@ describe("CP1 deterministic Forgot password guidance", () => {
     );
     expect(`${forgotPasswordGuidance("en")} ${forgotPasswordGuidance("ro")}`)
       .not.toMatch(/\/settings|\/login|recovery code|cod de recuperare/iu);
+  });
+
+  it.each([
+    ["en","Show me the password recovery page.","FORGOT_PASSWORD"],
+    ["en","Reset my password for me.","CREDENTIAL_OPERATION"],
+    ["en","Reset my password and show me the recovery page.","CREDENTIAL_OPERATION_AND_FORGOT_PASSWORD"],
+    ["en","Do not reset my password; show me the recovery page.","FORGOT_PASSWORD"],
+    ["ro","Arată-mi pagina de recuperare a parolei.","FORGOT_PASSWORD"],
+    ["ro","Resetează-mi parola în locul meu.","CREDENTIAL_OPERATION"],
+    ["ro","Resetează-mi parola și arată-mi pagina de recuperare.","CREDENTIAL_OPERATION_AND_FORGOT_PASSWORD"],
+    ["ro","Nu-mi reseta parola; arată-mi pagina de recuperare.","FORGOT_PASSWORD"]
+  ] as const)("maps %s recovery clauses to the closed %s decision",(
+    language,text,kind
+  ) => {
+    expect(classifySecurityRecovery(text,language)).toMatchObject({ kind,language });
+  });
+
+  it.each([
+    ["en","I am not asking to reset a password. Where is Help?"],
+    ["ro","Nu cer resetarea parolei. Unde găsesc Ajutor?"]
+  ] as const)("does not divert a solely negated %s recovery mention",(language,text) => {
+    expect(classifySecurityRecovery(text,language)).toBeNull();
+  });
+
+  it("keeps operation refusal and combined guidance fixed, actionless, and destination-free", () => {
+    expect(recoverySecurityGuidance("CREDENTIAL_OPERATION","en")).toBe(
+      "Support cannot receive credentials or reset, validate, or submit a password, reset token, or recovery code."
+    );
+    expect(recoverySecurityGuidance("CREDENTIAL_OPERATION_AND_FORGOT_PASSWORD","ro")).toBe(
+      "Asistența nu poate primi credențiale și nu poate reseta, valida sau trimite o parolă, un token de resetare ori un cod de recuperare. Folosește opțiunea Am uitat parola din produs."
+    );
+    expect([
+      recoverySecurityGuidance("CREDENTIAL_OPERATION","en"),
+      recoverySecurityGuidance("CREDENTIAL_OPERATION_AND_FORGOT_PASSWORD","ro")
+    ].join(" ")).not.toMatch(/\/settings|\/login|https?:|href/iu);
   });
 });

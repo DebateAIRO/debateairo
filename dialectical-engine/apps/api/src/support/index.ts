@@ -2,7 +2,6 @@ import { createHash, randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { SupportConfigurationPort, SupportConfigurationState } from "@debateai/register";
 import type { LoadedHelpCorpus } from "@debateai/support-kb";
-import { resolveSupportActions } from "@debateai/support-kb/navigation";
 import { normalizeClientIp } from "../client-ip.js";
 import { SupportC3AdmissionWindow } from "./c3-admission.js";
 import type { SupportAnswerPort } from "./answer.js";
@@ -22,7 +21,7 @@ import {
   type SupportSessionRecord
 } from "./session.js";
 import { SHREDDED_NOTICE,supportTemplate,type SupportLanguage } from "./templates.js";
-import { forgotPasswordGuidance } from "./security-guidance.js";
+import { recoverySecurityGuidance,type SupportSecurityRecoveryKind } from "./security-guidance.js";
 
 export const SUPPORT_ROUTE_PATHS = Object.freeze([
   "POST /v1/support/sessions",
@@ -375,8 +374,15 @@ export function installSupportRoutes(
           sources: Object.freeze([]),actions: Object.freeze([])
         });
       }
-      if (classification.securityNavigation === "FORGOT_PASSWORD") {
-        const text = forgotPasswordGuidance(responseLanguage);
+      if (classification.securityNavigation === "FORGOT_PASSWORD"
+        || classification.securityOperation === "CREDENTIAL_OPERATION") {
+        const recoveryKind: SupportSecurityRecoveryKind =
+          classification.securityNavigation === "FORGOT_PASSWORD"
+          && classification.securityOperation === "CREDENTIAL_OPERATION"
+            ? "CREDENTIAL_OPERATION_AND_FORGOT_PASSWORD"
+            : classification.securityNavigation === "FORGOT_PASSWORD"
+              ? "FORGOT_PASSWORD" : "CREDENTIAL_OPERATION";
+        const text = recoverySecurityGuidance(recoveryKind,responseLanguage);
         await application.messages.write({
           messageId: randomUUID(),sessionId: found.sessionId,role: "user",
           text: body.text,outcome: "REFUSE_ZONE",language: responseLanguage,
@@ -392,10 +398,7 @@ export function installSupportRoutes(
         });
         return reply.send({
           message_id: messageId,outcome: "REFUSE_ZONE",text: stored.text,
-          sources: Object.freeze([]),
-          actions: resolveSupportActions(["forgot-password"],{
-            signedIn: found.identityOwnerRef !== null,language: responseLanguage
-          })
+          sources: Object.freeze([]),actions: Object.freeze([])
         });
       }
       const previousMessages = application.cases === undefined

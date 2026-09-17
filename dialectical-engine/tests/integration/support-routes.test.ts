@@ -42,6 +42,7 @@ import {
   type SupportKeyPort
 } from "../../apps/api/src/support/keys.js";
 import { supportTemplate } from "../../apps/api/src/support/templates.js";
+import { recoverySecurityGuidance } from "../../apps/api/src/support/security-guidance.js";
 import {
   migrate,
   PostgresSupportCaseRepository,
@@ -2064,7 +2065,7 @@ describe("SUP-01 support routes", () => {
     ["Unde este pagina pentru validarea tokenului de resetare a parolei?","ro"],
     ["Unde este pagina pentru validarea codului de recuperare a parolei?","ro"]
   ] as const).map((item,index) => [...item,`203.0.113.${180 + index}`] as const))(
-  "keeps reset-token operations in the fixed security refusal: %s", async (
+  "combines reset-token refusal with unresolved safe recovery guidance: %s", async (
     requestText,language,clientIp
   ) => {
     const respond = vi.fn<SupportAnswerPort["respond"]>();
@@ -2075,9 +2076,67 @@ describe("SUP-01 support routes", () => {
     );
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
-      outcome:"REFUSE_ZONE",text:supportTemplate("REFUSE_ZONE",language).replace("{link}","/settings")
+      outcome:"REFUSE_ZONE",
+      text:recoverySecurityGuidance("CREDENTIAL_OPERATION_AND_FORGOT_PASSWORD",language),
+      sources:[],actions:[]
     });
     expect(respond).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it.each(([
+    ["positive-navigation","en","Show me the password recovery page.","FORGOT_PASSWORD"],
+    ["operation-only","en","Reset my password for me.","CREDENTIAL_OPERATION"],
+    ["mixed","en","Reset my password; then show me the recovery page.","CREDENTIAL_OPERATION_AND_FORGOT_PASSWORD"],
+    ["negated-operation-navigation","en","Do not reset my password; show me the recovery page.","FORGOT_PASSWORD"],
+    ["positive-navigation","ro","Arată-mi pagina de recuperare a parolei.","FORGOT_PASSWORD"],
+    ["operation-only","ro","Resetează-mi parola în locul meu.","CREDENTIAL_OPERATION"],
+    ["mixed","ro","Resetează-mi parola; apoi arată-mi pagina de recuperare.","CREDENTIAL_OPERATION_AND_FORGOT_PASSWORD"],
+    ["negated-operation-navigation","ro","Nu-mi reseta parola; arată-mi pagina de recuperare.","FORGOT_PASSWORD"]
+  ] as const).map((item,index) => [...item,`203.0.113.${220 + index}`] as const))(
+  "keeps generated %s %s recovery behavior deterministic and actionless",async (
+    _className,language,requestText,guidanceKind,clientIp
+  ) => {
+    const respond = vi.fn<SupportAnswerPort["respond"]>();
+    const listSession = vi.fn(async () => []);
+    const write = vi.fn(async (input: Parameters<SupportMessageCipherPort["write"]>[0]) =>
+      Object.freeze({ ...input }));
+    const server = api(true,{
+      answerPort:Object.freeze({ respond }),
+      messagePort:Object.freeze({
+        write,writeAndTransit:vi.fn(),read:vi.fn(async () => null),listSession
+      }) as never
+    });
+    const opened = await openSession(server,clientIp,language);
+    const response = await sendMessage(server,opened.body,requestText,clientIp);
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      outcome:"REFUSE_ZONE",text:recoverySecurityGuidance(guidanceKind,language),
+      sources:[],actions:[]
+    });
+    expect(respond).not.toHaveBeenCalled();
+    expect(listSession).not.toHaveBeenCalled();
+    expect(write).toHaveBeenCalledTimes(2);
+    await server.close();
+  });
+
+  it.each(([
+    ["en","I am not asking to reset a password. Where is Help?"],
+    ["ro","Nu cer resetarea parolei. Unde găsesc Ajutor?"]
+  ] as const).map((item,index) => [...item,`203.0.113.${240 + index}`] as const))(
+  "keeps a solely negated %s recovery mention on the ordinary bounded path",async (
+    language,requestText,clientIp
+  ) => {
+    const respond = vi.fn<SupportAnswerPort["respond"]>(async () => Object.freeze({
+      messageId:randomUUID(),outcome:"NO_SOURCE",text:"No reviewed source matched.",
+      canEscalate:true,sources:Object.freeze([]),actions:Object.freeze([])
+    }));
+    const server = api(true,{ answerPort:Object.freeze({ respond }) });
+    const opened = await openSession(server,clientIp,language);
+    const response = await sendMessage(server,opened.body,requestText,clientIp);
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ outcome:"NO_SOURCE",sources:[],actions:[] });
+    expect(respond).toHaveBeenCalledTimes(1);
     await server.close();
   });
 
@@ -2771,10 +2830,10 @@ describe("SUP-01 support routes", () => {
     const deterministic = api(true,{ clock: () => new Date(CLOCK_BASE_MS + 40) });
     const zoneSession = await openSession(deterministic,"203.0.113.201");
     const firstZone = await sendMessage(
-      deterministic,zoneSession.body,"Reset my password","203.0.113.201"
+      deterministic,zoneSession.body,"Change my email address","203.0.113.201"
     );
     const secondZone = await sendMessage(
-      deterministic,zoneSession.body,"Reset my password again","203.0.113.201"
+      deterministic,zoneSession.body,"Change my email address again","203.0.113.201"
     );
     expect(firstZone.json()).not.toHaveProperty("case_token");
     expect(secondZone.json()).toMatchObject(receipt);

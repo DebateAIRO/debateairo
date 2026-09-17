@@ -52,6 +52,17 @@ describe("Support credential lexical facts", () => {
   });
 
   it.each([
+    ["Show me the recovery page; my reset token is INERT-RESET-7.","INERT-RESET-7"],
+    ["Arată-mi pagina de recuperare; parola mea este inert-stejar-9.","inert-stejar-9"]
+  ])("retains a supplied credential value inside a recovery-navigation request: %s",(
+    text,secret
+  ) => {
+    const facts = analyzeSupportCredentialText(text);
+    expect(facts.credentialValueSpans.map(({ start,end }) => text.slice(start,end)))
+      .toContain(secret);
+  });
+
+  it.each([
     ["My pass\u200Bword is inert-birch-7","inert-birch-7"],
     ["Paro\u200Bla mea este inert-fag-7","inert-fag-7"],
     ["Codul de veri\u2060ficare este INERTCODE","INERTCODE"]
