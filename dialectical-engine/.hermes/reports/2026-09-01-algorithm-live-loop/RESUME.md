@@ -372,8 +372,9 @@ line, typed block on the ceremony, content law in the log, shape-vs-outcome boun
 
 **Operator's next actions (unchanged in kind, shorter in list).** (1) The ceremony re-run per
 `packets/readiness-ask-2026-09-16.md` — with `--depth-params '{"depth":2}'` — then read the seven
-`DOD-*` lines; (2) the Node 22.23.1 run; (3) the V packet's 2026-09-17 rows; (4) remove the
-`lane-cont-t2/t3/t8` worktrees; (5) W12 §6 steps 4–7 after the re-run.
+`DOD-*` lines; (2) the Node 22.23.1 run; (3) the V packet's 2026-09-17 rows; (4) W12 §6 steps 4–7
+after the re-run. The `lane-cont-t2/t3/t8` worktrees were removed at V's word later the same evening
+(PROGRESS, 19:3x) — nothing else of this mission's lives outside `algo-loop-2026-09-16`.
 
 **Known reds, unchanged.** The gate of record's 140 (100 Node-26 `localStorage`, 40 owned); among
 them s7 `:98`. F31's 3+3 audit rows.
