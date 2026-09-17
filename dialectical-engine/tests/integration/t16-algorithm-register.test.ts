@@ -242,6 +242,21 @@ describe("T16 algorithm register rows + seeding", () => {
     expect((await database.pool.query("SELECT register_version FROM register.register_version WHERE register_version > 4")).rows).toEqual([]);
   });
 
+  /**
+   * The literal 2 here is the manifest-DECLARED acceptance version
+   * (`migrations/0050_t16_algorithm_register_rows.sql:49-52` declares 2 and 5),
+   * NOT the ceremony's pin — `ACCEPTANCE_REGISTER_VERSION` is 3 since D77 (c).
+   * The two differ, so this case no longer covers the version the ceremony
+   * actually seeds: at the pin, a seal carrying NOT ONE required row is not
+   * refused, because version 3 is undeclared and the publication trigger only
+   * declares a profile for a version that already carries a required row
+   * (`migrations/0061_algorithm_publication_profiles.sql:10-37`). Only the
+   * all-missing case is unguarded there: a seal at 3 carrying SOME required rows
+   * trips the same `REGISTER_REQUIRED_ROW_MISSING`, measured, and no test pins
+   * that yet. Ticket `F-REGISTER-V3-REQUIRED-ROW-PROFILE` adds 3 to the manifest;
+   * when it lands, this literal becomes `ACCEPTANCE_REGISTER_VERSION` and the gap
+   * closes.
+   */
   it("rolls back historical acceptance publication when all required algorithm rows are missing", async () => {
     await expect(importHistoricalRegisterFixture(database.pool, 2, [
       registerFixtureRow("riskTier", "standard", "test:incomplete-acceptance")
@@ -346,6 +361,9 @@ describe("T16 algorithm register rows + seeding", () => {
 
   it("leaves a version the manifest does not govern untouched", async () => {
     // Historical versions (dev 4, ceremony 1) are ungoverned by construction.
+    // Not an exhaustive list of ungoverned versions: since D77 (c) moved the
+    // ceremony pin to 3, that version is ungoverned too until it carries a
+    // required row — see the note above and `F-REGISTER-V3-REQUIRED-ROW-PROFILE`.
     await expect(database.pool.query("SELECT register.assert_required_rows($1)", [4]))
       .resolves.toBeDefined();
     await expect(database.pool.query("SELECT register.assert_required_rows($1)", [1]))
