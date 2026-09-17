@@ -139,13 +139,28 @@ describe("CP1 recovery predicate semantics", () => {
     ["en","Validate my reset token for me."],
     ["en","Please submit the reset code."],
     ["en","Support must check this reset token."],
+    ["en","Please verify this recovery code."],
+    ["en","Submit my recovery token."],
     ["ro","Validează codul de resetare pentru mine."],
     ["ro","Te rog trimite tokenul de resetare."],
-    ["ro","Asistența trebuie să verifice codul de resetare."]
+    ["ro","Asistența trebuie să verifice codul de resetare."],
+    ["ro","Verifică tokenul de recuperare."],
+    ["ro","Trimite codul de recuperare."]
   ] as const)("recognizes a %s credential operation from its reset token/code subject: %s",(
     language,text
   ) => {
     expectSemantics(text,language,{ navigation:"ABSENT",credentialOperation:"AFFIRMATIVE" });
+  });
+
+  it.each([
+    ["en","Do not verify this recovery code."],
+    ["en","Support must not submit my recovery token."],
+    ["ro","Nu verifica tokenul de recuperare."],
+    ["ro","Asistența nu trebuie să trimită codul de recuperare."]
+  ] as const)("keeps a negated %s recovery credential operation non-affirmative: %s",(
+    language,text
+  ) => {
+    expectSemantics(text,language,{ navigation:"ABSENT",credentialOperation:"NEGATED" });
   });
 
   it.each([

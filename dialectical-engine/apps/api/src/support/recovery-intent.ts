@@ -38,7 +38,8 @@ function normalized(value: string): string {
 }
 
 function tokenize(value: string,normalizeInput: boolean): readonly string[] {
-  const source = normalizeInput ? normalized(value) : value;
+  const source = (normalizeInput ? normalized(value) : value)
+    .replace(/[‘’‛`´]/gu,"'");
   return Object.freeze(source.match(/[\p{L}\p{N}]+(?:'[\p{L}\p{N}]+)?|[,.;:!?]/gu) ?? []);
 }
 
@@ -64,12 +65,18 @@ function contains(words: readonly string[],pattern: RegExp): boolean {
   return words.some((word) => pattern.test(word));
 }
 
-function recoverySubject(words: readonly string[]): boolean {
+function passwordRecoverySubject(words: readonly string[]): boolean {
   const password = contains(words,PASSWORD_WORD);
   const recovery = contains(words,RECOVERY_WORD) || contains(words,RESET_WORD);
   const resetCredential = contains(words,RESET_WORD)
     && contains(words,CREDENTIAL_OBJECT_WORD);
   return (password && recovery) || resetCredential;
+}
+
+function credentialRecoverySubject(words: readonly string[]): boolean {
+  return passwordRecoverySubject(words)
+    || ((contains(words,RECOVERY_WORD) || contains(words,RESET_WORD))
+      && contains(words,CREDENTIAL_OBJECT_WORD));
 }
 
 function isNegated(words: readonly string[],predicateIndex: number): boolean {
@@ -106,9 +113,10 @@ function credentialOperationIndexes(words: readonly string[]): readonly number[]
 function navigationIndexes(
   words: readonly string[],operationIndexes: readonly number[]
 ): readonly number[] {
-  const localContext = recoverySubject(words)
-    || contains(words,RECOVERY_WORD) || contains(words,RESET_WORD);
-  if (!localContext) return Object.freeze([]);
+  if (!passwordRecoverySubject(words)
+    && !contains(words,RECOVERY_WORD) && !contains(words,RESET_WORD)) {
+    return Object.freeze([]);
+  }
   const indexes = words.flatMap((word,index) => NAVIGATION_WORD.test(word) ? [index] : []);
   if (indexes.length > 0) return Object.freeze(indexes);
   if (operationIndexes.length === 0
@@ -138,15 +146,21 @@ function analyzeRecoverySemanticsInput(
 ): RecoverySemantics {
   const parsed = clauses(text,normalizeInput);
   const allWords = parsed.flatMap(({ words }) => words);
-  const globalSubject = recoverySubject(allWords);
+  const globalNavigationSubject = passwordRecoverySubject(allWords);
+  const globalCredentialSubject = credentialRecoverySubject(allWords);
   const navigation: Array<Readonly<{ negated: boolean }>> = [];
   const credentialOperation: Array<Readonly<{ negated: boolean }>> = [];
 
   for (const clause of parsed) {
-    const hasSubject = recoverySubject(clause.words) || globalSubject;
-    if (!hasSubject) continue;
-    const operationIndexes = credentialOperationIndexes(clause.words);
-    for (const index of navigationIndexes(clause.words,operationIndexes)) {
+    const hasNavigationSubject = passwordRecoverySubject(clause.words)
+      || globalNavigationSubject;
+    const hasCredentialSubject = credentialRecoverySubject(clause.words)
+      || globalCredentialSubject;
+    if (!hasNavigationSubject && !hasCredentialSubject) continue;
+    const operationIndexes = hasCredentialSubject
+      ? credentialOperationIndexes(clause.words) : Object.freeze([]);
+    for (const index of hasNavigationSubject
+      ? navigationIndexes(clause.words,operationIndexes) : Object.freeze([])) {
       const word = clause.words[index] ?? "";
       const difficulty = ["amintesc","find","gasesc","găsesc","remember"].includes(word)
         && clause.words.slice(Math.max(0,index - 3),index).some((candidate) =>

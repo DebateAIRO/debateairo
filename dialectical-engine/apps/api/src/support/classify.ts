@@ -28,7 +28,7 @@ export type SupportSensitiveIntentFamily =
   | "minor"
   | "legal-data";
 
-const ACCOUNT_ERASURE_PATTERN = /(?:(?:\bdelete|\berase|\bremove)\b.{0,40}\b(?:(?:my|this|the)\s+)?account\b|(?<!\p{L})(?:șterg|sterg)\p{L}*(?:-[\p{L}]+)?.{0,40}(?<!\p{L})cont\p{L}*(?!\p{L}))/u;
+const ACCOUNT_ERASURE_PATTERN = /(?:(?:\bdelete|\berase|\bremove)\b.{0,40}\b(?:(?:my|this|the)\s+)?account\b|(?<!\p{L})(?:șterg|sterg|ștearg|stearg|elimin)\p{L}*(?:-[\p{L}]+)?.{0,40}(?<!\p{L})cont\p{L}*(?!\p{L}))/u;
 
 const ZONE_RULES: readonly ZoneRule[] = Object.freeze([
   Object.freeze({
@@ -300,7 +300,8 @@ const ROMANIAN_WORDS = new Set([
   "cineva", "cont", "cum", "dezbatere", "dezbaterii", "dezbaterile", "disponibile",
   "este", "funcționează", "ghidul", "îmi", "început", "întâmplă", "nivelurile", "opțiuni",
   "persoană", "pot", "proprietarul", "publicarea", "răspunsul", "retrag", "să",
-  "scriu", "sunt", "sursa", "telefon", "unde", "vizitatorii", "stricat", "merge", "nu"
+  "scriu", "sunt", "sursa", "telefon", "unde", "vizitatorii", "stricat", "merge", "nu",
+  "codul", "recuperare", "trimite"
 ]);
 
 function boundedUnicodeSlice(message: string): string {
@@ -380,6 +381,9 @@ export function classifySupportMessage(message: string): SupportClassification {
         ? {} : { securityOperation:"CREDENTIAL_OPERATION" as const })
     });
   }
+  if (INJECTION_PATTERNS.some((pattern) => pattern.test(prepared.injectionText))) {
+    return Object.freeze({ outcome: "REFUSE_INJECTION", language, link: null });
+  }
   const solelyNegatedRecovery = recoverySemantics.navigation !== "AFFIRMATIVE"
     && recoverySemantics.credentialOperation === "NEGATED";
   const publicAccountLocation = isPreparedPublicAccountLocationGuide(views);
@@ -393,9 +397,6 @@ export function classifySupportMessage(message: string): SupportClassification {
   const sensitiveFamily = sensitiveIntentFamilyFromViews(views);
   if (sensitiveFamily !== null && sensitiveFamily !== "account-erasure") {
     return Object.freeze({ outcome: "REFUSE_SAFETY",language,link: null });
-  }
-  if (INJECTION_PATTERNS.some((pattern) => pattern.test(prepared.injectionText))) {
-    return Object.freeze({ outcome: "REFUSE_INJECTION", language, link: null });
   }
   if (INCIDENT_PATTERNS.some((pattern) => views.some((view) => pattern.test(view)))) {
     return Object.freeze({ outcome: "INCIDENT", language, link: null });
