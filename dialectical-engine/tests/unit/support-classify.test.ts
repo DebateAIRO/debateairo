@@ -633,7 +633,9 @@ describe("SUP-01 deterministic support classifier", () => {
     ["Deconectează toate sesiunile active acum.","ro"],
     ["Unde sunt sesiunile active, apoi deconectează-le pe toate.","ro"],
     ["Șterge-mi contul acum.","ro"],
-    ["Unde sunt opțiunile contului, apoi șterge-mi contul.","ro"]
+    ["Unde sunt opțiunile contului, apoi șterge-mi contul.","ro"],
+    ["Where can Support delete my account now?","en"],
+    ["Unde poate Asistența șterge contul meu?","ro"]
   ] as const)("keeps account operations in deterministic zone refusal: %s",(message,language) => {
     expect(classifySupportMessage(message)).toMatchObject({
       outcome:"REFUSE_ZONE",language,link:"/settings"
@@ -658,8 +660,12 @@ describe("SUP-01 deterministic support classifier", () => {
   it.each([
     ["en","Reset my password for me."],
     ["en","Support must validate the reset token for my password."],
+    ["en","Validate my reset token for me."],
+    ["en","Do not validate my reset token, reset my password for me."],
     ["ro","Resetează-mi parola în locul meu."],
-    ["ro","Asistența trebuie să valideze tokenul de resetare pentru parola mea."]
+    ["ro","Asistența trebuie să valideze tokenul de resetare pentru parola mea."],
+    ["ro","Validează codul de resetare pentru mine."],
+    ["ro","Nu valida tokenul de resetare, resetează-mi parola."]
   ] as const)("keeps an affirmative %s operation in the fixed operation refusal",(
     language,message
   ) => {

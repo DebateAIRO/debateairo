@@ -127,9 +127,57 @@ describe("CP1 recovery predicate semantics", () => {
   it.each([
     ["en","The password policy article describes account safety."],
     ["en","Recovery time after a service incident is five minutes."],
+    ["en","The reset token expires after the documented interval."],
     ["ro","Articolul despre parole descrie siguranța contului."],
-    ["ro","Timpul de recuperare după incident este de cinci minute."]
+    ["ro","Timpul de recuperare după incident este de cinci minute."],
+    ["ro","Codul de resetare expiră după intervalul documentat."]
   ] as const)("keeps benign %s vocabulary outside recovery intent: %s",(language,text) => {
     expectSemantics(text,language,{ navigation:"ABSENT",credentialOperation:"ABSENT" });
+  });
+
+  it.each([
+    ["en","Validate my reset token for me."],
+    ["en","Please submit the reset code."],
+    ["en","Support must check this reset token."],
+    ["ro","Validează codul de resetare pentru mine."],
+    ["ro","Te rog trimite tokenul de resetare."],
+    ["ro","Asistența trebuie să verifice codul de resetare."]
+  ] as const)("recognizes a %s credential operation from its reset token/code subject: %s",(
+    language,text
+  ) => {
+    expectSemantics(text,language,{ navigation:"ABSENT",credentialOperation:"AFFIRMATIVE" });
+  });
+
+  it.each([
+    ["en","Do not validate my reset token, reset my password for me."],
+    ["en","Do not validate my reset token; reset my password for me."],
+    ["en","Do not validate my reset token, but reset my password for me."],
+    ["ro","Nu valida tokenul de resetare, resetează-mi parola."],
+    ["ro","Nu valida tokenul de resetare; resetează-mi parola."],
+    ["ro","Nu valida tokenul de resetare, dar resetează-mi parola."]
+  ] as const)("keeps %s negation local across predicate boundaries: %s",(language,text) => {
+    expectSemantics(text,language,{ navigation:"ABSENT",credentialOperation:"AFFIRMATIVE" });
+  });
+
+  it("preserves predicate-local polarity over bounded punctuation and conjunction transforms", () => {
+    const controls = [
+      {
+        language:"en",negated:"Do not validate my reset token",
+        affirmative:"reset my password for me",separators:[", ","; ",". "," but "]
+      },
+      {
+        language:"ro",negated:"Nu valida tokenul de resetare",
+        affirmative:"resetează-mi parola",separators:[", ","; ",". "," dar "]
+      }
+    ] as const;
+    for (const control of controls) {
+      for (const separator of control.separators) {
+        expectSemantics(
+          `${control.negated}${separator}${control.affirmative}.`,
+          control.language,
+          { navigation:"ABSENT",credentialOperation:"AFFIRMATIVE" }
+        );
+      }
+    }
   });
 });

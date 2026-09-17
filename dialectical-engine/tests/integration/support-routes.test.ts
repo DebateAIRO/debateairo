@@ -940,7 +940,8 @@ describe("SUP-01 support routes", () => {
   it.each([
     ["Show my active sessions","en","203.0.113.232"],
     ["Șterge-mi contul acum.","ro","203.0.113.233"],
-    ["Where are the account options, and delete my account now.","en","203.0.113.234"]
+    ["Where are the account options, and delete my account now.","en","203.0.113.234"],
+    ["Where can Support delete my account now?","en","203.0.113.235"]
   ] as const)("keeps private records and account operations off the answer path: %s", async (
     text,language,ip
   ) => {
@@ -2131,10 +2132,14 @@ describe("SUP-01 support routes", () => {
   it.each(([
     ["positive-navigation","en","Show me the password recovery page.","FORGOT_PASSWORD"],
     ["operation-only","en","Reset my password for me.","CREDENTIAL_OPERATION"],
+    ["operation-token-only","en","Validate my reset token for me.","CREDENTIAL_OPERATION"],
+    ["comma-mixed","en","Do not validate my reset token, reset my password for me.","CREDENTIAL_OPERATION"],
     ["mixed","en","Reset my password; then show me the recovery page.","CREDENTIAL_OPERATION_AND_FORGOT_PASSWORD"],
     ["negated-operation-navigation","en","Do not reset my password; show me the recovery page.","FORGOT_PASSWORD"],
     ["positive-navigation","ro","Arată-mi pagina de recuperare a parolei.","FORGOT_PASSWORD"],
     ["operation-only","ro","Resetează-mi parola în locul meu.","CREDENTIAL_OPERATION"],
+    ["operation-code-only","ro","Validează codul de resetare pentru mine.","CREDENTIAL_OPERATION"],
+    ["comma-mixed","ro","Nu valida tokenul de resetare, resetează-mi parola.","CREDENTIAL_OPERATION"],
     ["mixed","ro","Resetează-mi parola; apoi arată-mi pagina de recuperare.","CREDENTIAL_OPERATION_AND_FORGOT_PASSWORD"],
     ["negated-operation-navigation","ro","Nu-mi reseta parola; arată-mi pagina de recuperare.","FORGOT_PASSWORD"]
   ] as const).map((item,index) => [...item,`203.0.113.${220 + index}`] as const))(

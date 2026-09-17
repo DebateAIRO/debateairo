@@ -39,7 +39,7 @@ function normalized(value: string): string {
 
 function tokenize(value: string,normalizeInput: boolean): readonly string[] {
   const source = normalizeInput ? normalized(value) : value;
-  return Object.freeze(source.match(/[\p{L}\p{N}]+(?:'[\p{L}\p{N}]+)?|[.;:!?]/gu) ?? []);
+  return Object.freeze(source.match(/[\p{L}\p{N}]+(?:'[\p{L}\p{N}]+)?|[,.;:!?]/gu) ?? []);
 }
 
 function clauses(value: string,normalizeInput: boolean): readonly Clause[] {
@@ -50,7 +50,7 @@ function clauses(value: string,normalizeInput: boolean): readonly Clause[] {
     current = [];
   };
   for (const token of tokenize(value,normalizeInput)) {
-    if (/^[.;:!?]$/u.test(token) || CLAUSE_BOUNDARIES.has(token)) {
+    if (/^[,.;:!?]$/u.test(token) || CLAUSE_BOUNDARIES.has(token)) {
       flush();
       continue;
     }
@@ -67,7 +67,9 @@ function contains(words: readonly string[],pattern: RegExp): boolean {
 function recoverySubject(words: readonly string[]): boolean {
   const password = contains(words,PASSWORD_WORD);
   const recovery = contains(words,RECOVERY_WORD) || contains(words,RESET_WORD);
-  return password && recovery;
+  const resetCredential = contains(words,RESET_WORD)
+    && contains(words,CREDENTIAL_OBJECT_WORD);
+  return (password && recovery) || resetCredential;
 }
 
 function isNegated(words: readonly string[],predicateIndex: number): boolean {
