@@ -21,6 +21,19 @@ describe("ACC-01 one-shot ceremony arguments", () => {
   const asOf = new Date("2026-08-09T00:00:00.000Z");
   /** A credential an operator might still type on the command line. Never real. */
   const offeredOnArgv = "z".repeat(43);
+  /**
+   * The message a refusal carries, or the empty string when the parser did not
+   * refuse at all — so a "the message never contains the value" assertion cannot
+   * pass merely because nothing was thrown.
+   */
+  const refusalMessage = (argv: readonly string[]): string => {
+    try {
+      parseAcceptanceArguments(argv, asOf, environment);
+      return "";
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+  };
 
   it("reads the service credential from the environment and returns it", () => {
     expect(parseAcceptanceArguments([], asOf, environment).serviceCredential).toBe(serviceCredential);
@@ -35,6 +48,18 @@ describe("ACC-01 one-shot ceremony arguments", () => {
       .toThrow("ACCEPTANCE_SERVICE_CREDENTIAL_REQUIRED");
   });
 
+  /**
+   * The discriminating case. An empty environment throws `REQUIRED` whether the
+   * credential is read from the environment or from argv, so the two cases above
+   * survive an argv-reading parser. Here argv DOES carry values and the
+   * environment does not carry the credential: only a parser that reads the
+   * environment, and nothing else, still refuses.
+   */
+  it("requires the environment credential even when argv carries values", () => {
+    expect(() => parseAcceptanceArguments(["--question", "x"], asOf, {}))
+      .toThrow("ACCEPTANCE_SERVICE_CREDENTIAL_REQUIRED");
+  });
+
   it("refuses an environment credential of 42 characters", () => {
     expect(() => parseAcceptanceArguments([], asOf, { ACCEPTANCE_SERVICE_CREDENTIAL: "s".repeat(42) }))
       .toThrow("ACCEPTANCE_SERVICE_CREDENTIAL_INVALID");
@@ -44,10 +69,18 @@ describe("ACC-01 one-shot ceremony arguments", () => {
    * The old shape must not survive by habit. The refusal is decided BEFORE the
    * unknown-argument and missing-value checks, so `--service-credential` alone
    * reads as the credential refusal and not as `ACCEPTANCE_ARGUMENT_VALUE_REQUIRED`.
+   *
+   * The `=`-joined spelling is the one an operator is likeliest to reach for, and
+   * it is the dangerous one: an exact-token refusal lets it through to the
+   * unknown-argument throw, which quotes the whole token — credential included —
+   * onto a stream `closing-run.sh` redirects into the persisted ceremony log.
    */
   it.each([
     { position: "alone", argv: ["--service-credential"] },
     { position: "with a value", argv: ["--service-credential", offeredOnArgv] },
+    { position: "joined with =", argv: [`--service-credential=${offeredOnArgv}`] },
+    { position: "joined with = and empty", argv: ["--service-credential="] },
+    { position: "joined with = before other arguments", argv: [`--service-credential=${offeredOnArgv}`, "--risk-tier", "casual"] },
     { position: "before other arguments", argv: ["--service-credential", offeredOnArgv, "--risk-tier", "casual"] },
     { position: "after --serve", argv: ["--serve", "--service-credential", offeredOnArgv] }
   ])("refuses a credential offered on argv, $position", ({ argv }) => {
@@ -56,14 +89,40 @@ describe("ACC-01 one-shot ceremony arguments", () => {
   });
 
   it("never repeats the offered value in the argv refusal", () => {
-    let message = "";
-    try {
-      parseAcceptanceArguments(["--service-credential", offeredOnArgv], asOf, environment);
-    } catch (error) {
-      message = error instanceof Error ? error.message : String(error);
-    }
-    expect(message).toContain("ACCEPTANCE_SERVICE_CREDENTIAL_ON_ARGV_REFUSED");
+    expect(refusalMessage(["--service-credential", offeredOnArgv]))
+      .toContain("ACCEPTANCE_SERVICE_CREDENTIAL_ON_ARGV_REFUSED");
+    expect(refusalMessage(["--service-credential", offeredOnArgv]))
+      .not.toContain(offeredOnArgv);
+    // The `=`-joined spelling carries the value INSIDE the token, so a refusal
+    // that named the token it refused would publish the credential itself.
+    expect(refusalMessage([`--service-credential=${offeredOnArgv}`]))
+      .toContain("ACCEPTANCE_SERVICE_CREDENTIAL_ON_ARGV_REFUSED");
+    expect(refusalMessage([`--service-credential=${offeredOnArgv}`]))
+      .not.toContain(offeredOnArgv);
+  });
+
+  /**
+   * F-CREDENTIAL-ON-ARGV, the second mouth of the same leak. The generic
+   * unknown-argument refusal quotes the token it did not recognise, and an
+   * operator can put a credential where a NAME is expected — bare, or joined to
+   * some other flag. `main()` has no catch, so that message reaches stderr, which
+   * `closing-run.sh` redirects into the ceremony log. A refusal must be able to
+   * name what it refused without becoming the thing that publishes a secret.
+   */
+  it("never quotes a credential-shaped token in the unknown-argument refusal", () => {
+    const message = refusalMessage([offeredOnArgv]);
+    expect(message).toContain("UNKNOWN_ACCEPTANCE_ARGUMENT");
     expect(message).not.toContain(offeredOnArgv);
+  });
+
+  it("never quotes an over-long token in the unknown-argument refusal", () => {
+    const message = refusalMessage([`--unknown=${offeredOnArgv}`]);
+    expect(message).toContain("UNKNOWN_ACCEPTANCE_ARGUMENT");
+    expect(message).not.toContain(offeredOnArgv);
+  });
+
+  it("still names a short, harmless unknown argument in full", () => {
+    expect(refusalMessage(["--mystery", "value"])).toContain("UNKNOWN_ACCEPTANCE_ARGUMENT:--mystery");
   });
 
   it("documents and applies only asker-input defaults — the default question is self-contained (ACC-01 N1)", () => {

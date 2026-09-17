@@ -55,12 +55,41 @@ const supportedArguments = new Set([
   "--steering-annotations"
 ]);
 
+/** The shape of a service credential: 43 characters of `[A-Za-z0-9_-]`. */
+const credentialPattern = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * No argument name this tool supports is longer than this, so a token past it is
+ * either a typo or a value in a name's place — and a value is the thing that must
+ * never be quoted.
+ */
+const longestSupportedArgumentLength = 32;
+
+/**
+ * F-CREDENTIAL-ON-ARGV, the second mouth of the leak. A refusal has to name the
+ * argument it refused to be any use, but `main()` has no catch, so whatever it
+ * names reaches stderr — which `closing-run.sh` redirects into the persisted
+ * ceremony log. An operator can put the credential where a NAME is expected: bare
+ * (`tsx run-acceptance.ts <credential>` puts it at an even index) or joined to
+ * another flag (`--unknown=<credential>`). So a token that looks like a credential
+ * is described rather than quoted, and one too long to be any supported name is
+ * reported by its length alone — never by a prefix of itself, since the first
+ * characters are exactly what the process listing gave away in the first place.
+ */
+function describeToken(token: string): string {
+  if (credentialPattern.test(token)) return "[redacted: looks like a credential]";
+  if (token.length > longestSupportedArgumentLength) {
+    return `[redacted: ${String(token.length)}-character token]`;
+  }
+  return token;
+}
+
 function argumentMap(arguments_: readonly string[]): ReadonlyMap<string, string> {
   const output = new Map<string, string>();
   for (let index = 0; index < arguments_.length; index += 2) {
     const name = arguments_[index];
     if (name === undefined || !supportedArguments.has(name)) {
-      throw new Error(`UNKNOWN_ACCEPTANCE_ARGUMENT:${String(name)}`);
+      throw new Error(`UNKNOWN_ACCEPTANCE_ARGUMENT:${name === undefined ? "undefined" : describeToken(name)}`);
     }
     const value = arguments_[index + 1];
     if (value === undefined) throw new Error(`ACCEPTANCE_ARGUMENT_VALUE_REQUIRED:${name}`);
@@ -89,8 +118,15 @@ export function parseAcceptanceArguments(
    * generic one. A process's arguments are readable by every user of the machine
    * through the process list for the whole of the run; its environment is not.
    * The offered value is never repeated in the message, in any form.
+   *
+   * BOTH spellings. `--service-credential=<value>` is the one an operator is
+   * likeliest to reach for, and it is the dangerous one: an exact-token test lets
+   * it through to the unknown-argument throw, which would quote the whole token —
+   * credential and all — onto the stream `closing-run.sh` writes to the ceremony
+   * log. Matching the `=`-joined prefix here is what keeps the value off that log.
    */
-  if (arguments_.includes(credentialArgument)) {
+  if (arguments_.some((argument) =>
+    argument === credentialArgument || argument.startsWith(`${credentialArgument}=`))) {
     throw new Error(
       `ACCEPTANCE_SERVICE_CREDENTIAL_ON_ARGV_REFUSED:${credentialArgument} is no longer read from the ` +
       `command line; export ${credentialEnvironmentKey} in your own shell instead`
@@ -104,7 +140,7 @@ export function parseAcceptanceArguments(
   if (serviceCredential === undefined || serviceCredential.trim().length === 0) {
     throw new Error("ACCEPTANCE_SERVICE_CREDENTIAL_REQUIRED");
   }
-  if (!/^[A-Za-z0-9_-]{43}$/.test(serviceCredential)) {
+  if (!credentialPattern.test(serviceCredential)) {
     throw new Error("ACCEPTANCE_SERVICE_CREDENTIAL_INVALID");
   }
   const ask = AskRequestSchema.parse({

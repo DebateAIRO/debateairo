@@ -7,8 +7,9 @@
 # F-CREDENTIAL-ON-ARGV (2026-09-18): the credential is NEVER passed as a command-line argument, here or to
 # the ceremony. A process's arguments are readable by every user of the machine through the process list for
 # the whole of the run; its environment is not. The ceremony refuses `--service-credential` on argv by name,
-# so the old shape cannot survive by habit. The variable this script checks below is simply inherited by the
-# ceremony process it starts.
+# and so does this script, at its very first statement and with exit 7, because the header block below
+# writes this script's own arguments into the ceremony log. The variable checked further down is inherited
+# by the ceremony process this script starts.
 # HOST-INDEPENDENT (2026-09-16, Task 18): the mission dir comes from this script's own location, the
 # engine from the mission dir, and the repo root from git. Export R=<checkout> to run against another
 # checkout; note that inside a linked worktree `--show-toplevel` is that WORKTREE's root, which is the
@@ -24,6 +25,18 @@
 # bytes are a program header (a `#!` shebang, or a Mach-O / universal-binary magic number). A file
 # that is not a program is refused by name and never run. The definition of done needs M>=2 makers.
 set -u
+# F-CREDENTIAL-ON-ARGV, FIRST, before this script computes a path, runs anything or opens a log.
+# The header block below interpolates "$*" into "$LOG" and flushes it BEFORE the ceremony starts, so a
+# credential typed at THIS script would come to rest in the mission's evidence log — the one durable
+# resting place this ticket exists to prevent — no matter how loudly the ceremony refuses it later.
+# Both spellings are refused, the offered value is never printed, and nothing has been written yet.
+for a in "$@"; do
+  case "$a" in
+    --service-credential|--service-credential=*)
+      echo "ACCEPTANCE_SERVICE_CREDENTIAL_ON_ARGV_REFUSED: the credential is never a command-line argument, here or to the ceremony; export ACCEPTANCE_SERVICE_CREDENTIAL in your own shell instead. Nothing was started, and nothing was written to any log." >&2
+      exit 7 ;;
+  esac
+done
 M="$(cd "$(dirname "$0")/.." && pwd)"; DE="$(cd "$M/../../.." && pwd)"
 R="${R:-$(git -C "$DE" rev-parse --show-toplevel)}"; OUTDIR=$M/logs/closing-run
 # Maker binaries: DISCOVERED on PATH, never a hard-coded home directory. An ACCEPTANCE_*_BINARY the
@@ -94,8 +107,10 @@ if [ "${PREFLIGHT_ONLY:-0}" = "1" ]; then
 fi
 : "${ACCEPTANCE_SERVICE_CREDENTIAL:?export ACCEPTANCE_SERVICE_CREDENTIAL in this shell first (43 chars, [A-Za-z0-9_-]); this script never writes it}"
 printf '%s' "$ACCEPTANCE_SERVICE_CREDENTIAL" | grep -qE '^[A-Za-z0-9_-]{43}$' || { echo "the credential is not 43 chars of [A-Za-z0-9_-]"; exit 2; }
-# The ceremony reads the credential from its own environment (F-CREDENTIAL-ON-ARGV). Exporting it here is
-# what makes the child inherit it whether the operator exported it or set it only for this script's own run.
+# The ceremony reads the credential from its own environment (F-CREDENTIAL-ON-ARGV). Both normal launch
+# shapes already put it in this script's environment, and therefore in its children's — a variable the
+# operator set WITHOUT exporting never reaches this script at all, and the check above would already have
+# refused. This line makes the inheritance explicit at the point of use, and covers the sourced case.
 export ACCEPTANCE_SERVICE_CREDENTIAL
 mkdir -p "$OUTDIR"; STAMP=$(date '+%Y%m%d-%H%M%S'); LOG="$OUTDIR/ceremony-$STAMP.log"
 COMMIT=$(git -C "$R" rev-parse HEAD); TREE=$(git -C "$R" rev-parse HEAD^{tree}); DIRTY=$(git -C "$R" status --porcelain | grep -v '^??' | wc -l | tr -d ' ')
