@@ -7,8 +7,11 @@ import { TypedDomainError } from "@debateai/kernel";
 import { SUPPORT_CATALOG_CANONICAL } from "./catalog.js";
 import {
   parseSupportRecoveryComponents,supportRecoveryTextSha256,
+  selectSupportRecoveryEntry,supportSourceIdsSatisfyPolicy,
   type SupportRecoveryComponent
 } from "./recovery.js";
+
+export { selectSupportRecoveryEntry,supportSourceIdsSatisfyPolicy };
 
 export type HelpCorpusLanguage = "en" | "ro";
 export type HelpCorpusStatus = "shipped" | "intended";

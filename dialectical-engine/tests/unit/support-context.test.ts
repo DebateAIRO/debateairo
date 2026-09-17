@@ -461,6 +461,46 @@ describe("Support knowledge context", () => {
   });
 
   it.each([
+    ["en" as const,"Where do I find my debates and the public debate library?"],
+    ["en" as const,"How can I open Your debates together with Public debates?"],
+    ["ro" as const,"Unde găsesc dezbaterile mele și biblioteca publică?"],
+    ["ro" as const,"Cum deschid Dezbaterile tale împreună cu Dezbateri publice?"]
+  ])("binds the compound private/public library guide to a required reviewed source in %s: %s",(
+    language,query
+  ) => {
+    const corpus = productionReviewedCorpus();
+    const result = buildSupportKnowledgeContext({
+      entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,
+      availableActionIds:SUPPORT_ACTION_IDS,language,query,historyText:"",maxCodePoints:24_000
+    });
+
+    expect(result.sourcePolicy).toEqual({
+      id:"your-and-public-debates",
+      requiredSourceIds:["app-navigation"],
+      allowedSourceIds:["app-navigation","browse-public-debates"],
+      recoverySourceIds:["app-navigation"]
+    });
+    expect(result.sourceIds).toContain("app-navigation");
+    expect(result.sourceIds.every((id) =>
+      ["app-navigation","browse-public-debates"].includes(id))).toBe(true);
+    expect(result.sourceIds).not.toContain("getting-started-debate");
+  });
+
+  it.each([
+    ["en" as const,"Where can I browse the public debate library? Do not open my debates."],
+    ["ro" as const,"Unde este biblioteca publică? Nu deschide dezbaterile mele."]
+  ])("does not activate the compound source contract for a negated private-list half in %s",(
+    language,query
+  ) => {
+    const corpus = productionReviewedCorpus();
+    const result = buildSupportKnowledgeContext({
+      entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,
+      availableActionIds:SUPPORT_ACTION_IDS,language,query,historyText:"",maxCodePoints:24_000
+    });
+    expect(result.sourcePolicy).toBeNull();
+  });
+
+  it.each([
     ["en" as const,"Where is Home?",false,["home"]],
     ["ro" as const,"Unde este Acasă?",false,["home"]],
     ["en" as const,"Where is New debate?",true,["start-debate"]],

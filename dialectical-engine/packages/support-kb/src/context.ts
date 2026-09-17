@@ -1,7 +1,8 @@
 import type { HelpCorpusEntry } from "./index.js";
 import {
-  SUPPORT_ACTION_CATALOG,SUPPORT_GUIDE_LABELS,
-  type SupportActionDefinition,type SupportActionId,type SupportCapability,type SupportLanguage
+  SUPPORT_ACTION_CATALOG,SUPPORT_GUIDE_LABELS,SUPPORT_SOURCE_POLICIES,
+  type SupportActionDefinition,type SupportActionId,type SupportCapability,type SupportLanguage,
+  type SupportSourcePolicy
 } from "./catalog.js";
 
 export type SupportKnowledgeReference<CanonicalId extends string = string> = Readonly<{
@@ -15,6 +16,7 @@ export type SupportKnowledgeContext = Readonly<{
   requestedActionIds: readonly SupportActionId[];
   sourceReferences: readonly SupportKnowledgeReference[];
   actionReferences: readonly SupportKnowledgeReference<SupportActionId>[];
+  sourcePolicy: SupportSourcePolicy | null;
 }>;
 
 const POLICY: Readonly<Record<SupportLanguage, readonly string[]>> = Object.freeze({
@@ -306,6 +308,17 @@ export function buildSupportKnowledgeContext(input: Readonly<{
     }));
     return Object.freeze({ item,score });
   }).filter(({ score }) => score > 0);
+  const matchedGuideActionIds = new Set(guideMatches.flatMap(({ item }) =>
+    item.actionId === null ? [] : [item.actionId]));
+  const sourcePolicyDefinition = SUPPORT_SOURCE_POLICIES.find(({ requiredActionIds }) =>
+    requiredActionIds.every((id) => matchedGuideActionIds.has(id)));
+  const sourcePolicy: SupportSourcePolicy | null = sourcePolicyDefinition === undefined ? null
+    : Object.freeze({
+      id:sourcePolicyDefinition.id,
+      requiredSourceIds:sourcePolicyDefinition.requiredSourceIds,
+      allowedSourceIds:sourcePolicyDefinition.allowedSourceIds,
+      recoverySourceIds:sourcePolicyDefinition.recoverySourceIds
+    });
   const guideArticleEvidence = new Map<string,number>();
   for (const { item,score } of guideMatches) {
     if (item.sourceBinding) guideArticleEvidence.set(
@@ -420,6 +433,10 @@ export function buildSupportKnowledgeContext(input: Readonly<{
       }));
     });
   }
+  const policyAvailable = sourcePolicy === null || [
+    ...sourcePolicy.requiredSourceIds,...sourcePolicy.recoverySourceIds
+  ].every((id) => eligibleEntries.some((entry) => entry.id === id
+    && entry.fallback !== undefined));
   const ranked = eligibleEntries
     .map((entry) => ({
       entry,
@@ -431,6 +448,7 @@ export function buildSupportKnowledgeContext(input: Readonly<{
         + (articleEvidence.get(entry.id)?.score ?? 0) * 1_000_000,
     }))
     .filter(({ entry,evidence,capability }) => {
+      if (sourcePolicy !== null && !sourcePolicy.allowedSourceIds.includes(entry.id)) return false;
       if (!hasCompleteCatalogMatch && product.preferredArticleId !== null
         && entry.id !== product.preferredArticleId) {
         return evidence.aliasScore >= 2 || evidence.titleScore >= 2;
@@ -442,7 +460,7 @@ export function buildSupportKnowledgeContext(input: Readonly<{
   let text = base;
   const sourceIds: string[] = [];
   const sourceReferences: SupportKnowledgeReference[] = [];
-  for (const { entry } of ranked) {
+  for (const { entry } of policyAvailable ? ranked : []) {
     if (sourceIds.length >= 3) break;
     const reference = input.referenceFor("source",sourceIds.length);
     const section = articleSection(entry,reference);
@@ -454,6 +472,12 @@ export function buildSupportKnowledgeContext(input: Readonly<{
     text += section;
     sourceIds.push(entry.id);
     sourceReferences.push(Object.freeze({ reference,canonicalId:entry.id }));
+  }
+  if (sourcePolicy !== null
+    && !sourcePolicy.requiredSourceIds.every((id) => sourceIds.includes(id))) {
+    sourceIds.splice(0);
+    sourceReferences.splice(0);
+    text = base;
   }
   text += outputContract(
     sourceReferences.map(({ reference }) => reference),
@@ -477,6 +501,7 @@ export function buildSupportKnowledgeContext(input: Readonly<{
     sourceIds: Object.freeze(sourceIds),
     requestedActionIds: Object.freeze(actionIds),
     sourceReferences: Object.freeze(sourceReferences),
-    actionReferences: Object.freeze(actionReferences)
+    actionReferences: Object.freeze(actionReferences),
+    sourcePolicy
   });
 }

@@ -10,6 +10,7 @@ import {
   SUPPORT_GUIDE_LABELS,
   SUPPORT_PAGE_ROUTES,
   SUPPORT_PROXY_ROUTES,
+  SUPPORT_SOURCE_POLICIES,
 } from "../../packages/support-kb/src/catalog.js";
 
 function discoverPageRoutes(directory: string, root = directory): string[] {
@@ -119,6 +120,16 @@ describe("Support catalog route coverage", () => {
       expect(label.sourceBinding || label.capabilityBinding || label.actionId !== null,label.articleId)
         .toBe(true);
     }
+  });
+
+  it("declares the compound debate-library source contract from closed menu actions", () => {
+    expect(SUPPORT_SOURCE_POLICIES).toEqual([{
+      id:"your-and-public-debates",
+      requiredActionIds:["your-debates","public-catalog"],
+      requiredSourceIds:["app-navigation"],
+      allowedSourceIds:["app-navigation","browse-public-debates"],
+      recoverySourceIds:["app-navigation"]
+    }]);
   });
 
   it("keeps the browser-safe catalog free of Node-only imports and exports it as a subpath", () => {

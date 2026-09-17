@@ -4,6 +4,9 @@ import type {
   HelpCorpusEntry,HelpCorpusSnapshotLookup,LoadedHelpCorpus
 } from "@debateai/support-kb";
 import {
+  selectSupportRecoveryEntry,supportSourceIdsSatisfyPolicy
+} from "@debateai/support-kb";
+import {
   SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,type SupportAction
 } from "@debateai/support-kb/catalog";
 import { buildSupportKnowledgeContext } from "@debateai/support-kb/context";
@@ -249,7 +252,8 @@ export function createSupportAnswerService(input: Readonly<{
           sources: Object.freeze([]),actions: Object.freeze([])
         });
       }
-      const recoveryEntry = structured ? entries[0] : undefined;
+      const recoveryEntry = structured
+        ? selectSupportRecoveryEntry(entries,context!.sourcePolicy) : undefined;
       const sourceActionIds = recoveryEntry === undefined ? Object.freeze([]) : Object.freeze(
         context!.requestedActionIds.filter((id) => SUPPORT_CAPABILITIES.some(({ articleIds,actionIds }) =>
           articleIds.includes(recoveryEntry.id) && actionIds.includes(id)
@@ -327,11 +331,16 @@ export function createSupportAnswerService(input: Readonly<{
             context!.sourceReferences.map(({ reference }) => reference),
             context!.actionReferences.map(({ reference }) => reference)
           );
-        const draft = !structured ? undefined
+        const translatedDraft = !structured ? undefined
           : referenceDraft === null || referenceDraft === undefined ? null
           : translateSupportDraftReferences(referenceDraft,{
             sources:context!.sourceReferences,actions:context!.actionReferences
           });
+        const draft = !structured ? undefined
+          : translatedDraft === null || translatedDraft === undefined
+            || !supportSourceIdsSatisfyPolicy(
+              translatedDraft.sourceIds,context!.sourcePolicy
+            ) ? null : translatedDraft;
         const rejected = structured && draft === null;
         const recovered = rejected
           && recoveryEntry?.fallback !== undefined

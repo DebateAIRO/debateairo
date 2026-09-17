@@ -5,7 +5,9 @@ import {
   analyzeSupportCredentialText,canonicalSupportTextViews,supportTextContainsCredentialOperation,
   supportTextHasUnsafePath,TypedDomainError
 } from "@debateai/kernel";
-import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "./catalog.js";
+import {
+  SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,type SupportSourcePolicy
+} from "./catalog.js";
 
 export type SupportRecoveryComponent = Readonly<{
   id: string;
@@ -107,3 +109,38 @@ export function parseSupportRecoveryComponents(input: string | Buffer): ParsedSu
 }
 
 export function supportRecoveryTextSha256(value: string): string { return sha256(value); }
+
+function validSourcePolicy(policy: SupportSourcePolicy): boolean {
+  const required = new Set(policy.requiredSourceIds);
+  const allowed = new Set(policy.allowedSourceIds);
+  const recovery = new Set(policy.recoverySourceIds);
+  return policy.requiredSourceIds.length > 0
+    && required.size === policy.requiredSourceIds.length
+    && allowed.size === policy.allowedSourceIds.length
+    && recovery.size === policy.recoverySourceIds.length
+    && policy.requiredSourceIds.every((id) => allowed.has(id))
+    && policy.recoverySourceIds.length === 1
+    && policy.recoverySourceIds.every((id) => required.has(id));
+}
+
+export function supportSourceIdsSatisfyPolicy(
+  sourceIds: readonly string[],policy: SupportSourcePolicy | null
+): boolean {
+  if (policy === null) return true;
+  if (!validSourcePolicy(policy)) return false;
+  return sourceIds.length > 0
+    && sourceIds.every((id) => policy.allowedSourceIds.includes(id))
+    && policy.requiredSourceIds.every((id) => sourceIds.includes(id));
+}
+
+export function selectSupportRecoveryEntry<T extends Readonly<{
+  id: string;
+  fallback?: string;
+}>>(entries: readonly T[],policy: SupportSourcePolicy | null): T | undefined {
+  if (policy === null) return entries[0];
+  if (!validSourcePolicy(policy)
+    || !supportSourceIdsSatisfyPolicy(entries.map(({ id }) => id),policy)) return undefined;
+  const recoveryId = policy.recoverySourceIds[0]!;
+  const entry = entries.find(({ id }) => id === recoveryId);
+  return entry?.fallback === undefined ? undefined : entry;
+}

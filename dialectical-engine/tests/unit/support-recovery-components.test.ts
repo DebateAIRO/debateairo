@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach,describe,expect,it } from "vitest";
 
-import { loadHelpCorpus } from "../../packages/support-kb/src/index.js";
+import {
+  loadHelpCorpus,selectSupportRecoveryEntry,supportSourceIdsSatisfyPolicy
+} from "../../packages/support-kb/src/index.js";
 import { SUPPORT_CATALOG_CANONICAL } from "../../packages/support-kb/src/catalog.js";
 
 const directories: string[] = [];
@@ -63,6 +65,28 @@ afterEach(() => {
 });
 
 describe("reviewed Support recovery components", () => {
+  it("selects the declared reviewed recovery source and fails closed on invalid coverage", () => {
+    const policy = Object.freeze({
+      id:"your-and-public-debates",
+      requiredSourceIds:Object.freeze(["app-navigation"]),
+      allowedSourceIds:Object.freeze(["app-navigation","browse-public-debates"]),
+      recoverySourceIds:Object.freeze(["app-navigation"])
+    });
+    const app = Object.freeze({ id:"app-navigation",fallback:"Use the reviewed Home guidance." });
+    const browse = Object.freeze({
+      id:"browse-public-debates",fallback:"Use the reviewed public-library guidance."
+    });
+
+    expect(supportSourceIdsSatisfyPolicy([app.id],policy)).toBe(true);
+    expect(supportSourceIdsSatisfyPolicy([browse.id,app.id],policy)).toBe(true);
+    expect(supportSourceIdsSatisfyPolicy([browse.id],policy)).toBe(false);
+    expect(supportSourceIdsSatisfyPolicy([app.id,"getting-started-debate"],policy)).toBe(false);
+    expect(selectSupportRecoveryEntry([browse,app],policy)).toBe(app);
+    expect(selectSupportRecoveryEntry([browse],policy)).toBeUndefined();
+    expect(selectSupportRecoveryEntry([app],{
+      ...policy,recoverySourceIds:["browse-public-debates"]
+    })).toBeUndefined();
+  });
   it("uses the visible Transcripts label in both navigation drafts", () => {
     const document = JSON.parse(readFileSync(new URL(
       "../../packages/support-kb/recovery/components.json",import.meta.url

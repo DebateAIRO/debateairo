@@ -67,6 +67,17 @@ export type SupportGuideLabel = Readonly<{
   labels: Readonly<Record<SupportLanguage, readonly string[]>>;
 }>;
 
+export type SupportSourcePolicy = Readonly<{
+  id: string;
+  requiredSourceIds: readonly string[];
+  allowedSourceIds: readonly string[];
+  recoverySourceIds: readonly string[];
+}>;
+
+export type SupportSourcePolicyDefinition = SupportSourcePolicy & Readonly<{
+  requiredActionIds: readonly SupportActionId[];
+}>;
+
 function labels(en: string, ro: string): Readonly<Record<SupportLanguage, string>> {
   return Object.freeze({ en, ro });
 }
@@ -156,6 +167,17 @@ export const SUPPORT_GUIDE_LABELS: readonly SupportGuideLabel[] = Object.freeze(
   guideLabel("support-cases",null,["Report a bug","Email support"],["Raportează o eroare","Asistență prin email"]),
   guideLabel("settings-help-menus",null,["Human support cases"],["Cazuri de asistență umană"]),
   guideLabel("account-access",null,["Verify email","Enroll MFA"],["Verifică emailul","Configurează MFA"]),
+]);
+
+/** Source-set rules for requests whose reviewed meaning spans more than one menu destination. */
+export const SUPPORT_SOURCE_POLICIES: readonly SupportSourcePolicyDefinition[] = Object.freeze([
+  Object.freeze({
+    id:"your-and-public-debates",
+    requiredActionIds:Object.freeze(["your-debates","public-catalog"] as const),
+    requiredSourceIds:Object.freeze(["app-navigation"]),
+    allowedSourceIds:Object.freeze(["app-navigation","browse-public-debates"]),
+    recoverySourceIds:Object.freeze(["app-navigation"])
+  })
 ]);
 
 export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze([

@@ -7,6 +7,8 @@ import type { SupportModelPort } from "../../apps/api/src/support/model.js";
 import {
   createHelpCorpusSnapshotLookup,type HelpCorpusEntry,type LoadedHelpCorpus
 } from "../../packages/support-kb/src/index.js";
+import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
+import { buildSupportKnowledgeContext } from "../../packages/support-kb/src/context.js";
 import type { SupportMessageCipherPort } from "../../apps/api/src/support/session.js";
 import { createSupportModelReferenceFactory } from "../../apps/api/src/support/model-references.js";
 
@@ -161,6 +163,76 @@ describe("CP1 composed answer context", () => {
       outcome:"ANSWER_GROUNDED",sources:[{ id:"settings-help-menus" }],
       actions:[{ id:"active-sessions",href:"/settings#active-sessions-heading" }]
     });
+  });
+
+  it.each([
+    ["en" as const,"Where do I find my debates and the public debate library?"],
+    ["ro" as const,"Unde găsesc dezbaterile mele și biblioteca publică?"]
+  ])("recovers a rejected compound %s answer from the required app-navigation source",async (
+    language,text
+  ) => {
+    const drafted = authorDraftCorpus();
+    const snapshot = corpus(drafted.entries.filter((candidate) =>
+      candidate.lang === language && [
+        "app-navigation","browse-public-debates","getting-started-debate"
+      ].includes(candidate.id)),`compound-recovery-${language}`);
+    const complete = vi.fn(async () => Object.freeze({ text:"not-json" }));
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-17T14:00:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({
+      ...request(snapshot),text,language,detectedLanguage:language,signedIn:true
+    });
+    const required = snapshot.entries.find((candidate) => candidate.id === "app-navigation")!;
+
+    expect(result).toMatchObject({
+      outcome:"ANSWER_GROUNDED",text:required.fallback,
+      sources:[{ id:"app-navigation" }]
+    });
+    expect(result.sources?.map(({ id }) => id)).not.toContain("getting-started-debate");
+  });
+
+  it("enforces required and allowed compound sources independent of accepted-draft order",async () => {
+    const drafted = authorDraftCorpus();
+    const snapshot = corpus(drafted.entries.filter((candidate) => candidate.lang === "en" && [
+      "app-navigation","browse-public-debates","getting-started-debate"
+    ].includes(candidate.id)),"compound-source-contract");
+    const query = "Where do I find my debates and the public debate library?";
+    const context = buildSupportKnowledgeContext({
+      entries:snapshot.entries,capabilities:SUPPORT_CAPABILITIES,language:"en",query,historyText:"",
+      maxCodePoints:24_000,availableActionIds:SUPPORT_ACTION_IDS,
+      referenceFor:modelReferenceFactory().referenceFor
+    });
+    const sourceReference = new Map(context.sourceReferences.map((item) => [
+      item.canonicalId,item.reference
+    ]));
+    const app = sourceReference.get("app-navigation")!;
+    const browse = sourceReference.get("browse-public-debates")!;
+    const required = snapshot.entries.find((candidate) => candidate.id === "app-navigation")!;
+    const cases = [
+      { ids:[app],text:"Use Home to find both lists.",expected:["app-navigation"] },
+      { ids:[app,browse],text:"Use Home and the public catalog.",expected:["app-navigation","browse-public-debates"] },
+      { ids:[browse,app],text:"Use the public catalog and Your debates.",expected:["app-navigation","browse-public-debates"] },
+      { ids:[browse],text:"This covers only the public catalog.",expected:["app-navigation"],recovered:true }
+    ] as const;
+
+    for (const candidate of cases) {
+      const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
+        kind:"answer",text:candidate.text,sourceIds:candidate.ids,actionIds:[]
+      }) }));
+      const service = createSupportAnswerService({
+        entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+        modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+        clock:(() => { let at=Date.parse("2026-09-17T14:30:00.000Z");return () => new Date(++at); })()
+      });
+      const result = await service.respond({ ...request(snapshot),text:query,signedIn:true });
+      expect(result.sources?.map(({ id }) => id)).toEqual(candidate.expected);
+      expect(result.text).toBe("recovered" in candidate ? required.fallback : candidate.text);
+      expect(result.sources?.map(({ id }) => id)).not.toContain("getting-started-debate");
+    }
   });
 
   it.each([
