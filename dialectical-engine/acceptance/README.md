@@ -188,11 +188,44 @@ HTTP header, cookie, URL, or request body:
 ```
 
 By default the ceremony settles, verifies the FAIR-01 fair-debate gate,
-prints the run id / answer id / graph and maker report / UI URL, and shuts
-the whole stack down cleanly. Pass the value-less **`--serve`** flag to keep
+prints the run id / answer id / graph and maker report / definition-of-done
+report / UI URL, and shuts the whole stack down cleanly. Pass the value-less
+**`--serve`** flag to keep
 the database, model shim, claude relay and API standing after settle so the
 UI at `http://localhost:3000/debate/<run-id>` can browse the settled debate
 (Ctrl-C stops the stack). This replaces the earlier ad-hoc standing script.
+
+#### The definition-of-done report
+
+The Global definition of done (`slices/S12-closure/SPEC.md:33-45`) names nine
+sub-clauses. The ceremony prints **one line per sub-clause**, each led by a
+stable, unique token. Sub-clauses 4 and 9 — the recorded ceiling and the
+envelope state at terminal — keep the `T17 envelope at terminal` line they have
+always had; the rest are read by `acceptance/dod-facts.ts` and printed on the
+same `console.info` stream, which `tools/closing-run.sh` captures verbatim into
+`logs/closing-run/ceremony-*.log`. The tokens are fixed: a token that moved
+would invalidate every log captured before it moved.
+
+| Token | Sub-clause | What the line carries |
+| --- | --- | --- |
+| `DOD-1 panel-reduced-tau` | panel-reduced τ, non-self-graded | node count, whether every τ had a non-author voice, the node ids of any single-voice panel |
+| `DOD-2 measured-edges` | measured edges | attack-edge count and how many carry a PRESENT magnitude |
+| `DOD-3 root-final-vs-tau` | a root's final strength ≠ τ | root count, whether one differs, the witness node id, and each root's τ / final |
+| `DOD-5 surviving-objection` | the statement acknowledging the strongest surviving objection | the strongest survivor's node id and final strength (or `none`), whether the last evaluator round was satisfied, and whether `SYNTHESIS-OBJECTION-STANDING` rides the answer |
+| `DOD-6 evaluator-loop` | the evaluator loop record | rounds recorded / the sealed `evaluatorLoopMaxRounds`, and each round's number, stage and verdict |
+| `DOD-7 verdict-label` | the code-derived three-state label | the label (or the unavailability reason ref), the terminal and the serve state |
+| `DOD-8 confidence-band` | the band counted over cited nodes | the band, its `LOOKED_UP/RAN/REASONING` basis counts, and the ceiling's register row key |
+
+Only a SHAPE violation refuses the ceremony — a node with no τ, rounds numbered
+other than 1..n, more rounds than the register sealed, or a label that is
+neither a state nor an unavailability reason
+(`ACCEPTANCE_DOD_*`). A definition-of-done OUTCOME — no root differing, an
+objection still standing, a single-voice panel, an UNKNOWN magnitude, no
+surviving objection — is **reported, never thrown**: the closing run's judge
+decides what it means, and a reader that threw would destroy the evidence.
+
+The same facts ride the returned ceremony as the typed, frozen
+`definitionOfDone` block, so the live proofs can assert on them directly.
 
 Ask-input defaults (all overrideable by the named CLI flag) are:
 
