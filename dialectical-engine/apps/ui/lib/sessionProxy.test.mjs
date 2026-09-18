@@ -207,3 +207,54 @@ test("L3-F12: an upstream timeout is reported as 504, never as a fabricated API 
   assert.equal(response.status, 504);
   assert.equal((await response.json()).error, "API_UPSTREAM_TIMEOUT");
 });
+
+// ---------------------------------------------------------------- B23b: L3-F6, L3-F7, DL3-F5
+
+async function forwardedHeadersFor(requestHeaders, upstreamHeaders = { "content-type": "application/json" }) {
+  process.env.DIALECTICAL_API_BASE = "http://api.internal:8000";
+  let forwarded;
+  globalThis.fetch = async (_url, init) => {
+    forwarded = new Headers(init.headers);
+    return new Response("{}", { headers: upstreamHeaders });
+  };
+  const { GET } = await loadRoute();
+  const response = await GET(new Request("https://app.test/api/v1/public/debates", { headers: requestHeaders }),
+    { params: Promise.resolve({ path: ["v1", "public", "debates"] }) });
+  return { forwarded, response };
+}
+
+test("L3-F6: the stamped client ip is forwarded only behind server.mjs, never under a bare next start", async () => {
+  delete process.env.DIALECTICAL_UI_EDGE;
+  const bare = await forwardedHeadersFor({ "x-debateai-client-ip": "203.0.113.9" });
+  assert.equal(bare.forwarded.get("x-forwarded-for"), null, "a bare next start must not vouch for a client-supplied address");
+
+  process.env.DIALECTICAL_UI_EDGE = "server.mjs";
+  try {
+    const edged = await forwardedHeadersFor({ "x-debateai-client-ip": "203.0.113.9" });
+    assert.equal(edged.forwarded.get("x-forwarded-for"), "203.0.113.9");
+  } finally {
+    delete process.env.DIALECTICAL_UI_EDGE;
+  }
+});
+
+test("L3-F7: content-length is dropped downstream when the upstream body is content-encoded", async () => {
+  const encoded = await forwardedHeadersFor({}, {
+    "content-type": "application/json", "content-encoding": "gzip", "content-length": "999"
+  });
+  assert.equal(encoded.response.headers.get("content-length"), null, "the proxy re-frames a decoded body");
+  assert.equal(encoded.response.headers.get("content-encoding"), null);
+
+  const plain = await forwardedHeadersFor({}, { "content-type": "application/json", "content-length": "2" });
+  assert.equal(plain.response.headers.get("content-length"), "2");
+});
+
+test("DL3-F5: x-support-session-token is forwarded only in the API's capability grammar", async () => {
+  const lawful = "t".repeat(43);
+  const good = await forwardedHeadersFor({ "x-support-session-token": lawful });
+  assert.equal(good.forwarded.get("x-support-session-token"), lawful);
+  for (const bad of ["not a token!", "t".repeat(42), "t".repeat(44), `${"t".repeat(43)}\r\nx: y`]) {
+    const refused = await forwardedHeadersFor({ "x-support-session-token": bad }).catch((error) => ({ error }));
+    if ("error" in refused) continue; // an unlawful header value the Headers constructor itself rejects
+    assert.equal(refused.forwarded.get("x-support-session-token"), null, `unlawful value must not be forwarded: ${JSON.stringify(bad)}`);
+  }
+});

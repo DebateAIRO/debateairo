@@ -41,6 +41,19 @@ const UPSTREAM_TIMEOUT_MS = 30_000;
 const SESSION_COOKIE_NAME = "__Host-debateai-session";
 const CSRF_COOKIE_NAME = "__Host-debateai-csrf";
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
+/** The API's support capability grammar (apps/api/src/support/session.ts CAPABILITY_PATTERN). */
+const SUPPORT_SESSION_TOKEN_HEADER = "x-support-session-token";
+const SUPPORT_SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+/**
+ * L3-F6: server.mjs strips every inbound forwarded header and re-stamps the client
+ * address itself, then sets this marker before Next starts. Without the marker (a bare
+ * `next start`) the stamped header is client-controlled and is never vouched for.
+ */
+const EDGE_MARKER_ENV = "DIALECTICAL_UI_EDGE";
+
+function behindOwnEdge(): boolean {
+  return process.env[EDGE_MARKER_ENV] === "server.mjs";
+}
 
 function readApiBase(): URL {
   const configured = process.env.DIALECTICAL_API_BASE?.trim();
@@ -75,11 +88,14 @@ function createUpstreamHeaders(request: Request): Headers {
   const headers = new Headers();
   for (const name of REQUEST_HEADER_ALLOWLIST) {
     const value = request.headers.get(name);
-    if (value !== null) headers.set(name, value);
+    if (value === null) continue;
+    // DL3-F5: the support capability travels only in its exact grammar (as the cookies do).
+    if (name === SUPPORT_SESSION_TOKEN_HEADER && !SUPPORT_SESSION_TOKEN_PATTERN.test(value)) continue;
+    headers.set(name, value);
   }
   const cookie = filteredSessionCookies(request.headers.get("cookie"));
   if (cookie !== null) headers.set("cookie", cookie);
-  const clientIp = normalizeClientIp(request.headers.get(TRUSTED_CLIENT_IP_HEADER));
+  const clientIp = behindOwnEdge() ? normalizeClientIp(request.headers.get(TRUSTED_CLIENT_IP_HEADER)) : null;
   if (clientIp !== null) headers.set("x-forwarded-for", clientIp);
   return headers;
 }
@@ -128,6 +144,9 @@ function createDownstreamHeaders(upstream: Headers): Headers {
     const value = upstream.get(name);
     if (value !== null) headers.set(name, value);
   }
+  // L3-F7: fetch hands the proxy a DECODED body while content-length described the
+  // encoded one; forwarding that length would frame the response wrong.
+  if (upstream.has("content-encoding")) headers.delete("content-length");
   const setCookies = typeof upstream.getSetCookie === "function"
     ? upstream.getSetCookie() : [];
   for (const value of setCookies) {

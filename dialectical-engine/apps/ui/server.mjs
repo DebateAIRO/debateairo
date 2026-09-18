@@ -25,6 +25,10 @@ if (!Number.isInteger(port) || port < 1 || port > 65_535) {
 }
 const trustedProxies = parseTrustedProxies(process.env.DIALECTICAL_UI_TRUSTED_PROXIES);
 const edgeSecret = readEdgeSecret(process.env.DIALECTICAL_UI_EDGE_SECRET_PATH);
+// L3-F6: the API proxy route vouches for the stamped client address only when THIS
+// front door is in front of it. A bare `next start` never sets the marker, so a
+// client-supplied `x-debateai-client-ip` is dropped there instead of being forwarded.
+process.env.DIALECTICAL_UI_EDGE = "server.mjs";
 
 const app = next({ dev: development, hostname, port });
 await app.prepare();
