@@ -66,3 +66,42 @@ test("L3-F5: every SSR page reads the session through readSessionCookie, never t
     assert.doesNotMatch(source, /\.get\(USER_TOKEN_COOKIE\)\?\.value/, `${page} no longer reads the raw value`);
   }
 });
+
+// ------------------------------------------------------------ DL3-F1: SSR carries the visitor's address
+
+test("DL3-F1: readTrustedClientIp vouches for the stamped address only behind server.mjs", async () => {
+  const { readTrustedClientIp } = await load();
+  const store = (value) => ({ get: (name) => (name === "x-debateai-client-ip" ? value : null) });
+  delete process.env.DIALECTICAL_UI_EDGE;
+  assert.equal(readTrustedClientIp(store("203.0.113.9")), undefined, "a bare next start never vouches for it");
+  process.env.DIALECTICAL_UI_EDGE = "server.mjs";
+  try {
+    assert.equal(readTrustedClientIp(store("203.0.113.9")), "203.0.113.9");
+    assert.equal(readTrustedClientIp(store("::ffff:203.0.113.9")), "203.0.113.9");
+    for (const bad of [null, "", "203.0.113.9, 10.0.0.1", "evil.test", " 203.0.113.9"]) {
+      assert.equal(readTrustedClientIp(store(bad)), undefined, `${JSON.stringify(bad)} is not one address`);
+    }
+  } finally {
+    delete process.env.DIALECTICAL_UI_EDGE;
+  }
+});
+
+test("DL3-F1: createServerContractClient forwards the visitor's address so per-source budgets see the visitor, not 127.0.0.1", async () => {
+  process.env.DIALECTICAL_API_BASE = "http://api.internal:8000";
+  const { createServerContractClient } = await load();
+  const seen = [];
+  const fetchStub = async (_url, init) => {
+    seen.push(new Headers(init?.headers).get("x-forwarded-for"));
+    return Response.json({ items: [], total: 0 });
+  };
+  await createServerContractClient(fetchStub, undefined, "S5 SSR", "203.0.113.9").readPublicDebates(1, 0);
+  await createServerContractClient(fetchStub, undefined, "S5 SSR").readPublicDebates(1, 0);
+  assert.deepEqual(seen, ["203.0.113.9", null]);
+});
+
+test("DL3-F1: every SSR page that reads the API passes the visitor's address", () => {
+  for (const page of ["../app/page.tsx", "../app/public/debate/[id]/page.tsx", "../app/login/page.tsx", "../app/debate/[id]/page.tsx"]) {
+    const source = read(page);
+    assert.match(source, /readTrustedClientIp\(await headers\(\)\)/, `${page} reads the stamped address through the guarded reader`);
+  }
+});

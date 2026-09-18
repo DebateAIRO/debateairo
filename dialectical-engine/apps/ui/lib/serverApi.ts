@@ -1,4 +1,5 @@
 import { ContractHttpError, createContractClient, type Answer, type ContractClient, type RunProjection } from "@debateai/contract";
+import { normalizeClientIp, TRUSTED_CLIENT_IP_HEADER } from "../trusted-client-ip.mjs";
 import type { DebateDetail, DebateSummary } from "./types.js";
 import { debateDetailFromAnswer, debateSummariesFromIndex } from "./v3/adapter.js";
 
@@ -32,10 +33,25 @@ export function readSessionCookie(
   return sessionCookieValue(store.get(USER_TOKEN_COOKIE)?.value);
 }
 
+/**
+ * DL3-F1: server-rendered reads reach the API from the SSR hop, so without this every
+ * visitor was `127.0.0.1` to the API and B10's per-source public-read budget collapsed
+ * into one bucket shared by everyone. server.mjs strips every inbound forwarded header
+ * and re-stamps the visitor's address; the same rule as the /api proxy applies here: the
+ * stamp is vouched for only behind server.mjs (L3-F6), and only as one exact address.
+ */
+export function readTrustedClientIp(
+  store: Readonly<{ get(name: string): string | null }>
+): string | undefined {
+  if (process.env.DIALECTICAL_UI_EDGE !== "server.mjs") return undefined;
+  return normalizeClientIp(store.get(TRUSTED_CLIENT_IP_HEADER)) ?? undefined;
+}
+
 export function createServerContractClient(
   fetchImplementation: typeof fetch = fetch,
   sessionCookie?: string,
-  userAgent?: string
+  userAgent?: string,
+  clientIp?: string
 ): ContractClient {
   const baseUrl = process.env.DIALECTICAL_API_BASE?.trim();
   if (baseUrl === undefined || baseUrl.length === 0) {
@@ -47,7 +63,8 @@ export function createServerContractClient(
     ...(session === null ? {} : {
       cookieHeader: `${USER_TOKEN_COOKIE}=${session}`
     }),
-    ...(userAgent === undefined ? {} : { userAgent })
+    ...(userAgent === undefined ? {} : { userAgent }),
+    ...(clientIp === undefined ? {} : { forwardedFor: clientIp })
   });
 }
 
@@ -67,9 +84,10 @@ export type DebateListPage = {
 export async function listDebatesPageServer(
   token: string,
   client?: ContractClient,
-  userAgent?: string
+  userAgent?: string,
+  clientIp?: string
 ): Promise<DebateListPage> {
-  const resolvedClient = client ?? createServerContractClient(fetch, token, userAgent);
+  const resolvedClient = client ?? createServerContractClient(fetch, token, userAgent, clientIp);
   const index = await resolvedClient.readAnswerIndex(HOME_PAGE_SIZE, 0);
   const modelsByAnswerId = new Map<string, string[]>();
   for (const item of index.items) {
@@ -115,9 +133,10 @@ export async function getDebateServer(
   id: string,
   token: string,
   client?: ContractClient,
-  userAgent?: string
+  userAgent?: string,
+  clientIp?: string
 ): Promise<GetDebateServerResult> {
-  const resolvedClient = client ?? createServerContractClient(fetch, token, userAgent);
+  const resolvedClient = client ?? createServerContractClient(fetch, token, userAgent, clientIp);
   let answer: Answer;
   try {
     try {

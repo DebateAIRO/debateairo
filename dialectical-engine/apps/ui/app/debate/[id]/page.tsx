@@ -2,7 +2,7 @@ import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 import type { Answer } from "@debateai/contract";
 import DebatePageGate from "./DebatePageGate";
-import { getDebateServer, readSessionCookie } from "@/lib/serverApi";
+import { getDebateServer, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
 import type { DebateDetail } from "@/lib/types";
 import { debateDetailFromRunProjection } from "@/lib/v3/adapter";
 
@@ -46,7 +46,7 @@ export default async function DebatePage({
   let initialError: string | null = null;
 
   if (token !== null) {
-    const result = await getDebateServer(id, token, undefined, userAgent);
+    const result = await getDebateServer(id, token, undefined, userAgent, readTrustedClientIp(await headers()));
     if (result.ok) {
       initialDebate = result.debate;
       initialAnswer = result.answer;

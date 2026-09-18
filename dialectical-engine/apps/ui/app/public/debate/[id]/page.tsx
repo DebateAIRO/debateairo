@@ -1,5 +1,6 @@
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { createServerContractClient } from "@/lib/serverApi";
+import { createServerContractClient, readTrustedClientIp } from "@/lib/serverApi";
 import { PublicDebatePageClient } from "./PublicDebatePageClient";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +9,9 @@ export default async function PublicDebatePage({ params }: { params: Promise<{ i
   const { id } = await params;
   let debate;
   try {
-    debate = await createServerContractClient().readPublicDebate(id);
+    // DL3-F1: the public-read budget is per visitor; without the stamped address every
+    // server-rendered read would count against one bucket shared by all visitors.
+    debate = await createServerContractClient(fetch, undefined, undefined, readTrustedClientIp(await headers())).readPublicDebate(id);
   } catch {
     notFound();
   }

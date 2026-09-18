@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cookies, headers } from "next/headers";
-import { createServerContractClient, listDebatesPageServer, readSessionCookie } from "@/lib/serverApi";
+import { createServerContractClient, listDebatesPageServer, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
 import { LibraryComposer } from "@/components/LibraryComposer";
 import { DebatesBuffer, PublicDebatesBuffer } from "@/components/DebatesBuffer";
 import { LandingPage } from "@/components/landing/LandingPage";
@@ -26,6 +26,7 @@ export default async function HomePage({
       ? requestedTab
       : token !== null ? "yours" : "public";
   const userAgent = (await headers()).get("user-agent") ?? undefined;
+  const clientIp = readTrustedClientIp(await headers());
   let debates: DebateSummary[] = [];
   let total: number | null = null;
   let error: string | null = null;
@@ -33,7 +34,7 @@ export default async function HomePage({
   let published: Awaited<ReturnType<ContractClient["readPublicDebates"]>> = { items: [], total: 0 };
   let publishedError: string | null = null;
   try {
-    published = await createServerContractClient(fetch, undefined, userAgent).readPublicDebates(50, 0);
+    published = await createServerContractClient(fetch, undefined, userAgent, clientIp).readPublicDebates(50, 0);
   } catch {
     publishedError = "Published debates are temporarily unavailable.";
   }
@@ -41,7 +42,7 @@ export default async function HomePage({
     error = "Sign in to start a debate and save it to your account.";
   } else {
     try {
-      const page = await listDebatesPageServer(token, undefined, userAgent);
+      const page = await listDebatesPageServer(token, undefined, userAgent, clientIp);
       debates = page.summaries;
       total = page.total;
       sessionConfirmed = true;
