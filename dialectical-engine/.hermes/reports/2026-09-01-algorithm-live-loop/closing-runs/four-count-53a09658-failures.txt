@@ -1,0 +1,45 @@
+tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle DebateCanvas agreed review mark binds its agreed review verdict role
+tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle DebateCanvas disputed review mark binds its disputed review verdict role
+tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle DebateMap root hub binds its reasoning accent role
+tests/architecture/s04-contract.test.ts > S04 DDL and runtime attachment contract DR-128 mints only the claim-type composition structure and wires a loud register read
+tests/architecture/s10-carrier-erasure-red.test.ts > S10 carrier erasure — RED acceptance contracts filters completed private tombstones before any external key load
+tests/architecture/s13-contract.test.ts > S13 / cross-run memory architecture lands append-only memory carriers without a closure job or embedding dependency
+tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract carries the S04 orphan-audit wording fix and deterministic locale tiebreak
+tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract uses the generated contract client for both browser and SSR with no V2 wire mirror
+tests/architecture/s7-authorization-contract.test.ts > Accounts S7 ownership architecture hardens every immutable memory scope carrier and derives it from run ownership
+tests/architecture/s8-publication-contract.test.ts > Accounts S8 publication architecture ships the deliberate controls and public-only reader in the UI composition
+tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law matches all 27 dependency-edge rows and structural rules 1–5
+tests/integration/memory-database.test.ts > S13 / FX-S22-04 / FX-PT-MEM — real PostgreSQL memory path does not link a legacy candidate after an ownership claim changes its effective scope
+tests/integration/obs-l3-s06-runner-binding.test.ts > S06 deployment linkage evaluates the runner installer before the DB dependency in the real production entrypoint
+tests/integration/obs-l3-s06-runner-binding.test.ts > S06 provider gateway binding captures one provider occurrence after the real gateway exhausts all attempts
+tests/integration/obs-l3-s06-runner-binding.test.ts > S06 runner task binding captures the real task failure before terminal recording with declared context and Hatchet attempt index
+tests/integration/obs-l3-s06-runner-binding.test.ts > S06 runner task binding preserves the original task failure when terminal recording fails and captures the recording alarm
+tests/integration/registration-database.test.ts > S3 registration and verification on real PostgreSQL S3d post-hash main-process secondary RSS tripwire stays flat and counts every refusal
+tests/integration/registration-database.test.ts > S3 registration and verification on real PostgreSQL S3d rework3 B1/B3 probes deep-queue slack and the following audit window
+tests/integration/s7-authorization-database.test.ts > S7 real PostgreSQL ownership and IDOR boundary locks every matching run before allocation while a rejected transfer is queued
+tests/render/load01-debate-page.test.tsx > LOAD-01 real debate-page render T21 renders HOLDING with its honest remaining time and no error banner
+tests/render/load01-debate-page.test.tsx > LOAD-01 real debate-page render renders a mid-session run.terminal failure as failed with no live progress
+tests/render/pda-s02-public-page.test.tsx > S02 public debate answer surface preserves the published answer fields and disclosure after the client-shell split
+tests/render/pda-s02-public-tree.test.tsx > S02 public argument-tree projection renders every reading mode, real projected claims, and a read-only node drawer
+tests/render/pda-s02-public-tree.test.tsx > S02 public argument-tree projection renders no tree controls for a legacy answer-only publication
+tests/render/pda-s02-scoring-chrome.test.tsx > S02 public scoring diagnostics opens the owner diagnostics drawer over the same DR-115 unavailable payload
+tests/render/sup-04-widget.test.tsx > SUP-04 product-route support widget expands on Enter, focuses the message control, and follows the Romanian override
+tests/render/t1-canvas.test.tsx > card anatomy keeps BASE, FINAL, and an accessible Details control on one card
+tests/render/t1-canvas.test.tsx > card anatomy maps all completed review outcomes and absence to four distinct compact states
+tests/render/t1-canvas.test.tsx > card anatomy renders nested shell/core bezels and token-typed stance tabs for PRO and CON cards
+tests/render/t1-canvas.test.tsx > card anatomy uses a structural line token for the DebateMap hub ring
+tests/render/t1-canvas.test.tsx > set-aside and synthesis shows the public challenge lock without inventing regeneration
+tests/render/t3-library.test.tsx > lists renders a live count for the three Public debates rows
+tests/render/t3-library.test.tsx > lists renders every library row as a shell/core bezel
+tests/render/t3-library.test.tsx > lists renders recased native selectors and a live count for the four Your debates rows
+tests/render/t3-library.test.tsx > lists renders the public search-indexing disclosure once under the list and never on Yours
+tests/render/t9-landing.test.tsx > T9-C1 route split & chrome keeps the route branch immediate and the landing a server component
+tests/render/ui02d-model-identity.test.tsx > UI-02d renders recorded house, family, and exact model id pins the map maker prop through the rendered readout
+tests/render/ui02e-debate-canvas.test.tsx > UI-02e renders the real DebateCanvas gate surface keeps typed maker and score absence visible instead of collapsing to silence
+tests/unit/registration.test.ts > S3 ruled authentication policy S3c B4 keeps the isolated production RSS curve below the published measured bound
+tests/unit/text-control-bytes.test.ts > HYG-01 tracked text control-byte guard finds no forbidden raw control bytes in cached or untracked repository text sources
+tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps kills MUT-A: deleting the V3ScoreBadges JSX render site
+tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps kills MUT-C: deleting the maker meta line from the contentful node header
+tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps uses DR-160 content-aware overflow instead of a fixed collapse breakpoint
+tests/unit/v2ui-pages.test.ts > UI-02d — every non-canvas maker surface preserves its recorded maker prop pins tree, thread, outline, split, map, and drawer at all eight call sites
+tests/unit/v2ui-pages.test.ts > XREV-01 — node review uses the existing V2 card and drawer vocabulary shows typed review outcome and reviewer house on cards, including honest absence

@@ -440,3 +440,35 @@ for V's attention: `F-UI-VERDICT-LABEL-DRAWER-ONLY` — the label reaches the si
 drawer; `F-REGISTER-HISTORICAL-IMPORT-CAP` — one refit left before the sealing mechanism needs a
 decision); the V packet's §A rows at their defaults; a single-maker run if V ever wants bullet 4
 witnessed. **Read first, for humans:** `PLAIN-STATUS.md`.
+
+## 2026-09-19 01:34 — NEWEST ENTRY WINS
+
+**THE RUNTIME IS NODE 26.8.2 AND THE TEST ENVIRONMENT IS FIXED (D78).** `package.json` engines declares
+26.8.2 (Homebrew's newest; nodejs.org's 26.9.0 was two days old and unbottled), the runner is vitest
+5.0.1, and the `localStorage` caveat that rode on every gate number since 2026-09-16 is gone: the
+four-count at `53a09658` is **45 / 0 / 0 / 1** (45 failing of 5364) against 140 at `31f6e25b`. `origin/dev` = the commit that carries these records (the tip of `git log`).
+
+**The one thing to know before touching a register file:** `register.bootstrap.json` is **sealed register
+version 1**, not a plain file. `persistBootstrapRegister` seals it through `importHistorical`
+(replay-only), the production runbook has the operator confirm its exact snapshot hash and "unchanged
+row/value/source bytes", and editing it moves that hash and throws `FX-REG-SEALED_VERSION_MISMATCH`
+against any database already holding v1. A seat was told otherwise by its brief on 2026-09-18, changed
+it, measured the consequence and reported it — the edit was reverted (D78 d). Recording today's machine
+pins lawfully is `F-BOOTSTRAP-REGISTER-V2-RUNTIME-PINS`. The same law governs the acceptance register
+(D77 ADDENDUM 1 a/1): **a sealed value is never edited, only superseded.**
+
+**Still owed, none of it blocking:** the tickets filed at closure and after it — `F-UI-VERDICT-LABEL-DRAWER-ONLY`
+and `F-UI-DEFECTS-UNMASKED-BY-NODE26` (both for V's UI program; the second holds the four defects the
+storage failures were masking, each with its frame), `F-BOOTSTRAP-REGISTER-V2-RUNTIME-PINS`,
+`F-AUTH-MEMORY-BOUNDS-MEASURED-ON-NODE-22` (the registration service's two resident bounds were measured
+on Node 22 and never re-measured), `F-S3D-SEPARATION-PERMUTATION-FLAKE` (a permutation-test assertion that
+rejects ~1 % of the time by construction — do NOT raise its ceiling), `F-UI-TYPECHECK-NEEDS-A-BUILD` (the
+website typecheck fails from a clean tree and had been answered by a stale incremental cache), `F-STOPPING-DECISIONS-UNPERSISTED`, `F-REGISTER-V3-REQUIRED-ROW-PROFILE`
+with `F-T16-MANIFEST-PROVENANCE-STALE` (one migration), `F-REGISTER-HISTORICAL-IMPORT-CAP`,
+`F-J27-GATE-ACCEPTANCE-SITE`, `F-CLOSING-RUN-OUTDIR-OVERRIDE`. The Node 22.23.1 run that D73 e/7 owed is
+**retired**: the project no longer declares that runtime.
+
+**If a next session runs the ceremony:** `packets/readiness-ask-2026-09-16.md` sections 3, 5 and 8,
+unchanged by this upgrade — export the credential, run the short form from the engine root, depth 2. It
+seals acceptance register version 3 and is still the first witness of the credential rules (D77 f).
+**Read first, for humans:** `PLAIN-STATUS.md`.

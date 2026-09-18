@@ -1,6 +1,34 @@
 # Where things stand, in plain language
 
-*Written 2026-09-17 and updated 2026-09-18 for the project owner. This page explains the state of the V3 debate engine work without the code names the other files in this folder use. Every claim links to the file that holds the details. When the detailed records change, this page is updated in the same commit.*
+*Written 2026-09-17 and updated through 2026-09-19 for the project owner. This page explains the state of the V3 debate engine work without the code names the other files in this folder use. Every claim links to the file that holds the details. When the detailed records change, this page is updated in the same commit.*
+
+## 2026-09-18, later: Node upgraded, and the hundred "failing" tests were never broken code
+
+**What you asked for.** "Upgrade to the latest stable Node version available and adapt the code in case there are problems." Node is the engine the code runs on, like the version of Windows a program needs.
+
+**What was installed.** This Mac went from Node 26.5.0 to **26.8.2**, the newest version Homebrew offers. Node's own website has 26.9.0, released two days ago and not yet packaged for Homebrew, so it was not used. The 26 line becomes the long-term-support line next month, so this is the right line to be on.
+
+**The interesting part: the 100 failing tests were not broken code.** For weeks every report has carried the same caveat — about 100 of the 140 failing tests fail "because of the Node version". Now we know exactly why, and it was one small thing:
+
+- Newer versions of Node invented their own version of the browser's "remember this in the page" storage. It exists, but it is empty and switched off unless you start Node a special way.
+- The testing tool pretends to be a browser so that website tests can run without a browser. When it sets up that fake browser, it skips anything Node has already defined — and Node had now defined that storage. So the tests got Node's empty switched-off version instead of the working fake-browser one.
+- Every one of those tests starts by emptying the storage. With nothing there to empty, they all died on their very first line, before testing anything at all.
+
+**The fix was the testing tool, not our code.** Version 5.0.1 of that tool, released two weeks ago, adds exactly those two storage items to the list it hands over, and declares Node 26 supported. Upgrading it fixed the whole class at once. The alternative would have been to start Node with a special flag, which would have given every test one shared storage file on disk and quietly broken the isolation the tests depend on.
+
+**The result.** Failing tests went from 140 to 45. That is 99 tests that now pass and were only ever failing because of the environment. Of the 45 left, 41 are the same failures this project already owned and tracks on cards, 3 are those same tests under slightly different names because the new testing tool prints titles differently, and 1 is the occasionally-failing test described below.
+
+**Four real defects were hiding behind the noise.** The September 16 audit predicted "about four" real failures masked by the storage problem. Exactly four appeared, all in the debate canvas and map: a corner radius written as a raw number instead of the design's token, the review marks that are styled but never actually drawn on a card (twice), and the map's hub ring geometry. These are unbuilt pieces of the design, not one-line bugs, so they were written up rather than patched: [F-UI-DEFECTS-UNMASKED-BY-NODE26](board/F-UI-DEFECTS-UNMASKED-BY-NODE26.md), for your UI work. Worth knowing: because these tests kept their names, a simple before-and-after count would not show them. They only surface if someone reads why each remaining test fails.
+
+**One thing I stopped and reversed.** The worker also updated the Node version inside the project's "machine pins" file — a record of what this machine had on 2026-08-07. That sounds harmless, but that file is a sealed record: the production setup instructions tell an operator to confirm its exact fingerprint in the live database, and the code refuses to start against a database whose sealed copy differs. Editing it would have rewritten history an operator is told to verify. It is reverted. The record still says the true thing about its own date, the project's actual requirement now says 26.8.2, and recording today's machine pins properly needs a new sealed version, which is now a to-do card. This is the second time in one day the same rule decided a question: **a sealed value is never edited, only superseded.**
+
+**Two things the final checks turned up.** First, the test pass had to be run twice. The first run shared the Mac with another AI agent I had working, and two timing tests failed — including the one that proves an attacker cannot tell a registered email from an unregistered one by how long the site takes to answer. On a quiet machine those tests pass comfortably, and the numbers show why: only the half of the measurement that does real work slowed down, which is what happens when something else is competing for the processor. The rule now recorded: a test run that measures timing is done on a quiet machine, and my own agents count as noise.
+
+Second, and more useful: one remaining failure is a test that is designed to fail occasionally. It compares a measurement against a threshold it calculates from its own data, in a way that flags roughly one run in a hundred even when nothing is wrong, and the run makes about a dozen such comparisons. It has a card, with the arithmetic and an explicit warning not to "fix" it by raising the threshold, because the threshold is the security property.
+
+**One more thing I checked myself, and it was worth it.** The website's own type check was outside every automated check. When I ran it properly it failed, and the reason is that it had been reporting success from a cache: it reuses previous results, and reusing them skipped the work entirely. The failure itself is old and not caused by this upgrade. The lesson is the one worth keeping: a cached check can report success for something that does not actually pass. Card: [F-UI-TYPECHECK-NEEDS-A-BUILD](board/F-UI-TYPECHECK-NEEDS-A-BUILD.md).
+
+**Still not re-measured.** Two memory limits for the sign-in service were measured on the old Node and have not been checked on the new one. They are not wrong, just unverified. That has a card too: [F-AUTH-MEMORY-BOUNDS-MEASURED-ON-NODE-22](board/F-AUTH-MEMORY-BOUNDS-MEASURED-ON-NODE-22.md).
 
 ## 2026-09-18, early morning: you decided the open questions, three changes followed, and the mission is signed off
 
@@ -62,9 +90,9 @@ DebateAI has two generations. **V2** is the older Python system that runs the li
 
 **What you get.** A log with the nine facts the checklist wants. Two of them can only be proven by a real run, never by the automated tests: whether the argument links carry measured weights, and whether propagation actually moved at least one top-level score. The seven new report lines and what each one means are described in the code's own guide, [acceptance/README.md](../../../acceptance/README.md), under "The definition-of-done report".
 
-### 2. Run the automated tests on the right Node version (you, or an agent with your go)
+### 2. Run the automated tests on the right Node version — DONE on 2026-09-18, the other way round
 
-The V3 code runs on Node.js, the runtime the code is built for, like an app built for one phone OS version. The project is pinned to Node 22.23.1; this Mac has Node 26. About 100 of the 140 currently failing tests fail only because of that mismatch (a browser-storage feature Node 26 changed). Running the suite once under Node 22.23.1 should clear those 100 and is expected to uncover roughly four real failures that were hidden behind them. Details: decision D73, item (e)(7) in [DECISIONS.md](DECISIONS.md).
+This item said the project was pinned to Node 22.23.1 while this Mac ran Node 26, and that running the tests on 22.23.1 would clear about 100 failures. It was resolved by moving forward instead of back: the Mac is on Node 26.8.2, the project now declares that version, and the testing tool was upgraded to the release that works with it. The 100 failures are gone, and the four real ones they were hiding are written up. The top section of this page has the detail.
 
 ### 3. Look at the small choices made on your behalf (you, five minutes)
 
@@ -110,6 +138,8 @@ Around 20:15 the Mac froze for everyone: your terminal, my commands, even the Cl
 | **Mutant** | A deliberately broken copy of the code, used to check that a test really notices the breakage, like testing a smoke detector with actual smoke. |
 | **Gate** | Running the automated tests and type checks at a given commit and recording the counts. "140 / 0 / 0 / 1" means 140 failing tests, 0 test files that failed to load, 0 skipped, 1 unhandled error; every one of those is known and explained. |
 | **Credential** | Your secret API key. No AI agent here ever sees it. |
+| **Node** | The engine the code runs on, like the version of Windows a program needs. This Mac and the project are now both on Node 26.8.2. |
+| **jsdom, the testing tool** | Website tests need a browser. Rather than open one, the tests use a pretend browser (jsdom) driven by a test runner (vitest). When the pretend browser is missing a piece, tests fail for reasons that have nothing to do with the website. |
 | **Stop threshold, freeze threshold (δ, ε)** | The two tuning numbers you set on 2026-09-18. Stop: how much a position's score must still move between rounds for the debate to keep going deeper (now 0.01). Freeze: the least an argument must be able to move a score to earn further replies (now 0.005). |
 | **Sealed register, register version** | The engine reads its policy numbers from a database table whose rows, once written, are never edited ("sealed"). Changing a number means writing a new numbered version next to the old one. The real-run setup is now on version 3. |
 | **Confirm-items** | The seven questions the mission's goal asked you to confirm at the end. Answered on 2026-09-18. |
@@ -122,6 +152,7 @@ Around 20:15 the Mac froze for everyone: your terminal, my commands, even the Cl
 - **What happened, day by day:** [PROGRESS.md](PROGRESS.md), newest section at the bottom.
 - **Every decision and why:** [DECISIONS.md](DECISIONS.md); the entries of 2026-09-17 are D74–D76, and everything you decided on 2026-09-18 is D77 with its first addendum, at the end.
 - **The final verdict on the whole mission:** [agent-reports/w12-whole-goal-verdict-2026-09-18.md](agent-reports/w12-whole-goal-verdict-2026-09-18.md).
+- **The Node upgrade, in detail:** entry D78 at the end of [DECISIONS.md](DECISIONS.md); the worker's and reviewer's reports are the two files named `d78-…-2026-09-18.md` in [agent-reports](agent-reports/).
 - **Tonight's three changes, plainly:** the plan [docs/superpowers/plans/2026-09-18-owner-rulings-d77.md](../../../docs/superpowers/plans/2026-09-18-owner-rulings-d77.md); the workers' and reviewers' reports are the six files named `d77-…-2026-09-18.md` in [agent-reports](agent-reports/).
 - **Every worker's and reviewer's report:** the [agent-reports](agent-reports/) folder; today's are `dod-facts-seat-2026-09-17.md` (the worker) and `dod-facts-review-2026-09-17.md` (the reviewer).
 - **The plan for today's fix, in ordinary sentences:** [docs/superpowers/plans/2026-09-17-ceremony-report-six-facts.md](../../../docs/superpowers/plans/2026-09-17-ceremony-report-six-facts.md).

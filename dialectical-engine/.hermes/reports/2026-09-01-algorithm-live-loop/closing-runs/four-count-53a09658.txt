@@ -1,0 +1,3 @@
+FOUR-COUNT  failures=45  suite-load=0  skips=0  unhandled=1
+TOTALS(json)  tests=5364  passed=5319  failedTests=45  files=427  failedFiles=25
+CONSOLE  Test Files  25 failed | 402 passed (427)  |  Tests  45 failed | 5319 passed (5364)  |  Errors  1 error
