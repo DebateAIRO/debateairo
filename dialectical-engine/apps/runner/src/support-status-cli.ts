@@ -98,7 +98,7 @@ function configurationRows(status: NonNullable<SupportConfigurationStatus>): rea
   const parsed = JSON.parse(status.configurationText) as unknown;
   if (!Array.isArray(parsed)) throw new TypeError("SUPPORT_STATUS_INVALID");
   return Object.freeze((parsed as ConfigurationEnvelope[]).map((row) => Object.freeze(row))
-    .sort((left, right) => left.row_key.localeCompare(right.row_key)));
+    .sort((left, right) => (left.row_key < right.row_key ? -1 : left.row_key > right.row_key ? 1 : 0)));
 }
 
 function retentionLines(rows: readonly ConfigurationEnvelope[]): readonly string[] {
