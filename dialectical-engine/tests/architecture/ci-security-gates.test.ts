@@ -34,6 +34,20 @@ describe("CI security gates (F-03)", () => {
     const db = read(".github/dependabot.yml");
     expect(db.match(/target-branch: "dev"/g)?.length).toBe(2);
   });
+  // DL6-F3 (delta audit 2026-09-18): the secret gate must SEE the directories where agent
+  // seats paste command output. Whole-tree exemptions for tests/, docs/ and .hermes/ made it
+  // blind to 88 % of the delta's new files; exemptions are per named fixture file instead.
+  it("never exempts a whole tree from the secret scan (DL6-F3)", () => {
+    const config = read(".gitleaks.toml");
+    const paths = config.slice(config.indexOf("paths = ["), config.indexOf("]", config.indexOf("paths = [")));
+    expect(paths).not.toMatch(/tests\/\.\*/);
+    expect(paths).not.toMatch(/docs\/\.\*/);
+    expect(paths).not.toMatch(/hermes\/\.\*/);
+    for (const entry of paths.split("\n").filter((line) => line.trim().startsWith("'''"))) {
+      expect(entry, entry).toMatch(/\\\.(ts|mjs|json|md)''',?$/);
+    }
+  });
+
   it("runs gitleaks as a pinned, sha256-verified binary, not the licensed action (B7b)", () => {
     const wf = read(".github/workflows/security.yml");
     expect(wf).not.toContain("gitleaks-action");

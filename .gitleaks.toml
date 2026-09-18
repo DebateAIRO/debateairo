@@ -1,7 +1,25 @@
 # .gitleaks.toml
 [extend]
 useDefault = true
+
+# DL6-F3 (delta audit 2026-09-18): this allowlist used to exempt three whole trees —
+# dialectical-engine/{tests,docs,.hermes} — which is where 88 % of the delta's new files
+# landed and where agent seats paste command output. The only secret gate was blind to the
+# directories most likely to catch a pasted credential. The exemptions are now per FILE,
+# each one a fixture whose non-secret value is named below, so everything else in those
+# trees is scanned. A future match is classified the way V-24 established: read it, and if
+# it is not live, record its exact gitleaks fingerprint in .gitleaksignore with a reason.
 [allowlist]
-description = "Test fixtures and documented non-secrets"
-paths = [ '''dialectical-engine/tests/.*''', '''dialectical-engine/docs/.*''', '''dialectical-engine/\.hermes/.*''' ]
-regexes = [ '''correct horse battery staple''', '''debateai-dev-only''' ]
+description = "Named non-secret fixtures (per file), and documented non-secret literals"
+paths = [
+  # AWS's own published example access key, used as an obviously-fake token fixture.
+  '''dialectical-engine/tests/unit/api-operational-error\.test\.ts''',
+  '''dialectical-engine/tests/unit/dev-runner-reconciliation\.test\.ts''',
+  # A loopback Hatchet client token minted for the embedded-PostgreSQL fixture.
+  '''dialectical-engine/tests/integration/support-config-principals\.test\.ts'''
+]
+regexes = [
+  '''correct horse battery staple''',
+  '''debateai-dev-only''',
+  '''AKIAIOSFODNN7EXAMPLE'''
+]
