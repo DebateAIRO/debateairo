@@ -57,28 +57,28 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@debateai/battery-decision": "workspace:*",
-    "@debateai/battery": "workspace:*",
-    "@debateai/budget": "workspace:*",
     "@debateai/api": "workspace:*",
+    "@debateai/battery": "workspace:*",
+    "@debateai/battery-decision": "workspace:*",
+    "@debateai/budget": "workspace:*",
     "@debateai/contract": "workspace:*",
-    "@debateai/crypto": "workspace:*",
     "@debateai/critique": "workspace:*",
+    "@debateai/crypto": "workspace:*",
     "@debateai/db": "workspace:*",
     "@debateai/graph": "workspace:*",
+    "@debateai/judgement": "workspace:*",
     "@debateai/kernel": "workspace:*",
     "@debateai/ledger": "workspace:*",
     "@debateai/liveness": "workspace:*",
     "@debateai/memory": "workspace:*",
     "@debateai/obs-capture": "workspace:*",
-    "@debateai/judgement": "workspace:*",
     "@debateai/propagation": "workspace:*",
-    "@debateai/published-arithmetic": "workspace:*",
     "@debateai/providers": "workspace:*",
+    "@debateai/published-arithmetic": "workspace:*",
     "@debateai/register": "workspace:*",
     "@debateai/runner": "workspace:*",
-    "@debateai/settlement": "workspace:*",
     "@debateai/serve": "workspace:*",
+    "@debateai/settlement": "workspace:*",
     "@debateai/valuation": "workspace:*",
     "@types/node": "26.2.0",
     "@types/pg": "8.21.0",
@@ -90,6 +90,6 @@
     "tsx": "4.23.11",
     "typescript": "7.0.2",
     "typescript-classic": "npm:typescript@5.9.3",
-    "vitest": "4.1.10"
+    "vitest": "5.0.1"
   }
 }
