@@ -259,6 +259,18 @@ tautological.
 open with zero backends waiting on a row lock, the counter reads 4, and all five
 invariant cases still refuse their violating write.
 
+**Timing evidence, host-normalised.** Several agents share this Mac, so absolute
+milliseconds drift by 3x between runs; the timing case therefore measures a
+control transaction of the same shape (two indexed inserts plus a commit) against
+an unguarded relation immediately before each measured batch, and asserts on the
+guard's overhead ABOVE that control. RED (§4 removed): `guard overhead went 0.208
+-> 0.725 ms/commit as N went 600 -> 1200 (raw 0.348 -> 0.833, control 0.140 ->
+0.107)` — the control is flat, so the growth is the guard. GREEN: `guard overhead
+went 0.680 -> 0.665 ms/commit as N went 600 -> 1200 (raw 0.847 -> 0.800, control
+0.167 -> 0.135)` — flat, on a host that was three times slower that minute. The
+slope is what the finding was; the residual constant (~0.19 ms on an idle host,
+~0.68 ms under load) is the scoped check itself and does not grow with N.
+
 SUP-07's four mechanism-level cases were rewritten against the new mechanism
 (trigger inventory 44 with the five scope guards and no dirty markers, the two
 0054 functions present and hash-identical but trigger-less, the two new functions

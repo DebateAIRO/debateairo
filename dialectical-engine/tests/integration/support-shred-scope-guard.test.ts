@@ -57,14 +57,16 @@ async function insertSessionPair(
   `, [sessionId, liveWrappedKey(1), at]);
 }
 
-/** One commit per session, exactly as PostgresSupportSessionRepository.create does. */
-async function createSessions(count: number): Promise<number> {
+async function timeCommits(
+  count: number,
+  work: (client: PoolClient) => Promise<void>
+): Promise<number> {
   const started = process.hrtime.bigint();
   for (let index = 0; index < count; index += 1) {
     const client = await supportPool.connect();
     try {
       await client.query("BEGIN");
-      await insertSessionPair(client, randomUUID());
+      await work(client);
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
@@ -76,9 +78,40 @@ async function createSessions(count: number): Promise<number> {
   return Number(process.hrtime.bigint() - started) / 1e6 / count;
 }
 
+/** One commit per session, exactly as PostgresSupportSessionRepository.create does. */
+async function createSessions(count: number): Promise<number> {
+  return timeCommits(count, (client) => insertSessionPair(client, randomUUID()));
+}
+
+/**
+ * The same shape of transaction — two indexed inserts and a commit — against a
+ * relation with no guard on it. This is the machine-speed control: several
+ * agents share this host, so absolute milliseconds drift by 3x between runs and
+ * only the guard's overhead ABOVE this baseline is the finding.
+ */
+async function createControlRows(count: number): Promise<number> {
+  return timeCommits(count, async (client) => {
+    for (const _ of [0, 1]) {
+      const id = randomUUID();
+      await client.query(
+        "INSERT INTO public.db1_timing_control(id,token,created_at) VALUES($1,$2,$3)",
+        [id, id.replaceAll("-", "").padEnd(64, "0"), at]
+      );
+    }
+  });
+}
+
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  await database.pool.query(`
+    CREATE TABLE IF NOT EXISTS public.db1_timing_control (
+      id uuid PRIMARY KEY,
+      token char(64) NOT NULL UNIQUE,
+      created_at timestamptz NOT NULL
+    );
+    GRANT INSERT ON public.db1_timing_control TO debateai_support;
+  `);
   supportPool = createPool(database.connectionString);
   supportPool.on("connect", (client) => {
     void client.query("SET ROLE debateai_support");
@@ -98,14 +131,21 @@ describe("0065 §4 the shred guard is no longer a global serialisation point (DL
     // measured ~0.48 microseconds per existing session per commit, so the third
     // batch of this loop cost several times the first. The scoped guard touches
     // only the session being created.
-    const batch = 800;
+    const batch = 600;
+    const firstControl = await createControlRows(batch);
     const first = await createSessions(batch);
     await createSessions(batch);
+    const thirdControl = await createControlRows(batch);
     const third = await createSessions(batch);
-    expect(
-      third,
-      `ms/commit grew from ${first.toFixed(3)} to ${third.toFixed(3)} as N went ${batch} -> ${batch * 2}`
-    ).toBeLessThanOrEqual(first * 1.5);
+    // Each control run is taken immediately before the batch it normalises, so
+    // host load cancels out and what is left is the guard's own cost.
+    const firstOverhead = Math.max(first - firstControl, 0.001);
+    const thirdOverhead = Math.max(third - thirdControl, 0.001);
+    const report = `guard overhead went ${firstOverhead.toFixed(3)} -> ${thirdOverhead.toFixed(3)} ms/commit`
+      + ` as N went ${batch} -> ${batch * 2}`
+      + ` (raw ${first.toFixed(3)} -> ${third.toFixed(3)}, control ${firstControl.toFixed(3)} -> ${thirdControl.toFixed(3)})`;
+    console.info(`[DL5-F1] ${report}`);
+    expect(thirdOverhead, report).toBeLessThanOrEqual(firstOverhead * 2);
     expect((await database.pool.query<{ count: number }>(
       "SELECT count(*)::int AS count FROM support.session"
     )).rows[0]?.count).toBeGreaterThanOrEqual(batch * 3);
