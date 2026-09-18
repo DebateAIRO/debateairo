@@ -26,7 +26,18 @@ const VULNERABLE: Record<string, (version: string) => boolean> = {
   postcss: (v) => compare(v, "8.5.23") < 0,
   sharp: (v) => compare(v, "0.35.4") < 0,
   nanoid: (v) => v.startsWith("3.") && compare(v, "3.3.18") < 0,
-  esbuild: (v) => compare(v, "0.24.3") < 0 || (compare(v, "0.27.3") >= 0 && compare(v, "0.28.1") < 0)
+  esbuild: (v) => compare(v, "0.24.3") < 0 || (compare(v, "0.27.3") >= 0 && compare(v, "0.28.1") < 0),
+  // DL6-F1 (delta audit 2026-09-18): the advisory database moved under the merged tree and
+  // pnpm audit went red again on paths nothing in this repo reaches with attacker input
+  // (fastify's own ajv/fast-json-stringify compilers; qs under the Hatchet SDK; vitest).
+  // Floors, not exclusions: every version below cleared the 7-day cooldown on its own.
+  fastify: (v) => compare(v, "5.12.1") < 0,
+  "fast-uri": (v) => (v.startsWith("3.") && compare(v, "3.1.6") < 0)
+    || (v.startsWith("4.") && compare(v, "4.1.3") < 0),
+  qs: (v) => compare(v, "6.16.0") < 0,
+  // @vitest/mocker ships in lockstep with vitest and is quoted in the lockfile (scoped
+  // names do not match this file's unquoted resolver), so the vitest floor covers it.
+  vitest: (v) => compare(v, "4.1.11") < 0
 };
 
 describe("dependency floors (F-02)", () => {
