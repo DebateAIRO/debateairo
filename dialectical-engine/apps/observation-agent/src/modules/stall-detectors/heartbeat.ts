@@ -1,5 +1,6 @@
-import { readFile } from "node:fs/promises";
 import { z } from "zod";
+import { readCustodiedSecretFile } from "../../core/custody.js";
+import { assertLoopbackUrl } from "../../core/loopback.js";
 import type { ObservationSignal } from "../../core/signals.js";
 import type {
   ModuleStatusProjection,
@@ -37,7 +38,7 @@ type ReadWorkerHeartbeatInput = Readonly<{
   now: Date;
   timeoutMs: number;
   heartbeatThresholdSeconds?: number;
-  readToken?: (path: string, encoding: "utf8") => Promise<string>;
+  readToken?: (path: string) => Promise<string>;
   fetch?: typeof globalThis.fetch;
 }>;
 
@@ -60,9 +61,13 @@ export async function readWorkerHeartbeat(
   input: ReadWorkerHeartbeatInput
 ): Promise<WorkerHeartbeatSnapshot> {
   const threshold = input.heartbeatThresholdSeconds ?? 30;
+  // DL7-F1: the pin is checked before the token is read and before any request
+  // is attempted, and it is NOT swallowed into UNKNOWN below — a policy that
+  // names another host is a refusal to act on, not an unavailable probe.
+  assertLoopbackUrl(input.workerListUrl);
   if (input.tokenPath === undefined) return unknown(input, threshold);
   try {
-    const token = (await (input.readToken ?? readFile)(input.tokenPath, "utf8")).trim();
+    const token = (await (input.readToken ?? readCustodiedSecretFile)(input.tokenPath)).trim();
     if (token.length === 0) return unknown(input, threshold);
     const response = await (input.fetch ?? globalThis.fetch)(input.workerListUrl, {
       method: "GET",

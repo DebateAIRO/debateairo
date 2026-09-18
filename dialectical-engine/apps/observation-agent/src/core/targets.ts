@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { ObservationError } from "./errors.js";
+import { isLoopbackUrl, OBSERVATION_URL_NOT_LOOPBACK } from "./loopback.js";
 import { OBSERVATION_COMPONENTS, type ModuleConfigurationObject, type ModuleTargetFragment } from "./types.js";
 
 const componentSchema = z.enum(OBSERVATION_COMPONENTS);
@@ -9,6 +10,10 @@ const expectedSchema = z.enum(["always", "when_dev_stack", "never"]);
 const safePath = z.string().min(1).max(1_024)
   .regex(/^[A-Za-z0-9_@+./-]+$/u)
   .refine((value) => !value.split("/").includes(".."));
+// DL7-F1: a target URL is a place the agent will send the Hatchet tenant token,
+// so a repo fragment may only name this host — `z.string().url()` alone admitted
+// `https://attacker.example/x`.
+const loopbackUrl = z.string().url().refine(isLoopbackUrl, { message: OBSERVATION_URL_NOT_LOOPBACK });
 const dockerTargetSchema = z.object({
   component: componentSchema,
   kind: z.literal("docker")
@@ -27,14 +32,14 @@ const postgresTargetSchema = z.object({
 const hatchetTargetSchema = z.object({
   component: z.literal("hatchet"),
   kind: z.literal("hatchet"),
-  live_url: z.string().url(),
-  ready_url: z.string().url(),
+  live_url: loopbackUrl,
+  ready_url: loopbackUrl,
   container: z.string().min(1)
 }).strict();
 const httpTargetSchema = z.object({
   component: componentSchema,
   kind: z.literal("http"),
-  live_url: z.string().url(),
+  live_url: loopbackUrl,
   expected: expectedSchema.optional()
 }).strict();
 const processTargetSchema = z.object({
@@ -62,8 +67,8 @@ const certificateTargetSchema = z.object({
 const hatchetMetricsTargetSchema = z.object({
   component: z.literal("hatchet"),
   kind: z.literal("hatchet_metrics"),
-  rest_url: z.string().url(),
-  prometheus_url: z.string().url().optional()
+  rest_url: loopbackUrl,
+  prometheus_url: loopbackUrl.optional()
 }).strict();
 
 export const observationTargetSchema = z.discriminatedUnion("kind", [
@@ -150,6 +155,12 @@ export async function loadObservationTargetCatalog(directory: string): Promise<O
     });
   } catch (error) {
     if (error instanceof ObservationError) throw error;
+    // A loopback refusal keeps its own code: "this fragment names another host"
+    // must not read as "this fragment is malformed" (DL7-F1).
+    if (error instanceof z.ZodError
+      && error.issues.some((issue) => issue.message === OBSERVATION_URL_NOT_LOOPBACK)) {
+      throw new ObservationError(OBSERVATION_URL_NOT_LOOPBACK, error);
+    }
     throw new ObservationError("OBSERVATION_TARGETS_INVALID", error);
   }
 }

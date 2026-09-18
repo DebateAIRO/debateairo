@@ -3,6 +3,11 @@ import { join } from "node:path";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { ObservationError } from "../../core/errors.js";
+import {
+  isLoopbackUrl,
+  looksLikeAbsoluteUrl,
+  OBSERVATION_URL_NOT_LOOPBACK
+} from "../../core/loopback.js";
 import { SEVERITIES, type Severity } from "../../core/signals.js";
 import {
   OBSERVATION_COMPONENTS,
@@ -39,7 +44,14 @@ interface ModuleThresholdObject {
 
 type ModuleThresholdValue = string | number | boolean
   | readonly ModuleThresholdValue[] | ModuleThresholdObject;
-const safeModuleString = z.string().min(1).max(512).regex(/^[A-Za-z0-9_@.:/+%=-]+$/u);
+// DL7-F1: the string grammar admits a URL, and a URL-valued module threshold is
+// a place the daemon will send the Hatchet tenant token. A ratified policy may
+// therefore only name this host — the grammar alone let `https://example.org/w`
+// through, and the daemon's own DB role can write that row.
+const safeModuleString = z.string().min(1).max(512).regex(/^[A-Za-z0-9_@.:/+%=-]+$/u)
+  .refine((value) => !looksLikeAbsoluteUrl(value) || isLoopbackUrl(value), {
+    message: OBSERVATION_URL_NOT_LOOPBACK
+  });
 const moduleThresholdValueSchema: z.ZodType<ModuleThresholdValue> = z.lazy(() => z.union([
   z.number().finite(), z.boolean(), safeModuleString,
   z.array(moduleThresholdValueSchema),
