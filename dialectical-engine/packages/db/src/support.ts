@@ -1420,11 +1420,24 @@ async function lockShredTargetRows(
     ORDER BY case_id
     FOR UPDATE
   `, [caseIds])).rows;
+  // DL2-F1: a plain SELECT, deliberately. `SELECT ... FOR UPDATE` needs UPDATE on
+  // at least one column of the relation, and support.shred_audit is append-only
+  // for the only principal that ever runs a shred: 0054:875 grants
+  // debateai_support SELECT and INSERT there, and the boot attestation
+  // (assertSupportDatabaseRole, below) refuses any UPDATE grant on it — so the
+  // lock clause made every shredOwner/shredSession abort with 42501, and the
+  // suite only passed because it ran as the embedded superuser. Widening the
+  // grant would end the table's append-only promise; the lock is not needed:
+  // both entry points already hold the owner or session advisory lock for the
+  // whole transaction (lockSupportOwners / lockSupportSessions above, which are
+  // keyed on exactly the (target_kind, target_ref) pair read here), and a second
+  // writer that somehow got past them fails closed on
+  // support_shred_audit_target_unique UNIQUE (target_kind, target_ref) (0054:257)
+  // at the INSERT in destroyLockedShredTarget.
   const audit = (await client.query<ShredAuditRow>(`
     SELECT at,os_user,target_kind,target_ref,keys_destroyed
     FROM support.shred_audit
     WHERE target_kind=$1 AND target_ref=$2
-    FOR UPDATE
   `, [targetKind, targetRef])).rows[0];
   return { sessions, cases, sessionKeys, caseKeys, audit };
 }

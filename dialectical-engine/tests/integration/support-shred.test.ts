@@ -6,6 +6,7 @@ import type { Pool, PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   assertSupportKeyCoverage,
+  createPool,
   lockSupportOwners,
   lockSupportSessions,
   migrate,
@@ -1070,5 +1071,180 @@ describe("SUP-07 transactional shred boundary", () => {
       "DELETE FROM support.shred_audit WHERE target_kind='owner' AND target_ref=$1", [auditOwner]
     );
     await database.pool.query("ALTER TABLE support.shred_audit ENABLE TRIGGER USER");
+  });
+});
+
+/**
+ * DL2-F1. Every other test in this file drives the shred through
+ * `database.pool`, whose connections are the embedded cluster's initdb
+ * superuser (tests/support/testDatabase.ts:86-90,113). The only principal that
+ * ever runs `pnpm support:shred` in dev or production is `debateai_support`
+ * (apps/runner/src/support-shred-cli.ts:117-130 through
+ * support-status-cli-credentials.ts:122,158), which holds SELECT+INSERT on
+ * support.shred_audit and nothing else — the boot attestation
+ * (packages/db/src/support.ts:2386-2402) refuses any UPDATE grant there. So the
+ * suite proved a path no real caller can take.
+ */
+describe("SUP-07 shred under the attested support principal (DL2-F1)", () => {
+  async function supportRolePool(): Promise<Pool> {
+    const pool = createPool(database.connectionString);
+    pool.on("connect", (client) => {
+      // Queued on the client before any later query, so every connection this
+      // pool hands out has already dropped to the capability role.
+      void client.query("SET ROLE debateai_support");
+    });
+    const role = await pool.query<{ current_user: string }>("SELECT current_user");
+    expect(role.rows[0]?.current_user).toBe("debateai_support");
+    return pool;
+  }
+
+  it("completes an owner shred and an anonymous session shred as debateai_support", async () => {
+    const ownerRef = randomUUID();
+    const ownerSession = randomUUID();
+    const ownerCase = randomUUID();
+    await seedShredTarget({ ownerRef, sessionId: ownerSession, caseId: ownerCase });
+    const anonymousSession = randomUUID();
+    await seedShredTarget({ sessionId: anonymousSession });
+
+    const pool = await supportRolePool();
+    try {
+      const repository = new PostgresSupportShredRepository(pool);
+      await expect(repository.shredOwner(ownerRef, "vitest", at)).resolves.toEqual({
+        kind: "SHREDDED", counts: { sessions: 1, cases: 1, keysDestroyed: 2 }
+      });
+      await expect(repository.shredOwner(ownerRef, "vitest", at))
+        .resolves.toEqual({ kind: "ALREADY_SHREDDED" });
+      await expect(repository.shredSession(anonymousSession, "vitest", at)).resolves.toEqual({
+        kind: "SHREDDED", counts: { sessions: 1, cases: 0, keysDestroyed: 1 }
+      });
+      await expect(repository.shredSession(anonymousSession, "vitest", at))
+        .resolves.toEqual({ kind: "ALREADY_SHREDDED" });
+    } finally {
+      await pool.end();
+    }
+
+    const audits = await database.pool.query<{ target_kind: string; keys_destroyed: number }>(`
+      SELECT target_kind,keys_destroyed FROM support.shred_audit
+      WHERE target_ref=ANY($1::text[]) ORDER BY target_kind
+    `, [[ownerRef, anonymousSession]]);
+    expect(audits.rows).toEqual([
+      { target_kind: "owner", keys_destroyed: 2 },
+      { target_kind: "session", keys_destroyed: 1 }
+    ]);
+    await expect(assertSupportKeyCoverage(database.pool)).resolves.toBeUndefined();
+  });
+
+  it("holds no UPDATE on support.shred_audit, so no lock clause there may need one", async () => {
+    // The grant the fix must NOT widen: SELECT ... FOR UPDATE needs UPDATE on at
+    // least one column, and 0054:875 gives the role only SELECT and INSERT.
+    const privileges = await database.pool.query<{
+      table_update: boolean; any_column_update: boolean; select: boolean; insert: boolean;
+    }>(`
+      SELECT pg_catalog.has_table_privilege('debateai_support','support.shred_audit','UPDATE') AS table_update,
+        EXISTS (
+          SELECT 1 FROM pg_catalog.pg_attribute AS attribute
+          WHERE attribute.attrelid='support.shred_audit'::regclass
+            AND attribute.attnum>0 AND NOT attribute.attisdropped
+            AND pg_catalog.has_column_privilege(
+              'debateai_support','support.shred_audit',attribute.attname,'UPDATE'
+            )
+        ) AS any_column_update,
+        pg_catalog.has_table_privilege('debateai_support','support.shred_audit','SELECT') AS select,
+        pg_catalog.has_table_privilege('debateai_support','support.shred_audit','INSERT') AS insert
+    `);
+    expect(privileges.rows[0]).toEqual({
+      table_update: false, any_column_update: false, select: true, insert: true
+    });
+
+    const pool = await supportRolePool();
+    try {
+      await expect(pool.query("SELECT 1 FROM support.shred_audit FOR UPDATE"))
+        .rejects.toMatchObject({ code: "42501" });
+      await expect(pool.query("SELECT 1 FROM support.shred_audit")).resolves.toBeDefined();
+      // The four locks the shred still takes are all on relations that do carry a
+      // column-level UPDATE grant, so they stay legal for this principal.
+      for (const relation of [
+        "support.session", "support.\"case\"", "support.session_key", "support.case_key"
+      ]) {
+        await expect(pool.query(`SELECT 1 FROM ${relation} FOR UPDATE`)).resolves.toBeDefined();
+      }
+    } finally {
+      await pool.end();
+    }
+  });
+
+  it("locks no support relation that the attested role cannot UPDATE", async () => {
+    // The regression pin for the whole class: a row lock is a write intent, and
+    // PostgreSQL refuses SELECT ... FOR UPDATE/SHARE without UPDATE on at least
+    // one column. Every lock clause in the repository is resolved back to the
+    // relations it names and compared with the column-level UPDATE grants
+    // 0054:882-885 makes, so the next lock clause on an append-only relation
+    // fails here instead of in production.
+    const source = await readFile(
+      new URL("../../packages/db/src/support.ts", import.meta.url), "utf8"
+    );
+    const lockClause = /FOR\s+(?:NO\s+KEY\s+)?(?:UPDATE|KEY\s+SHARE|SHARE)(?:\s+OF\s+([A-Za-z_,\s"\\]+?))?\s*(?:`|"|\n)/gu;
+    const locked = new Set<string>();
+    let found = 0;
+    for (const match of source.matchAll(lockClause)) {
+      const start = source.slice(0, match.index).search(/SELECT[^;]*$/u);
+      if (start < 0) continue;
+      found += 1;
+      const span = source.slice(start, match.index);
+      const relations = new Map<string, string>();
+      for (const reference of span.matchAll(
+        /support\.\\?"?([a-z_]+)\\?"?(?:\s+AS\s+([a-z_]+))?/gu
+      )) {
+        const relation = `support.${reference[1]!}`;
+        relations.set(reference[2] ?? reference[1]!, relation);
+      }
+      const named = match[1]?.split(",").map((entry) => entry.trim().replaceAll(/[\\"]/gu, ""));
+      for (const [alias, relation] of relations) {
+        if (named === undefined || named.includes(alias)) locked.add(relation);
+      }
+    }
+    expect(found).toBeGreaterThanOrEqual(6);
+    const grants = await database.pool.query<{ relation: string }>(`
+      SELECT DISTINCT 'support.' || relation.relname AS relation
+      FROM pg_catalog.pg_class AS relation
+      JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid=relation.relnamespace
+      JOIN pg_catalog.pg_attribute AS attribute ON attribute.attrelid=relation.oid
+      WHERE namespace.nspname='support' AND relation.relkind IN ('r','p')
+        AND attribute.attnum>0 AND NOT attribute.attisdropped
+        AND pg_catalog.has_column_privilege(
+          'debateai_support',relation.oid,attribute.attname,'UPDATE'
+        )
+    `);
+    const updatable = new Set(grants.rows.map(({ relation }) => relation));
+    expect([...locked].sort()).toEqual([
+      "support.case", "support.case_key", "support.session", "support.session_key"
+    ]);
+    for (const relation of locked) {
+      expect(updatable.has(relation), `${relation} is locked but not UPDATE-able`).toBe(true);
+    }
+    expect(locked.has("support.shred_audit")).toBe(false);
+  });
+
+  it("serialises two concurrent owner shreds on the advisory lock and the audit UNIQUE", async () => {
+    // What replaces the dropped FOR UPDATE: lockSupportOwners/lockSupportSessions
+    // (packages/db/src/support.ts:356-368) plus
+    // support_shred_audit_target_unique (0054:257).
+    const ownerRef = randomUUID();
+    await seedShredTarget({ ownerRef, sessionId: randomUUID() });
+    const pool = await supportRolePool();
+    try {
+      const repository = new PostgresSupportShredRepository(pool);
+      const outcomes = await Promise.all([
+        repository.shredOwner(ownerRef, "vitest", at),
+        repository.shredOwner(ownerRef, "vitest", at)
+      ]);
+      expect(outcomes.filter(({ kind }) => kind === "SHREDDED")).toHaveLength(1);
+      expect(outcomes.filter(({ kind }) => kind === "ALREADY_SHREDDED")).toHaveLength(1);
+    } finally {
+      await pool.end();
+    }
+    expect((await database.pool.query<{ count: number }>(
+      "SELECT count(*)::int AS count FROM support.shred_audit WHERE target_ref=$1", [ownerRef]
+    )).rows).toEqual([{ count: 1 }]);
   });
 });
