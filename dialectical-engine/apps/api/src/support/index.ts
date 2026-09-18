@@ -987,6 +987,17 @@ export function installSupportRoutes(
     }
   );
 
+  /**
+   * DL1-F4. This route is anonymous by design, for the help widget. It used to
+   * echo `configuration` verbatim — the internal model ref, every limiter
+   * threshold, the snapshot sha and the register version — beside daily spend,
+   * token totals, open sessions, new cases and the deflection ratios, handing
+   * an unauthenticated caller the exact tuning of the subsystem's own controls.
+   * The body is now the four fields the widget reads
+   * (`apps/ui/components/support/Assistant.tsx`); the operator view stays whole
+   * in `apps/runner/src/support-status-cli.ts`, which reads the database
+   * directly and needs no HTTP route.
+   */
   api.get("/v1/support/status", policy("GET /v1/support/status"), async (_request, reply) => {
     if (application === undefined) return unavailable(reply);
     const [configuration, support, knowledge] = await Promise.all([
@@ -995,25 +1006,10 @@ export function installSupportRoutes(
       application.knowledge.status()
     ]);
     return reply.send({
-      configuration,
-      calls_today: support.callsToday,
-      calls_last_7_days: support.callsLast7Days ?? support.callsToday,
-      input_tokens_today: support.inputTokensToday ?? null,
-      output_tokens_today: support.outputTokensToday ?? null,
-      cost_usd_today: support.costUsdToday ?? null,
-      input_tokens_last_7_days: support.inputTokensLast7Days ?? null,
-      output_tokens_last_7_days: support.outputTokensLast7Days ?? null,
-      cost_usd_last_7_days: support.costUsdLast7Days ?? null,
-      open_sessions: support.openSessions,
-      new_cases: support.newCases,
-      kb_version: knowledge.kbVersion,
-      kb_loaded: { shipped: knowledge.shipped, ignored: knowledge.ignored },
+      configuration: { kind: configuration.kind },
       relay_state: support.relayState ?? "AVAILABLE",
-      relay_unavailable_since: support.relayUnavailableSince?.toISOString() ?? null,
-      deflection_7_days: support.deflection7Days,
-      deflection_30_days: support.deflection30Days,
-      rating_resolution_7_days: support.ratingResolution7Days,
-      rating_resolution_30_days: support.ratingResolution30Days
+      kb_version: knowledge.kbVersion,
+      kb_loaded: { shipped: knowledge.shipped }
     });
   });
 }

@@ -1886,26 +1886,98 @@ describe("SUP-01 support routes", () => {
     await server.close();
   });
 
+  /**
+   * DL1-F4. The anonymous route echoed `configuration` verbatim — the internal
+   * model ref, every limiter threshold, the snapshot sha and the register
+   * version — next to daily spend, token totals, open sessions and new cases.
+   * The widget reads `configuration.kind`, `relay_state`, `kb_loaded.shipped`
+   * and `kb_version`; the operator keeps the full view in the status CLI.
+   */
+  it("discloses no model identity, limit, spend, or volume in public status", async () => {
+    const server = api(true,{
+      sessionPort: sessionPort({
+        status: async () => Object.freeze({
+          callsToday: 7,callsLast7Days: 40,
+          inputTokensToday: 900,outputTokensToday: 800,costUsdToday: 1.25,
+          inputTokensLast7Days: 9_000,outputTokensLast7Days: 8_000,costUsdLast7Days: 12.5,
+          openSessions: 3,newCases: 2,
+          relayState: "AVAILABLE" as const,
+          deflection7Days: 0.5,deflection30Days: 0.5,
+          ratingResolution7Days: 0.5,ratingResolution30Days: 0.5
+        })
+      })
+    });
+    const response = await server.inject({ method: "GET",url: "/v1/support/status" });
+    await server.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      configuration: { kind: "AVAILABLE" },
+      relay_state: "AVAILABLE",
+      kb_version: KB_VERSION,
+      kb_loaded: { shipped: 12 }
+    });
+    const names = new Set<string>();
+    const walk = (value: unknown): void => {
+      if (typeof value !== "object" || value === null) return;
+      for (const [name,nested] of Object.entries(value as Record<string,unknown>)) {
+        names.add(name);
+        walk(nested);
+      }
+    };
+    walk(response.json());
+    for (const forbidden of [
+      "supportModelRef","supportEnabled","supportDailyCallCap","supportRelayConcurrency",
+      "supportQueueDepth","supportLockAfterInjections","supportIpCooldownMinutes",
+      "supportLimitAnonMessages10m","supportLimitAnonMessages24h","supportLimitAnonSessions1h",
+      "supportLimitSessionMessages","supportLimitMessageCharacters",
+      "supportLimitAccountMessages10m","supportLimitAccountMessages24h",
+      "supportRetentionPolicy","supportRetentionRatifiedBy",
+      "snapshot","values","supportSnapshotSha256","fullSnapshotSha256","supportRegisterVersion",
+      "schemaVersion","recordedAt","code",
+      "calls_today","calls_last_7_days","cost_usd_today","cost_usd_last_7_days",
+      "input_tokens_today","output_tokens_today",
+      "input_tokens_last_7_days","output_tokens_last_7_days",
+      "open_sessions","new_cases","relay_unavailable_since",
+      "deflection_7_days","deflection_30_days",
+      "rating_resolution_7_days","rating_resolution_30_days"
+    ]) {
+      expect([...names],`disclosed ${forbidden}`).not.toContain(forbidden);
+    }
+    for (const secret of [
+      DEFAULT_CONFIGURATION.supportModelRef,"b".repeat(64),"c".repeat(64),
+      "9007199254740992","1.25","12.5"
+    ]) {
+      expect(response.body,`disclosed ${secret}`).not.toContain(secret);
+    }
+  });
+
+  /**
+   * DL1-F4 removed `calls_today` (volume) and `kb_loaded.ignored` (unread by
+   * the widget) from this pin; what the route composes from its three ports is
+   * still asserted, through the fields the widget consumes.
+   */
   it("composes public status from register, KB, and support repository ports", async () => {
     const server = api(true);
     const response = await server.inject({ method: "GET", url: "/v1/support/status" });
-    const callsToday = Number((await database.pool.query<{ count: string }>(`
-      SELECT count(*)::text AS count FROM support.message
-      WHERE role='assistant'
-        AND model_called
-        AND received_at >= date_trunc('day',statement_timestamp())
-    `)).rows[0]?.count);
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({
-      calls_today: callsToday,
+    expect(response.json()).toEqual({
+      configuration: { kind: "AVAILABLE" },
       kb_version: KB_VERSION,
-      kb_loaded: { shipped: 12, ignored: 1 },
+      kb_loaded: { shipped: 12 },
       relay_state: "AVAILABLE"
     });
     await server.close();
   });
 
-  it("projects exact nullable deflection and rating-resolution status fields", async () => {
+  /**
+   * DL1-F4 turned this pin inside out: the deflection and rating-resolution
+   * ratios are operational volume, so the anonymous route must not project
+   * them at all. Their exact nullable arithmetic stays pinned on the
+   * repository itself in tests/integration/support-metrics.test.ts, and the
+   * operator still reads them through apps/runner/src/support-status-cli.ts.
+   */
+  it("keeps deflection and rating-resolution ratios out of public status", async () => {
     const server = api(true,{
       sessionPort: sessionPort({
         status: async () => Object.freeze({
@@ -1917,10 +1989,10 @@ describe("SUP-01 support routes", () => {
     });
     const response = await server.inject({ method: "GET",url: "/v1/support/status" });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({
-      deflection_7_days: null,deflection_30_days: 0.625,
-      rating_resolution_7_days: 0.5,rating_resolution_30_days: null
-    });
+    expect(Object.keys(response.json()).sort())
+      .toEqual(["configuration","kb_loaded","kb_version","relay_state"]);
+    expect(response.body).not.toContain("0.625");
+    expect(response.body).not.toContain("0.5");
     await server.close();
   });
 
