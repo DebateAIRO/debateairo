@@ -406,7 +406,14 @@ export const AnswerSummarySchema = z.object({
   serve_state: z.enum(["COMPOSED", "RECOMPOSED_ONCE", "COMPONENTS_ONLY"]),
   staleness_state: StalenessStateSchema,
   builds_on_previous: z.boolean(),
-  created_at_sequence: z.number().int().positive()
+  created_at_sequence: z.number().int().positive(),
+  // DL3-F2: the library row states the model lineage that made it, exactly as
+  // PublicDebateSummarySchema.models does for a published debate. The index
+  // query already reads every answer projection it summarises, so this costs
+  // nothing there and removes the home page's per-row full answer read.
+  // Optional, never invented: a row with no recorded maker lineage says so by
+  // omission rather than by an empty claim about what ran.
+  models: z.array(z.string().trim().min(1)).optional()
 }).strict();
 export const OpenRunSummarySchema = z.object({
   run_ref: z.string().min(1),

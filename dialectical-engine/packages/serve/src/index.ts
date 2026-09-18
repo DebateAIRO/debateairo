@@ -2971,7 +2971,14 @@ export class ServeRepository {
           serve_state: answer.serve_state,
           staleness_state: answer.staleness_state,
           builds_on_previous: answer.builds_on_previous.value,
-          created_at_sequence: Number(row.created_at_sequence)
+          created_at_sequence: Number(row.created_at_sequence),
+          // DL3-F2: the row's own model lineage, derived here from the
+          // projection this query has already decrypted and read. The library
+          // page used to fetch each of these answers a second time, one full
+          // decrypting read per row, purely to colour a model dot.
+          models: [...new Set(answer.nodes.flatMap((node) =>
+            node.maker_lineage === null ? [] : [node.maker_lineage.model_id]
+          ))]
         }]),
         open_runs: openRuns.flatMap(({ row, projection }) => projection === null ? [] : [{
           run_ref: projection.runRef,

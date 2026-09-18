@@ -556,7 +556,9 @@ export function debateSummariesFromIndex(index: AnswerIndex): DebateSummary[] {
     status: "complete",
     created_at: "",
     completed_at: null,
-    models: [],
+    // DL3-F2: the index row states its own lineage now; an older row that does
+    // not is typed absence, never a model this seam invented.
+    models: item.models === undefined ? [] : [...item.models],
     created_at_sequence: item.created_at_sequence,
     terminal_reason: null
   }));
