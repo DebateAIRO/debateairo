@@ -5407,6 +5407,19 @@ export function runnerTerminalFailureReason(error: unknown): string {
   return `RUNNER_EXECUTION_FAILED:${operationalDiagnosticOf(error)}`;
 }
 
+/**
+ * DL4-F1: whatever the task throws, the Hatchet SDK serialises its {message, stack} into
+ * Hatchet's own store and to stderr — outside the AEAD boundary. A typed failure keeps its
+ * code (the terminal vocabulary the callers and tests rely on) and loses its text; anything
+ * else leaves as the bounded operational diagnostic. No cause, no foreign stack frames.
+ */
+function scrubbedTaskFailure(error: unknown): TypedDomainError {
+  const code = error instanceof TypedDomainError ? error.code : runnerTerminalFailureReason(error);
+  const scrubbed = new TypedDomainError(code, code);
+  scrubbed.stack = `${scrubbed.name}: ${code}`;
+  return scrubbed;
+}
+
 export function declareHatchetWalkingSkeletonTask(input: {
   readonly client: Pick<Hatchet, "task">;
   readonly runner: WalkingSkeletonRunner;
@@ -5435,7 +5448,7 @@ export function declareHatchetWalkingSkeletonTask(input: {
         if (!recorded) {
           throw new TypedDomainError("RUNNER_FAILURE_STATE_NOT_RECORDED", dispatch.workItemId);
         }
-        throw error;
+        throw scrubbedTaskFailure(error);
       }
     }
   });

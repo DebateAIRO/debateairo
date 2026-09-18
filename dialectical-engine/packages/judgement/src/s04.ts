@@ -132,11 +132,29 @@ function firstBalancedObject(text: string): string | null {
   return null;
 }
 
+/**
+ * DL4-F1: a schema failure names the issue CODES and PATHS only. zod's own message embeds
+ * the received values and the unrecognised keys - the model's text - and that message used
+ * to travel into ledger parse_error columns, Hatchet failure payloads and stderr, outside
+ * the AEAD boundary. Paths are the schema's names (and array indices); nothing the model
+ * wrote is copied. Bounded so a pathological issue list cannot grow the message either.
+ */
+const MAX_SCHEMA_FAILURE_MESSAGE_CHARS = 512;
+
+function schemaFailureMessage(error: z.ZodError): string {
+  const rendered = error.issues
+    .map((issue) => `${issue.code}@${issue.path.length === 0 ? "$" : issue.path.map(String).join(".")}`)
+    .join(",");
+  return rendered.length > MAX_SCHEMA_FAILURE_MESSAGE_CHARS
+    ? `${rendered.slice(0, MAX_SCHEMA_FAILURE_MESSAGE_CHARS - 1)}…`
+    : rendered;
+}
+
 function schemaResult<T>(decoded: unknown, strategy: "RAW" | "ONE_FENCE" | "BRACE_BALANCED", schema: z.ZodType<T>): ParseStructuredArtifactResult<T> {
   const parsed = schema.safeParse(decoded);
   return parsed.success
     ? Object.freeze({ kind: "PARSED", strategy, value: parsed.data })
-    : Object.freeze({ kind: "SCHEMA_FAILURE", message: parsed.error.message });
+    : Object.freeze({ kind: "SCHEMA_FAILURE", message: schemaFailureMessage(parsed.error) });
 }
 
 export function parseStructuredArtifact<T>(content: string, schema: z.ZodType<T>): ParseStructuredArtifactResult<T> {
