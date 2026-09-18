@@ -1,6 +1,25 @@
 const SUPPORT_API_PATH = /^\/api\/v1\/support(?:\/|$)/u;
 const CAPABILITY = /^[A-Za-z0-9_-]{43}$/u;
 
+/** A support request that failed with a status, kept so the status can be read. */
+export class SupportHttpError extends Error {
+  constructor(readonly status: number) {
+    super("SUPPORT_REQUEST_UNAVAILABLE");
+    this.name = "SupportHttpError";
+  }
+}
+
+/**
+ * DL3-F3: the API answers 404 for a session capability whose owner no longer
+ * matches the cookie — an identity change on a shared tab, an expiry, or a
+ * server-side lock. That is a stale session, not an outage, and the widget's
+ * answer is a new session rather than "Support is unavailable" forever (the
+ * compact surface has no "New conversation" control to escape with).
+ */
+export function isStaleSupportSession(failure: unknown): boolean {
+  return failure instanceof SupportHttpError && failure.status === 404;
+}
+
 function csrfToken(): string | null {
   if (typeof document === "undefined") return null;
   return document.cookie.split(";").flatMap((member) => {

@@ -272,7 +272,9 @@ apps/ui/components/support/CaseView.tsx
 apps/ui/components/support/ConsentToggle.tsx
 apps/ui/components/support/DebatePicker.tsx
 apps/ui/components/support/SupportWidget.tsx
+apps/ui/components/support/conversation.ts
 apps/ui/components/support/http.ts
+apps/ui/components/support/supportConversation.test.mjs
 apps/ui/content-security-policy.d.mts
 apps/ui/content-security-policy.mjs
 apps/ui/edge-upgrade.mjs

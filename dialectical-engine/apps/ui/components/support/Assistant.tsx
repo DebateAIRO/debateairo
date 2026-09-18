@@ -6,7 +6,16 @@ import { BrandMark } from "../TopBar.js";
 import { ModeToggle } from "../ModeToggle.js";
 import { ConsentToggle } from "./ConsentToggle.js";
 import { DebatePicker } from "./DebatePicker.js";
-import { supportPost } from "./http.js";
+import {
+  browserSupportConversationStorage,
+  clearStoredSupportConversation,
+  restoreSupportConversation,
+  writeStoredSupportConversation,
+  SUPPORT_CONVERSATION_STORAGE_KEY,
+  type SupportConversationMessage,
+  type SupportOwnContext
+} from "./conversation.js";
+import { isStaleSupportSession, supportPost, SupportHttpError } from "./http.js";
 
 export type SupportAssistantLanguage = "en" | "ro";
 export type SupportAssistantOutcome =
@@ -54,7 +63,7 @@ type SupportReply = Readonly<{
   caseAcknowledgement?: SupportCaseAcknowledgement;
 }>;
 type SupportSessionStart = SupportSession | SupportReply;
-type OwnContextSelection = Readonly<{ runId: string }> | Readonly<{ latest: true }>;
+type OwnContextSelection = SupportOwnContext;
 
 export type SupportAssistantClient = Readonly<{
   createSession(language: SupportAssistantLanguage): Promise<SupportSessionStart>;
@@ -182,7 +191,9 @@ async function readJson(response: Response): Promise<Record<string,unknown>> {
   const body = await response.json() as Record<string,unknown>;
   if (!response.ok
     && (typeof body.outcome !== "string" || typeof body.text !== "string")) {
-    throw new Error("SUPPORT_REQUEST_UNAVAILABLE");
+    // DL3-F3: the status travels with the failure so a stale session (404) can
+    // be told apart from an outage and recovered from instead of dead-ending.
+    throw new SupportHttpError(response.status);
   }
   return body;
 }
@@ -249,49 +260,9 @@ export const supportAssistantClient: SupportAssistantClient = Object.freeze({
   }
 });
 
-type ConversationMessage = Readonly<{
-  id: string;
-  role: "assistant" | "user";
-  text: string;
-  link?: string;
-  outcome?: SupportAssistantOutcome;
-}>;
+type ConversationMessage = SupportConversationMessage;
 
-export const SUPPORT_CONVERSATION_STORAGE_KEY = "debateai.support.conversation.v1";
-
-type StoredConversation = Readonly<{
-  language: SupportAssistantLanguage;
-  session: SupportSession | null;
-  messages: readonly ConversationMessage[];
-  ownContext: OwnContextSelection;
-}>;
-
-function readStoredConversation(): StoredConversation | null {
-  if (typeof sessionStorage === "undefined") return null;
-  try {
-    const raw = sessionStorage.getItem(SUPPORT_CONVERSATION_STORAGE_KEY);
-    if (raw === null) return null;
-    const value = JSON.parse(raw) as Partial<StoredConversation>;
-    if ((value.language !== "en" && value.language !== "ro")
-      || !Array.isArray(value.messages)
-      || !value.messages.every((message) => message !== null && typeof message === "object"
-        && typeof message.id === "string" && typeof message.text === "string"
-        && (message.role === "assistant" || message.role === "user"))) return null;
-    const session = value.session === null ? null
-      : value.session !== undefined && typeof value.session.sessionId === "string"
-        && typeof value.session.token === "string"
-        && typeof value.session.identityBound === "boolean" ? value.session : null;
-    const ownContext = value.ownContext !== undefined && "runId" in value.ownContext
-      && typeof value.ownContext.runId === "string"
-      ? { runId: value.ownContext.runId } as const : { latest: true } as const;
-    return Object.freeze({
-      language: value.language,session,
-      messages: Object.freeze(value.messages as ConversationMessage[]),ownContext
-    });
-  } catch {
-    return null;
-  }
-}
+export { SUPPORT_CONVERSATION_STORAGE_KEY };
 
 export function Assistant({
   client = supportAssistantClient,signedIn,onLanguageChange,initialContext,
@@ -306,16 +277,21 @@ export function Assistant({
   onClose?: () => void;
 }>) {
   const persistent = client === supportAssistantClient;
-  const [stored] = useState(() => persistent ? readStoredConversation() : null);
-  const [language,setLanguage] = useState<SupportAssistantLanguage>(stored?.language ?? "en");
-  const [session,setSession] = useState<SupportSession | null>(stored?.session ?? null);
-  const [messages,setMessages] = useState<readonly ConversationMessage[]>(stored?.messages ?? [
-    { id: "disclosure",role: "assistant",text: DISCLOSURE[stored?.language ?? "en"] }
+  const [language,setLanguage] = useState<SupportAssistantLanguage>("en");
+  // DL3-F3: the capability lives here and nowhere else. It is never written to
+  // sessionStorage, so it cannot outlive the page that minted it.
+  const [session,setSession] = useState<SupportSession | null>(null);
+  const [messages,setMessages] = useState<readonly ConversationMessage[]>([
+    { id: "disclosure",role: "assistant",text: DISCLOSURE.en }
   ]);
   const [busy,setBusy] = useState(false);
   const [identityAvailable,setIdentityAvailable] = useState(signedIn ?? false);
+  // DL3-F3: nothing stored is read back until the identity at the keyboard is
+  // known, so a signed-out first paint can never show a signed-in transcript.
+  const [identityResolved,setIdentityResolved] = useState(signedIn !== undefined);
+  const [restored,setRestored] = useState(false);
   const [ownContext,setOwnContext] = useState<OwnContextSelection>(
-    initialContext ?? stored?.ownContext ?? { latest: true }
+    initialContext ?? { latest: true }
   );
   const [activeTopic,setActiveTopic] = useState("reading");
   const [contextOpen,setContextOpen] = useState(false);
@@ -331,23 +307,46 @@ export function Assistant({
     onLanguageChange?.(language);
   },[language,onLanguageChange]);
 
+  // DL3-F3: the transcript is restored once, against the identity that produced
+  // it. A transcript belonging to anyone else is erased on the way past.
   useEffect(() => {
-    if (!persistent || typeof sessionStorage === "undefined") return;
-    sessionStorage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY,JSON.stringify({
-      language,session,messages,ownContext
-    }));
-  },[language,messages,ownContext,persistent,session]);
+    if (!persistent || restored || !identityResolved) return;
+    setRestored(true);
+    const conversation = restoreSupportConversation(
+      browserSupportConversationStorage(),identityAvailable
+    );
+    if (conversation === null) return;
+    setLanguage(conversation.language);
+    if (conversation.messages.length > 0) setMessages(conversation.messages);
+    if (initialContext === undefined) setOwnContext(conversation.ownContext);
+  },[identityAvailable,identityResolved,initialContext,persistent,restored]);
+
+  useEffect(() => {
+    if (!persistent || !restored) return;
+    writeStoredSupportConversation(browserSupportConversationStorage(),{
+      language,identityBound: identityAvailable,messages,ownContext
+    });
+  },[identityAvailable,language,messages,ownContext,persistent,restored]);
 
   useEffect(() => {
     if (signedIn !== undefined) {
       setIdentityAvailable(signedIn);
+      setIdentityResolved(true);
+      return;
+    }
+    if (client.isSignedIn === undefined) {
+      setIdentityResolved(true);
       return;
     }
     let active = true;
-    void client.isSignedIn?.().then((available) => {
-      if (active) setIdentityAvailable(available);
+    void client.isSignedIn().then((available) => {
+      if (!active) return;
+      setIdentityAvailable(available);
+      setIdentityResolved(true);
     }).catch(() => {
-      if (active) setIdentityAvailable(false);
+      if (!active) return;
+      setIdentityAvailable(false);
+      setIdentityResolved(true);
     });
     return () => { active = false; };
   },[client,signedIn]);
@@ -399,9 +398,7 @@ export function Assistant({
     setActiveTopic("reading");
     setContextOpen(false);
     if (inputRef.current !== null) inputRef.current.value = "";
-    if (persistent && typeof sessionStorage !== "undefined") {
-      sessionStorage.removeItem(SUPPORT_CONVERSATION_STORAGE_KEY);
-    }
+    if (persistent) clearStoredSupportConversation(browserSupportConversationStorage());
   }
 
   function appendReply(response: SupportReply): void {
@@ -420,7 +417,7 @@ export function Assistant({
     ]);
   }
 
-  async function activeSession(): Promise<SupportSession | null> {
+  async function activeSession(discardCurrent = false): Promise<SupportSession | null> {
     let currentIdentity = identityAvailable;
     if (signedIn !== undefined) {
       currentIdentity = signedIn;
@@ -433,7 +430,9 @@ export function Assistant({
         setIdentityAvailable(false);
       }
     }
-    if (session !== null && session.identityBound === currentIdentity) return session;
+    if (!discardCurrent && session !== null && session.identityBound === currentIdentity) {
+      return session;
+    }
     const started = await client.createSession(language);
     if (isSupportReply(started)) {
       appendReply(started);
@@ -441,6 +440,27 @@ export function Assistant({
     }
     setSession(started);
     return started;
+  }
+
+  /**
+   * DL3-F3: one attempt, and if the API says the capability is unknown (404 —
+   * a stale identity-bound session on a shared tab, an expiry, a lock) one
+   * retry on a brand-new session. Without this the compact widget answered
+   * "Support is unavailable" for the life of the tab, with no reset control.
+   */
+  async function withSupportSession<T>(
+    run: (active: SupportSession) => Promise<T>
+  ): Promise<T | null> {
+    const active = await activeSession();
+    if (active === null) return null;
+    try {
+      return await run(active);
+    } catch (failure) {
+      if (!isStaleSupportSession(failure)) throw failure;
+      setSession(null);
+      const fresh = await activeSession(true);
+      return fresh === null ? null : await run(fresh);
+    }
   }
 
   async function sendRequest(rawRequest: string,clearComposer?: () => void): Promise<void> {
@@ -452,12 +472,10 @@ export function Assistant({
       id: `user-${current.length}`,role: "user",text: request
     }]);
     try {
-      const active = await activeSession();
-      if (active === null) return;
-      const response = isOwnContextRequest(request)
-        ? await client.sendMessage(active,request,language,ownContext)
-        : await client.sendMessage(active,request,language);
-      appendReply(response);
+      const response = await withSupportSession((active) => isOwnContextRequest(request)
+        ? client.sendMessage(active,request,language,ownContext)
+        : client.sendMessage(active,request,language));
+      if (response !== null) appendReply(response);
     } catch {
       appendReply({ messageId: "",outcome: "DEGRADED",text: REQUEST_UNAVAILABLE[language] });
     } finally {
@@ -476,9 +494,8 @@ export function Assistant({
     if (busy) return;
     setBusy(true);
     try {
-      const active = await activeSession();
-      if (active === null) return;
-      const opened = await client.escalate(active,language);
+      const opened = await withSupportSession((active) => client.escalate(active,language));
+      if (opened === null) return;
       if (isSupportReply(opened)) {
         appendReply(opened);
       } else {
@@ -515,12 +532,11 @@ export function Assistant({
   }
 
   async function changeConsent(on: boolean): Promise<void> {
-    const active = await activeSession();
-    if (active === null) return;
-    if (client.setConsent === undefined) throw new Error("SUPPORT_CONSENT_UNAVAILABLE");
+    const setConsent = client.setConsent;
+    if (setConsent === undefined) throw new Error("SUPPORT_CONSENT_UNAVAILABLE");
     try {
-      const result = await client.setConsent(active,on);
-      if (result !== null) appendReply(result);
+      const result = await withSupportSession((active) => setConsent(active,on));
+      if (result !== null && result !== undefined) appendReply(result);
     } catch (error) {
       appendReply({ messageId: "",outcome: "DEGRADED",text: REQUEST_UNAVAILABLE[language] });
       throw error;
