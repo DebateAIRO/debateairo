@@ -317,7 +317,7 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
     ]);
   });
 
-  it("installs five statement markers and one deferred guard-only constraint trigger", async () => {
+  it("installs five deferred per-row scope guards and no global dirty marker", async () => {
     const triggers = await database.pool.query<{
       trigger_name: string;
       relation_name: string;
@@ -334,21 +334,32 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
       WHERE namespace.nspname='support' AND NOT trigger.tgisinternal
       ORDER BY trigger.tgname
     `);
-    // 13 from 0054 (5 markers + 1 deferred guard + 7 content-v2 envelope triggers)
-    // plus the 32 DB1 / DL5-F2 guards migrations/0065_security_delta_guards.sql
+    // 7 content-v2 envelope triggers from 0054, plus the 5 deferred per-row scope
+    // guards and the 32 DL5-F2 guards that migrations/0065_security_delta_guards.sql
     // installs: reject_truncate on all 17 support relations, reject_mutation on the
-    // 9 append-only ones and reject_delete on the 6 never-deleted column-mutable ones.
-    expect(triggers.rows).toHaveLength(45);
+    // 9 append-only ones, reject_delete on the 6 never-deleted column-mutable ones.
+    expect(triggers.rows).toHaveLength(44);
+    // DB1 / DL2-F2 + DL5-F1: 0054's five AFTER ... FOR EACH STATEMENT dirty
+    // markers and the singleton constraint trigger they armed are gone. They were
+    // the global serialisation point (one row lock held to COMMIT for every
+    // support write) and the whole-schema re-scan at every commit. The invariant
+    // is now enforced per touched row, scoped to that row's session or shred
+    // target — see tests/integration/support-shred-scope-guard.test.ts.
     expect(triggers.rows.filter(({ trigger_name }) =>
       trigger_name === "support_shred_integrity_guard_trigger"
-    )).toEqual([expect.objectContaining({
-      relation_name: "_shred_integrity_guard",
-      deferrable: true,
-      initially_deferred: true,
-      definition: expect.stringContaining("UPDATE OF mutation_generation")
-    })]);
-    expect(triggers.rows.filter(({ trigger_name }) =>
-      trigger_name.startsWith("support_shred_dirty_"))).toHaveLength(5);
+        || trigger_name.startsWith("support_shred_dirty_"))).toEqual([]);
+    const scopeGuards = triggers.rows
+      .filter(({ trigger_name }) => trigger_name === "support_shred_row_guard")
+      .sort((left, right) => left.relation_name < right.relation_name ? -1 : 1);
+    expect(scopeGuards.map(({ relation_name }) => relation_name))
+      .toEqual(["case", "case_key", "session", "session_key", "shred_audit"]);
+    for (const guard of scopeGuards) {
+      expect(guard.deferrable, guard.relation_name).toBe(true);
+      expect(guard.initially_deferred, guard.relation_name).toBe(true);
+      expect(guard.definition, guard.relation_name)
+        .toContain("support.assert_shred_integrity_row()");
+      expect(guard.definition, guard.relation_name).toContain("FOR EACH ROW");
+    }
     expect(triggers.rows.filter(({ trigger_name }) =>
       trigger_name.includes("_content_v2_") || trigger_name.includes("_snapshot_v2_")
         || trigger_name.includes("_summary_v2_"))).toHaveLength(7);
@@ -405,6 +416,52 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
         support_execute: false,
         body_sha256: "538dac0a59a56771a1081636404cd2f9d6e32c0550ae465a0f8085dc02c55276"
       }
+    ]);
+    // 0054's two functions keep their bodies byte for byte — 0054:507-538 and
+    // 753-787 pin them by hash, and 0063:20-39 forbids replacing another
+    // migration's function — they are simply unreachable now.
+    expect((await database.pool.query<{ count: number }>(`
+      SELECT count(*)::int AS count FROM pg_catalog.pg_trigger AS trigger
+      WHERE NOT trigger.tgisinternal AND trigger.tgfoid=ANY(ARRAY[
+        'support.mark_shred_integrity_dirty()'::regprocedure,
+        'support.assert_shred_integrity()'::regprocedure
+      ])
+    `)).rows[0]?.count).toBe(0);
+
+    const scoped = await database.pool.query<{
+      proname: string; security_definer: boolean; configuration: string[];
+      public_execute: boolean; support_execute: boolean;
+    }>(`
+      SELECT procedure.proname,procedure.prosecdef AS security_definer,
+        procedure.proconfig AS configuration,
+        has_function_privilege('public',procedure.oid,'EXECUTE') AS public_execute,
+        has_function_privilege('debateai_support',procedure.oid,'EXECUTE') AS support_execute
+      FROM pg_catalog.pg_proc AS procedure
+      WHERE procedure.pronamespace='support'::regnamespace
+        AND procedure.proname IN ('assert_shred_integrity_row','assert_shred_integrity_scope')
+      ORDER BY procedure.proname
+    `);
+    expect(scoped.rows.map(({ proname }) => proname))
+      .toEqual(["assert_shred_integrity_row", "assert_shred_integrity_scope"]);
+    for (const row of scoped.rows) {
+      expect(row.security_definer, row.proname).toBe(true);
+      expect(row.public_execute, row.proname).toBe(false);
+      expect(row.support_execute, row.proname).toBe(false);
+      expect(row.configuration, row.proname).toContain("search_path=pg_catalog, pg_temp");
+      // Without this the plan cache re-creates the O(N) commit: a backend that
+      // first ran the guard against an empty support.session keeps a
+      // sequential-scan generic plan as the table grows.
+      expect(row.configuration, row.proname).toContain("plan_cache_mode=force_custom_plan");
+    }
+    expect((await database.pool.query<{ indexdef: string }>(`
+      SELECT indexdef FROM pg_catalog.pg_indexes
+      WHERE schemaname='support'
+        AND indexname IN ('support_session_identity_owner_ref_idx','support_case_session_id_idx')
+      ORDER BY indexname
+    `)).rows.map(({ indexdef }) => indexdef)).toEqual([
+      "CREATE INDEX support_case_session_id_idx ON support.\"case\" USING btree (session_id)",
+      "CREATE INDEX support_session_identity_owner_ref_idx ON support.session"
+        + " USING btree (identity_owner_ref) WHERE (identity_owner_ref IS NOT NULL)"
     ]);
   });
 
@@ -470,7 +527,7 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
     expect(restored).toEqual({ destroyed_at: null, zero: false });
   });
 
-  it("revalidates every dirty generation after an early constraint flush", async () => {
+  it("revalidates the touched scope after an early constraint flush", async () => {
     const sessionId = randomUUID();
     await createSessionPair({ sessionId, fill: 4 });
     const client = await database.pool.connect();
@@ -481,23 +538,19 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
         "UPDATE support.session SET shredded_at=shredded_at WHERE session_id=$1",
         [sessionId]
       );
-      await client.query(
-        "SET CONSTRAINTS support.support_shred_integrity_guard_trigger IMMEDIATE"
-      );
+      await client.query("SET CONSTRAINTS support.support_shred_row_guard IMMEDIATE");
       expect((await client.query<{ count: string }>(`
         SELECT current_setting('debateai.support_shred_validation_count') AS count
       `)).rows[0]?.count).toBe("1");
-      await client.query(
-        "SET CONSTRAINTS support.support_shred_integrity_guard_trigger DEFERRED"
-      );
+      await client.query("SET CONSTRAINTS support.support_shred_row_guard DEFERRED");
       await client.query(`UPDATE support.session_key
         SET wrapped_key=decode(repeat('00',61),'hex'),destroyed_at=$2 WHERE session_id=$1`,
       [sessionId, at]);
       await expect(client.query(
-        "SET CONSTRAINTS support.support_shred_integrity_guard_trigger IMMEDIATE"
+        "SET CONSTRAINTS support.support_shred_row_guard IMMEDIATE"
       )).rejects.toThrow("SUPPORT_SHRED_INTEGRITY_INVALID");
-      await client.query("ROLLBACK").catch(() => undefined);
     } finally {
+      await client.query("ROLLBACK").catch(() => undefined);
       client.release();
     }
   });
@@ -555,7 +608,7 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
     }
   });
 
-  it("runs one scan per dirty generation including a later valid generation", async () => {
+  it("runs one scoped check per touched row, not one whole-schema scan", async () => {
     const first = randomUUID();
     const second = randomUUID();
     const client = await database.pool.connect();
@@ -565,9 +618,11 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
       await insertSessionPair(client, { sessionId: first, fill: 7 });
       await insertSessionPair(client, { sessionId: second, fill: 8 });
       await client.query("SET CONSTRAINTS ALL IMMEDIATE");
+      // Two sessions x (session row + key row) = four scope checks, each one
+      // session wide. 0054 counted one whole-schema scan per dirty generation.
       expect((await client.query<{ count: string }>(`
         SELECT current_setting('debateai.support_shred_validation_count') AS count
-      `)).rows[0]?.count).toBe("1");
+      `)).rows[0]?.count).toBe("4");
       await client.query("SET CONSTRAINTS ALL DEFERRED");
       await client.query(`UPDATE support.session_key
         SET wrapped_key=decode(repeat('00',61),'hex'),destroyed_at=$1
@@ -581,9 +636,11 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
       ) SELECT $1,'vitest','session',session_id::text,1
         FROM support.session WHERE session_id=ANY($2::uuid[])`, [at, [first, second]]);
       await client.query("SET CONSTRAINTS ALL IMMEDIATE");
+      // Six more touched rows (2 keys + 2 sessions + 2 audit rows), six more
+      // scoped checks, and the transaction still commits: the invariant holds.
       expect((await client.query<{ count: string }>(`
         SELECT current_setting('debateai.support_shred_validation_count') AS count
-      `)).rows[0]?.count).toBe("2");
+      `)).rows[0]?.count).toBe("10");
       await client.query("COMMIT");
     } finally {
       await client.query("ROLLBACK").catch(() => undefined);

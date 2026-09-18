@@ -188,3 +188,401 @@ REVOKE EXECUTE ON FUNCTION register.claim_type_composition_map_is_valid(jsonb)
 -- apps/observation-agent and deploy/, which package DB1 may not touch.
 
 -- §4 -------------------------------------------------------------------------
+--
+-- DL2-F2 / DL5-F1. The shred-integrity invariant stays exactly as 0054 defined
+-- it; only its enforcement mechanism changes, from one global serialisation
+-- point plus a full-schema scan to a per-scope check.
+--
+-- What 0054 built: five AFTER ... FOR EACH STATEMENT triggers on
+-- support.session, session_key, "case", case_key and shred_audit, each calling
+-- support.mark_shred_integrity_dirty(), which UPDATEs the single row of
+-- support._shred_integrity_guard (0054:540-559). That UPDATE takes a row lock
+-- held to COMMIT, so EVERY writer in the support subsystem queues behind every
+-- other one, whatever rows it touched. The UPDATE then fires a DEFERRABLE
+-- INITIALLY DEFERRED constraint trigger which, at COMMIT, runs
+-- support.assert_shred_integrity() — a seven-branch EXISTS with a GROUP BY over
+-- ALL support.session and support."case" rows and correlated sub-queries over
+-- shred_audit x session, with no predicate on the rows the transaction actually
+-- touched (0054:588-680), against a table that has no index on
+-- identity_owner_ref. Measured on the audit's probe: 0.33 -> 0.76 ms per
+-- session+key commit as N went 300 -> 1200 (slope ~0.48 microseconds per
+-- existing session per commit; a trigger-free control table cost 0.13 ms), and
+-- a concurrent session INSERT sat in wait_event_type=Lock,
+-- wait_event=transactionid for 735 ms. Support rows are never deleted, and
+-- anonymous session creation is open to the internet, so N only grows: the
+-- subsystem's own availability decays with its own traffic.
+--
+-- What this file installs instead: one DEFERRABLE INITIALLY DEFERRED
+-- CONSTRAINT TRIGGER ... FOR EACH ROW on the same five relations, calling
+-- support.assert_shred_integrity_row(), which resolves the touched row to its
+-- SCOPE — one session, or the owner / anonymous-session target the shred audit
+-- is keyed on — and calls support.assert_shred_integrity_scope(), which runs
+-- 0054's seven branches restricted to that scope. Both functions are new and
+-- belong to this file; 0054's two functions are not redefined (their bodies are
+-- pinned by body hash at 0054:507-538 and 753-787, and the 0063:20-39 rule
+-- forbids replacing another migration's function), they are simply no longer
+-- reachable from a trigger.
+--
+-- Cross-transaction ordering is preserved, and moved from global to per scope.
+-- assert_shred_integrity_scope() opens by taking the scope's session rows
+-- FOR UPDATE, in session_id order, before it reads anything else. Two commits
+-- whose scopes overlap therefore still serialise exactly as the singleton made
+-- them, and the second one re-reads after the first commits and sees the
+-- violation (the 0054 regression the SUP-07 suite pins: an owner shred and a
+-- new session for that owner must not both commit). Two commits with disjoint
+-- scopes — the anonymous-session case that drives N — no longer meet at all.
+-- Deterministic lock order (ORDER BY session_id) keeps the guard deadlock-free.
+--
+-- Residual, deliberate and named: the singleton UPDATE also produced a
+-- first-updater-wins conflict under REPEATABLE READ and SERIALIZABLE for ANY
+-- pair of support writers. The scoped guard reproduces that only for
+-- overlapping scopes (via the row locks). No application path is affected:
+-- every support writer runs withSupportTransaction, i.e. READ COMMITTED
+-- (packages/db/src/support.ts:324-340), owner-bound session creation and the
+-- owner shred both hold the same per-owner advisory lock for the whole
+-- transaction (support.ts:390-398 and 1482-1489), and under SERIALIZABLE
+-- create()'s read of support.shred_audit against shredOwner()'s INSERT there is
+-- an rw-antidependency SSI aborts on its own.
+--
+-- support.session gets the index the full scan never had; it is partial because
+-- anonymous sessions (identity_owner_ref IS NULL) are the bulk and are never an
+-- owner scope.
+--
+-- Replay note for the migration ledger (B28 / DL5-F9): this file drops all six
+-- of 0054's guard triggers, so a standalone replay of 0054 — which
+-- tests/integration/support-shred.test.ts exercises, and which 0063:20-39
+-- records as legal in production — finds none of them, re-creates all six and
+-- passes its own contract. Both mechanisms then enforce the same invariant and
+-- the slow one is back until 0065 is replayed. Dropping only some of the six
+-- would instead abort that replay with SUPPORT_SHRED_DEFINITION_DRIFT.
+
+CREATE INDEX IF NOT EXISTS support_session_identity_owner_ref_idx
+  ON support.session (identity_owner_ref)
+  WHERE identity_owner_ref IS NOT NULL;
+
+-- The cases of a session were only reachable through support."case"'s primary
+-- key or the partial support_case_trigger_generation_unique index, so every
+-- `WHERE session_id = ...` — the scoped guard's, and lockShredTargetRows'
+-- (packages/db/src/support.ts:1401-1407) — planned as a sequential scan.
+CREATE INDEX IF NOT EXISTS support_case_session_id_idx
+  ON support."case" (session_id);
+
+CREATE OR REPLACE FUNCTION support.assert_shred_integrity_scope(
+  p_session_id uuid,
+  p_target_kind text,
+  p_target_ref text
+)
+RETURNS void
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+-- Measured, and the reason this line exists: plpgsql caches a generic plan for
+-- each statement in the body after a few calls, and a backend that first ran
+-- this guard against an empty support.session keeps a sequential-scan plan as
+-- the table grows — the O(N) commit this section exists to remove, re-created
+-- through the plan cache. (Probe: 0.449 ms/commit at N=200, 0.739 ms on the same
+-- pooled connection at N=2200, 0.400 ms on a fresh connection at the same N.)
+-- Every predicate here is a highly selective equality on one to a handful of
+-- ids, so re-planning per call is both correct and cheap, and its cost does not
+-- depend on N.
+SET plan_cache_mode = force_custom_plan
+AS $support_shred_scope_function$
+DECLARE
+  v_kind text := p_target_kind;
+  v_ref text := p_target_ref;
+  v_owner uuid;
+  v_anonymous uuid;
+  v_sessions uuid[];
+  v_invalid boolean;
+  v_count integer;
+BEGIN
+  IF p_session_id IS NULL AND v_kind IS NULL THEN
+    RETURN;
+  END IF;
+  IF v_kind IS NULL THEN
+    SELECT CASE WHEN scoped.identity_owner_ref IS NULL THEN 'session' ELSE 'owner' END,
+      CASE WHEN scoped.identity_owner_ref IS NULL
+        THEN scoped.session_id::text ELSE scoped.identity_owner_ref::text END
+    INTO v_kind, v_ref
+    FROM support.session AS scoped
+    WHERE scoped.session_id = p_session_id;
+  END IF;
+  IF v_kind = 'owner' THEN
+    v_owner := v_ref::uuid;
+  ELSIF v_kind = 'session' THEN
+    v_anonymous := v_ref::uuid;
+  END IF;
+
+  -- Collect the scope with one index lookup per source; never an OR over the
+  -- whole table, which would plan as a sequential scan and put the O(N) cost
+  -- straight back. session_id hits the primary key; identity_owner_ref hits the
+  -- partial index this file adds.
+  v_sessions := ARRAY[]::uuid[];
+  IF p_session_id IS NOT NULL THEN
+    v_sessions := v_sessions || p_session_id;
+  END IF;
+  IF v_anonymous IS NOT NULL THEN
+    v_sessions := v_sessions || v_anonymous;
+  END IF;
+  IF v_owner IS NOT NULL THEN
+    v_sessions := v_sessions || COALESCE((
+      SELECT array_agg(owned.session_id)
+      FROM support.session AS owned
+      WHERE owned.identity_owner_ref = v_owner
+    ), ARRAY[]::uuid[]);
+  END IF;
+  SELECT COALESCE(array_agg(DISTINCT member.session_id), ARRAY[]::uuid[])
+  INTO v_sessions
+  FROM pg_catalog.unnest(v_sessions) AS member(session_id);
+
+  -- The serialisation point, scoped: the rows of this scope are locked before
+  -- anything is read, in session_id order so the guard cannot deadlock with
+  -- itself, and as the definer (debateai_support holds only column UPDATEs
+  -- here, and none at all on shred_audit — see DL2-F1). Two commits whose
+  -- scopes overlap therefore still order exactly as the 0054 singleton made
+  -- them; two commits on unrelated sessions never meet.
+  PERFORM 1
+  FROM support.session AS locked
+  WHERE locked.session_id = ANY(v_sessions)
+  ORDER BY locked.session_id
+  FOR UPDATE;
+
+  SELECT EXISTS (
+    -- exactly one live key per session, and the tombstone markers agree
+    SELECT 1 FROM support.session AS parent
+    LEFT JOIN support.session_key AS key ON key.session_id=parent.session_id
+    WHERE parent.session_id = ANY(v_sessions)
+    GROUP BY parent.session_id,parent.shredded_at
+    HAVING pg_catalog.count(key.session_id)<>1
+      OR pg_catalog.bool_or(
+        (parent.shredded_at IS NULL) IS DISTINCT FROM (key.destroyed_at IS NULL)
+      )
+    UNION ALL
+    -- the same for every case of a session in scope
+    SELECT 1 FROM support."case" AS parent
+    LEFT JOIN support.case_key AS key ON key.case_id=parent.case_id
+    WHERE parent.session_id = ANY(v_sessions)
+    GROUP BY parent.case_id,parent.shredded_at
+    HAVING pg_catalog.count(key.case_id)<>1
+      OR pg_catalog.bool_or(
+        (parent.shredded_at IS NULL) IS DISTINCT FROM (key.destroyed_at IS NULL)
+      )
+    UNION ALL
+    -- a shredded session leaves no unshredded case behind
+    SELECT 1 FROM support."case" AS child
+    JOIN support.session AS parent ON parent.session_id=child.session_id
+    WHERE parent.session_id = ANY(v_sessions)
+      AND parent.shredded_at IS NOT NULL AND child.shredded_at IS NULL
+    UNION ALL
+    -- every shredded session is covered by its audit row
+    SELECT 1 FROM support.session AS object
+    WHERE object.session_id = ANY(v_sessions) AND object.shredded_at IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM support.shred_audit AS audit
+        WHERE audit.target_kind = CASE
+            WHEN object.identity_owner_ref IS NULL THEN 'session' ELSE 'owner' END
+          AND audit.target_ref = COALESCE(
+            object.identity_owner_ref, object.session_id
+          )::text
+      )
+    UNION ALL
+    -- and so is every shredded case, through its parent
+    SELECT 1 FROM support."case" AS object
+    JOIN support.session AS parent ON parent.session_id=object.session_id
+    WHERE parent.session_id = ANY(v_sessions) AND object.shredded_at IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM support.shred_audit AS audit
+        WHERE audit.target_kind = CASE
+            WHEN parent.identity_owner_ref IS NULL THEN 'session' ELSE 'owner' END
+          AND audit.target_ref = COALESCE(
+            parent.identity_owner_ref, parent.session_id
+          )::text
+      )
+    UNION ALL
+    -- an owner audit row means: that owner has sessions, all of them and all of
+    -- their cases are shredded, and keys_destroyed counts exactly their keys
+    SELECT 1 FROM support.shred_audit AS audit
+    WHERE audit.target_kind='owner' AND v_owner IS NOT NULL
+      AND audit.target_ref = v_owner::text
+      AND (
+        NOT EXISTS (SELECT 1 FROM support.session AS owned
+          WHERE owned.identity_owner_ref=v_owner)
+        OR EXISTS (SELECT 1 FROM support.session AS owned
+          WHERE owned.identity_owner_ref=v_owner AND owned.shredded_at IS NULL)
+        OR EXISTS (SELECT 1 FROM support."case" AS owned_case
+          JOIN support.session AS owned ON owned.session_id=owned_case.session_id
+          WHERE owned.identity_owner_ref=v_owner AND owned_case.shredded_at IS NULL)
+        OR audit.keys_destroyed<>(
+          SELECT pg_catalog.count(*)::integer FROM (
+            SELECT owned_key.session_id FROM support.session_key AS owned_key
+            JOIN support.session AS owned ON owned.session_id=owned_key.session_id
+            WHERE owned.identity_owner_ref=v_owner
+            UNION ALL
+            SELECT owned_case_key.case_id FROM support.case_key AS owned_case_key
+            JOIN support."case" AS owned_case
+              ON owned_case.case_id=owned_case_key.case_id
+            JOIN support.session AS owned ON owned.session_id=owned_case.session_id
+            WHERE owned.identity_owner_ref=v_owner
+          ) AS owner_keys
+        )
+      )
+    UNION ALL
+    -- a session audit row means: exactly one anonymous session with that id,
+    -- shredded, its cases shredded, keys_destroyed counting its keys
+    SELECT 1 FROM support.shred_audit AS audit
+    WHERE audit.target_kind='session' AND v_anonymous IS NOT NULL
+      AND audit.target_ref = v_anonymous::text
+      AND (
+        (SELECT pg_catalog.count(*) FROM support.session AS anonymous
+          WHERE anonymous.session_id=v_anonymous
+            AND anonymous.identity_owner_ref IS NULL)<>1
+        OR EXISTS (SELECT 1 FROM support.session AS anonymous
+          WHERE anonymous.session_id=v_anonymous AND anonymous.shredded_at IS NULL)
+        OR EXISTS (SELECT 1 FROM support."case" AS anonymous_case
+          WHERE anonymous_case.session_id=v_anonymous
+            AND anonymous_case.shredded_at IS NULL)
+        OR audit.keys_destroyed<>(
+          SELECT pg_catalog.count(*)::integer FROM (
+            SELECT anonymous_key.session_id FROM support.session_key AS anonymous_key
+            WHERE anonymous_key.session_id=v_anonymous
+            UNION ALL
+            SELECT anonymous_case_key.case_id FROM support.case_key AS anonymous_case_key
+            JOIN support."case" AS anonymous_case
+              ON anonymous_case.case_id=anonymous_case_key.case_id
+            WHERE anonymous_case.session_id=v_anonymous
+          ) AS anonymous_keys
+        )
+      )
+  ) INTO v_invalid;
+
+  IF v_invalid THEN
+    RAISE EXCEPTION 'SUPPORT_SHRED_INTEGRITY_INVALID';
+  END IF;
+
+  -- Observable proof that the guard ran, for the SUP-07 suite: one increment per
+  -- scope checked, transaction-local (0054 counted whole-schema scans instead).
+  v_count:=COALESCE(NULLIF(pg_catalog.current_setting(
+    'debateai.support_shred_validation_count',true
+  ),'')::integer,0)+1;
+  PERFORM pg_catalog.set_config(
+    'debateai.support_shred_validation_count',v_count::text,true
+  );
+END
+$support_shred_scope_function$;
+
+CREATE OR REPLACE FUNCTION support.assert_shred_integrity_row()
+RETURNS trigger
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+SET plan_cache_mode = force_custom_plan
+AS $support_shred_row_function$
+DECLARE
+  v_row jsonb;
+  v_session uuid;
+  v_kind text;
+  v_ref text;
+BEGIN
+  IF TG_OP='DELETE' THEN
+    v_row:=pg_catalog.to_jsonb(OLD);
+  ELSE
+    v_row:=pg_catalog.to_jsonb(NEW);
+  END IF;
+  IF TG_TABLE_NAME='shred_audit' THEN
+    v_kind:=v_row->>'target_kind';
+    v_ref:=v_row->>'target_ref';
+  ELSIF TG_TABLE_NAME='case_key' THEN
+    SELECT parent.session_id INTO v_session
+    FROM support."case" AS parent
+    WHERE parent.case_id=(v_row->>'case_id')::uuid;
+  ELSE
+    v_session:=(v_row->>'session_id')::uuid;
+  END IF;
+  PERFORM support.assert_shred_integrity_scope(v_session,v_kind,v_ref);
+  RETURN NULL;
+END
+$support_shred_row_function$;
+
+REVOKE ALL ON FUNCTION support.assert_shred_integrity_scope(uuid, text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION support.assert_shred_integrity_row() FROM PUBLIC;
+REVOKE ALL ON FUNCTION support.assert_shred_integrity_scope(uuid, text, text)
+  FROM debateai_support;
+REVOKE ALL ON FUNCTION support.assert_shred_integrity_row() FROM debateai_support;
+
+-- Retire 0054's global mechanism. The constraint trigger goes last and only
+-- after SET CONSTRAINTS fires whatever this transaction already queued for it:
+-- 0054's closing statement (0054:985-988) bumps mutation_generation to schedule
+-- one validation, and PostgreSQL resolves a deferred event's trigger at COMMIT,
+-- so dropping it with an event outstanding would fail the whole migration.
+DO $security_delta_retire_global_guard$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_catalog.pg_trigger AS trigger
+    WHERE trigger.tgrelid='support._shred_integrity_guard'::regclass
+      AND trigger.tgname='support_shred_integrity_guard_trigger'
+      AND NOT trigger.tgisinternal
+  ) THEN
+    SET CONSTRAINTS support.support_shred_integrity_guard_trigger IMMEDIATE;
+    DROP TRIGGER support_shred_integrity_guard_trigger
+      ON support._shred_integrity_guard;
+  END IF;
+END
+$security_delta_retire_global_guard$;
+
+DROP TRIGGER IF EXISTS support_shred_dirty_session ON support.session;
+DROP TRIGGER IF EXISTS support_shred_dirty_session_key ON support.session_key;
+DROP TRIGGER IF EXISTS support_shred_dirty_case ON support."case";
+DROP TRIGGER IF EXISTS support_shred_dirty_case_key ON support.case_key;
+DROP TRIGGER IF EXISTS support_shred_dirty_audit ON support.shred_audit;
+
+DO $security_delta_install_scope_guards$
+DECLARE target text;
+BEGIN
+  FOREACH target IN ARRAY ARRAY[
+    'support.session',
+    'support.session_key',
+    'support."case"',
+    'support.case_key',
+    'support.shred_audit'
+  ] LOOP
+    EXECUTE pg_catalog.format(
+      'DROP TRIGGER IF EXISTS support_shred_row_guard ON %s', target
+    );
+    EXECUTE pg_catalog.format(
+      'CREATE CONSTRAINT TRIGGER support_shred_row_guard '
+      'AFTER INSERT OR UPDATE OR DELETE ON %s '
+      'DEFERRABLE INITIALLY DEFERRED '
+      'FOR EACH ROW EXECUTE FUNCTION support.assert_shred_integrity_row()', target
+    );
+  END LOOP;
+END
+$security_delta_install_scope_guards$;
+
+DO $security_delta_scope_guard_contract$
+BEGIN
+  IF (
+    SELECT pg_catalog.count(*) FROM pg_catalog.pg_trigger AS trigger
+    WHERE NOT trigger.tgisinternal
+      AND trigger.tgname='support_shred_row_guard'
+      AND trigger.tgfoid='support.assert_shred_integrity_row()'::regprocedure
+      AND trigger.tgdeferrable AND trigger.tginitdeferred
+      AND trigger.tgenabled IN ('O','A')
+      AND trigger.tgrelid=ANY(ARRAY[
+        'support.session'::regclass,'support.session_key'::regclass,
+        'support."case"'::regclass,'support.case_key'::regclass,
+        'support.shred_audit'::regclass
+      ])
+  )<>5 OR EXISTS (
+    SELECT 1 FROM pg_catalog.pg_trigger AS trigger
+    WHERE NOT trigger.tgisinternal
+      AND trigger.tgfoid=ANY(ARRAY[
+        'support.mark_shred_integrity_dirty()'::regprocedure,
+        'support.assert_shred_integrity()'::regprocedure
+      ])
+  ) THEN
+    RAISE EXCEPTION 'SUPPORT_SHRED_SCOPE_GUARD_INVALID';
+  END IF;
+END
+$security_delta_scope_guard_contract$;
