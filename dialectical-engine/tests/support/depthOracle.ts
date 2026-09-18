@@ -8,8 +8,12 @@ import ts from "typescript-classic";
  * UNDETERMINED occurrences emit sites keyed by literal spans; OTHER is withheld.
  * Text-only ceiling detection remains a separate arm (plan REVISION 4, §1–§3).
  *
- * NAMED FACT (D68 ADDENDUM 2), carried verbatim:
- * Node 22.23.1 UNVERIFIED (V, 2026-09-06): the pinned parser was installed and imported under Node 25.7.0 only.
+ * NAMED FACT (D68 ADDENDUM 2, V, 2026-09-06) and what closed it:
+ * at the time the pinned parser had been installed and imported under Node
+ * 25.7.0 only, so it was UNVERIFIED on the runtime the register then pinned.
+ * That is closed as of the 2026-09-18 runtime upgrade: the register now pins
+ * Node 26.8.2 and the whole suite — this module's callers included — was run
+ * under that runtime on vitest 5.0.1.
  */
 
 export type DuplicateKind = "DEPTH_BOUND_LITERAL" | "DOMAIN_ENUMERATION";

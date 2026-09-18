@@ -14,9 +14,11 @@ import { parseModule } from "../support/depthOracle.js";
  * Authority: D68 ADDENDUM (the alias grant); plan REVISION 4 §8.8 R3, §9.12 R3,
  * §9.15 R4; codex plan-r4 verdict "## F2".
  *
- * NAMED FACT, carried per D68 ADDENDUM 2:
- *   Node 22.23.1 UNVERIFIED (V, 2026-09-06): the pinned parser was installed and
- *   imported under Node 25.7.0 only.
+ * NAMED FACT (D68 ADDENDUM 2, V, 2026-09-06) and what closed it:
+ *   at the time the pinned parser had been installed and imported under Node
+ *   25.7.0 only, so it was UNVERIFIED on the runtime the register then pinned.
+ *   That is closed as of the 2026-09-18 runtime upgrade: the register now pins
+ *   Node 26.8.2 and this file was run under that runtime on vitest 5.0.1.
  *
  * NO evaluator code lives here. Round 1 creates `tests/support/depthOracle.ts`.
  */
