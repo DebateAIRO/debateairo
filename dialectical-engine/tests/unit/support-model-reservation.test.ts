@@ -5,6 +5,7 @@ import type {
   SupportConfigurationState
 } from "../../packages/register/src/support-config.js";
 import {
+  SUPPORT_MODEL_RESERVATION_EVENT_CAP,
   SupportModelReservationLedger,
   createReservedSupportModelPort,
   reserveSupportModelCall
@@ -454,6 +455,33 @@ describe("SUP-01 final model-call reservation", () => {
       .rejects.toMatchObject({ code: "SUPPORT_MODEL_UNAVAILABLE" });
     expect(durableCalls).toBe(1);
     expect(providerCalls).toBe(0);
+    expect(reservations.activeCount()).toBe(0);
+  });
+
+  /**
+   * DL1-F8. `#events` grew one frozen record per model call for the lifetime of
+   * the process and nothing in production ever read it back, so the ledger's
+   * memory tracked uptime x the daily cap. The retained window is now a fixed
+   * bound; `#active`, which the release path depends on, is untouched.
+   */
+  it("bounds the retained reservation events and keeps the newest", () => {
+    const reservations = ledger();
+    for (let index = 0;index < 5_000;index += 1) {
+      reservations.reserve({
+        kind: "new",
+        nonce: `nonce-bounded-${String(index).padStart(12,"0")}`,
+        supportRegisterVersion: "9007199254740992",
+        atMs: index
+      }).releaseBeforePost();
+    }
+    const retained = reservations.events();
+
+    expect(retained.length).toBeLessThanOrEqual(64);
+    expect(SUPPORT_MODEL_RESERVATION_EVENT_CAP).toBe(64);
+    expect(retained.at(-1)?.nonce).toBe(`nonce-bounded-${String(4_999).padStart(12,"0")}`);
+    expect(retained.at(0)?.nonce).toBe(
+      `nonce-bounded-${String(5_000 - retained.length).padStart(12,"0")}`
+    );
     expect(reservations.activeCount()).toBe(0);
   });
 

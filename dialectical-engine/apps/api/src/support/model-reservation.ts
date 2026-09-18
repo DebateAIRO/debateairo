@@ -59,6 +59,14 @@ function validIdentifier(value: string): boolean {
   return value.length >= 1 && value.length <= 256 && /^[A-Za-z0-9:_-]+$/u.test(value);
 }
 
+/**
+ * DL1-F8. The ledger used to keep one frozen record per model call for the
+ * lifetime of the process, and nothing in production ever read them back, so
+ * its memory grew with uptime x the daily cap. Only the newest records are
+ * retained now; the `#active` set the release path depends on is unchanged.
+ */
+export const SUPPORT_MODEL_RESERVATION_EVENT_CAP = 64 as const;
+
 export class SupportModelReservationLedger {
   readonly #events: SupportModelReservationEvent[] = [];
   readonly #active = new Set<string>();
@@ -109,6 +117,7 @@ export class SupportModelReservationLedger {
       immutable: true as const,
       singleUse: true as const
     });
+    if (this.#events.length >= SUPPORT_MODEL_RESERVATION_EVENT_CAP) this.#events.shift();
     this.#events.push(event);
     this.#active.add(reservationId);
     let state: "RESERVED" | "CONSUMED" | "RELEASED" = "RESERVED";
@@ -145,6 +154,7 @@ export class SupportModelReservationLedger {
     });
   }
 
+  /** The retained window, oldest first, never longer than the cap. */
   events(): readonly SupportModelReservationEvent[] {
     return Object.freeze([...this.#events]);
   }
