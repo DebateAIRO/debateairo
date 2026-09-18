@@ -81,6 +81,32 @@ Each one with a failing test written first, then the fix, then the test passing:
 - **One correction to a reviewer's own advice.** It recommended a package version published two days earlier, which would have broken your own "packages must be a week old" rule. I used the 31-day-old version that fixes the same problems with no exception needed.
 - **I can't run the secret scanner here.** It isn't installed, and I won't download and run an unverified program on this Mac — that is the rule we set after the September incident. My own sweep of all 5,362 files in those directories found three known test fixtures and nothing live; the real proof is the scanner's own run on the pull request.
 
+## Where the work stands at the end of 19 September
+
+**Every repair that did not need a decision from you is done.** Fifty commits, all on this Mac, nothing sent anywhere.
+
+| Check | Result |
+|---|---|
+| The whole codebase compiles | 0 errors |
+| The automatic test gate | 1 failure — a memory measurement that only works on the Node version the project pins; it fails the same way on untouched `dev`, and GitHub skips it |
+| Known-vulnerable packages | none (was 14) |
+| The website builds for production | yes |
+| The website's security smoke test | passes |
+| The website's own test suite | 130 of 130 |
+| A real browser, with the strict rules on | no violations on the landing page, cookie banner, consent panel or support widget |
+
+### One thing I checked by hand rather than trusting a test
+
+The support chat used to keep its access token in the browser's session storage, where it survived logout — on a shared computer the next person inherited the previous person's support conversation. After the fix I opened the site in a browser and read what is actually stored: four fields, **not one token-shaped string in it**. The token now lives only in memory.
+
+### A change you will notice
+
+Because the token is no longer stored, **closing the small support window ends that conversation's session**. The text you can see stays on screen; sending a new message starts a fresh session. That is the deliberate trade for not leaving a key lying around in a shared browser — worth knowing before someone reports it as a bug.
+
+### A failing test that is wrong about the product
+
+One test claims the support button doesn't open with the Enter key. The product is fine: a real browser presses a button with Enter automatically, and the test's simulated key press doesn't reproduce that in its fake browser. The file the test covers was not touched by any of this work. I've recorded it so nobody "fixes" working code to satisfy a broken test.
+
 ## What is still open
 
 ### 1. Finish the quiet clean-up after the merge (no decision needed)
