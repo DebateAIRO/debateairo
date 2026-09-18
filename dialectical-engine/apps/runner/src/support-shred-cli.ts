@@ -52,12 +52,22 @@ export type SupportShredCliDependencies = Readonly<{
   clock(): Date;
 }>;
 
+/**
+ * DL7-F11: a shred destroys the keys that make a person's support history readable, and it
+ * cannot be undone. One mistyped or mis-pasted reference used to be enough, so the caller
+ * now says so explicitly with `--yes`. The refusal is its own code, distinct from a
+ * malformed command, so an operator sees WHICH mistake they made.
+ */
 export function parseSupportShredArguments(arguments_: readonly string[]): SupportShredCliTarget {
-  if (arguments_.length !== 2
+  if ((arguments_.length !== 2 && arguments_.length !== 3)
     || (arguments_[0] !== "--owner" && arguments_[0] !== "--session")
     || typeof arguments_[1] !== "string"
-    || !CANONICAL_UUID.test(arguments_[1])) {
+    || !CANONICAL_UUID.test(arguments_[1])
+    || (arguments_.length === 3 && arguments_[2] !== "--yes")) {
     throw new SupportShredCliError("SUPPORT_SHRED_USAGE");
+  }
+  if (arguments_.length !== 3) {
+    throw new SupportShredCliError("SUPPORT_SHRED_UNCONFIRMED");
   }
   return Object.freeze({
     kind: arguments_[0] === "--owner" ? "owner" : "session",

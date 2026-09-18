@@ -55,7 +55,7 @@ type ConfigurationEnvelope = Readonly<{
 }>;
 
 const RETENTION_UNAVAILABLE = "retention: unavailable — support register not initialized";
-const ERASURE_MANUAL_STEP = "erasures: run pnpm support:shred --owner <owner_ref> after each account erasure (wiring pending V, row SUP-D5)";
+const ERASURE_MANUAL_STEP = "erasures: run pnpm support:shred --owner <owner_ref> --yes after each account erasure (wiring pending V, row V-26)";
 const RETENTION_ACTOR_UNAVAILABLE = "retention actor: unavailable — no age-based shred command is implemented";
 
 export function formatSpend(input: Readonly<{

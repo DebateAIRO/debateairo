@@ -7,7 +7,7 @@ import {
   type SupportStatusRepositoryPort
 } from "../../apps/runner/src/support-status-cli.js";
 
-const ERASURE_LINE = "erasures: run pnpm support:shred --owner <owner_ref> after each account erasure (wiring pending V, row SUP-D5)";
+const ERASURE_LINE = "erasures: run pnpm support:shred --owner <owner_ref> --yes after each account erasure (wiring pending V, row V-26)";
 const UNAVAILABLE_LINE = "retention: unavailable — support register not initialized";
 
 const support: SupportStatusRepositoryPort = {

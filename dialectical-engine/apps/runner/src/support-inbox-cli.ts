@@ -187,6 +187,48 @@ export async function runSupportInboxCommand(
   throw new TypeError("SUPPORT_INBOX_USAGE");
 }
 
+/** DL7-F11: the largest reply body this CLI will buffer from stdin before refusing. */
+const MAX_REPLY_STDIN_BYTES = 64 * 1024;
+
+/**
+ * DL7-F11: V's reply is a person's support answer, usually quoting what the user wrote.
+ * On argv it lands in shell history and is readable by every local account through `ps` —
+ * the pattern this branch already removed for the mail recipient (L7-F7). The reply body now
+ * arrives on stdin by default; the argv form still works, loudly, because a script may rely
+ * on it. Every other command is passed through untouched.
+ */
+export async function resolveSupportInboxArguments(
+  argv: readonly string[],
+  readStdin: () => Promise<string>,
+  warn: (message: string) => void
+): Promise<readonly string[]> {
+  if (argv[0] !== "reply") return argv;
+  if (argv.length === 3) {
+    warn("SUPPORT_REPLY_TEXT_ON_ARGV: the reply body is visible in shell history and to "
+      + "every local account via ps. Pipe it on stdin instead: "
+      + "pnpm support:reply <case-id> < reply.txt\n");
+    return argv;
+  }
+  if (argv.length !== 2) return argv;
+  const body = await readStdin();
+  if (Buffer.byteLength(body, "utf8") > MAX_REPLY_STDIN_BYTES) {
+    throw new TypeError("SUPPORT_CASE_MESSAGE_TOO_LARGE");
+  }
+  return Object.freeze([...argv, body.replace(/\n$/u, "")]);
+}
+
+async function readAllStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  let received = 0;
+  for await (const chunk of process.stdin) {
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string);
+    received += bytes.byteLength;
+    if (received > MAX_REPLY_STDIN_BYTES) throw new TypeError("SUPPORT_CASE_MESSAGE_TOO_LARGE");
+    chunks.push(bytes);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 async function main(): Promise<void> {
   const credentials = await loadDevelopmentSupportStatusCliCredentials(
     join(resolveDevCustodyRoot(resolve(".")), "database-principals.env")
@@ -200,7 +242,12 @@ async function main(): Promise<void> {
   try {
     const state = await configuration.current();
     if (state.kind !== "AVAILABLE") throw new TypeError(state.code);
-    process.stdout.write(await runSupportInboxCommand(process.argv.slice(2),{
+    const argv = await resolveSupportInboxArguments(
+      process.argv.slice(2),
+      readAllStdin,
+      (message) => { process.stderr.write(message); }
+    );
+    process.stdout.write(await runSupportInboxCommand(argv,{
       repository: new PostgresSupportCaseSummaryRepository(pool),keys,
       limits: {
         messageByteLimit: state.snapshot.values.supportLimitMessageCharacters,
