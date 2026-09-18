@@ -6,6 +6,7 @@ import { BrandMark } from "../TopBar.js";
 import { ModeToggle } from "../ModeToggle.js";
 import { ConsentToggle } from "./ConsentToggle.js";
 import { DebatePicker } from "./DebatePicker.js";
+import { supportCaseLink } from "./caseLink.js";
 import {
   browserSupportConversationStorage,
   clearStoredSupportConversation,
@@ -145,21 +146,32 @@ const REQUEST_UNAVAILABLE = Object.freeze({
 
 const STATIC_ROUTES = new Set(["/","/new","/login","/sign-up","/settings","/help"]);
 const PUBLIC_DEBATE = /^\/public\/debate\/[A-Za-z0-9_-]+$/u;
-const SUPPORT_CASE = /^\/help[?]case=[A-Za-z0-9_-]{43}$/u;
+const SUPPORT_CASE = /^\/help(?:[?]|#)case=([A-Za-z0-9_-]{43})$/u;
 
+/**
+ * DL3-F4: the single place a case link becomes an href. The API still mints the
+ * retired `/help?case=…` form, so it is still recognised here — and rendered as
+ * `/help#case=…`, because a bearer in the query string reaches the address bar,
+ * browser history and any future access log, and a bearer in the fragment does
+ * not reach a server at all.
+ */
 function safeFirstPartyLink(link: string | undefined): string | null {
   if (link === undefined) return null;
-  return STATIC_ROUTES.has(link) || PUBLIC_DEBATE.test(link) || SUPPORT_CASE.test(link) ? link : null;
+  const bearer = SUPPORT_CASE.exec(link);
+  if (bearer !== null) return supportCaseLink(bearer[1]!);
+  return STATIC_ROUTES.has(link) || PUBLIC_DEBATE.test(link) ? link : null;
 }
 
 function caseAcknowledgement(body: Readonly<Record<string,unknown>>): SupportCaseAcknowledgement | null {
   if (typeof body.case_acknowledgement !== "string"
     || typeof body.case_token !== "string" || !/^[A-Za-z0-9_-]{43}$/u.test(body.case_token)
     || typeof body.sla_hours !== "number" || !Number.isSafeInteger(body.sla_hours)
-    || typeof body.link !== "string" || body.link !== `/help?case=${body.case_token}`) return null;
+    || typeof body.link !== "string"
+    || (body.link !== `/help?case=${body.case_token}`
+      && body.link !== supportCaseLink(body.case_token))) return null;
   return Object.freeze({
     text: body.case_acknowledgement,token: body.case_token,
-    slaHours: body.sla_hours,link: body.link
+    slaHours: body.sla_hours,link: supportCaseLink(body.case_token)
   });
 }
 

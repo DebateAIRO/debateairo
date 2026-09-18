@@ -13,7 +13,9 @@ describe("SUP-02 case browser surfaces", () => {
     const html = renderToStaticMarkup(<CaseOpened token="opaque-token" slaHours={48} language="en" />);
     expect(html).toContain("I&#x27;ve opened case opaque-token for a person.");
     expect(html).toContain("within 48 hours");
-    expect(html).toContain('href="/help?case=opaque-token"');
+    // DL3-F4: the bearer rides the fragment, which never reaches a server.
+    expect(html).toContain('href="/help#case=opaque-token"');
+    expect(html).not.toContain("?case=");
     expect(html).toContain("I can&#x27;t promise an outcome");
     expect(html).not.toMatch(/\b(?:will|guaranteed|resolved)\b/iu);
   });

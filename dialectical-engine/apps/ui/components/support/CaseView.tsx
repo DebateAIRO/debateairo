@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect,useState,type FormEvent } from "react";
+import { useCallback,useEffect,useState,type FormEvent } from "react";
 import type { SupportAssistantLanguage } from "./Assistant";
+import { consumeSupportCaseTokenFromUrl,supportCaseLink } from "./caseLink.js";
 import { supportPost } from "./http.js";
 
 const COPY = Object.freeze({
@@ -30,7 +31,8 @@ export function CaseOpened({ token,slaHours,language }: Readonly<{
   slaHours: number;
   language: SupportAssistantLanguage;
 }>) {
-  const link = `/help?case=${encodeURIComponent(token)}`;
+  // DL3-F4: the fragment, so the bearer never reaches a server or a proxy log.
+  const link = supportCaseLink(token);
   const text = COPY[language].opened
     .replace("{token}",token)
     .replace("{sla}",String(slaHours))
@@ -88,30 +90,39 @@ export function CaseLookup() {
     token: string;language: SupportAssistantLanguage;state: Parameters<typeof CaseView>[0]["state"];
     messages: readonly SupportCaseViewMessage[];summary: string | null;
   }> | null>(null);
-  useEffect(() => {
-    const token = new URLSearchParams(window.location.search).get("case");
-    if (token === null) return;
-    void fetch(`/api/v1/support/cases/${encodeURIComponent(token)}`)
-      .then(async (response) => response.ok ? response.json() as Promise<Record<string,unknown>> : null)
-      .then((body) => {
-        if (body === null) {
-          setRecord({ token,language: "en",state: "NOT_FOUND",messages: [],summary: null });
-          return;
-        }
-        const opened = body.case as Record<string,unknown>;
-        setRecord({
-          token,language: opened.language === "ro" ? "ro" : "en",
-          state: body.kind === "SHREDDED"
-            ? "SHREDDED" : String(opened.state) as Parameters<typeof CaseView>[0]["state"],
-          messages: body.kind === "SHREDDED" ? [] : body.messages as readonly SupportCaseViewMessage[],
-          summary: body.kind === "SHREDDED" || typeof opened.summary !== "string"
-            ? null : opened.summary
-        });
-      });
+
+  const load = useCallback(async (token: string): Promise<void> => {
+    const response = await fetch(`/api/v1/support/cases/${encodeURIComponent(token)}`);
+    const body = response.ok ? await response.json() as Record<string,unknown> : null;
+    if (body === null) {
+      setRecord({ token,language: "en",state: "NOT_FOUND",messages: [],summary: null });
+      return;
+    }
+    const opened = body.case as Record<string,unknown>;
+    setRecord({
+      token,language: opened.language === "ro" ? "ro" : "en",
+      state: body.kind === "SHREDDED"
+        ? "SHREDDED" : String(opened.state) as Parameters<typeof CaseView>[0]["state"],
+      messages: body.kind === "SHREDDED" ? [] : body.messages as readonly SupportCaseViewMessage[],
+      summary: body.kind === "SHREDDED" || typeof opened.summary !== "string"
+        ? null : opened.summary
+    });
   },[]);
+
+  // DL3-F4: the bearer is taken out of the address before the first request and
+  // held here, in component state, for the life of this page. Nothing re-reads
+  // the URL, so nothing needs the bearer to still be in it.
+  useEffect(() => {
+    const token = consumeSupportCaseTokenFromUrl(window.location,window.history);
+    if (token === null) return;
+    void load(token);
+  },[load]);
+
   if (record === null) return null;
   return <CaseView {...record} onReply={(text) => {
-    void supportCaseClient.reply(record.token,text).then(() => window.location.reload());
+    // A reload would look for a bearer this page has already cleared, so the
+    // reply re-reads the case through the token it is still holding.
+    void supportCaseClient.reply(record.token,text).then(() => load(record.token));
   }} />;
 }
 

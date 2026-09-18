@@ -240,7 +240,11 @@ describe("SUP-01 /help assistant", () => {
     }
     await submit("ordinary safety request");
     expect(document.body.textContent).toContain(acknowledgement);
-    expect(document.querySelector<HTMLAnchorElement>(`a[href="${link}"]`)).not.toBeNull();
+    // DL3-F4: the API still writes the retired ?case= form into its sentence;
+    // what the browser can navigate to is the fragment form, which never
+    // reaches a server, a proxy log or the address bar as a query.
+    expect(document.querySelector<HTMLAnchorElement>(`a[href="/help#case=${token}"]`)).not.toBeNull();
+    expect(document.querySelector(`a[href="${link}"]`)).toBeNull();
   });
 
   it("retains automated token/SLA/link fields from the browser client contract", async () => {
@@ -254,7 +258,8 @@ describe("SUP-01 /help assistant", () => {
     await expect(supportAssistantClient.sendMessage(
       SESSION,"ordinary safety request","en"
     )).resolves.toMatchObject({
-      caseAcknowledgement: { text: acknowledgement,token,slaHours: 48,link }
+      // DL3-F4: the API's ?case= link is accepted and carried as #case=.
+      caseAcknowledgement: { text: acknowledgement,token,slaHours: 48,link: `/help#case=${token}` }
     });
   });
 
@@ -343,7 +348,9 @@ describe("SUP-01 /help assistant", () => {
       .find((button) => button.textContent === "No") as HTMLButtonElement).click());
     await settle();
     expect(document.body.textContent).toContain(text);
-    expect(document.querySelector<HTMLAnchorElement>(`a[href="${link}"]`)).not.toBeNull();
+    // DL3-F4: rendered as the fragment form, never as a query bearer.
+    expect(document.querySelector<HTMLAnchorElement>(`a[href="/help#case=${token}"]`)).not.toBeNull();
+    expect(document.querySelector(`a[href="${link}"]`)).toBeNull();
   });
 
   it("renders SHREDDED returned by consent, rating, and escalation mutations", async () => {

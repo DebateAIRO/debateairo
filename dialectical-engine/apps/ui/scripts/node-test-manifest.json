@@ -2,6 +2,7 @@
   "components/authRoutes.source-test.mjs",
   "components/debateReferenceDesign.source-test.mjs",
   "components/modeTransition.test.mjs",
+  "components/support/caseLink.test.mjs",
   "components/support/supportConversation.test.mjs",
   "lib/contentSecurityPolicy.test.mjs",
   "lib/edgeUpgrade.test.mjs",
