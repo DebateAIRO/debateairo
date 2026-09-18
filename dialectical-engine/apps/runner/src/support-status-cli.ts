@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { TypedDomainError } from "@debateai/kernel";
 import { createPool, createSupportControlPlanePool, PostgresSupportStatusRepository, type Pool } from "@debateai/db";
@@ -9,6 +9,7 @@ import type {
 } from "@debateai/register";
 import { createPostgresRegisterPublicationPort } from "@debateai/register";
 import { withProductionSupportConfigCliConnection } from "./support-config-cli-credentials.js";
+import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
 import {
   loadDevelopmentSupportStatusCliCredentials,
   loadProductionSupportStatusCliCredentials
@@ -254,7 +255,7 @@ async function main(): Promise<void> {
   if (arguments_.configurationCredentialFile === null
     || arguments_.supportDataCredentialFile === null) {
     const credentials = await loadDevelopmentSupportStatusCliCredentials(
-      resolve(".local/dev-auth/database-principals.env")
+      join(resolveDevCustodyRoot(resolve(".")), "database-principals.env")
     );
     const configurationPool = createSupportControlPlanePool(credentials.configurationDatabaseUrl);
     const supportPool = createPool(credentials.supportDatabaseUrl);

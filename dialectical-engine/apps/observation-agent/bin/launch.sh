@@ -3,7 +3,18 @@ set -eu
 
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 repo_root="$(cd "$script_dir/../../.." && pwd -P)"
-environment_file="$repo_root/.local/dev-auth/observation-agent.env"
+
+# DL7-F4: dev key custody is movable — DEBATEAI_DEV_CUSTODY_ROOT exists so keys need never
+# sit inside a cloud-synced checkout (F-05). The resolver in
+# deploy/dev-auth/custody-root.mjs is the single source of that rule; this launcher honours
+# the same override rather than assuming the repository, and refuses a relative override
+# instead of silently reading the wrong file.
+custody_root="${DEBATEAI_DEV_CUSTODY_ROOT:-$repo_root/.local/dev-auth}"
+if [[ "$custody_root" != /* ]]; then
+  print -u2 -- DEV_AUTH_CUSTODY_ROOT_RELATIVE
+  exit 2
+fi
+environment_file="$custody_root/observation-agent.env"
 
 if [[ ! -f "$environment_file" ]]; then
   print -u2 -- OBSERVATION_ENV_FILE_MISSING

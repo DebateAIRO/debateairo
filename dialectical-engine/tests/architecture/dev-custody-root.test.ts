@@ -1,4 +1,4 @@
-import { chmod, lstat, mkdtemp, mkdir, readFile, rm, symlink } from "node:fs/promises";
+import { chmod, lstat, mkdtemp, mkdir, readFile, readdir, rm, symlink } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { loadDevelopmentCommandEnvironment } from "@debateai/register";
@@ -127,8 +127,52 @@ describe("dev custody root (F-05, L2-F1, L2-F2)", () => {
       .toBe(join(root, "engine", ".local", "dev-auth"));
   });
 
-  it("is the only place that spells the custody path", async () => {
-    const sources = [
+  // DEV-SYNC 2026-09-18 (DL7-F4): this row used to walk a FIXED list of eight files, which is
+  // exactly why fourteen sites written after the 2026-09-02 audit — the support CLIs, the
+  // observation agent, the deployment-register receipt path — spelled the custody path again
+  // without anyone noticing. It now DISCOVERS every shipped source under apps/, deploy/ and
+  // packages/: whoever spells the path must be the resolver, and everyone else must ask it.
+  it("is the only place that spells the custody path (discovered, not listed)", async () => {
+    // The custody TREE specifically — `.local/dev-auth` however it is spelled, including the
+    // join(…, ".local", "dev-auth") form. Deliberately NOT a bare `.local`: ~/.local/bin and
+    // ~/.local/state are ordinary XDG locations and a different finding (DL6-F4, DL7-F5).
+    const spellsThePath = /\.local["'`]?\s*[,/]\s*["'`]?\s*dev-auth/;
+    const importsTheResolver = /\bresolveDevCustodyRoot\b/;
+    const roots = ["apps", "deploy", "packages"];
+    const skip = new Set(["node_modules", ".next", "dist", "coverage", "generated"]);
+    const sources: string[] = [];
+    const walk = async (directory: string): Promise<void> => {
+      for (const entry of await readdir(join(REPOSITORY_ROOT, directory), { withFileTypes: true })) {
+        if (skip.has(entry.name)) continue;
+        const relative = `${directory}/${entry.name}`;
+        if (entry.isDirectory()) { await walk(relative); continue; }
+        if (/\.(ts|tsx|mjs|js|sh)$/.test(entry.name) && !/\.test\.|\.source-test\./.test(entry.name)) {
+          sources.push(relative);
+        }
+      }
+    };
+    for (const root of roots) await walk(root);
+    expect(sources.length).toBeGreaterThan(200);
+
+    // A file may NAME the custody location only if it also HONOURS the override — a
+    // configured-contract value compared literally, or a shell default, is fine as long as
+    // the same file asks. What this row forbids is the class that produced fourteen sites:
+    // building a custody path out of the literal and never consulting the resolver at all.
+    // A shell script cannot import a JavaScript resolver, so it honours the variable itself.
+    const honoursTheOverride = /\bresolveDevCustodyRoot\b|\bDEBATEAI_DEV_CUSTODY_ROOT\b/;
+    const violations: string[] = [];
+    for (const source of sources) {
+      if (source.endsWith("deploy/dev-auth/custody-root.mjs")) continue;
+      const text = await readFile(join(REPOSITORY_ROOT, source), "utf8");
+      if (!spellsThePath.test(text)) continue;
+      if (honoursTheOverride.test(text)) continue;
+      violations.push(`${source}: spells the custody path and never asks resolveDevCustodyRoot`);
+    }
+    expect(violations).toEqual([]);
+
+    // The eight launchers the 2026-09-02 audit named must still ASK the resolver, not merely
+    // avoid the literal: a launcher that stopped calling it would place custody somewhere else.
+    for (const source of [
       "apps/runner/src/dev-secret-files.ts",
       "apps/runner/src/dev-hatchet-token.ts",
       "apps/runner/src/dev-api-environment.ts",
@@ -137,17 +181,9 @@ describe("dev custody root (F-05, L2-F1, L2-F2)", () => {
       "apps/runner/src/dev-database-principals-cli.ts",
       "deploy/dev-auth/tls-front-door.mjs",
       "deploy/dev-auth/create-local-certificate.mjs"
-    ];
-    const spellsThePath = /["'`]\.local["'`/]|\.local\/dev-auth|["'`]dev-auth["'`]\s*\)/;
-    const importsTheResolver =
-      /import\s*\{[^}]*\bresolveDevCustodyRoot\b[^}]*\}\s*from\s*"[^"]*custody-root\.mjs"/;
-    const violations: string[] = [];
-    for (const source of sources) {
-      const text = await readFile(join(REPOSITORY_ROOT, source), "utf8");
-      if (spellsThePath.test(text)) violations.push(`${source}: spells the custody path`);
-      if (!importsTheResolver.test(text)) violations.push(`${source}: does not import resolveDevCustodyRoot`);
+    ]) {
+      expect(importsTheResolver.test(await readFile(join(REPOSITORY_ROOT, source), "utf8")), source).toBe(true);
     }
-    expect(violations).toEqual([]);
   });
 
   it("owns the exact-0700 parent-directory custody policy and never repairs it (L7-F10)", async () => {

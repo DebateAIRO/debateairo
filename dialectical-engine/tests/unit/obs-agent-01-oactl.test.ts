@@ -306,8 +306,12 @@ describe("OBS-01 core oactl controls", () => {
       setRolePassword: async (password) => { appliedPassword = password; }
     });
     expect(appliedPassword).toBe("deterministic-test-secret");
+    // pin updated 2026-09-19 (DL7-F4): dev custody is movable (DEBATEAI_DEV_CUSTODY_ROOT),
+    // so the receipt names the file it actually wrote instead of a fixed repo-relative
+    // string that would be a lie whenever the override is set. With no override the
+    // resolver returns <repoRoot>/.local/dev-auth, so this fixture's path is unchanged.
     expect(result).toEqual({
-      output: "PROVISIONED .local/dev-auth/observation-agent.env",
+      output: `PROVISIONED ${join(repoRoot, ".local/dev-auth/observation-agent.env")}`,
       environmentPath: join(repoRoot, ".local/dev-auth/observation-agent.env")
     });
     expect(JSON.stringify(result)).not.toContain("deterministic-test-secret");

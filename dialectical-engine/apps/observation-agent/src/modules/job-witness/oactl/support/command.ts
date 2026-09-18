@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import pg from "pg";
 import { ObservationError } from "../../../../core/errors.js";
 import { SCHEDULER_JOBS, type SchedulerJob } from "../../witness.js";
+import { resolveDevCustodyRoot } from "../../../../../../../deploy/dev-auth/custody-root.mjs";
 
 export type JobCompletionReceipt = Readonly<{
   job: SchedulerJob;
@@ -61,7 +62,8 @@ function unquote(value: string): string {
 
 async function databaseUrl(): Promise<string> {
   const repoRoot = resolve(import.meta.dirname, "../../../../../../..");
-  const content = await readFile(join(repoRoot, ".local", "dev-auth", "observation-agent.env"), "utf8");
+  // DL7-F4: custody is movable; ask the resolver rather than assuming the checkout.
+  const content = await readFile(join(resolveDevCustodyRoot(repoRoot), "observation-agent.env"), "utf8");
   for (const line of content.split("\n")) {
     if (line.startsWith("OBSERVATION_DATABASE_URL=")) {
       const value = unquote(line.slice("OBSERVATION_DATABASE_URL=".length));

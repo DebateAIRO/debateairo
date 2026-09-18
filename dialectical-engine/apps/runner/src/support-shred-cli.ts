@@ -1,5 +1,5 @@
 import { userInfo } from "node:os";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   createPool,
@@ -9,6 +9,7 @@ import {
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import { loadDevelopmentCommandEnvironment } from "@debateai/register";
+import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
 import {
   loadDevelopmentSupportStatusCliCredentials,
   loadProductionSupportStatusCliCredentials
@@ -119,7 +120,7 @@ async function loadDefaultCredentials(): Promise<Readonly<{ supportDatabaseUrl: 
     return loadProductionSupportStatusCliCredentials(resolve("secrets/api-support.json"));
   }
   return loadDevelopmentSupportStatusCliCredentials(
-    resolve(".local/dev-auth/database-principals.env")
+    join(resolveDevCustodyRoot(resolve(".")), "database-principals.env")
   );
 }
 

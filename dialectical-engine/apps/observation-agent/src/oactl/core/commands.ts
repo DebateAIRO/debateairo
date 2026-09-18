@@ -21,6 +21,7 @@ import { provisionObservationAgent } from "./provision.js";
 import { fixedStateDirectory, removeMute, writeMute } from "./state.js";
 import { renderStatus } from "./status.js";
 import { loadMergedThresholdPolicy, ThresholdRepository } from "./thresholds.js";
+import { resolveDevCustodyRoot } from "../../../../../deploy/dev-auth/custody-root.mjs";
 
 export const CORE_VERB_NAMES = Object.freeze([
   "provision", "install", "uninstall", "start", "kill", "status", "mute",
@@ -148,7 +149,8 @@ function unquote(value: string): string {
 }
 
 async function readProvisionedEnvironment(repoRoot: string): Promise<z.infer<typeof environmentSchema>> {
-  const path = join(repoRoot, ".local", "dev-auth", "observation-agent.env");
+  // DL7-F4: read the env file where custody actually is, not where the repository is.
+  const path = join(resolveDevCustodyRoot(repoRoot), "observation-agent.env");
   try {
     const entries = (await readFile(path, "utf8")).trim().split("\n").map((line) => {
       const separator = line.indexOf("=");

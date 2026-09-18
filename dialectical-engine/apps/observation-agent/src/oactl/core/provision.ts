@@ -3,6 +3,7 @@ import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import pg from "pg";
 import { fixedStateDirectory } from "./state.js";
+import { resolveDevCustodyRoot } from "../../../../../deploy/dev-auth/custody-root.mjs";
 
 const DEV_ADMIN_DATABASE_URL =
   "postgresql://debateai:debateai-dev-only@127.0.0.1:55432/debateai";
@@ -44,7 +45,9 @@ export async function provisionObservationAgent(input: Readonly<{
   const databaseUrl = new URL(DEV_ADMIN_DATABASE_URL);
   databaseUrl.username = "debateai_observation_agent";
   databaseUrl.password = password;
-  const authDirectory = join(input.repoRoot, ".local", "dev-auth");
+  // DL7-F4: dev custody is movable (DEBATEAI_DEV_CUSTODY_ROOT, F-05) so keys need never
+  // live inside a cloud-synced checkout; the agent's own env file and Hatchet token follow it.
+  const authDirectory = resolveDevCustodyRoot(input.repoRoot);
   const environmentPath = join(authDirectory, "observation-agent.env");
   const rows = [
     ["OBSERVATION_DATABASE_URL", databaseUrl.toString()],
@@ -60,7 +63,7 @@ export async function provisionObservationAgent(input: Readonly<{
   );
   await chmod(environmentPath, 0o600);
   return Object.freeze({
-    output: "PROVISIONED .local/dev-auth/observation-agent.env",
+    output: `PROVISIONED ${environmentPath}`,
     environmentPath
   });
 }

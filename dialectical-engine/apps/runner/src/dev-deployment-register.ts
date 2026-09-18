@@ -31,6 +31,7 @@ import {
   type RegisterVersionText
 } from "@debateai/register";
 import type { DevelopmentConfiguredProvider, DevelopmentProviderPanel } from "./dev-provider-panel.js";
+import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
 
 export type DevelopmentDeploymentRegisterRow = Readonly<{
   rowKey: string;
@@ -65,8 +66,14 @@ export const DEVELOPMENT_REGISTER_VERSION = 5 as const;
 export const DEVELOPMENT_HISTORICAL_REGISTER_VERSION = 4 as const;
 export const DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_SCHEMA =
   "debateai.dev-deployment-register-receipt.v1" as const;
-export const DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_RELATIVE_PATH =
-  ".local/dev-auth/deployment-register-receipt.v1.json" as const;
+/**
+ * DL7-F4: the receipt lives in dev custody, and dev custody is movable
+ * (DEBATEAI_DEV_CUSTODY_ROOT, F-05) so keys need never sit inside a cloud-synced checkout.
+ * The name is custody-relative; {@link developmentDeploymentRegisterReceiptPath} resolves it
+ * through the one resolver that owns the rule.
+ */
+export const DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_FILENAME =
+  "deployment-register-receipt.v1.json" as const;
 export const DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX =
   "DEV_DEPLOYMENT_REGISTER_RECEIPT_V1=" as const;
 
@@ -179,7 +186,7 @@ async function readReceiptBytes(path: string): Promise<string> {
 
 export function developmentDeploymentRegisterReceiptPath(repositoryRoot: string): string {
   if (!isAbsolute(repositoryRoot)) throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_PATH_INVALID");
-  return join(resolve(repositoryRoot), DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_RELATIVE_PATH);
+  return join(resolveDevCustodyRoot(resolve(repositoryRoot)), DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_FILENAME);
 }
 
 function parseReceiptJson(source: string): DevelopmentDeploymentRegisterMachineReceiptV1 {

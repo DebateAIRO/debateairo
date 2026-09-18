@@ -1,7 +1,24 @@
 import { X509Certificate } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { resolveDevCustodyRoot } from "../../../../../deploy/dev-auth/custody-root.mjs";
 import { observationRepoRoot, resolveRepoPath, type ResolvedRepoPath } from "../../core/paths.js";
 import type { ModuleTargetFragment } from "../../core/types.js";
+
+/**
+ * DL7-F4. The ratified target names the certificate by its custody-relative location, and
+ * dev custody is movable (`DEBATEAI_DEV_CUSTODY_ROOT`, F-05): keys must be able to live
+ * outside a cloud-synced checkout. The configured value stays the contract — it is still
+ * compared exactly — but the path is RESOLVED through the custody resolver, so the agent
+ * reads the certificate where custody actually is rather than where the repository is.
+ */
+const CUSTODY_PREFIX = ".local/dev-auth/";
+
+function resolveCertificatePath(repoRoot: string, configuredPath: string): ResolvedRepoPath {
+  if (!configuredPath.startsWith(CUSTODY_PREFIX)) return resolveRepoPath(repoRoot, configuredPath);
+  const withinCustody = configuredPath.slice(CUSTODY_PREFIX.length);
+  return join(resolveDevCustodyRoot(repoRoot), withinCustody) as ResolvedRepoPath;
+}
 
 export type CertificateCapacitySnapshot = Readonly<{
   days: number;
@@ -45,7 +62,7 @@ export async function readCertificateCapacity(
   dependencies: CertificateCapacityDependencies = productionDependencies,
   repoRoot = observationRepoRoot()
 ): Promise<CertificateCapacitySnapshot> {
-  const path = resolveRepoPath(repoRoot, targetPath(targetFragment));
+  const path = resolveCertificatePath(repoRoot, targetPath(targetFragment));
   const contents = await dependencies.read(path);
   const notAfter = dependencies.notAfter(contents);
   if (!Number.isFinite(notAfter.getTime())) throw new Error("OBSERVATION_CERTIFICATE_INVALID");
