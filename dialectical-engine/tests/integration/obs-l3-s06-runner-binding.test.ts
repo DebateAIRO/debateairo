@@ -127,10 +127,16 @@ describe("S06 runner task binding", () => {
     });
     if (taskFn === undefined) throw new Error("TASK_FN_NOT_DECLARED");
 
+    // pin updated 2026-09-18 (DEV-SYNC, DL4-F1): the task still REJECTS with the same typed
+    // code — what this row is about, together with the capture-before-terminal order below —
+    // but it may no longer be the same OBJECT. The Hatchet SDK serialises whatever is thrown
+    // into its own Postgres and to stderr, outside the AEAD store, so the runner rethrows a
+    // scrubbed error carrying the code and no model text (apps/runner/src/index.ts,
+    // `scrubbedTaskFailure`; tests/unit/runner-failure-redaction.test.ts owns that contract).
     await expect(taskFn(
       { runId: "run:s06", workItemId: "work:s06" },
       { retryCount: () => 2 },
-    )).rejects.toBe(failure);
+    )).rejects.toMatchObject({ code: failure.code });
 
     expect(order).toEqual(["capture", "terminal"]);
     expect(captured).toHaveLength(1);
