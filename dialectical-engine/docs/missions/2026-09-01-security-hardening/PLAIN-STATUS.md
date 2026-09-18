@@ -67,7 +67,7 @@ The deployment kit exists but was written before the support chat and the monito
 
 ## Your decisions
 
-The technical version with exact values is [V-DECISIONS-PACKET.md](V-DECISIONS-PACKET.md). Here they are in plain words, grouped so you can answer quickly. You can reply "yes to all of group A" and only discuss the ones you want to.
+**Each decision is explained in full — what it is about, my answer, the alternatives, the cost — in [DECISIONS-EXPLAINED.md](DECISIONS-EXPLAINED.md).** The technical version with exact values is [V-DECISIONS-PACKET.md](V-DECISIONS-PACKET.md). Below, the short form, grouped so you can answer quickly. Two are already ruled (V-15: the server starts empty, no sweep; V-23: Cloudflare together, at the end). You can reply "yes to all of group A" and only discuss the ones you want to.
 
 ### Group A — routine; I recommend "yes" to all thirteen
 
