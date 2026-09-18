@@ -114,6 +114,14 @@ function notFound(reply: FastifyReply) {
   return reply.status(404).send({ error: "NOT_FOUND",message: "NOT_FOUND" });
 }
 
+/**
+ * DL1-F9. A message body may not exceed 16 KiB of UTF-8. The register's
+ * code-point limit stays authoritative for what a session may say; this
+ * ceiling only keeps the hash, the classifier and two round-trips away from a
+ * body that cannot be lawful at any setting.
+ */
+const SUPPORT_MESSAGE_BYTE_CEILING = 16 * 1_024;
+
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
@@ -335,6 +343,22 @@ export function installSupportRoutes(
       const tokenSha256 = capabilityFrom(request);
       if (tokenSha256 === null) return reply.status(404).send({ error: "NOT_FOUND" });
       if (!isResourceId(request.params.id)) return notFound(reply);
+      const body = typeof request.body === "object" && request.body !== null
+        ? request.body as Readonly<Record<string, unknown>> : {};
+      /**
+       * DL1-F9. The register's 2,000-code-point rule sits behind a session read,
+       * a configuration read, a sha256 and the classifier's code-point spread —
+       * all of which used to run over a body of up to the 256 KiB transport
+       * ceiling. The cheap byte refusal comes first; everything below keeps its
+       * order, including the code-point rule that carries the RATE_LIMITED
+       * evidence.
+       */
+      if (typeof body.text === "string"
+        && Buffer.byteLength(body.text,"utf8") > SUPPORT_MESSAGE_BYTE_CEILING) {
+        return reply.status(400).send({
+          error: "MALFORMED_REQUEST",message: "MALFORMED_REQUEST"
+        });
+      }
       const found = await application.sessions.read({ sessionId: request.params.id, tokenSha256 });
       if (found === null || !sessionOwnerMatches(request,found)) {
         return reply.status(404).send({ error: "NOT_FOUND" });
@@ -358,8 +382,6 @@ export function installSupportRoutes(
           text: supportTemplate("DISABLED", found.language)
         });
       }
-      const body = typeof request.body === "object" && request.body !== null
-        ? request.body as Readonly<Record<string, unknown>> : {};
       if (typeof body.text !== "string") {
         return reply.status(400).send({ error: "SUPPORT_MESSAGE_INVALID" });
       }

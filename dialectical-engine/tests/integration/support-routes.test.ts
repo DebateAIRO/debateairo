@@ -1255,6 +1255,67 @@ describe("SUP-01 support routes", () => {
     await server.close();
   });
 
+  /**
+   * DL1-F9. The handler read the session (DB), read the configuration, hashed
+   * `body.text` and ran the classifier's full code-point spread over as much as
+   * 256 KiB before the 2 000-code-point rule refused the message. The cheap
+   * byte ceiling now comes first, and the code-point rule keeps its place
+   * behind it.
+   */
+  it("refuses an oversized message body before the session read, config read, and classifier", async () => {
+    let reads = 0;
+    let configurations = 0;
+    const relay = vi.fn(async () => Object.freeze({
+      messageId: randomUUID(),outcome: "ANSWER_GROUNDED" as const,text: "must not run",
+      canEscalate: true
+    }));
+    const state = availableConfigurationState(true);
+    const server = api(true,{
+      configurationPort: Object.freeze({
+        current: async () => {
+          configurations += 1;
+          return state;
+        }
+      }),
+      sessionPort: sessionPort({
+        read: async (input) => {
+          reads += 1;
+          return sessions.read(input);
+        }
+      }),
+      answerPort: Object.freeze({ respond: relay })
+    });
+    const opened = await openSession(server,"203.0.113.212");
+    expect(opened.response.statusCode).toBe(201);
+    reads = 0;
+    configurations = 0;
+    const oversized = await sendMessage(
+      server,opened.body,"x".repeat(200 * 1_024),"203.0.113.212"
+    );
+    const refusedBeforeWork = { reads,configurations };
+    // The byte ceiling is the only thing that moved: a body inside it still
+    // reaches the register-driven 2,000-code-point rule.
+    const atCeiling = await sendMessage(
+      server,opened.body,"y".repeat(16 * 1_024),"203.0.113.212"
+    );
+    const rows = await database.pool.query<{ count: number }>(
+      "SELECT count(*)::int AS count FROM support.message WHERE session_id=$1",
+      [opened.body.session_id]
+    );
+    await server.close();
+
+    expect(oversized.statusCode).toBe(400);
+    expect(oversized.json()).toEqual({
+      error: "MALFORMED_REQUEST",message: "MALFORMED_REQUEST"
+    });
+    expect(refusedBeforeWork).toEqual({ reads: 0,configurations: 0 });
+    expect(atCeiling.statusCode).toBe(429);
+    expect(atCeiling.json()).toMatchObject({ outcome: "RATE_LIMITED" });
+    expect({ reads,configurations }).toEqual({ reads: 1,configurations: 1 });
+    expect(relay).not.toHaveBeenCalled();
+    expect(rows.rows).toEqual([{ count: 0 }]);
+  });
+
   it("applies session counts universally while anonymous IP limits remain anonymous-only", async () => {
     const server = api(true, { configuration: {
       supportLimitAnonMessages10m: 1,
