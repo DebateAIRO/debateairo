@@ -6,7 +6,7 @@
       "runtimeExecutable": "sh",
       "runtimeArgs": [
         "-c",
-        "cd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/apps/ui && NEXT_DIST_DIR=.next-dev pnpm dev"
+        "cd dialectical-engine/apps/ui && NEXT_DIST_DIR=.next-dev pnpm dev"
       ],
       "port": 3000
     },
@@ -15,7 +15,7 @@
       "runtimeExecutable": "sh",
       "runtimeArgs": [
         "-c",
-        "cd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine && pnpm run dev:auth:up"
+        "cd dialectical-engine && pnpm run dev:auth:up"
       ],
       "port": 3000,
       "url": "https://localhost:3000"
@@ -25,7 +25,7 @@
       "runtimeExecutable": "/bin/zsh",
       "runtimeArgs": [
         "-lc",
-        "cd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/consent-s02/dialectical-engine/apps/ui && DIALECTICAL_UI_HOST=127.0.0.1 PORT=4000 DIALECTICAL_API_BASE=http://127.0.0.1:8790 NEXT_PUBLIC_API_BASE=/api exec node server.mjs --dev"
+        "cd dialectical-engine/.worktrees/consent-s02/dialectical-engine/apps/ui && DIALECTICAL_UI_HOST=127.0.0.1 PORT=4000 DIALECTICAL_API_BASE=http://127.0.0.1:8790 NEXT_PUBLIC_API_BASE=/api exec node server.mjs --dev"
       ],
       "port": 4000,
       "url": "http://localhost:4000"
@@ -35,19 +35,10 @@
       "runtimeExecutable": "/bin/zsh",
       "runtimeArgs": [
         "-lc",
-        "cd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/consent-s02/dialectical-engine && exec pnpm dev:auth:up"
+        "cd dialectical-engine/.worktrees/consent-s02/dialectical-engine && exec pnpm dev:auth:up"
       ],
       "port": 3000,
       "url": "https://localhost:3000"
-    },
-    {
-      "name": "design-ref",
-      "runtimeExecutable": "sh",
-      "runtimeArgs": [
-        "-c",
-        "cd /private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/04681aae-9136-40c1-a806-db68080ab2e1/scratchpad/designsrv && python3 -m http.server 4599"
-      ],
-      "port": 4599
     },
     {
       "name": "tiers-s01-open",
