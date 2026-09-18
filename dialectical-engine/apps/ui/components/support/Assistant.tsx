@@ -8,6 +8,9 @@ import { ConsentToggle } from "./ConsentToggle.js";
 import { DebatePicker } from "./DebatePicker.js";
 import { supportCaseLink } from "./caseLink.js";
 import {
+  supportConsentRecordFrom,type SupportConsentRecord
+} from "./consent.js";
+import {
   browserSupportConversationStorage,
   clearStoredSupportConversation,
   restoreSupportConversation,
@@ -49,6 +52,8 @@ type SupportSession = Readonly<{
   sessionId: string;
   token: string;
   identityBound: boolean;
+  /** DL3-F6: the server's own-context consent for THIS session, or null. */
+  consentOwnContextAt?: string | null;
 }>;
 export type SupportCaseAcknowledgement = Readonly<{
   text: string;
@@ -75,7 +80,9 @@ export type SupportAssistantClient = Readonly<{
     context?: OwnContextSelection
   ): Promise<SupportReply>;
   isSignedIn?(): Promise<boolean>;
-  setConsent?(session: SupportSession,on: boolean): Promise<SupportReply | null>;
+  setConsent?(
+    session: SupportSession,on: boolean
+  ): Promise<SupportReply | SupportConsentRecord | null>;
   rate(
     session: SupportSession,messageId: string,rating: "yes" | "no"
   ): Promise<SupportCaseAcknowledgement | SupportReply | null>;
@@ -226,9 +233,13 @@ export const supportAssistantClient: SupportAssistantClient = Object.freeze({
       throw new Error("SUPPORT_RESPONSE_INVALID");
     }
     const session = body.session as Record<string,unknown>;
+    const consent = supportConsentRecordFrom(body);
     return Object.freeze({
       sessionId: String(session.session_id),token: String(body.session_token),
-      identityBound: session.identity_bound === true
+      identityBound: session.identity_bound === true,
+      // DL3-F6: the served record states this session's own-context consent.
+      // It used to be discarded here, so the control could only guess.
+      ...(consent === null ? {} : { consentOwnContextAt: consent.consentOwnContextAt })
     });
   },
   async sendMessage(session,text,language,context) {
@@ -249,7 +260,9 @@ export const supportAssistantClient: SupportAssistantClient = Object.freeze({
       `/api/v1/support/sessions/${encodeURIComponent(session.sessionId)}/consent`,
       { on },session.token
     ));
-    return replyFrom(body);
+    // DL3-F6: a terminal reply (SHREDDED, DISABLED…) still wins; otherwise the
+    // route answers with the updated session record, which is the consent fact.
+    return replyFrom(body) ?? supportConsentRecordFrom(body);
   },
   async rate(session,messageId,rating) {
     const body = await readJson(await supportPost(
@@ -548,7 +561,16 @@ export function Assistant({
     if (setConsent === undefined) throw new Error("SUPPORT_CONSENT_UNAVAILABLE");
     try {
       const result = await withSupportSession((active) => setConsent(active,on));
-      if (result !== null && result !== undefined) appendReply(result);
+      if (result === null || result === undefined) return;
+      if (isSupportReply(result)) {
+        appendReply(result);
+        return;
+      }
+      // DL3-F6: the server's new record replaces the one this session held, so
+      // the control shows what the API actually holds rather than a local guess.
+      setSession((current) => current === null
+        ? current
+        : { ...current,consentOwnContextAt: result.consentOwnContextAt });
     } catch (error) {
       appendReply({ messageId: "",outcome: "DEGRADED",text: REQUEST_UNAVAILABLE[language] });
       throw error;
@@ -582,6 +604,7 @@ export function Assistant({
     <ConsentToggle
       signedIn={identityAvailable}
       language={language}
+      consentedAt={session?.consentOwnContextAt ?? null}
       onChange={changeConsent}
     />
     <DebatePicker

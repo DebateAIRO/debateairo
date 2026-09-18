@@ -35,6 +35,29 @@ describe("SUP-03 per-conversation own-context consent", () => {
     expect(renderToStaticMarkup(<ConsentToggle signedIn={false} language="en" />)).toBe("");
   });
 
+  it("DL3-F6: shows the consent the server actually holds, not a local default", async () => {
+    const consentedAt = "2026-09-19T08:14:00.000Z";
+    expect(renderToStaticMarkup(<ConsentToggle signedIn language="en" consentedAt={consentedAt} />))
+      .toContain("checked");
+    expect(renderToStaticMarkup(<ConsentToggle signedIn language="en" consentedAt={null} />))
+      .not.toContain("checked");
+
+    // The compact widget unmounts on close and remounts on open: a control that
+    // remembered its own answer showed OFF while the server still held consent.
+    const onChange = vi.fn().mockResolvedValue(undefined);
+    await act(async () => root!.render(
+      <ConsentToggle signedIn language="en" consentedAt={consentedAt} onChange={onChange} />
+    ));
+    const toggle = document.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    expect(toggle.checked).toBe(true);
+    await act(async () => toggle.click());
+    expect(onChange).toHaveBeenNthCalledWith(1,false);
+    await act(async () => root!.render(
+      <ConsentToggle signedIn language="en" consentedAt={null} onChange={onChange} />
+    ));
+    expect(document.querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked).toBe(false);
+  });
+
   it("reports explicit on and off transitions without retaining consent outside the component", async () => {
     const onChange = vi.fn().mockResolvedValue(undefined);
     await act(async () => root!.render(
