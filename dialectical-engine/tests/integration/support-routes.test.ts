@@ -501,10 +501,16 @@ describe("SUP-01 support routes", () => {
     expect(transcripts.rowCount).toBe(0);
   });
 
+  /**
+   * DL1-F3 moved the third expectation from 429 to 201: one backward clock
+   * reading refuses that call only. The invariant under test is unchanged —
+   * the refused observation must not create a session — and the new one is that
+   * the instance is not left denying every caller until restart.
+   */
   it.each([
     ["anonymous", false],
     ["authenticated", true]
-  ] as const)("poisons regressing %s creation observations before later mutations", async (
+  ] as const)("refuses only the regressing %s creation observation", async (
     _name, authenticated
   ) => {
     const observations = [CLOCK_BASE_MS, CLOCK_BASE_MS - 1, CLOCK_BASE_MS + 1];
@@ -537,11 +543,11 @@ describe("SUP-01 support routes", () => {
     }
     await server.close();
 
-    expect(responses.map((response) => response.statusCode)).toEqual([201, 429, 429]);
-    expect(createdAt).toEqual([CLOCK_BASE_MS]);
+    expect(responses.map((response) => response.statusCode)).toEqual([201, 429, 201]);
+    expect(createdAt).toEqual([CLOCK_BASE_MS, CLOCK_BASE_MS + 1]);
   });
 
-  it("rejects regressing authenticated creation with real PostgreSQL and keeps later time poisoned", async () => {
+  it("rejects regressing authenticated creation with real PostgreSQL and admits the next", async () => {
     const before = await database.pool.query<{ count: string }>(
       "SELECT count(*)::text AS count FROM support.session"
     );
@@ -563,14 +569,14 @@ describe("SUP-01 support routes", () => {
     );
     await server.close();
 
-    expect(responses.map((response) => response.statusCode)).toEqual([201, 429, 429]);
-    expect(Number(after.rows[0]?.count) - Number(before.rows[0]?.count)).toBe(1);
+    expect(responses.map((response) => response.statusCode)).toEqual([201, 429, 201]);
+    expect(Number(after.rows[0]?.count) - Number(before.rows[0]?.count)).toBe(2);
   });
 
   it.each([
     ["anonymous", null],
     ["authenticated", IDENTITY.authenticated.ownerRef]
-  ] as const)("rejects regressing %s messages without persistent admission or rate evidence", async (
+  ] as const)("rejects the regressing %s message only, without rate evidence", async (
     _name, identityOwnerRef
   ) => {
     const sessionId = `00000000-0000-4000-8000-${identityOwnerRef === null ? "000000000011" : "000000000012"}`;
@@ -609,8 +615,8 @@ describe("SUP-01 support routes", () => {
     ];
     await server.close();
 
-    expect(responses.map((response) => response.statusCode)).toEqual([503, 429, 429]);
-    expect(persistentAdmissions).toBe(1);
+    expect(responses.map((response) => response.statusCode)).toEqual([503, 429, 503]);
+    expect(persistentAdmissions).toBe(2);
     expect(rateEvidenceWrites).toBe(0);
   });
 
@@ -659,7 +665,7 @@ describe("SUP-01 support routes", () => {
     expect(evidence.rowCount).toBe(0);
   });
 
-  it("preserves one-hour anonymous creation expiry before a rewind poisons the route", async () => {
+  it("preserves one-hour anonymous creation expiry across a refused rewind", async () => {
     const observations = [
       CLOCK_BASE_MS,
       CLOCK_BASE_MS + 60 * 60 * 1_000 + 1,
@@ -696,8 +702,8 @@ describe("SUP-01 support routes", () => {
     }
     await server.close();
 
-    expect(responses.map((response) => response.statusCode)).toEqual([201, 201, 429, 429]);
-    expect(createCalls).toBe(2);
+    expect(responses.map((response) => response.statusCode)).toEqual([201, 201, 429, 201]);
+    expect(createCalls).toBe(3);
   });
 
   it.each([
@@ -709,7 +715,7 @@ describe("SUP-01 support routes", () => {
       supportLimitAnonMessages10m: 100,
       supportLimitAnonMessages24h: 1
     }]
-  ] as const)("preserves %s message expiry before a rewind poisons the route", async (
+  ] as const)("preserves %s message expiry across a refused rewind", async (
     _name, horizonMs, overrides
   ) => {
     const observations = [
@@ -757,12 +763,12 @@ describe("SUP-01 support routes", () => {
     }
     await server.close();
 
-    expect(responses.map((response) => response.statusCode)).toEqual([503, 503, 429, 429]);
-    expect(persistentAdmissions).toBe(2);
+    expect(responses.map((response) => response.statusCode)).toEqual([503, 503, 429, 503]);
+    expect(persistentAdmissions).toBe(3);
     expect(rateEvidenceWrites).toBe(0);
   });
 
-  it("records only the session-closed decision before a rewind poisons the route", async () => {
+  it("records a session-closed decision for every refused read but none for a rewind", async () => {
     const sessionId = "00000000-0000-4000-8000-000000000031";
     const observations = [
       CLOCK_BASE_MS,
@@ -804,7 +810,8 @@ describe("SUP-01 support routes", () => {
 
     expect(responses.map((response) => response.statusCode)).toEqual([503, 429, 429, 429]);
     expect(persistentAdmissions).toBe(1);
-    expect(rateEvidenceWrites).toBe(1);
+    // DL1-F3: the rewind writes nothing; the two aged-out reads each record one.
+    expect(rateEvidenceWrites).toBe(2);
   });
 
   it("creates an anonymous capability session without storing the raw token", async () => {
