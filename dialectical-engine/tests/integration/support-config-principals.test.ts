@@ -436,7 +436,12 @@ describe("REGISTER-SUPPORT-PUBLICATION development operator principal", () => {
     const client = await database.pool.connect();
     try {
       await client.query("BEGIN");
-      await client.query("SET LOCAL ROLE debateai_runtime");
+      // DB1 / DL5-F4 (migrations/0065_security_delta_guards.sql §3) revoked the
+      // surplus import/publish EXECUTE from debateai_runtime — it has held no
+      // INSERT on register.register_row since 0055:2019, so it could never have
+      // reached the CHECK. The closed owner publisher named in this test's title
+      // is the role that actually carries the constraint.
+      await client.query("SET LOCAL ROLE debateai_register_publication_owner");
       await expect(client.query(`
         SELECT * FROM register.import_historical_register_version(
           4,

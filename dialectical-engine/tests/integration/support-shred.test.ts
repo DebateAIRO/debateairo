@@ -333,7 +333,11 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
       WHERE namespace.nspname='support' AND NOT trigger.tgisinternal
       ORDER BY trigger.tgname
     `);
-    expect(triggers.rows).toHaveLength(13);
+    // 13 from 0054 (5 markers + 1 deferred guard + 7 content-v2 envelope triggers)
+    // plus the 32 DB1 / DL5-F2 guards migrations/0065_security_delta_guards.sql
+    // installs: reject_truncate on all 17 support relations, reject_mutation on the
+    // 9 append-only ones and reject_delete on the 6 never-deleted column-mutable ones.
+    expect(triggers.rows).toHaveLength(45);
     expect(triggers.rows.filter(({ trigger_name }) =>
       trigger_name === "support_shred_integrity_guard_trigger"
     )).toEqual([expect.objectContaining({
@@ -347,6 +351,21 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
     expect(triggers.rows.filter(({ trigger_name }) =>
       trigger_name.includes("_content_v2_") || trigger_name.includes("_snapshot_v2_")
         || trigger_name.includes("_summary_v2_"))).toHaveLength(7);
+    expect(triggers.rows.filter(({ trigger_name }) => trigger_name === "reject_truncate")
+      .map(({ relation_name }) => relation_name).sort()).toEqual([
+      "_shred_integrity_guard", "abuse_event", "admission_event", "case", "case_event",
+      "case_key", "case_message", "message", "public_incident", "rating", "relay_call",
+      "relay_waiter", "relay_waiter_event", "session", "session_key", "shred_audit", "tool_call"
+    ]);
+    expect(triggers.rows.filter(({ trigger_name }) => trigger_name === "reject_mutation")
+      .map(({ relation_name }) => relation_name).sort()).toEqual([
+      "abuse_event", "admission_event", "case_event", "rating", "relay_call",
+      "relay_waiter", "relay_waiter_event", "shred_audit", "tool_call"
+    ]);
+    expect(triggers.rows.filter(({ trigger_name }) => trigger_name === "reject_delete")
+      .map(({ relation_name }) => relation_name).sort()).toEqual([
+      "_shred_integrity_guard", "case", "case_key", "public_incident", "session", "session_key"
+    ]);
 
     const functions = await database.pool.query<{
       proname: string;

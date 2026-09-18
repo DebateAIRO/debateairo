@@ -145,9 +145,10 @@ const EXECUTE_GRANTS: Readonly<Record<string, readonly string[]>> = {
   // INSERTs to the dedicated `debateai_register_publication_owner` role (0055:2010-2016)
   // and grants it this CHECK function for the same executor-init reason; 0055 also revokes
   // INSERT on register.register_row from debateai_runtime (0055:2019), so the runtime
-  // grant 0056 keeps is now surplus — a candidate for the post-sync guard migration.
+  // grant 0056 kept became surplus. DB1 / DL5-F4 revoked it in
+  // migrations/0065_security_delta_guards.sql §3; the owner grant is the live one.
   "register.claim_type_composition_map_is_valid(jsonb)": [
-    "debateai_runtime", "debateai_register_publication_owner"
+    "debateai_register_publication_owner"
   ],
   // trigger functions: fired by the trigger machinery, no application caller.
   "evidence.validate_instrument_certification()": [],
@@ -365,6 +366,14 @@ describe("0056 search_path pins (L5-F10)", () => {
       expect((await client.query<{ can_execute: boolean }>(
         "SELECT has_function_privilege('debateai_runtime','core.enforce_node_structure()','EXECUTE') AS can_execute"
       )).rows[0]!.can_execute).toBe(false);
+      // DB1 / DL5-F4 (0065 §3) revoked the surplus debateai_runtime EXECUTE on the
+      // CHECK helper; the pin is now that the call is refused for that role while the
+      // register publication owner keeps it (asserted by EXECUTE_GRANTS above).
+      const compositionDenied = await failureOf(
+        client, "SELECT register.claim_type_composition_map_is_valid('[]'::jsonb)"
+      );
+      expect(sqlState(compositionDenied)).toBe("42501");
+      await client.query("RESET ROLE");
       const composition = await client.query<{ rejected: boolean; accepted: boolean }>(`
         SELECT register.claim_type_composition_map_is_valid('[]'::jsonb) AS rejected,
           register.claim_type_composition_map_is_valid(
@@ -372,6 +381,7 @@ describe("0056 search_path pins (L5-F10)", () => {
           ) AS accepted
       `);
       expect(composition.rows[0]).toEqual({ rejected: false, accepted: true });
+      await client.query("SET LOCAL ROLE debateai_runtime");
       const insertNode = `
         INSERT INTO core.node (
           run_id, claim_text, claim_type, parent_node_id, child_kind, depth, sibling_ordinal,
