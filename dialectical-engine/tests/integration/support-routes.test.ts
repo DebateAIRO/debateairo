@@ -1174,6 +1174,68 @@ describe("SUP-01 support routes", () => {
     await server.close();
   });
 
+  /**
+   * DL1-F1. `{id}` and `body.session_id` reached the `uuid` columns unvalidated,
+   * Postgres raised 22P02 and a pure client fault surfaced as a 500 plus one
+   * `api.request.failed` line. Every support route now answers the branch's
+   * constant typed 404 before it touches the repository.
+   */
+  it("answers a typed 404 for non-UUID support ids before any repository call", async () => {
+    const reads: string[] = [];
+    const ratings: string[] = [];
+    const consents: string[] = [];
+    const server = api(true,{
+      sessionPort: sessionPort({
+        read: async (input) => {
+          reads.push(input.sessionId);
+          return sessions.read(input);
+        },
+        rateMessage: async (input) => {
+          ratings.push(input.messageId);
+          return sessions.rateMessage!(input);
+        },
+        setConsent: async (input) => {
+          consents.push(input.sessionId);
+          return sessions.setConsent!(input);
+        }
+      })
+    });
+    const failureLog = vi.spyOn(console,"error").mockImplementation(() => undefined);
+    const probes = [
+      ["GET","/v1/support/sessions/not-a-uuid",undefined],
+      ["POST","/v1/support/sessions/not-a-uuid/messages",{ text: "How do I start?" }],
+      ["POST","/v1/support/sessions/not-a-uuid/consent",{ on: true }],
+      ["POST","/v1/support/sessions/not-a-uuid/escalate",{ language: "en" }],
+      ["POST","/v1/support/messages/not-a-uuid/rating",{
+        session_id: randomUUID(),rating: "yes"
+      }],
+      [`POST`,`/v1/support/messages/${randomUUID()}/rating`,{
+        session_id: "not-a-uuid",rating: "yes"
+      }]
+    ] as const;
+    const responses = [];
+    for (const [method,url,payload] of probes) {
+      responses.push(await server.inject({
+        method,url,
+        headers: { "x-support-session-token": "A".repeat(43) },
+        ...(payload === undefined ? {} : { payload })
+      }));
+    }
+    const failures = failureLog.mock.calls
+      .map((call): string => String(call[0]))
+      .filter((line): boolean => line.includes("api.request.failed"));
+    failureLog.mockRestore();
+    await server.close();
+
+    expect(responses.map((response) => response.statusCode))
+      .toEqual([404,404,404,404,404,404]);
+    for (const response of responses) {
+      expect(response.json()).toEqual({ error: "NOT_FOUND",message: "NOT_FOUND" });
+    }
+    expect({ reads,ratings,consents }).toEqual({ reads: [],ratings: [],consents: [] });
+    expect(failures).toEqual([]);
+  });
+
   it("applies the 2,000-character boundary to authenticated support sessions", async () => {
     const server = api(true);
     const opened = await openAuthenticatedSession(server, "203.0.113.31");

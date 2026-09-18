@@ -96,6 +96,24 @@ function unavailable(reply: FastifyReply) {
   return reply.status(503).send({ error: "SUPPORT_NOT_COMPOSED" });
 }
 
+/**
+ * DL1-F1. Every support `{id}` and `body.session_id` lands in a `uuid` column,
+ * where a non-UUID raises Postgres `22P02`; the generic handler then turned a
+ * pure client fault into a 500 plus one `api.request.failed` line. The routes
+ * mirror the API's `ResourceIdSchema` here and answer the branch's constant
+ * typed 404 before the repository is ever asked.
+ */
+const SUPPORT_RESOURCE_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+
+function isResourceId(value: unknown): value is string {
+  return typeof value === "string" && SUPPORT_RESOURCE_ID.test(value);
+}
+
+function notFound(reply: FastifyReply) {
+  return reply.status(404).send({ error: "NOT_FOUND",message: "NOT_FOUND" });
+}
+
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
@@ -252,6 +270,7 @@ export function installSupportRoutes(
       if (application === undefined) return unavailable(reply);
       const tokenSha256 = capabilityFrom(request);
       if (tokenSha256 === null) return reply.status(404).send({ error: "NOT_FOUND" });
+      if (!isResourceId(request.params.id)) return notFound(reply);
       const state = await application.configuration.current();
       if (state.kind === "DISABLED") return reply.status(503).send({ error: state.code });
       const found = await application.sessions.read({
@@ -282,6 +301,7 @@ export function installSupportRoutes(
       if (tokenSha256 === null || typeof body.on !== "boolean") {
         return reply.status(400).send({ error: "SUPPORT_CONSENT_INVALID" });
       }
+      if (!isResourceId(request.params.id)) return notFound(reply);
       const found = await application.sessions.read({
         sessionId: request.params.id,tokenSha256
       });
@@ -314,6 +334,7 @@ export function installSupportRoutes(
       if (application === undefined) return unavailable(reply);
       const tokenSha256 = capabilityFrom(request);
       if (tokenSha256 === null) return reply.status(404).send({ error: "NOT_FOUND" });
+      if (!isResourceId(request.params.id)) return notFound(reply);
       const found = await application.sessions.read({ sessionId: request.params.id, tokenSha256 });
       if (found === null || !sessionOwnerMatches(request,found)) {
         return reply.status(404).send({ error: "NOT_FOUND" });
@@ -775,6 +796,9 @@ export function installSupportRoutes(
         || (body.rating !== "yes" && body.rating !== "no" && body.rating !== "human")) {
         return reply.status(404).send({ error: "NOT_FOUND" });
       }
+      if (!isResourceId(request.params.id) || !isResourceId(body.session_id)) {
+        return notFound(reply);
+      }
       const found = await application.sessions.read({
         sessionId: body.session_id,tokenSha256
       });
@@ -811,6 +835,7 @@ export function installSupportRoutes(
       if (application?.cases === undefined) return unavailable(reply);
       const tokenSha256 = capabilityFrom(request);
       if (tokenSha256 === null) return reply.status(404).send({ error: "NOT_FOUND" });
+      if (!isResourceId(request.params.id)) return notFound(reply);
       const found = await application.sessions.read({ sessionId: request.params.id,tokenSha256 });
       if (found === null || !sessionOwnerMatches(request,found)) {
         return reply.status(404).send({ error: "NOT_FOUND" });
