@@ -89,3 +89,48 @@ Seven read-only lanes (`delta-L1` … `delta-L7`), same schema and rubric as the
 - **V-28** (DL4-F2): seal a per-run token/cost envelope (tokens or USD per ask) in the register, enforced by the gateway, so the ask cap bounds money and not only attempt counts. Recommended: yes, before any paid gateway is configured (V-9c).
 - **V-29** (DL5-F8): replace the observation agent's `pg_monitor` membership with the narrower grants its one query needs. Recommended: yes, small.
 - **V-30** (DL7-F2): the acceptance CLI relays put the prompt on the vendor CLI's argv; on a single-user Mac this is the A4 residual V-10 grades LOW; on the server the relays must never run at all (V-9c: paid API keys through the HTTP gateway). Recommended: rule both; no code change in dev.
+
+---
+
+## Status, 2026-09-19
+
+### Closed on `security/dev-sync-2026-09-18`
+
+| Finding | Commit | Note |
+|---|---|---|
+| DL1-F1, F3, F4, F5a+b, F8, F9 | `8f3656a2` `9692a18b` `cf374faa` `0033f0af` `44177503` `5e05905c` | Support API round 1 |
+| DL2-F1 | `cebf125a` | The shred's `FOR UPDATE` on a table its own role may not update — the only erasure path for support transcripts, dead since it was written |
+| DL2-F2 / DL5-F1 | `4e28f1dd` `fef54d98` | Singleton lock + full-schema scan → five deferred per-row triggers scoped to one session or shred target. Two further causes found while measuring: `support."case"` had no usable `session_id` index, and plpgsql's cached generic plan re-created the O(N) commit |
+| DL2-F6 | `49fdb0c0` | Principal ordering by code units — the order `name` columns use |
+| DL3-F1 | `9e065e81` | |
+| DL3-F2, F3 | `390ee559` `f2cf696b` | |
+| DL3-F5 | `f141b474` | with B23b |
+| DL4-F1, F3 | `f9d55a65` `097f7bbb` `d710fbc1` | |
+| DL5-F2, F4, F5, F9 | `cfbc183c` `a6d1e2fe` | Migration 0065; DL5-F9 could not be fixed forward (`migrate()` keys on the file name), so it is pinned with the lexical-ordering fact for B28 |
+| DL6-F1, F3, F4 | `6e988cdc` `6d51c6c1` `994d41ec` | |
+| DL7-F1, F3, F4, F5, F11 | `54dcc6d4` `31f91360` `10b682bc` `7ce6638e` `96f58512` | |
+
+### DL7-F9 — refused on evidence, and that refusal is the finding
+
+DB1 was asked to revoke the observation daemon's `INSERT` on `observation.threshold_policy`
+(the table that rules it). It traced the callers first and declined: `oactl thresholds apply`
+is a **live** INSERT caller and opens its pool with `OBSERVATION_DATABASE_URL` — the same
+principal the daemon runs as. Revoking would have broken a real operator command; adding a
+test asserting the grant still exists would have enshrined the hole. Closing it properly needs
+a SECOND principal (an operator role distinct from the daemon role) plus credential wiring in
+`apps/observation-agent` and `deploy/` — a DEPLOY1 item, listed there now. The loopback pin
+from `54dcc6d4` devalues the grant in the meantime: a poisoned threshold can no longer send
+the Hatchet token anywhere off-box.
+
+### Still open
+
+- **S2** — DL1-F2 (no admission on support reads, uncached `/status`, unbounded authenticated
+  session-create), DL1-F7 (anonymous model-budget starvation; anonymous mutating support POSTs
+  need no Origin), DL2-F3, DL2-F4, DL2-F7, DL5-F3, DL7-F7.
+- **UI2** — DL3-F4, DL3-F6, DL3-F7 (in flight).
+- **RUN1** — DL4-F4 and the V-11 handoffs, pending V's ruling.
+- **DEPLOY1** — the VPS kit refresh, DL5-F7, DL7-F6, DL2-F5, and now DL7-F9's second principal.
+- **Owner decisions** — V-26, V-28, V-29, V-30 (and the original V-1…V-25).
+- **Deferred** — DL2-F8, DL5-F8, DL5-F10, DL6-F6, DL6-F7, DL6-F10, DL7-F10, DL7-F12; the
+  `support.message`/`case_message` row guards and DL5-F6 are named in delta-L5's own
+  "left to a later package" list.
