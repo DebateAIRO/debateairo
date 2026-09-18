@@ -326,6 +326,7 @@ apps/ui/lib/v3/labels.ts
 apps/ui/lib/v3/liveEvents.ts
 apps/ui/lib/v3/missingCapabilities.ts
 apps/ui/lib/v3/publicAnswerExport.ts
+apps/ui/lib/v3/requestFailure.ts
 apps/ui/lib/v3/tokenUnlock.ts
 apps/ui/middleware.ts
 apps/ui/next-env.d.ts

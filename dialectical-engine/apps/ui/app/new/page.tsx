@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
 import { createDebate, contractClient } from "@/lib/api";
 import { SCRUTINY_DEPTH_OPTIONS, ScrutinyDepth } from "@/lib/scrutinyDepth";
+import { requestFailureMessage } from "@/lib/v3/requestFailure";
 import { AuthGate } from "@/components/AuthGate";
 import { SupportWidget } from "@/components/support/SupportWidget";
 import {
@@ -89,7 +90,8 @@ function NewDebateForm({ token }: { token: string }) {
       setSessionDefaultsError(null);
     }).catch((failure: unknown) => {
       if (!active) return;
-      setSessionDefaultsError(`ASK_SESSION_DEFAULTS_UNAVAILABLE: ${failure instanceof Error ? failure.message : "Session read failed"}`);
+      // DL3-F7: classified copy, never the contract client's server-authored text.
+      setSessionDefaultsError(requestFailureMessage("SESSION_DEFAULTS", failure));
     });
     return () => { active = false; };
   }, [token]);
@@ -126,7 +128,9 @@ function NewDebateForm({ token }: { token: string }) {
       const debate = await createDebate(topic.trim(), config, token);
       router.push(`/debate/${encodeURIComponent(debate.id)}?starting=1`);
     } catch (exc) {
-      setError(exc instanceof Error ? exc.message : "Unable to create debate");
+      // DL3-F7: see lib/v3/requestFailure.ts — the banner states what this page
+      // observed, not whatever sentence arrived from upstream.
+      setError(requestFailureMessage("DEBATE_CREATE", exc));
     } finally {
       setSubmitting(false);
     }

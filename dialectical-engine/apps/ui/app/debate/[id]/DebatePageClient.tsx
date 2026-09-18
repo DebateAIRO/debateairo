@@ -32,6 +32,7 @@ import {
 } from "@/lib/debateHeaderOverflow";
 import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
 import { tokenUnlockFailureMessage } from "@/lib/v3/tokenUnlock";
+import { requestFailureMessage } from "@/lib/v3/requestFailure";
 import {
   applyRunEvent,
   createLiveRunState,
@@ -464,7 +465,10 @@ export default function DebatePageClient({
       // Existing in-flight runs resolve through the loading bundle above.
       // A remaining NOT_FOUND therefore means neither a visible run nor a
       // visible answer exists, and must remain an honest fatal result.
-      setError(exc instanceof ContractHttpError ? exc.code : exc instanceof Error ? exc.message : "Unable to load debate");
+      // DL3-F7: the fatal screen and the inline banner both render this string,
+      // so it is classified copy — never a contract code and never the server's
+      // own sentence (lib/v3/requestFailure.ts).
+      setError(requestFailureMessage("DEBATE_READ", exc));
     }
   }, [id]);
 
@@ -520,7 +524,7 @@ export default function DebatePageClient({
         setScoringState((current) => ({
           status: "error",
           data: current.data,
-          error: exc instanceof Error ? exc.message : "Unable to load scoring"
+          error: requestFailureMessage("SCORING_READ", exc)
         }));
       });
     return () => {
@@ -543,7 +547,7 @@ export default function DebatePageClient({
         setAdaptiveDepthDryRunState((current) => ({
           status: "error",
           data: current.data,
-          error: exc instanceof Error ? exc.message : "Unable to load adaptive depth dry-run"
+          error: requestFailureMessage("ADAPTIVE_DEPTH_READ", exc)
         }));
       });
     return () => {
