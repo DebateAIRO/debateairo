@@ -58,3 +58,76 @@ Probe (scratchpad only, `node --test`, 2/2 pass, worktree untouched): `route.ts`
 - No build and no browser pass: CSP compatibility is asserted from source (no inline handlers/scripts, no external hosts). DEV-SYNC §4's pending "browser pass for the nonce CSP against the UI added on dev" is the proof; a single pass over `/help`, `/settings`, `/debate/<id>`, `/public/debate/<ref>` with the console open settles it.
 - DL3-F1 is confirmed by a line-by-line trace (UI → contract client → Fastify `request.ip` → admission key), not by a running server; a 121-request loop against a built UI with `admissionPolicy` published takes a minute and should be added to the S5 smoke. DL3-F2 is bounded arithmetic, not a measurement.
 - Severity movers: DL3-F1 drops to LOW if SSR forwards the client IP (the fix) and would rise to HIGH only if the same loopback attribution also fed audit-source or auth flows started from SSR (none found: every credential flow goes through the proxy, which attributes correctly). DL3-F2 drops to LOW/INFO once `models` rides the index. DL3-F3 rises to MEDIUM if a support-session token alone ever authorises reading identity-bound history (today `sessionOwnerMatches` requires the cookie) or if support transcripts start carrying account data. DL3-F4 rises to MEDIUM the day an access log or analytics records query strings, or if case tokens gain write powers beyond "reply".
+
+## Fix package UI2 2026-09-19
+
+Five findings closed on `security/dev-sync-2026-09-18`, one commit each, red before green in every case. Test discipline: focused files only, never the full suite; `pnpm run typecheck` re-run to 0 errors after each commit. UI behaviour suites are `node:test` files under `apps/ui/**`, registered in `apps/ui/scripts/node-test-manifest.json`; four new shipped `apps/ui` files were added to `tests/support/shipped-corpus.manifest.txt` through its own switch.
+
+| Finding | Commit | Verdict |
+|---|---|---|
+| DL3-F2 | `390ee559` | closed — one upstream call per library page |
+| DL3-F3 | `f2cf696b` | closed — capability out of storage, transcript bound to its owner, 404 recovered |
+| DL3-F4 | `70002eb5` | closed in the browser; the API's path-borne token is a contract change ruled elsewhere |
+| DL3-F6 | `18f4de4b` | closed — the box shows the consent the server holds |
+| DL3-F7 | `9e5d57da` | closed — classified copy at all five cited sites |
+
+### DL3-F2 — `390ee559` · the home page's N+1 is gone
+**Change.** `AnswerSummarySchema` carries an optional `models` (`packages/contract/src/index.ts`), on the precedent `PublicDebateSummarySchema.models` set at `:283`. The owned answer-index query derives it from the answer projections it had **already** read and decrypted to build each row (`ServeRepository.readAnswerIndex`, `packages/serve/src/index.ts`), so the lineage costs nothing at the source. `debateSummariesFromIndex` reads `item.models` (`apps/ui/lib/v3/adapter.ts`) and the hydration loop is deleted from `listDebatesPageServer` (`apps/ui/lib/serverApi.ts`).
+
+**Path correction.** The packet named `packages/db/src/index.ts` for the index query. The owned answer-index query is not there — it is `ServeRepository.readAnswerIndex` in `packages/serve/src/index.ts`. Only that one object literal was touched; `packages/db/src/index.ts` was not modified. `apps/api/src/index.ts:1995` needed no change: the route is a pass-through that parses `AnswerIndexSchema`.
+
+**RED** — `pnpm exec vitest run tests/architecture/dl3-f2-answer-index-models.test.ts tests/unit/v2ui-data-layer.test.ts` → `Tests 5 failed | 59 passed (64)`:
+- *a fifty-row library page costs exactly one upstream call* — `expected [ 'readAnswerIndex', …(50) ] to deeply equal [ 'readAnswerIndex' ]`
+- *carries the model lineage the index row already states* — `expected [] to deeply equal [ 'gpt-5' ]`
+- *lets an index row state the models that made it* — `AnswerSummarySchema` rejected the unrecognised key `models`
+- *derives that lineage in the index query…* — `expected 'async readAnswerIndex(…' to contain 'DL3-F2'`
+- *leaves no per-row answer read in the SSR library page* — `expected listDebatesPageServer not to contain 'readAnswer('`
+
+**GREEN** — same command → `Test Files 2 passed (2) · Tests 64 passed (64)`; `apps/ui: node --import tsx --test lib/serverApi.test.mjs` → 7/7; `pnpm run typecheck` → 0 errors.
+
+**Left out.** `ServeRepository.readAnswerIndex` has no executable unit seam — it needs a live pool and a run-content lease, and its only runtime coverage is `tests/integration/database.test.ts`, which needs Postgres and was not run. That one derivation is therefore pinned by a source assertion plus the contract-schema and SSR behavioural tests. `models` is **optional**, exactly like the public precedent, so every existing `readAnswerIndex` stub in `tests/**` stays valid and an index row that states no lineage projects to `[]` rather than to an invented model. The SSR contract client still has no timeout or abort (`packages/contract/src/client.ts:104-117`) — pre-existing, and no longer amplified by a 50× fan-out.
+
+### DL3-F3 — `f2cf696b` · the support capability leaves `sessionStorage`
+**Change.** New `apps/ui/components/support/conversation.ts` owns what the widget may leave in the browser. (1) The capability is React state only; persistence goes through a whitelisting writer that can emit `language`, `identityBound`, `messages`, `ownContext` and nothing else, and the reader **erases** — not ignores — any payload carrying a `session`, because a tab open across the deploy keeps its `sessionStorage`. (2) The transcript is stored against the identity that produced it, restored only once that identity is known (so a signed-out first paint can never show a signed-in transcript), erased on identity change, and erased by `SessionControls`' `finishSession`, which logout, revoke-all and revoking the current session all run through. (3) `isStaleSupportSession` (`http.ts`) classifies the API's 404 as a stale session rather than an outage, and `withSupportSession` retries once on a brand-new session.
+
+**RED** — `apps/ui: node --import tsx --test components/support/supportConversation.test.mjs` → `tests 10, pass 0, fail 10`: seven storage tests on `ERR_MODULE_NOT_FOUND` for `conversation.ts`; *the API's 404 is classified…* on `TypeError: SupportHttpError is not a constructor`; *the assistant persists through the whitelisting writer* on `AssertionError: the assistant writes through the whitelist`; *ending a session erases the support conversation* on `AssertionError: input did not match /clearStoredSupportConversation/`.
+
+**GREEN** — 10/10; `tests/unit/v2ui-node-runner.test.ts` 2 passed (the suite is in the manifest); `tests/render/sup-01-help.test.tsx`, `sup-03-consent.test.tsx`, `s5-session-controls.test.tsx` all pass, including *replaces a persisted anonymous capability before a signed-in request* and *continues one session and its messages across widget and full-page remounts in the tab*; typecheck 0.
+
+**Left out.** The finding also proposed a "New conversation" control on the compact surface. The 404 recovery already removes the dead end it was meant to escape, and adding a control is a product change. Consequence worth recording: because the capability is no longer persisted, closing the compact widget (which unmounts `Assistant`) ends that support session; the transcript survives, the next message opens a new session.
+
+### DL3-F4 — `70002eb5` · the case bearer rides the fragment
+**Change.** New `apps/ui/components/support/caseLink.ts`, following B27's mailed-token pattern in `apps/ui/lib/mfaEnrollment.ts` line for line: read the fragment, `history.replaceState` it away before the first request, keep the token in component state. `supportCaseLink(token)` builds `/help#case=…`. The retired `?case=` form is read for one release — first rewritten to the fragment form so the query form leaves navigation state, then consumed like a fragment bearer. A value failing the API's 43-character grammar is cleared and never becomes a request path. `CaseLookup` re-fetches after a reply instead of `location.reload()` (a reload would look for a bearer the page has already cleared). `safeFirstPartyLink` in `Assistant.tsx` is now the single place a case link becomes an `href`: the API still mints `?case=` links, and every one renders as `#case=`.
+
+**RED** — `apps/ui: node --import tsx --test components/support/caseLink.test.mjs` → `tests 8, pass 0, fail 8`: six behavioural tests on `ERR_MODULE_NOT_FOUND` for `caseLink.ts`; *the case surfaces build and read the fragment form, and never reload* on `AssertionError: the acknowledgement link is the fragment form`; *every rendered case link is normalised* on `AssertionError: input did not match /supportCaseLink\(/`.
+
+**GREEN** — 8/8; `tests/render/sup-01-help.test.tsx`, `sup-02-case-view.test.tsx`, `sup-03-consent.test.tsx` → 3 files, 37 tests passed; `tests/unit/v2ui-node-runner.test.ts`, `tests/architecture/sup-01-boundary.test.ts`, `sup-04-mounts.test.ts` → 15 passed; typecheck 0.
+
+**Left out.** The API side is untouched, as ruled: it still takes the token in the path (`/v1/support/cases/<token>`) and still writes `/help?case=…` into its acknowledgement sentence. Nothing here depends on that, because the UI normalises at the render boundary. Five render assertions that pinned `href="/help?case=…"` now pin the fragment form and assert the query form is absent; the acknowledgement **text**, which is the API's copy, is unchanged.
+
+### DL3-F6 — `18f4de4b` · the consent box shows the server's consent
+**Change.** New `apps/ui/components/support/consent.ts`: `supportConsentRecordFrom` reads `session.consent_own_context_at` from any served session body and returns **null** for a body that says nothing, so nothing invents "off". `createSession` keeps the served value, the consent route's updated record replaces it, and `ConsentToggle` renders `checked` from `consentedAt`. The control keeps only the answer the user just gave, so the tick still follows the pointer without a round trip; a refused change drops that answer and the server's record rules again; the answer dies with the component, so a remount — the case that used to show OFF over a live consent — reads the server.
+
+**RED** — `apps/ui: node --import tsx --test components/support/consent.test.mjs` → `tests 5, pass 0, fail 5`: three behavioural tests on `ERR_MODULE_NOT_FOUND` for `consent.ts`; *the toggle renders the server's value, not a local default* (`ConsentToggle.tsx` held `const [checked,setChecked] = useState(false)`); *the assistant carries the recorded consent on the session it holds* (`createSession` discarded it). Also `pnpm exec vitest run tests/render/sup-03-consent.test.tsx` → × *shows the consent the server actually holds* — `expected '<label><input type="checkbox"/>Let th…' to contain 'checked'`.
+
+**GREEN** — 5/5 node; `sup-03-consent.test.tsx`, `sup-01-help.test.tsx`, `v2ui-node-runner`, `s1-1-depth-contract` all pass; typecheck 0.
+
+**Left out.** The finding also proposed showing "consented at …". That needs new bilingual copy for a fact the tick already states, so it is not in this fix.
+
+### DL3-F7 — `9e5d57da` · banners state what the page observed
+**Change.** New `apps/ui/lib/v3/requestFailure.ts`, on `tokenUnlock.ts`'s model: a closed SUBJECT alphabet (5) × a closed KIND alphabet (7: REFUSED, MISSING, BUSY, UNREACHABLE, SERVER_FAILED, UNREADABLE, UNCLASSIFIED), one constant clause each, the sentence being their concatenation. Nothing is derived from the caught object beyond the contract client's own typed discriminants. DR-115 holds: UNREACHABLE, SERVER_FAILED, UNREADABLE and UNCLASSIFIED all say the outcome is unknown, and only REFUSED — the coordinator answering 401/403 — claims a refusal. Wired at all five cited sites: `app/new/page.tsx` (session defaults, create) and `DebatePageClient.tsx` (debate read, scoring read, adaptive-depth dry run). The raw contract code that used to render as copy (`exc.code`, e.g. `SESSION_REQUIRED`) is gone with them.
+
+**RED** — `pnpm exec vitest run tests/unit/v2ui-banner-copy.test.ts`: first `Error: Cannot find module '../../apps/ui/lib/v3/requestFailure.js'` (`Test Files 1 failed`, no tests); then with the module present and the call sites untouched, × *leaves no contract error text in a page's error banner* — `app/new/page.tsx classifies its failures: expected '"use client";…' to contain 'requestFailureMessage('`.
+
+**GREEN** — 4/4; `tests/unit/v2ui-data-layer.test.ts`, `s1-1-depth-contract.test.ts`, `tests/render/ux01-new-debate-form.test.tsx`, `bug02-debate-effects.test.tsx` → 5 files, 1 086 tests passed; typecheck 0.
+
+**Left out.** `lib/serverApi.ts:139` still puts `failure.message` on the SSR `kind: "pending"` result. No page reads that field — `app/debate/[id]/page.tsx` handles `ok | loading | failed | not_found` only — so it reaches no banner; removing it would change a value nothing renders.
+
+### Red before this package, and still red
+Both were reproduced with this package's files reverted, so neither is caused here.
+- `tests/render/sup-04-widget.test.tsx > "expands on Enter, focuses the message control, and follows the Romanian override"`. jsdom runs no activation behaviour for a dispatched `Enter` keydown (`b.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}))` fires 0 clicks), so the widget never expands. Verified against `HEAD` with the DL3-F3 changes reverted. `tests/render` is outside `pnpm run test:ci-gate` (which covers `tests/unit` + `tests/architecture`), so it is not in `tests/ci-known-red.txt`.
+- `tests/render/load01-debate-page.test.tsx` — 3 failures (*T21 renders HOLDING…*, *renders a mid-session run.terminal failure…*, *behaviorally throws Next notFound…*). The identical three fail at this package's base commit `96f58512` with every file of this package reverted.
+
+### Not fixed here
+- **DL3-F5** (proxy forwards `x-support-session-token` verbatim) is not in this package's scope; `apps/ui/app/api/[...path]/route.ts` and `lib/sessionProxy.test.mjs` are untouched.
+- **DL3-F1** was already closed on the branch before this package (`lib/serverApi.ts` `readTrustedClientIp`, pinned by `lib/serverApi.test.mjs`); it was re-run green after every change here.
