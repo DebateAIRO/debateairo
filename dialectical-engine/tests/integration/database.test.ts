@@ -762,6 +762,39 @@ describe("BUG-01 content-rejection retry accounting", () => {
     }
   });
 
+  // DL4-F3 (delta audit, closes L4-F8's residual): the run-wide ceiling is re-checked before
+  // EVERY attempt of the gateway's own retry loop, not once per call. A run pinned to one
+  // model attempt, asked with a per-call bound of three against a provider that always
+  // fails, must stop after the first attempt with the run's refusal - never spend two more.
+  it("DL4-F3 re-checks the pinned run ceiling before every retry inside one gateway call", async () => {
+    const question = `dl4-f3-per-attempt-ceiling-${randomUUID()}`;
+    const runId = await createRun(question, 1);
+    const workItemId = await new WorkItemRepository(database.pool).enqueue({
+      runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
+    });
+    const provider = await startProviderDouble([{ status: 503 }, { status: 503 }, { status: 503 }]);
+    try {
+      const gateway = createPostgresProviderGateway(database.pool, {
+        endpoint: provider.endpoint, model: "test-layer/model", maker: "test-layer:reviewer",
+        sleepImplementation: async () => undefined
+      });
+      await expect(gateway.call({
+        runId, subjectItemId: workItemId,
+        callSiteKey: "JUDGE:review:dl4-f3", role: "JUDGE" as const, lane: "served" as const,
+        bound: { maxAttempts: 3, tokenCeiling: 256, deadlineMs: 5_000 },
+        contractHash: "contract:dl4-f3", providerRef: "provider:test-layer:reviewer",
+        packet: { messages: [{ role: "user" as const, content: "Review an existing debate node" }] }
+      })).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_EXHAUSTED" });
+      expect(provider.calls()).toBe(1);
+      expect(await new BudgetRepository(database.pool).countRunModelAttempts(runId)).toBe(1);
+    } finally {
+      await provider.stop();
+      await new WorkItemRepository(database.pool).recordTerminalFailure({
+        runId, workItemId, reason: "TEST_LAYER:DL4_F3_COMPLETE"
+      });
+    }
+  });
+
   it("T11/T13 charges every rejected attempt while terminal execution counts only the accepted attempt", async () => {
     const question = `bug01-accounting-${randomUUID()}`;
     const { runId, workItemId } = await createRunnerWork(question);

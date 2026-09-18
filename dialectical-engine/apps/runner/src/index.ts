@@ -5501,7 +5501,13 @@ export function createPostgresProviderGateway(
       }
       return http.call({
         ...request,
-        bound: { ...request.bound, maxAttempts: remaining }
+        bound: { ...request.bound, maxAttempts: remaining },
+        // DL4-F3: the pinned run ceiling is consulted before EVERY attempt of the gateway's
+        // retry loop (B26c's hook, wired here), not only once per call; the refusal is the
+        // run's own RUN_COST_ENVELOPE_EXHAUSTED and no ledger row is written for it.
+        ...(authenticatedEvaluatorScope ? {} : {
+          assertAttemptAllowed: () => budget.assertModelAttemptAllowed(request.runId!)
+        })
       });
       });
     }

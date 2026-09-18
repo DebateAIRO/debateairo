@@ -78,8 +78,10 @@ export interface ProviderCallRequest {
    * L4-F8: re-evaluated before EVERY attempt, so a run-wide model-attempt ceiling checked once
    * by the caller cannot be overshot by the gateway's own retry/repair loop. It throws to refuse;
    * the refusal propagates untouched and no ledger row is written for the refused attempt.
+   * May be asynchronous: the shipped composition consults the run's pinned ceiling in the
+   * database (DL4-F3).
    */
-  readonly assertAttemptAllowed?: () => void;
+  readonly assertAttemptAllowed?: () => void | Promise<void>;
 }
 
 export class ProviderCallFailedError extends TypedDomainError {
@@ -505,7 +507,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       // L4-F8: back off first, then re-check the ceiling, so the decision to spend an attempt is
       // taken on the freshest state rather than on state read up to a backoff ago.
       if (attempt > 1) await sleep(providerBackoffMs(attempt));
-      request.assertAttemptAllowed?.();
+      await request.assertAttemptAllowed?.();
       attemptsMade = attempt;
       const attemptTokenCeiling = lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures);
       const inputHash = digest(JSON.stringify(attemptPacket));
