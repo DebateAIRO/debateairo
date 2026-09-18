@@ -1,6 +1,6 @@
-# The 26 security decisions, explained
+# The 30 security decisions, explained
 
-*Written 18 September 2026 for the owner. For each decision: what it is about in plain words, the answer I would give, the other options and what they cost, and what I need from you. The technical one-liners live in [V-DECISIONS-PACKET.md](V-DECISIONS-PACKET.md); every answer you confirm here gets copied there as the ruling.*
+*Written 18 September 2026 for the owner; Group D added on 19 September after the re-check of the newer code. For each decision: what it is about in plain words, the answer I would give, the other options and what they cost, and what I need from you. The technical one-liners live in [V-DECISIONS-PACKET.md](V-DECISIONS-PACKET.md); every answer you confirm here gets copied there as the ruling.*
 
 **How to use this:** read the "My answer" line of each item. If you agree with all of them, reply "go with your answers". If you disagree with some, name them ("V-3: later, V-19: option 2"). Anything you don't mention, I'll treat as "go with your answer".
 
@@ -145,6 +145,33 @@ Three parts:
 **My answer.** Tighten what's accepted to at most twice the official cost. Small change, with a typed refusal code.
 
 ---
+
+## Group D — four new decisions, from the 19 September re-check
+
+The re-check of the 656 newer commits produced four questions that are yours rather than mine.
+
+### V-26 — When someone deletes their account, should their support chat go too?
+**About.** Account deletion erases the account and its debates. It does **not** touch the support conversation: that lives in its own tables, linked to the account, and is erased only by an operator running a command, or eventually by a retention timer. Two problems. First, most people who delete an account expect *everything* to go. Second — the reviewer proved this — that operator command **cannot actually run**: it asks the database for a kind of lock its own login isn't allowed to take, so PostgreSQL refuses it. The support transcripts have, in practice, no working erasure path at all.
+**My answer.** Fix the broken command (already being done), then make account deletion also erase that account's support conversation, in the same operation. One deletion, everything gone.
+**Alternative.** Leave support transcripts to the retention timer and say so plainly in the privacy notice. That is defensible, but it has to be *written down* for users, not left implicit.
+**Cost.** Small, once the command works.
+
+### V-28 — A spending limit measured in money, not in calls
+**About.** Your cap is "20 debates per hour per account". That limits how many debates start. It does not limit what a debate *costs*. The reviewer measured the worst case and it has grown: up to 2,748 model calls for one deep debate, and a cut-off answer is now retried asking for up to three times as many words. Think of it as a phone plan that limits how many calls you make but not how long each one lasts.
+**Why it matters now.** With the personal-subscription tools this spends quota. The moment the server uses paid API keys (decision V-9c), it spends money.
+**My answer.** Before any paid key is configured, seal a per-debate ceiling in tokens or in dollars, enforced where the calls are actually made. Then the cap bounds the bill, not just the call count.
+**Alternative.** Rely on each vendor's own monthly spending limit. That works, but it protects you only after the fact and it stops *everything* when hit, not just the runaway debate.
+**Cost.** Half an agent-day plus a decision on the number. My suggested starting point: a per-debate ceiling roughly 3× a normal debate's measured cost, which stops runaways without touching ordinary use.
+
+### V-29 — The monitoring agent can read every query's text
+**About.** The monitoring agent logs into the database with a role that belongs to PostgreSQL's built-in "monitor" group. That group can see the text of every query running on the server — which can include user content — while the agent only ever runs one narrow query of its own.
+**My answer.** Give it exactly the permissions its one query needs and drop the group membership. Small, and it removes a whole class of accidental exposure.
+**Alternative.** Keep it: the agent only listens on the machine itself, so the exposure is limited to someone already on the server.
+
+### V-30 — How the support chat reaches the AI model
+**About.** The support chat currently sends the visitor's message to the model through the same development command-line tools the engine uses, and those tools pass the entire message as a command-line argument — which any other account on the same machine can read with a standard command. On your single-user Macs that is the local-neighbour risk you already graded low (V-10). On a shared server it would be a genuine leak of what people type into support.
+**My answer.** Rule that those command-line tools are development-only and never run on the server; the server talks to models over the proper paid-API path (this is part of V-9c). No code change needed in development.
+**Alternative.** Harden the tools to pass the text by file instead of on the command line, so they *could* run anywhere. More work, and it keeps a development shortcut alive in production — I would not.
 
 ## The three "decide later" items the packet also listed
 
