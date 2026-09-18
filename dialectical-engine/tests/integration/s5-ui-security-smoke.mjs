@@ -92,10 +92,10 @@ function assertDocumentPolicy(response, surface, path) {
 }
 
 function assertHydrationHtml(html, nonce, surface, path) {
-  const openingTags = [...html.matchAll(/<script\b[^>]*>/g)].map((match) => match[0]);
+  const openingTags = [...html.matchAll(/<script\b[^>]*>/gi)].map((match) => match[0]);
   assert(openingTags.length > 0, `${surface} ${path}: emits scripts`);
   const sources = openingTags.flatMap((tag) => {
-    const source = tag.match(/\bsrc="([^"]+)"/);
+    const source = tag.match(/\bsrc="([^"]+)"/i);
     return source === null ? [] : [source[1]];
   });
   assert(sources.length > 0, `${surface} ${path}: emits production hydration scripts`);
