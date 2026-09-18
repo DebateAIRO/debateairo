@@ -93,3 +93,238 @@ Delta functions verified clean (pinned `search_path`, PUBLIC revoked, grants mat
 - The probe ran on embedded PostgreSQL 18.4 as a superuser-owned cluster; grant *effects* for LOGIN principals (`debateai_prod_*`) were reasoned from the manifest, since those roles are minted by the provisioner, not by migrations. The DL5-F1 timing numbers are from a single sequential connection on a laptop; the slope (≈0.48 µs per existing session per commit) is the finding, not the absolute values.
 - What would change the severities: DL5-F1 rises to HIGH if the support subsystem is judged a production-critical surface whose outage counts as an asset (it is currently an anonymous helper) or falls to LOW if V rules a small global cap on anonymous sessions acceptable; DL5-F2 rises to HIGH only if a long-lived owner credential is ever placed on the VPS (C3 forbids it — same condition as L5-F4); DL5-F3 falls to LOW if V rules that support IP hashes are operational security data with a documented short retention (then the retention sweep is the whole fix); DL5-F4 rises to MEDIUM if any runtime path ever reads "latest sealed version" instead of the pinned `REGISTER_VERSION`.
 - Residual for the orchestrator: the follow-up guard migration (DEV-SYNC §3 item 4) should take the table above verbatim, plus DL5-F5's `ALTER FUNCTION`, DL5-F4's revokes and DL5-F6's explicit `WITH INHERIT FALSE`, and land with a DISCOVERY test rather than another fixed list.
+
+## Fix package DB1 2026-09-18
+
+Four commits on `security/dev-sync-2026-09-18`, one per finding. New file
+`migrations/0065_security_delta_guards.sql` (§1-§3 in the first commit, §4 in the
+third); no landed migration was edited, and 0065 owns every object it creates —
+it never `CREATE OR REPLACE`s a function another migration defines (the
+0063:20-39 rule). Every statement is idempotent and the file is replayable.
+
+| Finding | Commit | State |
+|---|---|---|
+| DL5-F2 (+ DL5-F5, DL5-F4; DL7-F9 traced, not done) | `cfbc183c` | fixed |
+| DL2-F1 | `cebf125a` | fixed |
+| DL2-F2 / DL5-F1 | `4e28f1dd` | fixed |
+| DL5-F9 | `a6d1e2fe` | ledgered, pinned; no forward fix exists |
+
+### DL5-F2 — guards for the 20 delta relations (`cfbc183c`)
+
+`core.install_truncate_guard` on all 20. Three further treatments, chosen per
+relation from the grants 0050-0057 actually made:
+
+- **append-only, `reject_mutation BEFORE UPDATE OR DELETE ... FOR EACH STATEMENT`
+  (0057's shape, the delta-era convention, strictest because it refuses a
+  zero-row UPDATE)** — `support.abuse_event`, `case_event`, `rating`,
+  `tool_call`, `relay_call`, `relay_waiter`, `relay_waiter_event`,
+  `admission_event`, `shred_audit`, `serve.synthesis_round`.
+- **TRUNCATE guard only** — `support.message`, `support.case_message`. Both carry
+  the content-v2 envelope triggers whose refusal of a v1 rewrite is proved by an
+  owner-session `UPDATE` in `tests/integration/support-cases.test.ts` and
+  `support-routes.test.ts`; a statement-level `reject_mutation` fires before the
+  row trigger and would replace `SUPPORT_CONTENT_V2_REQUIRED` with 55000. No
+  privilege changes either way — `debateai_support` holds no UPDATE or DELETE on
+  either — so the residual is the owner session, which the TRUNCATE guard now
+  closes. **Left to a later package**, with those content-v2 probes restructured.
+- **never deleted but column-mutable, `reject_delete BEFORE DELETE ... FOR EACH
+  STATEMENT`** — `support.session`, `"case"`, `session_key`, `case_key`,
+  `public_incident`, `_shred_integrity_guard`. A blanket `reject_mutation` would
+  break the shred itself (`shredded_at`/`wrapped_key`/`destroyed_at` are granted
+  UPDATE at 0054:882-885) and the incident CLI (0053:35). Its own trigger name
+  keeps an earlier migration's `DROP TRIGGER IF EXISTS reject_mutation` away.
+- **TRUNCATE guard only, deliberately** — `register.required_row`,
+  `required_row_version`: a migration-owned manifest, and `0061:2-8` DELETEs from
+  `required_row_version` by design when a profile is rebuilt; a reject trigger
+  fires for the owner too and would brick that migration.
+
+Also in the same commit: **DL5-F5**, `ALTER FUNCTION
+core.reject_edge_mutation_except_measurement() SET search_path = pg_catalog,
+pg_temp` (body untouched); **DL5-F4**, `REVOKE EXECUTE ... FROM debateai_runtime`
+on `register.publish_register_version`, `import_historical_register_version`,
+`assert_required_rows` and `claim_type_composition_map_is_valid(jsonb)`, each
+caller re-verified by grep first.
+
+**RED** (before 0065) — `pnpm exec vitest run tests/architecture/security-migration-0065.test.ts`:
+`8 failed | 4 passed (12)`.
+- *guards every application base table that is not a named mutable exception* —
+  expected 26, got 46: the 20 delta relations, discovered from `pg_class` /
+  `pg_trigger`, not listed.
+- *refuses TRUNCATE and the closed mutations from the database owner* —
+  `support.shred_audit accepted TRUNCATE`.
+- *pins search_path on every function defined in an application schema* —
+  `["core.reject_edge_mutation_except_measurement()"]`.
+- four × *… is not executable by debateai_runtime* — `runtime: true,
+  authorization_runtime: true`.
+
+**GREEN** — `12 passed (12)`, later `14 passed (14)` with the DL5-F9 block.
+
+The test is the DISCOVERY test the audit asked for. It derives its subjects from
+the catalog — base tables with no enabled `BEFORE TRUNCATE` statement trigger;
+relations carrying a `core.reject_mutation()` UPDATE/DELETE guard but no TRUNCATE
+guard (self-maintaining, no list at all); application-schema functions with no
+`search_path=` in `proconfig`, extension-owned functions excluded by `pg_depend`;
+`TRUNCATE` in any application-schema ACL. The one literal list is
+`MUTABLE_UNGUARDED_RELATIONS`: 26 **pre-delta** relations, each with the reason it
+is legitimately mutable. It also pins the application-schema set itself, so a new
+schema fails rather than escaping every rule.
+
+Dependent pins updated in the same commit: `security-migration-0056.test.ts`
+(89 passed), `register-support-publication.test.ts` (27), `support-config-principals.test.ts`
+(8), `support-shred.test.ts` (20 at that point).
+
+**DL7-F9 — traced and NOT done, deliberately.** The revoke was verified first, as
+instructed, and a live caller needs the grant:
+`apps/observation-agent/src/oactl/core/thresholds.ts:270` (`oactl thresholds
+apply`, the OBS-01 SPEC.md step-3 ritual) INSERTs into
+`observation.threshold_policy`, and `oactl/core/commands.ts:196-198` opens its
+pool with `OBSERVATION_DATABASE_URL` — the same env key, and therefore the same
+`debateai_observation_agent` principal, the daemon uses at `main.ts:84,103`
+(`oactl/core/provision.ts:44-50` writes that URL with the agent's own
+credential). Revoking here breaks the only apply path with no writer to take it
+over. Closing it properly needs a second principal (say
+`debateai_obs_threshold_operator`) plus credential wiring in
+`apps/observation-agent` and `deploy/`, both outside package DB1's file scope. No
+test was added: a test asserting the grant still exists would enshrine the hole.
+**Owed to a later package**, together with DL5-F6's explicit
+`GRANT pg_monitor ... WITH INHERIT FALSE` (also outside DB1: it is a manifest and
+provisioner change).
+
+### DL2-F1 — the shred runs under its own principal again (`cebf125a`)
+
+`packages/db/src/support.ts` `lockShredTargetRows` took `SELECT … FROM
+support.shred_audit … FOR UPDATE`. PostgreSQL refuses a row lock without UPDATE
+on at least one column, and 0054:875 grants `debateai_support` only SELECT and
+INSERT there while the boot attestation (`support.ts:2386-2402`) forbids any
+UPDATE grant — so every `shredOwner`/`shredSession` aborted 42501 and rolled
+back. Fixed in code, not by widening the grant. The claim that nothing else is
+needed was verified in the code first: both entry points already hold the
+transaction-scoped advisory lock keyed on exactly the `(target_kind, target_ref)`
+pair the audit row uses (`support.ts:356-368, 1482-1489, 1502`), and a writer
+past them fails closed on `support_shred_audit_target_unique` (0054:257) at the
+INSERT. The four remaining `FOR UPDATE` locks are on relations that do carry
+column-level UPDATE grants.
+
+**RED** — `pnpm exec vitest run tests/integration/support-shred.test.ts -t "DL2-F1"`:
+`2 failed | 1 passed | 20 skipped (23)`; both failures
+`error: permission denied for table shred_audit` (SQLSTATE 42501, `aclchk.c`,
+`aclcheck_error`). The third case — *holds no UPDATE on support.shred_audit, so
+no lock clause there may need one* — was green before and after: it is the pin
+that the grant was **not** widened.
+
+**GREEN** — `24 passed (24)`. The new cases drive `PostgresSupportShredRepository`
+through a pool whose connections `SET ROLE debateai_support` (asserted with
+`current_user`), prove `SHREDDED` then `ALREADY_SHREDDED` for an owner target
+with a case and for an anonymous session, re-check `assertSupportKeyCoverage`,
+and race two concurrent owner shreds down to exactly one audit row. A
+class-level regression pin was added as the audit proposed: every `FOR UPDATE` /
+`FOR SHARE` clause in `packages/db/src/support.ts` is parsed out of the source,
+resolved through its aliases back to the support relations it names, and compared
+with the column-level UPDATE grants in the catalog.
+
+### DL2-F2 / DL5-F1 — the guard is no longer a global serialisation point (`4e28f1dd`)
+
+0065 §4. The invariant is unchanged; the mechanism is replaced. The five
+`AFTER … FOR EACH STATEMENT` dirty markers and the singleton constraint trigger
+are dropped; five `DEFERRABLE INITIALLY DEFERRED CONSTRAINT TRIGGER … FOR EACH
+ROW` call the new `support.assert_shred_integrity_row()`, which resolves the
+touched row to its scope and calls the new
+`support.assert_shred_integrity_scope()`, running 0054's seven branches over that
+scope only. 0054's two functions keep their bodies byte for byte (hash-pinned at
+0054:507-538 and 753-787) and are now bound to no trigger.
+
+Ordering is kept and moved from global to per scope: the scope function locks the
+scope's session rows `FOR UPDATE`, in `session_id` order, before reading. Two new
+indexes: `support.session(identity_owner_ref)` (partial) and the missing
+`support."case"(session_id)` — the latter also un-seq-scans
+`lockShredTargetRows`. Both new functions carry
+`SET plan_cache_mode = force_custom_plan`: without it plpgsql's cached generic
+plan, built while `support.session` was empty, re-creates the O(N) commit
+(measured 0.449 ms/commit at N=200, 0.739 ms on the *same* pooled connection at
+N=2200, 0.400 ms on a *fresh* connection at the same N).
+
+**RED** (§4 removed from the file) — `pnpm exec vitest run tests/integration/support-shred-scope-guard.test.ts`:
+`3 failed | 5 passed (8)`.
+- *keeps the cost of a session commit flat as the session table grows* —
+  `ms/commit grew from 0.402 to 1.185 as N went 800 -> 1600`.
+- *lets a second session commit while the first transaction is still open* —
+  `expected 'blocked' to be 'committed'`.
+- *checks only the touched scope …* — `expected '1' to be '4'`: one whole-schema
+  scan where four scoped checks belong.
+The five invariant cases were green **before** the change, so they are not
+tautological.
+
+**GREEN** — `8 passed (8)`: ms/commit flat within 1.5× across three batches of
+800, the second session commits in 19 ms while the first transaction is still
+open with zero backends waiting on a row lock, the counter reads 4, and all five
+invariant cases still refuse their violating write.
+
+SUP-07's four mechanism-level cases were rewritten against the new mechanism
+(trigger inventory 44 with the five scope guards and no dirty markers, the two
+0054 functions present and hash-identical but trigger-less, the two new functions
+and two indexes pinned, `SET CONSTRAINTS` by the new constraint name, scope
+semantics for the counter). A missing `ROLLBACK` that let a failing case poison
+the next one through the shared pool was fixed at the same time.
+
+**Named residual.** The singleton UPDATE also produced a first-updater-wins
+conflict under REPEATABLE READ and SERIALIZABLE between *any* two support
+writers; the scoped guard reproduces that only for overlapping scopes. No
+application path depends on the wider form: every writer runs READ COMMITTED
+(`withSupportTransaction`, `support.ts:324-340`), owner-bound session creation and
+the owner shred both hold the same per-owner advisory lock for the whole
+transaction (`support.ts:390-398`, `1482-1489`), and under SERIALIZABLE
+`create()`'s read of `support.shred_audit` against `shredOwner()`'s INSERT there
+is an rw-antidependency SSI aborts on. The SUP-07 case *serializes owner shreds
+against new signed sessions at every isolation level* stays green at all three
+levels.
+
+**Replay note for B28.** §4 drops all six of 0054's guard triggers, so a
+standalone replay of 0054 — which `support-shred.test.ts` exercises and 0063:20-39
+records as legal in production — finds none of them, re-creates all six and
+passes its own contract; both mechanisms then enforce the same invariant and the
+slow one is back until 0065 is replayed. Dropping only *some* of the six would
+instead abort that replay with `SUPPORT_SHRED_DEFINITION_DRIFT: triggers`. The
+ledger work should record "replay 0065 after any replay of 0054".
+
+### DL5-F9 — the migration is `0053_support_public_incident.sql` (`a6d1e2fe`)
+
+`0053_support_public_incident.sql:3` opens `CREATE TABLE support.public_incident (`
+with no `IF NOT EXISTS`; every other delta `CREATE` is guarded. A standalone
+replay of that file aborts 42P07. **No forward fix exists and none was invented:**
+`migrate()` keys its ledger on the file name, so a corrected copy in 0065 changes
+nothing about replaying 0053 itself, and the table already exists on every
+migrated database. What 0065's test contributes instead is the guard against the
+next one — the discovered set of unguarded `CREATE TABLE` statements across
+`migrations/` must be exactly `{0002_s02.sql` (pre-delta, `core.edge`)`,
+0053_support_public_incident.sql}`, and unguarded `CREATE INDEX` must stay empty
+(it is).
+
+**Lexical-ordering fact, for the B28 migration-ledger follow-up.** Eight numeric
+prefixes are duplicated — `0025`, `0050`, `0051`, `0052`, `0053`, `0054`, `0055`,
+`0057` — and `migrate()` sorts by **file name** (`packages/db/src/index.ts:769`).
+Inside each pair the applied order is therefore a lexical accident of the suffix:
+every `_support` / `_observation` twin runs before its `_t…` twin only because
+`s` and `o` sort before `t`. No cross-pair dependency exists today (re-verified:
+`0054_tint1` → `0052_t5`; `0061` → `0055` and `0050_t16`; `0064` → `0050_t16`;
+`0056` → `0052_t5`; `0062` → `0034`/`0058`/`0060`; `0063` → `0038`/`0040`), so
+nothing is broken, but a third twin would sort unpredictably against its
+siblings. The test holds the duplicate set fixed and requires a unique prefix
+from `0065` onward; a checksum per applied file is still owed (B28).
+
+### Deliberately left to a later package
+
+- **DL7-F9** — `observation.threshold_policy` INSERT for the observation agent's
+  own role: needs a second principal and credential wiring outside DB1's files
+  (evidence above).
+- **DL5-F6** — the explicit `GRANT pg_monitor … WITH INHERIT FALSE, SET TRUE` (or
+  the narrowing to `pg_read_all_stats`), the manifest's `inheritOption`,
+  `ownsRelations` and `forbiddenMemberships` rows: `deploy/` and the P3 manifest,
+  outside DB1.
+- **`support.message` / `support.case_message` row-mutation guards** — the
+  TRUNCATE guard is in; the blanket `reject_mutation` waits on the content-v2
+  probes being restructured (reason above). No privilege gain is outstanding,
+  only owner-session depth.
+- **DL5-F3** (keyed IP hash + retention sweep), **DL5-F7** (`hardening.sql`
+  CONNECT list), **DL5-F8**, **DL5-F10** (boot-time `snapshot_sha256` witness) —
+  not in DB1's scope.
+- **0053's replay** — unfixable forward; ledgered above.
