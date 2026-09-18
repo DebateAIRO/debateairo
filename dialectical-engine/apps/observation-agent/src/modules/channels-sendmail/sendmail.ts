@@ -127,10 +127,23 @@ export function createSendmailDeliveryExecutor(input: Readonly<{
     }
     const capture = await resolveCaptureDirectory(input.stateDir, captureDirectory);
     const subject = `dialectical-engine ${signal.data.severity} ${signal.data.component} ${signal.data.class}`;
-    const message = `Subject: ${subject}\nContent-Type: text/plain; charset=utf-8\n\n${renderImpact(signal.data)}\n`;
+    // DL7-F3: `-t` means the recipient rides in the header block on stdin, where
+    // no other local uid can read it out of `ps`; the mail sink accepts nothing
+    // else, and a header block is only a header block in CRLF. Both the address
+    // and the subject come from validated closed values, so neither can fold a
+    // second header in. The body is normalised because the sink splits on the
+    // first CRLF pair and an LF-only message has no header block at all.
+    const headers = Object.freeze([
+      `To: ${to}`,
+      `From: ${from}`,
+      `Subject: ${subject}`,
+      "Content-Type: text/plain; charset=utf-8"
+    ]);
+    const body = renderImpact(signal.data).split("\n").join("\r\n");
+    const message = `${headers.join("\r\n")}\r\n\r\n${body}\r\n`;
     await execute(Object.freeze({
       file: executable,
-      args: Object.freeze(["-i", "-f", from, "--", to]),
+      args: Object.freeze(["-i", "-t", "-f", from]),
       stdin: message,
       env: Object.freeze({
         PATH: `${resolve(homedir(), ".local/bin")}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`,

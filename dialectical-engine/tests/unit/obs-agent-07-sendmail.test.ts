@@ -5,8 +5,58 @@ import { afterEach, describe, expect, it } from "vitest";
 import { signalSchema } from "../../apps/observation-agent/src/core/signals.js";
 import {
   createSendmailDeliveryExecutor,
-  resolveCaptureDirectory
+  resolveCaptureDirectory,
+  type SendmailSpawnRequest
 } from "../../apps/observation-agent/src/modules/channels-sendmail/sendmail.js";
+
+const CAPTURE_SCRIPT = "deploy/dev-auth/sendmail-capture.mjs";
+const SHIPPED_FRAGMENT = "deploy/observation-agent/targets.dev.d/OBS-07.json";
+
+/**
+ * DL7-F3. The capture script IS the contract, so this pin reads the flags out
+ * of the script's own `requireInvocation` guard instead of restating them.
+ * Until 2026-09-18 the agent's pin restated `-i -f <from> -- <to>` against a
+ * fake spawn while the script demanded `-i -t -f <from>`: two pins that
+ * contradicted each other and both passed. Derive the contract and they
+ * cannot drift apart again.
+ */
+async function captureInvocationContract(): Promise<Readonly<{
+  argumentCount: number;
+  flags: readonly string[];
+}>> {
+  const source = await readFile(CAPTURE_SCRIPT, "utf8");
+  const count = /argv\.length !== (\d+)/u.exec(source);
+  const flags = [...source.matchAll(/argv\[(\d+)\] !== "([^"]+)"/gu)];
+  if (count === null || flags.length === 0) {
+    throw new Error("the capture script's invocation guard could not be read");
+  }
+  return Object.freeze({
+    argumentCount: Number(count[1]),
+    flags: Object.freeze(flags
+      .sort((left, right) => Number(left[1]) - Number(right[1]))
+      .map((match) => match[2]!))
+  });
+}
+
+/** A grammar the script enforces, read from the script itself (DL7-F3). */
+async function captureGrammar(name: "RECIPIENT_GRAMMAR" | "EMAIL_SHAPE"): Promise<RegExp> {
+  const source = await readFile(CAPTURE_SCRIPT, "utf8");
+  const pattern = new RegExp(`${name}\\s*=\\s*\\n?\\s*/([^\\n]+)/;`, "u").exec(source);
+  if (pattern === null) throw new Error(`the capture script's ${name} could not be read`);
+  return new RegExp(pattern[1]!);
+}
+
+const captureRecipientGrammar = () => captureGrammar("RECIPIENT_GRAMMAR");
+const captureEnvelopeSenderShape = () => captureGrammar("EMAIL_SHAPE");
+
+/** The `notify` block of the fragment the agent ships with. */
+function shippedNotify(fragment: unknown): Readonly<Record<string, string>> {
+  const notify = (fragment as Readonly<{ notify?: unknown }>).notify;
+  if (notify === null || typeof notify !== "object" || Array.isArray(notify)) {
+    throw new Error(`${SHIPPED_FRAGMENT} carries no notify block`);
+  }
+  return notify as Readonly<Record<string, string>>;
+}
 
 const scratchDirectories: string[] = [];
 afterEach(async () => {
@@ -46,7 +96,7 @@ describe("OBS-07 sendmail channel", () => {
     );
   });
 
-  it("uses exact argv, a fixed template, child-only capture env, stdin close, and 10s timeout", async () => {
+  it("meets the capture script's own invocation contract with no recipient on argv", async () => {
     const repoRoot = await scratch();
     const stateDir = join(repoRoot, "state");
     const capture = join(stateDir, "dev-mail-capture");
@@ -62,18 +112,14 @@ describe("OBS-07 sendmail channel", () => {
       writeFile(join(repoRoot, ".local/dev-auth/tls/localhost.pem"), "certificate"),
       writeFile(sendmail, "capture")
     ]);
-    const calls: unknown[] = [];
+    // The notify block the agent actually ships with, so this pin measures the
+    // deployed configuration against the sink's grammar, not a fixture (DL7-F3).
+    const notify = shippedNotify(JSON.parse(await readFile(SHIPPED_FRAGMENT, "utf8")));
+    const calls: SendmailSpawnRequest[] = [];
     const execute = createSendmailDeliveryExecutor({
       repoRoot,
       stateDir,
-      configuration: {
-        notify: {
-          sendmail_path: "deploy/dev-auth/sendmail-capture.mjs",
-          dev_capture_dir: "dev-mail-capture",
-          from: "observation-agent@localhost",
-          to: "ops@localhost"
-        }
-      },
+      configuration: { notify },
       async spawn(request) {
         await readFile(request.file);
         calls.push(request);
@@ -89,16 +135,38 @@ describe("OBS-07 sendmail channel", () => {
     } finally {
       process.chdir(originalCwd);
     }
-    expect(calls).toEqual([{
-      file: sendmail,
-      args: ["-i", "-f", "observation-agent@localhost", "--", "ops@localhost"],
-      stdin: "Subject: dialectical-engine FATAL hatchet INFRA_DOWN\nContent-Type: text/plain; charset=utf-8\n\nHatchet is down: asks are accepted but no debate work is dispatched or run.\n",
-      env: {
-        PATH: `${join(homedir(), ".local/bin")}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`,
-        DEBATEAI_DEV_MAIL_CAPTURE_DIR: capture
-      },
-      timeoutMs: 10_000,
-      closeStdin: true
-    }]);
+    expect(calls).toHaveLength(1);
+    const request = calls[0]!;
+    expect(request.file).toBe(sendmail);
+    expect(request.env).toEqual({
+      PATH: `${join(homedir(), ".local/bin")}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`,
+      DEBATEAI_DEV_MAIL_CAPTURE_DIR: capture
+    });
+    expect(request.timeoutMs).toBe(10_000);
+    expect(request.closeStdin).toBe(true);
+
+    // argv: exactly the script's flags plus the envelope sender, and nothing else.
+    const contract = await captureInvocationContract();
+    expect(request.args).toEqual([...contract.flags, notify.from]);
+    expect(request.args).toHaveLength(contract.argumentCount);
+    // No recipient on argv (L7-F7): the envelope sender is the only address there.
+    expect(request.args.filter((argument) => argument.includes("@"))).toEqual([notify.from]);
+    expect(request.args).not.toContain(notify.to);
+    expect(notify.from).toMatch(await captureEnvelopeSenderShape());
+
+    // Message: CRLF framing throughout, exactly one `To:`, no fan-out header,
+    // no obs-fold continuation — the four things the script itself checks.
+    expect(request.stdin).not.toMatch(/(?<!\r)\n/u);
+    const separator = request.stdin.indexOf("\r\n\r\n");
+    expect(separator).toBeGreaterThan(0);
+    const headers = request.stdin.slice(0, separator).split("\r\n");
+    expect(headers.filter((header) => /^to:/iu.test(header))).toEqual([`To: ${notify.to}`]);
+    expect(notify.to).toMatch(await captureRecipientGrammar());
+    expect(headers.some((header) => /^[ \t]/u.test(header))).toBe(false);
+    expect(headers.some((header) =>
+      /^(?:cc|bcc|resent-to|resent-cc|resent-bcc):/iu.test(header))).toBe(false);
+    expect(request.stdin.slice(separator + 4))
+      .toBe("Hatchet is down: asks are accepted but no debate work is dispatched or run.\r\n");
+    expect(headers).toContain("Subject: dialectical-engine FATAL hatchet INFRA_DOWN");
   });
 });
