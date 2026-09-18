@@ -935,8 +935,17 @@ export function installSupportRoutes(
       }
       let found;
       try {
+        /**
+         * DL1-F5. The token alone no longer decides: the case service also sees
+         * when it was presented (the thirty-day ceiling) and who presented it
+         * (the owner binding the row already carries). A refusal is the same
+         * typed 404 an unknown token gets — a 403 here would confirm the case.
+         */
         found = await application.caseAccess.readByToken(tokenSha256,{
-          limit,...(request.query.cursor === undefined ? {} : { cursor: request.query.cursor })
+          limit,
+          at: (application.clock ?? (() => new Date()))(),
+          callerOwnerRef: request.authenticatedSession?.ownerRef ?? null,
+          ...(request.query.cursor === undefined ? {} : { cursor: request.query.cursor })
         });
       } catch (error) {
         if (error instanceof SupportCaseError && error.code === "SUPPORT_CASE_CURSOR_INVALID") {
@@ -988,6 +997,7 @@ export function installSupportRoutes(
       try {
         state = await application.caseAccess.replyByToken({
           tokenSha256,text: body.text,at: (application.clock ?? (() => new Date()))(),
+          callerOwnerRef: request.authenticatedSession?.ownerRef ?? null,
           messageByteLimit: configuration.snapshot.values.supportLimitMessageCharacters,
           caseMessageLimit: configuration.snapshot.values.supportLimitSessionMessages
         });

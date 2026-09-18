@@ -219,6 +219,14 @@ export type SupportCaseAccessPort = Readonly<{
   readByToken(tokenSha256: string,pagination?: Readonly<{
     limit: number;
     cursor?: string;
+    /**
+     * DL1-F5(b). The authenticated caller behind this read, or `null` for an
+     * anonymous one. Omitting it is read as anonymous, so an owner-bound case
+     * stays closed to a caller that never declared itself.
+     */
+    callerOwnerRef?: string | null;
+    /** DL1-F5(a). The instant the token is presented; defaults to the clock. */
+    at?: Date;
   }>): Promise<SupportCaseViewRecord | null>;
   replyByToken(input: Readonly<{
     tokenSha256: string;
@@ -226,8 +234,50 @@ export type SupportCaseAccessPort = Readonly<{
     at: Date;
     messageByteLimit: number;
     caseMessageLimit: number;
+    callerOwnerRef?: string | null;
   }>): Promise<SupportCaseState | Readonly<{ kind: "SHREDDED";notice: string }> | null>;
 }>;
+
+/**
+ * DL1-F5(a). A case token is a 256-bit bearer capability that travels in a URL
+ * — the API path and the `/help?case=` link — so it survives in browser
+ * history, shared links and proxy access logs. It now stops authorising the
+ * decrypted transcript thirty days after the creation timestamp already on the
+ * row, with no migration and no new column.
+ */
+export const SUPPORT_CASE_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
+
+function rowInstantMs(value: unknown): number | null {
+  if (value instanceof Date) {
+    const atMs = value.getTime();
+    return Number.isSafeInteger(atMs) ? atMs : null;
+  }
+  if (typeof value === "string") {
+    const atMs = Date.parse(value);
+    return Number.isSafeInteger(atMs) ? atMs : null;
+  }
+  return null;
+}
+
+/**
+ * The single gate both token surfaces pass: an unreadable or aged creation
+ * timestamp, or a case bound to an owner the caller has not authenticated as,
+ * is indistinguishable from an unknown token. It never throws and never
+ * discloses which of the two refused.
+ */
+function tokenRefused(
+  row: Readonly<Record<string,unknown>>,
+  at: Date,
+  callerOwnerRef: string | null
+): boolean {
+  const createdAtMs = rowInstantMs(row.created_at);
+  const atMs = at.getTime();
+  if (createdAtMs === null || !Number.isSafeInteger(atMs)) return true;
+  if (atMs - createdAtMs > SUPPORT_CASE_TOKEN_TTL_MS) return true;
+  const owner = row.identity_owner_ref;
+  if (owner === null || owner === undefined) return false;
+  return typeof owner !== "string" || owner !== callerOwnerRef;
+}
 
 const CASE_CURSOR_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
@@ -274,7 +324,9 @@ function shreddedRow(row: Readonly<Record<string,unknown>>): boolean {
 export function createSupportCaseAccessService(input: Readonly<{
   repository: SupportCaseAccessRepositoryPort;
   keys: Pick<SupportKeyPort,"unwrapDataKey" | "openContent" | "sealContent">;
+  clock?: () => Date;
 }>): SupportCaseAccessPort {
+  const clock = input.clock ?? (() => new Date());
   async function withDataKey<T>(row: Readonly<Record<string,unknown>>,
     use: (key: Buffer) => Promise<T> | T): Promise<T> {
     const caseId = String(row.case_id);
@@ -376,6 +428,9 @@ export function createSupportCaseAccessService(input: Readonly<{
         page: { limit: pagination?.limit ?? 40,...cursor }
       });
       if (row === null) return null;
+      if (tokenRefused(row,pagination?.at ?? clock(),pagination?.callerOwnerRef ?? null)) {
+        return null;
+      }
       if (shreddedRow(row)) {
         const language = row.language === "ro" ? "ro" : "en";
         return Object.freeze({
@@ -397,6 +452,7 @@ export function createSupportCaseAccessService(input: Readonly<{
       }
       const row = await input.repository.readCaseEncrypted({ tokenSha256: request.tokenSha256 });
       if (row === null) return null;
+      if (tokenRefused(row,request.at,request.callerOwnerRef ?? null)) return null;
       const language = row.language === "ro" ? "ro" : "en";
       if (shreddedRow(row)) return Object.freeze({
         kind: "SHREDDED" as const,notice: SHREDDED_NOTICE[language]

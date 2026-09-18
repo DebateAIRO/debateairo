@@ -61,6 +61,8 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 
 const KB_VERSION = "a".repeat(64);
 const IDENTITY = testHttpIdentity("support-routes");
+/** DL1-F5(b): a second account, so an owner-bound case has a foreign caller. */
+const CASE_OWNER = testHttpIdentity("support-routes-case-owner");
 const CLOCK_BASE_MS = Date.parse("2026-09-06T12:00:00.000Z");
 const INVALID_CLOCK_OBSERVATIONS = Object.freeze([
   ["NaN", Number.NaN],
@@ -263,7 +265,7 @@ describe("SUP-01 support routes", () => {
   ) {
     return buildApi({
       application: askApplication(),
-      sessions: testSessionApplication([IDENTITY]),
+      sessions: testSessionApplication([IDENTITY,CASE_OWNER]),
       allowedOrigin: TEST_APP_ORIGIN,
       support: {
         configuration: options.configurationPort ?? configuration(enabled, options.configuration),
@@ -315,11 +317,13 @@ describe("SUP-01 support routes", () => {
     };
   }
 
-  async function openAuthenticatedSession(server: FastifyInstance, ip: string) {
+  async function openAuthenticatedSession(
+    server: FastifyInstance, ip: string, identity = IDENTITY
+  ) {
     const response = await server.inject({
       method: "POST",
       url: "/v1/support/sessions",
-      headers: { ...testSessionHeaders(IDENTITY, true), "x-forwarded-for": ip },
+      headers: { ...testSessionHeaders(identity, true), "x-forwarded-for": ip },
       payload: { language: "en" }
     });
     const payload = response.json<{
@@ -2376,6 +2380,115 @@ describe("SUP-01 support routes", () => {
     `,[body.case.case_id])).rows[0]!;
     expect(afterShred).toEqual(beforeShred);
     await server.close();
+  });
+
+  /**
+   * DL1-F5(b) at the route. The case token travels in the URL path and in the
+   * `/help?case=` link, so it reaches history, shared links and access logs.
+   * When the case carries an owner, holding the token is no longer enough: the
+   * caller must present that owner's session, and anyone else gets the same
+   * 404 an unknown token gets — never a 403 that would confirm it exists.
+   */
+  it("binds an owner-bound case token to the owner's session", async () => {
+    const server = api(true,{ clock: () => new Date(CLOCK_BASE_MS + 40) });
+    const opened = await openAuthenticatedSession(server,"203.0.113.213",CASE_OWNER);
+    const escalated = await server.inject({
+      method: "POST",
+      url: `/v1/support/sessions/${opened.body.session_id}/escalate`,
+      headers: {
+        ...testSessionHeaders(CASE_OWNER,true),
+        "x-support-session-token": opened.body.session_token
+      },
+      payload: { language: "en" }
+    });
+    expect(escalated.statusCode).toBe(201);
+    const caseBody = escalated.json<{ case: { case_id: string };case_token: string }>();
+    const anonymousRead = await server.inject({
+      method: "GET",url: `/v1/support/cases/${caseBody.case_token}`
+    });
+    const anonymousReply = await server.inject({
+      method: "POST",url: `/v1/support/cases/${caseBody.case_token}/messages`,
+      payload: { text: "let me in" }
+    });
+    const foreignRead = await server.inject({
+      method: "GET",url: `/v1/support/cases/${caseBody.case_token}`,
+      headers: testSessionHeaders(IDENTITY)
+    });
+    const foreignReply = await server.inject({
+      method: "POST",url: `/v1/support/cases/${caseBody.case_token}/messages`,
+      headers: testSessionHeaders(IDENTITY,true),payload: { text: "let me in" }
+    });
+    const ownerRead = await server.inject({
+      method: "GET",url: `/v1/support/cases/${caseBody.case_token}`,
+      headers: testSessionHeaders(CASE_OWNER)
+    });
+    const ownerReply = await server.inject({
+      method: "POST",url: `/v1/support/cases/${caseBody.case_token}/messages`,
+      headers: testSessionHeaders(CASE_OWNER,true),payload: { text: "it is me" }
+    });
+    const appended = await database.pool.query<{ count: number }>(
+      "SELECT count(*)::int AS count FROM support.case_message WHERE case_id=$1",
+      [caseBody.case.case_id]
+    );
+    await server.close();
+
+    expect([
+      anonymousRead.statusCode,anonymousReply.statusCode,
+      foreignRead.statusCode,foreignReply.statusCode
+    ]).toEqual([404,404,404,404]);
+    expect(anonymousRead.json())
+      .toEqual({ error: "NOT_FOUND",text: supportTemplate("NOT_FOUND","en") });
+    expect(foreignRead.json()).toEqual(anonymousRead.json());
+    expect(anonymousReply.json()).toEqual({ error: "NOT_FOUND" });
+    expect(foreignReply.json()).toEqual({ error: "NOT_FOUND" });
+    expect([ownerRead.statusCode,ownerReply.statusCode]).toEqual([200,200]);
+    expect(ownerRead.json()).toMatchObject({
+      kind: "READABLE",case: { case_id: caseBody.case.case_id }
+    });
+    expect(appended.rows).toEqual([{ count: 1 }]);
+  });
+
+  /**
+   * DL1-F5(a) at the route: the same token, thirty days and one millisecond
+   * later, is refused for reads and replies alike.
+   */
+  it("expires a case token thirty days after the case was opened", async () => {
+    const opening = api(true,{ clock: () => new Date(CLOCK_BASE_MS + 45) });
+    const opened = await openSession(opening,"203.0.113.214");
+    const escalated = await opening.inject({
+      method: "POST",
+      url: `/v1/support/sessions/${opened.body.session_id}/escalate`,
+      headers: { "x-support-session-token": opened.body.session_token },
+      payload: { language: "en" }
+    });
+    expect(escalated.statusCode).toBe(201);
+    const caseBody = escalated.json<{ case: { case_id: string };case_token: string }>();
+    const fresh = await opening.inject({
+      method: "GET",url: `/v1/support/cases/${caseBody.case_token}`
+    });
+    await opening.close();
+
+    const later = api(true,{
+      clock: () => new Date(CLOCK_BASE_MS + 45 + 30 * 24 * 60 * 60 * 1_000 + 1)
+    });
+    const expiredRead = await later.inject({
+      method: "GET",url: `/v1/support/cases/${caseBody.case_token}`
+    });
+    const expiredReply = await later.inject({
+      method: "POST",url: `/v1/support/cases/${caseBody.case_token}/messages`,
+      payload: { text: "too late" }
+    });
+    const appended = await database.pool.query<{ count: number }>(
+      "SELECT count(*)::int AS count FROM support.case_message WHERE case_id=$1",
+      [caseBody.case.case_id]
+    );
+    await later.close();
+
+    expect(fresh.statusCode).toBe(200);
+    expect([expiredRead.statusCode,expiredReply.statusCode]).toEqual([404,404]);
+    expect(expiredRead.json())
+      .toEqual({ error: "NOT_FOUND",text: supportTemplate("NOT_FOUND","en") });
+    expect(appended.rows).toEqual([{ count: 0 }]);
   });
 
   it("returns typed already-opened without a capability for concurrent manual escalation", async () => {
