@@ -8,15 +8,16 @@ import ts from "typescript-classic";
  * UNDETERMINED occurrences emit sites keyed by literal spans; OTHER is withheld.
  * Text-only ceiling detection remains a separate arm (plan REVISION 4, §1–§3).
  *
- * NAMED FACT (D68 ADDENDUM 2, V, 2026-09-06) and what closed it:
- * at the time the pinned parser had been installed and imported under Node
- * 25.7.0 only, so it was UNVERIFIED on the runtime the project declared.
- * That is closed as of the 2026-09-18 runtime upgrade. The runtime the project
- * DECLARES is `package.json` engines, and it says 26.8.2; the whole suite —
- * this module's callers included — was run under Node 26.8.2 on vitest 5.0.1.
- * The sealed bootstrap register version 1 still reads "v22.23.1", and that is
- * not a contradiction: it is a dated measurement taken on 2026-08-07, sealed
- * with that version, and never the declaration of today's runtime.
+ * NAMED FACT (D68 ADDENDUM 2), carried verbatim:
+ * "Node 22.23.1 UNVERIFIED (V, 2026-09-06): the pinned parser was installed and imported under Node 25.7.0 only."
+ *
+ * CLOSED (2026-09-18, the D78 runtime upgrade): the runtime this project
+ * DECLARES is `package.json` engines, and it now says the Node 26.8.2 line; the
+ * whole suite — this module's callers included — was run under Node 26.8.2 on
+ * vitest 5.0.1. The sealed bootstrap register version 1 still reads "v22.23.1",
+ * and that is not a contradiction: it is a dated measurement taken on
+ * 2026-08-07, sealed with that version, and never a declaration of today's
+ * runtime.
  */
 
 export type DuplicateKind = "DEPTH_BOUND_LITERAL" | "DOMAIN_ENUMERATION";

@@ -17,6 +17,15 @@ import { describe, expect, it } from "vitest";
  *
  * This file is the regression pin for that arrangement: it fails on any runner
  * that hands the test something other than jsdom's storage.
+ *
+ * KNOWN LIMIT of the last assertion, stated rather than hidden. Node emits that
+ * ExperimentalWarning once per process and vitest reuses a worker across files,
+ * so inside a whole-suite run this line is a per-file guard that an earlier file
+ * may already have satisfied by consuming the single emission; on its own it
+ * cannot prove the warning is gone from the run. The evidence for that is the
+ * whole-run count instead: the four-count log `full-31f6e25b.log`, taken on
+ * vitest 4.1.10, contains the string `--localstorage-file` 8 times, and
+ * `full-53a09658.log`, taken on vitest 5.0.1, contains it 0 times.
  */
 
 const KEY = "node26-jsdom-storage-environment";
