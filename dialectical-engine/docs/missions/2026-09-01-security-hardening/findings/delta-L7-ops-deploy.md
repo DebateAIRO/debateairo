@@ -87,3 +87,71 @@ Lane L7 of the DELTA audit. Worktree `.claude/worktrees/security-hardening-2026-
 - No probe was executed and no live stack, container, launchd job or listener was started or inspected beyond the read-only inventory above; the agent has never been provisioned on this Mac, so the live modes of `observation-agent.env`, the state dir and launchd's log files are unverified. `launchd`'s creation mode for `StandardOutPath` files is assumed 0644 inside the 0700 state dir.
 - The DL7-F3 trace stops at the script's argument check; it was not run (rule: never execute a binary from the tree). The contradiction between `tests/unit/obs-agent-07-sendmail.test.ts:94` and `tests/integration/dev-mail-capture.test.ts:92` is enough to make it CONFIRMED.
 - What would change the severities: V-10 (other-uid co-tenants out of scope locally) → DL7-F2 LOW; a loopback pin on every URL-valued target/threshold (or a revoke of the daemon's INSERT) → DL7-F1 LOW; deploying the CLI relay pattern on the VPS → DL7-F2 HIGH; a production observer built from this agent → DL7-F1 HIGH (the token there is the production tenant's).
+
+## Fix package OBS1 2026-09-18
+
+Three findings fixed in the observation agent, each committed on its own on `security/dev-sync-2026-09-18`. Red-before-green throughout: the focused test was written first, run, and confirmed to fail for the stated reason before any source change. No agent, launchd job, container, CLI or binary from the tree was started at any point.
+
+### DL7-F1 — loopback pin on every URL-valued target and threshold; Hatchet token under custody
+**Commit** `54dcc6d4` — `fix(obs-agent): pin every URL-valued target and threshold to loopback; read the Hatchet token under custody (DL7-F1)`
+
+**What changed**
+- New `apps/observation-agent/src/core/loopback.ts`: literal loopback hosts only — `127.0.0.1`, `::1`, `localhost`, with the WHATWG bracketed-IPv6 form unwrapped. A DNS name that happens to resolve to 127.0.0.1 today is refused: a resolver answer is not a property of the configuration under review. Typed refusal `OBSERVATION_URL_NOT_LOOPBACK`.
+- `core/targets.ts`: `live_url`, `ready_url`, `rest_url` and `prometheus_url` now carry the pin, and `loadObservationTargetCatalog` surfaces the loopback refusal under its own code instead of folding it into the generic `OBSERVATION_TARGETS_INVALID` — "this fragment names another host" must not read as "this fragment is malformed".
+- `oactl/core/thresholds.ts`: a module-threshold string that is an absolute URL (`<scheme>://…`) must be loopback. This closes the grammar hole at `thresholds.ts:42` for **every** module threshold key, not only `worker_list_url`, so a policy version written by the daemon's own DB role cannot re-aim the daemon at all.
+- New `core/custody.ts`: reuses `assertDevCustodyDirectory` from `deploy/dev-auth/custody-root.mjs` verbatim for the token's parent directory (real directory, not a symlink, this uid, exactly 0700) and adds `O_NOFOLLOW` + `isFile` + uid + `nlink === 1` + exact 0600 + a 64 KiB bound on the file itself. The mode checks are the project's, not a second opinion.
+- Both bearer call sites — `stall-detectors/heartbeat.ts` and `hatchet-throughput/client.ts` — check the pin **before** the token is opened, and read the token through the custody loader. The heartbeat refusal is raised outside the `try` that turns probe trouble into `UNKNOWN`: a policy naming another host is a refusal to act on, not an unavailable probe.
+
+**RED** `pnpm exec vitest run tests/unit/obs-agent-dl7-f1-loopback.test.ts` → 5 failed | 1 passed. `worker_list_url: "https://example.org/w"` parsed clean through `thresholdPolicySchema`; a fragment with `rest_url` on `attacker.example` loaded without complaint; `readWorkerHeartbeat` read the token and returned `UNKNOWN` instead of refusing; `readHatchetRest` reached the injected fetcher (`OBSERVATION_HATCHET_REST_INVALID`); a 0644 token file was accepted. (The one passing case was the new custody loader itself.)
+
+**GREEN** same command → 6 passed (6). Neighbours: `obs-agent-03-heartbeat`, `obs-agent-01-discovery`, `obs-agent-01-oactl`, `obs-agent-06-hatchet`, `obs-agent-01-boundaries`, `obs-agent-06-source-boundary`, `obs-agent-01-privacy` → 34 passed (34). `tsc --noEmit`: 0 errors.
+
+**Left out (still owed by the operator / another lane)**
+- The migration-side half of the finding — revoking `INSERT` on `observation.threshold_policy` from `debateai_observation_agent` and giving `oactl thresholds apply` its own ratifier role (DL7-F9) — is untouched: `migrations/**` is outside this package's file bounds. The loopback pin makes that INSERT far less valuable but does not remove it.
+- `redirect: "error"` on the two `fetch` calls was not added. Undici drops `Authorization` cross-origin, so the audit already ruled redirects out as a vector, and the pin now makes the initial host loopback by construction.
+- Taking the Hatchet base URL from the provisioned env rather than the DB would need a new `OBSERVATION_*` key in `packages/register/src/runtime-environment.ts`, outside these bounds. The loopback pin achieves the same containment for the token.
+- No integration case against a real PostgreSQL (the finding's third proposed test) — no database was started.
+
+### DL7-F3 — sendmail channel back on the capture script's contract
+**Commit** `31f91360` — `fix(obs-agent): put the sendmail channel back on the capture script's contract (DL7-F3)`
+
+**What changed**
+- `channels-sendmail/sendmail.ts` emits `["-i", "-t", "-f", <from>]` with the recipient in a CRLF `To:` header on stdin — no address on argv beyond the envelope sender — and normalises the impact body to CRLF so the sink's `\r\n\r\n` split finds a header block at all.
+- The unit pin no longer restates the contract. `tests/unit/obs-agent-07-sendmail.test.ts` now **reads** the flags and the argument count out of the script's own `requireInvocation` guard, and the recipient and envelope grammars out of its `RECIPIENT_GRAMMAR` and `EMAIL_SHAPE`. Change `deploy/dev-auth/sendmail-capture.mjs` and the pin changes with it; the two can no longer contradict each other and both pass.
+- The pin runs against the notify block the agent actually ships with (`deploy/observation-agent/targets.dev.d/OBS-07.json`) rather than a fixture. That surfaced **a second, independent defect the audit did not record**: the sink's `RECIPIENT_GRAMMAR` requires a dotted domain, so `ops@localhost` would still have been refused with `DEV_MAIL_CAPTURE_RECIPIENT_INVALID` after the argv and CRLF fixes. Both addresses move to the reserved `localhost.test`, matching the API's dev sender (`noreply@localhost.test`).
+
+**RED** `pnpm exec vitest run tests/unit/obs-agent-07-sendmail.test.ts` → 1 failed | 1 passed: *expected `['-i','-f','observation-agent@localhost','--','ops@localhost']` to deeply equal `['-i','-t','-f','observation-agent@localhost']`*. After the argv and CRLF fix the same pin failed a second time, on the shipped recipient: *expected `'ops@localhost'` to match `/…(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/`*.
+
+**GREEN** same command → 2 passed (2). With `obs-agent-07-argv`, `obs-agent-07-injection`, `obs-agent-07-delivery-health`, `obs-agent-07-routing`, `obs-agent-01-discovery` → 38 passed (38). `tsc -p apps/observation-agent/tsconfig.json`: 0 errors.
+
+**Left out**
+- No test executes the capture script. The rule for this package is that nothing from the tree is run, so "the sink accepts what the agent produces" is proved **statically**, against the script's own extracted grammars, rather than by a spawn that lands an `.eml`. The finding's proposed integration case is therefore not implemented; the existing `tests/integration/dev-mail-capture.test.ts` still pins the script's side by spawning it, and was neither modified nor run here.
+- The `notify.to` grammar in `core/targets.ts` (`/^[A-Za-z0-9_.+-]+@[A-Za-z0-9.-]+$/`) still admits a dotless domain the sink will refuse. Tightening it to match the sink would churn four other test files (`obs-agent-01-discovery`, `obs-agent-07-delivery-health`, `obs-agent-07-storm-fixture`, `obs-agent-07-sendmail`), one of which needs a live database to verify, so the shipped value was corrected instead and the schema left alone. Worth a follow-up.
+
+### DL7-F5 — program-header guard in the launcher
+**Commit** `7ce6638e` — `fix(obs-agent): prove node and docker are programs before the launcher execs them (DL7-F5)`
+
+**What changed**
+- `apps/observation-agent/bin/launch.sh` deduces each binary by NAME (`command -v`), follows the symlink, and refuses unless the target is a real, non-empty, executable file whose first four bytes are a program header: `#!`, Mach-O in either width and byte order, a universal archive, or ELF. The candidate is read four bytes deep and **never started** to find out what it is. Refusals are typed — `OBSERVATION_RUNTIME_PATH_INVALID <name>` or `OBSERVATION_RUNTIME_NOT_A_PROGRAM <name> <path>` — with exit 2. Same discipline as `.hermes/reports/2026-09-01-algorithm-live-loop/tools/closing-run.sh` (`is_program`) and `docs/superpowers/plans/2026-09-17-relay-binaries-deduced.md`.
+- The `exec` target is the proven absolute path, so no name is left for the shell to resolve and there is no ENOEXEC fallback to reach. This is the whole of the 2026-09-17 class: a shell that cannot execute a file reads it back as a script.
+- The daemon execs `docker` by name off the PATH this launcher exports, so the same proof is taken here when a docker resolves. An absent docker is not a fault (the wrapper's ENOENT is clean and bounded) and does not block the boot.
+- The repository root was already deduced from the script's own location and there was no one-machine path; the new architecture test keeps it that way.
+
+**RED** `pnpm exec vitest run tests/architecture/obs-agent-dl7-f5-launcher.test.ts` → 2 failed | 1 passed: no `command -v`, no `head -c 4`, none of the four magic numbers, and *expected `'exec node --import tsx apps/observation-agent/src/main.ts'` to match `/^\s*exec\s+"\$[A-Za-z_][A-Za-z0-9_]*"/`*. The pre-fix launcher at `HEAD` matched none of `command -v|head -c 4|2321|exec "$`.
+
+**GREEN** same command → 3 passed (3). With `obs-agent-01-runtime`, `obs-agent-01-boundaries`, `obs-agent-01-docker`, `obs-agent-02-docker`, `obs-agent-01-oactl`, `repo-hygiene` → 32 passed (32).
+
+**Left out**
+- `tests/architecture/obs-agent-01-runtime.test.ts` pinned the old `exec node …` line verbatim; it now pins the verified-path form and defers the guard itself to the new file. That is a pin update, not a relaxation.
+- The plist's `KeepAlive: true` is unchanged, so a refused launch is still retried every 10 s. Nothing is executed on those retries now, so the fork-bomb path is closed; the finding's `KeepAlive: { SuccessfulExit: false }` suggestion is left for the operator.
+- **The launcher's shell syntax was not machine-verified.** This package runs no CLI, so not even `zsh -n` was executed against it. Before the next `oactl install`, the operator should run `zsh -n apps/observation-agent/bin/launch.sh` in their own shell.
+- The daemon-side `docker` lookup in `src/docker/wrapper.ts` still calls `execFile("docker", …)` by name. A PATH walk inside the agent is impossible within this package's rules: `tests/architecture/obs-agent-01-boundaries.test.ts` requires every environment read to go through the register loader, and adding a key there means editing `packages/register/**`, outside these bounds. Proving the candidate in the launcher covers it in practice, because the launcher pins the PATH the daemon inherits — but it is a guarantee about the launch, not about the call site. Worth revisiting if the register loader ever gains the key.
+
+### Scope note the whole package inherits
+The observation agent is **macOS-only as written** — launchd, `/usr/bin/vm_stat`, `sysctl hw.memsize`, `stat -f`, `/usr/bin/osascript`, `~/.local/bin/hermes`, `#!/bin/zsh`, and container names `debateai-v3-*` — so the VPS has **no observer at all**, while the `observation` schema and the `pg_monitor` grant already exist there without a consumer (see "VPS readiness gaps", line 52). Nothing in this fix package changes that, and nothing in it should be read as making the agent deployable: whether the production observer is a Linux port of this agent or something else stays a deployment-phase decision for V, not a fix-package item.
+
+### Verification summary
+- Focused runs only; the full suite was never run (several agents share this Mac).
+- Regression sweep over the whole observation-agent surface: 57 files (`tests/unit/obs-agent-*`, `tests/unit/obs-l2-*`, `tests/architecture/obs-agent-*`, `tests/architecture/obs-l2-*`) → **348 passed (348)**.
+- `tests/integration/obs-agent-*` were **not** run: they need a live PostgreSQL, and no stack was started.
+- `pnpm run typecheck`: **0 errors in every OBS1 path**. The repository-wide run is currently red in `tests/integration/support-cases.test.ts` only — another lane's in-progress work in this shared worktree, untouched here.
