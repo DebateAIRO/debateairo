@@ -45,9 +45,11 @@ apps/api/src/support/shred.ts
 apps/api/src/support/templates.ts
 apps/api/src/support/tools.ts
 apps/evaluator-worker/src/index.ts
+apps/observation-agent/src/core/custody.ts
 apps/observation-agent/src/core/database.ts
 apps/observation-agent/src/core/errors.ts
 apps/observation-agent/src/core/lifecycle.ts
+apps/observation-agent/src/core/loopback.ts
 apps/observation-agent/src/core/modules.ts
 apps/observation-agent/src/core/paths.ts
 apps/observation-agent/src/core/routing.ts
@@ -274,6 +276,8 @@ apps/ui/components/support/DebatePicker.tsx
 apps/ui/components/support/SupportWidget.tsx
 apps/ui/components/support/caseLink.test.mjs
 apps/ui/components/support/caseLink.ts
+apps/ui/components/support/consent.test.mjs
+apps/ui/components/support/consent.ts
 apps/ui/components/support/conversation.ts
 apps/ui/components/support/http.ts
 apps/ui/components/support/supportConversation.test.mjs

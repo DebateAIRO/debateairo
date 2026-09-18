@@ -18,15 +18,24 @@ type ProxyRoute = Readonly<{
 
 const originalFetch = globalThis.fetch;
 const originalBase = process.env.DIALECTICAL_API_BASE;
+const originalEdge = process.env.DIALECTICAL_UI_EDGE;
 
 beforeEach(() => {
   process.env.DIALECTICAL_API_BASE = "http://127.0.0.1:8790";
+  // L3-F6 (2026-09-19): the proxy vouches for the edge-stamped client address only when it
+  // is running behind server.mjs, which sets this marker before Next starts; under a bare
+  // `next start` the header is caller-controlled and is dropped instead. This row is about
+  // the deployed shape — our own front door in front — so it declares that shape. The
+  // opposite case (no marker, header dropped) is owned by apps/ui/lib/sessionProxy.test.mjs.
+  process.env.DIALECTICAL_UI_EDGE = "server.mjs";
 });
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
   if (originalBase === undefined) delete process.env.DIALECTICAL_API_BASE;
   else process.env.DIALECTICAL_API_BASE = originalBase;
+  if (originalEdge === undefined) delete process.env.DIALECTICAL_UI_EDGE;
+  else process.env.DIALECTICAL_UI_EDGE = originalEdge;
 });
 
 function inertApplication(): ApiOptions["application"] {
