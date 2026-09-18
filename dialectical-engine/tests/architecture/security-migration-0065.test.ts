@@ -1,3 +1,4 @@
+import { readdir, readFile } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "@debateai/db";
 import type { PoolClient } from "pg";
@@ -315,5 +316,70 @@ describe("0065 surplus EXECUTE grants revoked (DL5-F4)", () => {
     // register.assert_required_rows still fires from the 0061 trigger, which
     // runs as the definer regardless of the caller's EXECUTE.
     await expect(database.pool.query("SELECT register.assert_required_rows(1)")).resolves.toBeDefined();
+  });
+});
+
+// DL5-F9. The ledger facts this package could not fix forward, pinned so the
+// NEXT one is caught at authoring time. See the report section in
+// docs/missions/2026-09-01-security-hardening/findings/delta-L5-data-layer.md:
+// 0053's CREATE TABLE cannot be repaired by a later file (migrate() keys on the
+// file name, and only a standalone replay of 0053 itself hits the 42P07), and
+// the eight duplicated numeric prefixes order by file name — every _support /
+// _observation twin precedes its _t… twin only because 's'/'o' sort before 't'.
+describe("0065 migration-ledger hygiene (DL5-F9)", () => {
+  const MIGRATIONS = new URL("../../migrations/", import.meta.url);
+
+  // Both predate this package. 0002 is pre-delta; 0053 is DL5-F9's finding and
+  // is ledgered rather than repaired, because no later file can make a
+  // standalone replay of 0053 idempotent.
+  const UNGUARDED_CREATE_TABLE = [
+    "0002_s02.sql",
+    "0053_support_public_incident.sql"
+  ] as const;
+
+  // Pre-0065 duplicated numeric prefixes, recorded for the B28 checksum work.
+  const DUPLICATED_PREFIXES = ["0025", "0050", "0051", "0052", "0053", "0054", "0055", "0057"] as const;
+
+  async function migrationFiles(): Promise<string[]> {
+    return (await readdir(MIGRATIONS)).filter((name) => /^\d+.*\.sql$/u.test(name)).sort();
+  }
+
+  it("guards every CREATE TABLE and CREATE INDEX outside the two ledgered files", async () => {
+    const files = await migrationFiles();
+    const unguardedTables: string[] = [];
+    const unguardedIndexes: string[] = [];
+    for (const name of files) {
+      const source = await readFile(new URL(name, MIGRATIONS), "utf8");
+      for (const line of source.split("\n")) {
+        if (/^\s*CREATE\s+TABLE\s+/iu.test(line) && !/IF\s+NOT\s+EXISTS/iu.test(line)) {
+          unguardedTables.push(name);
+        }
+        if (/^\s*CREATE\s+(UNIQUE\s+)?INDEX\s+/iu.test(line) && !/IF\s+NOT\s+EXISTS/iu.test(line)) {
+          unguardedIndexes.push(name);
+        }
+      }
+    }
+    expect([...new Set(unguardedTables)]).toEqual([...UNGUARDED_CREATE_TABLE]);
+    expect(unguardedIndexes).toEqual([]);
+  });
+
+  it("allocates a unique numeric prefix from 0065 onward", async () => {
+    const files = await migrationFiles();
+    const byPrefix = new Map<string, string[]>();
+    for (const name of files) {
+      const prefix = name.slice(0, 4);
+      byPrefix.set(prefix, [...(byPrefix.get(prefix) ?? []), name]);
+    }
+    const duplicated = [...byPrefix.entries()]
+      .filter(([, names]) => names.length > 1)
+      .map(([prefix]) => prefix)
+      .sort();
+    expect(duplicated).toEqual([...DUPLICATED_PREFIXES]);
+    expect(duplicated.filter((prefix) => Number(prefix) >= 65)).toEqual([]);
+    // migrate() sorts by file name (packages/db/src/index.ts:769), so inside a
+    // duplicated pair the applied order is a lexical accident of the suffix.
+    // Nothing may depend on it; a new file must not add another pair.
+    expect(files.filter((name) => Number(name.slice(0, 4)) >= 65))
+      .toEqual(["0065_security_delta_guards.sql"]);
   });
 });
