@@ -46,6 +46,41 @@ Eight local commits of work, from `6fb99707` (the merge) to `979e009f`, plus the
 
 **Two honest notes.** (1) I made one slip along the way — a test I added in the wrong place broke the compile check; I caught it on the next check and repaired it in the following commit. (2) This Mac runs Node 26, while the project pins Node 22.23.1. One measurement test times out here because of that (it does the same on untouched `dev`). Installing Node 22.23.1 on this Mac — already on your owed list — would make local results match GitHub's.
 
+## What was done on 19 September — the re-check, and what it found
+
+**The 656 newer commits have now been security-checked.** Seven reviewers, one per area, went through everything that changed since the September inspection.
+
+**The headline: no critical or high-severity holes.** 58 findings — 0 critical, 0 high, 19 medium, 30 low, 9 informational. Nothing lets an anonymous visitor reach your identity data, your keys, another person's private debates, or unlimited spending.
+
+The medium findings fall into three groups: the support chat (it can be starved or made to reveal internal settings), the monitoring agent (it trusted its own configuration too far), and protections that were written as fixed lists and had quietly fallen behind the newer code.
+
+### The three most interesting things they found
+
+1. **Two of the security fixes tripped over each other.** Every page drawn on the server told the system it was coming *from* the server, so the "120 page reads per visitor" limit collapsed into one bucket shared by everyone. About 120 anonymous page loads would have made every public debate page fail for all visitors at once. Fixed.
+2. **The "delete my support conversation" command could never have worked.** It asks the database for a kind of lock its own login isn't permitted to take, so the database refuses it. It has been broken since it was written, and it is the *only* erasure path for support conversations. The lock is fixed; whether account deletion should also trigger it is your decision (V-26).
+3. **Twelve newer tools ignored the movable key folder.** The September work made the key folder movable so keys need never sit in a cloud-synced directory. Everything written afterwards went back to assuming the old location — including a command that *writes* the monitoring agent's database password and token there. All twelve now ask properly, and the guard that should have caught them no longer walks a hand-written list of eight files: it now discovers every source file in the project, so this cannot happen quietly again.
+
+### Fixed since yesterday
+
+Each one with a failing test written first, then the fix, then the test passing:
+
+| What | Why it mattered |
+|---|---|
+| The shared-bucket bug | Public pages could be knocked out for everyone |
+| Model text escaping into the job system | Fragments of private debates reached a store outside the encryption boundary, and the server log, on every routine parsing failure |
+| The spending ceiling now checked before every retry | The hook existed since September and was never connected |
+| Support chat: six fixes | Junk web addresses no longer look like server crashes; a clock adjustment no longer freezes support for everyone until a restart; the public status page no longer publishes your AI model's identity, every rate limit and your daily spend; oversized messages are refused before any work; support links now expire and are tied to their owner |
+| Monitoring agent: three fixes | It would send your job-system token to any address its configuration named; its alert emails were broken by the merge and put the recipient back on the command line; its launcher now proves what it is about to run is a real program — the exact lesson from the 17 September incident |
+| Database: guards for 20 new tables | Newer tables could be emptied by one command, including the one that records erasures |
+| Dependency alarms: 14 → 0 | The automatic security check would have failed as-is |
+| The secret scanner sees three whole directories again | It was blind to exactly where AI agents paste command output |
+| A sorting bug in the server-setup check | The first database login containing a digit would have made the production check fail — on a correct database — right when you provision the server |
+
+### Two honest notes
+
+- **One correction to a reviewer's own advice.** It recommended a package version published two days earlier, which would have broken your own "packages must be a week old" rule. I used the 31-day-old version that fixes the same problems with no exception needed.
+- **I can't run the secret scanner here.** It isn't installed, and I won't download and run an unverified program on this Mac — that is the rule we set after the September incident. My own sweep of all 5,362 files in those directories found three known test fixtures and nothing live; the real proof is the scanner's own run on the pull request.
+
 ## What is still open
 
 ### 1. Finish the quiet clean-up after the merge (no decision needed)
