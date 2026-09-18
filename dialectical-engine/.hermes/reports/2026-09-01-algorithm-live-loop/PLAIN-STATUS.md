@@ -1,6 +1,40 @@
 # Where things stand, in plain language
 
-*Written 2026-09-17 for the project owner. This page explains the state of the V3 debate engine work without the code names the other files in this folder use. Every claim links to the file that holds the details. When the detailed records change, this page is updated in the same commit.*
+*Written 2026-09-17 and updated 2026-09-18 for the project owner. This page explains the state of the V3 debate engine work without the code names the other files in this folder use. Every claim links to the file that holds the details. When the detailed records change, this page is updated in the same commit.*
+
+## 2026-09-18, early morning: you decided the open questions, three changes followed, and the mission is signed off
+
+**What you decided.** I put ten questions to you, each with a recommendation and the alternatives. Your answers:
+
+| Question | Your answer | What it means |
+|---|---|---|
+| When should a debate stop going deeper? (the "stop threshold") | Lower it from 0.02 to 0.01 | After each round the engine checks whether any position's score still moved. Below the threshold it stops. In the real run the winner led by about 0.011, so the old 0.02 would have called a debate "settled" while scores were still moving by more than the lead. |
+| When should one argument stop getting replies? (the "freeze threshold") | Lower it from 0.01 to 0.005 | An argument that cannot move any position's score by at least this much gets no further replies. The old value would have frozen four of the six main arguments of the real run, two of them close enough to matter. |
+| Your secret key was visible in the Mac's process list during a run | Fix it before pushing | Done, see below. |
+| 1. The verdict label comes from code, the verdict text from an AI, and a second AI checks they agree | Yes | This is how the real run worked. |
+| 2. If the checking AI still objects after three rewrites, serve the answer with a visible warning | Yes | The reader gets the answer and sees the disagreement. |
+| 3. Should that objection also force the label down to "contested"? | No | The label comes from the numbers only. |
+| 4. The website's words for the three labels | Rename now | Done, see below. |
+| 5. If some of the AI judges fail, carry on with the rest and mark it visibly | Yes | Never a silent self-grade. |
+| 6. A single AI on its own can never print "supported" | Yes | |
+| 7. "One debate, one frame" | Park it | Revisit with live data. |
+
+You also said you do not need the single-model run ("I trust that it will work"). The sign-off says so openly: that one item of the finish-line checklist was never demonstrated by a run, by your decision.
+
+**What was built from your answers.** Three small changes, each written by one AI worker and then checked by a second AI that had never seen it (the "second doctor's opinion"):
+
+1. **The two thresholds.** The new numbers are in. One thing surfaced that matters: the real-run setup keeps a sealed copy of these numbers, and a sealed copy can never be edited. So the new numbers were added as a new sealed version next to the old one. Your run of September 17 and its data stay untouched, and nothing has to be reset before the next run. One honest limit: with the debate set to two levels deep, the stop threshold cannot trigger at all (there is no earlier round to compare with until the last one), so it only starts to matter for deeper debates.
+2. **Your key is off the command line.** The program now reads the key only from the environment variable you already export, and refuses it if it is typed on the command line. The reviewer found two ways the key could still have ended up in the saved run log (writing the flag with an `=` sign, and the run tool copying its own command line into the log before the program could refuse). Both are closed. The guide's copy-paste commands were also cleaned: no command block contains a `<` or `>` any more, because that is exactly the character that emptied your three tools on the 17th when a line was pasted into the terminal.
+3. **The website's words.** The three labels now use the engine's own words: supported, contested, unsupported. A sentence that was false went away: for "unsupported" the banner used to say that no evidence was available, which is not what the label means. Two new sentences, which you can change or veto:
+   - contested: "The run did not settle this either way: the positions were too close, the judges disagreed, the leading position was not strong enough, or part of the comparison was missing."
+   - unsupported: "Even the leading position here came out weak once the arguments were weighed against each other — a weak case, not a disproved one."
+   One honest limit: **none of this is visible on the site today.** The label reaches a reader only as a raw word in a side drawer, and nothing feeds the banner yet. That is a separate item for your UI work, with its own ticket.
+
+**The tests.** Every test file the three changes touched was run three times at the final commit: all green except the same two known failures as before (one safeguard test from before this work, and five cases of one website test that fail only on this Mac's Node version). Then the full automated pass ran at the final commit: **140 failing tests out of 5363** — exactly the same known failures as before tonight, name for name, nothing new. All the tests added or changed tonight pass.
+
+**The sign-off.** The reviewer role has now written the final verdict on the whole mission: **the goal is met**, with two things said openly. First, the single-model run was skipped at your word, so that checklist item was never demonstrated. Second, every test number here comes from this Mac's newer Node version, and one run on the project's pinned version is still owed. The verdict is in [agent-reports/w12-whole-goal-verdict-2026-09-18.md](agent-reports/w12-whole-goal-verdict-2026-09-18.md); it also lists what it does not claim.
+
+**What is left, none of it blocking.** One test run on the pinned Node version (item 2 below). Seven small to-do cards written during the night, in the [board](board/) folder; the two worth your attention are that the verdict label is not yet visible on the site (`F-UI-VERDICT-LABEL-DRAWER-ONLY`), and that the sealed numbers can be re-tuned only one more time before the sealing mechanism needs a design decision (`F-REGISTER-HISTORICAL-IMPORT-CAP`). Everything you decided, with the measurements behind the two thresholds, is entry D77 at the end of [DECISIONS.md](DECISIONS.md).
 
 ## The big news of 2026-09-17, late evening: the real run happened, and it passed
 
@@ -36,9 +70,9 @@ The V3 code runs on Node.js, the runtime the code is built for, like an app buil
 
 While building, I sometimes had to choose between two reasonable options without you. Each choice is written down as a default that stands unless you say no. The newest ones are in the "2026-09-17" section at the bottom of [V-DECISIONS-PACKET.md](V-DECISIONS-PACKET.md); each row says what was chosen and what saying "no" would mean. Example: the run's log now never contains the text of any argument, only ids and numbers, because the same texts are encrypted in the database and a log file is not a safe place for them. If you want the texts in the log anyway, that is a one-line veto.
 
-### 4. After the run: the last steps to declare the mission finished (mostly agents, with your go)
+### 4. After the run: the last steps to declare the mission finished — DONE on 2026-09-18
 
-The real run's log now exists (see the top of this page). What remains: a second run with a single AI model (to prove the machine still works when only one provider is available, about as long as tonight's run), fitting two tuning numbers from the measured spend (now possible: 114 calls in 79 minutes against a ceiling of 396), presenting seven remaining questions to you, and then the final sign-off, where the reviewer role declares the mission complete against the checklist. A full automated test pass ran right after the run, as the instructions require, and finished at 00:34: 140 failing tests out of 5,341, the same 140 known ones as before tonight's changes (100 of them the Node version mismatch from item 2, the rest owned by tickets), nothing new, and all 66 tests added tonight passing. The list, in order, is section 6 of [agent-reports/w12-closure-audit-2026-09-16.md](agent-reports/w12-closure-audit-2026-09-16.md); its addenda at the bottom say what today changed.
+The steps this section listed on 2026-09-17 are done, except the single-model run, which you chose to skip: the two tuning numbers were fitted from the real run and you ruled on them, the seven questions were put to you and answered, and the reviewer role has written the final verdict. The section at the top of this page has the details. A full automated test pass ran after the real run (00:34: 140 failing tests out of 5,341, the same 140 known ones as before, nothing new) and again after tonight's three changes (see the top section).
 
 ### 5. Two loose ends that are not part of this mission (for your awareness)
 
@@ -76,13 +110,19 @@ Around 20:15 the Mac froze for everyone: your terminal, my commands, even the Cl
 | **Mutant** | A deliberately broken copy of the code, used to check that a test really notices the breakage, like testing a smoke detector with actual smoke. |
 | **Gate** | Running the automated tests and type checks at a given commit and recording the counts. "140 / 0 / 0 / 1" means 140 failing tests, 0 test files that failed to load, 0 skipped, 1 unhandled error; every one of those is known and explained. |
 | **Credential** | Your secret API key. No AI agent here ever sees it. |
+| **Stop threshold, freeze threshold (δ, ε)** | The two tuning numbers you set on 2026-09-18. Stop: how much a position's score must still move between rounds for the debate to keep going deeper (now 0.01). Freeze: the least an argument must be able to move a score to earn further replies (now 0.005). |
+| **Sealed register, register version** | The engine reads its policy numbers from a database table whose rows, once written, are never edited ("sealed"). Changing a number means writing a new numbered version next to the old one. The real-run setup is now on version 3. |
+| **Confirm-items** | The seven questions the mission's goal asked you to confirm at the end. Answered on 2026-09-18. |
+| **Verdict, sign-off** | The reviewer role's written judgement of whether the mission met its goal, item by item, saying what it does not claim. |
 | **`dev`, `main`, V2, V3** | `main` is the V2 production site, never touched by this mission; `dev` is V3 and is where all of this lives. |
 
 ## Where to look for details
 
 - **What to do next, for the next AI session:** the newest entry at the bottom of [RESUME.md](RESUME.md).
 - **What happened, day by day:** [PROGRESS.md](PROGRESS.md), newest section at the bottom.
-- **Every decision and why:** [DECISIONS.md](DECISIONS.md); today's are D74 and its first addendum, at the end.
+- **Every decision and why:** [DECISIONS.md](DECISIONS.md); the entries of 2026-09-17 are D74–D76, and everything you decided on 2026-09-18 is D77 with its first addendum, at the end.
+- **The final verdict on the whole mission:** [agent-reports/w12-whole-goal-verdict-2026-09-18.md](agent-reports/w12-whole-goal-verdict-2026-09-18.md).
+- **Tonight's three changes, plainly:** the plan [docs/superpowers/plans/2026-09-18-owner-rulings-d77.md](../../../docs/superpowers/plans/2026-09-18-owner-rulings-d77.md); the workers' and reviewers' reports are the six files named `d77-…-2026-09-18.md` in [agent-reports](agent-reports/).
 - **Every worker's and reviewer's report:** the [agent-reports](agent-reports/) folder; today's are `dod-facts-seat-2026-09-17.md` (the worker) and `dod-facts-review-2026-09-17.md` (the reviewer).
 - **The plan for today's fix, in ordinary sentences:** [docs/superpowers/plans/2026-09-17-ceremony-report-six-facts.md](../../../docs/superpowers/plans/2026-09-17-ceremony-report-six-facts.md).
 - **The code that prints the new report lines:** [acceptance/dod-facts.ts](../../../acceptance/dod-facts.ts), called from [acceptance/run-acceptance.ts](../../../acceptance/run-acceptance.ts).

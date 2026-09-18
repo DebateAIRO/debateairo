@@ -415,3 +415,28 @@ them s7 `:98`. F31's 3+3 audit rows.
 RED frames, both mutant matrices), `agent-reports/dod-facts-review-2026-09-17.md` (the verdict and the
 scoped re-check); the SDD ledger `.superpowers/sdd/2026-09-17-ceremony-report-six-facts/progress.md`
 (ignored by version control, on this host).
+
+## 2026-09-18 03:06 — NEWEST ENTRY WINS
+
+**THE MISSION IS SIGNED OFF (D77 ADDENDUM 1 h).** The judge's whole-goal verdict is
+`agent-reports/w12-whole-goal-verdict-2026-09-18.md`: **MET**, with two things said openly — the
+mono-maker bullet is UNWITNESSED because V waived that run (D77 e), and every suite number on this branch
+was measured under Node 26.5.0 (a Node 22.23.1 run is still owed, D73 e/7). The V packet is FINAL.
+`origin/dev` = the commit that carries these records (the tip of `git log`); the mission branch is at the same commit.
+
+**What V ruled on 2026-09-18 (D77):** δ 0.02 → 0.01, ε 0.01 → 0.005 (refitted from the real run; the J2
+companions NOT refitted, said so); the seven confirm-items decided (1/2/5/6 yes, 3 no, 4 rename now, 7
+park); the mono run waived; the credential taken off the command line before the push. All three code
+changes landed, blind-reviewed and gated (ADDENDUM 1 a–c).
+
+**If a next session runs the ceremony:** `packets/readiness-ask-2026-09-16.md`, sections 3, 5 and 8 —
+export the credential, run the short form from the engine root as printed (no credential argument; the
+tool refuses it, exit 7), depth 2. The next run seals acceptance register version 3 (the new pair) beside
+version 2; nothing to reset. It is also the first witness that the child inherits the exported variable
+and that a log written under the new rules holds no trace of it.
+
+**What is left, none of it blocking:** the Node 22.23.1 run; the seven tickets filed at closure (the two
+for V's attention: `F-UI-VERDICT-LABEL-DRAWER-ONLY` — the label reaches the site only as a raw word in a
+drawer; `F-REGISTER-HISTORICAL-IMPORT-CAP` — one refit left before the sealing mechanism needs a
+decision); the V packet's §A rows at their defaults; a single-maker run if V ever wants bullet 4
+witnessed. **Read first, for humans:** `PLAIN-STATUS.md`.
