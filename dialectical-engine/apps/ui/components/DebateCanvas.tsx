@@ -279,14 +279,14 @@ function CanvasCard({
     boxShadow: "var(--shadow-card)",
     boxSizing: "border-box",
     border: "1px solid var(--line-strong)",
-    borderRadius: 16,
-    padding: role === "root" ? 7 : 6
+    borderRadius: "var(--r-card)",
+    padding: 4
   };
 
   const innerStyle: CSSProperties = scrutiny
     ? {
         background: "var(--core)",
-        borderRadius: role === "root" ? 10 : 11,
+        borderRadius: "var(--r-card)",
         position: "relative",
         borderColor: scrutiny.color,
         boxShadow: `0 0 0 4px ${scrutiny.bg}, var(--shadow-card)`
@@ -294,7 +294,7 @@ function CanvasCard({
     : role === "root"
       ? {
           background: "var(--core)",
-          borderRadius: 11,
+          borderRadius: "var(--r-card)",
           position: "relative",
           borderColor: "var(--line-2)",
           boxShadow: "var(--shadow-card)"
@@ -345,9 +345,9 @@ function CanvasCard({
             display: "block",
             position: "absolute",
             top: 0,
-            left: role === "root" ? 20 : 15,
-            width: role === "root" ? 52 : 44,
-            height: 4,
+            left: 0,
+            width: "100%",
+            height: 3,
             borderRadius: "var(--r-tab)",
             background: stanceLine
           }}
@@ -467,6 +467,27 @@ function CanvasCard({
               <>
                 <div className="nodeClaim treePreview">{node.claim}</div>
                 <div className="nodeControls nodeReferenceFooter" data-reference-tree-footer>
+                  {onChallengeNode ? (
+                    <button
+                      type="button"
+                      className="nodeCtrl challenge"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onChallengeNode(node, event.currentTarget);
+                      }}
+                    >
+                      ⚐ Challenge
+                    </button>
+                  ) : (
+                    <span
+                      className="nodeCtrl challenge"
+                      aria-disabled="true"
+                      tabIndex={-1}
+                      style={{ opacity: 0.55 }}
+                    >
+                      🔒 Challenge
+                    </span>
+                  )}
                   {onChallengeNode ? (
                     <button
                       type="button"

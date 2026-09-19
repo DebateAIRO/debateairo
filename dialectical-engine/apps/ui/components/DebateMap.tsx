@@ -20,7 +20,7 @@ type Arc = {
 
 const CX = 300;
 const CY = 300;
-const HUB_R = 46;
+const HUB_R = 44;
 const GAP = 10;
 const MAX_R = 286;
 const RING_GAP = 5;
@@ -136,8 +136,8 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
               cx={CX}
               cy={CY}
               r={HUB_R}
-              fill="var(--ink)"
-              stroke="var(--bg)"
+              fill="var(--reasoning-line)"
+              stroke="var(--core)"
               strokeWidth={2.5}
               style={{ cursor: "pointer" }}
               onClick={() => {
@@ -147,8 +147,8 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
             >
               <title>{root.claim}</title>
             </circle>
-            <circle cx={CX} cy={CY} r={9} fill="none" stroke="var(--bg)" strokeWidth={2.5} />
-            <circle cx={CX} cy={CY} r={2.4} fill="var(--bg)" />
+            <circle cx={CX} cy={CY} r={9} fill="none" stroke="var(--core)" strokeWidth={2.5} />
+            <circle cx={CX} cy={CY} r={2.4} fill="var(--core)" />
           </svg>
         </div>
 
