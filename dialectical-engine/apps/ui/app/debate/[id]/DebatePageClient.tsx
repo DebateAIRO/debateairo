@@ -343,7 +343,8 @@ export default function DebatePageClient({
   publicNodesById = null,
   publicExport = null,
   renderPublicHonesty = null,
-  publicOverview = null
+  publicOverview = null,
+  publicHeader = null
 }: {
   id: string;
   initialDebate: DebateDetail | null;
@@ -371,6 +372,13 @@ export default function DebatePageClient({
     onDetails: () => void;
     onRead: (nodeId: string) => void;
   }>) => ReactNode) | null;
+  /**
+   * Published-answer header: pseudonym, published date, badges, residual
+   * objections and the indexing disclosure. These have no other public home,
+   * so the public page supplies them and the workspace renders them under the
+   * chrome.
+   */
+  publicHeader?: ReactNode;
 }) {
   const [debate, setDebate] = useState<DebateDetail | null>(initialDebate);
   const [answer, setAnswer] = useState<Answer | null>(initialAnswer);
@@ -1085,6 +1093,7 @@ export default function DebatePageClient({
     );
   }
 
+  const statusKind = complete ? "pillOk" : generating ? "pillGen" : "";
   const scoringStatusText = scoringStatusMessage();
   const scoringConfidenceText = formatScoringConfidenceCopy();
   const scoringInsightsExpandable = scoringState.status === "loaded" && scoringByNodeId.size > 0;
@@ -1109,25 +1118,35 @@ export default function DebatePageClient({
             <span className="debateTopTitle debateTopTitleMeasure" aria-hidden ref={debateHeaderTitleMeasureRef}>
               {debate.topic}
             </span>
+            <span className={`pill ${statusKind}`}>
+              <span className="dot" />
+              {statusLabel(debate.run_state ?? debate.status)}
+            </span>
+            {debate.completion?.humanReason ? (
+              <span className="topSwitchStatus" role="status" title={debate.completion.humanReason}>
+                {debate.completion.humanReason}
+              </span>
+            ) : null}
           </div>
         </div>
         <div className="debateTopControlRow" ref={debateHeaderControlsRef}>
           {publicMode ? (
             <span className="publicViewPill"><span aria-hidden>🔒</span> Public view · actions locked</span>
-          ) : (
-            <ScoringErrorBoundary>
-              <button
-                type="button"
-                className="debateScoringPill"
-                data-debate-scoring-pill
-                aria-label="Open scoring diagnostics"
-                onClick={() => setScoringDiagnosticsOpen(true)}
-              >
-                <span className="debateScoringDot" aria-hidden />
-                Scoring · {scoringByNodeId.size}/{countClaims(debate.tree)}
-              </button>
-            </ScoringErrorBoundary>
-          )}
+          ) : null}
+          {/* Scoring diagnostics is a read-only drawer, so the public reader
+              keeps it: "actions locked" withholds writes, not evidence. */}
+          <ScoringErrorBoundary>
+            <button
+              type="button"
+              className="debateScoringPill"
+              data-debate-scoring-pill
+              aria-label="Open scoring diagnostics"
+              onClick={() => setScoringDiagnosticsOpen(true)}
+            >
+              <span className="debateScoringDot" aria-hidden />
+              Scoring · {scoringByNodeId.size}/{countClaims(debate.tree)}
+            </button>
+          </ScoringErrorBoundary>
           {hasTree ? (
             <div className="segment" role="group" aria-label="View">
               <button type="button" aria-pressed={view === "thread"} onClick={() => setView("thread")}>
@@ -1213,6 +1232,8 @@ export default function DebatePageClient({
           </details>
         </div>
       </header>
+
+      {publicMode && publicHeader ? publicHeader : null}
 
       {/* ---- verdict-first banner (flag-gated: NEXT_PUBLIC_VERDICT_FIRST_UI) ---- */}
       {!publicMode && process.env.NEXT_PUBLIC_VERDICT_FIRST_UI === "true" ? <VerdictBanner verdict={debate.verdict} /> : null}
