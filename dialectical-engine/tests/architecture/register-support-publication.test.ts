@@ -190,6 +190,10 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     expect(initializer).not.toMatch(
       /(?:process[.]env|\bcurrent\b|\blatest\b|MIGRATION_DATABASE_URL|databaseUrl|password|token|publishGeneral|publish_support_configuration|[.]query\s*\()/iu
     );
+    // VACUOUS-ORDERING GUARD: the binding loop above pins
+    // "const commitAcknowledgedAt = new Date()" but not the connection call, so
+    // a missing connection gave indexOf -1 and this comparison passed anyway.
+    expect(initializer).toContain("await withProductionSupportConfigCliConnection");
     expect(initializer.indexOf("await withProductionSupportConfigCliConnection"))
       .toBeLessThan(initializer.indexOf("const commitAcknowledgedAt = new Date()"));
 
