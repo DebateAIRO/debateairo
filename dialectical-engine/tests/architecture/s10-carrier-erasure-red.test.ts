@@ -86,13 +86,33 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
   });
 
   it("filters completed private tombstones before any external key load", async () => {
-    const [liveness, memory] = await Promise.all([
+    const [liveness, memory, migration] = await Promise.all([
       source("packages/liveness/src/index.ts"),
-      source("packages/memory/src/index.ts")
+      source("packages/memory/src/index.ts"),
+      source("migrations/0040_account_erasure.sql")
     ]);
 
-    expect(liveness.includes("serve.private_run_erasure_tombstone")).toBe(true);
-    expect(memory.includes("serve.private_run_erasure_tombstone")).toBe(true);
+    // DEV-11E(3) / commit 2d1f86b8: the restricted runtime principal is denied
+    // SELECT on the private erasure carriers, so liveness and memory naming
+    // serve.private_run_erasure_tombstone themselves is now a 42501, not a
+    // safeguard. The completed-tombstone filter moved into the SECURITY DEFINER
+    // predicate core.run_private_content_is_live, which both owner-scoped reads
+    // apply before any lease or key load. The filter is pinned at both call
+    // sites AND in the predicate's body, so the whole path stays guarded; the
+    // direct carrier read is now pinned ABSENT, which the old pair never did.
+    expect(liveness.includes("core.run_private_content_is_live")).toBe(true);
+    expect(memory.includes("core.run_private_content_is_live")).toBe(true);
+    expect(liveness.includes("serve.private_run_erasure_tombstone")).toBe(false);
+    expect(memory.includes("serve.private_run_erasure_tombstone")).toBe(false);
+
+    const predicate = migration.slice(
+      migration.indexOf("CREATE OR REPLACE FUNCTION core.run_private_content_is_live"),
+      migration.indexOf("REVOKE ALL ON FUNCTION core.run_private_content_is_live")
+    );
+    expect(predicate).toContain("SECURITY DEFINER");
+    expect(predicate).toMatch(
+      /NOT EXISTS \(\s*SELECT 1 FROM serve\.private_run_erasure_tombstone/
+    );
   });
 
   it("holds a PostgreSQL session content lease across prepared decrypt and use", async () => {

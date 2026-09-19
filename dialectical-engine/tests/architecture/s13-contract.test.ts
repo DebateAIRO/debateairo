@@ -58,7 +58,12 @@ describe("S13 / cross-run memory architecture", () => {
 
     const candidatePrepare = evaluate.indexOf("prepareLeasedContentEncryptionForRun");
     const candidateTransaction = evaluate.indexOf("withWriteTransaction");
-    const candidateLock = evaluate.indexOf("FOR UPDATE", candidateTransaction);
+    // DEV-11E(4) / commit 2d1f86b8: every MemoryRepository run lock is taken
+    // through the SECURITY DEFINER capability core.lock_owned_live_runs, whose
+    // body ends `ORDER BY run.run_id FOR UPDATE`. The runtime principal has no
+    // UPDATE on core.run, so the inline form cannot come back — s7's sibling
+    // contract pins the capability's ordering on the migration body.
+    const candidateLock = evaluate.indexOf("FROM core.lock_owned_live_runs(", candidateTransaction);
     const candidateOwner = evaluate.indexOf("core.run_is_owned_by", candidateLock);
     const candidateFetch = evaluate.indexOf("const candidateRows = await client.query", candidateOwner);
     const candidateDecrypt = evaluate.indexOf("decryptLeasedContentForRun", candidateFetch);
@@ -75,7 +80,7 @@ describe("S13 / cross-run memory architecture", () => {
     const finalTransaction = record.indexOf("await withWriteTransaction");
     const finalCallback = record.indexOf("async (client) =>", finalTransaction);
     const sortedRunIds = record.indexOf("[input.key.runId, selected.priorRunId].sort()", finalCallback);
-    const finalLock = record.indexOf("ORDER BY run_id FOR UPDATE", sortedRunIds);
+    const finalLock = record.indexOf("FROM core.lock_owned_live_runs(", sortedRunIds);
     const sourceOwner = record.indexOf("core.run_is_owned_by", finalLock);
     const selectedOwner = record.indexOf("core.run_is_owned_by", sourceOwner + 1);
     const firstWrite = record.indexOf("INSERT INTO memory.question_key", selectedOwner);
