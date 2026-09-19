@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { DebateNode } from "@/lib/types";
+import { ModelMetaLine } from "@/components/ModelPresentation";
 import { ROLE_PALETTES, renderStateOf, roleOf } from "@/lib/debatePresentation";
 
 type DebateMapProps = {
@@ -156,6 +157,12 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
           <div className="mapReadout" data-reference-map-readout>
             <span className="referenceStanceTab" style={{ background: readoutRole === "root" ? "var(--ink)" : readoutPal.line }} aria-hidden />
             <div className="nodeEyebrow">{readoutRole === "root" ? "Root claim" : readoutRole}</div>
+            {readoutNode.active_generation || readoutNode.maker !== undefined ? (
+              <ModelMetaLine
+                modelId={readoutNode.active_generation?.model_id ?? null}
+                maker={readoutNode.maker}
+              />
+            ) : null}
             <div className="mapReadoutClaim">{readoutNode.claim}</div>
             <div className="mapReadoutFooter">
               <span>Hover a wedge to inspect · click to focus</span>
