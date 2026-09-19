@@ -5420,23 +5420,77 @@ export function declareHatchetWalkingSkeletonTask(input: {
   return input.client.task({
     name: input.workflowName,
     retries: input.engineRetries,
-    fn: async (dispatch: { runId: string; workItemId: string }) => {
+    // S06 capture binding. It was written in e8d99d33 and destroyed by the
+    // conflict resolution in merge 1c9578a2, which took the mainline side of
+    // this file whole; the test that specifies it survived the same merge.
+    // Restored here. Observability never changes product semantics: every
+    // capture is optional (`capture?.`), the emitter is total, and the error
+    // that escapes is the one that would have escaped without any of this.
+    fn: async (
+      dispatch: { runId: string; workItemId: string },
+      hatchetContext?: { retryCount?(): number }
+    ) => {
+      const capture = await import("@debateai/obs-capture").catch(() => undefined);
+      // Read the SDK accessor inside a guard: a throwing retryCount() must not
+      // reject the task before executeWorkItem has run (s06-rework-1.md §4).
+      let observedRetryCount: unknown;
       try {
-        const result = await input.runner.executeWorkItem(dispatch.workItemId);
-        return result.kind === "COMPLETED"
-          ? { kind: result.kind, answerId: result.answerId }
-          : { kind: result.kind };
-      } catch (error) {
-        const recorded = await input.failures.recordTerminalFailure({
-          runId: dispatch.runId,
-          workItemId: dispatch.workItemId,
-          reason: runnerTerminalFailureReason(error)
-        });
-        if (!recorded) {
-          throw new TypedDomainError("RUNNER_FAILURE_STATE_NOT_RECORDED", dispatch.workItemId);
-        }
-        throw error;
+        observedRetryCount = hatchetContext?.retryCount?.();
+      } catch {
+        observedRetryCount = undefined;
       }
+      const attemptIndex = typeof observedRetryCount === "number"
+        && Number.isSafeInteger(observedRetryCount)
+        && observedRetryCount >= 0
+        ? observedRetryCount
+        : 0;
+      const execute = async () => {
+        try {
+          const result = await input.runner.executeWorkItem(dispatch.workItemId);
+          return result.kind === "COMPLETED"
+            ? { kind: result.kind, answerId: result.answerId }
+            : { kind: result.kind };
+        } catch (error) {
+          capture?.emit(Object.freeze({
+            code: error instanceof TypedDomainError ? error.code : "OBS_CAPTURE_SELF",
+            error,
+            taxonomy_class: "JOB_FAILURE",
+            capture_point: "job",
+            disposition: "THROWN",
+            source: "hatchet",
+            attempt_index: attemptIndex
+          }));
+          const recorded = await input.failures.recordTerminalFailure({
+            runId: dispatch.runId,
+            workItemId: dispatch.workItemId,
+            reason: runnerTerminalFailureReason(error)
+          });
+          if (!recorded) {
+            // OBS-R064: a handler that cannot record the failure must still
+            // propagate the ORIGINAL error. The unrecorded state is an alarm
+            // alongside it, never a replacement for it.
+            const recordingFailure = new TypedDomainError(
+              "RUNNER_FAILURE_STATE_NOT_RECORDED",
+              dispatch.workItemId
+            );
+            capture?.emit(Object.freeze({
+              code: recordingFailure.code,
+              error: recordingFailure,
+              taxonomy_class: "JOB_FAILURE",
+              capture_point: "job",
+              disposition: "HANDLED",
+              source: "hatchet",
+              attempt_index: attemptIndex
+            }));
+          }
+          throw error;
+        }
+      };
+      if (capture === undefined) return execute();
+      return capture.runWithObsContext(Object.freeze({
+        run_ref: Object.freeze({ kind: "run", value: dispatch.runId }),
+        work_item_ref: Object.freeze({ kind: "work_item", value: dispatch.workItemId })
+      }), execute);
     }
   });
 }
@@ -5461,6 +5515,12 @@ export function createPostgresProviderGateway(
           "Every provider content operation must be bound to one leased run"
         );
       }
+      // S06 gateway seam, restored with the task binding above (e8d99d33,
+      // lost in merge 1c9578a2). The run this call is bound to joins the
+      // ambient context; the caller's own fields are preserved.
+      const leasedRunId = request.runId;
+      const capture = await import("@debateai/obs-capture").catch(() => undefined);
+      const execute = async (): Promise<ProviderCallResult> => {
       const claimsEvaluatorScope=request.lane==="evaluator"
         || request.callSiteKey.startsWith("evaluator.")
         || request.subjectItemId.startsWith("evaluator:");
@@ -5485,9 +5545,9 @@ export function createPostgresProviderGateway(
           );
         }
       }
-      return withRunContentLease(pool,[request.runId],async () => {
+      return withRunContentLease(pool,[leasedRunId],async () => {
       if (!authenticatedEvaluatorScope) {
-        await budget.assertModelAttemptAllowed(request.runId!);
+        await budget.assertModelAttemptAllowed(leasedRunId);
       }
       const consumed = await ledger.countModelAttempts({
         runId: request.runId,
@@ -5499,11 +5559,30 @@ export function createPostgresProviderGateway(
       if (remaining <= 0) {
         throw new TypedDomainError("CALL_BUDGET_EXHAUSTED", request.subjectItemId);
       }
-      return http.call({
-        ...request,
-        bound: { ...request.bound, maxAttempts: remaining }
+      try {
+        return await http.call({
+          ...request,
+          bound: { ...request.bound, maxAttempts: remaining }
+        });
+      } catch (error) {
+        capture?.emit(Object.freeze({
+          code: error instanceof TypedDomainError ? error.code : "OBS_CAPTURE_SELF",
+          error,
+          taxonomy_class: "PROVIDER_EXHAUSTED",
+          capture_point: "provider",
+          disposition: "THROWN",
+          source: "first_party"
+        }));
+        throw error;
+      }
       });
-      });
+      };
+      if (capture === undefined) return execute();
+      const ambient = capture.getObsContext();
+      return capture.runWithObsContext(Object.freeze({
+        ...ambient,
+        run_ref: Object.freeze({ kind: "run", value: leasedRunId })
+      }), execute);
     }
   };
 }
