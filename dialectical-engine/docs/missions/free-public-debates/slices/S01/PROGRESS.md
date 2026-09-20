@@ -9,3 +9,4 @@
 | 2026-09-20 | ARCH | t_eff46252 | READY consumed — PLAN filled (C1 → C2 ∥ C4 → C3), ADR-0026 |
 | 2026-09-20 | ARCH-REV p1 | t_b82d832e | REWORK consumed (B1–B5, N1–N5) → ARCH-FIX t_552c5401 |
 | 2026-09-20 | ARCH-FIX p2 | t_552c5401 | READY consumed — PLAN Revision 2 |
+| 2026-09-20 | ARCH-REV p2 | t_616ddb75 | REWORK consumed (B1-p2, N1-p2…N3-p2) → ARCH-FIX t_7b0c12ad → ARCH-REV p3 t_cfd2f03b (final) |
