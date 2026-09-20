@@ -27,6 +27,8 @@ for l in plan[ms-1:me]:
     new=" (new)" if ("(new)" in extra or not pathlib.Path(f"{LANE}/{path}").exists()) else ""
     note=extra.strip(); note=f" — {note}" if note and note!="(new)" else ""
     allowed.append(f"{LANE}/{path}{new}{note.replace('(new)','').rstrip(' —')}")
+gs=next(n for n,l in heads if l.startswith("## Global Constraints")); ge=next(n for n,l in heads if n>gs)-1
+while plan[ge-1].strip() in("","---"): ge-=1
 frame=pathlib.Path(FRAME).read_text().strip().replace("\n"," ⏎ ")
 traps='"zsh + vitest: an unquoted `$FILES` is ONE filter token — \\"No test files found\\" is BROKEN, not RED (2026-09-01, AUDIT-STATE)" · "`git diff/log/ls-tree -- <pathspec>` from inside `dialectical-engine/`: a git-root-relative path matches NOTHING and returns an EMPTY diff that reads as \\"unchanged\\" (2026-09-01, AUDIT-STATE)" · "`git add -A` in a tree that two sessions are writing (2026-09-02, cost: three files committed under wrong messages)"'
 rep={"SEAT":f"BUILD-S01-{C}","SLICE":"S01","CLUSTER":C,"PASS":"1","MODEL":"codex gpt-5.6-sol",
@@ -38,5 +40,5 @@ rep={"SEAT":f"BUILD-S01-{C}","SLICE":"S01","CLUSTER":C,"PASS":"1","MODEL":"codex
 s=pathlib.Path(f"{A}/.claude/skills/heartbeat-orchestrator/templates/BUILD.md").read_text()
 for k,v in rep.items(): s=s.replace(f"__{k}__",v)
 for k,v in {"__MISSION_ROOT__":MR,"__PACKET_DIR__":PK,"__REPORTS__":R,"__SLICE_TICKET__":"t_2e15bf90","__MISSION__":M}.items(): s=s.replace(k,v)
-s=s.replace("PLAN.md steps","the plan's Global Constraints "+f"({MR}/slices/S01/PLAN.md:13-23) and PLAN.md steps").replace("· DECISIONS.md ·",f"· {MR}/slices/S01/DECISIONS.md (the sections your steps cite) · {A}/docs/architecture/01-decisions/ADR-0026-system-publication-without-grant.md ·")
+s=s.replace("PLAN.md steps","the plan's Global Constraints "+f"({MR}/slices/S01/PLAN.md:{gs}-{ge}) and PLAN.md steps").replace("· DECISIONS.md ·",f"· {MR}/slices/S01/DECISIONS.md (the sections your steps cite) · {A}/docs/architecture/01-decisions/ADR-0026-system-publication-without-grant.md ·")
 out=f"{PK}/BUILD-S01-{C}.md"; pathlib.Path(out).write_text(s); print("wrote",out,"steps",start,end,len(steps),"allowed",len(allowed))
