@@ -36,6 +36,75 @@ export type SupportCaseSummaryDraft = Readonly<{
   actionIds: readonly never[];
 }>;
 
+const ACCOUNT_DETAIL_CLAIM = /\b(?:active sessions?|privacy preferences?|cookie preferences?|claim legacy debates?|delete account|deletion schedule|sesiuni active|preferin(?:te|tele) (?:cookie|de confidentialitate)|revendic(?:a|area) dezbaterilor vechi|sterger(?:ea|ii) contului|programarea stergerii)\b/u;
+const NAVIGATION_COMMITMENT = /\b(?:support|asistenta)\b[^.!?;\n]{0,80}\b(?:can\s+(?:guide|navigate|direct)|poate\s+(?:ghida|naviga|indrepta|deschide))\b/u;
+const EMAIL = /\b(?:e-?mail(?:ul)?|mail)\b/u;
+const CASE = /\b(?:human\s+case|support\s+case|case|caz(?:ul)?)\b/u;
+const CASE_CREATION = /\b(?:create[ds]?|open(?:s|ed)?|cre(?:eaza|at|are)|deschide)\b/u;
+const CASE_CREATION_NEGATION = /\b(?:does\s+not|doesn['’]?t|cannot|can['’]?t|nu)\b[^.!?;\n]{0,40}\b(?:create|open|cre(?:eaza|a)|deschide)\b/u;
+
+const NAVIGATION_DESTINATIONS = Object.freeze([
+  Object.freeze({ actionId:"home-library",pattern:/\b(?:home|pagina principala|acasa|librar(?:y|ie)|biblioteca)\b/u }),
+  Object.freeze({ actionId:"sign-in",pattern:/\b(?:sign\s*in|log\s*in|autentificare)\b/u }),
+  Object.freeze({ actionId:"register",pattern:/\b(?:create (?:an )?account|account creation|register|registration|crearea (?:unui )?cont|inregistrare)\b/u }),
+  Object.freeze({ actionId:"help-desk",pattern:/\b(?:help(?: center| desk)?|centrul de ajutor|ajutor)\b/u }),
+  Object.freeze({ actionId:"settings",pattern:/\b(?:account settings|settings page|setarile contului|pagina de setari)\b/u }),
+  Object.freeze({ actionId:"active-sessions",pattern:/\b(?:active sessions?|sesiuni active)\b/u }),
+  Object.freeze({ actionId:"privacy-preferences",pattern:/\b(?:privacy preferences?|cookie preferences?|preferinte de confidentialitate|preferinte cookie)\b/u }),
+  Object.freeze({ actionId:"delete-account",pattern:/\b(?:delete account|account deletion|stergerea contului)\b/u })
+] as const);
+
+function authorityText(value: string): string {
+  return value.normalize("NFKD").replace(/\p{M}/gu,"").toLocaleLowerCase("en-US");
+}
+
+function conflatesCaseAndEmail(value: string): boolean {
+  return authorityText(value).split(/[.!?;\n]+/u).some((clause) =>
+    EMAIL.test(clause) && CASE.test(clause) && CASE_CREATION.test(clause)
+      && !CASE_CREATION_NEGATION.test(clause)
+  );
+}
+
+/**
+ * Binds material visitor prose to the canonical source/action authority that
+ * was supplied for this request. It may complete an omitted visible citation
+ * from that already supplied authority, but it never invents authority.
+ */
+export function bindSupportDraftAuthority(
+  draft: SupportDraft,
+  allowedSourceIds: readonly string[],
+  requestedActionIds: readonly (SupportActionId | string)[]
+): SupportDraft | null {
+  const text = authorityText(draft.text);
+  if (conflatesCaseAndEmail(text)) return null;
+
+  const sourceIds = [...draft.sourceIds];
+  if (ACCOUNT_DETAIL_CLAIM.test(text) && !sourceIds.includes("settings-help-menus")) {
+    if (!allowedSourceIds.includes("settings-help-menus") || sourceIds.length >= 3) return null;
+    sourceIds.push("settings-help-menus");
+  }
+
+  const requiredActions = new Set<string>();
+  for (const clause of text.split(/[.!?;\n]+/u)) {
+    if (!NAVIGATION_COMMITMENT.test(clause)) continue;
+    for (const destination of NAVIGATION_DESTINATIONS) {
+      if (destination.pattern.test(clause)) requiredActions.add(destination.actionId);
+    }
+  }
+  if (requiredActions.size > 0 && (
+    !sourceIds.includes("app-navigation")
+    || !allowedSourceIds.includes("app-navigation")
+    || [...requiredActions].some((id) =>
+      !requestedActionIds.includes(id) || !draft.actionIds.includes(id)
+    )
+  )) return null;
+
+  if (sourceIds.length === draft.sourceIds.length) return draft;
+  return Object.freeze({
+    ...draft,sourceIds:Object.freeze(sourceIds),actionIds:Object.freeze([...draft.actionIds])
+  });
+}
+
 export type SupportDraftDiagnosticCode =
   | "RAW_TOO_LONG"
   | "JSON_INVALID"

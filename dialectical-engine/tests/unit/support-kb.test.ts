@@ -104,6 +104,23 @@ afterEach(() => {
 });
 
 describe("Help Corpus loader", () => {
+  it("keeps paired public scoring and human-case draft facts aligned", () => {
+    const content = fileURLToPath(
+      new URL("../../packages/support-kb/content/", import.meta.url),
+    );
+    const enScoring = readFileSync(join(content,"debate-workspace-menus.en.md"),"utf8");
+    const roScoring = readFileSync(join(content,"debate-workspace-menus.ro.md"),"utf8");
+    const enCases = readFileSync(join(content,"support-cases.en.md"),"utf8");
+    const roCases = readFileSync(join(content,"support-cases.ro.md"),"utf8");
+
+    for (const [document,terms] of [
+      [enScoring,["provider and model","cache or staleness","unresolved holes and fatal flags"]],
+      [roScoring,["furnizorul și modelul","cache sau învechire","golurile nerezolvate și marcajele fatale"]],
+      [enCases,["email support does not create this case","receipt, response target, or private case link"]],
+      [roCases,["emailul de asistență nu creează acest caz","confirmarea, termenul de răspuns sau legătura privată"]]
+    ] as const) for (const term of terms) expect(document).toContain(term);
+  });
+
   it("binds the separately reviewed public-guide corpus in the editorial manifest", () => {
     const directory = fileURLToPath(
       new URL("../../packages/support-kb/content/", import.meta.url),

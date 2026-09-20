@@ -14,6 +14,7 @@ import { createSupportModelReferenceFactory } from "../../apps/api/src/support/m
 
 const REFERENCE_REQUEST_ID = "10000000-0000-4000-8000-000000000001";
 const SOURCE_REFERENCE = "s-10000000000040008000000000000001-1";
+const SECOND_SOURCE_REFERENCE = "s-10000000000040008000000000000001-2";
 const ACTION_REFERENCE = "a-10000000000040008000000000000001-1";
 const SECOND_ACTION_REFERENCE = "a-10000000000040008000000000000001-2";
 const modelReferenceFactory = () => createSupportModelReferenceFactory(REFERENCE_REQUEST_ID);
@@ -162,6 +163,92 @@ describe("CP1 composed answer context", () => {
     expect(result).toMatchObject({
       outcome:"ANSWER_GROUNDED",sources:[{ id:"settings-help-menus" }],
       actions:[{ id:"active-sessions",href:"/settings#active-sessions-heading" }]
+    });
+  });
+
+  it("repairs omitted visible Account authority through the actual answer boundary",async () => {
+    const snapshot = corpus([
+      Object.freeze({
+        ...entry("settings-help-menus","Account Settings Active sessions Privacy Claim legacy debates Delete account."),
+        lang:"ro" as const
+      }),
+      Object.freeze({
+        ...entry("app-navigation","Account deschide pagina de setări a contului autentificat."),
+        lang:"ro" as const
+      })
+    ],"account-authority");
+    const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
+      kind:"answer",
+      text:"Account deschide setările contului autentificat. De acolo poți gestiona sesiunile active prin Active sessions (examinare sau revocare), preferințele cookie prin Privacy, revendica dezbateri vechi prin Claim legacy debates și programa sau anula ștergerea contului prin Delete account.",
+      sourceIds:[SECOND_SOURCE_REFERENCE],actionIds:[]
+    }) }));
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-20T19:00:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({
+      ...request(snapshot),text:"Account",language:"ro",detectedLanguage:"ro",signedIn:true
+    });
+
+    expect(result).toMatchObject({ outcome:"ANSWER_GROUNDED",actions:[] });
+    expect(result.sources?.map(({ id }) => id)).toEqual([
+      "settings-help-menus","app-navigation"
+    ]);
+  });
+
+  it("rejects unsupported destination promises through the actual answer boundary",async () => {
+    const snapshot = corpus([
+      Object.freeze({ ...entry("support-status-limits","Starea publică a serviciului și limitele Asistenței."),lang:"ro" as const }),
+      Object.freeze({ ...entry("unsupported-capabilities","Acțiuni indisponibile și limitări."),lang:"ro" as const }),
+      Object.freeze({ ...entry("public-answer-disclosure","Limitele unui răspuns publicat."),lang:"ro" as const })
+    ],"destination-authority");
+    const badText = "Asistența te poate ghida către pagina principală, biblioteca de dezbateri, autentificare, creearea unui cont sau centrul de ajutor, în funcție de contextul tău de autentificare.";
+    const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
+      kind:"answer",text:badText,
+      sourceIds:[SOURCE_REFERENCE,SECOND_SOURCE_REFERENCE],actionIds:[]
+    }) }));
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-20T19:10:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({
+      ...request(snapshot),text:"La ce poate răspunde Asistența și care sunt limitele ei?",
+      language:"ro",detectedLanguage:"ro"
+    });
+
+    expect(result).toMatchObject({ outcome:"ANSWER_GROUNDED",actions:[] });
+    expect(result.text).not.toBe(badText);
+    expect(result.sources).toHaveLength(1);
+  });
+
+  it("rejects human-case and email conflation through the actual answer boundary",async () => {
+    const supportCase = Object.freeze({
+      ...entry("support-cases","Cazul uman folosește escaladarea; emailul este separat."),
+      lang:"ro" as const
+    });
+    const snapshot = corpus([supportCase],"case-email-authority");
+    const badText = "Un caz de asistență umană se creează separat, prin opțiunea de escaladare către o persoană sau prin fluxul de email de asistență — este un caz asincron, nu un apel telefonic.";
+    const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
+      kind:"answer",text:badText,sourceIds:[SOURCE_REFERENCE],actionIds:[]
+    }) }));
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-20T19:20:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({
+      ...request(snapshot),text:"Care este diferența dintre acest ghid public și un caz de asistență umană?",
+      language:"ro",detectedLanguage:"ro"
+    });
+
+    expect(result).toMatchObject({
+      outcome:"ANSWER_GROUNDED",text:supportCase.fallback,
+      sources:[{ id:"support-cases" }],actions:[]
     });
   });
 

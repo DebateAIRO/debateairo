@@ -407,6 +407,9 @@ export function Assistant({
   const [pageStatus,setPageStatus] = useState<SupportPageStatus | null>(null);
   const [statusUnavailable,setStatusUnavailable] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const conversationPaneRef = useRef<HTMLDivElement>(null);
+  const conversationEndRef = useRef<HTMLDivElement>(null);
+  const followLatestRef = useRef(true);
 
   useEffect(() => {
     onLanguageChange?.(language);
@@ -418,6 +421,14 @@ export function Assistant({
       language,session,messages
     }));
   },[language,messages,persistent,session]);
+
+  useEffect(() => {
+    if (!fullPage || !followLatestRef.current) return;
+    const end = conversationEndRef.current;
+    if (end !== null && typeof end.scrollIntoView === "function") {
+      end.scrollIntoView({ block:"end",behavior:"smooth" });
+    }
+  },[fullPage,messages.length]);
 
   useEffect(() => {
     if (signedIn !== undefined) {
@@ -772,9 +783,18 @@ export function Assistant({
           <button className="supportNewConversation" type="button" onClick={beginNewConversation}>New conversation</button>
         </header>
 
-        <div className="supportChatScroll">
+        <div
+          className="supportChatScroll"
+          ref={conversationPaneRef}
+          onScroll={() => {
+            const pane = conversationPaneRef.current;
+            if (pane === null) return;
+            followLatestRef.current = pane.scrollHeight - pane.scrollTop - pane.clientHeight <= 48;
+          }}
+        >
           <p className="supportTimestamp">Today · Support conversation</p>
           {conversation}
+          <div ref={conversationEndRef} data-support-conversation-end aria-hidden />
           {ratingControls}
           <div className="supportSuggestions" aria-label="Suggested questions">
             {HELP_SUGGESTIONS.map((suggestion) => <button

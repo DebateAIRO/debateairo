@@ -21,7 +21,7 @@ import {
 import { SupportQueueError,type SupportRelayQueue } from "./queue.js";
 import type { SupportDegradedPort } from "./degraded.js";
 import {
-  diagnoseSupportDraft,parseSupportDraft,screenSupportModelText,
+  bindSupportDraftAuthority,diagnoseSupportDraft,parseSupportDraft,screenSupportModelText,
   type SupportDraftReport,validateSupportDraft
 } from "./response-policy.js";
 import {
@@ -336,11 +336,16 @@ export function createSupportAnswerService(input: Readonly<{
           : translateSupportDraftReferences(referenceDraft,{
             sources:context!.sourceReferences,actions:context!.actionReferences
           });
+        const authorityDraft = !structured ? undefined
+          : translatedDraft === null || translatedDraft === undefined ? null
+          : bindSupportDraftAuthority(
+            translatedDraft,context!.sourceIds,context!.requestedActionIds
+          );
         const draft = !structured ? undefined
-          : translatedDraft === null || translatedDraft === undefined
+          : authorityDraft === null || authorityDraft === undefined
             || !supportSourceIdsSatisfyPolicy(
-              translatedDraft.sourceIds,context!.sourcePolicy
-            ) ? null : translatedDraft;
+              authorityDraft.sourceIds,context!.sourcePolicy
+            ) ? null : authorityDraft;
         const rejected = structured && draft === null;
         const recovered = rejected
           && recoveryEntry?.fallback !== undefined

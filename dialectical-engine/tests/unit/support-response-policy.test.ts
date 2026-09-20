@@ -1,5 +1,6 @@
 import { describe,expect,it } from "vitest";
 import {
+  bindSupportDraftAuthority,
   diagnoseSupportDraft,
   parseSupportCaseSummaryDraft,
   parseSupportDraft,
@@ -19,6 +20,64 @@ function raw(text: string, overrides: Readonly<Record<string,unknown>> = {}): st
 }
 
 describe("CP1 support model response policy", () => {
+  it("completes material Account citations from supplied authority without widening ordinary prose", () => {
+    const detailed = {
+      kind: "answer" as const,
+      text: "Active sessions reviews devices and Delete account shows the deletion schedule.",
+      sourceIds: ["app-navigation"],actionIds: []
+    };
+
+    expect(bindSupportDraftAuthority(detailed,["settings-help-menus","app-navigation"],[]))
+      .toEqual({ ...detailed,sourceIds:["app-navigation","settings-help-menus"] });
+    expect(bindSupportDraftAuthority(detailed,["app-navigation"],[])).toBeNull();
+    expect(bindSupportDraftAuthority({
+      kind:"answer",text:"Account opens the signed-in settings page.",
+      sourceIds:["app-navigation"],actionIds:[]
+    },["app-navigation"],[])).not.toBeNull();
+  });
+
+  it("requires source-backed closed actions for navigation commitments but preserves descriptions", () => {
+    const unsupported = {
+      kind:"answer" as const,
+      text:"Support can guide you to Home, sign in, account creation, and Help.",
+      sourceIds:["support-status-limits"],actionIds:[]
+    };
+    expect(bindSupportDraftAuthority(unsupported,[
+      "support-status-limits","public-answer-disclosure","unsupported-capabilities"
+    ],[])).toBeNull();
+
+    const description = {
+      kind:"answer" as const,
+      text:"Home is the debate library and Public debates is the published catalog.",
+      sourceIds:["app-navigation"],actionIds:[]
+    };
+    expect(bindSupportDraftAuthority(description,["app-navigation"],[])).toEqual(description);
+
+    const navigation = {
+      kind:"answer" as const,
+      text:"Support can guide you to Home.",sourceIds:["app-navigation"],
+      actionIds:["home-library"]
+    };
+    expect(bindSupportDraftAuthority(
+      navigation,["app-navigation"],["home-library"]
+    )).toEqual(navigation);
+  });
+
+  it("rejects case-email conflation while preserving the separate mail workflow", () => {
+    expect(bindSupportDraftAuthority({
+      kind:"answer",text:"A human case is created through escalation or the support-email flow.",
+      sourceIds:["support-cases"],actionIds:[]
+    },["support-cases"],[])).toBeNull();
+    expect(bindSupportDraftAuthority({
+      kind:"answer",text:"Escalation creates the human case; support email is a separate mail workflow.",
+      sourceIds:["support-cases"],actionIds:[]
+    },["support-cases"],[])).not.toBeNull();
+    expect(bindSupportDraftAuthority({
+      kind:"answer",text:"Escaladarea creează cazul uman; emailul de asistență este un flux separat.",
+      sourceIds:["support-cases"],actionIds:[]
+    },["support-cases"],[])).not.toBeNull();
+  });
+
   it("reports a closed secret-safe rejection shape without completion bytes or identifiers", () => {
     const completion = JSON.stringify({
       kind: "answer",
