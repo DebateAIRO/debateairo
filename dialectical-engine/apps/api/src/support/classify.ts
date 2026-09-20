@@ -76,7 +76,8 @@ const ZONE_RULES: readonly ZoneRule[] = Object.freeze([
   }),
   Object.freeze({
     pattern: /(?:\bsign[ -]?in\b|\blog[ -]?in\b|\blogin\b|\bautentific\w*\b)/u,
-    link: "/login"
+    link: "/login",
+    publicLocationGuide: true
   })
 ]);
 

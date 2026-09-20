@@ -595,7 +595,7 @@ describe("SUP-01 deterministic support classifier", () => {
   });
 
   it.each([
-    ["sign-in", "Where can I sign in to my account?", "/login"],
+    ["sign-in-operation", "Sign in to my account for me.", "/login"],
     ["sign-up", "Where can I sign up for an account?", "/sign-up"],
     ["forgot-password", "How can I reset a forgotten password?", null],
     ["verification", "My verification link expired; send a new verification code.", "/settings"],
@@ -617,10 +617,24 @@ describe("SUP-01 deterministic support classifier", () => {
     ["en", "Where can I manage active sessions?"],
     ["en", "Please tell me where the account deletion options are."],
     ["en", "Do not delete my account; where can I find the account deletion options?"],
+    ["en", "Where can I sign in?"],
+    ["en", "Where is the login page?"],
     ["ro", "Unde pot gestiona sesiunile active?"],
     ["ro", "Unde găsesc opțiunile de ștergere a contului?"],
-    ["ro", "Nu îmi șterge contul; unde găsesc opțiunile de ștergere a contului?"]
+    ["ro", "Nu îmi șterge contul; unde găsesc opțiunile de ștergere a contului?"],
+    ["ro", "Unde mă pot autentifica?"],
+    ["ro", "Unde găsesc pagina de autentificare?"]
   ] as const)("keeps public %s account-menu location guidance on the answer path: %s",(
+    language,message
+  ) => {
+    expect(classifySupportMessage(message)).toEqual({ outcome:null,language,link:null });
+  });
+
+  it.each([
+    ["ro","Unde îmi pot crea un cont?"],
+    ["en","What is Dialectical-Engine, and what can I do in this app?"],
+    ["ro","Ce este Dialectical-Engine și ce pot face în această aplicație?"]
+  ] as const)("retains the accepted %s account-creation and product-guide controls: %s",(
     language,message
   ) => {
     expect(classifySupportMessage(message)).toEqual({ outcome:null,language,link:null });
@@ -640,6 +654,17 @@ describe("SUP-01 deterministic support classifier", () => {
   ] as const)("keeps account operations in deterministic zone refusal: %s",(message,language) => {
     expect(classifySupportMessage(message)).toMatchObject({
       outcome:"REFUSE_ZONE",language,link:"/settings"
+    });
+  });
+
+  it.each([
+    ["Where can Support sign in to my account?","en"],
+    ["Where can you log in to my account for me?","en"],
+    ["Unde poate Asistența să se autentifice în contul meu?","ro"],
+    ["Unde te poți autentifica în contul meu în locul meu?","ro"]
+  ] as const)("keeps a Support sign-in operation in zone refusal: %s",(message,language) => {
+    expect(classifySupportMessage(message)).toMatchObject({
+      outcome:"REFUSE_ZONE",language,link:"/login"
     });
   });
 

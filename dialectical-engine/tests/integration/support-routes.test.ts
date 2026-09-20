@@ -2566,6 +2566,45 @@ describe("SUP-01 support routes", () => {
     await server.close();
   });
 
+  it.each([
+    ["Where can I sign in?","en","203.0.113.244","Choose Sign in."],
+    ["Unde găsesc pagina de autentificare?","ro","203.0.113.245","Alege Autentificare."]
+  ] as const)("routes public sign-in navigation through ingress and opaque references: %s",async (
+    requestText,language,clientIp,answerText
+  ) => {
+    const article = Object.freeze({
+      id:"account-access",lang:language,title:language === "ro" ? "Acces la cont" : "Account access",
+      status:"shipped" as const,sources:Object.freeze(["reviewed-fixture"]),
+      verifiedAgainst:"reviewed-fixture",ratifiedBy:"V" as const,ratifiedOn:"2026-09-17",
+      body:"Raw fixture body is excluded from the model surface.",
+      modelProjection:language === "ro"
+        ? "Pagina Autentificare permite accesul public la fluxul contului."
+        : "The Sign in page is the public entry to the account flow.",
+      fallback:answerText
+    });
+    const snapshots = createHelpCorpusSnapshotLookup(corpus([article]));
+    const complete = vi.fn(async () => Object.freeze({
+      text:JSON.stringify({
+        kind:"answer",text:answerText,
+        sourceIds:[MODEL_SOURCE_REFERENCE],actionIds:[MODEL_ACTION_REFERENCE]
+      })
+    }));
+    const answer = createSupportAnswerService({
+      entries:[article],snapshots,messages:messageCipher,
+      modelFor:() => Object.freeze({ complete }),modelReferenceFactory
+    });
+    const server = api(true,{ answerPort:answer });
+    const opened = await openSession(server,clientIp,language);
+    const response = await sendMessage(server,opened.body,requestText,clientIp);
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      outcome:"ANSWER_GROUNDED",text:answerText,
+      sources:[{ id:"account-access" }],actions:[{ id:"sign-in",href:"/login" }]
+    });
+    expect(complete).toHaveBeenCalledOnce();
+    await server.close();
+  });
+
   it("advertises no owner-only action to an anonymous export model request", async () => {
     const article = Object.freeze({
       id: "export-json",lang: "en" as const,title: "Export a debate as JSON",

@@ -25,8 +25,12 @@ describe("Support public-guide boundary", () => {
   it.each([
     ["Where can I manage active sessions?","en"],
     ["Where are the account deletion options?","en"],
+    ["Where can I sign in?","en"],
+    ["Where is the login page?","en"],
     ["Unde pot gestiona sesiunile active?","ro"],
-    ["Unde găsesc opțiunile de ștergere a contului?","ro"]
+    ["Unde găsesc opțiunile de ștergere a contului?","ro"],
+    ["Unde mă pot autentifica?","ro"],
+    ["Unde găsesc pagina de autentificare?","ro"]
   ] as const)("keeps account-menu locations public: %s", (text,language) => {
     expect(classifyPublicGuideBoundary(text,language)).toEqual({ kind: "PUBLIC_GUIDE" });
     expect(isPublicAccountLocationGuide(text)).toBe(true);
@@ -43,6 +47,15 @@ describe("Support public-guide boundary", () => {
   ] as const)("does not treat an explicit %s Support account operation as navigation: %s",(
     text,_language
   ) => {
+    expect(isPublicAccountLocationGuide(text)).toBe(false);
+  });
+
+  it.each([
+    "Where can Support sign in to my account?",
+    "Where can you log in to my account for me?",
+    "Unde poate Asistența să se autentifice în contul meu?",
+    "Unde te poți autentifica în contul meu în locul meu?"
+  ])("does not treat a Support sign-in operation as public navigation: %s",(text) => {
     expect(isPublicAccountLocationGuide(text)).toBe(false);
   });
 
