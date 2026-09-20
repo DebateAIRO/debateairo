@@ -122,6 +122,25 @@ describe("Support knowledge context", () => {
     }
   });
 
+  it.each([
+    ["en" as const,"Where can I sign in?","account-access",["sign-in"]],
+    ["ro" as const,"Unde îmi pot crea un cont?","account-access",["sign-up"]],
+    ["en" as const,"What is Dialectical-Engine, and what can I do in this app?","product-identity",[]],
+    ["ro" as const,"Ce este Dialectical-Engine și ce pot face în această aplicație?","product-identity",[]]
+  ])("grounds the exact owner %s prompt against all reviewed entries: %s",(
+    language,query,sourceId,actionIds
+  ) => {
+    const corpus = productionReviewedCorpus();
+    const availableActionIds = resolveSupportActions(SUPPORT_ACTION_IDS,{ signedIn:false,language })
+      .map(({ id }) => id);
+    const result = buildSupportKnowledgeContext({
+      entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,
+      availableActionIds,language,query,historyText:"",maxCodePoints:24_000
+    });
+    expect(result.sourceIds).toContain(sourceId);
+    expect(result.requestedActionIds).toEqual(actionIds);
+  });
+
   it("selects newly reviewed knowledge lexically without a hard-coded intent list", () => {
     // Property: article reachability follows its own current words rather than a separately edited regex gate.
     const result = buildSupportKnowledgeContext({

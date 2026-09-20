@@ -180,6 +180,21 @@ function phraseScore(value: string,term: string): number {
   return 0;
 }
 
+function canonicalActionPhraseScore(value: string,term: string): number {
+  const valueWords = semanticWords(value);
+  const termWords = semanticWords(term);
+  if (termWords.length === 0 || valueWords.length < termWords.length) return 0;
+  for (let start = 0;start <= valueWords.length - termWords.length;start += 1) {
+    if (termWords.every((termWord,index) => {
+      const valueWord = valueWords[start + index];
+      return valueWord === termWord
+        || valueWord !== undefined
+          && [valueWord,termWord].every((word) => word === "crea" || word === "creeaza");
+    })) return termWords.length;
+  }
+  return 0;
+}
+
 function orderedPhraseScore(value: string,term: string): number {
   const valueWords = semanticWords(value);
   const termWords = semanticWords(term);
@@ -304,7 +319,9 @@ export function buildSupportKnowledgeContext(input: Readonly<{
   const guideMatches = SUPPORT_GUIDE_LABELS.map((item) => {
     if (item.requiresNavigationIntent && !hasActionIntent) return Object.freeze({ item,score:0 });
     const score = Math.max(0,...item.labels[input.language].map((label) => {
-      const matched = phraseScore(affirmative,label);
+      const matched = item.actionId === null
+        ? phraseScore(affirmative,label)
+        : canonicalActionPhraseScore(affirmative,label);
       return item.actionId !== null && matched === 1
         && GENERIC_SINGLE_ACTION_LABEL.test(normalizedText(label)) && !hasActionIntent
         ? 0 : matched;

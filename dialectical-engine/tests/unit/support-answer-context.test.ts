@@ -5,7 +5,7 @@ import { describe,expect,it,vi } from "vitest";
 import { createSupportAnswerService } from "../../apps/api/src/support/answer.js";
 import type { SupportModelPort } from "../../apps/api/src/support/model.js";
 import {
-  createHelpCorpusSnapshotLookup,type HelpCorpusEntry,type LoadedHelpCorpus
+  createHelpCorpusSnapshotLookup,loadHelpCorpus,type HelpCorpusEntry,type LoadedHelpCorpus
 } from "../../packages/support-kb/src/index.js";
 import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
 import { buildSupportKnowledgeContext } from "../../packages/support-kb/src/context.js";
@@ -43,6 +43,15 @@ function authorDraftCorpus(): LoadedHelpCorpus {
     title:component.id.replaceAll("-"," "),modelProjection:component.modelProjection,
     fallback:component.fallback,ratifiedBy:"",ratifiedOn:""
   })),"author-draft-corpus");
+}
+
+function productionReviewedCorpus(): LoadedHelpCorpus {
+  const root = resolve(process.cwd(),"packages/support-kb");
+  return loadHelpCorpus(resolve(root,"content"),{
+    reviewManifest:JSON.parse(readFileSync(resolve(root,"reviews/manifest.json"),"utf8")) as unknown,
+    recoveryComponents:readFileSync(resolve(root,"recovery/components.json")),
+    requireReviewedRecovery:true
+  });
 }
 
 const messages = Object.freeze({
@@ -240,10 +249,8 @@ describe("CP1 composed answer context", () => {
   ])("binds a canonical %s destination promise through the actual answer service: %s",async (
     language,signedIn,query,answerText,sourceId,actionIds
   ) => {
-    const drafted = authorDraftCorpus();
-    const snapshot = corpus(drafted.entries.filter((candidate) =>
-      candidate.lang === language && candidate.id === sourceId
-    ),`canonical-destination-${language}-${sourceId}`);
+    const snapshot = productionReviewedCorpus();
+    expect(snapshot.entries).toHaveLength(44);
     const availableActionIds = resolveSupportActions(SUPPORT_ACTION_IDS,{ signedIn,language })
       .map(({ id }) => id);
     const context = buildSupportKnowledgeContext({

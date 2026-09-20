@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { TypedDomainError } from "@debateai/kernel";
 import {
-  createHelpCorpusSnapshotLookup,type HelpCorpusEntry,type LoadedHelpCorpus
+  createHelpCorpusSnapshotLookup,loadHelpCorpus,type HelpCorpusEntry,type LoadedHelpCorpus
 } from "../../packages/support-kb/src/index.js";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildApi, type AskApplication } from "../../apps/api/src/index.js";
@@ -2600,6 +2600,43 @@ describe("SUP-01 support routes", () => {
     expect(response.json()).toMatchObject({
       outcome:"ANSWER_GROUNDED",text:answerText,
       sources:[{ id:"account-access" }],actions:[{ id:"sign-in",href:"/login" }]
+    });
+    expect(complete).toHaveBeenCalledOnce();
+    await server.close();
+  });
+
+  it("routes the Romanian owner sign-up prompt through the reviewed full corpus",async () => {
+    const kbRoot = join(process.cwd(),"packages/support-kb");
+    const snapshot = loadHelpCorpus(join(kbRoot,"content"),{
+      reviewManifest:JSON.parse(await readFile(
+        join(kbRoot,"reviews/manifest.json"),"utf8"
+      )) as unknown,
+      recoveryComponents:await readFile(join(kbRoot,"recovery/components.json")),
+      requireReviewedRecovery:true
+    });
+    expect(snapshot.entries).toHaveLength(44);
+    const complete = vi.fn(async () => Object.freeze({
+      text:JSON.stringify({
+        kind:"answer",text:"Alege Creează un cont.",
+        sourceIds:[MODEL_SOURCE_REFERENCE],actionIds:[MODEL_ACTION_REFERENCE]
+      })
+    }));
+    const answer = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
+      messages:messageCipher,modelFor:() => Object.freeze({ complete }),modelReferenceFactory
+    });
+    const server = api(true,{ answerPort:answer,knowledgePort:Object.freeze({
+      status:async () => Object.freeze({ kbVersion:snapshot.kbVersion,shipped:44,ignored:0 }),
+      snapshot:(version:string) => version === snapshot.kbVersion ? snapshot : undefined
+    }) });
+    const opened = await openSession(server,"203.0.113.246","ro");
+    const response = await sendMessage(
+      server,opened.body,"Unde îmi pot crea un cont?","203.0.113.246"
+    );
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      outcome:"ANSWER_GROUNDED",sources:[{ id:"account-access" }],
+      actions:[{ id:"sign-up",href:"/sign-up" }]
     });
     expect(complete).toHaveBeenCalledOnce();
     await server.close();
