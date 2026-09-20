@@ -2,18 +2,72 @@ import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { auditS14TypeGraph } from "../../tools/orphan-audit/src/index.js";
 
+/** Names a module declares with `export type X` / `export interface X`. */
+function exportedTypeNames(source: string): readonly string[] {
+  return Object.freeze(
+    [...source.matchAll(/^export (?:type|interface) ([A-Za-z_$][\w$]*)/gmu)].map((match) => match[1]!)
+  );
+}
+
+/**
+ * The V2-wire-mirror rule, as a function so it can be tested for FAILABILITY
+ * rather than trusted: every type name the UI re-declares that the shared
+ * contract already owns. A UI-only shape returns nothing.
+ */
+export function redeclaredContractTypes(
+  contractSources: readonly string[],
+  uiTypeSource: string
+): readonly string[] {
+  const owned = new Set(contractSources.flatMap((source) => exportedTypeNames(source)));
+  return Object.freeze(exportedTypeNames(uiTypeSource).filter((name) => owned.has(name)).sort());
+}
+
 describe("S14 / AC-59..61 / W19 — native UI contract", () => {
   it("uses the generated contract client for both browser and SSR with no V2 wire mirror", async () => {
-    const [browser, server, types] = await Promise.all([
+    const [browser, server, types, contractIndex, contractClient] = await Promise.all([
       readFile(new URL("../../apps/ui/lib/api.ts", import.meta.url), "utf8"),
       readFile(new URL("../../apps/ui/lib/serverApi.ts", import.meta.url), "utf8"),
-      readFile(new URL("../../apps/ui/lib/types.ts", import.meta.url), "utf8")
+      readFile(new URL("../../apps/ui/lib/types.ts", import.meta.url), "utf8"),
+      readFile(new URL("../../packages/contract/src/index.ts", import.meta.url), "utf8"),
+      readFile(new URL("../../packages/contract/src/client.ts", import.meta.url), "utf8")
     ]);
     expect(browser).toContain("createContractClient");
     expect(server).toContain("createContractClient");
-    expect(types).toContain("@debateai/contract");
-    expect(types).not.toContain("export type DebateDetail");
+
+    // V RULED 2026-09-20 — this rule is AMENDED, not relaxed.
+    //
+    // It used to demand `expect(types).toContain("@debateai/contract")` and
+    // `expect(types).not.toContain("export type DebateDetail")`. Neither is
+    // honestly satisfiable. The shared contract has no `DebateDetail` at all,
+    // and the UI's shape carries screen-side fields the wire never had —
+    // branch lineage, analyzer runs, agent outputs, provenance, lifecycle
+    // decisions. `apps/ui/lib/v3/adapter.ts` exists precisely BECAUSE the two
+    // shapes differ. Satisfying the old wording would mean pushing
+    // screen-shaped types into the wire contract, which is worse, or moving a
+    // declaration so a text search stops finding it, which is cheating.
+    //
+    // What the rule was protecting is unchanged and is now asserted directly:
+    // the UI must never silently RE-DECLARE a type the shared contract already
+    // owns, because two declarations of one wire shape drift apart and that is
+    // what "V2 wire mirror" meant. A UI-only shape with no contract equivalent
+    // is permitted — that is the part the old wording got wrong. The rule's
+    // own failability is pinned by the sibling test below, so it cannot rot
+    // into a tautology the way a text search can.
+    expect(redeclaredContractTypes([contractIndex, contractClient], types)).toEqual([]);
     expect(types).not.toContain("ScoringRefreshState");
+  });
+
+  // The amended rule must be able to FAIL. A rule that only ever sees a clean
+  // tree proves nothing about the tree; this pins that a genuine re-declaration
+  // of a contract-owned type is reported, and that a UI-only shape is not.
+  it("reports a UI re-declaration of a contract-owned type and stays silent on a UI-only shape", () => {
+    const contract = "export type PublicDebate = { id: string };\nexport type Answer = { text: string };\n";
+    expect(redeclaredContractTypes([contract], "export type PublicDebate = { id: string; drawerOpen: boolean };\n"))
+      .toEqual(["PublicDebate"]);
+    expect(redeclaredContractTypes([contract], "export interface Answer { text: string }\n"))
+      .toEqual(["Answer"]);
+    expect(redeclaredContractTypes([contract], "export type DebateDetail = { branches: string[] };\n"))
+      .toEqual([]);
   });
 
   it("routes browser contract traffic through the V3 same-origin API boundary", async () => {
