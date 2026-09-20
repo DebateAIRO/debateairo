@@ -25,3 +25,7 @@ The verdict claims: the FIX checker passes on SPEC-v2, fails on the frozen SPEC 
 | 2026-09-20 20:54→21:16 | ARCH-S01 | t_eff46252 | grok-4.6 (session 01a0bff4-9e4c-73d1-a083-fcec78f440bf) | PLAN(S01): clusters C1 → C2 ∥ C4 → C3, migration 0066, ADR-0026 | READY — the handoff claims all four base runs CLUSTER_GREEN with the two named pre-existing failures carried as expected counts, and a zero-gap R-1…R-25 trace | `skills-check.sh` 5/5, Grok transcript | agent-reports/ARCH-S01.md |
 
 Measured by the orchestrator: PLAN.md 999 lines; ADR-0026 exists; the lane is 0 dirty at 5b6cc9b1. UNVERIFIED by the seat and carried forward: whether `reconcileKeyCleanup` has a periodic production caller (C2-S18). Packet defects → t_6fb82ae4.
+| 2026-09-20 21:18→21:37 | ARCH-REV-S01 | t_b82d832e | claude-opus-5 (Agent tool; 286,443 tokens, 92 tool uses, ~19 min) | blind review of PLAN(S01) + ARCH packet | **REWORK** p1 — B1–B5, N1–N5; packet defects P5–P8 | `skills-check.sh` 4/4 against `subagents/agent-a9c30f07ba1f8df9b.jsonl` | agent-reports/ARCH-REV-S01.md |
+
+The verdict claims: every base cluster command re-run scripted and inline with zero disagreements against PLAN §8; B4(b)/(c) READ from function bodies, not reproduced. Measured by the orchestrator: lane 0 dirty after the seat.
+Ruling: B1–B5 and N1–N5 go to ONE ARCH-FIX node in ARCH-S01's own Grok session — why: every finding lands in PLAN.md (one surface) — cost if wrong: a larger pass-2 review. ARCH-REV pass 2 resumes the Opus reviewer by SendMessage.

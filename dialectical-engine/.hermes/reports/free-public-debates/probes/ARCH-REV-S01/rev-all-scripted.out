@@ -1,0 +1,19 @@
+########## SCRIPTED C1 ##########
+tests/integration/tiers-s02-run-plan-tier.test.ts rc=0 passed=6 failed=0 (expect 6/0)
+tests/integration/plan-tiers-route-privileges.test.ts rc=0 passed=1 failed=0 (expect 1/0)
+CLUSTER_GREEN
+marker-rc=0
+########## SCRIPTED C2 ##########
+tests/unit/s8-publication.test.ts rc=0 passed=26 failed=0 (expect 26/0)
+tests/integration/s8-publication-database.test.ts rc=1 passed=25 failed=1 (expect 25/1)
+CLUSTER_GREEN
+marker-rc=0
+########## SCRIPTED C3 ##########
+tests/unit/s8-publication-http.test.ts rc=0 passed=4 failed=0 (expect 4/0)
+tests/unit/s7-authorization.test.ts rc=1 passed=30 failed=1 (expect 30/1)
+CLUSTER_GREEN
+marker-rc=0
+########## SCRIPTED C4 ##########
+tests/unit/s10-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+CLUSTER_GREEN
+marker-rc=0
