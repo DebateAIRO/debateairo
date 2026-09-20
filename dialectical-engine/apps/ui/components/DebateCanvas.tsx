@@ -16,6 +16,7 @@ import {
 import { ModelMetaLine } from "@/components/ModelPresentation";
 import { SCRUTINY_STATUS } from "@/lib/scrutiny";
 import {
+  formatIndependencePill,
   formatScoreBadgeLabel,
   formatScorePercent,
   formatStrengthPill,
@@ -257,6 +258,9 @@ function CanvasCard({
   // typed reason there are none (never 0, never a dash — DR-115).
   const v3Scores =
     v3NodesById === undefined ? null : v3ScorePresentation(v3NodeScoreState(node, v3NodesById));
+  // Evidence sourcing breadth. Null below one distinct source, so a card with
+  // no record stays silent rather than printing "sources: 0".
+  const independencePill = formatIndependencePill(node.evidence_independence);
 
   // Additive, flag-gated low-strength dimming (Phase 9 Task 4). Never replaces
   // the existing abandoned/scoreFilterMatch terms -- a node can be abandoned
@@ -451,6 +455,15 @@ function CanvasCard({
                   <V3ScoreBadges node={node} presentation={v3Scores} openNodeDetails={openNodeDetails} />
                 ) : null}
               </ScoringErrorBoundary>
+              {independencePill ? (
+                <span
+                  className="scoreBadge independence"
+                  aria-label={`Evidence sourcing for ${node.claim}: ${independencePill.title}`}
+                  title={independencePill.title}
+                >
+                  {independencePill.pillText}
+                </span>
+              ) : null}
             </div>
 
             {state === "pending" ? (

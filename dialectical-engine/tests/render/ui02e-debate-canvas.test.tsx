@@ -65,7 +65,65 @@ function renderedCard(html: string, nodeId: string): string {
   return html.slice(start, end >= 0 ? end : undefined);
 }
 
+function renderedCanvasWithIndependence(): string {
+  const answer = buildFairShapedAnswer();
+  const projected = debateDetailFromAnswer(answer);
+  const scored = projected.tree!.children[0]!;
+  const sourced: DebateNode = {
+    ...scored,
+    id: "node:sourced",
+    evidence_independence: {
+      distinct_source_count: 2,
+      pairs: [["nature.com", "LOOKED_UP"], ["replication.org", "RAN"]]
+    },
+    children: []
+  };
+  // A node that carries an independence RECORD whose count is zero. This is
+  // the boundary the helper guards, and it is distinct from a node with no
+  // record at all — only this fixture can prove the `<= 0` arm.
+  const zeroSourced: DebateNode = {
+    ...scored,
+    id: "node:zero-sourced",
+    evidence_independence: { distinct_source_count: 0, pairs: [] },
+    children: []
+  };
+
+  return renderToStaticMarkup(
+    <DebateCanvas
+      root={{ ...projected.tree!, children: [sourced, zeroSourced] }}
+      expanded={new Set()}
+      selectedNodeId={null}
+      v3NodesById={contractNodesById(answer)}
+      meta={{ claims: 2, depth: 1, judged: 1, derivedStanding: 0, setAside: 0 }}
+      onOpenNode={noop}
+      onChallengeNode={noop}
+      onToggleExpand={noop}
+    />
+  );
+}
+
 describe("UI-02e renders the real DebateCanvas gate surface", () => {
+  it("shows recorded evidence sourcing breadth on the card, and nothing when there is none", () => {
+    // PROPERTY: when a node records distinct evidence source-domain/method
+    // pairs, the card says how many, and the accessible name carries the
+    // honest caveat that this measures sourcing BREADTH and not accuracy.
+    // 2b670d30 deleted this render site outright; the helper
+    // (lib/scoringFormat.ts:120 formatIndependencePill), the node field and
+    // the wording all survived, so nothing named the loss and nothing failed.
+    const html = renderedCanvasWithIndependence();
+
+    expect(html).toContain("sources: 2 distinct");
+    expect(html).toContain("2 distinct source-domain/method pairs");
+    expect(html).toContain("not verified accuracy or training-corpus independence");
+    // Exactly one card shows a pill: the zero-count node carries a record but
+    // no sources, and must stay silent rather than print "sources: 0 distinct".
+    expect(html.match(/sources: \d+ distinct/g)).toHaveLength(1);
+    expect(html).not.toContain("sources: 0");
+    // A card with no independence record at all is silent too.
+    expect(renderedCanvas()).not.toContain("sources:");
+  });
+
+
   it("DR-184 T28 renders the immutable four-term standing census in the sticky control", () => {
     const html = renderedCanvas();
     expect(html).toContain("3 claims across 1 levels · 1 judged · 1 standing on their arguments · 1 set aside");
