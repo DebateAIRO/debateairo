@@ -1,0 +1,4 @@
+MUTANT B1 FAIL (detector caught):
+B1-wrapper: wrapper not in C2-S4
+B1-ts-path: C2-S6 does not call the wrapper
+B1-s10: missing

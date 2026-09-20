@@ -1,0 +1,3 @@
+MUTANT B5 FAIL (detector caught):
+B5-coalesce: missing
+B5-not-missing-null: missing

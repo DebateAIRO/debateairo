@@ -179,3 +179,37 @@ Classification of the work (`superpowers:brainstorming`): **architectural** — 
 ## 13. Rows for V
 
 None new. V-1…V-6 bind; I-1…I-4 bind. No product question was found that those rows do not settle. The trigger location, the actor literal, the column name and the cluster cut are HOW.
+
+---
+
+# APPENDED 2026-09-20 by ARCH-FIX-S01-02 (pass 2, after ARCH-REV-S01-p1 REWORK)
+
+Sections 1–13 above are not rewritten. Assigned findings B1–B5, N1–N5. P1–P8 named, not fixed.
+
+## 14. Decisions taken at ARCH-FIX-S01-02
+
+| date | question | choice | reason | ruled by |
+|---|---|---|---|---|
+| 2026-09-20 | B1 — how TypeScript writes a system DENY audit | New `identity.audit_system_publication_attempt`, SECURITY DEFINER, GRANT EXECUTE TO debateai_runtime. Application never calls `append_audit_event_internal`. | Measured: `0040_account_erasure.sql:6211-6213` REVOKE ALL from debateai_runtime. The preflight wrapper at `:3884` requires a session and a binding (R-20.4). | ARCH-FIX-S01-02, accepting ARCH-REV-S01-p1 B1 |
+| 2026-09-20 | B2 — reconciler identity and production caller | `tryAutoPublish({runId, answer, userId, ownerRef})`. Work row stores user_id/owner_ref. Production caller is `apps/api/src/main.ts:297-305` (boot + 30s interval), added to the C2 file map. | Measured: `AuthenticatedSession` at `sessions.ts:34-41` carries session/token hashes a background job does not have. `grep -c main.ts PLAN.md` was 0; the interval exists at `main.ts:297-305`. Reviewer's predicted skip of main.ts is rejected: R-10 has no production trigger without it. | ARCH-FIX-S01-02, accepting both halves of B2 |
+| 2026-09-20 | B3 — who adds `isFreePublicBound` | C2-S6's interface list and done-criterion. The three contradictory sentences at the C3 intro are deleted. | A BUILD node reads its cluster's steps. C2-S6 was satisfiable without the method; C3 then had no lawful file. | ARCH-FIX-S01-02, accepting B3 |
+| 2026-09-20 | B4(a)(b)(c) — in-transaction guards | FOR UPDATE on `core.run`; `run_is_free_public_bound`; `run_private_content_is_live`; latest visibility ≠ PUBLISHED under that lock; system intent table added to erasure contention in 0068. C2-S3 cases 10–14 go RED if any is omitted. | Measured: owner function holds the three guards (`:3996-3997`, `:4003-4004`, `:4061-4062`). `serve.publication_snapshot` is not in the erasure-barrier table list (`:4238-4245`). `listPublicRefs` is `DISTINCT ON (run_id)` (`publication.ts:531-540`). Two concurrent GETs plus the reconciler on the same run are the production shape (V's walk polls every 10s). | ARCH-FIX-S01-02, accepting B4; not contesting B4(c) |
+| 2026-09-20 | B5 — missing `freePublicRule` key during migrate→deploy | `COALESCE((p_run->>'freePublicRule')::boolean, false)`. C1-S9 re-pointed at extra-key rejection (`0061_plan_tier_on_run.sql:21-30`). | Measured: `db:migrate` is a separate CLI (`package.json:23`, `migrate-cli.ts:6`). `plan_tier` is nullable (`0061:1`); this column is NOT NULL DEFAULT false. A missing-key → false test would pin the outage as correct. | ARCH-FIX-S01-02, accepting B5 |
+| 2026-09-20 | N1 — Test Files assertion | One `rc=… passed=… failed=…` line per path. | Measured: `run-suites.sh:15` runs vitest once per path. | ARCH-FIX-S01-02, accepting N1 |
+| 2026-09-20 | N2 — 202 PENDING as delete success | 202 is success only with a `serve.private_run_erasure_tombstone` row. CONTENDED is not success. | Measured: `account-erasure.ts:110-112` maps CONTENDED → PENDING → HTTP 202 (`index.ts:793`). | ARCH-FIX-S01-02, accepting N2 |
+| 2026-09-20 | N3 — counts standing in for membership | Named `it(` titles, named COALESCE/INSERT sites, named 52 route strings. | `grep -c` counts lines (TOOLING-TRAPS:236). SV-1 add-and-remove mutant keeps 52. | ARCH-FIX-S01-02, accepting N3 |
+| 2026-09-20 | N4 — REV worktree contract generation | SV-0: `pnpm install` then `pnpm run generate:contract`; `test -f packages/contract/generated/client.ts`. | TOOLING-TRAPS heading at `:294-301`. C2 edits `packages/contract/src/index.ts`. | ARCH-FIX-S01-02, accepting N4 |
+| 2026-09-20 | N5 — `actor_ref_version` | System visibility insert writes `2`. | Column DEFAULT 1, CHECK IN (1,2) (`:388-393`); owner writes `2` at `:4112`. | ARCH-FIX-S01-02, accepting N5 |
+
+## 15. Alternatives rejected at ARCH-FIX-S01-02
+
+| alternative | why not |
+|---|---|
+| Contest B4(c) as "two concurrent GETs are not realistic" | PLAN C2-S18 puts the reconciler on the same run as the GET hook; SPEC §4.1 step 3 polls every 10s. The reviewer named this prediction; it is false. |
+| Answer B2 with `{userId, ownerRef}` and leave `main.ts` unmapped | R-10 then has no production trigger. The hedge in pass-1 C2-S18 ("if no periodic caller, document GET as the trigger") is the branch the finding closed. |
+| Keep C1-S9 as missing-key → false | That pins B5's outage as the intended contract. Extra-key rejection is the allow-list's actual pin. |
+| Write DENY from TypeScript via `audit_publication_preflight_denial` | Requires a live session and a `publication_event_binding` row (`:3908-3922`). R-20.4. |
+
+## 16. Rows for V
+
+None new. No product question was opened by the review. P1–P8 remain the orchestrator's.

@@ -56,9 +56,14 @@ notices. The owner-driven function's grant is `0040_account_erasure.sql:4157-416
    `0040_account_erasure.sql:6370-6377`.
 4. **The audit actor of a successful system publish, and of a failed auto-publish attempt,
    is the literal text `system:free-public-auto-publish`** written to
-   `identity.audit_event.actor_key_ref` through `identity.append_audit_event_internal`.
-   Owner-driven writes a UUID (`v_audit_actor_ref::text`). A test classifies system vs user
-   by `actor_key_ref = 'system:free-public-auto-publish'` on that row, with no join.
+   `identity.audit_event.actor_key_ref`. The TypeScript application does **not** call
+   `identity.append_audit_event_internal` (revoked from `debateai_runtime` at
+   `migrations/0040_account_erasure.sql:6211-6213`). Failed attempts that never enter the
+   transition are written by `identity.audit_system_publication_attempt`, `SECURITY DEFINER`,
+   `GRANT EXECUTE TO debateai_runtime`. Successful ALLOW rows are written inside
+   `core.transition_system_run_publication` (also `SECURITY DEFINER`). Owner-driven writes a
+   UUID (`v_audit_actor_ref::text`). A test classifies system vs user by
+   `actor_key_ref = 'system:free-public-auto-publish'` on that row, with no join.
 5. **No phantom identity rows.** A system publish inserts no `identity.session` row, no
    `identity.step_up_grant` row, and no `identity.publication_event_binding` row. The
    snapshot's `created_at` and the public envelope's `published_at` are the same

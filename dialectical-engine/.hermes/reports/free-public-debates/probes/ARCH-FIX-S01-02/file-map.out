@@ -1,0 +1,37 @@
+MAP:
+  migrations/0066_free_public_rule.sql                         C1
+  packages/db/src/schema.ts                                    C1
+  packages/db/src/index.ts                                     C1
+  packages/db/src/free-public-binding.ts                       C1
+  tests/integration/fpd-s01-c1-binding.test.ts                 C1
+  tests/integration/fpd-s01-c1-privileges.test.ts              C1
+  docs/architecture/01-decisions/ADR-0026-system-publication-without-grant.md already written by ARCH-S01; BUILD does not edit
+  migrations/0067_system_run_publication.sql                   C2
+  packages/db/src/publication.ts                               C2
+  apps/api/src/publications.ts                                 C2
+  apps/api/src/main.ts                                         C2
+  apps/api/src/index.ts                                        C2 first (answer-route hook), then C3 (unpublish 409). Not parallel.
+  packages/contract/src/index.ts                               C2
+  packages/contract/src/client.ts                              C2
+  tests/unit/fpd-s01-c2-auto-publish.test.ts                   C2
+  tests/integration/fpd-s01-c2-system-publication.test.ts      C2
+  tests/unit/fpd-s01-c3-unpublish-http.test.ts                 C3
+  migrations/0068_bound_published_erasure.sql                  C4
+  tests/unit/fpd-s01-c4-erasure-http.test.ts                   C4
+  tests/integration/fpd-s01-c4-delete-published.test.ts        C4
+
+=== C1 files mentioned, not owned by C1 in the map ===
+  UNMAPPED  tests/integration/plan-tiers-route-privileges.test.ts
+  UNMAPPED  tests/integration/tiers-s02-run-plan-tier.test.ts
+
+=== C2 files mentioned, not owned by C2 in the map ===
+  UNMAPPED  tests/architecture/s8-publication-contract.test.ts
+  UNMAPPED  tests/integration/s8-publication-database.test.ts
+  UNMAPPED  tests/unit/s8-publication.test.ts
+
+=== C3 files mentioned, not owned by C3 in the map ===
+  UNMAPPED  tests/unit/s8-publication-http.test.ts
+
+=== C4 files mentioned, not owned by C4 in the map ===
+  OTHER(C2 first (answer-route hook), then C3 (unpublish 409). Not parallel.) apps/api/src/index.ts
+  UNMAPPED  tests/unit/s10-erasure-http.test.ts
