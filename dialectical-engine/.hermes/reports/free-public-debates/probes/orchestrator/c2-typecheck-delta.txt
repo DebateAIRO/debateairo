@@ -1,0 +1,16 @@
+tests/integration/s8-publication-database.test.ts: error TS2554: Expected 5 arguments, but got 2.
+tests/integration/s8-publication-database.test.ts: error TS2554: Expected 5 arguments, but got 2.
+tests/integration/s8-publication-database.test.ts: error TS2554: Expected 5 arguments, but got 2.
+tests/integration/s8-publication-database.test.ts: error TS2554: Expected 5 arguments, but got 2.
+tests/integration/s8-publication-database.test.ts: error TS2554: Expected 5 arguments, but got 2.
+tests/integration/s8-publication-database.test.ts: error TS2554: Expected 5 arguments, but got 2.
+tests/integration/s8-publication-database.test.ts: error TS2554: Expected 5 arguments, but got 2.
+tests/integration/s8-publication-database.test.ts: error TS2554: Expected 5 arguments, but got 2.
+tests/unit/pda-s04-node-carrier-audit.test.ts: error TS2554: Expected 5 arguments, but got 3.
+tests/unit/s8-publication-http.test.ts: error TS2322: Type '{ reconcileSystemKeyProvisionCleanup?: (limit?: number | undefined) => Promise<number>; reconcileFreePublicAutoPublish?: (limit?: number | undefined) => Promise<number>; ... 10 more ...; list: ((limit: number, offset: number) => Promise<...>) | (() => Promise<...>); }' is not assignable to type 'PublicationApplication'.
+tests/unit/s8-publication-http.test.ts: error TS2554: Expected 5 arguments, but got 2.
+tests/unit/s8-publication.test.ts: error TS2554: Expected 5 arguments, but got 2.
+tests/unit/s8-publication.test.ts: error TS2554: Expected 5 arguments, but got 2.
+tests/unit/s8-publication.test.ts: error TS2554: Expected 5 arguments, but got 2.
+tests/unit/s8-publication.test.ts: error TS2554: Expected 5 arguments, but got 3.
+tests/unit/s8-publication.test.ts: error TS2554: Expected 5 arguments, but got 3.
