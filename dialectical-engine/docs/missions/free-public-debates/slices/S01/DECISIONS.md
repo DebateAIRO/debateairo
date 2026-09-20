@@ -61,3 +61,65 @@ be taken without V.
 None left open. C1–C3 were resolved by V at intake; C4–C7 bind as their row defaults and are written
 as SPEC requirements R-8, R-9/R-11, R-24/R-12 and R-6/R-7. One new contested product question was
 found and is the V-ROW in §3; the SPEC is frozen on its recommended default, as the law requires.
+
+---
+
+# APPENDED 2026-09-20 by REQ-FIX-02 (pass 2, after REQ-REV pass 1 REWORK)
+
+Sections 1–4 above are REQ-01's and are not rewritten. This section is appended.
+
+## 5. Re-pointing — every SPEC reference above now means `SPEC-v2.md`
+
+`SPEC-v2.md` is the SPEC of record; `SPEC.md` stays byte-identical as the superseded first version.
+Requirement numbers R-1…R-25 are unchanged, so every `R-n` cited in §1–§4 still names the same
+requirement. Two references above are section pointers, not line pointers, and resolve against the
+new file: §1's "Acceptance in one display mode or two | Once (SPEC §4 preamble)" → `SPEC-v2.md` §4.0;
+§4's "SPEC requirements R-8, R-9/R-11, R-24/R-12 and R-6/R-7" → the same numbers in `SPEC-v2.md`.
+Row V-5 in §3 was transcribed by the orchestrator into `V-DECISIONS-PACKET.md:11`; its default is
+unchanged and still binds.
+
+## 6. Decisions taken at pass 2
+
+| date | question | choice | reason | ruled by |
+|---|---|---|---|---|
+| 2026-09-20 | B1 — R-8 (BLOCKED: nothing outstanding) and R-9 (never PRIVATE with nothing outstanding) cannot both hold | R-9, R-5 and R-7 are scoped to a **publishable bound run** (`terminal` other than `BLOCKED`); R-8 states that R-9 does not reach it | R-4 already carried that carve-out and R-9 did not. Scoping the general requirement is one sentence; narrowing R-8 would contradict row V-1, which V has not ruled on. | REQ-FIX-02 |
+| 2026-09-20 | B2 — which wire carries "outstanding, not private by choice" | One optional key, `publish_pending: true`, on `PublicationTransitionSchema`, absent unless outstanding | V-2's words are about what the owner is *served*, so a test-only row would not discharge them. An optional key absent on every other run leaves every existing response byte-identical, which a new `state` value could not. The residual deploy-skew risk is written into R-11.4 rather than hidden. | REQ-FIX-02 |
+| 2026-09-20 | N4 — R-21 also required an audit row for a refused unpublish | Dropped from the requirements; the failed-auto-publish half stays and is pinned to the audit path the denial branch already uses | The reviewer is right that it sits beyond I-1…I-4 and beyond this node's charge, which asked what a *system publish* records. Kept as residue in §8 so it is not lost. | REQ-FIX-02, accepting the finding |
+| 2026-09-20 | B3 — V's walk returned 400 instead of the statuses it named | §4 rewritten with the exact `.strict()` bodies, the 202/`run_ref` pin, `DELETE_PRIVATE_DEBATE`, the step-up body, and `step_up_grant.token` | Six members of one class, all measured at `3f374361`. A walk whose first mutating call is a 400 tests nothing. | REQ-FIX-02 |
+| 2026-09-20 | Where the pass-2 checker lives | `slices/S01/spec-v2-check.sh` | This seat's allowed list is exhaustive and does not include `.hermes/reports/.../probes/`, where the convention would put it. The slice directory is allowed and the file is genuinely handed forward — the next REV pass runs it. Named as a packet defect in the handoff. | REQ-FIX-02 |
+
+## 7. Alternatives rejected at pass 2
+
+| alternative | why not |
+|---|---|
+| Close B1 by narrowing R-8 instead of R-9 (let a BLOCKED run hold an outstanding record that never clears) | Row V-1's default is that a BLOCKED Free answer is not published; an outstanding record that never clears is a retry loop with no terminal state, and it would make R-21's audit count unbounded. |
+| Close B2 by moving the distinction to a test-only row (the reviewer's second option) | No wire change and no deploy skew, and it is the cheaper build — but the owner's own read would still answer plain `PRIVATE`, which is the thing intake C5 names. Recorded as the V-ROW in §9 so V can take the cheaper build if the skew worries him more than the wording. |
+| Close B2 with a third `state` value | `SPEC.md` R-11 already forbade it and `SPEC-v2.md` R-11.1 keeps the ban: an older reader parses two values and meets a third. Same class as the back-compat trap in R-22. |
+| Close B3 by telling V to use the shipped contract client instead of typing bodies | The client already sends the acknowledgement flags (`packages/contract/src/client.ts:463-475`), so the walk would pass without proving the server refuses — and V's acceptance is meant to be a stranger's walk, not a call through code this mission may change. |
+| Renumber requirements in `SPEC-v2.md` | Would invalidate `PLAN.md` §3's 25 trace rows and every `R-n` cited in §1–§4 above, for no gain. |
+| Fix the packet defects P-A…P-F myself | They are N8, the orchestrator's, ticket `t_5b665910`. Named, not fixed. |
+
+## 8. Residue — filed, not built in S01
+
+- A refused unpublish (R-12) leaves no audit row of its own. Ticket at TEST(S01), beside the UI
+  follow-up row V-3 already defers.
+- `docs/missions/public-debate-access/INTAKE.md:57-75` carries drifted line numbers for
+  `readPublicDebate` (it says `publications.ts:301`; that is `async unpublish` today). Another
+  mission's document, outside this seat's contract — named here so the next seat does not copy it.
+
+## 9. Rows for V
+
+```
+V-ROW: NEW · S01 · t_2e15bf90 · Where the "publish is still pending" signal lives
+A Free run whose auto-publish has not landed yet must not look private-by-choice (intake C5, row V-2).
+SPEC-v2 R-11 puts that signal on the owner's own read as one optional key, publish_pending, on
+GET /v1/runs/{id}/visibility. The cheaper alternative is to keep the signal internal — only a database
+row a test reads — leaving the owner's read saying plain PRIVATE until the publish lands.
+Recommended default: the optional key. The SPEC is frozen on it (R-11).
+Smallest yes/no for V: "Should the owner's own screen be able to tell 'publishing' from 'private'?"
+VERDICT: the optional key / CONFIDENCE: medium / STRONGEST COUNTER: it changes a .strict() wire schema
+that a UI built from an older bundle parses, so during a staggered deploy one outstanding run reads as
+an unavailable publication status; the internal-only build has no wire risk at all and still satisfies
+row V-2's literal text, which speaks about retrying rather than about what the owner sees.
+```
+

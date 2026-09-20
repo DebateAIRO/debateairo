@@ -15,3 +15,7 @@ Ruling: REQ-01's security note (the Free refusal must sit AFTER ownership + gran
 
 The verdict claims: no suites run; every §4 step UNVERIFIED against a live server (by charge). Packet defects against the orchestrator (N8) ticketed t_5b665910 and swept into the ARCH charges the same day.
 Ruling: all of B1–B3 AND N1–N7 go to ONE REQ-FIX node in REQ-01's own session — why: SPEC-v2 is being written anyway and every N touches the same file (one surface, one node) — cost if wrong: a slightly larger pass-2 review.
+| 2026-09-20 20:34→20:46 | REQ-FIX-02 | t_9e5427b1 | claude-opus-5 (REQ-01's session resumed by SendMessage; 237,660 tokens cumulative, 55 tool uses) | SPEC-v2(S01) after REQ-REV p1 | READY p2 — the handoff claims all ten findings ADDRESSED, 18 mutants killed / 0 escaped, and corrects three counts the verdict gave (ask keys 11 not 10; B3 members 6 not 5; N2/N3 members 2 not 1) | `skills-check.sh` 2/2 new skills, same subagent transcript | agent-reports/REQ-FIX-02.md |
+
+Measured by the orchestrator: SPEC.md unchanged vs 06e4eceb; the checker runs (zsh) and prints the three repo facts as claimed. V-ROW → V-6. Packet defects → t_e85e12a3.
+Ruling: REQ-REV pass 2 RESUMES the pass-1 Grok session (01a0bfd1…) instead of a fresh one — why: the pass is scoped to that seat's own findings and probes; blindness to the AUTHOR is kept (it never sees REQ-FIX's reasoning beyond the READY comment the contract lets it read) — cost if wrong: one fresh-session re-run (~14 min).

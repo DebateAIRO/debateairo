@@ -9,13 +9,13 @@ V's goal, verbatim, is in the intake record. In one line: **a Free debate is mad
 server itself, and cannot be made private again** — auto-publish on serve, unpublish refused, the
 creator may still delete. Premium is unchanged. Backend only: no `apps/ui` file is written.
 V's rulings I-1…I-4 are closed and live in the intake record. Contradictions C1–C7 are there too;
-C4–C7 carry defaults that bind as rows V-1…V-4 until V rules.
+C4–C7 carry defaults that bind as rows V-1…V-5 until V rules (V-5 is REQ-01's delete-while-public row).
 
 ## 2. Slices
 
 | code | name | ui | done oracle |
 |---|---|---|---|
-| S01 | A Free debate is made public by the server and cannot be made private again | `no` | `slices/S01/SPEC.md` §4 — V runs the numbered walk once, personally, against a served lane |
+| S01 | A Free debate is made public by the server and cannot be made private again | `no` | `slices/S01/SPEC-v2.md` §4 — V runs the numbered walk once, personally, against a served lane |
 
 One slice. The argument for not splitting it, and the alternatives rejected, are in
 `slices/S01/DECISIONS.md` §1–§2.
@@ -41,8 +41,11 @@ One slice. The argument for not splitting it, and the alternatives rejected, are
 | what you need | where it is |
 |---|---|
 | V's verbatim goal, rulings I-1…I-4, contradiction check C1–C7, measured state, the baseline table | `docs/missions/free-public-debates/00-intake.md` |
-| the rows whose defaults bind until V rules (V-1…V-4) | `docs/missions/free-public-debates/V-DECISIONS-PACKET.md` |
-| WHAT S01 builds — requirements R-1…R-25, suite assertions, V's acceptance walk | `docs/missions/free-public-debates/slices/S01/SPEC.md` (frozen) |
+| the rows whose defaults bind until V rules (V-1…V-5) | `docs/missions/free-public-debates/V-DECISIONS-PACKET.md` |
+| WHAT S01 builds — requirements R-1…R-25, suite assertions, V's acceptance walk | `docs/missions/free-public-debates/slices/S01/SPEC-v2.md` — **the SPEC of record**, frozen at REQ-FIX-02's READY |
+| the superseded first version, kept byte-identical | `docs/missions/free-public-debates/slices/S01/SPEC.md` (frozen at REQ-01's READY; read `SPEC-v2.md` instead) |
+| the detector for the findings SPEC-v2 closes | `docs/missions/free-public-debates/slices/S01/spec-v2-check.sh` |
+| the REQ-REV pass-1 verdict that produced SPEC-v2 | `docs/missions/free-public-debates/reviews/REQ-REV-p1.md` |
 | HOW — steps, clusters, the SPEC↔PLAN trace | `docs/missions/free-public-debates/slices/S01/PLAN.md` |
 | why a choice was made, what was rejected, rows for V | `docs/missions/free-public-debates/slices/S01/DECISIONS.md` |
 | where the slice stands | `docs/missions/free-public-debates/slices/S01/PROGRESS.md` (orchestrator writes) |
