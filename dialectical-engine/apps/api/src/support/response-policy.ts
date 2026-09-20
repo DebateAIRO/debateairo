@@ -4,7 +4,8 @@ import {
   supportTextViewHasUnsafePath
 } from "@debateai/kernel";
 import {
-  SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,type SupportActionId
+  SUPPORT_ACTION_CATALOG,SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,SUPPORT_GUIDE_LABELS,
+  type SupportActionId
 } from "@debateai/support-kb/catalog";
 
 const MAX_RAW_CODE_POINTS = 8_192;
@@ -41,28 +42,61 @@ const NAVIGATION_COMMITMENT = /\b(?:support|asistenta)\b[^.!?;\n]{0,80}\b(?:can\
 const EMAIL = /\b(?:e-?mail(?:ul)?|mail)\b/u;
 const CASE = /\b(?:human\s+case|support\s+case|case|caz(?:ul)?)\b/u;
 const CASE_CREATION = /\b(?:create[ds]?|open(?:s|ed)?|cre(?:eaza|at|are)|deschide)\b/u;
-const CASE_CREATION_NEGATION = /\b(?:does\s+not|doesn['’]?t|cannot|can['’]?t|nu)\b[^.!?;\n]{0,40}\b(?:create|open|cre(?:eaza|a)|deschide)\b/u;
-
-const NAVIGATION_DESTINATIONS = Object.freeze([
-  Object.freeze({ actionId:"home-library",pattern:/\b(?:home|pagina principala|acasa|librar(?:y|ie)|biblioteca)\b/u }),
-  Object.freeze({ actionId:"sign-in",pattern:/\b(?:sign\s*in|log\s*in|autentificare)\b/u }),
-  Object.freeze({ actionId:"register",pattern:/\b(?:create (?:an )?account|account creation|register|registration|crearea (?:unui )?cont|inregistrare)\b/u }),
-  Object.freeze({ actionId:"help-desk",pattern:/\b(?:help(?: center| desk)?|centrul de ajutor|ajutor)\b/u }),
-  Object.freeze({ actionId:"settings",pattern:/\b(?:account settings|settings page|setarile contului|pagina de setari)\b/u }),
-  Object.freeze({ actionId:"active-sessions",pattern:/\b(?:active sessions?|sesiuni active)\b/u }),
-  Object.freeze({ actionId:"privacy-preferences",pattern:/\b(?:privacy preferences?|cookie preferences?|preferinte de confidentialitate|preferinte cookie)\b/u }),
-  Object.freeze({ actionId:"delete-account",pattern:/\b(?:delete account|account deletion|stergerea contului)\b/u })
-] as const);
+const CASE_CREATION_NEGATION = /\b(?:does\s+not|doesn['’]?t|did\s+not|never|cannot|can['’]?t|nu)\b[^.!?;\n]{0,40}\b(?:create|open|cre(?:eaza|a)|deschide)\b/u;
 
 function authorityText(value: string): string {
   return value.normalize("NFKD").replace(/\p{M}/gu,"").toLocaleLowerCase("en-US");
 }
 
+function authorityWords(value: string): string {
+  return authorityText(value).replace(/[^\p{L}\p{N}]+/gu," ").trim();
+}
+
 function conflatesCaseAndEmail(value: string): boolean {
-  return authorityText(value).split(/[.!?;\n]+/u).some((clause) =>
+  return authorityText(value).split(/[.!?;\n]+|\b(?:while|whereas|iar|in timp ce)\b/u).some((clause) =>
     EMAIL.test(clause) && CASE.test(clause) && CASE_CREATION.test(clause)
       && !CASE_CREATION_NEGATION.test(clause)
   );
+}
+
+type NavigationMatch = Readonly<{
+  actionId: SupportActionId;
+  phrase: string;
+}>;
+
+function navigationMatches(clause: string): readonly NavigationMatch[] {
+  const words = ` ${authorityWords(clause)} `;
+  const matches = SUPPORT_GUIDE_LABELS.flatMap((row) => row.actionId === null ? []
+    : [...row.labels.en,...row.labels.ro].flatMap((label) => {
+      const phrase = authorityWords(label);
+      return phrase !== "" && words.includes(` ${phrase} `)
+        ? [Object.freeze({ actionId:row.actionId!,phrase })] : [];
+    }));
+  return Object.freeze(matches.filter((candidate,index) =>
+    matches.findIndex(({ actionId,phrase }) =>
+      actionId === candidate.actionId && phrase === candidate.phrase
+    ) === index
+    && !matches.some((other) => other.actionId !== candidate.actionId
+      && other.phrase.length > candidate.phrase.length
+      && ` ${other.phrase} `.includes(` ${candidate.phrase} `))
+  ));
+}
+
+function actionHasRequestAuthority(
+  actionId: SupportActionId,
+  sourceIds: readonly string[],
+  allowedSourceIds: readonly string[],
+  requestedActionIds: readonly (SupportActionId | string)[],
+  draftActionIds: readonly string[]
+): boolean {
+  const action = SUPPORT_ACTION_CATALOG.find(({ id }) => id === actionId);
+  if (action === undefined || action.availability === "unresolved"
+    || action.availability === "excluded") return false;
+  if (!requestedActionIds.includes(actionId) || !draftActionIds.includes(actionId)) return false;
+  const reviewedSources = SUPPORT_GUIDE_LABELS
+    .filter((row) => row.actionId === actionId)
+    .map(({ articleId }) => articleId);
+  return reviewedSources.some((id) => sourceIds.includes(id) && allowedSourceIds.includes(id));
 }
 
 /**
@@ -84,20 +118,14 @@ export function bindSupportDraftAuthority(
     sourceIds.push("settings-help-menus");
   }
 
-  const requiredActions = new Set<string>();
+  const requiredActions = new Set<SupportActionId>();
   for (const clause of text.split(/[.!?;\n]+/u)) {
     if (!NAVIGATION_COMMITMENT.test(clause)) continue;
-    for (const destination of NAVIGATION_DESTINATIONS) {
-      if (destination.pattern.test(clause)) requiredActions.add(destination.actionId);
-    }
+    for (const { actionId } of navigationMatches(clause)) requiredActions.add(actionId);
   }
-  if (requiredActions.size > 0 && (
-    !sourceIds.includes("app-navigation")
-    || !allowedSourceIds.includes("app-navigation")
-    || [...requiredActions].some((id) =>
-      !requestedActionIds.includes(id) || !draft.actionIds.includes(id)
-    )
-  )) return null;
+  if ([...requiredActions].some((id) => !actionHasRequestAuthority(
+    id,sourceIds,allowedSourceIds,requestedActionIds,draft.actionIds
+  ))) return null;
 
   if (sourceIds.length === draft.sourceIds.length) return draft;
   return Object.freeze({

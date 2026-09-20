@@ -7,7 +7,9 @@ import {
   projectSupportDraftReport,
   validateSupportDraft
 } from "../../apps/api/src/support/response-policy.js";
-import { SUPPORT_ACTION_CATALOG,SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
+import {
+  SUPPORT_ACTION_CATALOG,SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,SUPPORT_GUIDE_LABELS
+} from "../../packages/support-kb/src/catalog.js";
 
 function raw(text: string, overrides: Readonly<Record<string,unknown>> = {}): string {
   return JSON.stringify({
@@ -56,11 +58,56 @@ describe("CP1 support model response policy", () => {
     const navigation = {
       kind:"answer" as const,
       text:"Support can guide you to Home.",sourceIds:["app-navigation"],
-      actionIds:["home-library"]
+      actionIds:["home"]
     };
     expect(bindSupportDraftAuthority(
-      navigation,["app-navigation"],["home-library"]
+      navigation,["app-navigation"],["home"]
     )).toEqual(navigation);
+  });
+
+  it("derives every promised destination from the canonical action and guide catalogs", () => {
+    for (const action of SUPPORT_ACTION_CATALOG) {
+      const guideRows = SUPPORT_GUIDE_LABELS.filter(({ actionId }) => actionId === action.id);
+      expect(guideRows.length).toBeGreaterThan(0);
+      const row = guideRows[0]!;
+      const label = row.labels.en[0]!;
+      const draft = {
+        kind:"answer" as const,text:`Support can guide you to ${label}.`,
+        sourceIds:[row.articleId],actionIds:[action.id]
+      };
+      const bound = bindSupportDraftAuthority(draft,[row.articleId],[action.id]);
+      if (["unresolved","excluded"].includes(action.availability)) expect(bound).toBeNull();
+      else expect(bound).toEqual(draft);
+    }
+    expect(new Set(SUPPORT_ACTION_CATALOG.map(({ id }) => id)))
+      .toEqual(new Set(SUPPORT_ACTION_IDS));
+
+    for (const row of SUPPORT_GUIDE_LABELS.filter(({ actionId }) => actionId === "start-debate")) {
+      const draft = {
+        kind:"answer" as const,
+        text:`Support can guide you to ${row.labels.en[0]}.`,
+        sourceIds:[row.articleId],actionIds:["start-debate"]
+      };
+      expect(bindSupportDraftAuthority(draft,[row.articleId],["start-debate"])).toEqual(draft);
+    }
+  });
+
+  it("rejects a canonical promise when any request-local authority edge is missing", () => {
+    const valid = {
+      kind:"answer" as const,text:"Support can guide you to Active sessions.",
+      sourceIds:["settings-help-menus"],actionIds:["active-sessions"]
+    };
+    expect(bindSupportDraftAuthority(valid,["settings-help-menus"],["active-sessions"]))
+      .toEqual(valid);
+    expect(bindSupportDraftAuthority(valid,["app-navigation"],["active-sessions"]))
+      .toBeNull();
+    expect(bindSupportDraftAuthority(valid,["settings-help-menus"],[])).toBeNull();
+    expect(bindSupportDraftAuthority({ ...valid,actionIds:[] },["settings-help-menus"],["active-sessions"]))
+      .toBeNull();
+    expect(diagnoseSupportDraft(JSON.stringify({
+      kind:"answer",text:"Support can guide you to Home.",
+      sourceIds:["app-navigation"],actionIds:["home-library"]
+    }),["app-navigation"],["home"])).toMatchObject({ code:"ACTION_MEMBERSHIP_INVALID" });
   });
 
   it("rejects case-email conflation while preserving the separate mail workflow", () => {
@@ -76,6 +123,30 @@ describe("CP1 support model response policy", () => {
       kind:"answer",text:"Escaladarea creează cazul uman; emailul de asistență este un flux separat.",
       sourceIds:["support-cases"],actionIds:[]
     },["support-cases"],[])).not.toBeNull();
+    expect(bindSupportDraftAuthority({
+      kind:"answer",text:"Escalation creates the human case, while support email is a separate mail workflow.",
+      sourceIds:["support-cases"],actionIds:[]
+    },["support-cases"],[])).not.toBeNull();
+    expect(bindSupportDraftAuthority({
+      kind:"answer",text:"Escaladarea creează cazul uman, iar emailul este un flux separat.",
+      sourceIds:["support-cases"],actionIds:[]
+    },["support-cases"],[])).not.toBeNull();
+    expect(bindSupportDraftAuthority({
+      kind:"answer",text:"Support email does not create the human case; escalation does.",
+      sourceIds:["support-cases"],actionIds:[]
+    },["support-cases"],[])).not.toBeNull();
+    expect(bindSupportDraftAuthority({
+      kind:"answer",text:"Emailul de asistență nu creează cazul uman; escaladarea îl creează.",
+      sourceIds:["support-cases"],actionIds:[]
+    },["support-cases"],[])).not.toBeNull();
+    expect(bindSupportDraftAuthority({
+      kind:"answer",text:"Email support creates the human case and receives its private case link.",
+      sourceIds:["support-cases"],actionIds:[]
+    },["support-cases"],[])).toBeNull();
+    expect(bindSupportDraftAuthority({
+      kind:"answer",text:"Emailul de asistență creează cazul uman și primește legătura privată.",
+      sourceIds:["support-cases"],actionIds:[]
+    },["support-cases"],[])).toBeNull();
   });
 
   it("reports a closed secret-safe rejection shape without completion bytes or identifiers", () => {

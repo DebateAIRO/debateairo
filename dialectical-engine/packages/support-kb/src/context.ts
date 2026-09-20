@@ -43,11 +43,11 @@ const STOP_WORDS = new Set([
 
 const PRODUCT_ALIAS_SOURCE = String.raw`\b(?:dialectical(?:[\s-]*engine)|debate\s*airo)\b`;
 const PRODUCT_OVERVIEW_WORDS = new Set([
-  "about","agent","answer","cannot","cant","define","describe","does","explain","feature","features","give",
+  "about","agent","answer","app","application","cannot","cant","define","describe","does","explain","feature","features","give",
   "debate","identity","mean","meaning","overview","product","purpose","question","questions","support",
   "tell","tool","use","used","what","why",
-  "asistent","asistentul","capabilitati","despre","explica","face","folosit","folosita",
-  "identitate","intrebare","intrebari","poate","prezentare","produs","raspund","raspunde",
+  "aceasta","aplicatie","asistent","asistentul","capabilitati","despre","explica","face","folosit","folosita",
+  "identitate","intrebare","intrebari","poate","pot","prezentare","produs","raspund","raspunde",
   "scop","spune"
 ]);
 const GENERIC_BRANDED_WORDS = new Set([
@@ -139,6 +139,9 @@ function overlapScore(query: Set<string>, value: string): number {
 }
 
 function inflectedMatch(left: string,right: string): boolean {
+  if (left !== right && [left,right].every((word) => word === "crea" || word === "creeaza")) {
+    return true;
+  }
   const shorter = Math.min(left.length,right.length);
   if (shorter < 4) return false;
   let common = 0;

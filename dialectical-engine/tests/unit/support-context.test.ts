@@ -87,7 +87,7 @@ describe("Support knowledge context", () => {
 
   it("meets the exact public answerable and unsupported case matrix from the immutable production corpus", () => {
     const corpus = productionReviewedCorpus();
-    expect(corpus.kbVersion).toBe("fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278");
+    expect(corpus.kbVersion).toBe("7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af");
     expect(Object.isFrozen(corpus)).toBe(true);
     expect(Object.isFrozen(corpus.entries)).toBe(true);
 

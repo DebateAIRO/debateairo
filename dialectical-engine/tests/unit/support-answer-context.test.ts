@@ -9,6 +9,7 @@ import {
 } from "../../packages/support-kb/src/index.js";
 import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
 import { buildSupportKnowledgeContext } from "../../packages/support-kb/src/context.js";
+import { resolveSupportActions } from "../../packages/support-kb/src/navigation.js";
 import type { SupportMessageCipherPort } from "../../apps/api/src/support/session.js";
 import { createSupportModelReferenceFactory } from "../../apps/api/src/support/model-references.js";
 
@@ -225,6 +226,60 @@ describe("CP1 composed answer context", () => {
     expect(result.sources).toHaveLength(1);
   });
 
+  it.each([
+    ["en" as const,false,"Where is Home?","Support can guide you to Home.","app-navigation",["home"]],
+    ["ro" as const,false,"Unde este Acasă?","Asistența te poate ghida către Acasă.","app-navigation",["home"]],
+    ["en" as const,false,"Where is Help?","Support can guide you to Help.","app-navigation",["help"]],
+    ["ro" as const,false,"Unde este Ajutor?","Asistența te poate ghida către Ajutor.","app-navigation",["help"]],
+    ["en" as const,true,"Where are Active sessions?","Support can guide you to Active sessions.","settings-help-menus",["active-sessions"]],
+    ["ro" as const,true,"Unde sunt Sesiunile active?","Asistența te poate ghida către Sesiuni active.","settings-help-menus",["active-sessions"]],
+    ["en" as const,false,"Where can I Sign in or Create account?","Support can guide you to Sign in or Create account.","account-access",["sign-in","sign-up"]],
+    ["ro" as const,false,"Unde sunt Autentificare și Creează un cont?","Asistența te poate ghida către Autentificare sau Creează un cont.","account-access",["sign-in","sign-up"]],
+    ["en" as const,false,"Where can I sign in?","Support can guide you to Sign in.","account-access",["sign-in"]],
+    ["ro" as const,false,"Unde îmi pot crea un cont?","Asistența te poate ghida către Creează un cont.","account-access",["sign-up"]]
+  ])("binds a canonical %s destination promise through the actual answer service: %s",async (
+    language,signedIn,query,answerText,sourceId,actionIds
+  ) => {
+    const drafted = authorDraftCorpus();
+    const snapshot = corpus(drafted.entries.filter((candidate) =>
+      candidate.lang === language && candidate.id === sourceId
+    ),`canonical-destination-${language}-${sourceId}`);
+    const availableActionIds = resolveSupportActions(SUPPORT_ACTION_IDS,{ signedIn,language })
+      .map(({ id }) => id);
+    const context = buildSupportKnowledgeContext({
+      entries:snapshot.entries,capabilities:SUPPORT_CAPABILITIES,language,
+      query,historyText:"",maxCodePoints:24_000,availableActionIds,
+      referenceFor:modelReferenceFactory().referenceFor
+    });
+    const sourceReferences = new Map(context.sourceReferences.map(({ canonicalId,reference }) =>
+      [canonicalId,reference]
+    ));
+    const actionReferences = new Map(context.actionReferences.map(({ canonicalId,reference }) =>
+      [canonicalId,reference]
+    ));
+    const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
+      kind:"answer",text:answerText,
+      sourceIds:[sourceReferences.get(sourceId)!],
+      actionIds:actionIds.map((id) => actionReferences.get(
+        id as (typeof SUPPORT_ACTION_IDS)[number]
+      )!)
+    }) }));
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-20T19:15:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({
+      ...request(snapshot),text:query,language,detectedLanguage:language,signedIn
+    });
+
+    expect(result).toMatchObject({
+      outcome:"ANSWER_GROUNDED",text:answerText,sources:[{ id:sourceId }],
+      actions:actionIds.map((id) => ({ id }))
+    });
+  });
+
   it("rejects human-case and email conflation through the actual answer boundary",async () => {
     const supportCase = Object.freeze({
       ...entry("support-cases","Cazul uman folosește escaladarea; emailul este separat."),
@@ -248,6 +303,41 @@ describe("CP1 composed answer context", () => {
 
     expect(result).toMatchObject({
       outcome:"ANSWER_GROUNDED",text:supportCase.fallback,
+      sources:[{ id:"support-cases" }],actions:[]
+    });
+  });
+
+  it.each([
+    ["en" as const,"Escalation creates the human case, while support email is a separate mail workflow.",false],
+    ["ro" as const,"Escaladarea creează cazul uman, iar emailul este un flux separat.",false],
+    ["en" as const,"Email support creates the human case and receives its private case link.",true],
+    ["ro" as const,"Emailul de asistență creează cazul uman și primește legătura privată.",true]
+  ])("enforces the %s case/email relation through the actual answer boundary",async (
+    language,answerText,rejected
+  ) => {
+    const supportCase = Object.freeze({
+      ...entry("support-cases","Escalation creates a human Support case; email is separate."),
+      lang:language,title:"Support cases"
+    });
+    const snapshot = corpus([supportCase],`case-email-relation-${language}`);
+    const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
+      kind:"answer",text:answerText,sourceIds:[SOURCE_REFERENCE],actionIds:[]
+    }) }));
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-20T19:22:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({
+      ...request(snapshot),text:language === "ro"
+        ? "Cum creez un caz uman și ce face emailul de asistență?"
+        : "How do I create a human case and what does support email do?",
+      language,detectedLanguage:language
+    });
+
+    expect(result).toMatchObject({
+      outcome:"ANSWER_GROUNDED",text:rejected ? supportCase.fallback : answerText,
       sources:[{ id:"support-cases" }],actions:[]
     });
   });
@@ -422,10 +512,12 @@ describe("CP1 composed answer context", () => {
   });
 
   it.each([
-    "Is Dialectical Engine a reasoning instrument?",
-    "Give me an overview of dialecticalengine."
-  ])("grounds a reviewed identity paraphrase through the actual service on the admitted corpus: %s", async (
-    text
+    ["en" as const,"Is Dialectical Engine a reasoning instrument?"],
+    ["en" as const,"Give me an overview of dialecticalengine."],
+    ["en" as const,"What is Dialectical-Engine, and what can I do in this app?"],
+    ["ro" as const,"Ce este Dialectical-Engine și ce pot face în această aplicație?"]
+  ])("grounds a reviewed %s identity paraphrase through the actual service: %s", async (
+    language,text
   ) => {
     const snapshot = authorDraftCorpus();
     const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
@@ -439,7 +531,7 @@ describe("CP1 composed answer context", () => {
     });
 
     const result = await service.respond({
-      ...request(snapshot),text
+      ...request(snapshot),text,language,detectedLanguage:language
     });
 
     expect(complete).toHaveBeenCalledOnce();

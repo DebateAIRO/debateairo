@@ -88,16 +88,16 @@
     {
       "id": "debate-workspace-menus",
       "lang": "en",
-      "articleSha256": "dd5673e995acba7c108c52ff31080880206bdf0d51b2ca9f0113b0828e7be607",
-      "modelProjection": "When a debate has a tree, Thread shows a sequence, Split compares branches, Tree shows hierarchy, and Map shows relationships. Scoring appears when available; Library returns Home. Replay, Workspace, Honesty, Export, and How it works are controls for the debate already open, with Export available only for an exportable answer and public debates exposing a smaller read-only set. Support can explain these controls but cannot read a private debate, choose its identifier, replay it, inspect artifacts, or operate owner controls.",
-      "fallback": "Use Thread, Split, Tree, or Map after the debate tree exists. Replay, Workspace, Honesty, Export, and How it works act on the debate already open; some require an owner workspace or a completed answer. Support can explain them but cannot inspect or operate a private debate."
+      "articleSha256": "e3f92be13a7d880e259c331e2c5dc3881abd9693e1846b90fcddafeda151170d",
+      "modelProjection": "When a debate has a tree, Thread shows a sequence, Split compares branches, Tree shows hierarchy, and Map shows relationships. Scoring appears only when available. Its public diagnostics can show availability, load and refresh status; provider and model with checked or generated timestamps; cache or staleness; current, scored, skipped and truncated claim counts and score-aware filters; unresolved holes and fatal flags; and recommended investigations. A category or value can be absent when scoring data is unavailable. Support can explain these public categories but cannot read a visitor's debate or its scoring values. Replay, Workspace, Honesty, Export, and How it works act on the debate already open; public debates expose a smaller read-only set.",
+      "fallback": "Scoring diagnostics can show availability, load and refresh status; provider and model timestamps; cache or staleness; claim counts and filters; unresolved holes, fatal flags, and recommended investigations when scoring data is available. Support can explain these categories but cannot read a visitor's debate or scoring values."
     },
     {
       "id": "debate-workspace-menus",
       "lang": "ro",
-      "articleSha256": "3cd8b0cdabe438779873f8f940cdff4bb2039ff55742f9400f8805320c8cbc39",
-      "modelProjection": "Când dezbaterea are un arbore, Thread arată o succesiune, Split compară ramurile, Tree arată ierarhia, iar Map arată relațiile. Evaluarea apare când este disponibilă; Library revine Acasă. Replay, Workspace, Honesty, Export și How it works sunt controale pentru dezbaterea deja deschisă; Export apare numai pentru un răspuns exportabil, iar dezbaterile publice oferă un set mai mic, numai pentru citire. Asistența poate explica aceste controale, dar nu poate citi o dezbatere privată, alege identificatorul ei, reporni generarea, inspecta artefactele sau opera controalele proprietarului.",
-      "fallback": "Folosește Thread, Split, Tree sau Map după apariția arborelui dezbaterii. Replay, Workspace, Honesty, Export și How it works acționează asupra dezbaterii deja deschise; unele necesită spațiul proprietarului sau un răspuns finalizat. Asistența le poate explica, dar nu poate inspecta sau opera o dezbatere privată."
+      "articleSha256": "eb2b85327509e4e9e0e4b29009af11b109e225f70e784b09f447d17ed7aa162a",
+      "modelProjection": "Când dezbaterea are un arbore, Thread arată o succesiune, Split compară ramurile, Tree arată ierarhia, iar Map arată relațiile. Evaluarea apare numai când este disponibilă. Diagnosticul public poate arăta disponibilitatea, starea încărcării și a reîmprospătării; furnizorul și modelul cu momentele verificării sau generării; cache sau învechire; numărul afirmațiilor curente, evaluate, omise și trunchiate și filtrele bazate pe scor; golurile nerezolvate și marcajele fatale; și investigațiile recomandate. O categorie sau o valoare poate lipsi când datele de evaluare nu sunt disponibile. Asistența poate explica aceste categorii publice, dar nu poate citi dezbaterea sau valorile ei. Replay, Workspace, Honesty, Export și How it works acționează asupra dezbaterii deja deschise; dezbaterile publice oferă un set mai mic, numai pentru citire.",
+      "fallback": "Diagnosticul de evaluare poate arăta disponibilitatea, starea încărcării și a reîmprospătării; furnizorul și modelul; cache sau învechire; numărul afirmațiilor și filtrele; golurile nerezolvate, marcajele fatale și investigațiile recomandate când datele sunt disponibile. Asistența poate explica aceste categorii, dar nu poate citi dezbaterea sau valorile ei."
     },
     {
       "id": "delete-a-private-debate",
@@ -242,16 +242,16 @@
     {
       "id": "support-cases",
       "lang": "en",
-      "articleSha256": "96ea24b2aff54d46beeb25cec255041f335e93c52590829ad64f53ad62fe9aa2",
-      "modelProjection": "Talk to a human creates an asynchronous Support case, not a telephone call. The server case receipt gives a response target of forty-eight hours, while another panel currently says one working day on weekdays. The receipt is authoritative until the wording is aligned. Keep the case receipt private because it controls case access. Support does not verify inbox delivery.",
-      "fallback": "Choose Talk to a human to create an asynchronous case; it is not a telephone call. Rely on the server receipt's forty-eight-hour response target while another panel still says one working day on weekdays. Keep the receipt private because it controls access to the case. Support does not verify inbox delivery."
+      "articleSha256": "300f6b63a1798ee15ba335538bdc9eb0e1c5dca11c770ce11f5e11edee9cee9e",
+      "modelProjection": "Talk to a human or Escalate to a human creates an asynchronous Support case, not a telephone call. Email support is a separate mail workflow and does not create the case in this app or receive its receipt, response target, or private case link. The server receipt gives a response target of forty-eight hours, while another panel currently says one working day on weekdays. Rely on the receipt until the wording is aligned. Keep it private because it controls case access. Support does not verify inbox delivery.",
+      "fallback": "Choose Talk to a human or Escalate to a human to create an asynchronous case; it is not a telephone call. Email support is a separate mail workflow and does not create that case or receive its receipt, response target, or private link. Rely on the server receipt's forty-eight-hour target while another panel still says one working day on weekdays, and keep the receipt private."
     },
     {
       "id": "support-cases",
       "lang": "ro",
-      "articleSha256": "2346f0b14cfd3ac25ccd609d8268809da9975dc2079179778e10df3da7f88aac",
-      "modelProjection": "Cere ajutorul unei persoane creează un caz asincron de Asistență, nu un apel telefonic. Confirmarea serverului oferă un termen țintă de patruzeci și opt de ore, iar alt panou spune în prezent o zi lucrătoare în zilele lucrătoare. Confirmarea este autoritară până la alinierea textelor. Păstrează confirmarea privată deoarece controlează accesul la caz. Asistența nu verifică livrarea în inbox.",
-      "fallback": "Alege Cere ajutorul unei persoane pentru un caz asincron; nu este un apel telefonic. Bazează-te pe termenul de patruzeci și opt de ore din confirmarea serverului cât timp alt panou spune încă o zi lucrătoare în zilele lucrătoare. Păstrează confirmarea privată deoarece controlează accesul la caz. Asistența nu verifică livrarea în inbox."
+      "articleSha256": "4073ca95886bd56063c9f6ff49b959e3affa5c5a0a9000b6ecf6ff2171535977",
+      "modelProjection": "Talk to a human sau Escalate to a human creează un caz asincron de Asistență, nu un apel telefonic. Emailul de asistență este un flux separat de mail și nu creează cazul din această aplicație și nu primește confirmarea, termenul de răspuns sau legătura privată. Confirmarea serverului oferă un termen țintă de patruzeci și opt de ore, iar alt panou spune în prezent o zi lucrătoare în zilele lucrătoare. Bazează-te pe confirmare până la alinierea textelor. Păstreaz-o privată deoarece controlează accesul la caz. Asistența nu verifică livrarea în inbox.",
+      "fallback": "Alege Talk to a human sau Escalate to a human pentru a crea un caz asincron; nu este un apel telefonic. Emailul de asistență este un flux separat și nu creează acel caz și nu primește confirmarea, termenul sau legătura privată. Bazează-te pe termenul de patruzeci și opt de ore din confirmarea serverului cât timp alt panou spune o zi lucrătoare și păstrează confirmarea privată."
     },
     {
       "id": "support-status-limits",

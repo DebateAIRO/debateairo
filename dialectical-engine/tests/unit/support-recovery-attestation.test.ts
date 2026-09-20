@@ -52,9 +52,24 @@ const GUIDE_REVIEW = Object.freeze({
   ratifiedOn: "",
 });
 
+const QUALITY_REVIEW = Object.freeze({
+  reviewedBy: "SOL",
+  reviewerSession: "01a09ef7-e096-7c31-9b35-806840028cf0",
+  reviewedOn: "2026-09-20",
+  evidence:
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_QUALITY_REVIEW.md",
+  ratifiedBy: "",
+  ratifiedOn: "",
+});
+
+const QUALITY_SUPPLEMENT_REVIEW = Object.freeze({
+  ...QUALITY_REVIEW,
+  evidence:
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-wording-supplement.json",
+});
+
 const GUIDE_IDS = new Set([
   "app-navigation",
-  "debate-workspace-menus",
   "settings-help-menus",
   "support-status-limits",
 ]);
@@ -72,8 +87,8 @@ const EXPECTED = [
   ["budget-tier-choice", "ro", "e648150ae607bb98c55059eaea6162ffc2cd09df437721b75c8c7b226ef4984d", "d8648bd28c6eddb018f6508c7c1eed9e0a20941807979d42701e35e4351ea371", "1496048887bc41ba3968fdaf7d0fe17e43feffaba1f1c997f46f0b420d30652f"],
   ["debate-topic-and-description", "en", "695b7b405e599260acd7c5a51f897f46b52b238f2860a20168cd14cfdc176bad", "290097ca24858424c4bc2a6845182a9c1cbcd0214c6a3109e2b32cf7e0bd0f56", "7234ce24457ad97fe943e93b1caf0e28a8d74e30aa1748f1d29b158cdcba67b7"],
   ["debate-topic-and-description", "ro", "90f1fff60a4245eeda7b5131b671772b425e8ab682f967c4c31c2ad42c7207a2", "8cd97dedffdf9b059f4d809b73f60f59174007b42a7a99998989c354af93bee8", "c6470bf637f904245f4c5f468c1b33c1d43d03fa0b45d1d3ba32eb47f12840f7"],
-  ["debate-workspace-menus", "en", "dd5673e995acba7c108c52ff31080880206bdf0d51b2ca9f0113b0828e7be607", "7577c504c4b671b0027e49b37f64f0d2a456df9412a9349e58a98e631f8494bf", "4028dd08b5d16d4ab54fba253595f758273d5d8dc9f8d6784ccf9b5c47d70618"],
-  ["debate-workspace-menus", "ro", "3cd8b0cdabe438779873f8f940cdff4bb2039ff55742f9400f8805320c8cbc39", "e24fe21a32ba3cadd4539cc77afe806630b38b67dce8e33815665017cc3b03ef", "7d0c57c3f8bb32eee70788195fe3d9971cbcb7ee4548249ea9a600207ac9ac0f"],
+  ["debate-workspace-menus", "en", "e3f92be13a7d880e259c331e2c5dc3881abd9693e1846b90fcddafeda151170d", "d4da3f54b348b1c78dad80b67cbe1db12d196f396e6385c2dc0d2fd0ef5d0f34", "28525e3135cc7b623a00f52d7f9aa520579959f4238bb51117866ad3ba89bcce"],
+  ["debate-workspace-menus", "ro", "eb2b85327509e4e9e0e4b29009af11b109e225f70e784b09f447d17ed7aa162a", "095fe2fae248ca61c4b7e99100ab4bc4343d0ab7e525576bf747baa79d6816c8", "5e558ff25dda284435df41eca3e9de5f6b1f940f95cb0b8a3126801bba415e97"],
   ["delete-a-private-debate", "en", "7c37881f26d875f87a0177bc35593d9f52a1739b25a848df98ad2d478c7bdb26", "9ae0d23732c129d4b3e3e06b4c81833a5546b214506ecc53c3b531b4856dc49c", "92409ee15ce6ed5f380136ab090d3ce2a82ee355e379e7d068609baf9e92365b"],
   ["delete-a-private-debate", "ro", "afc631bec586e463df1b217d79fc9ea694f873f5690b028c7b79aa65d83cfaa9", "1f4b3b1719c76d8223159dd73049c47761dd4fd6482103d40cf31d53fd2b54a3", "46037245889b3c11b737e40222ce1c6d1b800020a92ee4e92725ad03d8338727"],
   ["export-json", "en", "c31c5bd3a2eb80e1352f27431e459f8272ae37605a9988210cff2aa82d6b7ea5", "690569195ed4098fd00b5bf102658f9bd26b2610897ca816163f8abb2a47946d", "6abec339af9fc96715c8964a17341461db4042701acb1f54e1e9deea37421afb"],
@@ -94,8 +109,8 @@ const EXPECTED = [
   ["risk-tier-choice", "ro", "f40e8583d9ec012f6510c4f6ae6a6527680bc279f393388dc8cd2a31762f4d96", "0845807a9ba9cc68c608a5be752fdbaa08147fe8aed5a06a61021bb91675a34a", "d35f24c30f5998d0a8945f6efdd97cbebf45c0612b6181ff47c48c81951b02ab"],
   ["settings-help-menus", "en", "2f1fd92ebe1f560f631a0990b8883e0aa857783114751f9532cabcf97ba86ede", "3677572a1b6fe513930ad82259a89b985f0c3ce023c57be4489794be27147a79", "ea5720fab4e9755c489c63daec5e85d0cf6b3a0fa9d30a97827dadc7d0e166b5"],
   ["settings-help-menus", "ro", "57b5e6f5d34327177b504261fcc2b4f24e1e7693093f2d42cfd3348fc17872f7", "4c8e8ab9af79965af5234b0da312f2970bf9d36f3b131765c4ac31353c5d2495", "574aef1c82b5203dcab7fd229ad3c6b9bcaa13c64a55924e7ffc49c5bab2d3cc"],
-  ["support-cases", "en", "96ea24b2aff54d46beeb25cec255041f335e93c52590829ad64f53ad62fe9aa2", "7560677362565332479dbe8c16b0e4035278a077512c7eeffdb3bbaa4ba0b76d", "bfc3f07ee653c9d9e798fd8468f1bf658a3ef29e72aef75ba93c348c96a50948"],
-  ["support-cases", "ro", "2346f0b14cfd3ac25ccd609d8268809da9975dc2079179778e10df3da7f88aac", "e993e92c67a698c504f3b6bac0eceeb4e47afb56ba02bd10f5c3c5d00274b10c", "dec984e5c9ae5fcf5e0ab7d575aef01339b9300ca42bce94950ab3a39d13ee82"],
+  ["support-cases", "en", "300f6b63a1798ee15ba335538bdc9eb0e1c5dca11c770ce11f5e11edee9cee9e", "04ff511b177c062b1fa66397db84ac7295b75319e2c27fc870aaff171c43ae76", "df37d0f11029ff345c6f303c425bdeb36435ab0a51e0dbddf22ffd0877ca49a1"],
+  ["support-cases", "ro", "4073ca95886bd56063c9f6ff49b959e3affa5c5a0a9000b6ecf6ff2171535977", "23df826d8a8701abb080a371df942b978885224bb612140c54221f2806615c2a", "62bbe76506089edca69ffca3d820f7ebd9610f831cf6a3b007efe00125cb971f"],
   ["support-status-limits", "en", "f5344e3c0e5f0bec3bb3b5b10dff77b12a85d90233a6d7a7cf8a31f38cc7bfe7", "932f33969c279c6e7db4dc9d0d47fee7eb535b0d1cb593f9b9e9ccc743913385", "3aafc3b34626b517e8827a8ff0ab9fa6deadf978dee235bd6d78936f37354375"],
   ["support-status-limits", "ro", "0ba2909d0b6bf0dbb731e6c19ceff73cd99babbfed69949aec3b28d57f732bfa", "05ede1015a5f66f5a5e2e564d061353d433c3af82ea2871bf9489764a27915f0", "b14e495dcccbcf8d01c1e6213e28ee4c738ee405c6ea8eb4cc572d79f7a73b5e"],
   ["unpublish-a-debate", "en", "70e53322f323778974e50ca4f4342a4e8cba5c41d5139d51452530a40c7563a2", "64f871c823dd78f05d18f50ec45373fa07a9ad79f72b4234c8adc9aae443db0b", "db2b5340f4c9089567e0c8b4559cc9ac4749039b91bd3a8b2fbbd5c799991c1f"],
@@ -133,7 +148,11 @@ describe("production Support recovery attestation", () => {
         articleSha256,
         modelProjectionSha256,
         fallbackSha256,
-        ...(GUIDE_IDS.has(id)
+        ...(id === "debate-workspace-menus"
+          ? QUALITY_REVIEW
+          : id === "support-cases"
+            ? QUALITY_SUPPLEMENT_REVIEW
+            : GUIDE_IDS.has(id)
           ? GUIDE_REVIEW
           : id === "product-identity"
             ? IDENTITY_REVIEW
@@ -152,7 +171,7 @@ describe("production Support recovery attestation", () => {
       },
       recovery: {
         componentFileSha256:
-          "0c06363ee4409efe96807786ad96ed73e46659481f61c56e957eeb340fff3b94",
+          "aa94ff0592d41b399f38eb9be034b5e77ec2d350677e52b1e39852196245f9d9",
         components: expectedRows,
       },
     });
