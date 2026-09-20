@@ -472,3 +472,38 @@ with `F-T16-MANIFEST-PROVENANCE-STALE` (one migration), `F-REGISTER-HISTORICAL-I
 unchanged by this upgrade — export the credential, run the short form from the engine root, depth 2. It
 seals acceptance register version 3 and is still the first witness of the credential rules (D77 f).
 **Read first, for humans:** `PLAIN-STATUS.md`.
+
+## 2026-09-20 00:22 — NEWEST ENTRY WINS
+
+**THE SUITE WENT 45 → 12 (D79).** V asked to "fix the tests"; three Opus 5 seats read all 45
+reds one by one under the law *never make a test pass by weakening it*. `origin/dev` = the commit that carries these records (the tip of `git log`).
+the reds that remain are the ones V deferred or that are ticketed debt, plus anything the delta names
+
+**The thing to know before you trust any number in this repository.** Five distinct ways a check can
+look like it is working while checking nothing were found and recorded in
+`board/F-SAFEGUARD-MOVED-WITHOUT-ITS-TESTS.md` (three addenda). The two that bind a future gate reader:
+1. **A red test measures only up to its first failing assertion.** Everything after is UNMEASURED. A new
+   red appearing inside an already-red test when you fix it is a mask lifting, not a regression.
+2. **A green gate is evidence about the code the tests REACH.** A behaviour deleted together with its
+   guard produces no failure and appears in no four-count. Two such losses were recovered on 2026-09-20
+   — the drawer's empty state and the canvas independence pill — and neither failed a test nor appeared
+   in any gate; both were found by reading the discarded side of a merge.
+
+**The instrument for that class, run once and unfinished:** the merge-discard sweep — 16 conflicted
+merges, 5,505 (merge, file) pairs, **16 genuine one-side discards of which 5 are live in the V3 tree**.
+`1c9578a2` is closed. **Four live discards remain unswept for what else they dropped**: `apps/ui/app/page.tsx`,
+`apps/ui/components/DebatesBuffer.tsx`, `apps/ui/components/NodeDetailDrawer.tsx` and the already-restored
+`tests/architecture/s8-publication-contract.test.ts`. Finishing that sweep is the highest-value work left
+in this tree.
+
+**Open for V:** `F-DR160-TOOLBAR-NAME-OF-RECORD` (two governed designs disagree about whether the action
+toolbar belongs in the compact chrome; today's code satisfies the stricter one by naming alone — a
+one-minute decision with the measurement already in the ticket). Deferred by V's own ruling: the canvas
+review marks (ruled YES, not yet built — six tests stay red as an honest "agreed, not built") and the
+library row styling. `scaffold` stays red as ticketed debt F31.
+
+**Tickets from this round:** `F-SAFEGUARD-MOVED-WITHOUT-ITS-TESTS` (high, with the five families),
+`F-DR160-TOOLBAR-NAME-OF-RECORD`. Corrected at the source by the seats that reproduced them:
+`F-AUTH-MEMORY-BOUNDS-MEASURED-ON-NODE-22` (the sealed bounds do NOT need re-measuring; the harness needs
+a budget) and `F-S3D-SEPARATION-PERMUTATION-FLAKE` (~6 %, and the defect is a null resampled WITH
+replacement). **Read first, for humans:** `PLAIN-STATUS.md`.

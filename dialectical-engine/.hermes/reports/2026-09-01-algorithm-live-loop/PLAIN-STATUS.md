@@ -1,6 +1,38 @@
 # Where things stand, in plain language
 
-*Written 2026-09-17 and updated through 2026-09-19 for the project owner. This page explains the state of the V3 debate engine work without the code names the other files in this folder use. Every claim links to the file that holds the details. When the detailed records change, this page is updated in the same commit.*
+*Written 2026-09-17 and updated through 2026-09-20 for the project owner. This page explains the state of the V3 debate engine work without the code names the other files in this folder use. Every claim links to the file that holds the details. When the detailed records change, this page is updated in the same commit.*
+
+## 2026-09-19 → 20: "please fix the tests" — and what the failures turned out to be
+
+**What you asked.** You said you still did not understand what needed doing, asked me to fix the tests, and said to ask if I needed anything. Three workers took the 45 failures in three groups, under one rule I did not let them bend: **never make a test pass by lowering the bar.** If a test is right about something the product lacks, that is a finding, not a fix.
+
+**The headline: most of those failures were not "features nobody built". They were features that were built, and then deleted by accident.** Two tidy-up commits on 1–2 September — "consolidate local UI and workspace changes" and "checkpoint local development state" — removed large parts of your designed website work and left behind every test that described it. A third loss came from a merge that kept a test and threw away the code it was testing. Real consequences, all now fixed: published debates went out **without their search-indexing notice**, a stalled run stopped saying why it was waiting, a failed run stopped saying "Failed", and a stranger following a shared link could not open the argument tree.
+
+**Where the count landed.** Failing tests went from 45 to **12**, out of 5367. 33 closed this round and nothing new appeared. Nothing failed that is not accounted for, and here is every one of the twelve:
+
+| how many | what it is | whose call |
+|---|---|---|
+| 6 | the review marks on debate cards | yours — ruled YES, deferred to your website work |
+| 1 | the library rows' card frame | yours — deferred with the same ruling |
+| 1 | where the debate toolbar belongs | **waiting on you**, one minute, card linked below |
+| 1 | a structural check you already have a card for (F31) | already tracked |
+| 3 | three measurements in the sign-up tests whose instruments are unreliable, not the code they measure | already tracked, each with its own card |
+
+The three measurement ones are worth one sentence, because they are not bugs in your product: one compares a number against a threshold it recalculates from its own data every run, which makes it fail roughly six times in a hundred for no reason; one watches for memory growth using a calculation that also trips when memory is *released*; and one is a test being cut off after a minute when the work it does takes under two. All three have cards saying what to fix, and in every case what to fix is the measurement, not the thing measured.
+
+**What you decided, and what it produced.** You chose to restore only what a visitor would notice, and separately ruled that the review marks belong on the debate card, that a shared link should open on the summary with the tree one click away, and that the library counter should count the rows on screen. All three of those are built. The review marks are recorded as your decision and left for your website work — the tests for them stay red on purpose, which is an honest "agreed, not yet built" rather than a hidden disagreement.
+
+**One decision still waiting for you, and it takes a minute.** Your debate header's buttons work again. But two of your own designs disagree about whether that toolbar belongs inside the compact header. It is inside today, under a different class name, so the stricter design's check passes on a spelling rather than on the arrangement it meant to protect. Outside satisfies both designs at once. Inside means retiring two checks and saying why. Either is fine; leaving it unexamined is the only bad option. Details: [F-DR160-TOOLBAR-NAME-OF-RECORD](board/F-DR160-TOOLBAR-NAME-OF-RECORD.md).
+
+**Five ways a test can look like it is working when it is not.** This is the part worth keeping, because it changes how much any green result is worth:
+
+1. **A safeguard moves and its test stays behind.** Three safeguards moved into the database in August, correctly; four tests kept looking for them in the old place.
+2. **A check that cannot fail.** A test looked for text that no longer existed, got "not found", and treated that as success. Swept the whole project: 149 candidates examined, 10 were incapable of failing, all repaired. One had been passing since August while checking nothing.
+3. **A check that never runs.** When a test fails, every line after the failing one is skipped. One test died on its first line, so its second line — which would have caught a real problem — had never run once.
+4. **A check that was deleted.** A merge discarded part of a test file, removing the rules that your public disclosure appears exactly once and in the right place. A deleted test cannot report its own absence: the file still existed, still passed, still looked maintained.
+5. **A check that tests less than it claims.** A worker wrote a new test, it passed, and it was wrong: the example it used never reached the code it claimed to check. It was caught only because the deliberate sabotage written to prove the test worked failed to break it.
+
+**The honest limit, which I want you to have in plain words.** A count of failing tests counts *failures*. If a piece of your product was deleted **together with the test that guarded it**, nothing fails and nothing appears in any number I give you. Two of the losses recovered tonight were exactly that: they broke no test and appeared in no report, and were found only by reading what old merges threw away. That sweep has been run once, for one shape of loss, and it found sixteen discards of which five are still live. **So a clean test run means the code the tests reach is behaving — not that nothing is missing.**
 
 ## 2026-09-18, later: Node upgraded, and the hundred "failing" tests were never broken code
 
