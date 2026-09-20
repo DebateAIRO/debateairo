@@ -242,3 +242,11 @@ Sections 1–16 above are not rewritten. Assigned findings B1-p2, N1-p2, N2-p2, 
 ## 19. Rows for V
 
 None new. B1-p2, N1-p2, N2-p2, N3-p2 are HOW. P1–P8 remain the orchestrator's.
+
+## 20. Orchestrator folds — ARCH-REV(S01) pass 3 (PASS; N1-p3 … N3-p3), 2026-09-20
+
+Appended by the orchestrator. The plan cleared its review at pass 3 (blocking findings 5 → 1 → 0); these three non-blocking findings are FACTS every BUILD seat of the cluster they touch reads before its first edit. The remedy is the seat's; each is closed inside its cluster against a RED case the plan already names (verdict `reviews/ARCH-REV-S01-p3.md`).
+
+- **N1-p3 (C2)** — the new system key-provision intent table, as the plan writes it, has no `cleanup_claim_token` / `cleanup_claimed_at` columns, and the plan's own claim/complete cleanup functions need them (the owner-side table carries both: `migrations/0040_account_erasure.sql:1028-1029`). RED case: C2-S3 case 16.
+- **N2-p3 (C2)** — the plan says the boot path does not read an answer (PLAN "C2-S6"/"C2-S18" text) while C2-S18 itself awaits the reconciler at boot, and the reconciler reads a served answer. One of the two sentences is wrong; C2-S19.3 is the case that decides it.
+- **N3-p3 (C4)** — the cluster order is **C1 → C2 → C3 ∥ C4** (PLAN §1, Revision 3). C4's own intro paragraph still says "Parallel with C2 after C1": that sentence is stale; C4 starts after C2 is green.

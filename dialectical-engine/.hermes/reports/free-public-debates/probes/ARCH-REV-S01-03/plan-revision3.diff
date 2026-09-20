@@ -1,0 +1,184 @@
+diff --git a/dialectical-engine/docs/missions/free-public-debates/slices/S01/PLAN.md b/dialectical-engine/docs/missions/free-public-debates/slices/S01/PLAN.md
+index 1d2a30ff..e3908478 100644
+--- a/dialectical-engine/docs/missions/free-public-debates/slices/S01/PLAN.md
++++ b/dialectical-engine/docs/missions/free-public-debates/slices/S01/PLAN.md
+@@ -2,6 +2,8 @@
+ 
+ **Revision 2** — ARCH-FIX-S01-02 after ARCH-REV-S01-p1 REWORK (`docs/missions/free-public-debates/reviews/ARCH-REV-S01-p1.md`). Assigned findings B1 B2 B3 B4 B5 N1 N2 N3 N4 N5. Steps changed: C1-S1, C1-S3, C1-S9, C1-S12 · C2-S1, C2-S3, C2-S4, C2-S5, C2-S6, C2-S7, C2-S10, C2-S12, C2-S15, C2-S18, C2-S19, C2-S20 · C3 Files/intro · C4-S1, C4-S2, C4-S4 · §1.1 (`apps/api/src/main.ts`) · §6 SV-0, SV-1 · §7 N1/N3 rows · ADR-0026 decision 4. P1–P8 named, not fixed.
+ 
++**Revision 3** — ARCH-FIX-S01-03 after ARCH-REV-S01-p2 REWORK (`docs/missions/free-public-debates/reviews/ARCH-REV-S01-p2.md`). Assigned findings B1-p2, N1-p2, N2-p2, N3-p2 (last lawful pass). Steps changed: C2-S3, C2-S4, C2-S5, C2-S6, C2-S18, C2-S19 · C4-S2 · §1 parallelism (C4 waits on C2). P1–P8 named, not fixed.
++
+ > **For agentic workers:** REQUIRED SUB-SKILL: `superpowers:test-driven-development`. RED first on every cluster. The coder is Codex gpt-5.6-sol. Clusters are BUILD units, not review units; `REV(S01)` runs once, after every cluster is green three times (worst run counts).
+ 
+ **Goal:** A Free run created after this slice ships is published by the server when its answer is served, cannot be unpublished, and can be deleted by its creator while public. Premium and every run that exists at deploy keep today's behaviour.
+@@ -30,7 +32,7 @@
+ 
+ A cluster is the smallest group of steps that is verifiable on its own. It is a BUILD node; it is not a review unit. The review unit is the whole slice, once, at `REV(S01)`. Each cluster's command is run three times and the worst run is the one that counts.
+ 
+-Parallelism: **C1 first. Then C2 ∥ C4. Then C3.** C3 waits on C2 because both write `apps/api/src/index.ts`. C4 does not wait on C2: owner-driven publish of a bound Free run is enough to reach the published-delete path.
++Parallelism: **C1 first. Then C2. Then C3 ∥ C4.** C3 waits on C2 because both write `apps/api/src/index.ts`. C4 waits on C2 because `0068`'s contention gate and C4-S2 cases 7–8 read `serve.system_publication_key_provision_intent` (created in `0067`) and C2-S4's claim/complete cleanup (B1-p2).
+ 
+ `RUNNER` below means:
+ 
+@@ -46,7 +48,7 @@ cwd = the S01 lane. `N` / `P` / `M` / `Q` / `U` / `E` / `D` are the passed count
+ | S01-C1 | Binding column and predicate | C1-S1…C1-S14 | `$RUNNER tests/integration/fpd-s01-c1-binding.test.ts:N:0 tests/integration/fpd-s01-c1-privileges.test.ts:P:0 tests/integration/tiers-s02-run-plan-tier.test.ts:6:0 tests/integration/plan-tiers-route-privileges.test.ts:1:0` | New files omitted at ARCH base. Regression suites asserted GREEN at their intake counts. |
+ | S01-C2 | System publish, outstanding, `publish_pending` | C2-S1…C2-S22 | `$RUNNER tests/unit/fpd-s01-c2-auto-publish.test.ts:M:0 tests/integration/fpd-s01-c2-system-publication.test.ts:Q:0 tests/unit/s8-publication.test.ts:26:0 tests/integration/s8-publication-database.test.ts:25:1` | Database suite is a DELTA: the named corpus-key test stays the only failure. |
+ | S01-C3 | Unpublish 409 after a live grant | C3-S1…C3-S10 | `$RUNNER tests/unit/fpd-s01-c3-unpublish-http.test.ts:U:0 tests/unit/s8-publication-http.test.ts:4:0 tests/unit/s7-authorization.test.ts:30:1` | `s7` DELTA: named test stays the only failure, expected 50 actual 52. Depends on C2 (`index.ts`). |
+-| S01-C4 | Delete a bound published run | C4-S1…C4-S12 | `$RUNNER tests/unit/fpd-s01-c4-erasure-http.test.ts:E:0 tests/integration/fpd-s01-c4-delete-published.test.ts:D:0 tests/unit/s10-erasure-http.test.ts:8:0` | Parallel with C2 after C1. Erasure role `debateai_erasure_runtime`. |
++| S01-C4 | Delete a bound published run | C4-S1…C4-S12 | `$RUNNER tests/unit/fpd-s01-c4-erasure-http.test.ts:E:0 tests/integration/fpd-s01-c4-delete-published.test.ts:D:0 tests/unit/s10-erasure-http.test.ts:8:0` | After C2 (0067 table + cleanup). Erasure role `debateai_erasure_runtime`. |
+ 
+ ARCH base-run scripts (new files omitted) live under `.hermes/reports/free-public-debates/probes/ARCH-S01/`. Verdicts: §8.
+ 
+@@ -316,14 +318,15 @@ If omitted, C2-S2 is BROKEN not RED.
+ 7. `PublicDebateSchema.parse` of a snapshot written before this slice (fixture: today's owner-driven snapshot shape) still succeeds; a system-publish snapshot's `published_at` EXACT-equals `created_at.toISOString()` of `serve.publication_snapshot` (R-22).
+ 8. `SET ROLE debateai_runtime` EXECUTE on `core.transition_system_run_publication` succeeds; a role without GRANT gets SQLSTATE `42501`.
+ 9. Calling `core.transition_run_publication` with the owner's live grant still publishes a Premium run (R-25 / owner path unchanged).
+-10. **B4(a) Premium.** Call `core.transition_system_run_publication` directly with a Premium run id and a PREPARED system intent → returns NULL, `SELECT count(*) FROM serve.publication_snapshot WHERE run_id=$1` is 0, no new `core.run_visibility_event` row.
++10. **B4(a) Premium.** Call `core.transition_system_run_publication` directly with a Premium run id and a PREPARED system intent → returns NULL, `SELECT count(*) FROM serve.publication_snapshot WHERE run_id=$1` is 0, no new `core.run_visibility_event` row. `SELECT count(*) FROM identity.audit_event WHERE actor_key_ref='system:free-public-auto-publish' AND decision='DENY' AND target_id=$run_id::text` equals **1** (N2-p2: the transition writes DENY for every NULL it returns after taking the lock).
+ 11. **B4(a) NULL tier.** Same call with `plan_tier IS NULL` → same NULLs.
+ 12. **B4(a) pre-rule.** Same call with `free_public_rule=false` and `plan_tier='free'` → same NULLs.
+ 13. **B4(b) erased.** After `core.run_private_content_is_live(p_run_id)` is false for a bound Free run, the same direct call returns NULL, no snapshot, no `PUBLISHED` visibility.
+-14. **B4(c) race.** Two overlapping `tryAutoPublish` calls on one bound publishable run; after both settle, `SELECT count(*) FROM serve.publication_snapshot WHERE run_id=$1` = 1.
++14. **B4(c) race (N3-p2).** Two database connections (two pools). Both call `prepareSystemKeyProvision` to completion — two PREPARED intents, two `publication_ref`s — **before** either calls `systemPublish`. Then both call `systemPublish`. After both settle, `SELECT count(*) FROM serve.publication_snapshot WHERE run_id=$1` = 1. Sequential `tryAutoPublish` (application step 3) is **not** this case. This case must be watched FAILING with C2-S4 body item 4 (`IF v_latest_state='PUBLISHED' return NULL`) removed before its GREEN is quoted.
+ 15. **B1 wrapper GRANT.** `SET ROLE debateai_runtime` then `SELECT identity.audit_system_publication_attempt(...)` is not 42501; an unprivileged role gets SQLSTATE `42501`.
++16. **B1-p2 orphan cleanup.** Insert a PREPARED `serve.system_publication_key_provision_intent` with `expires_at` in the past. `serve.claim_system_publication_key_provision_cleanup(100)` returns that row; `serve.complete_system_publication_key_provision_cleanup(publication_ref, claim_token)` returns true; `SELECT count(*) FROM serve.system_publication_key_provision_intent WHERE run_id=$1` is 0. The case goes RED if either function is omitted from `0067`.
+ 
+-Done: file exists with cases 1–15. RED until C2-S4…C2-S10. Cases 10–12 going GREEN after deleting `require core.run_is_free_public_bound` from the migration is a C2-S4 defect.
++Done: file exists with cases 1–16. RED until C2-S4…C2-S10. Cases 10–12 going GREEN after deleting `require core.run_is_free_public_bound` from the migration is a C2-S4 defect. Case 14 going GREEN after deleting body item 4 is a C2-S4 defect (N3-p2). Case 16 going GREEN after deleting the claim/complete functions is a C2-S4 defect (B1-p2).
+ 
+ #### C2-S4: Migration `0067_system_run_publication.sql`
+ 
+@@ -352,6 +355,8 @@ Functions (all `SECURITY DEFINER`, `SET search_path = pg_catalog`, `REVOKE ALL F
+ 
+ - `serve.prepare_system_publication_key_provision(p_publication_ref uuid, p_run_id uuid, p_user_id uuid, p_owner_ref uuid) RETURNS boolean` — lock run, lock account, `run_is_owned_by`, `run_private_content_is_live`, latest visibility not already PUBLISHED, insert tombstone + system intent. No session. No grant.
+ - `serve.abandon_system_publication_key_provision(p_publication_ref uuid, p_user_id uuid) RETURNS boolean`
++- `serve.claim_system_publication_key_provision_cleanup(p_limit integer)` (B1-p2) — `RETURNS TABLE(publication_ref uuid, run_id uuid, user_id uuid, owner_ref uuid, claim_token uuid)`. Claims rows where `cleanup_state='PREPARED' AND expires_at<=clock_timestamp()` **or** a stale `RECONCILING` claim, `FOR UPDATE SKIP LOCKED`, matching `serve.claim_publication_key_provision_cleanup` at `0040_account_erasure.sql:1355-1404`. Sets `cleanup_state='RECONCILING'`. `REVOKE ALL FROM PUBLIC`.
++- `serve.complete_system_publication_key_provision_cleanup(p_publication_ref uuid, p_claim_token uuid) RETURNS boolean` (B1-p2) — deletes the intent where `publication_ref` and `cleanup_claim_token` match. Does not insert a snapshot. `REVOKE ALL FROM PUBLIC`.
+ - `identity.audit_system_publication_attempt(p_audit_id uuid, p_run_id uuid, p_reason text, p_occurred_at timestamptz, p_decision text) RETURNS boolean` (B1) — the **only** path `debateai_runtime` has to write a system-publish audit row from TypeScript. Calls `identity.append_audit_event_internal` with `actor_key_ref='system:free-public-auto-publish'`. For `p_decision='DENY'`: `event_type='debate.publication.denied'`, `target_type='debate.publication_attempt'`, `target_id=p_run_id::text`, `success=false`, `justification=p_reason`. For `p_decision='ALLOW'`: not used (ALLOW is written inside the transition). No `identity.session` read, no `identity.publication_event_binding` row, no grant. `REVOKE ALL FROM PUBLIC`; `GRANT EXECUTE TO debateai_runtime`. Direct `append_audit_event_internal` from the application is SQLSTATE 42501 (`0040_account_erasure.sql:6211-6213`).
+ - `core.transition_system_run_publication` parameters (signature pinned here; BUILD does not add a 15th):
+   `p_event_id uuid, p_run_id uuid, p_user_id uuid, p_owner_ref uuid, p_publication_ref uuid, p_expected_pseudonym text, p_content_ciphertext jsonb, p_presented_at timestamptz, p_audit_id uuid, p_denied_audit_id uuid`
+@@ -363,7 +368,7 @@ Functions (all `SECURITY DEFINER`, `SET search_path = pg_catalog`, `REVOKE ALL F
+   5. Require system key-provision intent PREPARED. No session/grant/binding reads.
+   6. Insert snapshot with `created_at=p_presented_at`. Insert visibility `PUBLISHED`, `warning_version='PUBLIC_INDEXED_V1'`, `actor_audit_token='00000000-0000-4000-8000-0000000000f1'`, **`actor_ref_version=2`** (N5; owner writes the literal `2` at `:4112`; DEFAULT 1 is the silent miss).
+   7. `append_audit_event_internal(p_audit_id, 'system:free-public-auto-publish', 'debate.publication.published', 'debate.publication_event_ref', p_publication_ref::text, p_presented_at, '{"schema":"s10-publication-event-v2"}'::jsonb, 'ALLOW', true, NULL)` — legal here because this function is `SECURITY DEFINER`.
+-  8. Delete the system intent; return `p_publication_ref`. On denial after the lock: write DENY via `identity.audit_system_publication_attempt` (or the same `append_audit_event_internal` DENY shape inside this DEFINER body) and return NULL.
++  8. Delete the system intent; return `p_publication_ref`. **One DENY rule (N2-p2):** every NULL this function returns *after taking the run lock* (items 2–5 failing) writes exactly one DENY via `identity.audit_system_publication_attempt` inside this DEFINER body, then returns NULL. `tryAutoPublish` step 8 never writes a DENY. C2-S3 case 10 pins the count at 1.
+ - `core.claim_free_public_auto_publish_work(p_limit integer)` — `FOR UPDATE SKIP LOCKED` where `cleared_at IS NULL AND next_attempt_at <= clock_timestamp()`. Returns `run_id, user_id, owner_ref, reason`.
+ - `core.clear_free_public_auto_publish_work(p_run_id uuid)` — set `cleared_at`.
+ - `core.upsert_free_public_auto_publish_work(p_run_id uuid, p_user_id uuid, p_owner_ref uuid, p_reason text)` — insert or increment `attempt_count`, storing the owner identity the reconciler will reuse (B2).
+@@ -371,11 +376,11 @@ Functions (all `SECURITY DEFINER`, `SET search_path = pg_catalog`, `REVOKE ALL F
+ GRANTs:
+ 
+ - prepare/abandon/transition/claim-work/clear/upsert/`identity.audit_system_publication_attempt` → `debateai_runtime`
+-- system key-provision claim/complete cleanup → `debateai_publication_cleanup` (mirror `:6373-6377`)
++- `GRANT EXECUTE ON FUNCTION serve.claim_system_publication_key_provision_cleanup(integer), serve.complete_system_publication_key_provision_cleanup(uuid,uuid) TO debateai_publication_cleanup` (B1-p2; signatures named, matching `0040_account_erasure.sql:6373-6374`)
+ 
+ `0067` does **not** contain `DROP FUNCTION` for `core.transition_run_publication` or `core.create_encrypted_run`.
+ 
+-Done: file exists; `grep DROP FUNCTION migrations/0067_system_run_publication.sql` is empty; GRANT lines name `debateai_runtime`.
++Done: file exists; `grep DROP FUNCTION migrations/0067_system_run_publication.sql` is empty; GRANT lines name `debateai_runtime`; `grep -F 'claim_system_publication_key_provision_cleanup(integer)' migrations/0067_system_run_publication.sql` is ≥ 1 (the GRANT names the signature, not only the name — B1-p2).
+ 
+ If omitted, C2-S3 cases 1 and 8 stay RED.
+ 
+@@ -385,6 +390,8 @@ If omitted, C2-S3 cases 1 and 8 stay RED.
+ 
+ - `prepareSystemKeyProvision(...)`
+ - `abandonSystemKeyProvision(...)`
++- `claimSystemKeyProvisionCleanup(limit)` → `SELECT * FROM serve.claim_system_publication_key_provision_cleanup($1)` (B1-p2)
++- `completeSystemKeyProvisionCleanup(publicationRef, claimToken)` → `SELECT serve.complete_system_publication_key_provision_cleanup($1,$2)` (B1-p2)
+ - `systemPublish(...)` → `SELECT core.transition_system_run_publication(...)`
+ - `auditSystemPublicationAttempt(auditId, runId, reason, occurredAt, decision)` → `SELECT identity.audit_system_publication_attempt(...)` (B1)
+ - `upsertAutoPublishWork(runId, userId, ownerRef, reason)`
+@@ -404,9 +411,13 @@ If omitted, C2-S3 cannot go GREEN.
+ 
+ `apps/api/src/publications.ts`:
+ 
++- Constructor gains a fifth argument (N1-p2), after `cleanupRepository`:
++  `readServedAnswer: (runId: string, ownership: RunOwnershipAccess) => Promise<Answer | null>`
++  Wired in `apps/api/src/main.ts` (C2 already owns that file) as a closure over the existing `PostgresAskApplication.readRunAnswer` (`apps/api/src/index.ts:1448-1449`, which ignores its session parameter). `RunOwnershipAccess` is `{ ownerRef, legacyAskerId }` (`packages/db/src/index.ts:901-904`), built from the work row's `owner_ref`. **Do not** read an answer on the boot path. The reader is called only from `reconcileFreePublicAutoPublish`.
+ - Extend `PublicationApplication` with:
+   - `tryAutoPublish(input: { runId: string; answer: Answer; userId: string; ownerRef: string }): Promise<void>` — **no** `AuthenticatedSession` (B2). The HTTP hook passes `request.authenticatedSession.userId` / `.ownerRef`. The reconciler passes the two columns stored on the work row.
+   - `reconcileFreePublicAutoPublish(limit?: number): Promise<number>`
++  - `reconcileSystemKeyProvisionCleanup(limit?: number): Promise<number>` (B1-p2) — same loop shape as `reconcileKeyProvisionCleanup` (`apps/api/src/publications.ts:360-380`): claim, destroy the publication-key material if present, complete. Called from the same `main.ts` boot list and interval.
+   - `isFreePublicBound(runId: string): Promise<boolean>` — delegates to `core.run_is_free_public_bound` (B3). Present on the interface in **this** step's list and in this step's done-criterion. C3 does not add it and does not edit `publications.ts`.
+ - `tryAutoPublish` algorithm (no throw to the caller):
+   1. If `answer.terminal === "BLOCKED"`: `clearAutoPublishWork(runId)`; return. Do not publish (R-8).
+@@ -416,12 +427,12 @@ If omitted, C2-S3 cannot go GREEN.
+   5. `randomUUID()` publicationRef; `occurredAt = this.clock()`; `published_at: occurredAt.toISOString()` in `PublicDebateSchema.parse({…})` — **the same `occurredAt` is passed as `p_presented_at`** (R-22.2).
+   6. `prepareSystemKeyProvision`; on false: upsert `AUTO_PUBLISH_KEY_PROVISION_FAILED` + `auditSystemPublicationAttempt(..., 'DENY')`; return.
+   7. `cipher.create`; on throw: abandon provision, upsert `AUTO_PUBLISH_CIPHER_FAILED` + `auditSystemPublicationAttempt(..., 'DENY')`; return. Do not rethrow.
+-  8. `systemPublish`; on null: abandon, upsert `AUTO_PUBLISH_TRANSITION_NULL`. Do not write a second DENY here if the DEFINER function already wrote one; if the call never entered the function, write DENY via the wrapper.
++  8. `systemPublish`; on null: abandon, upsert `AUTO_PUBLISH_TRANSITION_NULL`. **Never write DENY** (N2-p2). The transition wrote DENY for every NULL after the lock; a NULL that never entered the function is provision/cipher/pseudonym, already audited at steps 4/6/7.
+   9. `clearAutoPublishWork`; return.
+ - Never call `preflightGrant`. Never mint a step-up grant. Never construct an `AuthenticatedSession`.
+-- `reconcileFreePublicAutoPublish`: claim work SKIP LOCKED; for each row, read the served projection for `row.runId` (no session); call `tryAutoPublish({ runId: row.runId, answer, userId: row.userId, ownerRef: row.ownerRef })`; return processed count.
++- `reconcileFreePublicAutoPublish`: claim work SKIP LOCKED; for each row, `const answer = await this.readServedAnswer(row.runId, { ownerRef: row.ownerRef, legacyAskerId: null })`; if `answer === null`, skip (not yet served); else `tryAutoPublish({ runId: row.runId, answer, userId: row.userId, ownerRef: row.ownerRef })`; return processed count. The reader is the constructor argument named above (N1-p2).
+ 
+-Done: `tryAutoPublish`, `reconcileFreePublicAutoPublish` **and** `isFreePublicBound` are on the interface; `tryAutoPublish`'s input type has `userId` and `ownerRef` and does not mention `AuthenticatedSession`; unit tests C2-S1 1–5 go GREEN.
++Done: `tryAutoPublish`, `reconcileFreePublicAutoPublish`, `reconcileSystemKeyProvisionCleanup` **and** `isFreePublicBound` are on the interface; constructor takes `readServedAnswer`; `tryAutoPublish`'s input type has `userId` and `ownerRef` and does not mention `AuthenticatedSession`; unit tests C2-S1 1–5 go GREEN.
+ 
+ If omitted, GET answer will 200 and the run stays PRIVATE with nothing outstanding — R-9 RED.
+ 
+@@ -498,9 +509,9 @@ If omitted, pre-slice snapshots 404.
+ 
+ #### C2-S12: List membership exactly once
+ 
+-After a successful system publish, `GET /v1/public/debates` across `limit=100` pages contains the `public_ref` once (R-5). A second `tryAutoPublish` on the same run does not insert a second snapshot because C2-S4 step 4 re-checks latest visibility **under the run row lock inside the transition** (B4(c)). The prepare-time "not already PUBLISHED" check is a different transaction and is not this guard.
++After a successful system publish, `GET /v1/public/debates` across `limit=100` pages contains the `public_ref` once (R-5). A second `tryAutoPublish` on the same run does not insert a second snapshot because C2-S4 step 4 re-checks latest visibility **under the run row lock inside the transition** (B4(c)). The prepare-time "not already PUBLISHED" check is a different transaction and is not this guard. The detector is C2-S3 case 14 (two pools, both prepares complete before either `systemPublish` — N3-p2), not sequential `tryAutoPublish`.
+ 
+-Done: C2-S3 case 2 plus C2-S3 case 14 (`SELECT count(*) FROM serve.publication_snapshot WHERE run_id=$1` = 1 after two overlapping `tryAutoPublish` calls).
++Done: C2-S3 case 2 plus C2-S3 case 14.
+ 
+ If omitted, retries could duplicate list entries.
+ 
+@@ -559,18 +570,20 @@ publicationCleanupTimer = setInterval(() => {
+ },30_000);
+ ```
+ 
+-C2 adds `publications.reconcileFreePublicAutoPublish()` to the boot `await` list and to the `Promise.all` array. No new timer, no new route. Tests still call `reconcileFreePublicAutoPublish` directly for R-8/R-10.
++C2 adds `publications.reconcileFreePublicAutoPublish()` **and** `publications.reconcileSystemKeyProvisionCleanup()` (B1-p2) to the boot `await` list and to the `Promise.all` array. No new timer, no new route. Tests still call both methods directly. The `PostgresPublicationApplication` constructed here receives `readServedAnswer` (N1-p2). Boot does **not** call `readServedAnswer`.
+ 
+-Done: `grep -n 'reconcileFreePublicAutoPublish' apps/api/src/main.ts` prints two lines (boot + interval). Route count 52; no `app.(get|post|delete)` added.
++Done: `grep -n 'reconcileFreePublicAutoPublish' apps/api/src/main.ts` prints two lines (boot + interval). `grep -n 'reconcileSystemKeyProvisionCleanup' apps/api/src/main.ts` prints two lines. Route count 52; no `app.(get|post|delete)` added.
+ 
+-If omitted as a new route, R-23 and the s7 pair both move. If the two `main.ts` calls are omitted, C2-S19's interval case is RED and R-10 has no production trigger.
++If omitted as a new route, R-23 and the s7 pair both move. If the two `reconcileFreePublicAutoPublish` `main.ts` calls are omitted, C2-S19.2 is RED. If the two `reconcileSystemKeyProvisionCleanup` calls are omitted, C2-S19.4 is RED.
+ 
+-#### C2-S19: Production cases that go RED if the hook or the interval is omitted
++#### C2-S19: Production cases that go RED if the hook, the interval, the reader, or the cleanup is omitted
+ 
+ Named:
+ 
+ 1. GET hook (C2-S7): `buildApi` GET `/v1/runs/:id/answer` on a bound Free run with a served non-BLOCKED answer, then visibility is `PUBLISHED`, with no `POST /v1/runs/:id/publish`. If the hook is omitted, this test is RED.
+ 2. Interval (B2 / C2-S18): `grep -F 'reconcileFreePublicAutoPublish' apps/api/src/main.ts` returns 2. If either the boot `await` or the `setInterval` `Promise.all` member is removed, this grep is RED.
++3. Reconciler publishes without a further GET (N1-p2 / R-10): a bound publishable run with a served answer, outstanding work row present, **no** subsequent `GET /v1/runs/:id/answer`; one `reconcileFreePublicAutoPublish()`; latest visibility is `PUBLISHED`. If `readServedAnswer` is omitted or the method returns 0 without reading, this case is RED.
++4. Orphan-intent cleanup in production (B1-p2): `grep -F 'reconcileSystemKeyProvisionCleanup' apps/api/src/main.ts` returns 2. If either the boot `await` or the interval member is removed, this grep is RED. C2-S3 case 16 is RED if the SQL functions are omitted.
+ 
+ #### C2-S20: Three-run C2 command
+ 
+@@ -743,6 +756,7 @@ If omitted, C4-S3 is BROKEN.
+ 5. `SET ROLE debateai_erasure_runtime` EXECUTE is not 42501; unprivileged role is 42501.
+ 6. Signature still `core.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)` — `has_function_privilege` / `to_regprocedure` of that signature is non-null. No `DROP FUNCTION`.
+ 7. **B4(b) contention.** A PREPARED row in `serve.system_publication_key_provision_intent` for the run makes `prepare_private_run_erasure` return `'CONTENDED'` (same as the owner intent table at `:4524-4526`), not `'CLEANED'` and not `'PUBLISHED'`.
++8. **B1-p2 expired orphan.** A PREPARED system intent with `expires_at` in the past, after `claim_system_publication_key_provision_cleanup` + `complete_…`, makes `prepare_private_run_erasure` return a success outcome (`'PREPARED'`/`'COMMITTED'`/`'ERASED'`/`'CLEANED'`), not `'CONTENDED'`. Goes RED if the cleanup pair is omitted (the gate at C4-S4 would then see the row forever).
+ 
+ RED until C4-S4.
+ 
+@@ -850,7 +864,7 @@ C4 file map only.
+ | R-7 | no pseudonym on a publishable bound run → not published, outstanding instead | C2-S1.4, C2-S6 step 4 | S01-C2 |
+ | R-8 | BLOCKED answer is not published and is not retried forever; R-9 does not apply | C2-S1.1, C2-S13 | S01-C2 |
+ | R-9 | publishable bound run: publish failure never fails the run; PUBLISHED or PRIVATE+outstanding | C2-S1.3, C2-S6 steps 6–8, C2-S7 try/catch | S01-C2 |
+-| R-10 | a retried outstanding publish lands with no user action | C2-S1.5, C2-S6 `reconcileFreePublicAutoPublish`, C2-S18 `main.ts` interval, C2-S19.2 | S01-C2 |
++| R-10 | a retried outstanding publish lands with no user action | C2-S1.5, C2-S6 `readServedAnswer` + `reconcileFreePublicAutoPublish`, C2-S18 `main.ts` interval, C2-S19.2, C2-S19.3 | S01-C2 |
+ | R-11 | `publish_pending` optional literal `true` on `PublicationTransitionSchema`; absent otherwise | C2-S1.6, C2-S8, C2-S14 | S01-C2 |
+ | R-12 | unpublish on a bound published run → 409 `FREE_DEBATE_CANNOT_BE_UNPUBLISHED` | C3-S1 R-12, C3-S3, C3-S8 | S01-C3 |
+ | R-13 | refusal only after ownership + live grant; everyone else today's 404 | C3-S1 G5/G6/R-13, C3-S4 | S01-C3 |
+@@ -1066,6 +1080,8 @@ Lane dirty count after all four runs: 0. Scripts: `probes/ARCH-S01/s01-c{1,2,3,4
+ 
+ **Revision 2 re-run (ARCH-FIX-S01-02, 2026-09-20):** cluster commands at base are unchanged (new files still omitted). Copied scripts in `probes/ARCH-FIX-S01-02/s01-c{1,2,3,4}-base.sh`. Verbatim: C1 `CLUSTER_GREEN` 6/0 + 1/0 · C2 `CLUSTER_GREEN` 26/0 + 25/1 named `"preserves a committed corpus key when the publish result is transport-ambiguous"` · C3 `CLUSTER_GREEN` 4/0 + 30/1 named `"keeps one complete, duplicate-free policy row per contract route"` · C4 `CLUSTER_GREEN` 8/0. Lane dirty 0.
+ 
++**Revision 3 re-run (ARCH-FIX-S01-03, 2026-09-20):** cluster commands at base still unchanged. Script `probes/ARCH-FIX-S01-03/s01-clusters-base.sh`. Verbatim identical four `CLUSTER_GREEN` markers. Lane dirty 0.
++
+ ---
+ 
+ ## 9. Screens

@@ -1,0 +1,6 @@
+MAP rows: 20
+  C1 UNMAPPED  migrations/0061_plan_tier_on_run.sql
+  C2 OTHER(C1) packages/db/src/index.ts
+  C4 UNMAPPED  apps/api/src/account-erasure.ts
+  C4 OTHER(C2 first (answer-route hook), then C3 (unpublish 409). Not parallel.) apps/api/src/index.ts
+UNMAPPED count: 2
