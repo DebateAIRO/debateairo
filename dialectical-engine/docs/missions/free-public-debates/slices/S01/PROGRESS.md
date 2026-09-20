@@ -12,3 +12,4 @@
 | 2026-09-20 | ARCH-REV p2 | t_616ddb75 | REWORK consumed (B1-p2, N1-p2…N3-p2) → ARCH-FIX t_7b0c12ad → ARCH-REV p3 t_cfd2f03b (final) |
 | 2026-09-20 | ARCH-FIX p3 | t_7b0c12ad | READY consumed — PLAN Revision 3 (C4 now waits on C2) |
 | 2026-09-20 | ARCH-REV p3 | t_cfd2f03b | PASS consumed — plan cleared (5 → 1 → 0 blocking); BUILD C1 READY |
+| 2026-09-20 | BUILD C1 | t_35c9b921 | READY consumed — `31d6dee5`; C2 base frame measured at that head |
