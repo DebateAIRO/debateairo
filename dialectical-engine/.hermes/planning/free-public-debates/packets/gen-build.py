@@ -40,10 +40,14 @@ rep={"SEAT":f"BUILD-S01-{C}","SLICE":"S01","CLUSTER":C,"PASS":"1","MODEL":"codex
 s=pathlib.Path(f"{A}/.claude/skills/heartbeat-orchestrator/templates/BUILD.md").read_text()
 for k,v in rep.items(): s=s.replace(f"__{k}__",v)
 for k,v in {"__MISSION_ROOT__":MR,"__PACKET_DIR__":PK,"__REPORTS__":R,"__SLICE_TICKET__":"t_2e15bf90","__MISSION__":M}.items(): s=s.replace(k,v)
-s=s.replace("PLAN.md steps","the plan's Global Constraints "+f"({MR}/slices/S01/PLAN.md:{gs}-{ge}) and PLAN.md steps").replace("· DECISIONS.md ·",f"· {MR}/slices/S01/DECISIONS.md — ONLY these sections, by heading: "## 10. Orchestrator folds — REQ-REV pass 2 (PASS; N1-p2 … N3-p2), 2026-09-20", "## 20. Orchestrator folds — ARCH-REV(S01) pass 3 (PASS; N1-p3 … N3-p3), 2026-09-20", and the ARCH decision sections "## 11.", "## 14." and "## 17." where one of your steps cites a decision · {A}/docs/architecture/01-decisions/ADR-0026-system-publication-without-grant.md ·")
-s=s.replace("- inputs (read these","- cwd rule, stated once: every PRODUCT command and every code edit happens in the lane on the cwd line above; mission files (PLAN, DECISIONS, your self-report, your probe logs) live under the mission home that COMMON line 3 calls the repo root — you never run a product command there.
-- inputs (read these",1)
-if CHARGES: s+="
-### Charges
-"+pathlib.Path(CHARGES).read_text()
+DEC_SECTIONS=(" — ONLY these sections, by heading: '## 10. Orchestrator folds — REQ-REV pass 2 (PASS; N1-p2 … N3-p2), 2026-09-20', "
+  "'## 20. Orchestrator folds — ARCH-REV(S01) pass 3 (PASS; N1-p3 … N3-p3), 2026-09-20', and the ARCH decision sections "
+  "'## 11.', '## 14.' and '## 17.' where one of your steps cites a decision")
+s=s.replace("PLAN.md steps","the plan's Global Constraints "+f"({MR}/slices/S01/PLAN.md:{gs}-{ge}) and PLAN.md steps")
+s=s.replace("· DECISIONS.md ·",f"· {MR}/slices/S01/DECISIONS.md"+DEC_SECTIONS+f" · {A}/docs/architecture/01-decisions/ADR-0026-system-publication-without-grant.md ·")
+CWD_RULE=("- cwd rule, stated once: every PRODUCT command and every code edit happens in the lane on the cwd line above; "
+ "mission files (PLAN, DECISIONS, your self-report, your probe logs) live under the mission home that COMMON line 3 calls the repo root "
+ "— you never run a product command there.")
+s=s.replace("- inputs (read these",CWD_RULE+chr(10)+"- inputs (read these",1)
+if CHARGES: s+=chr(10)+"### Charges"+chr(10)+pathlib.Path(CHARGES).read_text()
 out=f"{PK}/BUILD-S01-{C}.md"; pathlib.Path(out).write_text(s); print("wrote",out,"steps",start,end,len(steps),"allowed",len(allowed))
