@@ -289,6 +289,11 @@ export class PostgresSupportSessionRepository {
     const result = await this.pool.query<SupportSessionRow>(`
       SELECT session_id,identity_owner_ref,language,
         CASE
+          WHEN state='OPEN' AND EXISTS (
+            SELECT 1
+            FROM support.abuse_event AS event
+            WHERE event.session_id=support.session.session_id AND event.class='LOCK'
+          ) THEN 'LOCKED'
           WHEN state='OPEN' AND $3::integer IS NOT NULL AND (
             SELECT count(*)
             FROM support.abuse_event AS event
@@ -337,12 +342,17 @@ export class PostgresSupportSessionRepository {
         created_at: Date;
         shredded_at: Date | null;
         injections: string;
+        locked: boolean;
       }>(`
         SELECT state,identity_owner_ref,created_at,shredded_at,(
           SELECT count(*)::text
           FROM support.abuse_event AS event
           WHERE event.session_id=support.session.session_id AND event.class='INJECTION'
-        ) AS injections
+        ) AS injections,EXISTS(
+          SELECT 1
+          FROM support.abuse_event AS event
+          WHERE event.session_id=support.session.session_id AND event.class='LOCK'
+        ) AS locked
         FROM support.session
         WHERE session_id=$1 AND session_token_sha256=$2
       `, [input.sessionId, input.tokenSha256]);
@@ -350,7 +360,7 @@ export class PostgresSupportSessionRepository {
       if (row === undefined) return "NOT_FOUND";
       if (row.identity_owner_ref !== input.identityOwnerRef) return "NOT_FOUND";
       if (row.shredded_at !== null) return "SHREDDED";
-      if (row.state !== "OPEN") {
+      if (row.state !== "OPEN" || row.locked) {
         return "LOCKED";
       }
       if (Number(row.injections) >= input.lockAfterInjections) {
@@ -507,6 +517,11 @@ export class PostgresSupportSessionRepository {
           AND message.session_id=$1
           AND session.session_token_sha256=$2
           AND session.shredded_at IS NULL
+          AND session.state='OPEN'
+          AND NOT EXISTS (
+            SELECT 1 FROM support.abuse_event AS event
+            WHERE event.session_id=session.session_id AND event.class='LOCK'
+          )
           AND message.role='assistant'
           AND message.outcome IN ('ANSWER_GROUNDED','NO_SOURCE')
         ON CONFLICT (message_id) DO NOTHING
@@ -658,14 +673,18 @@ export class PostgresSupportCaseRepository {
         await lockSupportSessions(client,[input.sessionId]);
         const parent = (await client.query<{
           state: string;shredded_at: Date | null;destroyed_at: Date | null;wrapped_key: Buffer;
+          locked: boolean;
         }>(`
-          SELECT parent.state,parent.shredded_at,key.destroyed_at,key.wrapped_key
+          SELECT parent.state,parent.shredded_at,key.destroyed_at,key.wrapped_key,EXISTS(
+            SELECT 1 FROM support.abuse_event AS event
+            WHERE event.session_id=parent.session_id AND event.class='LOCK'
+          ) AS locked
           FROM support.session AS parent
           JOIN support.session_key AS key ON key.session_id=parent.session_id
           WHERE parent.session_id=$1
           FOR UPDATE OF parent,key
         `,[input.sessionId])).rows[0];
-        if (parent === undefined || parent.state !== "OPEN"
+        if (parent === undefined || parent.state !== "OPEN" || parent.locked
           || parent.shredded_at !== null || parent.destroyed_at !== null
           || parent.wrapped_key.byteLength !== 61 || parent.wrapped_key[0] !== 1) {
           throw new TypeError("SUPPORT_CASE_PARENT_INVALID");
@@ -753,14 +772,18 @@ export class PostgresSupportCaseRepository {
           shredded_at: Date | null;
           destroyed_at: Date | null;
           wrapped_key: Buffer;
+          locked: boolean;
         }>(`
-          SELECT parent.state,parent.shredded_at,key.destroyed_at,key.wrapped_key
+          SELECT parent.state,parent.shredded_at,key.destroyed_at,key.wrapped_key,EXISTS(
+            SELECT 1 FROM support.abuse_event AS event
+            WHERE event.session_id=parent.session_id AND event.class='LOCK'
+          ) AS locked
           FROM support.session AS parent
           JOIN support.session_key AS key ON key.session_id=parent.session_id
           WHERE parent.session_id=$1
           FOR UPDATE OF parent,key
         `, [input.sessionId])).rows[0];
-        if (parent === undefined || parent.state !== "OPEN"
+        if (parent === undefined || parent.state !== "OPEN" || parent.locked
           || parent.shredded_at !== null || parent.destroyed_at !== null
           || parent.wrapped_key.byteLength !== 61 || parent.wrapped_key[0] !== 1) {
           throw new TypeError("SUPPORT_CASE_PARENT_INVALID");

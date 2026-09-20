@@ -67,6 +67,37 @@ beforeAll(async () => {
 afterAll(async () => database?.stop(),120_000);
 
 describe("SUP-02 cases", () => {
+  it("rejects both case producers after an immutable session lock", async () => {
+    const lockedSession = await session();
+    await database.pool.query(`
+      INSERT INTO support.abuse_event(
+        abuse_event_id,session_id,class,message_sha256,ip_sha256,at
+      ) VALUES($1,$2,'LOCK',NULL,$3,$4)
+    `,[randomUUID(),lockedSession,"d".repeat(64),createdAt]);
+    const repository = new PostgresSupportCaseRepository(
+      database.pool,
+      async () => Object.freeze({
+        wrappedKey: wrapped(4),transcriptSnapshotCiphertext: contentV2(4)
+      })
+    );
+    await expect(repository.createCaseOnce({
+      sessionId: lockedSession,identityOwnerRef: null,language: "en",createdAt,
+      triggerPredicate: "E1",triggerGeneration: "manual",toolCalls: [],
+      kbVersion: "b".repeat(64),slaHours: 48,
+      prepare: async () => Object.freeze({
+        caseId: randomUUID(),token: "locked-token",tokenSha256: "e".repeat(64)
+      })
+    })).rejects.toThrow("SUPPORT_CASE_PARENT_INVALID");
+    await expect(repository.createCase({
+      caseId: randomUUID(),tokenSha256: "f".repeat(64),sessionId: lockedSession,
+      language: "en",createdAt
+    })).rejects.toThrow("SUPPORT_CASE_PARENT_INVALID");
+    expect((await database.pool.query(
+      "SELECT count(*)::int AS count FROM support.\"case\" WHERE session_id=$1",
+      [lockedSession]
+    )).rows).toEqual([{ count: 0 }]);
+  });
+
   it("opens one case for concurrent attempts at the same trigger generation", async () => {
     const sessionId = await session();
     let prepared = 0;

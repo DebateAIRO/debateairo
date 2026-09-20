@@ -652,6 +652,7 @@ export function installSupportRoutes(
       if (found.shreddedAt !== undefined && found.shreddedAt !== null) {
         return shredded(reply,found.language);
       }
+      if (found.state === "LOCKED") return rateLimited(reply,found.language);
       const ratings = await application.sessions.rateMessage({
         sessionId: found.sessionId,tokenSha256,messageId: request.params.id,rating: body.rating,
         at: (application.clock ?? (() => new Date()))()
@@ -686,6 +687,7 @@ export function installSupportRoutes(
       if (found.shreddedAt !== undefined && found.shreddedAt !== null) {
         return shredded(reply,found.language);
       }
+      if (found.state === "LOCKED") return rateLimited(reply,found.language);
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Readonly<Record<string,unknown>> : {};
       const language = body.language === undefined ? found.language : languageFrom(body.language);
