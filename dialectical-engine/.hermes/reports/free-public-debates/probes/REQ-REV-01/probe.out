@@ -1,0 +1,156 @@
+PROBE REQ-REV-01 2026-09-20T17:27:24Z
+cwd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine
+git-toplevel /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all
+HEAD fe513724
+
+=== P1 publications.ts:301 is unpublish, not readPublicDebate ===
+  }
+
+  async unpublish(input: Readonly<{
+    runId: string;
+    authenticated: AuthenticatedSession;
+--- readPublicDebate ---
+382:  async readPublicDebate(publicationRef: string): Promise<PublicDebate | null> {
+  async readPublicDebate(publicationRef: string): Promise<PublicDebate | null> {
+    return this.repository.withContentLease(publicationRef,async () => {
+      const snapshot = await this.repository.readPublic(publicationRef);
+      if (snapshot === null) return null;
+      let prepared: Awaited<ReturnType<PublicationCipher["open"]>> | undefined;
+      try {
+        // Visibility is authorized before external key resolution/decryption.
+        prepared = await this.cipher.open(publicationRef, snapshot.runId);
+        const publicDebate = PublicDebateSchema.parse(
+          prepared.decrypt(snapshot.contentCiphertext)
+        );
+        prepared.close();
+        prepared = undefined;
+        // A concurrent unpublish can commit while decryption runs. Latest-wins
+        // visibility is revalidated before any plaintext leaves the service.
+        if (publicDebate.public_ref !== snapshot.publicationRef
+          || publicDebate.published_at !== snapshot.createdAt.toISOString()) return null;
+        return await this.repository.revalidatePublic(snapshot.runId, publicationRef)
+          ? publicDebate : null;
+      } catch {
+        return null;
+      } finally {
+        prepared?.close();
+      }
+    });
+  }
+
+=== P2 PublicationTransitionSchema is .strict() two fields ===
+export const PublicationTransitionSchema = z.object({
+  state: z.enum(["PRIVATE", "PUBLISHED"]),
+  public_ref: z.uuid().nullable()
+}).strict();
+--- client parses visibility with it ---
+    readRunVisibility: (runId: string) => request(
+      `/v1/runs/${encodeURIComponent(runId)}/visibility`,
+      PublicationTransitionSchema
+    ),
+    publishRun: (runId: string, stepUpGrant: string) => request(
+      `/v1/runs/${encodeURIComponent(runId)}/publish`,
+      PublicationTransitionSchema,
+      { method: "POST", body: JSON.stringify({
+          step_up_grant: stepUpGrant,
+          warning_acknowledged: true
+        }) }
+    ),
+    unpublishRun: (runId: string, stepUpGrant: string) => request(
+      `/v1/runs/${encodeURIComponent(runId)}/unpublish`,
+      PublicationTransitionSchema,
+      { method: "POST", body: JSON.stringify({
+          step_up_grant: stepUpGrant,
+          copies_may_persist_acknowledged: true
+        }) }
+
+=== P3 request bodies today's API requires ===
+--- AskRequestSchema ---
+  question_line: z.string().trim().min(1),
+  risk_tier: RiskTierSchema,
+  tier_source: AskTierSourceSchema,
+  tier_provenance_ref: z.string().trim().min(1),
+  composition_budget_tier: CompositionBudgetTierSchema,
+  depth_params: z.record(z.string(), z.unknown()),
+  decision_scope: z.string().trim().min(1),
+  as_of: z.iso.datetime(),
+  steering_presets: z.array(z.string().trim().min(1)),
+  plan_tier: PlanTierSchema,
+  steering_annotations: z.array(z.string().min(1))
+}).strict();
+export type AskRequest = z.infer<typeof AskRequestSchema>;
+
+export const AskAcceptedSchema = z.object({
+  run_ref: z.string().min(1),
+  status: z.literal("QUEUED")
+}).strict();
+--- grant actions ---
+export const RunTargetedGrantActionSchema = z.enum([
+  "PUBLISH", "UNPUBLISH", "DELETE_PRIVATE_DEBATE"
+]);
+--- publish/unpublish bodies ---
+export const PublishDebateRequestSchema = z.object({
+  step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  warning_acknowledged: z.literal(true)
+}).strict();
+
+export const UnpublishDebateRequestSchema = z.object({
+  step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  copies_may_persist_acknowledged: z.literal(true)
+}).strict();
+
+=== P4 unauthenticated auth:user ===
+    return reply.status(401).send({ error: "SESSION_REQUIRED" });
+--- DELETE debates anonymous handler (not reached if preHandler 401s) ---
+      if (!runId.success || authenticated===undefined) {
+        return reply.status(404).send({ error:"NOT_FOUND" });
+--- malformed -> 400 ---
+    const malformed = knownError instanceof MalformedRequestError || knownError instanceof SyntaxError;
+    const authFlow = knownError instanceof AuthFlowError;
+    // Only an error marked at the ask-evaluation stage is a refusal. Register,
+    // memory, sequence-allocation and other persistence faults remain 5xx even
+    // when they happen behind POST /v1/asks (DR-115).
+    const askRefusal = knownError instanceof AskRefusal;
+    // A pool failure that reached this boundary without being typed by the auth
+    // service still takes the one constant retryable envelope. It must never
+    // fall through to the generic 500 branch, whose body is `knownError.message`
+    // — for these that message IS the internal ARGON2_* code.
+    const argon2Unavailable = knownError instanceof Argon2InfrastructureError;
+    const statusCode = malformed ? 400
+      : authFlow ? knownError.statusCode
+        : argon2Unavailable ? 503
+          : askRefusal ? 422 : 500;
+    const errorCode = malformed
+      ? "MALFORMED_REQUEST"
+      : authFlow ? knownError.code
+        : argon2Unavailable ? AUTH_RETRYABLE_UNAVAILABLE_CODE
+          : askRefusal ? knownError.code : "INTERNAL_ERROR";
+    if (statusCode >= 500) {
+      console.error(JSON.stringify(Object.freeze({
+
+=== P5 route table count (SPEC R-23 command, from packet cwd) ===
+52
+--- table start/end ---
+  { route: "POST /v1/auth/register", auth: "public", resource: "identity", action: "register" },
+  { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" }
+--- visibility handler line ---
+1080:    "/v1/runs/:id/visibility",
+
+=== P6 SPEC R-24 git check from packet cwd ===
+0
+
+=== P7 freeze pathspec from packet cwd vs git root ===
+cwd docs/missions/... --stat lines:
+ .../free-public-debates/slices/S01/SPEC.md         | 256 +++++++++++++++++++++
+ 6 files changed, 498 insertions(+)
+git-root docs/missions/... --stat lines:
+
+=== P8 INSTRUCTIONS line count ===
+      89 docs/missions/free-public-debates/INSTRUCTIONS.md
+
+=== P9 R-8 vs R-9: PRIVATE+outstanding=0 is required by R-8 and forbidden by R-9 ===
+both clauses present: YES
+
+=== P10 SPEC never names acknowledgement literals ===
+NO_HITS
+DONE
