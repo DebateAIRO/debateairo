@@ -14,6 +14,7 @@ async function seedSession(input: Readonly<{
   ageMs: number;
   rating?: "yes" | "no" | "human";
   openedCase?: boolean;
+  locked?: boolean;
   outcome?: "ANSWER_GROUNDED" | "REFUSE_SAFETY";
   modelCalled?: boolean;
 }>): Promise<void> {
@@ -59,6 +60,13 @@ async function seedSession(input: Readonly<{
         caseId,Buffer.concat([Buffer.from([1]),Buffer.alloc(60,0x33)]),at
       ]);
     }
+    if (input.locked) {
+      await client.query(`INSERT INTO support.abuse_event(
+        abuse_event_id,session_id,class,message_sha256,ip_sha256,at
+      ) VALUES($1,$2,'LOCK',NULL,$3,$4)`,[
+        randomUUID(),sessionId,"d".repeat(64),at
+      ]);
+    }
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
@@ -85,7 +93,7 @@ describe("support outcome metrics", () => {
 
     // A recovered answer deliberately retains ANSWER_GROUNDED and model_called=true;
     // metrics therefore count it as a rated resolution and as one relay call.
-    await seedSession({ ageMs: 1,rating: "yes",modelCalled: true });
+    await seedSession({ ageMs: 1,rating: "yes",modelCalled: true,locked: true });
     await seedSession({ ageMs: 3,outcome: "REFUSE_SAFETY",modelCalled: true });
     await seedSession({ ageMs: 2,rating: "no",openedCase: true });
     await seedSession({ ageMs: 10*24*60*60*1_000 });
@@ -96,7 +104,8 @@ describe("support outcome metrics", () => {
       deflection7Days: 1/3,
       deflection30Days: 3/5,
       ratingResolution7Days: 0.5,
-      ratingResolution30Days: 2/3
+      ratingResolution30Days: 2/3,
+      openSessions: 5
     });
     const status = await repository.status();
     expect(status.relayState).toBe("AVAILABLE");

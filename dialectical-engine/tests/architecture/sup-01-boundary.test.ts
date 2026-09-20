@@ -182,6 +182,12 @@ describe("SUP-01 support capability boundary", () => {
         .test(specifier)
     )).toEqual([]);
     expect(source).not.toMatch(/\b(?:SupportKeyPort|unwrapDataKey)\b/u);
+    expect(source).not.toMatch(
+      /UPDATE\s+support[.]session\s+SET\s+state\s*=\s*['"]LOCKED/iu
+    );
+    const supportApi = `${await readFile("apps/api/src/support/index.ts","utf8")}\n${
+      await readFile("apps/api/src/support/session.ts","utf8")}`;
+    expect(supportApi).not.toContain("finalizeInjectionLock");
   });
 
   it("composes the API support data plane from its dedicated credential", async () => {

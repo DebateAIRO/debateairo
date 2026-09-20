@@ -456,13 +456,6 @@ export function installSupportRoutes(
           detectedLanguage: classification.language,overrideLanguage,
           receivedAt: now,firstTokenAt: null,completedAt: now
         });
-        if (classification.outcome === "REFUSE_INJECTION"
-          && application.sessions.finalizeInjectionLock !== undefined) {
-          await application.sessions.finalizeInjectionLock({
-            sessionId: found.sessionId,
-            lockAfterInjections: state.snapshot.values.supportLockAfterInjections
-          });
-        }
         const opened = escalationBeforeResponse === null ? null
           : await openEscalatedCase(
             application,found,responseLanguage,escalationBeforeResponse.predicate,now
@@ -581,13 +574,6 @@ export function installSupportRoutes(
           firstTokenAt: null,
           completedAt: now
         });
-        if (classification.outcome === "REFUSE_INJECTION"
-          && application.sessions.finalizeInjectionLock !== undefined) {
-          await application.sessions.finalizeInjectionLock({
-            sessionId: found.sessionId,
-            lockAfterInjections: state.snapshot.values.supportLockAfterInjections
-          });
-        }
         if (escalationBeforeAnswer !== null) {
           await openEscalatedCase(
             application,found,responseLanguage,escalationBeforeAnswer.predicate,now

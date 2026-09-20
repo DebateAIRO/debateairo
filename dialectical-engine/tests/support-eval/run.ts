@@ -443,7 +443,6 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
         read: sessionRepository.read.bind(sessionRepository),
         admitMessage: sessionRepository.admitMessage.bind(sessionRepository),
         admitIpSession: sessionRepository.admitIpSession.bind(sessionRepository),
-        finalizeInjectionLock: sessionRepository.finalizeInjectionLock.bind(sessionRepository),
         recordRateLimit: sessionRepository.recordRateLimit.bind(sessionRepository),
         rateMessage: sessionRepository.rateMessage.bind(sessionRepository),
         status: status.status.bind(status)

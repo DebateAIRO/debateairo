@@ -465,23 +465,6 @@ export class PostgresSupportSessionRepository {
     });
   }
 
-  async finalizeInjectionLock(input: Readonly<{
-    sessionId: string;
-    lockAfterInjections: number;
-  }>): Promise<void> {
-    await withSupportTransaction(this.pool,async (client) => {
-      await lockSupportSessions(client,[input.sessionId]);
-      await client.query(`
-        UPDATE support.session
-        SET state='LOCKED'
-        WHERE session_id=$1 AND state='OPEN' AND (
-          SELECT count(*) FROM support.abuse_event AS event
-          WHERE event.session_id=support.session.session_id AND event.class='INJECTION'
-        ) >= $2::integer
-      `,[input.sessionId,input.lockAfterInjections]);
-    });
-  }
-
   async recordRateLimit(input: Readonly<{
     sessionId: string;
     messageSha256: string;
@@ -1997,7 +1980,11 @@ export class PostgresSupportStatusRepository {
         (SELECT (count(*) FILTER (WHERE rating='yes'))::numeric/NULLIF(count(*),0)
           FROM rating_metrics,bounds
           WHERE at>=bounds.observed_at-interval '30 days')::text AS rating_resolution_30_days,
-        (SELECT count(*) FROM support.session WHERE state='OPEN')::text AS open_sessions,
+        (SELECT count(*) FROM support.session AS session
+          WHERE session.state='OPEN' AND NOT EXISTS (
+            SELECT 1 FROM support.abuse_event AS event
+            WHERE event.session_id=session.session_id AND event.class='LOCK'
+          ))::text AS open_sessions,
         (SELECT count(*) FROM support."case" WHERE state='NEW')::text AS new_cases
     `,[this.clock()]);
     const row = result.rows[0];

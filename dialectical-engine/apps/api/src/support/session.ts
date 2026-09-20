@@ -80,10 +80,6 @@ export interface SupportSessionPort {
     cooldownMinutes: number;
     sessionLimit: number;
   }>): Promise<"ADMITTED" | "COOLDOWN" | "RATE_LIMITED">;
-  finalizeInjectionLock?(input: Readonly<{
-    sessionId: string;
-    lockAfterInjections: number;
-  }>): Promise<void>;
   recordRateLimit(input: Readonly<{
     sessionId: string;
     messageSha256: string;

@@ -511,7 +511,6 @@ const api = buildApi({
       read: supportSessions.read.bind(supportSessions),
       admitMessage: supportSessions.admitMessage.bind(supportSessions),
       admitIpSession: supportSessions.admitIpSession.bind(supportSessions),
-      finalizeInjectionLock: supportSessions.finalizeInjectionLock.bind(supportSessions),
       recordRateLimit: supportSessions.recordRateLimit.bind(supportSessions),
       rateMessage: supportSessions.rateMessage.bind(supportSessions),
       status: supportStatus.status.bind(supportStatus)
