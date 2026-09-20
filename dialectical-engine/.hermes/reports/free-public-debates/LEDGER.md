@@ -22,3 +22,6 @@ Ruling: REQ-REV pass 2 RESUMES the pass-1 Grok session (01a0bfd1…) instead of 
 | 2026-09-20 20:45→20:53 | REQ-REV-02 | t_7c3bd32e | grok-4.6 (session 01a0bfd1… resumed) | scoped pass 2 over SPEC-v2 | **PASS** — B1–B3, N1–N7 ADDRESSED; N1-p2…N3-p2 non-blocking | `skills-check.sh` 4/4 floor skills, Grok transcript | agent-reports/REQ-REV-02.md |
 
 The verdict claims: the FIX checker passes on SPEC-v2, fails on the frozen SPEC and on a B1 mutant, and PASSES an R-26 mutant (a checker gap, N3-p2); pass-1 probe files unchanged by hash. Folded: DECISIONS §10. Packet defect against the orchestrator (the copied probe hard-codes SPEC.md) noted on t_9bbd4b39's class: a handed-forward probe takes its target as an argument.
+| 2026-09-20 20:54→21:16 | ARCH-S01 | t_eff46252 | grok-4.6 (session 01a0bff4-9e4c-73d1-a083-fcec78f440bf) | PLAN(S01): clusters C1 → C2 ∥ C4 → C3, migration 0066, ADR-0026 | READY — the handoff claims all four base runs CLUSTER_GREEN with the two named pre-existing failures carried as expected counts, and a zero-gap R-1…R-25 trace | `skills-check.sh` 5/5, Grok transcript | agent-reports/ARCH-S01.md |
+
+Measured by the orchestrator: PLAN.md 999 lines; ADR-0026 exists; the lane is 0 dirty at 5b6cc9b1. UNVERIFIED by the seat and carried forward: whether `reconcileKeyCleanup` has a periodic production caller (C2-S18). Packet defects → t_6fb82ae4.
