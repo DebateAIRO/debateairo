@@ -29,3 +29,4 @@ Measured by the orchestrator: PLAN.md 999 lines; ADR-0026 exists; the lane is 0 
 
 The verdict claims: every base cluster command re-run scripted and inline with zero disagreements against PLAN §8; B4(b)/(c) READ from function bodies, not reproduced. Measured by the orchestrator: lane 0 dirty after the seat.
 Ruling: B1–B5 and N1–N5 go to ONE ARCH-FIX node in ARCH-S01's own Grok session — why: every finding lands in PLAN.md (one surface) — cost if wrong: a larger pass-2 review. ARCH-REV pass 2 resumes the Opus reviewer by SendMessage.
+Orchestrator defect (priced: none yet): the resume launcher's pointer prompt said "the next pass of the review you ran" when it resumed the ARCH seat for ARCH-FIX — wording written for REQ-REV p2 and reused. Fixed in `logs/launch-grok-resume.sh` for every later resume; the running ARCH-FIX seat is judged by its packet, which it reads first.
