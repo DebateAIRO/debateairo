@@ -35,4 +35,4 @@ A case file, not a diary, at most ~1,500 words: name the CAUSE, not the symptom 
 | typecheck diagnostics at base | 70 — assert the DELTA | `pnpm exec tsc --noEmit` → /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine/.hermes/reports/free-public-debates/logs/typecheck-base.log | 2026-09-20 |
 | no-touch listeners and paths | cited: intake record, line "No-touch listeners"; also `.local/**`, any live database, the main checkout /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine is NOT yours | `lsof -nP -iTCP -sTCP:LISTEN` | 2026-09-20 |
 | V's intake rulings I-1…I-4 and the contradiction check C1–C7 | cited: intake record — never restated in a packet | — | 2026-09-20 |
-| freeze commits (updated at every freeze — orchestrator §9) | `38a44dc3` intake · `06e4eceb` REQ READY | `git log --oneline -- docs/missions/free-public-debates` | 2026-09-20 |
+| freeze commits (updated at every freeze — orchestrator §9) | `38a44dc3` intake · `06e4eceb` REQ READY · `03a59ae1` REQ-REV p1 verdict | `git log --oneline -- docs/missions/free-public-debates` | 2026-09-20 |
