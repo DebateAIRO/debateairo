@@ -123,3 +123,11 @@ an unavailable publication status; the internal-only build has no wire risk at a
 row V-2's literal text, which speaks about retrying rather than about what the owner sees.
 ```
 
+
+## 10. Orchestrator folds — REQ-REV pass 2 (PASS; N1-p2 … N3-p2), 2026-09-20
+
+Appended by the orchestrator (planning reviews are one pass by default: N-findings are folded here, not reworked). SPEC-v2.md is frozen and is not edited; where a pointer inside it is stale, THIS section is the correction every later seat reads.
+
+- **N1-p2** — `INSTRUCTIONS.md:12,44` and `SPEC-v2.md:8` say rows V-1…V-5; row V-6 was transcribed after REQ-FIX's READY. **The binding set is V-1…V-6** (`V-DECISIONS-PACKET.md`), each default binding until V rules.
+- **N2-p2** — `SPEC-v2.md:104-105` (R-11.4) points at DECISIONS §3 (that is V-5); the row R-11 depends on is **§9 = V-6**. `SPEC-v2.md:175` (R-21 residue) points at §4; the residue list is **§8**.
+- **N3-p2** — `spec-v2-check.sh` does not forbid a new requirement id (a mutant adding `R-26` passes). The requirement set of S01 is **exactly R-1…R-25**; the check every later pass uses is the unique-R-id count (`grep -oE '\*\*R-[0-9]+' SPEC-v2.md | sort -u | wc -l` = 25), not the script alone.

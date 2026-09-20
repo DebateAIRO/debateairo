@@ -19,3 +19,6 @@ Ruling: all of B1–B3 AND N1–N7 go to ONE REQ-FIX node in REQ-01's own sessio
 
 Measured by the orchestrator: SPEC.md unchanged vs 06e4eceb; the checker runs (zsh) and prints the three repo facts as claimed. V-ROW → V-6. Packet defects → t_e85e12a3.
 Ruling: REQ-REV pass 2 RESUMES the pass-1 Grok session (01a0bfd1…) instead of a fresh one — why: the pass is scoped to that seat's own findings and probes; blindness to the AUTHOR is kept (it never sees REQ-FIX's reasoning beyond the READY comment the contract lets it read) — cost if wrong: one fresh-session re-run (~14 min).
+| 2026-09-20 20:45→20:53 | REQ-REV-02 | t_7c3bd32e | grok-4.6 (session 01a0bfd1… resumed) | scoped pass 2 over SPEC-v2 | **PASS** — B1–B3, N1–N7 ADDRESSED; N1-p2…N3-p2 non-blocking | `skills-check.sh` 4/4 floor skills, Grok transcript | agent-reports/REQ-REV-02.md |
+
+The verdict claims: the FIX checker passes on SPEC-v2, fails on the frozen SPEC and on a B1 mutant, and PASSES an R-26 mutant (a checker gap, N3-p2); pass-1 probe files unchanged by hash. Folded: DECISIONS §10. Packet defect against the orchestrator (the copied probe hard-codes SPEC.md) noted on t_9bbd4b39's class: a handed-forward probe takes its target as an argument.
