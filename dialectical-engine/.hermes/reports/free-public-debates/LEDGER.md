@@ -35,3 +35,4 @@ Orchestrator defect (priced: none yet): the resume launcher's pointer prompt sai
 
 The verdict claims: its own pass-1 `file-map-check.py` was broken (0 rows parsed) and is repaired and mutant-proved; B1-p2 is READ from function bodies, not reproduced (no code exists). The reviewer states B1-p2's omission predates Revision 2 and that it missed it at pass 1.
 Ruling: pass 3 is the cap for ARCH-REV(S01); if pass 3 = REWORK the open findings become a V row and BUILD does not start on the affected cluster — cost if wrong: none, this is law 3.3.
+| 2026-09-20 22:01→22:07 | ARCH-FIX-S01-03 | t_7b0c12ad | grok-4.6 (session 01a0bff4… resumed) | PLAN Revision 3 | READY p3 — the handoff claims B1-p2 closed by two defined system key-provision cleanup functions + a reconciler on main.ts + two RED cases, N1-p2…N3-p2 closed, mutants watched failing, and a changed cluster order (C4 now waits on C2) | resumed session — floor verified earlier | agent-reports/ARCH-FIX-S01-03.md |

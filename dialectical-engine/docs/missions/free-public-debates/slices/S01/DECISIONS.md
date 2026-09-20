@@ -213,3 +213,32 @@ Sections 1–13 above are not rewritten. Assigned findings B1–B5, N1–N5. P1�
 ## 16. Rows for V
 
 None new. No product question was opened by the review. P1–P8 remain the orchestrator's.
+
+---
+
+# APPENDED 2026-09-20 by ARCH-FIX-S01-03 (pass 3 of 3, after ARCH-REV-S01-p2 REWORK)
+
+Sections 1–16 above are not rewritten. Assigned findings B1-p2, N1-p2, N2-p2, N3-p2. Last lawful pass: none left open, no new V-ROW.
+
+## 17. Decisions taken at ARCH-FIX-S01-03
+
+| date | question | choice | reason | ruled by |
+|---|---|---|---|---|
+| 2026-09-20 | B1-p2 — GRANT on undefined cleanup + orphan intent undeletable | Name `serve.claim_system_publication_key_provision_cleanup(integer)` and `serve.complete_system_publication_key_provision_cleanup(uuid,uuid)` in C2-S4 with bodies; GRANT those signatures to `debateai_publication_cleanup`; repository methods; `reconcileSystemKeyProvisionCleanup` on the same `main.ts` boot+interval; C2-S3 case 16 and C4-S2 case 8. C4 waits on C2. | Measured: `PLAN.md` GRANT bullet named no functions; `0040:6373-6374` GRANTs named signatures; `migrate()` is one batch (`packages/db/src/index.ts:821`) so 42883 aborts C2-S4; `:775` contention gate turns a PREPARED orphan into HTTP 202 without tombstone (`account-erasure.ts:110-112`). Owner template is `claim_publication_key_provision_cleanup` at `:1355-1404` plus `reconcileKeyProvisionCleanup` at `publications.ts:360-380`. | ARCH-FIX-S01-03, accepting B1-p2 |
+| 2026-09-20 | N1-p2 — reconciler answer source | Inject `readServedAnswer(runId, RunOwnershipAccess) => Answer \| null` into `PostgresPublicationApplication`'s constructor; wire in `main.ts` from `PostgresAskApplication.readRunAnswer` (`index.ts:1448-1449`). Call it only inside `reconcileFreePublicAutoPublish`. C2-S19.3: outstanding + no GET + one reconcile → PUBLISHED. | Measured: constructor is `(repository, cipher, clock, cleanupRepository)` (`publications.ts:142-148`); repository has no answer read. `readRunAnswer` ignores session. Not an answer-read on the boot path (reviewer's predicted shortcut). | ARCH-FIX-S01-03, accepting N1-p2 |
+| 2026-09-20 | N2-p2 — second DENY unobservable | One rule: the transition writes DENY for every NULL after taking the lock; `tryAutoPublish` step 8 never writes DENY. C2-S3 case 10 pins DENY count = 1. | Measured: `systemPublish` returns NULL in both "entered and denied" and "never entered". TypeScript cannot distinguish. C2-S3 case 6 never enters the function, so R-21's count of 2 is safe either way; the step was not markable. | ARCH-FIX-S01-03, accepting N2-p2 |
+| 2026-09-20 | N3-p2 — race case passes sequentially | Two pools; both `prepareSystemKeyProvision` complete before either `systemPublish`. Watched FAILING with body item 4 removed before GREEN is quoted. | Measured: sequential `tryAutoPublish` returns early at step 3 (`latest visibility already PUBLISHED`), so count=1 without the in-transaction guard. | ARCH-FIX-S01-03, accepting N3-p2 |
+| 2026-09-20 | C2 ∥ C4 after B4(b)/B1-p2 | C4 waits on C2. | `0068` reads `serve.system_publication_key_provision_intent` created in `0067`. Parallelism was already false after Revision 2; B1-p2 makes it explicit. | ARCH-FIX-S01-03 |
+
+## 18. Alternatives rejected at ARCH-FIX-S01-03
+
+| alternative | why not |
+|---|---|
+| Pass the answer into `reconcileFreePublicAutoPublish` from `main.ts` boot | Reviewer's predicted shortcut. Puts an answer read on the boot path; a new unmapped dependency. Constructor injection is called only when work is claimed. |
+| Leave C2 ∥ C4 and have 0068 `CREATE TABLE IF NOT EXISTS` the system intent | Invents a second writer of C2's table. Sequence is cheaper. |
+| Contest B1-p2 as "expires_at will always be cleaned by abandon" | Abandon runs only on in-process failure (`PLAN` steps 6–8). Process death is the owner path's own comment at `main.ts:293-296`. |
+| Leave N1-p2/N2-p2/N3-p2 as V-rows | Last pass: an open finding becomes a V row and blocks the cluster. None of them is a product question. |
+
+## 19. Rows for V
+
+None new. B1-p2, N1-p2, N2-p2, N3-p2 are HOW. P1–P8 remain the orchestrator's.
