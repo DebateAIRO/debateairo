@@ -25,6 +25,8 @@ export {
   type LegacyRunClaimOutcome
 } from "./legacy-claim.js";
 
+export { runIsFreePublicBound } from "./free-public-binding.js";
+
 export {
   assertSupportKeyCoverage,
   assertSupportDatabaseRole,
@@ -33,7 +35,6 @@ export {
   PostgresSupportCaseRepository,
   PostgresSupportCaseSummaryRepository,
   PostgresSupportMessageRepository,
-  PostgresSupportOwnContextRepository,
   PostgresSupportRelayReservationRepository,
   PostgresSupportShredRepository,
   PostgresSupportSessionRepository,
@@ -46,7 +47,6 @@ export {
   type SupportMessageRead,
   type SupportMessageRole,
   type SupportMessageWrite,
-  type SupportOwnRunStateRow,
   type SupportRepositoryRecord,
   type SupportRepositoryStatus,
   type SupportRelayReservationResult,
@@ -662,6 +662,19 @@ async function planTierColumnIsApplied(
   return result.rows[0]?.applied === true;
 }
 
+async function freePublicRuleColumnIsApplied(
+  executor: Pick<Pool, "query"> | PoolClient
+): Promise<boolean> {
+  const result = await executor.query<{ applied: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.columns
+       WHERE table_schema='core' AND table_name='run'
+         AND column_name='free_public_rule'
+     ) AS applied`
+  );
+  return result.rows[0]?.applied === true;
+}
+
 type UntypedMethod = (...args: unknown[]) => unknown;
 
 function typedPoolFailure(error: unknown): TypedDomainError {
@@ -1162,6 +1175,8 @@ export class RunRepository {
     }
     const planTierColumnApplied = input.principal.kind === "legacy"
       && await planTierColumnIsApplied(this.pool);
+    const freePublicRuleColumnApplied = input.principal.kind === "legacy"
+      && await freePublicRuleColumnIsApplied(this.pool);
     const askContract = input.askContract ?? {};
     let storedQuestionLine = input.questionLine;
     let storedAskContract: Readonly<Record<string, unknown>> = askContract;
@@ -1222,6 +1237,7 @@ export class RunRepository {
         const created = await provisionExecutor.query<{
           created: boolean;
           plan_tier_supported: boolean;
+          free_public_rule_supported: boolean;
         }>(
           `WITH capability AS (
              SELECT COALESCE(
@@ -1229,14 +1245,26 @@ export class RunRepository {
                  to_regprocedure('core.create_encrypted_run(jsonb,uuid,uuid,jsonb)')
                ) LIKE '%''planTier''%',
                false
-             ) AS plan_tier_supported
+             ) AS plan_tier_supported,
+             COALESCE(
+               pg_get_functiondef(
+                 to_regprocedure('core.create_encrypted_run(jsonb,uuid,uuid,jsonb)')
+               ) LIKE '%''freePublicRule''%',
+               false
+             ) AS free_public_rule_supported
            )
            SELECT core.create_encrypted_run(
-             CASE WHEN capability.plan_tier_supported
-               THEN $1::jsonb ELSE $1::jsonb-'planTier' END,
+             CASE
+               WHEN capability.plan_tier_supported
+                 AND capability.free_public_rule_supported THEN $1::jsonb
+               WHEN capability.plan_tier_supported THEN $1::jsonb-'freePublicRule'
+               WHEN capability.free_public_rule_supported THEN $1::jsonb-'planTier'
+               ELSE $1::jsonb-'planTier'-'freePublicRule'
+             END,
              $2,$3,$4::jsonb
            ) AS created,
-           capability.plan_tier_supported
+           capability.plan_tier_supported,
+           capability.free_public_rule_supported
            FROM capability`,
           [JSON.stringify({
             runId,
@@ -1251,6 +1279,7 @@ export class RunRepository {
             tierProvenanceRef: input.tierProvenanceRef,
             compositionBudgetTier: input.compositionBudgetTier,
             planTier: input.planTier ?? null,
+            freePublicRule: true,
             depthParams: input.depthParams,
             discoveredPanel: input.discoveredPanel,
             strangerSampleRate: input.strangerSampleRate,
@@ -1302,23 +1331,25 @@ export class RunRepository {
         input.askerRiskTier, input.effectiveRiskTier, input.tierSource, input.tierProvenanceRef,
         input.compositionBudgetTier,
         ...(planTierColumnApplied ? [input.planTier ?? null] : []),
+        ...(freePublicRuleColumnApplied ? [true] : []),
         JSON.stringify(input.depthParams),
         JSON.stringify(input.discoveredPanel), input.strangerSampleRate,
         JSON.stringify(input.envelopeBasis), input.registerVersion,
         input.batteryVersion, JSON.stringify(storedAskContract), createdAtSeq
       ];
-      const bindOffset = planTierColumnApplied ? 1 : 0;
+      const planTierBindOffset = planTierColumnApplied ? 1 : 0;
+      const bindOffset = planTierBindOffset + (freePublicRuleColumnApplied ? 1 : 0);
       await client.query(
         `INSERT INTO core.run (
           run_id, question_line, asker_id, session_id, caller_scope, as_of,
           asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
-          composition_budget_tier${planTierColumnApplied ? ", plan_tier" : ""},
+          composition_budget_tier${planTierColumnApplied ? ", plan_tier" : ""}${freePublicRuleColumnApplied ? ", free_public_rule" : ""},
           depth_params, agent_count, discovered_panel,
           stranger_sample_rate, envelope_basis, register_version,
           battery_version, ask_contract, created_at_seq
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-          $11${planTierColumnApplied ? ", $12" : ""},
+          $11${planTierColumnApplied ? ", $12" : ""}${freePublicRuleColumnApplied ? `, $${12 + planTierBindOffset}` : ""},
           $${12 + bindOffset}::jsonb,
           jsonb_array_length($${13 + bindOffset}::jsonb),
           $${13 + bindOffset}::jsonb, $${14 + bindOffset},

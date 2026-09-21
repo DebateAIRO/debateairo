@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW6",
+  "ticket": "t_70110160",
+  "runId": 161,
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedAt": "2026-09-17T19:38:28Z",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "freezeCommit": "d451bf55a1097d3a471f79efd9d9d3cdfb6ee827",
+  "inputCustody": {
+    "count": 125,
+    "mismatches": []
+  },
+  "productManifest": {
+    "fileCount": 4,
+    "mismatches": [],
+    "checkoutHead": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+    "checkoutCleanObserved": true
+  },
+  "orderedEight": {
+    "harnessSha256": "6444862b9d465565a5416cec763a92216a04eb042bafe833dab43135c00debd2",
+    "files": [
+      {
+        "path": "capture-public-guide.mjs",
+        "bytes": 18423,
+        "sha256": "21961331c9c3c0236320f7fa50578e2b76827e9eb23946bdb5e531122083a019"
+      },
+      {
+        "path": "controls.mjs",
+        "bytes": 21960,
+        "sha256": "886b90b02d959fe1d493e987984481b8c0c9c483cd8529d1dd695fc908c3fda8"
+      },
+      {
+        "path": "matrix.mjs",
+        "bytes": 14253,
+        "sha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c"
+      },
+      {
+        "path": "pre-request-verifier.ts",
+        "bytes": 16486,
+        "sha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733"
+      },
+      {
+        "path": "runtime-capacity.mjs",
+        "bytes": 9935,
+        "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87"
+      },
+      {
+        "path": "session-lifecycle.mjs",
+        "bytes": 4254,
+        "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b"
+      },
+      {
+        "path": "verify-final-branches.ts",
+        "bytes": 5131,
+        "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a"
+      },
+      {
+        "path": "verify-guide-harness.mjs",
+        "bytes": 51876,
+        "sha256": "c2c980280038aff2ff436e46c531d6586a7bef839a4c570f83497942386794ae"
+      }
+    ]
+  },
+  "canonicalControlProof": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX6-control-proof.json",
+    "sha256": "c7aa6b60b0b9170d00023bd859003b956d57178f6be72e3e3da2752a3fdf849a",
+    "schemaVersion": 2,
+    "result": "PASS",
+    "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+    "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+    "harnessSha256": "6444862b9d465565a5416cec763a92216a04eb042bafe833dab43135c00debd2",
+    "controls": 100,
+    "passed": 100,
+    "uniqueNames": 100,
+    "retainedNames": 91,
+    "addedNames": 9
+  },
+  "finding": {
+    "id": "GH6-R1",
+    "projectorLines": "controls.mjs:248-263",
+    "attributionLines": "controls.mjs:330-337",
+    "missingControlLines": "verify-guide-harness.mjs:693-699",
+    "counterexample": {
+      "status": "ATTRIBUTED_RECOVERY",
+      "candidateCount": 1,
+      "record": "missing",
+      "fixedCounts": "missing",
+      "currentProjection": {
+        "category": null,
+        "validCount": null,
+        "invalidCount": null,
+        "duplicateCount": null,
+        "unmatchedCount": null
+      },
+      "currentPossibleAttribution": "REVIEWED_FALLBACK"
+    },
+    "verdict": "REWORK_BOUNDED_DIAGNOSTIC_SHAPE"
+  },
+  "retained": {
+    "stagedApiCheckpoint": "PASS",
+    "sessionDomDiagnosticThrowPhaseCodes": "PASS",
+    "attemptedCompletedAccounting": "PASS",
+    "privacyProjection": "PASS",
+    "matrixFix5Exact": "PASS",
+    "sourcePolicyFinalRevisionBinding": "PASS",
+    "digestAndAdapterBinding": "PASS",
+    "guide6OutputAbsence": "PASS"
+  },
+  "execution": {
+    "staticOnly": true,
+    "tests": false,
+    "probes": false,
+    "browser": false,
+    "runtime": false,
+    "http": false,
+    "database": false,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "git": false,
+    "heavyLease": false
+  }
+}

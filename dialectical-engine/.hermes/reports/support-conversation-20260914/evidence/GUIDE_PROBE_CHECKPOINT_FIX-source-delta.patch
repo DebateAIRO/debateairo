@@ -1,0 +1,30 @@
+--- /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND15/probe-zero-request-ui.mjs	2026-09-20 18:48:02
++++ /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PROBE_CHECKPOINT_FIX/probe-zero-request-ui.mjs	2026-09-20 19:06:53
+@@ -6,8 +6,10 @@
+ import {
+   classifyGuideBlockedSupportOperation,openGuideSupportSurface,
+   proveGuideFullReadiness,validateGuideUiProbeArguments
+-} from "./controls.mjs";
++} from "../GUIDE_HARNESS_BIND15/controls.mjs";
++import { createGuideProbeCheckpoint } from "./checkpoint-writer.mjs";
+ 
++const EVIDENCE_ROOT="/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence";
+ const EXECUTABLE_PATH="/Users/vladmihaimiron/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell";
+ const BASE_URL="https://localhost:3100";
+ const FIXED_CODE=/^GUIDE_[A-Z0-9_]+$/u;
+@@ -28,12 +30,9 @@
+   observations:[],transitions:[],failure:null,
+   consoleErrorCategories:emptyConsoleErrorCounts(),privateControls:[]
+ };
+-let created=false;
+-async function checkpoint() {
+-  await mkdir(EVIDENCE_ROOT,{ recursive:true });
+-  await writeFile(outputPath,`${JSON.stringify(result,null,2)}\n`,created ? {} : { flag:"wx",mode:0o600 });
+-  created=true;
+-}
++const checkpoint=createGuideProbeCheckpoint({
++  mkdir,writeFile,evidenceRoot:EVIDENCE_ROOT,outputPath,readResult:() => result
++});
+ const profile=await mkdtemp(resolve(tmpdir(),"guide-bind13-ui-"));
+ const context=await chromium.launchPersistentContext(profile,{
+   executablePath:EXECUTABLE_PATH,headless:true,viewport:{ width:1440,height:1000 }

@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PROBE_CHECKPOINT_REVIEW",
+  "ticket": "t_4b4b2ef8",
+  "runId": 200,
+  "verdict": "PASS_BOUNDED_CHECKPOINT_REPAIR",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "reviewedOn": "2026-09-20T16:12:29.076779Z",
+  "productRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productClean": true,
+  "freezeCommit": "fe554186fc82d97058e05da0ed63eb938d10cc4e",
+  "probe4Regression": {
+    "childExitStatus": 1,
+    "failureClass": "HARNESS_RUNTIME_REFERENCE_ERROR",
+    "failureSymbol": "EVIDENCE_ROOT",
+    "firstCheckpointLine": 33,
+    "catchCheckpointLine": 245,
+    "requiredOutputAbsent": true,
+    "completedTransitions": 0,
+    "transitionAttemptCounts": "UNAVAILABLE",
+    "blockedAttemptCounts": "UNAVAILABLE",
+    "installedAbortLogicIsPerRequestEvidence": false,
+    "zeroCountsReconstructed": false
+  },
+  "minimalDelta": {
+    "sourcePatchSha256": "cf85b16ab7d1818d901f91fc3397ac02352308ab09c3763e17cae904aa6ad73b",
+    "changes": [
+      "relocate unchanged BIND15 controls import",
+      "import production checkpoint writer",
+      "restore exact evidence-root binding",
+      "replace inline closure with explicit-dependency writer"
+    ],
+    "readinessChanged": false,
+    "trafficGuardChanged": false,
+    "transitionOrderChanged": false,
+    "cleanupBehaviorChanged": false,
+    "oracleChanged": false
+  },
+  "checkpointProof": {
+    "originalSourceExtracted": true,
+    "originalChildStatus": 1,
+    "originalFailure": "ReferenceError: EVIDENCE_ROOT is not defined",
+    "productionWriterImported": true,
+    "fixedChildStatus": 0,
+    "initialExclusiveWrite": true,
+    "initialMode": "0600",
+    "subsequentUpdates": 2,
+    "currentStateSerialization": true,
+    "fixedFailurePersistence": true,
+    "stubIoOnly": true,
+    "actualBrowser": false,
+    "actualSupportTraffic": false
+  },
+  "dependencyReview": {
+    "allRelocatedImportsResolve": true,
+    "mkdirBound": true,
+    "writeFileBound": true,
+    "evidenceRootBound": true,
+    "outputPathGuardValidatedBeforeWriter": true,
+    "resultBoundBeforeWriter": true,
+    "writerDependenciesExplicit": true,
+    "contextBound": true,
+    "profileBound": true,
+    "contextCloseInFinally": true,
+    "profileRemoveInFinally": true,
+    "behaviorAfterProfileCreationByteIdenticalToBind15": true
+  },
+  "preservedBindings": {
+    "orderedEightSha256": "b6162d665b60a1a35d882e41fa5b0da3259e9cb86bae32ca5d5056d320ad99d4",
+    "captureSha256": "53dbf7a2df891632de70c83ce3fab60a4deac98005df0015f6393880285e9f0b",
+    "controlsSha256": "20adde062fd0f7f478f8bf235e9c1be3a541f5f9bb2a5d421f1d6921d76397b7",
+    "matrixSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+    "preRequestVerifierSha256": "d5d6656431f93e3089c9c6751ae767b401d21f23bb90d398fa99a051af0ead39",
+    "controlProofSha256": "fb25e5bb044db363bc5ea54cf6090082603b3796df3d9d63df15671881da1fd5",
+    "controls": 130,
+    "matrixRows": 54,
+    "adapterNegatives": 3,
+    "actualNamespace": "GUIDE_LIVE_GUIDE15",
+    "wholeHarnessRebindRequired": false
+  },
+  "supplementalContract": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PROBE_CHECKPOINT_FIX/probe-contract.json",
+    "sha256": "a6000967793737e33a3dabe3361e578defb0af7f1df51a985275607d6cc6b638",
+    "bytes": 1639,
+    "supersedes": [
+      "future probe script",
+      "future probe output/log destination",
+      "future probe prerequisite"
+    ]
+  },
+  "preparedProbe5": {
+    "script": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PROBE_CHECKPOINT_FIX/probe-zero-request-ui.mjs",
+    "scriptSha256": "67dd1695af2f03f55d2bfbed1fafedabf2b8ec2bd57d3348eb23feb80cb4d8f2",
+    "scriptBytes": 12389,
+    "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "argv": [
+      "node",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PROBE_CHECKPOINT_FIX/probe-zero-request-ui.mjs",
+      "152eed4da1cd3e66b74d8301159ba76427552409",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE-run-LIVE8-PROBE5.json"
+    ],
+    "outputPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE-run-LIVE8-PROBE5.json",
+    "logPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_UI_TRANSITION_PROBE5-LIVE8.log",
+    "childStatusPreservedBy": "direct stdout/stderr redirection without tee",
+    "argumentGuardPassed": 5,
+    "argumentGuardTotal": 5,
+    "outputAbsent": true,
+    "logAbsent": true,
+    "pinnedExecutablePresent": true,
+    "executed": false
+  },
+  "custody": {
+    "reviewInputs": 79,
+    "reviewInputMismatches": 0,
+    "authorInputs": 64,
+    "authorArtifacts": 12
+  },
+  "artifacts": [
+    {
+      "role": "report",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_PROBE_CHECKPOINT_REVIEW.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_PROBE_CHECKPOINT_REVIEW.md",
+      "sha256": "c6964beac48c845ee54801db57f881f16aeb59a17636545b3393dc7d59f80e85",
+      "bytes": 6438
+    },
+    {
+      "role": "selfReport",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PROBE_CHECKPOINT_REVIEW.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PROBE_CHECKPOINT_REVIEW.md",
+      "sha256": "12db4c3f09bf6a6e237117c1c073b1f6bd4cec777c87cef1e9815eda7b4bd2bb",
+      "bytes": 3574
+    },
+    {
+      "role": "dependencyCheck",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PROBE_CHECKPOINT_REVIEW-dependency-check.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_PROBE_CHECKPOINT_REVIEW-dependency-check.json",
+      "sha256": "28c73a69e9073cfa26fa854540c13c6ce55fbd016565a704b61084f5dd80707b",
+      "bytes": 4367
+    },
+    {
+      "role": "staticCustody",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_PROBE_CHECKPOINT_REVIEW-static-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_PROBE_CHECKPOINT_REVIEW-static-custody.json",
+      "sha256": "502cb498c7e3fbe2e56a0794c56b29c7f1613df17f4583520ea167806b541798",
+      "bytes": 1621
+    }
+  ],
+  "limits": {
+    "staticReview": true,
+    "authorStubIoProofConsumed": true,
+    "probe5Run": false,
+    "browser": false,
+    "runtime": false,
+    "http": false,
+    "database": false,
+    "status": false,
+    "capacity": false,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "productWrites": false,
+    "gitWrites": false,
+    "harnessWrites": false,
+    "testabilityClaimed": false,
+    "readinessClaimed": false,
+    "acceptanceClaimed": false,
+    "forgot": "UNRESOLVED_ACTIONLESS",
+    "cp1": "INCOMPLETE",
+    "cp2": "GATED"
+  },
+  "selfExclusion": "This receipt excludes itself from artifacts and custody hashes."
+}

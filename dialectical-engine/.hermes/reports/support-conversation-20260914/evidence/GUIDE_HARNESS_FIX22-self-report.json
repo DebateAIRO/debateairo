@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX22",
+  "ticket": "t_81e8320a",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "PASS_SUCCESSOR_CUSTODY_CORRECTED",
+  "model": "gpt-5.6-sol",
+  "session": "01a09f02-346a-7fb0-aa70-0424f1fdd21e",
+  "skills": {
+    "retained": [
+      "superpowers:executing-plans",
+      "superpowers:systematic-debugging",
+      "superpowers:verification-before-completion"
+    ],
+    "reReadThisNode": false
+  },
+  "checks": {
+    "focused": "14/14",
+    "syntax": "5/5",
+    "retainedFull58": "HASH_MATCH",
+    "retainedScreenshot": "HASH_MATCH"
+  },
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "heavyLeaseReleased": true,
+  "limits": [
+    "Actual LIVE21 and owner-capacity commands remain unexecuted.",
+    "Forgot unresolved/actionless.",
+    "No readiness or acceptance claim."
+  ]
+}

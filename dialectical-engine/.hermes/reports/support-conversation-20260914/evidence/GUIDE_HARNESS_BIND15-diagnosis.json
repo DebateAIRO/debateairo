@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND15",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "observedFailure": {
+    "step": "FIRST_MODE_EXPECTED_STATE",
+    "code": "GUIDE_HARNESS_FULL_MODE_EXPECTED_STATE_TIMEOUT",
+    "before": {
+      "modeState": "TERRACOTTA",
+      "transitionState": "IDLE",
+      "toggleVisible": true,
+      "toggleEnabled": true,
+      "toggleHitTarget": true,
+      "privateHandlerReady": false
+    },
+    "afterDispatchedClick": {
+      "modeState": "TERRACOTTA",
+      "transitionState": "IDLE",
+      "privateHandlerReady": false
+    },
+    "laterFailureCheckpoint": {
+      "privateHandlerReady": true,
+      "cookieVisible": true,
+      "toggleHitTarget": true
+    }
+  },
+  "cause": {
+    "class": "HARNESS_PRE_HYDRATION_INTERACTION",
+    "established": true,
+    "reason": "The full-view path called the readiness interaction without the compact path's handler-hydration wait. The visible actionable mode click dispatched before its React handler existed, returned without a mode change, and timed out waiting for the expected state.",
+    "cookieObstructionSupported": false,
+    "discriminatorActionUsed": false
+  },
+  "producerContract": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/ui/components/modeTransition.ts",
+    "sha256": "5b433d669da6e13d49489aa3bf040c0e4fc895b96cec64bbd673540dbbd1ee3b",
+    "activeTransitionClickBehavior": "IGNORED",
+    "restorePrecondition": "EXPECTED_ARIA_STATE_AND_TRANSITION_IDLE"
+  },
+  "traffic": {
+    "actualSupportRequestsForwarded": 0,
+    "guardedAttempts": {
+      "status": 1,
+      "pageCaseListRead": 1,
+      "createSession": 0,
+      "sendMessage": 0,
+      "otherSupport": 0
+    }
+  },
+  "limits": [
+    "The diagnostic script's own verdict remained DIAGNOSIS_INCONCLUSIVE because its optional cookie hypothesis was unsupported.",
+    "The hydration cause is established by the fixed phase observations plus the source call order.",
+    "No independent five-transition success is claimed."
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_RECOVER33",
+  "ticket": "t_21dbe7b0",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "BLOCKED_AUTOREVIEW_PAID_STARTUP_HANDSHAKE",
+  "requestedOperation": {
+    "destination": "Z.AI GLM through the repository-supported Hermes CLI",
+    "fixedPrompt": "HERMES-SUPPORT acceptance transport handshake. Reply with the single word: OK",
+    "paidExternalRequest": true,
+    "localStoredCredentialUse": true,
+    "timeoutMs": 180000
+  },
+  "autoReview": {
+    "outcome": "REJECTED",
+    "rejectionText": "This action was rejected due to unacceptable risk.\nReason: This executes a real paid Hermes model handshake using locally stored credentials and sends a prompt to an external provider; the user did not explicitly authorize that specific payload, destination, or paid network side effect.\nThe agent must not attempt to achieve the same outcome via workaround, indirect execution, or policy circumvention. Proceed only with a materially safer alternative, or if the user explicitly approves the action after being informed of the risk. Otherwise, stop and request user input."
+  },
+  "execution": {
+    "diagnosticHandshakeStarted": false,
+    "diagnosticHandshakeAttempts": 0,
+    "runtime9Started": false,
+    "runtime9StartAttempts": 0,
+    "newStartupModelAttempts": 0,
+    "supportSessionsCreated": 0,
+    "supportMessagesSent": 0,
+    "statusReads": 0,
+    "capacityReads": 0,
+    "databaseQueries": 0,
+    "handshakeDiagnosticOutputAbsent": true,
+    "runtime9PrivateLogAbsent": true
+  },
+  "safeNextStep": "Explicit user approval for up to two paid Z.AI/GLM startup handshakes using the exact fixed prompt and existing local credential; then resume the retained diagnostic before any Runtime9 start.",
+  "productChanged": false,
+  "privateLogReadBeyondAuthorizedClosedRuntime8Filter": false,
+  "privateValuesRetained": false,
+  "recordedAtUtc": "2026-09-21T07:13:16.255Z"
+}

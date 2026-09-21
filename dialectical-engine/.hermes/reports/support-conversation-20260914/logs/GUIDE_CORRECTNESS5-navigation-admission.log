@@ -1,0 +1,789 @@
+{
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "rows": [
+    {
+      "index": 1,
+      "kind": "action",
+      "language": "en",
+      "query": "Where is Home?",
+      "signedIn": false,
+      "expected": [
+        "home"
+      ],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "sign-in",
+        "sign-up",
+        "help",
+        "support-status",
+        "method",
+        "sample-transcript"
+      ],
+      "sourceIds": [
+        "app-navigation",
+        "browse-public-debates",
+        "getting-started-debate"
+      ],
+      "requestedActionIds": [
+        "home"
+      ]
+    },
+    {
+      "index": 2,
+      "kind": "action",
+      "language": "ro",
+      "query": "Unde este Acasă?",
+      "signedIn": false,
+      "expected": [
+        "home"
+      ],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "sign-in",
+        "sign-up",
+        "help",
+        "support-status",
+        "method",
+        "sample-transcript"
+      ],
+      "sourceIds": [
+        "app-navigation",
+        "browse-public-debates",
+        "getting-started-debate"
+      ],
+      "requestedActionIds": [
+        "home"
+      ]
+    },
+    {
+      "index": 3,
+      "kind": "action",
+      "language": "en",
+      "query": "Where is New debate?",
+      "signedIn": true,
+      "expected": [
+        "start-debate"
+      ],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "help",
+        "support-status",
+        "settings",
+        "active-sessions",
+        "privacy-preferences",
+        "claim-legacy",
+        "delete-account",
+        "public-catalog",
+        "your-debates"
+      ],
+      "sourceIds": [
+        "getting-started-debate",
+        "debate-topic-and-description",
+        "risk-tier-choice"
+      ],
+      "requestedActionIds": [
+        "start-debate"
+      ]
+    },
+    {
+      "index": 4,
+      "kind": "action",
+      "language": "ro",
+      "query": "Unde este Dezbatere nouă?",
+      "signedIn": true,
+      "expected": [
+        "start-debate"
+      ],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "help",
+        "support-status",
+        "settings",
+        "active-sessions",
+        "privacy-preferences",
+        "claim-legacy",
+        "delete-account",
+        "public-catalog",
+        "your-debates"
+      ],
+      "sourceIds": [
+        "getting-started-debate",
+        "debate-topic-and-description",
+        "risk-tier-choice"
+      ],
+      "requestedActionIds": [
+        "start-debate"
+      ]
+    },
+    {
+      "index": 5,
+      "kind": "action",
+      "language": "en",
+      "query": "Open the Account page.",
+      "signedIn": true,
+      "expected": [
+        "settings"
+      ],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "help",
+        "support-status",
+        "settings",
+        "active-sessions",
+        "privacy-preferences",
+        "claim-legacy",
+        "delete-account",
+        "public-catalog",
+        "your-debates"
+      ],
+      "sourceIds": [
+        "settings-help-menus",
+        "account-settings",
+        "privacy-consent"
+      ],
+      "requestedActionIds": [
+        "settings"
+      ]
+    },
+    {
+      "index": 6,
+      "kind": "action",
+      "language": "ro",
+      "query": "Deschide pagina Cont.",
+      "signedIn": true,
+      "expected": [
+        "settings"
+      ],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "help",
+        "support-status",
+        "settings",
+        "active-sessions",
+        "privacy-preferences",
+        "claim-legacy",
+        "delete-account",
+        "public-catalog",
+        "your-debates"
+      ],
+      "sourceIds": [
+        "account-settings",
+        "settings-help-menus",
+        "privacy-consent"
+      ],
+      "requestedActionIds": [
+        "settings"
+      ]
+    },
+    {
+      "index": 7,
+      "kind": "action",
+      "language": "en",
+      "query": "Where is How it works?",
+      "signedIn": false,
+      "expected": [
+        "method"
+      ],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "sign-in",
+        "sign-up",
+        "help",
+        "support-status",
+        "method",
+        "sample-transcript"
+      ],
+      "sourceIds": [
+        "app-navigation",
+        "browse-public-debates",
+        "getting-started-debate"
+      ],
+      "requestedActionIds": [
+        "method"
+      ]
+    },
+    {
+      "index": 8,
+      "kind": "action",
+      "language": "ro",
+      "query": "Unde este Cum funcționează?",
+      "signedIn": false,
+      "expected": [
+        "method"
+      ],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "sign-in",
+        "sign-up",
+        "help",
+        "support-status",
+        "method",
+        "sample-transcript"
+      ],
+      "sourceIds": [
+        "app-navigation",
+        "browse-public-debates",
+        "getting-started-debate"
+      ],
+      "requestedActionIds": [
+        "method"
+      ]
+    },
+    {
+      "index": 9,
+      "kind": "action",
+      "language": "en",
+      "query": "Which link opens the Sample debate?",
+      "signedIn": false,
+      "expected": [
+        "sample-transcript"
+      ],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "sign-in",
+        "sign-up",
+        "help",
+        "support-status",
+        "method",
+        "sample-transcript"
+      ],
+      "sourceIds": [
+        "app-navigation",
+        "browse-public-debates",
+        "getting-started-debate"
+      ],
+      "requestedActionIds": [
+        "sample-transcript"
+      ]
+    },
+    {
+      "index": 10,
+      "kind": "action",
+      "language": "ro",
+      "query": "Ce link deschide Exemplu de dezbatere?",
+      "signedIn": false,
+      "expected": [
+        "sample-transcript"
+      ],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "sign-in",
+        "sign-up",
+        "help",
+        "support-status",
+        "method",
+        "sample-transcript"
+      ],
+      "sourceIds": [
+        "app-navigation",
+        "browse-public-debates",
+        "getting-started-debate"
+      ],
+      "requestedActionIds": [
+        "sample-transcript"
+      ]
+    },
+    {
+      "index": 11,
+      "kind": "action",
+      "language": "en",
+      "query": "Where is the Public debates tab?",
+      "signedIn": true,
+      "expected": [
+        "public-catalog"
+      ],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "help",
+        "support-status",
+        "settings",
+        "active-sessions",
+        "privacy-preferences",
+        "claim-legacy",
+        "delete-account",
+        "public-catalog",
+        "your-debates"
+      ],
+      "sourceIds": [
+        "browse-public-debates",
+        "app-navigation",
+        "getting-started-debate"
+      ],
+      "requestedActionIds": [
+        "public-catalog"
+      ]
+    },
+    {
+      "index": 12,
+      "kind": "action",
+      "language": "ro",
+      "query": "Unde este fila Dezbateri publice?",
+      "signedIn": true,
+      "expected": [
+        "public-catalog"
+      ],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "help",
+        "support-status",
+        "settings",
+        "active-sessions",
+        "privacy-preferences",
+        "claim-legacy",
+        "delete-account",
+        "public-catalog",
+        "your-debates"
+      ],
+      "sourceIds": [
+        "browse-public-debates",
+        "app-navigation",
+        "getting-started-debate"
+      ],
+      "requestedActionIds": [
+        "public-catalog"
+      ]
+    },
+    {
+      "index": 13,
+      "kind": "action",
+      "language": "en",
+      "query": "Where can I find Your debates?",
+      "signedIn": true,
+      "expected": [
+        "your-debates"
+      ],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "help",
+        "support-status",
+        "settings",
+        "active-sessions",
+        "privacy-preferences",
+        "claim-legacy",
+        "delete-account",
+        "public-catalog",
+        "your-debates"
+      ],
+      "sourceIds": [
+        "app-navigation",
+        "browse-public-debates",
+        "getting-started-debate"
+      ],
+      "requestedActionIds": [
+        "your-debates"
+      ]
+    },
+    {
+      "index": 14,
+      "kind": "action",
+      "language": "ro",
+      "query": "Unde găsesc Dezbaterile tale?",
+      "signedIn": true,
+      "expected": [
+        "your-debates"
+      ],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "help",
+        "support-status",
+        "settings",
+        "active-sessions",
+        "privacy-preferences",
+        "claim-legacy",
+        "delete-account",
+        "public-catalog",
+        "your-debates"
+      ],
+      "sourceIds": [
+        "browse-public-debates",
+        "getting-started-debate",
+        "app-navigation"
+      ],
+      "requestedActionIds": [
+        "your-debates"
+      ]
+    },
+    {
+      "index": 15,
+      "kind": "action",
+      "language": "en",
+      "query": "Where is Privacy in Settings?",
+      "signedIn": true,
+      "expected": [
+        "privacy-preferences"
+      ],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "help",
+        "support-status",
+        "settings",
+        "active-sessions",
+        "privacy-preferences",
+        "claim-legacy",
+        "delete-account",
+        "public-catalog",
+        "your-debates"
+      ],
+      "sourceIds": [
+        "settings-help-menus",
+        "privacy-consent",
+        "account-settings"
+      ],
+      "requestedActionIds": [
+        "privacy-preferences"
+      ]
+    },
+    {
+      "index": 16,
+      "kind": "action",
+      "language": "ro",
+      "query": "Unde este Confidențialitate în Setări?",
+      "signedIn": true,
+      "expected": [
+        "privacy-preferences"
+      ],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "help",
+        "support-status",
+        "settings",
+        "active-sessions",
+        "privacy-preferences",
+        "claim-legacy",
+        "delete-account",
+        "public-catalog",
+        "your-debates"
+      ],
+      "sourceIds": [
+        "settings-help-menus",
+        "privacy-consent",
+        "account-settings"
+      ],
+      "requestedActionIds": [
+        "privacy-preferences"
+      ]
+    },
+    {
+      "index": 17,
+      "kind": "prose",
+      "language": "en",
+      "query": "How does Pricing work?",
+      "signedIn": false,
+      "expected": [],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "sign-in",
+        "sign-up",
+        "help",
+        "support-status",
+        "method",
+        "sample-transcript"
+      ],
+      "sourceIds": [
+        "debate-workspace-menus",
+        "guide-how-it-works",
+        "app-navigation"
+      ],
+      "requestedActionIds": []
+    },
+    {
+      "index": 18,
+      "kind": "prose",
+      "language": "ro",
+      "query": "Cum funcționează Prețuri?",
+      "signedIn": false,
+      "expected": [],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "sign-in",
+        "sign-up",
+        "help",
+        "support-status",
+        "method",
+        "sample-transcript"
+      ],
+      "sourceIds": [
+        "app-navigation",
+        "guide-how-it-works",
+        "debate-workspace-menus"
+      ],
+      "requestedActionIds": []
+    },
+    {
+      "index": 19,
+      "kind": "prose",
+      "language": "en",
+      "query": "How do I change the Theme?",
+      "signedIn": true,
+      "expected": [],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "help",
+        "support-status",
+        "settings",
+        "active-sessions",
+        "privacy-preferences",
+        "claim-legacy",
+        "delete-account",
+        "public-catalog",
+        "your-debates"
+      ],
+      "sourceIds": [
+        "app-navigation"
+      ],
+      "requestedActionIds": []
+    },
+    {
+      "index": 20,
+      "kind": "prose",
+      "language": "ro",
+      "query": "Cum schimb Tema?",
+      "signedIn": true,
+      "expected": [],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "help",
+        "support-status",
+        "settings",
+        "active-sessions",
+        "privacy-preferences",
+        "claim-legacy",
+        "delete-account",
+        "public-catalog",
+        "your-debates"
+      ],
+      "sourceIds": [
+        "app-navigation"
+      ],
+      "requestedActionIds": []
+    },
+    {
+      "index": 21,
+      "kind": "prose",
+      "language": "en",
+      "query": "What does the Thread view show?",
+      "signedIn": true,
+      "expected": [],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "help",
+        "support-status",
+        "settings",
+        "active-sessions",
+        "privacy-preferences",
+        "claim-legacy",
+        "delete-account",
+        "public-catalog",
+        "your-debates"
+      ],
+      "sourceIds": [
+        "view-public-debate",
+        "debate-workspace-menus",
+        "guide-how-it-works"
+      ],
+      "requestedActionIds": []
+    },
+    {
+      "index": 22,
+      "kind": "prose",
+      "language": "ro",
+      "query": "Ce arată vizualizarea Fir?",
+      "signedIn": true,
+      "expected": [],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "help",
+        "support-status",
+        "settings",
+        "active-sessions",
+        "privacy-preferences",
+        "claim-legacy",
+        "delete-account",
+        "public-catalog",
+        "your-debates"
+      ],
+      "sourceIds": [
+        "debate-workspace-menus"
+      ],
+      "requestedActionIds": []
+    },
+    {
+      "index": 23,
+      "kind": "prose",
+      "language": "en",
+      "query": "How does Replay work?",
+      "signedIn": true,
+      "expected": [],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "help",
+        "support-status",
+        "settings",
+        "active-sessions",
+        "privacy-preferences",
+        "claim-legacy",
+        "delete-account",
+        "public-catalog",
+        "your-debates"
+      ],
+      "sourceIds": [
+        "debate-workspace-menus",
+        "guide-how-it-works"
+      ],
+      "requestedActionIds": []
+    },
+    {
+      "index": 24,
+      "kind": "prose",
+      "language": "ro",
+      "query": "Cum funcționează Repetă generarea?",
+      "signedIn": true,
+      "expected": [],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "help",
+        "support-status",
+        "settings",
+        "active-sessions",
+        "privacy-preferences",
+        "claim-legacy",
+        "delete-account",
+        "public-catalog",
+        "your-debates"
+      ],
+      "sourceIds": [
+        "debate-workspace-menus",
+        "guide-how-it-works",
+        "app-navigation"
+      ],
+      "requestedActionIds": []
+    },
+    {
+      "index": 25,
+      "kind": "prose",
+      "language": "en",
+      "query": "How can I export a debate?",
+      "signedIn": true,
+      "expected": [],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "help",
+        "support-status",
+        "settings",
+        "active-sessions",
+        "privacy-preferences",
+        "claim-legacy",
+        "delete-account",
+        "public-catalog",
+        "your-debates"
+      ],
+      "sourceIds": [
+        "export-json",
+        "guide-how-it-works",
+        "debate-workspace-menus"
+      ],
+      "requestedActionIds": []
+    },
+    {
+      "index": 26,
+      "kind": "prose",
+      "language": "ro",
+      "query": "Cum pot exporta o dezbatere?",
+      "signedIn": true,
+      "expected": [],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "help",
+        "support-status",
+        "settings",
+        "active-sessions",
+        "privacy-preferences",
+        "claim-legacy",
+        "delete-account",
+        "public-catalog",
+        "your-debates"
+      ],
+      "sourceIds": [
+        "export-json",
+        "guide-how-it-works",
+        "debate-workspace-menus"
+      ],
+      "requestedActionIds": []
+    },
+    {
+      "index": 27,
+      "kind": "prose",
+      "language": "en",
+      "query": "How is the public guide different from a human support case?",
+      "signedIn": false,
+      "expected": [],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "sign-in",
+        "sign-up",
+        "help",
+        "support-status",
+        "method",
+        "sample-transcript"
+      ],
+      "sourceIds": [
+        "settings-help-menus",
+        "support-cases",
+        "app-navigation"
+      ],
+      "requestedActionIds": []
+    },
+    {
+      "index": 28,
+      "kind": "prose",
+      "language": "ro",
+      "query": "Cum diferă ghidul public de un caz de asistență umană?",
+      "signedIn": false,
+      "expected": [],
+      "availableActionIds": [
+        "home",
+        "start-debate",
+        "sign-in",
+        "sign-up",
+        "help",
+        "support-status",
+        "method",
+        "sample-transcript"
+      ],
+      "sourceIds": [
+        "settings-help-menus",
+        "support-cases",
+        "app-navigation"
+      ],
+      "requestedActionIds": []
+    }
+  ],
+  "failures": []
+}

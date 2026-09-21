@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX23",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "result": "PASS",
+  "controls": 6,
+  "passed": 6,
+  "names": [
+    "actual final contract parsed by shared readFinalContract",
+    "all seven phase argv[2] values self-bind exact final contract",
+    "proof reports SHA-256 of actual final contract bytes",
+    "phase1 sees corrected owner-capacity output binding",
+    "capture child remains corrected FIX22 source",
+    "real predecessor contract fails before operational activity"
+  ],
+  "phaseContractPaths": {
+    "preflight": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX23-command-contract.json",
+    "readiness": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX23-command-contract.json",
+    "capacity": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX23-command-contract.json",
+    "gate": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX23-command-contract.json",
+    "rowProof": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX23-command-contract.json",
+    "capture": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX23-command-contract.json",
+    "idle": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX23-command-contract.json"
+  },
+  "commandContractSha256": "7502ed0d8bb8618e4ba56c2157efd24a5d9af92258b91ebc90d4ef6c82727c9c",
+  "ownerCapacityOutput": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-owner-capacity.json",
+  "captureChild": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX22/capture-public-guide.mjs",
+  "predecessorNegative": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND21-command-contract.json",
+    "operationalActivity": 0,
+    "result": "REJECTED_BEFORE_OPERATIONAL_ACTIVITY"
+  },
+  "operationalTraffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

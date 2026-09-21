@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "questionSha256": "fbb9c3f02ab160df01113bb5669ea0ac0df63e212ff5cd5c957c0a90af13d01a",
+  "answerSha256": "9f85e8c55ecdf9fa1244e0d76a5c8f89acaa98251b8b8702cd095d6756bbe738",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "context": {
+    "sourceIds": [
+      "app-navigation",
+      "guide-how-it-works",
+      "debate-workspace-menus"
+    ],
+    "requestedActionIds": [],
+    "sourcePolicy": null,
+    "appNavigationPosition": 0
+  },
+  "actualValidator": {
+    "diagnosticCode": "ACCEPTED",
+    "parsed": true,
+    "validated": true,
+    "translatedSourceIds": [
+      "app-navigation"
+    ],
+    "translatedActionIds": [],
+    "sourcePolicySatisfied": true,
+    "textScreenAccepted": true
+  },
+  "reviewedProjectionFacts": {
+    "appNavigationMentionsMethodAndTranscripts": true,
+    "appNavigationDefinesHomeAsLibrary": true,
+    "appNavigationMentionsHelpFreeText": true,
+    "appNavigationAllowsFixedNavigation": true,
+    "guideHowItWorksDescribesWorkspaceArtifacts": true,
+    "workspaceMenusDescribesOpenDebateControls": true
+  },
+  "harnessOracle": {
+    "expectedPrimaryIds": [
+      "guide-how-it-works",
+      "debate-workspace-menus"
+    ],
+    "acceptsActualPrimary": false
+  }
+}

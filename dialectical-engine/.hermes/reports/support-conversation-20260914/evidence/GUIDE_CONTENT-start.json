@@ -1,0 +1,52 @@
+{
+  "base": "714c7aa9f649b3e1bff4c517cb69b7245f68d9a3",
+  "clean": true,
+  "writePaths": [
+    "packages/support-kb/content/app-navigation.en.md",
+    "packages/support-kb/content/app-navigation.ro.md",
+    "packages/support-kb/content/debate-workspace-menus.en.md",
+    "packages/support-kb/content/debate-workspace-menus.ro.md",
+    "packages/support-kb/content/settings-help-menus.en.md",
+    "packages/support-kb/content/settings-help-menus.ro.md",
+    "packages/support-kb/content/support-status-limits.en.md",
+    "packages/support-kb/content/support-status-limits.ro.md",
+    "packages/support-kb/recovery/components.json",
+    "packages/support-kb/src/catalog.ts",
+    "packages/support-kb/src/navigation.ts",
+    "tests/architecture/support-catalog-coverage.test.ts",
+    "tests/unit/support-kb.test.ts",
+    "tests/unit/support-context.test.ts",
+    "tests/unit/support-navigation.test.ts",
+    "tests/unit/support-recovery-components.test.ts",
+    "tests/unit/support-answer-context.test.ts"
+  ],
+  "newFiles": [
+    "packages/support-kb/content/app-navigation.en.md",
+    "packages/support-kb/content/app-navigation.ro.md",
+    "packages/support-kb/content/debate-workspace-menus.en.md",
+    "packages/support-kb/content/debate-workspace-menus.ro.md",
+    "packages/support-kb/content/settings-help-menus.en.md",
+    "packages/support-kb/content/settings-help-menus.ro.md"
+  ],
+  "planSection": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PLAN-PUBLIC-GUIDE-v2.md",
+    "start": 138,
+    "end": 192
+  },
+  "boundaryReceipt": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_BOUNDARY-receipt.json",
+    "sha256": "1aa4d375f2d9d3b3250dceaf4ece11ae126f588835693fbd6c551d24cdbc92de"
+  },
+  "kbFiles": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/recovery/components.json",
+      "sha256": "8934293e862387fd3e6e83527780640e8497bdc50704854e43eb1d2db24fcae6",
+      "bytes": 31857
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/reviews/manifest.json",
+      "sha256": "8e0057f4091d5cae733ddafd92527d1f02144834a78a8724c37cc99672ca3951",
+      "bytes": 38174
+    }
+  ]
+}

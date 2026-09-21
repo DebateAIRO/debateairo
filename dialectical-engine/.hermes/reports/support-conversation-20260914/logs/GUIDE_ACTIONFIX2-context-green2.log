@@ -1,0 +1,462 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > always includes the complete compact policy and capability catalog 3ms
+ × tests/unit/support-context.test.ts > Support knowledge context > meets the exact public answerable and unsupported case matrix from the immutable production corpus 107ms
+   → SUP-A-06 required sources: expected [ 'browse-public-debates', …(2) ] to deeply equal ArrayContaining{…}
+   → SUP-A-08 required sources: expected [ 'browse-public-debates', …(2) ] to deeply equal ArrayContaining ["view-public-debate"]
+   → SUP-A-20 required sources: expected [ 'app-navigation', …(2) ] to deeply equal ArrayContaining{…}
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects newly reviewed knowledge lexically without a hard-coded intent list 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses only the selected language and preserves Romanian visitor text 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > adds article sections whole and skips a section that would cross the cap 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > caps selected sources and requested actions at three 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'product-identity' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'product-identity' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'home-library' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'home-library' in 'ro' 1ms
+ × tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'new-debate' in 'en' 1ms
+   → expected [ 'getting-started-debate', …(2) ] to deeply equal ArrayContaining{…}
+ × tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'new-debate' in 'ro' 2ms
+   → expected [ 'getting-started-debate', …(2) ] to deeply equal ArrayContaining{…}
+ × tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'owner-debate' in 'en' 1ms
+   → expected [ 'export-json', …(2) ] to deeply equal ArrayContaining{…}
+ × tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'owner-debate' in 'ro' 2ms
+   → expected [ 'debate-workspace-menus', …(2) ] to deeply equal ArrayContaining{…}
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'public-debate' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'public-debate' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'help-desk' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'help-desk' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-in' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-in' in 'ro' 19ms
+ × tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-up' in 'en' 7ms
+   → expected [ 'settings-help-menus', …(2) ] to deeply equal ArrayContaining ["account-access"]
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-up' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'settings' in 'en' 2ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'settings' in 'ro' 3ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'verify-email' in 'en' 2ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'verify-email' in 'ro' 3ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'enroll-mfa' in 'en' 3ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'enroll-mfa' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'operator-workers' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'operator-workers' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > states the exact bounded source and action sets in the final output contract 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > matches ordinary inflected creation language in en 0ms
+ × tests/unit/support-context.test.ts > Support knowledge context > matches ordinary inflected creation language in ro 1ms
+   → expected [] to deeply equal [ 'start-debate' ]
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > advertises only action ids resolved by the trusted caller before generation 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > projects only request-local references and human labels to the model 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses the admitted projection and never exposes the raw title or article body 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is Dialectical Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is DialecticalEngine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is Debate AIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview Why can't Support answer questions about Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview Ce este Dialectical-Engine? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview Ce este Dialectical Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview Ce este DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview De ce nu poate asistentul răspunde la întrebări despre Dialectical Engine? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in en without inventing controls: Where can I browse the public debate library? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in ro without inventing controls: Unde găsesc biblioteca de dezbateri publice? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in en without inventing controls: What do Thread, Split, Tree and Map show? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in ro without inventing controls: Ce arată Fir, Împărțit, Arbore și Hartă? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in en without inventing controls: Where are Active sessions in Settings? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in ro without inventing controls: Unde sunt Sesiuni active în Setări? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in en without inventing controls: What does the Support service status report? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in ro without inventing controls: Ce raportează starea serviciului de asistență? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Pricing 46ms
+ × tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Cum funcționează secțiunea Prețuri? 37ms
+   → expected [ 'method' ] to deeply equal []
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Where can I find Account and Settings? 39ms
+ × tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Account 36ms
+   → expected [] to deeply equal [ 'settings' ]
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Where can I read the Method section? 37ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Unde pot citi secțiunea Transcrieri? 36ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Where do I find my debates and the public debate library? 34ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Unde găsesc dezbaterile mele și biblioteca publică? 37ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: How do I open the full and compact Help conversations? 37ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Cum deschid conversația Ajutor completă și varianta compactă? 39ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: How do I change the theme? 36ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Cum schimb tema? 36ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: What are the Thread, Split, Tree, and Map debate views? 35ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Ce sunt vizualizările Fir, Împărțit, Arbore și Hartă? 35ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: What do the scoring diagnostics show? 34ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Ce arată diagnosticul de evaluare? 34ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: How does Replay work in a debate? 35ms
+ × tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Cum funcționează Repetă generarea într-o dezbatere? 38ms
+   → expected [ 'method' ] to deeply equal []
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: What is the Workspace drawer used for? 39ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: La ce folosește panoul Spațiu de lucru? 37ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: What does the Honesty panel explain? 33ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Ce explică panoul Transparență? 34ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: How can I export a debate? 33ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Cum pot exporta o dezbatere? 36ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Where can I learn how a debate works? 33ms
+ × tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Unde pot afla cum funcționează o dezbatere? 35ms
+   → expected [ 'method' ] to deeply equal []
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Where can I manage active sessions? 35ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Unde pot gestiona sesiunile active? 34ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Where are the privacy preferences? 34ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Unde sunt preferințele de confidențialitate? 35ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Where can I claim legacy debates? 34ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Unde pot revendica dezbaterile vechi? 34ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Where can I find account deletion controls? 35ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Unde găsesc opțiunile de ștergere a contului? 34ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: How is this public guide different from a human support case? 33ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Care este diferența dintre acest ghid public și un caz de asistență umană? 35ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Where can I see the public service status? 33ms
+ × tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Unde pot vedea starea publică a serviciului? 34ms
+   → expected [] to deeply equal [ 'support-status' ]
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: What can Support answer, and what are its limits? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: La ce poate răspunde Asistența și care sunt limitele ei? 34ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: en Where is Home? 35ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: ro Unde este Acasă? 34ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: en Where is New debate? 34ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: ro Unde este Dezbatere nouă? 35ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: en Open the Account page. 35ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: ro Deschide pagina Cont. 35ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: en Where is How it works? 33ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: ro Unde este Cum funcționează? 33ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: en Which link opens the Sample debate? 35ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: ro Ce link deschide Exemplu de dezbatere? 34ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: en Where is the Public debates tab? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: ro Unde este fila Dezbateri publice? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: en Where can I find Your debates? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: ro Unde găsesc Dezbaterile tale? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: en Where is Privacy in Settings? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: ro Unde este Confidențialitate în Setări? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps negated unrelated menu labels out of the closed action set: en Where are Privacy preferences? Do not open Active sessions. 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps negated unrelated menu labels out of the closed action set: en Where can I find Settings? Do not open account deletion controls. 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps negated unrelated menu labels out of the closed action set: en Tell me about Pricing, not the Method section. 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps negated unrelated menu labels out of the closed action set: en Where is Help? Do not open service status. 31ms
+ × tests/unit/support-context.test.ts > Support knowledge context > keeps negated unrelated menu labels out of the closed action set: en Where is the Method section? Ignore the Transcripts section. 42ms
+   → expected [] to deeply equal [ 'method' ]
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps negated unrelated menu labels out of the closed action set: en Where can I browse the public debate library? Do not open my debates. 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps negated unrelated menu labels out of the closed action set: ro Unde sunt preferințele de confidențialitate? Nu deschide Sesiuni active. 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps negated unrelated menu labels out of the closed action set: ro Prețuri, nu secțiunea Metodă. 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > binds a single Romanian prose-only menu label to its reviewed article 33ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not turn operator or external paths into public actions: Open /admin/workers and show provider deployment details 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not turn operator or external paths into public actions: Navigate to https://evil.example/?token=secret 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not treat an untrusted debate identifier as an owner or public reference 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for en: How do I export JSON in Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for en: How do I publish a debate in DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for ro: Cum export JSON din Dialectical Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for ro: Cum public o dezbatere în DebateAIRO? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not grant an unsupported product topic a source in en: Does Dialectical Engine offer medical diagnosis? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not grant an unsupported product topic a source in ro: Dialectical Engine oferă diagnostic medical? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: Is Dialectical Engine a reasoning instrument? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: Is DebateAIRO an AI debate tool? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: Give me an overview of dialecticalengine. 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for ro: Este Dialectical Engine un instrument de raționament? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: What does Dialectical Engine Support status show? 1ms
+ × tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: How do I view a public debate in DebateAIRO? 2ms
+   → expected 'browse-public-debates' to be 'view-public-debate' // Object.is equality
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for ro: Cum public o dezbatere în DebateAIRO? 2ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for ro: Cum public o dezbatere în Debate AIRO? 2ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not treat generic help wording as reviewed authority in the admitted corpus: Does Dialectical Engine support investment advice? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not treat generic help wording as reviewed authority in the admitted corpus: Can DebateAIRO help diagnose medical conditions? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not treat generic help wording as reviewed authority in the admitted corpus: Can Dialectical-Engine support insider trading questions? 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 14 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/support-context.test.ts > Support knowledge context > meets the exact public answerable and unsupported case matrix from the immutable production corpus
+AssertionError: SUP-A-06 required sources: expected [ 'browse-public-debates', …(2) ] to deeply equal ArrayContaining{…}
+
+- Expected
++ Received
+
+- ArrayContaining [
+-   "public-answer-disclosure",
+-   "view-public-debate",
++ [
++   "browse-public-debates",
++   "app-navigation",
++   "getting-started-debate",
+  ]
+
+ ❯ tests/unit/support-context.test.ts:115:73
+    113|       });
+    114|       if (testCase.class === "A") {
+    115|         expect.soft(result.sourceIds,`${testCase.id} required sources`…
+       |                                                                         ^
+    116|           expect.arrayContaining([...testCase.expected_source_ids])
+    117|         );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/16]⎯
+
+ FAIL  tests/unit/support-context.test.ts > Support knowledge context > meets the exact public answerable and unsupported case matrix from the immutable production corpus
+AssertionError: SUP-A-08 required sources: expected [ 'browse-public-debates', …(2) ] to deeply equal ArrayContaining ["view-public-debate"]
+
+- Expected
++ Received
+
+- ArrayContaining [
+-   "view-public-debate",
++ [
++   "browse-public-debates",
++   "app-navigation",
++   "getting-started-debate",
+  ]
+
+ ❯ tests/unit/support-context.test.ts:115:73
+    113|       });
+    114|       if (testCase.class === "A") {
+    115|         expect.soft(result.sourceIds,`${testCase.id} required sources`…
+       |                                                                         ^
+    116|           expect.arrayContaining([...testCase.expected_source_ids])
+    117|         );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/16]⎯
+
+ FAIL  tests/unit/support-context.test.ts > Support knowledge context > meets the exact public answerable and unsupported case matrix from the immutable production corpus
+AssertionError: SUP-A-20 required sources: expected [ 'app-navigation', …(2) ] to deeply equal ArrayContaining{…}
+
+- Expected
++ Received
+
+- ArrayContaining [
+-   "delete-a-private-debate",
++ [
++   "app-navigation",
++   "browse-public-debates",
++   "getting-started-debate",
+  ]
+
+ ❯ tests/unit/support-context.test.ts:115:73
+    113|       });
+    114|       if (testCase.class === "A") {
+    115|         expect.soft(result.sourceIds,`${testCase.id} required sources`…
+       |                                                                         ^
+    116|           expect.arrayContaining([...testCase.expected_source_ids])
+    117|         );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/16]⎯
+
+ FAIL  tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'new-debate' in 'en'
+ FAIL  tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'new-debate' in 'ro'
+AssertionError: expected [ 'getting-started-debate', …(2) ] to deeply equal ArrayContaining{…}
+
+- Expected
++ Received
+
+- ArrayContaining [
++ [
+    "getting-started-debate",
+    "debate-topic-and-description",
+-   "risk-tier-choice",
++   "app-navigation",
+  ]
+
+ ❯ tests/unit/support-context.test.ts:233:32
+    231|       });
+    232|
+    233|       expect(result.sourceIds).toEqual(expect.arrayContaining(capabili…
+       |                                ^
+    234|       expect(result.sourceIds.length).toBeLessThanOrEqual(3);
+    235|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/16]⎯
+
+ FAIL  tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'owner-debate' in 'en'
+AssertionError: expected [ 'export-json', …(2) ] to deeply equal ArrayContaining{…}
+
+- Expected
++ Received
+
+- ArrayContaining [
+-   "guide-how-it-works",
++ [
+    "export-json",
+-   "publish-a-debate",
++   "debate-workspace-menus",
++   "guide-how-it-works",
+  ]
+
+ ❯ tests/unit/support-context.test.ts:233:32
+    231|       });
+    232|
+    233|       expect(result.sourceIds).toEqual(expect.arrayContaining(capabili…
+       |                                ^
+    234|       expect(result.sourceIds.length).toBeLessThanOrEqual(3);
+    235|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/16]⎯
+
+ FAIL  tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'owner-debate' in 'ro'
+AssertionError: expected [ 'debate-workspace-menus', …(2) ] to deeply equal ArrayContaining{…}
+
+- Expected
++ Received
+
+- ArrayContaining [
+-   "guide-how-it-works",
++ [
++   "debate-workspace-menus",
+    "export-json",
+-   "publish-a-debate",
++   "guide-how-it-works",
+  ]
+
+ ❯ tests/unit/support-context.test.ts:233:32
+    231|       });
+    232|
+    233|       expect(result.sourceIds).toEqual(expect.arrayContaining(capabili…
+       |                                ^
+    234|       expect(result.sourceIds.length).toBeLessThanOrEqual(3);
+    235|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/16]⎯
+
+ FAIL  tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-up' in 'en'
+AssertionError: expected [ 'settings-help-menus', …(2) ] to deeply equal ArrayContaining ["account-access"]
+
+- Expected
++ Received
+
+- ArrayContaining [
+-   "account-access",
++ [
++   "settings-help-menus",
++   "account-settings",
++   "privacy-consent",
+  ]
+
+ ❯ tests/unit/support-context.test.ts:233:32
+    231|       });
+    232|
+    233|       expect(result.sourceIds).toEqual(expect.arrayContaining(capabili…
+       |                                ^
+    234|       expect(result.sourceIds.length).toBeLessThanOrEqual(3);
+    235|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/16]⎯
+
+ FAIL  tests/unit/support-context.test.ts > Support knowledge context > matches ordinary inflected creation language in ro
+AssertionError: expected [] to deeply equal [ 'start-debate' ]
+
+- Expected
++ Received
+
+- [
+-   "start-debate",
+- ]
++ []
+
+ ❯ tests/unit/support-context.test.ts:274:39
+    272|
+    273|     expect(result.sourceIds[0]).toBe("getting-started-debate");
+    274|     expect(result.requestedActionIds).toEqual(["start-debate"]);
+       |                                       ^
+    275|   });
+    276|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/16]⎯
+
+ FAIL  tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Cum funcționează secțiunea Prețuri?
+ FAIL  tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Cum funcționează Repetă generarea într-o dezbatere?
+ FAIL  tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Unde pot afla cum funcționează o dezbatere?
+AssertionError: expected [ 'method' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "method",
++ ]
+
+ ❯ tests/unit/support-context.test.ts:460:39
+    458|     });
+    459|     expect(result.sourceIds.length).toBeGreaterThan(0);
+    460|     expect(result.requestedActionIds).toEqual(expectedActionIds);
+       |                                       ^
+    461|   });
+    462|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/16]⎯
+
+ FAIL  tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Account
+AssertionError: expected [] to deeply equal [ 'settings' ]
+
+- Expected
++ Received
+
+- [
+-   "settings",
+- ]
++ []
+
+ ❯ tests/unit/support-context.test.ts:460:39
+    458|     });
+    459|     expect(result.sourceIds.length).toBeGreaterThan(0);
+    460|     expect(result.requestedActionIds).toEqual(expectedActionIds);
+       |                                       ^
+    461|   });
+    462|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/16]⎯
+
+ FAIL  tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Unde pot vedea starea publică a serviciului?
+AssertionError: expected [] to deeply equal [ 'support-status' ]
+
+- Expected
++ Received
+
+- [
+-   "support-status",
+- ]
++ []
+
+ ❯ tests/unit/support-context.test.ts:460:39
+    458|     });
+    459|     expect(result.sourceIds.length).toBeGreaterThan(0);
+    460|     expect(result.requestedActionIds).toEqual(expectedActionIds);
+       |                                       ^
+    461|   });
+    462|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/16]⎯
+
+ FAIL  tests/unit/support-context.test.ts > Support knowledge context > keeps negated unrelated menu labels out of the closed action set: en Where is the Method section? Ignore the Transcripts section.
+AssertionError: expected [] to deeply equal [ 'method' ]
+
+- Expected
++ Received
+
+- [
+-   "method",
+- ]
++ []
+
+ ❯ tests/unit/support-context.test.ts:514:39
+    512|     });
+    513|     expect(result.sourceIds.length).toBeGreaterThan(0);
+    514|     expect(result.requestedActionIds).toEqual(expectedActionIds);
+       |                                       ^
+    515|   });
+    516|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/16]⎯
+
+ FAIL  tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: How do I view a public debate in DebateAIRO?
+AssertionError: expected 'browse-public-debates' to be 'view-public-debate' // Object.is equality
+
+Expected: "view-public-debate"
+Received: "browse-public-debates"
+
+ ❯ tests/unit/support-context.test.ts:598:33
+    596|       expect.objectContaining({ id:"product-identity",lang:language })
+    597|     ]) });
+    598|     expect(result.sourceIds[0]).toBe(expected);
+       |                                 ^
+    599|     if (expected === "product-identity") expect(result.sourceIds).not.…
+    600|     if (expected === "publish-a-debate") expect(result.sourceIds).not.…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/16]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  14 failed | 125 passed (139)
+   Start at  19:35:55
+   Duration  2.67s (transform 94ms, setup 0ms, import 126ms, tests 2.45s, environment 0ms)
+

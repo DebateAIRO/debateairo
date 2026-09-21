@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_BIND31",
+  "ticket": "t_36863bc5",
+  "revision": "b103ce27a060c48fcf5613c1bf44be53c7cb2a0c",
+  "verdict": "PREPARED_NOT_EXECUTED_PRODUCT_REWORK",
+  "capturedAtUtc": "2026-09-21T05:47:50.512405Z",
+  "artifacts": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREVIEW_BIND31-unused-paths.json",
+      "sha256": "1f8547ec863089252eec2b38832422e00f2d91ffc8dcd65c17d3b2473bef536a",
+      "bytes": 27220
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREVIEW_BIND31-preparation.json",
+      "sha256": "8166a4ce88a667df438fa826c64a3735eeaa8bf4e43b02b408a5072edef8a1b4",
+      "bytes": 3712
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREVIEW_BIND31-self-report.json",
+      "sha256": "7568ee08b4cbf04ec179c6cca8cb87a9fb7bad2819f176d1c727f2671ec96b7f",
+      "bytes": 1426
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREVIEW_BIND31.md",
+      "sha256": "3bf9c269b4b4c518b901c3ba98ca6ed0de138627908878819c448f77b26c9651",
+      "bytes": 1807
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PREVIEW_BIND31.md",
+      "sha256": "3bf9c269b4b4c518b901c3ba98ca6ed0de138627908878819c448f77b26c9651",
+      "bytes": 1807
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREVIEW_BIND31-manifest.json",
+      "sha256": "37a7245368434da7a455f89ed1c41d9d9e52af00035800178136ee99d161f106",
+      "bytes": 1786
+    }
+  ],
+  "heavyLeaseReleased": true,
+  "runtimeTouched": false,
+  "traffic": {
+    "tls": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "notes": [
+    "All receipt artifacts are finite and immutable by this handoff.",
+    "Receipt excludes itself and all private or mutable logs.",
+    "All 123 retained future paths were absent at the preparation checkpoint."
+  ]
+}

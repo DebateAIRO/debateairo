@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_REVIEW34",
+  "ticket": "t_9ac4ece7",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "reviewedOn": "2026-09-21",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "productCheckout": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "head": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+    "porcelain": "",
+    "clean": true
+  },
+  "indexedInputs": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREVIEW_REVIEW34-inputs.json",
+    "matched": 93,
+    "total": 93,
+    "mismatches": 0
+  },
+  "futureAbsence": {
+    "declared": 123,
+    "unique": 123,
+    "absent": 123,
+    "present": 0
+  },
+  "literalHashCheck": {
+    "commandContractPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREVIEW_RECOVER34-command-contract.json",
+    "actualSha256": "f8a5df033841912013df6eda0f13d5811f9e709712e8311f692d7926d9d52030",
+    "operatorScriptPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREVIEW_RECOVER34/run-operator.mjs",
+    "operatorScriptSha256": "84793f9357933a8e6fbc87a87425698600a57287ca82c2eb4da05e5b94b50ca9",
+    "embeddedSha256": "6269d1c50fd24574f70f4d4898cd2cf1e2e42174c5f392b9516a558c75575107",
+    "matches": false,
+    "guardLine": 127,
+    "trafficBeforeFailure": false
+  },
+  "runtime": {
+    "node": "GUIDE_RUNTIME9",
+    "pid": 9800,
+    "pgid": 9800,
+    "detached": true,
+    "ports": 12,
+    "apiPort": 8890,
+    "ordinarySystemTlsHelpStatus": 200,
+    "privateRuntimeLogRead": false,
+    "privateRuntimeLogHashed": false
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

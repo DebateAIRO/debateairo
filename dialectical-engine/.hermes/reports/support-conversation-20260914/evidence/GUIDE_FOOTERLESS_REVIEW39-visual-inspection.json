@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FOOTERLESS_REVIEW39",
+  "verdict": "PASS_VISUAL_INSPECTION",
+  "inspectedAtActualSize": true,
+  "records": [
+    {"surface":"full","language":"ro","shape":"short","result":"PASS_COMPLETE_BODY","startSha256":"398fcda02994d0fc326b6cc4382c1600b9b433922edfd0614efa5a7c6121ebbf","endSha256":"398fcda02994d0fc326b6cc4382c1600b9b433922edfd0614efa5a7c6121ebbf","expandedSha256":"bed4b049547d17e49d4ae095f1f16f39bfe1bef9c3990325ed3eeb700fa0be80"},
+    {"surface":"compact","language":"ro","shape":"short","result":"PASS_COMPLETE_BODY","startSha256":"88a249cb00672299c4a8d4a52535296381dbadce804aa8a0d2b24cc298f17036","endSha256":"88a249cb00672299c4a8d4a52535296381dbadce804aa8a0d2b24cc298f17036","expandedSha256":"bf9f547aa9f91d154f910bbde6c5dd4f57c520a35471f2b6ea82255d08efd9fb"},
+    {"surface":"full","language":"en","shape":"short","result":"PASS_COMPLETE_BODY","startSha256":"a56822a45ae950927e1273991f0ba718a449a7b4ee2d43f49bf19c5caa093443","endSha256":"a56822a45ae950927e1273991f0ba718a449a7b4ee2d43f49bf19c5caa093443","expandedSha256":"fed0f6062764c80eb32a8607ad61f15084b6d3abcd5118ef21a4840ca01f73fd"},
+    {"surface":"compact","language":"en","shape":"short","result":"PASS_COMPLETE_BODY","startSha256":"02b10217e69663f4e6ff485aa59b7d0402d06b33a60addc6dba0fde9c97232b8","endSha256":"02b10217e69663f4e6ff485aa59b7d0402d06b33a60addc6dba0fde9c97232b8","expandedSha256":"a05c181e087bb42399202e44ad0a284bdfe59016b95a0cefe891234b1c679016"},
+    {"surface":"full","language":"en","shape":"long60","result":"PASS_START_END_COMPLETE","startSha256":"1c6cbcd125ea1e6efaf7de86406d2034436412b8cc589bdf6b2287360c20436f","endSha256":"8b405431a8bbfd1a8ee73462bde46e313418eaddea3760e2e5b367defb83e529","expandedSha256":"8a3f1cbe4e70023c631a632542494584b984f71e8e2518297bbc1ae7cd456d1e","observed":"Normal start shows line1; normal end shows line60; expanded evidence shows every line1-60."},
+    {"shape":"expected-footer-missing","result":"PASS_NEGATIVE_IMAGE_NOT_ACCEPTED","startSha256":"c59f82aa58235710bf983541da1aab934c2cd402b4cfc70d320c7c4e2c0b65d7","observed":"Grounded body is visible but required source footer is absent; no end or expanded success is accepted."}
+  ],
+  "preservedFixtureFailures": [
+    "Node assertion appended comparison text to the expected negative message.",
+    "Synthetic !important height clipped the first expanded long image; final2 visibly restores all60 lines."
+  ]
+}

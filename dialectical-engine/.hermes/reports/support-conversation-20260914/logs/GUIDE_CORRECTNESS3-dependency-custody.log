@@ -1,0 +1,9 @@
+detached_head=91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69
+detached_dirty=0
+primary_head=91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69
+primary_dirty=0
+ABSENT	node_modules
+ABSENT	apps/api/node_modules
+ABSENT	apps/ui/node_modules
+ABSENT	apps/runner/node_modules
+ABSENT	packages/support-kb/node_modules

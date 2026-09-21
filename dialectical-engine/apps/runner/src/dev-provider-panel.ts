@@ -3,6 +3,11 @@ import {
   type ProviderDiscoveryTarget
 } from "@debateai/providers";
 import { loadModelConfig, type ModelConfig } from "@debateai/model-config";
+import {
+  DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  loadDevelopmentAuthStackProfile,
+  type DevelopmentAuthStackProfile
+} from "./dev-auth-stack-profile.js";
 
 const REMOVED_SCAFFOLD_PROVIDER_REF = "development:local-vllm";
 const REMOVED_SCAFFOLD_MODEL = "qa-deterministic-v1";
@@ -92,7 +97,22 @@ export type DevelopmentApiProviderProbe = (
   input: DevelopmentApiProviderProbeInput
 ) => Promise<Readonly<{ model: string }>>;
 
-export function developmentProviderSlots(config: ModelConfig): readonly DevelopmentProviderSlot[] {
+function profileProviderPort(
+  defaultPort: number,
+  profile: DevelopmentAuthStackProfile
+): number {
+  const profileIndex = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE.providerPorts.indexOf(defaultPort);
+  if (profileIndex >= 0) return profile.providerPorts[profileIndex]!;
+  if (profile.name === "default") return defaultPort;
+  return defaultPort
+    + profile.publicPort
+    - DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE.publicPort;
+}
+
+export function developmentProviderSlots(
+  config: ModelConfig,
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+): readonly DevelopmentProviderSlot[] {
   const byTier = [...config.premium, ...config.free];
   const entries = [
     ...byTier.filter((entry) => entry.transport === "cli"),
@@ -106,6 +126,9 @@ export function developmentProviderSlots(config: ModelConfig): readonly Developm
     if (catalogue === undefined) throw new TypeError("DEV_PROVIDER_SLOT_UNRESOLVED");
     return Object.freeze({
       ...catalogue,
+      ...(catalogue.transport === "cli"
+        ? { port: profileProviderPort(catalogue.port!, profile) }
+        : {}),
       model: entry.model,
       ...(entry.transport === "api"
         ? { baseUrl: entry.baseUrl, keyVariable: entry.keyVariable }
@@ -161,7 +184,8 @@ function expectedBaseUrl(port: number): string {
 
 export function buildDevelopmentProviderPanel(
   observations: readonly DevelopmentCliTargetObservation[],
-  configuredProviders: readonly DevelopmentConfiguredProvider[]
+  configuredProviders: readonly DevelopmentConfiguredProvider[],
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): DevelopmentProviderPanel {
   const byRef = new Map(observations.map((observation) => [observation.providerRef, observation] as const));
   if (byRef.size !== configuredProviders.length) {
@@ -173,7 +197,8 @@ export function buildDevelopmentProviderPanel(
       providerRef === provider.providerRef
     );
     if (observation === undefined || catalogue === undefined
-      || (catalogue.transport === "cli" && observation.baseUrl !== expectedBaseUrl(catalogue.port!))
+      || (catalogue.transport === "cli" && observation.baseUrl
+        !== expectedBaseUrl(profileProviderPort(catalogue.port!, profile)))
       || (catalogue.transport === "api" && observation.baseUrl !== catalogue.baseUrl)) {
       throw new TypeError("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
     }
@@ -211,9 +236,10 @@ export async function resolveDevelopmentApiProviderSlots(
   providerPanel: DevelopmentProviderPanel,
   providerKeys: ReadonlyMap<string, string>,
   probe: DevelopmentApiProviderProbe,
-  warning: (line: string) => void = (line) => console.warn(line)
+  warning: (line: string) => void = (line) => console.warn(line),
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): Promise<DevelopmentProviderPanel> {
-  const slots = developmentProviderSlots(config);
+  const slots = developmentProviderSlots(config, profile);
   const currentTargets = new Map(providerPanel.targets.map((target) => [target.providerRef, target]));
   const observations = await Promise.all(slots.map(async (slot) => {
     if (slot.transport === "cli") {
@@ -262,7 +288,11 @@ export async function resolveDevelopmentApiProviderSlots(
       model: DEVELOPMENT_UNAVAILABLE_CLI_MODEL
     });
   }));
-  return buildDevelopmentProviderPanel(observations, configuredProvidersForSlots(slots));
+  return buildDevelopmentProviderPanel(
+    observations,
+    configuredProvidersForSlots(slots),
+    profile
+  );
 }
 
 /**
@@ -272,28 +302,28 @@ export async function resolveDevelopmentApiProviderSlots(
  * honest input when publishing the set without standing the CLIs up first.
  */
 export function developmentConfiguredProviderPanel(
-  configuredProviders: readonly DevelopmentConfiguredProvider[]
+  configuredProviders: readonly DevelopmentConfiguredProvider[],
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): DevelopmentProviderPanel {
   return buildDevelopmentProviderPanel(configuredProviders.map((provider) => {
     const catalogue = DEVELOPMENT_PROVIDER_SLOT_CATALOGUE.find(({ providerRef }) =>
       providerRef === provider.providerRef
     );
     if (catalogue === undefined) throw new TypeError("DEV_PROVIDER_SLOT_UNRESOLVED");
-    return (
-    Object.freeze({
+    return Object.freeze({
       providerRef: provider.providerRef,
       baseUrl: catalogue.transport === "cli"
-        ? expectedBaseUrl(catalogue.port!)
+        ? expectedBaseUrl(profileProviderPort(catalogue.port!, profile))
         : catalogue.baseUrl!,
       model: DEVELOPMENT_UNAVAILABLE_CLI_MODEL
-    })
-    );
-  }), configuredProviders);
+    });
+  }), configuredProviders, profile);
 }
 
 export function parseDevelopmentProviderPanelTargets(
   source: string,
-  configuredProviders: readonly DevelopmentConfiguredProvider[]
+  configuredProviders: readonly DevelopmentConfiguredProvider[],
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): DevelopmentProviderPanel {
   const targets = parseProviderDiscoveryTargets(source, configuredProviders);
   return buildDevelopmentProviderPanel(targets.map((target) => Object.freeze({
@@ -302,7 +332,7 @@ export function parseDevelopmentProviderPanelTargets(
     model: target.model,
     ...(target.authorizationHeader === undefined
       ? {} : { authorizationHeader: target.authorizationHeader })
-  })), configuredProviders);
+  })), configuredProviders, profile);
 }
 
 export function loadDevelopmentProviderPanelFromEnvironment(
@@ -313,5 +343,9 @@ export function loadDevelopmentProviderPanelFromEnvironment(
   if (targetsJson === undefined || targetsJson.trim() === "") {
     throw new TypeError("DEV_CLI_PROVIDER_PANEL_REQUIRED");
   }
-  return parseDevelopmentProviderPanelTargets(targetsJson, configuredProviders);
+  return parseDevelopmentProviderPanelTargets(
+    targetsJson,
+    configuredProviders,
+    loadDevelopmentAuthStackProfile(source)
+  );
 }

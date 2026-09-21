@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "path": "capture-public-guide.mjs",
+      "bytes": 18107,
+      "sha256": "33d46c07dba0f3deab6d2cb76494cfef534e135ea7145a284dbd70f471d4479f"
+    },
+    {
+      "path": "controls.mjs",
+      "bytes": 8812,
+      "sha256": "530c5e8e850b611945719a3563424c595c9a608fcb5a707e818f5da03284e8a3"
+    },
+    {
+      "path": "matrix.mjs",
+      "bytes": 13168,
+      "sha256": "cea34112498143dcf8b1a571e40e5a24d207b5b47ee9b142048506cc773ca1ae"
+    },
+    {
+      "path": "pre-request-verifier.ts",
+      "bytes": 13715,
+      "sha256": "a123d265d2070d9ef5929dd30bb752b826412e42b5091c68e4806b276b37a402"
+    },
+    {
+      "path": "runtime-capacity.mjs",
+      "bytes": 9935,
+      "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87"
+    },
+    {
+      "path": "session-lifecycle.mjs",
+      "bytes": 4254,
+      "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b"
+    },
+    {
+      "path": "verify-final-branches.ts",
+      "bytes": 5131,
+      "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a"
+    },
+    {
+      "path": "verify-guide-harness.mjs",
+      "bytes": 29210,
+      "sha256": "c0f5ffb26b4d0bddc48c5ed7850ea23ff779e8026ba68f8680d997582272d320"
+    }
+  ],
+  "serializedManifestSha256": "f8f2935965cd59b893ab02848cd9db17eeb71fa423f5620b61479e6647ae4917",
+  "authorProofHarnessSha256": "f8f2935965cd59b893ab02848cd9db17eeb71fa423f5620b61479e6647ae4917",
+  "match": true
+}

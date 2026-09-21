@@ -1,0 +1,21 @@
+file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX8/controls.mjs:433
+    throw new Error("GUIDE_HARNESS_API_DOM_MISMATCH");
+          ^
+
+Error: GUIDE_HARNESS_API_DOM_MISMATCH
+    at assertGuideObservation (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX8/controls.mjs:433:11)
+    at consumeGuideObservationStages (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX8/controls.mjs:605:23)
+    at async <anonymous> (/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX8/verify-guide-harness.mjs:803:3)
+    at async control (/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX8/verify-guide-harness.mjs:38:3)
+    at async <anonymous> (/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX8/verify-guide-harness.mjs:801:1)
+
+Node.js v22.23.1
+file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX8/run-final-controls.mjs:27
+    throw new Error(`GUIDE_HARNESS_FIX8_COMMAND_FAILED_${result.status}`);
+          ^
+
+Error: GUIDE_HARNESS_FIX8_COMMAND_FAILED_1
+    at run (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX8/run-final-controls.mjs:27:11)
+    at file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX8/run-final-controls.mjs:77:24
+
+Node.js v22.23.1

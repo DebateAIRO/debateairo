@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_ACTIONFIX2",
+  "ticket": "t_f60a1644",
+  "revision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "command": [
+    "pnpm",
+    "run",
+    "typecheck"
+  ],
+  "exitCode": 1,
+  "exitMeaning": "ATTRIBUTED_BASELINE_ONLY",
+  "baseline": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-typecheck-final2.log",
+    "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "bytes": 39611,
+    "diagnostics": 76
+  },
+  "current": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ACTIONFIX2-typecheck-final.log",
+    "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "bytes": 39611,
+    "diagnostics": 76
+  },
+  "byteIdentical": true,
+  "missionAddedDiagnostics": 0,
+  "measuredAt": "2026-09-17T16:53:57.523289Z"
+}

@@ -4,13 +4,12 @@ lang: en
 title: "Write the debate topic and guidance"
 status: shipped
 sources:
-  - apps/ui/app/new/page.tsx:156
-  - apps/ui/app/new/page.tsx:171
-  - apps/ui/app/new/page.tsx:212
-  - apps/ui/app/new/page.tsx:228
-verified_against: "2b670d30"
-ratified_by: V
-ratified_on: "2026-09-04"
+  - apps/ui/app/new/page.tsx:130
+  - apps/ui/app/new/page.tsx:215
+  - apps/ui/app/new/page.tsx:278
+verified_against: "b7ca2c41"
+ratified_by: ""
+ratified_on: ""
 ---
 
-Put the claim or question you want examined in **Topic**. To add guidance, use **Steering menu selections** for one selection per line and **Steering annotations** for free-text notes that are logged verbatim.
+Put the question or claim you want examined in **Topic**. The form requires more than six characters. Premium also lets you add one steering menu selection per line and free-text steering annotations. Free clears and disables those steering inputs. The current form has no separate description field.

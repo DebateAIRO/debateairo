@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_SIGNIN_CLASSIFIER_REVIEW",
+  "ticket": "t_fb5b4064",
+  "reviewedAt": "2026-09-20T23:00:06Z",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "revision": "0f4290c290fd38caa0ccfb3b6781fb8c33999a22",
+  "expectedRevision": "0f4290c290fd38caa0ccfb3b6781fb8c33999a22",
+  "baseRevision": "5d6e028ae5defc24e0690219d6128949e73b750d",
+  "worktree": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "clean": true,
+  "inputManifest": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SIGNIN_CLASSIFIER_REVIEW-inputs.json",
+    "sha256": "f5bdf60a7cc1f01136d7e2ba798126e5e38f16ce3b6651efa827f4f50ced2f9b",
+    "bytes": 11696
+  },
+  "frozenInputs": {
+    "count": 39,
+    "mismatches": []
+  },
+  "reviewMode": "STATIC_ONLY_NO_HEAVY_RUNTIME_BROWSER_HTTP_SUPPORT_MODEL_CAPACITY_DB_PRODUCT_KB_HARNESS_GIT"
+}

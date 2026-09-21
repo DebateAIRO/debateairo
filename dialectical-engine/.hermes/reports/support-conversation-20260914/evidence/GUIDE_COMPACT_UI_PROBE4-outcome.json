@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_COMPACT_UI_PROBE4",
+  "ticket": "t_f96afae0",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "verdict": "REWORK_CHECKPOINT_CONSTANT_UNDEFINED",
+  "childExitStatus": 1,
+  "failureClass": "HARNESS_RUNTIME_REFERENCE_ERROR",
+  "failureSymbol": "EVIDENCE_ROOT",
+  "source": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND15/probe-zero-request-ui.mjs",
+    "firstFailureLine": 33,
+    "catchCheckpointLine": 245
+  },
+  "requiredOutputAbsent": true,
+  "browserLaunch": "ATTEMPTED",
+  "completedTransitions": 0,
+  "transitionAttemptCounts": "UNAVAILABLE_BEFORE_FIRST_CHECKPOINT",
+  "traffic": {
+    "actualSupportRequestsForwarded": "ZERO_BY_INSTALLED_ABORT_GUARD",
+    "guardedAttemptCounts": "UNAVAILABLE_BEFORE_FIRST_CHECKPOINT",
+    "syntheticResponses": 0
+  },
+  "runtimeAfterFailure": {
+    "pid": 77769,
+    "ppid": 1,
+    "pgid": 77769,
+    "ordinaryTlsHelpStatus": 200,
+    "unrelatedListenersPreserved": true
+  },
+  "limits": [
+    "No UI transition or product behavior result was persisted.",
+    "Blocked browser attempt counts cannot be reconstructed from the absent checkpoint.",
+    "No Support, capacity, chat, model, database, product, Git, or service mutation was performed.",
+    "The one-shot was not retried."
+  ]
+}

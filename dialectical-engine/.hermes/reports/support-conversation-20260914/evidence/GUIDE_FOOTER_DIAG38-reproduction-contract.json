@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FOOTER_DIAG38",
+  "status": "PREPARED_NOT_EXECUTED",
+  "purpose": "Verify the contained-footer correction and persist decisive geometry without forwarding Support traffic.",
+  "namespaces": {"live": "LIVE31", "actual": "GUIDE23"},
+  "productionInputs": [
+    ".worktrees/support-conversation-cp1/dialectical-engine/apps/ui/components/support/Assistant.tsx",
+    ".worktrees/support-conversation-cp1/dialectical-engine/apps/ui/components/support/SupportWidget.tsx",
+    ".worktrees/support-conversation-cp1/dialectical-engine/apps/ui/app/help/page.tsx",
+    ".worktrees/support-conversation-cp1/dialectical-engine/apps/ui/app/globals.css",
+    ".hermes/reports/support-conversation-20260914/probes/GUIDE_PREVIEW_RECOVER34/capture-public-guide.mjs",
+    ".hermes/reports/support-conversation-20260914/probes/GUIDE_PREVIEW_RECOVER34/screenshot-evidence-successor.mjs successor"
+  ],
+  "environment": {
+    "profile": "fresh disposable UI/browser profile",
+    "responses": "local interception of public support session/message routes",
+    "forbidden": ["real Support", "status", "capacity", "model", "private state", "product quotas", "existing browser profiles", "retained Runtime9"],
+    "requiredForwardedCounts": {"support": 0, "status": 0, "capacity": 0, "model": 0}
+  },
+  "transcript": [
+    {
+      "sequence": 2,
+      "prompt": "Account",
+      "sourceIds": ["settings-help-menus", "app-navigation"],
+      "sourceLabels": ["Folosește Setările și Ajutorul uman", "Navighează în Dialectical Engine"],
+      "actions": []
+    },
+    {
+      "sequence": 15,
+      "prompt": "Ce arată diagnosticul de evaluare?",
+      "sourceIds": ["debate-workspace-menus"],
+      "sourceLabels": ["Folosește meniurile spațiului de dezbatere"],
+      "actions": []
+    },
+    {
+      "sequence": 19,
+      "prompt": "La ce folosește panoul Spațiu de lucru?",
+      "sourceIds": ["debate-workspace-menus", "guide-how-it-works"],
+      "sourceLabels": ["Folosește meniurile spațiului de dezbatere", "Cum citești o dezbatere"],
+      "actions": []
+    },
+    {
+      "sequence": 23,
+      "prompt": "Cum pot exporta o dezbatere?",
+      "sourceIds": ["export-json", "guide-how-it-works"],
+      "sourceLabels": ["Exportă o dezbatere ca JSON", "Cum citești o dezbatere"],
+      "actions": []
+    }
+  ],
+  "textAuthority": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE22-actual-receipt.json freshRows api.text, byte-exact for sequences 2,15,19,23",
+  "preCaptureIdentity": [
+    "Exactly one new assistant article appended for the requested row.",
+    "Article role is assistant.",
+    "Article text equals intercepted API text and saved row text.",
+    "Rendered source labels and actions equal the current row's payload.",
+    "Row23 selects the export article and its two source labels, never an earlier article."
+  ],
+  "persistBeforeThrow": [
+    "before/top/pre-footer/post-footer target, pane and footer floating-point rectangles",
+    "prior, requested, assigned and realized scrollTop",
+    "scrollHeight, clientHeight, maximum scroll and requested delta",
+    "containment/intersection decisions and explicit tolerance or margin",
+    "current row/article/source/action identity",
+    "failure code and exclusive-created failure artifact",
+    "post-finally observed scroll/style/viewport restoration"
+  ],
+  "controls": [
+    "Old helper reproduces unnecessary backward movement or the row23 failure.",
+    "Corrected helper preserves an already-contained row23 footer and captures it.",
+    "A genuinely below-pane footer scrolls forward and becomes painted inside the pane.",
+    "An unreachable or clipped footer still fails.",
+    "Stale target and source/action mutations fail before capture.",
+    "Styles, scroll and viewport restore on both success and failure."
+  ],
+  "executionAuthorizedHere": false,
+  "timingPlanningOnly": "2026-09-21T09:51:12.590Z"
+}

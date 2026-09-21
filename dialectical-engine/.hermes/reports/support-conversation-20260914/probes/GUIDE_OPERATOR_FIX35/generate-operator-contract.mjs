@@ -1,0 +1,10 @@
+import { createHash } from "node:crypto";
+import { readFile,writeFile } from "node:fs/promises";
+const R="/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914",E=`${R}/evidence`,P=`${R}/probes`;
+const sha=b=>createHash("sha256").update(b).digest("hex");
+const source=JSON.parse(await readFile(`${E}/GUIDE_PREVIEW_RECOVER34-operator-contract.json`,"utf8"));
+const scriptPath=`${P}/GUIDE_OPERATOR_FIX35/run-operator.mjs`,scriptBytes=await readFile(scriptPath);
+source.node="GUIDE_OPERATOR_FIX35";source.ticket="t_c7774a62";source.argv[3]=scriptPath;source.script={path:scriptPath,sha256:sha(scriptBytes),bytes:scriptBytes.byteLength};
+source.delta={kind:"OPERATOR_LITERAL_HASH_ONLY",retainedCommandContract:true,retainedCommandContractPath:source.commandContract.path,retainedSevenPhaseChain:true,retainedRuntime9:true,retainedFuturePaths:true};
+await writeFile(`${E}/GUIDE_OPERATOR_FIX35-operator-contract.json`,`${JSON.stringify(source,null,2)}\n`,{flag:"wx",mode:0o600});
+console.log(JSON.stringify({scriptSha256:source.script.sha256,commandSha256:source.commandContract.sha256,futurePaths:source.futureAbsence.count}));

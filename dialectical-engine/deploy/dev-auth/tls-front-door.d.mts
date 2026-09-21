@@ -30,7 +30,7 @@ export type DevTlsReadinessOperations = Readonly<{
 
 export type AttestedDevTlsFrontDoor = Readonly<{
   receipt: Readonly<{
-    origin: "https://localhost:3000";
+    origin: string;
     trust: "SYSTEM";
   }>;
   stop(): Promise<void>;
@@ -55,5 +55,6 @@ export function startAttestedDevTlsFrontDoor(input: Readonly<{
 }>): Promise<AttestedDevTlsFrontDoor>;
 
 export function createDevTlsReadinessOperations(
-  repositoryRoot?: string
+  repositoryRoot?: string,
+  endpoints?: Readonly<{ publicPort: number; uiPort: number }>
 ): DevTlsReadinessOperations;

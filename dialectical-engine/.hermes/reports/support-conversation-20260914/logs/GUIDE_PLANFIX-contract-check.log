@@ -1,0 +1,11 @@
+at=2026-09-17T09:49:46.947285+00:00
+actual=PASS
+mutant_B1=EXPECTED_FAIL findings=['B1_GATE_DEPENDENCY']
+mutant_B2=EXPECTED_FAIL findings=['B2_EIGHT_RECORD_SCOPE']
+mutant_B3=EXPECTED_FAIL findings=['B3_SERIAL_ORDER']
+mutant_B4=EXPECTED_FAIL findings=['B4_STRICT_MESSAGE_KEYS']
+mutant_INVENTORY=EXPECTED_FAIL findings=['INVENTORY_HELP_ACTION']
+mutant_ARGV=EXPECTED_FAIL findings=['VITEST_ARGV_UNSUPPORTED']
+sha256 2cb58e6136888f8802cdf4c5982aa9c0505e958f5cb3ae2dcdb49a6de40265fe 35888 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PLAN-PUBLIC-GUIDE-v2.md
+sha256 4dc2a6ecb17b29eb25f4b523eae9ed7d99c45c6d48aad356987d1e0868fbe327 7794 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/SPEC-v5.md
+sha256 32793ff1c7dc9c4a133c52de845f906092f1e7d71e8858b8d907a17abbc03c52 24943 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/MENU-COVERAGE-v2.json

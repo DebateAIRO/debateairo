@@ -1,0 +1,11 @@
+{
+  "outputPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE2-gate.json",
+  "templateSha256": "a0805ce6375c331c54eba98635134d61e682556b1d46572edc9e66f273e7e231",
+  "capacityPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE2-runtime-capacity.json",
+  "capacitySha256": "c44c9106d594acbbef626066a9a082fca18c9fe17a8a0c0dedfc32e5fe5bf68b",
+  "gateSha256": "d28abdf18521cece83a203e7296560b85b4c21badd07f0adb10d559e3ec62856",
+  "addedKeys": [
+    "runtimeCapacityPath",
+    "runtimeCapacitySha256"
+  ]
+}

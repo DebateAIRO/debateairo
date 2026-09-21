@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE9",
+  "phase": "PRETRAFFIC",
+  "observedAt": "2026-09-20T18:16:30.887Z",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "inputs": 188,
+  "contractSha256": "13af120d0dec648adaad3e503b5f85a070ddd5002d7023628e201d302805191b",
+  "templateSha256": "8a3599482aa0f2fac9941f23e43f4e0731a3f9422d82ac8f6d51728fa241b855",
+  "controls": 151,
+  "planned": {
+    "retained": 15,
+    "fresh": 39,
+    "sessions": 3
+  },
+  "checkedAbsent": 51,
+  "present": []
+}

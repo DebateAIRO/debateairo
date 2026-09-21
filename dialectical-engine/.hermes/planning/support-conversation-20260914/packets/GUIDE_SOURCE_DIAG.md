@@ -1,0 +1,29 @@
+# PACKET GUIDE_SOURCE_DIAG — independent actual guide-source diagnosis
+
+Read FIRST this packet then /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md. Resume original Sol /root/requirements; retained debugging and verification BODY skills. Assigned ticket/comments before claim; no subdelegation.
+
+## 1. Node
+- seat: GUIDE_SOURCE_DIAG; ticket: t_7ab39546; model: gpt-5.6-sol; rework rounds: max 3 under owner continuation.
+- cwd: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine; exact clean revision: 152eed4da1cd3e66b74d8301159ba76427552409; inputs: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SOURCE_DIAG-inputs.json.
+- self-report: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_SOURCE_DIAG.md (new).
+
+## 2. Contract
+- allowed: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SOURCE_DIAG/ (new, bounded inert diagnostic only); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SOURCE_DIAG.md (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SOURCE_DIAG- (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SOURCE_DIAG- (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_SOURCE_DIAG.md (new).
+- forbidden: product/KB/Git/harness/prior evidence edits; browser/runtime/HTTP/Support/model/status/capacity/DB activity; private records/logs/rejected drafts; new actual samples or favorable retries; quota mutations; owner questions/acceptance.
+- verification: sole heavy for bounded offline actual-validator/retrieval/oracle discriminator only if needed. No broad test suites or full audit; no implementation fix in this node.
+
+## 3. Work
+Actual LIVE8/GUIDE16 stopped on its first failure after21 attempts/20 completed,3 sessions/21 sends. Canonical26 is GUIDE_FAMILY guide compactRO MODEL. Observed HTTP200/ANSWER_GROUNDED with valid shapes and exact API/DOM equality, ACCEPTED_DRAFT, sourceIDs only app-navigation, actionIDs empty; expected primary source missing at DIAGNOSTIC_PROJECTED. The preceding20 passed their row oracles; do not combine them with another run. Browser preflight6 passed all5 transitions. This is a source-contract mismatch, not a transport/hydration failure.
+
+Independently inspect exact canonical question, required-source oracle/spec, accepted public answer if retained, reviewed public KB records, deterministic retrieval/topic resolution, allowed-source/model contract and actual post-model validation. Public accepted answer/evidence is allowed; private content/rejected drafts/ongoing logs are not. If exact accepted text was not retained, state that limitation and do not reconstruct it. Establish whether this is a product retrieval/validation defect, an over-constrained or incorrect oracle, or another proved mismatch. Do not assume the oracle is right, weaken it to fit the sample, or treat generic source membership as sufficient semantic guidance without evidence. User goal is useful free-form app-menu help in both languages, not a passing source-ID check alone.
+
+Use a minimal offline discriminator with actual code and the sealed public question/source metadata if static source cannot decide. No new model call or live request. Compare intended Guide feature/menu knowledge with app-navigation coverage and question intent, required prerequisites and declared navigation behavior. Check neighboring EN/RO forms and any exact source-intent alias gap only as needed to bound scope; avoid broad corpus churn. Distinguish observed accepted-draft behavior, provable code contract, inferred cause and unavailable evidence. Preserve normal model selection, data isolation, injection/credential/account-operation boundaries and all actual traffic/counter evidence.
+
+Return a precise source-anchored diagnosis plus smallest justified correction scope and meaningful regression/verification requirements. If product correction is needed, name exact product files and runtime paths for a separate author/reviewer. If oracle correction is justified, explain the existing reviewed knowledge/spec basis and preserve meaningful source/answer quality requirements, with a discriminating negative. If evidence is insufficient, state the exact missing public discriminator without another sample. No implementation or new capture here.
+
+Initial fresh capacity had70 daily message headroom;21 sends leave a conservative49, below a fresh54. That arithmetic is not a fresh measurement; rolling-history expiry remains unknown unless sealed timestamps establish it. Do not read capacity or propose quota bypass. Root will handle natural-availability planning separately. Forgot unresolved/actionless; CP1 incomplete; CP2 gated.
+
+## 4. Handoff
+Self-report question verbatim:
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
+Return SKILLS LOADED, ticket/session/revision/verdict, observed versus proved findings, exact source anchors/minimal scope/discriminator/limits, strict receipt node/ticket/revision/verdict/artifacts absolute/sha256/bytes excluding itself. Release heavy; no self-close/readiness/acceptance.

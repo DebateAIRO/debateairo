@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PHASE_IMPORT_FIX46",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_PHASE_IMPORTS_BOUND_REVIEW_REQUIRED",
+  "controls": 9,
+  "passed": 9,
+  "checks": [
+    {
+      "name": "final command contract and seven self paths",
+      "result": "PASS",
+      "contractSha256": "45eb57b992116b8475cc25489efcc4c465794ddba6f88109c9674ae9d80efd29"
+    },
+    {
+      "name": "31-file reachable local module closure exact hashes",
+      "result": "PASS",
+      "moduleClosureSha256": "4f3c36b53fe0c35df9f5bb0681201b5053326c30b3b17b24378b8efc35212c08"
+    },
+    {
+      "name": "seven phases and three configured children real-load to pre-I/O boundaries",
+      "result": "PASS",
+      "loaded": 10
+    },
+    {
+      "name": "actual missing-dependency predecessor rejects before I/O",
+      "result": "PASS",
+      "failureCode": "ERR_MODULE_NOT_FOUND"
+    },
+    {
+      "name": "corrected actual row child preserves full58 logical proof",
+      "result": "PASS",
+      "rows": 58,
+      "actualModelRows": 18
+    },
+    {
+      "name": "retained10 plus remaining21 composition contract bound to LIVE35",
+      "result": "PASS"
+    },
+    {
+      "name": "115 operational future paths remain absent",
+      "result": "PASS",
+      "count": 115
+    },
+    {
+      "name": "actual final operator accepts current digest and rejects stale digest",
+      "result": "PASS"
+    },
+    {
+      "name": "proof serialized",
+      "result": "PASS"
+    }
+  ],
+  "contractSha256": "45eb57b992116b8475cc25489efcc4c465794ddba6f88109c9674ae9d80efd29",
+  "moduleClosureSha256": "4f3c36b53fe0c35df9f5bb0681201b5053326c30b3b17b24378b8efc35212c08",
+  "traffic": {
+    "runtime": false,
+    "browser": false,
+    "http": false,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE8",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "result": "NOT_PRODUCED_CAPTURE_FAILED",
+  "manualScriptProduced": false,
+  "reason": "The packet conditions the owner walkthrough on a successful all-54 capture; this run stopped after 20 completed rows.",
+  "initialCapacity": {
+    "measuredAtUtc": "2026-09-20T16:52:47.181Z",
+    "hourlySessionLimit": 5,
+    "initialObservedHourlySessions": 0,
+    "dailyMessageLimit": 100,
+    "initialObservedDailyMessages": 30,
+    "initialDailyHeadroom": 70
+  },
+  "partialCapture": {
+    "sessionsCreated": 3,
+    "messagesSent": 21,
+    "calculatedHourlySessionSlotsRemainingUnderSameBound": 2,
+    "calculatedDailyHeadroomRemainingUnderSameBound": 49
+  },
+  "futureFullRun": {
+    "requiredSessions": 5,
+    "requiredMessages": 54,
+    "immediateDailyHeadroomSufficient": false,
+    "sessionCapacityConservativeNotBeforeUtc": "2026-09-20T18:01:45.567Z",
+    "recentMessageCapacityConservativeNotBeforeUtc": "2026-09-20T17:14:45.364Z",
+    "dailyCapacityConservativeNotBeforeUtc": "2026-09-21T17:04:45.364Z",
+    "conservativeNotBeforeUtc": "2026-09-21T17:04:45.364Z",
+    "caveat": "The 24-hour bound uses the actual receipt mtime as an upper bound for all 21 new sends. Older rolling-history expiry remains unknown; no future availability may be claimed without a fresh supported capacity read and no intervening traffic."
+  },
+  "ownerManualPlanningOnly": {
+    "plannedSessions": 2,
+    "plannedMessages": 3,
+    "scriptUnavailableBecauseCaptureFailed": true,
+    "dailyHeadroomWouldBeSufficientUnderSameBound": true,
+    "recentMessageCapacityConservativeNotBeforeUtc": "2026-09-20T17:14:45.364Z",
+    "caveat": "No owner manual is authorized from a failed full capture. These numbers are planning metadata only, not testability evidence."
+  },
+  "freshMeasurementRequired": true
+}

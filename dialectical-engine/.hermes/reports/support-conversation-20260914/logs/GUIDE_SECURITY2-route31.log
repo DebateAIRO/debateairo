@@ -1,0 +1,11 @@
+{
+  "kind": "CUSTODY_FAILURE",
+  "revision": "2ccb57fa061f74a81c8f2ef42bd33c768f00d4e0",
+  "custody": {
+    "head": "2ccb57fa061f74a81c8f2ef42bd33c768f00d4e0",
+    "dirty": "?? apps/api/node_modules\n?? apps/runner/node_modules\n?? apps/ui/node_modules\n?? node_modules\n?? packages/support-kb/node_modules",
+    "manifestRevision": "2ccb57fa061f74a81c8f2ef42bd33c768f00d4e0",
+    "productMismatches": [],
+    "deletedPresent": []
+  }
+}

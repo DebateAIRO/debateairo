@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_COMPACT_DIAG",
+  "ticket": "t_21586114",
+  "session": "/root/requirements",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "verdict": "HARNESS_PRECONDITION_DEFECT_PROVED_LIVE7_CAUSE_UNRESOLVED_NO_PRODUCT_DEFECT_PROVED",
+  "sealedEvidence": {
+    "completedRows": 15,
+    "attemptedRows": 15,
+    "supportRequests": 15,
+    "createdSessions": 2,
+    "lastCompleted": {
+      "sequence": 43,
+      "mode": "full",
+      "language": "ro",
+      "kind": "PROMPT_INJECTION"
+    },
+    "nextUnattempted": {
+      "sequence": 3,
+      "mode": "compact",
+      "language": "ro",
+      "kind": "GUIDE_FAMILY",
+      "family": "pricing-placeholder"
+    },
+    "failureStage": "OPEN_COMPACT_AFTER_WIDGET_TOGGLE_BEFORE_COMPOSER_VISIBLE",
+    "fixedCode": "GUIDE_HARNESS_COMPACT_COMPOSER_VISIBILITY_TIMEOUT",
+    "locator": ".supportAssistantCompact .supportComposer input[name=\"support-message\"]",
+    "waitMs": 30000,
+    "nextRequestStarted": false,
+    "nextSessionCreated": false,
+    "failedUiState": "UNAVAILABLE",
+    "childNumericExitStatus": "NOT_CAPTURED",
+    "shellStatus": "EXIT_0_FROM_TEE_WITHOUT_PIPEFAIL"
+  },
+  "finiteTrace": [
+    {
+      "fact": "The failed group transition was STORAGE_RESET_BEFORE_REMOUNT, followed by openMode(compact, ro).",
+      "source": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND12/capture-public-guide.mjs",
+      "lines": "289-303"
+    },
+    {
+      "fact": "Compact open waits only for domcontentloaded, clicks the server-visible toggle immediately, and waits for the composer before calling the harness hydration check.",
+      "source": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND12/capture-public-guide.mjs",
+      "lines": "158-173"
+    },
+    {
+      "fact": "The product starts collapsed, and the panel/Assistant exists only when expanded or closing; expansion depends on the React onClick handler.",
+      "source": "apps/ui/components/support/SupportWidget.tsx",
+      "lines": "36-48, 63-107"
+    },
+    {
+      "fact": "Once Assistant is mounted, the compact branch always contains the composer input.",
+      "source": "apps/ui/components/support/Assistant.tsx",
+      "lines": "667-703"
+    },
+    {
+      "fact": "The compact root is display:grid; no inspected compact style hides the composer.",
+      "source": "apps/ui/app/globals.css",
+      "lines": "1160-1167"
+    },
+    {
+      "fact": "The render contract proves collapsed markup has no panel and a hydrated click expands, mounts the panel, and focuses the message input.",
+      "source": "tests/render/sup-04-widget.test.tsx",
+      "lines": "53-59, 82-101"
+    }
+  ],
+  "findings": [
+    {
+      "id": "GCD-1",
+      "status": "PROVED",
+      "class": "HARNESS_PRECONDITION",
+      "statement": "The harness does not establish client hydration before its first compact-toggle interaction. Its only interaction-based hydration check runs after the composer that the interaction must mount."
+    },
+    {
+      "id": "GCD-2",
+      "status": "SUPPORTED_COMPETING_CAUSE_NOT_PROVED_FOR_LIVE7",
+      "class": "CLICK_BEFORE_HANDLER_ATTACHMENT",
+      "statement": "A click on server-rendered collapsed markup before React attaches the toggle handler can leave the product collapsed and make the subsequent composer wait time out. LIVE7 retained no post-click state, so this mechanism cannot be attributed as the exact historical cause."
+    },
+    {
+      "id": "GCD-3",
+      "status": "NOT_PROVED",
+      "class": "PRODUCT_RENDERING_DEFECT",
+      "statement": "The sealed evidence does not show that the product reached expanded state, mounted the compact Assistant, or hid a mounted composer. Current source and render tests instead establish the expected post-hydration path."
+    },
+    {
+      "id": "GCD-4",
+      "status": "PROVED",
+      "class": "FAILURE_OBSERVABILITY",
+      "statement": "The capture did not checkpoint compact toggle count/visibility, hydration readiness, widget state, aria-expanded, panel/compact-root/composer counts and visibility, URL, or cookie-region state around the click. The wrapper also allowed tee to mask the child failure status."
+    }
+  ],
+  "limits": [
+    "No failure DOM, screenshot, broader UI state, exact child numeric exit status, or product exception was retained.",
+    "No actual browser, runtime, HTTP, Support, model, capacity, DB, or private-log observation was performed by this diagnosis.",
+    "The diagnosis cannot retroactively identify the exact LIVE7 UI state and cannot justify a product behavior patch.",
+    "Forgot-password destination remains unresolved and actionless."
+  ],
+  "nextScope": {
+    "namespace": "GUIDE_HARNESS_BIND13",
+    "businessProductBehaviorChange": false,
+    "requiredContracts": [
+      "Establish a stable client-hydration readiness signal before the first compact toggle. If no stable public signal exists, add an observability-only SupportWidget readiness marker set in useEffect and a render test proving server-collapsed, hydrated-ready, one-click-expanded, panel-mounted, composer-visible, and focused states. Do not change Support behavior.",
+      "In a new append-only harness namespace, checkpoint fixed enums before click, immediately after click, and after the bounded transition wait: toggleCount/toggleVisible, hydrationReady, widgetState, ariaExpanded, panelCount/panelVisible, compactRootCount/compactRootVisible, composerCount/composerVisible, URL class, cookieRegionVisible, and categorized console counts. Serialize no page text, storage values, cookies, credentials, or private data.",
+      "Require exactly one toggle and the collapsed-to-expanded transition from one interaction. Emit predicate-specific fixed codes for missing/duplicate toggle, readiness timeout, no state transition, panel absence, compact-root absence, composer absence, and composer invisibility.",
+      "Checkpoint before and after every UI transition so an exception still leaves the last safe projection.",
+      "Preserve child numeric exit status. Do not invoke the child through an unguarded tee pipeline; use pipefail or capture logging inside the runner.",
+      "Keep the existing 54-row matrix, response oracles, request spacing, session accounting, privacy checks, and prior frozen evidence immutable."
+    ],
+    "zeroRequestPreflight": {
+      "required": true,
+      "transitions": [
+        "fresh full/en",
+        "same-session full/ro",
+        "storage-reset/remount compact/ro",
+        "route-remount full/en",
+        "storage-reset/remount compact/en"
+      ],
+      "assertions": [
+        "createSession=0",
+        "sendMessage=0",
+        "no private controls",
+        "single toggle",
+        "hydration ready before interaction",
+        "one interaction changes collapsed to expanded in compact mode",
+        "panel, compact root, and composer are visible",
+        "language selection is deterministic after mount"
+      ]
+    },
+    "review": [
+      "Separate baseline review of the append-only BIND13 harness and any observability-only product marker.",
+      "Run no actual 54-row capture until the zero-request transition preflight passes in a new output namespace.",
+      "A later actual capture must use fresh capacity/readiness evidence and must not relabel LIVE7."
+    ]
+  },
+  "heavyLease": "NOT_ACQUIRED_NO_INERT_COMMAND_NEEDED",
+  "productFilesChanged": []
+}

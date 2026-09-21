@@ -1,0 +1,155 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-EsjccT/data ... ok
+creating subdirectories ... 
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-EsjccT/data -l logfile start
+
+
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] 2026-09-17 17:08:38.728 EEST [61011] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] 2026-09-17 17:08:38.730 EEST [61011] LOG:  listening on IPv4 address "127.0.0.1", port 51695
+
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] 2026-09-17 17:08:38.730 EEST [61011] LOG:  listening on IPv6 address "::1", port 51695
+
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] 2026-09-17 17:08:38.730 EEST [61011] LOG:  listening on Unix socket "/tmp/.s.PGSQL.51695"
+
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] 2026-09-17 17:08:38.736 EEST [61017] LOG:  database system was shut down at 2026-09-17 17:08:38 EEST
+
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] 2026-09-17 17:08:38.741 EEST [61011] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] 2026-09-17 17:08:39.115 EEST [61040] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] 2026-09-17 17:08:39.463 EEST [61040] WARNING:  there is no transaction in progress
+
+
+ ↓ tests/integration/support-relay-reservations.test.ts > SUP-06 durable relay controls > does not record a final call when its caller is already aborted
+ ↓ tests/integration/support-relay-reservations.test.ts > SUP-06 durable relay controls > shares concurrency between instances and preserves the final-call UTC cap across restart
+ ↓ tests/integration/support-relay-reservations.test.ts > SUP-06 durable relay controls > serializes concurrent final-call reservations at the exact durable daily boundary
+ ↓ tests/integration/support-relay-reservations.test.ts > SUP-06 durable relay controls > records through the ordinary pool while all sixteen dedicated lease slots are held
+ ↓ tests/integration/support-relay-reservations.test.ts > SUP-06 durable relay controls > coordinates global FIFO and exact waiting depth across repository instances
+ ↓ tests/integration/support-relay-reservations.test.ts > SUP-06 durable relay controls > admits the exact global waiting-depth boundary
+ ↓ tests/integration/support-relay-reservations.test.ts > SUP-06 durable relay controls > refuses out-of-order promotion under scheduler pressure
+ ↓ tests/integration/support-relay-reservations.test.ts > SUP-06 durable relay controls > durably terminalizes a cancelled waiter before returning
+ ↓ tests/integration/support-relay-reservations.test.ts > SUP-06 durable relay controls > terminalizes a cancelled head and refuses to revive stale waiters after restart
+ ↓ tests/integration/support-relay-reservations.test.ts > SUP-06 durable relay controls > renews every live follower near expiry without 100ms event amplification
+ ↓ tests/integration/support-relay-reservations.test.ts > SUP-06 durable relay controls > releases a real-PG acquisition that commits before local cancellation wins
+ ✓ tests/integration/support-relay-reservations.test.ts > SUP-06 durable relay controls > keeps two live followers globally full beyond one lease and frees exactly one depth place 6094ms
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] 2026-09-17 17:08:45.559 EEST [61011] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] 2026-09-17 17:08:45.559 EEST [61011] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] 2026-09-17 17:08:45.561 EEST [61011] LOG:  background worker "logical replication launcher" (PID 61023) exited with exit code 1
+
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] 2026-09-17 17:08:45.563 EEST [61015] LOG:  shutting down
+
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] 2026-09-17 17:08:45.564 EEST [61015] LOG:  checkpoint starting: shutdown immediate
+
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] 2026-09-17 17:08:45.656 EEST [61015] LOG:  checkpoint complete: wrote 1704 buffers (10.4%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.061 s, sync=0.030 s, total=0.093 s; sync files=1143, longest=0.001 s, average=0.001 s; distance=13559 kB, estimate=13559 kB; lsn=0/24C50B8, redo lsn=0/24C50B8
+
+
+stdout | tests/integration/support-relay-reservations.test.ts
+[S00 DB embedded] 2026-09-17 17:08:45.661 EEST [61011] LOG:  database system is shut down
+
+
+ ↓ tests/integration/support-relay-reservations.test.ts > SUP-06 durable relay controls > enforces shared depth and cancellation head-of-line through two queue instances
+ ↓ tests/integration/support-relay-reservations.test.ts > SUP-06 durable relay controls > forcibly closes a real PostgreSQL lease when aborted cleanup never settles
+ ↓ tests/integration/support-relay-reservations.test.ts > SUP-06 durable relay controls > blocks a new low slot while a legacy high slot survives a live 2 to 1 reduction
+ ↓ tests/integration/support-relay-reservations.test.ts > SUP-06 durable relay controls > keeps only the oldest waiter when live depth shrinks from 3 to 1
+ ↓ tests/integration/support-relay-reservations.test.ts > SUP-06 durable relay controls > rejects local excess waiters as FULL when durable depth reconciliation shrinks
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 16 skipped (17)
+   Start at  17:08:37
+   Duration  8.58s (transform 263ms, setup 0ms, import 750ms, tests 7.74s, environment 0ms)
+

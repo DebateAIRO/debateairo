@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "at": "2026-09-20T19:16:15.941084+00:00",
+  "node": "GUIDE_QUALITY_FIX2",
+  "ticket": "t_5a112d71",
+  "baseRevision": "6cbe0e7ad18b20eca35876f4a91478cfbba82307",
+  "originalInputs": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_FIX2-inputs.json",
+    "sha256": "7c3b9cae941f363763c593a9372118fc2b6097dbfde05fa56ab02647b04c4327",
+    "bytes": 11827
+  },
+  "originalPacket": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/GUIDE_QUALITY_FIX2.md",
+    "sha256": "fd10d48d5ca3a9117edeae70da63bca6f4c6b8024da843d12a200ccf782127d1",
+    "bytes": 7550
+  },
+  "additionalWritePaths": [
+    "tests/unit/support-context.test.ts",
+    "tests/unit/support-recovery-attestation.test.ts"
+  ],
+  "unchangedBaseFiles": [
+    {
+      "relative": "tests/unit/support-context.test.ts",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-context.test.ts",
+      "sha256": "7c0a4421c6f7ffa3301dd36133fc64c1a5034859b95697f51370826d6e699580",
+      "bytes": 33927
+    },
+    {
+      "relative": "tests/unit/support-recovery-attestation.test.ts",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-recovery-attestation.test.ts",
+      "sha256": "75af82e33c566b3de0fdef5ff397e84da22effc48d22e798d1465fbe496ddef7",
+      "bytes": 16190
+    }
+  ],
+  "authorization": "Root authorizes only exact pinned KB-version and reviewed recovery-component/manifest expectation updates required by independently reviewed corpus attestation. Preserve all assertions and strict44 behavior; no weakening, fixture reshaping or unrelated cleanup. Run affected checks and final validation.",
+  "freezeDiscipline": "Hash-bound board authorization now; administrative Git freeze deferred until author releases Git lease."
+}

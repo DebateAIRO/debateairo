@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_FIX27",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "evidenceRoot": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision",
+  "baseUrl": "https://localhost:3100",
+  "runtimeCustodyPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME7-stack-custody.json",
+  "runtimeCustodyContractPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND21-runtime-custody-contract.json",
+  "runtimeCustodyContractSha256": "4d3d9f2fe4aec30a49a73ab339794e44f3df9191cdc5e9ff7630bc4294b79ed3",
+  "runtimeLogPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE20-stack.log",
+  "gateTemplatePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX25-gate-template.json",
+  "gateTemplateSha256": "08afa7f933acaa1fa94575fc3f8e0c997fc187c92bc8e851c54ddf7f7b32d9bc",
+  "actualReceipt": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/actual-receipt.json",
+  "browserProfile": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/browser-profile",
+  "actualSequences": [
+    1,
+    2,
+    15,
+    19,
+    23,
+    27,
+    31,
+    35,
+    39,
+    47,
+    43,
+    10,
+    18,
+    26,
+    34,
+    56,
+    58,
+    54,
+    5,
+    13,
+    21,
+    25,
+    29,
+    37,
+    45,
+    53,
+    8,
+    12,
+    42,
+    55,
+    57
+  ],
+  "phases": {
+    "preflight": {
+      "argv": [
+        "/Users/vladmihaimiron/.local/bin/node",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX22/phase-preflight.mjs",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/contract.json"
+      ],
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/preflight-output.json",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/preflight-wrapper.log",
+      "ui": {
+        "script": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/sentinel-ui-preflight.mjs",
+        "sha256": "e43c6217a780a793314208ef52c3f7811e882babf09eebfde0d149fa13953c3f",
+        "bytes": 936,
+        "argv": [
+          "/Users/vladmihaimiron/.local/bin/node",
+          "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/sentinel-ui-preflight.mjs",
+          "456cafb9e56a737de550570b5736ec52d79ddf48",
+          "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/ui-output.json"
+        ],
+        "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/ui-output.json",
+        "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/ui-child.log"
+      }
+    },
+    "readiness": {
+      "argv": [
+        "/Users/vladmihaimiron/.local/bin/node",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND21/phase-readiness.mjs",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/contract.json"
+      ],
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/readiness-output.json",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/readiness-wrapper.log"
+    },
+    "capacity": {
+      "argv": [
+        "/Users/vladmihaimiron/.local/bin/node",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND21/phase-capacity.mjs",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/contract.json"
+      ],
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/capacity-output.json",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/capacity-wrapper.log"
+    },
+    "gate": {
+      "argv": [
+        "/Users/vladmihaimiron/.local/bin/node",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND21/phase-gate.mjs",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/contract.json"
+      ],
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/gate-output.json",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/gate-wrapper.log"
+    },
+    "rowProof": {
+      "argv": [
+        "/Users/vladmihaimiron/.local/bin/node",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX26/phase-row-proof.mjs",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/contract.json"
+      ],
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/rowProof-output.json",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/rowProof-wrapper.log",
+      "childArgv": [
+        "/Users/vladmihaimiron/.local/bin/node",
+        "--import",
+        "tsx",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX25/replay-row-proofs.mjs",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-gate.json",
+        "456cafb9e56a737de550570b5736ec52d79ddf48",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-LIVE25.json"
+      ],
+      "result": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-LIVE25.json"
+    },
+    "capture": {
+      "argv": [
+        "/Users/vladmihaimiron/.local/bin/node",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX26/phase-capture.mjs",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/contract.json"
+      ],
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/capture-output.json",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/capture-wrapper.log",
+      "childArgv": [
+        "/Users/vladmihaimiron/.local/bin/node",
+        "--import",
+        "tsx",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX25/capture-public-guide.mjs",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-gate.json"
+      ]
+    },
+    "idle": {
+      "argv": [
+        "/Users/vladmihaimiron/.local/bin/node",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND21/phase-idle.mjs",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/contract.json"
+      ],
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/idle-output.json",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/idle-wrapper.log"
+    }
+  },
+  "ownerCapacity": {
+    "contractPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX22-owner-capacity-contract.json",
+    "contractSha256": "df5580ba8dd47e354a74aa04b8308d7b626564bd116076b682b1f6d0037d03fc",
+    "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/control-fixtures-rework1/collision/owner-capacity.json"
+  }
+}

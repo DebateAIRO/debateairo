@@ -1,0 +1,334 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_QUALITY_REVIEW2",
+  "ticket": "t_3d58abd7",
+  "revision": "5d6e028ae5defc24e0690219d6128949e73b750d",
+  "reviewedAt": "2026-09-20T19:35:40Z",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "verdict": "PASS_FOCUSED31_EXECUTION_PLAN",
+  "canonicalSelection": [
+    1,
+    2,
+    5,
+    8,
+    10,
+    12,
+    13,
+    15,
+    18,
+    19,
+    21,
+    23,
+    25,
+    26,
+    27,
+    29,
+    31,
+    34,
+    35,
+    37,
+    39,
+    42,
+    43,
+    45,
+    47,
+    53,
+    54
+  ],
+  "ownerRegressions": [
+    {
+      "sequence": 55,
+      "mode": "compact",
+      "language": "en",
+      "prompt": "What is Dialectical-Engine, and what can I do in this app?",
+      "requiredSource": "product-identity"
+    },
+    {
+      "sequence": 56,
+      "mode": "compact",
+      "language": "ro",
+      "prompt": "Ce este Dialectical-Engine și ce pot face în această aplicație?",
+      "requiredSource": "product-identity"
+    },
+    {
+      "sequence": 57,
+      "mode": "compact",
+      "language": "en",
+      "prompt": "Where can I sign in?",
+      "requiredSource": "account-access",
+      "requiredAction": "sign-in"
+    },
+    {
+      "sequence": 58,
+      "mode": "compact",
+      "language": "ro",
+      "prompt": "Unde îmi pot crea un cont?",
+      "requiredSource": "account-access",
+      "requiredAction": "sign-up"
+    }
+  ],
+  "groups": [
+    {
+      "id": "lifecycle-full-en",
+      "mode": "full",
+      "language": "en",
+      "sequences": [
+        1
+      ]
+    },
+    {
+      "id": "full-ro",
+      "mode": "full",
+      "language": "ro",
+      "sequences": [
+        2,
+        15,
+        19,
+        23,
+        27,
+        31,
+        35,
+        39,
+        47,
+        43
+      ]
+    },
+    {
+      "id": "compact-ro",
+      "mode": "compact",
+      "language": "ro",
+      "sequences": [
+        10,
+        18,
+        26,
+        34,
+        56,
+        58,
+        54
+      ]
+    },
+    {
+      "id": "full-en",
+      "mode": "full",
+      "language": "en",
+      "sequences": [
+        5,
+        13,
+        21,
+        25,
+        29,
+        37,
+        45,
+        53
+      ]
+    },
+    {
+      "id": "compact-en",
+      "mode": "compact",
+      "language": "en",
+      "sequences": [
+        8,
+        12,
+        42,
+        55,
+        57
+      ]
+    }
+  ],
+  "counts": {
+    "requests": 31,
+    "uniqueRequests": 31,
+    "canonicalRows": 27,
+    "ownerRows": 4,
+    "sessions": 5,
+    "english": 14,
+    "romanian": 17,
+    "deterministic": 4,
+    "maxModelCalls": 27
+  },
+  "menuCoverage": [
+    {
+      "sequence": 1,
+      "family": "pricing-placeholder",
+      "mode": "full",
+      "language": "en"
+    },
+    {
+      "sequence": 2,
+      "family": "global-navigation",
+      "mode": "full",
+      "language": "ro"
+    },
+    {
+      "sequence": 5,
+      "family": "landing",
+      "mode": "full",
+      "language": "en"
+    },
+    {
+      "sequence": 8,
+      "family": "home-library",
+      "mode": "compact",
+      "language": "en"
+    },
+    {
+      "sequence": 10,
+      "family": "help",
+      "mode": "compact",
+      "language": "ro"
+    },
+    {
+      "sequence": 12,
+      "family": "theme",
+      "mode": "compact",
+      "language": "en"
+    },
+    {
+      "sequence": 13,
+      "family": "debate-views",
+      "mode": "full",
+      "language": "en"
+    },
+    {
+      "sequence": 15,
+      "family": "scoring",
+      "mode": "full",
+      "language": "ro"
+    },
+    {
+      "sequence": 18,
+      "family": "replay",
+      "mode": "compact",
+      "language": "ro"
+    },
+    {
+      "sequence": 19,
+      "family": "workspace",
+      "mode": "full",
+      "language": "ro"
+    },
+    {
+      "sequence": 21,
+      "family": "honesty",
+      "mode": "full",
+      "language": "en"
+    },
+    {
+      "sequence": 23,
+      "family": "export",
+      "mode": "full",
+      "language": "ro"
+    },
+    {
+      "sequence": 25,
+      "family": "guide",
+      "mode": "full",
+      "language": "en"
+    },
+    {
+      "sequence": 26,
+      "family": "guide",
+      "mode": "compact",
+      "language": "ro"
+    },
+    {
+      "sequence": 27,
+      "family": "active-sessions",
+      "mode": "full",
+      "language": "ro"
+    },
+    {
+      "sequence": 29,
+      "family": "privacy",
+      "mode": "full",
+      "language": "en"
+    },
+    {
+      "sequence": 31,
+      "family": "legacy-claim",
+      "mode": "full",
+      "language": "ro"
+    },
+    {
+      "sequence": 34,
+      "family": "account-deletion",
+      "mode": "compact",
+      "language": "ro"
+    },
+    {
+      "sequence": 35,
+      "family": "human-case-separation",
+      "mode": "full",
+      "language": "ro"
+    },
+    {
+      "sequence": 37,
+      "family": "public-help-status",
+      "mode": "full",
+      "language": "en"
+    },
+    {
+      "sequence": 39,
+      "family": "support-availability-limits",
+      "mode": "full",
+      "language": "ro"
+    }
+  ],
+  "menuFamilyCount": 20,
+  "menuRepresentativeCount": 21,
+  "affectedRows": [
+    2,
+    15,
+    19,
+    23,
+    27,
+    31,
+    35,
+    39
+  ],
+  "broadGuideRows": [
+    25,
+    26
+  ],
+  "boundaryRows": {
+    "privateRecord": 42,
+    "promptInjection": 43,
+    "ordinaryRecoveryNavigation": 45,
+    "credentialOperationRefusal": 47
+  },
+  "helpNavigationRows": [
+    {
+      "sequence": 53,
+      "mode": "full",
+      "language": "en",
+      "activation": "pointer"
+    },
+    {
+      "sequence": 54,
+      "mode": "compact",
+      "language": "ro",
+      "activation": "keyboard"
+    }
+  ],
+  "preconditions": [
+    "Current offline source/action/branch/response-contract proof for canonical54 plus owner55-58.",
+    "Exact final product and strict44 corpus binding in the running API.",
+    "Capacity for 31 requests and five capture sessions plus reserved six messages and two owner sessions.",
+    "First-failure stopping; no skip/retry selector and no favorable replacement sample."
+  ],
+  "futureEvidence": [
+    "API/DOM/source/action/outcome equality for all 31 fresh rows.",
+    "A current-answer screenshot for every row; long answers preserve original-pane top/footer plus any labeled expansion.",
+    "Short owner walkthrough and final independent quality review."
+  ],
+  "deferred": "Full live54/58 language/surface permutation evaluation is deferred; it is not completed by this plan.",
+  "limits": [
+    "Plan review only; no execution occurred.",
+    "No historical answer is promoted.",
+    "Forgot remains actionless and connector-blocked."
+  ]
+}

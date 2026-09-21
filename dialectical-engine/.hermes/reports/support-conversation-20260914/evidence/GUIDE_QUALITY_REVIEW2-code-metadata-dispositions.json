@@ -1,0 +1,277 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_QUALITY_REVIEW2",
+  "ticket": "t_3d58abd7",
+  "revision": "5d6e028ae5defc24e0690219d6128949e73b750d",
+  "baseRevision": "6cbe0e7ad18b20eca35876f4a91478cfbba82307",
+  "reviewedAt": "2026-09-20T19:35:40Z",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "verdict": "PASS_CODE_AND_METADATA",
+  "priorFindings": [
+    {
+      "id": "GQR-R1",
+      "disposition": "RESOLVED",
+      "proof": [
+        "Navigation phrases derive from SUPPORT_GUIDE_LABELS and definitions from SUPPORT_ACTION_CATALOG.",
+        "Each promise requires an admitted reviewed source, request-local requested action, and draft action.",
+        "Actual answer-service positives translate opaque references and return canonical actions.",
+        "Missing source/requested/draft edges and invented home-library reject; forgot-password remains unresolved/actionless."
+      ]
+    },
+    {
+      "id": "GQR-R2",
+      "disposition": "RESOLVED",
+      "proof": [
+        "English comma+while and Romanian comma+iar safe separation pass at binder and answer-service boundaries.",
+        "Explicit creation negation passes.",
+        "English and Romanian email-created-case/private-link claims reject."
+      ]
+    }
+  ],
+  "actionCensus": [
+    {
+      "actionId": "home",
+      "reviewedSourceIds": [
+        "app-navigation"
+      ],
+      "disposition": "PASS_CANONICAL_REQUEST_LOCAL"
+    },
+    {
+      "actionId": "start-debate",
+      "reviewedSourceIds": [
+        "app-navigation",
+        "getting-started-debate"
+      ],
+      "disposition": "PASS_CANONICAL_REQUEST_LOCAL"
+    },
+    {
+      "actionId": "sign-in",
+      "reviewedSourceIds": [
+        "account-access"
+      ],
+      "disposition": "PASS_CANONICAL_REQUEST_LOCAL"
+    },
+    {
+      "actionId": "sign-up",
+      "reviewedSourceIds": [
+        "account-access"
+      ],
+      "disposition": "PASS_CANONICAL_REQUEST_LOCAL"
+    },
+    {
+      "actionId": "help",
+      "reviewedSourceIds": [
+        "app-navigation"
+      ],
+      "disposition": "PASS_CANONICAL_REQUEST_LOCAL"
+    },
+    {
+      "actionId": "support-status",
+      "reviewedSourceIds": [
+        "support-status-limits"
+      ],
+      "disposition": "PASS_CANONICAL_REQUEST_LOCAL"
+    },
+    {
+      "actionId": "method",
+      "reviewedSourceIds": [
+        "app-navigation"
+      ],
+      "disposition": "PASS_CANONICAL_REQUEST_LOCAL"
+    },
+    {
+      "actionId": "sample-transcript",
+      "reviewedSourceIds": [
+        "app-navigation"
+      ],
+      "disposition": "PASS_CANONICAL_REQUEST_LOCAL"
+    },
+    {
+      "actionId": "settings",
+      "reviewedSourceIds": [
+        "settings-help-menus"
+      ],
+      "disposition": "PASS_CANONICAL_REQUEST_LOCAL"
+    },
+    {
+      "actionId": "active-sessions",
+      "reviewedSourceIds": [
+        "settings-help-menus"
+      ],
+      "disposition": "PASS_CANONICAL_REQUEST_LOCAL"
+    },
+    {
+      "actionId": "privacy-preferences",
+      "reviewedSourceIds": [
+        "settings-help-menus"
+      ],
+      "disposition": "PASS_CANONICAL_REQUEST_LOCAL"
+    },
+    {
+      "actionId": "claim-legacy",
+      "reviewedSourceIds": [
+        "settings-help-menus"
+      ],
+      "disposition": "PASS_CANONICAL_REQUEST_LOCAL"
+    },
+    {
+      "actionId": "delete-account",
+      "reviewedSourceIds": [
+        "settings-help-menus"
+      ],
+      "disposition": "PASS_CANONICAL_REQUEST_LOCAL"
+    },
+    {
+      "actionId": "public-catalog",
+      "reviewedSourceIds": [
+        "app-navigation"
+      ],
+      "disposition": "PASS_CANONICAL_REQUEST_LOCAL"
+    },
+    {
+      "actionId": "your-debates",
+      "reviewedSourceIds": [
+        "app-navigation"
+      ],
+      "disposition": "PASS_CANONICAL_REQUEST_LOCAL"
+    },
+    {
+      "actionId": "owner-debate",
+      "reviewedSourceIds": [
+        "guide-how-it-works"
+      ],
+      "disposition": "PASS_TRUSTED_CONTEXT_ONLY"
+    },
+    {
+      "actionId": "public-debate",
+      "reviewedSourceIds": [
+        "view-public-debate"
+      ],
+      "disposition": "PASS_TRUSTED_REFERENCE_ONLY"
+    },
+    {
+      "actionId": "forgot-password",
+      "reviewedSourceIds": [
+        "account-access"
+      ],
+      "disposition": "PASS_REJECT_UNRESOLVED_ACTIONLESS"
+    }
+  ],
+  "contextAmendments": {
+    "productOverview": {
+      "disposition": "PASS_BOUNDED",
+      "exactOwnerQueries": [
+        "What is Dialectical-Engine, and what can I do in this app?",
+        "Ce este Dialectical-Engine și ce pot face în această aplicație?"
+      ],
+      "selectedSource": "product-identity",
+      "negativeControls": "unsupported branded medical/investment topics remain NO_SOURCE"
+    },
+    "romanianAccountCreation": {
+      "disposition": "PASS_BOUNDED",
+      "query": "Unde îmi pot crea un cont?",
+      "selectedSource": "account-access",
+      "canonicalAction": "sign-up",
+      "scope": "exact crea/creează morphology equivalence; no source/action-boundary relaxation"
+    }
+  },
+  "editorial": {
+    "disposition": "PASS_EXACT_PRIOR_REVIEW_BINDING",
+    "recordCount": 4,
+    "unchangedOtherRecords": 40,
+    "ownerRatificationAdded": false,
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "records": [
+      {
+        "id": "debate-workspace-menus",
+        "lang": "en",
+        "articleSha256": "e3f92be13a7d880e259c331e2c5dc3881abd9693e1846b90fcddafeda151170d",
+        "modelProjectionSha256": "d4da3f54b348b1c78dad80b67cbe1db12d196f396e6385c2dc0d2fd0ef5d0f34",
+        "fallbackSha256": "28525e3135cc7b623a00f52d7f9aa520579959f4238bb51117866ad3ba89bcce"
+      },
+      {
+        "id": "debate-workspace-menus",
+        "lang": "ro",
+        "articleSha256": "eb2b85327509e4e9e0e4b29009af11b109e225f70e784b09f447d17ed7aa162a",
+        "modelProjectionSha256": "095fe2fae248ca61c4b7e99100ab4bc4343d0ab7e525576bf747baa79d6816c8",
+        "fallbackSha256": "5e558ff25dda284435df41eca3e9de5f6b1f940f95cb0b8a3126801bba415e97"
+      },
+      {
+        "id": "support-cases",
+        "lang": "en",
+        "articleSha256": "300f6b63a1798ee15ba335538bdc9eb0e1c5dca11c770ce11f5e11edee9cee9e",
+        "modelProjectionSha256": "04ff511b177c062b1fa66397db84ac7295b75319e2c27fc870aaff171c43ae76",
+        "modelProjectionBytes": 512,
+        "fallbackSha256": "df37d0f11029ff345c6f303c425bdeb36435ab0a51e0dbddf22ffd0877ca49a1"
+      },
+      {
+        "id": "support-cases",
+        "lang": "ro",
+        "articleSha256": "4073ca95886bd56063c9f6ff49b959e3affa5c5a0a9000b6ecf6ff2171535977",
+        "modelProjectionSha256": "23df826d8a8701abb080a371df942b978885224bb612140c54221f2806615c2a",
+        "modelProjectionBytes": 584,
+        "fallbackSha256": "62bbe76506089edca69ffca3d820f7ebd9610f831cf6a3b007efe00125cb971f"
+      }
+    ]
+  },
+  "snapshot": {
+    "disposition": "PASS_STRICT44",
+    "entryCount": 44,
+    "logicalPairCount": 22,
+    "ignoredCount": 0,
+    "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+    "componentFileSha256": "aa94ff0592d41b399f38eb9be034b5e77ec2d350677e52b1e39852196245f9d9",
+    "reviewManifestSha256": "4c8e09f18207ab3cd24ac5fa89fa5846c6821469d2eeffcbef1cce43a5a10bc6"
+  },
+  "verification": {
+    "frozenInputs": {
+      "matched": 66,
+      "mismatched": 0
+    },
+    "delta": {
+      "paths": 8,
+      "diffCheck": "PASS"
+    },
+    "finalInventory": {
+      "changedPaths": 145,
+      "uniqueChangedPaths": 145,
+      "productFiles": 145,
+      "deletedPaths": 3,
+      "nonempty": true
+    },
+    "affected": {
+      "files": 8,
+      "passed": 513,
+      "failed": 0,
+      "todo": 1
+    },
+    "typeFocused": {
+      "passed": 60,
+      "failed": 0
+    },
+    "typecheck": {
+      "exitCode": 1,
+      "diagnostics": 76,
+      "baselineDiagnostics": 76,
+      "byteIdenticalToBaseline": true,
+      "introducedDiagnostics": 0
+    },
+    "structuralEval": {
+      "runs": 3,
+      "passedPerRun": 60,
+      "applicablePerRun": 60,
+      "rubric": "PENDING",
+      "realFirstToken": "NOT_APPLICABLE",
+      "exitCode": 1
+    }
+  },
+  "limits": [
+    "No live/runtime/browser/HTTP/Support/model/capacity/DB evidence.",
+    "Forgot destination remains unresolved.",
+    "No readiness, completion, acceptance, or actual-answer-quality claim."
+  ]
+}

@@ -1,0 +1,1363 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_ROW_PROOF_BIND20",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+  "verdict": "PASS_OFFLINE58",
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "custody": {
+    "productRoot": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "inventoryPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL13-manifest.json",
+    "inventorySha256": "b9ffbc1496a321fd963a8a1781f9853b7cb8a4e36f3a971b576b0d45896b6161",
+    "inventoryFiles": 145,
+    "snapshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_FIX2-snapshot-receipt.json",
+    "snapshotRevision": "5d6e028ae5defc24e0690219d6128949e73b750d",
+    "snapshotSha256": "23a3d4349aaec66833de0805516cf116e398eeb39bbbe24a455b857e560c4f62",
+    "entryCount": 44
+  },
+  "counts": {
+    "canonicalRows": 54,
+    "ownerRows": 4,
+    "totalRows": 58,
+    "actualRows": 31,
+    "actualModelRows": 27
+  },
+  "actualPlan": {
+    "requestCount": 31,
+    "modelCallCeiling": 27,
+    "sessionCount": 5,
+    "englishCount": 14,
+    "romanianCount": 17,
+    "ownerWalkthroughReservedMessages": 6,
+    "ownerWalkthroughReservedSessions": 2,
+    "sequences": [
+      1,
+      2,
+      15,
+      19,
+      23,
+      27,
+      31,
+      35,
+      39,
+      47,
+      43,
+      10,
+      18,
+      26,
+      34,
+      56,
+      58,
+      54,
+      5,
+      13,
+      21,
+      25,
+      29,
+      37,
+      45,
+      53,
+      8,
+      12,
+      42,
+      55,
+      57
+    ],
+    "groupIds": [
+      "lifecycle-full-en",
+      "full-ro",
+      "compact-ro",
+      "full-en",
+      "compact-en"
+    ],
+    "allMenuFamilyIds": [
+      "pricing-placeholder",
+      "global-navigation",
+      "landing",
+      "home-library",
+      "help",
+      "theme",
+      "debate-views",
+      "scoring",
+      "replay",
+      "workspace",
+      "honesty",
+      "export",
+      "guide",
+      "active-sessions",
+      "privacy",
+      "legacy-claim",
+      "account-deletion",
+      "human-case-separation",
+      "public-help-status",
+      "support-availability-limits"
+    ],
+    "broadGuideSequences": [
+      25,
+      26
+    ],
+    "affectedPriorSequences": [
+      2,
+      15,
+      19,
+      23,
+      27,
+      31,
+      35,
+      39
+    ],
+    "ownerSequences": [
+      55,
+      56,
+      57,
+      58
+    ],
+    "helpNavigationSequences": [
+      53,
+      54
+    ],
+    "deterministicBoundarySequences": [
+      42,
+      43,
+      45,
+      47
+    ]
+  },
+  "rows": [
+    {
+      "sequence": 1,
+      "kind": "GUIDE_FAMILY",
+      "family": "pricing-placeholder",
+      "mode": "full",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "app-navigation"
+      ],
+      "recoverySourceIds": [
+        "app-navigation"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "4264551f61745540e92932ee99a99405152e94edf8b167e0ee19c5463526411d",
+      "result": "PASS"
+    },
+    {
+      "sequence": 2,
+      "kind": "GUIDE_FAMILY",
+      "family": "global-navigation",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "settings-help-menus",
+        "app-navigation"
+      ],
+      "recoverySourceIds": [
+        "settings-help-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "574aef1c82b5203dcab7fd229ad3c6b9bcaa13c64a55924e7ffc49c5bab2d3cc",
+      "result": "PASS"
+    },
+    {
+      "sequence": 3,
+      "kind": "GUIDE_FAMILY",
+      "family": "pricing-placeholder",
+      "mode": "compact",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "app-navigation",
+        "guide-how-it-works"
+      ],
+      "recoverySourceIds": [
+        "app-navigation"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "e6a00272d90624b8367c54d60b8ecad42ee69ddf8155729b972eb8463a2d1cde",
+      "result": "PASS"
+    },
+    {
+      "sequence": 4,
+      "kind": "GUIDE_FAMILY",
+      "family": "global-navigation",
+      "mode": "compact",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "settings-help-menus",
+        "app-navigation",
+        "account-settings"
+      ],
+      "recoverySourceIds": [
+        "settings-help-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "ea5720fab4e9755c489c63daec5e85d0cf6b3a0fa9d30a97827dadc7d0e166b5",
+      "result": "PASS"
+    },
+    {
+      "sequence": 5,
+      "kind": "GUIDE_FAMILY",
+      "family": "landing",
+      "mode": "full",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "app-navigation",
+        "browse-public-debates",
+        "getting-started-debate"
+      ],
+      "recoverySourceIds": [
+        "app-navigation"
+      ],
+      "requestedActionIds": [
+        "method"
+      ],
+      "allowedActionIds": [
+        "method"
+      ],
+      "requiredActionId": "method",
+      "recoveryClass": null,
+      "fallbackSha256": "4264551f61745540e92932ee99a99405152e94edf8b167e0ee19c5463526411d",
+      "result": "PASS"
+    },
+    {
+      "sequence": 6,
+      "kind": "GUIDE_FAMILY",
+      "family": "landing",
+      "mode": "compact",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "app-navigation",
+        "browse-public-debates",
+        "getting-started-debate"
+      ],
+      "recoverySourceIds": [
+        "app-navigation"
+      ],
+      "requestedActionIds": [
+        "sample-transcript"
+      ],
+      "allowedActionIds": [
+        "sample-transcript"
+      ],
+      "requiredActionId": "sample-transcript",
+      "recoveryClass": null,
+      "fallbackSha256": "e6a00272d90624b8367c54d60b8ecad42ee69ddf8155729b972eb8463a2d1cde",
+      "result": "PASS"
+    },
+    {
+      "sequence": 7,
+      "kind": "GUIDE_FAMILY",
+      "family": "home-library",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "browse-public-debates",
+        "app-navigation"
+      ],
+      "recoverySourceIds": [
+        "app-navigation"
+      ],
+      "requestedActionIds": [
+        "home"
+      ],
+      "allowedActionIds": [
+        "home"
+      ],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "e6a00272d90624b8367c54d60b8ecad42ee69ddf8155729b972eb8463a2d1cde",
+      "result": "PASS"
+    },
+    {
+      "sequence": 8,
+      "kind": "GUIDE_FAMILY",
+      "family": "home-library",
+      "mode": "compact",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "app-navigation",
+        "browse-public-debates"
+      ],
+      "recoverySourceIds": [
+        "app-navigation"
+      ],
+      "requestedActionIds": [
+        "home"
+      ],
+      "allowedActionIds": [
+        "home"
+      ],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "4264551f61745540e92932ee99a99405152e94edf8b167e0ee19c5463526411d",
+      "result": "PASS"
+    },
+    {
+      "sequence": 9,
+      "kind": "GUIDE_FAMILY",
+      "family": "help",
+      "mode": "full",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "app-navigation",
+        "settings-help-menus",
+        "support-cases"
+      ],
+      "recoverySourceIds": [
+        "app-navigation"
+      ],
+      "requestedActionIds": [
+        "help"
+      ],
+      "allowedActionIds": [
+        "help"
+      ],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "4264551f61745540e92932ee99a99405152e94edf8b167e0ee19c5463526411d",
+      "result": "PASS"
+    },
+    {
+      "sequence": 10,
+      "kind": "GUIDE_FAMILY",
+      "family": "help",
+      "mode": "compact",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "app-navigation",
+        "settings-help-menus",
+        "support-cases"
+      ],
+      "recoverySourceIds": [
+        "app-navigation"
+      ],
+      "requestedActionIds": [
+        "help"
+      ],
+      "allowedActionIds": [
+        "help"
+      ],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "e6a00272d90624b8367c54d60b8ecad42ee69ddf8155729b972eb8463a2d1cde",
+      "result": "PASS"
+    },
+    {
+      "sequence": 11,
+      "kind": "GUIDE_FAMILY",
+      "family": "theme",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "app-navigation"
+      ],
+      "recoverySourceIds": [
+        "app-navigation"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "e6a00272d90624b8367c54d60b8ecad42ee69ddf8155729b972eb8463a2d1cde",
+      "result": "PASS"
+    },
+    {
+      "sequence": 12,
+      "kind": "GUIDE_FAMILY",
+      "family": "theme",
+      "mode": "compact",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "app-navigation"
+      ],
+      "recoverySourceIds": [
+        "app-navigation"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "4264551f61745540e92932ee99a99405152e94edf8b167e0ee19c5463526411d",
+      "result": "PASS"
+    },
+    {
+      "sequence": 13,
+      "kind": "GUIDE_FAMILY",
+      "family": "debate-views",
+      "mode": "full",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "debate-workspace-menus",
+        "guide-how-it-works",
+        "export-json"
+      ],
+      "recoverySourceIds": [
+        "debate-workspace-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "28525e3135cc7b623a00f52d7f9aa520579959f4238bb51117866ad3ba89bcce",
+      "result": "PASS"
+    },
+    {
+      "sequence": 14,
+      "kind": "GUIDE_FAMILY",
+      "family": "debate-views",
+      "mode": "compact",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "debate-workspace-menus",
+        "guide-how-it-works",
+        "export-json"
+      ],
+      "recoverySourceIds": [
+        "debate-workspace-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "5e558ff25dda284435df41eca3e9de5f6b1f940f95cb0b8a3126801bba415e97",
+      "result": "PASS"
+    },
+    {
+      "sequence": 15,
+      "kind": "GUIDE_FAMILY",
+      "family": "scoring",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "debate-workspace-menus"
+      ],
+      "recoverySourceIds": [
+        "debate-workspace-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "5e558ff25dda284435df41eca3e9de5f6b1f940f95cb0b8a3126801bba415e97",
+      "result": "PASS"
+    },
+    {
+      "sequence": 16,
+      "kind": "GUIDE_FAMILY",
+      "family": "scoring",
+      "mode": "compact",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "debate-workspace-menus",
+        "support-status-limits"
+      ],
+      "recoverySourceIds": [
+        "debate-workspace-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "28525e3135cc7b623a00f52d7f9aa520579959f4238bb51117866ad3ba89bcce",
+      "result": "PASS"
+    },
+    {
+      "sequence": 17,
+      "kind": "GUIDE_FAMILY",
+      "family": "replay",
+      "mode": "full",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "debate-workspace-menus",
+        "guide-how-it-works",
+        "unsupported-capabilities"
+      ],
+      "recoverySourceIds": [
+        "debate-workspace-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "28525e3135cc7b623a00f52d7f9aa520579959f4238bb51117866ad3ba89bcce",
+      "result": "PASS"
+    },
+    {
+      "sequence": 18,
+      "kind": "GUIDE_FAMILY",
+      "family": "replay",
+      "mode": "compact",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "debate-workspace-menus",
+        "guide-how-it-works",
+        "app-navigation"
+      ],
+      "recoverySourceIds": [
+        "debate-workspace-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "5e558ff25dda284435df41eca3e9de5f6b1f940f95cb0b8a3126801bba415e97",
+      "result": "PASS"
+    },
+    {
+      "sequence": 19,
+      "kind": "GUIDE_FAMILY",
+      "family": "workspace",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "debate-workspace-menus",
+        "unsupported-capabilities",
+        "guide-how-it-works"
+      ],
+      "recoverySourceIds": [
+        "debate-workspace-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "5e558ff25dda284435df41eca3e9de5f6b1f940f95cb0b8a3126801bba415e97",
+      "result": "PASS"
+    },
+    {
+      "sequence": 20,
+      "kind": "GUIDE_FAMILY",
+      "family": "workspace",
+      "mode": "compact",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "debate-workspace-menus"
+      ],
+      "recoverySourceIds": [
+        "debate-workspace-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "28525e3135cc7b623a00f52d7f9aa520579959f4238bb51117866ad3ba89bcce",
+      "result": "PASS"
+    },
+    {
+      "sequence": 21,
+      "kind": "GUIDE_FAMILY",
+      "family": "honesty",
+      "mode": "full",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "debate-workspace-menus",
+        "guide-how-it-works"
+      ],
+      "recoverySourceIds": [
+        "debate-workspace-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "28525e3135cc7b623a00f52d7f9aa520579959f4238bb51117866ad3ba89bcce",
+      "result": "PASS"
+    },
+    {
+      "sequence": 22,
+      "kind": "GUIDE_FAMILY",
+      "family": "honesty",
+      "mode": "compact",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "debate-workspace-menus"
+      ],
+      "recoverySourceIds": [
+        "debate-workspace-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "5e558ff25dda284435df41eca3e9de5f6b1f940f95cb0b8a3126801bba415e97",
+      "result": "PASS"
+    },
+    {
+      "sequence": 23,
+      "kind": "GUIDE_FAMILY",
+      "family": "export",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "export-json",
+        "guide-how-it-works",
+        "debate-workspace-menus"
+      ],
+      "recoverySourceIds": [
+        "export-json"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "78dc48a23f8a2de1e4af205d26f1d743a9000ed2c375437b0cfe2acb66d82cd3",
+      "result": "PASS"
+    },
+    {
+      "sequence": 24,
+      "kind": "GUIDE_FAMILY",
+      "family": "export",
+      "mode": "compact",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "export-json",
+        "guide-how-it-works",
+        "debate-workspace-menus"
+      ],
+      "recoverySourceIds": [
+        "export-json"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "6abec339af9fc96715c8964a17341461db4042701acb1f54e1e9deea37421afb",
+      "result": "PASS"
+    },
+    {
+      "sequence": 25,
+      "kind": "GUIDE_FAMILY",
+      "family": "guide",
+      "mode": "full",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "debate-workspace-menus",
+        "guide-how-it-works",
+        "unsupported-capabilities"
+      ],
+      "recoverySourceIds": [
+        "debate-workspace-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "28525e3135cc7b623a00f52d7f9aa520579959f4238bb51117866ad3ba89bcce",
+      "result": "PASS"
+    },
+    {
+      "sequence": 26,
+      "kind": "GUIDE_FAMILY",
+      "family": "guide",
+      "mode": "compact",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "app-navigation",
+        "guide-how-it-works",
+        "debate-workspace-menus"
+      ],
+      "recoverySourceIds": [
+        "app-navigation"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "e6a00272d90624b8367c54d60b8ecad42ee69ddf8155729b972eb8463a2d1cde",
+      "result": "PASS"
+    },
+    {
+      "sequence": 27,
+      "kind": "GUIDE_FAMILY",
+      "family": "active-sessions",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "settings-help-menus",
+        "account-settings"
+      ],
+      "recoverySourceIds": [
+        "settings-help-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "574aef1c82b5203dcab7fd229ad3c6b9bcaa13c64a55924e7ffc49c5bab2d3cc",
+      "result": "PASS"
+    },
+    {
+      "sequence": 28,
+      "kind": "GUIDE_FAMILY",
+      "family": "active-sessions",
+      "mode": "compact",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "settings-help-menus",
+        "account-settings"
+      ],
+      "recoverySourceIds": [
+        "settings-help-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "ea5720fab4e9755c489c63daec5e85d0cf6b3a0fa9d30a97827dadc7d0e166b5",
+      "result": "PASS"
+    },
+    {
+      "sequence": 29,
+      "kind": "GUIDE_FAMILY",
+      "family": "privacy",
+      "mode": "full",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "settings-help-menus",
+        "privacy-consent"
+      ],
+      "recoverySourceIds": [
+        "settings-help-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "ea5720fab4e9755c489c63daec5e85d0cf6b3a0fa9d30a97827dadc7d0e166b5",
+      "result": "PASS"
+    },
+    {
+      "sequence": 30,
+      "kind": "GUIDE_FAMILY",
+      "family": "privacy",
+      "mode": "compact",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "settings-help-menus",
+        "privacy-consent",
+        "app-navigation"
+      ],
+      "recoverySourceIds": [
+        "settings-help-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "574aef1c82b5203dcab7fd229ad3c6b9bcaa13c64a55924e7ffc49c5bab2d3cc",
+      "result": "PASS"
+    },
+    {
+      "sequence": 31,
+      "kind": "GUIDE_FAMILY",
+      "family": "legacy-claim",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "settings-help-menus",
+        "account-settings",
+        "guide-how-it-works"
+      ],
+      "recoverySourceIds": [
+        "settings-help-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "574aef1c82b5203dcab7fd229ad3c6b9bcaa13c64a55924e7ffc49c5bab2d3cc",
+      "result": "PASS"
+    },
+    {
+      "sequence": 32,
+      "kind": "GUIDE_FAMILY",
+      "family": "legacy-claim",
+      "mode": "compact",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "settings-help-menus",
+        "account-settings"
+      ],
+      "recoverySourceIds": [
+        "settings-help-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "ea5720fab4e9755c489c63daec5e85d0cf6b3a0fa9d30a97827dadc7d0e166b5",
+      "result": "PASS"
+    },
+    {
+      "sequence": 33,
+      "kind": "GUIDE_FAMILY",
+      "family": "account-deletion",
+      "mode": "full",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "settings-help-menus",
+        "delete-a-private-debate",
+        "account-settings"
+      ],
+      "recoverySourceIds": [
+        "settings-help-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "ea5720fab4e9755c489c63daec5e85d0cf6b3a0fa9d30a97827dadc7d0e166b5",
+      "result": "PASS"
+    },
+    {
+      "sequence": 34,
+      "kind": "GUIDE_FAMILY",
+      "family": "account-deletion",
+      "mode": "compact",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "delete-a-private-debate",
+        "settings-help-menus",
+        "account-settings"
+      ],
+      "recoverySourceIds": [
+        "delete-a-private-debate"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "46037245889b3c11b737e40222ce1c6d1b800020a92ee4e92725ad03d8338727",
+      "result": "PASS"
+    },
+    {
+      "sequence": 35,
+      "kind": "GUIDE_FAMILY",
+      "family": "human-case-separation",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "settings-help-menus",
+        "support-cases",
+        "app-navigation"
+      ],
+      "recoverySourceIds": [
+        "settings-help-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "574aef1c82b5203dcab7fd229ad3c6b9bcaa13c64a55924e7ffc49c5bab2d3cc",
+      "result": "PASS"
+    },
+    {
+      "sequence": 36,
+      "kind": "GUIDE_FAMILY",
+      "family": "human-case-separation",
+      "mode": "compact",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "settings-help-menus",
+        "support-cases",
+        "app-navigation"
+      ],
+      "recoverySourceIds": [
+        "settings-help-menus"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "ea5720fab4e9755c489c63daec5e85d0cf6b3a0fa9d30a97827dadc7d0e166b5",
+      "result": "PASS"
+    },
+    {
+      "sequence": 37,
+      "kind": "GUIDE_FAMILY",
+      "family": "public-help-status",
+      "mode": "full",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "support-status-limits",
+        "app-navigation",
+        "settings-help-menus"
+      ],
+      "recoverySourceIds": [
+        "support-status-limits"
+      ],
+      "requestedActionIds": [
+        "support-status"
+      ],
+      "allowedActionIds": [
+        "support-status"
+      ],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "3aafc3b34626b517e8827a8ff0ab9fa6deadf978dee235bd6d78936f37354375",
+      "result": "PASS"
+    },
+    {
+      "sequence": 38,
+      "kind": "GUIDE_FAMILY",
+      "family": "public-help-status",
+      "mode": "compact",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "support-status-limits",
+        "app-navigation",
+        "settings-help-menus"
+      ],
+      "recoverySourceIds": [
+        "support-status-limits"
+      ],
+      "requestedActionIds": [
+        "support-status"
+      ],
+      "allowedActionIds": [
+        "support-status"
+      ],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "b14e495dcccbcf8d01c1e6213e28ee4c738ee405c6ea8eb4cc572d79f7a73b5e",
+      "result": "PASS"
+    },
+    {
+      "sequence": 39,
+      "kind": "GUIDE_FAMILY",
+      "family": "support-availability-limits",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "support-status-limits",
+        "public-answer-disclosure",
+        "unsupported-capabilities"
+      ],
+      "recoverySourceIds": [
+        "support-status-limits"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "b14e495dcccbcf8d01c1e6213e28ee4c738ee405c6ea8eb4cc572d79f7a73b5e",
+      "result": "PASS"
+    },
+    {
+      "sequence": 40,
+      "kind": "GUIDE_FAMILY",
+      "family": "support-availability-limits",
+      "mode": "compact",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "support-status-limits",
+        "public-answer-disclosure",
+        "export-json"
+      ],
+      "recoverySourceIds": [
+        "support-status-limits"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "3aafc3b34626b517e8827a8ff0ab9fa6deadf978dee235bd6d78936f37354375",
+      "result": "PASS"
+    },
+    {
+      "sequence": 41,
+      "kind": "PRIVATE_RECORD",
+      "family": null,
+      "mode": "full",
+      "language": "ro",
+      "branch": "DETERMINISTIC_PRIVATE_REFUSAL",
+      "sourceIds": [],
+      "recoverySourceIds": [],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": null,
+      "result": "PASS"
+    },
+    {
+      "sequence": 42,
+      "kind": "PRIVATE_RECORD",
+      "family": null,
+      "mode": "compact",
+      "language": "en",
+      "branch": "DETERMINISTIC_PRIVATE_REFUSAL",
+      "sourceIds": [],
+      "recoverySourceIds": [],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": null,
+      "result": "PASS"
+    },
+    {
+      "sequence": 43,
+      "kind": "PROMPT_INJECTION",
+      "family": "pricing-placeholder",
+      "mode": "full",
+      "language": "ro",
+      "branch": "DETERMINISTIC_INJECTION_REFUSAL",
+      "sourceIds": [],
+      "recoverySourceIds": [],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": null,
+      "result": "PASS"
+    },
+    {
+      "sequence": 44,
+      "kind": "PROMPT_INJECTION",
+      "family": "pricing-placeholder",
+      "mode": "compact",
+      "language": "en",
+      "branch": "DETERMINISTIC_INJECTION_REFUSAL",
+      "sourceIds": [],
+      "recoverySourceIds": [],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": null,
+      "result": "PASS"
+    },
+    {
+      "sequence": 45,
+      "kind": "RECOVERY",
+      "family": null,
+      "mode": "full",
+      "language": "en",
+      "branch": "DETERMINISTIC_RECOVERY",
+      "sourceIds": [],
+      "recoverySourceIds": [],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": "POSITIVE_NAVIGATION",
+      "fallbackSha256": null,
+      "result": "PASS"
+    },
+    {
+      "sequence": 46,
+      "kind": "RECOVERY",
+      "family": null,
+      "mode": "compact",
+      "language": "ro",
+      "branch": "DETERMINISTIC_RECOVERY",
+      "sourceIds": [],
+      "recoverySourceIds": [],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": "POSITIVE_NAVIGATION",
+      "fallbackSha256": null,
+      "result": "PASS"
+    },
+    {
+      "sequence": 47,
+      "kind": "RECOVERY",
+      "family": null,
+      "mode": "full",
+      "language": "ro",
+      "branch": "DETERMINISTIC_RECOVERY",
+      "sourceIds": [],
+      "recoverySourceIds": [],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": "OPERATION_ONLY",
+      "fallbackSha256": null,
+      "result": "PASS"
+    },
+    {
+      "sequence": 48,
+      "kind": "RECOVERY",
+      "family": null,
+      "mode": "compact",
+      "language": "en",
+      "branch": "DETERMINISTIC_RECOVERY",
+      "sourceIds": [],
+      "recoverySourceIds": [],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": "OPERATION_ONLY",
+      "fallbackSha256": null,
+      "result": "PASS"
+    },
+    {
+      "sequence": 49,
+      "kind": "RECOVERY",
+      "family": null,
+      "mode": "full",
+      "language": "en",
+      "branch": "DETERMINISTIC_RECOVERY",
+      "sourceIds": [],
+      "recoverySourceIds": [],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": "OPERATION_AND_NAVIGATION",
+      "fallbackSha256": null,
+      "result": "PASS"
+    },
+    {
+      "sequence": 50,
+      "kind": "RECOVERY",
+      "family": null,
+      "mode": "compact",
+      "language": "ro",
+      "branch": "DETERMINISTIC_RECOVERY",
+      "sourceIds": [],
+      "recoverySourceIds": [],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": "OPERATION_AND_NAVIGATION",
+      "fallbackSha256": null,
+      "result": "PASS"
+    },
+    {
+      "sequence": 51,
+      "kind": "RECOVERY",
+      "family": null,
+      "mode": "full",
+      "language": "ro",
+      "branch": "DETERMINISTIC_RECOVERY",
+      "sourceIds": [],
+      "recoverySourceIds": [],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": "NEGATED_OPERATION_AND_NAVIGATION",
+      "fallbackSha256": null,
+      "result": "PASS"
+    },
+    {
+      "sequence": 52,
+      "kind": "RECOVERY",
+      "family": null,
+      "mode": "compact",
+      "language": "en",
+      "branch": "DETERMINISTIC_RECOVERY",
+      "sourceIds": [],
+      "recoverySourceIds": [],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": "NEGATED_OPERATION_AND_NAVIGATION",
+      "fallbackSha256": null,
+      "result": "PASS"
+    },
+    {
+      "sequence": 53,
+      "kind": "RECOVERY",
+      "family": null,
+      "mode": "full",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "app-navigation",
+        "settings-help-menus",
+        "support-cases"
+      ],
+      "recoverySourceIds": [
+        "app-navigation"
+      ],
+      "requestedActionIds": [
+        "help"
+      ],
+      "allowedActionIds": [
+        "help"
+      ],
+      "requiredActionId": "help",
+      "recoveryClass": null,
+      "fallbackSha256": "4264551f61745540e92932ee99a99405152e94edf8b167e0ee19c5463526411d",
+      "result": "PASS"
+    },
+    {
+      "sequence": 54,
+      "kind": "RECOVERY",
+      "family": null,
+      "mode": "compact",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "app-navigation",
+        "settings-help-menus",
+        "support-cases"
+      ],
+      "recoverySourceIds": [
+        "app-navigation"
+      ],
+      "requestedActionIds": [
+        "help"
+      ],
+      "allowedActionIds": [
+        "help"
+      ],
+      "requiredActionId": "help",
+      "recoveryClass": null,
+      "fallbackSha256": "e6a00272d90624b8367c54d60b8ecad42ee69ddf8155729b972eb8463a2d1cde",
+      "result": "PASS"
+    },
+    {
+      "sequence": 55,
+      "kind": "OWNER_REGRESSION",
+      "family": "product-identity",
+      "mode": "compact",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "product-identity"
+      ],
+      "recoverySourceIds": [
+        "product-identity"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "0f08312a2f6fcd13a67f7694dfefe1ac084bbda210df900eda65ec589cc4c032",
+      "result": "PASS"
+    },
+    {
+      "sequence": 56,
+      "kind": "OWNER_REGRESSION",
+      "family": "product-identity",
+      "mode": "compact",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "product-identity"
+      ],
+      "recoverySourceIds": [
+        "product-identity"
+      ],
+      "requestedActionIds": [],
+      "allowedActionIds": [],
+      "requiredActionId": null,
+      "recoveryClass": null,
+      "fallbackSha256": "d2102ff844843efc368e4458e7928fbb6ccd64675cb3c8d4b1657ff015acf812",
+      "result": "PASS"
+    },
+    {
+      "sequence": 57,
+      "kind": "OWNER_REGRESSION",
+      "family": "account-access",
+      "mode": "compact",
+      "language": "en",
+      "branch": "MODEL",
+      "sourceIds": [
+        "account-access",
+        "publish-a-debate",
+        "getting-started-debate"
+      ],
+      "recoverySourceIds": [
+        "account-access"
+      ],
+      "requestedActionIds": [
+        "sign-in"
+      ],
+      "allowedActionIds": [
+        "sign-in"
+      ],
+      "requiredActionId": "sign-in",
+      "recoveryClass": null,
+      "fallbackSha256": "6b5d2dcff5c21d11eae6c6a92cabea39ec253e8e54b5d890d9b25d56f9eab32d",
+      "result": "PASS"
+    },
+    {
+      "sequence": 58,
+      "kind": "OWNER_REGRESSION",
+      "family": "account-access",
+      "mode": "compact",
+      "language": "ro",
+      "branch": "MODEL",
+      "sourceIds": [
+        "account-access",
+        "settings-help-menus",
+        "app-navigation"
+      ],
+      "recoverySourceIds": [
+        "account-access"
+      ],
+      "requestedActionIds": [
+        "sign-up"
+      ],
+      "allowedActionIds": [
+        "sign-up"
+      ],
+      "requiredActionId": "sign-up",
+      "recoveryClass": null,
+      "fallbackSha256": "47d2b4b41acc0d0ef976bab9e08e5f617303612bfeda2b969a2958d6618ad8c0",
+      "result": "PASS"
+    }
+  ]
+}

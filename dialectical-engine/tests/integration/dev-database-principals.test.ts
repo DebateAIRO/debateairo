@@ -85,7 +85,7 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
     await rm(secretRoot, { recursive: true, force: true });
   });
 
-  it("creates eleven distinct SCRAM LOGINs with only their ruled direct memberships", async () => {
+  it("creates the declared distinct SCRAM LOGINs with only their ruled direct memberships", async () => {
     await provisionDevelopmentDatabasePrincipals({
       adminPool: database.pool,
       adminDatabaseUrl: database.connectionString,
@@ -117,12 +117,13 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       WHERE rolname=ANY($1::text[])
       ORDER BY rolname
     `,[DEVELOPMENT_DATABASE_PRINCIPALS.map(({ roleName }) => roleName)]);
-    expect(roles.rows).toHaveLength(11);
+    expect(roles.rows).toHaveLength(DEVELOPMENT_DATABASE_PRINCIPALS.length);
     expect(roles.rows.every((role) => role.rolcanlogin && role.rolinherit
       && !role.rolsuper && !role.rolcreatedb && !role.rolcreaterole
       && !role.rolreplication && !role.rolbypassrls
       && role.rolpassword?.startsWith("SCRAM-SHA-256$") === true)).toBe(true);
-    expect(new Set(roles.rows.map(({ rolpassword }) => rolpassword)).size).toBe(11);
+    expect(new Set(roles.rows.map(({ rolpassword }) => rolpassword)).size)
+      .toBe(DEVELOPMENT_DATABASE_PRINCIPALS.length);
 
     const memberships = await database.pool.query<{
       member_name: string;
@@ -545,7 +546,7 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
     });
     expect(outcome).toEqual({
       exitCode: 0,
-      stdout: `DEV_DATABASE_PRINCIPALS_READY=11:${cliCredentialPath}\n`,
+      stdout: `DEV_DATABASE_PRINCIPALS_READY=${DEVELOPMENT_DATABASE_PRINCIPALS.length}:${cliCredentialPath}\n`,
       stderr: ""
     });
     const credentialSource = await readFile(cliCredentialPath, "utf8");
@@ -565,7 +566,8 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       })
     ));
     expect(outcomes.every((outcome) => outcome.status === "fulfilled")).toBe(true);
-    expect(parseCredentialFile(await readFile(concurrentCredentialPath, "utf8")).size).toBe(11);
+    expect(parseCredentialFile(await readFile(concurrentCredentialPath, "utf8")).size)
+      .toBe(DEVELOPMENT_DATABASE_PRINCIPALS.length);
   }, 120_000);
 
   it("adds the newly ruled support principal without rotating existing development credentials", async () => {
@@ -579,7 +581,7 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       .filter((row) => row.length > 0 && !row.startsWith("SUPPORT_DATABASE_URL="))
       .join("\n") + "\n";
     const legacyCredentials = parseCredentialFile(legacySource);
-    expect(legacyCredentials.size).toBe(10);
+    expect(legacyCredentials.size).toBe(DEVELOPMENT_DATABASE_PRINCIPALS.length-1);
     const upgradedPath = join(secretRoot, "legacy-database-principals.env");
     await writeFile(upgradedPath, legacySource, { encoding: "utf8", mode: 0o600 });
 
@@ -587,10 +589,13 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       adminPool: database.pool,
       adminDatabaseUrl: database.connectionString,
       credentialFilePath: upgradedPath
-    })).resolves.toEqual({ credentialFilePath: upgradedPath, principalCount: 11 });
+    })).resolves.toEqual({
+      credentialFilePath: upgradedPath,
+      principalCount: DEVELOPMENT_DATABASE_PRINCIPALS.length
+    });
 
     const upgraded = parseCredentialFile(await readFile(upgradedPath, "utf8"));
-    expect(upgraded.size).toBe(11);
+    expect(upgraded.size).toBe(DEVELOPMENT_DATABASE_PRINCIPALS.length);
     for (const [environmentKey, databaseUrl] of legacyCredentials) {
       expect(upgraded.get(environmentKey)).toBe(databaseUrl);
     }
@@ -700,11 +705,15 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
         adminPool: database.pool,
         adminDatabaseUrl: database.connectionString,
         credentialFilePath: path
-      })).resolves.toEqual({ credentialFilePath: path, principalCount: 11 });
+      })).resolves.toEqual({
+        credentialFilePath: path,
+        principalCount: DEVELOPMENT_DATABASE_PRINCIPALS.length
+      });
       const upgraded = await readFile(path, "utf8");
       expect(upgraded.startsWith(legacySource)).toBe(true);
       expect(upgraded.slice(0, legacySource.length)).toBe(legacySource);
-      expect(upgraded.trimEnd().split("\n")).toHaveLength(11);
+      expect(upgraded.trimEnd().split("\n"))
+        .toHaveLength(DEVELOPMENT_DATABASE_PRINCIPALS.length);
       expect(upgraded.trimEnd().split("\n").slice(legacyLength).map(
         (row) => row.slice(0, row.indexOf("="))
       )).toEqual(DEVELOPMENT_DATABASE_PRINCIPALS.slice(legacyLength).map(

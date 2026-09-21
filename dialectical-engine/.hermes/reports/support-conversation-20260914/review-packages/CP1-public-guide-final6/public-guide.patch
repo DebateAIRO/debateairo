@@ -1,0 +1,71 @@
+diff --git a/dialectical-engine/packages/support-kb/src/context.ts b/dialectical-engine/packages/support-kb/src/context.ts
+index 2e0b6a29ea4a8e9ed89ca303df120f9e06f9ea03..a1a830ee29b0cef55f4b4f0412d7f460efd4382b 100644
+--- a/dialectical-engine/packages/support-kb/src/context.ts
++++ b/dialectical-engine/packages/support-kb/src/context.ts
+@@ -152,7 +152,7 @@ function semanticWords(value: string): readonly string[] {
+ 
+ const NEGATED_TAIL = /\b(?:do\s+not|don['’]?t|not|never|ignore|avoid|without|nu|niciodat[ăa]|ignor[ăa]|evit[ăa]|f[ăa]r[ăa])\b/u;
+ const CLAUSE_BOUNDARY = /[.!?;,\n]+|\b(?:but|dar|îns[ăa])\b/u;
+-const ACTION_INTENT = /\b(?:where|find|open|read|link|page|tab|browse|navigate|manage|go|see|unde|g[ăa]sesc|deschid|citi|leg[ăa]tur[ăa]|pagin[ăa]|fil[ăa]|r[ăa]sfoi|gestiona|v[ăa]d)\b/u;
++const ACTION_INTENT = /\b(?:where|find|open|read|link|page|tab|browse|navigate|manage|go|see|unde|g[ăa]sesc|deschi(?:d(?:e|em|eti)?|zi)|citi|leg[ăa]tur[ăa]|pagin[ăa]|fil[ăa]|r[ăa]sfoi|gestiona|v[ăa]d)\b/u;
+ const GENERIC_SINGLE_ACTION_LABEL = /^(?:help|ajutor)$/u;
+ 
+ function affirmativeQuery(value: string): string {
+diff --git a/dialectical-engine/tests/unit/support-answer-context.test.ts b/dialectical-engine/tests/unit/support-answer-context.test.ts
+index 5295be27cb7875068bdd12323747ab82372a95a7..f62f07a9321d4fab99e391baabbf2e7007323a41 100644
+--- a/dialectical-engine/tests/unit/support-answer-context.test.ts
++++ b/dialectical-engine/tests/unit/support-answer-context.test.ts
+@@ -167,7 +167,8 @@ describe("CP1 composed answer context", () => {
+ 
+   it.each([
+     ["en" as const,"Where do I find my debates and the public debate library?"],
+-    ["ro" as const,"Unde găsesc dezbaterile mele și biblioteca publică?"]
++    ["ro" as const,"Unde găsesc dezbaterile mele și biblioteca publică?"],
++    ["ro" as const,"Deschide Dezbaterile mele și Biblioteca de dezbateri publice."]
+   ])("recovers a rejected compound %s answer from the required app-navigation source",async (
+     language,text
+   ) => {
+diff --git a/dialectical-engine/tests/unit/support-context.test.ts b/dialectical-engine/tests/unit/support-context.test.ts
+index b1d3a6997f85bd9955c8f883abdd1676f14dbbb8..bdc674c42b306f4a24842f603e20014e33337971 100644
+--- a/dialectical-engine/tests/unit/support-context.test.ts
++++ b/dialectical-engine/tests/unit/support-context.test.ts
+@@ -464,7 +464,12 @@ describe("Support knowledge context", () => {
+     ["en" as const,"Where do I find my debates and the public debate library?"],
+     ["en" as const,"How can I open Your debates together with Public debates?"],
+     ["ro" as const,"Unde găsesc dezbaterile mele și biblioteca publică?"],
+-    ["ro" as const,"Cum deschid Dezbaterile tale împreună cu Dezbateri publice?"]
++    ["ro" as const,"Cum deschid Dezbaterile tale împreună cu Dezbateri publice?"],
++    ["ro" as const,"Deschide Dezbaterile mele și Biblioteca de dezbateri publice."],
++    ["ro" as const,"Deschide Biblioteca de dezbateri publice și Dezbaterile mele."],
++    ["ro" as const,"Deschizi Dezbaterile mele și Biblioteca de dezbateri publice?"],
++    ["ro" as const,"Deschidem Dezbaterile mele și Biblioteca de dezbateri publice."],
++    ["ro" as const,"Deschideți Dezbaterile mele și Biblioteca de dezbateri publice."]
+   ])("binds the compound private/public library guide to a required reviewed source in %s: %s",(
+     language,query
+   ) => {
+diff --git a/dialectical-engine/tests/unit/support-public-guide-boundary.test.ts b/dialectical-engine/tests/unit/support-public-guide-boundary.test.ts
+index c4e7e2d19aae2237cd8283fc0e38a561ca8d37dc..8dc3695429a44876d56e68f3e3e90d0517cfd1ee 100644
+--- a/dialectical-engine/tests/unit/support-public-guide-boundary.test.ts
++++ b/dialectical-engine/tests/unit/support-public-guide-boundary.test.ts
+@@ -8,11 +8,20 @@ describe("Support public-guide boundary", () => {
+     ["Where is Your debates?","en"],
+     ["How do I use the debate workspace?","en"],
+     ["Unde găsesc Dezbaterile tale?","ro"],
+-    ["Cum folosesc meniul dezbaterii?","ro"]
++    ["Cum folosesc meniul dezbaterii?","ro"],
++    ["Open Your debates and Browse public debates.","en"],
++    ["Deschide Dezbaterile mele și Biblioteca de dezbateri publice.","ro"]
+   ] as const)("keeps public product guidance public: %s", (text,language) => {
+     expect(classifyPublicGuideBoundary(text,language)).toEqual({ kind: "PUBLIC_GUIDE" });
+   });
+ 
++  it.each([
++    ["Where can I browse public debates? Do not open my debates.","en"],
++    ["Unde găsesc dezbaterile publice? Nu deschide dezbaterile mele.","ro"]
++  ] as const)("keeps a negated private-list half as public navigation: %s",(text,language) => {
++    expect(classifyPublicGuideBoundary(text,language)).toEqual({ kind:"PUBLIC_GUIDE" });
++  });
++
+   it.each([
+     ["Where can I manage active sessions?","en"],
+     ["Where are the account deletion options?","en"],

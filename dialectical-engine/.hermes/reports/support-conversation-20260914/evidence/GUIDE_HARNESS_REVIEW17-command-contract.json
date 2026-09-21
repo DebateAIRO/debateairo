@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW17",
+  "result": "PASS_STATIC_ENTRYPOINT_CONTRACT",
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "gatePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE9-gate.json",
+  "sameGateRequired": true,
+  "gateMaxAgeMsAtValidation": 120000,
+  "maxFutureClockSkewMs": 5000,
+  "rowProof": {
+    "argv": [
+      "node",
+      "--import",
+      "tsx",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_BIND17/replay-row-proofs.mjs",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE9-gate.json",
+      "152eed4da1cd3e66b74d8301159ba76427552409",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-LIVE9.json"
+    ],
+    "logPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ROW_PROOF-LIVE9.log",
+    "mustCompleteBeforeCapture": true,
+    "entrypointChecks": [
+      "exactly three positional arguments",
+      "absolute gate path",
+      "exact 40-hex revision",
+      "absolute evidence-root output",
+      "GUIDE_ROW_PROOF-run-*.json basename"
+    ],
+    "typescriptDependency": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND17/pre-request-verifier.ts",
+    "tsxLoaderRequired": true
+  },
+  "capture": {
+    "argv": [
+      "node",
+      "--import",
+      "tsx",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND17/capture-public-guide.mjs",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE9-gate.json"
+    ],
+    "logPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE9-capture.log",
+    "builtInReceipt": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE17-actual-receipt.json",
+    "builtInScreenshotCount": 39,
+    "entrypointCheck": "process.argv[2] must be an absolute gate path",
+    "extraArgumentsAllowedByReviewedContract": false,
+    "typescriptDependency": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND17/pre-request-verifier.ts",
+    "tsxLoaderRequired": true
+  },
+  "launchBindingRequired": [
+    "exact argv",
+    "exact cwd",
+    "same gate bytes/hash",
+    "row proof output",
+    "direct-redirection log paths",
+    "fresh gate",
+    "row proof PASS54 before capture"
+  ],
+  "readmeLiteralCommandsPresent": false,
+  "dispatchDocumentationRequired": true,
+  "executed": false
+}

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE5",
+  "ticket": "t_ad9d20bc",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "verdict": "FAIL_PRETRAFFIC_OPERATOR_INVOCATION",
+  "stage": "ROW_PROOF_ADAPTER_INVOCATION",
+  "command": [
+    "node",
+    ".hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_FIX9/replay-row-proofs.mjs",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE5-gate.json",
+    "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-GUIDE_LIVE5.json"
+  ],
+  "missingInvocationArgument": [
+    "--import",
+    "tsx"
+  ],
+  "processExitCode": 1,
+  "errorCode": "ERR_MODULE_NOT_FOUND",
+  "failedResolution": "packages/support-kb/src/catalog.js",
+  "adapterResultCode": "GUIDE_ROW_PROOF_UNCLASSIFIED_FAILURE",
+  "rowsDerived": 0,
+  "traffic": {
+    "capacityStatusReads": 1,
+    "capacityCountsOnlyReads": 1,
+    "browserStarted": false,
+    "sessions": 0,
+    "supportRequests": 0,
+    "modelRequests": 0
+  },
+  "inference": "OPERATOR_COMMAND_ERROR_ONLY",
+  "productOrHarnessFailureInferred": false,
+  "retryPerformed": false
+}

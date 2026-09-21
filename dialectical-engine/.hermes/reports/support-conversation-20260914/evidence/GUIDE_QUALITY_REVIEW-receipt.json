@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_QUALITY_REVIEW",
+  "ticket": "t_62335359",
+  "revision": "6cbe0e7ad18b20eca35876f4a91478cfbba82307",
+  "baseRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "reviewedOn": "2026-09-20T18:58:31Z",
+  "verdict": "REWORK_CODE_DRAFT_EDITORIAL_PASS",
+  "counts": {
+    "indexedInputs": 65,
+    "exactInputMatches": 65,
+    "blockingCodeFindings": 2,
+    "changedDraftEditorialPass": 4,
+    "retainedUnchangedComponents": 40,
+    "canonicalActionCensus": 18,
+    "newTestsRun": 0,
+    "newSupportRequests": 0,
+    "newModelRequests": 0
+  },
+  "attestation": {
+    "authorizedPaths": [
+      "packages/support-kb/recovery/components.json",
+      "packages/support-kb/reviews/manifest.json"
+    ],
+    "exactCurrentDraftHashesApproved": 4,
+    "ownerFields": "BLANK",
+    "publicationPerformed": false
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_QUALITY_REVIEW.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_QUALITY_REVIEW.md",
+      "sha256": "32be1b311463cba9733a747420a9d7f09db4c215979bc1e89b7ca3dcf1422967",
+      "bytes": 10831
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-code-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-code-dispositions.json",
+      "sha256": "619cc448946f5316747da15fe49b7bce866e0b33206d02653bd1fa400b7e5d38",
+      "bytes": 12597
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-knowledge-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-knowledge-dispositions.json",
+      "sha256": "9ac6bdc6c4ceea6c61fdc559f94d13412d4f7d01825317860ed9df2ab5e50383",
+      "bytes": 25648
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-custody.json",
+      "sha256": "d94ff43b8f5d069c941ba9120087a60ab18e1fc8caf54c8bd92c2555b8fc7ce4",
+      "bytes": 2430
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_QUALITY_REVIEW.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_QUALITY_REVIEW.md",
+      "sha256": "271ab5a86f0940f50acad440bef2d358d9a73386355501e12a9746c3f941acd2",
+      "bytes": 4434
+    }
+  ],
+  "limits": [
+    "Intermediate code requires correction before final validation.",
+    "Final44 snapshot, KB digest, structural evaluation and affected composed suite are unproved.",
+    "Forgot remains unresolved/actionless.",
+    "No readiness, CP1 completion or owner acceptance."
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_RUNTIME7",
+  "ticket": "t_bb4c9a2b",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "PASS_OWNED_RUNTIME_READY",
+  "model": "gpt-5.6-sol",
+  "session": "01a09f02-346a-7fb0-aa70-0424f1fdd21e",
+  "skills": {
+    "retained": [
+      "superpowers:executing-plans",
+      "superpowers:systematic-debugging",
+      "superpowers:verification-before-completion"
+    ],
+    "reReadThisNode": false
+  },
+  "checks": {
+    "supervisorPid": 12272,
+    "requiredListeners": 12,
+    "unrelatedListenerRecordsPreserved": 7,
+    "ordinaryTlsHelpStatus": 200,
+    "idleCustody": "PASS",
+    "futureActualOutputsAbsent": "PASS"
+  },
+  "traffic": {
+    "supportStatus": 0,
+    "capacity": 0,
+    "supportSessions": 0,
+    "supportMessages": 0,
+    "model": 0,
+    "database": 0
+  },
+  "limits": [
+    "API KB confirmation deferred to the later single fresh status/capacity gate.",
+    "Forgot password remains unresolved/actionless.",
+    "No owner acceptance or CP1 readiness claimed."
+  ]
+}

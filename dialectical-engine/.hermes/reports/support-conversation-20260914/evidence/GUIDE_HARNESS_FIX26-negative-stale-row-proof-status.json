@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "phase": "ROW_PROOF",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "status": 0,
+  "signal": null,
+  "completedAtUtc": "2020-01-01T00:00:00.000Z",
+  "resultPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX26-negative-stale-row-proof-result.json",
+  "resultSha256": "593c9577035be42d4907f1a6cac421d61a5ed0ae3c27369c83c183769827c4c3",
+  "gatePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX26-inert-gate.json",
+  "gateSha256": "04c023c4c79e717e6ca46e7ca1408bef9db40960968cbb0b30915a2a1a6c6a3d",
+  "validatedRows": 58,
+  "validation": "PASS"
+}

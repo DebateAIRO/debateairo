@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_SOURCE_DIAG",
+  "ticket": "t_7ab39546",
+  "session": "/root/requirements",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "verdict": "ORACLE_PRIMARY_SET_INCOMPLETE_OBSERVED_PRODUCT_ANSWER_SOURCE_SUPPORTED",
+  "observed": {
+    "canonicalSequence": 26,
+    "language": "ro",
+    "mode": "compact",
+    "questionSha256": "fbb9c3f02ab160df01113bb5669ea0ac0df63e212ff5cd5c957c0a90af13d01a",
+    "answerSha256": "9f85e8c55ecdf9fa1244e0d76a5c8f89acaa98251b8b8702cd095d6756bbe738",
+    "httpStatus": 200,
+    "outcome": "ANSWER_GROUNDED",
+    "origin": "MODEL_ACCEPTED_DRAFT",
+    "sourceIds": ["app-navigation"],
+    "actionIds": [],
+    "apiDomEqual": true,
+    "diagnostic": "ACCEPTED_DRAFT",
+    "failureCode": "GUIDE_HARNESS_EXPECTED_PRIMARY_SOURCE_MISSING"
+  },
+  "offlineActualCode": {
+    "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+    "romanianContextSourceIds": [
+      "app-navigation",
+      "guide-how-it-works",
+      "debate-workspace-menus"
+    ],
+    "requestedActionIds": [],
+    "sourcePolicy": null,
+    "appNavigationPosition": 0,
+    "diagnoseSupportDraft": "ACCEPTED",
+    "parseSupportDraft": true,
+    "validateSupportDraft": true,
+    "translatedSourceIds": ["app-navigation"],
+    "translatedActionIds": [],
+    "supportSourceIdsSatisfyPolicy": true,
+    "screenSupportModelText": true,
+    "broadEnglishContextSourceIds": [
+      "debate-workspace-menus",
+      "guide-how-it-works",
+      "unsupported-capabilities"
+    ]
+  },
+  "sourceAuthority": {
+    "appNavigationProjection": [
+      "landing Method and Transcripts/sample",
+      "Home is the debate library",
+      "Help accepts free text",
+      "Support may explain and offer fixed navigation"
+    ],
+    "guideHowItWorksProjection": "workspace artifacts and the interpretation of an already-open debate",
+    "debateWorkspaceMenusProjection": "controls belonging to an already-open debate",
+    "menuInventory": {
+      "landingMethod": "app-navigation",
+      "landingTranscripts": "app-navigation",
+      "localHowItWorksControl": "guide-how-it-works"
+    }
+  },
+  "provedFindings": [
+    {
+      "id": "GSD-1",
+      "status": "PROVED",
+      "statement": "Production supplied app-navigation first for the exact Romanian request, and the structured validator intentionally accepts a non-empty subset of supplied sources. A one-source app-navigation draft follows the current production contract."
+    },
+    {
+      "id": "GSD-2",
+      "status": "PROVED",
+      "statement": "The reviewed app-navigation projection contains the public landing Method/Transcripts, Home/library, Help/free-text, and fixed-navigation facts used by the retained answer. Its citation is semantically relevant to the broad where-to-learn request."
+    },
+    {
+      "id": "GSD-3",
+      "status": "PROVED",
+      "statement": "The harness guide family permits only guide-how-it-works or debate-workspace-menus as the primary source. Its pre-request proof merely requires that one expected source appear somewhere in the context, while the actual assertion rejects the semantically valid app-navigation primary."
+    },
+    {
+      "id": "GSD-4",
+      "status": "OBSERVED_NOT_A_FAILURE_BY_ITSELF",
+      "statement": "The paired broad English prompt currently produces guide/workspace sources without app-navigation, while the Romanian prompt produces app-navigation first. Both sets can answer the ambiguous broad question from different reviewed surfaces; this diagnosis does not prove that either production answer is wrong."
+    }
+  ],
+  "notProved": [
+    "No evidence shows a transport, hydration, storage, response-shape, API/DOM, credential, privacy, or source-membership product failure for canonical row 26.",
+    "No claim-level semantic validator exists, so the successful source citation does not prove every possible generated sentence is useful; the retained public answer was inspected separately against its reviewed projection.",
+    "The retained sample cannot establish how a future model completion will choose among supplied sources."
+  ],
+  "correction": {
+    "kind": "APPEND_ONLY_HARNESS_ORACLE_CORRECTION",
+    "productChanges": [],
+    "bothBroadRows": {
+      "applies": true,
+      "reason": "The family-level expectation is shared by the English and Romanian rows and the public landing authority is bilingual.",
+      "expectedPrimarySourceIds": [
+        "app-navigation",
+        "guide-how-it-works",
+        "debate-workspace-menus"
+      ]
+    },
+    "localDiscriminator": {
+      "en": "In an already open debate, what does the How it works control explain?",
+      "ro": "Într-o dezbatere deja deschisă, ce explică controlul Cum funcționează?",
+      "allowedPrimarySourceIds": [
+        "guide-how-it-works",
+        "debate-workspace-menus"
+      ],
+      "rejectedPrimarySourceIds": [
+        "app-navigation",
+        "getting-started-debate",
+        "support-status-limits"
+      ],
+      "actionPolicy": "NONE"
+    },
+    "requiredControls": [
+      "Both paired broad-guide rows accept app-navigation only when it is present in the production-derived proof context.",
+      "Both paired broad-guide rows continue accepting guide-how-it-works or debate-workspace-menus when present in proof context.",
+      "The explicit already-open-debate local-control fixtures reject app-navigation-only authority and require guide-how-it-works or debate-workspace-menus.",
+      "Unrelated, absent, empty, duplicate, or proof-external sources remain rejected.",
+      "Empty text and generic non-answer fixtures remain rejected; a useful broad fixture names or explains the reviewed Method/Transcripts destination, while a useful local fixture explains the already-open-debate control.",
+      "Existing API/DOM equality, accepted-draft attribution, language, action, privacy, credential, injection, session, and traffic controls remain unchanged."
+    ],
+    "writeScope": [
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND17/matrix.mjs",
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND17/pre-request-verifier.ts",
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND17/controls.mjs",
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND17/verify-guide-harness.mjs",
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_BIND17/replay-row-proofs.mjs",
+      "new GUIDE_HARNESS_BIND17 evidence, manifest, receipt, and separate review artifacts"
+    ]
+  },
+  "execution": {
+    "heavyLease": "USED_AND_RELEASED",
+    "offlineCommands": 2,
+    "sandboxSetupFailures": 1,
+    "liveRequests": 0,
+    "modelCalls": 0,
+    "capacityReads": 0,
+    "browserCalls": 0,
+    "databaseCalls": 0,
+    "privateLogReads": 0
+  },
+  "productFilesChanged": []
+}

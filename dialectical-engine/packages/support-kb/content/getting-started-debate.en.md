@@ -4,13 +4,15 @@ lang: en
 title: "Start a debate"
 status: shipped
 sources:
-  - apps/ui/app/new/page.tsx:58
-  - apps/ui/app/new/page.tsx:103
-  - apps/ui/app/new/page.tsx:131
-  - apps/ui/app/new/page.tsx:132
-verified_against: "2b670d30"
-ratified_by: V
-ratified_on: "2026-09-04"
+  - apps/ui/app/new/page.tsx:73
+  - apps/ui/app/new/page.tsx:111
+  - apps/ui/app/new/page.tsx:130
+  - apps/ui/app/new/page.tsx:184
+  - apps/ui/app/new/page.tsx:237
+  - apps/ui/components/LibraryComposer.tsx:23
+verified_against: "b7ca2c41"
+ratified_by: ""
+ratified_on: ""
 ---
 
-Sign in, then open `/new` to start a debate. Enter a debatable claim or question, choose a risk tier, a composition budget tier, and a tree depth, then select **Start run**. After the debate is created, the app opens its debate page.
+Sign in and open `/new` to use the complete debate form. Enter a question or claim longer than six characters. Free keeps the visible risk, budget, depth, and steering controls at fixed values. Premium lets you edit the current risk, budget, depth, and steering controls before selecting **Start run**. The home composer may carry your topic to `/new` when its direct start is unavailable; Support does not start the debate for you.

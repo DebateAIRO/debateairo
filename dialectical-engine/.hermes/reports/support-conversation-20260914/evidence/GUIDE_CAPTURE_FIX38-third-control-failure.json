@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_FIX38",
+  "attempt": 3,
+  "verdict": "DIAGNOSTIC_CODE_NORMALIZATION_REWORK_REQUIRED",
+  "completedBeforeFailure": [
+    "old helper reproduced backward movement or footer failure",
+    "corrected four-turn row23 preserved already-contained footer",
+    "genuinely below-pane footer scrolled forward into painted containment"
+  ],
+  "failure": {
+    "control": "unreachable clipped footer retains its fixed failure code",
+    "expected": "GUIDE_CAPTURE_ORIGINAL_PANE_FOOTER_UNREACHABLE",
+    "actual": "Playwright-wrapped page.evaluate error containing the expected code"
+  },
+  "productIssueRevealed": false,
+  "operationalTraffic": 0,
+  "disposition": "extract only the closed GUIDE_CAPTURE_* token from wrapped browser errors; preserve the original exception and geometry"
+}

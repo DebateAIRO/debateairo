@@ -1,0 +1,16 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ ✓ tests/render/support-topbar.test.tsx > Support-visible global Account navigation > opens the signed-in Account surface without changing the other global actions 22ms
+ ✓ tests/render/support-topbar.test.tsx > Support-visible global Account navigation > retains the minimal auth top bar on /login 4ms
+ ✓ tests/render/support-topbar.test.tsx > Support-visible global Account navigation > retains the minimal auth top bar on /sign-up 3ms
+ ✓ tests/render/support-topbar.test.tsx > Support-visible global Account navigation > retains the minimal auth top bar on /verify-email 3ms
+ ✓ tests/render/support-topbar.test.tsx > Support-visible global Account navigation > retains the minimal auth top bar on /enroll-mfa 3ms
+ ✓ tests/render/support-topbar.test.tsx > Support-visible global Account navigation > continues suppressing the global bar on /debate/11111111-1111-4111-8111-111111111111 1ms
+ ✓ tests/render/support-topbar.test.tsx > Support-visible global Account navigation > continues suppressing the global bar on /public/debate/11111111-1111-4111-8111-111111111111 0ms
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  12:42:09
+   Duration  609ms (transform 43ms, setup 0ms, import 82ms, tests 37ms, environment 395ms)
+

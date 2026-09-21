@@ -1,0 +1,45 @@
+{
+  "node": "GUIDE_ATTEST",
+  "base": "af02290219c734d2ad2fe7df878356fec9043b15",
+  "writePaths": [
+    "packages/support-kb/reviews/manifest.json",
+    "tests/unit/support-recovery-attestation.test.ts"
+  ],
+  "inputs": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/SPEC-v5.md",
+      "sha256": "4dc2a6ecb17b29eb25f4b523eae9ed7d99c45c6d48aad356987d1e0868fbe327",
+      "bytes": 7794
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PLAN-PUBLIC-GUIDE-v2.md",
+      "sha256": "2cb58e6136888f8802cdf4c5982aa9c0505e958f5cb3ae2dcdb49a6de40265fe",
+      "bytes": 35888
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/OWNER-PUBLIC-GUIDE-20260917.md",
+      "sha256": "bc80328fa3ecddb954ff4b7872fe2c460e8c3af37cbb8619807b3371f1175f63",
+      "bytes": 1478
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTENT_FIX-consumption.json",
+      "sha256": "24757c36c9fa5c393e709eaaba53e8ff0d65fd29a6cc9b26d8174058a971e1f6",
+      "bytes": 12331
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_EDITORIAL_RECHECK-consumption.json",
+      "sha256": "e9be7ed2696ab14911432d99c962994798dfbd68171d2ddbfe1180ed1204c39d",
+      "bytes": 10394
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTENT_FIX-editorial-inputs.json",
+      "sha256": "a146423ca75bcbb9846fcfc909ec307eb998473ffd6377d79606f817a7da2a6b",
+      "bytes": 20592
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_EDITORIAL_RECHECK.md",
+      "sha256": "e54611582c3f4830f21662bddbdc2b546b644e9554d804064f85f0f7f886eaa1",
+      "bytes": 5293
+    }
+  ]
+}

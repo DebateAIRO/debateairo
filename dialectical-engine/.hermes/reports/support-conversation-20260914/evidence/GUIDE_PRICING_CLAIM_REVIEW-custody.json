@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PRICING_CLAIM_REVIEW",
+  "ticket": "t_201482d3",
+  "revision": "b103ce27a060c48fcf5613c1bf44be53c7cb2a0c",
+  "baseRevision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "freeze": "3943d290971264631986c8d7cc503826af82c3ee",
+  "authorReceipt": {
+    "sha256": "a2ffe74777aa68c9f73527612cfc69b0998fea44a83a8e5c9fd0ce3c0fde95b6",
+    "bytes": 7842
+  },
+  "authorConsumption": {
+    "sha256": "80bb55c93f7b1f7d95620d984a667601e7616d3475fef9a7e1a5d8d0e20cb72b",
+    "bytes": 24110
+  },
+  "product": {
+    "clean": true,
+    "changedPaths": 4,
+    "responsePolicySha256": "a5c48c9192837435f46d9249ad0b5d2c4506a18688421204746e1e275336525e",
+    "testFileSha256": [
+      "b4b30b6d1557a6498debe69b20cfb92715afdc7f53cc68a40e07b2bddd1a185f",
+      "4b2af9c1b5bc26cb100fab5ea57014a7e269e3fba6f35a4ba4332a51613507ec",
+      "04ed2fde4372af818367c34f29c5b6e16c5b2532a626f525d27b9ea73ade4da2"
+    ]
+  },
+  "authorVerification": {
+    "affectedPassed": 444,
+    "affectedFailed": 0,
+    "affectedFiles": 3,
+    "logSha256": "58bf18455a537af022fb0474f8ccc11aa2dee8d57c361c48a436519e8ad45d2a",
+    "normalizedDiagnostics": 76,
+    "normalizedBaselineEqual": true,
+    "ownedPathDiagnostics": 0
+  },
+  "indexedInputs": {
+    "inputs": 30,
+    "verified": 30,
+    "mismatches": 0
+  },
+  "reviewMode": "STATIC_READ_ONLY_DELTA_REVIEW",
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

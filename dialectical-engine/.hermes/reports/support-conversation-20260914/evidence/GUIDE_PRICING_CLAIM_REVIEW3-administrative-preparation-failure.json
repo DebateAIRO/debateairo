@@ -1,0 +1,9 @@
+{
+  "at": "2026-09-21T06:06:28.420540+00:00",
+  "node": "GUIDE_PRICING_CLAIM_REVIEW3",
+  "ticket": "t_39dbe68c",
+  "error": "packet-check parsed slash-separated prose as nonexistent /private-data/credential/injection path",
+  "stage": "after ticket creation, before freeze/dispatch",
+  "traffic": 0,
+  "resolution": "plain prose, resume existing ticket without new generator execution"
+}

@@ -1,0 +1,16 @@
+Target root: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-security/dialectical-engine
+Target revision: 2ccb57fa061f74a81c8f2ef42bd33c768f00d4e0
+Manifest: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL-manifest.json
+
+Run only after explicit heavy-lease transfer and temporary authorized dependency-link creation.
+
+SEALED PREP31:
+env LOG=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY2-route31.log zsh /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-orchestrator/scripts/run-capture.sh env TSX_DISABLE_CACHE=1 GUIDE_SECURITY2_TARGET_ROOT=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-security/dialectical-engine GUIDE_SECURITY2_TARGET_REVISION=2ccb57fa061f74a81c8f2ef42bd33c768f00d4e0 GUIDE_SECURITY2_TARGET_MANIFEST=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL-manifest.json node --import tsx /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY2_PREP/run-security2-probe.mts
+
+ADJACENT ACTOR4:
+env LOG=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY2-adjacent4.log zsh /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-orchestrator/scripts/run-capture.sh env TSX_DISABLE_CACHE=1 GUIDE_SECURITY2_TARGET_ROOT=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-security/dialectical-engine GUIDE_SECURITY2_TARGET_REVISION=2ccb57fa061f74a81c8f2ef42bd33c768f00d4e0 GUIDE_SECURITY2_TARGET_MANIFEST=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL-manifest.json node --import tsx /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY2/run-adjacent-probe.mts
+
+CHANGED UNIT PATHS:
+env LOG=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY2-focused.log zsh /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-orchestrator/scripts/run-capture.sh env LANG=en_US.UTF-8 TSX_DISABLE_CACHE=1 pnpm exec vitest run tests/unit/support-recovery-intent.test.ts tests/unit/support-public-guide-boundary.test.ts tests/unit/support-classify.test.ts --maxWorkers=1
+
+Remove all five dependency links and rerun static manifest/input/head/clean custody before handoff.

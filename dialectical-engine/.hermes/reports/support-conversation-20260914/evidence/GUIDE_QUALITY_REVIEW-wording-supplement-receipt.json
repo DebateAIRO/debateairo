@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_QUALITY_REVIEW_WORDING_SUPPLEMENT",
+  "ticket": "t_62335359",
+  "revision": "6cbe0e7ad18b20eca35876f4a91478cfbba82307",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "reviewedAt": "2026-09-20T19:04:27Z",
+  "verdict": "PASS_EXACT_WORDING_SUPPLEMENT",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-wording-supplement.json",
+      "sha256": "7ede542145876d02a540f26cecddc68dc7b66fdf957c203060c10cb01bf88aee",
+      "bytes": 6047
+    }
+  ],
+  "dependencies": {
+    "knowledgeDispositions": {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-knowledge-dispositions.json",
+      "sha256": "9ac6bdc6c4ceea6c61fdc559f94d13412d4f7d01825317860ed9df2ab5e50383",
+      "bytes": 25648
+    },
+    "editorialInput": {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_FIX-editorial-input.json",
+      "sha256": "6def288a428c0a2aaaa8c74c401662f563ea0038d673581dae62d66d06e77998",
+      "bytes": 7538
+    },
+    "originalReviewReceipt": {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-receipt.json",
+      "sha256": "244854af9cf1dba39c8930bc6e8ea5ba6c8589b4c9049beb767d84e4348a4541",
+      "bytes": 3385
+    }
+  },
+  "counts": {
+    "substitutions": 2,
+    "articlesChanged": 0,
+    "fallbacksChanged": 0,
+    "productWrites": 0,
+    "newTests": 0,
+    "newTraffic": 0
+  },
+  "limits": [
+    "No product, article, fallback, metadata or prior evidence bytes were changed.",
+    "This supplement does not resolve the sealed runtime code REWORK.",
+    "Any other projection edit requires independent exact-byte review."
+  ]
+}

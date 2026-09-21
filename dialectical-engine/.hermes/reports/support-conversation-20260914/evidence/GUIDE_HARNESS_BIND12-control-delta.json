@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND12",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "finding": "GH10_R1_EMPTY_FINAL8_PRODUCT_INVENTORY",
+  "resolvedBy": [
+    "derive FINAL9 from the complete cumulative Git delta and rehash all 144 present files",
+    "exercise the actual FINAL9 object through shared pre-request membership, file-hash and six-attested-file validation",
+    "reject the retained empty FINAL8 plus missing-member and stale-hash fixtures",
+    "bind future outputs to unused GUIDE_LIVE_GUIDE12 namespace",
+    "retain all 112 reviewed control purposes and all 54 matrix rows"
+  ],
+  "controls": {
+    "previous": 112,
+    "current": 116,
+    "retained": 112,
+    "added": 4
+  },
+  "inventory": {
+    "previousFinal8ProductFiles": 0,
+    "currentFinal9ProductFiles": 144,
+    "deletedProductPaths": 3,
+    "attestedFiles": 6,
+    "producerInvariant": "lane-relative cumulative members equal the baseline-to-final Git delta; every present member is rehashed from the clean final checkout"
+  },
+  "harnessDelta": [
+    {
+      "path": "README.md",
+      "status": "CHANGED",
+      "sha256": "daa86da3b6d45ff92e78821ad3dbe8d3e92ed51765aed5aff79d86fe511154f5",
+      "bytes": 5384,
+      "previousSha256": "0712255069a8ccfcce1529cb10f14f7080534b38378f4e5d29309321a913c8dc",
+      "previousBytes": 4505
+    },
+    {
+      "path": "build-final9-inventory.mjs",
+      "status": "NEW",
+      "sha256": "e3b4e9fae71d48a6f96ffd81c4cf693db2dbd1b54459d2c4b343915570867fd7",
+      "bytes": 4832
+    },
+    {
+      "path": "capture-public-guide.mjs",
+      "status": "CHANGED",
+      "sha256": "a0a0b26aca49e75714fd8dd4199a491e03065920ff555681c047624fdaccc2a5",
+      "bytes": 18426,
+      "previousSha256": "acb9671453cc0c7d6bec7e168b1ba712d5af8d0aac88f2d38a0c62822432c495",
+      "previousBytes": 18426
+    },
+    {
+      "path": "controls.mjs",
+      "status": "UNCHANGED",
+      "sha256": "ec6af64b04e2ba31fed9025ca93394d059bd4e34f939400b64a5e1d9ae362272",
+      "bytes": 27827,
+      "previousSha256": "ec6af64b04e2ba31fed9025ca93394d059bd4e34f939400b64a5e1d9ae362272",
+      "previousBytes": 27827
+    },
+    {
+      "path": "gate-contract.json",
+      "status": "UNCHANGED",
+      "sha256": "a06a7ad7b1e328f5432a4ac9403436f87aab15427410c63cec0b55d93b3b8680",
+      "bytes": 4552,
+      "previousSha256": "a06a7ad7b1e328f5432a4ac9403436f87aab15427410c63cec0b55d93b3b8680",
+      "previousBytes": 4552
+    },
+    {
+      "path": "matrix.mjs",
+      "status": "UNCHANGED",
+      "sha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+      "bytes": 14253,
+      "previousSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+      "previousBytes": 14253
+    },
+    {
+      "path": "package-evidence.mjs",
+      "status": "CHANGED",
+      "sha256": "b1c9379186f0c8a0a4c361830ff5152c4ba20369bc14c0ac44e910e544ea14e7",
+      "bytes": 8714,
+      "previousSha256": "70162c9575545a7153eb3df39c6aed515d0ec1defe15e7c574bee981dce120ba",
+      "previousBytes": 7736
+    },
+    {
+      "path": "pre-request-verifier.ts",
+      "status": "CHANGED",
+      "sha256": "d5d6656431f93e3089c9c6751ae767b401d21f23bb90d398fa99a051af0ead39",
+      "bytes": 16751,
+      "previousSha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733",
+      "previousBytes": 16486
+    },
+    {
+      "path": "run-final-controls.mjs",
+      "status": "CHANGED",
+      "sha256": "7cf7883a78cf4f3b28f037a44cef8efe98a6fd2e13bb78d21cc8b6d09f9e71a4",
+      "bytes": 9959,
+      "previousSha256": "196c67ba8ddced97cd557133b866968f74fbc71bbcda82eeaebbf9ebcad33a33",
+      "previousBytes": 6800
+    },
+    {
+      "path": "runtime-capacity.mjs",
+      "status": "UNCHANGED",
+      "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87",
+      "bytes": 9935,
+      "previousSha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87",
+      "previousBytes": 9935
+    },
+    {
+      "path": "seal-receipt.mjs",
+      "status": "CHANGED",
+      "sha256": "d21f6f8e938318aacbfad22afe7c688c430fd2f4e91895bb3c0205c374b1895b",
+      "bytes": 4864,
+      "previousSha256": "11b9581581b2d2f5b421432ca8f360fede2db810325e3b9a398b167a3b30cca3",
+      "previousBytes": 4864
+    },
+    {
+      "path": "session-lifecycle.mjs",
+      "status": "UNCHANGED",
+      "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b",
+      "bytes": 4254,
+      "previousSha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b",
+      "previousBytes": 4254
+    },
+    {
+      "path": "verify-final-branches.ts",
+      "status": "UNCHANGED",
+      "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a",
+      "bytes": 5131,
+      "previousSha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a",
+      "previousBytes": 5131
+    },
+    {
+      "path": "verify-fix9-red.mjs",
+      "status": "UNCHANGED",
+      "sha256": "09f194ae1f401a4bbe8c0ebaa1e461e6201e93c13c22b6b8babc8129da7fc977",
+      "bytes": 1641,
+      "previousSha256": "09f194ae1f401a4bbe8c0ebaa1e461e6201e93c13c22b6b8babc8129da7fc977",
+      "previousBytes": 1641
+    },
+    {
+      "path": "verify-guide-harness.mjs",
+      "status": "CHANGED",
+      "sha256": "8f426c1b623cfa090f2d3a850c256165a1561b38978c3986dcb6bf28e891f07a",
+      "bytes": 64194,
+      "previousSha256": "ca70884b46182820274eed32207db169b0f99360713aead850568a5f2df70d4f",
+      "previousBytes": 64194
+    }
+  ],
+  "adapterDelta": [
+    {
+      "path": "README.md",
+      "status": "CHANGED",
+      "sha256": "6673a55728e5e3bd494cd3162b18517604b68e0568533874fa19201bde0d4710",
+      "bytes": 1402,
+      "previousSha256": "3a98ff5217e5d0151d1ac82bd40d63a3b3e692f15b46158321897cd4a9670c3e",
+      "previousBytes": 1402
+    },
+    {
+      "path": "replay-row-proofs.mjs",
+      "status": "CHANGED",
+      "sha256": "ce5e35f58f1f9a06f27a4a72e09c68738f9fdee7589751dabcf66174a87aaa0f",
+      "bytes": 6478,
+      "previousSha256": "a980115960bd0e8282e42331f3b736e22b48b17ee4750819ff2fa45f3f60f330",
+      "previousBytes": 6478
+    },
+    {
+      "path": "reviewed-harness-custody.mjs",
+      "status": "CHANGED",
+      "sha256": "07119ca89272d0bc04762c9a1664fbad0e5b8de4bc2b4ac5d3471f14977bd2d8",
+      "bytes": 1417,
+      "previousSha256": "44b4cb9853818227611e9e52c391697015575cea83b76004b3bf7bc54f9ddb2a",
+      "previousBytes": 1417
+    },
+    {
+      "path": "verify-negative-fixture.mjs",
+      "status": "CHANGED",
+      "sha256": "f6705a6129add9c085fbab058199054becc0f14a57966e2ea64e8f0b43950cef",
+      "bytes": 1361,
+      "previousSha256": "60a29ec04aa80728d99b8654e55ea222ac94e8960d06d37f1c7222cb10bd4184",
+      "previousBytes": 1361
+    }
+  ],
+  "dispositions": {
+    "live6ActualRow43Cause": "PRODUCT_CORRECTION_CONSUMED_SEPARATELY",
+    "productPatch": false,
+    "matrixChanged": false,
+    "sourcePolicyChanged": false,
+    "navigationChanged": false,
+    "actualTraffic": false,
+    "liveRetry": false
+  }
+}

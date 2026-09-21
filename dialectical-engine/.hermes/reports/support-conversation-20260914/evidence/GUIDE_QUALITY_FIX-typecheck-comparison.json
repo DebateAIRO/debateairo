@@ -1,0 +1,12 @@
+{
+  "revision": "6cbe0e7ad18b20eca35876f4a91478cfbba82307",
+  "command": "pnpm run typecheck",
+  "exitCode": 1,
+  "diagnosticCount": 76,
+  "currentLog": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX-typecheck.log",
+  "currentSha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+  "baselineLog": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX-typecheck.log",
+  "baselineSha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+  "byteIdentical": true,
+  "introducedDiagnostics": 0
+}

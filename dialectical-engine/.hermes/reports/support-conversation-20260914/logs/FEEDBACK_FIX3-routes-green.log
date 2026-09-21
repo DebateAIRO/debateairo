@@ -1,0 +1,36 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/support-routes.test.ts [ tests/integration/support-routes.test.ts ]
+Error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mExpected `,` or `)` but found `;`
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m tests/integration/support-routes.test.ts:629:5 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m584 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249mi[0m[38;5;249mt[0m[38;5;249m.[0m[38;5;249me[0m[38;5;249ma[0m[38;5;249mc[0m[38;5;249mh[0m([38;5;249m([0m[38;5;249m[[0m
+ [38;5;240m    │[0m          ┬  
+ [38;5;240m    │[0m          ╰── Opened here
+ [38;5;240m    │[0m 
+ [38;5;246m629 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m}[0m[38;5;249m)[0m;
+ [38;5;240m    │[0m     ┬  
+ [38;5;240m    │[0m     ╰── `,` or `)` expected
+[38;5;246m─────╯[0m
+
+  Plugin: vite:oxc
+  File: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/integration/support-routes.test.ts
+ ❯ transformWithOxc node_modules/.pnpm/vite@8.2.1_@types+node@26.2.0_esbuild@0.28.1_tsx@4.23.11_yaml@2.9.0/node_modules/vite/dist/node/chunks/node.js:4097:19
+ ❯ TransformPluginContext.transform node_modules/.pnpm/vite@8.2.1_@types+node@26.2.0_esbuild@0.28.1_tsx@4.23.11_yaml@2.9.0/node_modules/vite/dist/node/chunks/node.js:4168:26
+ ❯ EnvironmentPluginContainer.transform node_modules/.pnpm/vite@8.2.1_@types+node@26.2.0_esbuild@0.28.1_tsx@4.23.11_yaml@2.9.0/node_modules/vite/dist/node/chunks/node.js:30851:51
+ ❯ loadAndTransform node_modules/.pnpm/vite@8.2.1_@types+node@26.2.0_esbuild@0.28.1_tsx@4.23.11_yaml@2.9.0/node_modules/vite/dist/node/chunks/node.js:20619:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  11:41:16
+   Duration  124ms (transform 0ms, setup 0ms, import 0ms, tests 0ms, environment 0ms)
+

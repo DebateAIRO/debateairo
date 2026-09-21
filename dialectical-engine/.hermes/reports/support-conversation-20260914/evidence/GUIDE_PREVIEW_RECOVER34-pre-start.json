@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_RECOVER34",
+  "observedAtUtc": "2026-09-21T07:58:43.446Z",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "head": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "statusClean": true,
+  "transientPortsFree": true,
+  "dataPlaneListeners": [
+    {
+      "pid": 19920,
+      "command": "com.docker.backend",
+      "port": 7177
+    },
+    {
+      "pid": 19920,
+      "command": "com.docker.backend",
+      "port": 8988
+    },
+    {
+      "pid": 19920,
+      "command": "com.docker.backend",
+      "port": 55433
+    }
+  ],
+  "unrelatedListeners": [
+    {
+      "pid": 1142,
+      "command": "rapportd",
+      "port": 51966
+    },
+    {
+      "pid": 1142,
+      "command": "rapportd",
+      "port": 51966
+    },
+    {
+      "pid": 1205,
+      "command": "ControlCenter",
+      "port": 7000
+    },
+    {
+      "pid": 1205,
+      "command": "ControlCenter",
+      "port": 7000
+    },
+    {
+      "pid": 1205,
+      "command": "ControlCenter",
+      "port": 5000
+    },
+    {
+      "pid": 1205,
+      "command": "ControlCenter",
+      "port": 5000
+    },
+    {
+      "pid": 1682,
+      "command": "node",
+      "port": 9797
+    },
+    {
+      "pid": 1698,
+      "command": "Ollama",
+      "port": 49251
+    },
+    {
+      "pid": 1719,
+      "command": "ollama",
+      "port": 11434
+    }
+  ]
+}

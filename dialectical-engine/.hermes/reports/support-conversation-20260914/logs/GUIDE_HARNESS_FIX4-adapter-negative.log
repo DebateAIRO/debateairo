@@ -1,0 +1,1 @@
+{"schemaVersion":1,"result":"PASS","controls":3,"passed":3,"names":["changed previously unpinned controls source is rejected","rejection occurs before dynamic importer","real reviewed harness remains untouched"],"importerCalls":0,"successfulRows":0,"traffic":{"browser":false,"sessions":0,"supportRequests":0,"modelRequests":0}}

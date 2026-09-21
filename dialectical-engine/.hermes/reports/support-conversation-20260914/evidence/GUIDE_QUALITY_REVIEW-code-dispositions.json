@@ -1,0 +1,373 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_QUALITY_REVIEW",
+  "ticket": "t_62335359",
+  "revision": "6cbe0e7ad18b20eca35876f4a91478cfbba82307",
+  "baseRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "reviewedOn": "2026-09-20T18:58:31Z",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "verdict": "REWORK_CODE_DRAFT_EDITORIAL_PASS",
+  "findings": [
+    {
+      "id": "GQR-R1",
+      "severity": "BLOCKING",
+      "title": "Navigation validator is detached from the canonical action/source catalog",
+      "anchors": [
+        "apps/api/src/support/response-policy.ts:46",
+        "packages/support-kb/src/catalog.ts:13",
+        "packages/support-kb/src/catalog.ts:116",
+        "packages/support-kb/src/catalog.ts:138"
+      ],
+      "evidence": "The validator maps Home, Create account and Help to home-library, register and help-desk. Canonical IDs are home, sign-up and help. Its positive unit test directly supplies the invented home-library string, so it does not exercise structured parsing or the actual answer service. The validator also requires app-navigation for every destination even when canonical source bindings are settings-help-menus, account-access, support-status-limits, guide-how-it-works or view-public-debate.",
+      "impact": "A valid request-local action can be rejected; invented IDs cannot pass normal action membership. Valid Settings and account-access guidance falls back despite having the correct source and action. Several closed destinations remain outside the new check.",
+      "minimumCorrection": "Derive destination ID, reviewed source binding, audience/applicability and labels from SUPPORT_ACTION_CATALOG and SUPPORT_GUIDE_LABELS rather than a parallel partial table. Require each promised destination to have its exact request-local canonical action and an admitted source binding. Preserve trusted-context and unresolved restrictions."
+    },
+    {
+      "id": "GQR-R2",
+      "severity": "BLOCKING",
+      "title": "Case/email detector rejects safe ordinary separation prose",
+      "anchors": [
+        "apps/api/src/support/response-policy.ts:61",
+        "tests/unit/support-response-policy.test.ts:66"
+      ],
+      "evidence": "The detector splits on sentence punctuation and semicolon but not comma. “Escalation creates the human case, while support email is a separate mail workflow.” and “Escaladarea creează cazul uman, iar emailul este un flux separat.” each contain EMAIL, CASE and CASE_CREATION in one clause and no literal negation, so both are rejected. Tests use a semicolon that avoids the predicate.",
+      "impact": "Truthful bilingual public guidance can be silently replaced by fallback solely because of punctuation, weakening free-form answers.",
+      "minimumCorrection": "Recognize positive separation constructions (while/whereas/separately and Romanian iar/în timp ce/separat) without allowing the unsafe “email creates/opens the case” relation. Add actual answer-service safe and unsafe bilingual cases."
+    }
+  ],
+  "destinationCensus": [
+    {
+      "canonicalActionId": "home",
+      "reviewedSourceIds": [
+        "app-navigation"
+      ],
+      "intermediateCoverage": "WRONG_ID_home-library",
+      "boundary": "public fixed route"
+    },
+    {
+      "canonicalActionId": "start-debate",
+      "reviewedSourceIds": [
+        "app-navigation",
+        "getting-started-debate"
+      ],
+      "intermediateCoverage": "OMITTED",
+      "boundary": "public context-dependent route"
+    },
+    {
+      "canonicalActionId": "sign-in",
+      "reviewedSourceIds": [
+        "account-access"
+      ],
+      "intermediateCoverage": "ID_OK_WRONG_BLANKET_SOURCE",
+      "boundary": "signed-out fixed route"
+    },
+    {
+      "canonicalActionId": "sign-up",
+      "reviewedSourceIds": [
+        "account-access"
+      ],
+      "intermediateCoverage": "WRONG_ID_register",
+      "boundary": "signed-out fixed route"
+    },
+    {
+      "canonicalActionId": "help",
+      "reviewedSourceIds": [
+        "app-navigation"
+      ],
+      "intermediateCoverage": "WRONG_ID_help-desk",
+      "boundary": "public fixed route"
+    },
+    {
+      "canonicalActionId": "support-status",
+      "reviewedSourceIds": [
+        "support-status-limits"
+      ],
+      "intermediateCoverage": "OMITTED",
+      "boundary": "public fixed fragment"
+    },
+    {
+      "canonicalActionId": "method",
+      "reviewedSourceIds": [
+        "app-navigation"
+      ],
+      "intermediateCoverage": "OMITTED",
+      "boundary": "signed-out fixed fragment"
+    },
+    {
+      "canonicalActionId": "sample-transcript",
+      "reviewedSourceIds": [
+        "app-navigation"
+      ],
+      "intermediateCoverage": "OMITTED",
+      "boundary": "signed-out fixed fragment"
+    },
+    {
+      "canonicalActionId": "settings",
+      "reviewedSourceIds": [
+        "settings-help-menus"
+      ],
+      "intermediateCoverage": "ID_OK_WRONG_BLANKET_SOURCE",
+      "boundary": "signed-in fixed route"
+    },
+    {
+      "canonicalActionId": "active-sessions",
+      "reviewedSourceIds": [
+        "settings-help-menus"
+      ],
+      "intermediateCoverage": "ID_OK_WRONG_BLANKET_SOURCE",
+      "boundary": "signed-in fixed fragment"
+    },
+    {
+      "canonicalActionId": "privacy-preferences",
+      "reviewedSourceIds": [
+        "settings-help-menus"
+      ],
+      "intermediateCoverage": "ID_OK_WRONG_BLANKET_SOURCE",
+      "boundary": "signed-in fixed fragment"
+    },
+    {
+      "canonicalActionId": "claim-legacy",
+      "reviewedSourceIds": [
+        "settings-help-menus"
+      ],
+      "intermediateCoverage": "OMITTED",
+      "boundary": "signed-in fixed fragment"
+    },
+    {
+      "canonicalActionId": "delete-account",
+      "reviewedSourceIds": [
+        "settings-help-menus"
+      ],
+      "intermediateCoverage": "ID_OK_WRONG_BLANKET_SOURCE",
+      "boundary": "signed-in fixed fragment"
+    },
+    {
+      "canonicalActionId": "public-catalog",
+      "reviewedSourceIds": [
+        "app-navigation"
+      ],
+      "intermediateCoverage": "OMITTED_LIBRARY_MISCLASSIFIED",
+      "boundary": "signed-in fixed query"
+    },
+    {
+      "canonicalActionId": "your-debates",
+      "reviewedSourceIds": [
+        "app-navigation"
+      ],
+      "intermediateCoverage": "OMITTED",
+      "boundary": "signed-in fixed query; explicit navigation intent"
+    },
+    {
+      "canonicalActionId": "owner-debate",
+      "reviewedSourceIds": [
+        "guide-how-it-works"
+      ],
+      "intermediateCoverage": "OMITTED",
+      "boundary": "trusted owner context only"
+    },
+    {
+      "canonicalActionId": "public-debate",
+      "reviewedSourceIds": [
+        "view-public-debate"
+      ],
+      "intermediateCoverage": "OMITTED",
+      "boundary": "trusted public reference only"
+    },
+    {
+      "canonicalActionId": "forgot-password",
+      "reviewedSourceIds": [
+        "account-access"
+      ],
+      "intermediateCoverage": "OMITTED_AS_REQUIRED",
+      "boundary": "unresolved and must remain actionless"
+    }
+  ],
+  "requiredRegressions": {
+    "actualServiceCanonicalPositive": [
+      {
+        "lang": "en",
+        "text": "Support can guide you to Home.",
+        "sources": [
+          "app-navigation"
+        ],
+        "requestedActions": [
+          "home"
+        ],
+        "draftActions": [
+          "home"
+        ],
+        "expect": "ACCEPT"
+      },
+      {
+        "lang": "ro",
+        "text": "Asistența te poate ghida la Acasă.",
+        "sources": [
+          "app-navigation"
+        ],
+        "requestedActions": [
+          "home"
+        ],
+        "draftActions": [
+          "home"
+        ],
+        "expect": "ACCEPT"
+      },
+      {
+        "lang": "en",
+        "text": "Support can guide you to Active sessions.",
+        "sources": [
+          "settings-help-menus"
+        ],
+        "requestedActions": [
+          "active-sessions"
+        ],
+        "draftActions": [
+          "active-sessions"
+        ],
+        "expect": "ACCEPT"
+      },
+      {
+        "lang": "ro",
+        "text": "Asistența te poate ghida la Sesiuni active.",
+        "sources": [
+          "settings-help-menus"
+        ],
+        "requestedActions": [
+          "active-sessions"
+        ],
+        "draftActions": [
+          "active-sessions"
+        ],
+        "expect": "ACCEPT"
+      },
+      {
+        "lang": "en",
+        "text": "Support can guide you to Sign in or Create account.",
+        "sources": [
+          "account-access"
+        ],
+        "requestedActions": [
+          "sign-in",
+          "sign-up"
+        ],
+        "draftActions": [
+          "sign-in",
+          "sign-up"
+        ],
+        "expect": "ACCEPT"
+      },
+      {
+        "lang": "ro",
+        "text": "Asistența te poate ghida la Autentificare sau Creează un cont.",
+        "sources": [
+          "account-access"
+        ],
+        "requestedActions": [
+          "sign-in",
+          "sign-up"
+        ],
+        "draftActions": [
+          "sign-in",
+          "sign-up"
+        ],
+        "expect": "ACCEPT"
+      }
+    ],
+    "navigationNegative": [
+      "Same destination prose with a missing source binding must recover/refuse.",
+      "Same destination prose with a missing requested action or missing draft action must recover/refuse.",
+      "Invented IDs home-library/register/help-desk must fail normal structured membership.",
+      "forgot-password remains unresolved and actionless; owner/public debate actions require trusted validated references."
+    ],
+    "caseEmailSafe": [
+      {
+        "lang": "en",
+        "text": "Escalation creates the human case, while support email is a separate mail workflow.",
+        "expect": "ACCEPT"
+      },
+      {
+        "lang": "ro",
+        "text": "Escaladarea creează cazul uman, iar emailul este un flux separat.",
+        "expect": "ACCEPT"
+      }
+    ],
+    "caseEmailUnsafe": [
+      {
+        "lang": "en",
+        "text": "Email support creates the human case and receives its private case link.",
+        "expect": "REJECT"
+      },
+      {
+        "lang": "ro",
+        "text": "Emailul de asistență creează cazul uman și primește legătura privată.",
+        "expect": "REJECT"
+      }
+    ]
+  },
+  "passingDispositions": [
+    "Opaque source/action references are translated before authority binding.",
+    "The exact old Romanian Account draft gains the supplied settings-help-menus citation; absent authority rejects.",
+    "The exact old unsupported destination promise and exact old case/email conflation are rejected through the actual answer service.",
+    "Existing credential/private/injection screens execute before the new binder and are not widened.",
+    "The full-page pane follows appended messages only while near bottom; a reader who scrolled up is not forced down. Compact rendering, keyboard controls and consent code are unchanged.",
+    "Four changed knowledge records pass independent draft editorial review by exact hashes."
+  ],
+  "testEvidence": {
+    "focused": {
+      "passed": 246,
+      "failed": 0
+    },
+    "contentDraft": {
+      "passed": 1,
+      "failed": 0,
+      "skipped": 35
+    },
+    "manifestTransition": {
+      "passed": 34,
+      "failed": 2,
+      "disposition": "EXPECTED_STALE_COMPONENT_AND_REVIEW_ATTESTATION_ONLY"
+    },
+    "typecheck": {
+      "diagnostics": 76,
+      "baselineByteIdentical": true,
+      "introduced": 0
+    }
+  },
+  "liveApplicability": {
+    "historicalOnlyInvalidated": [
+      2,
+      15,
+      35,
+      39
+    ],
+    "projectionChanged": [
+      19,
+      23
+    ],
+    "newBinderAffected": [
+      27,
+      31
+    ],
+    "unchangedModelInputHistorical": [
+      1,
+      7,
+      11
+    ],
+    "unchangedDeterministicStaticCarry": [
+      41,
+      43,
+      47,
+      51
+    ],
+    "finalRuntimeEvidence": "No old row is relabeled as executed at the final revision. After code correction, exact editorial attestation and final KB digest, rerun the eight behavior-affected rows 2,15,19,23,27,31,35,39. Re-capture all 15 screenshots against the corrected pane/capture procedure. Rows 1,7,11 and deterministic 41,43,47,51 remain useful for historical/content comparison and defining-byte static carry only."
+  },
+  "limits": [
+    "No heavy test, browser, runtime, HTTP, Support/model, capacity, DB, product, KB, Git or private-data action.",
+    "The final 44-entry snapshot, new KB digest, structural evaluation and affected composed suite have not run.",
+    "Forgot remains unresolved and actionless."
+  ]
+}

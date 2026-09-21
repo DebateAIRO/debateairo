@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_BIND32",
+  "producerNode": "GUIDE_RUNTIME8",
+  "outputPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREVIEW_BIND32-runtime-custody.json",
+  "privateRuntimeLogPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_RUNTIME8-stack.log",
+  "exactKeys": [
+    "schemaVersion",
+    "node",
+    "revision",
+    "pid",
+    "pgid",
+    "commandMarker",
+    "runtimeLogPath",
+    "ports",
+    "startedAtUtc",
+    "detached",
+    "ordinarySystemTls"
+  ],
+  "required": {
+    "schemaVersion": 1,
+    "node": "GUIDE_RUNTIME8",
+    "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+    "commandMarker": "pnpm dev:auth:up",
+    "runtimeLogPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_RUNTIME8-stack.log",
+    "ports": {
+      "ui": 3100,
+      "api": 3101,
+      "postgres": 55433,
+      "redis": 7177,
+      "auxiliary": 8988,
+      "relayStart": 8890,
+      "relayEnd": 8896
+    },
+    "detached": true,
+    "ordinarySystemTls": {
+      "path": "/help",
+      "customCa": false,
+      "insecure": false,
+      "status": 200
+    }
+  },
+  "dynamic": {
+    "pid": "positive safe integer",
+    "pgid": "positive safe integer",
+    "startedAtUtc": "finite ISO-8601 timestamp"
+  },
+  "limitation": "Produced only after supported owned reload; no Support status, capacity, model, or database read."
+}

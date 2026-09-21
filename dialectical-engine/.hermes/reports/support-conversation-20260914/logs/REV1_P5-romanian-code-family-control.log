@@ -1,0 +1,1 @@
+{"status":"PASS","revision":"475c5a7e7eb8f48a3f5a81379f37b49fdd014ce9","termCases":9,"suppliedValueCases":3,"unsafePolicyCases":5,"safePolicyControls":6,"serviceControls":[{"calls":1,"predicate":"CREDENTIAL_OPERATION","outcome":"ANSWER_GROUNDED"},{"calls":1,"predicate":"CREDENTIAL_OPERATION","outcome":"ANSWER_GROUNDED"}]}

@@ -1,0 +1,45 @@
+{
+  "revision": "3d0ad7acaab0ff90bd783a6948bf99f117d74fe2",
+  "inputs": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/SPEC-v5.md",
+      "sha256": "4dc2a6ecb17b29eb25f4b523eae9ed7d99c45c6d48aad356987d1e0868fbe327",
+      "bytes": 7794
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PLAN-PUBLIC-GUIDE-v2.md",
+      "sha256": "2cb58e6136888f8802cdf4c5982aa9c0505e958f5cb3ae2dcdb49a6de40265fe",
+      "bytes": 35888
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_CONTEXT_REVIEW.md",
+      "sha256": "c1ce29324f8758eda3bb76558f9ef61a1b8b6028d3aace4de82e22cc58194964",
+      "bytes": 7278
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTEXT_REVIEW-receipt.json",
+      "sha256": "50e757ccfdd639cc1039d7bd089e9d86585e35046c58e49111b8243b3272e8e4",
+      "bytes": 1681
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTEXT_REVIEW-consumption.json",
+      "sha256": "a10602573bb569f3c9c2759279479b3f9545a2c427b0ee2fada3bb248e6477bf",
+      "bytes": 6169
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_NAVFIX-artifact-receipt.json",
+      "sha256": "a7d4b435f3b7ec355c0ae8dff2d449adf81d7f62fcebadc4d13dec9d5a5fc11d",
+      "bytes": 3615
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_NAVFIX-consumption.json",
+      "sha256": "1a1200214c34223b9fec5ce96a4bee3e51ec5d6fa3e3da2def533ce76f5bc00f",
+      "bytes": 12572
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTEXT_FIX-start.json",
+      "sha256": "9ccda4c4d493bab5c8af709dfead2f586234248cd5a1b82a9b83a773e4964fa3",
+      "bytes": 434
+    }
+  ]
+}

@@ -1,0 +1,121 @@
+diff --git a/dialectical-engine/migrations/0071_isolate_erasure_role_from_free_public_predicate.sql b/dialectical-engine/migrations/0071_isolate_erasure_role_from_free_public_predicate.sql
+new file mode 100644
+index 00000000..c80d630b
+--- /dev/null
++++ b/dialectical-engine/migrations/0071_isolate_erasure_role_from_free_public_predicate.sql
+@@ -0,0 +1,5 @@
++-- Bound published-run deletion evaluates this predicate inside the
++-- SECURITY DEFINER erasure function; the erasure principal must not execute
++-- the predicate directly because API startup attests its exact function set.
++REVOKE EXECUTE ON FUNCTION core.run_is_free_public_bound(uuid)
++  FROM debateai_erasure_runtime;
+diff --git a/dialectical-engine/tests/integration/fpd-s01-c1-privileges.test.ts b/dialectical-engine/tests/integration/fpd-s01-c1-privileges.test.ts
+index f92816e1..f4d309b6 100644
+--- a/dialectical-engine/tests/integration/fpd-s01-c1-privileges.test.ts
++++ b/dialectical-engine/tests/integration/fpd-s01-c1-privileges.test.ts
+@@ -91,12 +91,12 @@ describe("S01 C1 bound-predicate privileges", () => {
+     });
+   });
+ 
+-  it("debateai_erasure_runtime can read the bound predicate", async () => {
++  it("debateai_erasure_runtime cannot read the bound predicate directly", async () => {
+     const runId = await insertBoundFreeRun();
+ 
+     await expect(
+       erasurePool.query("SELECT core.run_is_free_public_bound($1::uuid) AS bound", [runId])
+-    ).resolves.toMatchObject({ rows: [{ bound: true }] });
++    ).rejects.toMatchObject({ code: "42501" });
+   });
+ 
+   it("a role without a grant cannot read the bound predicate", async () => {
+diff --git a/dialectical-engine/tests/integration/fpd-s01-l1-boot-role-assertions.test.ts b/dialectical-engine/tests/integration/fpd-s01-l1-boot-role-assertions.test.ts
+new file mode 100644
+index 00000000..1b513522
+--- /dev/null
++++ b/dialectical-engine/tests/integration/fpd-s01-l1-boot-role-assertions.test.ts
+@@ -0,0 +1,85 @@
++import { mkdtemp, readFile, rm } from "node:fs/promises";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { afterAll, beforeAll, describe, expect, it } from "vitest";
++import {
++  assertAccountErasureDatabaseRole,
++  assertContentProvisionDatabaseRole,
++  assertPublicationCleanupDatabaseRole,
++  assertPublicationDatabaseRoleSeparation,
++  createPool,
++  migrate,
++  type Pool
++} from "@debateai/db";
++import { provisionDevelopmentDatabasePrincipals } from "../../apps/runner/src/dev-database-principals.js";
++import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
++
++let database: TestDatabase;
++let secretRoot: string;
++
++function parseCredentialFile(source: string): ReadonlyMap<string, string> {
++  return new Map(source.trim().split("\n").map((line) => {
++    const separator = line.indexOf("=");
++    if (separator < 1) throw new TypeError("TEST_CREDENTIAL_LINE_INVALID");
++    return [line.slice(0, separator), line.slice(separator + 1)];
++  }));
++}
++
++function requiredCredential(credentials: ReadonlyMap<string, string>, key: string): string {
++  const value = credentials.get(key);
++  if (value === undefined) throw new TypeError(`TEST_CREDENTIAL_MISSING:${key}`);
++  return value;
++}
++
++describe("S01 L1 API boot database-role assertions", () => {
++  beforeAll(async () => {
++    database = await startTestDatabase();
++    await migrate(database.pool);
++    secretRoot = await mkdtemp(join(tmpdir(), "debateai-fpd-s01-l1-"));
++  }, 120_000);
++
++  afterAll(async () => {
++    await database?.stop();
++    await rm(secretRoot, { recursive: true, force: true });
++  });
++
++  it("passes every role assertion executed by API startup against the real login principals", async () => {
++    const credentialFilePath = join(secretRoot, "database-principals.env");
++    await provisionDevelopmentDatabasePrincipals({
++      adminPool: database.pool,
++      adminDatabaseUrl: database.connectionString,
++      credentialFilePath
++    });
++    const credentials = parseCredentialFile(await readFile(credentialFilePath, "utf8"));
++    const pools: Pool[] = [
++      requiredCredential(credentials, "DATABASE_URL"),
++      requiredCredential(credentials, "AUTHORIZATION_DATABASE_URL"),
++      requiredCredential(credentials, "PUBLICATION_CLEANUP_DATABASE_URL"),
++      requiredCredential(credentials, "CONTENT_PROVISION_DATABASE_URL"),
++      requiredCredential(credentials, "CONTENT_PROVISION_DATABASE_URL"),
++      requiredCredential(credentials, "LIVENESS_DATABASE_URL"),
++      requiredCredential(credentials, "ERASURE_DATABASE_URL")
++    ].map((databaseUrl) => createPool(databaseUrl, { max: 1 }));
++    const [
++      runtimePool,
++      authorizationPool,
++      publicationCleanupPool,
++      contentProvisionPool,
++      serverAskAdmissionPool,
++      legacyAskAdmissionPool,
++      erasurePool
++    ] = pools as [Pool, Pool, Pool, Pool, Pool, Pool, Pool];
++    try {
++      await expect(Promise.all([
++        assertAccountErasureDatabaseRole(runtimePool, erasurePool),
++        assertAccountErasureDatabaseRole(legacyAskAdmissionPool, erasurePool),
++        assertPublicationDatabaseRoleSeparation(runtimePool, authorizationPool),
++        assertPublicationCleanupDatabaseRole(publicationCleanupPool),
++        assertContentProvisionDatabaseRole(runtimePool, contentProvisionPool),
++        assertContentProvisionDatabaseRole(runtimePool, serverAskAdmissionPool)
++      ])).resolves.toEqual([undefined, undefined, undefined, undefined, undefined, undefined]);
++    } finally {
++      await Promise.all(pools.map(async (pool) => pool.end()));
++    }
++  }, 120_000);
++});

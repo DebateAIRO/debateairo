@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW23",
+  "ticket": "t_179862b9",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "PASS_FINAL_LITERAL_COMMAND_BINDING",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW23.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW23.md",
+      "sha256": "20fcd67373ac49f6b5779f4a9bf183399403f21ce7d16fffe14ce373eceef31f",
+      "bytes": 3941
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW23-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW23-dispositions.json",
+      "sha256": "afb182b4f8fda43f4cc2cc1df1d912f4806032b2eed4f9e07a9ec93f6772bc2b",
+      "bytes": 3561
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW23-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW23-custody.json",
+      "sha256": "eedcac4a284bcda1f995803240497891ff5c16b7a1c6c129be1e6cdb1debb88d",
+      "bytes": 1630
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW23.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW23.md",
+      "sha256": "a5db443afa40b19b9b5d3e44aaa1e25b21e99750875b6c70d17552923161e565",
+      "bytes": 2635
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "heavyLeaseHeld": false,
+  "finding": "All seven phase argv[2] values self-bind the exact FIX23 contract; actual-byte proof and predecessor fail-closed negative pass.",
+  "retained": [
+    "FIX22 owner-capacity contract remains unchanged and unexecuted.",
+    "GUIDE21 provenance, output reservation, current full58 and screenshot proof remain retained.",
+    "Actual31, owner capacity, live success, readiness and acceptance remain pending."
+  ]
+}

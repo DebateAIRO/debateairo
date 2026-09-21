@@ -1,0 +1,41 @@
+{
+  "node": "FEEDBACK2_REV1",
+  "ticket": "t_053c1512",
+  "reviewerSession": "/root/plan_review",
+  "revision": "9e87fe5859b44fbd62dd485e03045e5bcde96bed",
+  "priorRevision": "1b23c0b732679fdb665a19e03104b800f9d2ef38",
+  "evidenceFreeze": "b89d0bf11e01f39dbd7b53cc84ddaa05bde92055",
+  "verdict": "REWORK",
+  "artifacts": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/FEEDBACK2_REV1.md",
+      "sha256": "899a41033c6e7e84c4e03fb0ee7904dc3b66166e3e3b738524dfa65fb919f179",
+      "bytes": 4090
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FEEDBACK2_REV1.md",
+      "sha256": "fa38a98f3fba2872e3239595d40702051db364c44565974c7e2de9805ea70034",
+      "bytes": 2858
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/FEEDBACK2_REV1/feedback2-correction-control.ts",
+      "sha256": "add8039e8af12dc08140cf5a5e0ab65e472cc083f7c28d9dbce94215db9971b9",
+      "bytes": 8138
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/FEEDBACK2_REV1/feedback2-caller-observations.ts",
+      "sha256": "64d484fe252c9276ba7afd54f570e825b189dd6bea260eefd088e564f6fe5498",
+      "bytes": 5707
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FEEDBACK2_REV1-correction-control.log",
+      "sha256": "69d41fced9b0c630c24b39456a1899457d3acfde7cd8bc5351b8ac60ae13322e",
+      "bytes": 1034
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FEEDBACK2_REV1-caller-observations.log",
+      "sha256": "b9ffdfdc7be3b0746c99c2ea7fc996d88b111c9d7cbbb0f1176a50271e99e283",
+      "bytes": 3549
+    }
+  ]
+}

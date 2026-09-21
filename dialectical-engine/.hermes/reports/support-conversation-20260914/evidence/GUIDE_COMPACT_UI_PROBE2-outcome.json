@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_COMPACT_UI_PROBE2",
+  "ticket": "t_6790e21d",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "verdict": "REWORK_EXECUTION_CONTRACT",
+  "attemptedAt": "2026-09-20T15:21:40Z",
+  "childExitStatus": 1,
+  "failureCode": "GUIDE_UI_PROBE_ARGUMENTS_INVALID",
+  "failureClass": "OUTPUT_NAMESPACE_REJECTED_BEFORE_BROWSER_LAUNCH",
+  "requestedOutput": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE2-run-LIVE8.json",
+  "requestedOutputAbsentAfterFailure": true,
+  "browserLaunchAttempted": false,
+  "transitionAttempts": 0,
+  "traffic": {
+    "actualSupportRequestsForwarded": 0,
+    "guardedBrowserAttempts": 0,
+    "pageCaseListRead": 0,
+    "createSession": 0,
+    "sendMessage": 0,
+    "otherSupport": 0
+  },
+  "causeEvidence": {
+    "script": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND14/probe-zero-request-ui.mjs",
+    "sourceLines": "16-20",
+    "acceptedBasenamePattern": "^GUIDE_UI_TRANSITION_PROBE-run-[A-Za-z0-9_-]+\\.json$",
+    "reviewedRequiredBasename": "GUIDE_UI_TRANSITION_PROBE2-run-LIVE8.json",
+    "contract": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND14-probe-contract.json"
+  },
+  "runtimeAfterFailure": {
+    "pid": 77769,
+    "ppid": 1,
+    "pgid": 77769,
+    "ordinaryTlsHelpStatus": 200,
+    "unrelatedListenersPreserved": true
+  },
+  "limits": [
+    "No browser context or transition was exercised.",
+    "This is not product behavior evidence.",
+    "No capacity, chat, model, database, or Support runtime request was made.",
+    "The one-shot was not retried."
+  ]
+}

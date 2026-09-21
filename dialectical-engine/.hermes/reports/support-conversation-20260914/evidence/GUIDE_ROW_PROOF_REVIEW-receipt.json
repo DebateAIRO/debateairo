@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_ROW_PROOF_REVIEW",
+  "ticket": "t_e33cc99c",
+  "revision": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  "sourceRevision": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+  "verdict": "REWORK",
+  "reviewMode": "preparedAdapterStatic",
+  "adapterState": "PREPARED_NOT_EXECUTED",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "agentPath": "/root/baseline",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-17T15:42:06Z",
+  "finding": {
+    "id": "GRP-R1",
+    "disposition": "REWORK",
+    "summary": "The reviewed f8f eight-file harness digest is printed in custody but never compared with current bytes or the constructor-returned proof; only matrix and verifier files are directly pinned.",
+    "minimumFix": [
+      "hash and validate all eight reviewed FIX2 executable files before import",
+      "dynamically import matrix/verifier after the full reviewed digest passes",
+      "require verifier.controlProof.harnessSha256 equals the reviewed f8f digest before row projection",
+      "emit the verified actual digest in custody"
+    ]
+  },
+  "passingBoundaries": [
+    "exact54 matrix and direct verifier hashes",
+    "exact target revision and clean product custody through constructor",
+    "exact inventory/attestation/33-suite/schema2 proof/capacity prerequisites",
+    "no capture, Playwright, capacity reader, HTTP/DB or model client imports",
+    "fixed all-zero traffic projection",
+    "empty rows and fixed GUIDE_* code on first constructor failure",
+    "54 public metadata rows only after constructor success",
+    "exclusive output creation mode0600"
+  ],
+  "adapter": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF/replay-row-proofs.mjs",
+    "sha256": "0ef7c5168af426c9c87572fc52110b5a0ad40ac0bf35a7638e80c9cb294039d7",
+    "bytes": 5333
+  },
+  "bindings": {
+    "matrixSha256": "cea34112498143dcf8b1a571e40e5a24d207b5b47ee9b142048506cc773ca1ae",
+    "verifierSha256": "a123d265d2070d9ef5929dd30bb752b826412e42b5091c68e4806b276b37a402",
+    "claimedHarnessSha256": "f8f2935965cd59b893ab02848cd9db17eeb71fa423f5620b61479e6647ae4917",
+    "claimedHarnessBindingVerified": false
+  },
+  "inputCustody": {
+    "count": 59,
+    "allMatch": true
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_ROW_PROOF_REVIEW.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_ROW_PROOF_REVIEW.md",
+      "sha256": "eb1f7325545da49a7fb2b896ca177e4f0289dab14147ac9a1b1429545033a8b2",
+      "bytes": 7481
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_ROW_PROOF_REVIEW.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_ROW_PROOF_REVIEW.md",
+      "sha256": "7b4cb8033f26b332fc197de3f86e82f0258d0c9f63169095bf740ebc65af777b",
+      "bytes": 3104
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ROW_PROOF_REVIEW-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_ROW_PROOF_REVIEW-custody.json",
+      "sha256": "7195128eb45cdd00d87673d02a93df23f9da312df9f39f2ac4ae7dd07cdd6910",
+      "bytes": 25742
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ROW_PROOF_REVIEW-static.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_ROW_PROOF_REVIEW-static.json",
+      "sha256": "a620064daef6a63b295057455f6a198170da6434d8f70350342276103c99056c",
+      "bytes": 2128
+    }
+  ],
+  "limitations": [
+    "No adapter execution or all-54 product proof occurred.",
+    "No runtime capacity was measured and no live gate was validated.",
+    "Active product action-admission correction is outside this review.",
+    "No product, source, harness, adapter, Git/index, browser, HTTP, database, model, runtime or service mutation occurred.",
+    "This receipt makes no product verdict, readiness, checkpoint completion or acceptance claim."
+  ]
+}

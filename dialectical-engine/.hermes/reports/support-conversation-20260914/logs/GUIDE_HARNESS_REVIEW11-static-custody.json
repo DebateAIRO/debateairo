@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW11",
+  "ticket": "t_bca4bdd9",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "inputCustody": {
+    "count": 97,
+    "mismatches": []
+  },
+  "productCheckout": {
+    "head": "152eed4da1cd3e66b74d8301159ba76427552409",
+    "clean": true
+  },
+  "inventory": {
+    "sha256": "f2397d8f0bd4d083de7a308c8e1aba17e62fa4a359ddce47b4ef752c4b136a3b",
+    "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+    "present": 144,
+    "uniquePresent": 144,
+    "deleted": 3,
+    "uniqueDeleted": 3,
+    "productMismatches": [],
+    "gitUnsupported": [],
+    "presentEqualsCumulativeGitDelta": true,
+    "deletedEqualsCumulativeGitDelta": true,
+    "final8ChangedPathsNormalizeToPresent": true,
+    "final8DeletedNormalizeToDeleted": true,
+    "final8ProductFiles": 0,
+    "attestedFiles": 6,
+    "attestedMismatches": [],
+    "immutableInputs": 29,
+    "immutableMismatches": []
+  },
+  "proof": {
+    "previous": 112,
+    "current": 116,
+    "passed": 116,
+    "retainedPrefixExact": true,
+    "addedExact": true,
+    "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+    "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+    "harnessSha256": "1c46d0d55ed0e8f4f7900682a031ccec2b47e9e831d7357a426975f10e78391a",
+    "recomputedHarnessSha256": "1c46d0d55ed0e8f4f7900682a031ccec2b47e9e831d7357a426975f10e78391a",
+    "uniqueNames": 116
+  },
+  "retainedExactFiles": {
+    "controls.mjs": true,
+    "gate-contract.json": true,
+    "matrix.mjs": true,
+    "runtime-capacity.mjs": true,
+    "session-lifecycle.mjs": true,
+    "verify-final-branches.ts": true,
+    "verify-fix9-red.mjs": true
+  },
+  "futureOutputs": {
+    "checked": 56,
+    "present": []
+  },
+  "staticDisposition": {
+    "actualFinal9": "passes independent membership/current-byte/attested checks",
+    "emptyFinal8": "rejected by nonempty productFiles condition",
+    "missingAttested": "rejected because required attested laneRelative is absent from inventory map",
+    "staleAttested": "rejected by current-file hash check before attested comparison",
+    "sharedFunction": "validateGuideStaticBoundInputs is called by both inert wrapper and createGuidePreRequestVerifier"
+  },
+  "limits": {
+    "staticOnly": true,
+    "testsRun": false,
+    "runtime": false,
+    "traffic": false,
+    "gitWrites": false,
+    "heavyLease": false
+  }
+}

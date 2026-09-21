@@ -1,0 +1,268 @@
+diff --git a/dialectical-engine/apps/api/src/support/public-guide-boundary.ts b/dialectical-engine/apps/api/src/support/public-guide-boundary.ts
+index 90261e73bc45dbfbc06ccb7f2ed1ccb207106316..d05712f5a56e4876cbc4268d787ba857788387b4 100644
+--- a/dialectical-engine/apps/api/src/support/public-guide-boundary.ts
++++ b/dialectical-engine/apps/api/src/support/public-guide-boundary.ts
+@@ -8,8 +8,9 @@ const RECORD_NOUN = /\b(?:account|debates?|runs?|records?|history|messages?|case
+ const PERSONAL = /\b(?:my|mine|our|account|actual|active|current|latest|mea|meu|mele|nostru|noastra|contul|activ(?:a|e)?|actual(?:a|e)?|curent(?:a|e)?|ultim(?:a|e)?)\b/u;
+ const READ_OPERATION = /\b(?:list|show|retrieve|inspect|summari[sz]e|report|read|check|what(?:'s| is)|listeaz(?:a)?|arat(?:a)?|recupereaz(?:a)?|inspecteaz(?:a)?|rezum(?:a|ati)?|raporteaz(?:a)?|citeste|verific(?:a)?|care este)\b/u;
+ const LOCATION = /\b(?:where|find|go|open|page|menu|tab|button|navigate|unde|g[ăa]sesc|merg|deschid|pagin(?:a|ă)?|meniu|fila|buton|navig)/u;
+-const ACCOUNT_LOCATION_TARGET = /(?:\b(?:active |other |account )?sessions?\b|\bsesiun\p{L}*\b|\baccount\b.{0,40}\b(?:deletion|removal|erasure|delete|remove|erase)\b|\b(?:deletion|removal|erasure|delete|remove|erase)\b.{0,40}\baccount\b|(?<!\p{L})(?:ștergere|stergere|șterge|sterge|eliminare|elimina)\p{L}*(?!\p{L}).{0,40}\bcont\p{L}*\b)/u;
+-const ACCOUNT_OPERATION = /(?:\b(?:sign|log)[ -]?out\b|\b(?:delete|erase|remove)\b.{0,48}\baccount\b|\bdeconect\p{L}*\b|(?<!\p{L})(?:șterg|sterg|elimin)\p{L}*(?!\p{L}).{0,48}\bcont\p{L}*\b)/u;
++const ACCOUNT_LOCATION_TARGET = /(?:\b(?:active |other |account )?sessions?\b|\bsesiun\p{L}*\b|\baccount\b.{0,40}\b(?:deletion|removal|erasure|delete|remove|erase)\b|\b(?:deletion|removal|erasure|delete|remove|erase)\b.{0,40}\baccount\b|(?<!\p{L})(?:șterg|sterg|elimin)\p{L}*(?!\p{L}).{0,40}\bcont\p{L}*\b)/u;
++const ACCOUNT_OPERATION = /(?:\b(?:sign|log)[ -]?out\b|\b(?:delete|erase|remove)\b.{0,48}\baccount\b|\bdeconect\p{L}*\b|(?<!\p{L})(?:șterg(?:e|i|em|eți|eti|ă|a)?|sterg(?:e|i|em|eti|a)?|șteargă|stearga|elimin(?:ă|a|e|ează|eaza|i|ăm|am|ați|ati)?)(?!\p{L}).{0,48}\bcont\p{L}*\b)/u;
++const SUPPORT_ACTOR = /\b(?:support(?: agent)?|assistant|asistența|asistenta|asistent(?:a|ul)?|agent(?:ul)? de suport)\b/u;
+ const NEGATION = /\b(?:do not|don't|never|cannot|can't|must not|should not|without|nu|niciodat[ăa]|f[ăa]r[ăa])\b/u;
+ const CLAUSE_BOUNDARY = /[.!?;]+|,\s*|\b(?:and|then|but|plus|iar|apoi|dar|și|si)\b/u;
+ 
+@@ -24,6 +25,12 @@ function hasAffirmativeAccountOperation(clause: string): boolean {
+   return !NEGATION.test(prefix);
+ }
+ 
++function hasAffirmativeSupportAccountOperation(clause: string): boolean {
++  const operation = ACCOUNT_OPERATION.exec(clause);
++  if (operation === null || !hasAffirmativeAccountOperation(clause)) return false;
++  return SUPPORT_ACTOR.test(clause.slice(Math.max(0,operation.index - 64),operation.index));
++}
++
+ /**
+  * Public account-menu guidance may name a sensitive setting without asking
+  * Support to read private records or perform the account operation. Mixed
+@@ -33,7 +40,8 @@ function hasAffirmativeAccountOperation(clause: string): boolean {
+ export function isPreparedPublicAccountLocationGuide(views: readonly string[]): boolean {
+   return views.some((text) => LOCATION.test(text) && ACCOUNT_LOCATION_TARGET.test(text)
+     && text.split(CLAUSE_BOUNDARY).every((clause) =>
+-      !hasAffirmativeAccountOperation(clause) || LOCATION.test(clause)
++      !hasAffirmativeAccountOperation(clause)
++        || (LOCATION.test(clause) && !hasAffirmativeSupportAccountOperation(clause))
+     ));
+ }
+ 
+diff --git a/dialectical-engine/apps/api/src/support/recovery-intent.ts b/dialectical-engine/apps/api/src/support/recovery-intent.ts
+index 2e2a7317fc148fc0c4fb18e9fda7353723af34d3..fc0e085f4e9b2d5f44c4367f5c924c618b4c34ef 100644
+--- a/dialectical-engine/apps/api/src/support/recovery-intent.ts
++++ b/dialectical-engine/apps/api/src/support/recovery-intent.ts
+@@ -39,7 +39,7 @@ function normalized(value: string): string {
+ 
+ function tokenize(value: string,normalizeInput: boolean): readonly string[] {
+   const source = normalizeInput ? normalized(value) : value;
+-  return Object.freeze(source.match(/[\p{L}\p{N}]+(?:'[\p{L}\p{N}]+)?|[.;:!?]/gu) ?? []);
++  return Object.freeze(source.match(/[\p{L}\p{N}]+(?:'[\p{L}\p{N}]+)?|[,.;:!?]/gu) ?? []);
+ }
+ 
+ function clauses(value: string,normalizeInput: boolean): readonly Clause[] {
+@@ -50,7 +50,7 @@ function clauses(value: string,normalizeInput: boolean): readonly Clause[] {
+     current = [];
+   };
+   for (const token of tokenize(value,normalizeInput)) {
+-    if (/^[.;:!?]$/u.test(token) || CLAUSE_BOUNDARIES.has(token)) {
++    if (/^[,.;:!?]$/u.test(token) || CLAUSE_BOUNDARIES.has(token)) {
+       flush();
+       continue;
+     }
+@@ -67,7 +67,9 @@ function contains(words: readonly string[],pattern: RegExp): boolean {
+ function recoverySubject(words: readonly string[]): boolean {
+   const password = contains(words,PASSWORD_WORD);
+   const recovery = contains(words,RECOVERY_WORD) || contains(words,RESET_WORD);
+-  return password && recovery;
++  const resetCredential = contains(words,RESET_WORD)
++    && contains(words,CREDENTIAL_OBJECT_WORD);
++  return (password && recovery) || resetCredential;
+ }
+ 
+ function isNegated(words: readonly string[],predicateIndex: number): boolean {
+diff --git a/dialectical-engine/tests/integration/support-routes.test.ts b/dialectical-engine/tests/integration/support-routes.test.ts
+index 3b74e3c7f73e7ae56bad67bcfea8018888017e56..626ab7e600d896da5795887ea52059c3d60f5204 100644
+--- a/dialectical-engine/tests/integration/support-routes.test.ts
++++ b/dialectical-engine/tests/integration/support-routes.test.ts
+@@ -940,7 +940,8 @@ describe("SUP-01 support routes", () => {
+   it.each([
+     ["Show my active sessions","en","203.0.113.232"],
+     ["Șterge-mi contul acum.","ro","203.0.113.233"],
+-    ["Where are the account options, and delete my account now.","en","203.0.113.234"]
++    ["Where are the account options, and delete my account now.","en","203.0.113.234"],
++    ["Where can Support delete my account now?","en","203.0.113.235"]
+   ] as const)("keeps private records and account operations off the answer path: %s", async (
+     text,language,ip
+   ) => {
+@@ -2131,10 +2132,14 @@ describe("SUP-01 support routes", () => {
+   it.each(([
+     ["positive-navigation","en","Show me the password recovery page.","FORGOT_PASSWORD"],
+     ["operation-only","en","Reset my password for me.","CREDENTIAL_OPERATION"],
++    ["operation-token-only","en","Validate my reset token for me.","CREDENTIAL_OPERATION"],
++    ["comma-mixed","en","Do not validate my reset token, reset my password for me.","CREDENTIAL_OPERATION"],
+     ["mixed","en","Reset my password; then show me the recovery page.","CREDENTIAL_OPERATION_AND_FORGOT_PASSWORD"],
+     ["negated-operation-navigation","en","Do not reset my password; show me the recovery page.","FORGOT_PASSWORD"],
+     ["positive-navigation","ro","Arată-mi pagina de recuperare a parolei.","FORGOT_PASSWORD"],
+     ["operation-only","ro","Resetează-mi parola în locul meu.","CREDENTIAL_OPERATION"],
++    ["operation-code-only","ro","Validează codul de resetare pentru mine.","CREDENTIAL_OPERATION"],
++    ["comma-mixed","ro","Nu valida tokenul de resetare, resetează-mi parola.","CREDENTIAL_OPERATION"],
+     ["mixed","ro","Resetează-mi parola; apoi arată-mi pagina de recuperare.","CREDENTIAL_OPERATION_AND_FORGOT_PASSWORD"],
+     ["negated-operation-navigation","ro","Nu-mi reseta parola; arată-mi pagina de recuperare.","FORGOT_PASSWORD"]
+   ] as const).map((item,index) => [...item,`203.0.113.${220 + index}`] as const))(
+diff --git a/dialectical-engine/tests/unit/support-classify.test.ts b/dialectical-engine/tests/unit/support-classify.test.ts
+index 583cac1506f1ddf8f57af9d3a4aaaad9d89e6a10..d2bfa2ea29003680c9e5fe03c44f917ce1d5b846 100644
+--- a/dialectical-engine/tests/unit/support-classify.test.ts
++++ b/dialectical-engine/tests/unit/support-classify.test.ts
+@@ -633,7 +633,9 @@ describe("SUP-01 deterministic support classifier", () => {
+     ["Deconectează toate sesiunile active acum.","ro"],
+     ["Unde sunt sesiunile active, apoi deconectează-le pe toate.","ro"],
+     ["Șterge-mi contul acum.","ro"],
+-    ["Unde sunt opțiunile contului, apoi șterge-mi contul.","ro"]
++    ["Unde sunt opțiunile contului, apoi șterge-mi contul.","ro"],
++    ["Where can Support delete my account now?","en"],
++    ["Unde poate Asistența șterge contul meu?","ro"]
+   ] as const)("keeps account operations in deterministic zone refusal: %s",(message,language) => {
+     expect(classifySupportMessage(message)).toMatchObject({
+       outcome:"REFUSE_ZONE",language,link:"/settings"
+@@ -658,8 +660,12 @@ describe("SUP-01 deterministic support classifier", () => {
+   it.each([
+     ["en","Reset my password for me."],
+     ["en","Support must validate the reset token for my password."],
++    ["en","Validate my reset token for me."],
++    ["en","Do not validate my reset token, reset my password for me."],
+     ["ro","Resetează-mi parola în locul meu."],
+-    ["ro","Asistența trebuie să valideze tokenul de resetare pentru parola mea."]
++    ["ro","Asistența trebuie să valideze tokenul de resetare pentru parola mea."],
++    ["ro","Validează codul de resetare pentru mine."],
++    ["ro","Nu valida tokenul de resetare, resetează-mi parola."]
+   ] as const)("keeps an affirmative %s operation in the fixed operation refusal",(
+     language,message
+   ) => {
+diff --git a/dialectical-engine/tests/unit/support-public-guide-boundary.test.ts b/dialectical-engine/tests/unit/support-public-guide-boundary.test.ts
+index 6577d3bdc916e2fc669c7bae88f9bca6ad02233e..9d82887851888cf124aeff0e31ba020e190ee8be 100644
+--- a/dialectical-engine/tests/unit/support-public-guide-boundary.test.ts
++++ b/dialectical-engine/tests/unit/support-public-guide-boundary.test.ts
+@@ -1,5 +1,7 @@
+ import { describe,expect,it } from "vitest";
+-import { classifyPublicGuideBoundary } from "../../apps/api/src/support/public-guide-boundary.js";
++import {
++  classifyPublicGuideBoundary,isPublicAccountLocationGuide
++} from "../../apps/api/src/support/public-guide-boundary.js";
+ 
+ describe("Support public-guide boundary", () => {
+   it.each([
+@@ -18,6 +20,61 @@ describe("Support public-guide boundary", () => {
+     ["Unde găsesc opțiunile de ștergere a contului?","ro"]
+   ] as const)("keeps account-menu locations public: %s", (text,language) => {
+     expect(classifyPublicGuideBoundary(text,language)).toEqual({ kind: "PUBLIC_GUIDE" });
++    expect(isPublicAccountLocationGuide(text)).toBe(true);
++  });
++
++  it.each([
++    ["Where can Support delete my account now?","en"],
++    ["Where could the assistant remove my account?","en"],
++    ["Unde poate Asistența șterge contul meu?","ro"],
++    ["Unde poate agentul de suport să elimine contul meu?","ro"]
++  ] as const)("does not treat an explicit %s Support account operation as navigation: %s",(
++    text,_language
++  ) => {
++    expect(isPublicAccountLocationGuide(text)).toBe(false);
++  });
++
++  it.each([
++    "Where can I delete my account?",
++    "Where can I find the account deletion setting?",
++    "Do not delete my account; where can I find the account deletion setting?",
++    "Where can Support explain the account deletion setting?",
++    "Unde pot să îmi șterg contul?",
++    "Unde găsesc opțiunea de ștergere a contului?",
++    "Nu îmi șterge contul; unde găsesc opțiunea de ștergere?",
++    "Unde poate Asistența să explice opțiunea de ștergere a contului?"
++  ])("retains user navigation and non-operational Support guidance: %s",(text) => {
++    expect(isPublicAccountLocationGuide(text)).toBe(true);
++  });
++
++  it("distinguishes Support actors from user navigation across bounded operation forms", () => {
++    const controls = [
++      {
++        prefix:"Where can",actors:["Support","the assistant"],
++        operations:["delete","remove"],object:"my account"
++      },
++      {
++        prefix:"Unde poate",actors:["Asistența","agentul de suport"],
++        operations:["șterge","elimine"],object:"contul meu"
++      }
++    ] as const;
++    for (const control of controls) {
++      for (const actor of control.actors) {
++        for (const operation of control.operations) {
++          expect(
++            isPublicAccountLocationGuide(
++              `${control.prefix} ${actor} ${operation} ${control.object}?`
++            )
++          ).toBe(false);
++        }
++      }
++    }
++    expect(isPublicAccountLocationGuide(
++      "Support must not delete my account; where is the deletion setting?"
++    )).toBe(true);
++    expect(isPublicAccountLocationGuide(
++      "Asistența nu șterge contul; unde găsesc opțiunea de ștergere?"
++    )).toBe(true);
+   });
+ 
+   it.each([
+diff --git a/dialectical-engine/tests/unit/support-recovery-intent.test.ts b/dialectical-engine/tests/unit/support-recovery-intent.test.ts
+index 6fa05fe2d258bafdaa6ae3db30cb9139f9aeb5c8..0562436401b96ee76bfeadd841b3cbf9478f3a1b 100644
+--- a/dialectical-engine/tests/unit/support-recovery-intent.test.ts
++++ b/dialectical-engine/tests/unit/support-recovery-intent.test.ts
+@@ -127,9 +127,57 @@ describe("CP1 recovery predicate semantics", () => {
+   it.each([
+     ["en","The password policy article describes account safety."],
+     ["en","Recovery time after a service incident is five minutes."],
++    ["en","The reset token expires after the documented interval."],
+     ["ro","Articolul despre parole descrie siguranța contului."],
+-    ["ro","Timpul de recuperare după incident este de cinci minute."]
++    ["ro","Timpul de recuperare după incident este de cinci minute."],
++    ["ro","Codul de resetare expiră după intervalul documentat."]
+   ] as const)("keeps benign %s vocabulary outside recovery intent: %s",(language,text) => {
+     expectSemantics(text,language,{ navigation:"ABSENT",credentialOperation:"ABSENT" });
+   });
++
++  it.each([
++    ["en","Validate my reset token for me."],
++    ["en","Please submit the reset code."],
++    ["en","Support must check this reset token."],
++    ["ro","Validează codul de resetare pentru mine."],
++    ["ro","Te rog trimite tokenul de resetare."],
++    ["ro","Asistența trebuie să verifice codul de resetare."]
++  ] as const)("recognizes a %s credential operation from its reset token/code subject: %s",(
++    language,text
++  ) => {
++    expectSemantics(text,language,{ navigation:"ABSENT",credentialOperation:"AFFIRMATIVE" });
++  });
++
++  it.each([
++    ["en","Do not validate my reset token, reset my password for me."],
++    ["en","Do not validate my reset token; reset my password for me."],
++    ["en","Do not validate my reset token, but reset my password for me."],
++    ["ro","Nu valida tokenul de resetare, resetează-mi parola."],
++    ["ro","Nu valida tokenul de resetare; resetează-mi parola."],
++    ["ro","Nu valida tokenul de resetare, dar resetează-mi parola."]
++  ] as const)("keeps %s negation local across predicate boundaries: %s",(language,text) => {
++    expectSemantics(text,language,{ navigation:"ABSENT",credentialOperation:"AFFIRMATIVE" });
++  });
++
++  it("preserves predicate-local polarity over bounded punctuation and conjunction transforms", () => {
++    const controls = [
++      {
++        language:"en",negated:"Do not validate my reset token",
++        affirmative:"reset my password for me",separators:[", ","; ",". "," but "]
++      },
++      {
++        language:"ro",negated:"Nu valida tokenul de resetare",
++        affirmative:"resetează-mi parola",separators:[", ","; ",". "," dar "]
++      }
++    ] as const;
++    for (const control of controls) {
++      for (const separator of control.separators) {
++        expectSemantics(
++          `${control.negated}${separator}${control.affirmative}.`,
++          control.language,
++          { navigation:"ABSENT",credentialOperation:"AFFIRMATIVE" }
++        );
++      }
++    }
++  });
+ });

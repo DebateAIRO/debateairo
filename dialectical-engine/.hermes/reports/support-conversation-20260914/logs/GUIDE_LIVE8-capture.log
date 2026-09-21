@@ -1,0 +1,22 @@
+{"progress":true,"observedAt":"2026-09-20T16:54:24.162Z","attemptedRowCount":2,"completedRowCount":2,"failure":null}
+{"progress":true,"observedAt":"2026-09-20T16:55:24.161Z","attemptedRowCount":4,"completedRowCount":4,"failure":null}
+{"progress":true,"observedAt":"2026-09-20T16:56:24.163Z","attemptedRowCount":6,"completedRowCount":6,"failure":null}
+{"progress":true,"observedAt":"2026-09-20T16:57:24.165Z","attemptedRowCount":7,"completedRowCount":7,"failure":null}
+{"progress":true,"observedAt":"2026-09-20T16:58:24.111Z","attemptedRowCount":9,"completedRowCount":9,"failure":null}
+{"progress":true,"observedAt":"2026-09-20T16:59:24.114Z","attemptedRowCount":12,"completedRowCount":12,"failure":null}
+{"progress":true,"observedAt":"2026-09-20T17:00:24.112Z","attemptedRowCount":14,"completedRowCount":14,"failure":null}
+{"progress":true,"observedAt":"2026-09-20T17:01:24.115Z","attemptedRowCount":15,"completedRowCount":15,"failure":null}
+{"progress":true,"observedAt":"2026-09-20T17:02:24.116Z","attemptedRowCount":16,"completedRowCount":16,"failure":null}
+{"progress":true,"observedAt":"2026-09-20T17:03:24.118Z","attemptedRowCount":18,"completedRowCount":18,"failure":null}
+{"progress":true,"observedAt":"2026-09-20T17:04:24.119Z","attemptedRowCount":20,"completedRowCount":20,"failure":null}
+file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/controls.mjs:817
+        throw new Error("GUIDE_HARNESS_EXPECTED_PRIMARY_SOURCE_MISSING");
+              ^
+
+Error: GUIDE_HARNESS_EXPECTED_PRIMARY_SOURCE_MISSING
+    at assertGuideObservation (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/controls.mjs:817:15)
+    at consumeGuideObservationStages (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/controls.mjs:969:23)
+    at async send (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/capture-public-guide.mjs:374:48)
+    at async file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/capture-public-guide.mjs:449:7
+
+Node.js v22.23.1

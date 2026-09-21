@@ -1,0 +1,106 @@
+{
+  "schema": "support-identity-editrev-receipt-v1",
+  "node": "IDENTITY_EDITREV",
+  "ticket": "t_4a2b2ccc",
+  "runId": 83,
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewerAgent": "/root/baseline",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-17",
+  "productRevision": "a5225dfdcf9f244c876cfbcb6516c4ea37e2f5da",
+  "baseRevision": "475c5a7e7eb8f48a3f5a81379f37b49fdd014ce9",
+  "contractFreeze": "f395db1f2e2ada413b07f14f7f49235541b487d1",
+  "verdict": "PASS",
+  "records": [
+    {
+      "id": "product-identity",
+      "lang": "en",
+      "verdict": "PASS",
+      "article": {
+        "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-product/dialectical-engine/packages/support-kb/content/product-identity.en.md",
+        "sha256": "3841870d3e2310a8fbee6325e59b4c25e92437b644b6a311910ade1e304ef4aa",
+        "bytes": 551
+      },
+      "modelProjectionSha256": "797d3ca04d545f868a633dd67d7f52a9758ddb86fa26aaf87d3d87ee5ff32d64",
+      "modelProjectionBytes": 287,
+      "fallbackSha256": "0f08312a2f6fcd13a67f7694dfefe1ac084bbda210df900eda65ec589cc4c032",
+      "fallbackBytes": 259,
+      "projectionDisposition": "PASS_COMPLETE_ACCURATE_ACTIONLESS",
+      "fallbackDisposition": "PASS_USEFUL_ACCURATE_ACTIONLESS"
+    },
+    {
+      "id": "product-identity",
+      "lang": "ro",
+      "verdict": "PASS",
+      "article": {
+        "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-product/dialectical-engine/packages/support-kb/content/product-identity.ro.md",
+        "sha256": "d05337815983d83f075964b6db5063dfbff40721a720013aaeeff19c98262391",
+        "bytes": 631
+      },
+      "modelProjectionSha256": "5ca60396146b9390d5f2848c703a221d75e0f3e2c88740cc44d1abde6c77ae40",
+      "modelProjectionBytes": 363,
+      "fallbackSha256": "d2102ff844843efc368e4458e7928fbb6ccd64675cb3c8d4b1657ff015acf812",
+      "fallbackBytes": 350,
+      "projectionDisposition": "PASS_COMPLETE_ACCURATE_ACTIONLESS",
+      "fallbackDisposition": "PASS_USEFUL_ACCURATE_ACTIONLESS"
+    }
+  ],
+  "currentBindings": {
+    "components": {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-product/dialectical-engine/packages/support-kb/recovery/components.json",
+      "sha256": "8934293e862387fd3e6e83527780640e8497bdc50704854e43eb1d2db24fcae6",
+      "bytes": 31857
+    },
+    "catalog": {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-product/dialectical-engine/packages/support-kb/src/catalog.ts",
+      "sha256": "f33cd1d8b57ecd076aff02135fe4070e7b7b51ee090bad4f64c0e08a668cedf5",
+      "bytes": 10682
+    }
+  },
+  "retainedCorpus": {
+    "baseRecordCount": 36,
+    "currentRecordCount": 38,
+    "newIdentityRecordCount": 2,
+    "retainedRecordCount": 36,
+    "retainedExactOrderedValueEquality": true,
+    "disposition": "RETAIN_PRIOR_REVIEW_NO_FRESH_SEMANTIC_APPROVAL"
+  },
+  "factEvidence": [
+    "apps/ui/app/layout.tsx:28-30",
+    "apps/ui/app/page.tsx:60-64",
+    "apps/api/src/support/templates.ts:44-48",
+    "packages/support-kb/src/catalog.ts:101-115",
+    "packages/support-kb/src/context.ts:41-76"
+  ],
+  "sourceCustody": {
+    "startHead": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "endHead": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "startCachedFullIndexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "endCachedFullIndexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "startWorkingFullIndexDiffSha256": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19",
+    "endWorkingFullIndexDiffSha256": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19",
+    "startTrackedDirtyPathCount": 58,
+    "endTrackedDirtyPathCount": 58
+  },
+  "artifacts": [
+    {
+      "kind": "editorialReport",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/PRODUCT-IDENTITY-EDITORIAL.md",
+      "sha256": "547f3922ab8dc7d2450e989249a9a72e8e93d8fd34bc5e7b821d4fbbebe15bef",
+      "bytes": 5263
+    },
+    {
+      "kind": "selfReport",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/IDENTITY_EDITREV.md",
+      "sha256": "4334c469b1b5efb3fd086938c16c11ddcd61fa00722ffef2a78afde43f046e6c",
+      "bytes": 4433
+    }
+  ],
+  "limits": [
+    "Peer review is not owner ratification or checkpoint acceptance.",
+    "The prior 36 records were checked only for exact ordered value equality and were not semantically re-reviewed.",
+    "No manifest admission, product mutation, test, build, preview, model request, Support request, credential/reset operation or runtime verdict occurred.",
+    "The canonical Forgot-password destination remains unresolved and no replacement was inferred.",
+    "Actual model-token usage is unavailable."
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FOOTERLESS_REVIEW39",
+  "ticket": "t_f0af1892",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "freeze": "7ec1fec907f46cfdcc7a97695c64d1604aa48de8",
+  "inputsSha256": "c223b3a2dbee4c9bb57ba61095eeed16767866a13d19d1783ab782dc101a481d",
+  "authorReceiptSha256": "8f495583febc3aaf36fc03733e8fd0f06bde005e313652d324f8c242035d53ea",
+  "consumptionSha256": "ef806a7400b053572ef7e3bdba6042a69f1b5f7dd94c22d0a02a222c54ff5360",
+  "helper": {"sha256":"10a806c50999a84f3a036375807ef29a29c92ef6368047ec4e14c28af148b3be","bytes":24095},
+  "callContract": {"sha256":"1bf78f46a7d3a3dab109f2ae90cfd04b928878d31b03976202a886012a4c5cc6","bytes":1079},
+  "controlProof": {"sha256":"2e237f50aeba203febf307e70d97d382a61ac03732be475198b77b10181a0416","bytes":19722,"passed":9,"total":9},
+  "helperContractSha256": "238356cfb8023031b44514364e17aa879ec6cd8835950632d4da347db041836c",
+  "productSources": {
+    "assistantSha256":"08973898240182a2c04894b1987ffab92e593d70bb9eb9808484f2c76c8e710d",
+    "cssSha256":"4a63c4227acdc5edd4f8358a7ebe7378a03a3334be05e8ae83f0e0a5c430fe5b"
+  },
+  "concurrentBind40Inspected": false,
+  "operationalTraffic": 0
+}

@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX8",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "productClean": true,
+  "orderedEightDigestAlgorithm": "sha256(JSON.stringify(ordered file records))",
+  "harnessSha256": "be7a0ca7f0b4f768ac40a2ecb020a7f17f96df5a8f32100b43e3b85e3752047c",
+  "orderedFiles": [
+    {
+      "path": "capture-public-guide.mjs",
+      "bytes": 18423,
+      "sha256": "7e00bcb022cd32770dbe61314d1fc78095201643fa8acfe62682ff8ebda71de1"
+    },
+    {
+      "path": "controls.mjs",
+      "bytes": 27615,
+      "sha256": "4887cfdf2a22643d3a161ccbfee385f27cc231468a1d2f1c51a501a203b12135"
+    },
+    {
+      "path": "matrix.mjs",
+      "bytes": 14253,
+      "sha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c"
+    },
+    {
+      "path": "pre-request-verifier.ts",
+      "bytes": 16486,
+      "sha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733"
+    },
+    {
+      "path": "runtime-capacity.mjs",
+      "bytes": 9935,
+      "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87"
+    },
+    {
+      "path": "session-lifecycle.mjs",
+      "bytes": 4254,
+      "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b"
+    },
+    {
+      "path": "verify-final-branches.ts",
+      "bytes": 5131,
+      "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a"
+    },
+    {
+      "path": "verify-guide-harness.mjs",
+      "bytes": 62790,
+      "sha256": "1161d55dc3c4583ed55769263ba627dfee78f1d07cd82b749f473f7441e32e0f"
+    }
+  ],
+  "controlProof": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX8-control-proof.json",
+    "sha256": "3f64bec7379a4af710e3d184748c646c8486dc29a8026b8ce16bb61d41340a14",
+    "controls": 111,
+    "passed": 111
+  },
+  "retainedControlPurposes": 105,
+  "addedControlPurposes": 6,
+  "matrixSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+  "preRequestVerifierSha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733",
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "database": 0,
+    "supportRequests": 0,
+    "modelRequests": 0
+  }
+}

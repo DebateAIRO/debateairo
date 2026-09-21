@@ -1,0 +1,9 @@
+file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND15/probe-zero-request-ui.mjs:33
+  await mkdir(EVIDENCE_ROOT,{ recursive:true });
+              ^
+
+ReferenceError: EVIDENCE_ROOT is not defined
+    at checkpoint (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND15/probe-zero-request-ui.mjs:33:15)
+    at file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND15/probe-zero-request-ui.mjs:245:9
+
+Node.js v22.23.1

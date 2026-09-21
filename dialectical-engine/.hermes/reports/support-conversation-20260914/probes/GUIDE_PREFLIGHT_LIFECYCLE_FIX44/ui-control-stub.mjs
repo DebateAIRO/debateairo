@@ -1,0 +1,1 @@
+import { writeFile } from "node:fs/promises";const output=process.argv[2];if(!output?.startsWith("/"))throw new Error("GUIDE_LIFECYCLE_STUB_ARGUMENT_INVALID");await writeFile(output,`${JSON.stringify({completed:true,createSessionAttempts:0,messageAttempts:1,forwardedDynamicRequests:0,hiddenSupportSetupRequests:0},null,2)}\n`,{flag:"wx",mode:0o600});

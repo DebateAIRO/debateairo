@@ -1,0 +1,33 @@
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
++ []
+- [
+-   {
+-     href: '/login?next=%2Fnew',
+-     id: 'start-debate',
+-     label: 'Start a debate'
+-   }
+- ]
+
+    at answerServiceControl (/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/REV1_P4/correctness-boundary-control.ts:215:10)
+    at async <anonymous> (/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/REV1_P4/correctness-boundary-control.ts:245:3) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [],
+  expected: [
+    {
+      id: 'start-debate',
+      label: 'Start a debate',
+      href: '/login?next=%2Fnew'
+    }
+  ],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v22.23.1

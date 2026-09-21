@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_FIX18",
+  "baseRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "status": "PREPARED_NOT_EXECUTED_AWAITING_FINAL_PRODUCT_BINDING",
+  "required": [
+    "finalRevision",
+    "productInventoryPathAndSha256",
+    "expectedKbVersionAndEntryCount44",
+    "reviewedKbReceiptAndManifest",
+    "supportedRuntimeReloadReceiptWithMatchingKbVersion",
+    "retainedSequences",
+    "freshSequences",
+    "freshSessionGroups",
+    "retentionManifestPathAndSha256OrInvalidationDecision",
+    "newActualNamespace",
+    "newProfileReceiptScreenshotCapacityGateRowProofAndLogPaths",
+    "gateTemplatePathAndSha256",
+    "attestationRequiredSuiteAndControlProofBindings",
+    "absoluteSevenPhaseHelperContracts"
+  ],
+  "preparedHelpers": {
+    "capture": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_FIX18/capture-public-guide.mjs",
+    "capacity": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_FIX18/materialize-runtime-capacity.mjs",
+    "gate": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_FIX18/materialize-final-gate.mjs",
+    "commandContractGenerator": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_FIX18/command-contract.mjs"
+  },
+  "lifecycle": {
+    "reason": "apps/api/src/main.ts loads the Help corpus once at process startup",
+    "requiredLaterStep": "Under a runtime lease, verify the owned preview group, supported-stop only that group, and start detached pnpm dev:auth:up from the clean final revision; then verify the running status reports the reviewed KB digest.",
+    "preserve": [
+      "unrelated listeners",
+      "Docker data-plane services",
+      "existing support configuration",
+      "usage counters"
+    ],
+    "supportConfigurationPublicationRequired": false,
+    "supportConfigurationInitializerAuthorized": false
+  },
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "status": 0,
+    "database": 0,
+    "capacity": 0,
+    "supportRequests": 0,
+    "modelRequests": 0
+  }
+}

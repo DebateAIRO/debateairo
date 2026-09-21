@@ -1,0 +1,1615 @@
+commit 53d877e15dfc6b1314bf08ad6d1eea68b41bda52
+Merge: 971e938c 0d34f82f
+Author: Vlad Mihai Miron <vladmihaimiron@192.168.1.10>
+Date:   Mon Sep 21 16:03:57 2026 +0300
+
+    merge: codex/support-conversation-cp1 into the all-worktrees integration (2026-09-21)
+    
+    Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+
+diff --cc dialectical-engine/apps/api/src/main.ts
+index 4f6fa931,983d03f3..8591d2b5
+--- a/dialectical-engine/apps/api/src/main.ts
++++ b/dialectical-engine/apps/api/src/main.ts
+@@@ -1,6 -1,6 +1,7 @@@
+ +import "@debateai/obs-capture/install/api";
+  import { Hatchet } from "@hatchet-dev/typescript-sdk";
+  import { randomUUID } from "node:crypto";
++ import { readFileSync } from "node:fs";
+  import { resolve } from "node:path";
+  import {
+    Argon2WorkerPool,
+diff --cc dialectical-engine/apps/runner/src/dev-api-environment.ts
+index 718e8bc4,46864ad8..709f5f9a
+--- a/dialectical-engine/apps/runner/src/dev-api-environment.ts
++++ b/dialectical-engine/apps/runner/src/dev-api-environment.ts
+@@@ -81,7 -83,7 +84,8 @@@ type AssembleDevelopmentApiEnvironmentI
+    providerPanel: DevelopmentProviderPanel;
+    registerReceipt: DevelopmentDeploymentRegisterMachineReceiptV1;
+    supportModelTarget: string;
+ +  heldConfiguredProviderSets?: ReadonlyMap<string, readonly string[]>;
++   profile?: DevelopmentAuthStackProfile;
+  }>;
+  
+  function currentUid(): number {
+@@@ -312,7 -314,7 +316,8 @@@ async function publishExactFile
+  function isExactProviderRuntimeRefresh(
+    existing: string,
+    expected: string,
+-   configuredProviders: readonly DevelopmentConfiguredProvider[]
+++  configuredProviders: readonly DevelopmentConfiguredProvider[],
++   profile: DevelopmentAuthStackProfile
+  ): boolean {
+    try {
+      const existingValues = parseExactEnvironment(existing, DEVELOPMENT_API_ENVIRONMENT_KEYS);
+@@@ -322,9 -324,13 +327,14 @@@
+        if (existingValues.get(key) !== expectedValues.get(key)) return false;
+      }
+      parseDevelopmentProviderPanelTargets(
+-       existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!, configuredProviders
++       existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!,
+++      configuredProviders,
++       profile
++     );
++     parseDevelopmentSupportModelTargetJson(
++       existingValues.get("SUPPORT_MODEL_TARGET_JSON")!,
++       profile
+      );
+-     parseDevelopmentSupportModelTargetJson(existingValues.get("SUPPORT_MODEL_TARGET_JSON")!);
+      return true;
+    } catch {
+      return false;
+@@@ -344,8 -350,7 +354,9 @@@
+  function isExactPublishedRegisterRefresh(
+    existing: string,
+    expected: string,
+ -  profile: DevelopmentAuthStackProfile
+ +  configuredProviders: readonly DevelopmentConfiguredProvider[],
+++  profile: DevelopmentAuthStackProfile,
+ +  heldConfiguredProviderSets?: ReadonlyMap<string, readonly string[]>
+  ): boolean {
+    const receiptKeys = new Set([
+      "REGISTER_VERSION",
+@@@ -364,11 -369,13 +375,13 @@@
+          || receiptKeys.has(key)) continue;
+        if (existingValues.get(key) !== expectedValues.get(key)) return false;
+      }
+ -    // The OUTGOING targets cannot be re-parsed against the new configured set - that set is
+ -    // precisely what changed - so they are held to the rule a publication actually obeys:
+ -    // slots are ADDED, never removed or renamed. An environment naming a provider the
+ -    // deployment does not configure (the retired local-vllm scaffold, say) stays drift.
+ +    // The OUTGOING targets cannot be re-parsed against the new configured set because that
+ +    // set is precisely what changed. An additive publication is admitted directly. A removal
+ +    // is admitted only when the caller proves the exact outgoing set was held by its version.
+      const incoming = parseDevelopmentProviderPanelTargets(
+-       expectedValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!, configuredProviders
++       expectedValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!,
+++      configuredProviders,
++       profile
+      );
+      const configuredRefs = new Set(incoming.targets.map((target) => target.providerRef));
+      const outgoing: unknown = JSON.parse(existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!);
+@@@ -377,19 -383,12 +390,22 @@@
+      for (const row of outgoing) {
+        if (typeof row !== "object" || row === null) return false;
+        const providerRef = (row as Readonly<Record<string, unknown>>).provider_ref;
+ -      if (typeof providerRef !== "string" || !configuredRefs.has(providerRef)) return false;
+ +      if (typeof providerRef !== "string") return false;
+ +      outgoingRefs.push(providerRef);
+      }
+ +    const additive = outgoingRefs.every((providerRef) => configuredRefs.has(providerRef));
+ +    const heldRefs = heldConfiguredProviderSets?.get(existingValues.get("REGISTER_VERSION")!);
+ +    const heldSet = heldRefs === undefined ? undefined : new Set(heldRefs);
+ +    const exactHeldSet = heldSet !== undefined
+ +      && heldSet.size === heldRefs!.length
+ +      && new Set(outgoingRefs).size === outgoingRefs.length
+ +      && outgoingRefs.length === heldSet.size
+ +      && outgoingRefs.every((providerRef) => heldSet.has(providerRef));
+ +    if (!additive && !exactHeldSet) return false;
+-     parseDevelopmentSupportModelTargetJson(existingValues.get("SUPPORT_MODEL_TARGET_JSON")!);
++     parseDevelopmentSupportModelTargetJson(
++       existingValues.get("SUPPORT_MODEL_TARGET_JSON")!,
++       profile
++     );
+      return true;
+    } catch {
+      return false;
+@@@ -399,20 -398,19 +415,22 @@@
+  function isExactProviderRuntimeRefreshWithLegacyProbeTimeout(
+    existing: string,
+    expected: string,
+-   configuredProviders: readonly DevelopmentConfiguredProvider[]
+++  configuredProviders: readonly DevelopmentConfiguredProvider[],
++   profile: DevelopmentAuthStackProfile
+  ): boolean {
+    const upgraded = existing.replace(
+      "PROVIDER_PROBE_TIMEOUT_MS=5000\n",
+      `PROVIDER_PROBE_TIMEOUT_MS=${DEVELOPMENT_CLI_CALL_TIMEOUT_MS}\n`
+    );
+ -  return upgraded !== existing && isExactProviderRuntimeRefresh(upgraded, expected, profile);
+ +  return upgraded !== existing
+-     && isExactProviderRuntimeRefresh(upgraded, expected, configuredProviders);
+++    && isExactProviderRuntimeRefresh(upgraded, expected, configuredProviders, profile);
+  }
+  
+  function isExactLegacyEnvironmentWithoutSupportModelTarget(
+    existing: string,
+    expected: string,
+-   configuredProviders: readonly DevelopmentConfiguredProvider[]
+++  configuredProviders: readonly DevelopmentConfiguredProvider[],
++   profile: DevelopmentAuthStackProfile
+  ): boolean {
+    try {
+      const legacyKeys = DEVELOPMENT_API_ENVIRONMENT_KEYS.filter((key) =>
+@@@ -425,9 -423,13 +443,14 @@@
+        if (existingValues.get(key) !== expectedValues.get(key)) return false;
+      }
+      parseDevelopmentProviderPanelTargets(
+-       existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!, configuredProviders
++       existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!,
+++      configuredProviders,
++       profile
++     );
++     parseDevelopmentSupportModelTargetJson(
++       expectedValues.get("SUPPORT_MODEL_TARGET_JSON")!,
++       profile
+      );
+-     parseDevelopmentSupportModelTargetJson(expectedValues.get("SUPPORT_MODEL_TARGET_JSON")!);
+      return true;
+    } catch {
+      return false;
+@@@ -518,21 -524,10 +545,22 @@@ export async function assembleDevelopme
+      join(custodyRoot, "api.env"),
+      source,
+      [],
+ -    (existing) => isExactProviderRuntimeRefresh(existing, source, profile)
+ -      || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(existing, source, profile)
+ -      || isExactPublishedRegisterRefresh(existing, source, profile)
+ -      || isExactLegacyEnvironmentWithoutSupportModelTarget(existing, source, profile)
+ +    (existing) => isExactProviderRuntimeRefresh(
+-       existing, source, input.providerPanel.configuredProviders
+++      existing, source, input.providerPanel.configuredProviders, profile
+ +    )
+ +      || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(
+-         existing, source, input.providerPanel.configuredProviders
+++        existing, source, input.providerPanel.configuredProviders, profile
+ +      )
+ +      || isExactPublishedRegisterRefresh(
+ +        existing,
+ +        source,
+ +        input.providerPanel.configuredProviders,
+++        profile,
+ +        input.heldConfiguredProviderSets
+ +      )
+ +      || isExactLegacyEnvironmentWithoutSupportModelTarget(
+-         existing, source, input.providerPanel.configuredProviders
+++        existing, source, input.providerPanel.configuredProviders, profile
+ +      )
+    );
+    return Object.freeze({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused });
+  }
+diff --cc dialectical-engine/apps/runner/src/dev-api-process.ts
+index bd443526,4529cbb0..be9fe05f
+--- a/dialectical-engine/apps/runner/src/dev-api-process.ts
++++ b/dialectical-engine/apps/runner/src/dev-api-process.ts
+@@@ -166,10 -169,11 +170,12 @@@ function validateExactEnvironment
+      parseApiEnvironment(values);
+      const providerPanel = parseDevelopmentProviderPanelTargets(
+        values.PROVIDER_DISCOVERY_TARGETS_JSON!,
+-       loadModelConfigConfiguredProviders(repositoryRoot)
+++      loadModelConfigConfiguredProviders(repositoryRoot),
++       profile
+      );
+      const supportModelTarget = parseDevelopmentSupportModelTargetJson(
+-       values.SUPPORT_MODEL_TARGET_JSON!
++       values.SUPPORT_MODEL_TARGET_JSON!,
++       profile
+      );
+      const custodyRoot = join(repositoryRoot, ".local", "dev-auth");
+      const exact = new Map<string, string>([
+diff --cc dialectical-engine/apps/runner/src/dev-auth-data-plane.ts
+index a5882016,5d075e14..aecfc793
+--- a/dialectical-engine/apps/runner/src/dev-auth-data-plane.ts
++++ b/dialectical-engine/apps/runner/src/dev-auth-data-plane.ts
+@@@ -379,19 -390,13 +390,19 @@@ export function createDevelopmentAuthDa
+            DEBATEAI_DEV_PROVIDER_TARGETS_JSON: providerPanel.targetsJson
+          }
+        );
+ -      return parseDevelopmentDeploymentRegisterCliOutput(output, cwd);
+ +      await parseDevelopmentDeploymentRegisterCliOutput(seedOutput, cwd);
+ +      const publishOutput = await runPnpm(
+ +        ["dev:auth:publish-provider-set"],
+ +        "DEV_AUTH_DATA_PLANE_REGISTER_PUBLICATION_FAILED",
+ +        migrationEnvironment
+ +      );
+ +      return parseDevelopmentDeploymentRegisterCliOutput(publishOutput, cwd);
+      },
+      async initializeSupportConfiguration(registerReceipt) {
+-       const credentials = await loadDevelopmentSupportConfigCliCredentials(
+-         join(cwd,".local","dev-auth","database-principals.env")
++       const pool = await createDevelopmentSupportConfigInitializationPool(
++         join(cwd,".local","dev-auth","database-principals.env"),
++         String(profile.postgresPort)
+        );
+-       const pool = createSupportControlPlanePool(credentials.databaseUrl);
+        try {
+          await initializeDevelopmentSupportConfiguration({
+            publication: createPostgresRegisterPublicationPort(pool),
+diff --cc dialectical-engine/apps/runner/src/dev-auth-stack.ts
+index b094c589,fe9efc6a..c74f6357
+--- a/dialectical-engine/apps/runner/src/dev-auth-stack.ts
++++ b/dialectical-engine/apps/runner/src/dev-auth-stack.ts
+@@@ -30,16 -28,9 +30,13 @@@ import 
+  } from "./dev-cli-provider-panel.js";
+  import {
+    DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
+ +  resolveDevelopmentApiProviderSlots,
+ +  type DevelopmentApiProviderProbe,
+    type DevelopmentProviderPanel
+  } from "./dev-provider-panel.js";
+ +import { loadModelConfig, ModelConfigShapeError, type ModelConfig } from "@debateai/model-config";
+ +import { readProviderKeys } from "./dev-provider-keys.js";
+- import {
+-   HERMES_SUPPORT_PORT,
+-   startHermesSupportRelay
+- } from "../../../acceptance/hermes-relay.js";
++ import { startHermesSupportRelay } from "../../../acceptance/hermes-relay.js";
+  import type { DevelopmentDeploymentRegisterMachineReceiptV1 } from "./dev-deployment-register.js";
+  import {
+    createDevTlsReadinessOperations,
+@@@ -62,15 -56,8 +63,16 @@@ type SupportModelRelayHandle = Stoppabl
+    providerRef: "development:hermes-glm-5.3-flash";
+  }>;
+  
+ +export type DevelopmentApiProviderAvailabilityOperations = Readonly<{
+ +  readProviderKeys(repositoryRoot: string): Promise<ReadonlyMap<string, string>>;
+ +  probe: DevelopmentApiProviderProbe;
+ +  warning(line: string): void;
+ +}>;
+ +
+  export type DevelopmentAuthStackOperations = Readonly<{
++   profile?: DevelopmentAuthStackProfile;
+ +  generateContract(): Promise<void>;
+ +  checkModelConfig(): Promise<void>;
+    isPublicPortOccupied(): Promise<boolean>;
+    startProviderPanel(): Promise<DevelopmentCliProviderPanelHandle>;
+    startSupportModelRelay(): Promise<SupportModelRelayHandle>;
+@@@ -152,14 -138,7 +154,15 @@@ async function stopOwned(resources: rea
+  export async function startDevelopmentAuthStack(
+    operations: DevelopmentAuthStackOperations
+  ): Promise<DevelopmentAuthStack> {
++   const profile = operations.profile ?? DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE;
+ +  await fixedStage(
+ +    "DEV_AUTH_STACK_MODEL_CONFIG_INVALID",
+ +    () => operations.checkModelConfig()
+ +  );
+ +  await fixedStage(
+ +    "DEV_AUTH_STACK_CONTRACT_GENERATION_FAILED",
+ +    () => operations.generateContract()
+ +  );
+    const occupied = await fixedStage(
+      "DEV_AUTH_STACK_PREFLIGHT_FAILED",
+      () => operations.isPublicPortOccupied()
+@@@ -259,90 -235,31 +262,116 @@@ export async function superviseDevelopm
+    }
+  }
+  
+++const DEFAULT_DEVELOPMENT_API_PROVIDER_AVAILABILITY_OPERATIONS:
+++DevelopmentApiProviderAvailabilityOperations = Object.freeze({
+++  readProviderKeys,
+++  async probe(input) {
+++    const response = await fetch(`${input.baseUrl.replace(/\/$/u, "")}/chat/completions`, {
+++      method: "POST",
+++      headers: {
+++        authorization: `Bearer ${input.keyValue}`,
+++        "content-type": "application/json"
+++      },
+++      body: JSON.stringify({
+++        model: input.model,
+++        messages: [{ role: "user", content: "Reply with OK." }],
+++        max_tokens: 64
+++      })
+++    });
+++    if (!response.ok) throw new TypeError("DEV_PROVIDER_SLOT_PROBE_FAILED");
+++    const body = await response.json() as Readonly<{ model?: unknown }>;
+++    if (typeof body.model !== "string") throw new TypeError("DEV_PROVIDER_SLOT_PROBE_FAILED");
+++    return Object.freeze({ model: body.model });
+++  },
+++  warning: (line) => console.warn(line)
+++});
+++
+  export function createDevelopmentAuthStackOperations(
+    repositoryRoot: string,
+    commandEnvironment: Readonly<Record<string, string>>,
+-   apiProviderOperations: DevelopmentApiProviderAvailabilityOperations = Object.freeze({
+-     readProviderKeys,
+-     async probe(input) {
+-       const response = await fetch(`${input.baseUrl.replace(/\/$/u, "")}/chat/completions`, {
+-         method: "POST",
+-         headers: {
+-           authorization: `Bearer ${input.keyValue}`,
+-           "content-type": "application/json"
+-         },
+-         body: JSON.stringify({
+-           model: input.model,
+-           messages: [{ role: "user", content: "Reply with OK." }],
+-           max_tokens: 64
+-         })
+-       });
+-       if (!response.ok) throw new TypeError("DEV_PROVIDER_SLOT_PROBE_FAILED");
+-       const body = await response.json() as Readonly<{ model?: unknown }>;
+-       if (typeof body.model !== "string") throw new TypeError("DEV_PROVIDER_SLOT_PROBE_FAILED");
+-       return Object.freeze({ model: body.model });
+-     },
+-     warning: (line) => console.warn(line)
+-   })
+ -  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+++  profileOrApiProviderOperations: DevelopmentAuthStackProfile
+++    | DevelopmentApiProviderAvailabilityOperations = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+++  explicitApiProviderOperations: DevelopmentApiProviderAvailabilityOperations =
+++    DEFAULT_DEVELOPMENT_API_PROVIDER_AVAILABILITY_OPERATIONS
+  ): DevelopmentAuthStackOperations {
+++  const profile = "name" in profileOrApiProviderOperations
+++    ? profileOrApiProviderOperations
+++    : DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE;
+++  const apiProviderOperations = "name" in profileOrApiProviderOperations
+++    ? explicitApiProviderOperations
+++    : profileOrApiProviderOperations;
+ +  const execFileAsync = promisify(execFile);
+    const hatchetOperations = createDevelopmentHatchetTokenOperations(
+      repositoryRoot,
+-     commandEnvironment
++     commandEnvironment,
++     profile
+    );
+-   const tlsOperations = createDevTlsReadinessOperations(repositoryRoot);
++   const tlsOperations = createDevTlsReadinessOperations(repositoryRoot, {
++     publicPort: profile.publicPort,
++     uiPort: profile.uiPort
++   });
+ +  let checkedModelConfig: ModelConfig | undefined;
+    return Object.freeze({
++     profile,
+ +    async generateContract() {
+ +      await execFileAsync(
+ +        commandEnvironment.PNPM_EXECUTABLE?.trim() || "pnpm",
+ +        ["generate:contract"],
+ +        {
+ +          cwd: repositoryRoot,
+ +          env: { ...commandEnvironment },
+ +          maxBuffer: 128 * 1024
+ +        }
+ +      );
+ +    },
+ +    async checkModelConfig() {
+ +      try {
+ +        checkedModelConfig = loadModelConfig(repositoryRoot);
+ +      } catch (error) {
+ +        if (error instanceof ModelConfigShapeError) {
+ +          const model = error.model === undefined ? "" : ` model=${error.model}`;
+ +          console.error(
+ +            `DEV_AUTH_STACK_MODEL_CONFIG_INVALID tier=${error.tier}${model} class ${error.classNumber}`
+ +          );
+ +        }
+ +        throw error;
+ +      }
+ +    },
+      isPublicPortOccupied: () => tlsOperations.isPublicPortOccupied(),
+ -    startProviderPanel: () => startDevelopmentCliProviderPanel(undefined, profile),
+ +    async startProviderPanel() {
+ +      const config = checkedModelConfig ?? loadModelConfig(repositoryRoot);
+-       const cliHandle = await startDevelopmentCliProviderPanel(config);
+++      const cliHandle = await startDevelopmentCliProviderPanel(
+++        config,
+++        undefined,
+++        apiProviderOperations.warning,
+++        profile
+++      );
+ +      try {
+ +        const panel = await resolveDevelopmentApiProviderSlots(
+ +          config,
+ +          cliHandle.panel,
+ +          await apiProviderOperations.readProviderKeys(repositoryRoot),
+ +          apiProviderOperations.probe,
+-           apiProviderOperations.warning
+++          apiProviderOperations.warning,
+++          profile
+ +        );
+ +        return Object.freeze({
+ +          panel,
+ +          healthyProviderRefs: panel.healthyProviderRefs,
+ +          stop: () => cliHandle.stop()
+ +        });
+ +      } catch (error) {
+ +        await cliHandle.stop().catch(() => undefined);
+ +        throw error;
+ +      }
+ +    },
+      async startSupportModelRelay() {
+        const relay = await startHermesSupportRelay({
+-         port: HERMES_SUPPORT_PORT,
+-         timeoutMs: DEVELOPMENT_CLI_CALL_TIMEOUT_MS
++         port: profile.supportModelPort,
++         timeoutMs: DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
++         ...(profile.name === "support-preview"
++           ? { developmentStackProfile: "support-preview" as const }
++           : {})
+        });
+        return Object.freeze({
+          targetJson: relay.targetJson,
+@@@ -360,21 -278,13 +390,23 @@@
+      async provisionHatchetToken() {
+        await provisionDevelopmentHatchetToken({
+          repositoryRoot,
+-         operations: hatchetOperations
++         operations: hatchetOperations,
++         profile
+        });
+      },
+ -    async assembleApiEnvironment(providerPanel, registerReceipt, supportModelTarget) {
+ +    async assembleApiEnvironment(
+ +      providerPanel,
+ +      registerReceipt,
+ +      supportModelTarget,
+ +      heldConfiguredProviderSets
+ +    ) {
+        await assembleDevelopmentApiEnvironment({
+ -        repositoryRoot,providerPanel,registerReceipt,supportModelTarget,profile
+ +        repositoryRoot,
+ +        providerPanel,
+ +        registerReceipt,
+ +        supportModelTarget,
+++        profile,
+ +        ...(heldConfiguredProviderSets === undefined ? {} : { heldConfiguredProviderSets })
+        });
+      },
+      startApi: () => startDevelopmentApiProcess({
+diff --cc dialectical-engine/apps/runner/src/dev-cli-provider-panel.ts
+index b7467128,9e16f9ab..db3a2ee2
+--- a/dialectical-engine/apps/runner/src/dev-cli-provider-panel.ts
++++ b/dialectical-engine/apps/runner/src/dev-cli-provider-panel.ts
+@@@ -4,14 -4,19 +4,18 @@@ import { startGrokRelay } from "../../.
+  import { startModelShim } from "../../../acceptance/model-shim.js";
+  import {
+    buildDevelopmentProviderPanel,
+ -  developmentCliProviderRoster,
+    DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
+ -  DEVELOPMENT_CLI_PROVIDER_ROSTER,
+    DEVELOPMENT_MINIMUM_DISTINCT_MAKERS,
+    DEVELOPMENT_UNAVAILABLE_CLI_MODEL,
+ +  developmentProviderSlots,
+    type DevelopmentProviderPanel
+  } from "./dev-provider-panel.js";
++ import {
++   DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
++   type DevelopmentAuthStackProfile
++ } from "./dev-auth-stack-profile.js";
+  
+ -export { DEVELOPMENT_CLI_PROVIDER_ROSTER } from "./dev-provider-panel.js";
+ +export { DEVELOPMENT_PROVIDER_SLOT_CATALOGUE } from "./dev-provider-panel.js";
+  
+  export type DevelopmentCliRelay = Readonly<{
+    port: number;
+@@@ -41,17 -52,12 +45,18 @@@ async function closeRelays(relays: read
+  }
+  
+  export async function startDevelopmentCliProviderPanel(
+ -  operations: DevelopmentCliProviderPanelOperations = createDevelopmentCliProviderPanelOperations(),
+ +  config: ModelConfig = loadModelConfig(process.cwd()),
+ +  operations: DevelopmentCliProviderPanelOperations = createDevelopmentCliProviderPanelOperations(config),
+-   warning: (line: string) => void = (line) => { console.warn(line); }
+++  warning: (line: string) => void = (line) => { console.warn(line); },
++   profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+  ): Promise<DevelopmentCliProviderPanelHandle> {
+-   const slots = developmentProviderSlots(config);
+ -  const roster = developmentCliProviderRoster(profile);
+++  const slots = developmentProviderSlots(config, profile);
+ +  const cliSlots = slots.filter((slot) => slot.transport === "cli");
+ +  if (operations.starts.length !== cliSlots.length) {
+ +    throw new TypeError("DEV_CLI_PROVIDER_PANEL_START_SET_INVALID");
+ +  }
+    const settled = await Promise.allSettled(operations.starts.map((start, index) =>
+ -    start(roster[index]!.port)
+ +    start(cliSlots[index]!.port!)
+    ));
+    const relays = settled.flatMap((outcome) => outcome.status === "fulfilled" ? [outcome.value] : []);
+    let panel: DevelopmentProviderPanel;
+@@@ -93,11 -84,7 +98,15 @@@
+          model: DEVELOPMENT_UNAVAILABLE_CLI_MODEL
+        });
+      });
+-     panel = buildDevelopmentProviderPanel(observations, slots.map((provider) => ({
+-       providerRef: provider.providerRef,
+-       adapterKind: provider.adapterKind,
+-       maker: provider.maker
+-     })));
+ -    panel = buildDevelopmentProviderPanel(observations, profile);
+++    panel = buildDevelopmentProviderPanel(
+++      observations,
+++      slots.map((provider) => ({
+++        providerRef: provider.providerRef,
+++        adapterKind: provider.adapterKind,
+++        maker: provider.maker
+++      })),
+++      profile
+++    );
+      if (panel.healthyProviderRefs.length < DEVELOPMENT_MINIMUM_DISTINCT_MAKERS) {
+        throw new TypeError("DEV_CLI_PROVIDER_PANEL_INSUFFICIENT_MAKERS");
+      }
+diff --cc dialectical-engine/apps/runner/src/dev-provider-panel.ts
+index 2c594e98,4d13afbf..9d54c611
+--- a/dialectical-engine/apps/runner/src/dev-provider-panel.ts
++++ b/dialectical-engine/apps/runner/src/dev-provider-panel.ts
+@@@ -2,7 -2,11 +2,12 @@@ import 
+    parseProviderDiscoveryTargets,
+    type ProviderDiscoveryTarget
+  } from "@debateai/providers";
+ +import { loadModelConfig, type ModelConfig } from "@debateai/model-config";
++ import {
++   DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
++   loadDevelopmentAuthStackProfile,
++   type DevelopmentAuthStackProfile
++ } from "./dev-auth-stack-profile.js";
+  
+  const REMOVED_SCAFFOLD_PROVIDER_REF = "development:local-vllm";
+  const REMOVED_SCAFFOLD_MODEL = "qa-deterministic-v1";
+@@@ -10,116 -14,66 +15,134 @@@ export const DEVELOPMENT_UNAVAILABLE_CL
+  export const DEVELOPMENT_MINIMUM_DISTINCT_MAKERS = 1 as const;
+  export const DEVELOPMENT_CLI_CALL_TIMEOUT_MS = 180_000 as const;
+  
+ -export const REMOVED_DEVELOPMENT_SCAFFOLD_TARGETS_JSON = JSON.stringify([{
+ -  provider_ref: REMOVED_SCAFFOLD_PROVIDER_REF,
+ -  base_url: "http://127.0.0.1:8791/v1",
+ -  model: REMOVED_SCAFFOLD_MODEL
+ -}]);
+ +export type DevelopmentProviderSlotCatalogueEntry = Readonly<{
+ +  tier: "free" | "premium";
+ +  word: "codex" | "claude" | "grok" | "openai" | "zai";
+ +  transport: "cli" | "api";
+ +  providerRef: string;
+ +  maker: "OpenAI" | "Anthropic" | "xAI" | "Z.AI";
+ +  adapterKind: "openai-compatible-http";
+ +  port?: number;
+ +  baseUrl?: string;
+ +}>;
+  
+ -/**
+ - * One slot per plan-tier roster member (V, 2026-09-12: "Both free and premium need to be
+ - * accessible at the same time"). Discovery is 1:1 with the configured provider set — one
+ - * target per provider_ref, checked in parseProviderDiscoveryTargets — so a maker that
+ - * serves two tiers needs two slots. The order is the order of the discovery targets and
+ - * of the sealed configuredProviderSet row; appending is safe, reordering is not.
+ - */
+ -export const DEVELOPMENT_CLI_PROVIDER_ROSTER = Object.freeze([
+ +export const DEVELOPMENT_PROVIDER_SLOT_CATALOGUE = Object.freeze([
+ +  Object.freeze({
+ +    tier: "premium", word: "codex", transport: "cli",
+ +    providerRef: "development:codex-premium-cli", maker: "OpenAI",
+ +    adapterKind: "openai-compatible-http", port: 8_795
+ +  }),
+    Object.freeze({
+ -    providerRef: "development:codex-cli",
+ -    adapterKind: "openai-compatible-http" as const,
+ -    maker: "OpenAI",
+ -    port: 8_791
+ +    tier: "premium", word: "claude", transport: "cli",
+ +    providerRef: "development:claude-premium-cli", maker: "Anthropic",
+ +    adapterKind: "openai-compatible-http", port: 8_796
+    }),
+    Object.freeze({
+ -    providerRef: "development:codex-premium-cli",
+ -    adapterKind: "openai-compatible-http" as const,
+ -    maker: "OpenAI",
+ -    port: 8_795
+ +    tier: "premium", word: "grok", transport: "cli",
+ +    providerRef: "development:grok-cli", maker: "xAI",
+ +    adapterKind: "openai-compatible-http", port: 8_793
+    }),
+    Object.freeze({
+ -    providerRef: "development:claude-cli",
+ -    adapterKind: "openai-compatible-http" as const,
+ -    maker: "Anthropic",
+ -    port: 8_792
+ +    tier: "free", word: "codex", transport: "cli",
+ +    providerRef: "development:codex-cli", maker: "OpenAI",
+ +    adapterKind: "openai-compatible-http", port: 8_791
+    }),
+    Object.freeze({
+ -    providerRef: "development:claude-premium-cli",
+ -    adapterKind: "openai-compatible-http" as const,
+ -    maker: "Anthropic",
+ -    port: 8_796
+ +    tier: "free", word: "claude", transport: "cli",
+ +    providerRef: "development:claude-cli", maker: "Anthropic",
+ +    adapterKind: "openai-compatible-http", port: 8_792
+    }),
+    Object.freeze({
+ -    providerRef: "development:grok-cli",
+ -    adapterKind: "openai-compatible-http" as const,
+ -    maker: "xAI",
+ -    port: 8_793
+ +    tier: "free", word: "grok", transport: "cli",
+ +    providerRef: "development:grok-free-cli", maker: "xAI",
+ +    adapterKind: "openai-compatible-http", port: 8_797
+ +  }),
+ +  Object.freeze({
+ +    tier: "premium", word: "openai", transport: "api",
+ +    providerRef: "development:openai-premium-api", maker: "OpenAI",
+ +    adapterKind: "openai-compatible-http", baseUrl: "https://api.openai.com/v1"
+ +  }),
+ +  Object.freeze({
+ +    tier: "premium", word: "zai", transport: "api",
+ +    providerRef: "development:zai-premium-api", maker: "Z.AI",
+ +    adapterKind: "openai-compatible-http", baseUrl: "https://api.z.ai/api/coding/paas/v4"
+ +  }),
+ +  Object.freeze({
+ +    tier: "free", word: "openai", transport: "api",
+ +    providerRef: "development:openai-free-api", maker: "OpenAI",
+ +    adapterKind: "openai-compatible-http", baseUrl: "https://api.openai.com/v1"
+ +  }),
+ +  Object.freeze({
+ +    tier: "free", word: "zai", transport: "api",
+ +    providerRef: "development:zai-free-api", maker: "Z.AI",
+ +    adapterKind: "openai-compatible-http", baseUrl: "https://api.z.ai/api/coding/paas/v4"
+    })
+ -] as const);
+ +] satisfies readonly DevelopmentProviderSlotCatalogueEntry[]);
+ +
+ +export type DevelopmentProviderSlot = DevelopmentProviderSlotCatalogueEntry & Readonly<{
+ +  model: string;
+ +  baseUrl?: string;
+ +  keyVariable?: string;
+ +}>;
+  
+ -type DevelopmentCliProvider = Omit<(typeof DEVELOPMENT_CLI_PROVIDER_ROSTER)[number], "port"> &
+ -  Readonly<{ port: number }>;
+ +export type DevelopmentApiProviderProbeInput = Readonly<{
+ +  tier: "free" | "premium";
+ +  model: string;
+ +  baseUrl: string;
+ +  keyVariable: string;
+ +  keyValue: string;
+ +}>;
+ +
+ +export type DevelopmentApiProviderProbe = (
+ +  input: DevelopmentApiProviderProbeInput
+ +) => Promise<Readonly<{ model: string }>>;
+ +
+- export function developmentProviderSlots(config: ModelConfig): readonly DevelopmentProviderSlot[] {
+++function profileProviderPort(
+++  defaultPort: number,
+++  profile: DevelopmentAuthStackProfile
+++): number {
+++  const profileIndex = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE.providerPorts.indexOf(defaultPort);
+++  if (profileIndex >= 0) return profile.providerPorts[profileIndex]!;
+++  if (profile.name === "default") return defaultPort;
+++  return defaultPort
+++    + profile.publicPort
+++    - DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE.publicPort;
+++}
++ 
+ -export function developmentCliProviderRoster(
+++export function developmentProviderSlots(
+++  config: ModelConfig,
++   profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+ -): readonly DevelopmentCliProvider[] {
+ -  return Object.freeze(DEVELOPMENT_CLI_PROVIDER_ROSTER.map((provider, index) => Object.freeze({
+ -    providerRef: provider.providerRef,
+ -    adapterKind: provider.adapterKind,
+ -    maker: provider.maker,
+ -    port: profile.providerPorts[index]!
+ -  })));
+++): readonly DevelopmentProviderSlot[] {
+ +  const byTier = [...config.premium, ...config.free];
+ +  const entries = [
+ +    ...byTier.filter((entry) => entry.transport === "cli"),
+ +    ...byTier.filter((entry) => entry.transport === "api")
+ +  ];
+ +  return Object.freeze(entries.map((entry) => {
+ +    const word = entry.transport === "cli" ? entry.cli : entry.api;
+ +    const catalogue = DEVELOPMENT_PROVIDER_SLOT_CATALOGUE.find((candidate) =>
+ +      candidate.tier === entry.tier && candidate.word === word
+ +    );
+ +    if (catalogue === undefined) throw new TypeError("DEV_PROVIDER_SLOT_UNRESOLVED");
+ +    return Object.freeze({
+ +      ...catalogue,
+++      ...(catalogue.transport === "cli"
+++        ? { port: profileProviderPort(catalogue.port!, profile) }
+++        : {}),
+ +      model: entry.model,
+ +      ...(entry.transport === "api"
+ +        ? { baseUrl: entry.baseUrl, keyVariable: entry.keyVariable }
+ +        : {})
+ +    });
+ +  }));
+  }
+  
+ +export const REMOVED_DEVELOPMENT_SCAFFOLD_TARGETS_JSON = JSON.stringify([{
+ +  provider_ref: REMOVED_SCAFFOLD_PROVIDER_REF,
+ +  base_url: "http://127.0.0.1:8791/v1",
+ +  model: REMOVED_SCAFFOLD_MODEL
+ +}]);
+ +
+  export type DevelopmentConfiguredProvider = Readonly<{
+    providerRef: string;
+    adapterKind: "openai-compatible-http";
+@@@ -161,20 -113,17 +184,22 @@@ function expectedBaseUrl(port: number)
+  
+  export function buildDevelopmentProviderPanel(
+    observations: readonly DevelopmentCliTargetObservation[],
+-   configuredProviders: readonly DevelopmentConfiguredProvider[]
+++  configuredProviders: readonly DevelopmentConfiguredProvider[],
++   profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+  ): DevelopmentProviderPanel {
+ -  const roster = developmentCliProviderRoster(profile);
+ -  const configuredProviders = configuredProvidersFor(roster);
+    const byRef = new Map(observations.map((observation) => [observation.providerRef, observation] as const));
+ -  if (byRef.size !== roster.length) {
+ +  if (byRef.size !== configuredProviders.length) {
+      throw new TypeError("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
+    }
+ -  const rows = roster.map((provider) => {
+ +  const rows = configuredProviders.map((provider) => {
+      const observation = byRef.get(provider.providerRef);
+ -    if (observation === undefined || observation.baseUrl !== expectedBaseUrl(provider.port)) {
+ +    const catalogue = DEVELOPMENT_PROVIDER_SLOT_CATALOGUE.find(({ providerRef }) =>
+ +      providerRef === provider.providerRef
+ +    );
+ +    if (observation === undefined || catalogue === undefined
+-       || (catalogue.transport === "cli" && observation.baseUrl !== expectedBaseUrl(catalogue.port!))
+++      || (catalogue.transport === "cli" && observation.baseUrl
+++        !== expectedBaseUrl(profileProviderPort(catalogue.port!, profile)))
+ +      || (catalogue.transport === "api" && observation.baseUrl !== catalogue.baseUrl)) {
+        throw new TypeError("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
+      }
+      const healthy = observation.model !== DEVELOPMENT_UNAVAILABLE_CLI_MODEL;
+@@@ -206,65 -155,6 +231,70 @@@
+    });
+  }
+  
+ +export async function resolveDevelopmentApiProviderSlots(
+ +  config: ModelConfig,
+ +  providerPanel: DevelopmentProviderPanel,
+ +  providerKeys: ReadonlyMap<string, string>,
+ +  probe: DevelopmentApiProviderProbe,
+-   warning: (line: string) => void = (line) => console.warn(line)
+++  warning: (line: string) => void = (line) => console.warn(line),
+++  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+ +): Promise<DevelopmentProviderPanel> {
+-   const slots = developmentProviderSlots(config);
+++  const slots = developmentProviderSlots(config, profile);
+ +  const currentTargets = new Map(providerPanel.targets.map((target) => [target.providerRef, target]));
+ +  const observations = await Promise.all(slots.map(async (slot) => {
+ +    if (slot.transport === "cli") {
+ +      const target = currentTargets.get(slot.providerRef);
+ +      if (target === undefined) throw new TypeError("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
+ +      return Object.freeze({
+ +        providerRef: target.providerRef,
+ +        baseUrl: target.baseUrl,
+ +        model: target.model,
+ +        ...(target.authorizationHeader === undefined
+ +          ? {} : { authorizationHeader: target.authorizationHeader })
+ +      });
+ +    }
+ +    const keyValue = providerKeys.get(slot.keyVariable!)?.trim();
+ +    if (keyValue === undefined || keyValue === "") {
+ +      warning(`DEV_PROVIDER_SLOT_UNAVAILABLE class (a) tier=${slot.tier} model=${slot.model}`);
+ +      return Object.freeze({
+ +        providerRef: slot.providerRef,
+ +        baseUrl: slot.baseUrl!,
+ +        model: DEVELOPMENT_UNAVAILABLE_CLI_MODEL
+ +      });
+ +    }
+ +    try {
+ +      const response = await probe({
+ +        tier: slot.tier,
+ +        model: slot.model,
+ +        baseUrl: slot.baseUrl!,
+ +        keyVariable: slot.keyVariable!,
+ +        keyValue
+ +      });
+ +      if (response.model === slot.model) {
+ +        return Object.freeze({
+ +          providerRef: slot.providerRef,
+ +          baseUrl: slot.baseUrl!,
+ +          model: slot.model,
+ +          authorizationHeader: `Bearer ${keyValue}`
+ +        });
+ +      }
+ +    } catch {
+ +      // A failed availability probe is represented by the same bounded absent-slot shape.
+ +    }
+ +    warning(`DEV_PROVIDER_SLOT_UNAVAILABLE class (b) tier=${slot.tier} model=${slot.model}`);
+ +    return Object.freeze({
+ +      providerRef: slot.providerRef,
+ +      baseUrl: slot.baseUrl!,
+ +      model: DEVELOPMENT_UNAVAILABLE_CLI_MODEL
+ +    });
+ +  }));
+-   return buildDevelopmentProviderPanel(observations, configuredProvidersForSlots(slots));
+++  return buildDevelopmentProviderPanel(
+++    observations,
+++    configuredProvidersForSlots(slots),
+++    profile
+++  );
+ +}
+ +
+  /**
+   * The deployment's CONFIGURED provider set, straight from the roster: refs, makers and
+   * adapter kinds, with every slot marked unavailable. Health is not part of the register
+@@@ -272,29 -162,23 +302,29 @@@
+   * honest input when publishing the set without standing the CLIs up first.
+   */
+  export function developmentConfiguredProviderPanel(
+-   configuredProviders: readonly DevelopmentConfiguredProvider[]
+++  configuredProviders: readonly DevelopmentConfiguredProvider[],
++   profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+  ): DevelopmentProviderPanel {
+ -  const roster = developmentCliProviderRoster(profile);
+ -  return buildDevelopmentProviderPanel(roster.map((provider) =>
+ -    Object.freeze({
+ +  return buildDevelopmentProviderPanel(configuredProviders.map((provider) => {
+ +    const catalogue = DEVELOPMENT_PROVIDER_SLOT_CATALOGUE.find(({ providerRef }) =>
+ +      providerRef === provider.providerRef
+ +    );
+ +    if (catalogue === undefined) throw new TypeError("DEV_PROVIDER_SLOT_UNRESOLVED");
+-     return (
+-     Object.freeze({
+++    return Object.freeze({
+        providerRef: provider.providerRef,
+ -      baseUrl: expectedBaseUrl(provider.port),
+ +      baseUrl: catalogue.transport === "cli"
+-         ? expectedBaseUrl(catalogue.port!)
+++        ? expectedBaseUrl(profileProviderPort(catalogue.port!, profile))
+ +        : catalogue.baseUrl!,
+        model: DEVELOPMENT_UNAVAILABLE_CLI_MODEL
+--    })
+-     );
+-   }), configuredProviders);
+ -  ), profile);
+++    });
+++  }), configuredProviders, profile);
+  }
+  
+  export function parseDevelopmentProviderPanelTargets(
+    source: string,
+-   configuredProviders: readonly DevelopmentConfiguredProvider[]
+++  configuredProviders: readonly DevelopmentConfiguredProvider[],
++   profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+  ): DevelopmentProviderPanel {
+ -  const configuredProviders = configuredProvidersFor(developmentCliProviderRoster(profile));
+    const targets = parseProviderDiscoveryTargets(source, configuredProviders);
+    return buildDevelopmentProviderPanel(targets.map((target) => Object.freeze({
+      providerRef: target.providerRef,
+@@@ -302,7 -186,7 +332,7 @@@
+      model: target.model,
+      ...(target.authorizationHeader === undefined
+        ? {} : { authorizationHeader: target.authorizationHeader })
+-   })), configuredProviders);
+ -  })), profile);
+++  })), configuredProviders, profile);
+  }
+  
+  export function loadDevelopmentProviderPanelFromEnvironment(
+@@@ -313,5 -196,8 +343,9 @@@
+    if (targetsJson === undefined || targetsJson.trim() === "") {
+      throw new TypeError("DEV_CLI_PROVIDER_PANEL_REQUIRED");
+    }
+-   return parseDevelopmentProviderPanelTargets(targetsJson, configuredProviders);
++   return parseDevelopmentProviderPanelTargets(
++     targetsJson,
+++    configuredProviders,
++     loadDevelopmentAuthStackProfile(source)
++   );
+  }
+diff --cc dialectical-engine/apps/runner/src/dev-runner-process.ts
+index f4ce4889,96a69e35..b695abb8
+--- a/dialectical-engine/apps/runner/src/dev-runner-process.ts
++++ b/dialectical-engine/apps/runner/src/dev-runner-process.ts
+@@@ -8,9 -8,12 +8,13 @@@ import 
+    DEVELOPMENT_RUN_DEATH_POLICY
+  } from "./dev-deployment-register.js";
+  import {
+ +  loadModelConfigConfiguredProviders,
+    parseDevelopmentProviderPanelTargets
+  } from "./dev-provider-panel.js";
++ import {
++   DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
++   type DevelopmentAuthStackProfile
++ } from "./dev-auth-stack-profile.js";
+  
+  const DEVELOPMENT_CLAIM_MARGIN_MS = 1_000;
+  
+@@@ -56,12 -59,11 +60,14 @@@ export class DevelopmentRunnerProcessEr
+  function createRunnerEnvironment(
+    commandEnvironment: Readonly<Record<string, string>>,
+    apiEnvironment: Readonly<Record<string, string>>,
+-   repositoryRoot: string
+++  repositoryRoot: string,
++   profile: DevelopmentAuthStackProfile
+  ): Readonly<Record<string, string>> {
+ +  const configuredProviders = loadModelConfigConfiguredProviders(repositoryRoot);
+    const providerPanel = parseDevelopmentProviderPanelTargets(
+      apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON!,
+-     configuredProviders
+++    configuredProviders,
++     profile
+    );
+    const targets = parseProviderDiscoveryTargets(
+      apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON!,
+@@@ -137,7 -141,7 +145,8 @@@ export async function startDevelopmentR
+      child = input.operations.startRunner(createRunnerEnvironment(
+        input.commandEnvironment,
+        apiEnvironment,
+-       input.repositoryRoot
+++      input.repositoryRoot,
++       profile
+      ));
+    } catch (error) {
+      throw new DevelopmentRunnerProcessError("DEV_RUNNER_PROCESS_START_FAILED", error);
+diff --cc dialectical-engine/apps/ui/components/support/Assistant.tsx
+index 6bde4838,ddda0640..d202906c
+--- a/dialectical-engine/apps/ui/components/support/Assistant.tsx
++++ b/dialectical-engine/apps/ui/components/support/Assistant.tsx
+@@@ -2,11 -2,15 +2,16 @@@
+  
+  import { useEffect,useRef,useState,type FormEvent,type ReactNode } from "react";
+  import { redactSupportText } from "@debateai/kernel";
++ import {
++   SUPPORT_CAPABILITIES,
++   type SupportAction,
++   type SupportActionId
++ } from "@debateai/support-kb/catalog";
++ import { resolveSupportActions } from "@debateai/support-kb/navigation";
++ import { requestPreferences } from "../../lib/consent.js";
+  import { BrandMark } from "../TopBar.js";
+  import { ModeToggle } from "../ModeToggle.js";
+ +import { AiNotice } from "../AiNotice";
+- import { ConsentToggle } from "./ConsentToggle.js";
+- import { DebatePicker } from "./DebatePicker.js";
+  import { supportPost } from "./http.js";
+  
+  export type SupportAssistantLanguage = "en" | "ro";
+@@@ -536,17 -641,25 +642,28 @@@ export function Assistant(
+    const conversation = <div className="supportConversation" aria-label="Support conversation" aria-live="polite">
+      {messages.map((message) => {
+        const link = safeFirstPartyLink(message.link);
+ +      const generated = message.role === "assistant" && message.outcome === "ANSWER_GROUNDED";
++       const sources = message.sources ?? Object.freeze([]);
++       const actions = message.actions ?? Object.freeze([]);
++       const hasFooter = link !== null || sources.length > 0 || actions.length > 0;
+ -      return <article className={`supportMessage supportMessage--${message.role}`} key={message.id} data-role={message.role}>
+ +      return <article className={`supportMessage supportMessage--${message.role}`} key={message.id} data-role={message.role}
+ +        data-ai-generated={generated ? "true" : undefined}
+ +        data-content-origin={message.role === "user" ? "user" : generated ? "ai" : "automated"}>
+          {message.role === "assistant" ? <div className="supportMessageShell">
+            <div className="supportMessageTab" aria-hidden />
+--          <div className="supportMessageCore">
+--            <p>{message.text}</p>
+-             {link === null ? null : <footer className="supportCitation">
+-               <span>{generated ? "AI · " : ""}DOCS · PRODUCT GUIDE</span>
+-               <a href={link}>View source →</a>
+++            <div className="supportMessageCore">
+++              <p>{message.text}</p>
++             {!hasFooter ? null : <footer className="supportCitation">
++               {sources.length === 0 ? null : <div role="list" aria-label={language === "en" ? "Sources" : "Surse"}>
++                 {sources.map((source) => <span role="listitem" key={source.id}>{source.label}</span>)}
++               </div>}
++               {actions.length === 0 ? null : <nav aria-label={language === "en" ? "Actions" : "Acțiuni"}>
++                 {actions.map((action) => <a href={action.href} key={action.id}>{action.label}</a>)}
++               </nav>}
++               {link === null ? null : <>
+ -                <span>DOCS · PRODUCT GUIDE</span>
+++                <span>{generated ? "AI · " : ""}DOCS · PRODUCT GUIDE</span>
++                 <a href={link}>View source →</a>
++               </>}
+              </footer>}
+            </div>
+          </div> : <p>{message.text}</p>}
+@@@ -586,13 -685,6 +689,7 @@@
+        placeholder={language === "en" ? "Describe what happened…" : "Descrie ce s-a întâmplat…"}
+      />
+      {fullPage ? <div className="supportComposerBar">
+-       <button
+-         className="supportAttach"
+-         type="button"
+-         aria-expanded={contextOpen}
+-         onClick={() => setContextOpen((open) => !open)}
+-       >⌁ <span>Attach a debate</span></button>
+-       <span className="supportComposerHint">Session and device details attached automatically · replies are AI-generated.</span>
+++      <span className="supportComposerHint">Replies are AI-generated.</span>
+        <button className="supportSend" type="submit" disabled={busy}>{WORDS[language].send}</button>
+      </div> : <div className="supportComposerBar supportComposerBar--compact">
+        <button className="supportSend" type="submit" disabled={busy}>{WORDS[language].send}</button>
+@@@ -610,9 -702,7 +707,8 @@@
+          >{CLOSE_ARROW}</button>}
+          {languageControls}
+        </div>
+ +      <AiNotice variant="banner" language={language} />
+        {conversation}
+-       {contextControls}
+        {ratingControls}
+        <button
+          type="button"
+@@@ -683,18 -775,26 +781,27 @@@
+  
+        <section className="supportAgent" aria-label="Support agent conversation">
+          <header className="supportAgentHeader">
+--          <div className="supportAgentAvatar" aria-hidden>◆</div>
+--          <div className="supportAgentIdentity">
+--            <div><h1>Support agent</h1><span className={`supportOnline supportOnline--${statusLabel.toLowerCase()}`}>{statusLabel}</span></div>
+-             <p><strong>You are talking to an AI, not a person.</strong> It answers from the product docs and your account, cites its source, and hands off to a human when it cannot.</p>
+ -            <p>Answers from public product guidance, cites its source, and hands off to a person when it cannot.</p>
+++            <div className="supportAgentAvatar" aria-hidden>◆</div>
+++            <div className="supportAgentIdentity">
+++              <div><h1>Support agent</h1><span className={`supportOnline supportOnline--${statusLabel.toLowerCase()}`}>{statusLabel}</span></div>
+++            <p><strong>You are talking to an AI, not a person.</strong> It answers from public product guidance, cites its source, and hands off to a human when it cannot.</p>
+            </div>
+            <button className="supportNewConversation" type="button" onClick={beginNewConversation}>New conversation</button>
+          </header>
+  
+-         <div className="supportChatScroll">
++         <div
++           className="supportChatScroll"
++           ref={conversationPaneRef}
++           onScroll={() => {
++             const pane = conversationPaneRef.current;
++             if (pane === null) return;
++             followLatestRef.current = pane.scrollHeight - pane.scrollTop - pane.clientHeight <= 48;
++           }}
++         >
+ +          <AiNotice variant="banner" language={language} />
+            <p className="supportTimestamp">Today · Support conversation</p>
+            {conversation}
++           <div ref={conversationEndRef} data-support-conversation-end aria-hidden />
+            {ratingControls}
+            <div className="supportSuggestions" aria-label="Suggested questions">
+              {HELP_SUGGESTIONS.map((suggestion) => <button
+diff --cc dialectical-engine/packages/kernel/src/index.ts
+index 04afd7d1,607421f9..142b90cb
+--- a/dialectical-engine/packages/kernel/src/index.ts
++++ b/dialectical-engine/packages/kernel/src/index.ts
+@@@ -280,9 -282,12 +282,12 @@@ export function exhaustive(value: never
+    throw new TypeError(`Unknown closed-vocabulary member: ${String(value)}`);
+  }
+  
++ export * from "./support-credentials.js";
++ export * from "./support-text-views.js";
++ 
+  export class TypedDomainError extends Error {
+ -  constructor(readonly code: string, message: string) {
+ -    super(message);
+ +  constructor(readonly code: string, message: string, options?: { cause?: unknown }) {
+ +    super(message, options);
+      this.name = "TypedDomainError";
+    }
+  }
+diff --cc dialectical-engine/packages/register/src/runtime-environment.ts
+index 4d6bf053,30bea078..357d3006
+--- a/dialectical-engine/packages/register/src/runtime-environment.ts
++++ b/dialectical-engine/packages/register/src/runtime-environment.ts
+@@@ -46,7 -46,7 +46,8 @@@ export function loadDevelopmentCommandE
+      XDG_CONFIG_HOME: z.string().min(1).optional(),
+      PNPM_EXECUTABLE: z.string().min(1).optional(),
+      DEBATEAI_DEV_DOCKER_BIN: z.string().min(1).optional(),
+ +    OBS_FLUSH_DEADLINE_MS: z.string().optional(),
++     DEBATEAI_DEV_AUTH_STACK_PROFILE: z.enum(["default", "support-preview"]).optional(),
+      DEBATEAI_DEV_PROVIDER_TARGETS_JSON: z.string().min(1).optional(),
+      DEBATEAI_DEV_SUPPORT_MODEL_TARGET_JSON: z.string().min(1).optional(),
+      NODE_ENV: z.enum(["development", "test", "production"]).optional()
+diff --cc dialectical-engine/tests/integration/dev-api-process.test.ts
+index 63d57f3c,e24eac16..27c80676
+--- a/dialectical-engine/tests/integration/dev-api-process.test.ts
++++ b/dialectical-engine/tests/integration/dev-api-process.test.ts
+@@@ -1,4 -1,4 +1,4 @@@
+--import { chmod, link, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+++import { chmod, copyFile, link, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+  import { tmpdir } from "node:os";
+  import { join } from "node:path";
+  import { afterEach, describe, expect, it, vi } from "vitest";
+@@@ -15,7 -15,13 +15,15 @@@ import 
+    writeDevelopmentDeploymentRegisterReceipt
+  } from "../../apps/runner/src/dev-deployment-register.js";
+  import { parseRegisterVersionText } from "../../packages/register/src/index.js";
+--import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
++ import {
++   DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
++   SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE,
++   type DevelopmentAuthStackProfile
++ } from "../../apps/runner/src/dev-auth-stack-profile.js";
+ -import { developmentConfiguredProviderPanel } from "../../apps/runner/src/dev-provider-panel.js";
+++import {
+++  developmentConfiguredProviderPanel,
+++  loadModelConfigConfiguredProviders
+++} from "../../apps/runner/src/dev-provider-panel.js";
+  
+  const roots: string[] = [];
+  
+@@@ -53,20 -62,26 +64,26 @@@ function environment
+      REGISTER_DEPLOYMENT_RECEIPT_FILE: developmentDeploymentRegisterReceiptPath(root),
+      BATTERY_VERSION: "dev-auth-v1",
+      SETTLEMENT_WATCH_HANDLE: "dev-auth:settlement-watch",
+-     PROVIDER_DISCOVERY_TARGETS_JSON: TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson,
+ -    PROVIDER_DISCOVERY_TARGETS_JSON: profile.name === "default"
+ -      ? TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson
+ -      : developmentConfiguredProviderPanel(profile).targetsJson,
+++    PROVIDER_DISCOVERY_TARGETS_JSON: developmentConfiguredProviderPanel(
+++      loadModelConfigConfiguredProviders(process.cwd()),
+++      profile
+++    ).targetsJson,
+      SUPPORT_MODEL_TARGET_JSON: JSON.stringify({
+        provider_ref: "development:hermes-glm-5.3-flash",
+-       base_url: "http://127.0.0.1:8794/v1",
++       base_url: `http://127.0.0.1:${profile.supportModelPort}/v1`,
+        model: "z-ai/glm-5.3-flash",
+-       authorization_header: "Bearer support-test"
++       authorization_header: "Bearer support-test",
++       ...(profile.name === "support-preview"
++         ? { development_stack_profile: "support-preview" }
++         : {})
+      }),
+      PROVIDER_PROBE_TIMEOUT_MS: "180000",
+      NODE_ENV: "development",
+ -    EVALUATOR_DEV_MENU_ENABLED: profile.name === "default" ? "true" : "false",
+ +    EVALUATOR_DEV_MENU_ENABLED: "false",
+-     EVALUATOR_DEV_MENU_DATABASE_URL: "postgresql://debateai_dev_evaluator_api:evaluator@127.0.0.1:55432/debateai",
++     EVALUATOR_DEV_MENU_DATABASE_URL: database("debateai_dev_evaluator_api", "evaluator"),
+ -    EVALUATOR_DATABASE_URL: database("debateai_dev_evaluator_worker", "worker"),
+      HATCHET_CLIENT_TOKEN: "header.payload.signature",
+-     HATCHET_HOST_PORT: "127.0.0.1:7077",
+-     HATCHET_API_URL: "http://127.0.0.1:8888",
++     HATCHET_HOST_PORT: `127.0.0.1:${profile.hatchetGrpcPort}`,
++     HATCHET_API_URL: `http://127.0.0.1:${profile.hatchetApiPort}`,
+      HATCHET_TENANT_ID: "11111111-1111-4111-8111-111111111111",
+      HATCHET_WORKFLOW_NAME: "debateai-dev",
+      HATCHET_TLS_STRATEGY: "none",
+@@@ -74,9 -89,11 +91,13 @@@
+    });
+  }
+  
+- async function fixture(): Promise<Readonly<{ root: string; envPath: string }>> {
++ async function fixture(
++   profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
++ ): Promise<Readonly<{ root: string; envPath: string }>> {
+    const root = await mkdtemp(join(tmpdir(), "debateai-dev-api-process-"));
+    roots.push(root);
+++  await mkdir(join(root, "config"), { mode: 0o700 });
+++  await copyFile(join(process.cwd(), "config", "models.yaml"), join(root, "config", "models.yaml"));
+    await mkdir(join(root, ".local"), { mode: 0o700 });
+    await mkdir(join(root, ".local", "dev-auth"), { mode: 0o700 });
+    const registerReceipt = createDevelopmentDeploymentRegisterMachineReceipt({
+diff --cc dialectical-engine/tests/integration/dev-provider-panel.test.ts
+index fb8223f9,42f95329..b7752230
+--- a/dialectical-engine/tests/integration/dev-provider-panel.test.ts
++++ b/dialectical-engine/tests/integration/dev-provider-panel.test.ts
+@@@ -8,16 -4,8 +8,32 @@@ import 
+    loadDevelopmentProviderPanelFromEnvironment,
+    parseDevelopmentProviderPanelTargets
+  } from "../../apps/runner/src/dev-provider-panel.js";
+ -import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
+ -import { SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE } from "../../apps/runner/src/dev-auth-stack-profile.js";
+++import {
+++  SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE,
+++  type DevelopmentAuthStackProfile
+++} from "../../apps/runner/src/dev-auth-stack-profile.js";
+ +
+ +const slots = developmentProviderSlots(loadModelConfig(process.cwd()));
+- const LIVE_DEVELOPMENT_PROVIDER_PANEL = buildDevelopmentProviderPanel(slots.map((slot) => ({
+-   providerRef: slot.providerRef,
+-   baseUrl: slot.transport === "cli"
+-     ? `http://127.0.0.1:${slot.port}/v1`
+-     : slot.baseUrl!,
+-   model: slot.transport === "cli" ? slot.model : DEVELOPMENT_UNAVAILABLE_CLI_MODEL,
+-   ...(slot.transport === "cli" ? { authorizationHeader: "test-relay-header" } : {})
+- })), slots.map(({ providerRef, adapterKind, maker }) => ({ providerRef, adapterKind, maker })));
+++const configuredProviders = slots.map(({ providerRef, adapterKind, maker }) => ({
+++  providerRef, adapterKind, maker
+++}));
+++
+++function providerPanel(profile?: DevelopmentAuthStackProfile) {
+++  const selectedSlots = developmentProviderSlots(
+++    loadModelConfig(process.cwd()),
+++    profile
+++  );
+++  return buildDevelopmentProviderPanel(selectedSlots.map((slot) => ({
+++    providerRef: slot.providerRef,
+++    baseUrl: slot.transport === "cli"
+++      ? `http://127.0.0.1:${slot.port}/v1`
+++      : slot.baseUrl!,
+++    model: slot.transport === "cli" ? slot.model : DEVELOPMENT_UNAVAILABLE_CLI_MODEL,
+++    ...(slot.transport === "cli" ? { authorizationHeader: "test-relay-header" } : {})
+++  })), configuredProviders, profile);
+++}
+++
+++const LIVE_DEVELOPMENT_PROVIDER_PANEL = providerPanel();
+  
+  describe("real development CLI provider panel", () => {
+    it("loads the exact live CLI targets without changing the fixed maker order", () => {
+@@@ -48,16 -30,29 +64,26 @@@
+        .toThrow("PROVIDER_DISCOVERY_TARGET_SET_MISMATCH");
+      expect(() => parseDevelopmentProviderPanelTargets(JSON.stringify(rows.map((row, index) =>
+        index === 0 ? { ...row, base_url: "https://external.example/v1" } : row
+ -    )))).toThrow("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
+ +    )), LIVE_DEVELOPMENT_PROVIDER_PANEL.configuredProviders))
+ +      .toThrow("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
+    });
+  
++   it("accepts only the selected support-preview relay ports", () => {
+ -    const rows = JSON.parse(TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson) as Record<string, unknown>[];
+ -    const previewRows = rows.map((row, index) => ({
+ -      ...row,
+ -      base_url: `http://127.0.0.1:${SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE.providerPorts[index]}/v1`
+ -    }));
+ -    const source = JSON.stringify(previewRows);
+++    const source = providerPanel(SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE).targetsJson;
++     expect(loadDevelopmentProviderPanelFromEnvironment({
++       DEBATEAI_DEV_AUTH_STACK_PROFILE: "support-preview",
++       DEBATEAI_DEV_PROVIDER_TARGETS_JSON: source
+ -    }).targetsJson).toBe(source);
+ -    expect(() => parseDevelopmentProviderPanelTargets(source))
+++    }, configuredProviders).targetsJson).toBe(source);
+++    expect(() => parseDevelopmentProviderPanelTargets(source, configuredProviders))
++       .toThrow("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
++   });
++ 
+    it("rejects the removed scaffold and healthy-looking targets without relay credentials", () => {
+ -    const rows = JSON.parse(TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson) as Record<string, unknown>[];
+ +    const rows = JSON.parse(LIVE_DEVELOPMENT_PROVIDER_PANEL.targetsJson) as Record<string, unknown>[];
+      expect(() => parseDevelopmentProviderPanelTargets(JSON.stringify(rows.map((row, index) =>
+        index === 0 ? { ...row, model: "qa-deterministic-v1" } : row
+ -    )))).toThrow("DEV_CLI_PROVIDER_PANEL_TARGET_INVALID");
+ +    )), LIVE_DEVELOPMENT_PROVIDER_PANEL.configuredProviders))
+ +      .toThrow("DEV_CLI_PROVIDER_PANEL_TARGET_INVALID");
+      expect(() => parseDevelopmentProviderPanelTargets(JSON.stringify(rows.map((row, index) => {
+        if (index !== 0) return row;
+        const { authorization_header: _removed, ...withoutAuthorization } = row;
+diff --cc dialectical-engine/tests/unit/dev-auth-stack.test.ts
+index f9f75b30,b7ffb03c..4900788f
+--- a/dialectical-engine/tests/unit/dev-auth-stack.test.ts
++++ b/dialectical-engine/tests/unit/dev-auth-stack.test.ts
+@@@ -14,13 -9,7 +14,14 @@@ import 
+  import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
+  import { createDevelopmentDeploymentRegisterMachineReceipt } from "../../apps/runner/src/dev-deployment-register.js";
+  import { parseRegisterVersionText } from "../../packages/register/src/index.js";
+ +import {
+ +  buildDevelopmentProviderPanel,
+ +  DEVELOPMENT_UNAVAILABLE_CLI_MODEL,
+ +  developmentProviderSlots,
+ +  type DevelopmentApiProviderProbe,
+ +  type DevelopmentProviderPanel
+ +} from "../../apps/runner/src/dev-provider-panel.js";
++ import { SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE } from "../../apps/runner/src/dev-auth-stack-profile.js";
+  
+  const REGISTER_RECEIPT = createDevelopmentDeploymentRegisterMachineReceipt({
+    registerVersion: parseRegisterVersionText("424242"),
+@@@ -42,52 -31,10 +43,53 @@@ function deferredExit() 
+    return { exited, resolveExit };
+  }
+  
+ +function unavailableApiPanel(config: ModelConfig): DevelopmentProviderPanel {
+ +  const slots = developmentProviderSlots(config);
+ +  return buildDevelopmentProviderPanel(slots.map((slot) => Object.freeze({
+ +    providerRef: slot.providerRef,
+ +    baseUrl: slot.transport === "cli"
+ +      ? `http://127.0.0.1:${slot.port}/v1`
+ +      : slot.baseUrl!,
+ +    model: slot.transport === "cli" ? slot.model : DEVELOPMENT_UNAVAILABLE_CLI_MODEL,
+ +    ...(slot.transport === "cli" ? { authorizationHeader: "test-relay-header" } : {})
+ +  })), slots.map(({ providerRef, adapterKind, maker }) => Object.freeze({
+ +    providerRef, adapterKind, maker
+ +  })));
+ +}
+ +
+ +async function resolveApiAvailability(
+ +  config: ModelConfig,
+ +  providerPanel: DevelopmentProviderPanel,
+ +  providerKeys: ReadonlyMap<string, string>,
+ +  probe: DevelopmentApiProviderProbe,
+ +  warning: (line: string) => void
+ +): Promise<DevelopmentProviderPanel> {
+ +  const module = await import("../../apps/runner/src/dev-provider-panel.js") as Readonly<{
+ +    resolveDevelopmentApiProviderSlots?: (
+ +      config: ModelConfig,
+ +      providerPanel: DevelopmentProviderPanel,
+ +      providerKeys: ReadonlyMap<string, string>,
+ +      probe: DevelopmentApiProviderProbe,
+ +      warning: (line: string) => void
+ +    ) => Promise<DevelopmentProviderPanel>;
+ +  }>;
+ +  expect(module.resolveDevelopmentApiProviderSlots).toBeTypeOf("function");
+ +  return module.resolveDevelopmentApiProviderSlots!(config, providerPanel, providerKeys, probe, warning);
+ +}
+ +
+ +async function providerKeysReader(): Promise<(repositoryRoot: string) => Promise<ReadonlyMap<string, string>>> {
+ +  const module = await import("../../apps/runner/src/dev-provider-keys.js").catch(() => ({})) as Readonly<{
+ +    readProviderKeys?: (repositoryRoot: string) => Promise<ReadonlyMap<string, string>>;
+ +  }>;
+ +  expect(module.readProviderKeys).toBeTypeOf("function");
+ +  return module.readProviderKeys!;
+ +}
+ +
+  function operations(input: Readonly<{
+    occupied?: boolean;
++   preview?: boolean;
+    failAt?: "provider_panel" | "support_model" | "data" | "token" | "environment" | "api" | "runner" | "ui" | "tls";
+ +  apiEnvironmentPath?: string;
+  }> = {}): DevelopmentAuthStackOperations & Readonly<{
+    calls: string[];
+    apiExit: ReturnType<typeof deferredExit>;
+@@@ -494,19 -174,26 +497,26 @@@ describe("DEV-10F bounded local auth st
+      const runtime = operations({ occupied: true });
+      await expect(startDevelopmentAuthStack(runtime))
+        .rejects.toThrow("DEV_AUTH_STACK_PUBLIC_PORT_OCCUPIED");
+ -    expect(runtime.calls).toEqual(["preflight"]);
+ +    expect(runtime.calls).toEqual(["model-config", "contract:generate", "preflight"]);
+    });
+  
++   it("reports the selected support-preview origin without changing lifecycle ownership", async () => {
++     const runtime = operations({ preview: true });
++     const stack = await startDevelopmentAuthStack(runtime);
++     expect(stack.receipt.origin).toBe("https://localhost:3100");
++     await stack.stop();
++   });
++ 
+    it.each([
+ -    ["provider_panel", ["preflight", "providers:start"]],
+ -    ["support_model", ["preflight", "providers:start", "support:start", "providers:stop"]],
+ -    ["data", ["preflight", "providers:start", "support:start", "data:start", "support:stop", "providers:stop"]],
+ -    ["token", ["preflight", "providers:start", "support:start", "data:start", "token", "data:stop", "support:stop", "providers:stop"]],
+ -    ["environment", ["preflight", "providers:start", "support:start", "data:start", "token", "environment", "data:stop", "support:stop", "providers:stop"]],
+ -    ["api", ["preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "data:stop", "support:stop", "providers:stop"]],
+ -    ["runner", ["preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "api:stop", "data:stop", "support:stop", "providers:stop"]],
+ -    ["ui", ["preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"]],
+ -    ["tls", ["preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "tls:start", "ui:stop", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"]]
+ +    ["provider_panel", ["model-config", "contract:generate", "preflight", "providers:start"]],
+ +    ["support_model", ["model-config", "contract:generate", "preflight", "providers:start", "support:start", "providers:stop"]],
+ +    ["data", ["model-config", "contract:generate", "preflight", "providers:start", "support:start", "data:start", "support:stop", "providers:stop"]],
+ +    ["token", ["model-config", "contract:generate", "preflight", "providers:start", "support:start", "data:start", "token", "data:stop", "support:stop", "providers:stop"]],
+ +    ["environment", ["model-config", "contract:generate", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "data:stop", "support:stop", "providers:stop"]],
+ +    ["api", ["model-config", "contract:generate", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "data:stop", "support:stop", "providers:stop"]],
+ +    ["runner", ["model-config", "contract:generate", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "api:stop", "data:stop", "support:stop", "providers:stop"]],
+ +    ["ui", ["model-config", "contract:generate", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"]],
+ +    ["tls", ["model-config", "contract:generate", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "tls:start", "ui:stop", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"]]
+    ] as const)("unwinds only the started prefix when %s fails", async (failAt, expected) => {
+      const runtime = operations({ failAt });
+      await expect(startDevelopmentAuthStack(runtime))
+diff --cc dialectical-engine/tests/unit/dev-cli-provider-panel.test.ts
+index 4d002973,f9cb0734..b51aabb6
+--- a/dialectical-engine/tests/unit/dev-cli-provider-panel.test.ts
++++ b/dialectical-engine/tests/unit/dev-cli-provider-panel.test.ts
+@@@ -39,11 -11,7 +39,12 @@@ import 
+    type DevelopmentCliProviderPanelOperations,
+    type DevelopmentCliRelay
+  } from "../../apps/runner/src/dev-cli-provider-panel.js";
+ +import { developmentProviderSlots } from "../../apps/runner/src/dev-provider-panel.js";
+ +import {
+ +  buildDevelopmentProviderPanel,
+ +  DEVELOPMENT_UNAVAILABLE_CLI_MODEL
+ +} from "../../apps/runner/src/dev-provider-panel.js";
++ import { SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE } from "../../apps/runner/src/dev-auth-stack-profile.js";
+  
+  function relay(port: number, maker: string, model: string): DevelopmentCliRelay & {
+    close: ReturnType<typeof vi.fn>;
+@@@ -242,163 -93,57 +243,184 @@@ describe("development real CLI provide
+    });
+  
+    it("refuses when no real CLI answers", async () => {
+ -    await expect(startDevelopmentCliProviderPanel(operations([
+ -      new Error("logged out"), new Error("logged out"), new Error("logged out"),
+ -      new Error("logged out"), new Error("logged out")
+ -    ]))).rejects.toThrow("DEV_CLI_PROVIDER_PANEL_INSUFFICIENT_MAKERS");
+ +    await expect(startDevelopmentCliProviderPanel(loadModelConfig(process.cwd()), operations([
+ +      new Error("logged out"), new Error("logged out"), new Error("logged out")
+ +    ]), () => undefined)).rejects.toThrow("DEV_CLI_PROVIDER_PANEL_INSUFFICIENT_MAKERS");
+    });
+  
+ -  it("starts every relay on the selected support-preview port", async () => {
+ -    const ports = SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE.providerPorts;
+ -    const runtime = operations([
+ -      relay(ports[0], "OpenAI", "gpt-real"),
+ -      relay(ports[1], "OpenAI", "gpt-premium-real"),
+ -      relay(ports[2], "Anthropic", "claude-real"),
+ -      relay(ports[3], "Anthropic", "claude-premium-real"),
+ -      relay(ports[4], "xAI", "grok-real")
+ +  // Property: every rejected CLI slot is named once with its configured identity and typed cause.
+ +  // Production break: map a rejected Promise.allSettled outcome silently to the unavailable model.
+ +  it("prints one class-(c) line for a rejected CLI relay", async () => {
+ +    const mismatchCode =
+ +      "GROK_CLI_MODEL_MISMATCH expected=grok-4.6-build answered=grok-4.5-build";
+ +    const warnings: string[] = [];
+ +    const handle = await startDevelopmentCliProviderPanel(
+ +      loadModelConfig(process.cwd()),
+ +      operations([
+ +        relay(8795, "OpenAI", "gpt-5.6-sol"),
+ +        relay(8796, "Anthropic", "claude-opus-5"),
+ +        new Error(mismatchCode)
+ +      ]),
+ +      (line: string) => { warnings.push(line); }
+ +    );
+ +
+ +    expect(warnings).toEqual([
+ +      `DEV_PROVIDER_SLOT_UNAVAILABLE class (c) tier=premium model=grok-4.6-build code=${mismatchCode}`
+      ]);
+ +    await handle.stop();
+ +  });
+++
+++  it("starts every relay on the selected support-preview port", async () => {
+++    const config = loadModelConfig(process.cwd());
+++    const previewSlots = developmentProviderSlots(
+++      config,
+++      SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE
+++    ).filter((slot) => slot.transport === "cli");
+++    const runtime = operations(previewSlots.map((slot) =>
+++      relay(slot.port!, slot.maker, slot.model)
+++    ));
++     const handle = await startDevelopmentCliProviderPanel(
+++      config,
++       runtime,
+++      () => undefined,
++       SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE
++     );
++     for (const [index, start] of runtime.starts.entries()) {
+ -      expect(start).toHaveBeenCalledWith(ports[index]);
+++      expect(start).toHaveBeenCalledWith(previewSlots[index]!.port);
++     }
++     await handle.stop();
++   });
+  });
+  
+ -describe("development CLI model pins", () => {
+ -  it("carries one slot per roster member so BOTH plan tiers are admissible from one panel", () => {
+ -    // V, 2026-09-12: "Both free and premium need to be accessible at the same time."
+ -    // Discovery is 1:1 with the configured provider set, so every roster model of every
+ -    // tier needs its own slot; one slot per maker could only ever serve one tier.
+ -    const rosterModels = [...PLAN_TIER_ROSTERS.free, ...PLAN_TIER_ROSTERS.premium];
+ -    expect(DEVELOPMENT_CLI_PROVIDER_ROSTER).toHaveLength(rosterModels.length);
+ -    expect([...new Set(DEVELOPMENT_CLI_PROVIDER_ROSTER.map(({ port }) => port))])
+ -      .toHaveLength(rosterModels.length);
+ -    expect([...new Set(DEVELOPMENT_CLI_PROVIDER_ROSTER.map(({ providerRef }) => providerRef))])
+ -      .toHaveLength(rosterModels.length);
+ -    expect(DEVELOPMENT_CLI_MODEL_PINS.grokSandboxProfile).toBe("none");
+ -  });
+ -
+ -  it("pins each Codex and Claude slot to the roster model that slot exists to serve", () => {
+ -    expect(PLAN_TIER_ROSTERS.free).toContain(DEVELOPMENT_CLI_MODEL_PINS.codexFreeModel);
+ -    expect(PLAN_TIER_ROSTERS.premium).toContain(DEVELOPMENT_CLI_MODEL_PINS.codexPremiumModel);
+ -    expect(DEVELOPMENT_CLI_MODEL_PINS.codexFreeModel)
+ -      .not.toBe(DEVELOPMENT_CLI_MODEL_PINS.codexPremiumModel);
+ -    const anthropic = (models: readonly string[]) =>
+ -      models.find((modelId) => modelId.startsWith("claude-"))!.split(/[^a-z0-9]+/u);
+ -    expect(anthropic(PLAN_TIER_ROSTERS.free)).toContain(DEVELOPMENT_CLI_MODEL_PINS.claudeFreeAlias);
+ -    expect(anthropic(PLAN_TIER_ROSTERS.premium)).toContain(DEVELOPMENT_CLI_MODEL_PINS.claudePremiumAlias);
+ -    expect(DEVELOPMENT_CLI_MODEL_PINS.claudeFreeAlias)
+ -      .not.toBe(DEVELOPMENT_CLI_MODEL_PINS.claudePremiumAlias);
+ +describe("development CLI full-id starts", () => {
+ +  it("starts the three configured CLI entries with the full Codex model id", async () => {
+ +    relayStarts.codex.mockClear();
+ +    const operations = createDevelopmentCliProviderPanelOperations(loadModelConfig(process.cwd()));
+ +    expect(operations.starts).toHaveLength(3);
+ +    await operations.starts[0]!(8795);
+ +    expect(relayStarts.codex).toHaveBeenCalledWith({
+ +      port: 8795, timeoutMs: 180000, model: "gpt-5.6-sol"
+ +    });
+ +  });
+ +
+ +  it("starts the Claude relay with `--model claude-opus-5`", async () => {
+ +    relayStarts.claude.mockClear();
+ +    const operations = createDevelopmentCliProviderPanelOperations(loadModelConfig(process.cwd()));
+ +    await operations.starts[1]!(8796);
+ +    const panelOptions = relayStarts.claude.mock.calls[0]?.[0];
+ +    expect(panelOptions).toBeDefined();
+ +
+ +    const { startClaudeRelay } = await vi.importActual<
+ +      typeof import("../../acceptance/claude-relay.js")
+ +    >("../../acceptance/claude-relay.js");
+ +    const capturedEnvelopeScript = [
+ +      'console.log(JSON.stringify({',
+ +      '  is_error: false,',
+ +      '  result: JSON.stringify({ argumentList: process.argv }),',
+ +      '  modelUsage: { "claude-opus-5": {} }',
+ +      '}));'
+ +    ].join("");
+ +    const relay = await startClaudeRelay({
+ +      ...panelOptions!,
+ +      port: 0,
+ +      timeoutMs: 1_000,
+ +      testOnlyCommand: {
+ +        binary: process.execPath,
+ +        prefixArguments: ["-e", capturedEnvelopeScript, "--"]
+ +      }
+ +    });
+ +    try {
+ +      const response = await fetch(`${relay.baseUrl}/v1/chat/completions`, {
+ +        method: "POST",
+ +        headers: { "content-type": "application/json", authorization: relay.authorizationHeader },
+ +        body: JSON.stringify({
+ +          model: "ignored-by-relay",
+ +          messages: [{ role: "user", content: "Assert argv." }]
+ +        })
+ +      });
+ +      expect(response.status).toBe(200);
+ +      const completion = await response.json() as {
+ +        choices: readonly { message: { content: string } }[];
+ +      };
+ +      const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+ +        argumentList: readonly string[];
+ +      };
+ +      expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1])
+ +        .toBe("claude-opus-5");
+ +    } finally {
+ +      await relay.close();
+ +    }
+ +  });
+ +
+ +  it("passes the configured Claude id through the typed model option", async () => {
+ +    relayStarts.claude.mockClear();
+ +    const operations = createDevelopmentCliProviderPanelOperations(loadModelConfig(process.cwd()));
+ +    await operations.starts[1]!(8796);
+ +    expect(relayStarts.claude).toHaveBeenCalledWith({
+ +      port: 8796, timeoutMs: 180000, model: "claude-opus-5"
+ +    });
+ +  });
+ +
+ +  it("starts Grok with the configured reported lineage and no unsupported --model", async () => {
+ +    relayStarts.grok.mockClear();
+ +    const operations = createDevelopmentCliProviderPanelOperations(loadModelConfig(process.cwd()));
+ +    expect(operations.starts).toHaveLength(3);
+ +    await operations.starts[2]!(8793);
+ +    const panelOptions = relayStarts.grok.mock.calls[0]?.[0];
+ +    expect(panelOptions).toEqual({
+ +      port: 8793, timeoutMs: 180000, model: "grok-4.6-build", sandboxProfile: "none"
+ +    });
+ +
+ +    const { startGrokRelay } = await vi.importActual<
+ +      typeof import("../../acceptance/grok-relay.js")
+ +    >("../../acceptance/grok-relay.js");
+ +    const realSelectionBoundaryScript = [
+ +      'const selectedIndex = process.argv.indexOf("--model");',
+ +      'if (selectedIndex >= 0) {',
+ +      '  const selected = process.argv[selectedIndex + 1];',
+ +      '  console.log(JSON.stringify({',
+ +      '    type: "error",',
+ +      '    message: `Couldn\'t set model \'${selected}\': Invalid params: "unknown model id". Run \'grok models\' to see available models.`',
+ +      '  }));',
+ +      '  process.exitCode = 1;',
+ +      '} else {',
+ +      '  console.log(JSON.stringify({',
+ +      '    text: JSON.stringify({ argumentList: process.argv }),',
+ +      '    stopReason: "end_turn",',
+ +      '    modelUsage: { "grok-4.6-build": {} }',
+ +      '  }));',
+ +      '}'
+ +    ].join("");
+ +    const relay = await startGrokRelay({
+ +      ...panelOptions!,
+ +      port: 0,
+ +      timeoutMs: 1_000,
+ +      testOnlyCommand: {
+ +        binary: process.execPath,
+ +        prefixArguments: ["-e", realSelectionBoundaryScript, "--"]
+ +      }
+ +    });
+ +    try {
+ +      const response = await fetch(`${relay.baseUrl}/v1/chat/completions`, {
+ +        method: "POST",
+ +        headers: { "content-type": "application/json", authorization: relay.authorizationHeader },
+ +        body: JSON.stringify({
+ +          model: "ignored-by-relay",
+ +          messages: [{ role: "user", content: "Assert argv." }]
+ +        })
+ +      });
+ +      expect(response.status).toBe(200);
+ +      const completion = await response.json() as {
+ +        choices: readonly { message: { content: string } }[];
+ +      };
+ +      const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+ +        argumentList: readonly string[];
+ +      };
+ +      expect(relay.model).toBe("grok-4.6-build");
+ +      expect(relayed.argumentList).not.toContain("--model");
+ +    } finally {
+ +      await relay.close();
+ +    }
+    });
+  });
+  

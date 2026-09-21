@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-17T08:55:54Z",
+  "node": "FEEDBACK3_REV2",
+  "ticket": "t_e3556e0a",
+  "session": "/root/forgot_destination",
+  "model": "gpt-5.6-sol",
+  "revision": "479763da1f586a217f36204cc81138aaa81c6f81",
+  "previousRevision": "9e87fe5859b44fbd62dd485e03045e5bcde96bed",
+  "verdict": "REWORK",
+  "usage": "UNAVAILABLE",
+  "artifacts": [
+    {
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/FEEDBACK3_REV2.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/FEEDBACK3_REV2.md",
+      "sha256": "f0c63f9b6503a3626fcad3a19ad25f78bfc944efafa7362fb3b870e6fc15ecbc",
+      "bytes": 4460
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/FEEDBACK3_REV2.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FEEDBACK3_REV2.md",
+      "sha256": "b4f248b2ba7b3d5cc858c26607a5796e088167f607f7416f10bf70a9d82f7cef",
+      "bytes": 3687
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/FEEDBACK3_REV2/feedback3-boundary-control.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/FEEDBACK3_REV2/feedback3-boundary-control.ts",
+      "sha256": "ce883d14a7ccbc1cf3feaa9b21b10b3a26490143ec615f8f29715b39b8bcd35a",
+      "bytes": 16725
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/FEEDBACK3_REV2/run-feedback3-boundary-control.mjs",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/FEEDBACK3_REV2/run-feedback3-boundary-control.mjs",
+      "sha256": "5392f183a859560f5a3bc0da1e1f63b4caae8a71ec72213a30d355400ce96603",
+      "bytes": 2189
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/FEEDBACK3_REV2/verify-inputs.mjs",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/FEEDBACK3_REV2/verify-inputs.mjs",
+      "sha256": "0495640403dc86a02992fb5fa5b2775c72770ffea7ec50c5ce41c43e184ee995",
+      "bytes": 2029
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/FEEDBACK3_REV2-input-verification.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FEEDBACK3_REV2-input-verification.log",
+      "sha256": "83bdbc29690f73bc712e89ecf828de55142f012d9c303d3de54a744b67f8fd8b",
+      "bytes": 482
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/FEEDBACK3_REV2-feedback3-boundary.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FEEDBACK3_REV2-feedback3-boundary.log",
+      "sha256": "3f87ba73f515820daf27bfc5c1d7635518581caf7f30dd2e842d5ae7e8c1e137",
+      "bytes": 23189
+    }
+  ],
+  "limits": [
+    "Bounded FEEDBACK2 adjacent-family recheck only; no final-25 rerun, broad audit, or GUIDE_GAP/public-guide assessment.",
+    "Every exact prior failure is fixed; the remaining finding covers three equivalent negation members only.",
+    "The failed navigation cases fell to Settings and emitted no credential, URL, action, validation, or reset operation.",
+    "No general natural-language, negation, encoding, or model-semantic completeness claim is made.",
+    "No real HTTP, database, browser, preview, provider, model, authentication, reset, or account traffic.",
+    "Forgot-password destination remains unresolved and was not searched, guessed, or waived.",
+    "User alone accepts CP1; this receipt is not checkpoint acceptance."
+  ]
+}

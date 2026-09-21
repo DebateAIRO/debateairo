@@ -1,0 +1,38 @@
+GUIDE_CONTINUATION_FEASIBILITY39 static trace
+revision=0d34f82f4a2188d0ce1db04655b693798ffd2169
+execution=NONE_STATIC_ONLY
+
+UI persistence
+- apps/ui/components/support/Assistant.tsx:326-380 defines and validates the same-origin sessionStorage record: language, session, messages.
+- Assistant.tsx:397-423 hydrates language/session/messages on mount and persists every change.
+- Assistant.tsx:473-481 shows an actual language change clears the session; a same-language RO remount does not call this path.
+- Assistant.tsx:518-539 reuses a restored session when anonymous identity state matches and creates only when it does not.
+- Assistant.tsx:541-579 sends with the active session; only an exact 409 snapshot mismatch clears storage and creates a replacement.
+- Assistant.tsx:646-658 renders the canonical action as an ordinary anchor.
+- apps/ui/components/support/SupportWidget.tsx:96-105 mounts compact Assistant and a same-origin /help link.
+- apps/ui/app/help/page.tsx:4-13 mounts the same persistent Assistant with fullPage=true.
+
+Controller and lifecycle
+- capture-public-guide.mjs:328-346 activates the verified action by pointer/keyboard and waits for the exact destination.
+- capture-public-guide.mjs:348 onward selects reply roots from each row.mode, so a full row can follow a compact row after a proved transition.
+- capture-public-guide.mjs:430-476 currently forbids mixed row.mode inside one group and nulls mode/language after navigation; this is the harness-only incompatibility.
+- session-lifecycle.mjs:98-105 already models SAME_ORIGIN_NAVIGATION_ONLY as preserving stored session identity.
+- session-lifecycle.mjs:108-150 enforces exactly one newly observed session per fresh group and constant create count for continuation.
+
+Server acceptance
+- apps/api/src/support/index.ts:269-280 accepts messages by session id plus capability and checks owner/shred state, independent of UI surface.
+- support/index.ts:308-313 classifies with and responds in the stored session language; there is no surface-language override.
+- support/index.ts:320-338 retains 24-hour/session/rate/injection admission. Row43 is one terminal injection and remains below threshold 3; the first group is at most eight messages.
+
+Fixed remaining groups
+- RO continuation: compact 10,18,26,34,56,58,54; keyboard Help navigation; full 43 terminal.
+- Full EN: 5,13,21,25,29,37,45,53.
+- Compact EN: 8,12,42,55,57.
+- Row47 recapture: NOT REQUIRED by consumed baseline review.
+
+Capacity arithmetic from immutable LIVE31 counters
+- Existing conservative daily upper bound: 57 measured + 10 attempted = 67 of 100.
+- Remaining: 21 requests, exactly 18 MODEL branches, 3 new sessions.
+- Owner reserve: 6 requests/model calls and 2 sessions.
+- Combined future need: 27 messages and 5 sessions; daily bound becomes 94, leaving 6.
+- Hourly session demand equals the configured limit 5 only after the two old sessions naturally expire and a fresh counts-only frame confirms availability.

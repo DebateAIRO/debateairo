@@ -18,12 +18,15 @@ import {
   type DevelopmentDeploymentRegisterMachineReceiptV1
 } from "./dev-deployment-register.js";
 import { parseDevelopmentSupportModelTargetJson } from "./dev-support-model.js";
+import {
+  DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  type DevelopmentAuthStackProfile
+} from "./dev-auth-stack-profile.js";
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIRECTORY_MODE = 0o700;
 const MAX_CREDENTIAL_FILE_BYTES = 64 * 1024;
 const LOCAL_DATABASE_HOST = "127.0.0.1";
-const LOCAL_DATABASE_PORT = "55432";
 const LOCAL_DATABASE_NAME = "/debateai";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -82,6 +85,7 @@ type AssembleDevelopmentApiEnvironmentInput = Readonly<{
   registerReceipt: DevelopmentDeploymentRegisterMachineReceiptV1;
   supportModelTarget: string;
   heldConfiguredProviderSets?: ReadonlyMap<string, readonly string[]>;
+  profile?: DevelopmentAuthStackProfile;
 }>;
 
 function currentUid(): number {
@@ -174,7 +178,7 @@ function parseExactEnvironment(source: string, expectedKeys: readonly string[]):
   return parsed;
 }
 
-function readDatabaseCredentials(source: string): Map<string, string> {
+function readDatabaseCredentials(source: string, expectedPort: string): Map<string, string> {
   const expectedKeys = DEVELOPMENT_DATABASE_PRINCIPALS.map(({ environmentKey }) => environmentKey);
   const parsed = parseExactEnvironment(source, expectedKeys);
   const identities = new Set<string>();
@@ -189,7 +193,7 @@ function readDatabaseCredentials(source: string): Map<string, string> {
     }
     if ((url.protocol !== "postgres:" && url.protocol !== "postgresql:")
       || url.hostname !== LOCAL_DATABASE_HOST
-      || url.port !== LOCAL_DATABASE_PORT
+      || url.port !== expectedPort
       || url.pathname !== LOCAL_DATABASE_NAME
       || url.search !== ""
       || url.hash !== ""
@@ -207,7 +211,7 @@ function readDatabaseCredentials(source: string): Map<string, string> {
   return apiCredentials;
 }
 
-function tenantIdFromToken(token: string): string {
+function tenantIdFromToken(token: string, profile: DevelopmentAuthStackProfile): string {
   if (token.length > 8_192 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(token)) {
     throw new TypeError("DEV_API_ENVIRONMENT_HATCHET_TOKEN_INVALID");
   }
@@ -219,8 +223,8 @@ function tenantIdFromToken(token: string): string {
     };
     if (typeof payload.sub !== "string"
       || !UUID_PATTERN.test(payload.sub)
-      || payload.server_url !== "http://localhost:8888"
-      || payload.grpc_broadcast_address !== "localhost:7077") {
+      || payload.server_url !== `http://localhost:${profile.hatchetApiPort}`
+      || payload.grpc_broadcast_address !== `localhost:${profile.hatchetGrpcPort}`) {
       throw new TypeError("DEV_API_ENVIRONMENT_HATCHET_TOKEN_INVALID");
     }
     return payload.sub;
@@ -312,7 +316,8 @@ async function publishExactFile(
 function isExactProviderRuntimeRefresh(
   existing: string,
   expected: string,
-  configuredProviders: readonly DevelopmentConfiguredProvider[]
+  configuredProviders: readonly DevelopmentConfiguredProvider[],
+  profile: DevelopmentAuthStackProfile
 ): boolean {
   try {
     const existingValues = parseExactEnvironment(existing, DEVELOPMENT_API_ENVIRONMENT_KEYS);
@@ -322,9 +327,14 @@ function isExactProviderRuntimeRefresh(
       if (existingValues.get(key) !== expectedValues.get(key)) return false;
     }
     parseDevelopmentProviderPanelTargets(
-      existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!, configuredProviders
+      existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!,
+      configuredProviders,
+      profile
     );
-    parseDevelopmentSupportModelTargetJson(existingValues.get("SUPPORT_MODEL_TARGET_JSON")!);
+    parseDevelopmentSupportModelTargetJson(
+      existingValues.get("SUPPORT_MODEL_TARGET_JSON")!,
+      profile
+    );
     return true;
   } catch {
     return false;
@@ -345,6 +355,7 @@ function isExactPublishedRegisterRefresh(
   existing: string,
   expected: string,
   configuredProviders: readonly DevelopmentConfiguredProvider[],
+  profile: DevelopmentAuthStackProfile,
   heldConfiguredProviderSets?: ReadonlyMap<string, readonly string[]>
 ): boolean {
   const receiptKeys = new Set([
@@ -368,7 +379,9 @@ function isExactPublishedRegisterRefresh(
     // set is precisely what changed. An additive publication is admitted directly. A removal
     // is admitted only when the caller proves the exact outgoing set was held by its version.
     const incoming = parseDevelopmentProviderPanelTargets(
-      expectedValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!, configuredProviders
+      expectedValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!,
+      configuredProviders,
+      profile
     );
     const configuredRefs = new Set(incoming.targets.map((target) => target.providerRef));
     const outgoing: unknown = JSON.parse(existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!);
@@ -389,7 +402,10 @@ function isExactPublishedRegisterRefresh(
       && outgoingRefs.length === heldSet.size
       && outgoingRefs.every((providerRef) => heldSet.has(providerRef));
     if (!additive && !exactHeldSet) return false;
-    parseDevelopmentSupportModelTargetJson(existingValues.get("SUPPORT_MODEL_TARGET_JSON")!);
+    parseDevelopmentSupportModelTargetJson(
+      existingValues.get("SUPPORT_MODEL_TARGET_JSON")!,
+      profile
+    );
     return true;
   } catch {
     return false;
@@ -399,20 +415,22 @@ function isExactPublishedRegisterRefresh(
 function isExactProviderRuntimeRefreshWithLegacyProbeTimeout(
   existing: string,
   expected: string,
-  configuredProviders: readonly DevelopmentConfiguredProvider[]
+  configuredProviders: readonly DevelopmentConfiguredProvider[],
+  profile: DevelopmentAuthStackProfile
 ): boolean {
   const upgraded = existing.replace(
     "PROVIDER_PROBE_TIMEOUT_MS=5000\n",
     `PROVIDER_PROBE_TIMEOUT_MS=${DEVELOPMENT_CLI_CALL_TIMEOUT_MS}\n`
   );
   return upgraded !== existing
-    && isExactProviderRuntimeRefresh(upgraded, expected, configuredProviders);
+    && isExactProviderRuntimeRefresh(upgraded, expected, configuredProviders, profile);
 }
 
 function isExactLegacyEnvironmentWithoutSupportModelTarget(
   existing: string,
   expected: string,
-  configuredProviders: readonly DevelopmentConfiguredProvider[]
+  configuredProviders: readonly DevelopmentConfiguredProvider[],
+  profile: DevelopmentAuthStackProfile
 ): boolean {
   try {
     const legacyKeys = DEVELOPMENT_API_ENVIRONMENT_KEYS.filter((key) =>
@@ -425,9 +443,14 @@ function isExactLegacyEnvironmentWithoutSupportModelTarget(
       if (existingValues.get(key) !== expectedValues.get(key)) return false;
     }
     parseDevelopmentProviderPanelTargets(
-      existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!, configuredProviders
+      existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!,
+      configuredProviders,
+      profile
     );
-    parseDevelopmentSupportModelTargetJson(expectedValues.get("SUPPORT_MODEL_TARGET_JSON")!);
+    parseDevelopmentSupportModelTargetJson(
+      expectedValues.get("SUPPORT_MODEL_TARGET_JSON")!,
+      profile
+    );
     return true;
   } catch {
     return false;
@@ -437,6 +460,7 @@ function isExactLegacyEnvironmentWithoutSupportModelTarget(
 export async function assembleDevelopmentApiEnvironment(
   input: AssembleDevelopmentApiEnvironmentInput
 ): Promise<DevelopmentApiEnvironmentReceipt> {
+  const profile = input.profile ?? DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE;
   const repositoryRoot = resolve(input.repositoryRoot);
   const localRoot = join(repositoryRoot, ".local");
   const custodyRoot = join(repositoryRoot, ".local", "dev-auth");
@@ -459,12 +483,15 @@ export async function assembleDevelopmentApiEnvironment(
   if (databaseSource === undefined || hatchetSource === undefined) {
     throw new TypeError("DEV_API_ENVIRONMENT_CREDENTIAL_REQUIRED");
   }
-  const databases = readDatabaseCredentials(databaseSource);
+  const databases = readDatabaseCredentials(databaseSource, String(profile.postgresPort));
   const hatchet = parseExactEnvironment(hatchetSource, ["HATCHET_CLIENT_TOKEN"]);
   const token = hatchet.get("HATCHET_CLIENT_TOKEN")!;
-  const tenantId = tenantIdFromToken(token);
+  const tenantId = tenantIdFromToken(token, profile);
   const providerPanel = input.providerPanel;
-  const supportModelTarget = parseDevelopmentSupportModelTargetJson(input.supportModelTarget);
+  const supportModelTarget = parseDevelopmentSupportModelTargetJson(
+    input.supportModelTarget,
+    profile
+  );
   const custodyRegisterReceipt = await readDevelopmentDeploymentRegisterReceipt(repositoryRoot);
   if (serializeDevelopmentDeploymentRegisterReceipt(custodyRegisterReceipt)
     !== serializeDevelopmentDeploymentRegisterReceipt(input.registerReceipt)) {
@@ -488,11 +515,11 @@ export async function assembleDevelopmentApiEnvironment(
     ["ACCOUNT_ERASURE_GRACE_MS", "604800000"],
     ["MAIL_SENDMAIL_PATH", join(repositoryRoot, "deploy", "dev-auth", "sendmail-capture.mjs")],
     ["MAIL_FROM", "noreply@localhost.test"],
-    ["PUBLIC_APP_URL", "https://localhost:3000"],
+    ["PUBLIC_APP_URL", profile.publicOrigin],
     ["DATABASE_URL", databases.get("DATABASE_URL")!],
     ["SUPPORT_DATABASE_URL", databases.get("SUPPORT_DATABASE_URL")!],
     ["API_HOST", "127.0.0.1"],
-    ["API_PORT", "8790"],
+    ["API_PORT", String(profile.apiPort)],
     ["STRANGER_SAMPLE_RATE", "0"],
     ["REGISTER_VERSION", custodyRegisterReceipt.registerVersion],
     ["REGISTER_DEPLOYMENT_RECEIPT_SHA256", custodyRegisterReceipt.receiptSha256],
@@ -506,8 +533,8 @@ export async function assembleDevelopmentApiEnvironment(
     ["EVALUATOR_DEV_MENU_ENABLED", "false"],
     ["EVALUATOR_DEV_MENU_DATABASE_URL", databases.get("EVALUATOR_DEV_MENU_DATABASE_URL")!],
     ["HATCHET_CLIENT_TOKEN", token],
-    ["HATCHET_HOST_PORT", "127.0.0.1:7077"],
-    ["HATCHET_API_URL", "http://127.0.0.1:8888"],
+    ["HATCHET_HOST_PORT", `127.0.0.1:${profile.hatchetGrpcPort}`],
+    ["HATCHET_API_URL", `http://127.0.0.1:${profile.hatchetApiPort}`],
     ["HATCHET_TENANT_ID", tenantId],
     ["HATCHET_WORKFLOW_NAME", "debateai-dev"],
     ["HATCHET_TLS_STRATEGY", "none"],
@@ -519,19 +546,20 @@ export async function assembleDevelopmentApiEnvironment(
     source,
     [],
     (existing) => isExactProviderRuntimeRefresh(
-      existing, source, input.providerPanel.configuredProviders
+      existing, source, input.providerPanel.configuredProviders, profile
     )
       || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(
-        existing, source, input.providerPanel.configuredProviders
+        existing, source, input.providerPanel.configuredProviders, profile
       )
       || isExactPublishedRegisterRefresh(
         existing,
         source,
         input.providerPanel.configuredProviders,
+        profile,
         input.heldConfiguredProviderSets
       )
       || isExactLegacyEnvironmentWithoutSupportModelTarget(
-        existing, source, input.providerPanel.configuredProviders
+        existing, source, input.providerPanel.configuredProviders, profile
       )
   );
   return Object.freeze({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused });

@@ -1,0 +1,10 @@
+head 53d877e1 dirty 0 markers 0
+tests/unit/dev-auth-stack.test.ts rc=0  Tests 28 passed (28)
+tests/unit/dev-cli-provider-panel.test.ts rc=0  Tests 14 passed (14)
+tests/integration/dev-api-process.test.ts rc=0  Tests 10 passed (10)
+tests/integration/dev-database-principals.test.ts rc=1  Tests 1 failed | 15 passed (16)
+tests/integration/dev-provider-panel.test.ts rc=0  Tests 4 passed (4)
+tests/integration/dev-api-environment.test.ts rc=0  Tests 12 passed (12)
+tests/unit/dev-auth-data-plane.test.ts rc=0  Tests 5 passed (5)
+CLUSTER_GREEN
+tsc=70

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_FIX29",
+  "result": "PASS_REAL_MESSAGE_SCREENSHOT_TARGET",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+  "controls": 25,
+  "passed": 25,
+  "names": [
+    "actual row1 label-vs-id mismatch reproduced against sealed helper",
+    "successor compares visible source labels to API source labels",
+    "short full EN row1 complete/top/footer screenshots pass",
+    "long full RO complete/top/footer screenshots pass",
+    "long compact EN complete/top/footer screenshots pass",
+    "short compact RO complete/top/footer screenshots pass",
+    "previous reply target rejected in all four fixture cases",
+    "wrong assistant index rejected in all four fixture cases",
+    "stale visible projection rejected in all four fixture cases",
+    "zero Support requests in inert browser fixture",
+    "short reply already-visible footer remains accepted without weakening reachability",
+    "capture preserves exact API/DOM/source/action validation",
+    "capture records only first and second session creation observation timestamps",
+    "actual GUIDE22 receipt and screenshot namespace bound",
+    "fresh LIVE29 UI/capacity/gate/proof/capture/idle paths bound",
+    "all seven argv self-bind exact FIX29 command contract",
+    "fixed31 plan retains31 unique rows",
+    "full58 retained row proof hash is unchanged",
+    "Runtime7 and private LIVE20 log paths remain unchanged",
+    "FIX22 deferred owner contract and existing unused output retained",
+    "LIVE25 owner testability output remains in absence set",
+    "operator uses node --import tsx with require_escalated metadata",
+    "operator stdout and stderr remain tool-captured without outer redirection",
+    "123 future paths are unique and absent",
+    "four successor scripts pass syntax checks"
+  ],
+  "sourceCustody": {
+    "assistantSha256": "08973898240182a2c04894b1987ffab92e593d70bb9eb9808484f2c76c8e710d",
+    "retainedRowProofSha256": "1b5d7b296d5b5981d6391ebba27e8a35e03a0cd20cb671c7cf799494ee999520"
+  },
+  "traffic": {
+    "browserFixture": "local_setContent_only",
+    "supportAttempts": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "model": 0
+  }
+}

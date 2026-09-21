@@ -1,0 +1,124 @@
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: The input did not match the regular expression /GUIDE_HARNESS_ROW_PROOF_/u. Input:
+
+'import { closeSync,openSync } from "node:fs";\n' +
+  'import { spawn } from "node:child_process";\n' +
+  'import { readFile,writeFile } from "node:fs/promises";\n' +
+  'import { requireAbsoluteCommand,readFinalContract } from "../GUIDE_HARNESS_BIND21/phase-contract.mjs";\n' +
+  'import { validateGuideRowProofDependency } from "./proof-dependency.mjs";\n' +
+  '\n' +
+  'const contract=await readFinalContract(process.argv[2]);\n' +
+  'const phase=requireAbsoluteCommand(contract.phases.capture);\n' +
+  'if (!Array.isArray(phase.childArgv) || phase.childArgv.length !== 5\n' +
+  '  || !phase.childArgv.every(value=>typeof value === "string")\n' +
+  '  || !phase.childArgv[0].startsWith("/") || phase.childArgv[1] !== "--import"\n' +
+  '  || phase.childArgv[2] !== "tsx" || !phase.childArgv[3].startsWith("/")\n' +
+  '  || phase.childArgv[4] !== contract.phases.gate.output) {\n' +
+  '  throw new Error("GUIDE_CAPTURE_CHILD_ARGV_INVALID");\n' +
+  '}\n' +
+  '\n' +
+  '// This dependency is intentionally validated before opening the capture log,\n' +
+  '// creating a browser profile, or spawning the unchanged capture child.\n' +
+  'let statusBytes,resultBytes,gateBytes;\n' +
+  'try {\n' +
+  '  [statusBytes,resultBytes,gateBytes]=await Promise.all([\n' +
+  '    readFile(contract.phases.rowProof.output),readFile(contract.phases.rowProof.result),\n' +
+  '    readFile(contract.phases.gate.output)\n' +
+  '  ]);\n' +
+  '} catch {\n' +
+  '  throw new Error("GUIDE_CAPTURE_ROW_PROOF_EVIDENCE_MISSING");\n' +
+  '}\n' +
+  'let rowProofStatus;\n' +
+  'try { rowProofStatus=JSON.parse(statusBytes.toString("utf8")); }\n' +
+  'catch { throw new Error("GUIDE_CAPTURE_ROW_PROOF_STATUS_INVALID"); }\n' +
+  'const consumed=validateGuideRowProofDependency({\n' +
+  '  status:rowProofStatus,resultBytes,gateBytes,expectedRevision:contract.revision,\n' +
+  '  expectedKbVersion:contract.kbVersion,expectedGatePath:contract.phases.gate.output,\n' +
+  '  expectedResultPath:contract.phases.rowProof.result\n' +
+  '});\n' +
+  '\n' +
+  'const fd=openSync(phase.log,"wx",0o600);\n' +
+  'const child=spawn(phase.childArgv[0],phase.childArgv.slice(1),{ cwd:contract.cwd,stdio:["ignore",fd,fd] });\n' +
+  'const progress=setInterval(async()=>{ try {\n' +
+  '  const receipt=JSON.parse(await readFile(contract.actualReceipt,"utf8"));\n' +
+  '  process.stdout.write(`${JSON.stringify({ attemptedRowCount:receipt.attemptedRowCount,\n' +
+  '    completedRowCount:receipt.completedRowCount,failure:receipt.failure ?? null })}\\n`);\n' +
+  '} catch {} },60_000);\n' +
+  'const status=await new Promise((resolve,reject)=>{\n' +
+  '  child.once("error",reject); child.once("exit",code=>resolve(code ?? 1));\n' +
+  '});\n' +
+  'clearInterval(progress); closeSync(fd);\n' +
+  'await writeFile(phase.output,`${JSON.stringify({\n' +
+  '  schemaVersion:2,phase:"CAPTURE",revision:contract.revision,status,\n' +
+  '  consumedRowProofPath:consumed.resultPath,consumedRowProofSha256:consumed.resultSha256,\n' +
+  '  consumedGatePath:consumed.gatePath,consumedGateSha256:consumed.gateSha256,\n' +
+  '  consumedRowCount:consumed.validatedRows\n' +
+  '},null,2)}\\n`,{ flag:"wx",mode:0o600 });\n' +
+  'process.exitCode=status;\n'
+
+    at file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREVIEW_BIND32/verify-final-binding.mjs:44:8 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'import { closeSync,openSync } from "node:fs";\n' +
+    'import { spawn } from "node:child_process";\n' +
+    'import { readFile,writeFile } from "node:fs/promises";\n' +
+    'import { requireAbsoluteCommand,readFinalContract } from "../GUIDE_HARNESS_BIND21/phase-contract.mjs";\n' +
+    'import { validateGuideRowProofDependency } from "./proof-dependency.mjs";\n' +
+    '\n' +
+    'const contract=await readFinalContract(process.argv[2]);\n' +
+    'const phase=requireAbsoluteCommand(contract.phases.capture);\n' +
+    'if (!Array.isArray(phase.childArgv) || phase.childArgv.length !== 5\n' +
+    '  || !phase.childArgv.every(value=>typeof value === "string")\n' +
+    '  || !phase.childArgv[0].startsWith("/") || phase.childArgv[1] !== "--import"\n' +
+    '  || phase.childArgv[2] !== "tsx" || !phase.childArgv[3].startsWith("/")\n' +
+    '  || phase.childArgv[4] !== contract.phases.gate.output) {\n' +
+    '  throw new Error("GUIDE_CAPTURE_CHILD_ARGV_INVALID");\n' +
+    '}\n' +
+    '\n' +
+    '// This dependency is intentionally validated before opening the capture log,\n' +
+    '// creating a browser profile, or spawning the unchanged capture child.\n' +
+    'let statusBytes,resultBytes,gateBytes;\n' +
+    'try {\n' +
+    '  [statusBytes,resultBytes,gateBytes]=await Promise.all([\n' +
+    '    readFile(contract.phases.rowProof.output),readFile(contract.phases.rowProof.result),\n' +
+    '    readFile(contract.phases.gate.output)\n' +
+    '  ]);\n' +
+    '} catch {\n' +
+    '  throw new Error("GUIDE_CAPTURE_ROW_PROOF_EVIDENCE_MISSING");\n' +
+    '}\n' +
+    'let rowProofStatus;\n' +
+    'try { rowProofStatus=JSON.parse(statusBytes.toString("utf8")); }\n' +
+    'catch { throw new Error("GUIDE_CAPTURE_ROW_PROOF_STATUS_INVALID"); }\n' +
+    'const consumed=validateGuideRowProofDependency({\n' +
+    '  status:rowProofStatus,resultBytes,gateBytes,expectedRevision:contract.revision,\n' +
+    '  expectedKbVersion:contract.kbVersion,expectedGatePath:contract.phases.gate.output,\n' +
+    '  expectedResultPath:contract.phases.rowProof.result\n' +
+    '});\n' +
+    '\n' +
+    'const fd=openSync(phase.log,"wx",0o600);\n' +
+    'const child=spawn(phase.childArgv[0],phase.childArgv.slice(1),{ cwd:contract.cwd,stdio:["ignore",fd,fd] });\n' +
+    'const progress=setInterval(async()=>{ try {\n' +
+    '  const receipt=JSON.parse(await readFile(contract.actualReceipt,"utf8"));\n' +
+    '  process.stdout.write(`${JSON.stringify({ attemptedRowCount:receipt.attemptedRowCount,\n' +
+    '    completedRowCount:receipt.completedRowCount,failure:receipt.failure ?? null })}\\n`);\n' +
+    '} catch {} },60_000);\n' +
+    'const status=await new Promise((resolve,reject)=>{\n' +
+    '  child.once("error",reject); child.once("exit",code=>resolve(code ?? 1));\n' +
+    '});\n' +
+    'clearInterval(progress); closeSync(fd);\n' +
+    'await writeFile(phase.output,`${JSON.stringify({\n' +
+    '  schemaVersion:2,phase:"CAPTURE",revision:contract.revision,status,\n' +
+    '  consumedRowProofPath:consumed.resultPath,consumedRowProofSha256:consumed.resultSha256,\n' +
+    '  consumedGatePath:consumed.gatePath,consumedGateSha256:consumed.gateSha256,\n' +
+    '  consumedRowCount:consumed.validatedRows\n' +
+    '},null,2)}\\n`,{ flag:"wx",mode:0o600 });\n' +
+    'process.exitCode=status;\n',
+  expected: /GUIDE_HARNESS_ROW_PROOF_/u,
+  operator: 'match',
+  diff: 'simple'
+}
+
+Node.js v22.23.1

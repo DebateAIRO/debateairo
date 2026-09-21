@@ -1,0 +1,26 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/support-recovery-intent.test.ts [ tests/unit/support-recovery-intent.test.ts ]
+Error: Cannot find module '../../apps/api/src/support/recovery-intent.js' imported from /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-recovery-intent.test.ts
+ ❯ tests/unit/support-recovery-intent.test.ts:3:1
+      1| import { describe,expect,it } from "vitest";
+      2|
+      3| import {
+       | ^
+      4|   analyzeRecoverySemantics,type PredicatePolarity
+      5| } from "../../apps/api/src/support/recovery-intent.js";
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_MODULE_NOT_FOUND' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  15:25:37
+   Duration  124ms (transform 16ms, setup 0ms, import 0ms, tests 0ms, environment 0ms)
+

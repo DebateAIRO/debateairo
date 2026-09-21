@@ -1,0 +1,11 @@
+file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_LIFECYCLE_FIX44/artifact-lifecycle.mjs:3
+const fail=code=>{throw new Error(code)};
+                        ^
+
+Error: GUIDE_LIFECYCLE_OWNED_FILE_INVALID
+    at fail (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_LIFECYCLE_FIX44/artifact-lifecycle.mjs:3:25)
+    at validateOwnedFile (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_LIFECYCLE_FIX44/artifact-lifecycle.mjs:5:268)
+    at async validateArtifactLifecycle (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_LIFECYCLE_FIX44/artifact-lifecycle.mjs:16:61)
+    at async file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_LIFECYCLE_FIX44/phase-preflight.mjs:17:1
+
+Node.js v22.23.1

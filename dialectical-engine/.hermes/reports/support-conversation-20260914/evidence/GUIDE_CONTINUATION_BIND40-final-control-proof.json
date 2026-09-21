@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CONTINUATION_BIND40",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS",
+  "controls": 15,
+  "passed": 15,
+  "names": [
+    "command contract digest",
+    "seven phases exact",
+    "all seven self paths",
+    "budget3-21-18-plus-owner",
+    "established owner paths retained",
+    "future paths unique absent",
+    "retained10 composition hashes",
+    "six-file harness current",
+    "immutable FIX39 helper",
+    "narrow54-to43 controller anchors",
+    "actual constructor exact gated path",
+    "operator current digest boundary",
+    "operator stale digest rejects before I O",
+    "operator metadata actual bytes and ownership",
+    "final proof serialized"
+  ],
+  "traffic": {
+    "publicAssetsFromUiProof": true,
+    "forwardedSupport": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "model": 0
+  }
+}

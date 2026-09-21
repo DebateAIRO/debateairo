@@ -17,15 +17,17 @@ import {
   type DevelopmentDeploymentRegisterMachineReceiptV1
 } from "./dev-deployment-register.js";
 import { parseDevelopmentSupportModelTargetJson } from "./dev-support-model.js";
+import {
+  DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  type DevelopmentAuthStackProfile
+} from "./dev-auth-stack-profile.js";
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIRECTORY_MODE = 0o700;
 const MAX_ENVIRONMENT_BYTES = 64 * 1024;
 const MAX_PROBE_BODY_BYTES = 1_024;
 const LOCAL_API_HOST = "127.0.0.1";
-const LOCAL_API_PORT = 8_790;
 const LOCAL_API_SESSION_PATH = "/v1/session";
-const LOCAL_DATABASE_PORT = "55432";
 const LOCAL_DATABASE_NAME = "/debateai";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -52,7 +54,7 @@ export type DevelopmentApiProcessOperations = Readonly<{
 }>;
 
 export type DevelopmentApiProcess = Readonly<{
-  receipt: Readonly<{ host: "127.0.0.1"; port: 8790; auth: "DENY_DEFAULT" }>;
+  receipt: Readonly<{ host: "127.0.0.1"; port: number; auth: "DENY_DEFAULT" }>;
   exited: Promise<DevelopmentApiChildExit>;
   stop(): Promise<void>;
 }>;
@@ -65,7 +67,8 @@ export class DevelopmentApiProcessError extends Error {
 }
 
 export async function loadDevelopmentApiProcessEnvironment(
-  repositoryRoot: string
+  repositoryRoot: string,
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): Promise<Readonly<Record<string, string>>> {
   const root = resolve(repositoryRoot);
   const custodyRoot = join(root, ".local", "dev-auth");
@@ -75,7 +78,7 @@ export async function loadDevelopmentApiProcessEnvironment(
     await readPrivateEnvironment(join(custodyRoot, "api.env"))
   );
   const registerReceipt = await readDevelopmentDeploymentRegisterReceipt(root);
-  validateExactEnvironment(values, root, registerReceipt);
+  validateExactEnvironment(values, root, registerReceipt, profile);
   return values;
 }
 
@@ -143,11 +146,11 @@ function parseExactEnvironment(source: string): Readonly<Record<string, string>>
   return Object.freeze(values);
 }
 
-function assertLocalDatabaseUrl(value: string, expectedUser: string): void {
+function assertLocalDatabaseUrl(value: string, expectedUser: string, expectedPort: string): void {
   const url = new URL(value);
   if (url.protocol !== "postgresql:"
     || url.hostname !== LOCAL_API_HOST
-    || url.port !== LOCAL_DATABASE_PORT
+    || url.port !== expectedPort
     || url.pathname !== LOCAL_DATABASE_NAME
     || url.username !== expectedUser
     || url.password.length === 0
@@ -160,16 +163,19 @@ function assertLocalDatabaseUrl(value: string, expectedUser: string): void {
 function validateExactEnvironment(
   values: Readonly<Record<string, string>>,
   repositoryRoot: string,
-  registerReceipt: DevelopmentDeploymentRegisterMachineReceiptV1
+  registerReceipt: DevelopmentDeploymentRegisterMachineReceiptV1,
+  profile: DevelopmentAuthStackProfile
 ): void {
   try {
     parseApiEnvironment(values);
     const providerPanel = parseDevelopmentProviderPanelTargets(
       values.PROVIDER_DISCOVERY_TARGETS_JSON!,
-      loadModelConfigConfiguredProviders(repositoryRoot)
+      loadModelConfigConfiguredProviders(repositoryRoot),
+      profile
     );
     const supportModelTarget = parseDevelopmentSupportModelTargetJson(
-      values.SUPPORT_MODEL_TARGET_JSON!
+      values.SUPPORT_MODEL_TARGET_JSON!,
+      profile
     );
     const custodyRoot = join(repositoryRoot, ".local", "dev-auth");
     const exact = new Map<string, string>([
@@ -187,9 +193,9 @@ function validateExactEnvironment(
       ["PUBLICATION_ENABLED", "true"],
       ["ACCOUNT_ERASURE_GRACE_MS", "604800000"],
       ["MAIL_FROM", "noreply@localhost.test"],
-      ["PUBLIC_APP_URL", "https://localhost:3000"],
+      ["PUBLIC_APP_URL", profile.publicOrigin],
       ["API_HOST", LOCAL_API_HOST],
-      ["API_PORT", String(LOCAL_API_PORT)],
+      ["API_PORT", String(profile.apiPort)],
       ["STRANGER_SAMPLE_RATE", "0"],
       ["REGISTER_VERSION", registerReceipt.registerVersion],
       ["REGISTER_DEPLOYMENT_RECEIPT_SHA256", registerReceipt.receiptSha256],
@@ -201,8 +207,8 @@ function validateExactEnvironment(
       ["PROVIDER_PROBE_TIMEOUT_MS", String(DEVELOPMENT_CLI_CALL_TIMEOUT_MS)],
       ["NODE_ENV", "development"],
       ["EVALUATOR_DEV_MENU_ENABLED", "false"],
-      ["HATCHET_HOST_PORT", "127.0.0.1:7077"],
-      ["HATCHET_API_URL", "http://127.0.0.1:8888"],
+      ["HATCHET_HOST_PORT", `127.0.0.1:${profile.hatchetGrpcPort}`],
+      ["HATCHET_API_URL", `http://127.0.0.1:${profile.hatchetApiPort}`],
       ["HATCHET_WORKFLOW_NAME", "debateai-dev"],
       ["HATCHET_TLS_STRATEGY", "none"]
     ]);
@@ -214,23 +220,28 @@ function validateExactEnvironment(
     if (!UUID_PATTERN.test(values.HATCHET_TENANT_ID!)) {
       throw new DevelopmentApiProcessError("DEV_API_PROCESS_ENVIRONMENT_INVALID");
     }
-    assertLocalDatabaseUrl(values.DATABASE_URL!, "debateai_dev_runtime");
+    const postgresPort = String(profile.postgresPort);
+    assertLocalDatabaseUrl(values.DATABASE_URL!, "debateai_dev_runtime", postgresPort);
     assertLocalDatabaseUrl(
       values.CONTENT_PROVISION_DATABASE_URL!,
-      "debateai_dev_content_provision"
+      "debateai_dev_content_provision",
+      postgresPort
     );
     assertLocalDatabaseUrl(
       values.AUTHORIZATION_DATABASE_URL!,
-      "debateai_dev_authorization"
+      "debateai_dev_authorization",
+      postgresPort
     );
     assertLocalDatabaseUrl(
       values.PUBLICATION_CLEANUP_DATABASE_URL!,
-      "debateai_dev_publication_cleanup"
+      "debateai_dev_publication_cleanup",
+      postgresPort
     );
-    assertLocalDatabaseUrl(values.ERASURE_DATABASE_URL!, "debateai_dev_erasure");
+    assertLocalDatabaseUrl(values.ERASURE_DATABASE_URL!, "debateai_dev_erasure", postgresPort);
     assertLocalDatabaseUrl(
       values.EVALUATOR_DEV_MENU_DATABASE_URL!,
-      "debateai_dev_evaluator_api"
+      "debateai_dev_evaluator_api",
+      postgresPort
     );
   } catch (error) {
     if (error instanceof DevelopmentApiProcessError) throw error;
@@ -256,10 +267,12 @@ export async function startDevelopmentApiProcess(input: Readonly<{
   repositoryRoot: string;
   commandEnvironment: Readonly<Record<string, string>>;
   operations: DevelopmentApiProcessOperations;
+  profile?: DevelopmentAuthStackProfile;
   maximumProbeAttempts?: number;
 }>): Promise<DevelopmentApiProcess> {
   const repositoryRoot = resolve(input.repositoryRoot);
-  const values = await loadDevelopmentApiProcessEnvironment(repositoryRoot);
+  const profile = input.profile ?? DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE;
+  const values = await loadDevelopmentApiProcessEnvironment(repositoryRoot, profile);
   const preexisting = await input.operations.probe();
   if (preexisting !== null) {
     throw new DevelopmentApiProcessError("DEV_API_PROCESS_PORT_OCCUPIED");
@@ -294,7 +307,7 @@ export async function startDevelopmentApiProcess(input: Readonly<{
         }
         let stopped = false;
         return Object.freeze({
-          receipt: Object.freeze({ host: LOCAL_API_HOST, port: LOCAL_API_PORT, auth: "DENY_DEFAULT" }),
+          receipt: Object.freeze({ host: LOCAL_API_HOST, port: profile.apiPort, auth: "DENY_DEFAULT" }),
           exited: child.exited,
           async stop() {
             if (stopped) return;
@@ -312,11 +325,11 @@ export async function startDevelopmentApiProcess(input: Readonly<{
   }
 }
 
-function probeLocalApi(): Promise<DevelopmentApiProbe | null> {
+function probeLocalApi(port: number): Promise<DevelopmentApiProbe | null> {
   return new Promise((resolvePromise, rejectPromise) => {
     const request = get({
       host: LOCAL_API_HOST,
-      port: LOCAL_API_PORT,
+      port,
       path: LOCAL_API_SESSION_PATH,
       agent: false,
       timeout: 500
@@ -347,11 +360,12 @@ function probeLocalApi(): Promise<DevelopmentApiProbe | null> {
 }
 
 export function createDevelopmentApiProcessOperations(
-  repositoryRoot: string
+  repositoryRoot: string,
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): DevelopmentApiProcessOperations {
   const cwd = resolve(repositoryRoot);
   return Object.freeze({
-    probe: probeLocalApi,
+    probe: () => probeLocalApi(profile.apiPort),
     startApi(environment) {
       const child = spawn(
         process.execPath,

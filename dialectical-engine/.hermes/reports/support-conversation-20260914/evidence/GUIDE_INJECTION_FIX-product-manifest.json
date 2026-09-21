@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_INJECTION_FIX",
+  "ticket": "t_9a52015c",
+  "baseRevision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "finalRevision": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718",
+  "productFiles": [
+    {
+      "laneRelative": "apps/api/src/support/index.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/api/src/support/index.ts",
+      "sha256": "04429c6af9ed947a8964f43aef25614b7bd02d9629a2db3c15e367fbf0e6a61b",
+      "bytes": 36801
+    },
+    {
+      "laneRelative": "apps/api/src/support/session.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/api/src/support/session.ts",
+      "sha256": "63f1d0e5eb0566085f749c9d9164eed89964a28f754a2b75f3e98794a60264c9",
+      "bytes": 20091
+    },
+    {
+      "laneRelative": "apps/api/src/main.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/api/src/main.ts",
+      "sha256": "19a4f7ee4af1230c0b849c655557d15fcbedbdddb0de374f8e49155aa7cca117",
+      "bytes": 25917
+    },
+    {
+      "laneRelative": "packages/db/src/support.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/db/src/support.ts",
+      "sha256": "1b1d23c8fa0f7396616e2f0760f8bdce4360407e33477bdb41fc7d5215e739a1",
+      "bytes": 99487
+    },
+    {
+      "laneRelative": "tests/support-eval/run.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/support-eval/run.ts",
+      "sha256": "e83a8d4329a0ea1536c762bfd06069be536ea05b0ffcd473d2bfab7d082daaae",
+      "bytes": 26800
+    },
+    {
+      "laneRelative": "tests/integration/support-routes.test.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/integration/support-routes.test.ts",
+      "sha256": "240b4e7c2b21b458c2b18ac64eef0e463fa8d7427c8ae3229fe238d63cc11842",
+      "bytes": 141262
+    },
+    {
+      "laneRelative": "tests/integration/support-metrics.test.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/integration/support-metrics.test.ts",
+      "sha256": "82349b40859f50b16888bf6ab89aa0d14714ea62b93aa21aaa81c07b54deab5d",
+      "bytes": 4831
+    },
+    {
+      "laneRelative": "tests/integration/dev-database-principals.test.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/integration/dev-database-principals.test.ts",
+      "sha256": "6453ab6f53a06a31aae895a6c04263f61360cdde47600f9cc7afe6a01af4e8c6",
+      "bytes": 31378
+    },
+    {
+      "laneRelative": "tests/architecture/sup-01-boundary.test.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/architecture/sup-01-boundary.test.ts",
+      "sha256": "205cf83cbde894fadabda40e9cca3cf23af90aab9653a3f3760c47a31929d560",
+      "bytes": 16544
+    }
+  ],
+  "scopeExact": true,
+  "clean": true,
+  "change": "Remove forbidden mutable session lock finalization; retain immutable lock events and derive open-session status; add actual restricted-role coverage and source-derived principal cardinality fixtures.",
+  "measuredAt": "2026-09-20T12:39:20.637973Z"
+}

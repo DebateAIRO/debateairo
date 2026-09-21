@@ -1,0 +1,60 @@
+{
+  "revision": "6cbe0e7ad18b20eca35876f4a91478cfbba82307",
+  "stage": "NEEDS_EDITORIAL_ATTESTATION",
+  "completed": [
+    {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX-focused-final.log",
+      "files": [
+        "tests/unit/support-response-policy.test.ts",
+        "tests/unit/support-answer-context.test.ts",
+        "tests/render/support-assistant-scroll.test.tsx"
+      ],
+      "result": {
+        "passed": 246,
+        "failed": 0
+      }
+    },
+    {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX-content-green.log",
+      "files": [
+        "tests/unit/support-kb.test.ts"
+      ],
+      "filter": "keeps paired public scoring and human-case draft facts aligned",
+      "result": {
+        "passed": 1,
+        "failed": 0,
+        "skipped": 35
+      }
+    },
+    {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX-manifest-transition.log",
+      "files": [
+        "tests/unit/support-kb.test.ts"
+      ],
+      "result": {
+        "passed": 34,
+        "failed": 2
+      },
+      "disposition": "EXPECTED_UNRESOLVED_UNTIL_SEPARATE_EDITORIAL_ATTESTATION"
+    }
+  ],
+  "typecheck": {
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX-typecheck.log",
+    "diagnostics": 76,
+    "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "baselineIdentical": true
+  },
+  "afterAttestation": [
+    "tests/unit/support-kb.test.ts",
+    "tests/unit/support-recovery-components.test.ts",
+    "tests/unit/support-recovery-attestation.test.ts",
+    "tests/unit/support-context.test.ts",
+    "tests/unit/support-answer-context.test.ts",
+    "tests/unit/support-response-policy.test.ts",
+    "tests/render/support-assistant-scroll.test.tsx",
+    "tests/render/sup-01-help.test.tsx",
+    "strict44 snapshot",
+    "controlled structural evaluation",
+    "affected composed suite"
+  ]
+}

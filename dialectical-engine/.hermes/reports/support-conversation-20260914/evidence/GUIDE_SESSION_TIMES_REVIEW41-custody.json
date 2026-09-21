@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_SESSION_TIMES_REVIEW41",
+  "ticket": "t_2c340751",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "freeze": "49f8026a8e71c05087463b04754773ee82fdf36f",
+  "authorReceiptSha256": "b92648b18e1aac8a62760d0d72a5a4a22c01cb00f012d86a49f2b48817cec8f9",
+  "consumptionSha256": "ca044ae58f22b8f5ed19a640cc3e08d9d6c78a22f8a5d29be76e453a3f7c046b",
+  "captureSha256": "d7aa1d5103c19edfca883ce2900d6232ef632a2cef6e77593ee1de25cc6ce688",
+  "sessionTimesSha256": "6306d7a8370fa78bb192e4aa66706ad179a46cb2d470959a07b4892dc1bf5cee",
+  "composerSha256": "3e7f46cc5e0a844efc7c7a7dccfff2dd39eb2b9d3da48ee214c65fdee708b43d",
+  "commandContractSha256": "a7bb682a1017593a2f87b64d33689a47c2a0458253bab199dc067fb7bc898492",
+  "operatorSha256": "562514a844027212f1c812bc64a2679255c76a38fbcd423e8e50cf52b41f3121",
+  "sessionControls": {"passed":9,"total":9,"sha256":"d265253c7721edecd52612c45f87263e77a73fb1bf8e1cd8cfcc7c2e1baefcfc"},
+  "bindingControls": {"passed":13,"total":13,"sha256":"db85f844c8b835b7a6717662a5c9a20e049ad9fe0623fd265d037b663ab360d5"},
+  "futurePathCount": 115,
+  "futurePathsAbsent": 115,
+  "operationalTraffic": 0
+}

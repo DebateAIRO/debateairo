@@ -1,0 +1,229 @@
+diff --git a/dialectical-engine/apps/api/src/support/security-guidance.ts b/dialectical-engine/apps/api/src/support/security-guidance.ts
+index 3befcd9b2b14b1048a725ccacf5cff7be2a2389c..77d1fd5a40da8d3e78f14c24fab681aa93a7886a 100644
+--- a/dialectical-engine/apps/api/src/support/security-guidance.ts
++++ b/dialectical-engine/apps/api/src/support/security-guidance.ts
+@@ -12,8 +12,12 @@ const RECOVERY_SUBJECT_EN = /(?:\bpassword\b.{0,32}\b(?:recovery|reset)\b|\b(?:r
+ const RECOVERY_NAVIGATION_NOUN_EN = /\b(?:link|page|option|button|screen|opener)\b/u;
+ const RECOVERY_SUBJECT_RO = /(?:(?:recuper\p{L}*|reset\p{L}*).{0,32}(?<!\p{L})parol\p{L}*|(?<!\p{L})parol\p{L}*.{0,32}(?:recuper\p{L}*|reset\p{L}*))/u;
+ const RECOVERY_NAVIGATION_NOUN_RO = /(?<!\p{L})(?:link\p{L}*|pagin\p{L}*|opțiun\p{L}*|optiun\p{L}*|buton\p{L}*|ecran\p{L}*|deschidere)(?!\p{L})/u;
+-const RECOVERY_OPERATION_EN = /(?:(?:\bvalidate|\bverify|\bcheck|\bsubmit|\bexecute|\bperform|\bapply|\bchange|\breplace|\bset)\w*.{0,56}\b(?:reset\s+token|password\s+reset|reset)\b|\b(?:reset\s+token|password\s+reset|reset)\b.{0,56}(?:\bvalidate|\bverify|\bcheck|\bsubmit|\bexecute|\bperform|\bapply|\bchange|\breplace|\bset)\w*)/u;
+-const RECOVERY_OPERATION_RO = /(?:(?:valid\p{L}*|verific\p{L}*|trimit\p{L}*|execut\p{L}*|efectu\p{L}*|schimb\p{L}*|înlocu\p{L}*|inlocu\p{L}*).{0,56}(?:token\p{L}*|reset\p{L}*)|(?:token\p{L}*|reset\p{L}*).{0,56}(?:valid\p{L}*|verific\p{L}*|trimit\p{L}*|execut\p{L}*|efectu\p{L}*|schimb\p{L}*|înlocu\p{L}*|inlocu\p{L}*))/u;
++const RECOVERY_CREDENTIAL_OPERATION_EN = /(?:(?:\bvalidate|\bverify|\bcheck)\w*.{0,56}\b(?:reset|recovery)?\s*(?:token|code)\b|\b(?:reset|recovery)?\s*(?:token|code)\b.{0,56}(?:\bvalidate|\bverify|\bcheck)\w*)/u;
++const RECOVERY_EXECUTION_EN = /(?:(?:\bsubmit|\bexecute|\bperform|\bapply|\bchange|\breplace|\bset)\w*.{0,56}\b(?:password\s+)?reset\b|\b(?:password\s+)?reset\b.{0,56}(?:\bsubmit|\bexecute|\bperform|\bapply|\bchange|\breplace|\bset)\w*)/u;
++const RECOVERY_CREDENTIAL_OPERATION_RO = /(?:(?:valid\p{L}*|verific\p{L}*).{0,56}(?<!\p{L})(?:token|cod)\p{L}*|(?<!\p{L})(?:token|cod)\p{L}*.{0,56}(?:valid\p{L}*|verific\p{L}*))/u;
++const RECOVERY_EXECUTION_RO = /(?:(?:trimit\p{L}*|execut\p{L}*|efectu\p{L}*|schimb\p{L}*|înlocu\p{L}*|inlocu\p{L}*).{0,56}reset\p{L}*|reset\p{L}*.{0,56}(?:trimit\p{L}*|execut\p{L}*|efectu\p{L}*|schimb\p{L}*|înlocu\p{L}*|inlocu\p{L}*))/u;
++const NEGATED_RECOVERY_OPERATION_EN = /\b(?:do\s+not\s+want\s+to|don't\s+want\s+to|cannot|can't|do\s+not|don't|never)\s+(?:\p{L}+\s+){0,3}(?:validate|verify|check|submit|execute|perform|apply|change|replace|set)\w*/gu;
++const NEGATED_RECOVERY_OPERATION_RO = /(?<!\p{L})nu\s+(?:(?:vreau|dorim)\s+s[ăa]\s+|(?:poate|pot|putem)\s+)?(?:valid\p{L}*|verific\p{L}*|trimit\p{L}*|execut\p{L}*|efectu\p{L}*|schimb\p{L}*|înlocu\p{L}*|inlocu\p{L}*)/gu;
+ 
+ function normalized(value: string): string {
+   return value.normalize("NFKC").toLocaleLowerCase("en-US");
+@@ -35,6 +39,16 @@ function recoveryNavigation(value: string,language: SupportLanguage): boolean {
+   return RECOVERY_SUBJECT_EN.test(value) && RECOVERY_NAVIGATION_NOUN_EN.test(value);
+ }
+ 
++function hasAffirmativeRecoveryOperation(value: string): boolean {
++  const withoutNegatedOperations = value
++    .replace(NEGATED_RECOVERY_OPERATION_EN," ")
++    .replace(NEGATED_RECOVERY_OPERATION_RO," ");
++  return RECOVERY_CREDENTIAL_OPERATION_EN.test(withoutNegatedOperations)
++    || RECOVERY_EXECUTION_EN.test(withoutNegatedOperations)
++    || RECOVERY_CREDENTIAL_OPERATION_RO.test(withoutNegatedOperations)
++    || RECOVERY_EXECUTION_RO.test(withoutNegatedOperations);
++}
++
+ export function classifySecurityNavigation(text: string): SupportSecurityNavigation | null {
+   return classifySecurityNavigationViews([normalized(text)]);
+ }
+@@ -43,7 +57,7 @@ export function classifySecurityNavigationViews(
+   values: readonly string[]
+ ): SupportSecurityNavigation | null {
+   const views = normalizedViews(values);
+-  if (views.some((value) => RECOVERY_OPERATION_EN.test(value) || RECOVERY_OPERATION_RO.test(value))) {
++  if (views.some(hasAffirmativeRecoveryOperation)) {
+     return null;
+   }
+   if (views.some((value) => FORGOT_PASSWORD_RO.test(value) || recoveryNavigation(value,"ro"))) {
+diff --git a/dialectical-engine/packages/support-kb/src/context.ts b/dialectical-engine/packages/support-kb/src/context.ts
+index c878a23936cef87ce49f152d814e8b8343680f5c..367e63c7a5e32bb8929fde47bfd1825e66a7791d 100644
+--- a/dialectical-engine/packages/support-kb/src/context.ts
++++ b/dialectical-engine/packages/support-kb/src/context.ts
+@@ -40,7 +40,7 @@ const STOP_WORDS = new Set([
+ 
+ const PRODUCT_ALIAS_SOURCE = String.raw`\b(?:dialectical(?:[\s-]*engine)|debate\s*airo)\b`;
+ const PRODUCT_OVERVIEW_WORDS = new Set([
+-  "about","agent","answer","cannot","cant","define","describe","does","explain","feature","features",
++  "about","agent","answer","cannot","cant","define","describe","does","explain","feature","features","give",
+   "identity","mean","meaning","overview","product","purpose","question","questions","support",
+   "tell","use","used","what","why",
+   "asistent","asistentul","capabilitati","despre","explica","face","folosit","folosita",
+diff --git a/dialectical-engine/tests/integration/support-routes.test.ts b/dialectical-engine/tests/integration/support-routes.test.ts
+index 36cd9eeaa2fa78becfd25870ee32e685ce1be430..b3a931ff4c8ea44987a845278c06407cadb6597b 100644
+--- a/dialectical-engine/tests/integration/support-routes.test.ts
++++ b/dialectical-engine/tests/integration/support-routes.test.ts
+@@ -1938,19 +1938,24 @@ describe("SUP-01 support routes", () => {
+     await server.close();
+   });
+ 
+-  it.each([
++  it.each(([
+     ["Forgot password","en"],
+     ["Am uitat parola","ro"],
+     ["Give me the password recovery link","en"],
+     ["Where is the password reset page?","en"],
+     ["Where can I find the link to recover my password?","en"],
++    ["Can you check where the password reset page is?","en"],
++    ["I do not want to validate a reset token; show me the password recovery page.","en"],
+     ["Show the p%61ssword recovery link.","en"],
+     ["Vreau linkul de recuperare a parolei","ro"],
+     ["Unde este pagina pentru resetarea parolei?","ro"],
+     ["Unde găsesc linkul pentru a-mi recupera parola?","ro"],
++    ["Verifică unde este pagina de resetare a parolei.","ro"],
++    ["Nu vreau să validez tokenul de resetare; arată pagina de recuperare a parolei.","ro"],
+     ["Arată pagina pentru recuperarea p%61rolei.","ro"]
+-  ] as const)("returns canonical deterministic unresolved Forgot password guidance without a model: %s", async (
+-    requestText,language
++  ] as const).map((item,index) => [...item,`203.0.113.${100 + index}`] as const))(
++  "returns canonical deterministic unresolved Forgot password guidance without a model: %s", async (
++    requestText,language,clientIp
+   ) => {
+     const respond = vi.fn<SupportAnswerPort["respond"]>();
+     const write = vi.fn(async (input: Parameters<SupportMessageCipherPort["write"]>[0]) =>
+@@ -1962,9 +1967,9 @@ describe("SUP-01 support routes", () => {
+         writeAndTransit: vi.fn(),read: vi.fn(async () => null),listSession: vi.fn(async () => [])
+       }) as never
+     });
+-    const opened = await openSession(server,language === "en" ? "203.0.113.211" : "203.0.113.212");
++    const opened = await openSession(server,clientIp);
+     const response = await sendMessage(
+-      server,opened.body,requestText,language === "en" ? "203.0.113.211" : "203.0.113.212"
++      server,opened.body,requestText,clientIp
+     );
+     expect(response.statusCode).toBe(200);
+     expect(response.json()).toMatchObject({
+@@ -1977,17 +1982,19 @@ describe("SUP-01 support routes", () => {
+     await server.close();
+   });
+ 
+-  it.each([
++  it.each(([
+     ["Where is the page to validate my password reset token?","en"],
+-    ["Unde este pagina pentru validarea tokenului de resetare a parolei?","ro"]
+-  ] as const)("keeps reset-token operations in the fixed security refusal: %s", async (
+-    requestText,language
++    ["Unde este pagina pentru validarea tokenului de resetare a parolei?","ro"],
++    ["Unde este pagina pentru validarea codului de recuperare a parolei?","ro"]
++  ] as const).map((item,index) => [...item,`203.0.113.${180 + index}`] as const))(
++  "keeps reset-token operations in the fixed security refusal: %s", async (
++    requestText,language,clientIp
+   ) => {
+     const respond = vi.fn<SupportAnswerPort["respond"]>();
+     const server = api(true,{ answerPort:Object.freeze({ respond }) });
+-    const opened = await openSession(server,language === "en" ? "203.0.113.215" : "203.0.113.216");
++    const opened = await openSession(server,clientIp);
+     const response = await sendMessage(
+-      server,opened.body,requestText,language === "en" ? "203.0.113.215" : "203.0.113.216"
++      server,opened.body,requestText,clientIp
+     );
+     expect(response.statusCode).toBe(200);
+     expect(response.json()).toMatchObject({
+diff --git a/dialectical-engine/tests/unit/support-answer-context.test.ts b/dialectical-engine/tests/unit/support-answer-context.test.ts
+index 937d8f1edf7d550bd5bb69e5d2ff7cd693f227b2..54962dd0b9ed4a831e9aef4c788024de2b328d88 100644
+--- a/dialectical-engine/tests/unit/support-answer-context.test.ts
++++ b/dialectical-engine/tests/unit/support-answer-context.test.ts
+@@ -131,7 +131,12 @@ describe("CP1 composed answer context", () => {
+     expect(complete).not.toHaveBeenCalled();
+   });
+ 
+-  it("grounds a reviewed identity-fact paraphrase through the actual service on the admitted corpus", async () => {
++  it.each([
++    "Is Dialectical Engine a reasoning instrument?",
++    "Give me an overview of dialecticalengine."
++  ])("grounds a reviewed identity paraphrase through the actual service on the admitted corpus: %s", async (
++    text
++  ) => {
+     const snapshot = admittedCorpus();
+     const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
+       kind:"answer",text:"Dialectical Engine is a reasoning instrument.",
+@@ -144,7 +149,7 @@ describe("CP1 composed answer context", () => {
+     });
+ 
+     const result = await service.respond({
+-      ...request(snapshot),text:"Is Dialectical Engine a reasoning instrument?"
++      ...request(snapshot),text
+     });
+ 
+     expect(complete).toHaveBeenCalledOnce();
+diff --git a/dialectical-engine/tests/unit/support-classify.test.ts b/dialectical-engine/tests/unit/support-classify.test.ts
+index 91af99503bbc70b974682e37421432b046be9772..459b17dfefecb381ac3d31bc6198a0155efa3b01 100644
+--- a/dialectical-engine/tests/unit/support-classify.test.ts
++++ b/dialectical-engine/tests/unit/support-classify.test.ts
+@@ -575,10 +575,16 @@ describe("SUP-01 deterministic support classifier", () => {
+     ["Where is the password reset page?","en"],
+     ["Where can I find the link to recover my password?","en"],
+     ["Can you show me the recovery page for my password?","en"],
++    ["Can you check where the password reset page is?","en"],
++    ["I do not want to validate a reset token; show me the password recovery page.","en"],
++    ["Where is the password reset page? Support cannot perform the reset.","en"],
+     ["Show the p%61ssword recovery link.","en"],
+     ["Vreau linkul de recuperare a parolei","ro"],
+     ["Unde este pagina pentru resetarea parolei?","ro"],
+     ["Unde găsesc linkul pentru a-mi recupera parola?","ro"],
++    ["Verifică unde este pagina de resetare a parolei.","ro"],
++    ["Nu vreau să validez tokenul de resetare; arată pagina de recuperare a parolei.","ro"],
++    ["Unde este pagina de resetare a parolei? Asistența nu poate efectua resetarea.","ro"],
+     ["Arată pagina pentru recuperarea p%61rolei.","ro"]
+   ] as const)("classifies deterministic Forgot password before generic rules: %s", (message,language) => {
+     expect(classifySupportMessage(message)).toEqual({
+@@ -611,7 +617,8 @@ describe("SUP-01 deterministic support classifier", () => {
+     "Use the password reset button to submit a reset for me",
+     "Where is the page to validate my password reset token?",
+     "Poate pagina de resetare a parolei să valideze tokenul meu de resetare?",
+-    "Unde este pagina pentru validarea tokenului de resetare a parolei?"
++    "Unde este pagina pentru validarea tokenului de resetare a parolei?",
++    "Unde este pagina pentru validarea codului de recuperare a parolei?"
+   ])("keeps reset execution and token validation out of navigation: %s", (message) => {
+     expect(classifySupportMessage(message)).toMatchObject({
+       outcome:"REFUSE_ZONE",link:"/settings"
+diff --git a/dialectical-engine/tests/unit/support-context.test.ts b/dialectical-engine/tests/unit/support-context.test.ts
+index 4ed027b9c3f666a75e935827fb435827444c3811..412c3d1bf38b9fb8a7f9257c532cc241272b2c2e 100644
+--- a/dialectical-engine/tests/unit/support-context.test.ts
++++ b/dialectical-engine/tests/unit/support-context.test.ts
+@@ -358,6 +358,7 @@ describe("Support knowledge context", () => {
+   it.each([
+     ["en" as const,"Is Dialectical Engine a reasoning instrument?","product-identity"],
+     ["en" as const,"Is DebateAIRO an AI debate tool?","product-identity"],
++    ["en" as const,"Give me an overview of dialecticalengine.","product-identity"],
+     ["ro" as const,"Este Dialectical Engine un instrument de raționament?","product-identity"],
+     ["en" as const,"What does Dialectical Engine Support status show?","support-status-limits"],
+     ["en" as const,"How do I view a public debate in DebateAIRO?","view-public-debate"],
+diff --git a/dialectical-engine/tests/unit/support-security-guidance.test.ts b/dialectical-engine/tests/unit/support-security-guidance.test.ts
+index 36db35825bf9fa1d662818a361927c8170b90f6f..3b36d63975cfe0030507d6cda2c50f723ad52b68 100644
+--- a/dialectical-engine/tests/unit/support-security-guidance.test.ts
++++ b/dialectical-engine/tests/unit/support-security-guidance.test.ts
+@@ -15,10 +15,16 @@ describe("CP1 deterministic Forgot password guidance", () => {
+     ["Where is the password reset page?", "en"],
+     ["Where can I find the link to recover my password?", "en"],
+     ["Can you show me the recovery page for my password?", "en"],
++    ["Can you check where the password reset page is?", "en"],
++    ["I do not want to validate a reset token; show me the password recovery page.", "en"],
++    ["Where is the password reset page? Support cannot perform the reset.", "en"],
+     ["Show the p%61ssword recovery link.", "en"],
+     ["Vreau linkul de recuperare a parolei", "ro"],
+     ["Unde este pagina pentru resetarea parolei?", "ro"],
+     ["Unde găsesc linkul pentru a-mi recupera parola?", "ro"],
++    ["Verifică unde este pagina de resetare a parolei.", "ro"],
++    ["Nu vreau să validez tokenul de resetare; arată pagina de recuperare a parolei.", "ro"],
++    ["Unde este pagina de resetare a parolei? Asistența nu poate efectua resetarea.", "ro"],
+     ["Arată pagina pentru recuperarea p%61rolei.", "ro"]
+   ] as const)("recognizes %s before generic security routing", (text,language) => {
+     expect(classifySecurityNavigation(text)).toEqual({
+@@ -38,7 +44,8 @@ describe("CP1 deterministic Forgot password guidance", () => {
+     "Use the password reset button to submit a reset for me",
+     "Where is the page to validate my password reset token?",
+     "Poate pagina de resetare a parolei să valideze tokenul meu de resetare?",
+-    "Unde este pagina pentru validarea tokenului de resetare a parolei?"
++    "Unde este pagina pentru validarea tokenului de resetare a parolei?",
++    "Unde este pagina pentru validarea codului de recuperare a parolei?"
+   ])("keeps saved-MFA and ordinary password requests distinct: %s", (text) => {
+     expect(classifySecurityNavigation(text)).toBeNull();
+   });

@@ -1,0 +1,332 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+ ✓ tests/support-eval/run.test.ts > SUP-01 support eval release gate > publishes the support:eval command without an ambient runtime switch 1ms
+ ✓ tests/support-eval/run.test.ts > SUP-01 support eval release gate > discovers all ratified cases and separates the exact applicable and pending slices 4ms
+ ✓ tests/support-eval/run.test.ts > SUP-01 support eval release gate > checks outcome, language, required-source subset, and forbidden tools independently 0ms
+ ✓ tests/support-eval/run.test.ts > SUP-01 support eval release gate > prints honest structural, latency, and independent-rubric evidence without claiming PASS 3ms
+ ✓ tests/support-eval/run.test.ts > SUP-01 support eval release gate > fails numeric latency targets rather than merely printing a slow number 2ms
+ ✓ tests/support-eval/run.test.ts > SUP-01 support eval release gate > marks real-relay observations without persisted first-token evidence UNVERIFIED 3ms
+ ✓ tests/support-eval/run.test.ts > SUP-01 support eval release gate > counts executor errors as failures and returns nonzero for the worst of three runs 3ms
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded]   LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-Mr0yBf/data ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] ok
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] creating subdirectories ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] ok
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] selecting dynamic shared memory implementation ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] posix
+selecting default "max_connections" ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] ok
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-Mr0yBf/data -l logfile start
+
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:45:35.310 EEST [77210] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:45:35.312 EEST [77210] LOG:  listening on IPv4 address "127.0.0.1", port 64307
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:45:35.312 EEST [77210] LOG:  listening on IPv6 address "::1", port 64307
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:45:35.313 EEST [77210] LOG:  listening on Unix socket "/tmp/.s.PGSQL.64307"
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:45:35.317 EEST [77216] LOG:  database system was shut down at 2026-09-17 14:45:35 EEST
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:45:35.319 EEST [77210] LOG:  database system is ready to accept connections
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:45:35.643 EEST [77221] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:45:36.026 EEST [77221] WARNING:  there is no transaction in progress
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:45:36.707 EEST [77210] LOG:  received fast shutdown request
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:45:36.707 EEST [77210] LOG:  aborting any active transactions
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:45:36.708 EEST [77210] LOG:  background worker "logical replication launcher" (PID 77219) exited with exit code 1
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:45:36.711 EEST [77214] LOG:  shutting down
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:45:36.711 EEST [77214] LOG:  checkpoint starting: shutdown immediate
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:45:36.779 EEST [77214] LOG:  checkpoint complete: wrote 1746 buffers (10.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.038 s, sync=0.030 s, total=0.069 s; sync files=1146, longest=0.001 s, average=0.001 s; distance=13776 kB, estimate=13776 kB; lsn=0/24FB548, redo lsn=0/24FB548
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:45:36.784 EEST [77210] LOG:  database system is shut down
+
+
+ × tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases 2829ms
+   → expected { run: 1, total: 60, passed: 50, …(7) } to match object { passed: 60, total: 60, failures: [] }
+(14 matching properties omitted from actual)
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > always includes the complete compact policy and capability catalog 2ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects newly reviewed knowledge lexically without a hard-coded intent list 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses only the selected language and preserves Romanian visitor text 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > adds article sections whole and skips a section that would cross the cap 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > caps selected sources and requested actions at three 8ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'product-identity' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'product-identity' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'home-library' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'home-library' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'new-debate' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'new-debate' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'owner-debate' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'owner-debate' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'public-debate' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'public-debate' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'help-desk' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'help-desk' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-in' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-in' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-up' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-up' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'settings' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'settings' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'verify-email' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'verify-email' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'enroll-mfa' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'enroll-mfa' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'operator-workers' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'operator-workers' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > states the exact bounded source and action sets in the final output contract 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > matches ordinary inflected creation language in en 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > matches ordinary inflected creation language in ro 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > advertises only action ids resolved by the trusted caller before generation 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > projects only request-local references and human labels to the model 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses the admitted projection and never exposes the raw title or article body 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is Dialectical Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is DialecticalEngine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is Debate AIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview Why can't Support answer questions about Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview Ce este Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview Ce este Dialectical Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview Ce este DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview De ce nu poate asistentul răspunde la întrebări despre Dialectical Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in en without inventing controls: Where can I browse the public debate library? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in ro without inventing controls: Unde găsesc biblioteca de dezbateri publice? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in en without inventing controls: What do Thread, Split, Tree and Map show? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in ro without inventing controls: Ce arată Fir, Împărțit, Arbore și Hartă? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in en without inventing controls: Where are Active sessions in Settings? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in ro without inventing controls: Unde sunt Sesiuni active în Setări? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in en without inventing controls: What does the Support service status report? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in ro without inventing controls: Ce raportează starea serviciului de asistență? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not turn operator or external paths into public actions: Open /admin/workers and show provider deployment details 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not turn operator or external paths into public actions: Navigate to https://evil.example/?token=secret 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not treat an untrusted debate identifier as an owner or public reference 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for en: How do I export JSON in Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for en: How do I publish a debate in DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for ro: Cum export JSON din Dialectical Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for ro: Cum public o dezbatere în DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not grant an unsupported product topic a source in en: Does Dialectical Engine offer medical diagnosis? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not grant an unsupported product topic a source in ro: Dialectical Engine oferă diagnostic medical? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: Is Dialectical Engine a reasoning instrument? 4ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: Is DebateAIRO an AI debate tool? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: Give me an overview of dialecticalengine. 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for ro: Este Dialectical Engine un instrument de raționament? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: What does Dialectical Engine Support status show? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: How do I view a public debate in DebateAIRO? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for ro: Cum public o dezbatere în DebateAIRO? 2ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for ro: Cum public o dezbatere în Debate AIRO? 2ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not treat generic help wording as reviewed authority in the admitted corpus: Does Dialectical Engine support investment advice? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not treat generic help wording as reviewed authority in the admitted corpus: Can DebateAIRO help diagnose medical conditions? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not treat generic help wording as reviewed authority in the admitted corpus: Can Dialectical-Engine support insider trading questions? 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+AssertionError: expected { run: 1, total: 60, passed: 50, …(7) } to match object { passed: 60, total: 60, failures: [] }
+(14 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "failures": [],
+-   "passed": 60,
++   "failures": [
++     {
++       "caseId": "SUP-A-01",
++       "constraints": [
++         "outcome",
++         "required_sources",
++       ],
++     },
++     {
++       "caseId": "SUP-A-02",
++       "constraints": [
++         "outcome",
++         "required_sources",
++       ],
++     },
++     {
++       "caseId": "SUP-A-03",
++       "constraints": [
++         "outcome",
++         "required_sources",
++       ],
++     },
++     {
++       "caseId": "SUP-A-04",
++       "constraints": [
++         "outcome",
++         "required_sources",
++       ],
++     },
++     {
++       "caseId": "SUP-A-05",
++       "constraints": [
++         "outcome",
++         "required_sources",
++       ],
++     },
++     {
++       "caseId": "SUP-A-11",
++       "constraints": [
++         "outcome",
++         "required_sources",
++       ],
++     },
++     {
++       "caseId": "SUP-A-12",
++       "constraints": [
++         "outcome",
++         "required_sources",
++       ],
++     },
++     {
++       "caseId": "SUP-A-13",
++       "constraints": [
++         "outcome",
++         "required_sources",
++       ],
++     },
++     {
++       "caseId": "SUP-A-14",
++       "constraints": [
++         "outcome",
++         "required_sources",
++       ],
++     },
++     {
++       "caseId": "SUP-A-15",
++       "constraints": [
++         "outcome",
++         "required_sources",
++       ],
++     },
++   ],
++   "passed": 50,
+    "total": 60,
+  }
+
+ ❯ tests/support-eval/run.test.ts:141:30
+    139|         executeCase: executor.executeCase
+    140|       });
+    141|       expect(report.runs[0]).toMatchObject({ passed: 60,total: 60,fail…
+       |                              ^
+    142|       expect(report.verdict).toBe("PENDING");
+    143|     } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 80 passed (81)
+   Start at  14:45:32
+   Duration  4.24s (transform 475ms, setup 0ms, import 1.17s, tests 2.89s, environment 0ms)
+

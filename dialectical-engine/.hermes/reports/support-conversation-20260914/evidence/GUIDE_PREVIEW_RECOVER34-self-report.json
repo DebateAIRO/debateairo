@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_RECOVER34",
+  "ticket": "t_31c5023f",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_RECOVERED_BOUND_REVIEW_REQUIRED",
+  "diagnostic": {
+    "outcomeCode": "HERMES_DIAGNOSTIC_READY",
+    "attempts": 1
+  },
+  "runtime": {
+    "node": "GUIDE_RUNTIME9",
+    "pid": 9800,
+    "pgid": 9800,
+    "apiPort": 8890,
+    "tlsStatus": 200,
+    "idle": true
+  },
+  "traffic": {
+    "startupModelAttempts": 2,
+    "supportAnswerRequests": 0,
+    "statusReads": 0,
+    "capacityReads": 0,
+    "databaseQueries": 0,
+    "actualCaptureRows": 0
+  },
+  "binding": {
+    "passed": 12,
+    "controls": 12,
+    "futureAbsent": 123
+  },
+  "limitations": [
+    "INDEPENDENT_RUNTIME_OPERATOR_REVIEW_REQUIRED",
+    "PAID31_NOT_RUN",
+    "FORGOT_DESTINATION_UNRESOLVED",
+    "NO_CP1_ACCEPTANCE"
+  ]
+}

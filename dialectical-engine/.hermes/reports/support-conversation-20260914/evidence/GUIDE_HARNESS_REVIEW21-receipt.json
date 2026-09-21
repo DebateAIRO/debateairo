@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW21",
+  "ticket": "t_ba4349a2",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "REWORK_BOUNDED_SUCCESSOR_CUSTODY",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW21.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW21.md",
+      "sha256": "e014acedaa37ee9c9077726ec9763b76af19935fdd248e1c5bff1f765d8fde40",
+      "bytes": 7865
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW21-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW21-dispositions.json",
+      "sha256": "af1cbff471abd104f4dfd786c2efe5500d99a44de95e51462224ee031069048d",
+      "bytes": 3583
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW21-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW21-custody.json",
+      "sha256": "53414b27f0a93b7e3bf5ff4fd4cd5ec39d83e68bcb4e4eb129b6805477674195",
+      "bytes": 1182
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW21.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW21.md",
+      "sha256": "0a0deef9a6055eb66d36f9e3c7d9ed3f46d2ec610152c00f3eadfcff2a02d4bc",
+      "bytes": 2841
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "heavyLeaseHeld": false,
+  "findings": [
+    "GH21-R1 stale GUIDE18 row provenance and proof labels in GUIDE21 successor.",
+    "GH21-R2 owner capacity output collision detected only after status/database reads and omitted from binding freshness set."
+  ],
+  "retained": [
+    "The two requested field/capacity corrections pass 12/12 focused controls.",
+    "Full58 current-product and unchanged screenshot proof remain retained."
+  ]
+}

@@ -1,0 +1,14 @@
+Target root: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-security/dialectical-engine
+Dependency root: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+Revision: f3be0af81f1691db6c23494f9e286bb6b10f13bf
+Manifest: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL4-manifest.json
+
+After explicit heavy transfer, create exactly five read-only dependency symlinks from dependency root to target root.
+
+PRESERVED CONTEXT18:
+env LOG=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY5-context18.log zsh /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-orchestrator/scripts/run-capture.sh env TSX_DISABLE_CACHE=1 GUIDE_SECURITY5_TARGET_ROOT=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-security/dialectical-engine GUIDE_SECURITY5_TARGET_REVISION=f3be0af81f1691db6c23494f9e286bb6b10f13bf GUIDE_SECURITY5_TARGET_MANIFEST=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL4-manifest.json GUIDE_SECURITY5_DEPENDENCY_ROOT=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine GUIDE_SECURITY5_MATRIX=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY5/matrix.json GUIDE_SECURITY5_MATRIX_SHA256=ae7ff3ce8754a15e0ad2d7b33c45a9e70ce738263c9d8577288551b7add0d0ad GUIDE_SECURITY5_MATRIX_COUNT=18 node --import tsx /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY5/run-context-matrix.mts
+
+CHANGED AUTHORED CONTROLS:
+env LOG=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY5-focused.log zsh /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-orchestrator/scripts/run-capture.sh env LANG=en_US.UTF-8 TSX_DISABLE_CACHE=1 pnpm exec vitest run tests/architecture/support-catalog-coverage.test.ts tests/unit/support-context.test.ts tests/unit/support-answer-context.test.ts --maxWorkers=1
+
+Remove all five dependency symlinks and run node /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY5/run-custody.mjs post before handoff.

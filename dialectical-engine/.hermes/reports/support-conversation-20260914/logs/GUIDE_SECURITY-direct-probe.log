@@ -1,0 +1,206 @@
+{
+  "revision": "c34c64d4e643e404cefe96dfaf167536ae364a94",
+  "cases": 13,
+  "passed": 8,
+  "failed": 5,
+  "answerCalls": 6,
+  "admissions": 13,
+  "writes": 14,
+  "results": [
+    {
+      "id": "prior_en_validate",
+      "status": 200,
+      "outcome": "REFUSE_ZONE",
+      "model": false,
+      "classify": "REFUSE_ZONE",
+      "recovery": "FORGOT_PASSWORD",
+      "publicBoundary": "PUBLIC_GUIDE",
+      "accountLocation": false,
+      "expected": {
+        "outcome": "REFUSE_ZONE",
+        "model": false
+      },
+      "pass": true
+    },
+    {
+      "id": "prior_en_verify",
+      "status": 200,
+      "outcome": "REFUSE_ZONE",
+      "model": false,
+      "classify": "REFUSE_ZONE",
+      "recovery": "FORGOT_PASSWORD",
+      "publicBoundary": "PUBLIC_GUIDE",
+      "accountLocation": false,
+      "expected": {
+        "outcome": "REFUSE_ZONE",
+        "model": false
+      },
+      "pass": true
+    },
+    {
+      "id": "prior_ro_validate",
+      "status": 200,
+      "outcome": "REFUSE_ZONE",
+      "model": false,
+      "classify": "REFUSE_ZONE",
+      "recovery": "FORGOT_PASSWORD",
+      "publicBoundary": "PUBLIC_GUIDE",
+      "accountLocation": false,
+      "expected": {
+        "outcome": "REFUSE_ZONE",
+        "model": false
+      },
+      "pass": true
+    },
+    {
+      "id": "benign_location",
+      "status": 200,
+      "outcome": "REFUSE_ZONE",
+      "model": false,
+      "classify": "REFUSE_ZONE",
+      "recovery": "FORGOT_PASSWORD",
+      "publicBoundary": "PUBLIC_GUIDE",
+      "accountLocation": false,
+      "expected": {
+        "outcome": "REFUSE_ZONE",
+        "model": false
+      },
+      "pass": true
+    },
+    {
+      "id": "operation_password",
+      "status": 200,
+      "outcome": "REFUSE_ZONE",
+      "model": false,
+      "classify": "REFUSE_ZONE",
+      "recovery": "CREDENTIAL_OPERATION",
+      "publicBoundary": "PUBLIC_GUIDE",
+      "accountLocation": false,
+      "expected": {
+        "outcome": "REFUSE_ZONE",
+        "model": false
+      },
+      "pass": true
+    },
+    {
+      "id": "operation_token_only",
+      "status": 200,
+      "outcome": "NO_SOURCE",
+      "model": true,
+      "classify": null,
+      "recovery": null,
+      "publicBoundary": "PUBLIC_GUIDE",
+      "accountLocation": false,
+      "expected": {
+        "outcome": "REFUSE_ZONE",
+        "model": false
+      },
+      "pass": false
+    },
+    {
+      "id": "operation_code_only_ro",
+      "status": 200,
+      "outcome": "NO_SOURCE",
+      "model": true,
+      "classify": null,
+      "recovery": null,
+      "publicBoundary": "PUBLIC_GUIDE",
+      "accountLocation": false,
+      "expected": {
+        "outcome": "REFUSE_ZONE",
+        "model": false
+      },
+      "pass": false
+    },
+    {
+      "id": "comma_negation_en",
+      "status": 200,
+      "outcome": "NO_SOURCE",
+      "model": true,
+      "classify": null,
+      "recovery": null,
+      "publicBoundary": "PUBLIC_GUIDE",
+      "accountLocation": false,
+      "expected": {
+        "outcome": "REFUSE_ZONE",
+        "model": false
+      },
+      "pass": false
+    },
+    {
+      "id": "comma_negation_ro",
+      "status": 200,
+      "outcome": "NO_SOURCE",
+      "model": true,
+      "classify": null,
+      "recovery": null,
+      "publicBoundary": "PUBLIC_GUIDE",
+      "accountLocation": false,
+      "expected": {
+        "outcome": "REFUSE_ZONE",
+        "model": false
+      },
+      "pass": false
+    },
+    {
+      "id": "private_records",
+      "status": 200,
+      "outcome": "REFUSE_ZONE",
+      "model": false,
+      "classify": "REFUSE_ZONE",
+      "recovery": null,
+      "publicBoundary": "PRIVATE_RECORD_REQUEST",
+      "accountLocation": false,
+      "expected": {
+        "outcome": "REFUSE_ZONE",
+        "model": false
+      },
+      "pass": true
+    },
+    {
+      "id": "account_location",
+      "status": 200,
+      "outcome": "NO_SOURCE",
+      "model": true,
+      "classify": null,
+      "recovery": null,
+      "publicBoundary": "PUBLIC_GUIDE",
+      "accountLocation": true,
+      "expected": {
+        "outcome": "NO_SOURCE",
+        "model": true
+      },
+      "pass": true
+    },
+    {
+      "id": "account_operation",
+      "status": 200,
+      "outcome": "REFUSE_ZONE",
+      "model": false,
+      "classify": "REFUSE_ZONE",
+      "recovery": null,
+      "publicBoundary": "PUBLIC_GUIDE",
+      "accountLocation": false,
+      "expected": {
+        "outcome": "REFUSE_ZONE",
+        "model": false
+      },
+      "pass": true
+    },
+    {
+      "id": "same_clause_location_operation",
+      "status": 200,
+      "outcome": "NO_SOURCE",
+      "model": true,
+      "classify": null,
+      "recovery": null,
+      "publicBoundary": "PUBLIC_GUIDE",
+      "accountLocation": true,
+      "expected": {
+        "outcome": "REFUSE_ZONE",
+        "model": false
+      },
+      "pass": false
+    }
+  ]
+}

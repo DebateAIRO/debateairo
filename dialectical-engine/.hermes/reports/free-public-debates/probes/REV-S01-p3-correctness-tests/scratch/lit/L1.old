@@ -1,0 +1,2 @@
+REVOKE EXECUTE ON FUNCTION core.run_is_free_public_bound(uuid)
+  FROM debateai_erasure_runtime;

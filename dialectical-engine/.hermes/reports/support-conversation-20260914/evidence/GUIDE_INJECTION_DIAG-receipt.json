@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_INJECTION_DIAG",
+  "ticket": "t_b679d90e",
+  "session": "/root/requirements",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "verdict": "PROVED_HARNESS_LEGACY_RESPONSE_MISMATCH_ACTUAL_LIVE_RESPONSE_UNKNOWN",
+  "actualLiveResponse": "UNAVAILABLE_NOT_PERSISTED",
+  "provedMismatch": {
+    "productProducer": "legacy deterministic refusal omits sources/actions",
+    "uiConsumer": "normalizes absent decorations to empty arrays",
+    "fix7Projector": "rejects absent decorations before safe checkpoint",
+    "languageScope": "same deterministic producer for frozen EN and RO injection rows"
+  },
+  "minimalNextScope": {
+    "owner": "original preview harness author",
+    "productPatchAuthorized": false,
+    "liveRetryAuthorized": false,
+    "requirements": [
+      "branch-aware legacy deterministic decoration normalization",
+      "strict MODEL decoration presence and all-branch malformed-value rejection",
+      "safe API_RECEIVED checkpoint before full projection",
+      "closed predicate-specific projection errors",
+      "inert EN/RO and mutation controls in a new reviewed namespace"
+    ]
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_DIAG.md",
+      "sha256": "adbb568dc1ad3851414d1cc94ad66b7ba77065cc77a3c980241c7eaa1e93e8b7",
+      "bytes": 7742
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_DIAG-trace.json",
+      "sha256": "15a042fa21fc11149ea0180175aef64755795b38df371724f4d9abda1214f682",
+      "bytes": 3639
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_DIAG-custody.log",
+      "sha256": "d1335e664ee576dc5923ed530a45dc02e9f3af3ee44782eb2676f5c174da288c",
+      "bytes": 231
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_INJECTION_DIAG.md",
+      "sha256": "c4f204dea598e4dec29ffc87056b3bc6477e7667b3537f671e29ca9a98cb5a08",
+      "bytes": 2836
+    }
+  ],
+  "receiptExcludesItself": true,
+  "productClean": true,
+  "heavyLeaseUsed": false,
+  "gitLeaseUsed": false,
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "database": 0,
+    "supportRequests": 0,
+    "modelRequests": 0
+  },
+  "limits": [
+    "LIVE4 row43 status/body/outcome/visible/diagnostic/origin remain unavailable",
+    "proved static mismatch is not claimed as the actual lost response cause",
+    "39 rows were unattempted and 40 were unfinished including row43",
+    "Forgot remains unresolved and actionless",
+    "no preview readiness or checkpoint acceptance"
+  ]
+}

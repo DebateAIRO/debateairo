@@ -155,13 +155,15 @@ describe("DEV-08 persistent local-auth data plane", () => {
       scripts?: Record<string, string>;
     };
     const cli = await readFile("apps/runner/src/dev-auth-data-plane-cli.ts", "utf8");
+    const dataPlane = await readFile("apps/runner/src/dev-auth-data-plane.ts", "utf8");
     const capture = await readFile("deploy/dev-auth/sendmail-capture.mjs", "utf8");
     expect(packageJson.scripts?.["dev:auth:data-plane"])
       .toBe("tsx apps/runner/src/dev-auth-data-plane-cli.ts");
     expect(cli).toContain("createDevelopmentAuthDataPlaneOperations");
     expect(cli).toContain("loadDevelopmentCommandEnvironment()");
-    expect(await readFile("apps/runner/src/dev-auth-data-plane.ts", "utf8"))
-      .not.toContain("process.env");
+    expect(dataPlane).not.toContain("process.env");
+    expect(dataPlane).toContain("createDevelopmentSupportConfigInitializationPool");
+    expect(dataPlane).not.toContain("createSupportControlPlanePool");
     expect(capture).toContain('process.argv[2] === "--preflight"');
   });
 });

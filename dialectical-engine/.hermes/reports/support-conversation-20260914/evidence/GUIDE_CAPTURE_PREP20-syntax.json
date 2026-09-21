@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_PREP20",
+  "revision": null,
+  "preparationBase": "0f4290c290fd38caa0ccfb3b6781fb8c33999a22",
+  "verdict": "PASS_SYNTAX_ONLY",
+  "checks": {
+    "nodeCheckMjs": {
+      "files": 16,
+      "status": 0,
+      "logs": [
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CAPTURE_PREP20-node-check-final.log",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CAPTURE_PREP20-package-syntax.log"
+      ]
+    },
+    "nodeCheckTypeScript": {
+      "files": 1,
+      "status": 0,
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CAPTURE_PREP20-ts-syntax.log"
+    },
+    "jsonSyntax": {
+      "files": 5,
+      "status": 0,
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CAPTURE_PREP20-json-syntax-evidence.log"
+    }
+  },
+  "behavioralControlsExecuted": 0,
+  "operationalTraffic": 0
+}

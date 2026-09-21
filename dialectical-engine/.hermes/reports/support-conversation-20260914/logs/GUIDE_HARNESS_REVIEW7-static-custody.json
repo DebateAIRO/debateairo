@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW7",
+  "ticket": "t_421d66b7",
+  "runId": 163,
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedAt": "2026-09-17T19:52:39Z",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "freezeCommit": "c73e867e20d5cd924de27ef52080f4dd5ade84e8",
+  "inputCustody": {
+    "count": 124,
+    "mismatches": []
+  },
+  "productManifest": {
+    "fileCount": 4,
+    "mismatches": [],
+    "checkoutHead": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+    "checkoutCleanObserved": true
+  },
+  "orderedEight": {
+    "harnessSha256": "66a56435d7e0c664a12429498b5929b8f308f6217951700c506361d18554e30a",
+    "files": [
+      {
+        "path": "capture-public-guide.mjs",
+        "bytes": 18423,
+        "sha256": "d2ce62e07c570e607a0cfccefe1f17b75e1969686f45ddda73c159ec1650c238"
+      },
+      {
+        "path": "controls.mjs",
+        "bytes": 24484,
+        "sha256": "f544243fac5405704d0fd98841f8eb84e3732c392ff074530b9cb7de2fc0d711"
+      },
+      {
+        "path": "matrix.mjs",
+        "bytes": 14253,
+        "sha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c"
+      },
+      {
+        "path": "pre-request-verifier.ts",
+        "bytes": 16486,
+        "sha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733"
+      },
+      {
+        "path": "runtime-capacity.mjs",
+        "bytes": 9935,
+        "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87"
+      },
+      {
+        "path": "session-lifecycle.mjs",
+        "bytes": 4254,
+        "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b"
+      },
+      {
+        "path": "verify-final-branches.ts",
+        "bytes": 5131,
+        "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a"
+      },
+      {
+        "path": "verify-guide-harness.mjs",
+        "bytes": 55531,
+        "sha256": "6fc850a0bd6fec915940c3159375056062681cdabf9252570bfe774d30d930af"
+      }
+    ]
+  },
+  "canonicalControlProof": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX7-control-proof.json",
+    "sha256": "235f4e8a60005e17b9ecc0f816a3b06dc3d0148bb42bde830d65df5744857063",
+    "schemaVersion": 2,
+    "result": "PASS",
+    "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+    "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+    "harnessSha256": "66a56435d7e0c664a12429498b5929b8f308f6217951700c506361d18554e30a",
+    "controls": 105,
+    "passed": 105,
+    "uniqueNames": 105,
+    "priorNames": 100,
+    "allPriorNamesRetained": true,
+    "addedNames": [
+      "staged consumer rejects attributed diagnostic without a record at DOM stage",
+      "staged consumer rejects unknown attributed predicate without leaking it",
+      "staged consumer rejects missing and noninteger attributed fixed counts",
+      "fixed diagnostic producer statuses project only their allowed shapes",
+      "NOT APPLICABLE diagnostic preserves legitimate count nullability"
+    ]
+  },
+  "findingDisposition": {
+    "id": "GH6-R1",
+    "verdict": "RESOLVED",
+    "validatorLines": "controls.mjs:253-316",
+    "assertionRevalidationLine": "controls.mjs:354",
+    "controlLines": "verify-guide-harness.mjs:719-783",
+    "malformedLastSafePhase": "DOM_PROJECTED",
+    "malformedFailureCode": "GUIDE_HARNESS_DIAGNOSTIC_INVALID"
+  },
+  "schemas": {
+    "ACCEPTED_DRAFT": "category null; candidate and four counts zero",
+    "ATTRIBUTED_RECOVERY": "known category; candidate=valid=1; remaining counts zero",
+    "ATTRIBUTED_REFUSAL": "known category; candidate=valid=1; remaining counts zero",
+    "AMBIGUOUS": "category null; complete nonnegative counts; candidate=valid+invalid",
+    "NOT_APPLICABLE": "category and four inapplicable counts null; candidate retained"
+  },
+  "retained": {
+    "stagedPersistence": "PASS",
+    "attemptedCompletedAccounting": "PASS",
+    "privacyProjection": "PASS",
+    "matrixFix5Exact": "PASS",
+    "sourcePolicyFinalRevisionBinding": "PASS",
+    "digestAndAdapterBinding": "PASS",
+    "guide7OutputAbsence": "PASS"
+  },
+  "execution": {
+    "staticOnly": true,
+    "tests": false,
+    "probes": false,
+    "browser": false,
+    "runtime": false,
+    "status": false,
+    "capacity": false,
+    "http": false,
+    "database": false,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "git": false,
+    "heavyLease": false
+  }
+}

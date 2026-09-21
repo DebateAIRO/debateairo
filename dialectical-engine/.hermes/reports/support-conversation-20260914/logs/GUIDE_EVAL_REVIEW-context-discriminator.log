@@ -1,0 +1,414 @@
+COMMAND=TSX_DISABLE_CACHE=1 node --import tsx /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_EVAL_REVIEW/context-discriminator.ts
+{
+  "custody": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-correctness/dialectical-engine/packages/support-kb/src/context.ts",
+      "sha256": "05e004ec5365dbb6d11e89d9204ae7f801203d498cf8127a39818ead5e56c05d"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-correctness/dialectical-engine/packages/support-kb/src/catalog.ts",
+      "sha256": "f33cd1d8b57ecd076aff02135fe4070e7b7b51ee090bad4f64c0e08a668cedf5"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-correctness/dialectical-engine/packages/support-kb/recovery/components.json",
+      "sha256": "8934293e862387fd3e6e83527780640e8497bdc50704854e43eb1d2db24fcae6"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-correctness/dialectical-engine/packages/support-kb/reviews/manifest.json",
+      "sha256": "8e0057f4091d5cae733ddafd92527d1f02144834a78a8724c37cc99672ca3951"
+    }
+  ],
+  "componentEntries": 38,
+  "results": [
+    {
+      "id": "SUP-A-01",
+      "class": "A",
+      "expectedSourceIds": [
+        "getting-started-debate"
+      ],
+      "actualSourceIds": [
+        "getting-started-debate",
+        "debate-topic-and-description",
+        "risk-tier-choice"
+      ],
+      "requestedActionIds": [
+        "start-debate"
+      ]
+    },
+    {
+      "id": "SUP-A-02",
+      "class": "A",
+      "expectedSourceIds": [
+        "debate-topic-and-description"
+      ],
+      "actualSourceIds": [
+        "debate-topic-and-description",
+        "getting-started-debate",
+        "risk-tier-choice"
+      ],
+      "requestedActionIds": [
+        "start-debate"
+      ]
+    },
+    {
+      "id": "SUP-A-03",
+      "class": "A",
+      "expectedSourceIds": [
+        "risk-tier-choice",
+        "budget-tier-choice"
+      ],
+      "actualSourceIds": [
+        "getting-started-debate",
+        "risk-tier-choice",
+        "budget-tier-choice"
+      ],
+      "requestedActionIds": [
+        "start-debate"
+      ]
+    },
+    {
+      "id": "SUP-A-04",
+      "class": "A",
+      "expectedSourceIds": [
+        "guide-how-it-works"
+      ],
+      "actualSourceIds": [
+        "export-json",
+        "guide-how-it-works",
+        "getting-started-debate"
+      ],
+      "requestedActionIds": [
+        "home",
+        "public-catalog",
+        "your-debates"
+      ]
+    },
+    {
+      "id": "SUP-A-05",
+      "class": "A",
+      "expectedSourceIds": [
+        "unsupported-capabilities"
+      ],
+      "actualSourceIds": [
+        "product-identity",
+        "export-json",
+        "privacy-consent"
+      ],
+      "requestedActionIds": []
+    },
+    {
+      "id": "SUP-A-06",
+      "class": "A",
+      "expectedSourceIds": [
+        "public-answer-disclosure",
+        "view-public-debate"
+      ],
+      "actualSourceIds": [
+        "guide-how-it-works",
+        "export-json",
+        "public-answer-disclosure"
+      ],
+      "requestedActionIds": [
+        "home",
+        "public-catalog",
+        "your-debates"
+      ]
+    },
+    {
+      "id": "SUP-A-07",
+      "class": "A",
+      "expectedSourceIds": [
+        "browse-public-debates"
+      ],
+      "actualSourceIds": [
+        "browse-public-debates",
+        "getting-started-debate",
+        "export-json"
+      ],
+      "requestedActionIds": [
+        "home",
+        "public-catalog",
+        "your-debates"
+      ]
+    },
+    {
+      "id": "SUP-A-08",
+      "class": "A",
+      "expectedSourceIds": [
+        "view-public-debate"
+      ],
+      "actualSourceIds": [
+        "view-public-debate",
+        "public-answer-disclosure",
+        "export-json"
+      ],
+      "requestedActionIds": [
+        "public-debate"
+      ]
+    },
+    {
+      "id": "SUP-A-09",
+      "class": "A",
+      "expectedSourceIds": [
+        "publish-a-debate",
+        "unpublish-a-debate"
+      ],
+      "actualSourceIds": [
+        "publish-a-debate",
+        "export-json",
+        "guide-how-it-works"
+      ],
+      "requestedActionIds": [
+        "home",
+        "public-catalog",
+        "your-debates"
+      ]
+    },
+    {
+      "id": "SUP-A-10",
+      "class": "A",
+      "expectedSourceIds": [
+        "delete-a-private-debate"
+      ],
+      "actualSourceIds": [
+        "export-json",
+        "guide-how-it-works",
+        "delete-a-private-debate"
+      ],
+      "requestedActionIds": [
+        "owner-debate"
+      ]
+    },
+    {
+      "id": "SUP-A-11",
+      "class": "A",
+      "expectedSourceIds": [
+        "getting-started-debate"
+      ],
+      "actualSourceIds": [
+        "getting-started-debate",
+        "debate-topic-and-description",
+        "risk-tier-choice"
+      ],
+      "requestedActionIds": [
+        "start-debate"
+      ]
+    },
+    {
+      "id": "SUP-A-12",
+      "class": "A",
+      "expectedSourceIds": [
+        "debate-topic-and-description"
+      ],
+      "actualSourceIds": [
+        "debate-topic-and-description",
+        "getting-started-debate",
+        "risk-tier-choice"
+      ],
+      "requestedActionIds": [
+        "start-debate"
+      ]
+    },
+    {
+      "id": "SUP-A-13",
+      "class": "A",
+      "expectedSourceIds": [
+        "risk-tier-choice",
+        "budget-tier-choice"
+      ],
+      "actualSourceIds": [
+        "getting-started-debate",
+        "risk-tier-choice",
+        "budget-tier-choice"
+      ],
+      "requestedActionIds": [
+        "start-debate"
+      ]
+    },
+    {
+      "id": "SUP-A-14",
+      "class": "A",
+      "expectedSourceIds": [
+        "guide-how-it-works"
+      ],
+      "actualSourceIds": [
+        "getting-started-debate",
+        "debate-topic-and-description",
+        "public-answer-disclosure"
+      ],
+      "requestedActionIds": [
+        "home",
+        "public-catalog",
+        "your-debates"
+      ]
+    },
+    {
+      "id": "SUP-A-15",
+      "class": "A",
+      "expectedSourceIds": [
+        "unsupported-capabilities"
+      ],
+      "actualSourceIds": [
+        "guide-how-it-works",
+        "export-json",
+        "publish-a-debate"
+      ],
+      "requestedActionIds": [
+        "owner-debate"
+      ]
+    },
+    {
+      "id": "SUP-A-16",
+      "class": "A",
+      "expectedSourceIds": [
+        "public-answer-disclosure",
+        "view-public-debate"
+      ],
+      "actualSourceIds": [
+        "public-answer-disclosure",
+        "view-public-debate",
+        "browse-public-debates"
+      ],
+      "requestedActionIds": [
+        "home",
+        "public-catalog",
+        "your-debates"
+      ]
+    },
+    {
+      "id": "SUP-A-17",
+      "class": "A",
+      "expectedSourceIds": [
+        "browse-public-debates"
+      ],
+      "actualSourceIds": [
+        "browse-public-debates",
+        "getting-started-debate",
+        "view-public-debate"
+      ],
+      "requestedActionIds": [
+        "home",
+        "public-catalog",
+        "your-debates"
+      ]
+    },
+    {
+      "id": "SUP-A-18",
+      "class": "A",
+      "expectedSourceIds": [
+        "view-public-debate"
+      ],
+      "actualSourceIds": [
+        "view-public-debate",
+        "public-answer-disclosure",
+        "export-json"
+      ],
+      "requestedActionIds": [
+        "public-debate"
+      ]
+    },
+    {
+      "id": "SUP-A-19",
+      "class": "A",
+      "expectedSourceIds": [
+        "publish-a-debate",
+        "unpublish-a-debate"
+      ],
+      "actualSourceIds": [
+        "view-public-debate",
+        "browse-public-debates",
+        "export-json"
+      ],
+      "requestedActionIds": [
+        "home",
+        "public-catalog",
+        "your-debates"
+      ]
+    },
+    {
+      "id": "SUP-A-20",
+      "class": "A",
+      "expectedSourceIds": [
+        "delete-a-private-debate"
+      ],
+      "actualSourceIds": [
+        "export-json",
+        "guide-how-it-works",
+        "delete-a-private-debate"
+      ],
+      "requestedActionIds": [
+        "home",
+        "public-catalog",
+        "your-debates"
+      ]
+    },
+    {
+      "id": "SUP-B-01",
+      "class": "B",
+      "expectedSourceIds": [],
+      "actualSourceIds": [
+        "getting-started-debate",
+        "budget-tier-choice",
+        "debate-topic-and-description"
+      ],
+      "requestedActionIds": [
+        "start-debate"
+      ]
+    },
+    {
+      "id": "SUP-B-02",
+      "class": "B",
+      "expectedSourceIds": [],
+      "actualSourceIds": [
+        "guide-how-it-works",
+        "export-json",
+        "getting-started-debate"
+      ],
+      "requestedActionIds": [
+        "home",
+        "public-catalog",
+        "your-debates"
+      ]
+    },
+    {
+      "id": "SUP-B-03",
+      "class": "B",
+      "expectedSourceIds": [],
+      "actualSourceIds": [
+        "account-settings",
+        "guide-how-it-works",
+        "privacy-consent"
+      ],
+      "requestedActionIds": []
+    },
+    {
+      "id": "SUP-B-04",
+      "class": "B",
+      "expectedSourceIds": [],
+      "actualSourceIds": [],
+      "requestedActionIds": []
+    },
+    {
+      "id": "SUP-B-05",
+      "class": "B",
+      "expectedSourceIds": [],
+      "actualSourceIds": [
+        "product-identity",
+        "account-access",
+        "budget-tier-choice"
+      ],
+      "requestedActionIds": []
+    },
+    {
+      "id": "SUP-B-06",
+      "class": "B",
+      "expectedSourceIds": [],
+      "actualSourceIds": [
+        "product-identity",
+        "unsupported-capabilities"
+      ],
+      "requestedActionIds": []
+    }
+  ]
+}
+RC=0

@@ -1,0 +1,7 @@
+{
+  "verdict": "FAILED_FIXTURE_EXPECTATION",
+  "code": "GUIDE_CONTINUATION_BIND40_HELPER_HASH_EXPECTATION_STALE",
+  "expected": "2383566ca318e0d980269783e84334ace165c0355ca8d074cae1a75bf1238590",
+  "actual": "10a806c50999a84f3a036375807ef29a29c92ef6368047ec4e14c28af148b3be",
+  "disposition": "expectation corrected to independently reviewed FIX39 custody hash; helper bytes unchanged"
+}

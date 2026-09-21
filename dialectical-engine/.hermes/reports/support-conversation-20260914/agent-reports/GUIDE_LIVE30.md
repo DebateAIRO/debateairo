@@ -1,0 +1,15 @@
+# GUIDE_LIVE30
+
+Verdict: **FAILED_CAPTURE_SCREENSHOT_FOOTER_UNREACHABLE_NO_RETRY** at `0d34f82f4a2188d0ce1db04655b693798ffd2169`.
+
+The sealed PROCESS_BIND37 operator ran once under the required escalated execution context. PRETRAFFIC, corrected READINESS, the first and only capacity frame, gate and fresh58 row proof all passed. Capacity was measured at `2026-09-21T08:50:31.863Z`; row proof completed at `2026-09-21T08:50:33.056Z`. Capture stopped first with child status 1 and operator status 1. Idle did not run and no retry, resampling, restart or additional capacity read occurred.
+
+Capture attempted and completed five approved rows, created two sessions and sent five messages. Identifier-free session creation observations are `2026-09-21T08:50:35.959Z` and `2026-09-21T08:51:07.590Z`. All five rows were MODEL-branch, `ANSWER_GROUNDED`, `ACCEPTED_DRAFT` public responses. The sealed receipt does not expose an independent provider-call counter, so the exact provider-call count is UNAVAILABLE; measured model-branch rows are five under the ceiling of 27.
+
+The stop was `GUIDE_CAPTURE_ORIGINAL_PANE_FOOTER_UNREACHABLE` on canonical row 23 (export, full, Romanian). Its application response had HTTP 200, `ANSWER_GROUNDED`, accepted diagnostics, no actions, and exact API/DOM text, source and action equality. The failure occurred afterward while proving the original-pane footer screenshot. Four earlier rows have complete expanded/top/footer evidence; row 23 produced only its 652×700 top-pane PNG at `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE22-row-23-original-pane-top.png` (SHA-256 `bb3379432c74166b530bc74624efd537b9148d8bfbd099a4eee2c21eebec8cb1`). The helper threw before persisting row23 pane/footer rectangles, scrollTop/scrollHeight/clientHeight, case identity or restoration state, so those fields are explicitly UNAVAILABLE rather than reconstructed. This is a capture-instrumentation failure after an accepted application response. It does not establish whether the actual pane footer was usable, a product defect, or a provider-response failure.
+
+The fresh frame and partial accepted rows are failed-attempt evidence and are not reusable. A conservative future five-session bound is `2026-09-21T09:51:12.590Z`, derived from the second observed creation plus one hour and five seconds; it is not a future capacity PASS. The owner walkthrough was not created because the actual31 capture did not complete. Runtime9 was not restarted and its private ongoing log was not read or hashed. Post-failure custody is unverified because stop-first correctly prevented idle.
+
+SKILLS LOADED: retained mission BODY/protocol context; no new skill invoked. Native session: original Sol `/root/preview`, ticket `t_67ade796`.
+
+Self-report prompt retained verbatim: “treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.”

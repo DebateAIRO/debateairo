@@ -1,0 +1,10 @@
+file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX7/controls.mjs:476
+    throw new Error("GUIDE_HARNESS_API_PROJECTION_INVALID");
+          ^
+
+Error: GUIDE_HARNESS_API_PROJECTION_INVALID
+    at consumeGuideObservationStages (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX7/controls.mjs:476:11)
+    at async send (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX7/capture-public-guide.mjs:241:48)
+    at async file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX7/capture-public-guide.mjs:313:7
+
+Node.js v22.23.1

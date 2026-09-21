@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX26",
+  "ticket": "t_45088d73",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "PASS_CAPTURE_PROOF_DEPENDENCY",
+  "skillsLoaded": ["retained BODY skills and mission floors"],
+  "positive": {
+    "gatedRows": 58,
+    "producerStatus": 0,
+    "captureStatus": 0,
+    "sentinelChildCalls": 1,
+    "resultSha256": "593c9577035be42d4907f1a6cac421d61a5ed0ae3c27369c83c183769827c4c3"
+  },
+  "failBeforeSpawn": ["missing", "nonzero", "stale", "malformed", "tampered"],
+  "traffic": {"browser": 0, "http": 0, "status": 0, "capacity": 0, "database": 0, "support": 0, "model": 0},
+  "finding": "The successful gated proof existed but capture did not consume it, so phase ordering was procedural rather than enforced.",
+  "upgrade": "Generate explicit producer-consumer edges with exact path, hash, schema, freshness and fail-before-side-effect controls in the operational contract.",
+  "limits": ["No runtime availability claim", "Forgot unresolved/actionless", "No CP1 readiness or acceptance claim"]
+}

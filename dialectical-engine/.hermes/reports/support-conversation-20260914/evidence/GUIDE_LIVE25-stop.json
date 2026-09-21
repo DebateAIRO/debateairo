@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE25",
+  "ticket": "t_419471a7",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "STOPPED_ZERO_PHASE_ORCHESTRATION_LOADER",
+  "stage": "BEFORE_PHASE1",
+  "status": 1,
+  "code": "ERR_MODULE_NOT_FOUND",
+  "missingPublicModule": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/runner/src/dev-database-principals.js",
+  "reviewedPhasesAttempted": 0,
+  "reviewedPhasesCompleted": 0,
+  "supportRequests": 0,
+  "modelRequests": 0
+}

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "articleReviewCount": 32,
+  "recoveryReviewRecordCount": 44,
+  "admittedEntryCount": 44,
+  "admittedLogicalPairCount": 22,
+  "ignoredCount": 0,
+  "previewReviewedCount": 16,
+  "ownerRatifiedCount": 6,
+  "recoveryReviewedCount": 22,
+  "recoveryOwnerRatifiedCount": 0,
+  "guideRecordCount": 8,
+  "guideOwnerRatifiedCount": 0,
+  "manifestFileSha256": "6df66c5c9cdecde4a6eb2f38c6da2659310581b55f3bec130451040aa4c66849",
+  "componentFileSha256": "0c06363ee4409efe96807786ad96ed73e46659481f61c56e957eeb340fff3b94",
+  "canonicalCorpusDigest": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "immutable": true
+}

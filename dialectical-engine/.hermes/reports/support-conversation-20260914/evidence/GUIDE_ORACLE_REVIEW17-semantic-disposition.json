@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_ORACLE_REVIEW17",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "verdict": "PASS_JUSTIFIED_BOUNDED_ORACLE_CORRECTION",
+  "observed": {
+    "sequence": 26,
+    "language": "ro",
+    "prompt": "Unde pot afla cum funcționează o dezbatere?",
+    "promptSha256": "fbb9c3f02ab160df01113bb5669ea0ac0df63e212ff5cd5c957c0a90af13d01a",
+    "answer": "Informațiile despre cum funcționează o dezbatere se găsesc pe pagina de prezentare, care include o secțiune dedicată metodei, plus un exemplu de dezbatere însoțit de transcrierea completă, astfel încât să poți vedea structura și desfășurarea unei dezbateri în practică. De asemenea, în biblioteca de dezbateri există un control de ajutor care explică funcționarea. Dacă vrei să explorezi direct, poți porni navigarea către pagina principală sau către exemplul de dezbatere.",
+    "answerSha256": "9f85e8c55ecdf9fa1244e0d76a5c8f89acaa98251b8b8702cd095d6756bbe738",
+    "sourceIds": [
+      "app-navigation"
+    ],
+    "actionIds": [],
+    "apiDomEqual": true,
+    "draftDiagnostic": "ACCEPTED_DRAFT"
+  },
+  "clauseDispositions": [
+    {
+      "clause": "Informațiile despre cum funcționează o dezbatere se găsesc pe pagina de prezentare, care include o secțiune dedicată metodei, plus un exemplu de dezbatere însoțit de transcrierea completă, astfel încât să poți vedea structura și desfășurarea unei dezbateri în practică.",
+      "disposition": "SUPPORTED_USEFUL",
+      "authority": [
+        "app-navigation.ro.md:16",
+        "MENU-COVERAGE-v2 landing-method",
+        "MENU-COVERAGE-v2 landing-transcripts"
+      ],
+      "reason": "The landing Method section and sample debate transcript are reviewed public learning destinations."
+    },
+    {
+      "clause": "De asemenea, în biblioteca de dezbateri există un control de ajutor care explică funcționarea.",
+      "disposition": "SUPPORTED_USEFUL_GENERIC_HELP",
+      "authority": [
+        "app-navigation.ro.md:18",
+        "app-navigation.ro.md:20",
+        "apps/ui/app/page.tsx:125",
+        "MENU-COVERAGE-v2 help-compact"
+      ],
+      "reason": "Home is the debate library, which renders the Compact Help Support widget; this says generic help control, not the already-open-debate How it works control."
+    },
+    {
+      "clause": "Dacă vrei să explorezi direct, poți porni navigarea către pagina principală sau către exemplul de dezbatere.",
+      "disposition": "SUPPORTED_USEFUL_NO_ACTION_CLAIM",
+      "authority": [
+        "app-navigation.ro.md:16",
+        "app-navigation.ro.md:18",
+        "SUPPORT_ACTION_CATALOG method/sample-transcript/home"
+      ],
+      "reason": "The text points to reviewed Home and sample destinations without claiming that Support already activated them."
+    }
+  ],
+  "sourceMembershipVsQuality": {
+    "membershipAloneSufficient": false,
+    "retainedAnswerSeparatelyReviewed": true,
+    "retainedAnswerUseful": true,
+    "retainedAnswerSupported": true,
+    "genericHelpDistinctFromLocalHowItWorks": true,
+    "futureAnswerStillRequiresUsefulDestinationOrExplanation": true
+  },
+  "pairedBroadRows": {
+    "sequences": [
+      25,
+      26
+    ],
+    "prompts": {
+      "en": "Where can I learn how a debate works?",
+      "ro": "Unde pot afla cum funcționează o dezbatere?"
+    },
+    "allowedPrimarySourceIds": [
+      "app-navigation",
+      "guide-how-it-works",
+      "debate-workspace-menus"
+    ],
+    "appNavigationJustifiedBothLanguages": true,
+    "reason": "Both reviewed app-navigation articles expose landing Method/Transcripts, Home/library, and Compact Help/free-text Support facts."
+  },
+  "narrowLocalControl": {
+    "questions": {
+      "en": "In an already open debate, what does the How it works control explain?",
+      "ro": "Într-o dezbatere deja deschisă, ce explică controlul Cum funcționează?"
+    },
+    "allowedPrimarySourceIds": [
+      "guide-how-it-works",
+      "debate-workspace-menus"
+    ],
+    "rejectedPrimarySourceIds": [
+      "app-navigation"
+    ],
+    "anchors": [
+      "MENU-COVERAGE-v2 debate-how-it-works",
+      "debate-workspace-menus.ro.md:17-19",
+      "apps/ui/app/debate/[id]/DebatePageClient.tsx:1179"
+    ],
+    "reason": "The explicit named control is in the already-open debate surface; generic app navigation alone does not establish its local purpose."
+  },
+  "requiredRegressions": [
+    "both broad EN/RO rows accept app-navigation only when present in production-derived proof context",
+    "both broad rows retain guide-how-it-works and debate-workspace-menus alternatives",
+    "an app-navigation broad positive names or explains Method/Transcripts or library Compact Help",
+    "a generic non-answer with a valid source remains a failure",
+    "the explicit already-open-debate local-control EN/RO fixtures reject app-navigation-only authority",
+    "a fixture that conflates Compact Help with the named debate How it works control remains a failure",
+    "unrelated, absent, empty, duplicate, and proof-external sources remain failures",
+    "API/DOM equality, accepted-draft attribution, language, action, privacy, injection, credential, session, pacing, traffic and 42-model ceiling remain unchanged"
+  ],
+  "scope": {
+    "kind": "APPEND_ONLY_HARNESS_ORACLE",
+    "productChangesJustified": false,
+    "kbChangesJustified": false,
+    "relabelLive8": false,
+    "rowsUnchanged": 54,
+    "orderUnchanged": true,
+    "modelCeiling": 42,
+    "freshActualRunRequired": true
+  }
+}

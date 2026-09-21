@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND16",
+  "result": "PASS",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "harnessSha256": "fa91eede37beb7ac5f51366a9d4c7e89d62dc72c1033810d868bd5d2bf0c354c",
+  "controls": 136,
+  "passed": 136,
+  "retainedControlPurposes": 130,
+  "addedControlPurposes": 6,
+  "actualBoundInput": {
+    "productFiles": 144,
+    "attestedFiles": 6
+  },
+  "adapterNegative": {
+    "controls": 3,
+    "passed": 3,
+    "importerCalls": 0,
+    "successfulRows": 0
+  },
+  "checkpointRegression": {
+    "originalRejected": true,
+    "schemaVersion": 1,
+    "result": "PASS",
+    "initialExclusive": true,
+    "update": true,
+    "failureCheckpoint": true,
+    "mkdirCalls": 3,
+    "writeCalls": 3
+  },
+  "probeContract": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/probe-contract.json",
+    "script": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/probe-zero-request-ui.mjs",
+      "sha256": "666a54b1d9cd547951e609e79dd06ab88eb517bcc21f48a76ae385a921f053d6",
+      "bytes": 13837
+    },
+    "outputAbsent": true,
+    "logAbsent": true
+  },
+  "syntaxFiles": 14,
+  "unchangedFiles": [
+    "gate-contract.json",
+    "matrix.mjs",
+    "runtime-capacity.mjs",
+    "session-lifecycle.mjs",
+    "verify-final-branches.ts"
+  ],
+  "boundInputs": {
+    "productInventoryPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL9-manifest.json",
+    "attestationPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX-snapshot-receipt.json",
+    "suiteReceiptPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX-required-suites.json",
+    "suiteFiles": 34
+  },
+  "futureOutputs": {
+    "receipt": "GUIDE_LIVE_GUIDE16-actual-receipt.json",
+    "screenshots": 54,
+    "profileAbsent": true
+  },
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "database": 0,
+    "supportRequests": 0,
+    "modelRequests": 0
+  }
+}

@@ -1,0 +1,204 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-MAhR5Y/data ... ok
+creating subdirectories ... 
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] selecting dynamic shared memory implementation ... 
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-MAhR5Y/data -l logfile start
+
+
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] 2026-09-20 15:30:14.579 EEST [48088] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] 2026-09-20 15:30:14.581 EEST [48088] LOG:  listening on IPv4 address "127.0.0.1", port 61036
+
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] 2026-09-20 15:30:14.581 EEST [48088] LOG:  listening on IPv6 address "::1", port 61036
+
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] 2026-09-20 15:30:14.581 EEST [48088] LOG:  listening on Unix socket "/tmp/.s.PGSQL.61036"
+
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] 2026-09-20 15:30:14.584 EEST [48094] LOG:  database system was shut down at 2026-09-20 15:30:14 EEST
+
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] 2026-09-20 15:30:14.586 EEST [48088] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] 2026-09-20 15:30:14.862 EEST [48099] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] 2026-09-20 15:30:15.160 EEST [48099] WARNING:  there is no transaction in progress
+
+
+ × tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > creates twelve distinct SCRAM LOGINs with only their ruled direct memberships 200ms
+   → expected 11 to be 12 // Object.is equality
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > attests the exact runtime and support pools while runtime cannot resolve support tables
+[S00 DB embedded] 2026-09-20 15:30:15.549 EEST [48100] ERROR:  permission denied for schema support at character 15
+2026-09-20 15:30:15.549 EEST [48100] STATEMENT:  SELECT * FROM support.session LIMIT 1
+
+
+ ✓ tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > attests the exact runtime and support pools while runtime cannot resolve support tables 223ms
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > rejects runtime support membership and direct support-table privilege
+[S00 DB embedded] 2026-09-20 15:30:15.831 EEST [48099] WARNING:  role "debateai_dev_runtime" has not been granted membership in role "debateai_support" by role "debateai"
+
+
+ ✓ tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > rejects runtime support membership and direct support-table privilege 248ms
+ ✓ tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > fails closed when a required support relation is missing 210ms
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > reads latest provider discovery through the actual runtime capability without table SELECT
+[S00 DB embedded] 2026-09-20 15:30:16.232 EEST [48107] ERROR:  permission denied for table provider_probe
+2026-09-20 15:30:16.232 EEST [48107] STATEMENT:  SELECT probe_id FROM core.provider_probe LIMIT 1
+
+
+ ✓ tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > reads latest provider discovery through the actual runtime capability without table SELECT 209ms
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > reads the empty private liveness history without erasure-table SELECT
+[S00 DB embedded] 2026-09-20 15:30:16.438 EEST [48109] ERROR:  permission denied for table private_run_key_cleanup_intent
+2026-09-20 15:30:16.438 EEST [48109] STATEMENT:  SELECT run_id FROM serve.private_run_key_cleanup_intent LIMIT 1
+
+
+ ✓ tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > reads the empty private liveness history without erasure-table SELECT 206ms
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > records nonempty liveness and memory through the actual runtime capability boundary
+[S00 DB embedded] 2026-09-20 15:30:16.674 EEST [48111] ERROR:  permission denied for table private_run_key_cleanup_intent
+2026-09-20 15:30:16.674 EEST [48111] STATEMENT:  SELECT run_id FROM serve.private_run_key_cleanup_intent LIMIT 1
+
+
+ ✓ tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > records nonempty liveness and memory through the actual runtime capability boundary 246ms
+ ✓ tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > rejects privilege drift without rotating the credential file and stays idempotent after repair 173ms
+ ✓ tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > refuses a service principal as the provisioning authority 19ms
+ ✓ tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > runs the admin CLI without placing database credentials in its output 756ms
+ ✓ tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > converges concurrent first writers on one credential file 2755ms
+ ✓ tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > adds the newly ruled support principal without rotating existing development credentials 349ms
+ ✓ tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > rejects a permissive legacy credential before changing its bytes or mode 172ms
+ ✓ tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > rejects a hardlinked legacy credential without replacing either name 173ms
+ ✓ tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > rejects an unsafe existing credential parent without normalizing it 172ms
+ ✓ tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > upgrades exact nine-, ten-, and eleven-row private neighbors by suffix append only 694ms
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] 2026-09-20 15:30:21.969 EEST [48088] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] 2026-09-20 15:30:21.969 EEST [48088] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] 2026-09-20 15:30:21.970 EEST [48088] LOG:  background worker "logical replication launcher" (PID 48097) exited with exit code 1
+
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] 2026-09-20 15:30:21.972 EEST [48092] LOG:  shutting down
+
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] 2026-09-20 15:30:21.972 EEST [48092] LOG:  checkpoint starting: shutdown immediate
+
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] 2026-09-20 15:30:22.033 EEST [48092] LOG:  checkpoint complete: wrote 1731 buffers (10.6%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.031 s, sync=0.030 s, total=0.062 s; sync files=1144, longest=0.001 s, average=0.001 s; distance=13707 kB, estimate=13707 kB; lsn=0/24E9EB8, redo lsn=0/24E9EB8
+
+
+stdout | tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals
+[S00 DB embedded] 2026-09-20 15:30:22.038 EEST [48088] LOG:  database system is shut down
+
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/dev-database-principals.test.ts > DEV-03 isolated development database LOGIN principals > creates twelve distinct SCRAM LOGINs with only their ruled direct memberships
+AssertionError: expected 11 to be 12 // Object.is equality
+
+- Expected
++ Received
+
+- 12
++ 11
+
+ ❯ tests/integration/dev-database-principals.test.ts:125:76
+    123|       && !role.rolreplication && !role.rolbypassrls
+    124|       && role.rolpassword?.startsWith("SCRAM-SHA-256$") === true)).toB…
+    125|     expect(new Set(roles.rows.map(({ rolpassword }) => rolpassword)).s…
+       |                                                                            ^
+    126|
+    127|     const memberships = await database.pool.query<{
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 15 passed (16)
+   Start at  15:30:13
+   Duration  8.99s (transform 263ms, setup 0ms, import 753ms, tests 8.15s, environment 0ms)
+

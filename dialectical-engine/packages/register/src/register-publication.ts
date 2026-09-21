@@ -880,6 +880,7 @@ export function createPostgresRegisterPublicationPort(pool: Pool): RegisterPubli
             source_ref,recorded_at,configuration::text AS configuration_text
           FROM register.read_support_configuration_status()
         `);
+        if (Array.isArray(result.rows) && result.rows.length === 0) return null;
         const row = exactDatabaseResultRow(
           result.rows, SUPPORT_STATUS_RESULT_COLUMNS, "SUPPORT_CONFIG_SNAPSHOT_INVALID"
         );

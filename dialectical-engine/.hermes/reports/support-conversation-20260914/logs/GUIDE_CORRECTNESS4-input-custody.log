@@ -1,0 +1,38 @@
+{
+  "revision": "c8784902f78ed4ba1d637d122e1f32f598415f4e",
+  "inputManifestRevision": "c8784902f78ed4ba1d637d122e1f32f598415f4e",
+  "gateRevision": "c8784902f78ed4ba1d637d122e1f32f598415f4e",
+  "gateBase": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  "inputs": {
+    "checked": 51,
+    "failures": []
+  },
+  "detachedProduct": {
+    "checked": 143,
+    "failures": []
+  },
+  "primaryProduct": {
+    "checked": 143,
+    "failures": []
+  },
+  "changedPaths": {
+    "expected": [
+      "packages/support-kb/src/context.ts",
+      "tests/unit/support-answer-context.test.ts",
+      "tests/unit/support-context.test.ts"
+    ],
+    "actual": [
+      "packages/support-kb/src/context.ts",
+      "tests/unit/support-answer-context.test.ts",
+      "tests/unit/support-context.test.ts"
+    ]
+  },
+  "detached": {
+    "head": "c8784902f78ed4ba1d637d122e1f32f598415f4e",
+    "dirty": 0
+  },
+  "primary": {
+    "head": "c8784902f78ed4ba1d637d122e1f32f598415f4e",
+    "dirty": 0
+  }
+}

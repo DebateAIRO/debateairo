@@ -1,0 +1,21 @@
+freeze_sha256=5a8923f9a876d6216b761ce8302ce2f01621862954e4647e464d4a11c06cd0a0
+freeze_commit=b9901446b0d4e6a9e000156bb181bc4d7fe4b087
+source_head=18374fa8dc0ab7af30c9dba6b3a2586e72f017df
+detached_head=2ccb57fa061f74a81c8f2ef42bd33c768f00d4e0
+detached_dirty=0
+primary_head=2ccb57fa061f74a81c8f2ef42bd33c768f00d4e0
+primary_dirty=0
+indexed_inputs_checked=45
+indexed_inputs_mismatches=0
+detached_gate_files_checked=143
+detached_gate_mismatches=0
+primary_gate_files_checked=143
+primary_gate_mismatches=0
+changed_paths=6
+changed_paths_exact=True
+CHANGED	dialectical-engine/apps/api/src/support/public-guide-boundary.ts
+CHANGED	dialectical-engine/apps/api/src/support/recovery-intent.ts
+CHANGED	dialectical-engine/tests/integration/support-routes.test.ts
+CHANGED	dialectical-engine/tests/unit/support-classify.test.ts
+CHANGED	dialectical-engine/tests/unit/support-public-guide-boundary.test.ts
+CHANGED	dialectical-engine/tests/unit/support-recovery-intent.test.ts

@@ -1,0 +1,9 @@
+{
+  "node": "GUIDE_CONTEXT_FIX",
+  "ticket": "t_8a5af2ff",
+  "base": "3d0ad7acaab0ff90bd783a6948bf99f117d74fe2",
+  "writePaths": [
+    "tests/unit/support-answer-context.test.ts"
+  ],
+  "finding": "Independent static14-failure diagnosis: four-term synthetic query fails legitimate production relevance before intended answer path. Restore shared exact sentinel query crosscap; preserve all original assertions and production code."
+}

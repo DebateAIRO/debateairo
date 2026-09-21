@@ -1,0 +1,10 @@
+{
+  "schema": "guide-security2-adjacent-actor-v1",
+  "referenceRevision": "2ccb57fa061f74a81c8f2ef42bd33c768f00d4e0",
+  "cases": [
+    { "id": "adjacent_direct_you_operation", "language": "en", "class": "support-account-operation", "text": "Where can you delete my account for me?", "outcome": "REFUSE_ZONE", "model": false, "actions": 0, "sources": 0 },
+    { "id": "adjacent_postposed_support_operation", "language": "en", "class": "support-account-operation", "text": "Where can you remove my account, Support?", "outcome": "REFUSE_ZONE", "model": false, "actions": 0, "sources": 0 },
+    { "id": "control_direct_you_guidance", "language": "en", "class": "benign-account-navigation", "text": "Where can you show me the account deletion setting?", "outcome": "NO_SOURCE", "model": true, "actions": 0, "sources": 0 },
+    { "id": "control_named_support_guidance", "language": "en", "class": "benign-account-navigation", "text": "Where can Support explain the account deletion setting?", "outcome": "NO_SOURCE", "model": true, "actions": 0, "sources": 0 }
+  ]
+}

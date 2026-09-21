@@ -1,0 +1,284 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND15_UI_PROBE",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "completed": false,
+  "verdict": "FAIL_ZERO_SUPPORT_UI_TRANSITIONS",
+  "baseUrlClass": "LOCAL_ORDINARY_TLS",
+  "browser": {
+    "driver": "playwright@1.61.1",
+    "headless": true,
+    "tlsBypass": false,
+    "freshProfile": true
+  },
+  "traffic": {
+    "actualSupportRequestsForwarded": 0,
+    "guardedAttempts": {
+      "status": 1,
+      "pageCaseListRead": 1,
+      "createSession": 0,
+      "sendMessage": 0,
+      "otherSupport": 0
+    }
+  },
+  "transitionSequence": [
+    "fresh full/en",
+    "same-session full/ro",
+    "storage-reset compact/ro",
+    "route-remount full/en",
+    "storage-reset compact/en"
+  ],
+  "observations": [
+    {
+      "surface": "full",
+      "language": "en",
+      "phase": "BEFORE_INTERACTION",
+      "hydrationReady": "READY",
+      "toggleCount": 0,
+      "toggleVisible": "NOT_APPLICABLE",
+      "widgetState": "NOT_APPLICABLE",
+      "ariaExpanded": "NOT_APPLICABLE",
+      "panelCount": 0,
+      "panelVisible": "NOT_APPLICABLE",
+      "compactRootCount": 0,
+      "compactRootVisible": "NOT_APPLICABLE",
+      "composerCount": 1,
+      "composerVisible": "VISIBLE",
+      "urlClass": "HELP",
+      "cookieRegionVisible": "VISIBLE",
+      "consoleErrorCategories": {
+        "HTTP_401": 1,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 2
+      },
+      "fullReadiness": {
+        "languageControlCount": 2,
+        "visibleLanguageControlCount": 2,
+        "activeLanguage": "EN",
+        "composerCount": 1,
+        "composerVisible": "VISIBLE",
+        "modeToggleCount": 1,
+        "modeToggleVisible": "VISIBLE",
+        "modeState": "TERRACOTTA",
+        "urlClass": "HELP"
+      }
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "phase": "READY",
+      "hydrationReady": "READY",
+      "toggleCount": 0,
+      "toggleVisible": "NOT_APPLICABLE",
+      "widgetState": "NOT_APPLICABLE",
+      "ariaExpanded": "NOT_APPLICABLE",
+      "panelCount": 0,
+      "panelVisible": "NOT_APPLICABLE",
+      "compactRootCount": 0,
+      "compactRootVisible": "NOT_APPLICABLE",
+      "composerCount": 1,
+      "composerVisible": "VISIBLE",
+      "urlClass": "HELP",
+      "cookieRegionVisible": "VISIBLE",
+      "consoleErrorCategories": {
+        "HTTP_401": 1,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 2
+      },
+      "fullReadiness": {
+        "languageControlCount": 2,
+        "visibleLanguageControlCount": 2,
+        "activeLanguage": "EN",
+        "composerCount": 1,
+        "composerVisible": "VISIBLE",
+        "modeToggleCount": 1,
+        "modeToggleVisible": "VISIBLE",
+        "modeState": "TERRACOTTA",
+        "urlClass": "HELP"
+      }
+    },
+    {
+      "surface": "full",
+      "language": "ro",
+      "phase": "BEFORE_INTERACTION",
+      "hydrationReady": "READY",
+      "toggleCount": 0,
+      "toggleVisible": "NOT_APPLICABLE",
+      "widgetState": "NOT_APPLICABLE",
+      "ariaExpanded": "NOT_APPLICABLE",
+      "panelCount": 0,
+      "panelVisible": "NOT_APPLICABLE",
+      "compactRootCount": 0,
+      "compactRootVisible": "NOT_APPLICABLE",
+      "composerCount": 1,
+      "composerVisible": "VISIBLE",
+      "urlClass": "HELP",
+      "cookieRegionVisible": "UNKNOWN",
+      "consoleErrorCategories": {
+        "HTTP_401": 1,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 2
+      },
+      "fullReadiness": {
+        "languageControlCount": 2,
+        "visibleLanguageControlCount": 2,
+        "activeLanguage": "RO",
+        "composerCount": 1,
+        "composerVisible": "VISIBLE",
+        "modeToggleCount": 1,
+        "modeToggleVisible": "VISIBLE",
+        "modeState": "TERRACOTTA",
+        "urlClass": "HELP"
+      }
+    },
+    {
+      "surface": "full",
+      "language": "ro",
+      "phase": "READY",
+      "hydrationReady": "READY",
+      "toggleCount": 0,
+      "toggleVisible": "NOT_APPLICABLE",
+      "widgetState": "NOT_APPLICABLE",
+      "ariaExpanded": "NOT_APPLICABLE",
+      "panelCount": 0,
+      "panelVisible": "NOT_APPLICABLE",
+      "compactRootCount": 0,
+      "compactRootVisible": "NOT_APPLICABLE",
+      "composerCount": 1,
+      "composerVisible": "VISIBLE",
+      "urlClass": "HELP",
+      "cookieRegionVisible": "UNKNOWN",
+      "consoleErrorCategories": {
+        "HTTP_401": 1,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 2
+      },
+      "fullReadiness": {
+        "languageControlCount": 2,
+        "visibleLanguageControlCount": 2,
+        "activeLanguage": "RO",
+        "composerCount": 1,
+        "composerVisible": "VISIBLE",
+        "modeToggleCount": 1,
+        "modeToggleVisible": "VISIBLE",
+        "modeState": "TERRACOTTA",
+        "urlClass": "HELP"
+      }
+    },
+    {
+      "surface": "compact",
+      "language": "ro",
+      "phase": "BEFORE_INTERACTION",
+      "hydrationReady": "READY",
+      "toggleCount": 1,
+      "toggleVisible": "VISIBLE",
+      "widgetState": "COLLAPSED",
+      "ariaExpanded": "FALSE",
+      "panelCount": 0,
+      "panelVisible": "UNKNOWN",
+      "compactRootCount": 0,
+      "compactRootVisible": "UNKNOWN",
+      "composerCount": 0,
+      "composerVisible": "UNKNOWN",
+      "urlClass": "BASE",
+      "cookieRegionVisible": "UNKNOWN",
+      "consoleErrorCategories": {
+        "HTTP_401": 1,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 2
+      },
+      "fullReadiness": null
+    },
+    {
+      "surface": "compact",
+      "language": "ro",
+      "phase": "AFTER_INTERACTION",
+      "hydrationReady": "READY",
+      "toggleCount": 1,
+      "toggleVisible": "VISIBLE",
+      "widgetState": "EXPANDED",
+      "ariaExpanded": "TRUE",
+      "panelCount": 1,
+      "panelVisible": "VISIBLE",
+      "compactRootCount": 1,
+      "compactRootVisible": "VISIBLE",
+      "composerCount": 1,
+      "composerVisible": "VISIBLE",
+      "urlClass": "BASE",
+      "cookieRegionVisible": "UNKNOWN",
+      "consoleErrorCategories": {
+        "HTTP_401": 1,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 2
+      },
+      "fullReadiness": null
+    },
+    {
+      "surface": "compact",
+      "language": "ro",
+      "phase": "READY",
+      "hydrationReady": "READY",
+      "toggleCount": 1,
+      "toggleVisible": "VISIBLE",
+      "widgetState": "EXPANDED",
+      "ariaExpanded": "TRUE",
+      "panelCount": 1,
+      "panelVisible": "VISIBLE",
+      "compactRootCount": 1,
+      "compactRootVisible": "VISIBLE",
+      "composerCount": 1,
+      "composerVisible": "VISIBLE",
+      "urlClass": "BASE",
+      "cookieRegionVisible": "UNKNOWN",
+      "consoleErrorCategories": {
+        "HTTP_401": 1,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 2
+      },
+      "fullReadiness": null
+    }
+  ],
+  "transitions": [
+    {
+      "surface": "full",
+      "language": "en",
+      "result": "PASS",
+      "readyPhase": "READY"
+    },
+    {
+      "surface": "full",
+      "language": "ro",
+      "result": "PASS",
+      "readyPhase": "READY"
+    }
+  ],
+  "failure": {
+    "code": "GUIDE_UI_PROBE_UNCLASSIFIED_FAILURE",
+    "phase": "UNAVAILABLE",
+    "surface": "UNKNOWN",
+    "language": "UNKNOWN"
+  },
+  "consoleErrorCategories": {
+    "HTTP_401": 3,
+    "HTTP_404": 0,
+    "JS_OR_HYDRATION": 0,
+    "OTHER": 2
+  },
+  "privateControls": [
+    {
+      "surface": "full",
+      "passed": true
+    },
+    {
+      "surface": "full",
+      "passed": true
+    }
+  ]
+}

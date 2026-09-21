@@ -11,6 +11,10 @@ import {
   loadModelConfigConfiguredProviders,
   parseDevelopmentProviderPanelTargets
 } from "./dev-provider-panel.js";
+import {
+  DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  type DevelopmentAuthStackProfile
+} from "./dev-auth-stack-profile.js";
 
 const DEVELOPMENT_CLAIM_MARGIN_MS = 1_000;
 
@@ -56,12 +60,14 @@ export class DevelopmentRunnerProcessError extends Error {
 function createRunnerEnvironment(
   commandEnvironment: Readonly<Record<string, string>>,
   apiEnvironment: Readonly<Record<string, string>>,
-  repositoryRoot: string
+  repositoryRoot: string,
+  profile: DevelopmentAuthStackProfile
 ): Readonly<Record<string, string>> {
   const configuredProviders = loadModelConfigConfiguredProviders(repositoryRoot);
   const providerPanel = parseDevelopmentProviderPanelTargets(
     apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON!,
-    configuredProviders
+    configuredProviders,
+    profile
   );
   const targets = parseProviderDiscoveryTargets(
     apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON!,
@@ -130,14 +136,17 @@ export async function startDevelopmentRunnerProcess(input: Readonly<{
   repositoryRoot: string;
   commandEnvironment: Readonly<Record<string, string>>;
   operations: DevelopmentRunnerProcessOperations;
+  profile?: DevelopmentAuthStackProfile;
 }>): Promise<DevelopmentRunnerProcess> {
+  const profile = input.profile ?? DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE;
   const apiEnvironment = await input.operations.loadApiEnvironment(input.repositoryRoot);
   let child: DevelopmentRunnerChild;
   try {
     child = input.operations.startRunner(createRunnerEnvironment(
       input.commandEnvironment,
       apiEnvironment,
-      input.repositoryRoot
+      input.repositoryRoot,
+      profile
     ));
   } catch (error) {
     throw new DevelopmentRunnerProcessError("DEV_RUNNER_PROCESS_START_FAILED", error);
@@ -179,11 +188,12 @@ export async function startDevelopmentRunnerProcess(input: Readonly<{
 }
 
 export function createDevelopmentRunnerProcessOperations(
-  repositoryRoot: string
+  repositoryRoot: string,
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): DevelopmentRunnerProcessOperations {
   const cwd = resolve(repositoryRoot);
   return Object.freeze({
-    loadApiEnvironment: loadDevelopmentApiProcessEnvironment,
+    loadApiEnvironment: (root) => loadDevelopmentApiProcessEnvironment(root, profile),
     startRunner(environment) {
       const child = spawn(
         process.execPath,

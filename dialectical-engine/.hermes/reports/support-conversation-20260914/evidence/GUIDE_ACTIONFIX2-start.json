@@ -1,0 +1,17 @@
+{
+  "node": "GUIDE_ACTIONFIX2",
+  "ticket": "t_f60a1644",
+  "base": "c8784902f78ed4ba1d637d122e1f32f598415f4e",
+  "writePaths": [
+    "packages/support-kb/src/context.ts",
+    "packages/support-kb/src/catalog.ts",
+    "packages/support-kb/src/navigation.ts",
+    "tests/unit/support-context.test.ts",
+    "tests/unit/support-answer-context.test.ts",
+    "tests/unit/support-navigation.test.ts",
+    "tests/unit/support-kb.test.ts",
+    "tests/architecture/support-catalog-coverage.test.ts",
+    "tests/integration/support-routes.test.ts"
+  ],
+  "cause": "Separate final navigation correctness and boundary findings; resolve exact sealed counterexamples as coherent semantic classes."
+}

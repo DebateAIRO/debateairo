@@ -1,0 +1,36 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ × tests/render/support-topbar.test.tsx > Support-visible global Account navigation > opens the signed-in Account surface without changing the other global actions 25ms
+   → expected '/login' to be '/settings' // Object.is equality
+ ✓ tests/render/support-topbar.test.tsx > Support-visible global Account navigation > retains the minimal auth top bar on /login 5ms
+ ✓ tests/render/support-topbar.test.tsx > Support-visible global Account navigation > retains the minimal auth top bar on /sign-up 4ms
+ ✓ tests/render/support-topbar.test.tsx > Support-visible global Account navigation > retains the minimal auth top bar on /verify-email 3ms
+ ✓ tests/render/support-topbar.test.tsx > Support-visible global Account navigation > retains the minimal auth top bar on /enroll-mfa 3ms
+ ✓ tests/render/support-topbar.test.tsx > Support-visible global Account navigation > continues suppressing the global bar on /debate/11111111-1111-4111-8111-111111111111 1ms
+ ✓ tests/render/support-topbar.test.tsx > Support-visible global Account navigation > continues suppressing the global bar on /public/debate/11111111-1111-4111-8111-111111111111 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/render/support-topbar.test.tsx > Support-visible global Account navigation > opens the signed-in Account surface without changing the other global actions
+AssertionError: expected '/login' to be '/settings' // Object.is equality
+
+Expected: "/settings"
+Received: "/login"
+
+ ❯ tests/render/support-topbar.test.tsx:38:43
+     36|       .find(element => element.textContent?.trim() === "ASKER");
+     37|
+     38|     expect(account?.getAttribute("href")).toBe("/settings");
+       |                                           ^
+     39|     expect(newDebate?.getAttribute("href")).toBe("/new");
+     40|     expect(settings?.getAttribute("href")).toBe("/settings");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 passed (7)
+   Start at  12:41:52
+   Duration  932ms (transform 49ms, setup 0ms, import 108ms, tests 41ms, environment 671ms)
+

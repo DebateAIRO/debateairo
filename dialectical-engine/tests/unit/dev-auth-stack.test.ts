@@ -21,6 +21,7 @@ import {
   type DevelopmentApiProviderProbe,
   type DevelopmentProviderPanel
 } from "../../apps/runner/src/dev-provider-panel.js";
+import { SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE } from "../../apps/runner/src/dev-auth-stack-profile.js";
 
 const REGISTER_RECEIPT = createDevelopmentDeploymentRegisterMachineReceipt({
   registerVersion: parseRegisterVersionText("424242"),
@@ -86,6 +87,7 @@ async function providerKeysReader(): Promise<(repositoryRoot: string) => Promise
 
 function operations(input: Readonly<{
   occupied?: boolean;
+  preview?: boolean;
   failAt?: "provider_panel" | "support_model" | "data" | "token" | "environment" | "api" | "runner" | "ui" | "tls";
   apiEnvironmentPath?: string;
 }> = {}): DevelopmentAuthStackOperations & Readonly<{
@@ -102,6 +104,7 @@ function operations(input: Readonly<{
     if (input.failAt === stage) throw new Error(`sensitive ${stage} failure`);
   };
   return {
+    ...(input.preview ? { profile: SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE } : {}),
     calls,
     apiExit,
     uiExit,
@@ -497,6 +500,13 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
     expect(runtime.calls).toEqual(["model-config", "contract:generate", "preflight"]);
   });
 
+  it("reports the selected support-preview origin without changing lifecycle ownership", async () => {
+    const runtime = operations({ preview: true });
+    const stack = await startDevelopmentAuthStack(runtime);
+    expect(stack.receipt.origin).toBe("https://localhost:3100");
+    await stack.stop();
+  });
+
   it.each([
     ["provider_panel", ["model-config", "contract:generate", "preflight", "providers:start"]],
     ["support_model", ["model-config", "contract:generate", "preflight", "providers:start", "support:start", "providers:stop"]],
@@ -586,7 +596,7 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
     expect(source).not.toMatch(/dev-local-provider|qa-deterministic/iu);
     expect(source).not.toMatch(/mkcert\s+-install|seedAccount/iu);
     expect(source).not.toContain("process.env");
-    expect(cli).toContain("DEV_AUTH_STACK_READY=https://localhost:3000:RUNNER_REGISTERED");
+    expect(cli).toContain("DEV_AUTH_STACK_READY=${stack.receipt.origin}:RUNNER_REGISTERED");
     expect(cli).toContain("process.once(\"uncaughtException\"");
     expect(cli).toContain("process.once(\"unhandledRejection\"");
     expect(cli).toContain("runtimeFault.dispose()");

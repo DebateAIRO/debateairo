@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW21",
+  "ticket": "t_ba4349a2",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "verdict": "REWORK_BOUNDED_SUCCESSOR_CUSTODY",
+  "review20Correction": [
+    "Missed producer/consumer field mismatch: passed:true versus result:PASS.",
+    "Missed that five capture sessions and two owner sessions are deferred rather than simultaneous under immutable limit five."
+  ],
+  "dispositions": [
+    {"id":"GH21-C1","subject":"actual producer passed:true compatibility","disposition":"PASS","evidence":"Exact LIVE20 five-control output passes corrected real validator; old field check rejects it."},
+    {"id":"GH21-C2","subject":"private-control and traffic negatives","disposition":"PASS","evidence":"passed:false, missing controls and forwarded Support traffic reject."},
+    {"id":"GH21-C3","subject":"five-slot simultaneous capture capacity","disposition":"PASS","evidence":"Immutable measured limit5 fixture passes with zero used slots; one used slot rejects."},
+    {"id":"GH21-C4","subject":"daily/freshness/KB capture negatives","disposition":"PASS","evidence":"31+6 messages, 27+6 calls, 120-second age and exact KB remain enforced."},
+    {"id":"GH21-C5","subject":"deferred owner capacity semantics","disposition":"PASS_STATIC","evidence":"Separate validator requires current KB/model, two naturally free sessions, six messages, six calls, fresh frame, no cooldown/waiter and available relay."},
+    {"id":"GH21-C6","subject":"47-artifact manifest custody","disposition":"PASS","evidence":"47/47 SHA-256 and byte counts match."},
+    {"id":"GH21-C7","subject":"96-input review custody","disposition":"PASS","evidence":"96/96 SHA-256 and byte counts match."},
+    {"id":"GH21-C8","subject":"unchanged full58 and screenshot proof","disposition":"PASS_RETAINED","evidence":"Current-product full58 remains retained, not rerun; screenshot successor bytes are unchanged."},
+    {"id":"GH21-R1","subject":"successor row provenance","disposition":"REWORK","evidence":"Fresh LIVE_GUIDE21 rows still emit FRESH_GUIDE18_FIXED31; two proof labels likewise say GUIDE18."},
+    {"id":"GH21-R2","subject":"deferred owner output collision","disposition":"REWORK","evidence":"Status and DB reads occur before final wx collision check, and final binding omits owner output from freshness controls."},
+    {"id":"GH21-L1","subject":"live success/readiness","disposition":"NOT_ESTABLISHED","evidence":"No new runtime, status, capacity, database, Support, model or browser action occurred."},
+    {"id":"GH21-L2","subject":"Forgot/CP1/CP2","disposition":"UNRESOLVED_ACTIONLESS","evidence":"No destination, readiness, completion, acceptance or CP2 authorization is inferred."}
+  ],
+  "counts": {
+    "manifestArtifactsVerified": 47,
+    "indexedInputsVerified": 96,
+    "intendedCorrectionControls": 12,
+    "intendedCorrectionControlsPassed": 12,
+    "remainingFindings": 2,
+    "runtimeTraffic": 0,
+    "supportTraffic": 0,
+    "modelTraffic": 0,
+    "capacityTraffic": 0,
+    "databaseTraffic": 0
+  },
+  "minimumCorrection": [
+    "Rename per-row provenance and current proof labels from GUIDE18 to GUIDE21 and assert the literal.",
+    "Reserve/reject owner capacity output before any read, bind output absence, and prove collision invokes neither reader.",
+    "Rebind digest, control proof, gate, command contract, manifest and receipt append-only."
+  ]
+}

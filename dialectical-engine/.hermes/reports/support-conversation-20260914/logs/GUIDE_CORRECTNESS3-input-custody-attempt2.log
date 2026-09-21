@@ -1,0 +1,46 @@
+{
+  "revision": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  "inputManifestRevision": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  "gateRevision": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  "gateBase": "2ccb57fa061f74a81c8f2ef42bd33c768f00d4e0",
+  "inputs": {
+    "checked": 58,
+    "failures": []
+  },
+  "detachedProduct": {
+    "checked": 143,
+    "failures": []
+  },
+  "primaryProduct": {
+    "checked": 143,
+    "failures": []
+  },
+  "changedPaths": {
+    "expected": [
+      "apps/api/src/support/classify.ts",
+      "apps/api/src/support/public-guide-boundary.ts",
+      "apps/api/src/support/recovery-intent.ts",
+      "tests/integration/support-routes.test.ts",
+      "tests/unit/support-classify.test.ts",
+      "tests/unit/support-public-guide-boundary.test.ts",
+      "tests/unit/support-recovery-intent.test.ts"
+    ],
+    "actual": [
+      "apps/api/src/support/classify.ts",
+      "apps/api/src/support/public-guide-boundary.ts",
+      "apps/api/src/support/recovery-intent.ts",
+      "tests/integration/support-routes.test.ts",
+      "tests/unit/support-classify.test.ts",
+      "tests/unit/support-public-guide-boundary.test.ts",
+      "tests/unit/support-recovery-intent.test.ts"
+    ]
+  },
+  "detached": {
+    "head": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+    "dirty": 0
+  },
+  "primary": {
+    "head": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+    "dirty": 0
+  }
+}

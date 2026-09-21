@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PRICING_CLAIM_REVIEW2",
+  "ticket": "t_dfa4697e",
+  "revision": "130adf47da2e889005e73c3adb7ebb49fd50b529",
+  "baseRevision": "b103ce27a060c48fcf5613c1bf44be53c7cb2a0c",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "verdict": "REWORK_BOUNDED_FINANCIAL_POLARITY_ORDER",
+  "dispositions": [
+    {
+      "id": "GPCR2-C1",
+      "subject": "forward-order local polarity",
+      "disposition": "PASS",
+      "evidence": "A negated checkout predicate no longer licenses a later positive payment predicate across causal, comma, yet/or/sau or related connectors."
+    },
+    {
+      "id": "GPCR2-C2",
+      "subject": "new modal-negative forms",
+      "disposition": "PASS",
+      "evidence": "Added EN/RO may-not, might-not, poate-să-nu and ar-putea-să-nu limitations are admitted."
+    },
+    {
+      "id": "GPCR2-R1",
+      "subject": "reverse-order mixed-polarity leak",
+      "disposition": "REWORK",
+      "evidence": "In `Payment is not available, but checkout happens...`, the `not` belonging to the earlier payment predicate is treated as a preceding negation for the later positive checkout predicate. The Romanian `Plata nu este disponibilă, dar checkout are loc...` has the same defect."
+    },
+    {
+      "id": "GPCR2-R2",
+      "subject": "direct postfix negative regression",
+      "disposition": "REWORK",
+      "evidence": "The replacement after-pattern omits prior `cannot`, `can't`, `does not`, `doesn't`, and `isn't` forms, rejecting legitimate negative limitations whose financial term comes first."
+    },
+    {
+      "id": "GPCR2-C3",
+      "subject": "full44 service and real POST",
+      "disposition": "PASS_RETAINED",
+      "evidence": "Defining service/route code is unchanged; exact LIVE28 recovery, reviewed fallback and persisted model accounting remain covered by the 460-test affected frame."
+    },
+    {
+      "id": "GPCR2-C4",
+      "subject": "source/action and safety precedence",
+      "disposition": "PASS_RETAINED",
+      "evidence": "The two-file delta does not change source/action, credential, private-data, injection or security logic."
+    },
+    {
+      "id": "GPCR2-C5",
+      "subject": "Screenshot30",
+      "disposition": "PASS_RETAINED",
+      "evidence": "The complete full-answer screenshot and its binding remain unchanged."
+    },
+    {
+      "id": "GPCR2-L1",
+      "subject": "runtime and checkpoint status",
+      "disposition": "NOT_ESTABLISHED",
+      "evidence": "Static review only; preview rebind, runtime, actual31, capacity, readiness, completion and acceptance remain later gates."
+    },
+    {
+      "id": "GPCR2-L2",
+      "subject": "Forgot and CP2",
+      "disposition": "UNRESOLVED_ACTIONLESS",
+      "evidence": "No destination is inferred and no CP2 authorization follows."
+    }
+  ],
+  "hashes": {
+    "authorReceipt": "9ec55a4253b5da6644fea495642a942a564ef93f8be4c3be614e79b8afdfa787",
+    "authorConsumption": "e3274a9c3c01264142427b41319ae3ccee36bd6aa71850d668d1193b9939d153",
+    "responsePolicy": "2850c6b7dc5d59e09eae4083cd202d90bbe87d2fdd1b0baf460fb4f6e9d159b8",
+    "responsePolicyTests": "2ff215bcd6f02e391bb0a3abfea5571e5f4602f0b55bb712336c3f3a035e8e62",
+    "focusedGreen": "1cde18a4b43d73176ac37fa54327e7426bb2d68dc090c3cc1211eba0233553a2",
+    "finalAffectedSuite": "00efad600c96751819d17d01e4d9fe81b7a5b9cc770e7e5e9ee6e588eaad4364"
+  },
+  "counts": {
+    "changedProductFiles": 2,
+    "focusedTestsPassed": 231,
+    "focusedTestsFailed": 0,
+    "affectedTestsPassed": 460,
+    "affectedTestsFailed": 0,
+    "reviewedCorpusEntries": 44,
+    "indexedInputs": 29,
+    "indexedInputsVerified": 29,
+    "remainingFindings": 2
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE28",
+  "ticket": "t_0874e640",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "argv": [
+    "/Users/vladmihaimiron/.local/bin/node",
+    "--import",
+    "tsx",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX28/run-operator.mjs"
+  ],
+  "permissionMode": "require_escalated",
+  "exitCode": 1,
+  "stdoutLines": [
+    {
+      "phase": "preflight",
+      "status": 0,
+      "completedAtUtc": "2026-09-21T02:16:02.129Z"
+    },
+    {
+      "phase": "readiness",
+      "status": 0,
+      "completedAtUtc": "2026-09-21T02:16:02.311Z"
+    },
+    {
+      "phase": "capacity",
+      "status": 0,
+      "completedAtUtc": "2026-09-21T02:16:03.019Z"
+    },
+    {
+      "phase": "gate",
+      "status": 0,
+      "completedAtUtc": "2026-09-21T02:16:03.057Z"
+    },
+    {
+      "phase": "rowProof",
+      "status": 0,
+      "completedAtUtc": "2026-09-21T02:16:03.539Z"
+    }
+  ],
+  "stderr": {
+    "error": "GUIDE_OPERATOR_FIX27_PHASE_FAILED:capture:1",
+    "source": "GUIDE_OPERATOR_FIX28/run-operator.mjs:121"
+  },
+  "outerRedirection": false,
+  "preopenedArtifact": false,
+  "privateValuesRecorded": false
+}

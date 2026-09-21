@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FOOTERLESS_REVIEW39",
+  "ticket": "t_f0af1892",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_FOOTERLESS_HELPER_CALL_CONTRACT",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_FOOTERLESS_REVIEW39.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_FOOTERLESS_REVIEW39.md",
+      "sha256": "7010748e374cb3595b2f3a69cf53360ca1b30190a1b46a845833b069a023e105",
+      "bytes": 5119
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_REVIEW39-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_REVIEW39-dispositions.json",
+      "sha256": "9b5150cf4ec757d9ff2c1496fef03c37537c9c2475630b00f23380495791bfcf",
+      "bytes": 2940
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_REVIEW39-visual-inspection.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_REVIEW39-visual-inspection.json",
+      "sha256": "61ac76fb376c33fdf31f4209cdc846ea7da173fe1bf38b92c89fe65878bd751f",
+      "bytes": 2431
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_REVIEW39-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_REVIEW39-custody.json",
+      "sha256": "45b41bac389bff56566b56bdc9944e5d4bf3fb7e4b03e971214405e3776efa96",
+      "bytes": 1180
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_FOOTERLESS_REVIEW39.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_FOOTERLESS_REVIEW39.md",
+      "sha256": "e9c14caf7adfef3fd141d3239bc50605a64bd805b4ebe62fe258dea102a5b80c",
+      "bytes": 2714
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_REVIEW39-manifest.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_REVIEW39-manifest.json",
+      "sha256": "33bc5a75234ff66f60949710448b7bf2501801c07185d47fc798934837131dbd",
+      "bytes": 3189
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "heavyLeaseHeld": false,
+  "finding": null,
+  "controls": {
+    "passed": 9,
+    "total": 9
+  },
+  "visualRecords": 6,
+  "liveBinding": "UNVERIFIED_SEPARATE_REVIEW",
+  "row47Recapture": "NOT_REQUIRED",
+  "concurrentBind40Inspected": false,
+  "unverified": [
+    "BIND40 integration",
+    "remaining21 actual outputs",
+    "current capacity",
+    "Forgot destination",
+    "CP1/CP2 completion"
+  ],
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "process": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

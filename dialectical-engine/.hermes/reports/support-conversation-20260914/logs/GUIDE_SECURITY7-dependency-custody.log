@@ -1,0 +1,161 @@
+{
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "retainedRevision": "5731eb6faac25f9712f04aea029a021f6eee9352",
+  "crossLane": [
+    {
+      "path": "package.json",
+      "detached": "85c38389b711cf1b19948670209c1b8183f04c69",
+      "primary": "85c38389b711cf1b19948670209c1b8183f04c69"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "detached": "8b0f6abeb9afc8d30adcf495cba7276a65409c48",
+      "primary": "8b0f6abeb9afc8d30adcf495cba7276a65409c48"
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "detached": "8ed075ae628c4c6ea62d734907d475a1879f3ce8",
+      "primary": "8ed075ae628c4c6ea62d734907d475a1879f3ce8"
+    },
+    {
+      "path": "packages/support-kb/content",
+      "detached": "aa3f9c35ecdf59915a94d4659746bd2e21a7be99",
+      "primary": "aa3f9c35ecdf59915a94d4659746bd2e21a7be99"
+    },
+    {
+      "path": "packages/support-kb/recovery/components.json",
+      "detached": "c0b01e99b5d51ef2cf56920cf557a987dec753b3",
+      "primary": "c0b01e99b5d51ef2cf56920cf557a987dec753b3"
+    },
+    {
+      "path": "packages/support-kb/src/catalog.ts",
+      "detached": "25f7d7a1370d51825996123ab66bb3fa537abd1a",
+      "primary": "25f7d7a1370d51825996123ab66bb3fa537abd1a"
+    },
+    {
+      "path": "packages/support-kb/src/context.ts",
+      "detached": "a1a830ee29b0cef55f4b4f0412d7f460efd4382b",
+      "primary": "a1a830ee29b0cef55f4b4f0412d7f460efd4382b"
+    },
+    {
+      "path": "packages/support-kb/src/index.ts",
+      "detached": "ed2fefee163149cf055fc520385b7e4383c6ad53",
+      "primary": "ed2fefee163149cf055fc520385b7e4383c6ad53"
+    },
+    {
+      "path": "packages/support-kb/src/recovery.ts",
+      "detached": "f613349477ac3c057f7c8847064a333130586782",
+      "primary": "f613349477ac3c057f7c8847064a333130586782"
+    },
+    {
+      "path": "packages/support-kb/src/navigation.ts",
+      "detached": "dc60ffd5d16b337d695303b92856a8747276cace",
+      "primary": "dc60ffd5d16b337d695303b92856a8747276cace"
+    },
+    {
+      "path": "apps/api/src/support/answer.ts",
+      "detached": "51cd5d46d5487a58aa37a296d18e082126e1f643",
+      "primary": "51cd5d46d5487a58aa37a296d18e082126e1f643"
+    }
+  ],
+  "retained": [
+    {
+      "path": "apps/api/src/support/answer.ts",
+      "prior": "51cd5d46d5487a58aa37a296d18e082126e1f643",
+      "current": "51cd5d46d5487a58aa37a296d18e082126e1f643"
+    },
+    {
+      "path": "apps/api/src/support/public-guide-boundary.ts",
+      "prior": "ba6fa0908cd1bf1fcd273e829a9339b348514ae7",
+      "current": "ba6fa0908cd1bf1fcd273e829a9339b348514ae7"
+    },
+    {
+      "path": "apps/api/src/support/classify.ts",
+      "prior": "26a06aa385b8cf3d532775cad49f5fc9cec2e618",
+      "current": "26a06aa385b8cf3d532775cad49f5fc9cec2e618"
+    },
+    {
+      "path": "packages/support-kb/src/catalog.ts",
+      "prior": "25f7d7a1370d51825996123ab66bb3fa537abd1a",
+      "current": "25f7d7a1370d51825996123ab66bb3fa537abd1a"
+    },
+    {
+      "path": "packages/support-kb/src/index.ts",
+      "prior": "ed2fefee163149cf055fc520385b7e4383c6ad53",
+      "current": "ed2fefee163149cf055fc520385b7e4383c6ad53"
+    },
+    {
+      "path": "packages/support-kb/src/recovery.ts",
+      "prior": "f613349477ac3c057f7c8847064a333130586782",
+      "current": "f613349477ac3c057f7c8847064a333130586782"
+    },
+    {
+      "path": "apps/api/src/support/recovery-intent.ts",
+      "prior": "cb756ff73f0e7c0fb4a2bad219bb32ec716ed5d8",
+      "current": "cb756ff73f0e7c0fb4a2bad219bb32ec716ed5d8"
+    },
+    {
+      "path": "apps/api/src/support/response-policy.ts",
+      "prior": "dfa153786307717d4c7c2c19b8c8ba53ff4c61fe",
+      "current": "dfa153786307717d4c7c2c19b8c8ba53ff4c61fe"
+    },
+    {
+      "path": "apps/api/src/support/security-guidance.ts",
+      "prior": "e657b53d413dd044f21a4bfa0df732f7da87b72d",
+      "current": "e657b53d413dd044f21a4bfa0df732f7da87b72d"
+    },
+    {
+      "path": "packages/support-kb/src/navigation.ts",
+      "prior": "dc60ffd5d16b337d695303b92856a8747276cace",
+      "current": "dc60ffd5d16b337d695303b92856a8747276cace"
+    },
+    {
+      "path": "migrations/0050_support_foundation.sql",
+      "prior": "3f6bebcc2ff4518ca33f34b15b3439d60cda76fd",
+      "current": "3f6bebcc2ff4518ca33f34b15b3439d60cda76fd"
+    },
+    {
+      "path": "migrations/0051_support_cases.sql",
+      "prior": "a6b9c0b75fe25bc96d79c3d5e1cedf6cdd4956db",
+      "current": "a6b9c0b75fe25bc96d79c3d5e1cedf6cdd4956db"
+    },
+    {
+      "path": "migrations/0052_support_tool_calls.sql",
+      "prior": "d093cef34693babe42e69546ab19db6e2f1a85fa",
+      "current": "d093cef34693babe42e69546ab19db6e2f1a85fa"
+    },
+    {
+      "path": "migrations/0053_support_public_incident.sql",
+      "prior": "129d42fd3b438479e2a1b03acbe4eb7397244e28",
+      "current": "129d42fd3b438479e2a1b03acbe4eb7397244e28"
+    },
+    {
+      "path": "migrations/0054_support_keys_audit.sql",
+      "prior": "1c9fb9af8eeea710353a893e031c81711885a1fe",
+      "current": "1c9fb9af8eeea710353a893e031c81711885a1fe"
+    },
+    {
+      "path": "tests/support/testDatabase.ts",
+      "prior": "19f40159c554af292b5eb80cbe82ff53fda48db6",
+      "current": "19f40159c554af292b5eb80cbe82ff53fda48db6"
+    },
+    {
+      "path": "packages/db/src/index.ts",
+      "prior": "31e75afe1c9213dec31a400520deb115cb30b03f",
+      "current": "31e75afe1c9213dec31a400520deb115cb30b03f"
+    },
+    {
+      "path": "package.json",
+      "prior": "85c38389b711cf1b19948670209c1b8183f04c69",
+      "current": "85c38389b711cf1b19948670209c1b8183f04c69"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "prior": "8b0f6abeb9afc8d30adcf495cba7276a65409c48",
+      "current": "8b0f6abeb9afc8d30adcf495cba7276a65409c48"
+    }
+  ],
+  "crossLaneMismatches": [],
+  "retainedMismatches": [],
+  "ok": true
+}

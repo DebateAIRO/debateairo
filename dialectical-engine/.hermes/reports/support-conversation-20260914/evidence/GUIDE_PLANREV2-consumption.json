@@ -1,0 +1,153 @@
+{
+  "at": "2026-09-17T09:59:13.440432+00:00",
+  "node": "GUIDE_PLANREV2",
+  "ticket": "t_df613249",
+  "revision": "163f15c59bcfb1bf2cb0979f8b0e7d414ebd0703",
+  "verdict": "PASS",
+  "receipt": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PLANREV2-receipt.json",
+    "sha256": "1f4f37b7c1dc0f439d62f69128c42746828857d804c03ad1730cb1f1c2f81ba5"
+  },
+  "artifactsVerified": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_PLANREV2.md",
+      "sha256": "713f276ba34fb181f2c67b4cfaf2ac24798055818fe84217420b9df6d7d3f5bf",
+      "bytes": 4613
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PLANREV2.md",
+      "sha256": "f3c4badcaebc9976a1a4c251fe93ee7f5dda40eeb860d1135023eaaff3bc1420",
+      "bytes": 2984
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_PLANREV2-inputs.log",
+      "sha256": "d9f1ee424329be474cca60354fa36cc0ef5e54eab7f244d181e4af11e801a2da",
+      "bytes": 91
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_PLANREV2-contracts.log",
+      "sha256": "168a2ac481289a99ac2fd029ee786e2ac4e458903d2531438e6e96579db52eb5",
+      "bytes": 587
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_PLANREV2-contracts2.log",
+      "sha256": "28a3e0e07918914fb3a809c431e79ec640caf24c517e23afe6ce4c0d2f538f89",
+      "bytes": 569
+    }
+  ],
+  "inputsVerified": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PLANFIX-receipt.json",
+      "sha256": "e4d7b21b9e38ec12e012ce862054c662d0020e4f086519c28f2f437ae717a144",
+      "bytes": 2677
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PLANFIX-consumption.json",
+      "sha256": "bf0a43e405e81e0a68b72cd7dcd7b49b05b949f715641cd14f5172dcdd177e53",
+      "bytes": 9630
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_PLANREV.md",
+      "sha256": "3227fdeddf65696d1e78ceacdcefc7663532a0368a3d9b8fa6121d929d48496b",
+      "bytes": 8344
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PLANREV-consumption.json",
+      "sha256": "85c45c2435d6e28bf5f60eae1b23fc84034ceec0a98c4a105b041248bc239992",
+      "bytes": 7819
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ACCOUNT-consumption.json",
+      "sha256": "005c5d1df75e04fe3b39074f11728eee2b01c0b80e08a161246e25a70f0d6325",
+      "bytes": 5680
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/OWNER-PUBLIC-GUIDE-20260917.md",
+      "sha256": "bc80328fa3ecddb954ff4b7872fe2c460e8c3af37cbb8619807b3371f1175f63",
+      "bytes": 1478
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/SPEC-v5.md",
+      "sha256": "4dc2a6ecb17b29eb25f4b523eae9ed7d99c45c6d48aad356987d1e0868fbe327",
+      "bytes": 7794
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PLAN-PUBLIC-GUIDE-v2.md",
+      "sha256": "2cb58e6136888f8802cdf4c5982aa9c0505e958f5cb3ae2dcdb49a6de40265fe",
+      "bytes": 35888
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/MENU-COVERAGE-v2.json",
+      "sha256": "32793ff1c7dc9c4a133c52de845f906092f1e7d71e8858b8d907a17abbc03c52",
+      "bytes": 24943
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PLANFIX.md",
+      "sha256": "022b937f23708707ae58a1ac6fb630d86f04e63e78b35372949410a2f32e6822",
+      "bytes": 5936
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PLANFIX.md",
+      "sha256": "dc24d3b0aa121a4532e0c18590504ede4daf27dcea22c5d61894dd157615fa2a",
+      "bytes": 6320
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_PLANFIX-contract-check.log",
+      "sha256": "2787159cbae983e4697cfe788978c8b50f4fac2249f7dfee45289c955ae774e0",
+      "bytes": 1046
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_PLANFIX-input-hashes.log",
+      "sha256": "27a7208dd9d9afe99dc2c7478dd100978ba24596fe55148d69732516a4aed677",
+      "bytes": 1070
+    }
+  ],
+  "nativeSession": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-38-35-01a09f11-6f5f-74b2-9bba-1442a15308ef.jsonl",
+  "nativeSkillBodyProof": {
+    "using-superpowers": {
+      "nativeTimestamp": "2026-09-14T08:39:04.284Z",
+      "nativeCallId": "call_m1mcy5OFsrYNan6dWKlcoQHz",
+      "bodyPhrase": "This is not negotiable. You cannot rationalize your way out of this.",
+      "outputBodySha256": "f17fbc266faf570bd44db24514c6ed144068e9792f936cb36d374a3f59da296a"
+    },
+    "heartbeat-protocol": {
+      "nativeTimestamp": "2026-09-14T08:39:04.284Z",
+      "nativeCallId": "call_m1mcy5OFsrYNan6dWKlcoQHz",
+      "bodyPhrase": "One role per node: a seat that reviews does not code, and no seat reviews its own work",
+      "outputBodySha256": "f17fbc266faf570bd44db24514c6ed144068e9792f936cb36d374a3f59da296a"
+    },
+    "heartbeat-reviewer": {
+      "nativeTimestamp": "2026-09-14T08:39:04.284Z",
+      "nativeCallId": "call_m1mcy5OFsrYNan6dWKlcoQHz",
+      "bodyPhrase": "is a finding against the orchestrator's packet, not against the worker who obeyed it",
+      "outputBodySha256": "f17fbc266faf570bd44db24514c6ed144068e9792f936cb36d374a3f59da296a"
+    },
+    "verification-before-completion": {
+      "nativeTimestamp": "2026-09-14T08:39:04.284Z",
+      "nativeCallId": "call_m1mcy5OFsrYNan6dWKlcoQHz",
+      "bodyPhrase": "NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE",
+      "outputBodySha256": "f17fbc266faf570bd44db24514c6ed144068e9792f936cb36d374a3f59da296a"
+    },
+    "systematic-debugging": {
+      "nativeTimestamp": "2026-09-14T14:58:09.351Z",
+      "nativeCallId": "call_jryjQKIz5eKrofyOjFmfnXpd",
+      "bodyPhrase": "Violating the letter of this process is violating the spirit of debugging.",
+      "outputBodySha256": "682c3794161612c51546b2a58bd1b1eb3859afca8c55893cbc48c880b0886787"
+    },
+    "test-driven-development": {
+      "nativeTimestamp": "2026-09-16T06:36:00.387Z",
+      "nativeCallId": "call_6X1NeNdRq5eHjJMJfg66Ujeb",
+      "bodyPhrase": "If you didn't watch the test fail, you don't know if it tests the right thing.",
+      "outputBodySha256": "a01a8f9c6c6595593da2f82de113b4f1d950ad8bbbc82b4bfd20ae46c6802bf2"
+    }
+  },
+  "retainedProof": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PLANREV-consumption.json",
+    "sha256": "85c45c2435d6e28bf5f60eae1b23fc84034ceec0a98c4a105b041248bc239992"
+  },
+  "primaryAndDetachedClean": true,
+  "limits": [
+    "Separate reviewer owns planning verdict; root verifies custody.",
+    "Not an implementation or readiness claim."
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "revision": "b103ce27a060c48fcf5613c1bf44be53c7cb2a0c",
+  "command": "pnpm run typecheck",
+  "exitCode": 1,
+  "currentRaw": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_PRICING_CLAIM_FIX-typecheck-final.log",
+    "sha256": "0f5196df4f7a92731eb5613449c936a1ec78a34600260655075102b6293f0d3f",
+    "bytes": 39709
+  },
+  "baselineRaw": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-typecheck-final2.log",
+    "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "bytes": 39611
+  },
+  "currentDiagnostics": 76,
+  "baselineDiagnostics": 76,
+  "normalizedDiagnosticLinesEqual": true,
+  "normalizedDiagnosticLinesSha256": "7d9816c9fde8d1f83d2828485402016bfd02d53b1ad1c3f0f95f0d3567a14f4a",
+  "ownedPathDiagnostics": 0
+}

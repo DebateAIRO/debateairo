@@ -1,0 +1,1 @@
+{"schemaVersion":1,"result":"EXPECTED_RED","sequence":26,"oldOracleRejected":"app-navigation","code":"GUIDE_HARNESS_EXPECTED_PRIMARY_SOURCE_MISSING","traffic":{"browser":false,"runtime":false,"http":false,"supportRequests":0,"modelRequests":0}}

@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX3",
+  "authorizedDelta": "rows53/54 REQUIRE_CLOSED help plus immediate consumers and copied adapter bindings",
+  "namespaces": [
+    {
+      "oldDir": "GUIDE_HARNESS_FIX2",
+      "newDir": "GUIDE_HARNESS_FIX3",
+      "files": [
+        {
+          "path": "README.md",
+          "old": {
+            "sha256": "ac66740cc329f06b2c707a1b8819bd9d2dcc6a15239e995905790a1b90fb8755",
+            "bytes": 8162
+          },
+          "new": {
+            "sha256": "d1fea15b260e9a9589ec7b6778222e9b784006e3910f69284ffa9402cfb269b6",
+            "bytes": 8507
+          },
+          "changed": true
+        },
+        {
+          "path": "capture-public-guide.mjs",
+          "old": {
+            "sha256": "33d46c07dba0f3deab6d2cb76494cfef534e135ea7145a284dbd70f471d4479f",
+            "bytes": 18107
+          },
+          "new": {
+            "sha256": "421b9c450540a663e5f33420ce91fa28ea5b54aa065a829e10321f48cc9c03db",
+            "bytes": 18107
+          },
+          "changed": true
+        },
+        {
+          "path": "controls.mjs",
+          "old": {
+            "sha256": "530c5e8e850b611945719a3563424c595c9a608fcb5a707e818f5da03284e8a3",
+            "bytes": 8812
+          },
+          "new": {
+            "sha256": "530c5e8e850b611945719a3563424c595c9a608fcb5a707e818f5da03284e8a3",
+            "bytes": 8812
+          },
+          "changed": false
+        },
+        {
+          "path": "gate-contract.json",
+          "old": {
+            "sha256": "a06a7ad7b1e328f5432a4ac9403436f87aab15427410c63cec0b55d93b3b8680",
+            "bytes": 4552
+          },
+          "new": {
+            "sha256": "a06a7ad7b1e328f5432a4ac9403436f87aab15427410c63cec0b55d93b3b8680",
+            "bytes": 4552
+          },
+          "changed": false
+        },
+        {
+          "path": "matrix.mjs",
+          "old": {
+            "sha256": "cea34112498143dcf8b1a571e40e5a24d207b5b47ee9b142048506cc773ca1ae",
+            "bytes": 13168
+          },
+          "new": {
+            "sha256": "4614aae275462568eed6277c78193d252c441cd47c28bd37021de4d43ba91957",
+            "bytes": 13383
+          },
+          "changed": true
+        },
+        {
+          "path": "pre-request-verifier.ts",
+          "old": {
+            "sha256": "a123d265d2070d9ef5929dd30bb752b826412e42b5091c68e4806b276b37a402",
+            "bytes": 13715
+          },
+          "new": {
+            "sha256": "a123d265d2070d9ef5929dd30bb752b826412e42b5091c68e4806b276b37a402",
+            "bytes": 13715
+          },
+          "changed": false
+        },
+        {
+          "path": "runtime-capacity.mjs",
+          "old": {
+            "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87",
+            "bytes": 9935
+          },
+          "new": {
+            "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87",
+            "bytes": 9935
+          },
+          "changed": false
+        },
+        {
+          "path": "session-lifecycle.mjs",
+          "old": {
+            "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b",
+            "bytes": 4254
+          },
+          "new": {
+            "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b",
+            "bytes": 4254
+          },
+          "changed": false
+        },
+        {
+          "path": "verify-final-branches.ts",
+          "old": {
+            "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a",
+            "bytes": 5131
+          },
+          "new": {
+            "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a",
+            "bytes": 5131
+          },
+          "changed": false
+        },
+        {
+          "path": "verify-guide-harness.mjs",
+          "old": {
+            "sha256": "c0f5ffb26b4d0bddc48c5ed7850ea23ff779e8026ba68f8680d997582272d320",
+            "bytes": 29210
+          },
+          "new": {
+            "sha256": "cf736c307ec2db932957eaa445a52127974f217970c73acdcaeb8870dc10e94b",
+            "bytes": 31914
+          },
+          "changed": true
+        }
+      ],
+      "changed": [
+        "README.md",
+        "capture-public-guide.mjs",
+        "matrix.mjs",
+        "verify-guide-harness.mjs"
+      ],
+      "unchanged": [
+        "controls.mjs",
+        "gate-contract.json",
+        "pre-request-verifier.ts",
+        "runtime-capacity.mjs",
+        "session-lifecycle.mjs",
+        "verify-final-branches.ts"
+      ]
+    },
+    {
+      "oldDir": "GUIDE_ROW_PROOF_FIX",
+      "newDir": "GUIDE_ROW_PROOF_FIX3",
+      "files": [
+        {
+          "path": "README.md",
+          "old": {
+            "sha256": "4af97dc18fae9e38bba410d52ac264e6d7bf64724fb7a63889633743457a181c",
+            "bytes": 1879
+          },
+          "new": {
+            "sha256": "04d0300cba7e6a2bfdd968b63db9043754b8d8eb95c9254b6a8e3433bd107e0d",
+            "bytes": 1920
+          },
+          "changed": true
+        },
+        {
+          "path": "replay-row-proofs.mjs",
+          "old": {
+            "sha256": "8e16bab1607c978a63fbf15c1cdb9fa2c0c83fc6edb56176c99b9291be8c6b80",
+            "bytes": 6119
+          },
+          "new": {
+            "sha256": "2ee693b8736b3b0a16798b96d811044ed93aeb0b11f88307d5d33bad139758a5",
+            "bytes": 6121
+          },
+          "changed": true
+        },
+        {
+          "path": "reviewed-harness-custody.mjs",
+          "old": {
+            "sha256": "35c3fe3494078c38cca13eda624dd559c3d539dcb58cc981e0c229408fcbc805",
+            "bytes": 1417
+          },
+          "new": {
+            "sha256": "1a63bf8699447bf09eb2b8a7d469300d8d5be56fa74ae7266baf404939eaa604",
+            "bytes": 1417
+          },
+          "changed": true
+        },
+        {
+          "path": "verify-negative-fixture.mjs",
+          "old": {
+            "sha256": "7acfa22c93d2adfbf4ec2f18de12d3394feac836c10d1b347dc58e974214b154",
+            "bytes": 1358
+          },
+          "new": {
+            "sha256": "a0f45f9725041382fedf6cbb99f175387f92a3bbde38b4610ad4aff23603748e",
+            "bytes": 1359
+          },
+          "changed": true
+        }
+      ],
+      "changed": [
+        "README.md",
+        "replay-row-proofs.mjs",
+        "reviewed-harness-custody.mjs",
+        "verify-negative-fixture.mjs"
+      ],
+      "unchanged": []
+    }
+  ]
+}

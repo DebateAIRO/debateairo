@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE27",
+  "ticket": "t_0d922a12",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "STOPPED_PREFLIGHT_RUNTIME_PROCESS_CHECK",
+  "skillsLoaded": [
+    "retained mission BODY/floor instructions; no new skill read in this operational node"
+  ],
+  "phasesStarted": 0,
+  "supportRequestsAttempted": 0,
+  "sessionsCreated": 0,
+  "futurePathsRemainingAbsent": 123,
+  "cause": "UNPROVEN; spawnSync status was null during /bin/ps ownership check",
+  "heavyLeaseReleased": true,
+  "limitations": [
+    "Runtime liveness not established by this node",
+    "No product or harness conclusion",
+    "Forgot password remains unresolved/actionless"
+  ]
+}

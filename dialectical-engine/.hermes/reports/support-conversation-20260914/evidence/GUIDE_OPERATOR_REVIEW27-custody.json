@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_REVIEW27",
+  "ticket": "t_da0aba1b",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "freeze": "c5355964ee47f1c15ba6a58306784fbe5f769fb7",
+  "fix27Receipt": {
+    "sha256": "de8b028ad0d55b35a8792e7f0c93aed7135f9d752d8a0e31ec54710cae6dbccc"
+  },
+  "fix27Consumption": {
+    "sha256": "587f18cc90677da68bfcc82fe30283eaa909686ae3f93cf0801334dcdc6f75cd"
+  },
+  "manifest": {
+    "artifacts": 33,
+    "verified": 33,
+    "mismatches": 0
+  },
+  "receiptArtifacts": {
+    "artifacts": 34,
+    "verified": 34,
+    "mismatches": 0
+  },
+  "indexedInputs": {
+    "inputs": 122,
+    "verified": 122,
+    "mismatches": 0
+  },
+  "commandContract": {
+    "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_FIX27-command-contract.json",
+    "sha256": "04512905c4f1b224a5ed1b8249fc0484650ed06ee3519bcec7f90db9ba15bc7a",
+    "bytes": 10166,
+    "selfBoundPhases": 7
+  },
+  "operator": {
+    "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/run-operator.mjs",
+    "sha256": "464c5ea1e43d34d5ec575458c1c59e36dc27257f70e7be78a3dda983a1e9ac13",
+    "bytes": 10346,
+    "invocationTimeAbsencePaths": 121,
+    "sealedRequiredAbsencePaths": 123,
+    "omitted": [
+      ".hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-LIVE25.json",
+      ".hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-owner-testability.json"
+    ]
+  },
+  "reviewMode": "STATIC_READ_ONLY",
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PHASE_IMPORT_FIX46",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "sameCauseMissingEdgesCorrected": [
+    {
+      "consumer": "phase-capacity.mjs",
+      "missing": "./phase-contract.mjs",
+      "replacement": "copied reviewed GUIDE_HARNESS_BIND21/phase-contract.mjs"
+    },
+    {
+      "consumer": "phase-gate.mjs",
+      "missing": "./phase-contract.mjs",
+      "replacement": "copied reviewed GUIDE_HARNESS_BIND21/phase-contract.mjs"
+    },
+    {
+      "consumer": "replay-row-proofs.mjs",
+      "missing": "./matrix.mjs",
+      "replacement": "reviewed GUIDE_CONTINUATION_BIND40/matrix.mjs"
+    },
+    {
+      "consumer": "replay-row-proofs.mjs",
+      "missing": "./pre-request-verifier.ts",
+      "replacement": "reviewed GUIDE_CONTINUATION_BIND40/pre-request-verifier.ts"
+    }
+  ],
+  "freshBindings": {
+    "liveNamespace": "LIVE35",
+    "actualNamespace": "GUIDE_LIVE_GUIDE24",
+    "ownerCapacity": "GUIDE_LIVE21-owner-capacity.json",
+    "ownerWalkthrough": "GUIDE_LIVE25-owner-testability.json",
+    "composedManifest": "GUIDE_LIVE35-composed31-manifest.json"
+  },
+  "retainedContracts": {
+    "logicalMatrixRows": 58,
+    "remainingCaptureRows": 21,
+    "captureSessions": 3,
+    "actualModelCeiling": 18,
+    "pacingMs": 31000
+  },
+  "finalCommandContractSha256": "2257cae89fbe2592ddbb0d1ba6533931cb9c6fe1824465240ead8b9586af2e26",
+  "finalModuleClosureSha256": "2b50440b9474c79e91c832481a7644356c26dddf9733c3ca1c52148b88201e66"
+}

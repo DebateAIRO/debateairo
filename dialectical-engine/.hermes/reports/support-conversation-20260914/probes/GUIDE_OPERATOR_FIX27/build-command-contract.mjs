@@ -1,0 +1,13 @@
+import { createHash } from "node:crypto";
+import { readFile,writeFile } from "node:fs/promises";
+const ROOT="/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914";
+const E=`${ROOT}/evidence`;
+const source=`${E}/GUIDE_HARNESS_FIX26-command-contract.json`;
+const output=`${E}/GUIDE_OPERATOR_FIX27-command-contract.json`;
+const contract=JSON.parse(await readFile(source,"utf8"));
+contract.node="GUIDE_OPERATOR_FIX27";
+contract.phases.preflight.log=`${ROOT}/logs/GUIDE_LIVE27-preflight.log`;
+for (const phase of Object.values(contract.phases)) phase.argv[2]=output;
+const bytes=Buffer.from(`${JSON.stringify(contract,null,2)}\n`);
+await writeFile(output,bytes,{ flag:"wx",mode:0o600 });
+process.stdout.write(`${JSON.stringify({ output,sha256:createHash("sha256").update(bytes).digest("hex") })}\n`);

@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_NAVFIX",
+  "ticket": "t_1369cb3c",
+  "session": "/root/requirements",
+  "baseRevision": "9bf56f95711d19e6405fff5db06c4ad3d606bd68",
+  "productRevision": "3d0ad7acaab0ff90bd783a6948bf99f117d74fe2",
+  "verdict": "SCOPED_GREEN_AWAITING_SEPARATE_REVIEW_AND_COMPOSITION",
+  "productFiles": [
+    {
+      "laneRelative": "apps/api/src/support/classify.ts",
+      "sha256": "287490d68366b96cde811c7a220e51f0da477409a44478d16bb8112014d164dd",
+      "bytes": 18519
+    },
+    {
+      "laneRelative": "apps/api/src/support/public-guide-boundary.ts",
+      "sha256": "a267aca9cfb95ec3311ff66eabf7475e443db555cad639ac6e44b272a5ea824b",
+      "bytes": 3804
+    },
+    {
+      "laneRelative": "tests/integration/support-routes.test.ts",
+      "sha256": "4e160e766d748c46ef67b07ca8224c672aaab9d710619bbc958511e214499b08",
+      "bytes": 133739
+    },
+    {
+      "laneRelative": "tests/unit/support-classify.test.ts",
+      "sha256": "d3f47078054a072b919ce7608aaa0f4d5e796666df00325b8aedaea25361f847",
+      "bytes": 62716
+    },
+    {
+      "laneRelative": "tests/unit/support-public-guide-boundary.test.ts",
+      "sha256": "0ec98f046920d4628b8c235ef0ef31b626babaa7d1bca4021ced3cdbbe53a738",
+      "bytes": 1743
+    }
+  ],
+  "verification": {
+    "red": {
+      "exitCode": 1,
+      "passed": 542,
+      "failed": 9
+    },
+    "green1": {
+      "exitCode": 1,
+      "passed": 668,
+      "failed": 3
+    },
+    "green2": {
+      "exitCode": 1,
+      "passed": 668,
+      "failed": 3
+    },
+    "final": {
+      "exitCode": 0,
+      "passed": 671,
+      "failed": 0,
+      "files": 4
+    }
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_NAVFIX.md",
+      "sha256": "d851667af8b0f44d9ac89e42cb9e5ecb278e9a53c981632cdec71387d65dc290",
+      "bytes": 2529
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_NAVFIX.md",
+      "sha256": "3cd30a0ae0e349d8c21b24e0476a88f833a8c8d03cae51b853926a5855db9fa9",
+      "bytes": 2557
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_NAVFIX-product-manifest.json",
+      "sha256": "dc9694df236aa94d5ff2fb17019f8b523fdaed963ef8a02bfce7754d1a6c3334",
+      "bytes": 1361
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_NAVFIX-red.log",
+      "sha256": "db7cb4510baf427a2f9713ab3330c9ab325e1fabd80d2e9938ce376baf6aa6c0",
+      "bytes": 102051
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_NAVFIX-green.log",
+      "sha256": "eca5ae256f022d133951bed05e80fb70d4cceb1524253ede78d2d7ed05e8007d",
+      "bytes": 127528
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_NAVFIX-green2.log",
+      "sha256": "2f177fc877292423c3ed70c14bf8818d8ce619870c5ec10ebe7fb403ca42199a",
+      "bytes": 126251
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_NAVFIX-green3.log",
+      "sha256": "e68dd3b4019637e2dfb42bfddac9a15caee245e0c3aa3df90bd2a9e3c138f137",
+      "bytes": 124240
+    }
+  ],
+  "receiptExcludesSelf": true
+}

@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "ticket": "t_86e6f2a1",
+  "session": "/root/preview",
+  "capturedAtUtc": "2026-09-17T05:33:45Z",
+  "mode": "read-only",
+  "source": {
+    "root": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine",
+    "revision": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "statusEntriesAtFinalCheck": 194,
+    "relevantPathStatus": {
+      "apps/ui/components/LoginFlow.tsx": "clean",
+      "packages/contract/src/client.ts": "clean",
+      "apps/api/src/index.ts": "modified-by-concurrent-unrelated-work",
+      "apps/api/src/recovery.ts": "clean",
+      "apps/api/src/sessions.ts": "clean",
+      "packages/db/src/recovery.ts": "clean"
+    },
+    "fileSha256": {
+      "apps/ui/components/LoginFlow.tsx": "c946e45428214da4de31a5e267be0a24e9acc12f24aa55f01a683de2e8d20db6",
+      "apps/ui/components/authRoutes.source-test.mjs": "90baeda62815606a49f06332d1d960ca852b5b8934324cbbfd4196f35e394a2f",
+      "packages/contract/src/client.ts": "d3315cbc254e2c50d81d52e1caf60d3e20e0d0430f806267826b6078add0a790",
+      "apps/api/src/index.ts": "09fb43043584e1d5a13bbd29a804e161ebbbe4c955381c48b6c6b6e6c494dbee",
+      "apps/api/src/recovery.ts": "6e53b34bb0e9af764ab015f4797bbf51742d724baf89a68307157c4da9b36233",
+      "apps/api/src/sessions.ts": "175294140ba9f90a7087a9b6c13ba538b7eba1371a4c093e9a1c2ffc3e4ed5b5",
+      "packages/db/src/recovery.ts": "8e520585a25570c44aade4fcaf90045cc08139b3c9dda99723698b804ab822b2"
+    }
+  },
+  "productLane": {
+    "root": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "revision": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
+    "concurrentModifiedProductPathsAtFinalCheck": 10,
+    "modifiedByFindCurrent": []
+  },
+  "boundedSearch": {
+    "refs": [
+      "codex/auth-contract",
+      "codex/auth-integration",
+      "codex/auth-post-fallback",
+      "codex/auth-recovery-nav-guard",
+      "codex/auth-ui",
+      "codex/auth-ui-qa-fixes",
+      "dev",
+      "dev-clean",
+      "main"
+    ],
+    "accountWorktrees": [
+      "accounts-t2",
+      "accounts-t3",
+      "accounts-s9",
+      "accounts-t4",
+      "accounts-t6",
+      "accounts-t7",
+      "accounts-t8",
+      ".worktrees/all"
+    ],
+    "designs": [
+      {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/ui_designs/DebateAI Design Document.html",
+        "bytes": 1344801,
+        "forgotOccurrences": 0,
+        "resetOccurrences": 0,
+        "recoveryOccurrences": 19,
+        "recoveryMeaning": "recovery-email-and-saved-mfa-recovery-codes"
+      },
+      {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/ui_designs/Design_Support.html",
+        "bytes": 1338908,
+        "forgotOccurrences": 0,
+        "resetOccurrences": 0,
+        "recoveryOccurrences": 19,
+        "recoveryMeaning": "recovery-email-and-saved-mfa-recovery-codes"
+      }
+    ]
+  },
+  "finding": {
+    "canonicalForgotDestination": "UNRESOLVED",
+    "passwordRecoveryStart": {
+      "method": "POST",
+      "path": "/v1/auth/recovery/start",
+      "status": 202,
+      "publicResponse": "If this account can be recovered, instructions will arrive through an eligible channel.",
+      "navigable": false,
+      "redirectOrLocation": false,
+      "uiCallerFound": false,
+      "completionRouteFound": false
+    },
+    "savedMfaRecoveryCodeIsPasswordRecovery": false,
+    "scopeLimit": "No absence claim beyond the inspected current checkout, bounded refs/worktrees/history/designs, and observed targets."
+  },
+  "targets": {
+    "domReceipt": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIND_CURRENT-dom-receipt.json",
+      "bytes": 2398,
+      "sha256": "b6cfad121d79fc62a69e9edaad211eaa1d9b7548f265874568ab9fa5a4d64ce6"
+    },
+    "browserLog": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIND_CURRENT-browser.log",
+      "bytes": 2115,
+      "sha256": "498a84cf98e49c2e594eccc6d1f708573e93a17a9988dbfac92616dfec2f7a4b"
+    },
+    "captures": [
+      {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIND_CURRENT-target-3000-login.html",
+        "bytes": 19637,
+        "sha256": "8622ac5733b623c9999570a52fac8f7e109813898c9e88b21e58d974cdc35601"
+      },
+      {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIND_CURRENT-target-3000-login.png",
+        "bytes": 93268,
+        "sha256": "4b28e9e699346b2bd5bfa17beca1352c3d89bfacd24c726555e814be9587a973"
+      },
+      {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIND_CURRENT-target-3100-login.html",
+        "bytes": 19527,
+        "sha256": "6096045266ade5013edfb281629b8fe11e1ac66ff421da8c589dda38c9e5ce0d"
+      },
+      {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIND_CURRENT-target-3100-login.png",
+        "bytes": 66299,
+        "sha256": "4280d8019fb516868ccd29084a90d8366b5cbdea491bf3f9d93a486256339555",
+        "limitation": "vertically-offset partial visual; full link/button/form result comes from the fresh-page DOM receipt"
+      }
+    ],
+    "observedLoginContract": {
+      "links": ["/", "/sign-up"],
+      "buttons": ["mode-toggle", "Continue"],
+      "form": {"method": "POST", "action": "/login", "controls": ["email", "password"]},
+      "recoveryText": []
+    }
+  },
+  "liveness": {
+    "normalTlsPreviewLoginHttpStatus": 200,
+    "previewSupervisor": {"pid": 86341, "ppid": 1, "pgid": 86341, "command": "pnpm dev:auth:up"},
+    "previewListeners": [3100, 3101, 8890, 8891, 8892, 8893, 8894, 8895, 8896],
+    "originalListenersObserved": [3000, 3001, 8790, 8793, 8794, 8795, 8796],
+    "supportedStart": "DEBATEAI_DEV_AUTH_STACK_PROFILE=support-preview pnpm dev:auth:up",
+    "supportedStop": "SIGINT or SIGTERM to the revalidated owned supervisor; the supervisor stops only its owned resources in reverse order",
+    "serviceMutations": []
+  },
+  "verification": {
+    "testsOrBuildsRun": false,
+    "productWrites": false,
+    "gitWrites": false,
+    "authOrRecoverySubmissions": false,
+    "supportOrModelTraffic": false,
+    "usage": "UNAVAILABLE"
+  }
+}

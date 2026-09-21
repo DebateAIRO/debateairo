@@ -134,7 +134,6 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
   { route: "POST /v1/support/sessions", auth: "public", session: "optional", resource: "support-session", action: "create" },
   { route: "GET /v1/support/sessions/{id}", auth: "public", session: "optional", resource: "support-session", action: "read" },
-  { route: "POST /v1/support/sessions/{id}/consent", auth: "public", session: "optional", resource: "support-session", action: "consent" },
   { route: "POST /v1/support/sessions/{id}/messages", auth: "public", session: "optional", resource: "support-message", action: "create" },
   { route: "POST /v1/support/messages/{id}/rating", auth: "public", session: "optional", resource: "support-message", action: "rate" },
   { route: "POST /v1/support/sessions/{id}/escalate", auth: "public", session: "optional", resource: "support-case", action: "create" },
@@ -431,6 +430,23 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   }>): RunOwnershipAccess => request.authenticatedSession === undefined
     ? Object.freeze({ ownerRef: null, legacyAskerId: request.session.asker_id })
     : Object.freeze({ ownerRef: request.authenticatedSession.ownerRef, legacyAskerId: null });
+  const tryAutoPublishServedAnswer = async (
+    runId: string,
+    answer: Answer,
+    authenticated: AuthenticatedSession | undefined
+  ): Promise<void> => {
+    if (options.publications?.tryAutoPublish === undefined || authenticated === undefined) return;
+    try {
+      await options.publications.tryAutoPublish({
+        runId,
+        answer,
+        userId: authenticated.userId,
+        ownerRef: authenticated.ownerRef
+      });
+    } catch {
+      // Publication is best-effort here: the served answer remains available.
+    }
+  };
   api.addHook("onSend", async (request, reply, payload) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) reply.header(name, value);
     reply.header("cache-control", "no-store");
@@ -1004,7 +1020,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const answer = await options.application.readAnswer(
       answerId.data, request.session, version, ownershipFor(request)
     );
-    return answer === null ? reply.status(404).send({ error: "ANSWER_NOT_FOUND" }) : reply.send(AnswerSchema.parse(answer));
+    if (answer === null) return reply.status(404).send({ error: "ANSWER_NOT_FOUND" });
+    await tryAutoPublishServedAnswer(answer.run_ref,answer,request.authenticatedSession);
+    return reply.send(AnswerSchema.parse(answer));
   });
 
   api.get<{ Params: { id: string }; Querystring: { version?: string } }>("/v1/answers/:id/inspection", routePolicy("GET /v1/answers/{id}/inspection"), async (request, reply) => {
@@ -1098,6 +1116,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const runId = ResourceIdSchema.safeParse(request.params.id);
     if (!runId.success) return reply.status(404).send({ error: "ANSWER_NOT_SERVED" });
     const answer = await options.application.readRunAnswer(runId.data, request.session, ownershipFor(request));
+    if (answer !== null) {
+      await tryAutoPublishServedAnswer(runId.data,answer,request.authenticatedSession);
+    }
     return answer === null ? reply.status(404).send({ error: "ANSWER_NOT_SERVED" }) : reply.send(AnswerSchema.parse(answer));
   });
   api.post<{ Params: { id: string } }>(
@@ -1176,6 +1197,16 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         ownershipFor(request)
       );
       if (owned === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      const visibility = await options.publications.readOwnedVisibility({
+        runId: runId.data,
+        authenticated
+      });
+      if (visibility !== null
+        && visibility.state === "PUBLISHED"
+        && options.publications.isFreePublicBound !== undefined
+        && await options.publications.isFreePublicBound(runId.data)) {
+        return reply.status(409).send({ error: "FREE_DEBATE_CANNOT_BE_UNPUBLISHED" });
+      }
       const unpublished = await options.publications.unpublish({
         runId: runId.data,
         authenticated,

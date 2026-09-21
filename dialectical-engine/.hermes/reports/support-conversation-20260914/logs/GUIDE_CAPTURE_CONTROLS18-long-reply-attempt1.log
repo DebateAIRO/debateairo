@@ -1,0 +1,14 @@
+node:internal/fs/promises:858
+  return await PromisePrototypeThen(
+         ^
+
+Error: ENOENT: no such file or directory, mkdir '/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_CONTROLS18-screenshots/attempt1'
+    at async mkdir (node:internal/fs/promises:858:10)
+    at async file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_FIX18/long-reply-browser-fixture.mjs:14:1 {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'mkdir',
+  path: '/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_CONTROLS18-screenshots/attempt1'
+}
+
+Node.js v22.23.1

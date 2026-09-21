@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_REVIEW35",
+  "ticket": "t_e7fbe773",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_FINAL_OPERATOR_RUNTIME_BINDING",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_OPERATOR_REVIEW35.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_OPERATOR_REVIEW35.md",
+      "sha256": "f5145ac2f0c695ce9baf6baa1a256ee46155aff471a33117af595d9de797c0c1",
+      "bytes": 3487
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_REVIEW35-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_REVIEW35-dispositions.json",
+      "sha256": "e735fb2c53a6e8181f8b1e4f61f4762c25ec73aafc7c70982f735da886f928c6",
+      "bytes": 3871
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_REVIEW35-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_REVIEW35-custody.json",
+      "sha256": "27ddeb81a5354f4dea706df571ebb3948079af25f8f7a55e7e8a00ca8e1d9927",
+      "bytes": 1705
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_OPERATOR_REVIEW35.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_OPERATOR_REVIEW35.md",
+      "sha256": "8ac67338e09cf462f5ee48e0208c35b9adae6f30262ab646a37f160cabf1a8ae",
+      "bytes": 2610
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "heavyLeaseHeld": false,
+  "finding": null,
+  "retained": [
+    "Runtime9 health and exact two-request startup accounting.",
+    "Full58/FINAL18/KB7ef, fixed31, deferred owner capacity and FIX30 screenshot evidence.",
+    "123 unique absent future paths and zero review traffic."
+  ],
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

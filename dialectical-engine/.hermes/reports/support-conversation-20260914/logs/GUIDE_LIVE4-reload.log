@@ -1,0 +1,78 @@
+{
+  "before": {
+    "schemaVersion": 1,
+    "observedAt": "2026-09-17T19:59:38.674Z",
+    "historicalRevision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+    "finalRevision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+    "head": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+    "statusClean": true,
+    "supervisor": {
+      "pid": 65268,
+      "ppid": 1,
+      "pgid": 65268,
+      "state": "Ss",
+      "elapsed": "02:46:50",
+      "command": "pnpm dev:auth:up",
+      "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine"
+    },
+    "transientListeners": [
+      3100,
+      3101,
+      8890,
+      8891,
+      8892,
+      8893,
+      8894,
+      8895,
+      8896
+    ],
+    "dataPlaneListeners": [
+      55433,
+      7177,
+      8988
+    ],
+    "originalListeners": [
+      3001,
+      55432,
+      7077,
+      8888,
+      8790,
+      8793,
+      8794,
+      8795,
+      8796
+    ],
+    "ordinarySystemTls": {
+      "url": "https://localhost:3100/help",
+      "customCa": false,
+      "insecure": false,
+      "status": 200
+    }
+  },
+  "receipt": {
+    "schemaVersion": 1,
+    "stoppedAt": "2026-09-17T19:59:40.388Z",
+    "pid": 65268,
+    "processGroup": 65268,
+    "signal": "SIGTERM",
+    "scope": "VERIFIED_OWNED_PROCESS_GROUP",
+    "supervisorExited": true,
+    "transientRemaining": [],
+    "reusableDataPlane": [
+      55433,
+      7177,
+      8988
+    ],
+    "originalListenersPreserved": [
+      3001,
+      55432,
+      7077,
+      8888,
+      8790,
+      8793,
+      8794,
+      8795,
+      8796
+    ]
+  }
+}

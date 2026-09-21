@@ -1,0 +1,7 @@
+# GUIDE_HARNESS_BIND14 scope clarification
+
+The author traced Help's automatic GET of `/api/v1/support/cases` to the existing OwnCaseLookup producer. Bounded classification of that exact operation as `pageCaseListRead` is authorized while keeping it aborted before runtime, returning no synthetic data, and preserving negative method/token/unknown-path cases. This is a known blocked Support API operation, not a public-data route or permission to forward a request. Earlier packet wording that permitted only a public-page/static-prefetch distinction was too narrow for the established source evidence; this clarification supersedes that phrase only.
+
+The author also proposed reversible EN/RO interactions to establish public UI readiness. Existing requirements still apply: readiness must preserve any existing Support session, transcript and intended locale at every capture call site, and retain the exact five-session plan. Verify actual setLocale behavior and nonempty-session cases before sealing; an empty-session-only proof is insufficient. If language interactions reset conversation state, use a supported non-destructive readiness approach within the already authorized harness-only scope. No blind relaxation, saving/restoring private capabilities, favorable retries, product change or actual traffic is authorized.
+
+Original BIND14 write paths, sole inert heavy scope, separate REVIEW13, later zero-traffic UI_PROBE2, immutable prior evidence and all owner gates remain unchanged. This does not establish the historical timeout's exact cause.

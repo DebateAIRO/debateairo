@@ -1,0 +1,429 @@
+diff --git a/dialectical-engine/apps/api/src/support/response-policy.ts b/dialectical-engine/apps/api/src/support/response-policy.ts
+index 5939ec9a389e4ac7cf6d88f6034ac5b7129956bc..dfa153786307717d4c7c2c19b8c8ba53ff4c61fe 100644
+--- a/dialectical-engine/apps/api/src/support/response-policy.ts
++++ b/dialectical-engine/apps/api/src/support/response-policy.ts
+@@ -1,7 +1,7 @@
+ import { z } from "zod";
+ import {
+   analyzeSupportCredentialText,canonicalSupportTextViews,supportTextContainsCredentialOperation,
+-  supportTextHasUnsafePath
++  supportTextViewHasUnsafePath
+ } from "@debateai/kernel";
+ import {
+   SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,type SupportActionId
+@@ -147,7 +147,7 @@ function linkPredicate(value: string): SupportDraftPredicate | null {
+   const canonical = canonicalSupportTextViews(value);
+   if (canonical.unsafeEncoding) return "ENCODED_LINK_OR_PATH";
+   for (const candidate of canonical.views) {
+-    if (!MARKUP_OR_LINK.test(candidate) && !supportTextHasUnsafePath(candidate)) continue;
++    if (!MARKUP_OR_LINK.test(candidate) && !supportTextViewHasUnsafePath(candidate)) continue;
+     if (candidate !== canonical.views[0]) return "ENCODED_LINK_OR_PATH";
+     if (/(?:\[[^\]]+\]\s*\(|<\/?[a-z][^>]*>)/iu.test(candidate)) return "MARKUP";
+     if (/(?:https?:\/\/|www\.|(?:^|\s)\/\/)/iu.test(candidate)) return "RAW_LINK_OR_PROTOCOL";
+diff --git a/dialectical-engine/packages/kernel/src/index.ts b/dialectical-engine/packages/kernel/src/index.ts
+index d49d73452ed01e1b8ad3c8f970c5015343b853b5..607421f99db426dc99bfffd198afdf59381c879a 100644
+--- a/dialectical-engine/packages/kernel/src/index.ts
++++ b/dialectical-engine/packages/kernel/src/index.ts
+@@ -294,9 +294,6 @@ export class TypedDomainError extends Error {
+ 
+ const SUPPORT_SECRET_LIKE_PATTERN =
+   /(?:\b(?:sk|key)-[A-Za-z0-9_-]+\b|\b(?:code|cod(?:ul)?)\s+\d{6}\b|\b\d{6}\b|\b[A-Za-z0-9_-]+[.][A-Za-z0-9_-]+[.][A-Za-z0-9_-]+\b|\b[A-Za-z0-9_-]{32,}\b)/giu;
+-const SUPPORT_LABELLED_SECRET_PATTERN =
+-  /(\b(?:(?:my\s+)?password\s*(?:is|:|=)|parola\s+mea\s*(?:este|e|:|=))\s*)([^\s,;]+)/giu;
+-
+ /** Browser-safe and server-safe canonical support-message redaction. */
+ export function redactSupportText(text: string): Readonly<{ text: string;redacted: boolean }> {
+   const spans = analyzeSupportCredentialText(text).credentialValueSpans;
+@@ -307,10 +304,6 @@ export function redactSupportText(text: string): Readonly<{ text: string;redacte
+     cursor = end;
+   }
+   labelled += text.slice(cursor);
+-  labelled = labelled.replace(
+-    SUPPORT_LABELLED_SECRET_PATTERN,
+-    (_match,prefix: string) => `${prefix}[REDACTED_SECRET_LIKE]`
+-  );
+   const redactedText = labelled.replace(SUPPORT_SECRET_LIKE_PATTERN,"[REDACTED_SECRET_LIKE]");
+   return Object.freeze({ text: redactedText,redacted: redactedText !== text });
+ }
+diff --git a/dialectical-engine/packages/kernel/src/support-credentials.ts b/dialectical-engine/packages/kernel/src/support-credentials.ts
+index 221fc59235e1b1e3380b3ca1b922d5464fb930e2..1eb338e9ca08ec09a3f0c02c5dc20ae9cac58c21 100644
+--- a/dialectical-engine/packages/kernel/src/support-credentials.ts
++++ b/dialectical-engine/packages/kernel/src/support-credentials.ts
+@@ -80,20 +80,21 @@ const OPERATION_PATTERNS: readonly Readonly<{
+ const NEGATION = /\b(?:never|do\s+not|does\s+not|did\s+not|cannot|can\s+not|can't|must\s+not|will\s+not|should\s+not|nu|niciodata|nu\s+poate|nu\s+pot|nu\s+trebuie)\b/giu;
+ const REFERENCE = /(?:\b(?:it|them|this|that|these|those|acesta|aceasta|acestea|acestora|il|le|lor)\b|-o\b|-le\b)/giu;
+ const NON_CREDENTIAL_OBJECT = /\b(?:display\s+name|account\s+name|profile\s+name|nume(?:le)?\s+(?:afisat|contului|profilului))\b/giu;
+-const SCOPE_BOUNDARY = /(?:[.!?;\n]+|,?\s*\b(?:but|however|instead|except|unless|then|therefore|thus|so|as\s+a\s+result|because|while|although|yet|which\s+means|and\s+(?:also|then|generally|sometimes|later|still)|dar|insa|apoi|deci|asa\s+ca|prin\s+urmare|deoarece|fiindca|desi|totusi|ceea\s+ce\s+inseamna|si\s+de\s+asemenea)\b|\b(?:and|si)\s+(?=(?:you|the\s+visitor|support|i|we|they|may|might|should|must|will|would|can|could|is|are|please|send|share|provide|give|submit|enter|paste|upload|tell|show|receive|accept|repeat|transform|validate|decode|encode|reset|change|replace|regenerate|tu|vizitator|asistenta|poate|pot|ar|este|sunt|trebuie|poti|vei|va|vor|trim|partaj|furniz|introduc|lip|incarc|spun|arat|prim|accept|repet|transform|valid|verific|decod|encod|reset|schimb|inlocu|regener)))/giu;
++const SCOPE_BOUNDARY = /(?:[.!?;\n]+|,?\s*\b(?:but|however|instead|except|unless|then|therefore|thus|so|as\s+a\s+result|because|while|although|yet|which\s+means|and\s+(?:also|then|generally|sometimes|later|still)|plus|in\s+addition|additionally|moreover|furthermore|dar|insa|apoi|deci|asa\s+ca|prin\s+urmare|deoarece|fiindca|desi|totusi|ceea\s+ce\s+inseamna|si\s+de\s+asemenea|in\s+plus|de\s+asemenea)\b|\b(?:and|si)\s+(?=(?:you|the\s+visitor|support|i|we|they|may|might|should|must|will|would|can|could|is|are|please|send|share|provide|give|submit|enter|paste|upload|tell|show|receive|accept|repeat|transform|validate|decode|encode|reset|change|replace|regenerate|tu|vizitator|asistenta|poate|pot|ar|este|sunt|trebuie|poti|vei|va|vor|trim|partaj|furniz|introduc|lip|incarc|spun|arat|prim|accept|repet|transform|valid|verific|decod|encod|reset|schimb|inlocu|regener)))/giu;
+ const SENTENCE_BOUNDARY = /[.!?;\n]+/gu;
+-const LABEL_CONNECTOR = /^\s*(?:(?:my|your|his|her|our|their|visitor(?:'s)?|meu|mea|mele|ta|tau|dvs|dumneavoastra|utilizatorului)\s+){0,2}(?:(?:is|are|este|e|sunt)\b|:|=)\s*/iu;
++const LABEL_CONNECTOR = /^\s*(?:(?:my|your|his|her|our|their|visitor(?:'s)?|meu|mea|mele|ta|tau|dvs|dumneavoastra|utilizatorului)\b\s*){0,2}(?:(?:is|are|este|e|sunt)\b|:|=)\s*/iu;
+ const VALUE_STOP_WORDS = new Set([
+   "and","but","because","keep","please","so","then","therefore","which","while",
+   "asa","apoi","dar","deci","iar","pastreaza","pentru","si"
+ ]);
+ const QUOTE_PAIRS = new Map([["\"","\""],["'","'"],["„","”"],["“","”"],["«","»"]]);
+-const VALUE_HARD_DELIMITER = /[;\n]|[.!?](?=\s|$)|,(?=\s*(?:and|but|because|keep|please|so|then|therefore|which|while|asa|apoi|dar|deci|iar|pastreaza|pentru|si)\b)/giu;
+-const VALUE_COORDINATOR = /\s+\b(?:and|but|because|keep|please|so|then|therefore|which|while|asa|apoi|dar|deci|iar|pastreaza|pentru|si)\b/giu;
++const VALUE_HARD_DELIMITER = /[;\n]|[.!?](?=\s|$)/giu;
++const VALUE_BENIGN_FOLLOWUP_BOUNDARY = /(?:,?\s+\b(?:and|but|because|so|then|therefore|which|while|asa|apoi|dar|deci|iar|pentru|si)\b\s+(?=(?:i\s+(?:need|want|forgot|cannot|can't|have)|we\s+(?:need|want|cannot|have)|(?:eu\s+)?(?:am\s+nevoie|vreau|am\s+uitat|nu\s+pot))\b)|,\s*(?=(?:keep|please|pastreaza)\b))/giu;
+ const NON_VALUE_WORDS = new Set([
+   "available","disponibil","disponibile","encrypted","forgotten","invalid","missing","never","not","private","protected",
+   "required","safe","secure","unavailable","unknown","niciodata","nu","necesara",
+-  "necesar","protejata","protejat","sigura","sigur","uitata","uitat"
++  "necesar","protejata","protejat","sigura","sigur","uitata","uitat",
++  "indisponibil","indisponibila","indisponibile"
+ ]);
+ const VALUE_ARTICLES = new Set(["a","an","o","un","una"]);
+ 
+@@ -172,10 +173,10 @@ function labelledValueSpan(text: string,start: number): Readonly<{ start: number
+   }
+   const remainder = text.slice(start);
+   VALUE_HARD_DELIMITER.lastIndex = 0;
+-  VALUE_COORDINATOR.lastIndex = 0;
++  VALUE_BENIGN_FOLLOWUP_BOUNDARY.lastIndex = 0;
+   const hard = VALUE_HARD_DELIMITER.exec(remainder)?.index ?? remainder.length;
+-  const coordinator = VALUE_COORDINATOR.exec(remainder)?.index ?? remainder.length;
+-  const end = start + Math.min(hard,coordinator);
++  const followup = VALUE_BENIGN_FOLLOWUP_BOUNDARY.exec(remainder)?.index ?? remainder.length;
++  const end = start + Math.min(hard,followup);
+   const trimmedEnd = start + remainder.slice(0,end-start).trimEnd().length;
+   const words = remainder.slice(0,trimmedEnd-start).trimStart().split(/\s+/u);
+   const firstWord = words[0] ?? "";
+diff --git a/dialectical-engine/packages/kernel/src/support-text-views.ts b/dialectical-engine/packages/kernel/src/support-text-views.ts
+index d786403f40744905ee8101f5e2a1fc6418949bdc..70d5edd60bdd2d248b53019067fbbdce5f7aab81 100644
+--- a/dialectical-engine/packages/kernel/src/support-text-views.ts
++++ b/dialectical-engine/packages/kernel/src/support-text-views.ts
+@@ -36,10 +36,15 @@ export function canonicalSupportTextViews(value: string): CanonicalSupportTextVi
+   });
+ }
+ 
+-const UNSAFE_PATH = /(?:^|[\s('"`])(?:\/{1,2}(?=\S)|\\{1,2}(?=\S)|\.{1,2}[\\/](?=\S)|[a-z]:[\\/](?=\S))/iu;
++const UNSAFE_PATH = /(?:^|[\s('"`=,:;])(?:\/{1,2}(?=\S)|\\{1,2}(?=\S)|\.{1,2}[\\/](?=\S)|[a-z]:[\\/](?=\S))/iu;
++
++/** True when this already-canonical text view contains a URL-independent path form. */
++export function supportTextViewHasUnsafePath(value: string): boolean {
++  return UNSAFE_PATH.test(value);
++}
+ 
+ /** True when any bounded canonical view contains a URL-independent path form. */
+ export function supportTextHasUnsafePath(value: string): boolean {
+   const canonical = canonicalSupportTextViews(value);
+-  return canonical.unsafeEncoding || canonical.views.some((candidate) => UNSAFE_PATH.test(candidate));
++  return canonical.unsafeEncoding || canonical.views.some(supportTextViewHasUnsafePath);
+ }
+diff --git a/dialectical-engine/tests/integration/support-cases.test.ts b/dialectical-engine/tests/integration/support-cases.test.ts
+index bfce0b6af31f7cb5284885f93b9ee02969a1aa92..5e785aca4c1886312c9ae7e1d8be4664c7aec258 100644
+--- a/dialectical-engine/tests/integration/support-cases.test.ts
++++ b/dialectical-engine/tests/integration/support-cases.test.ts
+@@ -427,6 +427,12 @@ describe("SUP-02 cases", () => {
+       "The advisory summary was omitted because it did not pass Support safety checks."]
+     ,["en","My password is this synthetic phrase remains secret even when it contains many ordinary words.",
+       "The advisory summary was omitted because it did not pass Support safety checks."]
++    ,["en","Support does not request passwords, plus it could receive them.",
++      "The advisory summary was omitted because it did not pass Support safety checks."]
++    ,["ro","Asistența nu cere parole, plus le poate primi.",
++      "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței."]
++    ,["en","Network=%5C%5Cserver%5Cshare to continue.",
++      "The advisory summary was omitted because it did not pass Support safety checks."]
+   ] as const)("replaces an unsafe %s advisory summary before seal and persistence", async (
+     language,hostile,fallback
+   ) => {
+diff --git a/dialectical-engine/tests/unit/support-answer-context.test.ts b/dialectical-engine/tests/unit/support-answer-context.test.ts
+index 5d7a48a25af86e4aaecc86721d14474cb9254733..debb5f8c58fb5b730350429631dcd6e6f85ba219 100644
+--- a/dialectical-engine/tests/unit/support-answer-context.test.ts
++++ b/dialectical-engine/tests/unit/support-answer-context.test.ts
+@@ -304,6 +304,50 @@ describe("CP1 composed answer context", () => {
+     });
+   });
+ 
++  it.each([
++    "Support does not request passwords, plus it could receive them.",
++    "Support does not request passwords, in addition it accepts them.",
++    "Asistența nu cere parole, plus le poate primi.",
++    "Asistența nu cere parole, în plus le poate primi.",
++    "Network=%5C%5Cserver%5Cshare to continue."
++  ])("keeps a rejected transformed completion out of assistant storage and return: %s", async (
++    hostile
++  ) => {
++    const top = entry("selected-a","alpha crosscap selected marker");
++    const snapshot = corpus([top],"4".repeat(64));
++    const stored: string[] = [];
++    const localMessages = Object.freeze({
++      write: vi.fn(async (input) => {
++        stored.push(input.text);
++        return Object.freeze({ ...input,redacted: false });
++      }),
++      writeAndTransit: vi.fn(async (input,transit) => {
++        await transit(input.text);
++        stored.push(input.text);
++        return Object.freeze({ ...input,redacted: false });
++      }),read: vi.fn(async () => null),listSession: vi.fn(async () => [])
++    }) as unknown as SupportMessageCipherPort;
++    const complete = vi.fn(async () => Object.freeze({ text: JSON.stringify({
++      kind: "answer",text: hostile,sourceIds: [SOURCE_REFERENCE],actionIds: []
++    }) }));
++    const service = createSupportAnswerService({
++      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),
++      messages: localMessages,modelReferenceFactory,
++      modelFor: () => Object.freeze({ complete }) as never,
++      clock: (() => { let at = Date.parse("2026-09-17T10:00:00.000Z");return () => new Date(++at); })()
++    });
++
++    const result = await service.respond(request(snapshot));
++
++    expect(complete).toHaveBeenCalledTimes(1);
++    expect(result).toMatchObject({
++      outcome: "ANSWER_GROUNDED",text: top.fallback,sources: [{ id: top.id }]
++    });
++    expect(result.text).not.toContain(hostile);
++    expect(stored).not.toContain(hostile);
++    expect(stored).toContain(top.fallback!);
++  });
++
+   it("assigns distinct opaque identities to separate rejected model attempts", async () => {
+     const snapshot = corpus([entry("selected-a","alpha crosscap selected-a-end")],"f".repeat(64));
+     const reports: Array<Readonly<{ attemptId: string }>> = [];
+diff --git a/dialectical-engine/tests/unit/support-credentials.test.ts b/dialectical-engine/tests/unit/support-credentials.test.ts
+index 8497700c66139973fbeaa9191b13110f0966a9a4..c76e55fa8881cec5423c7c36027c643aac7ed5f4 100644
+--- a/dialectical-engine/tests/unit/support-credentials.test.ts
++++ b/dialectical-engine/tests/unit/support-credentials.test.ts
+@@ -50,13 +50,35 @@ describe("Support credential lexical facts", () => {
+   it.each([
+     ['My recovery code is "inert amber fern',"inert amber fern"],
+     ["My password is amber birch cedar dogwood elm fir grove hazel; keep it private.","amber birch cedar dogwood elm fir grove hazel"],
+-    ["My reset token is inert.alpha-beta/gamma; keep it private.","inert.alpha-beta/gamma"]
++    ["My reset token is inert.alpha-beta/gamma; keep it private.","inert.alpha-beta/gamma"],
++    ["My reset token is quartz and ember; keep it private.","quartz and ember"],
++    ["My reset token is quartz, and ember; keep it private.","quartz, and ember"],
++    ["My reset token is quartz but ember; keep it private.","quartz but ember"],
++    ["Codul de verificare este cuarț și chihlimbar; păstrează-l privat.","cuarț și chihlimbar"]
+   ])("owns the complete supplied-value span without retaining a suffix: %s", (text,secret) => {
+     const facts = analyzeSupportCredentialText(text);
+     expect(facts.credentialValueSpans.map(({ start,end }) => text.slice(start,end)))
+       .toContain(secret);
+   });
+ 
++  it.each([
++    ["My password is inert horse battery and I need help.","inert horse battery"],
++    ["My password is inert horse battery, and I need help.","inert horse battery"],
++    ["Parola mea este inert cal albastru și am nevoie de ajutor.","inert cal albastru"],
++    ["Parola mea este inert cal albastru, păstrează-l privat.","inert cal albastru"]
++  ])("stops a supplied value only at an independent subject-led clause: %s", (text,secret) => {
++    expect(analyzeSupportCredentialText(text).credentialValueSpans.map(({ start,end }) =>
++      text.slice(start,end)
++    )).toEqual([secret]);
++  });
++
++  it.each([
++    "My password is unavailable; show ordinary recovery guidance.",
++    "Parola mea este indisponibilă; arată ghidul obișnuit de recuperare."
++  ])("does not classify a benign unavailable state as a supplied value: %s", (text) => {
++    expect(analyzeSupportCredentialText(text).credentialValueSpans).toEqual([]);
++  });
++
+   it.each([
+     ["Support does not receive passwords and also asks you to send them here.","solicit"],
+     ["Support does not receive passwords, so send them here.","solicit"],
+@@ -73,11 +95,33 @@ describe("Support credential lexical facts", () => {
+     "Support does not receive passwords and may receive them.",
+     "Support cannot accept security codes, but it could validate them.",
+     "Asistența nu primește parole și poate primi acestea.",
+-    "Asistența nu verifică un cod de securitate, dar ar putea să îl primească."
++    "Asistența nu verifică un cod de securitate, dar ar putea să îl primească.",
++    "Support never asks for OTP codes, plus it accepts them.",
++    "Support does not request passwords, plus it could receive them.",
++    "Support does not request passwords, in addition it accepts them.",
++    "Support does not request passwords, additionally it accepts them.",
++    "Support does not request passwords, moreover it accepts them.",
++    "Support does not request passwords, furthermore it accepts them.",
++    "Asistența nu cere parole, plus le poate primi.",
++    "Asistența nu cere parole, în plus le poate primi.",
++    "Asistența nu cere parole, de asemenea le poate primi."
+   ])("starts a separate positive modal or auxiliary operation group: %s", (text) => {
+     expect(analyzeSupportCredentialText(text).operations.some(({ negated }) => !negated)).toBe(true);
+   });
+ 
++  it.each([
++    "Support does not request passwords, plus it does not accept them.",
++    "Support does not request passwords, in addition it never receives them.",
++    "Support does not request passwords, additionally it cannot validate them.",
++    "Support does not request passwords, moreover it does not use them.",
++    "Asistența nu cere parole, în plus nu le primește.",
++    "Asistența nu cere parole, de asemenea nu le verifică."
++  ])("keeps each additive operation group independently negated: %s", (text) => {
++    const operations = analyzeSupportCredentialText(text).operations;
++    expect(operations.length).toBeGreaterThan(1);
++    expect(operations.every(({ negated }) => negated)).toBe(true);
++  });
++
+   it("emits only closed lexical facts and numeric spans", () => {
+     const hostile = "Send your passwords and then validate them.";
+     const serialized = JSON.stringify(analyzeSupportCredentialText(hostile));
+diff --git a/dialectical-engine/tests/unit/support-redaction.test.ts b/dialectical-engine/tests/unit/support-redaction.test.ts
+index 1b7bba13a5737308cb98e029e28db5f693d79c55..b6d855a98ffec84cdfa6ad58c4146afb377868fb 100644
+--- a/dialectical-engine/tests/unit/support-redaction.test.ts
++++ b/dialectical-engine/tests/unit/support-redaction.test.ts
+@@ -43,7 +43,11 @@ describe("CP1 Support credential redaction", () => {
+   it.each([
+     ['My recovery code is "inert amber fern',"inert amber fern"],
+     ["My password is amber birch cedar dogwood elm fir grove hazel; keep it private.","amber birch cedar dogwood elm fir grove hazel"],
+-    ["My reset token is inert.alpha-beta/gamma; keep it private.","inert.alpha-beta/gamma"]
++    ["My reset token is inert.alpha-beta/gamma; keep it private.","inert.alpha-beta/gamma"],
++    ["My reset token is quartz and ember; keep it private.","quartz and ember"],
++    ["My reset token is quartz, and ember; keep it private.","quartz, and ember"],
++    ["My reset token is quartz but ember; keep it private.","quartz but ember"],
++    ["Codul de verificare este cuarț și chihlimbar; păstrează-l privat.","cuarț și chihlimbar"]
+   ])("removes the complete supplied value through a safe delimiter or end: %s", (text,secret) => {
+     const result = redactSupportText(text);
+     expect(result.redacted).toBe(true);
+@@ -51,6 +55,42 @@ describe("CP1 Support credential redaction", () => {
+     expect(result.text).toContain("[REDACTED_SECRET_LIKE]");
+   });
+ 
++  it.each([
++    ["My reset token is quartz and ember; keep it private.",["quartz","ember"]],
++    ["My reset token is quartz, and ember; keep it private.",["quartz","ember"]],
++    ["My reset token is quartz but ember; keep it private.",["quartz","ember"]],
++    ["Codul de verificare este cuarț și chihlimbar; păstrează-l privat.",["cuarț","chihlimbar"]]
++  ] as const)("leaves no coordinated supplied-value fragment at any redaction sink: %s", async (
++    text,fragments
++  ) => {
++    const observed: string[] = [];
++    const cipher = createSupportMessageCipher({
++      unwrapDataKey: vi.fn(async () => Buffer.alloc(32,1)),
++      sealContent: vi.fn((_aad: unknown,_key: Uint8Array,plaintext: Uint8Array) => {
++        observed.push(Buffer.from(plaintext).toString("utf8"));
++        return Buffer.from(plaintext);
++      }),openContent: vi.fn()
++    } as never,{
++      readSessionKey: vi.fn(async () => Buffer.from("wrapped")),
++      write: vi.fn(async (input) => { observed.push(Buffer.from(input.contentCiphertext).toString("utf8")); }),
++      read: vi.fn(async () => null),listSession: vi.fn(async () => [])
++    });
++
++    const stored = await cipher.writeAndTransit({
++      messageId: "41000000-0000-4000-8000-000000000001",
++      sessionId: "41000000-0000-4000-8000-000000000002",
++      role: "user",text,outcome: "REFUSE_ZONE",language: "en",detectedLanguage: "en",
++      overrideLanguage: null,receivedAt: new Date("2026-09-17T10:00:00.000Z"),
++      firstTokenAt: null,completedAt: null
++    },async (safeText) => { observed.push(safeText); });
++
++    observed.push(stored.text);
++    for (const value of observed) {
++      for (const fragment of fragments) expect(value).not.toContain(fragment);
++      expect(value).toContain("[REDACTED_SECRET_LIKE]");
++    }
++  });
++
+   it("stops an unquoted value at a declared coordinator without consuming benign prose", () => {
+     const result = redactSupportText("My password is inert horse battery and I need help.");
+     expect(result.text).toBe("My password is [REDACTED_SECRET_LIKE] and I need help.");
+@@ -59,6 +99,8 @@ describe("CP1 Support credential redaction", () => {
+   it.each([
+     "I forgot my password",
+     "Am uitat parola",
++    "My password is unavailable; show ordinary recovery guidance.",
++    "Parola mea este indisponibilă; arată ghidul obișnuit de recuperare.",
+     "Try again at 14:30 on 2026-09-14 with public error SUPPORT_MODEL_UNAVAILABLE."
+   ])("preserves benign guidance, dates, times, and public error IDs: %s", (text) => {
+     expect(redactSupportText(text)).toEqual({ text,redacted: false });
+diff --git a/dialectical-engine/tests/unit/support-response-policy.test.ts b/dialectical-engine/tests/unit/support-response-policy.test.ts
+index 1395e9ac3abea1a141dada32622ac4e168c08344..c86dfdd19a1282215d2343b853732dcd0b0eec5b 100644
+--- a/dialectical-engine/tests/unit/support-response-policy.test.ts
++++ b/dialectical-engine/tests/unit/support-response-policy.test.ts
+@@ -161,9 +161,58 @@ describe("CP1 support model response policy", () => {
+     "Support does not receive passwords and may receive them.",
+     "Support cannot accept a security code, but it could validate it.",
+     "Asistența nu primește parole și poate primi acestea.",
+-    "Asistența nu verifică un cod de securitate, dar ar putea să îl primească."
++    "Asistența nu verifică un cod de securitate, dar ar putea să îl primească.",
++    "Support never asks for OTP codes, plus it accepts them.",
++    "Support does not request passwords, plus it could receive them.",
++    "Support does not request passwords, in addition it accepts them.",
++    "Support does not request passwords, additionally it accepts them.",
++    "Support does not request passwords, moreover it accepts them.",
++    "Support does not request passwords, furthermore it accepts them.",
++    "Asistența nu cere parole, plus le poate primi.",
++    "Asistența nu cere parole, în plus le poate primi.",
++    "Asistența nu cere parole, de asemenea le poate primi."
+   ])("rejects a positive credential operation in a new modal group: %s", (text) => {
+     expect(parseSupportDraft(raw(text,{ actionIds: [] }))).toBeNull();
++    expect(parseSupportCaseSummaryDraft(JSON.stringify({
++      kind: "case_summary",text,sourceIds: [],actionIds: []
++    }))).toBeNull();
++  });
++
++  it.each([
++    "Support does not request passwords, plus it does not accept them.",
++    "Support does not request passwords, in addition it never receives them.",
++    "Support does not request passwords, additionally it cannot validate them.",
++    "Support does not request passwords, moreover it does not use them.",
++    "Asistența nu cere parole, în plus nu le primește.",
++    "Asistența nu cere parole, de asemenea nu le verifică."
++  ])("accepts independently negated additive operation groups: %s", (text) => {
++    expect(parseSupportDraft(raw(text,{ actionIds: [] }))).not.toBeNull();
++    expect(parseSupportCaseSummaryDraft(JSON.stringify({
++      kind: "case_summary",text,sourceIds: [],actionIds: []
++    }))).not.toBeNull();
++  });
++
++  it.each(["=",":",",",";"] .flatMap((delimiter) => [
++    [`root backslash after ${delimiter}`,`Target${delimiter}%5Csettings`],
++    [`drive path after ${delimiter}`,`Target${delimiter}C:%5Csettings`],
++    [`UNC path after ${delimiter}`,`Target${delimiter}%5C%5Cserver%5Cshare`]
++  ]))("rejects a decoded structural %s boundary in answer and summary text", (_name,text) => {
++    expect(parseSupportDraft(raw(text,{ actionIds: [] }))).toBeNull();
++    expect(parseSupportCaseSummaryDraft(JSON.stringify({
++      kind: "case_summary",text,sourceIds: [],actionIds: []
++    }))).toBeNull();
++  });
++
++  it.each([
++    "Progress=84% complete.",
++    "Ratio=3/4 with four observations.",
++    "Time=14:30 local.",
++    "Version=1.2.3 is available."
++  ])("keeps benign assignment text usable in answer and summary text: %s", (text) => {
++    expect(parseSupportDraft(raw(text,{ actionIds: [] }))).not.toBeNull();
++    expect(parseSupportCaseSummaryDraft(JSON.stringify({
++      kind: "case_summary",text,sourceIds: [],actionIds: []
++    }))).not.toBeNull();
+   });
+ 
+   it.each([
+diff --git a/dialectical-engine/tests/unit/support-text-views.test.ts b/dialectical-engine/tests/unit/support-text-views.test.ts
+index 353cdfc8371177be36867406c5d726552b494b8e..e646aaec782873839b5630d08d915c56a89e907f 100644
+--- a/dialectical-engine/tests/unit/support-text-views.test.ts
++++ b/dialectical-engine/tests/unit/support-text-views.test.ts
+@@ -34,7 +34,15 @@ describe("CP1 bounded canonical Support text views", () => {
+ 
+   it.each([
+     "/settings","../settings",".\\settings","C:\\Users\\visitor\\secret.txt",
+-    "\\\\server\\share\\secret.txt","%2Fsettings","..%2Fsettings"
++    "\\\\server\\share\\secret.txt","%2Fsettings","..%2Fsettings",
++    ...["=",":",",",";"].flatMap((delimiter) => [
++      `Target${delimiter}\\settings`,
++      `Target${delimiter}C:\\settings`,
++      `Target${delimiter}\\\\server\\share`,
++      `Target${delimiter}%5Csettings`,
++      `Target${delimiter}C:%5Csettings`,
++      `Target${delimiter}%5C%5Cserver%5Cshare`
++    ])
+   ])("recognizes every canonical filesystem and route path form: %s",(input) => {
+     expect(supportTextHasUnsafePath(input)).toBe(true);
+   });
+@@ -42,7 +50,11 @@ describe("CP1 bounded canonical Support text views", () => {
+   it.each([
+     "Progress is 50% complete.",
+     "Choose Settings from the account page.",
+-    "The ratio is 3/4 when four observations are available."
++    "The ratio is 3/4 when four observations are available.",
++    "Progress=84% complete.",
++    "Ratio=3/4 with four observations.",
++    "Time=14:30 local.",
++    "Version=1.2.3 is available."
+   ])("does not classify ordinary prose as a path: %s",(input) => {
+     expect(supportTextHasUnsafePath(input)).toBe(false);
+   });

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE9",
+  "ticket": "t_979538fe",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "verdict": "STOPPED_ZERO_TRAFFIC_CAPACITY_WRAPPER_NOT_FOUND",
+  "observedAt": "2026-09-20T18:18:12.625Z",
+  "stage": "CAPACITY_WRAPPER_INVOCATION",
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "command": [
+    "node",
+    ".hermes/reports/support-conversation-20260914/probes/GUIDE_LIVE9/materialize-runtime-capacity.mjs"
+  ],
+  "numericStatus": 1,
+  "errorCode": "ERR_MODULE_NOT_FOUND",
+  "failedResolvedPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_LIVE9/materialize-runtime-capacity.mjs",
+  "existingWrapperAbsolutePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_LIVE9/materialize-runtime-capacity.mjs",
+  "capacityReaderLoaded": false,
+  "capacity": {
+    "supportedStatusReads": 0,
+    "countsOnlyDatabaseReads": 0,
+    "receiptCreated": false,
+    "gateCreated": false
+  },
+  "rowProof": {
+    "attempted": false,
+    "receiptCreated": false
+  },
+  "capture": {
+    "attempted": false,
+    "freshRowsAttempted": 0,
+    "freshRowsCompleted": 0,
+    "sessionsCreated": 0,
+    "receiptCreated": false
+  },
+  "traffic": {
+    "http": 0,
+    "database": 0,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "browser": 0
+  },
+  "retainedRows": 15,
+  "retainedRowsRelabeledAsSuccess": false,
+  "retryPerformed": false,
+  "nextBoundedCorrection": "Invoke the existing reviewed wrapper by its absolute source-repository path from the product cwd; reverify unused outputs and obtain a new fresh gate in a separately authorized execution node.",
+  "runtimeLeftHealthy": true
+}

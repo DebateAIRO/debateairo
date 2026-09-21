@@ -1,0 +1,8 @@
+file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX23/verify-command-binding.mjs:79
+console.log(JSON.stringify({ result: proof.result, passed: proof.passed, controls: proof.controls, commandContractSha256 }));
+                                                                                                   ^
+
+ReferenceError: commandContractSha256 is not defined
+    at file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX23/verify-command-binding.mjs:79:100
+
+Node.js v22.23.1

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_RUNTIME7",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "pid": 12272,
+  "pgid": 12272,
+  "commandMarker": "pnpm dev:auth:up",
+  "runtimeLogPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE20-stack.log",
+  "ports": {
+    "ui": 3100,
+    "api": 8787,
+    "relay": 8894
+  },
+  "startedAtUtc": "2026-09-21T00:11:04.465Z",
+  "detached": true,
+  "ordinarySystemTls": {
+    "path": "/help",
+    "customCa": false,
+    "insecure": false,
+    "status": 200
+  }
+}

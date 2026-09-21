@@ -1,0 +1,12 @@
+{
+  "skill": "/Users/vladmihaimiron/.codex/plugins/cache/openai-curated-remote/superpowers/6.3.0/skills/brainstorming/SKILL.md",
+  "skillSha256": "74edf03ea6d24ef53db48677b93558d14a979bdf052ca3f57ecdca0c66791608",
+  "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-10-46-01a09ef7-fa46-7b73-bc98-70f84abd06cc.jsonl",
+  "proof": {
+    "nativeTimestamp": "2026-09-17T07:18:04.044Z",
+    "nativeCallId": "call_KtNNqLZScorEe8K5lNwtcXfr",
+    "outputType": "custom_tool_call_output",
+    "outputBodySha256": "7da9be7d7d96af8b0995292406daa20c324d1d842faf503d9dc8836ec8ef431f",
+    "match": "Full exact skill BODY present in actual output; invocation arguments excluded."
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 2,
+  "result": "PASS",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+  "harnessSha256": "96a89764da7f0d623accaa2d30e506d8a32f118939cc2934dc8c17c501af1c77",
+  "controls": 14,
+  "passed": 14,
+  "names": [
+    "remaining21 exact plan",
+    "retained10 exact",
+    "remaining21 order",
+    "composed31 unique",
+    "logical58 retained",
+    "three exact session groups",
+    "model ceiling18",
+    "compiled UI same-session transition",
+    "capacity exact3-27-24 accepted",
+    "capacity sessions2 rejected",
+    "capacity messages26 rejected",
+    "capacity model23 rejected",
+    "six-file harness digest",
+    "control proof serialized"
+  ]
+}

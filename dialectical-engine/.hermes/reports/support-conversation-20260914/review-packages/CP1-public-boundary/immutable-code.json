@@ -1,0 +1,163 @@
+{
+  "revision": "cd4f6d62c64d0abe8df9061ac5869930425beb5e",
+  "codeAccess": "Read exact Git objects with git show REV:dialectical-engine/PATH. Never read changing primary files as reviewed bytes.",
+  "paths": [
+    {
+      "laneRelative": "apps/api/src/index.ts",
+      "sha256": "004fe1f21b0d1188d4082eb6af374e1d8a112896868f01539e9281e94ae1d94e",
+      "bytes": 74218
+    },
+    {
+      "laneRelative": "apps/api/src/main.ts",
+      "sha256": "57c0ab02deafc9c71b3313c8ca3bc56555e60eae4cfc8b038e03f0927583da9c",
+      "bytes": 26007
+    },
+    {
+      "laneRelative": "apps/api/src/support/index.ts",
+      "sha256": "838c7b84242329c8939225de5fb2e29280184cedb0d6fd3ad6702898b726b275",
+      "bytes": 37176
+    },
+    {
+      "laneRelative": "apps/api/src/support/own-context.ts",
+      "deleted": true
+    },
+    {
+      "laneRelative": "apps/api/src/support/public-guide-boundary.ts",
+      "sha256": "7c8ab1813e418b06ace4a6f8109f008add1beea121ff0a8309321eb24aa06b2a",
+      "bytes": 1842
+    },
+    {
+      "laneRelative": "apps/api/src/support/session.ts",
+      "sha256": "9e716215de07fede9cd4ebfd64958814b26445179803c0e03824b97f70b34426",
+      "bytes": 20212
+    },
+    {
+      "laneRelative": "apps/api/src/support/templates.ts",
+      "sha256": "462fdd5a95a352c036f5856de125a399eb0c35319223ef49fd86b1b2ca0c8b22",
+      "bytes": 7712
+    },
+    {
+      "laneRelative": "apps/api/src/support/tools.ts",
+      "sha256": "127ee4e81771a348dd0f265ea37610e460f69ac3caa30fcdbd8026e14e2fa3ac",
+      "bytes": 463
+    },
+    {
+      "laneRelative": "apps/ui/app/debate/[id]/DebatePageGate.tsx",
+      "sha256": "ac2300bfcc9e1619c983cb9212c3b24531d9f124df2cf364a57fedfee0fd3e91",
+      "bytes": 1106
+    },
+    {
+      "laneRelative": "apps/ui/components/support/Assistant.tsx",
+      "sha256": "5921ced41c60a047a4c4e390f2e6154b99944c4ad0620433f130d58d590062b3",
+      "bytes": 35138
+    },
+    {
+      "laneRelative": "apps/ui/components/support/ConsentToggle.tsx",
+      "deleted": true
+    },
+    {
+      "laneRelative": "apps/ui/components/support/DebatePicker.tsx",
+      "deleted": true
+    },
+    {
+      "laneRelative": "apps/ui/components/support/SupportWidget.tsx",
+      "sha256": "27b9ae36550f4938b980a39273367e69666ee76e106dfbb085479648b471ed74",
+      "bytes": 3238
+    },
+    {
+      "laneRelative": "packages/contract/src/index.ts",
+      "sha256": "f38a11815d6d34badbbff1e10022f8c4e83ec3f28fedf6f0c636a31cb3ad3a31",
+      "bytes": 30537
+    },
+    {
+      "laneRelative": "packages/db/src/index.ts",
+      "sha256": "5128dc6638c8081b1faa6add4a23835e62c459f118816a10888def79375ba910",
+      "bytes": 61818
+    },
+    {
+      "laneRelative": "packages/db/src/support.ts",
+      "sha256": "271893c48919803ac65b51639eb4f18018b7cb7d6cee63020b4feeebdeb3b3d5",
+      "bytes": 99922
+    },
+    {
+      "laneRelative": "tests/architecture/sup-01-boundary.test.ts",
+      "sha256": "5bfb7f432ddf67a4e159821feee83d7349f3e6c1307b2a6a76035ec63bd4d6e4",
+      "bytes": 16222
+    },
+    {
+      "laneRelative": "tests/architecture/sup-03-projection.test.ts",
+      "sha256": "99c1050dbc9c8db1eb804d5f642f5d892d38e64c7a7a4e8b02eb33d02cd0a7f9",
+      "bytes": 1351
+    },
+    {
+      "laneRelative": "tests/integration/support-own-context.test.ts",
+      "sha256": "904cc7dbf9b7b0553d064b08f6cb86252c200029b3355b6d9bec2ce91749411b",
+      "bytes": 1261
+    },
+    {
+      "laneRelative": "tests/integration/support-routes.test.ts",
+      "sha256": "95370c4ca2b5cfab119aef25251a6fd7108a3506357f499db7a84cffe40c8d57",
+      "bytes": 128376
+    },
+    {
+      "laneRelative": "tests/render/sup-01-help.test.tsx",
+      "sha256": "57f314172b7b4fb6e592e5830ec65513773902d307dc93f49054e858ce2f11e0",
+      "bytes": 37748
+    },
+    {
+      "laneRelative": "tests/render/sup-03-consent.test.tsx",
+      "sha256": "8197e11ab3ae64e6bb01f16581ec884633db372d3728f8d8dbe955ea5be57b58",
+      "bytes": 1219
+    },
+    {
+      "laneRelative": "tests/render/sup-04-widget.test.tsx",
+      "sha256": "c1651b9646c465fb4014634671c73dcf7e9a2cdfdf7ecadeb4ca9101003206f6",
+      "bytes": 10115
+    },
+    {
+      "laneRelative": "tests/support-eval/cases/sup-e-01.json",
+      "sha256": "81031d3f4a85ae9d093554602f896e158e2912caffcd3cca2a1957e68fe59454",
+      "bytes": 448
+    },
+    {
+      "laneRelative": "tests/support-eval/cases/sup-e-02.json",
+      "sha256": "042fc3fdb993dbd11f51fd82ad71147a8c12399ba3ed73c4355944093f29487a",
+      "bytes": 426
+    },
+    {
+      "laneRelative": "tests/support-eval/cases/sup-e-03.json",
+      "sha256": "3fd316149a1320509f7113ad809f27d336581a5dcc9cc30d1e3de7d048c4c6c3",
+      "bytes": 449
+    },
+    {
+      "laneRelative": "tests/support-eval/cases/sup-e-04.json",
+      "sha256": "4ac456f166bf5b8fc30de30aa95284d311ebd7f07974cad34dd319669ee7da77",
+      "bytes": 432
+    },
+    {
+      "laneRelative": "tests/support-eval/cases/sup-e-05.json",
+      "sha256": "8f9b02589b831bbff28a7b11c7c65a21886e60e21888a293e734846ebdd0b60d",
+      "bytes": 437
+    },
+    {
+      "laneRelative": "tests/support-eval/cases/sup-e-06.json",
+      "sha256": "4995cc7685c4fcb8c73b562de3a1f6310413f57b3261a203be8180e5745102fa",
+      "bytes": 440
+    },
+    {
+      "laneRelative": "tests/support-eval/run.ts",
+      "sha256": "e76d84478bd6d0c98c9b448bdf5b5036bd1d615f21d801afa1f2896d08503bb6",
+      "bytes": 25752
+    },
+    {
+      "laneRelative": "tests/unit/s7-authorization.test.ts",
+      "sha256": "1a6607403b51a50067fa31e96bc00b9ee0b01c187906b315061b132bb7bf3bb2",
+      "bytes": 19691
+    },
+    {
+      "laneRelative": "tests/unit/support-public-guide-boundary.test.ts",
+      "sha256": "8465c87167a3c2e9dc97f5810ffc12841286c211addcb949ea013d172bcead9b",
+      "bytes": 1133
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_ACTION_COMPOSE",
+  "ticket": "t_3ffab684",
+  "measuredRevision": "b0b91a01cf161d17eef75577cbae94c629b7bc49",
+  "retainedForRevision": "c8784902f78ed4ba1d637d122e1f32f598415f4e",
+  "retentionBasis": "The only commit between measuredRevision and retainedForRevision changes test mock typing in tests/unit/support-answer-context.test.ts; runtime and evaluation-defining bytes are unchanged.",
+  "unchangedRuntimeAndEvalFiles": [
+    {
+      "laneRelative": "packages/support-kb/src/context.ts",
+      "sha256": "9c3b2909ac5b363dc93ba95ca1201f028b945bac799d81a7dc8f298c948cfdc3",
+      "bytes": 20217
+    },
+    {
+      "laneRelative": "apps/api/src/support/answer.ts",
+      "sha256": "16e1eb66a8f72a0bed59c00ab879bcddd54e191de5046baec8610d859ec77c76",
+      "bytes": 22479
+    },
+    {
+      "laneRelative": "tests/support-eval/run.ts",
+      "sha256": "2fdaf41e996700b32c92b2c99984e26abb1e7ace3422105f266868ee1a8a19cd",
+      "bytes": 26896
+    }
+  ],
+  "command": [
+    "pnpm",
+    "run",
+    "support:eval"
+  ],
+  "exitCode": 1,
+  "exitMeaning": "PENDING_INDEPENDENT_QUALITY_RUBRIC",
+  "mode": "deterministic-structural",
+  "runs": [
+    {
+      "run": 1,
+      "passed": 60,
+      "applicable": 60
+    },
+    {
+      "run": 2,
+      "passed": 60,
+      "applicable": 60
+    },
+    {
+      "run": 3,
+      "passed": 60,
+      "applicable": 60
+    }
+  ],
+  "classes": {
+    "A": {
+      "passed": 20,
+      "applicable": 20
+    },
+    "B": {
+      "passed": 6,
+      "applicable": 6
+    },
+    "C": {
+      "passed": 10,
+      "applicable": 10
+    },
+    "D": {
+      "passed": 12,
+      "applicable": 12
+    },
+    "E": {
+      "passed": 6,
+      "applicable": 6
+    },
+    "F": {
+      "passed": 3,
+      "applicable": 3
+    },
+    "G": {
+      "passed": 3,
+      "applicable": 3
+    }
+  },
+  "realFirstToken": "NOT_APPLICABLE",
+  "rubric": "PENDING",
+  "executedLog": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ACTION_COMPOSE-eval-escalated.log",
+    "sha256": "0b1d900ac71ac3c314a5de75a16561a004c0436a506c6d1285fd2e0d31c95aa6",
+    "bytes": 4772
+  },
+  "preservedSandboxFailure": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ACTION_COMPOSE-eval.log",
+    "sha256": "fb0d6cbdf3811bf264c88984f70e8e469de01efe1a9e64e109a59dcb8fec5f17",
+    "bytes": 1278,
+    "exitMeaning": "TSX_IPC_LISTENER_EPERM_BEFORE_EVALUATION"
+  },
+  "measuredAt": "2026-09-17T16:02:13.871701Z"
+}

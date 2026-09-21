@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE26",
+  "ticket": "t_0fbb505d",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "STOPPED_PHASE1_OPERATOR_LOG_COLLISION",
+  "loaderPrerequisite": {
+    "status": 0,
+    "invocationPrefix": ["/Users/vladmihaimiron/.local/bin/node", "--import", "tsx"],
+    "publicModulesImported": 2,
+    "privateReads": 0,
+    "runtimeReads": 0,
+    "traffic": 0
+  },
+  "orchestration": {
+    "invocation": [
+      "/Users/vladmihaimiron/.local/bin/node",
+      "--import",
+      "tsx",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_LIVE26/run-seven-phases.mjs"
+    ],
+    "normalExecutionPermission": true,
+    "stage": "PHASE1_PREFLIGHT",
+    "status": 1,
+    "cause": "The operator opened the contract preflight.log before invoking phase-preflight; phase-preflight requires every future phase output/log to remain absent before launching its UI child."
+  },
+  "phaseStatuses": {
+    "preflight": "FAILED_BEFORE_UI_CHILD",
+    "readiness": "NOT_RUN",
+    "capacity": "NOT_RUN",
+    "gate": "NOT_RUN",
+    "rowProof": "NOT_RUN",
+    "capture": "NOT_RUN",
+    "idle": "NOT_RUN"
+  },
+  "operationalPathCustody": {
+    "checked": 112,
+    "created": [
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE25-preflight.log"
+    ],
+    "createdCount": 1,
+    "absentCount": 111,
+    "preflightStatusOutputAbsent": true,
+    "uiOutputAbsent": true,
+    "uiLogAbsent": true,
+    "actualReceiptAbsent": true,
+    "screenshotsAbsent": true
+  },
+  "nodeArtifacts": {
+    "prerequisite": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE26-prerequisites.json",
+    "stop": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE26-stop.json",
+    "loaderLog": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE26-loader-prerequisite.log"
+  },
+  "actualCapture": {
+    "attemptedRequests": 0,
+    "completedRequests": 0,
+    "newSessions": 0,
+    "modelCalls": 0,
+    "sessionCreationTimestamps": []
+  },
+  "traffic": {
+    "uiChild": 0,
+    "supportStatus": 0,
+    "capacityDatabaseQueries": 0,
+    "support": 0,
+    "model": 0
+  },
+  "runtime": {
+    "pid": 12272,
+    "pgid": 12272,
+    "commandMarker": "pnpm dev:auth:up",
+    "postFailureProcess": "PASS",
+    "ordinarySystemTlsHelpStatus": 200,
+    "leftDetached": true
+  },
+  "successorCorrection": {
+    "scope": "thin operator only",
+    "requirements": [
+      "Do not pre-create any wrapper-owned contract output or log.",
+      "Use a distinct operator-only log, inherited output, or buffer and persist wrapper output only after the preflight absence check completes.",
+      "Use a fresh preflight log binding because the LIVE25 preflight log is now occupied.",
+      "Retain every other unused LIVE25 and GUIDE21 path."
+    ]
+  },
+  "limits": [
+    "No same-node retry after phase1 failure.",
+    "No capacity frame was read.",
+    "No Support or model request occurred.",
+    "Forgot remains unresolved/actionless."
+  ]
+}

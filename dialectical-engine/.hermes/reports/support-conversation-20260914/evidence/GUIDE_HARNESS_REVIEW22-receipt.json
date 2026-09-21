@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW22",
+  "ticket": "t_0be61e3a",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "REWORK_BOUNDED_FINAL_CONTRACT_SELF_BINDING",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW22.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW22.md",
+      "sha256": "d0100b1efc7e0fc2868383d2f4440a3bf7e3073acf7a0e5fe23e08caf655a396",
+      "bytes": 4870
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW22-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW22-dispositions.json",
+      "sha256": "cc9517fe1a395801b592f54e5248fb9bdd9b28f41cb86b69318ea887aeea6879",
+      "bytes": 3589
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW22-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW22-custody.json",
+      "sha256": "3af1a0758a76bb9b66858e7ee11076c274a6a68382d35aa38978e997f22f9c54",
+      "bytes": 1305
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW22.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW22.md",
+      "sha256": "f2f559918af4408ec233b33c6cbaff5cad9621206af7166de72bcc85f1ffa2fd",
+      "bytes": 2556
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "heavyLeaseHeld": false,
+  "finding": "All seven FIX22 phase argv arrays load BIND21 contract; binding proof hashes predecessor contract.",
+  "retained": [
+    "GUIDE21 row provenance correction passes.",
+    "Owner output pre-reader reservation and zero-reader collision negative pass.",
+    "Full58 and screenshot proof remain retained."
+  ]
+}

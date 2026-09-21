@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW25",
+  "ticket": "t_3962b425",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "freeze": "8ac36d406e32bdf4a2f768d28b216d929e65c967",
+  "fix25Receipt": {
+    "sha256": "222c98f001b98012cfa65d898566ec3a5208803d3639c099c870bab9fd8fb842"
+  },
+  "fix25Consumption": {
+    "sha256": "b95615564c489f3bc1c3b660805f6ddd58fd687c202fd4c2944182078a666000"
+  },
+  "manifest": {
+    "artifacts": 45,
+    "verified": 45,
+    "mismatches": 0
+  },
+  "receiptArtifacts": {
+    "artifacts": 46,
+    "verified": 46,
+    "mismatches": 0
+  },
+  "indexedInputs": {
+    "inputs": 117,
+    "verified": 117,
+    "mismatches": 0
+  },
+  "actualCommandContract": {
+    "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX25-command-contract.json",
+    "sha256": "f9c73d53a70f3474d41c6fd094e7a5b0fdd632919e8df35c72df6ab9c4b5ff0e",
+    "bytes": 10160
+  },
+  "realGated58Proof": {
+    "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-FIX25-FINAL-GATE.json",
+    "sha256": "104b78a1e92c1f42b9bad338633d7a470dec753c288259c3de39b86f74f00d44",
+    "bytes": 60470,
+    "passed": 58,
+    "rows": 58
+  },
+  "captureDependency": {
+    "rowProofStatusPath": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-row-proof-status.json",
+    "rowProofResultPath": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-LIVE25.json",
+    "consumedBySharedPhaseCapture": false,
+    "consumedByCaptureChild": false
+  },
+  "ownerContract": {
+    "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX22-owner-capacity-contract.json",
+    "sha256": "df5580ba8dd47e354a74aa04b8308d7b626564bd116076b682b1f6d0037d03fc",
+    "bytes": 1591
+  },
+  "reviewMode": "STATIC_READ_ONLY",
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

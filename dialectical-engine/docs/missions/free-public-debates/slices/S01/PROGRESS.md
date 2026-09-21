@@ -25,3 +25,5 @@
 | 2026-09-21 05:18 | FIX-A | t_728887e1 | READY consumed — `c358d494` (0070); slice verified at head under both locales, zero skips |
 
 - 2026-09-21 — REV(S01) pass 2 (scoped) = **PASS** (3/3 lenses) at `c358d494` · union `reviews/REV-S01-p2-UNION.md` · residue t_09a194c6 · t_154f3a17 · t_4b66f080 · **next: TEST(S01) — V's personal walk of SPEC-v3 §4 (step 4 per DECISIONS §31). Not Done until V's veto.**
+
+- 2026-09-21 — V ordered the merge BEFORE the veto: S01 + the support-conversation work = ONE local commit on integration/all. LIVE finding L1 (API refused to boot: 0066:21 grant vs the erasure role's exact set) → FIX 86b391a0 (migration 0071) → REV pass 3 (scoped, the cap) = **PASS** 2/2 · `reviews/REV-S01-p3-UNION.md`. **Served at https://localhost:3000. Next: TEST(S01) — V's. Needs a Free-tier model (keys or roster are V's). Not Done until V's veto.**

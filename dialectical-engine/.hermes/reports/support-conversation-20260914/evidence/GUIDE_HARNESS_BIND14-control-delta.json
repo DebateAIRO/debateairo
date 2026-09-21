@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND14",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "finding": "FULL_PUBLIC_READINESS_AND_EXACT_BLOCKED_PAGE_READ_CLASSIFICATION",
+  "disposition": "HARNESS_CORRECTED_LIVE_PROBE_STILL_REQUIRED_NO_PRODUCT_DEFECT_PROVED",
+  "controls": {
+    "previous": 120,
+    "current": 127,
+    "retained": 120,
+    "added": 7,
+    "names": [
+      "full readiness projection is fixed and surface specific",
+      "full readiness classifier distinguishes public preconditions",
+      "full readiness preserves nonempty Support state on same locale remount",
+      "full readiness changes locale once only at the planned session boundary",
+      "full capture call sites retain the exact five session boundary plan",
+      "failed full interaction checkpoints its closed predicate",
+      "blocked Support classifier isolates only the automatic case list read"
+    ]
+  },
+  "unchangedContracts": {
+    "matrixRows": 54,
+    "suiteFiles": 34,
+    "productFiles": 144,
+    "compactOneClick": true
+  },
+  "harnessDelta": [
+    {
+      "path": "README.md",
+      "bytes": 4718,
+      "sha256": "2c142080008e60df010ddd2b5245e5fd33e9decb947ccb81932bcb7c0dc004ee",
+      "status": "CHANGED",
+      "previousSha256": "e439fc306c0092c47a45d29180c86e21cc9e7f70b490a444e7be02492fccf000",
+      "previousBytes": 5507
+    },
+    {
+      "path": "build-final9-inventory.mjs",
+      "bytes": 4832,
+      "sha256": "907dfec63fc3a55dc6b733e8043be9ec15286d2a0e5a295df1114ae660356093",
+      "status": "CHANGED",
+      "previousSha256": "13b1624af38e9eeeeadf0f403589ce90fddbd7d16d0bdaec16c3d9c4f570dbea",
+      "previousBytes": 4832
+    },
+    {
+      "path": "capture-public-guide.mjs",
+      "bytes": 23923,
+      "sha256": "52f313bcb7a1eb5fa7047084fadd0dde184482a81575d223eaa3f2f521568b56",
+      "status": "CHANGED",
+      "previousSha256": "a46fac9feeaa9ea76d224e9fe7320acaa61429898868eb44363cb2b1d3b86eba",
+      "previousBytes": 21322
+    },
+    {
+      "path": "controls.mjs",
+      "bytes": 41120,
+      "sha256": "325a2b22d4870fa56b862e36c02f94d0efb2fe5dbdb978109207c296194b18c4",
+      "status": "CHANGED",
+      "previousSha256": "216c754353b9f2ed191135a9716e4b69c4513d11d702959440c9da62bc7e8602",
+      "previousBytes": 35710
+    },
+    {
+      "path": "gate-contract.json",
+      "bytes": 4552,
+      "sha256": "a06a7ad7b1e328f5432a4ac9403436f87aab15427410c63cec0b55d93b3b8680",
+      "status": "UNCHANGED",
+      "previousSha256": "a06a7ad7b1e328f5432a4ac9403436f87aab15427410c63cec0b55d93b3b8680",
+      "previousBytes": 4552
+    },
+    {
+      "path": "matrix.mjs",
+      "bytes": 14253,
+      "sha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+      "status": "UNCHANGED",
+      "previousSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+      "previousBytes": 14253
+    },
+    {
+      "path": "package-evidence.mjs",
+      "bytes": 16464,
+      "sha256": "a0dff5243d14e6506b966e6ed25314764e43404e15503bd9b84dce87650a2ee3",
+      "status": "CHANGED",
+      "previousSha256": "838d1c0fa35ae638f91cf5ca641706a43b278745f45ebf4f74baae658774b121",
+      "previousBytes": 15294
+    },
+    {
+      "path": "pre-request-verifier.ts",
+      "bytes": 16751,
+      "sha256": "d5d6656431f93e3089c9c6751ae767b401d21f23bb90d398fa99a051af0ead39",
+      "status": "UNCHANGED",
+      "previousSha256": "d5d6656431f93e3089c9c6751ae767b401d21f23bb90d398fa99a051af0ead39",
+      "previousBytes": 16751
+    },
+    {
+      "path": "probe-zero-request-ui.mjs",
+      "bytes": 12436,
+      "sha256": "6fec8d16353b31116d95540012139f21b200e9cb697ec1f733b2ffad05573b4d",
+      "status": "CHANGED",
+      "previousSha256": "def6e1b8a7bda541a999a7bfa457d6f8637a802d2ac6013dab9af61bea8153c4",
+      "previousBytes": 10172
+    },
+    {
+      "path": "run-final-controls.mjs",
+      "bytes": 10492,
+      "sha256": "334822ad20a542672ff84d26ad3d9e37a1c11f3d7b7b9feba6124c438ad284c4",
+      "status": "CHANGED",
+      "previousSha256": "6cb72a3ceee592b33c3485db826cb21a1cb4c360843b984357745d5c4a81e3a6",
+      "previousBytes": 10523
+    },
+    {
+      "path": "runtime-capacity.mjs",
+      "bytes": 9935,
+      "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87",
+      "status": "UNCHANGED",
+      "previousSha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87",
+      "previousBytes": 9935
+    },
+    {
+      "path": "seal-receipt-final.mjs",
+      "bytes": 5364,
+      "sha256": "ef9f8bde4755fb7ffc60596b97ff4dcdee163c5b575a1a2bc8272dac4f3f68ee",
+      "status": "CHANGED",
+      "previousSha256": "c4930c4b24306c3e8310f6b58bb2389933b58927733a0a0a0b8df356cf76cd70",
+      "previousBytes": 5944
+    },
+    {
+      "path": "seal-receipt.mjs",
+      "bytes": 64,
+      "sha256": "557a50f547ecc98b12a012cafafe560f913767bc38650258878854f0c79748e1",
+      "status": "CHANGED",
+      "previousSha256": "cd3a2aeb5845bfcbf3ff4730513d618b15d24b626d6436f4f79d7b04b2ab4985",
+      "previousBytes": 4864
+    },
+    {
+      "path": "session-lifecycle.mjs",
+      "bytes": 4254,
+      "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b",
+      "status": "UNCHANGED",
+      "previousSha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b",
+      "previousBytes": 4254
+    },
+    {
+      "path": "verify-final-branches.ts",
+      "bytes": 5131,
+      "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a",
+      "status": "UNCHANGED",
+      "previousSha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a",
+      "previousBytes": 5131
+    },
+    {
+      "path": "verify-fix9-red.mjs",
+      "bytes": 1641,
+      "sha256": "09f194ae1f401a4bbe8c0ebaa1e461e6201e93c13c22b6b8babc8129da7fc977",
+      "status": "UNCHANGED",
+      "previousSha256": "09f194ae1f401a4bbe8c0ebaa1e461e6201e93c13c22b6b8babc8129da7fc977",
+      "previousBytes": 1641
+    },
+    {
+      "path": "verify-guide-harness.mjs",
+      "bytes": 76385,
+      "sha256": "bcf47454b4d744caf96b3ad7558f4121bb4bc1e8d81d410cf180ba153b4c9201",
+      "status": "CHANGED",
+      "previousSha256": "48918434fb8212dd8aa805e06488795f2c48030fc7f91e2e5c18a3b9b5d29a74",
+      "previousBytes": 68646
+    }
+  ],
+  "adapterDelta": [
+    {
+      "path": "README.md",
+      "bytes": 665,
+      "sha256": "0f93dd950abacb15d98da996f151f3b9d56e3e7711f11ab4e9a43f958fd5698f",
+      "status": "CHANGED",
+      "previousSha256": "cb79949d6e8a189cd8a23f3095721d7885b35fb22a1790e657a92c8b7cdbb6fb",
+      "previousBytes": 1402
+    },
+    {
+      "path": "replay-row-proofs.mjs",
+      "bytes": 6478,
+      "sha256": "2f54cb5c5ad64ce61cfcab3ca5fc83707d84b92a97dd0a58a7250dceef4086b6",
+      "status": "CHANGED",
+      "previousSha256": "5926c4e4a86c3367d016dc412177bd3859f7a8b2ebba479d2871da946b595c84",
+      "previousBytes": 6478
+    },
+    {
+      "path": "reviewed-harness-custody.mjs",
+      "bytes": 1417,
+      "sha256": "363acc139a4cc9af86038510d7cc71b9ce22d8e967d5acb6b120805ba5231a00",
+      "status": "CHANGED",
+      "previousSha256": "e4ba2a6dfa579cfff5f6fbe91957804aeb3799269a7c8dd3760ebf115c7f4d6a",
+      "previousBytes": 1417
+    },
+    {
+      "path": "verify-negative-fixture.mjs",
+      "bytes": 1361,
+      "sha256": "da1f92061201e1f8211e3de17f0f11789368b78dcd2ff78df851cdf2ccaf2b84",
+      "status": "CHANGED",
+      "previousSha256": "8e4c990aaa55669d2d78fdfdf074f2f123edb4074592d7e5774507bc19082566",
+      "previousBytes": 1361
+    }
+  ],
+  "productPatch": false,
+  "liveProbeExecuted": false,
+  "actualCaptureExecuted": false
+}

@@ -1,0 +1,186 @@
+diff --git a/dialectical-engine/packages/kernel/src/support-credentials.ts b/dialectical-engine/packages/kernel/src/support-credentials.ts
+index 1eb338e9ca08ec09a3f0c02c5dc20ae9cac58c21..90aaab04ac612e69a8d717dd4194414db23401f4 100644
+--- a/dialectical-engine/packages/kernel/src/support-credentials.ts
++++ b/dialectical-engine/packages/kernel/src/support-credentials.ts
+@@ -48,20 +48,36 @@ type NormalizedText = Readonly<{
+ 
+ type Scope = Readonly<{ start: number;end: number;sentence: number }>;
+ 
++const ROMANIAN_CODE_NOUN_PATTERN = String.raw`cod(?:ul|ului|uri|urile|urilor)?`;
++
+ const TERM_PATTERNS: readonly Readonly<{
+   kind: SupportCredentialKind;pattern: RegExp;
+ }>[] = Object.freeze([
+-  { kind: "recovery-code",pattern: /\b(?:recovery\s+codes?|cod(?:ul|urile)?\s+de\s+recuperare)\b/giu },
+-  { kind: "verification-code",pattern: /\b(?:verification\s+codes?|cod(?:ul|urile)?\s+de\s+verificare)\b/giu },
+-  { kind: "security-code",pattern: /\b(?:security\s+codes?|cod(?:ul|urile)?\s+de\s+securitate)\b/giu },
+-  { kind: "authentication-code",pattern: /\b(?:authentication\s+codes?|cod(?:ul|urile)?\s+de\s+autentificare)\b/giu },
++  { kind: "recovery-code",pattern: new RegExp(
++    String.raw`\b(?:recovery\s+codes?|${ROMANIAN_CODE_NOUN_PATTERN}\s+de\s+recuperare)\b`,"giu"
++  ) },
++  { kind: "verification-code",pattern: new RegExp(
++    String.raw`\b(?:verification\s+codes?|${ROMANIAN_CODE_NOUN_PATTERN}\s+de\s+verificare)\b`,"giu"
++  ) },
++  { kind: "security-code",pattern: new RegExp(
++    String.raw`\b(?:security\s+codes?|${ROMANIAN_CODE_NOUN_PATTERN}\s+de\s+securitate)\b`,"giu"
++  ) },
++  { kind: "authentication-code",pattern: new RegExp(
++    String.raw`\b(?:authentication\s+codes?|${ROMANIAN_CODE_NOUN_PATTERN}\s+de\s+autentificare)\b`,"giu"
++  ) },
+   { kind: "reset-token",pattern: /\b(?:reset\s+tokens?|token(?:ul|urile)?\s+de\s+resetare)\b/giu },
+   { kind: "credentials",pattern: /\b(?:credentials?|date(?:le)?\s+de\s+autentificare)\b/giu },
+   { kind: "authenticator",pattern: /\b(?:authenticator(?:\s+codes?)?|autentificator(?:ul|ele|ului)?(?:\s+codes?)?)\b/giu },
+   { kind: "passcode",pattern: /\bpasscodes?\b/giu },
+-  { kind: "totp",pattern: /\b(?:(?:cod(?:ul|urile)?\s+)?totp(?:\s+codes?)?)\b/giu },
+-  { kind: "mfa",pattern: /\b(?:(?:cod(?:ul|urile)?\s+)?mfa(?:\s+codes?)?)\b/giu },
+-  { kind: "otp",pattern: /\b(?:(?:cod(?:ul|urile)?\s+)?otp(?:s|ul|urile)?(?:\s+codes?)?)\b/giu },
++  { kind: "totp",pattern: new RegExp(
++    String.raw`\b(?:(?:${ROMANIAN_CODE_NOUN_PATTERN}\s+)?totp(?:\s+codes?)?)\b`,"giu"
++  ) },
++  { kind: "mfa",pattern: new RegExp(
++    String.raw`\b(?:(?:${ROMANIAN_CODE_NOUN_PATTERN}\s+)?mfa(?:\s+codes?)?)\b`,"giu"
++  ) },
++  { kind: "otp",pattern: new RegExp(
++    String.raw`\b(?:(?:${ROMANIAN_CODE_NOUN_PATTERN}\s+)?otp(?:s|ul|urile)?(?:\s+codes?)?)\b`,"giu"
++  ) },
+   { kind: "password",pattern: /\b(?:password(?:s|ul|urile)?|parol(?:a|e|ele|ei|elor)?)\b/giu }
+ ]);
+ 
+diff --git a/dialectical-engine/tests/integration/support-cases.test.ts b/dialectical-engine/tests/integration/support-cases.test.ts
+index 5e785aca4c1886312c9ae7e1d8be4664c7aec258..50b504fcfa56164bf64b76e4b50b16a3c1d2a519 100644
+--- a/dialectical-engine/tests/integration/support-cases.test.ts
++++ b/dialectical-engine/tests/integration/support-cases.test.ts
+@@ -431,6 +431,10 @@ describe("SUP-02 cases", () => {
+       "The advisory summary was omitted because it did not pass Support safety checks."]
+     ,["ro","Asistența nu cere parole, plus le poate primi.",
+       "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței."]
++    ,["ro","Asistența nu cere coduri de autentificare; de asemenea le poate valida.",
++      "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței."]
++    ,["ro","Asistența nu cere coduri de securitate; în plus le poate verifica.",
++      "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței."]
+     ,["en","Network=%5C%5Cserver%5Cshare to continue.",
+       "The advisory summary was omitted because it did not pass Support safety checks."]
+   ] as const)("replaces an unsafe %s advisory summary before seal and persistence", async (
+diff --git a/dialectical-engine/tests/unit/support-answer-context.test.ts b/dialectical-engine/tests/unit/support-answer-context.test.ts
+index debb5f8c58fb5b730350429631dcd6e6f85ba219..e319f65bdcb0a139b4837bf84e7ce35df55e879f 100644
+--- a/dialectical-engine/tests/unit/support-answer-context.test.ts
++++ b/dialectical-engine/tests/unit/support-answer-context.test.ts
+@@ -309,6 +309,8 @@ describe("CP1 composed answer context", () => {
+     "Support does not request passwords, in addition it accepts them.",
+     "Asistența nu cere parole, plus le poate primi.",
+     "Asistența nu cere parole, în plus le poate primi.",
++    "Asistența nu cere coduri de autentificare; de asemenea le poate valida.",
++    "Asistența nu cere coduri de securitate; în plus le poate verifica.",
+     "Network=%5C%5Cserver%5Cshare to continue."
+   ])("keeps a rejected transformed completion out of assistant storage and return: %s", async (
+     hostile
+diff --git a/dialectical-engine/tests/unit/support-credentials.test.ts b/dialectical-engine/tests/unit/support-credentials.test.ts
+index c76e55fa8881cec5423c7c36027c643aac7ed5f4..2373da4315eb34e7ccde6ce73e17aaa414f7427f 100644
+--- a/dialectical-engine/tests/unit/support-credentials.test.ts
++++ b/dialectical-engine/tests/unit/support-credentials.test.ts
+@@ -3,6 +3,31 @@ import { describe,expect,it } from "vitest";
+ import { analyzeSupportCredentialText } from "../../packages/kernel/src/support-credentials.js";
+ 
+ describe("Support credential lexical facts", () => {
++  const romanianCodeNouns = ["cod","codul","codului","coduri","codurile","codurilor"] as const;
++  const romanianNamedCodeKinds = [
++    ["recuperare","recovery-code"],
++    ["verificare","verification-code"],
++    ["securitate","security-code"],
++    ["autentificare","authentication-code"]
++  ] as const;
++
++  it.each(romanianCodeNouns.flatMap((noun) => romanianNamedCodeKinds.map(([category,kind]) => [
++    `${noun} de ${category}`,kind
++  ] as const)))("recognizes the shipped Romanian code category %s", (text,kind) => {
++    expect(analyzeSupportCredentialText(text).credentialTerms).toEqual([
++      expect.objectContaining({ kind,start: 0,end: text.length })
++    ]);
++  });
++
++  it.each([
++    ["coduri TOTP","totp"],
++    ["codurilor MFA","mfa"],
++    ["codului OTP","otp"]
++  ] as const)("recognizes the Romanian code noun in acronym category %s", (text,kind) => {
++    expect(analyzeSupportCredentialText(text).credentialTerms)
++      .toEqual([expect.objectContaining({ kind })]);
++  });
++
+   it.each([
+     ["password","My password is inert-orchid-7","inert-orchid-7"],
+     ["password","Passwordul meu este inert-stejar-7","inert-stejar-7"],
+@@ -105,8 +130,11 @@ describe("Support credential lexical facts", () => {
+     "Asistența nu cere parole, plus le poate primi.",
+     "Asistența nu cere parole, în plus le poate primi.",
+     "Asistența nu cere parole, de asemenea le poate primi."
++    ,"Asistența nu cere coduri de autentificare; de asemenea le poate valida."
+   ])("starts a separate positive modal or auxiliary operation group: %s", (text) => {
+-    expect(analyzeSupportCredentialText(text).operations.some(({ negated }) => !negated)).toBe(true);
++    const facts = analyzeSupportCredentialText(text);
++    expect(facts.credentialTerms.length).toBeGreaterThan(0);
++    expect(facts.operations.some(({ negated }) => !negated)).toBe(true);
+   });
+ 
+   it.each([
+@@ -116,6 +144,7 @@ describe("Support credential lexical facts", () => {
+     "Support does not request passwords, moreover it does not use them.",
+     "Asistența nu cere parole, în plus nu le primește.",
+     "Asistența nu cere parole, de asemenea nu le verifică."
++    ,"Asistența nu cere coduri de autentificare; de asemenea nu le poate valida."
+   ])("keeps each additive operation group independently negated: %s", (text) => {
+     const operations = analyzeSupportCredentialText(text).operations;
+     expect(operations.length).toBeGreaterThan(1);
+diff --git a/dialectical-engine/tests/unit/support-redaction.test.ts b/dialectical-engine/tests/unit/support-redaction.test.ts
+index b6d855a98ffec84cdfa6ad58c4146afb377868fb..44663f06c1a52bf7c2b8bfed23b29a25597b7d10 100644
+--- a/dialectical-engine/tests/unit/support-redaction.test.ts
++++ b/dialectical-engine/tests/unit/support-redaction.test.ts
+@@ -27,6 +27,9 @@ describe("CP1 Support credential redaction", () => {
+     ["My pass\u200Bword is inert-birch-7","inert-birch-7"],
+     ["Paro\u200Bla mea este inert-fag-7","inert-fag-7"],
+     ["Codurile de recuperare sunt INERTRECOVERY","INERTRECOVERY"],
++    ["Coduri de autentificare: INERTAUTHCODES","INERTAUTHCODES"],
++    ["Codului de verificare = INERTVERIFY","INERTVERIFY"],
++    ["Codurilor de securitate: INERTSECURITY","INERTSECURITY"],
+     ["Datele de autentificare sunt INERTAUTH","INERTAUTH"]
+     ,['My password is "inert horse battery".',"inert horse battery"]
+     ,["Parola mea este „inert cal albastru”.","inert cal albastru"]
+diff --git a/dialectical-engine/tests/unit/support-response-policy.test.ts b/dialectical-engine/tests/unit/support-response-policy.test.ts
+index c86dfdd19a1282215d2343b853732dcd0b0eec5b..026ecf475fc4cb60259d08a32599dc6c85c445a1 100644
+--- a/dialectical-engine/tests/unit/support-response-policy.test.ts
++++ b/dialectical-engine/tests/unit/support-response-policy.test.ts
+@@ -171,6 +171,10 @@ describe("CP1 support model response policy", () => {
+     "Asistența nu cere parole, plus le poate primi.",
+     "Asistența nu cere parole, în plus le poate primi.",
+     "Asistența nu cere parole, de asemenea le poate primi."
++    ,"Asistența nu cere coduri de recuperare; de asemenea le poate valida."
++    ,"Asistența nu cere coduri de verificare; de asemenea le poate valida."
++    ,"Asistența nu cere coduri de securitate; de asemenea le poate valida."
++    ,"Asistența nu cere coduri de autentificare; de asemenea le poate valida."
+   ])("rejects a positive credential operation in a new modal group: %s", (text) => {
+     expect(parseSupportDraft(raw(text,{ actionIds: [] }))).toBeNull();
+     expect(parseSupportCaseSummaryDraft(JSON.stringify({
+@@ -185,6 +189,10 @@ describe("CP1 support model response policy", () => {
+     "Support does not request passwords, moreover it does not use them.",
+     "Asistența nu cere parole, în plus nu le primește.",
+     "Asistența nu cere parole, de asemenea nu le verifică."
++    ,"Asistența nu cere coduri de recuperare; de asemenea nu le poate valida."
++    ,"Asistența nu cere coduri de verificare; de asemenea nu le poate valida."
++    ,"Asistența nu cere coduri de securitate; de asemenea nu le poate valida."
++    ,"Asistența nu cere coduri de autentificare; de asemenea nu le poate valida."
+   ])("accepts independently negated additive operation groups: %s", (text) => {
+     expect(parseSupportDraft(raw(text,{ actionIds: [] }))).not.toBeNull();
+     expect(parseSupportCaseSummaryDraft(JSON.stringify({
+diff --git a/dialectical-engine/tests/unit/support-security-guidance.test.ts b/dialectical-engine/tests/unit/support-security-guidance.test.ts
+index db4a8683d5d2b43371a1da1aa1eae69c5d813725..48fc043e9a8e660fcdde23cac0dd6d4ae1a2c179 100644
+--- a/dialectical-engine/tests/unit/support-security-guidance.test.ts
++++ b/dialectical-engine/tests/unit/support-security-guidance.test.ts
+@@ -20,6 +20,8 @@ describe("CP1 deterministic Forgot password guidance", () => {
+   it.each([
+     "Where is my saved MFA recovery code?",
+     "Unde este codul de recuperare MFA salvat?",
++    "Codurile de autentificare rămân private.",
++    "Authentication codes remain private.",
+     "How do I change my password?"
+   ])("keeps saved-MFA and ordinary password requests distinct: %s", (text) => {
+     expect(classifySecurityNavigation(text)).toBeNull();

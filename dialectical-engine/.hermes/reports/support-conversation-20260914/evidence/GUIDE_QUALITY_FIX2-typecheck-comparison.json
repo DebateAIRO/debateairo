@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "revision": "5d6e028ae5defc24e0690219d6128949e73b750d",
+  "command": [
+    "pnpm",
+    "run",
+    "typecheck"
+  ],
+  "exitCode": 1,
+  "diagnostics": 76,
+  "baselineDiagnostics": 76,
+  "byteIdenticalToBaseline": true,
+  "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+  "baselineLog": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX-typecheck.log",
+  "finalLog": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX2-typecheck-final.log",
+  "introducedDiagnostics": 0,
+  "preservedFailedAttempt": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX2-typecheck.log"
+}

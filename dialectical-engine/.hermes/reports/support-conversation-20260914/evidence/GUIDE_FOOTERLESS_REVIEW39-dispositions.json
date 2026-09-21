@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FOOTERLESS_REVIEW39",
+  "ticket": "t_f0af1892",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_FOOTERLESS_HELPER_CALL_CONTRACT",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "dispositions": [
+    {"id":"CALL_CONTRACT","result":"PASS","basis":"Exact API and visible source/action equality precedes derivation of sourceIds, actionIds and footerExpected; helper independently matches the complete expected-layout object to API."},
+    {"id":"ABSENT_FOOTER","result":"PASS","basis":"Footerless BODY_END is admitted only for exact empty API/DOM source and action projections and actual footer absence."},
+    {"id":"MISSING_EXPECTED_FOOTER","result":"PASS","basis":"A validated nonempty source/action projection with no rendered footer fails GUIDE_CAPTURE_EXPECTED_FOOTER_MISSING and writes safe geometry/restoration evidence."},
+    {"id":"CURRENT_IDENTITY","result":"PASS","basis":"Article count, newly added assistant index, role, exact text, source labels and action label/href pairs are checked before geometry; stale previous target fails before capture."},
+    {"id":"SHORT_FULL_COMPACT_EN_RO","result":"PASS","basis":"Actual-size final2 images visibly contain each complete short body in full/compact and EN/RO; contained start/end pairs are byte-identical and expanded images remain separately labeled."},
+    {"id":"LONG_BODY_BOUNDARY","result":"PASS","basis":"Normal-pane start visibly includes line1; forward-scrolled normal-pane end includes line60 and has painted contained body-end geometry; expanded image visibly contains all60 lines."},
+    {"id":"MOVEMENT_RESTORATION","result":"PASS","basis":"Only measured forward movement is allowed for below-pane body end; success and failure restore pane position and viewport, while expanded capture restores styles and ancestor/page scroll."},
+    {"id":"FIX38_FOOTER_BRANCH","result":"PASS_RETAINED","basis":"The source/action footer branch keeps FIX38 reveal, strict containment, paint and restoration behavior; the delta selects BODY_END only for the validated footerless case."},
+    {"id":"CONTROLS","result":"PASS","basis":"9/9 sealed affected controls pass with zero operational traffic."},
+    {"id":"FAILED_FIXTURES","result":"PASS_PRESERVED","basis":"Strict Node message-equality and synthetic !important-height visual-QA failures remain disclosed; final2 resolves only those fixture defects."},
+    {"id":"ROW47_RECAPTURE","result":"NOT_REQUIRED","basis":"Existing row47 complete short original-pane evidence remains sufficient and must not be recaptured."},
+    {"id":"LIVE_BINDING","result":"UNVERIFIED_SEPARATE_REVIEW","basis":"FIX39 is intentionally unbound; incomplete BIND40 was not inspected."}
+  ],
+  "traffic": {"runtime":0,"browser":0,"http":0,"process":0,"status":0,"capacity":0,"database":0,"support":0,"model":0},
+  "heavyLeaseHeld": false
+}

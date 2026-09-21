@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_COMPLETION_REVIEW42",
+  "ticket": "t_6d597fc2",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "REWORK_BOUNDED_COMPLETION_STATE_INITIALIZATION",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "finding": {
+    "id": "GCR42-R1",
+    "predicate": "result?.sessionVersionFailure !== null",
+    "actualProducer": "sessionVersionFailure is absent from the capture result initializer and remains undefined on clean execution",
+    "impact": "The valid actual capture state always rejects before completed=true.",
+    "controlGap": "The positive stand-in manually supplies sessionVersionFailure:null and therefore does not exercise the actual initialized producer shape.",
+    "minimumCorrection": ["Initialize sessionVersionFailure:null in the actual capture result.","Make the valid control consume the same actual initialized shape/factory.","Retain non-null failure negative, exact-three validation and call ordering."]
+  },
+  "retainedPass": ["validation before completed/checkpoint/composer","exact-three timestamp validation","missing/extra/malformed/out-of-order/failure negatives","FIX41 producer/composer contract","seven FIX42 argv bindings","operator digest and ownership","115 future paths absent","all unrelated REVIEW41/40 dispositions"],
+  "traffic": {"runtime":0,"browser":0,"http":0,"process":0,"status":0,"capacity":0,"database":0,"support":0,"model":0},
+  "heavyLeaseHeld": false
+}

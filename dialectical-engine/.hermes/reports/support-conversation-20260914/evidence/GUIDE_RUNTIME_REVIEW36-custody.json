@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_RUNTIME_REVIEW36",
+  "ticket": "t_a0bea7dc",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "reviewedOn": "2026-09-21",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "productCheckout": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "head": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+    "porcelain": "",
+    "clean": true
+  },
+  "indexedInputs": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME_REVIEW36-inputs.json",
+    "matched": 82,
+    "total": 82,
+    "mismatches": 0
+  },
+  "processIdentityCounterexample": {
+    "custodyPid": 9800,
+    "custodyPgid": 9800,
+    "controlledPsPid": 123,
+    "controlledPsPpid": 1,
+    "controlledPsPgid": 123,
+    "readinessAccepted": true,
+    "idleAccepted": true,
+    "reason": "Both sources inspect command-marker inclusion only."
+  },
+  "finalBinding": {
+    "commandSha256": "30da55750cd96c3323234f988a07cf2961025db7ebe486176bd79858897e46e4",
+    "embeddedOperatorSha256": "30da55750cd96c3323234f988a07cf2961025db7ebe486176bd79858897e46e4",
+    "operatorScriptSha256": "293c8a65f70871b4be9cce21f13ca7a2aa522b1afc7c8c19a23d9ea91bce678a",
+    "hashGuardMatches": true
+  },
+  "futureAbsence": {
+    "declared": 123,
+    "unique": 123,
+    "absent": 123,
+    "present": 0
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

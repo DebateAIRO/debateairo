@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_GUARDFIX2",
+  "ticket": "t_4b36bd6a",
+  "baseRevision": "2ccb57fa061f74a81c8f2ef42bd33c768f00d4e0",
+  "finalRevision": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  "productFiles": [
+    {
+      "laneRelative": "apps/api/src/support/classify.ts",
+      "sha256": "dd358b8bb471a5a7cbdf38a080b2782a4115ef10b46d59662af5d5ec53a18baf",
+      "bytes": 18577
+    },
+    {
+      "laneRelative": "apps/api/src/support/public-guide-boundary.ts",
+      "sha256": "1d3a20e5c50adfdd2669fe6b99f256a66e9e9fe77a8ef457e79dd05c30900ff9",
+      "bytes": 5909
+    },
+    {
+      "laneRelative": "apps/api/src/support/recovery-intent.ts",
+      "sha256": "983cd60c3eb48b051153087453b74991d7a39c97825cc2c2a24cf2e1aa702ace",
+      "bytes": 8586
+    },
+    {
+      "laneRelative": "tests/integration/support-routes.test.ts",
+      "sha256": "e3906c29e22f01f48f66e2ae1a7e22c6c00e097e70c11f625db6ae7fb906e673",
+      "bytes": 136229
+    },
+    {
+      "laneRelative": "tests/unit/support-classify.test.ts",
+      "sha256": "94192bf33631793e634d861642faca06923ecb1718e8414438cf8d65e41f6e53",
+      "bytes": 64791
+    },
+    {
+      "laneRelative": "tests/unit/support-public-guide-boundary.test.ts",
+      "sha256": "eafdc9d754ab79e8cd07d97cfe1258ea232af35f333aa82950046bd4fda4f2ef",
+      "bytes": 5402
+    },
+    {
+      "laneRelative": "tests/unit/support-recovery-intent.test.ts",
+      "sha256": "65393c68e19b8c3ab600654c8eb4ea142b2382822f87089e97b85c100368d74f",
+      "bytes": 8614
+    }
+  ],
+  "scopeExact": true,
+  "clean": true,
+  "measuredAt": "2026-09-17T14:55:03.716640Z"
+}

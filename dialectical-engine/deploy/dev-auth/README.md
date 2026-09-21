@@ -15,16 +15,29 @@ pnpm dev:auth:up
 ```
 
 It composes the existing data-plane, Hatchet token, exact API environment, API,
-private UI, and trusted TLS steps. It refuses an existing port-3000 listener
+private UI, runner, and trusted TLS steps. It refuses an existing port-3000 listener
 before touching Docker, and cleans an owned startup prefix in reverse order.
-Its readiness line deliberately ends in `RUNNER_NOT_STARTED`: it does not run
-model workers, seed a user, accelerate account erasure, or prove the browser
-journey.
+It does not seed a user, accelerate account erasure, or prove the browser journey.
 
 The supported local-auth origin is exactly `https://localhost:3000`. The TLS
 front door binds `127.0.0.1:3000` and proxies the private UI listener at
 `127.0.0.1:3001`. It does not publish the API directly and does not rewrite the
 browser's `Host` or `Origin` headers.
+
+For a second, disjoint review stack, select the immutable support-preview
+profile before invoking the same supported supervisor:
+
+```sh
+DEBATEAI_DEV_AUTH_STACK_PROFILE=support-preview pnpm dev:auth:up
+```
+
+That profile uses `https://localhost:3100`, private UI `3101`, API `8890`,
+provider relays `8891`, `8895`, `8892`, `8896`, and `8893`, Hermes support
+`8894`, PostgreSQL `55433`, and Hatchet gRPC/API `7177`/`8988`. Its Compose
+project is `debateai-v3-support-preview`, so its containers and volume are
+separate from the default `debateai-v3` project. Only `default` and
+`support-preview` are accepted; arbitrary ports, URLs, and namespaces are
+rejected before startup.
 
 ## One-time trust setup
 

@@ -319,6 +319,9 @@ importers:
       '@debateai/kernel':
         specifier: workspace:*
         version: link:../../packages/kernel
+      '@debateai/support-kb':
+        specifier: workspace:*
+        version: link:../../packages/support-kb
       next:
         specifier: ^15.0.0
         version: 15.5.23(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PRICING_CLAIM_REVIEW3",
+  "ticket": "t_39dbe68c",
+  "revision": "8cdb75d75055ccb41b6325da23bf233b24e2614b",
+  "baseRevision": "130adf47da2e889005e73c3adb7ebb49fd50b529",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "verdict": "REWORK_BOUNDED_FINANCIAL_SUFFIX_CONSTRUCTION",
+  "dispositions": [
+    {
+      "id": "GPCR3-C1",
+      "subject": "arbitrary preceding-window authority",
+      "disposition": "PASS",
+      "evidence": "The 96-character lookback is removed; pre-mention forms are anchored at the current financial mention."
+    },
+    {
+      "id": "GPCR3-C2",
+      "subject": "both mixed-polarity orderings",
+      "disposition": "PASS",
+      "evidence": "Forward and reverse EN/RO ordering cases reject the later unsupported positive claim, including causal, comma, yet/or/sau forms."
+    },
+    {
+      "id": "GPCR3-C3",
+      "subject": "direct and modal negative examples",
+      "disposition": "PASS",
+      "evidence": "cannot/can't/does not/doesn't/isn't and specified EN/RO modal negatives are admitted by the current tests."
+    },
+    {
+      "id": "GPCR3-R1",
+      "subject": "suffix negative-modifier construction",
+      "disposition": "REWORK",
+      "evidence": "Bare `is not`, `isn't`, or `nu este` suffix matching admits positive `not only`, `not merely`, and `nu este doar` financial capability constructions."
+    },
+    {
+      "id": "GPCR3-C4",
+      "subject": "deterministic reviewed fallback",
+      "disposition": "SUPPORTED_NO_CONTRACT_OBSTACLE",
+      "evidence": "Existing full44 service and real POST evidence proves rejected financial drafts produce useful reviewed app-navigation guidance with correct action absence and accounting."
+    },
+    {
+      "id": "GPCR3-C5",
+      "subject": "full44 service and real POST",
+      "disposition": "PASS_RETAINED",
+      "evidence": "Exact LIVE28 recovery, reviewed fallback and persisted model accounting remain covered by the 468-test affected frame."
+    },
+    {
+      "id": "GPCR3-C6",
+      "subject": "source/action and safety precedence",
+      "disposition": "PASS_RETAINED",
+      "evidence": "The two-file delta does not change source/action, credential, private-data, injection or security logic."
+    },
+    {
+      "id": "GPCR3-C7",
+      "subject": "Screenshot30",
+      "disposition": "PASS_RETAINED",
+      "evidence": "The complete full-answer screenshot and its binding remain unchanged."
+    },
+    {
+      "id": "GPCR3-L1",
+      "subject": "runtime and checkpoint status",
+      "disposition": "NOT_ESTABLISHED",
+      "evidence": "Static review only; BIND32, runtime, actual31, capacity, readiness, completion and acceptance remain later gates."
+    },
+    {
+      "id": "GPCR3-L2",
+      "subject": "Forgot and CP2",
+      "disposition": "UNRESOLVED_ACTIONLESS",
+      "evidence": "No destination is inferred and no CP2 authorization follows."
+    }
+  ],
+  "hashes": {
+    "authorReceipt": "372c0c2913e924cea2d7086568866b3f91f2a6f391e6e1e902e2ed03277bae0a",
+    "authorConsumption": "326aa7c2129e5078fd434174961865eebe7162c3c7ef550eb916e0b5733e6401",
+    "responsePolicy": "e1fdd4fcc1e3d8c913fa48423bb80fc6d42b2daafd94633b9ec21f80f16a7332",
+    "responsePolicyTests": "b543431993fbd053ead0e576e5ae2e306eff4a0e774e3d7072deea42ce0df1ba",
+    "policyGreen": "f204bfe8c9cbcb1f171cb021fa2693861bff4b7019a6ee9810b6432c71e0c0a7",
+    "finalAffectedSuite": "97007dfbf71c70e330c5ea1684619f24f88b03964a1a53460f9c92248f18ce3a"
+  },
+  "counts": {
+    "changedProductFiles": 2,
+    "focusedTestsPassed": 239,
+    "focusedTestsFailed": 0,
+    "affectedTestsPassed": 468,
+    "affectedTestsFailed": 0,
+    "reviewedCorpusEntries": 44,
+    "indexedInputs": 26,
+    "indexedInputsVerified": 26,
+    "remainingFindings": 1
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

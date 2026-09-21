@@ -1,0 +1,227 @@
+{
+  "at": "2026-09-17T06:14:35.524216+00:00",
+  "node": "FIX_P4",
+  "ticket": "t_e276163b",
+  "revision": "475c5a7e7eb8f48a3f5a81379f37b49fdd014ce9",
+  "base": "ee06cd875956b76548ffb04d9dff29e4af8bbb74",
+  "status": "AUTHOR EVIDENCE CONSUMED; SEPARATE FOCUSED REVIEW PENDING",
+  "receipt": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX_P4-receipt.json",
+    "sha256": "e4c163cdb253adb39267206145512a5838df43a67ec48b320db22218884df36b"
+  },
+  "artifactsVerified": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX_P4.md",
+      "sha256": "b7c7ced9850c9872d392028ee21cdb304387fea35c16df695294165f48e20570",
+      "bytes": 4460
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FIX_P4.md",
+      "sha256": "bfab14d712cbcede2619cc7ed538b010da4f6b6c4d9544dea7d41d093f44775c",
+      "bytes": 3382
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/FIX_P4/correctness-boundary-control.ts",
+      "sha256": "2ac5fe55105c2d39ba980b9cc39149cb6d0861f24c7f73b5f2cd293ac1e46b52",
+      "bytes": 13022
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P4-correctness-red.log",
+      "sha256": "071db982ca6726ba185f5003d611c03e5d08b15c838ef8f8e79e64daa94efcd4",
+      "bytes": 1323
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P4-focused-unit-red.log",
+      "sha256": "359d75a5fd20aab6fb869dee6bdced0b90c59040c42233f85337b2385beadb85",
+      "bytes": 84104
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P4-support-cases-red.log",
+      "sha256": "c6ae19e40dba6c114eea17317fdcc181fabf3c0999bbf9374a6be2334798b5f6",
+      "bytes": 14488
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P4-focused-unit-green.log",
+      "sha256": "2c5daf13f1a20b9bc0964a2513a75026d19ef6a25165f1426943fd3a021d889a",
+      "bytes": 63828
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P4-correctness-green.log",
+      "sha256": "6235fa9c492b29fd3ddec3319e789592795e27094ac38a46ab397168abfcc55c",
+      "bytes": 947
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P4-support-cases-green.log",
+      "sha256": "432c8c5d062e0460b2d9af85f46b3d267ef0cb403bf7b139e51e07372bdf4702",
+      "bytes": 12566
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P4-final25.log",
+      "sha256": "fc7bea2585a58733f3403229e94964a5e0f070ebb21d0bdefdcd05e6ec2757df",
+      "bytes": 500938
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P4-typecheck-final.log",
+      "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+      "bytes": 39611
+    }
+  ],
+  "productFilesVerified": [
+    {
+      "laneRelative": "packages/kernel/src/support-credentials.ts",
+      "sha256": "1d4cb3b5c554c7010926bd3c2293c3926013411ddd03d2ce4d6952a5ae294be0",
+      "bytes": 15922
+    },
+    {
+      "laneRelative": "tests/integration/support-cases.test.ts",
+      "sha256": "75185830441a1fb2f467f4fe3b68c63ed4d29b7c69f96ed0e2dd6b5cb02b2632",
+      "bytes": 29045
+    },
+    {
+      "laneRelative": "tests/unit/support-answer-context.test.ts",
+      "sha256": "5987d64a025bf24a3cd4d27bd91345a0eb9ead2d1976b8d4d1a085cbe0a06fa0",
+      "bytes": 18171
+    },
+    {
+      "laneRelative": "tests/unit/support-credentials.test.ts",
+      "sha256": "3d49176217574d554adf5f0360216a449985bde4a09b5f932da466bc2cf03bb9",
+      "bytes": 8695
+    },
+    {
+      "laneRelative": "tests/unit/support-redaction.test.ts",
+      "sha256": "3f2c974e74e1c82ff3489739062fc919cd6c96461ac2b0e337045bca5c1676eb",
+      "bytes": 11071
+    },
+    {
+      "laneRelative": "tests/unit/support-response-policy.test.ts",
+      "sha256": "61f0304fd5c6e5af87e012f0f3ddd93e79e1fa040295b3bf72745ca37fa2676c",
+      "bytes": 18591
+    },
+    {
+      "laneRelative": "tests/unit/support-security-guidance.test.ts",
+      "sha256": "15dbe4a6123539219c59242709b01dfc745e44e0db5fd0b9b4f998f64f866575",
+      "bytes": 1668
+    }
+  ],
+  "clean": true,
+  "skills": {
+    "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-10-46-01a09ef7-fa46-7b73-bc98-70f84abd06cc.jsonl",
+    "nativeBodyProof": {
+      "using-superpowers": {
+        "nativeTimestamp": "2026-09-14T08:11:09.639Z",
+        "nativeCallId": "call_rx7cmEGqHf4jCNQibGPTL5lC",
+        "bodyPhrase": "This is not negotiable. You cannot rationalize your way out of this.",
+        "outputBodySha256": "c0f40aa624e3390af727c11e4e1972960f642a96a76de8eeb052eb3aaab61f67"
+      },
+      "heartbeat-protocol": {
+        "nativeTimestamp": "2026-09-14T08:11:09.639Z",
+        "nativeCallId": "call_rx7cmEGqHf4jCNQibGPTL5lC",
+        "bodyPhrase": "One role per node: a seat that reviews does not code, and no seat reviews its own work",
+        "outputBodySha256": "c0f40aa624e3390af727c11e4e1972960f642a96a76de8eeb052eb3aaab61f67"
+      },
+      "receiving-code-review": {
+        "nativeTimestamp": "2026-09-14T08:52:17.951Z",
+        "nativeCallId": "call_Mkpg5ETFWOHzDo1jBKu9z4m2",
+        "bodyPhrase": "RESPOND: Technical acknowledgment or reasoned pushback",
+        "outputBodySha256": "1ba2af997ca7a640a0e3197493843ff26fd271ee1ddd64ca2f75f3de8648cc24"
+      },
+      "heartbeat-worker": {
+        "nativeTimestamp": "2026-09-14T09:05:28.769Z",
+        "nativeCallId": "call_9DwJzl6XWXbcWstiKii3twfU",
+        "bodyPhrase": "Check the packet against reality and stop if it is wrong",
+        "outputBodySha256": "62f1266beb36276c5600208772ecdc05ef672b563160b82d2bad7bcb9b8438b8"
+      },
+      "test-driven-development": {
+        "nativeTimestamp": "2026-09-14T09:05:28.769Z",
+        "nativeCallId": "call_9DwJzl6XWXbcWstiKii3twfU",
+        "bodyPhrase": "If you didn't watch the test fail, you don't know if it tests the right thing.",
+        "outputBodySha256": "62f1266beb36276c5600208772ecdc05ef672b563160b82d2bad7bcb9b8438b8"
+      },
+      "systematic-debugging": {
+        "nativeTimestamp": "2026-09-14T10:16:38.986Z",
+        "nativeCallId": "call_Zlx3MsoFTMR1Vy2eEvhLJ1iW",
+        "bodyPhrase": "Violating the letter of this process is violating the spirit of debugging.",
+        "outputBodySha256": "9833739187ce8973c3839aa6aa966fcc470c27cb7d359b05fedf7f0de957ebf6"
+      },
+      "verification-before-completion": {
+        "nativeTimestamp": "2026-09-14T19:17:41.935Z",
+        "nativeCallId": "call_PpNPLmRsVUQw5dprmY9IkuVN",
+        "bodyPhrase": "NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE",
+        "outputBodySha256": "fc17fe2fa384d65a9ace73f93e1e9d202770d746cabdd59a84dc8f2b0adbb467"
+      }
+    }
+  },
+  "retainedSkillProof": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX_P3-consumption.json",
+    "sha256": "f6c29f37815778e03235b025f8fa06d34dce980ae2445ef45e3a5aae8e1c9946",
+    "method": "Same original native author session, retained seven actual BODY reads; no new-read claim."
+  },
+  "capturedLogFrames": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P4-correctness-red.log",
+      "sha256": "071db982ca6726ba185f5003d611c03e5d08b15c838ef8f8e79e64daa94efcd4",
+      "frames": []
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P4-focused-unit-red.log",
+      "sha256": "359d75a5fd20aab6fb869dee6bdced0b90c59040c42233f85337b2385beadb85",
+      "frames": [
+        "\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 22 \u23af\u23af\u23af\u23af\u23af\u23af\u23af",
+        " Test Files  4 failed | 1 passed (5)",
+        "      Tests  22 failed | 327 passed (349)",
+        "   Duration  941ms (transform 139ms, setup 0ms, import 283ms, tests 192ms, environment 0ms)"
+      ]
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P4-support-cases-red.log",
+      "sha256": "c6ae19e40dba6c114eea17317fdcc181fabf3c0999bbf9374a6be2334798b5f6",
+      "frames": [
+        "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 2 \u23af\u23af\u23af\u23af\u23af\u23af\u23af",
+        " Test Files  1 failed (1)",
+        "      Tests  2 failed | 30 passed (32)",
+        "   Duration  2.87s (transform 259ms, setup 0ms, import 838ms, tests 1.95s, environment 0ms)"
+      ]
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P4-focused-unit-green.log",
+      "sha256": "2c5daf13f1a20b9bc0964a2513a75026d19ef6a25165f1426943fd3a021d889a",
+      "frames": [
+        " Test Files  5 passed (5)",
+        "      Tests  349 passed (349)",
+        "   Duration  934ms (transform 145ms, setup 0ms, import 294ms, tests 188ms, environment 0ms)"
+      ]
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P4-correctness-green.log",
+      "sha256": "6235fa9c492b29fd3ddec3319e789592795e27094ac38a46ab397168abfcc55c",
+      "frames": []
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P4-support-cases-green.log",
+      "sha256": "432c8c5d062e0460b2d9af85f46b3d267ef0cb403bf7b139e51e07372bdf4702",
+      "frames": [
+        " Test Files  1 passed (1)",
+        "      Tests  32 passed (32)",
+        "   Duration  2.48s (transform 257ms, setup 0ms, import 741ms, tests 1.66s, environment 0ms)"
+      ]
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P4-final25.log",
+      "sha256": "fc7bea2585a58733f3403229e94964a5e0f070ebb21d0bdefdcd05e6ec2757df",
+      "frames": [
+        " Test Files  25 passed (25)",
+        "      Tests  1126 passed | 1 todo (1127)",
+        "   Duration  80.37s (transform 777ms, setup 0ms, import 5.10s, tests 72.63s, environment 506ms)"
+      ]
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P4-typecheck-final.log",
+      "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+      "frames": []
+    }
+  ],
+  "limits": [
+    "Root checked custody and captured evidence, not a substantive verdict.",
+    "New exact-revision preview still required; destination unresolved; user alone accepts."
+  ]
+}

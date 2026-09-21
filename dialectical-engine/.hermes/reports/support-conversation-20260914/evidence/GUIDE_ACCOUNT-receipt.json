@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_ACCOUNT",
+  "ticket": "t_bcd735ee",
+  "session": "/root/preview",
+  "base": "479763da1f586a217f36204cc81138aaa81c6f81",
+  "productRevision": "163f15c59bcfb1bf2cb0979f8b0e7d414ebd0703",
+  "productClean": true,
+  "productFiles": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/ui/components/TopBar.tsx",
+      "laneRelative": "apps/ui/components/TopBar.tsx",
+      "sha256": "08c3c98b450e676f0d2b6b822a79dc9f06f1fe57625d522f9c5f027faf918313",
+      "bytes": 2798
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/render/support-topbar.test.tsx",
+      "laneRelative": "tests/render/support-topbar.test.tsx",
+      "sha256": "9b9c2378d598084269155a27873f64bcea00c3ca37cab2195e3c3fd37f70f814",
+      "bytes": 2673
+    }
+  ],
+  "verification": {
+    "vitestVersion": "4.1.10",
+    "packetArgv": "pnpm exec vitest run tests/render/support-topbar.test.tsx --maxWorkers=1 --minWorkers=1",
+    "packetArgvResult": "RC_1_UNSUPPORTED_MINWORKERS_BEFORE_COLLECTION",
+    "supportedArgv": "pnpm exec vitest run tests/render/support-topbar.test.tsx --maxWorkers=1",
+    "behavioralRed": "1_FAILED_6_PASSED_ACCOUNT_LOGIN_VS_SETTINGS",
+    "green": "1_FILE_7_TESTS_PASSED"
+  },
+  "artifacts": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ACCOUNT-red.log",
+      "sha256": "72e6b82af882540c1645e72ada00fb2099ede2c6eef53507030e7882e912b332",
+      "bytes": 2052,
+      "status": "PACKET_ARGV_DEFECT"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ACCOUNT-behavior-red.log",
+      "sha256": "fe4e69b07d2925316dd0c691594a9b533e059928ff313bda5de67519c11a6d52",
+      "bytes": 2283,
+      "status": "MEANINGFUL_RED"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ACCOUNT-green.log",
+      "sha256": "7aae4fd889f335870baae92089e886a49f97424194e202796aaef8846824de6d",
+      "bytes": 1386,
+      "status": "GREEN"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ACCOUNT.md",
+      "sha256": "b3cb705ed7287650dac43f1dd3c8ef569e8b208a8f28abb14fc51b18bab51696",
+      "bytes": 2026
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_ACCOUNT.md",
+      "sha256": "7e2b5293cc4ff7630d286c894548e3cc63ba2cccb2905379327e2fed4a8cff35",
+      "bytes": 3015
+    }
+  ],
+  "limits": [
+    "No broader unchanged suite was run.",
+    "No service, browser, session, data, Support, model or acceptance action occurred.",
+    "Root owns integration and separate review."
+  ],
+  "usage": "UNAVAILABLE"
+}

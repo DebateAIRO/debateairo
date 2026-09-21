@@ -1,0 +1,11 @@
+file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/controls.mjs:306
+    throw new Error("GUIDE_HARNESS_LANGUAGE_FINAL_VERIFICATION_FAILED");
+          ^
+
+Error: GUIDE_HARNESS_LANGUAGE_FINAL_VERIFICATION_FAILED
+    at selectGuideSupportLanguage (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/controls.mjs:306:11)
+    at async <anonymous> (/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/verify-guide-harness.mjs:1680:16)
+    at async control (/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/verify-guide-harness.mjs:47:3)
+    at async <anonymous> (/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/verify-guide-harness.mjs:1677:1)
+
+Node.js v22.23.1

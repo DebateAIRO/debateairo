@@ -1,0 +1,40 @@
+{
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "inputManifestRevision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "gateRevision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "gateBase": "5731eb6faac25f9712f04aea029a021f6eee9352",
+  "inputs": {
+    "checked": 79,
+    "failures": []
+  },
+  "detachedProduct": {
+    "checked": 143,
+    "failures": []
+  },
+  "primaryProduct": {
+    "checked": 143,
+    "failures": []
+  },
+  "changedPaths": {
+    "expected": [
+      "packages/support-kb/src/context.ts",
+      "tests/unit/support-answer-context.test.ts",
+      "tests/unit/support-context.test.ts",
+      "tests/unit/support-public-guide-boundary.test.ts"
+    ],
+    "actual": [
+      "packages/support-kb/src/context.ts",
+      "tests/unit/support-answer-context.test.ts",
+      "tests/unit/support-context.test.ts",
+      "tests/unit/support-public-guide-boundary.test.ts"
+    ]
+  },
+  "detached": {
+    "head": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+    "dirty": 0
+  },
+  "primary": {
+    "head": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+    "dirty": 0
+  }
+}

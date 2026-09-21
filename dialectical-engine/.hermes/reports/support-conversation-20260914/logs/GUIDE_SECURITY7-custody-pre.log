@@ -1,0 +1,67 @@
+{
+  "phase": "pre",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "base": "5731eb6faac25f9712f04aea029a021f6eee9352",
+  "priorReviewRevision": "5731eb6faac25f9712f04aea029a021f6eee9352",
+  "indexedInputs": 84,
+  "inputBad": [],
+  "productFiles": 143,
+  "productBad": [],
+  "deleted": 3,
+  "deletedBad": [],
+  "detached": {
+    "head": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+    "dirty": ""
+  },
+  "primary": {
+    "head": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+    "dirty": ""
+  },
+  "roleDefiningFiles": [
+    "migrations/0050_support_foundation.sql",
+    "migrations/0051_support_cases.sql",
+    "migrations/0052_support_tool_calls.sql",
+    "migrations/0053_support_public_incident.sql",
+    "migrations/0054_support_keys_audit.sql",
+    "tests/support/testDatabase.ts",
+    "packages/db/src/index.ts",
+    "package.json",
+    "pnpm-lock.yaml"
+  ],
+  "roleChanged": [],
+  "expectedPriorDelta": [
+    "dialectical-engine/packages/support-kb/src/context.ts",
+    "dialectical-engine/tests/unit/support-answer-context.test.ts",
+    "dialectical-engine/tests/unit/support-context.test.ts",
+    "dialectical-engine/tests/unit/support-public-guide-boundary.test.ts"
+  ],
+  "priorDelta": [
+    "dialectical-engine/packages/support-kb/src/context.ts",
+    "dialectical-engine/tests/unit/support-answer-context.test.ts",
+    "dialectical-engine/tests/unit/support-context.test.ts",
+    "dialectical-engine/tests/unit/support-public-guide-boundary.test.ts"
+  ],
+  "dependencyLinks": [
+    {
+      "path": "node_modules",
+      "present": false
+    },
+    {
+      "path": "apps/api/node_modules",
+      "present": false
+    },
+    {
+      "path": "apps/ui/node_modules",
+      "present": false
+    },
+    {
+      "path": "apps/runner/node_modules",
+      "present": false
+    },
+    {
+      "path": "packages/support-kb/node_modules",
+      "present": false
+    }
+  ],
+  "ok": true
+}

@@ -1,0 +1,1 @@
+{"schemaVersion":1,"phase":"PRETRAFFIC","revision":"456cafb9e56a737de550570b5736ec52d79ddf48","contractSha256":"63893819aa990b40240a5238c7cf80a7043534f2d25c0bc1c32140b767312407","checkedAbsent":112,"present":[],"ui":{"verdict":"PASS_ZERO_SUPPORT_UI_TRANSITIONS","transitions":5,"actualSupportRequestsForwarded":0}}

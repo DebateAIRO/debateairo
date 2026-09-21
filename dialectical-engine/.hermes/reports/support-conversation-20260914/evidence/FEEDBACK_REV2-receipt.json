@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-17T08:05:45Z",
+  "node": "FEEDBACK_REV2",
+  "ticket": "t_bce33c23",
+  "session": "/root/forgot_destination",
+  "model": "gpt-5.6-sol",
+  "revision": "1b23c0b732679fdb665a19e03104b800f9d2ef38",
+  "priorRevision": "475c5a7e7eb8f48a3f5a81379f37b49fdd014ce9",
+  "freeze": "4f7a899c809f2a57d64d4cb66d2677874d5117f5",
+  "verdict": "REWORK",
+  "usage": "UNAVAILABLE",
+  "artifacts": [
+    {
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/FEEDBACK_REV2.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/FEEDBACK_REV2.md",
+      "sha256": "1340a72d1ae157730d0f189a3af01a727e95fbb3c7afeda786ae2c813afcc38e",
+      "bytes": 6022
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/FEEDBACK_REV2.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FEEDBACK_REV2.md",
+      "sha256": "4b7eff93e990f09b09f53faa21aa184ac522e892613dac1c6fb0a4fe35358fd1",
+      "bytes": 4114
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/FEEDBACK_REV2/feedback-boundary-control.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/FEEDBACK_REV2/feedback-boundary-control.ts",
+      "sha256": "76c7f29556821f174dcc5724673a3b66bc81af4ccf95a99a787de8486e5f2c6a",
+      "bytes": 14224
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/FEEDBACK_REV2/run-feedback-boundary-control.mjs",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/FEEDBACK_REV2/run-feedback-boundary-control.mjs",
+      "sha256": "be22fcdc3f594f805c13d446c20b5e55d29fef5998a5ceee3cceb3a6a2f78d1b",
+      "bytes": 2187
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/FEEDBACK_REV2/verify-inputs.mjs",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/FEEDBACK_REV2/verify-inputs.mjs",
+      "sha256": "51b3ec0cac41885422f4215b0cc2e3869b36a3a064a7ea5a5aa5ffee9c1b1b3a",
+      "bytes": 1363
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/FEEDBACK_REV2-input-verification.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FEEDBACK_REV2-input-verification.log",
+      "sha256": "281af3eb919e2926cd8f29458fc75e9f71750435a885e0b88050faf880e6f37e",
+      "bytes": 180
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/FEEDBACK_REV2-feedback-boundary.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FEEDBACK_REV2-feedback-boundary.log",
+      "sha256": "88dab1e11bbc60d7f4cc04f5d74273386b2dac7faadcf87c9b0af36e8c4ad462",
+      "bytes": 14753
+    }
+  ],
+  "limits": [
+    "Named owner-correction scope only; prior unaffected security evidence is retained and no whole audit or final-25 rerun was performed.",
+    "Synthetic in-memory completions establish source admission, persistence, and return boundaries, not live-provider behavior.",
+    "Two encoded recovery misses do not establish arbitrary-encoding completeness or a clickable destination.",
+    "Mixed reset-token/navigation cases emitted no link or action and performed no validation or reset.",
+    "No real HTTP, database, browser, preview, provider, model, authentication, reset, or account traffic.",
+    "Forgot-password destination remains unresolved and was not searched, guessed, or waived.",
+    "User alone accepts CP1; this receipt is not checkpoint acceptance."
+  ]
+}

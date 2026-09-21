@@ -143,7 +143,7 @@ if (process.send !== undefined) {
   process.send(Object.freeze({
     kind: "DEBATEAI_RUNNER_READY",
     worker: environment.HATCHET_WORKER_NAME,
-    registerVersion: environment.REGISTER_VERSION,
+    registerVersion: String(environment.REGISTER_VERSION),
     startupDispatched: startupReconciliation.dispatched
   }));
 }

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_COMPLETION_FIX42",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS",
+  "controls": 10,
+  "passed": 10,
+  "names": [
+    "command digest",
+    "seven self paths",
+    "corrected capture child",
+    "completion guard precedes compose",
+    "real completion boundary controls",
+    "115 futures absent and owner paths retained",
+    "operator metadata and ownership",
+    "current digest accepted",
+    "stale digest rejected",
+    "proof serialized"
+  ],
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

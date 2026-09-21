@@ -1,0 +1,126 @@
+$ tsx tests/support-eval/run.ts -- --runs=1
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-JiI0rg/data ... ok
+creating subdirectories ... 
+[S00 DB embedded] ok
+
+[S00 DB embedded] selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+[S00 DB embedded] ok
+running bootstrap script ... 
+[S00 DB embedded] ok
+
+[S00 DB embedded] performing post-bootstrap initialization ... 
+[S00 DB embedded] ok
+syncing data to disk ... 
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-JiI0rg/data -l logfile start
+
+
+[S00 DB embedded] 2026-09-17 13:31:32.407 EEST [36838] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+[S00 DB embedded] 2026-09-17 13:31:32.412 EEST [36838] LOG:  listening on IPv4 address "127.0.0.1", port 54480
+
+[S00 DB embedded] 2026-09-17 13:31:32.412 EEST [36838] LOG:  listening on IPv6 address "::1", port 54480
+
+[S00 DB embedded] 2026-09-17 13:31:32.412 EEST [36838] LOG:  listening on Unix socket "/tmp/.s.PGSQL.54480"
+
+[S00 DB embedded] 2026-09-17 13:31:32.415 EEST [36844] LOG:  database system was shut down at 2026-09-17 13:31:32 EEST
+
+[S00 DB embedded] 2026-09-17 13:31:32.418 EEST [36838] LOG:  database system is ready to accept connections
+
+[S00 DB embedded] 2026-09-17 13:31:32.711 EEST [36849] WARNING:  there is already a transaction in progress
+
+[S00 DB embedded] 2026-09-17 13:31:33.018 EEST [36849] WARNING:  there is no transaction in progress
+
+mode: deterministic-structural
+applicable: 60/60
+pending: SUP-02 (0), SUP-03 (0), SUP-05 (0)
+run 1: structural 23/60; first_token_p50=5ms target<=3000ms PASS; first_token_p95=40ms target<=8000ms PASS; completed_p95=41ms target<=20000ms PASS; deterministic_p95=3ms target<=1000ms PASS
+class A: 14/20
+class B: 1/6
+class C: 1/10
+class D: 1/12
+class E: 6/6
+class F: 0/3
+class G: 0/3
+  SUP-A-05: required_sources
+  SUP-A-06: required_sources
+  SUP-A-09: required_sources
+  SUP-A-14: required_sources
+  SUP-A-15: required_sources
+  SUP-A-19: required_sources
+  SUP-B-01: outcome
+  SUP-B-02: outcome
+  SUP-B-03: outcome
+  SUP-B-05: outcome
+  SUP-B-06: outcome
+  SUP-C-01: execution
+  SUP-C-03: execution
+  SUP-C-04: execution
+  SUP-C-05: execution
+  SUP-C-06: execution
+  SUP-C-07: execution
+  SUP-C-08: execution
+  SUP-C-09: execution
+  SUP-C-10: execution
+  SUP-D-01: execution
+  SUP-D-02: execution
+  SUP-D-03: execution
+  SUP-D-04: execution
+  SUP-D-05: execution
+  SUP-D-06-I-AM-V-RESET-MFA: execution
+  SUP-D-07-DEBATE-EXCERPT: execution
+  SUP-D-09: execution
+  SUP-D-10-COERCION-EN: execution
+  SUP-D-11-COERCION-RO: execution
+  SUP-D-12-ZONE-OVER-SAFETY: execution
+  SUP-F-01-OPEN-INCIDENT-EN: execution
+  SUP-F-02-OPEN-INCIDENT-RO: execution
+  SUP-F-03-NO-OPEN-INCIDENT: execution
+  SUP-G-01-TALK-TO-HUMAN: execution
+  SUP-G-02-TALK-TO-HUMAN-RO: execution
+  SUP-G-03-RATING-ESCALATION: execution
+real_first_token: NOT_APPLICABLE
+rubric: PENDING (independent-eval-author)
+VERDICT (worst run): FAIL (run 1)
+[S00 DB embedded] 2026-09-17 13:31:33.736 EEST [36838] LOG:  received fast shutdown request
+
+[S00 DB embedded] 2026-09-17 13:31:33.736 EEST [36838] LOG:  aborting any active transactions
+
+[S00 DB embedded] 2026-09-17 13:31:33.737 EEST [36838] LOG:  background worker "logical replication launcher" (PID 36847) exited with exit code 1
+
+[S00 DB embedded] 2026-09-17 13:31:33.739 EEST [36842] LOG:  shutting down
+
+[S00 DB embedded] 2026-09-17 13:31:33.739 EEST [36842] LOG:  checkpoint starting: shutdown immediate
+
+[S00 DB embedded] 2026-09-17 13:31:33.813 EEST [36842] LOG:  checkpoint complete: wrote 1745 buffers (10.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.041 s, sync=0.032 s, total=0.075 s; sync files=1146, longest=0.001 s, average=0.001 s; distance=13774 kB, estimate=13774 kB; lsn=0/24FACD8, redo lsn=0/24FACD8
+
+[S00 DB embedded] 2026-09-17 13:31:33.818 EEST [36838] LOG:  database system is shut down
+
+[ELIFECYCLE] Command failed with exit code 1.

@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_COMPACT_UI_PROBE3",
+  "ticket": "t_967133d1",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "verdict": "REWORK_FULL_LANGUAGE_INTERACTION_TIMEOUT",
+  "attemptedAt": "2026-09-20T15:35:27Z",
+  "childExitStatus": 1,
+  "failureCode": "GUIDE_HARNESS_FULL_LANGUAGE_INTERACTION_TIMEOUT",
+  "failurePhase": "FAILED",
+  "surface": "full",
+  "language": "en",
+  "completedTransitions": 0,
+  "hydrationReady": "NOT_READY",
+  "boundedPublicObservation": {
+    "urlClass": "HELP",
+    "composerCount": 1,
+    "composerVisible": "VISIBLE",
+    "languageControlCount": 2,
+    "visibleLanguageControlCount": 2,
+    "activeLanguage": "EN",
+    "modeToggleCount": 1,
+    "modeToggleVisible": "VISIBLE",
+    "modeState": "TERRACOTTA",
+    "cookieRegionVisible": "VISIBLE"
+  },
+  "traffic": {
+    "actualSupportRequestsForwarded": 0,
+    "guardedAttempts": {
+      "status": 1,
+      "pageCaseListRead": 1,
+      "createSession": 0,
+      "sendMessage": 0,
+      "otherSupport": 0
+    }
+  },
+  "consoleErrorCategories": {
+    "HTTP_401": 1,
+    "HTTP_404": 0,
+    "JS_OR_HYDRATION": 0,
+    "OTHER": 2
+  },
+  "runtimeAfterFailure": {
+    "pid": 77769,
+    "ppid": 1,
+    "pgid": 77769,
+    "ordinaryTlsHelpStatus": 200,
+    "unrelatedListenersPreserved": true
+  },
+  "limits": [
+    "The first transition failed before a transition PASS was recorded.",
+    "The fixed observation does not prove a product cause.",
+    "No Support request reached runtime and no session or message attempt occurred.",
+    "No capacity, chat, model, database, or private-log read occurred.",
+    "The one-shot was not retried."
+  ]
+}

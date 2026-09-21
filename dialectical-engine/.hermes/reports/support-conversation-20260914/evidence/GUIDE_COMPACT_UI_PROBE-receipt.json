@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_COMPACT_UI_PROBE",
+  "ticket": "t_e9166486",
+  "session": "/root/preview",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "verdict": "REWORK_ZERO_SUPPORT_UI_TRANSITION_PREFLIGHT",
+  "childExitStatus": 1,
+  "transitions": {
+    "planned": 5,
+    "passed": 3,
+    "failedOrdinal": 4,
+    "failureCode": "GUIDE_HARNESS_FULL_HYDRATION_TIMEOUT"
+  },
+  "traffic": {
+    "actualSupportRequestsForwarded": 0,
+    "blockedBrowserAttempts": {
+      "status": 3,
+      "createSession": 0,
+      "sendMessage": 0,
+      "otherSupport": 3
+    },
+    "syntheticResponses": 0,
+    "capacityReads": 0,
+    "supportQuestions": 0
+  },
+  "runtime": {
+    "preflightObservedAt": "2026-09-20T14:43:13.768Z",
+    "postflightObservedAt": "2026-09-20T14:44:38.132Z",
+    "pid": 77769,
+    "ppid": 1,
+    "pgid": 77769,
+    "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "command": "pnpm dev:auth:up",
+    "previewListenerCount": 12,
+    "unrelatedListenerCount": 9,
+    "unrelatedPreserved": true,
+    "ordinarySystemTls": {
+      "url": "https://localhost:3100/help",
+      "customCa": false,
+      "insecure": false,
+      "status": 200
+    }
+  },
+  "productClean": true,
+  "heavyLeaseReleased": true,
+  "gitLeaseUsed": false,
+  "receiptExcludesItself": true,
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_COMPACT_UI_PROBE.md",
+      "sha256": "b39dfd3bcdecdf3b1cc3713199a5833af8540f64d895005c8df31f3d53f1eede",
+      "bytes": 2049
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_COMPACT_UI_PROBE-inputs.json",
+      "sha256": "955f7827b1defeccd5640d25d61c8e71110e697c9c7e7cae4cf2488f98890966",
+      "bytes": 34301
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_COMPACT_UI_PROBE-outcome.json",
+      "sha256": "42a6339356526c44c68b4fc05c614a2816363848a4b731a92f4c1623a2fdb0dd",
+      "bytes": 4970
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_COMPACT_UI_PROBE-postflight.json",
+      "sha256": "ee3dcc7762bce8a466d7a5454685843eafb6e551a0c60eac95635411c14814c1",
+      "bytes": 2360
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_COMPACT_UI_PROBE-preflight.json",
+      "sha256": "cbbfc94d5738863658b3cabea96d47d9be34653592e41982f42e95815d87fc95",
+      "bytes": 2329
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_COMPACT_UI_PROBE.md",
+      "sha256": "177d466de8fc2db03799f631d4c1ca1283e413728f73b27b268d1af2c0e9a1d1",
+      "bytes": 2997
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE-run-LIVE8.json",
+      "sha256": "43b3588fe449cf13923f49c6dd240e2dabda1535dd7a76407880578c9fe79302",
+      "bytes": 6856
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_COMPACT_UI_PROBE-postflight.log",
+      "sha256": "ee3dcc7762bce8a466d7a5454685843eafb6e551a0c60eac95635411c14814c1",
+      "bytes": 2360
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_COMPACT_UI_PROBE-preflight.log",
+      "sha256": "cbbfc94d5738863658b3cabea96d47d9be34653592e41982f42e95815d87fc95",
+      "bytes": 2329
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_UI_TRANSITION_PROBE-LIVE8.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  ],
+  "limits": [
+    "The fifth compact/EN transition did not run after the one-shot stop.",
+    "Blocked browser attempts are not counted as forwarded runtime Support traffic.",
+    "No backend response quality, current capacity, product defect, or historical LIVE7 cause is established.",
+    "Forgot remains unresolved and actionless; no readiness or acceptance is claimed."
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "verdict": "PASS_PHASE_IMPORTS_BOUND_REVIEW_REQUIRED",
+  "passed": 9,
+  "contractSha256": "2257cae89fbe2592ddbb0d1ba6533931cb9c6fe1824465240ead8b9586af2e26",
+  "moduleClosureSha256": "2b50440b9474c79e91c832481a7644356c26dddf9733c3ca1c52148b88201e66"
+}

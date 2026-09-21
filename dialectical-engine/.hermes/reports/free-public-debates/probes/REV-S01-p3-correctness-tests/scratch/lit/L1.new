@@ -1,0 +1,2 @@
+GRANT EXECUTE ON FUNCTION core.run_is_free_public_bound(uuid)
+  TO debateai_erasure_runtime;

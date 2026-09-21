@@ -1,0 +1,28 @@
+{
+  "node": "GUIDE_NAVFIX",
+  "ticket": "t_1369cb3c",
+  "base": "9bf56f95711d19e6405fff5db06c4ad3d606bd68",
+  "writePaths": [
+    "apps/api/src/support/classify.ts",
+    "apps/api/src/support/public-guide-boundary.ts",
+    "tests/unit/support-classify.test.ts",
+    "tests/unit/support-public-guide-boundary.test.ts",
+    "tests/integration/support-routes.test.ts"
+  ],
+  "findingSource": "Original preview Sol static final-revision branch handoff, not yet executable probe",
+  "counterexamples": [
+    {
+      "row": 27,
+      "prompt": "Unde pot gestiona sesiunile active?"
+    },
+    {
+      "row": 28,
+      "prompt": "Where can I manage active sessions?"
+    },
+    {
+      "row": 34,
+      "prompt": "Unde g\u0103sesc op\u021biunile de \u0219tergere a contului?"
+    }
+  ],
+  "reportedCause": "classify.ts ZONE_RULES session/account-erasure matches cause REFUSE_ZONE before answer path, although public-guide-boundary returns PUBLIC_GUIDE. These are requests for locations, not operations."
+}

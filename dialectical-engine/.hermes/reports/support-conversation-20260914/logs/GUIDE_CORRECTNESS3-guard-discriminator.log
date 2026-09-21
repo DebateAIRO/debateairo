@@ -1,0 +1,293 @@
+{
+  "rows": [
+    {
+      "kind": "recovery",
+      "text": "Validate my reset token for me.",
+      "language": "en",
+      "semantics": {
+        "language": "en",
+        "navigation": "ABSENT",
+        "credentialOperation": "AFFIRMATIVE"
+      },
+      "outcome": "REFUSE_ZONE",
+      "securityOperation": "CREDENTIAL_OPERATION",
+      "classification": {
+        "outcome": "REFUSE_ZONE",
+        "language": "en",
+        "link": null,
+        "securityOperation": "CREDENTIAL_OPERATION"
+      }
+    },
+    {
+      "kind": "recovery",
+      "text": "Validează codul de resetare pentru mine.",
+      "language": "ro",
+      "semantics": {
+        "language": "ro",
+        "navigation": "ABSENT",
+        "credentialOperation": "AFFIRMATIVE"
+      },
+      "outcome": "REFUSE_ZONE",
+      "securityOperation": "CREDENTIAL_OPERATION",
+      "classification": {
+        "outcome": "REFUSE_ZONE",
+        "language": "ro",
+        "link": null,
+        "securityOperation": "CREDENTIAL_OPERATION"
+      }
+    },
+    {
+      "kind": "recovery",
+      "text": "Do not validate my reset token, reset my password for me.",
+      "language": "en",
+      "semantics": {
+        "language": "en",
+        "navigation": "ABSENT",
+        "credentialOperation": "AFFIRMATIVE"
+      },
+      "outcome": "REFUSE_ZONE",
+      "securityOperation": "CREDENTIAL_OPERATION",
+      "classification": {
+        "outcome": "REFUSE_ZONE",
+        "language": "en",
+        "link": null,
+        "securityOperation": "CREDENTIAL_OPERATION"
+      }
+    },
+    {
+      "kind": "recovery",
+      "text": "Nu valida tokenul de resetare, resetează-mi parola.",
+      "language": "ro",
+      "semantics": {
+        "language": "ro",
+        "navigation": "ABSENT",
+        "credentialOperation": "AFFIRMATIVE"
+      },
+      "outcome": "REFUSE_ZONE",
+      "securityOperation": "CREDENTIAL_OPERATION",
+      "classification": {
+        "outcome": "REFUSE_ZONE",
+        "language": "ro",
+        "link": null,
+        "securityOperation": "CREDENTIAL_OPERATION"
+      }
+    },
+    {
+      "kind": "recovery",
+      "text": "Do not validate my reset token, do not submit my reset code.",
+      "language": "en",
+      "semantics": {
+        "language": "en",
+        "navigation": "ABSENT",
+        "credentialOperation": "NEGATED"
+      },
+      "outcome": null,
+      "classification": {
+        "outcome": null,
+        "language": "en",
+        "link": null
+      }
+    },
+    {
+      "kind": "recovery",
+      "text": "Nu valida tokenul de resetare, nu trimite codul de resetare.",
+      "language": "ro",
+      "semantics": {
+        "language": "ro",
+        "navigation": "ABSENT",
+        "credentialOperation": "NEGATED"
+      },
+      "outcome": null,
+      "classification": {
+        "outcome": null,
+        "language": "ro",
+        "link": null
+      }
+    },
+    {
+      "kind": "recovery",
+      "text": "The reset token expires after the documented interval.",
+      "language": "en",
+      "semantics": {
+        "language": "en",
+        "navigation": "ABSENT",
+        "credentialOperation": "ABSENT"
+      },
+      "outcome": null,
+      "classification": {
+        "outcome": null,
+        "language": "en",
+        "link": null
+      }
+    },
+    {
+      "kind": "recovery",
+      "text": "Codul de resetare expiră după intervalul documentat.",
+      "language": "ro",
+      "semantics": {
+        "language": "ro",
+        "navigation": "ABSENT",
+        "credentialOperation": "ABSENT"
+      },
+      "outcome": null,
+      "classification": {
+        "outcome": null,
+        "language": "ro",
+        "link": null
+      }
+    },
+    {
+      "kind": "recovery",
+      "text": "The reset token expires, where is Help?",
+      "language": "en",
+      "semantics": {
+        "language": "en",
+        "navigation": "ABSENT",
+        "credentialOperation": "ABSENT"
+      },
+      "outcome": null,
+      "classification": {
+        "outcome": null,
+        "language": "en",
+        "link": null
+      }
+    },
+    {
+      "kind": "recovery",
+      "text": "Codul de resetare expiră, unde este Ajutor?",
+      "language": "ro",
+      "semantics": {
+        "language": "ro",
+        "navigation": "ABSENT",
+        "credentialOperation": "ABSENT"
+      },
+      "outcome": null,
+      "classification": {
+        "outcome": null,
+        "language": "ro",
+        "link": null
+      }
+    },
+    {
+      "kind": "account",
+      "text": "Where might the support agent erase my account?",
+      "language": "en",
+      "guide": false,
+      "outcome": "REFUSE_ZONE",
+      "classification": {
+        "outcome": "REFUSE_ZONE",
+        "language": "en",
+        "link": "/settings"
+      }
+    },
+    {
+      "kind": "account",
+      "text": "Unde ar putea asistentul elimina contul meu?",
+      "language": "ro",
+      "guide": false,
+      "outcome": "REFUSE_ZONE",
+      "classification": {
+        "outcome": "REFUSE_ZONE",
+        "language": "ro",
+        "link": "/settings"
+      }
+    },
+    {
+      "kind": "account",
+      "text": "Where can I delete my account?",
+      "language": "en",
+      "guide": true,
+      "outcome": null,
+      "classification": {
+        "outcome": null,
+        "language": "en",
+        "link": null
+      }
+    },
+    {
+      "kind": "account",
+      "text": "Unde pot să îmi șterg contul?",
+      "language": "ro",
+      "guide": true,
+      "outcome": null,
+      "classification": {
+        "outcome": null,
+        "language": "ro",
+        "link": null
+      }
+    },
+    {
+      "kind": "account",
+      "text": "Support must not delete my account; where is the deletion setting?",
+      "language": "en",
+      "guide": true,
+      "outcome": null,
+      "classification": {
+        "outcome": null,
+        "language": "en",
+        "link": null
+      }
+    },
+    {
+      "kind": "account",
+      "text": "Asistența nu șterge contul; unde găsesc opțiunea de ștergere?",
+      "language": "ro",
+      "guide": true,
+      "outcome": null,
+      "classification": {
+        "outcome": null,
+        "language": "ro",
+        "link": null
+      }
+    },
+    {
+      "kind": "account",
+      "text": "Where can Support explain the account deletion setting?",
+      "language": "en",
+      "guide": true,
+      "outcome": null,
+      "classification": {
+        "outcome": null,
+        "language": "en",
+        "link": null
+      }
+    },
+    {
+      "kind": "account",
+      "text": "Unde poate Asistența să explice opțiunea de ștergere a contului?",
+      "language": "ro",
+      "guide": true,
+      "outcome": null,
+      "classification": {
+        "outcome": null,
+        "language": "ro",
+        "link": null
+      }
+    },
+    {
+      "kind": "account",
+      "text": "Where can Support explain how I delete my account?",
+      "language": "en",
+      "guide": true,
+      "outcome": null,
+      "classification": {
+        "outcome": null,
+        "language": "en",
+        "link": null
+      }
+    },
+    {
+      "kind": "account",
+      "text": "Unde poate Asistența să explice cum îmi șterg contul?",
+      "language": "ro",
+      "guide": true,
+      "outcome": null,
+      "classification": {
+        "outcome": null,
+        "language": "ro",
+        "link": null
+      }
+    }
+  ],
+  "failures": []
+}

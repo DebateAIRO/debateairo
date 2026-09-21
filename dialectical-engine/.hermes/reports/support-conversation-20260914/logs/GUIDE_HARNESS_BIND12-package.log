@@ -1,0 +1,12 @@
+{
+  "result": "PASS",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "harnessSha256": "1c46d0d55ed0e8f4f7900682a031ccec2b47e9e831d7357a426975f10e78391a",
+  "controls": 116,
+  "retained": 112,
+  "added": 4,
+  "harnessFiles": 15,
+  "adapterFiles": 4,
+  "futureOutputsChecked": 56,
+  "traffic": 0
+}

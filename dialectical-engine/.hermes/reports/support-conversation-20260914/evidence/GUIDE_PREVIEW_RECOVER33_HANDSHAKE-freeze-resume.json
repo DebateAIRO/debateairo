@@ -1,0 +1,32 @@
+{
+  "at": "2026-09-21T07:08:17.366874+00:00",
+  "commit": "ac67fd5defcc22f97c5fc132df7e255c40990286",
+  "parent": "6b84d5cec6129e898b224bf7fad4f9a2ed67e3bd",
+  "tree": "86e5894ff23ea3125ebf110e274f16d604f99a25",
+  "records": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/GUIDE_PREVIEW_RECOVER33_HANDSHAKE.md",
+      "sha256": "a46939f16b8dfee821bfa92e371853e9e43a2fc30eeb7fcf88f6cf64b4ecbb81",
+      "bytes": 4310
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/tooling/amend-recover33-handshake.py",
+      "sha256": "aaaa11195ffb96eccb1fb88dd70e4179d149bb1d0eab03884bd1eed5aa2e238d",
+      "bytes": 5605
+    }
+  ],
+  "before": {
+    "head": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19",
+    "productRef": "0d34f82f4a2188d0ce1db04655b693798ffd2169"
+  },
+  "after": {
+    "head": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19",
+    "productRef": "0d34f82f4a2188d0ce1db04655b693798ffd2169"
+  },
+  "privateIndexRemoved": true,
+  "historicalIntakeGap": "unverified; no broader continuity claim"
+}

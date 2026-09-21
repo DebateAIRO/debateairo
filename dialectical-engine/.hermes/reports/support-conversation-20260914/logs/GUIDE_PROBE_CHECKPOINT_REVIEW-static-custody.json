@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PROBE_CHECKPOINT_REVIEW",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productHead": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productClean": true,
+  "indexedInputs": 79,
+  "inputMismatches": [],
+  "fixAuthorInputs": 64,
+  "fixArtifacts": 12,
+  "checkpointProof": {
+    "originalChildStatus": 1,
+    "fixedChildStatus": 0,
+    "initialExclusive": true,
+    "update": true,
+    "failurePersistence": true
+  },
+  "bind15": {
+    "controls": 130,
+    "passed": 130,
+    "orderedEightSha256": "b6162d665b60a1a35d882e41fa5b0da3259e9cb86bae32ca5d5056d320ad99d4",
+    "matrixSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+    "actualNamespace": "GUIDE_LIVE_GUIDE15"
+  },
+  "dependencyCheck": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PROBE_CHECKPOINT_REVIEW-dependency-check.json",
+    "sha256": "28c73a69e9073cfa26fa854540c13c6ce55fbd016565a704b61084f5dd80707b",
+    "bytes": 4367
+  },
+  "future": {
+    "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE-run-LIVE8-PROBE5.json",
+    "outputAbsent": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_UI_TRANSITION_PROBE5-LIVE8.log",
+    "logAbsent": true
+  },
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "database": 0
+  }
+}

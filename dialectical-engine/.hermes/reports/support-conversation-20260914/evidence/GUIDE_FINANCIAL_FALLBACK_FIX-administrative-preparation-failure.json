@@ -1,0 +1,9 @@
+{
+  "at": "2026-09-21T06:12:04.897731+00:00",
+  "node": "GUIDE_FINANCIAL_FALLBACK_FIX",
+  "ticket": "t_26e6de86",
+  "error": "packet-check parsed slash-separated prose as nonexistent /private-data path",
+  "stage": "after ticket creation, before freeze/dispatch",
+  "traffic": 0,
+  "resolution": "plain prose, resume existing ticket"
+}

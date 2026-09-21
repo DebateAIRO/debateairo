@@ -1,0 +1,825 @@
+^D[?25l
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+[?2026h
+ ❯ tests/integration/support-routes.test.ts [queued]
+
+ Test Files 0 passed (3)
+      Tests 0 passed (0)
+   Start at 08:35:38
+   Duration 0ms
+[?2026l[?2026h[K
+ ❯ tests/integration/support-routes.test.ts [queued]
+
+ Test Files 0 passed (3)
+      Tests 0 passed (0)
+   Start at 08:35:38
+   Duration 912ms
+[?2026l[?2026h[K
+ ❯ tests/integration/support-routes.test.ts 0/168
+
+ Test Files 0 passed (3)
+      Tests 0 passed (168)
+   Start at 08:35:38
+   Duration 1.32s
+[?2026l[?2026h[Kstdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded]   LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-LTtwk4/data ... 
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] ok
+creating subdirectories ... 
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] selecting dynamic shared memory implementation ... 
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+
+ ❯ tests/integration/support-routes.test.ts 0/168
+   └── beforeAll 407ms
+
+ Test Files 0 passed (3)
+      Tests 0 passed (168)
+   Start at 08:35:38
+   Duration 1.93s
+[?2026l[?2026h[Kstdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-LTtwk4/data -l logfile start
+
+
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] 2026-09-21 08:35:40.861 EEST [50873] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] 2026-09-21 08:35:40.863 EEST [50873] LOG:  listening on IPv4 address "127.0.0.1", port 55541
+
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] 2026-09-21 08:35:40.863 EEST [50873] LOG:  listening on IPv6 address "::1", port 55541
+
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] 2026-09-21 08:35:40.863 EEST [50873] LOG:  listening on Unix socket "/tmp/.s.PGSQL.55541"
+
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] 2026-09-21 08:35:40.866 EEST [50879] LOG:  database system was shut down at 2026-09-21 08:35:40 EEST
+
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] 2026-09-21 08:35:40.868 EEST [50873] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] 2026-09-21 08:35:41.143 EEST [50884] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] 2026-09-21 08:35:41.472 EEST [50884] WARNING:  there is no transaction in progress
+
+
+
+ ❯ tests/integration/support-routes.test.ts 0/168
+   └── beforeAll 1.43s
+
+ Test Files 0 passed (3)
+      Tests 0 passed (168)
+   Start at 08:35:38
+   Duration 2.95s
+[?2026l[?2026h[K
+ ❯ tests/integration/support-routes.test.ts 1/168
+
+ Test Files 0 passed (3)
+      Tests 0 passed | 1 skipped (168)
+   Start at 08:35:38
+   Duration 3.25s
+[?2026l[?2026h[K ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous NaN session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated NaN session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous positive infinity session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated positive infinity session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous negative infinity session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated negative infinity session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous negative session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated negative session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous unsafe session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated unsafe session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous NaN message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated NaN message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous positive infinity message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated positive infinity message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous negative infinity message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated negative infinity message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous negative message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated negative message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous unsafe message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated unsafe message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL anonymous NaN session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL authenticated NaN session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL anonymous positive infinity session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL authenticated positive infinity session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL anonymous negative infinity session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL authenticated negative infinity session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL anonymous negative session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL authenticated negative session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL anonymous unsafe session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL authenticated unsafe session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > does not persist RATE_LIMIT evidence or transcript bytes for invalid real-PostgreSQL messages
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > poisons regressing anonymous creation observations before later mutations
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > poisons regressing authenticated creation observations before later mutations
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects regressing authenticated creation with real PostgreSQL and keeps later time poisoned
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects regressing anonymous messages without persistent admission or rate evidence
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects regressing authenticated messages without persistent admission or rate evidence
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > allows concurrent equal-time anonymous creation observations
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > allows concurrent equal-time authenticated creation observations
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > allows concurrent equal-time anonymous message observations
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > allows concurrent equal-time authenticated message observations
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > preserves one-hour anonymous creation expiry before a rewind poisons the route
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > preserves ten-minute message expiry before a rewind poisons the route
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > preserves twenty-four-hour message expiry before a rewind poisons the route
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > records only the session-closed decision before a rewind poisons the route
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > creates an anonymous capability session without storing the raw token
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > uses stored session language for ambiguous text: 'en'
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > uses stored session language for ambiguous text: 'ro'
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects non-text-only message bodies
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects non-text-only message bodies
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects non-text-only message bodies
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects non-text-only message bodies
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > refuses private records without model work: List my debates
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > refuses private records without model work: Arată starea curentă a contului meu
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > routes a public account-menu location through bounded answer context: Where can I manage active sessions?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > routes a public account-menu location through bounded answer context: Unde pot gestiona sesiunile active?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > routes a public account-menu location through bounded answer context: Unde găsesc opțiunile de ștergere a contului?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > routes a public account-menu location through bounded answer context: Where can Support explain how I delete my account?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > routes a public account-menu location through bounded answer context: Unde poate Asistența să explice cum îmi șterg contul?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps private records and account operations off the answer path: Show my active sessions
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps private records and account operations off the answer path: Șterge-mi contul acum.
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps private records and account operations off the answer path: Where are the account options, and delete my account now.
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps private records and account operations off the answer path: Where can Support delete my account now?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps private records and account operations off the answer path: Where can you delete my account for me?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps private records and account operations off the answer path: Where can you remove my account, Support?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps private records and account operations off the answer path: Unde poate Asistența să îmi șteargă contul acum?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps private records and account operations off the answer path: Unde ar putea asistentul elimina contul meu?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps private records and account operations off the answer path: Unde poți să îmi ștergi contul?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps injection refusal precedence over private-record intent
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > accounts for injection before a private sessions request
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rolls back the session row when key material creation fails
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > stores only redacted ciphertext through the API boundary and becomes undecryptable after shred
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > zeroes transient message DEK and plaintext buffers on success and failures
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > treats an invalid identity cookie as anonymous
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > requires trusted origin and CSRF only when a mutating request binds a valid identity cookie
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > makes nullable session-owner mismatches indistinguishable and side-effect free
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > applies the 2,000-character boundary to authenticated support sessions
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > applies session counts universally while anonymous IP limits remain anonymous-only
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns DISABLED without a model-call reservation or transcript row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > preserves an exact final-gate DISABLED answer through the route contract
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > fails closed on SUPPORT_CONFIG_UNINITIALIZED creation and reads without creating a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > fails closed on SUPPORT_CONFIG_REFRESH_DEADLINE creation and reads without creating a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns fixed DISABLED creation without rows or anonymous admission consumption
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > still derives the effective lock when an available snapshot turns support off
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > does not lock after three repeats of a benign dangerous-noun product question
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > refuses injection before relay admission and stores only exact message and IP hashes
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > serves deterministic injection refusal through the actual restricted support role
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > persists zone and safety refusals as fixed encrypted assistant output without model transit
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > derives an effective lock from three immutable injection rows and refuses the fourth
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps an immutable lock terminal across threshold changes, ratings, and manual escalation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > serializes concurrent third and fourth injection admission at the immutable event boundary
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > applies the 24-hour two-lock IP cooldown window and records no raw IP or content
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns 429 on the 21st anonymous message inside the configured ten-minute window
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > shares ordinary admission counters across API instances and restart
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > allows 2,000 characters and returns 429 for 2,001 using the register snapshot
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > uses injected register limits for messages, characters, sessions, and injection lock
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps the ten-minute cutoff inclusive and excludes an event one millisecond beyond it
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > preserves a local-limit 429 and reports only a safe diagnostic when evidence fails
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > preserves a locked-session 429 and safe diagnostic when rate evidence fails
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > coalesces concurrent and long repeated rate limits to the immutable first event
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > composes public status from register, KB, and support repository ports
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > projects exact nullable deflection and rating-resolution status fields
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns 409 before admission, model work, or message writes when session snapshot A is unavailable
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > passes the exact route-resolved immutable snapshot object to answer work
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns canonical deterministic unresolved Forgot password guidance without a model: Forgot password
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns canonical deterministic unresolved Forgot password guidance without a model: Am uitat parola
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns canonical deterministic unresolved Forgot password guidance without a model: Give me the password recovery link
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns canonical deterministic unresolved Forgot password guidance without a model: Where is the password reset page?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns canonical deterministic unresolved Forgot password guidance without a model: Where can I find the link to recover my password?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns canonical deterministic unresolved Forgot password guidance without a model: Can you check where the password reset page is?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns canonical deterministic unresolved Forgot password guidance without a model: I do not want to validate a reset token; show me the password recovery page.
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns canonical deterministic unresolved Forgot password guidance without a model: I don’t want to validate a reset token; show me the password recovery page.
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns canonical deterministic unresolved Forgot password guidance without a model: Show the p%61ssword recovery link.
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns canonical deterministic unresolved Forgot password guidance without a model: Vreau linkul de recuperare a parolei
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns canonical deterministic unresolved Forgot password guidance without a model: Unde este pagina pentru resetarea parolei?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns canonical deterministic unresolved Forgot password guidance without a model: Unde găsesc linkul pentru a-mi recupera parola?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns canonical deterministic unresolved Forgot password guidance without a model: Verifică unde este pagina de resetare a parolei.
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns canonical deterministic unresolved Forgot password guidance without a model: Nu vreau să validez tokenul de resetare; arată pagina de recuperare a parolei.
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns canonical deterministic unresolved Forgot password guidance without a model: Arată pagina pentru recuperarea p%61rolei.
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > combines reset-token refusal with unresolved safe recovery guidance: Where is the page to validate my password reset token?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > combines reset-token refusal with unresolved safe recovery guidance: Unde este pagina pentru validarea tokenului de resetare a parolei?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > combines reset-token refusal with unresolved safe recovery guidance: Unde este pagina pentru validarea codului de recuperare a parolei?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps generated positive-navigation en recovery behavior deterministic and actionless
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps generated curly-negated-operation-navigation en recovery behavior deterministic and actionless
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps generated operation-only en recovery behavior deterministic and actionless
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps generated operation-token-only en recovery behavior deterministic and actionless
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps generated operation-recovery-code en recovery behavior deterministic and actionless
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps generated operation-recovery-token en recovery behavior deterministic and actionless
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps generated comma-mixed en recovery behavior deterministic and actionless
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps generated mixed en recovery behavior deterministic and actionless
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps generated negated-operation-navigation en recovery behavior deterministic and actionless
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps generated positive-navigation ro recovery behavior deterministic and actionless
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps generated operation-only ro recovery behavior deterministic and actionless
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps generated operation-code-only ro recovery behavior deterministic and actionless
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps generated operation-recovery-token ro recovery behavior deterministic and actionless
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps generated operation-recovery-code ro recovery behavior deterministic and actionless
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps generated comma-mixed ro recovery behavior deterministic and actionless
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps generated mixed ro recovery behavior deterministic and actionless
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps generated negated-operation-navigation ro recovery behavior deterministic and actionless
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps a solely negated en recovery mention on the ordinary bounded path
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps a solely negated ro recovery mention on the ordinary bounded path
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > recovers a rejected encoded link draft from the pinned top source before storage and HTTP
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > recovers a rejected internal identifier draft from the pinned top source before storage and HTTP
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns a grounded relay answer with server-owned sources, redacted transit, strict timestamps, and encrypted persistence
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > routes public sign-in navigation through ingress and opaque references: Where can I sign in?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > routes public sign-in navigation through ingress and opaque references: Unde găsesc pagina de autentificare?
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > routes the Romanian owner sign-up prompt through the reviewed full corpus
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] 2026-09-21 08:35:41.859 EEST [50873] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] 2026-09-21 08:35:41.859 EEST [50873] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] 2026-09-21 08:35:41.860 EEST [50873] LOG:  background worker "logical replication launcher" (PID 50882) exited with exit code 1
+
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] 2026-09-21 08:35:41.862 EEST [50877] LOG:  shutting down
+
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] 2026-09-21 08:35:41.862 EEST [50877] LOG:  checkpoint starting: shutdown immediate
+
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] 2026-09-21 08:35:41.926 EEST [50877] LOG:  checkpoint complete: wrote 1716 buffers (10.5%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.036 s, sync=0.028 s, total=0.065 s; sync files=1144, longest=0.001 s, average=0.001 s; distance=13595 kB, estimate=13595 kB; lsn=0/24CE080, redo lsn=0/24CE080
+
+
+stdout | tests/integration/support-routes.test.ts > SUP-01 support routes
+[S00 DB embedded] 2026-09-21 08:35:41.931 EEST [50873] LOG:  database system is shut down
+
+
+
+ ❯ tests/integration/support-routes.test.ts 147/168
+
+ Test Files 0 passed (3)
+      Tests 1 failed | 0 passed | 146 skipped (168)
+   Start at 08:35:38
+   Duration 3.45s
+[?2026l[?2026h[K × tests/integration/support-routes.test.ts > SUP-01 support routes > recovers an unsupported Pricing payment claim before storage and HTTP 183ms
+   → expected 'Pricing is informational and is not c…' not to be 'Pricing is informational and is not c…' // Object.is equality
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > advertises no owner-only action to an anonymous export model request
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns fixed NO_SOURCE without invoking the relay and persists only encrypted outcome rows
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > maps relay 502 failure to fixed encrypted DEGRADED while escalation remains available
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > maps relay 504 failure to fixed encrypted DEGRADED while escalation remains available
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > maps relay timeout failure to fixed encrypted DEGRADED while escalation remains available
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > maps relay connection failure to fixed encrypted DEGRADED while escalation remains available
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > opens a minimal encrypted case with a distinct opaque capability and exact Romanian receipt
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns typed already-opened without a capability for concurrent manual escalation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > redacts case replies before encryption and enforces the UTF-8 byte limit
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > serializes concurrent case-reply limits and pages replies with a SQL cursor
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > opens and commits an E2 case before returning the deterministic safety refusal
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > opens E8 for account erasure without a model or tool call: Delete my account
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > opens E8 for account erasure without a model or tool call: Erase my account
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > opens E8 for account erasure without a model or tool call: Șterge contul meu
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns opaque SLA/link receipts for newly opened E3, E6, E7, and E8 cases
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > redacts supplied en credentials before session storage and the E3 case snapshot
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > redacts supplied ro credentials before session storage and the E3 case snapshot
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > records authenticated message ratings and opens E5 after two consecutive no ratings
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > lists only identity-bound case metadata to the authenticated owner
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns SHREDDED without quota or mutation for every session write surface
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps the key-based adapter seam nonfunctional
+
+ ❯ tests/unit/support-answer-context.test.ts [queued]
+
+ Test Files 1 failed | 0 passed (3)
+      Tests 1 failed | 0 passed | 167 skipped (168)
+   Start at 08:35:38
+   Duration 3.56s
+[?2026l[?2026h[K
+ ❯ tests/unit/support-answer-context.test.ts 1/61
+
+ Test Files 1 failed | 0 passed (3)
+      Tests 1 failed | 0 passed | 168 skipped (229)
+   Start at 08:35:38
+   Duration 3.66s
+[?2026l[?2026h[K ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is Dialectical-Engine?
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is Dialectical Engine?
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is DebateAIRO?
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is Debate AIRO?
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: Why can't Support answer questions about Dialectical-Engine?
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds the Romanian identity surface in the Romanian identity article
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded topic at NO_SOURCE without a model call: Does Dialectical Engine offer medical diagnosis?
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded topic at NO_SOURCE without a model call: Does DebateAIRO provide investment advice?
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a Settings menu question and returns only the server-resolved section action
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > repairs omitted visible Account authority through the actual answer boundary
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects unsupported destination promises through the actual answer boundary
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical en destination promise through the actual answer service: false
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical ro destination promise through the actual answer service: false
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical en destination promise through the actual answer service: false
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical ro destination promise through the actual answer service: false
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical en destination promise through the actual answer service: true
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical ro destination promise through the actual answer service: true
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical en destination promise through the actual answer service: false
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical ro destination promise through the actual answer service: false
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical en destination promise through the actual answer service: false
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical ro destination promise through the actual answer service: false
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects human-case and email conflation through the actual answer boundary
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > enforces the en case/email relation through the actual answer boundary
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > enforces the ro case/email relation through the actual answer boundary
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > enforces the en case/email relation through the actual answer boundary
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > enforces the ro case/email relation through the actual answer boundary
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers a rejected compound en answer from the required app-navigation source
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers a rejected compound ro answer from the required app-navigation source
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers a rejected compound ro answer from the required app-navigation source
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > enforces required and allowed compound sources independent of accepted-draft order
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a reviewed en prose-only guide answer actionless in the actual service
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a reviewed ro prose-only guide answer actionless in the actual service
+ × tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers the observed unsupported Pricing payment claim through the full reviewed corpus 79ms
+   → expected 'Pricing on the site is informational …' not to be 'Pricing on the site is informational …' // Object.is equality
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a genuine en menu request bound to its relevant closed action
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a genuine ro menu request bound to its relevant closed action
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a negated unrelated en destination out of the model and response action sinks
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a negated unrelated ro destination out of the model and response action sinks
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a reviewed en identity paraphrase through the actual service: Is Dialectical Engine a reasoning instrument?
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a reviewed en identity paraphrase through the actual service: Give me an overview of dialecticalengine.
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a reviewed en identity paraphrase through the actual service: What is Dialectical-Engine, and what can I do in this app?
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a reviewed ro identity paraphrase through the actual service: Ce este Dialectical-Engine și ce pot face în această aplicație?
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded claim out of the actual service on the admitted corpus: Does Dialectical Engine support investment advice?
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded claim out of the actual service on the admitted corpus: Can DebateAIRO help diagnose medical conditions?
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers every rejected ordinary knowledge envelope from the pinned top source: not-json
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers every rejected ordinary knowledge envelope from the pinned top source: {"kind":"tool","text":"ignored","sourceIds":[],"actionIds":[]}
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > maps request-local model references to canonical response provenance
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps matching whole reviewed sections above 12,000 and below the 24,000 system cap
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > filters unavailable actions before the model sees the output contract
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > uses the exact immutable snapshot object already resolved by the route
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > reports only the closed diagnostic shape for a rejected completion
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects an internal identifier before canonical assistant storage
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects a request alias in narrative text before canonical assistant storage
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects a source reference issued for a prior request
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Support does not request passwords, plus it could receive them.
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Support does not request passwords, in addition it accepts them.
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere parole, plus le poate primi.
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere parole, în plus le poate primi.
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere coduri de autentificare; de asemenea le poate valida.
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere coduri de securitate; în plus le poate verifica.
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Network=%5C%5Cserver%5Cshare to continue.
+ ↓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > assigns distinct opaque identities to separate rejected model attempts
+
+ ❯ tests/unit/support-response-policy.test.ts 0/212
+
+ Test Files 2 failed | 0 passed (3)
+      Tests 2 failed | 0 passed | 227 skipped (441)
+   Start at 08:35:38
+   Duration 3.86s
+[?2026l[K ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > completes material Account citations from supplied authority without widening ordinary prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > requires source-backed closed actions for navigation commitments but preserves descriptions
+ × tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects an unsupported positive financial capability claim: Pricing is informational only, but paying for a debate happens through the debate creator after sign in. 5ms
+   → expected { kind: 'answer', …(3) } to be null
+ × tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects an unsupported positive financial capability claim: Creating a debate happens in the creator, and payment happens there too. 1ms
+   → expected { kind: 'answer', …(3) } to be null
+ × tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects an unsupported positive financial capability claim: Checkout is completed in the debate creator. 0ms
+   → expected { kind: 'answer', …(3) } to be null
+ × tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects an unsupported positive financial capability claim: Crearea dezbaterii și plata au loc în creator după autentificare. 1ms
+   → expected { kind: 'answer', …(3) } to be null
+ × tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects an unsupported positive financial capability claim: Poți plăti pentru dezbatere din creator. 0ms
+   → expected { kind: 'answer', …(3) } to be null
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > preserves a bounded negative financial limitation: Pricing is informational and is not a checkout flow. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > preserves a bounded negative financial limitation: You cannot purchase or change a plan from Pricing. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > preserves a bounded negative financial limitation: Public guidance does not establish where payment happens. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > preserves a bounded negative financial limitation: Pricing este informativ și nu este un flux de plată. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > preserves a bounded negative financial limitation: Ghidul public nu stabilește unde are loc plata. 0ms
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > derives every promised destination from the canonical action and guide catalogs
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a canonical promise when any request-local authority edge is missing
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects case-email conflation while preserving the separate mail workflow
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > reports a closed secret-safe rejection shape without completion bytes or identifiers
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > projects a closed per-attempt log record and drops arbitrary hostile fields
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > distinguishes syntax, exact-key, provenance, and accepted producer results
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts an exact bounded draft and preserves benign public identifiers
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: Settings does not offer controls to replace a password or regenerate MFA. Support cannot accept credentials.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: A fresh sign in may be required in Settings, but Support cannot receive passwords or security codes.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: Setările nu oferă controale pentru înlocuirea parolei sau regenerarea MFA. Asistența nu poate primi date de autentificare.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: În Setări poate fi necesară o autentificare recentă, dar Asistența nu poate primi parole sau coduri de securitate.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: You can change your account name in Settings. Support cannot receive your password.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: Poți schimba numele contului în Setări. Asistența nu poate primi parola.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: Recovery codes are available only after sign in.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: Codurile de recuperare sunt disponibile după autentificare.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: Reset tokens expire and must remain private.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: Codul de verificare este necesar pentru autentificare.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Send your password to Support.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Give Support your password so it can validate it.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: S​end your password to Support.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Do not share your password with anyone; send it here instead.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Do not share your password with anyone, then send it here.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: I changed your password successfully.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Your password is hunter2.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Trimite parola către Asistență.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Nu partaja parola cu nimeni; trimite-o aici în schimb.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Am schimbat parola ta cu succes.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Parola ta este hunter2.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Send your passwords to Support.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Trimite parolele către Asistență.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Send your security codes to Support.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Support does not receive passwords and you should send your password here.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Asistența nu primește parole și trebuie să trimiți parola aici.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Support cannot receive your password. Send it here instead.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Asistența nu poate primi parola. Trimite-o aici în schimb.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Support does not receive passwords and also asks you to send them here.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Support does not receive passwords, so send them here.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Support does not receive passwords and then asks you to send them here.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Asistența nu primește parole și de asemenea îți cere să le trimiți aici.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Asistența nu primește parole, așa că trimite-le aici.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Send your p%61ssword to Support.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Trimite p%2561rola către Asistență.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Support does not receive passwords while it asks you to send them here.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Support does not receive passwords and generally asks you to send them here.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Send your %EF%BD%90%EF%BD%81%EF%BD%93%EF%BD%93%EF%BD%97%EF%BD%8F%EF%BD%92%EF%BD%84 to Support.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Send your pass%E2%80%8Bword to Support.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Support does not receive passwords and may receive them.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Support cannot accept a security code, but it could validate it.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Asistența nu primește parole și poate primi acestea.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Asistența nu verifică un cod de securitate, dar ar putea să îl primească.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Support never asks for OTP codes, plus it accepts them.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Support does not request passwords, plus it could receive them.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Support does not request passwords, in addition it accepts them.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Support does not request passwords, additionally it accepts them.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Support does not request passwords, moreover it accepts them.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Support does not request passwords, furthermore it accepts them.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Asistența nu cere parole, plus le poate primi.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Asistența nu cere parole, în plus le poate primi.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Asistența nu cere parole, de asemenea le poate primi.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Asistența nu cere coduri de recuperare; de asemenea le poate valida.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Asistența nu cere coduri de verificare; de asemenea le poate valida.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Asistența nu cere coduri de securitate; de asemenea le poate valida.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Asistența nu cere coduri de autentificare; de asemenea le poate valida.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Support does not request passwords, plus it does not accept them.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Support does not request passwords, in addition it never receives them.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Support does not request passwords, additionally it cannot validate them.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Support does not request passwords, moreover it does not use them.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Asistența nu cere parole, în plus nu le primește.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Asistența nu cere parole, de asemenea nu le verifică.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Asistența nu cere coduri de recuperare; de asemenea nu le poate valida.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Asistența nu cere coduri de verificare; de asemenea nu le poate valida.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Asistența nu cere coduri de securitate; de asemenea nu le poate valida.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Asistența nu cere coduri de autentificare; de asemenea nu le poate valida.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural root backslash after = boundary in answer and summary text
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural drive path after = boundary in answer and summary text
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural UNC path after = boundary in answer and summary text
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural root backslash after : boundary in answer and summary text
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural drive path after : boundary in answer and summary text
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural UNC path after : boundary in answer and summary text
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural root backslash after , boundary in answer and summary text
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural drive path after , boundary in answer and summary text
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural UNC path after , boundary in answer and summary text
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural root backslash after ; boundary in answer and summary text
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural drive path after ; boundary in answer and summary text
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural UNC path after ; boundary in answer and summary text
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps benign assignment text usable in answer and summary text: Progress=84% complete.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps benign assignment text usable in answer and summary text: Ratio=3/4 with four observations.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps benign assignment text usable in answer and summary text: Time=14:30 local.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps benign assignment text usable in answer and summary text: Version=1.2.3 is available.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps an explicit noncredential object independent from an older credential: Support cannot receive passwords. You can change this display name in Settings.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps an explicit noncredential object independent from an older credential: Support cannot accept recovery codes. You may edit that profile name in Settings.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps an explicit noncredential object independent from an older credential: Asistența nu primește parole. Poți schimba acest nume afișat în Setări.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps all current human labels neutral in factual framing
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a closed internal action identifier in visitor prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a closed internal capability identifier in visitor prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a closed internal selected source identifier in visitor prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a closed internal control-obfuscated action identifier in visitor prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a closed internal formerly excepted action identifier in visitor prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a closed internal formerly excepted action identifier in visitor prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a closed internal formerly excepted action identifier in visitor prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a closed internal formerly excepted action identifier in visitor prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id start-debate in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id sign-in in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id sign-up in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id support-status in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id sample-transcript in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id active-sessions in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id privacy-preferences in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id claim-legacy in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id delete-account in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id public-catalog in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id your-debates in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id owner-debate in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id public-debate in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id forgot-password in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id product-identity in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id home-library in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id new-debate in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id help-desk in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id verify-email in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id enroll-mfa in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id operator-workers in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id app-navigation in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id browse-public-debates in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id getting-started-debate in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id debate-topic-and-description in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id risk-tier-choice in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id budget-tier-choice in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id guide-how-it-works in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id export-json in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id publish-a-debate in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id debate-workspace-menus in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id unpublish-a-debate in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id delete-a-private-debate in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id unsupported-capabilities in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id view-public-debate in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id public-answer-disclosure in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id settings-help-menus in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id support-cases in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id support-status-limits in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id account-access in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id account-settings in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id privacy-consent in narrative prose
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps ambiguous human-facing feature names usable: Open Settings to review the ordinary feature name.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps ambiguous human-facing feature names usable: Deschide Setări pentru a vedea numele obișnuit al funcției.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps ambiguous human-facing feature names usable: Return home after reading Help.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps ambiguous human-facing feature names usable: Select Forgot password to continue.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps ambiguous human-facing feature names usable: Alege Preferințe de confidențialitate pentru a continua.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps ambiguous human-facing feature names usable: Choose Sign in to continue.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps ambiguous human-facing feature names usable: Read Support status for details.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects raw text before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects malformed JSON before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects oversized JSON before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects extra key before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects wrong kind before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects raw URL before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects protocol-relative URL before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects percent-encoded HTTPS URL before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects percent-encoded path before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects double-encoded path before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects triple-encoded URL before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects deeper encoded path before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects malformed structural escape before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects path instruction before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects root backslash before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects relative forward path before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects relative backslash path before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects drive path before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects UNC path before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects encoded backslash before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects Markdown link before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects HTML before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects credential request before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects Romanian credential request before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects grouped code before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects control-obfuscated code before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects secret echo before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects false reset claim before validation
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps benign percentage text usable: Progress is 50% complete.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps benign percentage text usable: The 100% local export remains available.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps benign percentage text usable: Progresul este 50% finalizat.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts only the exact purpose-specific advisory summary envelope
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Open //example.test/reset
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Open https%3A%2F%2Fexample.test/reset
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Open %2Fsettings
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Your password is hunter2
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: I reset the visitor password successfully
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Choose <a href='/new'>Start</a>
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Use [this link](/new)
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: The visitor should use start-debate to continue.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: The visitor should read getting-started-debate for details.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Support does not receive passwords and the visitor should send a password here.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Support does not receive passwords and also asks the visitor to send them here.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Send the visitor p%61ssword to Support.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Open https%25253A%25252F%25252Fexample.test/reset
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: The visitor should use forgot-password to continue.
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects forged source
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unrequested action
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects missing source
+ ↓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects duplicate source
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/support-routes.test.ts > SUP-01 support routes > recovers an unsupported Pricing payment claim before storage and HTTP
+AssertionError: expected 'Pricing is informational and is not c…' not to be 'Pricing is informational and is not c…' // Object.is equality
+ ❯ tests/integration/support-routes.test.ts:2675:38
+    2673|       outcome:"ANSWER_GROUNDED",sources:[{ id:"app-navigation" }],acti…
+    2674|     });
+    2675|     expect(response.json().text).not.toBe(unsafe);
+       |                                      ^
+    2676|     expect(complete).toHaveBeenCalledOnce();
+    2677|     const stored = await database.pool.query<{ model_called:boolean;in…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers the observed unsupported Pricing payment claim through the full reviewed corpus
+AssertionError: expected 'Pricing on the site is informational …' not to be 'Pricing on the site is informational …' // Object.is equality
+ ❯ tests/unit/support-answer-context.test.ts:476:29
+    474|       outcome:"ANSWER_GROUNDED",sources:[{ id:"app-navigation" }],acti…
+    475|     });
+    476|     expect(result.text).not.toBe(unsafe);
+       |                             ^
+    477|     expect(result.text).not.toMatch(/paying for a debate happens/iu);
+    478|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects an unsupported positive financial capability claim: Pricing is informational only, but paying for a debate happens through the debate creator after sign in.
+AssertionError: expected { kind: 'answer', …(3) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "actionIds": [],
+  "kind": "answer",
+  "sourceIds": [
+    "app-navigation",
+  ],
+  "text": "Pricing is informational only, but paying for a debate happens through the debate creator after sign in.",
+}
+
+ ❯ tests/unit/support-response-policy.test.ts:77:31
+     75|     expect(bindSupportDraftAuthority({
+     76|       kind:"answer",text,sourceIds:["app-navigation"],actionIds:[]
+     77|     },["app-navigation"],[])).toBeNull();
+       |                               ^
+     78|   });
+     79|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects an unsupported positive financial capability claim: Creating a debate happens in the creator, and payment happens there too.
+AssertionError: expected { kind: 'answer', …(3) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "actionIds": [],
+  "kind": "answer",
+  "sourceIds": [
+    "app-navigation",
+  ],
+  "text": "Creating a debate happens in the creator, and payment happens there too.",
+}
+
+ ❯ tests/unit/support-response-policy.test.ts:77:31
+     75|     expect(bindSupportDraftAuthority({
+     76|       kind:"answer",text,sourceIds:["app-navigation"],actionIds:[]
+     77|     },["app-navigation"],[])).toBeNull();
+       |                               ^
+     78|   });
+     79|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects an unsupported positive financial capability claim: Checkout is completed in the debate creator.
+AssertionError: expected { kind: 'answer', …(3) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "actionIds": [],
+  "kind": "answer",
+  "sourceIds": [
+    "app-navigation",
+  ],
+  "text": "Checkout is completed in the debate creator.",
+}
+
+ ❯ tests/unit/support-response-policy.test.ts:77:31
+     75|     expect(bindSupportDraftAuthority({
+     76|       kind:"answer",text,sourceIds:["app-navigation"],actionIds:[]
+     77|     },["app-navigation"],[])).toBeNull();
+       |                               ^
+     78|   });
+     79|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+ FAIL  tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects an unsupported positive financial capability claim: Crearea dezbaterii și plata au loc în creator după autentificare.
+AssertionError: expected { kind: 'answer', …(3) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "actionIds": [],
+  "kind": "answer",
+  "sourceIds": [
+    "app-navigation",
+  ],
+  "text": "Crearea dezbaterii și plata au loc în creator după autentificare.",
+}
+
+ ❯ tests/unit/support-response-policy.test.ts:77:31
+     75|     expect(bindSupportDraftAuthority({
+     76|       kind:"answer",text,sourceIds:["app-navigation"],actionIds:[]
+     77|     },["app-navigation"],[])).toBeNull();
+       |                               ^
+     78|   });
+     79|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects an unsupported positive financial capability claim: Poți plăti pentru dezbatere din creator.
+AssertionError: expected { kind: 'answer', …(3) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "actionIds": [],
+  "kind": "answer",
+  "sourceIds": [
+    "app-navigation",
+  ],
+  "text": "Poți plăti pentru dezbatere din creator.",
+}
+
+ ❯ tests/unit/support-response-policy.test.ts:77:31
+     75|     expect(bindSupportDraftAuthority({
+     76|       kind:"answer",text,sourceIds:["app-navigation"],actionIds:[]
+     77|     },["app-navigation"],[])).toBeNull();
+       |                               ^
+     78|   });
+     79|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  7 failed | 5 passed | 429 skipped (441)
+   Start at  08:35:38
+   Duration  3.91s (transform 556ms, setup 0ms, import 1.46s, tests 2.18s, environment 0ms)
+
+[?25h

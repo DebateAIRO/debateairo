@@ -1,0 +1,14 @@
+revision=c8784902f78ed4ba1d637d122e1f32f598415f4e
+base=91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69
+command=git rev-parse HEAD:./package.json HEAD:./pnpm-lock.yaml HEAD:./pnpm-workspace.yaml HEAD:./packages/support-kb/content HEAD:./packages/support-kb/recovery HEAD:./packages/support-kb/src/catalog.ts HEAD:./packages/support-kb/src/navigation.ts
+detached_rc=0
+primary_rc=0
+package_json=85c38389b711cf1b19948670209c1b8183f04c69
+pnpm_lock=8b0f6abeb9afc8d30adcf495cba7276a65409c48
+pnpm_workspace=8ed075ae628c4c6ea62d734907d475a1879f3ce8
+support_kb_content=aa3f9c35ecdf59915a94d4659746bd2e21a7be99
+support_kb_recovery=84910a104520031a5a033d902da95d6b5cfd0e37
+support_catalog=eabf0ab16267d3bf452b7f9525912b4296313b73
+support_navigation=dc60ffd5d16b337d695303b92856a8747276cace
+prior_security_defining_diff=empty
+result=exact identity across detached and primary; prior guard, navigation resolver, catalog, role and data-source bindings unchanged

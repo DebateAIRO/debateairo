@@ -1,0 +1,50 @@
+{
+  "revision": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718",
+  "base": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "inputManifestRevision": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718",
+  "gateRevision": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718",
+  "inputs": {
+    "checked": 53,
+    "failures": []
+  },
+  "detachedProduct": {
+    "checked": 144,
+    "failures": []
+  },
+  "primaryProduct": {
+    "checked": 144,
+    "failures": []
+  },
+  "changedPaths": {
+    "expected": [
+      "apps/api/src/main.ts",
+      "apps/api/src/support/index.ts",
+      "apps/api/src/support/session.ts",
+      "packages/db/src/support.ts",
+      "tests/architecture/sup-01-boundary.test.ts",
+      "tests/integration/dev-database-principals.test.ts",
+      "tests/integration/support-metrics.test.ts",
+      "tests/integration/support-routes.test.ts",
+      "tests/support-eval/run.ts"
+    ],
+    "actual": [
+      "apps/api/src/main.ts",
+      "apps/api/src/support/index.ts",
+      "apps/api/src/support/session.ts",
+      "packages/db/src/support.ts",
+      "tests/architecture/sup-01-boundary.test.ts",
+      "tests/integration/dev-database-principals.test.ts",
+      "tests/integration/support-metrics.test.ts",
+      "tests/integration/support-routes.test.ts",
+      "tests/support-eval/run.ts"
+    ]
+  },
+  "detached": {
+    "head": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718",
+    "dirty": 0
+  },
+  "primary": {
+    "head": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718",
+    "dirty": 0
+  }
+}

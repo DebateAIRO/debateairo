@@ -1,0 +1,42 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps public product guidance public: Where is Your debates? 2ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps public product guidance public: How do I use the debate workspace? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps public product guidance public: Unde găsesc Dezbaterile tale? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps public product guidance public: Cum folosesc meniul dezbaterii? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps account-menu locations public: Where can I manage active sessions? 1ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps account-menu locations public: Where are the account deletion options? 1ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps account-menu locations public: Unde pot gestiona sesiunile active? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps account-menu locations public: Unde găsesc opțiunile de ștergere a contului? 1ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > does not treat an explicit Where can Support delete my account now? Support account operation as navigation: en 1ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > does not treat an explicit Where could the assistant remove my account? Support account operation as navigation: en 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > does not treat an explicit Unde poate Asistența șterge contul meu? Support account operation as navigation: ro 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > does not treat an explicit Unde poate agentul de suport să elimine contul meu? Support account operation as navigation: ro 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Where can I delete my account? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Where can I find the account deletion setting? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Do not delete my account; where can I find the account deletion setting? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Where can Support explain the account deletion setting? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Unde pot să îmi șterg contul? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Unde găsesc opțiunea de ștergere a contului? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Nu îmi șterge contul; unde găsesc opțiunea de ștergere? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Unde poate Asistența să explice opțiunea de ștergere a contului? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > distinguishes Support actors from user navigation across bounded operation forms 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: List my debates 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Show the current state of my account 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Summarize my latest debate 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Inspect my account records 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Show my active sessions 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: List the active devices on my account 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Listează dezbaterile mele 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Arată starea curentă a contului meu 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Rezumați ultima mea dezbatere 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Verifică înregistrările contului meu 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Arată sesiunile active ale contului meu 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Listează dispozitivele active ale contului meu 0ms
+
+ Test Files  1 passed (1)
+      Tests  33 passed (33)
+   Start at  17:05:41
+   Duration  131ms (transform 19ms, setup 0ms, import 29ms, tests 9ms, environment 0ms)
+

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "revision": "130adf47da2e889005e73c3adb7ebb49fd50b529",
+  "command": "pnpm exec vitest run tests/unit/support-response-policy.test.ts tests/unit/support-answer-context.test.ts tests/integration/support-routes.test.ts --maxWorkers=1",
+  "files": [
+    "tests/unit/support-response-policy.test.ts",
+    "tests/unit/support-answer-context.test.ts",
+    "tests/integration/support-routes.test.ts"
+  ],
+  "result": {
+    "filesPassed": 3,
+    "testsPassed": 460,
+    "failed": 0,
+    "exitCode": 0
+  },
+  "log": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_PRICING_CLAIM_FIX2-affected-final2.log",
+    "sha256": "00efad600c96751819d17d01e4d9fe81b7a5b9cc770e7e5e9ee6e588eaad4364",
+    "bytes": 91942
+  }
+}

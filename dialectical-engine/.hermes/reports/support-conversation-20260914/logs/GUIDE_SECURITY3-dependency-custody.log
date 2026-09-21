@@ -1,0 +1,16 @@
+revision=91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69
+detached=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-security/dialectical-engine
+primary=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+initial_command=git rev-parse HEAD:package.json HEAD:pnpm-lock.yaml HEAD:pnpm-workspace.yaml HEAD:packages/support-kb
+initial_rc=128
+initial_error=fatal: path 'dialectical-engine/package.json' exists, but not 'package.json'; Git suggested the worktree-relative HEAD:./ form
+
+corrected_command=git rev-parse HEAD:./package.json HEAD:./pnpm-lock.yaml HEAD:./pnpm-workspace.yaml HEAD:./packages/support-kb
+detached_rc=0
+primary_rc=0
+package_json=85c38389b711cf1b19948670209c1b8183f04c69
+pnpm_lock=8b0f6abeb9afc8d30adcf495cba7276a65409c48
+pnpm_workspace=8ed075ae628c4c6ea62d734907d475a1879f3ce8
+support_kb_tree=d7494f802e8c90b91132f27a26f4d23abaec37b0
+result=exact identity across detached and primary

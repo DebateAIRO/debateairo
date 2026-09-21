@@ -1,0 +1,22 @@
+$ tsx tests/support-eval/run.ts
+node:net:1919
+      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);
+                    ^
+
+Error: listen EPERM: operation not permitted /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/tsx-501/32274.pipe
+    at Server.setupListenHandle [as _listen2] (node:net:1919:21)
+    at listenInCluster (node:net:1998:12)
+    at Server.listen (node:net:2120:5)
+    at file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/tsx@4.23.11/node_modules/tsx/dist/cli.mjs:53:31472
+    at new Promise (<anonymous>)
+    at createIpcServer (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/tsx@4.23.11/node_modules/tsx/dist/cli.mjs:53:31450)
+    at async file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/tsx@4.23.11/node_modules/tsx/dist/cli.mjs:55:542 {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/tsx-501/32274.pipe',
+  port: -1
+}
+
+Node.js v22.23.1
+[ELIFECYCLE] Command failed with exit code 1.

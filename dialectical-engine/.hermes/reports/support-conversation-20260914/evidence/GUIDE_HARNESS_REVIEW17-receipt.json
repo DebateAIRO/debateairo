@@ -1,0 +1,244 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW17",
+  "ticket": "t_994ae292",
+  "runId": 209,
+  "verdict": "PASS_BOUNDED_ORACLE_AND_SEGMENTED_PLAN",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "reviewedOn": "2026-09-20T18:05:29.783594Z",
+  "productRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productClean": true,
+  "freezeCommit": "c1d7b4cbfcea80cb31918f5f24bd0025f157e104",
+  "oracle": {
+    "changedSequences": [
+      25,
+      26
+    ],
+    "primarySourceAlternatives": [
+      "app-navigation",
+      "guide-how-it-works",
+      "debate-workspace-menus"
+    ],
+    "proofMembershipRequired": true,
+    "sourceBoundUsefulnessRequired": true,
+    "genericBroadAnswerRejected": true,
+    "namedLocalHowItWorksRejectsAppNavigation": true,
+    "compactHelpNotLocalHowItWorks": true,
+    "oldOracleRed": "GUIDE_HARNESS_EXPECTED_PRIMARY_SOURCE_MISSING",
+    "focusedGreenPassed": 8,
+    "newModelSampleUsed": false
+  },
+  "retention": {
+    "sourceRun": "GUIDE_LIVE8",
+    "sourceRunStillFailed": true,
+    "retainedGroupIds": [
+      "lifecycle-full-en",
+      "full-ro"
+    ],
+    "retainedSequences": [
+      1,
+      2,
+      7,
+      11,
+      15,
+      19,
+      23,
+      27,
+      31,
+      35,
+      39,
+      41,
+      47,
+      51,
+      43
+    ],
+    "retainedRows": 15,
+    "partialThirdGroupRetained": false,
+    "affectedRowsRetained": false,
+    "manifestSha256": "55bd9d27e570dd8c8aa8a8c72044b9b33c132f0c9a919e2ef8abc4723c9debbc",
+    "productKbModelBound": true,
+    "canonicalRowsEqualOldAndNew": true,
+    "apiDomDiagnosticBound": true,
+    "screenshotPathsBound": 15,
+    "screenshotHashMismatches": 0,
+    "emptyModelHistoryBound": true,
+    "crossSegmentContinuityClaimed": false
+  },
+  "freshPlan": {
+    "groupIds": [
+      "compact-ro",
+      "full-en",
+      "compact-en"
+    ],
+    "groupSizes": [
+      13,
+      12,
+      14
+    ],
+    "freshSequences": [
+      3,
+      10,
+      14,
+      18,
+      22,
+      26,
+      30,
+      34,
+      38,
+      46,
+      50,
+      6,
+      54,
+      9,
+      13,
+      17,
+      21,
+      25,
+      29,
+      33,
+      37,
+      45,
+      49,
+      5,
+      53,
+      4,
+      8,
+      12,
+      16,
+      20,
+      24,
+      28,
+      32,
+      36,
+      40,
+      42,
+      48,
+      52,
+      44
+    ],
+    "freshRequests": 39,
+    "freshSessions": 3,
+    "combinedLogicalRows": 54,
+    "affectedSequencesFresh": [
+      25,
+      26
+    ],
+    "wholeGroupsOnly": true,
+    "skipResumeRetryAllowed": false,
+    "reportingLabel": "15 retained + 39 fresh = 54 logical rows",
+    "full54FallbackIfRetentionInvalid": true
+  },
+  "capacity": {
+    "maxAgeMsAtValidation": 120000,
+    "maxFutureClockSkewMs": 5000,
+    "freeAnonSessions1h": 3,
+    "recentAnonMessages10m": 0,
+    "freeAnonMessages24h": 39,
+    "perSessionMessages": 14,
+    "messageChars": 84,
+    "relayConcurrency": 1,
+    "queueDepth": 1,
+    "remainingDailyModelCalls": 42,
+    "injectionThreshold": 2,
+    "cooldown": false,
+    "relayWaiters": 0,
+    "relayState": "AVAILABLE",
+    "limitMutationAllowed": false
+  },
+  "composition": {
+    "retainedControlNamesExactPrefix": 136,
+    "addedControlPurposes": 15,
+    "finalControls": 151,
+    "finalPassed": 151,
+    "authorVerifierControls": 147,
+    "authorVerifierPassed": 147,
+    "orderedEightSha256": "b4880079137a603ffde919dd1f563162d3a1f93878a369ef16dbeba5912e577d",
+    "adapterNegativesPassed": 3,
+    "matrixRows": 54,
+    "probe6Transitions": 5,
+    "probe6SupportRequests": 0,
+    "packagingFirstFailureLog": "UNAVAILABLE_OVERWRITTEN",
+    "packagingSecondFailureLogRetained": true
+  },
+  "commandContract": {
+    "readmeLiteralCommandsPresent": false,
+    "live9PacketMustBindLiteralCommands": true,
+    "loader": [
+      "node",
+      "--import",
+      "tsx"
+    ],
+    "rowProofFirst": true,
+    "sameFreshGateRequired": true,
+    "exactArgvCwdOutputLogBindingRequired": true,
+    "directRedirectionRequired": true,
+    "extraArgumentsAuthorized": false,
+    "executed": false
+  },
+  "custody": {
+    "reviewInputs": 184,
+    "reviewInputMismatches": 0,
+    "authorInputs": 138,
+    "authorInputMismatches": 0,
+    "authorArtifacts": 43,
+    "authorArtifactMismatches": 0,
+    "futureOutputsCheckedAbsent": 41
+  },
+  "artifacts": [
+    {
+      "role": "report",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW17.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW17.md",
+      "sha256": "99accf919478124b5083b593f56f385d35c71cb7461519bb8e4c1607609ad226",
+      "bytes": 9374
+    },
+    {
+      "role": "selfReport",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW17.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW17.md",
+      "sha256": "8aaa13ec18f00264f6bb52b12b7176b25e4f6ae7fed97ae43df8abbd654e70bc",
+      "bytes": 4245
+    },
+    {
+      "role": "commandContract",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW17-command-contract.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW17-command-contract.json",
+      "sha256": "8dbd79aae85578a5ad5458dd885416a2a79c8d506bda823b67e83b8275bc87e8",
+      "bytes": 3173
+    },
+    {
+      "role": "staticCustody",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW17-static-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW17-static-custody.json",
+      "sha256": "6fbc95e72185edf61ad5ebc44aee6af2fc5f311d62bc6335bb5b4dc4d59161bc",
+      "bytes": 2917
+    }
+  ],
+  "limits": {
+    "staticReview": true,
+    "rowProofRun": false,
+    "freshCaptureRun": false,
+    "browser": false,
+    "runtime": false,
+    "http": false,
+    "database": false,
+    "status": false,
+    "capacityRead": false,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "productWrites": false,
+    "gitWrites": false,
+    "harnessWrites": false,
+    "liveResultClaimed": false,
+    "readinessClaimed": false,
+    "acceptanceClaimed": false,
+    "cp1": "INCOMPLETE",
+    "cp2": "GATED",
+    "forgot": "UNRESOLVED_ACTIONLESS"
+  },
+  "selfExclusion": "This receipt excludes itself from artifacts and custody hashes."
+}

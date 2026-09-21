@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "node": "GUIDE_INJECTION_SERVER_DIAG",
+  "ticket": "t_2ddf3990",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "verdict": "PROVED_REACHABLE_PRODUCT_DEFECT_LIVE6_FIRST_EXCEPTION_UNOBSERVED",
+  "productDirtyBefore": 0,
+  "productDirtyAfter": 0,
+  "minimumWritePaths": [
+    "apps/api/src/support/index.ts",
+    "apps/api/src/support/session.ts",
+    "apps/api/src/main.ts",
+    "packages/db/src/support.ts",
+    "tests/support-eval/run.ts",
+    "tests/integration/support-routes.test.ts",
+    "tests/integration/support-metrics.test.ts",
+    "tests/integration/dev-database-principals.test.ts",
+    "tests/architecture/sup-01-boundary.test.ts"
+  ],
+  "restrictedRoleBootstrap": [
+    "startTestDatabase()",
+    "migrate(database.pool)",
+    "provisionDevelopmentDatabasePrincipals({adminPool: database.pool, adminDatabaseUrl: database.connectionString, credentialFilePath})",
+    "parse SUPPORT_DATABASE_URL from the generated credential file",
+    "createPool(SUPPORT_DATABASE_URL)"
+  ],
+  "regressionCommand": "TSX_DISABLE_CACHE=1 pnpm exec vitest run tests/architecture/sup-01-boundary.test.ts tests/integration/dev-database-principals.test.ts tests/integration/support-routes.test.ts tests/integration/support-metrics.test.ts --maxWorkers=1",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_SERVER_DIAG.md",
+      "sha256": "66a062f97006a85e594ac05afa89067e332122ec5a1ca1b3699d75c22f1ff386",
+      "bytes": 8461
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_SERVER_DIAG-trace.json",
+      "sha256": "6f1f9d5eb187dd647c2fb852fb61255d4b1d0e452f908f5ba9373e063b201637",
+      "bytes": 3402
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_SERVER_DIAG-custody.log",
+      "sha256": "e84445aeca0dcd02d6626b3bb190993d87c101878786c2cd97631d96933e69ac",
+      "bytes": 392
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_INJECTION_SERVER_DIAG.md",
+      "sha256": "db4f8603a4c0d3bcb2595a3d80b95ba73dab3a25a0862dd779ecee5657aeb6e4",
+      "bytes": 2903
+    }
+  ],
+  "receiptExcludesItself": true,
+  "heavyCommands": 0,
+  "runtimeRequests": 0,
+  "databaseRequests": 0,
+  "modelRequests": 0,
+  "privateLogsRead": 0,
+  "checkpointAccepted": false
+}

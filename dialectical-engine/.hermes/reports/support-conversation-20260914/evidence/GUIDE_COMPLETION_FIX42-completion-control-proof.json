@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_COMPLETION_FIX42",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS",
+  "controls": 8,
+  "passed": 8,
+  "names": [
+    "valid passes",
+    "missing rejects before success checkpoint",
+    "extra rejects before success checkpoint",
+    "malformed rejects before success checkpoint",
+    "out-of-order rejects before success checkpoint",
+    "accumulated-failure rejects before success checkpoint",
+    "real capture invokes completion predicate before composer",
+    "proof serialized"
+  ],
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

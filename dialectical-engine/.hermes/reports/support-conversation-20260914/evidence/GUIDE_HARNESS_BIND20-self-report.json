@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND20",
+  "ticket": "t_1e8c584c",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "PASS_PREPARED_FINAL_OPERATION_CONTRACT",
+  "model": "gpt-5.6-sol",
+  "session": "01a09f02-346a-7fb0-aa70-0424f1fdd21e",
+  "skills": {
+    "retained": [
+      "superpowers:executing-plans",
+      "superpowers:systematic-debugging",
+      "superpowers:verification-before-completion"
+    ],
+    "reReadThisNode": false
+  },
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "proofs": {
+    "offline58": "PASS",
+    "focusedControls": "20/20",
+    "bindingControls": "13/13"
+  },
+  "limitations": [
+    "Runtime7 reload and custody are not executed.",
+    "UI preflight, capacity, gate, row proof, capture and idle phases are not executed.",
+    "Exact34 receipt is composed provenance, not a new monolithic run.",
+    "Forgot password is unresolved and actionless.",
+    "No owner acceptance or CP1 readiness is claimed."
+  ]
+}

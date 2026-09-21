@@ -1,0 +1,99 @@
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-0IHWjb/data ... ok
+creating subdirectories ... 
+[S00 DB embedded] ok
+
+[S00 DB embedded] selecting dynamic shared memory implementation ... 
+[S00 DB embedded] posix
+selecting default "max_connections" ... 
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+[S00 DB embedded] ok
+running bootstrap script ... 
+[S00 DB embedded] ok
+
+[S00 DB embedded] performing post-bootstrap initialization ... 
+[S00 DB embedded] ok
+syncing data to disk ... 
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-0IHWjb/data -l logfile start
+
+
+[S00 DB embedded] 2026-09-20 16:18:13.304 EEST [73063] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+[S00 DB embedded] 2026-09-20 16:18:13.306 EEST [73063] LOG:  listening on IPv4 address "127.0.0.1", port 52172
+
+[S00 DB embedded] 2026-09-20 16:18:13.306 EEST [73063] LOG:  listening on IPv6 address "::1", port 52172
+
+[S00 DB embedded] 2026-09-20 16:18:13.306 EEST [73063] LOG:  listening on Unix socket "/tmp/.s.PGSQL.52172"
+
+[S00 DB embedded] 2026-09-20 16:18:13.309 EEST [73069] LOG:  database system was shut down at 2026-09-20 16:18:13 EEST
+
+[S00 DB embedded] 2026-09-20 16:18:13.312 EEST [73063] LOG:  database system is ready to accept connections
+
+[S00 DB embedded] 2026-09-20 16:18:13.638 EEST [73078] WARNING:  there is already a transaction in progress
+
+[S00 DB embedded] 2026-09-20 16:18:13.961 EEST [73078] WARNING:  there is no transaction in progress
+
+{
+  "status": "PASS",
+  "rows": [
+    {
+      "case": "open-positive-rating",
+      "result": [
+        "yes"
+      ]
+    },
+    {
+      "case": "read-terminal-default-and-raised",
+      "default": "LOCKED",
+      "raised": "LOCKED"
+    },
+    {
+      "case": "admission-terminal-after-threshold-rise",
+      "result": "LOCKED"
+    },
+    {
+      "case": "direct-rating-terminal",
+      "result": null,
+      "ratingCount": 1
+    }
+  ]
+}
+[S00 DB embedded] 2026-09-20 16:18:13.972 EEST [73063] LOG:  received fast shutdown request
+
+[S00 DB embedded] 2026-09-20 16:18:13.972 EEST [73063] LOG:  aborting any active transactions
+
+[S00 DB embedded] 2026-09-20 16:18:13.973 EEST [73063] LOG:  background worker "logical replication launcher" (PID 73072) exited with exit code 1
+
+[S00 DB embedded] 2026-09-20 16:18:13.975 EEST [73067] LOG:  shutting down
+
+[S00 DB embedded] 2026-09-20 16:18:13.976 EEST [73067] LOG:  checkpoint starting: shutdown immediate
+
+[S00 DB embedded] 2026-09-20 16:18:14.039 EEST [73067] LOG:  checkpoint complete: wrote 1719 buffers (10.5%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.034 s, sync=0.030 s, total=0.064 s; sync files=1143, longest=0.001 s, average=0.001 s; distance=13557 kB, estimate=13557 kB; lsn=0/24C4778, redo lsn=0/24C4778
+
+[S00 DB embedded] 2026-09-20 16:18:14.045 EEST [73063] LOG:  database system is shut down
+

@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW15",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productHead": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productClean": true,
+  "indexedInputs": 106,
+  "inputMismatches": [],
+  "controls": {
+    "prior": 127,
+    "current": 130,
+    "passed": 130,
+    "priorNamesExactPrefix": true,
+    "addedNames": [
+      "full readiness reports the exact failed interaction phase",
+      "full adapters gate the first click on hydration and each restore on transition idle",
+      "documented PROBE4 argv passes the extracted guard and stale forms reject"
+    ]
+  },
+  "orderedEight": {
+    "sha256": "b6162d665b60a1a35d882e41fa5b0da3259e9cb86bae32ca5d5056d320ad99d4",
+    "files": [
+      {
+        "path": "capture-public-guide.mjs",
+        "bytes": 24172,
+        "sha256": "53dbf7a2df891632de70c83ce3fab60a4deac98005df0015f6393880285e9f0b"
+      },
+      {
+        "path": "controls.mjs",
+        "bytes": 42557,
+        "sha256": "20adde062fd0f7f478f8bf235e9c1be3a541f5f9bb2a5d421f1d6921d76397b7"
+      },
+      {
+        "path": "matrix.mjs",
+        "bytes": 14253,
+        "sha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c"
+      },
+      {
+        "path": "pre-request-verifier.ts",
+        "bytes": 16751,
+        "sha256": "d5d6656431f93e3089c9c6751ae767b401d21f23bb90d398fa99a051af0ead39"
+      },
+      {
+        "path": "runtime-capacity.mjs",
+        "bytes": 9935,
+        "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87"
+      },
+      {
+        "path": "session-lifecycle.mjs",
+        "bytes": 4254,
+        "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b"
+      },
+      {
+        "path": "verify-final-branches.ts",
+        "bytes": 5131,
+        "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a"
+      },
+      {
+        "path": "verify-guide-harness.mjs",
+        "bytes": 80453,
+        "sha256": "cb46ba00117d5488d6eecbc59419bce733a1dc65844caa6a751429d975383fa2"
+      }
+    ]
+  },
+  "futureOutputs": {
+    "checked": 57,
+    "present": [],
+    "probeLogPresent": false
+  },
+  "producer": {
+    "modeTransitionSha256": "5b433d669da6e13d49489aa3bf040c0e4fc895b96cec64bbd673540dbbd1ee3b",
+    "modeToggleSha256": "ddcb31e0c25fbc2e7c52e14b414a7edc522b29884f61f4f41d7870f8a590669b"
+  },
+  "argumentCheck": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW15-argument-check.json",
+    "sha256": "ad90c2cd0be71fdb6ce91afc9f311c8ec70e1dcf868941bb57bfcd8a35e6b7c6",
+    "bytes": 3425,
+    "passed": 5,
+    "total": 5
+  },
+  "pinnedExecutablePresent": true,
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "database": 0,
+    "supportRequests": 0,
+    "modelRequests": 0
+  }
+}

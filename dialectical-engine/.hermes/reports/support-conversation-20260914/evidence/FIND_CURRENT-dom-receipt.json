@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "browser": "playwright@1.61.1",
+  "freshProfile": true,
+  "results": [
+    {
+      "origin": "https://localhost:3000/login",
+      "status": "VISIBLE",
+      "tlsBypass": false,
+      "title": "Dialectical Engine",
+      "links": [
+        {
+          "text": "Dialectical Enginedezbatere.ro",
+          "href": "/"
+        },
+        {
+          "text": "Create one",
+          "href": "/sign-up"
+        }
+      ],
+      "buttons": [
+        {
+          "text": "☾",
+          "type": "button"
+        },
+        {
+          "text": "Continue",
+          "type": "submit"
+        }
+      ],
+      "forms": [
+        {
+          "action": "/login",
+          "method": "post",
+          "controls": [
+            {
+              "name": "email",
+              "type": "email",
+              "autocomplete": "username"
+            },
+            {
+              "name": "password",
+              "type": "password",
+              "autocomplete": "current-password"
+            }
+          ]
+        }
+      ],
+      "recoveryText": [],
+      "screenshot": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIND_CURRENT-target-3000-login.png"
+    },
+    {
+      "origin": "https://localhost:3100/login",
+      "status": "VISIBLE",
+      "tlsBypass": false,
+      "title": "Dialectical Engine",
+      "links": [
+        {
+          "text": "Dialectical Enginedezbatere.ro",
+          "href": "/"
+        },
+        {
+          "text": "Create one",
+          "href": "/sign-up"
+        }
+      ],
+      "buttons": [
+        {
+          "text": "☾",
+          "type": "button"
+        },
+        {
+          "text": "Continue",
+          "type": "submit"
+        }
+      ],
+      "forms": [
+        {
+          "action": "/login",
+          "method": "post",
+          "controls": [
+            {
+              "name": "email",
+              "type": "email",
+              "autocomplete": "username"
+            },
+            {
+              "name": "password",
+              "type": "password",
+              "autocomplete": "current-password"
+            }
+          ]
+        }
+      ],
+      "recoveryText": [],
+      "screenshot": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIND_CURRENT-target-3100-login.png"
+    }
+  ]
+}

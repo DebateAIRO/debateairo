@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE24",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "retained": {
+    "preflightSha256": "dfce83ea1e186372e9d16c0989e3117d262968c8c724d23540ad46572324df58",
+    "readinessSha256": "03fb0a8c0fef2d92496c6a2a7a0f263d15a2746752ce8b54cadaf4a8198c7a7f"
+  },
+  "runtime": {
+    "pid": 12272,
+    "pgid": 12272,
+    "commandMarker": "pnpm dev:auth:up",
+    "ordinaryTlsStatus": 200
+  },
+  "connection": {
+    "source": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/.local/dev-auth/api.env",
+    "loader": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/runner/src/dev-api-process.ts#readPrivateEnvironment+parseExactEnvironment",
+    "keySource": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/runner/src/dev-api-environment.ts#DEVELOPMENT_API_ENVIRONMENT_KEYS",
+    "privateReader": "faithful bounded local reproduction of unexported source helpers",
+    "selectedSourceKey": "SUPPORT_DATABASE_URL",
+    "childEnvironmentKey": "GUIDE_COUNTS_ONLY_DATABASE_URL",
+    "principalRole": "debateai_dev_support",
+    "publicSourceAnchors": [
+      {
+        "path": "apps/api/src/main.ts",
+        "anchor": "createPool(environment.SUPPORT_DATABASE_URL)"
+      },
+      {
+        "path": "apps/runner/src/dev-database-principals.ts",
+        "anchor": "environmentKey: \"SUPPORT_DATABASE_URL\""
+      },
+      {
+        "path": "apps/runner/src/dev-database-principals.ts",
+        "anchor": "roleName: \"debateai_dev_support\""
+      },
+      {
+        "path": "apps/runner/src/support-status-cli-credentials.ts",
+        "anchor": "const SUPPORT_KEY = \"SUPPORT_DATABASE_URL\""
+      }
+    ],
+    "present": true,
+    "acceptedShape": true,
+    "valueRecorded": false
+  },
+  "futureOutputsCheckedAbsent": 109
+}

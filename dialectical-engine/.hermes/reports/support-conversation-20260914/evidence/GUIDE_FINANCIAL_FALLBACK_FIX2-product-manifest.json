@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FINANCIAL_FALLBACK_FIX2",
+  "ticket": "t_d8c6e45b",
+  "baseRevision": "c683a0c752553fe2b4e226bc3f70879ce2460b74",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "productFiles": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/api/src/support/response-policy.ts",
+      "sha256": "32f30a60de319887b4603ee06ed20aefb16f0c64ca2cd8552396ee8959e8370f",
+      "bytes": 17053,
+      "laneRelative": "apps/api/src/support/response-policy.ts"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/integration/support-routes.test.ts",
+      "sha256": "477b9f4d8d0beb84ff9a351f16f905d68b0eb600394e6a2292f5f9953b8898c6",
+      "bytes": 152223,
+      "laneRelative": "tests/integration/support-routes.test.ts"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-answer-context.test.ts",
+      "sha256": "5c46fecf04faa1f795dd796b4c93bc021ace48005f68638f3188a7dd9e2eaadc",
+      "bytes": 47597,
+      "laneRelative": "tests/unit/support-answer-context.test.ts"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-response-policy.test.ts",
+      "sha256": "0ba7f70b57244ef92cac9eb1e593cb8a4ab3b204e6267ccfb1fac7366476b2f2",
+      "bytes": 29841,
+      "laneRelative": "tests/unit/support-response-policy.test.ts"
+    }
+  ],
+  "scopeExact": true
+}

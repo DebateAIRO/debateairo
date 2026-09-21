@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW8",
+  "ticket": "t_890d62ec",
+  "runId": 167,
+  "reviewerAgentPath": "/root/baseline",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-20T11:25:52Z",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "productRevision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "freezeCommit": "399df06063fb0624dd8f518049f6c79d7e20fcf6",
+  "verdict": "REWORK_BOUNDED_PARSE_CLASSIFICATION",
+  "finding": {
+    "id": "GH8-R1",
+    "status": "OPEN",
+    "severity": "BOUNDARY_EVIDENCE_ACCURACY",
+    "location": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX8/capture-public-guide.mjs:238",
+    "observed": "response.json rejection is replaced with an empty object",
+    "effect": "API_RECEIVED records body OBJECT and projection returns GUIDE_HARNESS_API_OUTCOME_INVALID instead of body INVALID and GUIDE_HARNESS_API_BODY_INVALID",
+    "minimalCorrection": [
+      "preserve JSON parse rejection as a non-object sentinel while retaining numeric status",
+      "add one inert actual response-read-boundary control proving API_RECEIVED body INVALID and GUIDE_HARNESS_API_BODY_INVALID",
+      "prove no raw body, parse exception, rejected text, headers, cookies, identifiers, or private values persist"
+    ]
+  },
+  "retainedDispositions": [
+    {
+      "area": "legacy deterministic absent-decoration normalization",
+      "verdict": "PASS"
+    },
+    {
+      "area": "MODEL array presence and all-branch malformed-present rejection",
+      "verdict": "PASS"
+    },
+    {
+      "area": "safe API_RECEIVED allowlist after a decoded value reaches the consumer",
+      "verdict": "PASS"
+    },
+    {
+      "area": "attempted/completed accounting and closed failure codes",
+      "verdict": "PASS"
+    },
+    {
+      "area": "EN/RO deterministic injection compatibility and strict assertions",
+      "verdict": "PASS"
+    },
+    {
+      "area": "105 predecessor purposes retained in 111-name proof",
+      "verdict": "PASS"
+    },
+    {
+      "area": "matrix, source policy, diagnostics, privacy, lifecycle, navigation, pacing, limits and no-retry",
+      "verdict": "PASS"
+    },
+    {
+      "area": "ordered-eight revision/KB/digest and copied adapter binding",
+      "verdict": "PASS"
+    },
+    {
+      "area": "GUIDE8 output namespace absence",
+      "verdict": "PASS"
+    }
+  ],
+  "controlEvidence": {
+    "harnessSha256": "be7a0ca7f0b4f768ac40a2ecb020a7f17f96df5a8f32100b43e3b85e3752047c",
+    "matrixSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+    "verifierSha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733",
+    "canonicalProofSha256": "3f64bec7379a4af710e3d184748c646c8486dc29a8026b8ce16bb61d41340a14",
+    "retainedPurposes": 105,
+    "addedPurposes": 6,
+    "controls": 111,
+    "passed": 111,
+    "uniqueNames": 111,
+    "adapterNegativeControls": 3,
+    "adapterNegativePassed": 3,
+    "adapterImporterCalls": 0,
+    "adapterSuccessfulRows": 0,
+    "inputCount": 64,
+    "inputMismatches": 0
+  },
+  "privacyAndFailureCustody": {
+    "decodedProjectionFailures": "fixed fields/status/closed outcome only before full projection",
+    "malformedWireJsonClassification": "REWORK_REQUIRED",
+    "actualLive4Cause": "UNKNOWN_UNAVAILABLE_NOT_PERSISTED",
+    "futureOutputsChecked": 56,
+    "futureOutputsPresent": []
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW8.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW8.md",
+      "sha256": "32080c9501116ef87cdceef74498c22c31c4866dcb37132fb1712ea8fb172fe0",
+      "bytes": 4981
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW8.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW8.md",
+      "sha256": "da1934ec41bb7db35cb3e35e136a562f707ffa15ea5ec885ee1d822a21393011",
+      "bytes": 3157
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW8-static-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW8-static-custody.json",
+      "sha256": "955fee6e3c6ea798f693d590088ced7e9a8bec78cfa86dc4b99d2c69aa9276bc",
+      "bytes": 3944
+    }
+  ],
+  "limits": [
+    "static changed-consumer review only; sealed author 111/111 and 3/3 were not rerun",
+    "no harness/test/probe/browser/runtime/status/capacity/HTTP/DB/Support/model/lifecycle/product/KB/Git mutation",
+    "LIVE4 row43 response and cause remain unknown and are not relabeled",
+    "REWORK does not authorize a capture, resampling, readiness, acceptance, checkpoint, or CP2 claim",
+    "Forgot remains unresolved/actionless"
+  ],
+  "leases": {
+    "heavy": "not_requested",
+    "git": "not_requested"
+  },
+  "receiptExcludesItself": true
+}

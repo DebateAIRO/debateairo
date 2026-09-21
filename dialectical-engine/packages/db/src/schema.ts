@@ -119,6 +119,7 @@ export const run = core.table("run", {
   tierProvenanceRef: text("tier_provenance_ref").notNull(),
   compositionBudgetTier: text("composition_budget_tier").notNull(),
   planTier: text("plan_tier"),
+  freePublicRule: boolean("free_public_rule").notNull().default(false),
   depthParams: jsonb("depth_params").notNull(),
   agentCount: integer("agent_count").notNull(),
   discoveredPanel: jsonb("discovered_panel").notNull(),

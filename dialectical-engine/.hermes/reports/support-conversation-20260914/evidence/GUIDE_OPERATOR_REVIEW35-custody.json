@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_REVIEW35",
+  "ticket": "t_e7fbe773",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "reviewedOn": "2026-09-21",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "productCheckout": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "head": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+    "porcelain": "",
+    "clean": true
+  },
+  "indexedInputs": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_REVIEW35-inputs.json",
+    "matched": 59,
+    "total": 59,
+    "mismatches": 0
+  },
+  "delta": {
+    "changedSourceLines": 1,
+    "oldEmbeddedSha256": "6269d1c50fd24574f70f4d4898cd2cf1e2e42174c5f392b9516a558c75575107",
+    "newEmbeddedSha256": "f8a5df033841912013df6eda0f13d5811f9e709712e8311f692d7926d9d52030",
+    "actualCommandSha256": "f8a5df033841912013df6eda0f13d5811f9e709712e8311f692d7926d9d52030",
+    "newOperatorSha256": "41de17e7eb11219ca183a4f156e13225ca6a79446035a5450a0e8d3665c4e153",
+    "exactMatch": true
+  },
+  "guardProof": {
+    "controlsPassed": 10,
+    "controlsTotal": 10,
+    "staleReachedBoundary": false,
+    "correctedReachedBoundary": true,
+    "operationalChildSpawned": false,
+    "privateEnvironmentRead": false,
+    "contractOutputsCreated": false
+  },
+  "futureAbsence": {
+    "declared": 123,
+    "unique": 123,
+    "absent": 123,
+    "present": 0
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

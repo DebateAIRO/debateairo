@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "productRoot": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "finalCommit": "__FINAL_REVISION__",
+  "productInventoryPath": "__FINAL_PRODUCT_INVENTORY_PATH__",
+  "productInventorySha256": "__FINAL_PRODUCT_INVENTORY_SHA256__",
+  "attestationPath": "__FINAL_ATTESTATION_PATH__",
+  "attestationSha256": "__FINAL_ATTESTATION_SHA256__",
+  "expectedSnapshotVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+  "expectedEntryCount": 44,
+  "requiredSuiteReceiptPath": "__FINAL_SUITE_RECEIPT_PATH__",
+  "requiredSuiteReceiptSha256": "__FINAL_SUITE_RECEIPT_SHA256__",
+  "controlProofPath": "__FINAL_CONTROL_PROOF_PATH__",
+  "controlProofSha256": "__FINAL_CONTROL_PROOF_SHA256__",
+  "runtimeLogPath": "__FINAL_PRIVATE_RUNTIME_LOG_PATH__",
+  "baseUrl": "https://localhost:3100",
+  "forgotConnector": "UNRESOLVED_ACTIONLESS"
+}

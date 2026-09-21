@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_COMPLETION_REVIEW42",
+  "ticket": "t_6d597fc2",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "freeze": "480e5e12a0004cb706d459a8f9060c52b47ca627",
+  "authorReceiptSha256": "c9fd940cdeabc99c6603cac5c9169bce0257e256b0071817e3797ec824c464a5",
+  "consumptionSha256": "0b612a5e345b29dbc6b44550d68d930a4a212ec9b66b8a99ce18a18c85f54a0a",
+  "captureSha256": "0f6016771ae8ebf838c24b358f9bf90cab95c8dfa270a258f16ddde7555b2ba1",
+  "completionSha256": "9407a7e82a0767518de793b3948bb2b1c3a0bca4dcb46c368e4bfbffae0fc481",
+  "commandContractSha256": "2fb449ede1f9fdb76ce8f951625feff6dff57f4505cb707866e11c506a167a45",
+  "operatorSha256": "5187a482b7d35132c8a953a4dd02f0d948f69f9f061dc1a2b3528406d37d97df",
+  "completionControls": {"passed":8,"total":8,"sha256":"6f8fc9eef445a5a786ad2056da0976efd17e7cd80c5b5757069805ba3d9dab26"},
+  "bindingControls": {"passed":10,"total":10,"sha256":"02edbd31bfac625afd665a6f803601ac2e23a35760882bdfe6e7367322305c19"},
+  "futurePathCount": 115,
+  "futurePathsAbsent": 115,
+  "operationalTraffic": 0
+}

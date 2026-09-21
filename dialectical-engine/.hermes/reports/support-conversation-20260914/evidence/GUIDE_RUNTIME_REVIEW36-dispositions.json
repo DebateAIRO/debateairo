@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_RUNTIME_REVIEW36",
+  "ticket": "t_a0bea7dc",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "verdict": "REWORK_RUNTIME_PROCESS_IDENTITY_GUARD",
+  "dispositions": [
+    {
+      "id": "GRR36-R1",
+      "subject": "readiness process identity",
+      "disposition": "REWORK",
+      "evidence": "Actual source checks only ps text includes command marker; controlled positive returns PID/PGID123/123 against custody9800/9800 and passes, without enforcing the detached PPID1 identity."
+    },
+    {
+      "id": "GRR36-R2",
+      "subject": "idle process identity",
+      "disposition": "REWORK",
+      "evidence": "Retained idle source also checks only command-marker inclusion and accepts the same mismatched controlled process row."
+    },
+    {
+      "id": "GRR36-P1",
+      "subject": "authenticated Runtime9 custody schema",
+      "disposition": "PASS",
+      "evidence": "Bound schema hash, exact11 keys, required current values, complete ports/API8890, detached/TLS facts, timestamp and custody PID/PGID shape are checked before operational I/O."
+    },
+    {
+      "id": "GRR36-P2",
+      "subject": "schema negative cases",
+      "disposition": "PASS",
+      "evidence": "Predecessor identity, API8787, invalid schema hash, missing/extra key and invalid custody PID reject before operational I/O."
+    },
+    {
+      "id": "GRR36-P3",
+      "subject": "actual public readiness checks",
+      "disposition": "PASS_EXCEPT_PROCESS_IDENTITY",
+      "evidence": "Exact Git revision/cleanliness and ordinary system TLS Help200 checks remain; process liveness marker exists but returned PID/PGID are not validated."
+    },
+    {
+      "id": "GRR36-P4",
+      "subject": "seven-phase source inventory",
+      "disposition": "PASS",
+      "evidence": "Seven direct phases and five transitive validators contain no Runtime7/8787 marker; final readiness argv selects BIND36."
+    },
+    {
+      "id": "GRR36-P5",
+      "subject": "final command and operator guard",
+      "disposition": "PASS",
+      "evidence": "All7 argv self-bind command SHA30da… and operator SHA293c… embeds it; real non-inert stale/current guard is discriminating."
+    },
+    {
+      "id": "GRR36-P6",
+      "subject": "future namespace custody",
+      "disposition": "PASS",
+      "evidence": "All123 fresh LIVE30/actual GUIDE22 paths are unique and absent; LIVE29 created0 sessions."
+    },
+    {
+      "id": "GRR36-P7",
+      "subject": "retained product/runtime/screenshot evidence",
+      "disposition": "PASS_RETAINED",
+      "evidence": "Product0d34, FINAL18, full58, fixed31, Runtime9 health/two startup requests, principal handling and FIX30 remain unchanged."
+    },
+    {
+      "id": "GRR36-L1",
+      "subject": "actual runtime and capture",
+      "disposition": "NOT_ESTABLISHED",
+      "evidence": "Offline controls are not live readiness, current capacity, fresh31 or answer-quality proof."
+    },
+    {
+      "id": "GRR36-L2",
+      "subject": "checkpoint status",
+      "disposition": "NOT_READY_OR_ACCEPTED",
+      "evidence": "Forgot unresolved/actionless; no CP1 completion/acceptance or CP2 authorization."
+    }
+  ],
+  "hashes": {
+    "readinessSource": "6a6b2d02562bd4faac1bc2057a4b42a961349df1e7e0f8e60b153d59b96c8181",
+    "idleSource": "676782741937b7fa2a86955931b55d63ba4da56e210e5adb48dc218352a60303",
+    "commandContract": "30da55750cd96c3323234f988a07cf2961025db7ebe486176bd79858897e46e4",
+    "operatorScript": "293c8a65f70871b4be9cce21f13ca7a2aa522b1afc7c8c19a23d9ea91bce678a",
+    "operatorContract": "24ced644b5595521d71cccd3b96ec9f354167eff4075c5a1e9ea559e63902e16",
+    "controlProof": "b64538ee64b7213650dea8454b9c0947027de4fe3549ca1998b60362b9ca4cff",
+    "runtimeDependencyInventory": "39e32760866052ffeb9306a5bc8c71f50ac9b93f0cc2073f0bae4ab5db166aaf",
+    "runtimeCustodyContract": "9094ce7d0c9543914bf61cd2d0a28a1965c338771acac0b70f04a9d6d00a25eb",
+    "screenshotHelper": "824e780a1817c198a6ca6ebc6215948241ecccbb5611617a033e650799ac4b29"
+  },
+  "counts": {
+    "indexedInputsMatched": 82,
+    "indexedInputsTotal": 82,
+    "authorControlsPassed": 18,
+    "authorControlsTotal": 18,
+    "authorPositiveIdentityControlsValid": 0,
+    "phaseCount": 7,
+    "transitiveValidators": 5,
+    "futurePathsAbsent": 123,
+    "futurePathsTotal": 123,
+    "remainingFindings": 1
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW25",
+  "ticket": "t_3962b425",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "REWORK_BOUNDED_CAPTURE_PROOF_DEPENDENCY",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW25.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW25.md",
+      "sha256": "97033dd2def8d66f6f935b39eed040b0baaa0bbbc1c43ebd2c04daec598b0b7d",
+      "bytes": 7304
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW25-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW25-dispositions.json",
+      "sha256": "384fcf3408745d5d594e59513821659a1ea452caf3f3390af07abbc541ee9e94",
+      "bytes": 4512
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW25-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW25-custody.json",
+      "sha256": "88d47f6158a1089d223566664f7ebe37c1eb8e607996a9c9c3797c35c465874b",
+      "bytes": 1982
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW25.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW25.md",
+      "sha256": "ff6b28a86f2a7aa22dec2d613391517378bda6098e9fd8b54212ca0ffa4a432d",
+      "bytes": 3577
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "heavyLeaseHeld": false,
+  "finding": "Capture phase does not consume or validate fresh LIVE25 row-proof status/result before spawning the operational child.",
+  "retained": [
+    "Real gated exact54+owner4 proof passes 58/58 with preserved RED attempts.",
+    "All seven FIX25 phase commands self-bind actual contract bytes and fresh LIVE25 paths.",
+    "Product, privacy, fixed31, screenshot, Runtime7 and deferred owner-capacity evidence remain retained."
+  ]
+}

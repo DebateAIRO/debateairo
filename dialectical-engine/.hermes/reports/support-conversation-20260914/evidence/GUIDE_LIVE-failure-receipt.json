@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "ticket": "t_34e192cc",
+  "session": "/root/preview",
+  "node": "GUIDE_LIVE",
+  "revision": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  "verdict": "BLOCKED_PRETRAFFIC_ACTION_PROOF_ZERO_REQUESTS",
+  "checkpointVerdict": "NOT_ISSUED",
+  "acceptance": "USER_ONLY",
+  "capture": {
+    "attempts": 1,
+    "exitCode": 1,
+    "failureCode": "GUIDE_HARNESS_PROSE_ONLY_ACTION_PROOF_MISMATCH",
+    "sentRows": 0,
+    "canonicalRows": 54,
+    "sessionsCreated": 0,
+    "supportMessages": 0,
+    "modelRequests": 0,
+    "browserStarted": false,
+    "receiptCreated": false,
+    "retried": false
+  },
+  "diagnosis": {
+    "method": "BOUNDED_STATIC_FROZEN_INPUTS",
+    "offendingRow": {
+      "sequence": 1,
+      "kind": "GUIDE_FAMILY",
+      "family": "pricing-placeholder",
+      "mode": "full",
+      "language": "en",
+      "prompt": "Pricing",
+      "branch": "MODEL",
+      "expectedSourceIds": ["app-navigation"],
+      "expectedActionPolicy": "NONE",
+      "observedDerivedActionIds": ["help", "support-status", "home"]
+    },
+    "classification": "PRODUCT_CONTRACT_MISMATCH_CAUGHT_BY_HARNESS",
+    "responsiblePaths": [
+      "packages/support-kb/src/context.ts#buildSupportKnowledgeContext",
+      "packages/support-kb/src/catalog.ts#SUPPORT_CAPABILITIES",
+      "packages/support-kb/src/navigation.ts#resolveSupportActions"
+    ],
+    "detectingPaths": [
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX2/matrix.mjs",
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX2/pre-request-verifier.ts#deriveGuideRowProof"
+    ],
+    "contractEvidence": [
+      "docs/missions/support-conversation-20260914/slices/CP1/PLAN-PUBLIC-GUIDE-v2.md:167",
+      "docs/missions/support-conversation-20260914/slices/CP1/SPEC-v4.md:96"
+    ],
+    "executableProbeRequiredForAttribution": false,
+    "sealedInertReplayEntryPoint": null,
+    "followUpAdapter": "New isolated adapter must read the sealed gate, call createGuidePreRequestVerifier(gate), assert prepare(row) for all 54 frozen rows, and exit before browser/session imports or traffic."
+  },
+  "gate": {
+    "runtimeCapacityPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE-runtime-capacity.json",
+    "runtimeCapacitySha256": "f21441771305bbb094e0b19e466dd1d98ceccac1e0b5d88f83fcb9dfdf0c85da",
+    "finalGatePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE-gate.json",
+    "finalGateSha256": "dd6e8e27db4481578db963e881a72beeb6f68fade8b5dce8ed918db7ac76250f",
+    "capacityMeasuredAtUtc": "2026-09-17T15:16:30.886Z",
+    "relayState": "AVAILABLE",
+    "cooldownActive": false
+  },
+  "preview": {
+    "url": "https://localhost:3100/help",
+    "pid": 98637,
+    "ppid": 1,
+    "pgid": 98637,
+    "revision": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+    "lastVerifiedAt": "2026-09-17T15:16:16.438Z",
+    "ordinaryTlsStatus": 200,
+    "originalListenersPreserved": true,
+    "leftRunning": true,
+    "postCaptureIdleRecheck": "NOT_RUN_AFTER_PRETRAFFIC_FAILURE"
+  },
+  "limits": [
+    "No actual visitor answers or screenshots exist because the verifier failed before browser startup.",
+    "No pointer, keyboard, API/DOM, language-switch, session-persistence, or post-capture quota evidence was produced.",
+    "Forgot-password remains unresolved and actionless.",
+    "The historical wrapper and group stop failures are preserved; no unrelated services were stopped.",
+    "No checkpoint readiness or owner acceptance is claimed."
+  ]
+}

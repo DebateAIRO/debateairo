@@ -1,0 +1,40 @@
+{
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "base": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718",
+  "inputManifestRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productManifestRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "inputs": {
+    "checked": 67,
+    "failures": []
+  },
+  "detachedChangedProduct": {
+    "checked": 4,
+    "failures": []
+  },
+  "primaryChangedProduct": {
+    "checked": 4,
+    "failures": []
+  },
+  "changedPaths": {
+    "expected": [
+      "apps/api/src/support/index.ts",
+      "packages/db/src/support.ts",
+      "tests/integration/support-cases.test.ts",
+      "tests/integration/support-routes.test.ts"
+    ],
+    "actual": [
+      "apps/api/src/support/index.ts",
+      "packages/db/src/support.ts",
+      "tests/integration/support-cases.test.ts",
+      "tests/integration/support-routes.test.ts"
+    ]
+  },
+  "detached": {
+    "head": "152eed4da1cd3e66b74d8301159ba76427552409",
+    "dirty": 0
+  },
+  "primary": {
+    "head": "152eed4da1cd3e66b74d8301159ba76427552409",
+    "dirty": 0
+  }
+}

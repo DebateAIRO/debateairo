@@ -1,0 +1,53 @@
+GUIDE_SECURITY8 STATIC CUSTODY AND TRACE
+captured_at=2026-09-20T12:51:24.397471+00:00
+base=0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13
+revision=78988fc2e5e24595bd9cd6ec0a3965c6039dc718
+detached_clean=true
+dirty_output=''
+input_index_sha256=532bd75f2502f15510231ef50467001fd70a523d5982e022adc35d13e2996550
+indexed_inputs=55 matched=55 mismatched=0
+delta_paths=9
+delta=dialectical-engine/apps/api/src/main.ts
+delta=dialectical-engine/apps/api/src/support/index.ts
+delta=dialectical-engine/apps/api/src/support/session.ts
+delta=dialectical-engine/packages/db/src/support.ts
+delta=dialectical-engine/tests/architecture/sup-01-boundary.test.ts
+delta=dialectical-engine/tests/integration/dev-database-principals.test.ts
+delta=dialectical-engine/tests/integration/support-metrics.test.ts
+delta=dialectical-engine/tests/integration/support-routes.test.ts
+delta=dialectical-engine/tests/support-eval/run.ts
+declared_principal_count=11
+privilege_delta_lines=0
+OBJECT CUSTODY
+apps/runner/src/dev-database-principals.ts	base=31f1d4e0070d3347447a07bb835d3e52db976be3	final=31f1d4e0070d3347447a07bb835d3e52db976be3	equal=true
+migrations	base=3038f703377f79ca7012e6d5ce72a644f47f6d55	final=3038f703377f79ca7012e6d5ce72a644f47f6d55	equal=true
+apps/api/src/support/classify.ts	base=26a06aa385b8cf3d532775cad49f5fc9cec2e618	final=26a06aa385b8cf3d532775cad49f5fc9cec2e618	equal=true
+apps/api/src/support/response-policy.ts	base=dfa153786307717d4c7c2c19b8c8ba53ff4c61fe	final=dfa153786307717d4c7c2c19b8c8ba53ff4c61fe	equal=true
+apps/api/src/support/escalation.ts	base=e928751b9338f0c0171eda6edb435e88aab7151d	final=e928751b9338f0c0171eda6edb435e88aab7151d	equal=true
+packages/support-kb/src/context.ts	base=a1a830ee29b0cef55f4b4f0412d7f460efd4382b	final=a1a830ee29b0cef55f4b4f0412d7f460efd4382b	equal=true
+apps/api/src/support/answer.ts	base=51cd5d46d5487a58aa37a296d18e082126e1f643	final=51cd5d46d5487a58aa37a296d18e082126e1f643	equal=true
+FINAL PRODUCT FILE CUSTODY
+apps/api/src/main.ts	sha256=19a4f7ee4af1230c0b849c655557d15fcbedbdddb0de374f8e49155aa7cca117	bytes=25917
+apps/api/src/support/index.ts	sha256=04429c6af9ed947a8964f43aef25614b7bd02d9629a2db3c15e367fbf0e6a61b	bytes=36801
+apps/api/src/support/session.ts	sha256=63f1d0e5eb0566085f749c9d9164eed89964a28f754a2b75f3e98794a60264c9	bytes=20091
+packages/db/src/support.ts	sha256=1b1d23c8fa0f7396616e2f0760f8bdce4360407e33477bdb41fc7d5215e739a1	bytes=99487
+tests/architecture/sup-01-boundary.test.ts	sha256=205cf83cbde894fadabda40e9cca3cf23af90aab9653a3f3760c47a31929d560	bytes=16544
+tests/integration/dev-database-principals.test.ts	sha256=6453ab6f53a06a31aae895a6c04263f61360cdde47600f9cc7afe6a01af4e8c6	bytes=31378
+tests/integration/support-metrics.test.ts	sha256=82349b40859f50b16888bf6ab89aa0d14714ea62b93aa21aaa81c07b54deab5d	bytes=4831
+tests/integration/support-routes.test.ts	sha256=240b4e7c2b21b458c2b18ac64eef0e463fa8d7427c8ae3229fe238d63cc11842	bytes=141262
+tests/support-eval/run.ts	sha256=e83a8d4329a0ea1536c762bfd06069be536ea05b0ffcd473d2bfab7d082daaae	bytes=26800
+TRACE GS8-1
+existing immutable LOCK insertion: packages/db/src/support.ts:399-413
+final restricted-role test proves physical OPEN plus derived LOCKED: tests/integration/support-routes.test.ts:1674-1697
+manual escalation read omits threshold/event lock: apps/api/src/support/index.ts:675-696
+rating-human read omits threshold/event lock: apps/api/src/support/index.ts:631-668
+case guards inspect physical state only: packages/db/src/support.ts:657-671 and 749-766
+TRACE GS8-2
+read recomputes only INJECTION count/current threshold: packages/db/src/support.ts:284-303
+admit recomputes only INJECTION count/current threshold: packages/db/src/support.ts:334-358
+status consumes any immutable LOCK event: packages/db/src/support.ts:1983-1987
+IP cooldown consumes immutable LOCK events: packages/db/src/support.ts:428-455
+HEAVY
+heavy_lease_acquired=false
+tests_executed=0
+runtime_or_database_traffic=false

@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_BIND31",
+  "ticket": "t_36863bc5",
+  "revision": "b103ce27a060c48fcf5613c1bf44be53c7cb2a0c",
+  "verdict": "PREPARED_NOT_EXECUTED_PRODUCT_REWORK",
+  "capturedAtUtc": "2026-09-21T05:47:50.512405Z",
+  "completed": [
+    {
+      "predicate": "product_head_observed_exact",
+      "value": "b103ce27a060c48fcf5613c1bf44be53c7cb2a0c"
+    },
+    {
+      "predicate": "product_worktree_status_observed_clean",
+      "value": true
+    },
+    {
+      "predicate": "final14_manifest_verified",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL14-manifest.json",
+      "sha256": "7d788822be63d0bbebb32cff32ce57caa90c7094f43c675bbc3c7c29722fccf9"
+    },
+    {
+      "predicate": "fix30_screenshot_helper_verified_byte_identical",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_FIX30/screenshot-evidence-successor.mjs",
+      "sha256": "824e780a1817c198a6ca6ebc6215948241ecccbb5611617a033e650799ac4b29"
+    },
+    {
+      "predicate": "fix30_future_absence_preserved",
+      "count": 123,
+      "evidencePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREVIEW_BIND31-unused-paths.json"
+    },
+    {
+      "predicate": "mechanical_successor_contract_scoped",
+      "value": true
+    }
+  ],
+  "preparedSuccessorContract": {
+    "preserveExact31": {
+      "sessions": 5,
+      "locales": {
+        "en": 14,
+        "ro": 17
+      },
+      "maxModelCalls": 27,
+      "pacingSeconds": 31
+    },
+    "preserveLogicalProofRows": 58,
+    "preserveFutureAbsenceCount": 123,
+    "preserveActualNamespace": "GUIDE_LIVE_GUIDE22",
+    "preservePhaseNamespace": "GUIDE_LIVE29",
+    "preserveOwnerCapacityOutput": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-owner-capacity.json",
+    "preserveOwnerWalkthroughOutput": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-owner-testability.json",
+    "futureRuntimeNode": "GUIDE_RUNTIME8",
+    "requiredNextBindingInputs": [
+      "corrected clean product revision",
+      "corrected product inventory/final manifest",
+      "consumed bounded product review"
+    ],
+    "mechanicalRebindingAfterCorrection": [
+      "product revision",
+      "product inventory hash",
+      "implementation hashes/imports",
+      "runtime custody identity and schema",
+      "seven literal self paths",
+      "deferred owner command product/runtime binding"
+    ]
+  },
+  "notExecuted": {
+    "successorProbeOrContractFilesCreated": false,
+    "full58LogicalProof": false,
+    "bindingControls": false,
+    "runtimeIdentityInspection": false,
+    "runtimeStop": false,
+    "runtimeStartOrReload": false,
+    "tlsReadiness": false,
+    "statusReads": 0,
+    "capacityReads": 0,
+    "databaseQueries": 0,
+    "supportRequests": 0,
+    "modelRequests": 0
+  },
+  "runtimeDisposition": {
+    "runtime7Touched": false,
+    "runtimeLivenessRevalidated": false,
+    "privateLogsReadOrHashed": false
+  },
+  "blocker": {
+    "class": "PRODUCT_REWORK_REQUIRED",
+    "source": "root baseline review direction",
+    "summary": "The b103 negation-scope correction can license a later positive payment claim after an earlier negated checkout clause and can reject valid modal negatives.",
+    "attributionLimit": "This node did not independently execute or reproduce the product review finding."
+  },
+  "heavyLeaseReleased": true
+}

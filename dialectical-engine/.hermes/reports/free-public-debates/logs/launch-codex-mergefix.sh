@@ -1,0 +1,7 @@
+#!/bin/zsh
+# launch-codex-mergefix.sh — the MERGE-FIX-ALL seat (Codex gpt-5.6-sol) in the private merge lane. Background; log below.
+LANE=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/merge-all-0921/dialectical-engine
+LOG=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine/.hermes/reports/free-public-debates/logs/seat-MERGE-FIX-ALL.log
+PROMPT="You are seat MERGE-FIX-ALL of the DebateAI heartbeat graph, mission free-public-debates, a coding node that resolves merge conflicts. First READ the comments on ticket t_ff44ab10 (hermes kanban --board free-public-debates show t_ff44ab10), then CLAIM it with a comment, then read your packet at this ABSOLUTE path FIRST and in full, then the COMMON.md it names, then ONLY the paths the packet allows: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine/.hermes/planning/free-public-debates/packets/MERGE-FIX-ALL.md . Write only the paths the packet allows. File the self-report, then post READY on the ticket. Nothing opened on the desktop; no push; no other worktree touched."
+cd $LANE && caffeinate -s -i /Users/vladmihaimiron/.local/bin/codex exec -c model='"gpt-5.6-sol"' -c sandbox_mode='"danger-full-access"' "$PROMPT" </dev/null > $LOG 2>&1
+echo "CODEX SEAT MERGE-FIX-ALL EXIT rc=$? $(date '+%H:%M:%S')" >> $LOG; grep -n "session id" $LOG | head -1; tail -40 $LOG

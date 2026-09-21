@@ -1,0 +1,59 @@
+node:internal/errors:983
+  const err = new Error(message);
+              ^
+
+Error: Command failed: lsof -nP -iTCP:3000 -iTCP:3001 -iTCP:3100 -iTCP:3101 -iTCP:8790 -iTCP:8791 -iTCP:8792 -iTCP:8793 -iTCP:8794 -iTCP:8795 -iTCP:8796 -iTCP:8890 -iTCP:8891 -iTCP:8892 -iTCP:8893 -iTCP:8894 -iTCP:8895 -iTCP:8896 -sTCP:LISTEN
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:916:11)
+    at execFileSync (node:child_process:952:15)
+    at run (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P3/preflight-owned-preview.mjs:6:31)
+    at file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P3/preflight-owned-preview.mjs:19:14
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {
+  status: 1,
+  signal: null,
+  output: [
+    null,
+    'COMMAND   PID           USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME\n' +
+      'node    86364 vladmihaimiron   14u  IPv4 0x7153ecd18be293f4      0t0  TCP 127.0.0.1:8891 (LISTEN)\n' +
+      'node    86364 vladmihaimiron   17u  IPv4  0x7f05f3f5d3238ce      0t0  TCP 127.0.0.1:8895 (LISTEN)\n' +
+      'node    86364 vladmihaimiron   18u  IPv4  0xba9767f347c318a      0t0  TCP 127.0.0.1:8894 (LISTEN)\n' +
+      'node    86364 vladmihaimiron   19u  IPv4 0xafe2e974a8a46e07      0t0  TCP 127.0.0.1:8892 (LISTEN)\n' +
+      'node    86364 vladmihaimiron   21u  IPv4 0x7487ee8d9b7d6ac1      0t0  TCP 127.0.0.1:8896 (LISTEN)\n' +
+      'node    86364 vladmihaimiron   22u  IPv4 0x8dec19f5f6c4724a      0t0  TCP 127.0.0.1:8893 (LISTEN)\n' +
+      'node    86364 vladmihaimiron   23u  IPv4 0x5f5e9a60469f3ff0      0t0  TCP 127.0.0.1:3100 (LISTEN)\n' +
+      'node    86948 vladmihaimiron   57u  IPv4  0xa5654ab0cbd8560      0t0  TCP 127.0.0.1:8890 (LISTEN)\n' +
+      'node    87002 vladmihaimiron   24u  IPv4 0xeeb307f5447fdeb5      0t0  TCP 127.0.0.1:3101 (LISTEN)\n' +
+      'node    90642 vladmihaimiron   18u  IPv4 0x21c8f97a106a615f      0t0  TCP 127.0.0.1:8796 (LISTEN)\n' +
+      'node    90642 vladmihaimiron   22u  IPv4 0xaa49dcc435396aaf      0t0  TCP 127.0.0.1:8795 (LISTEN)\n' +
+      'node    90642 vladmihaimiron   23u  IPv4  0x1ed9e2045d88a92      0t0  TCP 127.0.0.1:8793 (LISTEN)\n' +
+      'node    90642 vladmihaimiron   24u  IPv4 0x457f28dc742ee064      0t0  TCP 127.0.0.1:8794 (LISTEN)\n' +
+      'node    90837 vladmihaimiron   52u  IPv4 0x5e5455709086c082      0t0  TCP 127.0.0.1:8790 (LISTEN)\n' +
+      'node    90957 vladmihaimiron   24u  IPv4   0x3e07d3fc72db85      0t0  TCP 127.0.0.1:3001 (LISTEN)\n' +
+      'node    91012 vladmihaimiron   12u  IPv4 0x2ab9a6ae6034a12f      0t0  TCP 127.0.0.1:3000 (LISTEN)\n',
+    ''
+  ],
+  pid: 5300,
+  stdout: 'COMMAND   PID           USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME\n' +
+    'node    86364 vladmihaimiron   14u  IPv4 0x7153ecd18be293f4      0t0  TCP 127.0.0.1:8891 (LISTEN)\n' +
+    'node    86364 vladmihaimiron   17u  IPv4  0x7f05f3f5d3238ce      0t0  TCP 127.0.0.1:8895 (LISTEN)\n' +
+    'node    86364 vladmihaimiron   18u  IPv4  0xba9767f347c318a      0t0  TCP 127.0.0.1:8894 (LISTEN)\n' +
+    'node    86364 vladmihaimiron   19u  IPv4 0xafe2e974a8a46e07      0t0  TCP 127.0.0.1:8892 (LISTEN)\n' +
+    'node    86364 vladmihaimiron   21u  IPv4 0x7487ee8d9b7d6ac1      0t0  TCP 127.0.0.1:8896 (LISTEN)\n' +
+    'node    86364 vladmihaimiron   22u  IPv4 0x8dec19f5f6c4724a      0t0  TCP 127.0.0.1:8893 (LISTEN)\n' +
+    'node    86364 vladmihaimiron   23u  IPv4 0x5f5e9a60469f3ff0      0t0  TCP 127.0.0.1:3100 (LISTEN)\n' +
+    'node    86948 vladmihaimiron   57u  IPv4  0xa5654ab0cbd8560      0t0  TCP 127.0.0.1:8890 (LISTEN)\n' +
+    'node    87002 vladmihaimiron   24u  IPv4 0xeeb307f5447fdeb5      0t0  TCP 127.0.0.1:3101 (LISTEN)\n' +
+    'node    90642 vladmihaimiron   18u  IPv4 0x21c8f97a106a615f      0t0  TCP 127.0.0.1:8796 (LISTEN)\n' +
+    'node    90642 vladmihaimiron   22u  IPv4 0xaa49dcc435396aaf      0t0  TCP 127.0.0.1:8795 (LISTEN)\n' +
+    'node    90642 vladmihaimiron   23u  IPv4  0x1ed9e2045d88a92      0t0  TCP 127.0.0.1:8793 (LISTEN)\n' +
+    'node    90642 vladmihaimiron   24u  IPv4 0x457f28dc742ee064      0t0  TCP 127.0.0.1:8794 (LISTEN)\n' +
+    'node    90837 vladmihaimiron   52u  IPv4 0x5e5455709086c082      0t0  TCP 127.0.0.1:8790 (LISTEN)\n' +
+    'node    90957 vladmihaimiron   24u  IPv4   0x3e07d3fc72db85      0t0  TCP 127.0.0.1:3001 (LISTEN)\n' +
+    'node    91012 vladmihaimiron   12u  IPv4 0x2ab9a6ae6034a12f      0t0  TCP 127.0.0.1:3000 (LISTEN)\n',
+  stderr: ''
+}
+
+Node.js v22.23.1

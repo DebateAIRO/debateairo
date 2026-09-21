@@ -1,0 +1,458 @@
+diff --git a/dialectical-engine/apps/api/src/support/answer.ts b/dialectical-engine/apps/api/src/support/answer.ts
+index ddd30fa42432cabe9880c4edad6c1d21adc23a8a..51cd5d46d5487a58aa37a296d18e082126e1f643 100644
+--- a/dialectical-engine/apps/api/src/support/answer.ts
++++ b/dialectical-engine/apps/api/src/support/answer.ts
+@@ -3,6 +3,9 @@ import { TypedDomainError } from "@debateai/kernel";
+ import type {
+   HelpCorpusEntry,HelpCorpusSnapshotLookup,LoadedHelpCorpus
+ } from "@debateai/support-kb";
++import {
++  selectSupportRecoveryEntry,supportSourceIdsSatisfyPolicy
++} from "@debateai/support-kb";
+ import {
+   SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,type SupportAction
+ } from "@debateai/support-kb/catalog";
+@@ -249,7 +252,8 @@ export function createSupportAnswerService(input: Readonly<{
+           sources: Object.freeze([]),actions: Object.freeze([])
+         });
+       }
+-      const recoveryEntry = structured ? entries[0] : undefined;
++      const recoveryEntry = structured
++        ? selectSupportRecoveryEntry(entries,context!.sourcePolicy) : undefined;
+       const sourceActionIds = recoveryEntry === undefined ? Object.freeze([]) : Object.freeze(
+         context!.requestedActionIds.filter((id) => SUPPORT_CAPABILITIES.some(({ articleIds,actionIds }) =>
+           articleIds.includes(recoveryEntry.id) && actionIds.includes(id)
+@@ -327,11 +331,16 @@ export function createSupportAnswerService(input: Readonly<{
+             context!.sourceReferences.map(({ reference }) => reference),
+             context!.actionReferences.map(({ reference }) => reference)
+           );
+-        const draft = !structured ? undefined
++        const translatedDraft = !structured ? undefined
+           : referenceDraft === null || referenceDraft === undefined ? null
+           : translateSupportDraftReferences(referenceDraft,{
+             sources:context!.sourceReferences,actions:context!.actionReferences
+           });
++        const draft = !structured ? undefined
++          : translatedDraft === null || translatedDraft === undefined
++            || !supportSourceIdsSatisfyPolicy(
++              translatedDraft.sourceIds,context!.sourcePolicy
++            ) ? null : translatedDraft;
+         const rejected = structured && draft === null;
+         const recovered = rejected
+           && recoveryEntry?.fallback !== undefined
+diff --git a/dialectical-engine/packages/support-kb/src/catalog.ts b/dialectical-engine/packages/support-kb/src/catalog.ts
+index 2cb6e5dcac4e495e787b0703d2f024cfe3259688..25f7d7a1370d51825996123ab66bb3fa537abd1a 100644
+--- a/dialectical-engine/packages/support-kb/src/catalog.ts
++++ b/dialectical-engine/packages/support-kb/src/catalog.ts
+@@ -67,6 +67,17 @@ export type SupportGuideLabel = Readonly<{
+   labels: Readonly<Record<SupportLanguage, readonly string[]>>;
+ }>;
+ 
++export type SupportSourcePolicy = Readonly<{
++  id: string;
++  requiredSourceIds: readonly string[];
++  allowedSourceIds: readonly string[];
++  recoverySourceIds: readonly string[];
++}>;
++
++export type SupportSourcePolicyDefinition = SupportSourcePolicy & Readonly<{
++  requiredActionIds: readonly SupportActionId[];
++}>;
++
+ function labels(en: string, ro: string): Readonly<Record<SupportLanguage, string>> {
+   return Object.freeze({ en, ro });
+ }
+@@ -158,6 +169,17 @@ export const SUPPORT_GUIDE_LABELS: readonly SupportGuideLabel[] = Object.freeze(
+   guideLabel("account-access",null,["Verify email","Enroll MFA"],["Verifică emailul","Configurează MFA"]),
+ ]);
+ 
++/** Source-set rules for requests whose reviewed meaning spans more than one menu destination. */
++export const SUPPORT_SOURCE_POLICIES: readonly SupportSourcePolicyDefinition[] = Object.freeze([
++  Object.freeze({
++    id:"your-and-public-debates",
++    requiredActionIds:Object.freeze(["your-debates","public-catalog"] as const),
++    requiredSourceIds:Object.freeze(["app-navigation"]),
++    allowedSourceIds:Object.freeze(["app-navigation","browse-public-debates"]),
++    recoverySourceIds:Object.freeze(["app-navigation"])
++  })
++]);
++
+ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze([
+   capability({
+     id: "product-identity",
+diff --git a/dialectical-engine/packages/support-kb/src/context.ts b/dialectical-engine/packages/support-kb/src/context.ts
+index 81e99c89d9c03dab67ffe146b5834b6f553e5035..2e0b6a29ea4a8e9ed89ca303df120f9e06f9ea03 100644
+--- a/dialectical-engine/packages/support-kb/src/context.ts
++++ b/dialectical-engine/packages/support-kb/src/context.ts
+@@ -1,7 +1,8 @@
+ import type { HelpCorpusEntry } from "./index.js";
+ import {
+-  SUPPORT_ACTION_CATALOG,SUPPORT_GUIDE_LABELS,
+-  type SupportActionDefinition,type SupportActionId,type SupportCapability,type SupportLanguage
++  SUPPORT_ACTION_CATALOG,SUPPORT_GUIDE_LABELS,SUPPORT_SOURCE_POLICIES,
++  type SupportActionDefinition,type SupportActionId,type SupportCapability,type SupportLanguage,
++  type SupportSourcePolicy
+ } from "./catalog.js";
+ 
+ export type SupportKnowledgeReference<CanonicalId extends string = string> = Readonly<{
+@@ -15,6 +16,7 @@ export type SupportKnowledgeContext = Readonly<{
+   requestedActionIds: readonly SupportActionId[];
+   sourceReferences: readonly SupportKnowledgeReference[];
+   actionReferences: readonly SupportKnowledgeReference<SupportActionId>[];
++  sourcePolicy: SupportSourcePolicy | null;
+ }>;
+ 
+ const POLICY: Readonly<Record<SupportLanguage, readonly string[]>> = Object.freeze({
+@@ -306,6 +308,17 @@ export function buildSupportKnowledgeContext(input: Readonly<{
+     }));
+     return Object.freeze({ item,score });
+   }).filter(({ score }) => score > 0);
++  const matchedGuideActionIds = new Set(guideMatches.flatMap(({ item }) =>
++    item.actionId === null ? [] : [item.actionId]));
++  const sourcePolicyDefinition = SUPPORT_SOURCE_POLICIES.find(({ requiredActionIds }) =>
++    requiredActionIds.every((id) => matchedGuideActionIds.has(id)));
++  const sourcePolicy: SupportSourcePolicy | null = sourcePolicyDefinition === undefined ? null
++    : Object.freeze({
++      id:sourcePolicyDefinition.id,
++      requiredSourceIds:sourcePolicyDefinition.requiredSourceIds,
++      allowedSourceIds:sourcePolicyDefinition.allowedSourceIds,
++      recoverySourceIds:sourcePolicyDefinition.recoverySourceIds
++    });
+   const guideArticleEvidence = new Map<string,number>();
+   for (const { item,score } of guideMatches) {
+     if (item.sourceBinding) guideArticleEvidence.set(
+@@ -420,6 +433,10 @@ export function buildSupportKnowledgeContext(input: Readonly<{
+       }));
+     });
+   }
++  const policyAvailable = sourcePolicy === null || [
++    ...sourcePolicy.requiredSourceIds,...sourcePolicy.recoverySourceIds
++  ].every((id) => eligibleEntries.some((entry) => entry.id === id
++    && entry.fallback !== undefined));
+   const ranked = eligibleEntries
+     .map((entry) => ({
+       entry,
+@@ -431,6 +448,7 @@ export function buildSupportKnowledgeContext(input: Readonly<{
+         + (articleEvidence.get(entry.id)?.score ?? 0) * 1_000_000,
+     }))
+     .filter(({ entry,evidence,capability }) => {
++      if (sourcePolicy !== null && !sourcePolicy.allowedSourceIds.includes(entry.id)) return false;
+       if (!hasCompleteCatalogMatch && product.preferredArticleId !== null
+         && entry.id !== product.preferredArticleId) {
+         return evidence.aliasScore >= 2 || evidence.titleScore >= 2;
+@@ -442,7 +460,7 @@ export function buildSupportKnowledgeContext(input: Readonly<{
+   let text = base;
+   const sourceIds: string[] = [];
+   const sourceReferences: SupportKnowledgeReference[] = [];
+-  for (const { entry } of ranked) {
++  for (const { entry } of policyAvailable ? ranked : []) {
+     if (sourceIds.length >= 3) break;
+     const reference = input.referenceFor("source",sourceIds.length);
+     const section = articleSection(entry,reference);
+@@ -455,6 +473,12 @@ export function buildSupportKnowledgeContext(input: Readonly<{
+     sourceIds.push(entry.id);
+     sourceReferences.push(Object.freeze({ reference,canonicalId:entry.id }));
+   }
++  if (sourcePolicy !== null
++    && !sourcePolicy.requiredSourceIds.every((id) => sourceIds.includes(id))) {
++    sourceIds.splice(0);
++    sourceReferences.splice(0);
++    text = base;
++  }
+   text += outputContract(
+     sourceReferences.map(({ reference }) => reference),
+     actionReferences.map(({ reference }) => reference)
+@@ -477,6 +501,7 @@ export function buildSupportKnowledgeContext(input: Readonly<{
+     sourceIds: Object.freeze(sourceIds),
+     requestedActionIds: Object.freeze(actionIds),
+     sourceReferences: Object.freeze(sourceReferences),
+-    actionReferences: Object.freeze(actionReferences)
++    actionReferences: Object.freeze(actionReferences),
++    sourcePolicy
+   });
+ }
+diff --git a/dialectical-engine/packages/support-kb/src/index.ts b/dialectical-engine/packages/support-kb/src/index.ts
+index 6ec743b4111c41ea476f9527c48f564b47468207..ed2fefee163149cf055fc520385b7e4383c6ad53 100644
+--- a/dialectical-engine/packages/support-kb/src/index.ts
++++ b/dialectical-engine/packages/support-kb/src/index.ts
+@@ -7,9 +7,12 @@ import { TypedDomainError } from "@debateai/kernel";
+ import { SUPPORT_CATALOG_CANONICAL } from "./catalog.js";
+ import {
+   parseSupportRecoveryComponents,supportRecoveryTextSha256,
++  selectSupportRecoveryEntry,supportSourceIdsSatisfyPolicy,
+   type SupportRecoveryComponent
+ } from "./recovery.js";
+ 
++export { selectSupportRecoveryEntry,supportSourceIdsSatisfyPolicy };
++
+ export type HelpCorpusLanguage = "en" | "ro";
+ export type HelpCorpusStatus = "shipped" | "intended";
+ 
+diff --git a/dialectical-engine/packages/support-kb/src/recovery.ts b/dialectical-engine/packages/support-kb/src/recovery.ts
+index 2a853422bc92b1ff5dc6d5fdb1027e36799f7caa..f613349477ac3c057f7c8847064a333130586782 100644
+--- a/dialectical-engine/packages/support-kb/src/recovery.ts
++++ b/dialectical-engine/packages/support-kb/src/recovery.ts
+@@ -5,7 +5,9 @@ import {
+   analyzeSupportCredentialText,canonicalSupportTextViews,supportTextContainsCredentialOperation,
+   supportTextHasUnsafePath,TypedDomainError
+ } from "@debateai/kernel";
+-import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "./catalog.js";
++import {
++  SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,type SupportSourcePolicy
++} from "./catalog.js";
+ 
+ export type SupportRecoveryComponent = Readonly<{
+   id: string;
+@@ -107,3 +109,38 @@ export function parseSupportRecoveryComponents(input: string | Buffer): ParsedSu
+ }
+ 
+ export function supportRecoveryTextSha256(value: string): string { return sha256(value); }
++
++function validSourcePolicy(policy: SupportSourcePolicy): boolean {
++  const required = new Set(policy.requiredSourceIds);
++  const allowed = new Set(policy.allowedSourceIds);
++  const recovery = new Set(policy.recoverySourceIds);
++  return policy.requiredSourceIds.length > 0
++    && required.size === policy.requiredSourceIds.length
++    && allowed.size === policy.allowedSourceIds.length
++    && recovery.size === policy.recoverySourceIds.length
++    && policy.requiredSourceIds.every((id) => allowed.has(id))
++    && policy.recoverySourceIds.length === 1
++    && policy.recoverySourceIds.every((id) => required.has(id));
++}
++
++export function supportSourceIdsSatisfyPolicy(
++  sourceIds: readonly string[],policy: SupportSourcePolicy | null
++): boolean {
++  if (policy === null) return true;
++  if (!validSourcePolicy(policy)) return false;
++  return sourceIds.length > 0
++    && sourceIds.every((id) => policy.allowedSourceIds.includes(id))
++    && policy.requiredSourceIds.every((id) => sourceIds.includes(id));
++}
++
++export function selectSupportRecoveryEntry<T extends Readonly<{
++  id: string;
++  fallback?: string;
++}>>(entries: readonly T[],policy: SupportSourcePolicy | null): T | undefined {
++  if (policy === null) return entries[0];
++  if (!validSourcePolicy(policy)
++    || !supportSourceIdsSatisfyPolicy(entries.map(({ id }) => id),policy)) return undefined;
++  const recoveryId = policy.recoverySourceIds[0]!;
++  const entry = entries.find(({ id }) => id === recoveryId);
++  return entry?.fallback === undefined ? undefined : entry;
++}
+diff --git a/dialectical-engine/tests/architecture/support-catalog-coverage.test.ts b/dialectical-engine/tests/architecture/support-catalog-coverage.test.ts
+index 9e91b3fcaa9b467caf4c939a4f3e0284b6925ad2..a875285c10d49368d7bf3c0d3d0488269bf3d3ae 100644
+--- a/dialectical-engine/tests/architecture/support-catalog-coverage.test.ts
++++ b/dialectical-engine/tests/architecture/support-catalog-coverage.test.ts
+@@ -10,6 +10,7 @@ import {
+   SUPPORT_GUIDE_LABELS,
+   SUPPORT_PAGE_ROUTES,
+   SUPPORT_PROXY_ROUTES,
++  SUPPORT_SOURCE_POLICIES,
+ } from "../../packages/support-kb/src/catalog.js";
+ 
+ function discoverPageRoutes(directory: string, root = directory): string[] {
+@@ -121,6 +122,16 @@ describe("Support catalog route coverage", () => {
+     }
+   });
+ 
++  it("declares the compound debate-library source contract from closed menu actions", () => {
++    expect(SUPPORT_SOURCE_POLICIES).toEqual([{
++      id:"your-and-public-debates",
++      requiredActionIds:["your-debates","public-catalog"],
++      requiredSourceIds:["app-navigation"],
++      allowedSourceIds:["app-navigation","browse-public-debates"],
++      recoverySourceIds:["app-navigation"]
++    }]);
++  });
++
+   it("keeps the browser-safe catalog free of Node-only imports and exports it as a subpath", () => {
+     // Property: UI consumers can share the authority without bundling filesystem or crypto modules.
+     const packageDirectory = fileURLToPath(new URL("../../packages/support-kb/", import.meta.url));
+diff --git a/dialectical-engine/tests/unit/support-answer-context.test.ts b/dialectical-engine/tests/unit/support-answer-context.test.ts
+index c6350361b820178be3a9890fd2365234ad280614..5295be27cb7875068bdd12323747ab82372a95a7 100644
+--- a/dialectical-engine/tests/unit/support-answer-context.test.ts
++++ b/dialectical-engine/tests/unit/support-answer-context.test.ts
+@@ -7,6 +7,8 @@ import type { SupportModelPort } from "../../apps/api/src/support/model.js";
+ import {
+   createHelpCorpusSnapshotLookup,type HelpCorpusEntry,type LoadedHelpCorpus
+ } from "../../packages/support-kb/src/index.js";
++import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
++import { buildSupportKnowledgeContext } from "../../packages/support-kb/src/context.js";
+ import type { SupportMessageCipherPort } from "../../apps/api/src/support/session.js";
+ import { createSupportModelReferenceFactory } from "../../apps/api/src/support/model-references.js";
+ 
+@@ -163,6 +165,76 @@ describe("CP1 composed answer context", () => {
+     });
+   });
+ 
++  it.each([
++    ["en" as const,"Where do I find my debates and the public debate library?"],
++    ["ro" as const,"Unde găsesc dezbaterile mele și biblioteca publică?"]
++  ])("recovers a rejected compound %s answer from the required app-navigation source",async (
++    language,text
++  ) => {
++    const drafted = authorDraftCorpus();
++    const snapshot = corpus(drafted.entries.filter((candidate) =>
++      candidate.lang === language && [
++        "app-navigation","browse-public-debates","getting-started-debate"
++      ].includes(candidate.id)),`compound-recovery-${language}`);
++    const complete = vi.fn(async () => Object.freeze({ text:"not-json" }));
++    const service = createSupportAnswerService({
++      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
++      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
++      clock:(() => { let at=Date.parse("2026-09-17T14:00:00.000Z");return () => new Date(++at); })()
++    });
++
++    const result = await service.respond({
++      ...request(snapshot),text,language,detectedLanguage:language,signedIn:true
++    });
++    const required = snapshot.entries.find((candidate) => candidate.id === "app-navigation")!;
++
++    expect(result).toMatchObject({
++      outcome:"ANSWER_GROUNDED",text:required.fallback,
++      sources:[{ id:"app-navigation" }]
++    });
++    expect(result.sources?.map(({ id }) => id)).not.toContain("getting-started-debate");
++  });
++
++  it("enforces required and allowed compound sources independent of accepted-draft order",async () => {
++    const drafted = authorDraftCorpus();
++    const snapshot = corpus(drafted.entries.filter((candidate) => candidate.lang === "en" && [
++      "app-navigation","browse-public-debates","getting-started-debate"
++    ].includes(candidate.id)),"compound-source-contract");
++    const query = "Where do I find my debates and the public debate library?";
++    const context = buildSupportKnowledgeContext({
++      entries:snapshot.entries,capabilities:SUPPORT_CAPABILITIES,language:"en",query,historyText:"",
++      maxCodePoints:24_000,availableActionIds:SUPPORT_ACTION_IDS,
++      referenceFor:modelReferenceFactory().referenceFor
++    });
++    const sourceReference = new Map(context.sourceReferences.map((item) => [
++      item.canonicalId,item.reference
++    ]));
++    const app = sourceReference.get("app-navigation")!;
++    const browse = sourceReference.get("browse-public-debates")!;
++    const required = snapshot.entries.find((candidate) => candidate.id === "app-navigation")!;
++    const cases = [
++      { ids:[app],text:"Use Home to find both lists.",expected:["app-navigation"] },
++      { ids:[app,browse],text:"Use Home and the public catalog.",expected:["app-navigation","browse-public-debates"] },
++      { ids:[browse,app],text:"Use the public catalog and Your debates.",expected:["app-navigation","browse-public-debates"] },
++      { ids:[browse],text:"This covers only the public catalog.",expected:["app-navigation"],recovered:true }
++    ] as const;
++
++    for (const candidate of cases) {
++      const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
++        kind:"answer",text:candidate.text,sourceIds:candidate.ids,actionIds:[]
++      }) }));
++      const service = createSupportAnswerService({
++        entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
++        modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
++        clock:(() => { let at=Date.parse("2026-09-17T14:30:00.000Z");return () => new Date(++at); })()
++      });
++      const result = await service.respond({ ...request(snapshot),text:query,signedIn:true });
++      expect(result.sources?.map(({ id }) => id)).toEqual(candidate.expected);
++      expect(result.text).toBe("recovered" in candidate ? required.fallback : candidate.text);
++      expect(result.sources?.map(({ id }) => id)).not.toContain("getting-started-debate");
++    }
++  });
++
+   it.each([
+     ["en" as const,"Pricing"],
+     ["ro" as const,"Cum funcționează secțiunea Prețuri?"],
+diff --git a/dialectical-engine/tests/unit/support-context.test.ts b/dialectical-engine/tests/unit/support-context.test.ts
+index a12d6bf78321174bf552089e6ee91c51834674f8..b1d3a6997f85bd9955c8f883abdd1676f14dbbb8 100644
+--- a/dialectical-engine/tests/unit/support-context.test.ts
++++ b/dialectical-engine/tests/unit/support-context.test.ts
+@@ -460,6 +460,46 @@ describe("Support knowledge context", () => {
+     expect(result.requestedActionIds).toEqual(expectedActionIds);
+   });
+ 
++  it.each([
++    ["en" as const,"Where do I find my debates and the public debate library?"],
++    ["en" as const,"How can I open Your debates together with Public debates?"],
++    ["ro" as const,"Unde găsesc dezbaterile mele și biblioteca publică?"],
++    ["ro" as const,"Cum deschid Dezbaterile tale împreună cu Dezbateri publice?"]
++  ])("binds the compound private/public library guide to a required reviewed source in %s: %s",(
++    language,query
++  ) => {
++    const corpus = productionReviewedCorpus();
++    const result = buildSupportKnowledgeContext({
++      entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,
++      availableActionIds:SUPPORT_ACTION_IDS,language,query,historyText:"",maxCodePoints:24_000
++    });
++
++    expect(result.sourcePolicy).toEqual({
++      id:"your-and-public-debates",
++      requiredSourceIds:["app-navigation"],
++      allowedSourceIds:["app-navigation","browse-public-debates"],
++      recoverySourceIds:["app-navigation"]
++    });
++    expect(result.sourceIds).toContain("app-navigation");
++    expect(result.sourceIds.every((id) =>
++      ["app-navigation","browse-public-debates"].includes(id))).toBe(true);
++    expect(result.sourceIds).not.toContain("getting-started-debate");
++  });
++
++  it.each([
++    ["en" as const,"Where can I browse the public debate library? Do not open my debates."],
++    ["ro" as const,"Unde este biblioteca publică? Nu deschide dezbaterile mele."]
++  ])("does not activate the compound source contract for a negated private-list half in %s",(
++    language,query
++  ) => {
++    const corpus = productionReviewedCorpus();
++    const result = buildSupportKnowledgeContext({
++      entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,
++      availableActionIds:SUPPORT_ACTION_IDS,language,query,historyText:"",maxCodePoints:24_000
++    });
++    expect(result.sourcePolicy).toBeNull();
++  });
++
+   it.each([
+     ["en" as const,"Where is Home?",false,["home"]],
+     ["ro" as const,"Unde este Acasă?",false,["home"]],
+diff --git a/dialectical-engine/tests/unit/support-recovery-components.test.ts b/dialectical-engine/tests/unit/support-recovery-components.test.ts
+index 8dc3c587b6edab4f609460a58fa7f66d06f0b454..9947aa86189ec7a9e2a5addebaba923286d32bde 100644
+--- a/dialectical-engine/tests/unit/support-recovery-components.test.ts
++++ b/dialectical-engine/tests/unit/support-recovery-components.test.ts
+@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { afterEach,describe,expect,it } from "vitest";
+ 
+-import { loadHelpCorpus } from "../../packages/support-kb/src/index.js";
++import {
++  loadHelpCorpus,selectSupportRecoveryEntry,supportSourceIdsSatisfyPolicy
++} from "../../packages/support-kb/src/index.js";
+ import { SUPPORT_CATALOG_CANONICAL } from "../../packages/support-kb/src/catalog.js";
+ 
+ const directories: string[] = [];
+@@ -63,6 +65,28 @@ afterEach(() => {
+ });
+ 
+ describe("reviewed Support recovery components", () => {
++  it("selects the declared reviewed recovery source and fails closed on invalid coverage", () => {
++    const policy = Object.freeze({
++      id:"your-and-public-debates",
++      requiredSourceIds:Object.freeze(["app-navigation"]),
++      allowedSourceIds:Object.freeze(["app-navigation","browse-public-debates"]),
++      recoverySourceIds:Object.freeze(["app-navigation"])
++    });
++    const app = Object.freeze({ id:"app-navigation",fallback:"Use the reviewed Home guidance." });
++    const browse = Object.freeze({
++      id:"browse-public-debates",fallback:"Use the reviewed public-library guidance."
++    });
++
++    expect(supportSourceIdsSatisfyPolicy([app.id],policy)).toBe(true);
++    expect(supportSourceIdsSatisfyPolicy([browse.id,app.id],policy)).toBe(true);
++    expect(supportSourceIdsSatisfyPolicy([browse.id],policy)).toBe(false);
++    expect(supportSourceIdsSatisfyPolicy([app.id,"getting-started-debate"],policy)).toBe(false);
++    expect(selectSupportRecoveryEntry([browse,app],policy)).toBe(app);
++    expect(selectSupportRecoveryEntry([browse],policy)).toBeUndefined();
++    expect(selectSupportRecoveryEntry([app],{
++      ...policy,recoverySourceIds:["browse-public-debates"]
++    })).toBeUndefined();
++  });
+   it("uses the visible Transcripts label in both navigation drafts", () => {
+     const document = JSON.parse(readFileSync(new URL(
+       "../../packages/support-kb/recovery/components.json",import.meta.url

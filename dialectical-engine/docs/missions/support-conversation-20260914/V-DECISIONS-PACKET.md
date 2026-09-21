@@ -1,3 +1,7 @@
+# Current status — owner-authorized continuation
+
+Focused correction and current destination investigation are active. The dated product/review observations below remain historical until new exact-revision evidence is consumed.
+
 # Owner decisions
 
 CP1 is **not ready for verification or accepted**. Final separate reviews at `5cbfc6d483aae0f56eabfdee00a6829e09e76c3d` are consumed: correctness PASS; security REWORK; product truth PASS within its finite evidence, with Forgot still blocked. See the [final review union](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV-CP1-p3-UNION.md).
@@ -8,7 +12,7 @@ The original destination question remains unanswered and has not been repeated. 
 
 No guessed URL, replacement, Settings/MFA substitute or default human escalation is permitted. CP1-A05 remains blocked until that existing destination is supplied, verified, connected and separately tested. Ticket `t_979fe293`.
 
-## V-2 — Focused security correction after final review cap (DECISION REQUIRED)
+## V-2 — Focused security correction after final review cap (AUTHORIZED2026-09-17)
 
 Ticket `t_c5d11148`. Final [security review](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV2-p3.md) reproduces three blocking classes with actual final modules and synthetic in-memory ports:
 
@@ -16,11 +20,9 @@ Ticket `t_c5d11148`. Final [security review](/Users/vladmihaimiron/Documents/Deb
 2. Additive positive security-operation groups inherit prior negation and pass answer and summary screening.
 3. Encoded structural paths after assignment delimiters pass screening and synthetic storage/return.
 
-**Recommended decision:** authorize a focused Sol correction and a fresh separate Sol review beyond the current three-pass limit. Scope is the shared credential-span parser/redaction path, operation/object scoping, canonical path boundary detection, and every affected answer/summary/storage/model-transit sink. Require the existing reproductions to fail before correction, a generated structural matrix with paired benign controls, and affected regression checks at the exact final revision. Preserve all52 human labels,35 closed IDs, request aliases, snapshot identity, exact reviewed fallback, one model attempt, current runtime model and all consent/ownership/encryption/spend/degraded/human controls. Include verified Forgot navigation only once V-1 supplies its actual destination. Do not narrow the product objective or treat a safety waiver as closure.
+The owner instructed: “Do not come back to me again untill this is testable.” This supersedes the former review-pass approval cap. Native ticket `t_c5d11148` is resolved. FIX_P3 and FIND_CURRENT are dispatched under [the continuation authority](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/OWNER-RESUME-20260917.md). Separate pass4 remains required; prior evidence stays historical. No repeated authorization question, checkpoint acceptance, CP2, push or deployment follows from this instruction.
 
-The alternative is to pause with the current checkpoint blocked. No further implementation/review is dispatched by this document. Any authorization here permits the named correction/review work, not checkpoint acceptance, CP2, push or deployment. No extra real-model sample is presumed; any later need must be tied to the actual runtime change and exact acceptance scope.
-
-The approval is needed because [heartbeat-protocol SKILL.md](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-protocol/SKILL.md:70) explicitly states: “Three REV passes per slice, then it is V's. Pass 4 does not exist; it is a V DECISIONS PACKET row.” The third final review has returned REWORK. This is a workflow-limit decision; the checkpoint still requires working, verified behavior and explicit user acceptance.
+The original Forgot question remains unanswered; FIND_CURRENT now revalidates materially advanced current source and target UI. Its evidence may resolve V-1 without owner input. No guessed or replacement flow is authorized.
 
 ## Reviewable current state
 

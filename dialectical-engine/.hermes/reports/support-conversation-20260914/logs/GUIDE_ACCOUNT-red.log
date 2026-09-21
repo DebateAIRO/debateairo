@@ -1,0 +1,14 @@
+file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/vitest@4.1.10_@types+node@26.2.0_jsdom@30.0.1_vite@8.2.1_@types+node@26.2.0_esbuild@0.28.1_tsx@4.23.11_yaml@2.9.0_/node_modules/vitest/dist/chunks/cac.DdICfEr1.js:406
+          throw new CACError(`Unknown option \`${name.length > 1 ? `--${name}` : `-${name}`}\``);
+                ^
+
+CACError: Unknown option `--minWorkers`
+    at Command.checkUnknownOptions (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/vitest@4.1.10_@types+node@26.2.0_jsdom@30.0.1_vite@8.2.1_@types+node@26.2.0_esbuild@0.28.1_tsx@4.23.11_yaml@2.9.0_/node_modules/vitest/dist/chunks/cac.DdICfEr1.js:406:17)
+    at CAC.runMatchedCommand (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/vitest@4.1.10_@types+node@26.2.0_jsdom@30.0.1_vite@8.2.1_@types+node@26.2.0_esbuild@0.28.1_tsx@4.23.11_yaml@2.9.0_/node_modules/vitest/dist/chunks/cac.DdICfEr1.js:606:13)
+    at CAC.parse (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/vitest@4.1.10_@types+node@26.2.0_jsdom@30.0.1_vite@8.2.1_@types+node@26.2.0_esbuild@0.28.1_tsx@4.23.11_yaml@2.9.0_/node_modules/vitest/dist/chunks/cac.DdICfEr1.js:547:12)
+    at file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/vitest@4.1.10_@types+node@26.2.0_jsdom@30.0.1_vite@8.2.1_@types+node@26.2.0_esbuild@0.28.1_tsx@4.23.11_yaml@2.9.0_/node_modules/vitest/dist/cli.js:11:13
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+
+Node.js v22.23.1

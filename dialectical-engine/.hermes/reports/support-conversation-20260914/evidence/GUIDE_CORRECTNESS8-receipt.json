@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CORRECTNESS8",
+  "ticket": "t_769ab051",
+  "session": "/root/plan_review",
+  "baseRevision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "productRevision": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718",
+  "freezeCommit": "fba5c54c8e0e70d75f957518273fb19d984357e9",
+  "packetSha256": "74949d0d19a4f5c874404779a55094a5c65339535bddde1961d683211ddff7ee",
+  "verdict": "PASS",
+  "scope": "finite nine-path restricted-role lock correction and source-derived principal-count fixtures",
+  "commentsReadThrough": 2,
+  "findingDispositions": {
+    "restrictedRoleFirstRefusal": "PASS",
+    "immutableInjectionAndLock": "PASS",
+    "derivedReadAndAdmission": "PASS",
+    "concurrentAndConfiguredThreshold": "PASS",
+    "later429": "PASS",
+    "openSessionsMetric": "PASS",
+    "physicalCaseAndMessageLifecycle": "PASS_UNCHANGED_SEMANTICS",
+    "forbiddenUpdateState": "PASS",
+    "principalCardinality": "PASS_SOURCE_DERIVED_UNCHANGED_MEMBERSHIP",
+    "priorGuideCorrectness": "RETAINED_PASS_UNCHANGED_DEFINING_BYTES",
+    "live6FirstException": "UNKNOWN_NOT_ATTRIBUTED"
+  },
+  "verification": {
+    "custody": {
+      "exitCode": 0,
+      "indexedInputsChecked": 53,
+      "indexedInputsMatched": 53,
+      "detachedProductChecked": 144,
+      "detachedProductMatched": 144,
+      "primaryProductChecked": 144,
+      "primaryProductMatched": 144,
+      "changedPathsExpected": 9,
+      "changedPathsMatched": 9
+    },
+    "affectedDatabaseFrame": {
+      "exitCode": 0,
+      "testFiles": 4,
+      "testFilesPassed": 4,
+      "passed": 191,
+      "failed": 0,
+      "tsxDisableCache": true,
+      "maxWorkers": 1
+    },
+    "independentDiscriminator": {
+      "run": false,
+      "reason": "The real restricted-role regression and existing threshold, concurrency, configuration, metric, privilege, and cardinality controls directly distinguish every assigned boundary."
+    },
+    "principalDeclaration": {
+      "entries": 11,
+      "baseSha256": "7d68dd8a2e826ea1da9d8d2fa2555a3458e088710426b8cba3e6cd4f6bb690e8",
+      "finalSha256": "7d68dd8a2e826ea1da9d8d2fa2555a3458e088710426b8cba3e6cd4f6bb690e8",
+      "migrationPathsChanged": 0,
+      "provisioningSourceChanged": false
+    },
+    "retainedAuthorEvidence": {
+      "exact34Passed": 1699,
+      "exact34Failed": 0,
+      "exact34Todo": 1,
+      "typecheckExitCode": 1,
+      "typecheckBaselineDiagnostics": 76,
+      "typecheckCurrentDiagnostics": 76,
+      "typecheckByteIdentical": true,
+      "missionAddedDiagnostics": 0,
+      "snapshotEntries": 44,
+      "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+      "structuralEvalRuns": 3,
+      "structuralEvalRowsPerRun": 60,
+      "structuralEvalPassedPerRun": 60,
+      "structuralEvalRubric": "PENDING"
+    },
+    "cleanup": {
+      "detachedHeadExact": true,
+      "primaryHeadExact": true,
+      "detachedDirty": 0,
+      "primaryDirty": 0,
+      "temporaryLinksPresent": 0,
+      "heavyLeaseReleased": true
+    }
+  },
+  "limits": [
+    "LIVE6 HTTP500 remains a failed retained observation; its first exception is unobserved and unattributed",
+    "no full34, typecheck, or structural evaluation rerun",
+    "no browser, preview, actual Support, model, status, capacity, or live traffic",
+    "no broad corpus or language audit",
+    "full actual54 verification remains required",
+    "Forgot-password destination remains unresolved and actionless; CP2 remains gated",
+    "no runtime readiness, checkpoint, owner acceptance, or retrospective partial-capture success claim"
+  ],
+  "skillsLoaded": [
+    "using-superpowers",
+    "heartbeat-protocol",
+    "receiving-code-review",
+    "heartbeat-worker",
+    "test-driven-development",
+    "systematic-debugging",
+    "verification-before-completion"
+  ],
+  "usage": "UNAVAILABLE",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_CORRECTNESS8.md",
+      "sha256": "748a911217ab0a1aaf4447df92ea035c369ed5a9127f309af53367e5db7e0041",
+      "bytes": 5879
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_CORRECTNESS8.md",
+      "sha256": "97e4d75b4bdfbd680d610fa8758114eeaabbdc44ce5b6a5d6191aa0f162c7b6d",
+      "bytes": 4371
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CORRECTNESS8/custody.py",
+      "sha256": "3db6659bbaed1fc186a285e66c0da1f6197fd3cc4b3380a81fc1b695e9377451",
+      "bytes": 3293
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS8-input-custody.log",
+      "sha256": "9fa5f012f4cc17783d8c3949de564c3aabb47f19c0619ab8678cebd8886b9aa7",
+      "bytes": 1477
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS8-affected-db-tests.log",
+      "sha256": "e26e5093089568d92f91f114ad937bae90f217371037dac6c67cf488b6f2021e",
+      "bytes": 59189
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS8-cleanup-custody.log",
+      "sha256": "9fa5f012f4cc17783d8c3949de564c3aabb47f19c0619ab8678cebd8886b9aa7",
+      "bytes": 1477
+    }
+  ],
+  "receiptExcludesSelf": true,
+  "measuredAt": "2026-09-20T12:52:45Z"
+}

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND14",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "script": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND14/probe-zero-request-ui.mjs",
+    "sha256": "6fec8d16353b31116d95540012139f21b200e9cb697ec1f733b2ffad05573b4d",
+    "bytes": 12436
+  },
+  "outputPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE2-run-LIVE8.json",
+  "argv": [
+    "node",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND14/probe-zero-request-ui.mjs",
+    "152eed4da1cd3e66b74d8301159ba76427552409",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE2-run-LIVE8.json"
+  ],
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "logPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_UI_TRANSITION_PROBE2-LIVE8.log",
+  "childStatusPreservedBy": "direct stdout/stderr redirection without tee",
+  "prerequisites": [
+    "exact revision owned preview independently verified",
+    "ordinary system TLS for https://localhost:3100",
+    "pinned installed Playwright Chromium exists",
+    "output path absent"
+  ],
+  "transitions": [
+    "fresh full/en",
+    "same-session full/ro",
+    "storage-reset compact/ro",
+    "route-remount full/en",
+    "storage-reset compact/en"
+  ],
+  "noTrafficGuard": {
+    "behavior": "abort every classified Support operation before runtime; never fulfill or substitute a response",
+    "exactBlockedPageRead": {
+      "method": "GET",
+      "path": "/api/v1/support/cases",
+      "counter": "pageCaseListRead"
+    },
+    "requiredActualForwardedSupportRequests": 0,
+    "requiredCreateSessionAttempts": 0,
+    "requiredSendMessageAttempts": 0,
+    "requiredOtherSupportAttempts": 0,
+    "blockedStatusAndPageCaseListReadAttemptsReportedSeparately": true
+  },
+  "outputFields": "fixed transition enums/counts only",
+  "executed": false
+}

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_SESSION_TIMES_FIX41",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "reviewFinding": "GCR40-R1",
+  "changed": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SESSION_TIMES_FIX41/capture-public-guide.mjs",
+      "contract": "record exactly three session creation timestamps via recordSessionCreationTime; reject fourth"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SESSION_TIMES_FIX41/session-times.mjs",
+      "contract": "exact keys ordinal/observedAtUtc, ordinals 1..3, canonical UTC, strict order"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SESSION_TIMES_FIX41/composition.mjs",
+      "contract": "actual composer validates exact three before composed five-session manifest"
+    }
+  ],
+  "unchangedOperationalNamespace": {
+    "actualReceipt": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE24-actual-receipt.json",
+    "composedManifest": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE32-composed31-manifest.json",
+    "ownerCapacity": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-owner-capacity.json",
+    "ownerWalkthrough": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-owner-testability.json"
+  },
+  "commandContractSha256": "a7bb682a1017593a2f87b64d33689a47c2a0458253bab199dc067fb7bc898492",
+  "operatorSha256": "562514a844027212f1c812bc64a2679255c76a38fbcd423e8e50cf52b41f3121"
+}

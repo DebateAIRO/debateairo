@@ -13,3 +13,5 @@ Use native collaboration sessions with explicit Sol model. Resume same author fo
 Heavy-command capacity is one. Ask orchestrator for a lease before tests/build/install/stack startup; light read-only investigation may proceed concurrently.
 Use only your packet file scope. Write evidence immediately; report SKILLS LOADED and actual usage or unavailable (never estimates presented as measured).
 Return handoffs to orchestrator. Checkpoint states are READY FOR USER VERIFICATION then WAITING_FOR_USER_VERIFICATION; notify once, remain quiet until response.
+
+2026-09-17 owner continuation: Do not come back to me again untill this is testable. See OWNER-RESUME-20260917.md; continue correction and separate review beyond the prior cap, retain explicit user acceptance gate.

@@ -1,0 +1,457 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en affirmative navigation: show me the recovery page for my password 4ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: reset my password for me, and then show me the recovery page for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: show me the recovery page for my password; but reset my password for me. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: Support must validate the reset token for my password, and then show me the recovery page for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: show me the recovery page for my password; but Support must validate the reset token for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: do not reset my password, and then show me the recovery page for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: show me the recovery page for my password; but do not reset my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: Support must not validate the reset token for my password, and then show me the recovery page for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: show me the recovery page for my password; but Support must not validate the reset token for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: I don’t want Support to submit the reset for my password, and then show me the recovery page for my password. 1ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: show me the recovery page for my password; but I don’t want Support to submit the reset for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en affirmative navigation: where can I find the recovery link for my password 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: reset my password for me, and then where can I find the recovery link for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: where can I find the recovery link for my password; but reset my password for me. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: Support must validate the reset token for my password, and then where can I find the recovery link for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: where can I find the recovery link for my password; but Support must validate the reset token for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: do not reset my password, and then where can I find the recovery link for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: where can I find the recovery link for my password; but do not reset my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: Support must not validate the reset token for my password, and then where can I find the recovery link for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: where can I find the recovery link for my password; but Support must not validate the reset token for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: I don’t want Support to submit the reset for my password, and then where can I find the recovery link for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: where can I find the recovery link for my password; but I don’t want Support to submit the reset for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en affirmative operation without navigation: reset my password for me 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en affirmative operation without navigation: Support must validate the reset token for my password 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en negated operation without navigation: do not reset my password 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en negated operation without navigation: Support must not validate the reset token for my password 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en negated operation without navigation: I don’t want Support to submit the reset for my password 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en affirmative navigation: show me the recovery page for a forgotten password 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: reset a forgotten password for me, and then show me the recovery page for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: show me the recovery page for a forgotten password; but reset a forgotten password for me. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: Support must validate the reset token for a forgotten password, and then show me the recovery page for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: show me the recovery page for a forgotten password; but Support must validate the reset token for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: do not reset a forgotten password, and then show me the recovery page for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: show me the recovery page for a forgotten password; but do not reset a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: Support must not validate the reset token for a forgotten password, and then show me the recovery page for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: show me the recovery page for a forgotten password; but Support must not validate the reset token for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: I don’t want Support to submit the reset for a forgotten password, and then show me the recovery page for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: show me the recovery page for a forgotten password; but I don’t want Support to submit the reset for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en affirmative navigation: where can I find the recovery link for a forgotten password 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: reset a forgotten password for me, and then where can I find the recovery link for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: where can I find the recovery link for a forgotten password; but reset a forgotten password for me. 1ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: Support must validate the reset token for a forgotten password, and then where can I find the recovery link for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: where can I find the recovery link for a forgotten password; but Support must validate the reset token for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: do not reset a forgotten password, and then where can I find the recovery link for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: where can I find the recovery link for a forgotten password; but do not reset a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: Support must not validate the reset token for a forgotten password, and then where can I find the recovery link for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: where can I find the recovery link for a forgotten password; but Support must not validate the reset token for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: I don’t want Support to submit the reset for a forgotten password, and then where can I find the recovery link for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: where can I find the recovery link for a forgotten password; but I don’t want Support to submit the reset for a forgotten password. 0ms
+ × tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en affirmative operation without navigation: reset a forgotten password for me 4ms
+   → reset a forgotten password for me: expected { language: 'en', …(2) } to deeply equal { language: 'en', …(2) }
+ × tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en affirmative operation without navigation: Support must validate the reset token for a forgotten password 1ms
+   → Support must validate the reset token for a forgotten password: expected { language: 'en', …(2) } to deeply equal { language: 'en', …(2) }
+ × tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en negated operation without navigation: do not reset a forgotten password 1ms
+   → do not reset a forgotten password: expected { language: 'en', …(2) } to deeply equal { language: 'en', …(2) }
+ × tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en negated operation without navigation: Support must not validate the reset token for a forgotten password 0ms
+   → Support must not validate the reset token for a forgotten password: expected { language: 'en', …(2) } to deeply equal { language: 'en', …(2) }
+ × tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en negated operation without navigation: I don’t want Support to submit the reset for a forgotten password 0ms
+   → I don’t want Support to submit the reset for a forgotten password: expected { language: 'en', …(2) } to deeply equal { language: 'en', …(2) }
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro affirmative navigation: arată-mi pagina de recuperare pentru parola mea 2ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: resetează parola mea în locul meu, iar apoi arată-mi pagina de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: arată-mi pagina de recuperare pentru parola mea; dar resetează parola mea în locul meu. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: Asistența trebuie să valideze tokenul de resetare pentru parola mea, iar apoi arată-mi pagina de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: arată-mi pagina de recuperare pentru parola mea; dar Asistența trebuie să valideze tokenul de resetare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: nu reseta parola mea, iar apoi arată-mi pagina de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: arată-mi pagina de recuperare pentru parola mea; dar nu reseta parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: Asistența nu trebuie să valideze tokenul de resetare pentru parola mea, iar apoi arată-mi pagina de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: arată-mi pagina de recuperare pentru parola mea; dar Asistența nu trebuie să valideze tokenul de resetare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: nu vreau ca Asistența să trimită resetarea pentru parola mea, iar apoi arată-mi pagina de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: arată-mi pagina de recuperare pentru parola mea; dar nu vreau ca Asistența să trimită resetarea pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro affirmative navigation: unde găsesc linkul de recuperare pentru parola mea 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: resetează parola mea în locul meu, iar apoi unde găsesc linkul de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: unde găsesc linkul de recuperare pentru parola mea; dar resetează parola mea în locul meu. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: Asistența trebuie să valideze tokenul de resetare pentru parola mea, iar apoi unde găsesc linkul de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: unde găsesc linkul de recuperare pentru parola mea; dar Asistența trebuie să valideze tokenul de resetare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: nu reseta parola mea, iar apoi unde găsesc linkul de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: unde găsesc linkul de recuperare pentru parola mea; dar nu reseta parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: Asistența nu trebuie să valideze tokenul de resetare pentru parola mea, iar apoi unde găsesc linkul de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: unde găsesc linkul de recuperare pentru parola mea; dar Asistența nu trebuie să valideze tokenul de resetare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: nu vreau ca Asistența să trimită resetarea pentru parola mea, iar apoi unde găsesc linkul de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: unde găsesc linkul de recuperare pentru parola mea; dar nu vreau ca Asistența să trimită resetarea pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro affirmative operation without navigation: resetează parola mea în locul meu 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro affirmative operation without navigation: Asistența trebuie să valideze tokenul de resetare pentru parola mea 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro negated operation without navigation: nu reseta parola mea 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro negated operation without navigation: Asistența nu trebuie să valideze tokenul de resetare pentru parola mea 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro negated operation without navigation: nu vreau ca Asistența să trimită resetarea pentru parola mea 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro affirmative navigation: arată-mi pagina de recuperare pentru o parolă uitată 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: resetează o parolă uitată în locul meu, iar apoi arată-mi pagina de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: arată-mi pagina de recuperare pentru o parolă uitată; dar resetează o parolă uitată în locul meu. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: Asistența trebuie să valideze tokenul de resetare pentru o parolă uitată, iar apoi arată-mi pagina de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: arată-mi pagina de recuperare pentru o parolă uitată; dar Asistența trebuie să valideze tokenul de resetare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: nu reseta o parolă uitată, iar apoi arată-mi pagina de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: arată-mi pagina de recuperare pentru o parolă uitată; dar nu reseta o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: Asistența nu trebuie să valideze tokenul de resetare pentru o parolă uitată, iar apoi arată-mi pagina de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: arată-mi pagina de recuperare pentru o parolă uitată; dar Asistența nu trebuie să valideze tokenul de resetare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: nu vreau ca Asistența să trimită resetarea pentru o parolă uitată, iar apoi arată-mi pagina de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: arată-mi pagina de recuperare pentru o parolă uitată; dar nu vreau ca Asistența să trimită resetarea pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro affirmative navigation: unde găsesc linkul de recuperare pentru o parolă uitată 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: resetează o parolă uitată în locul meu, iar apoi unde găsesc linkul de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: unde găsesc linkul de recuperare pentru o parolă uitată; dar resetează o parolă uitată în locul meu. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: Asistența trebuie să valideze tokenul de resetare pentru o parolă uitată, iar apoi unde găsesc linkul de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: unde găsesc linkul de recuperare pentru o parolă uitată; dar Asistența trebuie să valideze tokenul de resetare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: nu reseta o parolă uitată, iar apoi unde găsesc linkul de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: unde găsesc linkul de recuperare pentru o parolă uitată; dar nu reseta o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: Asistența nu trebuie să valideze tokenul de resetare pentru o parolă uitată, iar apoi unde găsesc linkul de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: unde găsesc linkul de recuperare pentru o parolă uitată; dar Asistența nu trebuie să valideze tokenul de resetare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: nu vreau ca Asistența să trimită resetarea pentru o parolă uitată, iar apoi unde găsesc linkul de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: unde găsesc linkul de recuperare pentru o parolă uitată; dar nu vreau ca Asistența să trimită resetarea pentru o parolă uitată. 0ms
+ × tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro affirmative operation without navigation: resetează o parolă uitată în locul meu 1ms
+   → resetează o parolă uitată în locul meu: expected { language: 'ro', …(2) } to deeply equal { language: 'ro', …(2) }
+ × tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro affirmative operation without navigation: Asistența trebuie să valideze tokenul de resetare pentru o parolă uitată 0ms
+   → Asistența trebuie să valideze tokenul de resetare pentru o parolă uitată: expected { language: 'ro', …(2) } to deeply equal { language: 'ro', …(2) }
+ × tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro negated operation without navigation: nu reseta o parolă uitată 0ms
+   → nu reseta o parolă uitată: expected { language: 'ro', …(2) } to deeply equal { language: 'ro', …(2) }
+ × tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro negated operation without navigation: Asistența nu trebuie să valideze tokenul de resetare pentru o parolă uitată 1ms
+   → Asistența nu trebuie să valideze tokenul de resetare pentru o parolă uitată: expected { language: 'ro', …(2) } to deeply equal { language: 'ro', …(2) }
+ × tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro negated operation without navigation: nu vreau ca Asistența să trimită resetarea pentru o parolă uitată 0ms
+   → nu vreau ca Asistența să trimită resetarea pentru o parolă uitată: expected { language: 'ro', …(2) } to deeply equal { language: 'ro', …(2) }
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed en clause behavior: Reset my password and give me the recovery link. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed en clause behavior: Do not reset my password; just show me where I can recover it. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed en clause behavior: Can you check where the password reset page is? 0ms
+ × tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed en clause behavior: I am not asking to reset a password. Where is Help? 0ms
+   → I am not asking to reset a password. Where is Help?: expected { language: 'en', …(2) } to deeply equal { language: 'en', …(2) }
+ × tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed ro clause behavior: Resetează-mi parola și dă-mi linkul de recuperare. 0ms
+   → Resetează-mi parola și dă-mi linkul de recuperare.: expected { language: 'ro', …(2) } to deeply equal { language: 'ro', …(2) }
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed ro clause behavior: Nu-mi reseta parola; arată-mi doar unde o pot recupera. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed ro clause behavior: Verifică unde este pagina de resetare a parolei. 0ms
+ × tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed ro clause behavior: Nu cer resetarea parolei. Unde găsesc Ajutor? 0ms
+   → Nu cer resetarea parolei. Unde găsesc Ajutor?: expected { language: 'ro', …(2) } to deeply equal { language: 'ro', …(2) }
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps benign en vocabulary outside recovery intent: The password policy article describes account safety. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps benign en vocabulary outside recovery intent: Recovery time after a service incident is five minutes. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps benign ro vocabulary outside recovery intent: Articolul despre parole descrie siguranța contului. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps benign ro vocabulary outside recovery intent: Timpul de recuperare după incident este de cinci minute. 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 13 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en affirmative operation without navigation: reset a forgotten password for me
+AssertionError: reset a forgotten password for me: expected { language: 'en', …(2) } to deeply equal { language: 'en', …(2) }
+
+- Expected
++ Received
+
+  {
+    "credentialOperation": "AFFIRMATIVE",
+    "language": "en",
+-   "navigation": "ABSENT",
++   "navigation": "AFFIRMATIVE",
+  }
+
+ ❯ expectSemantics tests/unit/support-recovery-intent.test.ts:61:56
+     59|
+     60| function expectSemantics(text: string,language: Language,expected: Exp…
+     61|   expect(analyzeRecoverySemantics(text,language),text).toEqual({ langu…
+       |                                                        ^
+     62| }
+     63|
+ ❯ tests/unit/support-recovery-intent.test.ts:97:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/13]⎯
+
+ FAIL  tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en affirmative operation without navigation: Support must validate the reset token for a forgotten password
+AssertionError: Support must validate the reset token for a forgotten password: expected { language: 'en', …(2) } to deeply equal { language: 'en', …(2) }
+
+- Expected
++ Received
+
+  {
+    "credentialOperation": "AFFIRMATIVE",
+    "language": "en",
+-   "navigation": "ABSENT",
++   "navigation": "AFFIRMATIVE",
+  }
+
+ ❯ expectSemantics tests/unit/support-recovery-intent.test.ts:61:56
+     59|
+     60| function expectSemantics(text: string,language: Language,expected: Exp…
+     61|   expect(analyzeRecoverySemantics(text,language),text).toEqual({ langu…
+       |                                                        ^
+     62| }
+     63|
+ ❯ tests/unit/support-recovery-intent.test.ts:97:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/13]⎯
+
+ FAIL  tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en negated operation without navigation: do not reset a forgotten password
+AssertionError: do not reset a forgotten password: expected { language: 'en', …(2) } to deeply equal { language: 'en', …(2) }
+
+- Expected
++ Received
+
+  {
+    "credentialOperation": "NEGATED",
+    "language": "en",
+-   "navigation": "ABSENT",
++   "navigation": "NEGATED",
+  }
+
+ ❯ expectSemantics tests/unit/support-recovery-intent.test.ts:61:56
+     59|
+     60| function expectSemantics(text: string,language: Language,expected: Exp…
+     61|   expect(analyzeRecoverySemantics(text,language),text).toEqual({ langu…
+       |                                                        ^
+     62| }
+     63|
+ ❯ tests/unit/support-recovery-intent.test.ts:104:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/13]⎯
+
+ FAIL  tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en negated operation without navigation: Support must not validate the reset token for a forgotten password
+AssertionError: Support must not validate the reset token for a forgotten password: expected { language: 'en', …(2) } to deeply equal { language: 'en', …(2) }
+
+- Expected
++ Received
+
+  {
+    "credentialOperation": "NEGATED",
+    "language": "en",
+-   "navigation": "ABSENT",
++   "navigation": "NEGATED",
+  }
+
+ ❯ expectSemantics tests/unit/support-recovery-intent.test.ts:61:56
+     59|
+     60| function expectSemantics(text: string,language: Language,expected: Exp…
+     61|   expect(analyzeRecoverySemantics(text,language),text).toEqual({ langu…
+       |                                                        ^
+     62| }
+     63|
+ ❯ tests/unit/support-recovery-intent.test.ts:104:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/13]⎯
+
+ FAIL  tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en negated operation without navigation: I don’t want Support to submit the reset for a forgotten password
+AssertionError: I don’t want Support to submit the reset for a forgotten password: expected { language: 'en', …(2) } to deeply equal { language: 'en', …(2) }
+
+- Expected
++ Received
+
+  {
+    "credentialOperation": "NEGATED",
+    "language": "en",
+-   "navigation": "ABSENT",
++   "navigation": "AFFIRMATIVE",
+  }
+
+ ❯ expectSemantics tests/unit/support-recovery-intent.test.ts:61:56
+     59|
+     60| function expectSemantics(text: string,language: Language,expected: Exp…
+     61|   expect(analyzeRecoverySemantics(text,language),text).toEqual({ langu…
+       |                                                        ^
+     62| }
+     63|
+ ❯ tests/unit/support-recovery-intent.test.ts:104:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/13]⎯
+
+ FAIL  tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro affirmative operation without navigation: resetează o parolă uitată în locul meu
+AssertionError: resetează o parolă uitată în locul meu: expected { language: 'ro', …(2) } to deeply equal { language: 'ro', …(2) }
+
+- Expected
++ Received
+
+  {
+    "credentialOperation": "AFFIRMATIVE",
+    "language": "ro",
+-   "navigation": "ABSENT",
++   "navigation": "AFFIRMATIVE",
+  }
+
+ ❯ expectSemantics tests/unit/support-recovery-intent.test.ts:61:56
+     59|
+     60| function expectSemantics(text: string,language: Language,expected: Exp…
+     61|   expect(analyzeRecoverySemantics(text,language),text).toEqual({ langu…
+       |                                                        ^
+     62| }
+     63|
+ ❯ tests/unit/support-recovery-intent.test.ts:97:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/13]⎯
+
+ FAIL  tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro affirmative operation without navigation: Asistența trebuie să valideze tokenul de resetare pentru o parolă uitată
+AssertionError: Asistența trebuie să valideze tokenul de resetare pentru o parolă uitată: expected { language: 'ro', …(2) } to deeply equal { language: 'ro', …(2) }
+
+- Expected
++ Received
+
+  {
+    "credentialOperation": "AFFIRMATIVE",
+    "language": "ro",
+-   "navigation": "ABSENT",
++   "navigation": "AFFIRMATIVE",
+  }
+
+ ❯ expectSemantics tests/unit/support-recovery-intent.test.ts:61:56
+     59|
+     60| function expectSemantics(text: string,language: Language,expected: Exp…
+     61|   expect(analyzeRecoverySemantics(text,language),text).toEqual({ langu…
+       |                                                        ^
+     62| }
+     63|
+ ❯ tests/unit/support-recovery-intent.test.ts:97:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/13]⎯
+
+ FAIL  tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro negated operation without navigation: nu reseta o parolă uitată
+AssertionError: nu reseta o parolă uitată: expected { language: 'ro', …(2) } to deeply equal { language: 'ro', …(2) }
+
+- Expected
++ Received
+
+  {
+    "credentialOperation": "NEGATED",
+    "language": "ro",
+-   "navigation": "ABSENT",
++   "navigation": "NEGATED",
+  }
+
+ ❯ expectSemantics tests/unit/support-recovery-intent.test.ts:61:56
+     59|
+     60| function expectSemantics(text: string,language: Language,expected: Exp…
+     61|   expect(analyzeRecoverySemantics(text,language),text).toEqual({ langu…
+       |                                                        ^
+     62| }
+     63|
+ ❯ tests/unit/support-recovery-intent.test.ts:104:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/13]⎯
+
+ FAIL  tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro negated operation without navigation: Asistența nu trebuie să valideze tokenul de resetare pentru o parolă uitată
+AssertionError: Asistența nu trebuie să valideze tokenul de resetare pentru o parolă uitată: expected { language: 'ro', …(2) } to deeply equal { language: 'ro', …(2) }
+
+- Expected
++ Received
+
+  {
+    "credentialOperation": "NEGATED",
+    "language": "ro",
+-   "navigation": "ABSENT",
++   "navigation": "AFFIRMATIVE",
+  }
+
+ ❯ expectSemantics tests/unit/support-recovery-intent.test.ts:61:56
+     59|
+     60| function expectSemantics(text: string,language: Language,expected: Exp…
+     61|   expect(analyzeRecoverySemantics(text,language),text).toEqual({ langu…
+       |                                                        ^
+     62| }
+     63|
+ ❯ tests/unit/support-recovery-intent.test.ts:104:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/13]⎯
+
+ FAIL  tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro negated operation without navigation: nu vreau ca Asistența să trimită resetarea pentru o parolă uitată
+AssertionError: nu vreau ca Asistența să trimită resetarea pentru o parolă uitată: expected { language: 'ro', …(2) } to deeply equal { language: 'ro', …(2) }
+
+- Expected
++ Received
+
+  {
+    "credentialOperation": "NEGATED",
+    "language": "ro",
+-   "navigation": "ABSENT",
++   "navigation": "AFFIRMATIVE",
+  }
+
+ ❯ expectSemantics tests/unit/support-recovery-intent.test.ts:61:56
+     59|
+     60| function expectSemantics(text: string,language: Language,expected: Exp…
+     61|   expect(analyzeRecoverySemantics(text,language),text).toEqual({ langu…
+       |                                                        ^
+     62| }
+     63|
+ ❯ tests/unit/support-recovery-intent.test.ts:104:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/13]⎯
+
+ FAIL  tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed en clause behavior: I am not asking to reset a password. Where is Help?
+AssertionError: I am not asking to reset a password. Where is Help?: expected { language: 'en', …(2) } to deeply equal { language: 'en', …(2) }
+
+- Expected
++ Received
+
+  {
+    "credentialOperation": "NEGATED",
+    "language": "en",
+-   "navigation": "ABSENT",
++   "navigation": "AFFIRMATIVE",
+  }
+
+ ❯ expectSemantics tests/unit/support-recovery-intent.test.ts:61:56
+     59|
+     60| function expectSemantics(text: string,language: Language,expected: Exp…
+     61|   expect(analyzeRecoverySemantics(text,language),text).toEqual({ langu…
+       |                                                        ^
+     62| }
+     63|
+ ❯ tests/unit/support-recovery-intent.test.ts:124:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/13]⎯
+
+ FAIL  tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed ro clause behavior: Resetează-mi parola și dă-mi linkul de recuperare.
+AssertionError: Resetează-mi parola și dă-mi linkul de recuperare.: expected { language: 'ro', …(2) } to deeply equal { language: 'ro', …(2) }
+
+- Expected
++ Received
+
+  {
+    "credentialOperation": "AFFIRMATIVE",
+    "language": "ro",
+-   "navigation": "AFFIRMATIVE",
++   "navigation": "ABSENT",
+  }
+
+ ❯ expectSemantics tests/unit/support-recovery-intent.test.ts:61:56
+     59|
+     60| function expectSemantics(text: string,language: Language,expected: Exp…
+     61|   expect(analyzeRecoverySemantics(text,language),text).toEqual({ langu…
+       |                                                        ^
+     62| }
+     63|
+ ❯ tests/unit/support-recovery-intent.test.ts:124:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/13]⎯
+
+ FAIL  tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed ro clause behavior: Nu cer resetarea parolei. Unde găsesc Ajutor?
+AssertionError: Nu cer resetarea parolei. Unde găsesc Ajutor?: expected { language: 'ro', …(2) } to deeply equal { language: 'ro', …(2) }
+
+- Expected
++ Received
+
+  {
+    "credentialOperation": "NEGATED",
+    "language": "ro",
+-   "navigation": "ABSENT",
++   "navigation": "AFFIRMATIVE",
+  }
+
+ ❯ expectSemantics tests/unit/support-recovery-intent.test.ts:61:56
+     59|
+     60| function expectSemantics(text: string,language: Language,expected: Exp…
+     61|   expect(analyzeRecoverySemantics(text,language),text).toEqual({ langu…
+       |                                                        ^
+     62| }
+     63|
+ ❯ tests/unit/support-recovery-intent.test.ts:124:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/13]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  13 failed | 107 passed (120)
+   Start at  15:27:11
+   Duration  193ms (transform 26ms, setup 0ms, import 39ms, tests 26ms, environment 0ms)
+

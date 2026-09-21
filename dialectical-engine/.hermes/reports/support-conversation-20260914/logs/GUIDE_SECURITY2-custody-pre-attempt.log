@@ -1,0 +1,3 @@
+rc=1
+static custody helper used the worktree-relative path in `git show`; repository objects require the `dialectical-engine/` prefix.
+No product, test, runtime, network, database, or dependency operation ran. No output custody log was written by the failed helper.

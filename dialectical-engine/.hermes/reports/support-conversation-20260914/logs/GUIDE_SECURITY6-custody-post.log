@@ -1,0 +1,77 @@
+{
+  "phase": "post",
+  "revision": "5731eb6faac25f9712f04aea029a021f6eee9352",
+  "base": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "priorReviewRevision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "indexedInputs": 87,
+  "inputBad": [],
+  "productFiles": 143,
+  "productBad": [],
+  "deleted": 3,
+  "deletedBad": [],
+  "detached": {
+    "head": "5731eb6faac25f9712f04aea029a021f6eee9352",
+    "dirty": ""
+  },
+  "primary": {
+    "head": "5731eb6faac25f9712f04aea029a021f6eee9352",
+    "dirty": ""
+  },
+  "roleDefiningFiles": [
+    "migrations/0050_support_foundation.sql",
+    "migrations/0051_support_cases.sql",
+    "migrations/0052_support_tool_calls.sql",
+    "migrations/0053_support_public_incident.sql",
+    "migrations/0054_support_keys_audit.sql",
+    "tests/support/testDatabase.ts",
+    "packages/db/src/index.ts",
+    "package.json",
+    "pnpm-lock.yaml"
+  ],
+  "roleChanged": [],
+  "expectedPriorDelta": [
+    "dialectical-engine/apps/api/src/support/answer.ts",
+    "dialectical-engine/packages/support-kb/src/catalog.ts",
+    "dialectical-engine/packages/support-kb/src/context.ts",
+    "dialectical-engine/packages/support-kb/src/index.ts",
+    "dialectical-engine/packages/support-kb/src/recovery.ts",
+    "dialectical-engine/tests/architecture/support-catalog-coverage.test.ts",
+    "dialectical-engine/tests/unit/support-answer-context.test.ts",
+    "dialectical-engine/tests/unit/support-context.test.ts",
+    "dialectical-engine/tests/unit/support-recovery-components.test.ts"
+  ],
+  "priorDelta": [
+    "dialectical-engine/apps/api/src/support/answer.ts",
+    "dialectical-engine/packages/support-kb/src/catalog.ts",
+    "dialectical-engine/packages/support-kb/src/context.ts",
+    "dialectical-engine/packages/support-kb/src/index.ts",
+    "dialectical-engine/packages/support-kb/src/recovery.ts",
+    "dialectical-engine/tests/architecture/support-catalog-coverage.test.ts",
+    "dialectical-engine/tests/unit/support-answer-context.test.ts",
+    "dialectical-engine/tests/unit/support-context.test.ts",
+    "dialectical-engine/tests/unit/support-recovery-components.test.ts"
+  ],
+  "dependencyLinks": [
+    {
+      "path": "node_modules",
+      "present": false
+    },
+    {
+      "path": "apps/api/node_modules",
+      "present": false
+    },
+    {
+      "path": "apps/ui/node_modules",
+      "present": false
+    },
+    {
+      "path": "apps/runner/node_modules",
+      "present": false
+    },
+    {
+      "path": "packages/support-kb/node_modules",
+      "present": false
+    }
+  ],
+  "ok": true
+}

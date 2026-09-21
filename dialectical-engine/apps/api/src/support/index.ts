@@ -1,15 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { SupportConfigurationPort, SupportConfigurationState } from "@debateai/register";
+import type { LoadedHelpCorpus } from "@debateai/support-kb";
 import { normalizeClientIp } from "../client-ip.js";
 import { SupportC3AdmissionWindow } from "./c3-admission.js";
 import type { SupportAnswerPort } from "./answer.js";
 import { classifySupportMessage,supportIntentSurface } from "./classify.js";
 import { evaluateEscalation } from "./escalation.js";
-import {
-  formatOwnRunStateAnswer,isOwnContextListQuestion,isOwnContextQuestion,NIL_RUN_ID,
-  type SupportOwnContextPort
-} from "./own-context.js";
+import { classifyPublicGuideBoundary,privateRecordRefusal } from "./public-guide-boundary.js";
 import { SupportCaseError,type SupportCaseAccessPort } from "./cases.js";
 import {
   applyIncidentNotice,formatIncidentAnswer,type SupportIncidentRepositoryPort
@@ -23,11 +21,11 @@ import {
   type SupportSessionRecord
 } from "./session.js";
 import { SHREDDED_NOTICE,supportTemplate,type SupportLanguage } from "./templates.js";
+import { recoverySecurityGuidance,type SupportSecurityRecoveryKind } from "./security-guidance.js";
 
 export const SUPPORT_ROUTE_PATHS = Object.freeze([
   "POST /v1/support/sessions",
   "GET /v1/support/sessions/{id}",
-  "POST /v1/support/sessions/{id}/consent",
   "POST /v1/support/sessions/{id}/messages",
   "POST /v1/support/messages/{id}/rating",
   "POST /v1/support/sessions/{id}/escalate",
@@ -41,6 +39,7 @@ export type SupportRoutePath = typeof SUPPORT_ROUTE_PATHS[number];
 
 export interface SupportKnowledgeStatusPort {
   status(): Promise<Readonly<{ kbVersion: string; shipped: number; ignored: number }>>;
+  snapshot?(version: string): LoadedHelpCorpus | undefined;
 }
 
 export type SupportDiagnostic = "SUPPORT_RATE_LIMIT_EVIDENCE_WRITE_FAILED";
@@ -52,7 +51,6 @@ export interface SupportApplication {
   readonly answer?: SupportAnswerPort;
   readonly cases?: SupportCasePort;
   readonly caseAccess?: SupportCaseAccessPort;
-  readonly ownContext?: SupportOwnContextPort;
   readonly incidents?: Pick<SupportIncidentRepositoryPort,"readActiveIncidents">;
   readonly knowledge: SupportKnowledgeStatusPort;
   readonly clock?: () => Date;
@@ -83,8 +81,7 @@ function publicSession(record: SupportSessionRecord): Readonly<Record<string, un
     language: record.language,
     state: record.state,
     kb_version: record.kbVersion,
-    created_at: record.createdAt.toISOString(),
-    consent_own_context_at: record.consentOwnContextAt?.toISOString() ?? null
+    created_at: record.createdAt.toISOString()
   });
 }
 
@@ -153,14 +150,13 @@ async function openEscalatedCase(
   | null
 > {
   if (application.cases === undefined || predicate === undefined) return Promise.resolve(null);
-  const toolCalls = await application.ownContext?.listCalls?.(session.sessionId) ?? [];
   const request = {
     sessionId: session.sessionId,
     language,
     createdAt,
     identityOwnerRef: session.identityOwnerRef,
     triggerPredicate: predicate,
-    toolCalls,
+    toolCalls: Object.freeze([]),
     kbVersion: session.kbVersion,
     slaHours: 48
   } as const;
@@ -270,44 +266,6 @@ export function installSupportRoutes(
   );
 
   api.post<{ Params: { id: string } }>(
-    "/v1/support/sessions/:id/consent",
-    policy("POST /v1/support/sessions/{id}/consent"),
-    async (request,reply) => {
-      if (application === undefined || application.sessions.setConsent === undefined) {
-        return unavailable(reply);
-      }
-      const tokenSha256 = capabilityFrom(request);
-      const body = typeof request.body === "object" && request.body !== null
-        ? request.body as Readonly<Record<string,unknown>> : {};
-      if (tokenSha256 === null || typeof body.on !== "boolean") {
-        return reply.status(400).send({ error: "SUPPORT_CONSENT_INVALID" });
-      }
-      const found = await application.sessions.read({
-        sessionId: request.params.id,tokenSha256
-      });
-      if (found === null || !sessionOwnerMatches(request,found)) {
-        return reply.status(404).send({ error: "NOT_FOUND" });
-      }
-      if (found.shreddedAt !== undefined && found.shreddedAt !== null) {
-        return shredded(reply,found.language);
-      }
-      if (request.authenticatedSession === undefined) {
-        return reply.status(401).send({ error: "AUTHENTICATION_REQUIRED" });
-      }
-      const updated = await application.sessions.setConsent({
-        sessionId: request.params.id,
-        tokenSha256,
-        identityOwnerRef: request.authenticatedSession.ownerRef,
-        on: body.on,
-        at: (application.clock ?? (() => new Date()))()
-      });
-      return updated === null
-        ? reply.status(404).send({ error: "NOT_FOUND" })
-        : reply.send({ session: publicSession(updated) });
-    }
-  );
-
-  api.post<{ Params: { id: string } }>(
     "/v1/support/sessions/:id/messages",
     policy("POST /v1/support/sessions/{id}/messages"),
     async (request, reply) => {
@@ -339,7 +297,7 @@ export function installSupportRoutes(
       }
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Readonly<Record<string, unknown>> : {};
-      if (typeof body.text !== "string") {
+      if (Object.keys(body).length !== 1 || typeof body.text !== "string") {
         return reply.status(400).send({ error: "SUPPORT_MESSAGE_INVALID" });
       }
       const now = (application.clock ?? (() => new Date()))();
@@ -348,11 +306,17 @@ export function installSupportRoutes(
       const ipSha256 = sha256(clientIp(request));
       const messageSha256 = sha256(body.text);
       const classification = classifySupportMessage(body.text);
-      const overrideLanguage = body.language === undefined ? null : languageFrom(body.language);
-      if (body.language !== undefined && overrideLanguage === null) {
-        return reply.status(400).send({ error: "SUPPORT_LANGUAGE_INVALID" });
+      const publicGuideBoundary = classifyPublicGuideBoundary(body.text,found.language);
+      const overrideLanguage = null;
+      const responseLanguage = found.language;
+      const knowledgeSnapshot = application.answer === undefined
+        ? undefined : application.knowledge.snapshot?.(found.kbVersion);
+      if (application.answer !== undefined && knowledgeSnapshot === undefined) {
+        return reply.status(409).send({
+          error: "SUPPORT_KB_SNAPSHOT_UNAVAILABLE",
+          restart_session: true
+        });
       }
-      const responseLanguage = overrideLanguage ?? classification.language;
       if (now.getTime() < found.createdAt.getTime()
         || now.getTime() - found.createdAt.getTime() > 24 * 60 * 60 * 1_000
         || [...body.text].length > state.snapshot.values.supportLimitMessageCharacters) {
@@ -387,6 +351,55 @@ export function installSupportRoutes(
           at: now
         });
         return rateLimited(reply, responseLanguage);
+      }
+      if (publicGuideBoundary.kind === "PRIVATE_RECORD_REQUEST"
+        && classification.outcome !== "REFUSE_INJECTION"
+        && classification.outcome !== "REFUSE_SAFETY") {
+        const text = privateRecordRefusal(responseLanguage);
+        await application.messages.write({
+          messageId: randomUUID(),sessionId: found.sessionId,role: "user",
+          text: body.text,outcome: "REFUSE_ZONE",language: responseLanguage,
+          detectedLanguage: classification.language,overrideLanguage,
+          receivedAt: now,firstTokenAt: null,completedAt: now
+        });
+        const messageId = randomUUID();
+        const stored = await application.messages.write({
+          messageId,sessionId: found.sessionId,role: "assistant",
+          text,outcome: "REFUSE_ZONE",language: responseLanguage,
+          detectedLanguage: classification.language,overrideLanguage,
+          receivedAt: now,firstTokenAt: null,completedAt: now
+        });
+        return reply.send({
+          message_id: messageId,outcome: "REFUSE_ZONE",text: stored.text,
+          sources: Object.freeze([]),actions: Object.freeze([])
+        });
+      }
+      if (classification.securityNavigation === "FORGOT_PASSWORD"
+        || classification.securityOperation === "CREDENTIAL_OPERATION") {
+        const recoveryKind: SupportSecurityRecoveryKind =
+          classification.securityNavigation === "FORGOT_PASSWORD"
+          && classification.securityOperation === "CREDENTIAL_OPERATION"
+            ? "CREDENTIAL_OPERATION_AND_FORGOT_PASSWORD"
+            : classification.securityNavigation === "FORGOT_PASSWORD"
+              ? "FORGOT_PASSWORD" : "CREDENTIAL_OPERATION";
+        const text = recoverySecurityGuidance(recoveryKind,responseLanguage);
+        await application.messages.write({
+          messageId: randomUUID(),sessionId: found.sessionId,role: "user",
+          text: body.text,outcome: "REFUSE_ZONE",language: responseLanguage,
+          detectedLanguage: classification.language,overrideLanguage,
+          receivedAt: now,firstTokenAt: null,completedAt: now
+        });
+        const messageId = randomUUID();
+        const stored = await application.messages.write({
+          messageId,sessionId: found.sessionId,role: "assistant",
+          text,outcome: "REFUSE_ZONE",language: responseLanguage,
+          detectedLanguage: classification.language,overrideLanguage,
+          receivedAt: now,firstTokenAt: null,completedAt: now
+        });
+        return reply.send({
+          message_id: messageId,outcome: "REFUSE_ZONE",text: stored.text,
+          sources: Object.freeze([]),actions: Object.freeze([])
+        });
       }
       const previousMessages = application.cases === undefined
         ? []
@@ -443,13 +456,6 @@ export function installSupportRoutes(
           detectedLanguage: classification.language,overrideLanguage,
           receivedAt: now,firstTokenAt: null,completedAt: now
         });
-        if (classification.outcome === "REFUSE_INJECTION"
-          && application.sessions.finalizeInjectionLock !== undefined) {
-          await application.sessions.finalizeInjectionLock({
-            sessionId: found.sessionId,
-            lockAfterInjections: state.snapshot.values.supportLockAfterInjections
-          });
-        }
         const opened = escalationBeforeResponse === null ? null
           : await openEscalatedCase(
             application,found,responseLanguage,escalationBeforeResponse.predicate,now
@@ -461,142 +467,6 @@ export function installSupportRoutes(
               ? { refusal_link: classification.link } : { link: classification.link }
             : {}),
           ...openedCaseReceipt(opened,responseLanguage)
-        });
-      }
-      const ownContextIntent = isOwnContextQuestion(body.text)
-        || isOwnContextListQuestion(body.text)
-        || typeof body.run_id === "string" || body.latest === true;
-      if (ownContextIntent
-        && (request.authenticatedSession === undefined || found.consentOwnContextAt === null)) {
-        const outcome = request.authenticatedSession === undefined
-          ? "ANON_CONTEXT" as const : "CONSENT_NEEDED" as const;
-        const text = supportTemplate(outcome,responseLanguage);
-        await application.messages.write({
-          messageId: randomUUID(),sessionId: found.sessionId,role: "user",
-          text: body.text,outcome,language: responseLanguage,
-          detectedLanguage: classification.language,overrideLanguage,
-          receivedAt: now,firstTokenAt: null,completedAt: now
-        });
-        const messageId = randomUUID();
-        await application.messages.write({
-          messageId,sessionId: found.sessionId,role: "assistant",
-          text,outcome,language: responseLanguage,
-          detectedLanguage: classification.language,overrideLanguage,
-          receivedAt: now,firstTokenAt: null,completedAt: now
-        });
-        const opened = escalationBeforeResponse === null ? null
-          : await openEscalatedCase(
-            application,found,responseLanguage,escalationBeforeResponse.predicate,now
-          );
-        return reply.send({
-          message_id: messageId,outcome,text,...openedCaseReceipt(opened,responseLanguage)
-        });
-      }
-      if (ownContextIntent) {
-        if (application.ownContext === undefined || request.authenticatedSession === undefined) {
-          return unavailable(reply);
-        }
-        if (isOwnContextListQuestion(body.text)) {
-          const projections = await application.ownContext.list({
-            sessionId: found.sessionId,
-            ownerRef: request.authenticatedSession.ownerRef,
-            legacyAskerId: null,
-            at: now
-          });
-          const outcome = "ANSWER_OWN_STATE" as const;
-          const ownText = projections.map((projection) => [
-            projection.run_id.slice(0,8),projection.created_at,projection.run_state
-          ].join(" · ")).join("\n");
-          const text = application.incidents === undefined ? ownText : applyIncidentNotice(
-            ownText,supportIntentSurface(body.text),
-            await application.incidents.readActiveIncidents(),responseLanguage
-          );
-          await application.messages.write({
-            messageId: randomUUID(),sessionId: found.sessionId,role: "user",
-            text: body.text,outcome,language: responseLanguage,
-            detectedLanguage: classification.language,overrideLanguage,
-            receivedAt: now,firstTokenAt: null,completedAt: now
-          });
-          const messageId = randomUUID();
-          await application.messages.write({
-            messageId,sessionId: found.sessionId,role: "assistant",
-            text,outcome,language: responseLanguage,
-            detectedLanguage: classification.language,overrideLanguage,
-            receivedAt: now,firstTokenAt: null,completedAt: now
-          });
-          const opened = escalationBeforeResponse === null ? null
-            : await openEscalatedCase(
-              application,found,responseLanguage,escalationBeforeResponse.predicate,now
-            );
-          return reply.send({
-            message_id: messageId,outcome,text,...openedCaseReceipt(opened,responseLanguage)
-          });
-        }
-        const statedRun = typeof body.run_id === "string" ? body.run_id : NIL_RUN_ID;
-        const latest = body.latest === true || typeof body.run_id !== "string";
-        const result = await application.ownContext.read({
-          sessionId: found.sessionId,
-          ownerRef: request.authenticatedSession.ownerRef,
-          legacyAskerId: null,
-          runId: statedRun,
-          latest,
-          at: now
-        });
-        if (result === "NOT_OWNED") {
-          const outcome = "REFUSE_OTHER_USER" as const;
-          const text = supportTemplate(outcome,responseLanguage);
-          await application.messages.write({
-            messageId: randomUUID(),sessionId: found.sessionId,role: "user",
-            text: body.text,outcome,language: responseLanguage,
-            detectedLanguage: classification.language,overrideLanguage,
-            receivedAt: now,firstTokenAt: null,completedAt: now
-          });
-          await application.messages.write({
-            messageId: randomUUID(),sessionId: found.sessionId,role: "assistant",
-            text,outcome,language: responseLanguage,
-            detectedLanguage: classification.language,overrideLanguage,
-            receivedAt: now,firstTokenAt: null,completedAt: now
-          });
-          const toolCalls = await application.ownContext.listCalls?.(found.sessionId) ?? [];
-          const toolEscalation = evaluateEscalation({
-            message: body.text,classification: null,outcomes: [],ratings: [],
-            toolCalls,requestedHuman: false
-          });
-          const escalation = escalationBeforeResponse ?? toolEscalation;
-          const opened = escalation !== null
-            ? await openEscalatedCase(
-              application,found,responseLanguage,escalation.predicate,now,
-              escalation.predicate === "E4"
-                ? `tool:${toolCalls.at(-1)?.at.toISOString() ?? now.toISOString()}`
-                : `predicate:${escalation.predicate}`
-            ) : null;
-          return reply.send({ outcome,text,...openedCaseReceipt(opened,responseLanguage) });
-        }
-        const outcome = "ANSWER_OWN_STATE" as const;
-        const ownText = formatOwnRunStateAnswer(result,responseLanguage,now);
-        const text = application.incidents === undefined ? ownText : applyIncidentNotice(
-          ownText,supportIntentSurface(body.text),
-          await application.incidents.readActiveIncidents(),responseLanguage
-        );
-        await application.messages.write({
-          messageId: randomUUID(),sessionId: found.sessionId,role: "user",
-          text: body.text,outcome,language: responseLanguage,
-          detectedLanguage: classification.language,overrideLanguage,
-          receivedAt: now,firstTokenAt: null,completedAt: now
-        });
-        const messageId = randomUUID();
-        await application.messages.write({
-          messageId,sessionId: found.sessionId,role: "assistant",
-          text,outcome,language: responseLanguage,
-          detectedLanguage: classification.language,overrideLanguage,
-          receivedAt: now,firstTokenAt: null,completedAt: now
-        });
-        const opened = escalationBeforeResponse === null ? null
-          : await openEscalatedCase(
-            application,found,responseLanguage,escalationBeforeResponse.predicate,now
-          );
-        return reply.send({
-          message_id: messageId,outcome,text,...openedCaseReceipt(opened,responseLanguage)
         });
       }
       const escalationBeforeAnswer = escalationBeforeResponse;
@@ -704,13 +574,6 @@ export function installSupportRoutes(
           firstTokenAt: null,
           completedAt: now
         });
-        if (classification.outcome === "REFUSE_INJECTION"
-          && application.sessions.finalizeInjectionLock !== undefined) {
-          await application.sessions.finalizeInjectionLock({
-            sessionId: found.sessionId,
-            lockAfterInjections: state.snapshot.values.supportLockAfterInjections
-          });
-        }
         if (escalationBeforeAnswer !== null) {
           await openEscalatedCase(
             application,found,responseLanguage,escalationBeforeAnswer.predicate,now
@@ -729,6 +592,9 @@ export function installSupportRoutes(
           detectedLanguage: classification.language,
           overrideLanguage,
           modelRef: state.snapshot.values.supportModelRef,
+          kbVersion: found.kbVersion,
+          ...(knowledgeSnapshot === undefined ? {} : { snapshot: knowledgeSnapshot }),
+          signedIn: found.identityOwnerRef !== null,
           receivedAt: now
         });
         const escalationAfterAnswer = escalationBeforeAnswer ?? evaluateEscalation({
@@ -749,6 +615,8 @@ export function installSupportRoutes(
           outcome: result.outcome,
           text: result.text,
           can_escalate: result.canEscalate,
+          sources: result.sources ?? Object.freeze([]),
+          actions: result.actions ?? Object.freeze([]),
           ...openedCaseReceipt(opened,responseLanguage)
         });
       }
@@ -784,6 +652,7 @@ export function installSupportRoutes(
       if (found.shreddedAt !== undefined && found.shreddedAt !== null) {
         return shredded(reply,found.language);
       }
+      if (found.state === "LOCKED") return rateLimited(reply,found.language);
       const ratings = await application.sessions.rateMessage({
         sessionId: found.sessionId,tokenSha256,messageId: request.params.id,rating: body.rating,
         at: (application.clock ?? (() => new Date()))()
@@ -818,6 +687,7 @@ export function installSupportRoutes(
       if (found.shreddedAt !== undefined && found.shreddedAt !== null) {
         return shredded(reply,found.language);
       }
+      if (found.state === "LOCKED") return rateLimited(reply,found.language);
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Readonly<Record<string,unknown>> : {};
       const language = body.language === undefined ? found.language : languageFrom(body.language);

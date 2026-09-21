@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_FIX38",
+  "attempt": 1,
+  "verdict": "FIXTURE_REWORK_REQUIRED",
+  "completedBeforeFailure": [
+    "old helper reproduced backward movement or footer failure",
+    "corrected four-turn row23 preserved already-contained footer"
+  ],
+  "failure": {
+    "control": "genuinely below-pane footer scrolls forward into painted containment",
+    "expected": "SCROLLED_FORWARD",
+    "actual": "PRESERVED_ALREADY_CONTAINED",
+    "cause": "fixture pane constraint did not produce a below-pane footer"
+  },
+  "productIssueRevealed": false,
+  "operationalTraffic": 0,
+  "disposition": "strengthen only the inert fixture pane constraint and rerun under fresh artifact names"
+}

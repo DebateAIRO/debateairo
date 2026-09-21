@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_SESSION_TIMES_REVIEW41",
+  "ticket": "t_2c340751",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "REWORK_BOUNDED_COMPLETION_TIMESTAMP_PREDICATE",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "finding": {
+    "id": "GSTR41-R1",
+    "producerPath": ".hermes/reports/support-conversation-20260914/probes/GUIDE_SESSION_TIMES_FIX41/capture-public-guide.mjs",
+    "sourceAnchors": ["response listener lines 113-126 catches recordSessionCreationTime failure", "final success block lines 494-509 marks completed before composer validation"],
+    "impact": "A timestamp recorder failure can leave fewer than three records while the capture count predicate publishes completed=true; composition rejects only afterward.",
+    "minimumCorrection": [
+      "Reject any recorded sessionVersionFailure before success.",
+      "Validate actual sessionCreationTimesUtc with the shared exact-three validator before completed=true/checkpoint.",
+      "Add actual completion-boundary positive and fewer-record/caught-error negative proving no premature success or manifest."
+    ]
+  },
+  "retainedPass": [
+    "two-timestamp truncation removed",
+    "shared exact-three shape/ordinal/canonical-UTC/order validator",
+    "fourth timestamp rejection",
+    "real composer exact-three positive and five-session output",
+    "two/four/malformed/order/ordinal negatives",
+    "identifier-free timestamp records",
+    "exact remaining21/retained10/budgets unchanged",
+    "seven final FIX41 contract argv bindings",
+    "operator actual digest and current/stale guard",
+    "115 unique future paths absent",
+    "all unrelated REVIEW40 PASS dispositions"
+  ],
+  "traffic": {"runtime":0,"browser":0,"http":0,"process":0,"status":0,"capacity":0,"database":0,"support":0,"model":0},
+  "heavyLeaseHeld": false
+}

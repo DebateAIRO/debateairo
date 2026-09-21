@@ -1,0 +1,100 @@
+import { createHash } from "node:crypto";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
+
+const root = "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine";
+const receiptPath = `${root}/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SECURITY4-receipt.json`;
+const paths = [
+  `${root}/docs/missions/support-conversation-20260914/reviews/GUIDE_SECURITY4.md`,
+  `${root}/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_SECURITY4.md`,
+  `${root}/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY4-custody-pre.log`,
+  `${root}/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY4-dependency-custody.log`,
+  `${root}/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY4-context18.log`,
+  `${root}/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY4-focused.log`,
+  `${root}/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY4-custody-post.log`,
+  `${root}/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY4/matrix.json`,
+  `${root}/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY4/run-context-matrix.mts`,
+  `${root}/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY4/run-custody.mjs`,
+  `${root}/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY4/COMMANDS.txt`,
+  `${root}/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY4/package-receipt.mjs`,
+];
+const artifact = (path) => ({
+  path,
+  sha256: createHash("sha256").update(readFileSync(path)).digest("hex"),
+  bytes: statSync(path).size,
+});
+const result = {
+  schema: "GUIDE_SECURITY4_RECEIPT_V1",
+  node: "GUIDE_SECURITY4",
+  ticket: "t_ab6a6b83",
+  session: "/root/forgot_destination",
+  model: "gpt-5.6-sol",
+  revision: "c8784902f78ed4ba1d637d122e1f32f598415f4e",
+  base: "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  verdict: "REWORK",
+  scope: "finite three-path closed-navigation/public-context delta, generated 18-case context matrix, and two changed unit files",
+  commentsReadThrough: 1789661802,
+  usage: "UNAVAILABLE",
+  executions: [
+    {
+      id: "context18",
+      commandFile: `${root}/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY4/COMMANDS.txt`,
+      log: `${root}/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY4-context18.log`,
+      rc: 1,
+      runnerSha256: "d801ac3cd6023704280dc47c4438653da5a20ebc7464ec8a1934150521c29e90",
+      matrixPath: `${root}/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY4/matrix.json`,
+      matrixSha256: "ae7ff3ce8754a15e0ad2d7b33c45a9e70ce738263c9d8577288551b7add0d0ad",
+      expectedCount: 18,
+      observedCount: 18,
+      passed: 10,
+      failed: 8,
+      exactPrivateMarkersChecked: 79,
+      exactPrivateMarkerMatches: 0,
+    },
+    {
+      id: "changed-unit-files",
+      commandFile: `${root}/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY4/COMMANDS.txt`,
+      log: `${root}/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY4-focused.log`,
+      rc: 0,
+      testFiles: 2,
+      testsPassed: 149,
+    },
+  ],
+  findings: {
+    incorrectClosedPublicLinkAdmissions: 7,
+    supportedPublicSourceLosses: 1,
+    exactPrivateMarkerMatches: 0,
+    arbitraryUrlsObserved: 0,
+    privateDataAccessesObserved: 0,
+    capabilityExecutionsObserved: 0,
+    accountActionsObserved: 0,
+  },
+  custody: {
+    indexedInputsMatched: 66,
+    productFilesMatched: 143,
+    expectedDeletedAbsent: 3,
+    roleDefiningFilesUnchanged: 9,
+    packageObject: "85c38389b711cf1b19948670209c1b8183f04c69",
+    lockObject: "8b0f6abeb9afc8d30adcf495cba7276a65409c48",
+    workspaceObject: "8ed075ae628c4c6ea62d734907d475a1879f3ce8",
+    supportKbContentObject: "aa3f9c35ecdf59915a94d4659746bd2e21a7be99",
+    recoveryObject: "84910a104520031a5a033d902da95d6b5cfd0e37",
+    catalogObject: "eabf0ab16267d3bf452b7f9525912b4296313b73",
+    navigationResolverObject: "dc60ffd5d16b337d695303b92856a8747276cace",
+    detachedCleanExact: true,
+    primaryCleanExact: true,
+    temporaryDependencyLinksRemoved: 5,
+  },
+  limits: {
+    fullPolarityClassProven: false,
+    modelCalled: false,
+    browserUsed: false,
+    uiClicked: false,
+    liveApiCalled: false,
+    privateRecordsUsed: false,
+    accountActionExecuted: false,
+    forgotDestinationKnown: false,
+  },
+  artifacts: paths.map(artifact),
+};
+writeFileSync(receiptPath, `${JSON.stringify(result, null, 2)}\n`);
+console.log(JSON.stringify({ receiptPath, artifacts: result.artifacts.length }));

@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PRICING_CLAIM_REVIEW",
+  "ticket": "t_201482d3",
+  "revision": "b103ce27a060c48fcf5613c1bf44be53c7cb2a0c",
+  "baseRevision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "REWORK_BOUNDED_FINANCIAL_POLARITY",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_PRICING_CLAIM_REVIEW.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_PRICING_CLAIM_REVIEW.md",
+      "sha256": "03207340e80653414180293eb34306168e6a05fcaf0dedeaf431fd1eac950f99",
+      "bytes": 4854
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_REVIEW-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_REVIEW-dispositions.json",
+      "sha256": "5fd1c22dd518b7813249cab349c274fc2d3f9119febf82f9e2c95af8fade9e98",
+      "bytes": 4505
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_REVIEW-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_REVIEW-custody.json",
+      "sha256": "0b50ed19fa9825326ff5349f4c1e2e90212a3e384abaee34fb8024a50f629df7",
+      "bytes": 1517
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PRICING_CLAIM_REVIEW.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PRICING_CLAIM_REVIEW.md",
+      "sha256": "f53b2ba3674c686540cb341f4bde07ba8520dbb114aa9e090c99cf707e864a35",
+      "bytes": 3110
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "heavyLeaseHeld": false,
+  "finding": "The 96-character preceding-negation window lets an earlier negated checkout mention license a later unsupported positive payment claim, and the after-pattern rejects legitimate modal-negative limitations.",
+  "retained": [
+    "Exact observed LIVE28 unsafe answer, full44 service path and real POST accounting regression are valid.",
+    "Supported creation after sign-in and existing direct EN/RO negative limitations remain valid.",
+    "Screenshot30 complete full-answer capture remains PASS."
+  ]
+}

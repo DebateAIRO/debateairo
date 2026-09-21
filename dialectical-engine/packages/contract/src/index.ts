@@ -248,7 +248,8 @@ export const LegacyRunClaimResultSchema = z.object({
 
 export const PublicationTransitionSchema = z.object({
   state: z.enum(["PRIVATE", "PUBLISHED"]),
-  public_ref: z.uuid().nullable()
+  public_ref: z.uuid().nullable(),
+  publish_pending: z.literal(true).optional()
 }).strict();
 
 export const PublicDebateSummarySchema = z.object({
@@ -672,7 +673,6 @@ export const contractInventory = Object.freeze({
     "GET /v1/public/debates/{id}",
     "POST /v1/support/sessions",
     "GET /v1/support/sessions/{id}",
-    "POST /v1/support/sessions/{id}/consent",
     "POST /v1/support/sessions/{id}/messages",
     "POST /v1/support/messages/{id}/rating",
     "POST /v1/support/sessions/{id}/escalate",

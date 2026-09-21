@@ -1,0 +1,12 @@
+ours tests/unit/dev-auth-stack.test.ts rc=0  Tests 27 passed (27)
+ours tests/unit/dev-cli-provider-panel.test.ts rc=0  Tests 13 passed (13)
+ours tests/integration/dev-api-process.test.ts rc=1  Tests 5 failed | 4 passed (9)
+ours tests/integration/dev-database-principals.test.ts rc=1  Tests 1 failed | 15 passed (16)
+ours tests/integration/dev-provider-panel.test.ts rc=0  Tests 3 passed (3)
+ours tsc=70
+theirs tests/unit/dev-auth-stack.test.ts rc=0  Tests 16 passed (16)
+theirs tests/unit/dev-cli-provider-panel.test.ts rc=0  Tests 7 passed (7)
+theirs tests/integration/dev-api-process.test.ts rc=1  Tests 5 failed | 5 passed (10)
+theirs tests/integration/dev-database-principals.test.ts rc=0  Tests 16 passed (16)
+theirs tests/integration/dev-provider-panel.test.ts rc=1  Tests 1 failed | 3 passed (4)
+theirs tsc=76

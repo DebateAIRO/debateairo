@@ -1,0 +1,21 @@
+import { createHash } from "node:crypto";
+import { readFile,writeFile } from "node:fs/promises";
+import { validateGuideGateInput } from "../GUIDE_HARNESS_BIND17/controls.mjs";
+
+const evidence="/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence";
+const templatePath=`${evidence}/GUIDE_LIVE9-gate-template.json`;
+const capacityPath=`${evidence}/GUIDE_LIVE9-runtime-capacity.json`;
+const outputPath=`${evidence}/GUIDE_LIVE9-gate.json`;
+const expected="8a3599482aa0f2fac9941f23e43f4e0731a3f9422d82ac8f6d51728fa241b855";
+const sha256=bytes => createHash("sha256").update(bytes).digest("hex");
+const templateBytes=await readFile(templatePath);
+if (sha256(templateBytes) !== expected) throw new Error("GUIDE_LIVE9_GATE_TEMPLATE_HASH_MISMATCH");
+const template=JSON.parse(templateBytes);
+if (Object.keys(template).length !== 16 || Object.hasOwn(template,"runtimeCapacityPath") || Object.hasOwn(template,"runtimeCapacitySha256")) throw new Error("GUIDE_LIVE9_GATE_TEMPLATE_INVALID");
+const capacityBytes=await readFile(capacityPath);
+const capacitySha256=sha256(capacityBytes);
+const gate=validateGuideGateInput({ ...template,runtimeCapacityPath:capacityPath,runtimeCapacitySha256:capacitySha256 });
+if (Object.keys(gate).length !== 18 || !Object.keys(template).every(key => JSON.stringify(gate[key]) === JSON.stringify(template[key]))) throw new Error("GUIDE_LIVE9_GATE_STATIC_VALUE_MISMATCH");
+const bytes=Buffer.from(`${JSON.stringify(gate,null,2)}\n`);
+await writeFile(outputPath,bytes,{ flag:"wx",mode:0o600 });
+process.stdout.write(`${JSON.stringify({ outputPath,templateSha256:sha256(templateBytes),capacityPath,capacitySha256,gateSha256:sha256(bytes),staticKeys:16,finalKeys:18,addedKeys:["runtimeCapacityPath","runtimeCapacitySha256"] })}\n`);

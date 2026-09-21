@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FALLBACK_BINDING",
+  "ticket": "t_97987e3c",
+  "measuredRevision": "5731eb6faac25f9712f04aea029a021f6eee9352",
+  "command": [
+    "pnpm",
+    "run",
+    "support:eval"
+  ],
+  "exitCode": 1,
+  "exitMeaning": "PENDING_INDEPENDENT_QUALITY_RUBRIC",
+  "mode": "deterministic-structural",
+  "runs": [
+    {
+      "run": 1,
+      "passed": 60,
+      "applicable": 60
+    },
+    {
+      "run": 2,
+      "passed": 60,
+      "applicable": 60
+    },
+    {
+      "run": 3,
+      "passed": 60,
+      "applicable": 60
+    }
+  ],
+  "classes": {
+    "A": {
+      "passed": 20,
+      "applicable": 20
+    },
+    "B": {
+      "passed": 6,
+      "applicable": 6
+    },
+    "C": {
+      "passed": 10,
+      "applicable": 10
+    },
+    "D": {
+      "passed": 12,
+      "applicable": 12
+    },
+    "E": {
+      "passed": 6,
+      "applicable": 6
+    },
+    "F": {
+      "passed": 3,
+      "applicable": 3
+    },
+    "G": {
+      "passed": 3,
+      "applicable": 3
+    }
+  },
+  "realFirstToken": "NOT_APPLICABLE",
+  "rubric": "PENDING",
+  "log": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_FALLBACK_BINDING-eval-escalated.log",
+    "sha256": "95b16e6a777c01a2d411678781d754164593ecf6e566a008eb535812565bbdb1",
+    "bytes": 4715
+  },
+  "preservedSandboxFailure": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_FALLBACK_BINDING-eval.log",
+    "sha256": "293ad6a5c080d0205fb24a936d1428bc408d99157bb43749ed66914b4460c542",
+    "bytes": 1278
+  },
+  "measuredAt": "2026-09-17T18:55:01.055472Z"
+}

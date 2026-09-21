@@ -1,0 +1,67 @@
+{
+  "node": "GUIDE_SECURITY2_PREP",
+  "ticket": "t_ff1f3a30",
+  "session": "/root/forgot_destination",
+  "model": "gpt-5.6-sol",
+  "revision": "c34c64d4e643e404cefe96dfaf167536ae364a94",
+  "verdict": "PREPARED_NOT_EXECUTED",
+  "comments_read_through": "1789653868",
+  "matrix": {
+    "cases": 31,
+    "unique_ids": 31,
+    "exact_prior_failures": 5,
+    "deterministic_zero_answer": 25,
+    "ordinary_answer_controls": 6
+  },
+  "custody": {
+    "indexed_inputs": 18,
+    "input_mismatches": 0,
+    "reference_head_exact": true,
+    "reference_clean": true,
+    "active_author_output_inspected": false,
+    "probe_executed": false
+  },
+  "artifacts": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SECURITY2_PREP.md",
+      "sha256": "9d60bcc1b86f94715de7d9f74536eb87799ac5ae6f9ec82ae51e152ef059057e",
+      "bytes": 6893
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_SECURITY2_PREP.md",
+      "sha256": "65deafc69d010eb847cc5e3d19ba0aa080ece0f4b7f48aa34d17a5e4f4fd481c",
+      "bytes": 2997
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY2_PREP/matrix.json",
+      "sha256": "9b0438841af1dfe9b7fa6925f660a401f8c398887445ffedd8eccc9c4e18c53f",
+      "bytes": 7779
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY2_PREP/run-security2-probe.mts",
+      "sha256": "cbe8c90c6bd098df6c70c74cc2838c2a07d1237ed192d2bf0c16ad09321b9640",
+      "bytes": 7286
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY2_PREP/COMMAND.txt",
+      "sha256": "d4cd451e4df16017586b2737316e78cd4d5455f9ab7744cfe18e2e47cdd17e47",
+      "bytes": 1106
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY2_PREP-static.log",
+      "sha256": "5f25fbdbef0fda566d4188f036d190aa439d0739c5eb8e3620eb056de296834b",
+      "bytes": 212
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SECURITY2_PREP-inputs.json",
+      "sha256": "1dc5ffa4c898315c80b5c189269f2d0162950045d9463edae64ab676dfef95d6",
+      "bytes": 5078
+    }
+  ],
+  "limits": [
+    "preparation only; no PASS or REWORK verdict",
+    "runner was not executed and active author output was not inspected",
+    "later run requires verified final revision, immutable manifest, dependency preparation, and explicit heavy lease",
+    "finite EN/RO semantic matrix; no complete natural-language-class proof"
+  ]
+}

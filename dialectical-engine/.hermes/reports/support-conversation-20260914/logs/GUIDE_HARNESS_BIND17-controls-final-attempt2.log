@@ -1,0 +1,20 @@
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'afe939e27c23ff009fcdc0027496fdb926fd84dd6a580a3611b3df658627f3dc'
+- 'b4880079137a603ffde919dd1f563162d3a1f93878a369ef16dbeba5912e577d'
+
+    at file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND17/run-final-controls.mjs:169:8 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'afe939e27c23ff009fcdc0027496fdb926fd84dd6a580a3611b3df658627f3dc',
+  expected: 'b4880079137a603ffde919dd1f563162d3a1f93878a369ef16dbeba5912e577d',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v22.23.1

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_NAVFIX",
+  "ticket": "t_1369cb3c",
+  "baseRevision": "9bf56f95711d19e6405fff5db06c4ad3d606bd68",
+  "productRevision": "3d0ad7acaab0ff90bd783a6948bf99f117d74fe2",
+  "productFiles": [
+    {
+      "laneRelative": "apps/api/src/support/classify.ts",
+      "sha256": "287490d68366b96cde811c7a220e51f0da477409a44478d16bb8112014d164dd",
+      "bytes": 18519
+    },
+    {
+      "laneRelative": "apps/api/src/support/public-guide-boundary.ts",
+      "sha256": "a267aca9cfb95ec3311ff66eabf7475e443db555cad639ac6e44b272a5ea824b",
+      "bytes": 3804
+    },
+    {
+      "laneRelative": "tests/integration/support-routes.test.ts",
+      "sha256": "4e160e766d748c46ef67b07ca8224c672aaab9d710619bbc958511e214499b08",
+      "bytes": 133739
+    },
+    {
+      "laneRelative": "tests/unit/support-classify.test.ts",
+      "sha256": "d3f47078054a072b919ce7608aaa0f4d5e796666df00325b8aedaea25361f847",
+      "bytes": 62716
+    },
+    {
+      "laneRelative": "tests/unit/support-public-guide-boundary.test.ts",
+      "sha256": "0ec98f046920d4628b8c235ef0ef31b626babaa7d1bca4021ced3cdbbe53a738",
+      "bytes": 1743
+    }
+  ],
+  "unchangedCorpus": {
+    "componentSha256": "0c06363ee4409efe96807786ad96ed73e46659481f61c56e957eeb340fff3b94",
+    "reviewManifestSha256": "6df66c5c9cdecde4a6eb2f38c6da2659310581b55f3bec130451040aa4c66849"
+  }
+}

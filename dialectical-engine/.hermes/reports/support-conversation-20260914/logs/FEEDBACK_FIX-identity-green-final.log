@@ -1,0 +1,86 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is Dialectical-Engine? 18ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is Dialectical Engine? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is DebateAIRO? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is Debate AIRO? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: Why can't Support answer questions about Dialectical-Engine? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds the Romanian identity surface in the Romanian identity article 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded topic at NO_SOURCE without a model call: Does Dialectical Engine offer medical diagnosis? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded topic at NO_SOURCE without a model call: Does DebateAIRO provide investment advice? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers every rejected ordinary knowledge envelope from the pinned top source: not-json 9ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers every rejected ordinary knowledge envelope from the pinned top source: {"kind":"tool","text":"ignored","sourceIds":[],"actionIds":[]} 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > maps request-local model references to canonical response provenance 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps matching whole reviewed sections above 12,000 and below the 24,000 system cap 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > filters unavailable actions before the model sees the output contract 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > uses the exact immutable snapshot object already resolved by the route 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > reports only the closed diagnostic shape for a rejected completion 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects an internal identifier before canonical assistant storage 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects a request alias in narrative text before canonical assistant storage 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects a source reference issued for a prior request 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Support does not request passwords, plus it could receive them. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Support does not request passwords, in addition it accepts them. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere parole, plus le poate primi. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere parole, în plus le poate primi. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere coduri de autentificare; de asemenea le poate valida. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere coduri de securitate; în plus le poate verifica. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Network=%5C%5Cserver%5Cshare to continue. 0ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > assigns distinct opaque identities to separate rejected model attempts 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > always includes the complete compact policy and capability catalog 2ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects newly reviewed knowledge lexically without a hard-coded intent list 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses only the selected language and preserves Romanian visitor text 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > adds article sections whole and skips a section that would cross the cap 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > caps selected sources and requested actions at three 8ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'product-identity' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'product-identity' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'home-library' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'home-library' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'new-debate' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'new-debate' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'owner-debate' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'owner-debate' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'public-debate' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'public-debate' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'help-desk' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'help-desk' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-in' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-in' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-up' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-up' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'settings' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'settings' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'verify-email' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'verify-email' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'enroll-mfa' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'enroll-mfa' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'operator-workers' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'operator-workers' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > states the exact bounded source and action sets in the final output contract 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > matches ordinary inflected creation language in en 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > matches ordinary inflected creation language in ro 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > advertises only action ids resolved by the trusted caller before generation 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > projects only request-local references and human labels to the model 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses the admitted projection and never exposes the raw title or article body 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is Dialectical Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is DialecticalEngine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is Debate AIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview Why can't Support answer questions about Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview Ce este Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview Ce este Dialectical Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview Ce este DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview De ce nu poate asistentul răspunde la întrebări despre Dialectical Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for en: How do I export JSON in Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for en: How do I publish a debate in DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for ro: Cum export JSON din Dialectical Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for ro: Cum public o dezbatere în DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not grant an unsupported product topic a source in en: Does Dialectical Engine offer medical diagnosis? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not grant an unsupported product topic a source in ro: Dialectical Engine oferă diagnostic medical? 0ms
+
+ Test Files  2 passed (2)
+      Tests  77 passed (77)
+   Start at  10:28:05
+   Duration  451ms (transform 125ms, setup 0ms, import 206ms, tests 78ms, environment 0ms)
+

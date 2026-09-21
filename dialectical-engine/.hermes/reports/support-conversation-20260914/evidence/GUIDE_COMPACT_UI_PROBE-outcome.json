@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_COMPACT_UI_PROBE",
+  "ticket": "t_e9166486",
+  "session": "/root/preview",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "verdict": "REWORK_ZERO_SUPPORT_UI_TRANSITION_PREFLIGHT",
+  "childExitStatus": 1,
+  "retryPerformed": false,
+  "transitions": {
+    "planned": 5,
+    "passed": 3,
+    "passedSequence": [
+      {
+        "surface": "full",
+        "language": "en",
+        "result": "PASS",
+        "readyPhase": "READY"
+      },
+      {
+        "surface": "full",
+        "language": "ro",
+        "result": "PASS",
+        "readyPhase": "READY"
+      },
+      {
+        "surface": "compact",
+        "language": "ro",
+        "result": "PASS",
+        "readyPhase": "READY"
+      }
+    ],
+    "failed": {
+      "ordinal": 4,
+      "label": "route-remount full/en",
+      "code": "GUIDE_HARNESS_FULL_HYDRATION_TIMEOUT",
+      "phase": "FAILED",
+      "surface": "full",
+      "language": "en",
+      "observation": {
+        "surface": "full",
+        "language": "en",
+        "phase": "FAILED",
+        "hydrationReady": "NOT_READY",
+        "toggleCount": 0,
+        "toggleVisible": "NOT_APPLICABLE",
+        "widgetState": "NOT_APPLICABLE",
+        "ariaExpanded": "NOT_APPLICABLE",
+        "panelCount": 0,
+        "panelVisible": "NOT_APPLICABLE",
+        "compactRootCount": 0,
+        "compactRootVisible": "NOT_APPLICABLE",
+        "composerCount": 1,
+        "composerVisible": "VISIBLE",
+        "urlClass": "HELP",
+        "cookieRegionVisible": "UNKNOWN",
+        "consoleErrorCategories": {
+          "HTTP_401": 5,
+          "HTTP_404": 0,
+          "JS_OR_HYDRATION": 0,
+          "OTHER": 6
+        }
+      },
+      "hydrationTarget": "first visible EN support-language button",
+      "readinessPredicate": "some own property name starts with __reactProps$ and its value has an onClick function",
+      "timeoutMs": 30000,
+      "sourceAnchors": [
+        "GUIDE_HARNESS_BIND13/probe-zero-request-ui.mjs:70-75",
+        "GUIDE_HARNESS_BIND13/probe-zero-request-ui.mjs:145-159",
+        "GUIDE_HARNESS_BIND13/probe-zero-request-ui.mjs:177-180",
+        "GUIDE_HARNESS_BIND13/controls.mjs:132-150"
+      ],
+      "capturedDiscriminators": [
+        "surface",
+        "language",
+        "phase",
+        "hydrationReady",
+        "toggleCount",
+        "toggleVisible",
+        "widgetState",
+        "ariaExpanded",
+        "panelCount",
+        "panelVisible",
+        "compactRootCount",
+        "compactRootVisible",
+        "composerCount",
+        "composerVisible",
+        "urlClass",
+        "cookieRegionVisible",
+        "four fixed console category counts"
+      ],
+      "unavailableDiscriminators": [
+        "React internal property name or count",
+        "handler identity",
+        "public product readiness marker",
+        "raw DOM or text",
+        "arbitrary browser exception",
+        "network URL or body",
+        "historical LIVE7 state"
+      ]
+    }
+  },
+  "traffic": {
+    "actualSupportRequestsForwarded": 0,
+    "blockedBrowserAttempts": {
+      "status": 3,
+      "createSession": 0,
+      "sendMessage": 0,
+      "otherSupport": 3
+    },
+    "syntheticResponses": 0,
+    "capacityReads": 0,
+    "supportQuestions": 0
+  },
+  "fixedConsoleCategories": {
+    "HTTP_401": 5,
+    "HTTP_404": 0,
+    "JS_OR_HYDRATION": 0,
+    "OTHER": 6
+  },
+  "privateControls": [
+    {
+      "surface": "full",
+      "passed": true
+    },
+    {
+      "surface": "full",
+      "passed": true
+    },
+    {
+      "surface": "compact",
+      "passed": true
+    }
+  ],
+  "probeLogBytes": 0,
+  "runtime": {
+    "preflightObservedAt": "2026-09-20T14:43:13.768Z",
+    "postflightObservedAt": "2026-09-20T14:44:38.132Z",
+    "pid": 77769,
+    "ppid": 1,
+    "pgid": 77769,
+    "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "command": "pnpm dev:auth:up",
+    "previewListenerCount": 12,
+    "unrelatedListenerCount": 9,
+    "unrelatedPreserved": true,
+    "ordinarySystemTls": {
+      "url": "https://localhost:3100/help",
+      "customCa": false,
+      "insecure": false,
+      "status": 200
+    }
+  },
+  "causeAttribution": "UNDETERMINED",
+  "limitation": "The fixed observation proves a visible full composer on /help while the reviewed React-handler hydration precondition remained NOT_READY after remount. It does not establish whether application hydration, the internal handler marker, or another harness/runtime condition caused that mismatch.",
+  "boundedNextScope": "Review only the full-surface remount readiness predicate and its current producer contract. If corrected, retain the compact one-click contract, fixed projection, traffic guard, five-transition order, and all prior response/capacity rules; then obtain separate review before one new zero-Support probe. Do not patch product behavior or run Support traffic from this evidence alone.",
+  "historicalLive7CauseRelabelled": false
+}

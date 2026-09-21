@@ -1,0 +1,8 @@
+{
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "templateSha256": "54c2a6adf12bad3df6995170cf7ffa053c0e9a24650ce0dd67bb0897cf501df7",
+  "templateKeys": 16,
+  "controls": 136,
+  "harnessSha256": "fa91eede37beb7ac5f51366a9d4c7e89d62dc72c1033810d868bd5d2bf0c354c",
+  "productRoot": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine"
+}

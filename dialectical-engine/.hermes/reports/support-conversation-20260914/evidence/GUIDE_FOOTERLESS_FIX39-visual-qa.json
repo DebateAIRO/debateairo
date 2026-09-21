@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FOOTERLESS_FIX39",
+  "verdict": "PASS_VISUAL_QA",
+  "observations": [
+    {
+      "artifact": "GUIDE_FOOTERLESS_FIX39-final2-full-ro-short-original-pane-start.png",
+      "result": "PASS",
+      "observed": "Exact saved Romanian refusal body is fully painted in the original full pane; no footer is present."
+    },
+    {
+      "artifact": "GUIDE_FOOTERLESS_FIX39-final2-full-ro-short-original-pane-end.png",
+      "result": "PASS",
+      "observed": "Body-end capture intentionally matches the contained start capture for the short footerless reply."
+    },
+    {
+      "artifact": "GUIDE_FOOTERLESS_FIX39-final2-compact-ro-short-original-pane-start.png",
+      "result": "PASS",
+      "observed": "Exact Romanian refusal body is fully painted on the compact surface."
+    },
+    {
+      "artifact": "GUIDE_FOOTERLESS_FIX39-final2-full-en-long-original-pane-start.png",
+      "result": "PASS",
+      "observed": "Long footerless evidence visibly starts at public line 1 in the original pane."
+    },
+    {
+      "artifact": "GUIDE_FOOTERLESS_FIX39-final2-full-en-long-original-pane-end.png",
+      "result": "PASS",
+      "observed": "Long footerless evidence visibly ends at public line 60 after forward-only scrolling."
+    },
+    {
+      "artifact": "GUIDE_FOOTERLESS_FIX39-final2-full-en-long-complete-expanded.png",
+      "result": "PASS",
+      "observed": "All public lines 1 through 60 are painted in the separately labeled expanded evidence."
+    }
+  ],
+  "supersededFixtureFailure": "The attempt1 expanded image was clipped by a synthetic !important height override and is retained as fixture-only failure evidence.",
+  "qualification": "Offline production-markup/CSS fixture; no fresh Support response."
+}

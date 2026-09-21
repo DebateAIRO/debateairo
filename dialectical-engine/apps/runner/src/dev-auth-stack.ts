@@ -36,15 +36,16 @@ import {
 } from "./dev-provider-panel.js";
 import { loadModelConfig, ModelConfigShapeError, type ModelConfig } from "@debateai/model-config";
 import { readProviderKeys } from "./dev-provider-keys.js";
-import {
-  HERMES_SUPPORT_PORT,
-  startHermesSupportRelay
-} from "../../../acceptance/hermes-relay.js";
+import { startHermesSupportRelay } from "../../../acceptance/hermes-relay.js";
 import type { DevelopmentDeploymentRegisterMachineReceiptV1 } from "./dev-deployment-register.js";
 import {
   createDevTlsReadinessOperations,
   startAttestedDevTlsFrontDoor
 } from "../../../deploy/dev-auth/tls-front-door.mjs";
+import {
+  DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  type DevelopmentAuthStackProfile
+} from "./dev-auth-stack-profile.js";
 
 type Stoppable = Readonly<{ stop(): Promise<void> }>;
 type DataPlaneHandle = Stoppable & Readonly<{
@@ -69,6 +70,7 @@ export type DevelopmentApiProviderAvailabilityOperations = Readonly<{
 }>;
 
 export type DevelopmentAuthStackOperations = Readonly<{
+  profile?: DevelopmentAuthStackProfile;
   generateContract(): Promise<void>;
   checkModelConfig(): Promise<void>;
   isPublicPortOccupied(): Promise<boolean>;
@@ -95,7 +97,7 @@ export type DevelopmentAuthStackExit =
 
 export type DevelopmentAuthStack = Readonly<{
   receipt: Readonly<{
-    origin: "https://localhost:3000";
+    origin: string;
     dataPlane: "ATTESTED";
     mail: "CAPTURED";
     api: "DENY_DEFAULT";
@@ -152,6 +154,7 @@ async function stopOwned(resources: readonly Stoppable[]): Promise<void> {
 export async function startDevelopmentAuthStack(
   operations: DevelopmentAuthStackOperations
 ): Promise<DevelopmentAuthStack> {
+  const profile = operations.profile ?? DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE;
   await fixedStage(
     "DEV_AUTH_STACK_MODEL_CONFIG_INVALID",
     () => operations.checkModelConfig()
@@ -215,7 +218,7 @@ export async function startDevelopmentAuthStack(
     let stopPromise: Promise<void> | undefined;
     return Object.freeze({
       receipt: Object.freeze({
-        origin: "https://localhost:3000",
+        origin: profile.publicOrigin,
         dataPlane: "ATTESTED",
         mail: "CAPTURED",
         api: "DENY_DEFAULT",
@@ -259,40 +262,57 @@ export async function superviseDevelopmentAuthStack(
   }
 }
 
+const DEFAULT_DEVELOPMENT_API_PROVIDER_AVAILABILITY_OPERATIONS:
+DevelopmentApiProviderAvailabilityOperations = Object.freeze({
+  readProviderKeys,
+  async probe(input) {
+    const response = await fetch(`${input.baseUrl.replace(/\/$/u, "")}/chat/completions`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${input.keyValue}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        model: input.model,
+        messages: [{ role: "user", content: "Reply with OK." }],
+        max_tokens: 64
+      })
+    });
+    if (!response.ok) throw new TypeError("DEV_PROVIDER_SLOT_PROBE_FAILED");
+    const body = await response.json() as Readonly<{ model?: unknown }>;
+    if (typeof body.model !== "string") throw new TypeError("DEV_PROVIDER_SLOT_PROBE_FAILED");
+    return Object.freeze({ model: body.model });
+  },
+  warning: (line) => console.warn(line)
+});
+
 export function createDevelopmentAuthStackOperations(
   repositoryRoot: string,
   commandEnvironment: Readonly<Record<string, string>>,
-  apiProviderOperations: DevelopmentApiProviderAvailabilityOperations = Object.freeze({
-    readProviderKeys,
-    async probe(input) {
-      const response = await fetch(`${input.baseUrl.replace(/\/$/u, "")}/chat/completions`, {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${input.keyValue}`,
-          "content-type": "application/json"
-        },
-        body: JSON.stringify({
-          model: input.model,
-          messages: [{ role: "user", content: "Reply with OK." }],
-          max_tokens: 64
-        })
-      });
-      if (!response.ok) throw new TypeError("DEV_PROVIDER_SLOT_PROBE_FAILED");
-      const body = await response.json() as Readonly<{ model?: unknown }>;
-      if (typeof body.model !== "string") throw new TypeError("DEV_PROVIDER_SLOT_PROBE_FAILED");
-      return Object.freeze({ model: body.model });
-    },
-    warning: (line) => console.warn(line)
-  })
+  profileOrApiProviderOperations: DevelopmentAuthStackProfile
+    | DevelopmentApiProviderAvailabilityOperations = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  explicitApiProviderOperations: DevelopmentApiProviderAvailabilityOperations =
+    DEFAULT_DEVELOPMENT_API_PROVIDER_AVAILABILITY_OPERATIONS
 ): DevelopmentAuthStackOperations {
+  const profile = "name" in profileOrApiProviderOperations
+    ? profileOrApiProviderOperations
+    : DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE;
+  const apiProviderOperations = "name" in profileOrApiProviderOperations
+    ? explicitApiProviderOperations
+    : profileOrApiProviderOperations;
   const execFileAsync = promisify(execFile);
   const hatchetOperations = createDevelopmentHatchetTokenOperations(
     repositoryRoot,
-    commandEnvironment
+    commandEnvironment,
+    profile
   );
-  const tlsOperations = createDevTlsReadinessOperations(repositoryRoot);
+  const tlsOperations = createDevTlsReadinessOperations(repositoryRoot, {
+    publicPort: profile.publicPort,
+    uiPort: profile.uiPort
+  });
   let checkedModelConfig: ModelConfig | undefined;
   return Object.freeze({
+    profile,
     async generateContract() {
       await execFileAsync(
         commandEnvironment.PNPM_EXECUTABLE?.trim() || "pnpm",
@@ -320,14 +340,20 @@ export function createDevelopmentAuthStackOperations(
     isPublicPortOccupied: () => tlsOperations.isPublicPortOccupied(),
     async startProviderPanel() {
       const config = checkedModelConfig ?? loadModelConfig(repositoryRoot);
-      const cliHandle = await startDevelopmentCliProviderPanel(config);
+      const cliHandle = await startDevelopmentCliProviderPanel(
+        config,
+        undefined,
+        apiProviderOperations.warning,
+        profile
+      );
       try {
         const panel = await resolveDevelopmentApiProviderSlots(
           config,
           cliHandle.panel,
           await apiProviderOperations.readProviderKeys(repositoryRoot),
           apiProviderOperations.probe,
-          apiProviderOperations.warning
+          apiProviderOperations.warning,
+          profile
         );
         return Object.freeze({
           panel,
@@ -341,8 +367,11 @@ export function createDevelopmentAuthStackOperations(
     },
     async startSupportModelRelay() {
       const relay = await startHermesSupportRelay({
-        port: HERMES_SUPPORT_PORT,
-        timeoutMs: DEVELOPMENT_CLI_CALL_TIMEOUT_MS
+        port: profile.supportModelPort,
+        timeoutMs: DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
+        ...(profile.name === "support-preview"
+          ? { developmentStackProfile: "support-preview" as const }
+          : {})
       });
       return Object.freeze({
         targetJson: relay.targetJson,
@@ -354,13 +383,15 @@ export function createDevelopmentAuthStackOperations(
       createDevelopmentAuthDataPlaneOperations(
         repositoryRoot,
         commandEnvironment,
-        providerPanel
+        providerPanel,
+        profile
       )
     ),
     async provisionHatchetToken() {
       await provisionDevelopmentHatchetToken({
         repositoryRoot,
-        operations: hatchetOperations
+        operations: hatchetOperations,
+        profile
       });
     },
     async assembleApiEnvironment(
@@ -374,23 +405,27 @@ export function createDevelopmentAuthStackOperations(
         providerPanel,
         registerReceipt,
         supportModelTarget,
+        profile,
         ...(heldConfiguredProviderSets === undefined ? {} : { heldConfiguredProviderSets })
       });
     },
     startApi: () => startDevelopmentApiProcess({
       repositoryRoot,
       commandEnvironment,
-      operations: createDevelopmentApiProcessOperations(repositoryRoot)
+      operations: createDevelopmentApiProcessOperations(repositoryRoot, profile),
+      profile
     }),
     startRunner: () => startDevelopmentRunnerProcess({
       repositoryRoot,
       commandEnvironment,
-      operations: createDevelopmentRunnerProcessOperations(repositoryRoot)
+      operations: createDevelopmentRunnerProcessOperations(repositoryRoot, profile),
+      profile
     }),
     startUi: () => startDevelopmentUiProcess({
       repositoryRoot,
       commandEnvironment,
-      operations: createDevelopmentUiProcessOperations(repositoryRoot)
+      operations: createDevelopmentUiProcessOperations(repositoryRoot, profile),
+      profile
     }),
     startTls: () => startAttestedDevTlsFrontDoor({ operations: tlsOperations })
   });

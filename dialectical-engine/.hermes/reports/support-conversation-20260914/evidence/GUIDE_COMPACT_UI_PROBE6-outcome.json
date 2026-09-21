@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_COMPACT_UI_PROBE6",
+  "ticket": "t_ee28b8d7",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "verdict": "PASS_ZERO_SUPPORT_UI_TRANSITIONS",
+  "childExitStatus": 0,
+  "attempts": 1,
+  "completedTransitions": [
+    { "surface": "full", "language": "en", "result": "PASS" },
+    { "surface": "full", "language": "ro", "result": "PASS" },
+    { "surface": "compact", "language": "ro", "result": "PASS" },
+    { "surface": "full", "language": "en", "result": "PASS" },
+    { "surface": "compact", "language": "en", "result": "PASS" }
+  ],
+  "observations": 12,
+  "postReadyStages": {
+    "records": 40,
+    "expectedPerTransition": 8,
+    "allEnteredAndPassed": true,
+    "stages": [
+      "COOKIE_SETTLING",
+      "LOCALE_SELECTION",
+      "PRIVATE_CONTROL_CHECK",
+      "TRANSITION_COMPLETION"
+    ]
+  },
+  "privateControlChecks": { "total": 5, "passed": 5 },
+  "traffic": {
+    "actualSupportRequestsForwarded": 0,
+    "guardedAttempts": {
+      "status": 3,
+      "pageCaseListRead": 3,
+      "createSession": 0,
+      "sendMessage": 0,
+      "otherSupport": 0
+    }
+  },
+  "consoleErrorCategories": {
+    "HTTP_401": 7,
+    "HTTP_404": 0,
+    "JS_OR_HYDRATION": 0,
+    "OTHER": 6
+  },
+  "runtimeAfterProbe": {
+    "pid": 77769,
+    "ppid": 1,
+    "pgid": 77769,
+    "previewListeners": 12,
+    "unrelatedListenersPreserved": true,
+    "ordinaryTlsHelpStatus": 200
+  },
+  "limits": [
+    "This proves public opening and locale transitions under the all-Support-aborted guard.",
+    "It does not prove Support backend response quality or current quota.",
+    "No capacity read or Support question was performed.",
+    "Forgot remains unresolved and actionless."
+  ]
+}

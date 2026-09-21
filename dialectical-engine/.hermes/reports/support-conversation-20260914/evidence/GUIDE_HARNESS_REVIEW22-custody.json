@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW22",
+  "ticket": "t_0be61e3a",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "freeze": "2ba7774728cced7835c455c878fb0abe8944fb0f",
+  "fix22Receipt": {"sha256":"4e2485b5654266832f33089884ced63b31886974678210e6934c6a3dce72b3d5"},
+  "fix22Consumption": {"sha256":"289e5a73b0db89a9e5c7b3bb2dfe15ec1f1386970af83691904077a886899510"},
+  "manifest": {"artifacts":19,"verified":19,"mismatches":0},
+  "indexedInputs": {"inputs":53,"verified":53,"mismatches":0},
+  "actualCommandContract": {"path":".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX22-command-contract.json","sha256":"7ecae9657b4c3c55763b94b89e538716ce023b5d9a47941d40a9e65b9ec81c63"},
+  "wrongReferencedContract": {"path":".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND21-command-contract.json","sha256":"571bb52477c1ff0826b364109ef61666b69e00e0bde8aba1ae926bebb8ffef98"},
+  "ownerContract": {"path":".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX22-owner-capacity-contract.json","sha256":"df5580ba8dd47e354a74aa04b8308d7b626564bd116076b682b1f6d0037d03fc"},
+  "reviewMode": "STATIC_READ_ONLY",
+  "traffic": {"runtime":0,"browser":0,"http":0,"status":0,"capacity":0,"database":0,"support":0,"model":0}
+}

@@ -1,0 +1,140 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > redacts an ordinary labelled credential while retaining safe intent: My password is hunter2 8ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > redacts an ordinary labelled credential while retaining safe intent: password: orchard-pond-9 5ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > redacts an ordinary labelled credential while retaining safe intent: Parola mea este vanilie7 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > redacts an ordinary labelled credential while retaining safe intent: parola mea: lac-albastru-4 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > redacts every declared labelled credential class before transit: Passwordul meu este inert-stejar-7 1ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > redacts every declared labelled credential class before transit: My passcode is inert-maple-7 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > redacts every declared labelled credential class before transit: OTP is INERTABC 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > redacts every declared labelled credential class before transit: Reset token is inert-reset-7 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > redacts every declared labelled credential class before transit: My pass​word is inert-birch-7 1ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > redacts every declared labelled credential class before transit: Paro​la mea este inert-fag-7 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > redacts every declared labelled credential class before transit: Codurile de recuperare sunt INERTRECOVERY 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > redacts every declared labelled credential class before transit: Datele de autentificare sunt INERTAUTH 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > redacts every declared labelled credential class before transit: My password is "inert horse battery". 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > redacts every declared labelled credential class before transit: Parola mea este „inert cal albastru”. 7ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > redacts every declared labelled credential class before transit: Recovery code is inert maple river; keep it private. 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > redacts every declared labelled credential class before transit: Codul de securitate este inert arțar râu, păstrează-l privat. 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > redacts every declared labelled credential class before transit: My ｐａｓｓｗｏｒｄ is inert compatibility value; keep it private. 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > removes the complete supplied value through a safe delimiter or end: My recovery code is "inert amber fern 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > removes the complete supplied value through a safe delimiter or end: My password is amber birch cedar dogwood elm fir grove hazel; keep it private. 1ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > removes the complete supplied value through a safe delimiter or end: My reset token is inert.alpha-beta/gamma; keep it private. 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > removes the complete supplied value through a safe delimiter or end: My reset token is quartz and ember; keep it private. 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > removes the complete supplied value through a safe delimiter or end: My reset token is quartz, and ember; keep it private. 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > removes the complete supplied value through a safe delimiter or end: My reset token is quartz but ember; keep it private. 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > removes the complete supplied value through a safe delimiter or end: Codul de verificare este cuarț și chihlimbar; păstrează-l privat. 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > leaves no coordinated supplied-value fragment at any redaction sink: My reset token is quartz and ember; keep it private. 1ms
+ × tests/unit/support-redaction.test.ts > CP1 Support credential redaction > leaves no coordinated supplied-value fragment at any redaction sink: My reset token is quartz, and ember; keep it private. 3ms
+   → expected 'My reset token is [REDACTED_SECRET_LI…' not to contain 'ember'
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > leaves no coordinated supplied-value fragment at any redaction sink: My reset token is quartz but ember; keep it private. 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > leaves no coordinated supplied-value fragment at any redaction sink: Codul de verificare este cuarț și chihlimbar; păstrează-l privat. 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > stops an unquoted value at a declared coordinator without consuming benign prose 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > preserves benign guidance, dates, times, and public error IDs: I forgot my password 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > preserves benign guidance, dates, times, and public error IDs: Am uitat parola 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > preserves benign guidance, dates, times, and public error IDs: My password is unavailable; show ordinary recovery guidance. 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > preserves benign guidance, dates, times, and public error IDs: Parola mea este indisponibilă; arată ghidul obișnuit de recuperare. 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > preserves benign guidance, dates, times, and public error IDs: Try again at 14:30 on 2026-09-14 with public error SUPPORT_MODEL_UNAVAILABLE. 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > keeps a supplied credential out of canonical seal, persistence, and model transit: My pass​word is inert-birch-7 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > keeps a supplied credential out of canonical seal, persistence, and model transit: OTP is INERTABC 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > keeps a supplied credential out of canonical seal, persistence, and model transit: My password is "inert horse battery". 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > keeps a supplied credential out of canonical seal, persistence, and model transit: Parola mea este „inert cal albastru”. 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > screens a legacy labelled credential when an existing encrypted message is read 0ms
+ ✓ tests/unit/support-redaction.test.ts > CP1 Support credential redaction > keeps a legacy labelled credential out of the case snapshot and advisory transit 2ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled password value back to its original source span 8ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled password value back to its original source span 5ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled passcode value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled otp value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled totp value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled mfa value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled authenticator value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled recovery-code value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled verification-code value back to its original source span 1ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled security-code value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled reset-token value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled credentials value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps original spans across removed control characters: My pass​word is inert-birch-7 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps original spans across removed control characters: Paro​la mea este inert-fag-7 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps original spans across removed control characters: Codul de veri⁠ficare este INERTCODE 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a complete bounded multiword supplied value: My password is "inert horse battery". 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a complete bounded multiword supplied value: Parola mea este „inert cal albastru”. 7ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a complete bounded multiword supplied value: My recovery code is inert horse battery; keep it private. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a complete bounded multiword supplied value: Codul de verificare este inert cal albastru, păstrează-l privat. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > owns the complete supplied-value span without retaining a suffix: My recovery code is "inert amber fern 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > owns the complete supplied-value span without retaining a suffix: My password is amber birch cedar dogwood elm fir grove hazel; keep it private. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > owns the complete supplied-value span without retaining a suffix: My reset token is inert.alpha-beta/gamma; keep it private. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > owns the complete supplied-value span without retaining a suffix: My reset token is quartz and ember; keep it private. 0ms
+ × tests/unit/support-credentials.test.ts > Support credential lexical facts > owns the complete supplied-value span without retaining a suffix: My reset token is quartz, and ember; keep it private. 2ms
+   → expected [ 'quartz' ] to include 'quartz, and ember'
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > owns the complete supplied-value span without retaining a suffix: My reset token is quartz but ember; keep it private. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > owns the complete supplied-value span without retaining a suffix: Codul de verificare este cuarț și chihlimbar; păstrează-l privat. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > stops a supplied value only at an independent subject-led clause: My password is inert horse battery and I need help. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > stops a supplied value only at an independent subject-led clause: My password is inert horse battery, and I need help. 1ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > stops a supplied value only at an independent subject-led clause: Parola mea este inert cal albastru și am nevoie de ajutor. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > stops a supplied value only at an independent subject-led clause: Parola mea este inert cal albastru, păstrează-l privat. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > does not classify a benign unavailable state as a supplied value: My password is unavailable; show ordinary recovery guidance. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > does not classify a benign unavailable state as a supplied value: Parola mea este indisponibilă; arată ghidul obișnuit de recuperare. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > does not carry negation into a later coordinated operation: Support does not receive passwords and also asks you to send them here. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > does not carry negation into a later coordinated operation: Support does not receive passwords, so send them here. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > does not carry negation into a later coordinated operation: Asistența nu primește parole și de asemenea îți cere să le trimiți aici. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > does not carry negation into a later coordinated operation: Asistența nu primește parole, așa că trimite-le aici. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > does not carry negation into a later coordinated operation: Support does not receive passwords while it asks you to send them here. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > does not carry negation into a later coordinated operation: Support does not receive passwords and generally asks you to send them here. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Support does not receive passwords and may receive them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Support cannot accept security codes, but it could validate them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Asistența nu primește parole și poate primi acestea. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Asistența nu verifică un cod de securitate, dar ar putea să îl primească. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Support never asks for OTP codes, plus it accepts them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Support does not request passwords, plus it could receive them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Support does not request passwords, in addition it accepts them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Support does not request passwords, additionally it accepts them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Support does not request passwords, moreover it accepts them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Support does not request passwords, furthermore it accepts them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Asistența nu cere parole, plus le poate primi. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Asistența nu cere parole, în plus le poate primi. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Asistența nu cere parole, de asemenea le poate primi. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps each additive operation group independently negated: Support does not request passwords, plus it does not accept them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps each additive operation group independently negated: Support does not request passwords, in addition it never receives them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps each additive operation group independently negated: Support does not request passwords, additionally it cannot validate them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps each additive operation group independently negated: Support does not request passwords, moreover it does not use them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps each additive operation group independently negated: Asistența nu cere parole, în plus nu le primește. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps each additive operation group independently negated: Asistența nu cere parole, de asemenea nu le verifică. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > emits only closed lexical facts and numeric spans 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/support-credentials.test.ts > Support credential lexical facts > owns the complete supplied-value span without retaining a suffix: My reset token is quartz, and ember; keep it private.
+AssertionError: expected [ 'quartz' ] to include 'quartz, and ember'
+ ❯ tests/unit/support-credentials.test.ts:61:8
+     59|     const facts = analyzeSupportCredentialText(text);
+     60|     expect(facts.credentialValueSpans.map(({ start,end }) => text.slic…
+     61|       .toContain(secret);
+       |        ^
+     62|   });
+     63|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/unit/support-redaction.test.ts > CP1 Support credential redaction > leaves no coordinated supplied-value fragment at any redaction sink: My reset token is quartz, and ember; keep it private.
+AssertionError: expected 'My reset token is [REDACTED_SECRET_LI…' not to contain 'ember'
+
+Expected: "ember"
+Received: "My reset token is [REDACTED_SECRET_LIKE], and ember; keep it private."
+
+ ❯ tests/unit/support-redaction.test.ts:89:59
+     87|     observed.push(stored.text);
+     88|     for (const value of observed) {
+     89|       for (const fragment of fragments) expect(value).not.toContain(fr…
+       |                                                           ^
+     90|       expect(value).toContain("[REDACTED_SECRET_LIKE]");
+     91|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  2 failed | 96 passed (98)
+   Start at  08:34:36
+   Duration  309ms (transform 46ms, setup 0ms, import 74ms, tests 65ms, environment 0ms)
+

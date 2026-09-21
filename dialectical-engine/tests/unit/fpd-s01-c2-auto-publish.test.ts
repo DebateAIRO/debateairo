@@ -1,0 +1,503 @@
+import { describe, expect, it } from "vitest";
+import { PublicationTransitionSchema, type Answer } from "@debateai/contract";
+import type { PostgresPublicationRepository } from "@debateai/db";
+import { buildApi, SESSION_COOKIE_NAME } from "../../apps/api/src/index.js";
+import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
+
+const RUN_ID = "10000000-0000-4000-8000-000000000001";
+const USER_ID = "10000000-0000-4000-8000-000000000002";
+const OWNER_REF = "10000000-0000-4000-8000-000000000003";
+const SESSION_ID = "10000000-0000-4000-8000-000000000004";
+const ANSWER_ID = "10000000-0000-4000-8000-000000000005";
+
+function answer(terminal: Answer["terminal"] = "SERVED"): Answer {
+  return {
+    answer_id: "answer-c2",
+    answer_version: 1,
+    run_ref: RUN_ID,
+    terminal,
+    question_line: "Should a public square need a gatekeeper?",
+    verdict_state: "SUPPORTED",
+    verdict_unavailable: null,
+    confidence_band: "high",
+    band_ceiling: {
+      label: "high",
+      basis: { LOOKED_UP: 1, RAN: 0, REASONING: 0 },
+      register_row_key: "c2-band",
+      register_version: 1,
+      source_ref: "c2-source",
+      lift_path: "none"
+    },
+    answer_form: null,
+    serve_state: "COMPOSED",
+    composed_text: [{
+      segment_id: "segment-c2",
+      text: "A public answer.",
+      load_bearing: true,
+      served_number_refs: []
+    }],
+    number_slots: [],
+    abstention: null,
+    shadow_suppressions: [],
+    badges: [],
+    residual_objections: [],
+    value_hinges: [],
+    condition_marks: [],
+    condition_mark_records: [],
+    reversal_point: "New evidence",
+    builds_on_previous: { value: false, answer_ref: null },
+    memory_disclosure: null,
+    risk_tier: "standard",
+    tier_source: "ASKER",
+    tier_provenance_ref: "c2-tier",
+    cost_envelope: {
+      basis: {},
+      state: "WITHIN",
+      consumed_model_attempts: 1,
+      protected_core: "NEVER_SKIPPABLE"
+    },
+    composition_budget_tier: "low",
+    conformance_outcome: "PASS",
+    ledger_digest_handle: "c2-ledger",
+    inspection_handle: "c2-inspection",
+    as_of: "2026-09-20T12:00:00.000Z",
+    staleness_state: "FRESH",
+    relevant_as_of: "2026-09-20T12:00:00.000Z",
+    nodes: [],
+    edges: []
+  } as Answer;
+}
+
+type WorkRow = Readonly<{
+  runId: string;
+  userId: string;
+  ownerRef: string;
+  reason: string;
+}>;
+
+function harness() {
+  const state = {
+    bound: true,
+    pseudonym: "Public Thinker",
+    pseudonymThrows: false,
+    cipherFails: false,
+    prepareReturnsFalse: false,
+    publishOnPrepareFailure: false,
+    transitionReturnsNull: false,
+    publishOnTransitionNull: false,
+    transitionThrows: false,
+    visibility: { state: "PRIVATE" as "PRIVATE" | "PUBLISHED", publicRef: null as string | null },
+    work: undefined as WorkRow | undefined,
+    preflightCalls: 0,
+    systemPublishCalls: 0,
+    audits: [] as string[],
+    prepared: new Set<string>(),
+    calls: [] as string[],
+    encrypted: [] as unknown[]
+  };
+  const repository = {
+    async preflightGrant() {
+      state.preflightCalls += 1;
+      return true;
+    },
+    async runIsFreePublicBound() {
+      state.calls.push("bound");
+      return state.bound;
+    },
+    async readAuthorPseudonym() {
+      state.calls.push("pseudonym");
+      if (state.pseudonymThrows) throw new TypeError("TRANSIENT_DB");
+      return state.pseudonym;
+    },
+    async readOwnedVisibility() {
+      state.calls.push("visibility");
+      return {
+        ...state.visibility,
+        publishPending: state.work !== undefined
+      };
+    },
+    async prepareSystemKeyProvision(input: { publicationRef: string }) {
+      state.calls.push("prepare");
+      if (state.prepareReturnsFalse) {
+        if (state.publishOnPrepareFailure) {
+          state.visibility = { state: "PUBLISHED", publicRef: "concurrent-publication" };
+        }
+        return false;
+      }
+      state.prepared.add(input.publicationRef);
+      return true;
+    },
+    async abandonSystemKeyProvision(publicationRef: string) {
+      return state.prepared.delete(publicationRef);
+    },
+    async systemPublish(input: { publicationRef: string }) {
+      state.calls.push("publish");
+      state.systemPublishCalls += 1;
+      if (state.transitionThrows) throw new TypeError("SYSTEM_PUBLICATION_KEY_PROVISION_INTENT_INCOMPLETE");
+      if (state.transitionReturnsNull) {
+        if (state.publishOnTransitionNull) {
+          state.visibility = { state: "PUBLISHED", publicRef: "concurrent-publication" };
+        }
+        return null;
+      }
+      state.visibility = { state: "PUBLISHED", publicRef: input.publicationRef };
+      state.prepared.delete(input.publicationRef);
+      return input.publicationRef;
+    },
+    async auditSystemPublicationAttempt(
+      _auditId: string,
+      _runId: string,
+      reason: string
+    ) {
+      state.audits.push(reason);
+      return true;
+    },
+    async ensureAutoPublishWork(runId: string, userId: string, ownerRef: string) {
+      state.calls.push("ensure");
+      state.work ??= {
+        runId, userId, ownerRef, reason: "AUTO_PUBLISH_TRANSITION_NULL"
+      };
+      return true;
+    },
+    async upsertAutoPublishWork(
+      runId: string,
+      userId: string,
+      ownerRef: string,
+      reason: string
+    ) {
+      state.calls.push("upsert");
+      state.work = { runId, userId, ownerRef, reason };
+    },
+    async clearAutoPublishWork() {
+      state.calls.push("clear");
+      state.work = undefined;
+      return true;
+    },
+    async claimAutoPublishWork() {
+      return state.work === undefined ? [] : [state.work];
+    },
+    async countAutoPublishWork() {
+      return state.work === undefined ? 0 : 1;
+    },
+    async claimSystemKeyProvisionCleanup() {
+      return [];
+    }
+  };
+  const cipher = {
+    async create() {
+      if (state.cipherFails) throw new TypeError("CIPHER_DOWN");
+      return {
+        encrypt(value: unknown) {
+          state.encrypted.push(value);
+          return { schema: "test-envelope", value };
+        },
+        close() {}
+      };
+    },
+    async destroy() {
+      return "ALREADY_ABSENT" as const;
+    },
+    async exists() {
+      return false;
+    }
+  };
+  const application = new PostgresPublicationApplication(
+    repository as unknown as PostgresPublicationRepository,
+    cipher as never,
+    () => new Date("2026-09-20T12:00:00.000Z"),
+    repository as unknown as PostgresPublicationRepository,
+    async () => answer()
+  );
+  return { application, state };
+}
+
+const authenticated = {
+  userId: USER_ID,
+  ownerRef: OWNER_REF,
+  session: {
+    session_id: SESSION_ID,
+    asker_id: `owner:${OWNER_REF}`,
+    caller_scope: "ASKER",
+    ownership_provenance: "server_session",
+    provisional_identity_model: false
+  }
+} as never;
+
+describe("S01-C2 free-public auto publication", () => {
+  it("BLOCKED answer does not publish and outstanding stays 0 across two reconcilers", async () => {
+    // PROPERTY: BLOCKED is a terminal no-op and never becomes retry work.
+    // CATCHES: removing the first BLOCKED return. NEIGHBOUR: a served answer may publish.
+    const { application, state } = harness();
+    await application.tryAutoPublish({
+      runId: RUN_ID, answer: answer("BLOCKED"), userId: USER_ID, ownerRef: OWNER_REF
+    });
+    const first = await application.reconcileFreePublicAutoPublish();
+    const second = await application.reconcileFreePublicAutoPublish();
+    expect({ calls: state.systemPublishCalls, work: state.work, first, second }).toEqual({
+      calls: 0, work: undefined, first: 0, second: 0
+    });
+  });
+
+  it("publishable bound answer system-publishes with no PUBLISH grant", async () => {
+    // PROPERTY: the system path publishes without invoking the owner grant preflight.
+    // CATCHES: routing through preflightGrant. NEIGHBOUR: owner publish remains grant-gated.
+    const { application, state } = harness();
+    await application.tryAutoPublish({
+      runId: RUN_ID, answer: answer(), userId: USER_ID, ownerRef: OWNER_REF
+    });
+    expect({
+      state: state.visibility.state,
+      calls: state.systemPublishCalls,
+      preflightCalls: state.preflightCalls,
+      work: state.work
+    }).toEqual({ state: "PUBLISHED", calls: 1, preflightCalls: 0, work: undefined });
+  });
+
+  it("encrypts the canonical public snapshot with only the account pseudonym", async () => {
+    // PROPERTY: the system path encrypts the same public machine fields as owner publication.
+    // CATCHES: T10 substituting owner_ref for the account pseudonym.
+    const { application, state } = harness();
+    await application.tryAutoPublish({
+      runId: RUN_ID, answer: answer(), userId: USER_ID, ownerRef: OWNER_REF
+    });
+    expect(state.encrypted).toHaveLength(1);
+    const snapshot = state.encrypted[0] as Record<string, unknown>;
+    expect(snapshot).toEqual({
+      public_ref: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      author_pseudonym: "Public Thinker",
+      question: "Should a public square need a gatekeeper?",
+      published_at: "2026-09-20T12:00:00.000Z",
+      answer: {
+        terminal: "SERVED",
+        verdict: "SUPPORTED",
+        verdict_available: true,
+        confidence_band: "high",
+        summary_segments: [{ text: "A public answer." }],
+        badges: [],
+        residual_objections: [],
+        reversal_point: "New evidence",
+        as_of: "2026-09-20T12:00:00.000Z",
+        nodes: [],
+        edges: [],
+        tree_included: true
+      }
+    });
+    const serialized = JSON.stringify(snapshot);
+    for (const ownerNamingValue of [RUN_ID, USER_ID, OWNER_REF, SESSION_ID]) {
+      expect(serialized).not.toContain(ownerNamingValue);
+    }
+  });
+
+  it("enqueues durable work before a fallible pseudonym read", async () => {
+    // PROPERTY: once a bound served attempt starts, a later throw cannot lose the retry.
+    // CATCHES: enqueueing only inside enumerated failure branches.
+    const { application, state } = harness();
+    state.pseudonymThrows = true;
+    await expect(application.tryAutoPublish({
+      runId: RUN_ID, answer: answer(), userId: USER_ID, ownerRef: OWNER_REF
+    })).rejects.toThrow("TRANSIENT_DB");
+    expect({ work: state.work, calls: state.calls.slice(0, 4) }).toEqual({
+      work: {
+        runId: RUN_ID,
+        userId: USER_ID,
+        ownerRef: OWNER_REF,
+        reason: "AUTO_PUBLISH_TRANSITION_NULL"
+      },
+      calls: ["bound", "visibility", "ensure", "pseudonym"]
+    });
+  });
+
+  it("keeps durable work when the system transition raises", async () => {
+    // PROPERTY: a transition exception is best-effort to the caller and retryable in the background.
+    // CATCHES: allowing a 40001 to escape before any outstanding row exists.
+    const { application, state } = harness();
+    state.transitionThrows = true;
+    await expect(application.tryAutoPublish({
+      runId: RUN_ID, answer: answer(), userId: USER_ID, ownerRef: OWNER_REF
+    })).resolves.toBeUndefined();
+    expect({ reason: state.work?.reason, publishCalls: state.systemPublishCalls }).toEqual({
+      reason: "AUTO_PUBLISH_TRANSITION_NULL", publishCalls: 1
+    });
+  });
+
+  it("clears pending work when a competing publish wins before prepare or transition returns", async () => {
+    // PROPERTY: both losing race exits re-read visibility and preserve PUBLISHED without pending.
+    // CATCHES: unconditional failure upserts at either false/null return site.
+    for (const losingAt of ["prepare", "transition"] as const) {
+      const { application, state } = harness();
+      if (losingAt === "prepare") {
+        state.prepareReturnsFalse = true;
+        state.publishOnPrepareFailure = true;
+      } else {
+        state.transitionReturnsNull = true;
+        state.publishOnTransitionNull = true;
+      }
+      await application.tryAutoPublish({
+        runId: RUN_ID, answer: answer(), userId: USER_ID, ownerRef: OWNER_REF
+      });
+      expect({ losingAt, visibility: state.visibility.state, work: state.work }).toEqual({
+        losingAt, visibility: "PUBLISHED", work: undefined
+      });
+    }
+  });
+
+  it("checks binding before clearing a BLOCKED answer", async () => {
+    // PROPERTY: an unbound run is untouched even when its served payload is BLOCKED.
+    // CATCHES: clearing retry state before the persisted free-public predicate.
+    const { application, state } = harness();
+    state.bound = false;
+    state.work = { runId: RUN_ID, userId: USER_ID, ownerRef: OWNER_REF,
+      reason: "AUTO_PUBLISH_CIPHER_FAILED" };
+    await application.tryAutoPublish({
+      runId: RUN_ID, answer: answer("BLOCKED"), userId: USER_ID, ownerRef: OWNER_REF
+    });
+    expect({ calls: state.calls, work: state.work }).toEqual({
+      calls: ["bound"],
+      work: { runId: RUN_ID, userId: USER_ID, ownerRef: OWNER_REF,
+        reason: "AUTO_PUBLISH_CIPHER_FAILED" }
+    });
+  });
+
+  it("cipher create throw leaves outstanding AUTO_PUBLISH_CIPHER_FAILED and does not throw", async () => {
+    // PROPERTY: a cipher outage is observable retry work but is invisible to the GET caller.
+    // CATCHES: rethrowing the cipher error. NEIGHBOUR: success clears work.
+    const { application, state } = harness();
+    state.cipherFails = true;
+    let threw = false;
+    try {
+      await application.tryAutoPublish({
+        runId: RUN_ID, answer: answer(), userId: USER_ID, ownerRef: OWNER_REF
+      });
+    } catch {
+      threw = true;
+    }
+    expect({ threw, reason: state.work?.reason, audits: state.audits }).toEqual({
+      threw: false,
+      reason: "AUTO_PUBLISH_CIPHER_FAILED",
+      audits: ["AUTO_PUBLISH_CIPHER_FAILED"]
+    });
+  });
+
+  it("null pseudonym leaves outstanding AUTO_PUBLISH_NULL_PSEUDONYM", async () => {
+    // PROPERTY: absence of a pseudonym prevents publication and records one typed denial.
+    // CATCHES: substituting an identity or silently returning. NEIGHBOUR: live pseudonym publishes.
+    const { application, state } = harness();
+    state.pseudonym = null as unknown as string;
+    await application.tryAutoPublish({
+      runId: RUN_ID, answer: answer(), userId: USER_ID, ownerRef: OWNER_REF
+    });
+    expect({ calls: state.systemPublishCalls, reason: state.work?.reason, audits: state.audits }).toEqual({
+      calls: 0,
+      reason: "AUTO_PUBLISH_NULL_PSEUDONYM",
+      audits: ["AUTO_PUBLISH_NULL_PSEUDONYM"]
+    });
+  });
+
+  it("reconcileFreePublicAutoPublish retries without AuthenticatedSession", async () => {
+    // PROPERTY: durable owner identifiers suffice for a background retry after the owner stops polling.
+    // CATCHES: requiring AuthenticatedSession or omitting readServedAnswer. NEIGHBOUR: null answer stays queued.
+    const { application, state } = harness();
+    state.cipherFails = true;
+    await application.tryAutoPublish({
+      runId: RUN_ID, answer: answer(), userId: USER_ID, ownerRef: OWNER_REF
+    });
+    state.cipherFails = false;
+    const processed = await application.reconcileFreePublicAutoPublish();
+    expect({ processed, state: state.visibility.state, work: state.work, preflight: state.preflightCalls }).toEqual({
+      processed: 1, state: "PUBLISHED", work: undefined, preflight: 0
+    });
+  });
+
+  it("outstanding visibility carries publish_pending true; premium never-published does not", async () => {
+    // PROPERTY: publish_pending is present exactly while outstanding, never as false.
+    // CATCHES: omitting true or serializing false. NEIGHBOUR: ordinary PRIVATE stays byte-stable.
+    const { application, state } = harness();
+    state.work = {
+      runId: RUN_ID,
+      userId: USER_ID,
+      ownerRef: OWNER_REF,
+      reason: "AUTO_PUBLISH_CIPHER_FAILED"
+    };
+    const pending = await application.readOwnedVisibility({ runId: RUN_ID, authenticated });
+    state.work = undefined;
+    state.bound = false;
+    const premium = await application.readOwnedVisibility({ runId: RUN_ID, authenticated });
+    expect({ pending, premium }).toEqual({
+      pending: { state: "PRIVATE", public_ref: null, publish_pending: true },
+      premium: { state: "PRIVATE", public_ref: null }
+    });
+  });
+
+  it("GET answer invokes auto-publish but still returns 200 when auto-publish throws", async () => {
+    // PROPERTY: the served-answer response is independent of publication availability.
+    // CATCHES: omitting the GET hook or awaiting it outside try/catch. NEIGHBOUR: null answer remains 404.
+    let calls = 0;
+    const api = buildApi({
+      application: {
+        async readRunAnswer() { return answer(); }
+      } as never,
+      sessions: {
+        async authenticate() { return authenticated; },
+        verifyCsrf() { return true; }
+      } as never,
+      publications: {
+        async tryAutoPublish() {
+          calls += 1;
+          throw new TypeError("AUTO_PUBLISH_DOWN");
+        }
+      } as never
+    });
+    const response = await api.inject({
+      method: "GET",
+      url: `/v1/runs/${RUN_ID}/answer`,
+      headers: { cookie: `${SESSION_COOKIE_NAME}=${"a".repeat(43)}` }
+    });
+    await api.close();
+    expect({ status: response.statusCode, calls }).toEqual({ status: 200, calls: 1 });
+  });
+
+  it("GET answer by answer id invokes the same best-effort auto-publish hook", async () => {
+    // PROPERTY: every route that serves a full Answer triggers the free-public publication attempt.
+    // CATCHES: hooking only GET /v1/runs/{id}/answer.
+    const attempts: unknown[] = [];
+    const api = buildApi({
+      application: {
+        async readAnswer() { return answer(); }
+      } as never,
+      sessions: {
+        async authenticate() { return authenticated; },
+        verifyCsrf() { return true; }
+      } as never,
+      publications: {
+        async tryAutoPublish(input: unknown) { attempts.push(input); }
+      } as never
+    });
+    const response = await api.inject({
+      method: "GET",
+      url: `/v1/answers/${ANSWER_ID}`,
+      headers: { cookie: `${SESSION_COOKIE_NAME}=${"a".repeat(43)}` }
+    });
+    await api.close();
+    expect({ status: response.statusCode, attempts }).toEqual({
+      status: 200,
+      attempts: [{ runId: RUN_ID, answer: answer(), userId: USER_ID, ownerRef: OWNER_REF }]
+    });
+  });
+
+  it("wire schema accepts only absent or literal-true publish_pending", () => {
+    // PROPERTY: outstanding is an optional true marker, never a third state or false flag.
+    // CATCHES: omitting the key or accepting false. NEIGHBOUR: the pre-slice body remains valid.
+    const ordinary = PublicationTransitionSchema.safeParse({ state: "PRIVATE", public_ref: null });
+    const pending = PublicationTransitionSchema.safeParse({
+      state: "PRIVATE", public_ref: null, publish_pending: true
+    });
+    const falsePending = PublicationTransitionSchema.safeParse({
+      state: "PRIVATE", public_ref: null, publish_pending: false
+    });
+    const thirdState = PublicationTransitionSchema.safeParse({ state: "PENDING", public_ref: null });
+    expect({ ordinary: ordinary.success, pending: pending.success,
+      falsePending: falsePending.success, thirdState: thirdState.success }).toEqual({
+      ordinary: true, pending: true, falsePending: false, thirdState: false
+    });
+  });
+});

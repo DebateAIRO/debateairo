@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FINANCIAL_FALLBACK_FIX",
+  "ticket": "t_26e6de86",
+  "nativeRun": "ROOT_PERSISTED_CLAIM",
+  "baseRevision": "8cdb75d75055ccb41b6325da23bf233b24e2614b",
+  "revision": "c683a0c752553fe2b4e226bc3f70879ce2460b74",
+  "finalRevision": "c683a0c752553fe2b4e226bc3f70879ce2460b74",
+  "verdict": "IMPLEMENTED_REVIEW_REQUIRED",
+  "clean": true,
+  "productFiles": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/api/src/support/response-policy.ts",
+      "sha256": "d899d38d03acf61c05185cd9b0545123a117653fe488050b327abb1d5d4c7f9a",
+      "bytes": 16952,
+      "laneRelative": "apps/api/src/support/response-policy.ts"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/integration/support-routes.test.ts",
+      "sha256": "0eefb4bbe181b7d24a5f4e76437e1c015080e1f0a9cf973b8cbc43cdaff94e9f",
+      "bytes": 152240,
+      "laneRelative": "tests/integration/support-routes.test.ts"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-answer-context.test.ts",
+      "sha256": "2d392ae83555c2de6f755b72de45b24da249d91d30cccd0e4349bbf6a2dfc50b",
+      "bytes": 47592,
+      "laneRelative": "tests/unit/support-answer-context.test.ts"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-response-policy.test.ts",
+      "sha256": "8dd683ab31daefc1d71dd6dce32ca87e307698b8fde0b571ff10377f87e05a56",
+      "bytes": 28802,
+      "laneRelative": "tests/unit/support-response-policy.test.ts"
+    }
+  ],
+  "measurements": {
+    "red": {
+      "files": 1,
+      "passed": 223,
+      "failed": 23,
+      "exitCode": 1
+    },
+    "focusedGreen": {
+      "files": 1,
+      "passed": 248,
+      "failed": 0,
+      "exitCode": 0
+    },
+    "affectedFinal": {
+      "files": 3,
+      "passed": 480,
+      "failed": 0,
+      "exitCode": 0
+    },
+    "typecheck": {
+      "executed": false,
+      "reason": "Packet prohibited a broad typecheck; changed files compiled in the final Vitest frame.",
+      "inheritedQualifiedAtRevision": "8cdb75d75055ccb41b6325da23bf233b24e2614b",
+      "inheritedDiagnostics": 76,
+      "inheritedNormalizedSha256": "7d9816c9fde8d1f83d2828485402016bfd02d53b1ad1c3f0f95f0d3567a14f4a"
+    },
+    "snapshot": {
+      "entryCount": 44,
+      "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+      "inherited": true,
+      "componentSha256": "aa94ff0592d41b399f38eb9be034b5e77ec2d350677e52b1e39852196245f9d9",
+      "manifestSha256": "4c8e09f18207ab3cd24ac5fa89fa5846c6821469d2eeffcbef1cce43a5a10bc6"
+    }
+  },
+  "preservedFailures": [
+    "Reviewed-fallback RED: 23 failed / 223 passed in the response-policy suite.",
+    "The repository-wide 76-diagnostic typecheck baseline remains inherited, not re-attributed to this revision."
+  ],
+  "runtimeRequests": 0,
+  "modelRequests": 0,
+  "browserRequests": 0,
+  "databasePublication": 0,
+  "checkpointAccepted": false,
+  "inputs": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FINANCIAL_FALLBACK_FIX-inputs.json",
+      "sha256": "ea22c0aabbfd09881b25b8774eba226127dd758f4371bf1c0289a3f4fc02c449",
+      "bytes": 10425
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL16-manifest.json",
+      "sha256": "3021c43e9d036469397e9bcf6f85bd519d8f59590ca98fd2cc44857e9005f329",
+      "bytes": 71276
+    }
+  ],
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FINANCIAL_FALLBACK_FIX.md",
+      "sha256": "d95d836bbfe1a9a555179c677d963c6c799d7b8cd6a22337a70346190f04e335",
+      "bytes": 1733
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FINANCIAL_FALLBACK_FIX-product-manifest.json",
+      "sha256": "2f63cc5b1196c1b2b2a364fa014ce8e94167a07f801b058bdeca99f019b9c8c6",
+      "bytes": 1716
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FINANCIAL_FALLBACK_FIX-required-suites.json",
+      "sha256": "b7b8fd2d05d2b238e211e3dc6e365b50041f241a7c4537800d342a70725cbb17",
+      "bytes": 822
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL17-manifest.json",
+      "sha256": "70d1df94466d6452b1724fa67bc10310bfa14c96e012e2b3c25600dfec22cd48",
+      "bytes": 71866
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_FINANCIAL_FALLBACK_FIX.md",
+      "sha256": "619a698046f44a2e61d09df7f9f94f946fa7d2279aa0181f86c7239d1c4645de",
+      "bytes": 2010
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_FINANCIAL_FALLBACK_FIX-red.log",
+      "sha256": "9a92144a5e983f50b11a4815f17cd5dfd2ddc7e84d6505c47029cb883cf06706",
+      "bytes": 67840
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_FINANCIAL_FALLBACK_FIX-policy-green.log",
+      "sha256": "04944be17b30b7a5d54fd5d6908b260cdfefe36b5f1da5d13c2158b8c173831f",
+      "bytes": 47059
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_FINANCIAL_FALLBACK_FIX-affected-final.log",
+      "sha256": "fca262c6eb4d7d9d8819d60c59dfbff62c04ec8971f6f63fa2ce845319ee90e0",
+      "bytes": 96453
+    }
+  ],
+  "limits": [
+    "Independent review remains required before preview rebinding.",
+    "No live quality, preview readiness, or CP1 acceptance is claimed.",
+    "Forgot password remains unresolved/actionless and CP2 remains gated."
+  ]
+}

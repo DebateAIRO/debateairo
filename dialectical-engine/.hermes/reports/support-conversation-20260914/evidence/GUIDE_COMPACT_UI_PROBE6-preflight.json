@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_COMPACT_UI_PROBE6",
+  "phase": "preflight",
+  "observedAt": "2026-09-20T16:46:25.916Z",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "pid": 77769,
+  "ppid": 1,
+  "pgid": 77769,
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "command": "pnpm dev:auth:up",
+  "previewListeners": [
+    {
+      "pid": 77785,
+      "command": "node",
+      "port": 3100
+    },
+    {
+      "pid": 78396,
+      "command": "node",
+      "port": 3101
+    },
+    {
+      "pid": 19920,
+      "command": "com.docker.backend",
+      "port": 7177
+    },
+    {
+      "pid": 78381,
+      "command": "node",
+      "port": 8890
+    },
+    {
+      "pid": 77785,
+      "command": "node",
+      "port": 8891
+    },
+    {
+      "pid": 77785,
+      "command": "node",
+      "port": 8892
+    },
+    {
+      "pid": 77785,
+      "command": "node",
+      "port": 8893
+    },
+    {
+      "pid": 77785,
+      "command": "node",
+      "port": 8894
+    },
+    {
+      "pid": 77785,
+      "command": "node",
+      "port": 8895
+    },
+    {
+      "pid": 77785,
+      "command": "node",
+      "port": 8896
+    },
+    {
+      "pid": 19920,
+      "command": "com.docker.backend",
+      "port": 8988
+    },
+    {
+      "pid": 19920,
+      "command": "com.docker.backend",
+      "port": 55433
+    }
+  ],
+  "unrelatedListeners": [
+    {
+      "pid": 1205,
+      "command": "ControlCenter",
+      "port": 5000
+    },
+    {
+      "pid": 1205,
+      "command": "ControlCenter",
+      "port": 5000
+    },
+    {
+      "pid": 1205,
+      "command": "ControlCenter",
+      "port": 7000
+    },
+    {
+      "pid": 1205,
+      "command": "ControlCenter",
+      "port": 7000
+    },
+    {
+      "pid": 1682,
+      "command": "node",
+      "port": 9797
+    },
+    {
+      "pid": 1719,
+      "command": "ollama",
+      "port": 11434
+    },
+    {
+      "pid": 1142,
+      "command": "rapportd",
+      "port": 49152
+    },
+    {
+      "pid": 1142,
+      "command": "rapportd",
+      "port": 49152
+    },
+    {
+      "pid": 1698,
+      "command": "Ollama",
+      "port": 49251
+    }
+  ],
+  "ordinarySystemTls": {
+    "url": "https://localhost:3100/help",
+    "customCa": false,
+    "insecure": false,
+    "status": 200
+  },
+  "ongoingPrivateLogExcluded": true
+}

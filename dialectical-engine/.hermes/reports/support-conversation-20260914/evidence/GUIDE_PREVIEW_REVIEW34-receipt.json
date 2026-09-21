@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_REVIEW34",
+  "ticket": "t_9ac4ece7",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "REWORK_FINAL_OPERATOR_EMBEDDED_CONTRACT_HASH",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_PREVIEW_REVIEW34.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_PREVIEW_REVIEW34.md",
+      "sha256": "a7840ac9dfb3d58b4f82ca6c2ad9e911b25ac861781c6062d70831e4eca4a660",
+      "bytes": 4874
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREVIEW_REVIEW34-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_PREVIEW_REVIEW34-dispositions.json",
+      "sha256": "3b24ff51a003ea2f07fec9f700bee7b1ef7db6ebb2a1fb7238e54d1c199eee54",
+      "bytes": 5135
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREVIEW_REVIEW34-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_PREVIEW_REVIEW34-custody.json",
+      "sha256": "1deb9bacb07eab0e1dec043d5e180d9b2c02df00a326a1071501d77e2da31448",
+      "bytes": 2018
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PREVIEW_REVIEW34.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PREVIEW_REVIEW34.md",
+      "sha256": "c89f0790c38d837aabf12734ef68a127be8def22a8f9b7ed4a73d33ceee3a8ac",
+      "bytes": 3361
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "heavyLeaseHeld": false,
+  "finding": "The final RECOVER34 operator embeds predecessor command-contract SHA 6269d1c5… while the actual contract is f8a5df03…; its non-inert guard stops before preflight.",
+  "retained": [
+    "Exactly two owner-approved startup model requests with corrected diagnostic timing and no extra retry.",
+    "Healthy detached Runtime9 custody at exact0d34, 12 listeners, API8890 and system-TLS Help200.",
+    "Full58, FINAL18/KB7ef, fixed31, deferred owner capacity, 123 absent future paths and FIX30 screenshot evidence."
+  ],
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

@@ -1,0 +1,689 @@
+import { randomUUID } from "node:crypto";
+import { mkdtemp } from "node:fs/promises";
+import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import EmbeddedPostgres from "embedded-postgres";
+import { Pool, type PoolClient } from "pg";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { PublicDebateSchema } from "@debateai/contract";
+import { migrate, PostgresPublicationRepository } from "@debateai/db";
+
+type Seed = Readonly<{
+  runId: string;
+  userId: string;
+  ownerRef: string;
+  pseudonym: string;
+}>;
+
+let embedded: EmbeddedPostgres;
+let databaseDirectory: string;
+let databasePort: number;
+let pool: Pool;
+
+async function unusedPort(): Promise<number> {
+  const server = createServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  if (address === null || typeof address === "string") throw new TypeError("TEST_PORT_UNAVAILABLE");
+  await new Promise<void>((resolve, reject) => server.close((error) => {
+    if (error === undefined) resolve(); else reject(error);
+  }));
+  return address.port;
+}
+
+async function withRole<T>(
+  databasePool: Pool,
+  role: "debateai_runtime" | "debateai_publication_cleanup" | "debateai_c2_unprivileged",
+  use: (client: PoolClient) => Promise<T>
+): Promise<T> {
+  const client = await databasePool.connect();
+  try {
+    await client.query(`SET ROLE ${role}`);
+    return await use(client);
+  } finally {
+    await client.query("RESET ROLE").catch(() => undefined);
+    client.release();
+  }
+}
+
+async function seedRun(input: Readonly<{
+  planTier?: "free" | "premium" | null;
+  freePublicRule?: boolean;
+  privateContentLive?: boolean;
+}> = {}): Promise<Seed> {
+  const runId = randomUUID();
+  const userId = randomUUID();
+  const ownerRef = randomUUID();
+  const auditToken = randomUUID();
+  const identitySessionId = randomUUID();
+  const pseudonym = `Public Thinker ${runId}`;
+  const planTier = input.planTier === undefined ? "free" : input.planTier;
+  const freePublicRule = input.freePublicRule ?? true;
+  const privateContentLive = input.privateContentLive ?? true;
+  await pool.query(`
+    INSERT INTO identity."user"(
+      user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
+      password_hash,pseudonym,state,adult_affirmed_at,audit_token,owner_ref
+    ) VALUES ($1::uuid,decode(md5(($1::uuid)::text)||md5(($1::uuid)::text||':email'),'hex'),'{}'::jsonb,'{}'::jsonb,
+      'test-password-hash',$2,'active',clock_timestamp(),$3,$4)
+  `, [userId, pseudonym, auditToken, ownerRef]);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SET CONSTRAINTS ALL DEFERRED");
+    await client.query(`
+      INSERT INTO identity.session(
+        session_id,user_id,token_hash,binding_context,idle_expires_at,
+        absolute_expires_at,csrf_token_hash,last_mfa_at
+      ) VALUES ($1,$2,repeat('a',64),'{}'::jsonb,clock_timestamp()+interval '1 hour',
+        clock_timestamp()+interval '2 hours','sha256:'||repeat('b',64),clock_timestamp())
+    `, [identitySessionId, userId]);
+    await client.query(`
+      INSERT INTO identity.run_execution_binding(
+        execution_ref,user_id,identity_session_id,run_id,created_at
+      ) VALUES ($1,$2,$1,$3,clock_timestamp())
+    `, [identitySessionId, userId, runId]);
+    await client.query(`
+      INSERT INTO core.run_key_provision_intent(
+        run_id,user_id,owner_ref,identity_session_id,execution_ref,
+        requested_at,expires_at,cleanup_state
+      ) VALUES ($1,$2,$3,$4,$4,clock_timestamp(),clock_timestamp()+interval '5 minutes','PREPARED')
+    `, [runId, userId, ownerRef, identitySessionId]);
+    await client.query(`
+      INSERT INTO core.run_content_attestation_secret(run_id,secret,created_at)
+      VALUES ($1::uuid,decode(md5(($1::uuid)::text||':secret')||md5(($1::uuid)::text||':secret:2'),'hex'),clock_timestamp())
+    `, [runId]);
+    await client.query(`
+      INSERT INTO core.run(
+        run_id,question_line,ask_contract,asker_id,session_id,caller_scope,as_of,
+        asker_risk_tier,risk_tier,tier_source,tier_provenance_ref,
+        composition_budget_tier,plan_tier,free_public_rule,depth_params,agent_count,
+        discovered_panel,stranger_sample_rate,envelope_basis,register_version,battery_version,
+        created_at_seq,content_encryption_version,question_blind_index_version,
+        content_ciphertext,content_attestation
+      ) VALUES (
+        $1::uuid,
+        CASE WHEN $6::integer IS NULL THEN 'Should a public square need a gatekeeper?'
+          ELSE '⟦DEBATEAI:CIPHERTEXT:V1⟧' END,
+        CASE WHEN $6::integer IS NULL THEN '{}'::jsonb ELSE '{"ciphertext":true,"v":1}'::jsonb END,
+        'owner:'||$2::text,$3::text,'ASKER',clock_timestamp(),'standard','standard','ASKER',
+        'c2-test','low',$4,$5,'{}'::jsonb,1,'[{}]'::jsonb,0.1,'{}'::jsonb,1,'c2-test',
+        ledger.allocate_sequence(),$6::integer,CASE WHEN $6::integer IS NULL THEN NULL ELSE 2 END,
+        CASE WHEN $6::integer IS NULL THEN NULL
+          ELSE '{"v":1,"keyId":"c2-key","nonce":"c2-nonce","ct":"c2-ciphertext","tag":"c2-tag"}'::jsonb END,
+        CASE WHEN $6::integer IS NULL THEN NULL ELSE audit_crypto_internal.hmac(
+          core.content_envelope_attestation_bytes(
+            $1::uuid,'core.run',($1::uuid)::text,'content_ciphertext',
+            '{"v":1,"keyId":"c2-key","nonce":"c2-nonce","ct":"c2-ciphertext","tag":"c2-tag"}'::jsonb
+          ),
+          decode(md5(($1::uuid)::text||':secret')||md5(($1::uuid)::text||':secret:2'),'hex'),
+          'sha256'
+        ) END
+      )
+    `, [runId, ownerRef, identitySessionId, planTier, freePublicRule, 1]);
+    await client.query(`
+      INSERT INTO core.run_ownership_event(run_id,owner_ref,at_seq)
+      VALUES ($1,$2,ledger.allocate_sequence())
+    `, [runId, ownerRef]);
+    await client.query("COMMIT");
+    await pool.query("DELETE FROM identity.session WHERE session_id=$1", [identitySessionId]);
+    if (!privateContentLive) {
+      await pool.query(`
+        INSERT INTO serve.private_run_key_cleanup_intent(
+          request_ref,user_id,run_id,requested_at,cleanup_publication_refs
+        ) VALUES ($1,$2,$3,clock_timestamp(),ARRAY[]::uuid[])
+      `, [randomUUID(), userId, runId]);
+    }
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+  return { runId, userId, ownerRef, pseudonym };
+}
+
+function publicDebate(seed: Seed, publicationRef: string, publishedAt: Date) {
+  return {
+    public_ref: publicationRef,
+    author_pseudonym: seed.pseudonym,
+    question: "Should a public square need a gatekeeper?",
+    published_at: publishedAt.toISOString(),
+    answer: {
+      terminal: "SERVED",
+      verdict: "SUPPORTED",
+      verdict_available: true,
+      confidence_band: "high",
+      summary_segments: [{ text: "A public answer." }],
+      badges: [],
+      residual_objections: [],
+      reversal_point: "New evidence",
+      as_of: publishedAt.toISOString(),
+      nodes: [],
+      edges: [],
+      tree_included: true
+    }
+  } as const;
+}
+
+async function insertPreparedIntent(seed: Seed, publicationRef: string): Promise<void> {
+  await pool.query(`
+    INSERT INTO core.publication_ref_tombstone(ref,ref_kind,created_at)
+    VALUES ($1,'publication_ref',clock_timestamp()) ON CONFLICT (ref) DO NOTHING
+  `, [publicationRef]);
+  await pool.query(`
+    INSERT INTO serve.system_publication_key_provision_intent(
+      publication_ref,run_id,user_id,owner_ref,requested_at,expires_at,cleanup_state
+    ) VALUES ($1,$2,$3,$4,clock_timestamp(),clock_timestamp()+interval '5 minutes','PREPARED')
+  `, [publicationRef, seed.runId, seed.userId, seed.ownerRef]);
+}
+
+async function prepare(seed: Seed, publicationRef: string, databasePool = pool): Promise<boolean> {
+  return withRole(databasePool, "debateai_runtime", async (client) => {
+    const result = await client.query<{ prepared: boolean }>(`
+      SELECT serve.prepare_system_publication_key_provision($1,$2,$3,$4) AS prepared
+    `, [publicationRef, seed.runId, seed.userId, seed.ownerRef]);
+    return result.rows[0]?.prepared === true;
+  });
+}
+
+async function systemPublish(
+  seed: Seed,
+  publicationRef: string,
+  presentedAt = new Date("2026-09-21T00:00:00.000Z"),
+  databasePool = pool
+): Promise<string | null> {
+  const content = publicDebate(seed, publicationRef, presentedAt);
+  return withRole(databasePool, "debateai_runtime", async (client) => {
+    const result = await client.query<{ publication_ref: string | null }>(`
+      SELECT core.transition_system_run_publication(
+        $1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10
+      ) AS publication_ref
+    `, [
+      randomUUID(), seed.runId, seed.userId, seed.ownerRef, publicationRef,
+      seed.pseudonym, JSON.stringify(content), presentedAt, randomUUID(), randomUUID()
+    ]);
+    return result.rows[0]?.publication_ref ?? null;
+  });
+}
+
+async function count(query: string, values: readonly unknown[]): Promise<number> {
+  const result = await pool.query<{ count: string }>(query, [...values]);
+  return Number(result.rows[0]?.count ?? 0);
+}
+
+beforeAll(async () => {
+  databasePort = await unusedPort();
+  databaseDirectory = await mkdtemp(join(tmpdir(), "debateai-c2-postgres-"));
+  embedded = new EmbeddedPostgres({
+    databaseDir: join(databaseDirectory, "data"),
+    user: "postgres",
+    password: "postgres",
+    port: databasePort,
+    persistent: false,
+    initdbFlags: [
+      "--encoding=UTF8",
+      "--set=shared_memory_type=mmap",
+      "--set=dynamic_shared_memory_type=mmap"
+    ],
+    postgresFlags: [
+      "-c", "shared_memory_type=mmap",
+      "-c", "dynamic_shared_memory_type=mmap",
+      "-c", "lc_messages=C"
+    ],
+    onLog(message) { process.stderr.write(`[C2 DB] ${message}\n`); },
+    onError(message) { process.stderr.write(`[C2 DB error] ${message}\n`); }
+  });
+  await embedded.initialise();
+  await embedded.start();
+  await embedded.createDatabase("debateai_c2");
+  pool = new Pool({
+    host: "127.0.0.1",
+    port: databasePort,
+    database: "debateai_c2",
+    user: "postgres",
+    password: "postgres",
+    max: 8
+  });
+  await migrate(pool);
+  await pool.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='debateai_c2_unprivileged') THEN
+        CREATE ROLE debateai_c2_unprivileged NOLOGIN;
+      END IF;
+    END $$
+  `);
+}, 30_000);
+
+afterAll(async () => {
+  await pool?.end();
+  await embedded?.stop();
+}, 30_000);
+
+describe("S01-C2 system publication on real PostgreSQL", () => {
+  it("system-publishes a bound served run with no session or PUBLISH grant", async () => {
+    // PROPERTY: the runtime system function publishes a bound run without identity grant state.
+    // CATCHES: session/grant reads in the system transition. NEIGHBOUR: owner transition stays gated.
+    const seed = await seedRun();
+    const publicationRef = randomUUID();
+    const prepared = await prepare(seed, publicationRef);
+    const published = await systemPublish(seed, publicationRef);
+    const latest = await pool.query<{ state: string }>(`
+      SELECT state FROM core.run_visibility_event WHERE run_id=$1 ORDER BY at_seq DESC LIMIT 1
+    `, [seed.runId]);
+    const grantCount = await count(
+      "SELECT count(*) FROM identity.step_up_grant WHERE target_run_id=$1 AND action='PUBLISH'",
+      [seed.runId]
+    );
+    expect({ prepared, published, state: latest.rows[0]?.state, grantCount }).toEqual({
+      prepared: true, published: publicationRef, state: "PUBLISHED", grantCount: 0
+    });
+  });
+
+  it("lists a successful system publication exactly once across the full page", async () => {
+    // PROPERTY: latest-wins public membership contains one live ref for the run.
+    // CATCHES: duplicate snapshots/events. NEIGHBOUR: another run remains independently listable.
+    const seed = await seedRun();
+    const publicationRef = randomUUID();
+    await prepare(seed, publicationRef);
+    await systemPublish(seed, publicationRef);
+    const membership = await count(`
+      WITH latest AS (
+        SELECT DISTINCT ON (run_id) run_id,publication_ref,state
+        FROM core.run_visibility_event ORDER BY run_id,at_seq DESC
+      ) SELECT count(*) FROM latest WHERE state='PUBLISHED' AND publication_ref=$1
+    `, [publicationRef]);
+    expect(membership).toBe(1);
+  });
+
+  it("stores the account pseudonym and no owner identity value in the system snapshot", async () => {
+    // PROPERTY: the public snapshot carries only the pseudonym from the account.
+    // CATCHES: copying user/session/owner/email identifiers. NEIGHBOUR: pseudonym remains present.
+    const seed = await seedRun();
+    const publicationRef = randomUUID();
+    await prepare(seed, publicationRef);
+    await systemPublish(seed, publicationRef);
+    const snapshot = await pool.query<{ content_ciphertext: unknown }>(`
+      SELECT content_ciphertext FROM serve.publication_snapshot WHERE publication_ref=$1
+    `, [publicationRef]);
+    const serialized = JSON.stringify(snapshot.rows[0]?.content_ciphertext);
+    expect({
+      pseudonym: serialized.includes(seed.pseudonym),
+      userId: serialized.includes(seed.userId),
+      ownerRef: serialized.includes(seed.ownerRef),
+      email: serialized.includes("@")
+    }).toEqual({ pseudonym: true, userId: false, ownerRef: false, email: false });
+  });
+
+  it("writes the system ALLOW audit shape and PUBLIC_INDEXED_V1 visibility", async () => {
+    // PROPERTY: success is attributable to the named system actor from the audit row alone.
+    // CATCHES: UUID actor/default actor_ref_version/wrong warning. NEIGHBOUR: DENY uses a different event.
+    const seed = await seedRun();
+    const publicationRef = randomUUID();
+    await prepare(seed, publicationRef);
+    await systemPublish(seed, publicationRef);
+    const result = await pool.query<{
+      actor_key_ref: string;
+      decision: string;
+      success: boolean;
+      event_type: string;
+      warning_version: string;
+      actor_ref_version: number;
+    }>(`
+      SELECT audit.actor_key_ref,audit.decision,audit.success,audit.event_type,
+        visibility.warning_version,visibility.actor_ref_version
+      FROM identity.audit_event AS audit
+      JOIN core.run_visibility_event AS visibility
+        ON visibility.publication_ref=audit.target_id::uuid
+      WHERE visibility.run_id=$1 AND audit.actor_key_ref='system:free-public-auto-publish'
+    `, [seed.runId]);
+    expect(result.rows[0]).toEqual({
+      actor_key_ref: "system:free-public-auto-publish",
+      decision: "ALLOW",
+      success: true,
+      event_type: "debate.publication.published",
+      warning_version: "PUBLIC_INDEXED_V1",
+      actor_ref_version: 2
+    });
+  });
+
+  it("creates no identity session, publication binding, or PUBLISH grant", async () => {
+    // PROPERTY: system publication creates no phantom owner authorization records.
+    // CATCHES: fabricating session/grant/binding rows. NEIGHBOUR: audit row is still created.
+    const seed = await seedRun();
+    const publicationRef = randomUUID();
+    const before = await count("SELECT count(*) FROM identity.session", []);
+    await prepare(seed, publicationRef);
+    await systemPublish(seed, publicationRef);
+    const after = await count("SELECT count(*) FROM identity.session", []);
+    const grants = await count(
+      "SELECT count(*) FROM identity.step_up_grant WHERE target_run_id=$1 AND action='PUBLISH'",
+      [seed.runId]
+    );
+    const bindings = await count(
+      "SELECT count(*) FROM identity.publication_event_binding WHERE run_id=$1",
+      [seed.runId]
+    );
+    expect({ before, after, grants, bindings }).toEqual({ before, after: before, grants: 0, bindings: 0 });
+  });
+
+  it("counts two failed system attempts as two typed DENY audit rows", async () => {
+    // PROPERTY: every pre-transition failure is independently countable for the run.
+    // CATCHES: silent retry or overwrite. NEIGHBOUR: BLOCKED never calls this wrapper.
+    const seed = await seedRun();
+    await withRole(pool, "debateai_runtime", async (client) => {
+      await client.query(
+        "SELECT core.upsert_free_public_auto_publish_work($1,$2,$3,'AUTO_PUBLISH_CIPHER_FAILED')",
+        [seed.runId, seed.userId, seed.ownerRef]
+      );
+      for (const reason of ["AUTO_PUBLISH_CIPHER_FAILED", "AUTO_PUBLISH_KEY_PROVISION_FAILED"]) {
+        await client.query(
+          "SELECT identity.audit_system_publication_attempt($1,$2,$3,clock_timestamp(),'DENY')",
+          [randomUUID(), seed.runId, reason]
+        );
+      }
+    });
+    const denied = await count(`
+      SELECT count(*) FROM identity.audit_event
+      WHERE actor_key_ref='system:free-public-auto-publish' AND decision='DENY'
+        AND target_type='debate.publication_attempt' AND target_id=$1
+    `, [seed.runId]);
+    expect(denied).toBe(2);
+  });
+
+  it("keeps the pre-slice public contract parseable and aligns published_at with snapshot created_at", async () => {
+    // PROPERTY: both old and system snapshots satisfy the unchanged public schema and timestamp invariant.
+    // CATCHES: a required marker or second clock. NEIGHBOUR: optional visibility metadata is separate.
+    const seed = await seedRun();
+    const publicationRef = randomUUID();
+    const presentedAt = new Date("2026-09-21T00:00:00.000Z");
+    const old = PublicDebateSchema.parse(publicDebate(seed, randomUUID(), presentedAt));
+    await prepare(seed, publicationRef);
+    await systemPublish(seed, publicationRef, presentedAt);
+    const snapshot = await pool.query<{ content_ciphertext: unknown; created_at: Date }>(`
+      SELECT content_ciphertext,created_at FROM serve.publication_snapshot WHERE publication_ref=$1
+    `, [publicationRef]);
+    const parsed = PublicDebateSchema.parse(snapshot.rows[0]?.content_ciphertext);
+    expect({ old: old.author_pseudonym, publishedAt: parsed.published_at, createdAt: snapshot.rows[0]?.created_at.toISOString() }).toEqual({
+      old: seed.pseudonym,
+      publishedAt: presentedAt.toISOString(),
+      createdAt: presentedAt.toISOString()
+    });
+  });
+
+  it("grants the system transition only to debateai_runtime", async () => {
+    // PROPERTY: runtime can execute the transition and an unrelated role receives 42501.
+    // CATCHES: missing runtime grant or PUBLIC execute. NEIGHBOUR: SECURITY DEFINER owns table access.
+    const seed = await seedRun();
+    const publicationRef = randomUUID();
+    await prepare(seed, publicationRef);
+    const runtimeResult = await systemPublish(seed, publicationRef);
+    let sqlstate: string | undefined;
+    try {
+      await withRole(pool, "debateai_c2_unprivileged", async (client) => {
+        await client.query(`SELECT core.transition_system_run_publication(
+          $1,$2,$3,$4,$5,$6,$7::jsonb,clock_timestamp(),$8,$9
+        )`, [randomUUID(), seed.runId, seed.userId, seed.ownerRef, randomUUID(), seed.pseudonym, "{}", randomUUID(), randomUUID()]);
+      });
+    } catch (error) {
+      sqlstate = (error as { code?: string }).code;
+    }
+    expect({ runtimeResult, sqlstate }).toEqual({ runtimeResult: publicationRef, sqlstate: "42501" });
+  });
+
+  it("leaves the 14-argument owner transition intact while rejecting Premium system publish", async () => {
+    // PROPERTY: 0067 neither replaces the owner signature nor opens Premium to the system path.
+    // CATCHES: DROP/redefine owner transition or missing bound guard. NEIGHBOUR: bound Free system publish succeeds.
+    const seed = await seedRun({ planTier: "premium" });
+    const publicationRef = randomUUID();
+    await insertPreparedIntent(seed, publicationRef);
+    const systemResult = await systemPublish(seed, publicationRef);
+    const signature = await pool.query<{ arguments: string }>(`
+      SELECT pg_catalog.pg_get_function_identity_arguments(procedure.oid) AS arguments
+      FROM pg_catalog.pg_proc AS procedure
+      JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid=procedure.pronamespace
+      WHERE namespace.nspname='core' AND procedure.proname='transition_run_publication'
+    `);
+    expect({ systemResult, argumentCount: signature.rows[0]?.arguments.split(",").length }).toEqual({
+      systemResult: null, argumentCount: 14
+    });
+  });
+
+  it("returns NULL for Premium with one DENY and no snapshot or visibility event", async () => {
+    // PROPERTY: a prepared intent cannot bypass the bound predicate for Premium.
+    // CATCHES: deleting core.run_is_free_public_bound. NEIGHBOUR: bound Free passes.
+    const seed = await seedRun({ planTier: "premium" });
+    const publicationRef = randomUUID();
+    await insertPreparedIntent(seed, publicationRef);
+    const result = await systemPublish(seed, publicationRef);
+    const snapshots = await count("SELECT count(*) FROM serve.publication_snapshot WHERE run_id=$1", [seed.runId]);
+    const visibility = await count("SELECT count(*) FROM core.run_visibility_event WHERE run_id=$1", [seed.runId]);
+    const denied = await count(`SELECT count(*) FROM identity.audit_event
+      WHERE actor_key_ref='system:free-public-auto-publish' AND decision='DENY' AND target_id=$1`, [seed.runId]);
+    expect({ result, snapshots, visibility, denied }).toEqual({ result: null, snapshots: 0, visibility: 0, denied: 0 });
+  });
+
+  it("returns NULL for a NULL tier with no forgeable DENY and no publication", async () => {
+    // PROPERTY: legacy NULL-tier runs remain unbound even with a prepared system intent.
+    // CATCHES: treating NULL as Free. NEIGHBOUR: explicit Free plus rule true passes.
+    const seed = await seedRun({ planTier: null });
+    const publicationRef = randomUUID();
+    await insertPreparedIntent(seed, publicationRef);
+    const result = await systemPublish(seed, publicationRef);
+    const snapshots = await count("SELECT count(*) FROM serve.publication_snapshot WHERE run_id=$1", [seed.runId]);
+    const denied = await count("SELECT count(*) FROM identity.audit_event WHERE decision='DENY' AND target_id=$1", [seed.runId]);
+    expect({ result, snapshots, denied }).toEqual({ result: null, snapshots: 0, denied: 0 });
+  });
+
+  it("returns NULL for a pre-rule Free run with no forgeable DENY and no publication", async () => {
+    // PROPERTY: Free alone is insufficient; the persisted rule bit must also be true.
+    // CATCHES: testing tier without free_public_rule. NEIGHBOUR: post-rule Free passes.
+    const seed = await seedRun({ planTier: "free", freePublicRule: false });
+    const publicationRef = randomUUID();
+    await insertPreparedIntent(seed, publicationRef);
+    const result = await systemPublish(seed, publicationRef);
+    const snapshots = await count("SELECT count(*) FROM serve.publication_snapshot WHERE run_id=$1", [seed.runId]);
+    const denied = await count("SELECT count(*) FROM identity.audit_event WHERE decision='DENY' AND target_id=$1", [seed.runId]);
+    expect({ result, snapshots, denied }).toEqual({ result: null, snapshots: 0, denied: 0 });
+  });
+
+  it("returns NULL after private content is erased", async () => {
+    // PROPERTY: a bound run without live private content cannot create a public snapshot.
+    // CATCHES: deleting run_private_content_is_live. NEIGHBOUR: identical live content passes.
+    const seed = await seedRun({ privateContentLive: false });
+    const publicationRef = randomUUID();
+    await insertPreparedIntent(seed, publicationRef);
+    const live = await pool.query<{ live: boolean }>("SELECT core.run_private_content_is_live($1) AS live", [seed.runId]);
+    const result = await systemPublish(seed, publicationRef);
+    const snapshots = await count("SELECT count(*) FROM serve.publication_snapshot WHERE run_id=$1", [seed.runId]);
+    const published = await count("SELECT count(*) FROM core.run_visibility_event WHERE run_id=$1 AND state='PUBLISHED'", [seed.runId]);
+    expect({ live: live.rows[0]?.live, result, snapshots, published }).toEqual({ live: false, result: null, snapshots: 0, published: 0 });
+  });
+
+  it("serializes two completed prepares into exactly one system publication", async () => {
+    // PROPERTY: the under-lock latest-state guard admits one transition after both prepares finish.
+    // CATCHES: removing the in-transaction PUBLISHED guard. NEIGHBOUR: two distinct runs both publish.
+    const seed = await seedRun();
+    const firstRef = randomUUID();
+    const secondRef = randomUUID();
+    const secondPool = new Pool({
+      host: "127.0.0.1", port: databasePort, database: "debateai_c2",
+      user: "postgres", password: "postgres", max: 2
+    });
+    try {
+      const prepared = await Promise.all([prepare(seed, firstRef, pool), prepare(seed, secondRef, secondPool)]);
+      const settled = await Promise.all([
+        systemPublish(seed, firstRef, new Date("2026-09-21T00:00:00.000Z"), pool),
+        systemPublish(seed, secondRef, new Date("2026-09-21T00:00:01.000Z"), secondPool)
+      ]);
+      const snapshots = await count("SELECT count(*) FROM serve.publication_snapshot WHERE run_id=$1", [seed.runId]);
+      expect({ prepared, successful: settled.filter((value) => value !== null).length, snapshots }).toEqual({
+        prepared: [true, true], successful: 1, snapshots: 1
+      });
+    } finally {
+      await secondPool.end();
+    }
+  });
+
+  it("grants the failed-attempt audit wrapper only to debateai_runtime", async () => {
+    // PROPERTY: runtime has the narrow wrapper while unrelated roles cannot append system audit rows.
+    // CATCHES: missing runtime grant or PUBLIC execute. NEIGHBOUR: runtime still cannot call append_internal.
+    const seed = await seedRun();
+    const runtime = await withRole(pool, "debateai_runtime", async (client) => {
+      await client.query(
+        "SELECT core.upsert_free_public_auto_publish_work($1,$2,$3,'AUTO_PUBLISH_CIPHER_FAILED')",
+        [seed.runId, seed.userId, seed.ownerRef]
+      );
+      const result = await client.query<{ appended: boolean }>(`
+        SELECT identity.audit_system_publication_attempt(
+          $1,$2,'AUTO_PUBLISH_CIPHER_FAILED',clock_timestamp(),'DENY'
+        ) AS appended
+      `, [randomUUID(), seed.runId]);
+      return result.rows[0]?.appended === true;
+    });
+    let sqlstate: string | undefined;
+    try {
+      await withRole(pool, "debateai_c2_unprivileged", async (client) => {
+        await client.query(`SELECT identity.audit_system_publication_attempt(
+          $1,$2,'AUTO_PUBLISH_CIPHER_FAILED',clock_timestamp(),'DENY'
+        )`, [randomUUID(), seed.runId]);
+      });
+    } catch (error) {
+      sqlstate = (error as { code?: string }).code;
+    }
+    expect({ runtime, sqlstate }).toEqual({ runtime: true, sqlstate: "42501" });
+  });
+
+  it("prepare admits only a run bound to the Free-public rule", async () => {
+    // PROPERTY: provisioning itself rejects every unbound tier/rule shape.
+    // CATCHES: relying on the later transition as the only boundness check.
+    const premium = await seedRun({ planTier: "premium" });
+    const nullTier = await seedRun({ planTier: null });
+    const preRule = await seedRun({ planTier: "free", freePublicRule: false });
+    expect({
+      premium: await prepare(premium, randomUUID()),
+      nullTier: await prepare(nullTier, randomUUID()),
+      preRule: await prepare(preRule, randomUUID())
+    }).toEqual({ premium: false, nullTier: false, preRule: false });
+  });
+
+  it("appends a system DENY only for a bound run with outstanding work", async () => {
+    // PROPERTY: the narrow runtime wrapper cannot create an unrelated audit trail.
+    // CATCHES: validating only that the target run exists.
+    const seed = await seedRun();
+    const result = await withRole(pool, "debateai_runtime", async (client) => {
+      const before = await client.query<{ appended: boolean }>(`
+        SELECT identity.audit_system_publication_attempt(
+          $1,$2,'AUTO_PUBLISH_CIPHER_FAILED',clock_timestamp(),'DENY'
+        ) AS appended
+      `, [randomUUID(), seed.runId]);
+      await client.query(
+        "SELECT core.upsert_free_public_auto_publish_work($1,$2,$3,'AUTO_PUBLISH_CIPHER_FAILED')",
+        [seed.runId, seed.userId, seed.ownerRef]
+      );
+      const after = await client.query<{ appended: boolean }>(`
+        SELECT identity.audit_system_publication_attempt(
+          $1,$2,'AUTO_PUBLISH_CIPHER_FAILED',clock_timestamp(),'DENY'
+        ) AS appended
+      `, [randomUUID(), seed.runId]);
+      return { before: before.rows[0]?.appended, after: after.rows[0]?.appended };
+    });
+    expect(result).toEqual({ before: false, after: true });
+  });
+
+  it("backs off repeated failed auto-publish work with a capped delay", async () => {
+    // PROPERTY: retries continue, but a permanent failure is not reclaimed every scheduler tick.
+    // CATCHES: resetting next_attempt_at to clock_timestamp() on every failure.
+    const seed = await seedRun();
+    const states = await withRole(pool, "debateai_runtime", async (client) => {
+      const upsert = () => client.query(
+        "SELECT core.upsert_free_public_auto_publish_work($1,$2,$3,'AUTO_PUBLISH_CIPHER_FAILED')",
+        [seed.runId, seed.userId, seed.ownerRef]
+      );
+      const read = async () => (await client.query<{
+        attempt_count: number;
+        due: boolean;
+        delay_seconds: string;
+      }>(`
+        SELECT attempt_count,next_attempt_at<=clock_timestamp() AS due,
+          extract(epoch FROM next_attempt_at-clock_timestamp())::text AS delay_seconds
+        FROM core.free_public_auto_publish_work WHERE run_id=$1
+      `, [seed.runId])).rows[0];
+      await upsert();
+      const first = await read();
+      await upsert();
+      const second = await read();
+      for (let attempt = 2; attempt < 10; attempt += 1) await upsert();
+      const capped = await read();
+      return { first, second, capped };
+    });
+    expect(states.first?.attempt_count).toBe(1);
+    expect(states.first?.due).toBe(false);
+    expect(Number(states.first?.delay_seconds)).toBeGreaterThan(20);
+    expect(states.second?.attempt_count).toBe(2);
+    expect(states.second?.due).toBe(false);
+    expect(Number(states.second?.delay_seconds)).toBeGreaterThan(50);
+    expect(states.capped?.attempt_count).toBe(10);
+    expect(states.capped?.due).toBe(false);
+    expect(Number(states.capped?.delay_seconds)).toBeGreaterThan(3500);
+    expect(Number(states.capped?.delay_seconds)).toBeLessThanOrEqual(3600);
+  });
+
+  it("never projects publish_pending beside PUBLISHED even if stale work exists", async () => {
+    // PROPERTY: R-11 exposes exactly the two-key PUBLISHED shape.
+    // CATCHES: an outstanding-row EXISTS that ignores the latest visibility state.
+    const seed = await seedRun();
+    const publicationRef = randomUUID();
+    await prepare(seed, publicationRef);
+    await systemPublish(seed, publicationRef);
+    await withRole(pool, "debateai_runtime", async (client) => {
+      await client.query(
+        "SELECT core.upsert_free_public_auto_publish_work($1,$2,$3,'AUTO_PUBLISH_TRANSITION_NULL')",
+        [seed.runId, seed.userId, seed.ownerRef]
+      );
+    });
+    const runtimePool = {
+      query: (text: string, values?: unknown[]) => withRole(
+        pool, "debateai_runtime", (client) => client.query(text, values)
+      )
+    };
+    const repository = new PostgresPublicationRepository(runtimePool as never, {} as never);
+    expect(await repository.readOwnedVisibility(seed.runId, seed.userId, seed.ownerRef)).toEqual({
+      state: "PUBLISHED", publicRef: publicationRef
+    });
+  });
+
+  it("claims and completes an expired orphan system key-provision intent", async () => {
+    // PROPERTY: publication cleanup can claim then delete an expired PREPARED system intent.
+    // CATCHES: either cleanup function or either review-mandated claim column omitted.
+    // NEIGHBOUR: a future PREPARED intent is not claimed.
+    const seed = await seedRun();
+    const publicationRef = randomUUID();
+    await pool.query(`
+      INSERT INTO core.publication_ref_tombstone(ref,ref_kind,created_at)
+      VALUES ($1,'publication_ref',clock_timestamp())
+    `, [publicationRef]);
+    await pool.query(`
+      INSERT INTO serve.system_publication_key_provision_intent(
+        publication_ref,run_id,user_id,owner_ref,requested_at,expires_at,cleanup_state
+      ) VALUES ($1,$2,$3,$4,clock_timestamp()-interval '10 minutes',
+        clock_timestamp()-interval '5 minutes','PREPARED')
+    `, [publicationRef, seed.runId, seed.userId, seed.ownerRef]);
+    const result = await withRole(pool, "debateai_publication_cleanup", async (client) => {
+      const claimed = await client.query<{ publication_ref: string; claim_token: string }>(`
+        SELECT * FROM serve.claim_system_publication_key_provision_cleanup(100)
+      `);
+      const claim = claimed.rows.find((row) => row.publication_ref === publicationRef);
+      const completed = claim === undefined ? false : (await client.query<{ completed: boolean }>(`
+        SELECT serve.complete_system_publication_key_provision_cleanup($1,$2) AS completed
+      `, [publicationRef, claim.claim_token])).rows[0]?.completed === true;
+      return { claimed: claim?.publication_ref, completed };
+    });
+    const remaining = await count(
+      "SELECT count(*) FROM serve.system_publication_key_provision_intent WHERE run_id=$1",
+      [seed.runId]
+    );
+    expect({ ...result, remaining }).toEqual({ claimed: publicationRef, completed: true, remaining: 0 });
+  });
+});

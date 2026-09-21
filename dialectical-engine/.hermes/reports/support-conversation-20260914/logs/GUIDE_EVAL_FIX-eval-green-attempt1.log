@@ -1,0 +1,155 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+ ✓ tests/support-eval/run.test.ts > SUP-01 support eval release gate > publishes the support:eval command without an ambient runtime switch 1ms
+ ✓ tests/support-eval/run.test.ts > SUP-01 support eval release gate > discovers all ratified cases and separates the exact applicable and pending slices 4ms
+ ✓ tests/support-eval/run.test.ts > SUP-01 support eval release gate > checks outcome, language, required-source subset, and forbidden tools independently 1ms
+ ✓ tests/support-eval/run.test.ts > SUP-01 support eval release gate > prints honest structural, latency, and independent-rubric evidence without claiming PASS 3ms
+ ✓ tests/support-eval/run.test.ts > SUP-01 support eval release gate > fails numeric latency targets rather than merely printing a slow number 2ms
+ ✓ tests/support-eval/run.test.ts > SUP-01 support eval release gate > marks real-relay observations without persisted first-token evidence UNVERIFIED 4ms
+ ✓ tests/support-eval/run.test.ts > SUP-01 support eval release gate > counts executor errors as failures and returns nonzero for the worst of three runs 2ms
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded]   locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-v2AM54/data ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] ok
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] creating subdirectories ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] ok
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] ok
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-v2AM54/data -l logfile start
+
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:54:35.722 EEST [82271] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:54:35.725 EEST [82271] LOG:  listening on IPv4 address "127.0.0.1", port 65477
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:54:35.725 EEST [82271] LOG:  listening on IPv6 address "::1", port 65477
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:54:35.725 EEST [82271] LOG:  listening on Unix socket "/tmp/.s.PGSQL.65477"
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:54:35.729 EEST [82277] LOG:  database system was shut down at 2026-09-17 14:54:35 EEST
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:54:35.732 EEST [82271] LOG:  database system is ready to accept connections
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:54:36.063 EEST [82282] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:54:36.428 EEST [82282] WARNING:  there is no transaction in progress
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:54:37.104 EEST [82271] LOG:  received fast shutdown request
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:54:37.104 EEST [82271] LOG:  aborting any active transactions
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:54:37.105 EEST [82271] LOG:  background worker "logical replication launcher" (PID 82280) exited with exit code 1
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:54:37.107 EEST [82275] LOG:  shutting down
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:54:37.108 EEST [82275] LOG:  checkpoint starting: shutdown immediate
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:54:37.172 EEST [82275] LOG:  checkpoint complete: wrote 1745 buffers (10.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.036 s, sync=0.028 s, total=0.065 s; sync files=1146, longest=0.001 s, average=0.001 s; distance=13775 kB, estimate=13775 kB; lsn=0/24FAE30, redo lsn=0/24FAE30
+
+
+stdout | tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases
+[S00 DB embedded] 2026-09-17 14:54:37.177 EEST [82271] LOG:  database system is shut down
+
+
+ ✓ tests/support-eval/run.test.ts > SUP-01 support eval release gate > drives the in-process API and disposable PostgreSQL through all applicable cases 2359ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  14:54:33
+   Duration  3.78s (transform 481ms, setup 0ms, import 1.31s, tests 2.38s, environment 0ms)
+

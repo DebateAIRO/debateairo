@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_REVIEW27",
+  "ticket": "t_da0aba1b",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "verdict": "REWORK_BOUNDED_OPERATOR_ABSENCE_SET",
+  "dispositions": [
+    {
+      "id": "GO27-C1",
+      "subject": "public operator invocation",
+      "disposition": "PASS",
+      "evidence": "Exact cwd and node --import tsx invocation bind the sealed operator script and command contract."
+    },
+    {
+      "id": "GO27-C2",
+      "subject": "operator versus wrapper log ownership",
+      "disposition": "PASS",
+      "evidence": "Operator uses seven distinct post-exit logs and never opens wrapper-owned contract or child logs."
+    },
+    {
+      "id": "GO27-C3",
+      "subject": "real preflight wrapper seam",
+      "disposition": "PASS",
+      "evidence": "Real preflight wrapper reaches inert sentinel, creates wrapper/child evidence and leaves reserved contract log absent."
+    },
+    {
+      "id": "GO27-C4",
+      "subject": "numeric failure and stop-first",
+      "disposition": "PASS",
+      "evidence": "Child status1 is preserved, stop record is written and no later phase output appears."
+    },
+    {
+      "id": "GO27-C5",
+      "subject": "owner-map collision",
+      "disposition": "PASS",
+      "evidence": "Deliberate operator/wrapper log alias rejects before child execution."
+    },
+    {
+      "id": "GO27-C6",
+      "subject": "final command contract",
+      "disposition": "PASS",
+      "evidence": "All seven argv[2] values self-bind exact FIX27 bytes; only preflight log and mechanical self paths differ from FIX26."
+    },
+    {
+      "id": "GO27-C7",
+      "subject": "retained runtime and product sources",
+      "disposition": "PASS_RETAINED",
+      "evidence": "Wrappers, gated58, dependency, product, KB, private principal, screenshots, pacing and owner-capacity sources are unchanged."
+    },
+    {
+      "id": "GO27-R1",
+      "subject": "complete invocation-time absence set",
+      "disposition": "REWORK",
+      "evidence": "Real operator omits rowProof.result and GUIDE_LIVE25-owner-testability.json, checking 121 paths while static binding verifier checks 123."
+    },
+    {
+      "id": "GO27-L1",
+      "subject": "runtime and readiness",
+      "disposition": "NOT_ESTABLISHED",
+      "evidence": "Static review only; current capacity, actual31, owner capacity, live capture, readiness, completion and acceptance remain pending."
+    },
+    {
+      "id": "GO27-L2",
+      "subject": "Forgot and CP2",
+      "disposition": "UNRESOLVED_ACTIONLESS",
+      "evidence": "No destination is inferred and no CP2 authorization follows."
+    }
+  ],
+  "hashes": {
+    "finalCommandContract": "04512905c4f1b224a5ed1b8249fc0484650ed06ee3519bcec7f90db9ba15bc7a",
+    "operatorContract": "d0f8c0962d22cf50ae47ecd7bf22f7fed49bb6df6c38718de297cfec350b7d39",
+    "ownerMap": "cfca760a1ad8f47dfc85367ae758d2eb216ad891b99012288acdb871cca8300b",
+    "controlProof": "38c8900ba71114df07a3d6144c9c22bb378f3f1cb1acb5c663111737bcf3bce6",
+    "bindingProof": "51f884c0d7bd660448a7e9949a34b0dae4ea45a12a70d475afd894ec7d9cab59",
+    "operatorScript": "464c5ea1e43d34d5ec575458c1c59e36dc27257f70e7be78a3dda983a1e9ac13"
+  },
+  "counts": {
+    "focusedPassed": 18,
+    "focusedTotal": 18,
+    "bindingPassed": 35,
+    "bindingTotal": 35,
+    "phasesSelfBound": 7,
+    "phasesTotal": 7,
+    "operatorRuntimeAbsencePaths": 121,
+    "sealedRequiredAbsencePaths": 123,
+    "manifestVerified": 33,
+    "manifestTotal": 33,
+    "receiptArtifactsVerified": 34,
+    "receiptArtifactsTotal": 34,
+    "inputsVerified": 122,
+    "inputsTotal": 122,
+    "remainingFindings": 1
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

@@ -1,0 +1,8 @@
+file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND21/phase-readiness.mjs:16
+  throw new Error("GUIDE_CAPTURE_RUNTIME_CUSTODY_INVALID");
+        ^
+
+Error: GUIDE_CAPTURE_RUNTIME_CUSTODY_INVALID
+    at file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND21/phase-readiness.mjs:16:9
+
+Node.js v22.23.1

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_SESSION_TIMES_FIX41",
+  "ticket": "t_0e72d38b",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_SESSION_TIMES_BOUND_REVIEW_REQUIRED",
+  "sealedAtUtc": "2026-09-21T10:57:37.167708Z",
+  "finding": "GCR40-R1",
+  "controls": {
+    "session": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SESSION_TIMES_FIX41-session-control-proof.json",
+      "sha256": "d265253c7721edecd52612c45f87263e77a73fb1bf8e1cd8cfcc7c2e1baefcfc",
+      "bytes": 817
+    },
+    "final": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SESSION_TIMES_FIX41-final-control-proof.json",
+      "sha256": "db85f844c8b835b7a6717662a5c9a20e049ad9fe0623fd265d037b663ab360d5",
+      "bytes": 849
+    }
+  },
+  "bindings": {
+    "command": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SESSION_TIMES_FIX41-command-contract.json",
+      "sha256": "a7bb682a1017593a2f87b64d33689a47c2a0458253bab199dc067fb7bc898492",
+      "bytes": 32565
+    },
+    "operator": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SESSION_TIMES_FIX41-operator-contract.json",
+      "sha256": "c41f780f77223db63dcee665cfb04e4be059bd4b10fc5031a2f3dc0fd56d19c5",
+      "bytes": 22485
+    },
+    "delta": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SESSION_TIMES_FIX41-delta.json",
+      "sha256": "2df65fa8ba279688463d82e6a2e57e01138f881578571152e1df2569e63b4afd",
+      "bytes": 1991
+    }
+  },
+  "retained": {
+    "bind40ReceiptSha256": "7a6b277e59ea2e835de2277f75b30f89c51de5afdefadcea2b35d42635de8fdc",
+    "futureAbsenceCount": 115,
+    "live32": true,
+    "actualGuide24": true,
+    "ownerCapacity": "GUIDE_LIVE21-owner-capacity.json",
+    "ownerWalkthrough": "GUIDE_LIVE25-owner-testability.json"
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

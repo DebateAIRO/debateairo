@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW3",
+  "reviewedOn": "2026-09-17T17:49:18Z",
+  "verdict": "REWORK_CAPTURE_SAME_DESTINATION",
+  "productRevision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "sourceRevision": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "harnessSha256": "77b47d705133486ad4d7f520b117c191524cebaaf4131431df512c470177e314",
+  "authorReceiptSha256": "7bd2e38b5546170076620cf25838dddcbb7190ee8cdc035af778a71851342f7e",
+  "authorConsumptionSha256": "e13ea4b9662873830453e74df0b34969addc2c95f29fbf25a0e249414ef81c79",
+  "controlProof": {
+    "sha256": "648bd6fba1544ae4cb8f3fa941989e791b92fdc31203bad1a75864b1aa486a4c",
+    "controls": 65,
+    "passed": 65,
+    "scope": "inertHistoricalF3"
+  },
+  "adapter": {
+    "replaySha256": "2ee693b8736b3b0a16798b96d811044ed93aeb0b11f88307d5d33bad139758a5",
+    "custodySha256": "1a63bf8699447bf09eb2b8a7d469300d8d5be56fa74ae7266baf404939eaa604",
+    "negativeSha256": "a0f45f9725041382fedf6cbb99f175387f92a3bbde38b4610ad4aff23603748e",
+    "aggregateSha256": "b0d68ed0a8a27b3b9c67ba96b70a64e6051387d5a46bf75e886f75ea0643ad58"
+  },
+  "dispositions": [
+    {
+      "id": "ORACLE-53",
+      "result": "PASS_STATIC",
+      "fact": "Prompt/class/branch/source retained; REQUIRE_CLOSED pointer Help /help."
+    },
+    {
+      "id": "ORACLE-54",
+      "result": "PASS_STATIC",
+      "fact": "Prompt/class/branch/source retained; REQUIRE_CLOSED keyboard Help /help."
+    },
+    {
+      "id": "OTHER-52",
+      "result": "PASS_STATIC",
+      "fact": "All other matrix rows retained; actual recovery rows remain actionless."
+    },
+    {
+      "id": "BINDINGS",
+      "result": "PASS_STATIC",
+      "fact": "Schema2 proof binds exact f3, KB and ordered eight-file digest; adapter checks all eight before import and constructor equality; copied-source negative prevents import/success."
+    },
+    {
+      "id": "LIVE-ACTIVATION",
+      "result": "REWORK",
+      "fact": "Full row53 starts on /help and activates /help, but capture unconditionally waits for href to differ from the pre-click URL."
+    }
+  ],
+  "finding": {
+    "id": "GHR3-R1",
+    "file": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX3/capture-public-guide.mjs",
+    "lines": "173-175,198-209",
+    "severity": "blockingFutureLive3",
+    "mechanism": "openMode(full) loads baseUrl/help; row53 bound Help href is /help; activateBoundAction waits only for window.location.href !== before.",
+    "minimalCorrection": "Resolve the expected absolute destination. After the real pointer or keyboard activation, require that exact destination; wait for a transition only when before differs from it. Add a same-destination positive control and a wrong-destination/nonactivation negative using the same helper consumed by capture."
+  },
+  "fixedOutputsAbsent": {
+    "receipt": true,
+    "row53": true,
+    "row54": true,
+    "profile": true
+  },
+  "activity": {
+    "tests": 0,
+    "probes": 0,
+    "browser": 0,
+    "http": 0,
+    "database": 0,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "gitActions": 0
+  }
+}

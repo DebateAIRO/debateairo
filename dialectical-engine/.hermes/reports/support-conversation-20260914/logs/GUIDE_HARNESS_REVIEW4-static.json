@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW4",
+  "reviewedOn": "2026-09-17T18:02:24Z",
+  "verdict": "PASS_BOUNDED_FIX4",
+  "productRevision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "sourceRevision": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "harnessSha256": "4768a8b5296ca5838fa6e2588be5cebc537b2613513239e434f0cd60bd7c7c9e",
+  "authorReceiptSha256": "5f2332a8c49977b9238020664dd75edbeb4832caeade0695190a21d88f5905b3",
+  "authorConsumptionSha256": "ec90a5f1979be16e0dd4cc1a8cd436da133f37574216193adff1c2999192db1f",
+  "controlProof": {
+    "sha256": "9a80055910e14e988c76ebeaa4faf92eb57ddd84749443d0431e46fcd9ffa654",
+    "controls": 69,
+    "passed": 69,
+    "retained": 65,
+    "added": 4,
+    "scope": "inertHistoricalF3"
+  },
+  "adapter": {
+    "aggregateSha256": "bc265096f5211771c214c0aa63af1977618a1f536aeb1ec0be3b36017ddbb97a",
+    "replaySha256": "8f1c0930bc6e92c2bad6ee2a9e515f2bc478101968c5f6bc898303ce18ee9627",
+    "custodySha256": "8cc9f1d8617127f3090797071424caee3406db3052ac11dde19fe1da33ab6d28",
+    "negativeSha256": "08272f8d0efe221409570a309d142d3bc0d56c346dd1ba53c33ed417a1133530"
+  },
+  "findingDisposition": {
+    "id": "GHR3-R1",
+    "result": "PASS_CORRECTED",
+    "facts": [
+      "capture and controls import the same hashed navigation helper",
+      "same expected destination skips transition wait after real activation and still requires exact destination equality",
+      "different destination waits for exact expected URL and still requires exact destination equality",
+      "same/different/wrong/missing-activation controls call the shared helper"
+    ]
+  },
+  "retainedDispositions": [
+    "matrix byte-identical to FIX3",
+    "prior 65 controls and 54-row oracle/safety expectations retained",
+    "all eight executable dependencies included in ordered digest",
+    "adapter verifies full digest before import and constructor equality before success",
+    "mutation negative prevents import and successful rows"
+  ],
+  "fixedOutputsAbsent": {
+    "receipt": true,
+    "row01": true,
+    "row53": true,
+    "row54": true,
+    "profile": true
+  },
+  "activity": {
+    "tests": 0,
+    "probes": 0,
+    "browser": 0,
+    "http": 0,
+    "database": 0,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "gitActions": 0
+  }
+}

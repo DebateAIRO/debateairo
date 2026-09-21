@@ -1,0 +1,74 @@
+$ tsx tests/support-eval/run.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-YqOexy/data ... ok
+creating subdirectories ... 
+[S00 DB embedded] ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+[S00 DB embedded] ok
+running bootstrap script ... 
+[S00 DB embedded] ok
+
+[S00 DB embedded] performing post-bootstrap initialization ... 
+[S00 DB embedded] ok
+syncing data to disk ... 
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-YqOexy/data -l logfile start
+
+
+[S00 DB embedded] 2026-09-17 13:33:22.922 EEST [37819] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+[S00 DB embedded] 2026-09-17 13:33:22.924 EEST [37819] LOG:  listening on IPv4 address "127.0.0.1", port 54719
+
+[S00 DB embedded] 2026-09-17 13:33:22.924 EEST [37819] LOG:  listening on IPv6 address "::1", port 54719
+
+[S00 DB embedded] 2026-09-17 13:33:22.924 EEST [37819] LOG:  listening on Unix socket "/tmp/.s.PGSQL.54719"
+
+[S00 DB embedded] 2026-09-17 13:33:22.927 EEST [37825] LOG:  database system was shut down at 2026-09-17 13:33:22 EEST
+
+[S00 DB embedded] 2026-09-17 13:33:22.930 EEST [37819] LOG:  database system is ready to accept connections
+
+[S00 DB embedded] 2026-09-17 13:33:23.259 EEST [37830] WARNING:  there is already a transaction in progress
+
+[S00 DB embedded] 2026-09-17 13:33:23.618 EEST [37830] WARNING:  there is no transaction in progress
+
+[S00 DB embedded] 2026-09-17 13:33:23.623 EEST [37819] LOG:  received fast shutdown request
+
+[S00 DB embedded] 2026-09-17 13:33:23.623 EEST [37819] LOG:  aborting any active transactions
+
+[S00 DB embedded] 2026-09-17 13:33:23.624 EEST [37819] LOG:  background worker "logical replication launcher" (PID 37828) exited with exit code 1
+
+[S00 DB embedded] 2026-09-17 13:33:23.626 EEST [37823] LOG:  shutting down
+
+[S00 DB embedded] 2026-09-17 13:33:23.626 EEST [37823] LOG:  checkpoint starting: shutdown immediate
+
+[S00 DB embedded] 2026-09-17 13:33:23.699 EEST [37823] LOG:  checkpoint complete: wrote 1694 buffers (10.3%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.041 s, sync=0.031 s, total=0.073 s; sync files=1143, longest=0.001 s, average=0.001 s; distance=13553 kB, estimate=13553 kB; lsn=0/24C3630, redo lsn=0/24C3630
+
+[S00 DB embedded] 2026-09-17 13:33:23.704 EEST [37819] LOG:  database system is shut down
+
+SUPPORT_EVAL_FAILED

@@ -1,0 +1,16 @@
+{
+  "node": "GUIDE_CONTEXT_REVIEW",
+  "reason": "Pre-freeze packet check rejected slash-delimited prose as path; freeze nevertheless ran because orchestration call failed to gate dependent action. No dispatch occurred. V2 corrects prose only; source/evidence/permissions unchanged.",
+  "sealedOriginal": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/GUIDE_CONTEXT_REVIEW.md",
+    "sha256": "bd5757e808aad32cd4ace3f04fcea7ab52d76f52e674bd1546fca8c8972e770a"
+  },
+  "replacement": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/GUIDE_CONTEXT_REVIEW-v2.md",
+    "sha256": "2284c5962b9db99d0de4fa67a8abd87468498e947f3a2d096b05dec6b810d0bb"
+  },
+  "originalFreeze": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTEXT_REVIEW-freeze.json",
+    "sha256": "7ce8f6972be606edcc639347a981b495b37cd945acf3a570494c8ebc7dfe05cf"
+  }
+}

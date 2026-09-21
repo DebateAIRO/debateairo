@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND15",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productClean": true,
+  "runtimeAfterDiagnostic": {
+    "pid": 77769,
+    "ppid": 1,
+    "pgid": 77769,
+    "ordinaryTlsHelpStatus": 200,
+    "unrelatedListenersPreserved": true
+  },
+  "ongoingPrivateLogExcluded": true,
+  "productChanged": false,
+  "gitLeaseUsed": false
+}

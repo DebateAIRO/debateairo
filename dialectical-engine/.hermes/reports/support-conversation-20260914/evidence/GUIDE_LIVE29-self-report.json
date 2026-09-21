@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE29",
+  "ticket": "t_2ff659f9",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "FAILED_PRECAPTURE_STALE_RUNTIME_CUSTODY_WRAPPER",
+  "phases": {
+    "attempted": 2,
+    "completed": 1,
+    "preflight": {
+      "status": 0,
+      "completedAtUtc": "2026-09-21T08:22:47.699Z",
+      "verdict": "PASS_ZERO_SUPPORT_UI_TRANSITIONS",
+      "uiTransitions": 5,
+      "supportRequestsForwarded": 0
+    },
+    "readiness": {
+      "status": 1,
+      "fixedCode": "GUIDE_CAPTURE_RUNTIME_CUSTODY_INVALID",
+      "outputCreated": false
+    },
+    "capacity": {
+      "attempted": false
+    },
+    "gate": {
+      "attempted": false
+    },
+    "logical58": {
+      "attempted": false,
+      "completed": 0
+    },
+    "actual31": {
+      "attempted": false,
+      "completed": 0
+    }
+  },
+  "traffic": {
+    "sessions": 0,
+    "support": 0,
+    "model": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0
+  },
+  "cause": {
+    "kind": "STALE_WRAPPER_CONTRACT",
+    "sourcePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND21/phase-readiness.mjs",
+    "sourceLines": [
+      10,
+      14
+    ],
+    "expectedByWrapper": {
+      "node": "GUIDE_RUNTIME7",
+      "ports": {
+        "ui": 3100,
+        "api": 8787,
+        "relay": 8894
+      }
+    },
+    "actualReviewedCustody": {
+      "node": "GUIDE_RUNTIME9",
+      "apiPort": 8890,
+      "completeSupportPreviewPortMap": true
+    },
+    "runtimeFailureProved": false
+  },
+  "limitations": [
+    "READINESS_NOT_PROVED",
+    "CAPACITY_NOT_READ",
+    "LOGICAL58_NOT_RUN",
+    "ACTUAL31_NOT_RUN",
+    "FORGOT_UNRESOLVED"
+  ]
+}

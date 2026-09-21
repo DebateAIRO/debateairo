@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW",
+  "ticket": "t_558033fb",
+  "revision": "8fb8e407b350f9950cdb27a0f4caaf8e178d7cb6",
+  "sourceRevision": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+  "verdict": "REWORK",
+  "reviewMode": "immutableGitObjects",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "agentPath": "/root/baseline",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-17T13:21:59Z",
+  "localCheckoutHead": "af02290219c734d2ad2fe7df878356fec9043b15",
+  "findings": [
+    {
+      "id": "GH-R1",
+      "disposition": "REWORK",
+      "summary": "Five declarative session groups collapse to three actual Support sessions because same-origin sessionStorage survives full/compact transitions."
+    },
+    {
+      "id": "GH-R2",
+      "disposition": "REWORK",
+      "summary": "The bound control proof carries no revision or KB identity, and gate validation does not compare those identities to the final product."
+    }
+  ],
+  "reviewedCode": [
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX/capture-public-guide.mjs",
+      "sha256": "d6c19ef4fed9b1617a71d9d86aa29778a38bf76bea115d64a9b55f082c877b5f",
+      "bytes": 16406
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX/controls.mjs",
+      "sha256": "3c97bfbb59bcaa4154f74ea08098aa1f3fed6cbc07ec86b1b60df5a7216d459f",
+      "bytes": 7388
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX/matrix.mjs",
+      "sha256": "cea34112498143dcf8b1a571e40e5a24d207b5b47ee9b142048506cc773ca1ae",
+      "bytes": 13168
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX/pre-request-verifier.ts",
+      "sha256": "1394da510272fb2773d5da50c37a1eb203d62208225d871f405cdadd1b870c0c",
+      "bytes": 13512
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX/runtime-capacity.mjs",
+      "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87",
+      "bytes": 9935
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX/verify-guide-harness.mjs",
+      "sha256": "da70b27127874d6dd01673e4ebeefd0e6daacb449691f6e56c3acabcae995648",
+      "bytes": 24940
+    },
+    {
+      "path": "dialectical-engine/apps/ui/components/support/Assistant.tsx",
+      "gitRevision": "8fb8e407b350f9950cdb27a0f4caaf8e178d7cb6",
+      "sha256": "5921ced41c60a047a4c4e390f2e6154b99944c4ad0620433f130d58d590062b3",
+      "bytes": 35138
+    }
+  ],
+  "historicalControlProof": {
+    "sha256": "17c0ccb812c1144d2cc108cb6173f3eec516c034e6efcdb3426a9537ef9adfc9",
+    "bytes": 2972,
+    "controls": 54,
+    "passed": 54,
+    "bindingDisposition": "historical8fbOnly"
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW.md",
+      "sha256": "a9102c6cf77839917a034a68c0fab24f3da1df9d4d375a3c04152364ea0e9576",
+      "bytes": 9717
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW.md",
+      "sha256": "40237248c8bac9b32694537bc507d7a9269eff226d45114ca6deda3f92f690fc",
+      "bytes": 3673
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW-matrix.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW-matrix.json",
+      "sha256": "0a405d985510a43b702d711f969de229677b8d2d3f70bf2610c117698caf226c",
+      "bytes": 23923
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW-custody.log",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW-custody.log",
+      "sha256": "25f9b6ae2101beb7320fd5206307a8eb94beadc7b9705457cf9ff2e57943af64",
+      "bytes": 1009
+    }
+  ],
+  "limitations": [
+    "No runtime capacity value was read.",
+    "No browser, HTTP, database, Support, model, preview, product, Git, service, counter or limit action occurred.",
+    "The historical 54/54 proof is not execution on the future corrected product revision.",
+    "This receipt makes no preview-readiness, checkpoint-completion or owner-acceptance claim."
+  ]
+}

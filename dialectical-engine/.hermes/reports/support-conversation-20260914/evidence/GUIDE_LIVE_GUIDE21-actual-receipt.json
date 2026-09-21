@@ -1,0 +1,666 @@
+{
+  "schemaVersion": 2,
+  "completed": false,
+  "finalCommit": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+  "entryCount": 44,
+  "requiredSuiteFiles": [
+    "tests/unit/support-kb.test.ts",
+    "tests/unit/support-context.test.ts",
+    "tests/unit/support-navigation.test.ts",
+    "tests/architecture/support-catalog-coverage.test.ts",
+    "tests/unit/support-response-policy.test.ts",
+    "tests/unit/support-classify.test.ts",
+    "tests/unit/support-security-guidance.test.ts",
+    "tests/unit/support-model.test.ts",
+    "tests/unit/support-escalation.test.ts",
+    "tests/integration/support-routes.test.ts",
+    "tests/integration/support-metrics.test.ts",
+    "tests/integration/support-degraded.test.ts",
+    "tests/integration/support-relay-reservations.test.ts",
+    "tests/render/sup-01-help.test.tsx",
+    "tests/integration/support-config-convergence.test.ts",
+    "tests/integration/support-own-context.test.ts",
+    "tests/integration/support-shred.test.ts",
+    "tests/unit/support-answer-context.test.ts",
+    "tests/unit/support-redaction.test.ts",
+    "tests/integration/support-cases.test.ts",
+    "tests/unit/support-credentials.test.ts",
+    "tests/unit/support-model-references.test.ts",
+    "tests/unit/support-text-views.test.ts",
+    "tests/unit/support-recovery-components.test.ts",
+    "tests/unit/support-recovery-attestation.test.ts",
+    "tests/render/sup-03-consent.test.tsx",
+    "tests/render/sup-04-widget.test.tsx",
+    "tests/render/support-topbar.test.tsx",
+    "tests/unit/support-public-guide-boundary.test.ts",
+    "tests/unit/support-recovery-intent.test.ts",
+    "tests/unit/s7-authorization.test.ts",
+    "tests/architecture/sup-01-boundary.test.ts",
+    "tests/architecture/sup-03-projection.test.ts",
+    "tests/integration/dev-database-principals.test.ts"
+  ],
+  "gatePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-gate.json",
+  "gateSha256": "4b5af1293dc66a772b9c69504d3ba743a14062d2fc39cadefcc0652ea1148351",
+  "baseUrl": "https://localhost:3100",
+  "browser": {
+    "driver": "playwright@1.61.1",
+    "executablePath": "/Users/vladmihaimiron/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell",
+    "headless": true,
+    "tlsBypass": false,
+    "freshProfile": true
+  },
+  "supportApi": "actual",
+  "relay": "actual unchanged support-preview relay",
+  "identity": "actual anonymous visitor",
+  "syntheticSupportOverrides": false,
+  "privateRecordsUsed": false,
+  "credentialOrRecoveryOperations": 0,
+  "forgotConnector": "UNRESOLVED_ACTIONLESS",
+  "preRequestControlProof": {
+    "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+    "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+    "harnessSha256": "4c1d66dcacd4f80517ca098f2d9113e08c9ce1b5f3449956e39c9d1a7a46bdcf",
+    "declaredControls": 28,
+    "derivedFromBoundResult": true
+  },
+  "runtimeCapacity": {
+    "measuredAtUtc": "2026-09-21T02:16:02.364Z",
+    "supportRegisterVersion": "8",
+    "supportSchemaVersion": 1,
+    "supportSnapshotSha256": "0b70f96ba473d55fa94baea77b076b1f2712fe47a2e3e9b9bab40b9555add629",
+    "fullSnapshotSha256": "31fc7602bd5d8f92f557194b2ba4a5c92fe9469f46f81969903ab3d40fcb196a",
+    "limits": {
+      "support_limit_anon_msgs_10m": 20,
+      "support_limit_anon_msgs_24h": 100,
+      "support_limit_anon_sessions_1h": 5,
+      "support_limit_session_msgs": 40,
+      "support_limit_msg_chars": 2000,
+      "support_relay_concurrency": 2,
+      "support_queue_depth": 10,
+      "support_daily_call_cap": 500,
+      "support_lock_after_injections": 3,
+      "support_ip_cooldown_minutes": 60
+    },
+    "observed": {
+      "maxAnonSessionEvents1hByIp": 0,
+      "maxAnonMessageEvents10mByIp": 0,
+      "maxAnonMessageEvents24hByIp": 51,
+      "anyIpCooldownActive": false,
+      "callsToday": 0,
+      "liveRelayWaiters": 0,
+      "relayState": "AVAILABLE"
+    }
+  },
+  "matrixCount": 58,
+  "canonicalOrder": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58
+  ],
+  "coveragePlan": {
+    "requestCount": 31,
+    "modelCallCeiling": 27,
+    "sessionCount": 5,
+    "englishCount": 14,
+    "romanianCount": 17,
+    "ownerWalkthroughReservedMessages": 6,
+    "ownerWalkthroughReservedSessions": 2,
+    "sequences": [
+      1,
+      2,
+      15,
+      19,
+      23,
+      27,
+      31,
+      35,
+      39,
+      47,
+      43,
+      10,
+      18,
+      26,
+      34,
+      56,
+      58,
+      54,
+      5,
+      13,
+      21,
+      25,
+      29,
+      37,
+      45,
+      53,
+      8,
+      12,
+      42,
+      55,
+      57
+    ],
+    "groupIds": [
+      "lifecycle-full-en",
+      "full-ro",
+      "compact-ro",
+      "full-en",
+      "compact-en"
+    ],
+    "allMenuFamilyIds": [
+      "pricing-placeholder",
+      "global-navigation",
+      "landing",
+      "home-library",
+      "help",
+      "theme",
+      "debate-views",
+      "scoring",
+      "replay",
+      "workspace",
+      "honesty",
+      "export",
+      "guide",
+      "active-sessions",
+      "privacy",
+      "legacy-claim",
+      "account-deletion",
+      "human-case-separation",
+      "public-help-status",
+      "support-availability-limits"
+    ],
+    "broadGuideSequences": [
+      25,
+      26
+    ],
+    "affectedPriorSequences": [
+      2,
+      15,
+      19,
+      23,
+      27,
+      31,
+      35,
+      39
+    ],
+    "ownerSequences": [
+      55,
+      56,
+      57,
+      58
+    ],
+    "helpNavigationSequences": [
+      53,
+      54
+    ],
+    "deterministicBoundarySequences": [
+      42,
+      43,
+      45,
+      47
+    ]
+  },
+  "executionOrder": [
+    1,
+    2,
+    15,
+    19,
+    23,
+    27,
+    31,
+    35,
+    39,
+    47,
+    43,
+    10,
+    18,
+    26,
+    34,
+    56,
+    58,
+    54,
+    5,
+    13,
+    21,
+    25,
+    29,
+    37,
+    45,
+    53,
+    8,
+    12,
+    42,
+    55,
+    57
+  ],
+  "sessionGroups": [
+    {
+      "id": "lifecycle-full-en",
+      "mode": "full",
+      "language": "en",
+      "sequences": [
+        1
+      ]
+    },
+    {
+      "id": "full-ro",
+      "mode": "full",
+      "language": "ro",
+      "sequences": [
+        2,
+        15,
+        19,
+        23,
+        27,
+        31,
+        35,
+        39,
+        47,
+        43
+      ]
+    },
+    {
+      "id": "compact-ro",
+      "mode": "compact",
+      "language": "ro",
+      "sequences": [
+        10,
+        18,
+        26,
+        34,
+        56,
+        58,
+        54
+      ]
+    },
+    {
+      "id": "full-en",
+      "mode": "full",
+      "language": "en",
+      "sequences": [
+        5,
+        13,
+        21,
+        25,
+        29,
+        37,
+        45,
+        53
+      ]
+    },
+    {
+      "id": "compact-en",
+      "mode": "compact",
+      "language": "en",
+      "sequences": [
+        8,
+        12,
+        42,
+        55,
+        57
+      ]
+    }
+  ],
+  "pacing": {
+    "requiredRequestStartSpacingMs": 31000,
+    "requestStarts": [
+      {
+        "sequence": 1,
+        "requestStartOffsetMs": 2115
+      }
+    ]
+  },
+  "failureObservation": {
+    "phase": "DIAGNOSTIC_PROJECTED",
+    "canonicalRow": {
+      "sequence": 1,
+      "prompt": "Pricing",
+      "kind": "GUIDE_FAMILY",
+      "family": "pricing-placeholder",
+      "mode": "full",
+      "language": "en",
+      "branch": "MODEL",
+      "actionPolicy": "NONE",
+      "recoveryClass": null
+    },
+    "proof": {
+      "branch": "MODEL"
+    },
+    "apiReceived": {
+      "httpStatus": 200,
+      "outcome": "ANSWER_GROUNDED",
+      "fieldStates": {
+        "body": "OBJECT",
+        "status": "VALID",
+        "outcome": "CLOSED",
+        "text": "STRING",
+        "sources": "ARRAY",
+        "actions": "ARRAY"
+      }
+    },
+    "api": {
+      "status": 200,
+      "outcome": "ANSWER_GROUNDED",
+      "text": "Pricing on the site is informational only — it describes plans and costs but is not a checkout flow, so you cannot purchase or change a plan from it. If you have questions about what a plan includes, Support can explain the published information, but creating or paying for a debate happens through the debate creator after you sign in.",
+      "sources": [
+        {
+          "id": "app-navigation",
+          "label": "Navigate Dialectical Engine"
+        }
+      ],
+      "actions": []
+    },
+    "visible": {
+      "text": "Pricing on the site is informational only — it describes plans and costs but is not a checkout flow, so you cannot purchase or change a plan from it. If you have questions about what a plan includes, Support can explain the published information, but creating or paying for a debate happens through the debate creator after you sign in.",
+      "sources": [
+        "Navigate Dialectical Engine"
+      ],
+      "actions": []
+    },
+    "equality": {
+      "text": true,
+      "sources": true,
+      "actions": true
+    },
+    "diagnostic": {
+      "status": "ACCEPTED_DRAFT",
+      "category": null,
+      "candidateCount": 0,
+      "validCount": 0,
+      "invalidCount": 0,
+      "duplicateCount": 0,
+      "unmatchedCount": 0
+    },
+    "failureCode": null
+  },
+  "failure": null,
+  "attemptedRows": [
+    1
+  ],
+  "attemptedRowCount": 1,
+  "completedRowCount": 1,
+  "freshRows": [
+    {
+      "provenance": "FRESH_GUIDE21_FIXED31",
+      "sequence": 1,
+      "kind": "GUIDE_FAMILY",
+      "family": "pricing-placeholder",
+      "mode": "full",
+      "language": "en",
+      "prompt": "Pricing",
+      "branch": "MODEL",
+      "expectedSourceIds": [
+        "app-navigation"
+      ],
+      "actionPolicy": "NONE",
+      "navigation": null,
+      "lifecycleRole": "PRICING_EN_BEFORE_SWITCH",
+      "recoveryClass": null,
+      "proof": {
+        "branch": "MODEL",
+        "sourceIds": [
+          "app-navigation"
+        ],
+        "requestedActionIds": [],
+        "allowedActions": [],
+        "sourcePolicy": null,
+        "recoverySourceIds": [
+          "app-navigation"
+        ],
+        "fallbackSha256": "4264551f61745540e92932ee99a99405152e94edf8b167e0ee19c5463526411d",
+        "review": {
+          "reviewedBy": "SOL",
+          "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+          "reviewedOn": "2026-09-17",
+          "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_EDITORIAL_RECHECK.md"
+        }
+      },
+      "api": {
+        "status": 200,
+        "outcome": "ANSWER_GROUNDED",
+        "text": "Pricing on the site is informational only — it describes plans and costs but is not a checkout flow, so you cannot purchase or change a plan from it. If you have questions about what a plan includes, Support can explain the published information, but creating or paying for a debate happens through the debate creator after you sign in.",
+        "sources": [
+          {
+            "id": "app-navigation",
+            "label": "Navigate Dialectical Engine"
+          }
+        ],
+        "actions": []
+      },
+      "visible": {
+        "text": "Pricing on the site is informational only — it describes plans and costs but is not a checkout flow, so you cannot purchase or change a plan from it. If you have questions about what a plan includes, Support can explain the published information, but creating or paying for a debate happens through the debate creator after you sign in.",
+        "sources": [
+          "Navigate Dialectical Engine"
+        ],
+        "actions": []
+      },
+      "diagnostic": {
+        "status": "ACCEPTED_DRAFT",
+        "category": null,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0,
+        "unmatchedCount": 0
+      },
+      "attribution": {
+        "responseOrigin": "MODEL_ACCEPTED_DRAFT",
+        "apiDomTextEqual": true,
+        "apiDomSourcesEqual": true,
+        "apiDomActionsEqual": true
+      },
+      "selectedLanguage": "en",
+      "sessionCreateCount": 1
+    }
+  ],
+  "navigations": [],
+  "networkCounts": {
+    "createSession": 1,
+    "sendMessage": 1,
+    "forbiddenAnswers": 0,
+    "forbiddenConsent": 0
+  },
+  "sessionKbVersions": [
+    "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af"
+  ],
+  "sessionReplacementEvidence": [],
+  "groupSessionEvidence": [],
+  "noPrivateControls": [
+    {
+      "mode": "full",
+      "checked": true
+    }
+  ],
+  "consoleErrorCount": 3,
+  "consoleErrorCategories": {
+    "HTTP_401": 3,
+    "HTTP_404": 0,
+    "JS_OR_HYDRATION": 0,
+    "OTHER": 0
+  },
+  "screenshots": [],
+  "uiTransitions": [
+    {
+      "surface": "full",
+      "language": "en",
+      "phase": "BEFORE_INTERACTION",
+      "hydrationReady": "READY",
+      "toggleCount": 0,
+      "toggleVisible": "NOT_APPLICABLE",
+      "widgetState": "NOT_APPLICABLE",
+      "ariaExpanded": "NOT_APPLICABLE",
+      "panelCount": 0,
+      "panelVisible": "NOT_APPLICABLE",
+      "compactRootCount": 0,
+      "compactRootVisible": "NOT_APPLICABLE",
+      "composerCount": 1,
+      "composerVisible": "VISIBLE",
+      "urlClass": "HELP",
+      "cookieRegionVisible": "VISIBLE",
+      "consoleErrorCategories": {
+        "HTTP_401": 2,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 0
+      },
+      "fullReadiness": {
+        "languageControlCount": 2,
+        "visibleLanguageControlCount": 2,
+        "activeLanguage": "EN",
+        "composerCount": 1,
+        "composerVisible": "VISIBLE",
+        "modeToggleCount": 1,
+        "modeToggleVisible": "VISIBLE",
+        "modeState": "TERRACOTTA",
+        "urlClass": "HELP"
+      }
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "phase": "READY",
+      "hydrationReady": "READY",
+      "toggleCount": 0,
+      "toggleVisible": "NOT_APPLICABLE",
+      "widgetState": "NOT_APPLICABLE",
+      "ariaExpanded": "NOT_APPLICABLE",
+      "panelCount": 0,
+      "panelVisible": "NOT_APPLICABLE",
+      "compactRootCount": 0,
+      "compactRootVisible": "NOT_APPLICABLE",
+      "composerCount": 1,
+      "composerVisible": "VISIBLE",
+      "urlClass": "HELP",
+      "cookieRegionVisible": "VISIBLE",
+      "consoleErrorCategories": {
+        "HTTP_401": 2,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 0
+      },
+      "fullReadiness": {
+        "languageControlCount": 2,
+        "visibleLanguageControlCount": 2,
+        "activeLanguage": "EN",
+        "composerCount": 1,
+        "composerVisible": "VISIBLE",
+        "modeToggleCount": 1,
+        "modeToggleVisible": "VISIBLE",
+        "modeState": "TERRACOTTA",
+        "urlClass": "HELP"
+      }
+    }
+  ],
+  "uiTransitionFailure": null,
+  "postReadyStages": [
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "COOKIE_SETTLING",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "COOKIE_SETTLING",
+      "state": "PASSED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "LOCALE_SELECTION",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "LOCALE_SELECTION",
+      "state": "PASSED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "PRIVATE_CONTROL_CHECK",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "PRIVATE_CONTROL_CHECK",
+      "state": "PASSED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "TRANSITION_COMPLETION",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "TRANSITION_COMPLETION",
+      "state": "PASSED"
+    }
+  ],
+  "currentPostReadyStage": {
+    "surface": "full",
+    "language": "en",
+    "stage": "TRANSITION_COMPLETION",
+    "state": "PASSED"
+  },
+  "failureCode": "GUIDE_CAPTURE_SCREENSHOT_TARGET_MISMATCH"
+}

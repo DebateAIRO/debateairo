@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "phase": "ROW_PROOF",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "status": 0,
+  "signal": null,
+  "completedAtUtc": "2026-09-21T02:16:03.535Z",
+  "resultPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-LIVE25.json",
+  "resultSha256": "1b5d7b296d5b5981d6391ebba27e8a35e03a0cd20cb671c7cf799494ee999520",
+  "gatePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-gate.json",
+  "gateSha256": "4b5af1293dc66a772b9c69504d3ba743a14062d2fc39cadefcc0652ea1148351",
+  "validatedRows": 58,
+  "validation": "PASS"
+}

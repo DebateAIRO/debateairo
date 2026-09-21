@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_RUNTIME9",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "pid": 9800,
+  "pgid": 9800,
+  "commandMarker": "pnpm dev:auth:up",
+  "runtimeLogPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_RUNTIME9-stack.log",
+  "ports": {
+    "ui": 3100,
+    "api": 8890,
+    "postgres": 55433,
+    "hatchetGrpc": 7177,
+    "hatchetApi": 8988,
+    "providerStart": 8891,
+    "providerEnd": 8896,
+    "supportModel": 8894
+  },
+  "startedAtUtc": "2026-09-21T07:59:03.445Z",
+  "detached": true,
+  "ordinarySystemTls": {
+    "path": "/help",
+    "customCa": false,
+    "insecure": false,
+    "status": 200
+  }
+}

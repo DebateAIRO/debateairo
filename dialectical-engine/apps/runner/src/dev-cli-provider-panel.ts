@@ -10,6 +10,10 @@ import {
   developmentProviderSlots,
   type DevelopmentProviderPanel
 } from "./dev-provider-panel.js";
+import {
+  DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  type DevelopmentAuthStackProfile
+} from "./dev-auth-stack-profile.js";
 
 export { DEVELOPMENT_PROVIDER_SLOT_CATALOGUE } from "./dev-provider-panel.js";
 
@@ -43,9 +47,10 @@ async function closeRelays(relays: readonly DevelopmentCliRelay[]): Promise<void
 export async function startDevelopmentCliProviderPanel(
   config: ModelConfig = loadModelConfig(process.cwd()),
   operations: DevelopmentCliProviderPanelOperations = createDevelopmentCliProviderPanelOperations(config),
-  warning: (line: string) => void = (line) => { console.warn(line); }
+  warning: (line: string) => void = (line) => { console.warn(line); },
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): Promise<DevelopmentCliProviderPanelHandle> {
-  const slots = developmentProviderSlots(config);
+  const slots = developmentProviderSlots(config, profile);
   const cliSlots = slots.filter((slot) => slot.transport === "cli");
   if (operations.starts.length !== cliSlots.length) {
     throw new TypeError("DEV_CLI_PROVIDER_PANEL_START_SET_INVALID");
@@ -93,11 +98,15 @@ export async function startDevelopmentCliProviderPanel(
         model: DEVELOPMENT_UNAVAILABLE_CLI_MODEL
       });
     });
-    panel = buildDevelopmentProviderPanel(observations, slots.map((provider) => ({
-      providerRef: provider.providerRef,
-      adapterKind: provider.adapterKind,
-      maker: provider.maker
-    })));
+    panel = buildDevelopmentProviderPanel(
+      observations,
+      slots.map((provider) => ({
+        providerRef: provider.providerRef,
+        adapterKind: provider.adapterKind,
+        maker: provider.maker
+      })),
+      profile
+    );
     if (panel.healthyProviderRefs.length < DEVELOPMENT_MINIMUM_DISTINCT_MAKERS) {
       throw new TypeError("DEV_CLI_PROVIDER_PANEL_INSUFFICIENT_MAKERS");
     }

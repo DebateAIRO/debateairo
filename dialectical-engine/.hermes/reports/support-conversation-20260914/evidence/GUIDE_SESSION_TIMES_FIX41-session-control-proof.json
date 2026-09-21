@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_SESSION_TIMES_FIX41",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS",
+  "controls": 9,
+  "passed": 9,
+  "names": [
+    "actual producer records exactly three identifier-free ordered timestamps",
+    "actual producer rejects fourth timestamp",
+    "actual composer accepts exact three and emits five total ordinals",
+    "actual composer rejects two",
+    "actual composer rejects four",
+    "actual composer rejects malformed",
+    "actual composer rejects out of order",
+    "actual composer rejects incorrect ordinals",
+    "proof serialized"
+  ],
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "privateValuesPersisted": false
+}

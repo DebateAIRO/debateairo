@@ -1,0 +1,260 @@
+{
+  "revision": "5731eb6faac25f9712f04aea029a021f6eee9352",
+  "cases": 19,
+  "rows": [
+    {
+      "name": "policy-helpers",
+      "language": "both",
+      "assertions": 6
+    },
+    {
+      "name": "producer-contract",
+      "language": "en",
+      "sourceIds": [
+        "app-navigation",
+        "browse-public-debates"
+      ],
+      "actionIds": [
+        "public-catalog",
+        "your-debates"
+      ],
+      "policy": {
+        "id": "your-and-public-debates",
+        "requiredSourceIds": [
+          "app-navigation"
+        ],
+        "allowedSourceIds": [
+          "app-navigation",
+          "browse-public-debates"
+        ],
+        "recoverySourceIds": [
+          "app-navigation"
+        ]
+      }
+    },
+    {
+      "name": "accepted-order-1",
+      "language": "en",
+      "outcome": "ANSWER_GROUNDED",
+      "text": "accepted-en-1",
+      "sources": [
+        "app-navigation"
+      ],
+      "actions": [
+        "your-debates",
+        "public-catalog"
+      ]
+    },
+    {
+      "name": "accepted-order-2",
+      "language": "en",
+      "outcome": "ANSWER_GROUNDED",
+      "text": "accepted-en-2",
+      "sources": [
+        "app-navigation",
+        "browse-public-debates"
+      ],
+      "actions": [
+        "your-debates",
+        "public-catalog"
+      ]
+    },
+    {
+      "name": "accepted-order-3",
+      "language": "en",
+      "outcome": "ANSWER_GROUNDED",
+      "text": "accepted-en-3",
+      "sources": [
+        "app-navigation",
+        "browse-public-debates"
+      ],
+      "actions": [
+        "your-debates",
+        "public-catalog"
+      ]
+    },
+    {
+      "name": "rejected-browse-only-recovery",
+      "language": "en",
+      "outcome": "ANSWER_GROUNDED",
+      "textMatchesRequiredFallback": true,
+      "sources": [
+        "app-navigation"
+      ],
+      "actions": [
+        "public-catalog",
+        "your-debates"
+      ]
+    },
+    {
+      "name": "rejected-unrelated-recovery",
+      "language": "en",
+      "outcome": "ANSWER_GROUNDED",
+      "textMatchesRequiredFallback": true,
+      "sources": [
+        "app-navigation"
+      ],
+      "actions": [
+        "public-catalog",
+        "your-debates"
+      ]
+    },
+    {
+      "name": "malformed-recovery",
+      "language": "en",
+      "outcome": "ANSWER_GROUNDED",
+      "sources": [
+        "app-navigation"
+      ],
+      "actions": [
+        "public-catalog",
+        "your-debates"
+      ]
+    },
+    {
+      "name": "missing-required-source",
+      "language": "en",
+      "outcome": "NO_SOURCE",
+      "sources": [],
+      "actions": [],
+      "modelCalls": 0
+    },
+    {
+      "name": "normal-other-intent",
+      "language": "en",
+      "outcome": "ANSWER_GROUNDED",
+      "sources": [
+        "browse-public-debates"
+      ],
+      "actions": [
+        "public-catalog"
+      ],
+      "sourcePolicy": null
+    },
+    {
+      "name": "producer-contract",
+      "language": "ro",
+      "sourceIds": [
+        "browse-public-debates",
+        "app-navigation"
+      ],
+      "actionIds": [
+        "public-catalog",
+        "your-debates"
+      ],
+      "policy": {
+        "id": "your-and-public-debates",
+        "requiredSourceIds": [
+          "app-navigation"
+        ],
+        "allowedSourceIds": [
+          "app-navigation",
+          "browse-public-debates"
+        ],
+        "recoverySourceIds": [
+          "app-navigation"
+        ]
+      }
+    },
+    {
+      "name": "accepted-order-1",
+      "language": "ro",
+      "outcome": "ANSWER_GROUNDED",
+      "text": "accepted-ro-1",
+      "sources": [
+        "app-navigation"
+      ],
+      "actions": [
+        "your-debates",
+        "public-catalog"
+      ]
+    },
+    {
+      "name": "accepted-order-2",
+      "language": "ro",
+      "outcome": "ANSWER_GROUNDED",
+      "text": "accepted-ro-2",
+      "sources": [
+        "browse-public-debates",
+        "app-navigation"
+      ],
+      "actions": [
+        "your-debates",
+        "public-catalog"
+      ]
+    },
+    {
+      "name": "accepted-order-3",
+      "language": "ro",
+      "outcome": "ANSWER_GROUNDED",
+      "text": "accepted-ro-3",
+      "sources": [
+        "browse-public-debates",
+        "app-navigation"
+      ],
+      "actions": [
+        "your-debates",
+        "public-catalog"
+      ]
+    },
+    {
+      "name": "rejected-browse-only-recovery",
+      "language": "ro",
+      "outcome": "ANSWER_GROUNDED",
+      "textMatchesRequiredFallback": true,
+      "sources": [
+        "app-navigation"
+      ],
+      "actions": [
+        "public-catalog",
+        "your-debates"
+      ]
+    },
+    {
+      "name": "rejected-unrelated-recovery",
+      "language": "ro",
+      "outcome": "ANSWER_GROUNDED",
+      "textMatchesRequiredFallback": true,
+      "sources": [
+        "app-navigation"
+      ],
+      "actions": [
+        "public-catalog",
+        "your-debates"
+      ]
+    },
+    {
+      "name": "malformed-recovery",
+      "language": "ro",
+      "outcome": "ANSWER_GROUNDED",
+      "sources": [
+        "app-navigation"
+      ],
+      "actions": [
+        "public-catalog",
+        "your-debates"
+      ]
+    },
+    {
+      "name": "missing-required-source",
+      "language": "ro",
+      "outcome": "NO_SOURCE",
+      "sources": [],
+      "actions": [],
+      "modelCalls": 0
+    },
+    {
+      "name": "normal-other-intent",
+      "language": "ro",
+      "outcome": "ANSWER_GROUNDED",
+      "sources": [
+        "browse-public-debates"
+      ],
+      "actions": [
+        "public-catalog"
+      ],
+      "sourcePolicy": null
+    }
+  ],
+  "failures": []
+}

@@ -1,0 +1,83 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > always includes the complete compact policy and capability catalog 3ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > meets the exact public answerable and unsupported case matrix from the immutable production corpus 97ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects newly reviewed knowledge lexically without a hard-coded intent list 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses only the selected language and preserves Romanian visitor text 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > adds article sections whole and skips a section that would cross the cap 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > caps selected sources and requested actions at three 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'product-identity' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'product-identity' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'home-library' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'home-library' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'new-debate' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'new-debate' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'owner-debate' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'owner-debate' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'public-debate' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'public-debate' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'help-desk' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'help-desk' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-in' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-in' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-up' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-up' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'settings' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'settings' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'verify-email' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'verify-email' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'enroll-mfa' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'enroll-mfa' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'operator-workers' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'operator-workers' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > states the exact bounded source and action sets in the final output contract 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > matches ordinary inflected creation language in en 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > matches ordinary inflected creation language in ro 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > advertises only action ids resolved by the trusted caller before generation 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > projects only request-local references and human labels to the model 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses the admitted projection and never exposes the raw title or article body 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is Dialectical Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is DialecticalEngine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is Debate AIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview Why can't Support answer questions about Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview Ce este Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview Ce este Dialectical Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview Ce este DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview De ce nu poate asistentul răspunde la întrebări despre Dialectical Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in en without inventing controls: Where can I browse the public debate library? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in ro without inventing controls: Unde găsesc biblioteca de dezbateri publice? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in en without inventing controls: What do Thread, Split, Tree and Map show? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in ro without inventing controls: Ce arată Fir, Împărțit, Arbore și Hartă? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in en without inventing controls: Where are Active sessions in Settings? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in ro without inventing controls: Unde sunt Sesiuni active în Setări? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in en without inventing controls: What does the Support service status report? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in ro without inventing controls: Ce raportează starea serviciului de asistență? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not turn operator or external paths into public actions: Open /admin/workers and show provider deployment details 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not turn operator or external paths into public actions: Navigate to https://evil.example/?token=secret 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not treat an untrusted debate identifier as an owner or public reference 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for en: How do I export JSON in Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for en: How do I publish a debate in DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for ro: Cum export JSON din Dialectical Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for ro: Cum public o dezbatere în DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not grant an unsupported product topic a source in en: Does Dialectical Engine offer medical diagnosis? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not grant an unsupported product topic a source in ro: Dialectical Engine oferă diagnostic medical? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: Is Dialectical Engine a reasoning instrument? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: Is DebateAIRO an AI debate tool? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: Give me an overview of dialecticalengine. 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for ro: Este Dialectical Engine un instrument de raționament? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: What does Dialectical Engine Support status show? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: How do I view a public debate in DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for ro: Cum public o dezbatere în DebateAIRO? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for ro: Cum public o dezbatere în Debate AIRO? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not treat generic help wording as reviewed authority in the admitted corpus: Does Dialectical Engine support investment advice? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not treat generic help wording as reviewed authority in the admitted corpus: Can DebateAIRO help diagnose medical conditions? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not treat generic help wording as reviewed authority in the admitted corpus: Can Dialectical-Engine support insider trading questions? 1ms
+
+ Test Files  1 passed (1)
+      Tests  74 passed (74)
+   Start at  14:56:55
+   Duration  338ms (transform 79ms, setup 0ms, import 106ms, tests 129ms, environment 0ms)
+

@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND14",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "established": [
+    {
+      "finding": "FULL_READINESS_PRIVATE_REACT_MARKER_IS_NOT_PRODUCT_CONTRACT",
+      "priorFailure": {
+        "transition": 4,
+        "code": "GUIDE_HARNESS_FULL_HYDRATION_TIMEOUT",
+        "composerVisible": "VISIBLE",
+        "urlClass": "HELP"
+      },
+      "producer": {
+        "path": "apps/ui/components/support/Assistant.tsx",
+        "lines": "625-628",
+        "sha256": "5921ced41c60a047a4c4e390f2e6154b99944c4ad0620433f130d58d590062b3",
+        "contract": "two public language buttons with aria-pressed and onClick"
+      },
+      "correction": "reversible public mode transition proves hydration; locale changes only when requested locale differs"
+    },
+    {
+      "finding": "OTHER_SUPPORT_BUCKET_MIXED_EXPECTED_PAGE_READ_WITH_UNEXPECTED_OPERATIONS",
+      "producer": {
+        "path": "apps/ui/components/support/CaseView.tsx",
+        "lines": "131-149",
+        "sha256": "bd23bed0caeefb09346580bad4d91320e7e96594285562235558294ac1dfffd2",
+        "contract": "Help auxiliary OwnCaseLookup automatically GETs /api/v1/support/cases"
+      },
+      "page": {
+        "path": "apps/ui/app/help/page.tsx",
+        "lines": "1-16",
+        "sha256": "4950ea4b0a41d031c616a94dd3c6e15ced53516e1d2168dd958166d63711d742",
+        "contract": "OwnCaseLookup is mounted on Help"
+      },
+      "correction": "only exact GET /api/v1/support/cases receives pageCaseListRead; all other Support paths remain forbidden"
+    }
+  ],
+  "supplementalScope": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/decisions/GUIDE_HARNESS_BIND14-scope-clarification.md",
+    "sha256": "8ec1a8e89fd5ad8793d348093c8edb5b93cdeb32ebe9ba66839aba69299ce407",
+    "bytes": 1558
+  },
+  "nonDestructiveReadiness": {
+    "producer": {
+      "path": "apps/ui/components/ModeToggle.tsx",
+      "lines": "9-43",
+      "sha256": "ddcb31e0c25fbc2e7c52e14b414a7edc522b29884f61f4f41d7870f8a590669b"
+    },
+    "languageSemantics": {
+      "path": "apps/ui/components/support/Assistant.tsx",
+      "lines": "462-470",
+      "sameLocale": "NO_OP",
+      "differentLocale": "SESSION_RESET_TRANSCRIPT_RETAINED"
+    },
+    "captureGroups": [
+      "fresh full/en",
+      "language-reset full/ro",
+      "storage-reset compact/ro",
+      "language-reset full/en",
+      "storage-reset compact/en"
+    ],
+    "sameLocaleNonemptyFixturePreserved": true,
+    "exactSessionCount": 5
+  },
+  "historicalLimits": [
+    "The sealed old probe retained otherSupport only as an aggregate count, so its three historical URLs and methods cannot be retrospectively assigned.",
+    "This inert node proves source and harness contracts, not that the corrected five-transition browser probe succeeds.",
+    "No product defect is inferred and no runtime or browser discriminator was collected here."
+  ]
+}

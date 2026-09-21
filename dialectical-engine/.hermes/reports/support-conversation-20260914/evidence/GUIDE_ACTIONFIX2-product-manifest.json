@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_ACTIONFIX2",
+  "ticket": "t_f60a1644",
+  "baseRevision": "c8784902f78ed4ba1d637d122e1f32f598415f4e",
+  "finalRevision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "productFiles": [
+    {
+      "laneRelative": "packages/support-kb/src/catalog.ts",
+      "sha256": "7d9977b75820a33ac632a54eb65836032321965ee7a4c9311b8a3eacfcc6b527",
+      "bytes": 16135
+    },
+    {
+      "laneRelative": "packages/support-kb/src/context.ts",
+      "sha256": "c6526ee8b613e5b2c491974b16936078191796ebfb9f346ab45c37f1485861ad",
+      "bytes": 23579
+    },
+    {
+      "laneRelative": "tests/architecture/support-catalog-coverage.test.ts",
+      "sha256": "a524f38860c815478056ec59574d5aff02489a3bc9f7cfe0568ff46ebdbbe2c3",
+      "bytes": 6372
+    },
+    {
+      "laneRelative": "tests/unit/support-answer-context.test.ts",
+      "sha256": "34312b69289c1caddbdd0d7fbae938349a4db6e70770cdbb2defec3432bf1579",
+      "bytes": 30211
+    },
+    {
+      "laneRelative": "tests/unit/support-context.test.ts",
+      "sha256": "5cc19033223aba549fb7504132d7adb5735737ff95c3d5824425895fe8559da7",
+      "bytes": 31649
+    }
+  ],
+  "scopeExact": true,
+  "clean": true,
+  "change": "Closed EN/RO guide labels now provide bounded source and action evidence with affirmative-clause, availability, and child-destination constraints.",
+  "measuredAt": "2026-09-17T16:53:57.523289Z"
+}

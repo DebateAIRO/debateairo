@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND17",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "inheritedExecutableFiles": [
+    "pre-request-verifier.ts",
+    "verify-final-branches.ts"
+  ],
+  "changedExecutableFiles": [
+    "capture-public-guide.mjs",
+    "controls.mjs",
+    "matrix.mjs",
+    "runtime-capacity.mjs",
+    "session-lifecycle.mjs",
+    "verify-guide-harness.mjs"
+  ],
+  "retainedControlPurposes": 136,
+  "addedControlPurposes": 15,
+  "finalControlPurposes": 151,
+  "oracleRowsChanged": [
+    25,
+    26
+  ],
+  "canonicalPromptsChanged": 0,
+  "retainedRows": 15,
+  "freshRows": 39,
+  "freshSessions": 3,
+  "browserHelperBlocksUnchanged": true,
+  "probe6Retained": true,
+  "productChanges": 0,
+  "kbChanges": 0,
+  "traffic": {
+    "browser": false,
+    "runtime": false,
+    "http": false,
+    "supportRequests": 0,
+    "modelRequests": 0
+  }
+}

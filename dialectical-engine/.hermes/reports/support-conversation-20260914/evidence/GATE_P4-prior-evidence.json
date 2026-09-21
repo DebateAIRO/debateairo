@@ -1,0 +1,88 @@
+{
+  "at": "2026-09-17T05:29:32.805666+00:00",
+  "purpose": "Lean retained evidence for owner-authorized scoped final pass4; this is prior evidence only, not final product or verdict.",
+  "priorProduct": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
+  "priorLiveRuntime": "606b2eabea1dc9212159e53c193cf69655424e77",
+  "inputs": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/SPEC-v3.md",
+      "sha256": "c7f9343f0fd54d15a8bc2bca7585acf38693f02c59221cea216b5ae36cc7dcd8",
+      "bytes": 14848
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/CP1-REVIEWED-RECOVERY.md",
+      "sha256": "2ab3104381cf3006758813ede8be10ebd41904676505da9dcc3b8e4db963a6f7",
+      "bytes": 7814
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/OWNER-RESUME-20260917.md",
+      "sha256": "6b5caf665f520a7b5313c4564e5c6021ab06a727b54ef5d1e6f1f5f5cd4990fa",
+      "bytes": 1308
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV1-p3.md",
+      "sha256": "568d560fc7dd340064a53be3e4a4e0560b457c3033878fe680dc84f2db7a9b62",
+      "bytes": 12585
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/REV1-p3-consumption.json",
+      "sha256": "9f06ef8b16c6b6106c696c20b194ed4e8c25c58d400fadd5474c359e5bf02cf7",
+      "bytes": 10082
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV2-p3.md",
+      "sha256": "d00f033253f61099a5fa7f5c5dc20d1f1df7718b13bb01be9822508fe6b65d76",
+      "bytes": 10202
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/REV2-p3-consumption.json",
+      "sha256": "a9160eeea53a4e339eb6c75e98e91cfa4059ece902999909bb471c229053541d",
+      "bytes": 9685
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV3-p3.md",
+      "sha256": "7b6e674de759c14bab7869550b864a8ef75927822201f4a8f4fba0bf446de4b5",
+      "bytes": 10489
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/REV3-p3-consumption.json",
+      "sha256": "2ad7d202154bdfcfabf05f4241fb1c0c9d7d3a0f6441d3cc8f8868a3df54bf8f",
+      "bytes": 8352
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/REV2_P3/final-security-boundary-probe.ts",
+      "sha256": "1a9cd7b46307c9699f41994906437b60e6f0f5c5fa68b6a326c88e0cc6dae6d1",
+      "bytes": 18933
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/REV2_P3/run-final-security-probe.mjs",
+      "sha256": "95f35d13e8e468f05907f4eead9c2b432c788c21190d486ed00113a7078dba64",
+      "bytes": 2129
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/REV2_P3-final-security-boundary-attempt3.log",
+      "sha256": "8484b26d31157f5f17edcde9c7102cb604985027fc06b1f6268e6bf507204875",
+      "bytes": 29005
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE_P2-consumption.json",
+      "sha256": "fce3b4d83541ae6bdc9b834f1f535479ddbfde5091f55df91b24205836181d02",
+      "bytes": 20467
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE_P2-required-suites.json",
+      "sha256": "172cbfcef619b42a178eaa18676b179356c5d886a9d8313283522f839b4d1ec1",
+      "bytes": 4619
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/ATTEST_P2-consumption.json",
+      "sha256": "fcab1dd7da70b48dc00b1ec7dcea3ead4607a3ed24e13ecfb6c05dc654a54ad0",
+      "bytes": 37682
+    }
+  ],
+  "limits": [
+    "No active author/investigator output captured.",
+    "Prior final3 report ownership remains separate native Sol sessions, same model family.",
+    "New runtime correction needs new exact-revision evidence; no relabeling prior live sample."
+  ]
+}

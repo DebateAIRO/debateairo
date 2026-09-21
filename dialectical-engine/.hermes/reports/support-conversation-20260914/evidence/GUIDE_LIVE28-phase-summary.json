@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE28",
+  "ticket": "t_0874e640",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "STOPPED_CAPTURE_SCREENSHOT_TARGET_MISMATCH",
+  "permissionMode": "require_escalated",
+  "operatorExitCode": 1,
+  "phases": {
+    "preflight": {
+      "status": 0,
+      "completedAtUtc": "2026-09-21T02:16:02.129Z"
+    },
+    "readiness": {
+      "status": 0,
+      "completedAtUtc": "2026-09-21T02:16:02.311Z"
+    },
+    "capacity": {
+      "status": 0,
+      "completedAtUtc": "2026-09-21T02:16:03.019Z"
+    },
+    "gate": {
+      "status": 0,
+      "completedAtUtc": "2026-09-21T02:16:03.057Z"
+    },
+    "rowProof": {
+      "status": 0,
+      "completedAtUtc": "2026-09-21T02:16:03.539Z",
+      "validatedRows": 58
+    },
+    "capture": {
+      "status": 1,
+      "failureCode": "GUIDE_CAPTURE_SCREENSHOT_TARGET_MISMATCH"
+    },
+    "idle": {
+      "status": "NOT_STARTED"
+    }
+  },
+  "actual": {
+    "attemptedRowCount": 1,
+    "completedRowCount": 1,
+    "attemptedRows": [
+      1
+    ],
+    "sessionsCreated": 1,
+    "messagesSent": 1,
+    "modelCallsCeiling": 27,
+    "firstSessionCreatedAtUtc": null,
+    "secondSessionCreatedAtUtc": null,
+    "sessionTimestampQualification": "The capture recorded one session creation but no absolute session-creation timestamp; no timestamp is inferred."
+  },
+  "row1": {
+    "canonical": {
+      "sequence": 1,
+      "prompt": "Pricing",
+      "kind": "GUIDE_FAMILY",
+      "family": "pricing-placeholder",
+      "mode": "full",
+      "language": "en",
+      "branch": "MODEL",
+      "actionPolicy": "NONE",
+      "recoveryClass": null
+    },
+    "httpStatus": 200,
+    "outcome": "ANSWER_GROUNDED",
+    "publicAcceptedText": "Pricing on the site is informational only \u2014 it describes plans and costs but is not a checkout flow, so you cannot purchase or change a plan from it. If you have questions about what a plan includes, Support can explain the published information, but creating or paying for a debate happens through the debate creator after you sign in.",
+    "sources": [
+      {
+        "id": "app-navigation",
+        "label": "Navigate Dialectical Engine"
+      }
+    ],
+    "actions": [],
+    "visible": {
+      "text": "Pricing on the site is informational only \u2014 it describes plans and costs but is not a checkout flow, so you cannot purchase or change a plan from it. If you have questions about what a plan includes, Support can explain the published information, but creating or paying for a debate happens through the debate creator after you sign in.",
+      "sources": [
+        "Navigate Dialectical Engine"
+      ],
+      "actions": []
+    },
+    "equality": {
+      "text": true,
+      "sources": true,
+      "actions": true
+    },
+    "diagnostic": {
+      "status": "ACCEPTED_DRAFT",
+      "category": null,
+      "candidateCount": 0,
+      "validCount": 0,
+      "invalidCount": 0,
+      "duplicateCount": 0,
+      "unmatchedCount": 0
+    },
+    "attribution": {
+      "responseOrigin": "MODEL_ACCEPTED_DRAFT",
+      "apiDomTextEqual": true,
+      "apiDomSourcesEqual": true,
+      "apiDomActionsEqual": true
+    },
+    "selectedLanguage": "en",
+    "sessionCreateCount": 1
+  },
+  "failure": {
+    "stage": "POST_ACCEPTED_RESPONSE_SCREENSHOT_TARGET",
+    "code": "GUIDE_CAPTURE_SCREENSHOT_TARGET_MISMATCH",
+    "responseFailure": false,
+    "preBrowserFailure": false,
+    "preQuestionFailure": false,
+    "screenshotsRecorded": 0,
+    "expectedScreenshotPresence": [
+      {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE21-row-01-complete-expanded.png",
+        "present": false
+      },
+      {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE21-row-01-original-pane-top.png",
+        "present": false
+      },
+      {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE21-row-01-original-pane-footer.png",
+        "present": false
+      }
+    ],
+    "browserProfilePresentAfterFailure": false,
+    "captureWrapperStatus": 1,
+    "operatorStopPhase": "capture",
+    "operatorStopStatus": 1
+  },
+  "console": {
+    "count": 3,
+    "categories": {
+      "HTTP_401": 3,
+      "HTTP_404": 0,
+      "JS_OR_HYDRATION": 0,
+      "OTHER": 0
+    },
+    "origins": "UNKNOWN"
+  },
+  "runtime": {
+    "readinessPid": 12272,
+    "ordinaryTlsStatus": 200,
+    "lastVerifiedAtUtc": "2026-09-21T02:16:02.311Z",
+    "idleAfterFailure": "UNVERIFIED_STOP_FIRST"
+  },
+  "ownerWalkthrough": {
+    "created": false,
+    "availability": "NOT_CALCULATED_AFTER_FAILED_CAPTURE"
+  },
+  "retry": false,
+  "privateLogRead": false
+}

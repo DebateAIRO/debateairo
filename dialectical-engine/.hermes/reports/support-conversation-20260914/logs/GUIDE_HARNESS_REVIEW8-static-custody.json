@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW8",
+  "ticket": "t_890d62ec",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "freezeCommit": "399df06063fb0624dd8f518049f6c79d7e20fcf6",
+  "inputCustody": {
+    "count": 64,
+    "mismatches": []
+  },
+  "productCheckout": {
+    "headObserved": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+    "cleanObserved": true
+  },
+  "orderedEight": {
+    "harnessSha256": "be7a0ca7f0b4f768ac40a2ecb020a7f17f96df5a8f32100b43e3b85e3752047c",
+    "matchesAuthor": true,
+    "files": [
+      {
+        "path": "capture-public-guide.mjs",
+        "bytes": 18423,
+        "sha256": "7e00bcb022cd32770dbe61314d1fc78095201643fa8acfe62682ff8ebda71de1"
+      },
+      {
+        "path": "controls.mjs",
+        "bytes": 27615,
+        "sha256": "4887cfdf2a22643d3a161ccbfee385f27cc231468a1d2f1c51a501a203b12135"
+      },
+      {
+        "path": "matrix.mjs",
+        "bytes": 14253,
+        "sha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c"
+      },
+      {
+        "path": "pre-request-verifier.ts",
+        "bytes": 16486,
+        "sha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733"
+      },
+      {
+        "path": "runtime-capacity.mjs",
+        "bytes": 9935,
+        "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87"
+      },
+      {
+        "path": "session-lifecycle.mjs",
+        "bytes": 4254,
+        "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b"
+      },
+      {
+        "path": "verify-final-branches.ts",
+        "bytes": 5131,
+        "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a"
+      },
+      {
+        "path": "verify-guide-harness.mjs",
+        "bytes": 62790,
+        "sha256": "1161d55dc3c4583ed55769263ba627dfee78f1d07cd82b749f473f7441e32e0f"
+      }
+    ]
+  },
+  "controlProof": {
+    "schemaVersion": 2,
+    "result": "PASS",
+    "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+    "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+    "harnessSha256": "be7a0ca7f0b4f768ac40a2ecb020a7f17f96df5a8f32100b43e3b85e3752047c",
+    "controls": 111,
+    "passed": 111,
+    "uniqueNames": 111,
+    "priorNames": 105,
+    "allPriorNamesRetained": true,
+    "addedNames": [
+      "legacy deterministic branches normalize omitted decorations",
+      "English and Romanian injection refusals share omitted decoration compatibility",
+      "MODEL branch rejects omitted decorations with predicate codes",
+      "present malformed decorations reject every branch",
+      "API received checkpoint preserves fixed field states for projection failures",
+      "API received checkpoint strips private response extras"
+    ]
+  },
+  "preserved": {
+    "matrixSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+    "preRequestVerifierSha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733"
+  },
+  "futureOutputAbsence": {
+    "schemaVersion": 1,
+    "node": "GUIDE_HARNESS_FIX8",
+    "checked": 56,
+    "present": [],
+    "futureReceipt": "GUIDE_LIVE_GUIDE8-actual-receipt.json",
+    "futureScreenshots": 54,
+    "browserProfile": "ABSENT",
+    "captureExecuted": false
+  },
+  "finding": {
+    "id": "GH8-R1",
+    "status": "OPEN",
+    "location": "GUIDE_HARNESS_FIX8/capture-public-guide.mjs:238-239",
+    "description": "response.json rejection is replaced with {}, so malformed wire JSON is falsely classified as OBJECT/outcome-invalid rather than INVALID/body-invalid"
+  },
+  "execution": {
+    "staticOnly": true,
+    "tests": false,
+    "probes": false,
+    "browser": false,
+    "runtime": false,
+    "http": false,
+    "database": false,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "gitWrites": false,
+    "heavyLease": false
+  }
+}

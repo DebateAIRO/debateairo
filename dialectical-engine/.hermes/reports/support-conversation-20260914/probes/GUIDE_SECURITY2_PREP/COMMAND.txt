@@ -1,0 +1,7 @@
+Do not run during GUIDE_SECURITY2_PREP.
+
+After the final corrected revision and its immutable product manifest are supplied, replace only the three bracketed values and run under an explicitly transferred heavy lease:
+
+env LOG=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY2-route.log zsh /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-orchestrator/scripts/run-capture.sh env TSX_DISABLE_CACHE=1 GUIDE_SECURITY2_TARGET_ROOT=[EXACT_CLEAN_TARGET_ROOT] GUIDE_SECURITY2_TARGET_REVISION=[FULL_40_HEX_REVISION] GUIDE_SECURITY2_TARGET_MANIFEST=[ABSOLUTE_IMMUTABLE_PRODUCT_MANIFEST] node --import tsx /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY2_PREP/run-security2-probe.mts
+
+The target must already have its authorized read-only dependency links available. The probe refuses to run unless HEAD, clean status, manifest revision, every product-file digest/byte count, and every deleted-path assertion match.

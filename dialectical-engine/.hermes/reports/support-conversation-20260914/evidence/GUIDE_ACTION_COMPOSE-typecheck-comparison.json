@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_ACTION_COMPOSE",
+  "ticket": "t_3ffab684",
+  "revision": "c8784902f78ed4ba1d637d122e1f32f598415f4e",
+  "command": [
+    "pnpm",
+    "run",
+    "typecheck"
+  ],
+  "exitCode": 1,
+  "exitMeaning": "ATTRIBUTED_BASELINE_ONLY",
+  "baseline": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-typecheck-final2.log",
+    "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "bytes": 39611,
+    "diagnostics": 76
+  },
+  "current": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ACTION_COMPOSE-typecheck-final2.log",
+    "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "bytes": 39611,
+    "diagnostics": 76
+  },
+  "byteIdentical": true,
+  "missionAddedDiagnostics": 0,
+  "preservedPrefinalRed": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ACTION_COMPOSE-typecheck-final.log",
+    "sha256": "5ad3086251912438b759ef549cbb433bebfd82ad1c74d8523dc1aa61201a576f",
+    "bytes": 39832,
+    "revision": "b0b91a01cf161d17eef75577cbae94c629b7bc49",
+    "diagnostics": 78,
+    "missionAddedDiagnostics": 2,
+    "added": [
+      "tests/unit/support-answer-context.test.ts(194,20): TS2532",
+      "tests/unit/support-answer-context.test.ts(194,45): TS2493"
+    ]
+  },
+  "measuredAt": "2026-09-17T16:02:13.871701Z"
+}

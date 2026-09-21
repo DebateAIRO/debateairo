@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE24",
+  "ticket": "t_140e22fa",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "STOPPED_ROW_PROOF_MATRIX_COUNT",
+  "recordedAtUtc": "2026-09-21T01:01:48.968923Z",
+  "retained": {
+    "preflightSha256": "dfce83ea1e186372e9d16c0989e3117d262968c8c724d23540ad46572324df58",
+    "readinessSha256": "03fb0a8c0fef2d92496c6a2a7a0f263d15a2746752ce8b54cadaf4a8198c7a7f",
+    "live23FailureSha256": "38449a79fcf4b56bfde62962bdf046771a3356059c09716023fcda85730468d4"
+  },
+  "prerequisites": {
+    "result": "PASS",
+    "runtimePid": 12272,
+    "runtimePgid": 12272,
+    "ordinaryTlsStatus": 200,
+    "selectedSourceKey": "SUPPORT_DATABASE_URL",
+    "principalRole": "debateai_dev_support",
+    "childEnvironmentPresence": "PASS",
+    "valueRecorded": false
+  },
+  "capacity": {
+    "result": "PASS",
+    "measuredAtUtc": "2026-09-21T01:01:10.114Z",
+    "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+    "limits": {
+      "support_limit_anon_msgs_10m": 20,
+      "support_limit_anon_msgs_24h": 100,
+      "support_limit_anon_sessions_1h": 5,
+      "support_limit_session_msgs": 40,
+      "support_limit_msg_chars": 2000,
+      "support_relay_concurrency": 2,
+      "support_queue_depth": 10,
+      "support_daily_call_cap": 500,
+      "support_lock_after_injections": 3,
+      "support_ip_cooldown_minutes": 60
+    },
+    "observed": {
+      "maxAnonSessionEvents1hByIp": 0,
+      "maxAnonMessageEvents10mByIp": 0,
+      "maxAnonMessageEvents24hByIp": 51,
+      "anyIpCooldownActive": false,
+      "callsToday": 0,
+      "liveRelayWaiters": 0,
+      "relayState": "AVAILABLE"
+    }
+  },
+  "gate": {
+    "result": "PASS",
+    "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-gate.json"
+  },
+  "rowProof": {
+    "result": "FAILED",
+    "exitCode": 1,
+    "signal": null,
+    "code": "GUIDE_ROW_PROOF_MATRIX_COUNT_MISMATCH",
+    "resultArtifactWritten": false,
+    "expectedCount": 54,
+    "actualCount": 58,
+    "importer": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_BIND21/replay-row-proofs.mjs",
+    "matrixSource": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND21/matrix.mjs",
+    "canonicalSource": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND17/matrix.mjs",
+    "composition": "54 canonical + 4 owner rows"
+  },
+  "phaseStatuses": {
+    "preflight": "RETAINED_PASS",
+    "readiness": "RETAINED_PASS",
+    "capacity": "PASS",
+    "gate": "PASS",
+    "rowProof": "FAILED",
+    "capture": "NOT_RUN",
+    "idle": "NOT_RUN"
+  },
+  "actualCapture": {
+    "attemptedRequests": 0,
+    "completedRequests": 0,
+    "newSessions": 0,
+    "modelCalls": 0
+  },
+  "trafficThisNode": {
+    "preCapacityOrdinaryTlsReads": 1,
+    "capacityStatusReads": 1,
+    "capacityDatabaseQueries": 1,
+    "capacityResults": 1,
+    "support": 0,
+    "model": 0
+  },
+  "cumulativeMeasuredAttempts": {
+    "statusReads": 2,
+    "databaseQueryAttempts": 2,
+    "capacityResults": 1
+  },
+  "outputAbsence": {
+    "rowProofResult": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-LIVE21.json",
+      "absent": true
+    },
+    "capture": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-capture.json",
+      "absent": true
+    },
+    "captureLog": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE21-capture.log",
+      "absent": true
+    },
+    "idle": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-idle.json",
+      "absent": true
+    },
+    "idleLog": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE21-idle.log",
+      "absent": true
+    },
+    "actualReceipt": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE21-actual-receipt.json",
+      "absent": true
+    }
+  },
+  "runtime": {
+    "pid": 12272,
+    "pgid": 12272,
+    "leftUntouched": true,
+    "postFailureLiveness": "NOT_RECHECKED",
+    "lastProvedBy": "GUIDE_LIVE24-prerequisites.json"
+  },
+  "limits": [
+    "Capacity/gate freshness frame is consumed and not reusable.",
+    "No row-proof retry or capture occurred.",
+    "Deferred owner-capacity command not executed.",
+    "Forgot remains unresolved/actionless."
+  ]
+}

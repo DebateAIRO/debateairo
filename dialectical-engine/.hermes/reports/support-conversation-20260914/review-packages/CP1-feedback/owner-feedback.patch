@@ -1,0 +1,730 @@
+diff --git a/dialectical-engine/apps/api/src/support/security-guidance.ts b/dialectical-engine/apps/api/src/support/security-guidance.ts
+index 32804637310bad56fff705e9bdecd3638f9f071f..b01e454c912e0cc62aa777160459c77bc0fcab21 100644
+--- a/dialectical-engine/apps/api/src/support/security-guidance.ts
++++ b/dialectical-engine/apps/api/src/support/security-guidance.ts
+@@ -8,6 +8,8 @@ export type SupportSecurityNavigation = Readonly<{
+ 
+ const FORGOT_PASSWORD_RO = /(?:\bam\s+uitat\s+parol(?:a|ă)\b|\bnu(?:-mi)?\s+(?:mai\s+)?amintesc\s+parol(?:a|ă)\b)/u;
+ const FORGOT_PASSWORD_EN = /(?:\bforgot(?:ten)?\s+(?:my\s+)?password\b|\b(?:can(?:not|'t)|do\s+not|don't)\s+remember\s+(?:my\s+)?password\b)/u;
++const RECOVERY_NAVIGATION_EN = /(?:(?:password\s+(?:recovery|reset)|(?:recovery|reset)\s+(?:my\s+)?password).{0,40}\b(?:link|page|option|button|screen|opener)\b|\b(?:link|page|option|button|screen|opener)\b.{0,40}(?:password\s+(?:recovery|reset)|(?:recovery|reset)\s+(?:my\s+)?password))/u;
++const RECOVERY_NAVIGATION_RO = /(?:(?:recuperarea|resetarea|recuperare(?:a)?|resetare(?:a)?)\s+(?:a\s+)?parol(?:ei|a|ă).{0,40}\b(?:link(?:ul)?|pagin(?:a|ă)|opțiun(?:ea|e)|optiun(?:ea|e)|buton(?:ul)?|ecran(?:ul)?|deschidere)\b|\b(?:link(?:ul)?|pagin(?:a|ă)|opțiun(?:ea|e)|optiun(?:ea|e)|buton(?:ul)?|ecran(?:ul)?|deschidere)\b.{0,40}(?:recuperarea|resetarea|recuperare(?:a)?|resetare(?:a)?)\s+(?:a\s+)?parol(?:ei|a|ă))/u;
+ 
+ function normalized(value: string): string {
+   return value.normalize("NFKC").toLocaleLowerCase("en-US");
+@@ -20,10 +22,10 @@ export function classifySecurityNavigation(text: string): SupportSecurityNavigat
+ export function classifySecurityNavigationViews(
+   values: readonly string[]
+ ): SupportSecurityNavigation | null {
+-  if (values.some((value) => FORGOT_PASSWORD_RO.test(value))) {
++  if (values.some((value) => FORGOT_PASSWORD_RO.test(value) || RECOVERY_NAVIGATION_RO.test(value))) {
+     return Object.freeze({ kind: "FORGOT_PASSWORD",language: "ro",actionId: "forgot-password" });
+   }
+-  if (values.some((value) => FORGOT_PASSWORD_EN.test(value))) {
++  if (values.some((value) => FORGOT_PASSWORD_EN.test(value) || RECOVERY_NAVIGATION_EN.test(value))) {
+     return Object.freeze({ kind: "FORGOT_PASSWORD",language: "en",actionId: "forgot-password" });
+   }
+   return null;
+diff --git a/dialectical-engine/packages/support-kb/content/product-identity.en.md b/dialectical-engine/packages/support-kb/content/product-identity.en.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..9a2861d9ff017ce5db42e0ef6632e3f83ee0c959
+--- /dev/null
++++ b/dialectical-engine/packages/support-kb/content/product-identity.en.md
+@@ -0,0 +1,15 @@
++---
++id: product-identity
++lang: en
++title: "About Dialectical Engine"
++status: shipped
++sources:
++  - apps/ui/app/layout.tsx:29
++  - apps/ui/app/layout.tsx:30
++  - apps/api/src/support/templates.ts:47
++verified_against: "475c5a7e"
++ratified_by: ""
++ratified_on: ""
++---
++
++Dialectical Engine is the product name for this reasoning instrument. It lets several AI models argue a claim in a structured debate tree. Support can explain reviewed product behavior and point to verified pages, but it cannot sign visitors in, change accounts, or perform password resets.
+diff --git a/dialectical-engine/packages/support-kb/content/product-identity.ro.md b/dialectical-engine/packages/support-kb/content/product-identity.ro.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..d72fbdb821c0806b7bcd6e7240fba07617bdc292
+--- /dev/null
++++ b/dialectical-engine/packages/support-kb/content/product-identity.ro.md
+@@ -0,0 +1,15 @@
++---
++id: product-identity
++lang: ro
++title: "Despre Dialectical Engine"
++status: shipped
++sources:
++  - apps/ui/app/layout.tsx:29
++  - apps/ui/app/layout.tsx:30
++  - apps/api/src/support/templates.ts:48
++verified_against: "475c5a7e"
++ratified_by: ""
++ratified_on: ""
++---
++
++Dialectical Engine este numele produsului pentru acest instrument de raționament. Permite mai multor modele AI să argumenteze o afirmație într-un arbore structurat de dezbatere. Asistența poate explica funcționarea verificată a produsului și poate indica pagini verificate, dar nu poate autentifica vizitatori, modifica conturi sau efectua resetări de parolă.
+diff --git a/dialectical-engine/packages/support-kb/recovery/components.json b/dialectical-engine/packages/support-kb/recovery/components.json
+index 8a3cb92d87d0d3a8300658284de30b18cbe79aa3..b9ead68adbc6472424ea937e2ff58282ddb69432 100644
+--- a/dialectical-engine/packages/support-kb/recovery/components.json
++++ b/dialectical-engine/packages/support-kb/recovery/components.json
+@@ -141,6 +141,20 @@
+       "modelProjection": "Membrii autentificați pot deschide preferințele de confidențialitate din browser din Setări. Preferința este locală browserului și nu dovedește singură starea fiecărui sistem de analiză sau cookie. Textul politicii de confidențialitate folosește fereastra existentă a produsului acolo unde deschiderea este disponibilă. Setul curent de rute nu are o pagină independentă verificată pentru Confidențialitate sau Termeni.",
+       "fallback": "Autentifică-te, alege Setări, apoi Preferințe de confidențialitate. Preferința este locală browserului și nu dovedește singură starea fiecărui sistem de analiză sau cookie. Textul politicii se deschide în fereastra existentă a produsului acolo unde este disponibilă; nu există o pagină independentă verificată pentru Confidențialitate sau Termeni."
+     },
++    {
++      "id": "product-identity",
++      "lang": "en",
++      "articleSha256": "3841870d3e2310a8fbee6325e59b4c25e92437b644b6a311910ade1e304ef4aa",
++      "modelProjection": "Dialectical Engine is the product name for a reasoning instrument in which several AI models argue a claim in a structured debate tree. Support can explain reviewed product behavior and point to verified pages, but it cannot sign visitors in, change accounts, or perform password resets.",
++      "fallback": "Dialectical Engine is a reasoning instrument where several AI models argue a claim in a structured debate tree. Support can explain reviewed product behavior and point to verified pages. It cannot sign you in, change your account, or perform a password reset."
++    },
++    {
++      "id": "product-identity",
++      "lang": "ro",
++      "articleSha256": "d05337815983d83f075964b6db5063dfbff40721a720013aaeeff19c98262391",
++      "modelProjection": "Dialectical Engine este numele produsului pentru un instrument de raționament în care mai multe modele AI argumentează o afirmație într-un arbore structurat de dezbatere. Asistența poate explica funcționarea verificată a produsului și poate indica pagini verificate, dar nu poate autentifica vizitatori, modifica conturi sau efectua resetări de parolă.",
++      "fallback": "Dialectical Engine este un instrument de raționament în care mai multe modele AI argumentează o afirmație într-un arbore structurat de dezbatere. Asistența poate explica funcționarea verificată a produsului și poate indica pagini verificate. Nu te poate autentifica, nu îți poate modifica contul și nu poate efectua o resetare de parolă."
++    },
+     {
+       "id": "public-answer-disclosure",
+       "lang": "en",
+diff --git a/dialectical-engine/packages/support-kb/reviews/manifest.json b/dialectical-engine/packages/support-kb/reviews/manifest.json
+index 47f1d9869ea0b098b14edc956a40e20869ada1a4..4a45731bc9c4eddc5b6a8d2e8e13a64e080cbbb7 100644
+--- a/dialectical-engine/packages/support-kb/reviews/manifest.json
++++ b/dialectical-engine/packages/support-kb/reviews/manifest.json
+@@ -1,11 +1,11 @@
+ {
+   "schemaVersion": 2,
+   "catalog": {
+-    "sha256": "24784328a4bb8d4e5205b3036dd369268180df792243db1c296a0a7ed2a0f9fe",
++    "sha256": "44e1cc05f209bf22930b11755995d676121342d9b80a4d76e70ae58d70fd1cfa",
+     "reviewedBy": "SOL",
+-    "reviewerSession": "/root/plan_review",
+-    "reviewedOn": "2026-09-14",
+-    "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-p2.md"
++    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++    "reviewedOn": "2026-09-17",
++    "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/PRODUCT-IDENTITY-EDITORIAL.md"
+   },
+   "articles": [
+     {
+@@ -152,6 +152,24 @@
+       "reviewedOn": "2026-09-14",
+       "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-p2.md"
+     },
++    {
++      "id": "product-identity",
++      "lang": "en",
++      "sha256": "3841870d3e2310a8fbee6325e59b4c25e92437b644b6a311910ade1e304ef4aa",
++      "reviewedBy": "SOL",
++      "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++      "reviewedOn": "2026-09-17",
++      "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/PRODUCT-IDENTITY-EDITORIAL.md"
++    },
++    {
++      "id": "product-identity",
++      "lang": "ro",
++      "sha256": "d05337815983d83f075964b6db5063dfbff40721a720013aaeeff19c98262391",
++      "reviewedBy": "SOL",
++      "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++      "reviewedOn": "2026-09-17",
++      "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/PRODUCT-IDENTITY-EDITORIAL.md"
++    },
+     {
+       "id": "risk-tier-choice",
+       "lang": "en",
+@@ -226,7 +244,7 @@
+     }
+   ],
+   "recovery": {
+-    "componentFileSha256": "5ee8d592c3f1b3550c1f2af74c030fbbc12e80e258dc71b57aa28de045f99e8a",
++    "componentFileSha256": "8934293e862387fd3e6e83527780640e8497bdc50704854e43eb1d2db24fcae6",
+     "components": [
+       {
+         "id": "account-access",
+@@ -488,6 +506,32 @@
+         "ratifiedBy": "",
+         "ratifiedOn": ""
+       },
++      {
++        "id": "product-identity",
++        "lang": "en",
++        "articleSha256": "3841870d3e2310a8fbee6325e59b4c25e92437b644b6a311910ade1e304ef4aa",
++        "modelProjectionSha256": "797d3ca04d545f868a633dd67d7f52a9758ddb86fa26aaf87d3d87ee5ff32d64",
++        "fallbackSha256": "0f08312a2f6fcd13a67f7694dfefe1ac084bbda210df900eda65ec589cc4c032",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-17",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/PRODUCT-IDENTITY-EDITORIAL.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
++      {
++        "id": "product-identity",
++        "lang": "ro",
++        "articleSha256": "d05337815983d83f075964b6db5063dfbff40721a720013aaeeff19c98262391",
++        "modelProjectionSha256": "5ca60396146b9390d5f2848c703a221d75e0f3e2c88740cc44d1abde6c77ae40",
++        "fallbackSha256": "d2102ff844843efc368e4458e7928fbb6ccd64675cb3c8d4b1657ff015acf812",
++        "reviewedBy": "SOL",
++        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
++        "reviewedOn": "2026-09-17",
++        "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/PRODUCT-IDENTITY-EDITORIAL.md",
++        "ratifiedBy": "",
++        "ratifiedOn": ""
++      },
+       {
+         "id": "public-answer-disclosure",
+         "lang": "en",
+diff --git a/dialectical-engine/packages/support-kb/src/catalog.ts b/dialectical-engine/packages/support-kb/src/catalog.ts
+index 1018c2832ac48856cd374c67173bdb7e4e79dcb1..dce87e1147d028f880e625e98b67e512d674d65f 100644
+--- a/dialectical-engine/packages/support-kb/src/catalog.ts
++++ b/dialectical-engine/packages/support-kb/src/catalog.ts
+@@ -99,6 +99,20 @@ export const SUPPORT_ACTION_CATALOG: readonly SupportActionDefinition[] = Object
+ ]);
+ 
+ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze([
++  capability({
++    id: "product-identity",
++    route: "/",
++    labels: labels("About Dialectical Engine", "Despre Dialectical Engine"),
++    audience: "any",
++    availability: "public",
++    disposition: "action",
++    actionIds: [],
++    articleIds: ["product-identity"],
++    searchTerms: terms(
++      ["product", "identity", "overview", "purpose"],
++      ["produs", "identitate", "prezentare", "scop"]
++    ),
++  }),
+   capability({
+     id: "home-library",
+     route: "/",
+@@ -223,7 +237,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
+ ]);
+ 
+ export const SUPPORT_PAGE_ROUTES: readonly string[] = Object.freeze(
+-  SUPPORT_CAPABILITIES.map(({ route }) => route).sort(),
++  [...new Set(SUPPORT_CAPABILITIES.map(({ route }) => route))].sort(),
+ );
+ 
+ export const SUPPORT_PROXY_ROUTES: readonly string[] = Object.freeze(["/api/[...path]"]);
+diff --git a/dialectical-engine/packages/support-kb/src/context.ts b/dialectical-engine/packages/support-kb/src/context.ts
+index 3a17392c774115de85a821622f6a641f2b2d8a49..2fc7ea3db7deb5479e08df7a2e2e131342027c90 100644
+--- a/dialectical-engine/packages/support-kb/src/context.ts
++++ b/dialectical-engine/packages/support-kb/src/context.ts
+@@ -38,17 +38,44 @@ const STOP_WORDS = new Set([
+   "care", "cum", "din", "este", "pentru", "prin", "sau", "unui",
+ ]);
+ 
++const PRODUCT_ALIAS_SOURCE = String.raw`\b(?:dialectical(?:[\s-]*engine)|debate\s*airo)\b`;
++const PRODUCT_OVERVIEW_WORDS = new Set([
++  "about","agent","answer","cannot","cant","describe","does","explain","feature","features",
++  "identity","mean","meaning","overview","product","purpose","question","questions","support",
++  "tell","use","used","what","why",
++  "asistent","asistentul","capabilitati","despre","explica","face","folosit","folosita",
++  "identitate","intrebare","intrebari","poate","prezentare","produs","raspund","raspunde",
++  "scop","spune"
++]);
++
++function normalizedText(value: string): string {
++  return value.normalize("NFKD").replace(/\p{M}/gu,"").toLocaleLowerCase("en");
++}
++
+ function normalizeWords(value: string): Set<string> {
+   return new Set(
+-    value
+-      .normalize("NFKD")
+-      .replace(/\p{M}/gu, "")
+-      .toLocaleLowerCase("en")
++    normalizedText(value)
+       .split(/[^\p{L}\p{N}]+/u)
+       .filter((word) => word.length >= 3 && !STOP_WORDS.has(word)),
+   );
+ }
+ 
++function productQuery(value: string): Readonly<{
++  branded: boolean;
++  identityOverview: boolean;
++  words: Set<string>;
++}> {
++  const normalized = normalizedText(value);
++  const branded = new RegExp(PRODUCT_ALIAS_SOURCE,"u").test(normalized);
++  const withoutBrand = branded
++    ? normalized.replace(new RegExp(PRODUCT_ALIAS_SOURCE,"gu")," ") : normalized;
++  const words = normalizeWords(withoutBrand);
++  const identityOverview = branded && (
++    words.size === 0 || [...words].every((word) => PRODUCT_OVERVIEW_WORDS.has(word))
++  );
++  return Object.freeze({ branded,identityOverview,words });
++}
++
+ function overlapScore(query: Set<string>, value: string): number {
+   const words = normalizeWords(value);
+   let score = 0;
+@@ -123,17 +150,32 @@ export function buildSupportKnowledgeContext(input: Readonly<{
+   const availableActionIds = new Set(input.availableActionIds);
+   const base = baseSection(input.capabilities,input.language,availableActionIds);
+ 
+-  const queryWords = normalizeWords(input.query);
+-  const matchedCapabilities = input.capabilities
++  const product = productQuery(input.query);
++  const queryWords = product.words;
++  const eligibleEntries = input.entries.filter(({ lang,modelProjection }) =>
++    lang === input.language && modelProjection !== undefined
++  );
++  const matchedCapabilities = (product.identityOverview
++    ? input.capabilities.filter(({ id }) => id === "product-identity").map((item) => ({ item,score:1 }))
++    : input.capabilities
+     .map((item) => ({
+       item,
+-      score: overlapScore(
++      catalogScore: overlapScore(
+         queryWords,
+         `${item.labels[input.language]} ${item.searchTerms[input.language].join(" ")}`,
+       ),
+     }))
+-    .filter(({ score }) => score > 0)
+-    .sort((left, right) => right.score - left.score || left.item.id.localeCompare(right.item.id, "en"));
++    .filter(({ catalogScore }) => catalogScore > 0)
++    .map(({ item,catalogScore }) => ({
++      item,
++      score: product.branded
++        ? Math.max(0,...eligibleEntries
++          .filter(({ id }) => item.articleIds.includes(id))
++          .map((entry) => overlapScore(queryWords,entry.title) * 100
++            + overlapScore(queryWords,entry.body) * 10)) * 1_000 + catalogScore
++        : catalogScore,
++    }))
++    .sort((left, right) => right.score - left.score || left.item.id.localeCompare(right.item.id, "en")));
+   const actionIds: SupportActionId[] = [];
+   const seen = new Set<SupportActionId>();
+   const bestCapabilityScore = matchedCapabilities[0]?.score ?? 0;
+@@ -162,14 +204,16 @@ export function buildSupportKnowledgeContext(input: Readonly<{
+       capabilityArticleScore.set(id,Math.max(capabilityArticleScore.get(id) ?? 0,weighted));
+     });
+   }
+-  const ranked = input.entries
+-    .filter(({ lang,modelProjection }) => lang === input.language && modelProjection !== undefined)
++  const ranked = eligibleEntries
+     .map((entry) => ({
+       entry,
+       score: (capabilityArticleScore.get(entry.id) ?? 0)
+-        + overlapScore(queryWords, `${entry.title}\n${entry.body}`),
++        + (product.branded
++          ? overlapScore(queryWords,entry.title) * 100 + overlapScore(queryWords,entry.body) * 10
++          : overlapScore(queryWords, `${entry.title}\n${entry.body}`)),
+     }))
+-    .filter(({ score }) => score > 0)
++    .filter(({ entry,score }) => score > 0
++      && (!product.branded || capabilityArticleScore.has(entry.id)))
+     .sort((left, right) => right.score - left.score || left.entry.id.localeCompare(right.entry.id, "en"));
+ 
+   let text = base;
+diff --git a/dialectical-engine/tests/architecture/support-catalog-coverage.test.ts b/dialectical-engine/tests/architecture/support-catalog-coverage.test.ts
+index 227a6fa8f89bfff7d522ed665eac5d6c89e011bd..ce55a8a3e0df2377a2858402552a8db64e6e31c3 100644
+--- a/dialectical-engine/tests/architecture/support-catalog-coverage.test.ts
++++ b/dialectical-engine/tests/architecture/support-catalog-coverage.test.ts
+@@ -68,6 +68,12 @@ describe("Support catalog route coverage", () => {
+     }
+   });
+ 
++  it("keeps product identity public, actionless, and backed by one bilingual article", () => {
++    expect(SUPPORT_CAPABILITIES.find(({ id }) => id === "product-identity")).toMatchObject({
++      availability: "public",actionIds: [],articleIds: ["product-identity"]
++    });
++  });
++
+   it("keeps the browser-safe catalog free of Node-only imports and exports it as a subpath", () => {
+     // Property: UI consumers can share the authority without bundling filesystem or crypto modules.
+     const packageDirectory = fileURLToPath(new URL("../../packages/support-kb/", import.meta.url));
+diff --git a/dialectical-engine/tests/integration/support-routes.test.ts b/dialectical-engine/tests/integration/support-routes.test.ts
+index 21bdc5c4ea424f56024c2084baf5b8ad5ee74435..c7bfa1e64df5762147d4a804455a11dc1d3b5271 100644
+--- a/dialectical-engine/tests/integration/support-routes.test.ts
++++ b/dialectical-engine/tests/integration/support-routes.test.ts
+@@ -1940,7 +1940,11 @@ describe("SUP-01 support routes", () => {
+ 
+   it.each([
+     ["Forgot password","en"],
+-    ["Am uitat parola","ro"]
++    ["Am uitat parola","ro"],
++    ["Give me the password recovery link","en"],
++    ["Where is the password reset page?","en"],
++    ["Vreau linkul de recuperare a parolei","ro"],
++    ["Unde este pagina pentru resetarea parolei?","ro"]
+   ] as const)("returns canonical deterministic unresolved Forgot password guidance without a model: %s", async (
+     requestText,language
+   ) => {
+diff --git a/dialectical-engine/tests/unit/support-answer-context.test.ts b/dialectical-engine/tests/unit/support-answer-context.test.ts
+index e319f65bdcb0a139b4837bf84e7ce35df55e879f..b4efa0b0ab07a5f3678c1b21d80f37ba66f44c86 100644
+--- a/dialectical-engine/tests/unit/support-answer-context.test.ts
++++ b/dialectical-engine/tests/unit/support-answer-context.test.ts
+@@ -44,6 +44,82 @@ function request(snapshot: LoadedHelpCorpus) {
+ }
+ 
+ describe("CP1 composed answer context", () => {
++  it.each([
++    "What is Dialectical-Engine?",
++    "What is Dialectical Engine?",
++    "What is DebateAIRO?",
++    "What is Debate AIRO?",
++    "Why can't Support answer questions about Dialectical-Engine?"
++  ])("grounds a product identity variant only in the identity article: %s", async (text) => {
++    const identity = entry("product-identity","Dialectical Engine is a reasoning instrument for structured AI debates.");
++    const unrelated = entry("support-status-limits","Support status can be stale.");
++    const snapshot = corpus([identity,unrelated],"1".repeat(64));
++    const complete = vi.fn(async () => Object.freeze({ text: JSON.stringify({
++      kind:"answer",text:"Dialectical Engine is a reasoning instrument for structured AI debates.",
++      sourceIds:[SOURCE_REFERENCE],actionIds:[]
++    }) }));
++    const service = createSupportAnswerService({
++      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
++      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
++      clock:(() => { let at=Date.parse("2026-09-17T12:00:00.000Z");return () => new Date(++at); })()
++    });
++
++    const result = await service.respond({ ...request(snapshot),text });
++
++    expect(complete).toHaveBeenCalledOnce();
++    expect(result).toMatchObject({
++      outcome:"ANSWER_GROUNDED",sources:[{ id:"product-identity" }],actions:[]
++    });
++  });
++
++  it("grounds the Romanian identity surface in the Romanian identity article", async () => {
++    const identity = Object.freeze({
++      ...entry("product-identity","Dialectical Engine este un instrument de raționament."),
++      lang:"ro" as const,title:"Despre Dialectical Engine"
++    });
++    const snapshot = corpus([identity],"3".repeat(64));
++    const complete = vi.fn(async () => Object.freeze({ text: JSON.stringify({
++      kind:"answer",text:"Dialectical Engine este un instrument de raționament.",
++      sourceIds:[SOURCE_REFERENCE],actionIds:[]
++    }) }));
++    const service = createSupportAnswerService({
++      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
++      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
++      clock:(() => { let at=Date.parse("2026-09-17T12:00:00.000Z");return () => new Date(++at); })()
++    });
++
++    const result = await service.respond({
++      ...request(snapshot),text:"Ce este Dialectical-Engine?",
++      language:"ro",detectedLanguage:"ro"
++    });
++
++    expect(complete).toHaveBeenCalledOnce();
++    expect(result).toMatchObject({
++      outcome:"ANSWER_GROUNDED",sources:[{ id:"product-identity" }],actions:[]
++    });
++  });
++
++  it.each([
++    "Does Dialectical Engine offer medical diagnosis?",
++    "Does DebateAIRO provide investment advice?"
++  ])("keeps an unsupported branded topic at NO_SOURCE without a model call: %s", async (text) => {
++    const snapshot = corpus([
++      entry("product-identity","Dialectical Engine is a reasoning instrument for structured AI debates."),
++      entry("account-settings","Settings contains account controls.")
++    ],"2".repeat(64));
++    const complete = vi.fn();
++    const service = createSupportAnswerService({
++      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
++      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
++      clock:(() => { let at=Date.parse("2026-09-17T12:00:00.000Z");return () => new Date(++at); })()
++    });
++
++    const result = await service.respond({ ...request(snapshot),text });
++
++    expect(result).toMatchObject({ outcome:"NO_SOURCE",sources:[],actions:[] });
++    expect(complete).not.toHaveBeenCalled();
++  });
++
+   it.each(["not-json",JSON.stringify({ kind: "tool",text: "ignored",sourceIds: [],actionIds: [] })])(
+     "recovers every rejected ordinary knowledge envelope from the pinned top source: %s",
+     async (completionText) => {
+diff --git a/dialectical-engine/tests/unit/support-classify.test.ts b/dialectical-engine/tests/unit/support-classify.test.ts
+index 2547c3105907cc2054e60bdce51511ff5e7f6d4a..079c0537c5697259891759c73e9dee690328fa6d 100644
+--- a/dialectical-engine/tests/unit/support-classify.test.ts
++++ b/dialectical-engine/tests/unit/support-classify.test.ts
+@@ -570,7 +570,11 @@ describe("SUP-01 deterministic support classifier", () => {
+     ["I forgot my password","en"],
+     ["Can't remember my password","en"],
+     ["Am uitat parola","ro"],
+-    ["Am uitat parola and I need a replacement password","ro"]
++    ["Am uitat parola and I need a replacement password","ro"],
++    ["Give me the password recovery link","en"],
++    ["Where is the password reset page?","en"],
++    ["Vreau linkul de recuperare a parolei","ro"],
++    ["Unde este pagina pentru resetarea parolei?","ro"]
+   ] as const)("classifies deterministic Forgot password before generic rules: %s", (message,language) => {
+     expect(classifySupportMessage(message)).toEqual({
+       outcome: "REFUSE_ZONE",language,link: null,
+diff --git a/dialectical-engine/tests/unit/support-context.test.ts b/dialectical-engine/tests/unit/support-context.test.ts
+index 7666595de80b03dfdcae9bdba5c27c9dc538f52c..678cf51ca3a945f153c0196f1d09bda86ded3ee2 100644
+--- a/dialectical-engine/tests/unit/support-context.test.ts
++++ b/dialectical-engine/tests/unit/support-context.test.ts
+@@ -283,4 +283,64 @@ describe("Support knowledge context", () => {
+     expect(result.text).not.toContain(candidate.title);
+     expect(result.text).not.toContain(candidate.body);
+   });
++
++  const identityEntries = [
++    entry("product-identity","en","About Dialectical Engine","Dialectical Engine is a reasoning instrument."),
++    entry("product-identity","ro","Despre Dialectical Engine","Dialectical Engine este un instrument de raționament."),
++    entry("getting-started-debate","en","Start a debate","Choose a topic and plan controls."),
++    entry("getting-started-debate","ro","Pornește o dezbatere","Alege un subiect și opțiunile planului."),
++    entry("export-json","en","Export a debate as JSON","Export a served answer and ledger digest as JSON."),
++    entry("export-json","ro","Exportă o dezbatere ca JSON","Exportă răspunsul servit și registrul ca JSON."),
++    entry("publish-a-debate","en","Publish a debate","Publish a debate from its owner workspace."),
++    entry("publish-a-debate","ro","Publică o dezbatere","Publică o dezbatere din spațiul proprietarului.")
++  ];
++
++  it.each([
++    ["en" as const,"What is Dialectical-Engine?"],
++    ["en" as const,"What is Dialectical Engine?"],
++    ["en" as const,"What is DialecticalEngine?"],
++    ["en" as const,"What is DebateAIRO?"],
++    ["en" as const,"What is Debate AIRO?"],
++    ["en" as const,"Why can't Support answer questions about Dialectical-Engine?"],
++    ["ro" as const,"Ce este Dialectical-Engine?"],
++    ["ro" as const,"Ce este Dialectical Engine?"],
++    ["ro" as const,"Ce este DebateAIRO?"],
++    ["ro" as const,"De ce nu poate asistentul răspunde la întrebări despre Dialectical Engine?"]
++  ])("selects only reviewed product identity for %s overview %s", (language,query) => {
++    const result = buildSupportKnowledgeContext({
++      entries:identityEntries,capabilities:SUPPORT_CAPABILITIES,
++      availableActionIds:SUPPORT_ACTION_IDS,language,query,historyText:"",maxCodePoints:24_000
++    });
++    expect(result.sourceIds).toEqual(["product-identity"]);
++    expect(result.requestedActionIds).toEqual([]);
++  });
++
++  it.each([
++    ["en" as const,"How do I export JSON in Dialectical-Engine?","export-json"],
++    ["en" as const,"How do I publish a debate in DebateAIRO?","publish-a-debate"],
++    ["ro" as const,"Cum export JSON din Dialectical Engine?","export-json"],
++    ["ro" as const,"Cum public o dezbatere în DebateAIRO?","publish-a-debate"]
++  ])("keeps the named feature ahead of the product alias for %s: %s", (
++    language,query,expected
++  ) => {
++    const result = buildSupportKnowledgeContext({
++      entries:identityEntries,capabilities:SUPPORT_CAPABILITIES,
++      availableActionIds:SUPPORT_ACTION_IDS,language,query,historyText:"",maxCodePoints:24_000
++    });
++    expect(result.sourceIds[0]).toBe(expected);
++    expect(result.sourceIds).not.toContain("product-identity");
++    expect(result.requestedActionIds).toEqual(["owner-debate"]);
++  });
++
++  it.each([
++    ["en" as const,"Does Dialectical Engine offer medical diagnosis?"],
++    ["ro" as const,"Dialectical Engine oferă diagnostic medical?"]
++  ])("does not grant an unsupported product topic a source in %s: %s", (language,query) => {
++    const result = buildSupportKnowledgeContext({
++      entries:identityEntries,capabilities:SUPPORT_CAPABILITIES,
++      availableActionIds:SUPPORT_ACTION_IDS,language,query,historyText:"",maxCodePoints:24_000
++    });
++    expect(result.sourceIds).toEqual([]);
++    expect(result.requestedActionIds).toEqual([]);
++  });
+ });
+diff --git a/dialectical-engine/tests/unit/support-kb.test.ts b/dialectical-engine/tests/unit/support-kb.test.ts
+index 3253ab66c9158eee85cda1e25db498298822852f..a6e45a8a4a0efa071824ead7f2c6e477b6c89990 100644
+--- a/dialectical-engine/tests/unit/support-kb.test.ts
++++ b/dialectical-engine/tests/unit/support-kb.test.ts
+@@ -121,16 +121,16 @@ describe("Help Corpus loader", () => {
+     });
+ 
+     expect(corpus).toMatchObject({
+-      shippedCount: 18,
++      shippedCount: 19,
+       ignoredCount: 0,
+-      previewReviewedCount: 12,
++      previewReviewedCount: 13,
+       ownerRatifiedCount: 6,
+-      recoveryReviewedCount: 18,
++      recoveryReviewedCount: 19,
+       recoveryOwnerRatifiedCount: 0,
+-      kbVersion: "d674533e89d145bf9203248e2e324b451e57a2f1d3f257614d31678b7ac379df",
++      kbVersion: "23f8131ced441159be735d779ff4d863c9b0b77cf79a7eb513df49e7711f9f3e",
+     });
+-    expect(corpus.reviewManifest.articles).toHaveLength(24);
+-    expect(corpus.entries.filter(({ ratifiedBy }) => ratifiedBy === "")).toHaveLength(24);
++    expect(corpus.reviewManifest.articles).toHaveLength(26);
++    expect(corpus.entries.filter(({ ratifiedBy }) => ratifiedBy === "")).toHaveLength(26);
+   });
+ 
+   it("keeps changed and new real corpus drafts excluded until separate editorial review", () => {
+@@ -142,7 +142,8 @@ describe("Help Corpus loader", () => {
+ 
+     expect(corpus.entries).toHaveLength(12);
+     expect(corpus.shippedCount).toBe(6);
+-    expect(corpus.ignoredCount).toBe(12);
++    expect(corpus.ignoredCount).toBe(13);
++    expect(corpus.entries.some(({ id }) => id === "product-identity")).toBe(false);
+     expect(corpus.previewReviewedCount).toBe(0);
+     expect(corpus.ownerRatifiedCount).toBe(6);
+     expect(corpus.manifest.split("\n")).toHaveLength(25);
+@@ -165,8 +166,8 @@ describe("Help Corpus loader", () => {
+       recoveryComponents: readFileSync(componentPath),requireReviewedRecovery: true
+     });
+ 
+-    expect(corpus.entries).toHaveLength(36);
+-    expect(corpus.recoveryReviewedCount).toBe(18);
++    expect(corpus.entries).toHaveLength(38);
++    expect(corpus.recoveryReviewedCount).toBe(19);
+     expect(corpus.recoveryOwnerRatifiedCount).toBe(0);
+   });
+ 
+diff --git a/dialectical-engine/tests/unit/support-recovery-attestation.test.ts b/dialectical-engine/tests/unit/support-recovery-attestation.test.ts
+index 030d4e980ee1125d1520dce7af111817ccd6491a..8a446b447968d90033d0dcb96d3c45c4c3032283 100644
+--- a/dialectical-engine/tests/unit/support-recovery-attestation.test.ts
++++ b/dialectical-engine/tests/unit/support-recovery-attestation.test.ts
+@@ -32,6 +32,16 @@ const REVIEW = Object.freeze({
+   ratifiedOn: "",
+ });
+ 
++const IDENTITY_REVIEW = Object.freeze({
++  reviewedBy: "SOL",
++  reviewerSession: "01a09ef7-e096-7c31-9b35-806840028cf0",
++  reviewedOn: "2026-09-17",
++  evidence:
++    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/PRODUCT-IDENTITY-EDITORIAL.md",
++  ratifiedBy: "",
++  ratifiedOn: "",
++});
++
+ const EXPECTED = [
+   ["account-access", "en", "17aac248d75d7ad161fba2a44068d20743a9759ae56c9b30359c7e1d5550c2e7", "c138d4ed2ecd19847cb74b1fd7ad91eb9b047369cb2a391f15563e0915ec192a", "6b5d2dcff5c21d11eae6c6a92cabea39ec253e8e54b5d890d9b25d56f9eab32d"],
+   ["account-access", "ro", "5048de52b22b474fb8185e718fcaf235cd23896eff8fd7e42f4399d5266e9410", "e3ca804d9cd657ec82e9a9f81fd2dc1299997ee59cc4a752e757cd9e67d6ef98", "47d2b4b41acc0d0ef976bab9e08e5f617303612bfeda2b969a2958d6618ad8c0"],
+@@ -53,6 +63,8 @@ const EXPECTED = [
+   ["guide-how-it-works", "ro", "94acc4db2ccecb9a0d4f5b82350e91d26643b76c6caff879019edc107a3e3000", "65482fb1f90d62942b4e6f87a289c151978250fb385efc10d12c8e239780c195", "cb344a791adc4616c177c993b4f186595725f6ea3de8b1f95fcd8a6f0ff07ed8"],
+   ["privacy-consent", "en", "54cca7dbfb790c9d6aac077b00775e5ac6d5bc277be38733e92047bc63c262d5", "5de30c60b097bc464f12d9aef13fbc67e0c15c6d5aa4ca1a91f82fe77fc394ae", "419fbdd08f1d581b9484d6df1cb6b63077aef93ab627b9ab87c0c6054ce66d49"],
+   ["privacy-consent", "ro", "e9b04331a2aa76d3ed9bd45c2199263dc476ae62d15c33db30ed537fedeb5c5d", "7db208bec972f230adaddf05162305126e6aeeb431fd66bad468886e2c62710e", "940316e6b1a66598baa91183116c92477be57df65885dc22b1ce4954393e11f6"],
++  ["product-identity", "en", "3841870d3e2310a8fbee6325e59b4c25e92437b644b6a311910ade1e304ef4aa", "797d3ca04d545f868a633dd67d7f52a9758ddb86fa26aaf87d3d87ee5ff32d64", "0f08312a2f6fcd13a67f7694dfefe1ac084bbda210df900eda65ec589cc4c032"],
++  ["product-identity", "ro", "d05337815983d83f075964b6db5063dfbff40721a720013aaeeff19c98262391", "5ca60396146b9390d5f2848c703a221d75e0f3e2c88740cc44d1abde6c77ae40", "d2102ff844843efc368e4458e7928fbb6ccd64675cb3c8d4b1657ff015acf812"],
+   ["public-answer-disclosure", "en", "e67c271558e6bb5b4100fa735059e781e453c268808d555c6e85af36e3e678ea", "1ee826de541e74d701fd502bfe70e85c009da2b94d3e6d38c1fc98924f251670", "9c733e8f40697f0cd9f15f5984947edaff532a10bc3375d10ca94747e10cc569"],
+   ["public-answer-disclosure", "ro", "6e845c95414ae5b9190cf5917136776d7af931eaf626b2da4a0540b3bf7925f1", "4ee30438ed6e75bb79f2e458bb78a6e8e8b79d3271e59c372dff626ce23a3819", "903906d5fc6d89668a42a2108cf30e21b1ec166a9fdce9e7aeff1bf4882fa45d"],
+   ["publish-a-debate", "en", "9385f0dd00f8014e3445d1ee4c8c5230dc12d0379766d35c9c7845814f288e29", "83119e6803f854c04ad0153b55cc69212563a92f6b7e350ef29f656ff6c90a3c", "b2974fdf83f15e7142380698b7b21a95bd9efe7cbcfaa5d07028f292bcfd53ef"],
+@@ -72,7 +84,7 @@ const EXPECTED = [
+ ] as const;
+ 
+ describe("production Support recovery attestation", () => {
+-  it("admits the exact separately reviewed 36-record corpus as a deterministic immutable snapshot", () => {
++  it("admits the exact separately reviewed 38-record corpus as a deterministic immutable snapshot", () => {
+     const componentBytes = readFileSync(componentPath);
+     const components = JSON.parse(componentBytes.toString("utf8")) as {
+       components: Array<{
+@@ -98,27 +110,27 @@ describe("production Support recovery attestation", () => {
+         articleSha256,
+         modelProjectionSha256,
+         fallbackSha256,
+-        ...REVIEW,
++        ...(id === "product-identity" ? IDENTITY_REVIEW : REVIEW),
+       }),
+     );
+     expect(corpus.reviewManifest).toMatchObject({
+       schemaVersion: 2,
+       recovery: {
+         componentFileSha256:
+-          "5ee8d592c3f1b3550c1f2af74c030fbbc12e80e258dc71b57aa28de045f99e8a",
++          "8934293e862387fd3e6e83527780640e8497bdc50704854e43eb1d2db24fcae6",
+         components: expectedRows,
+       },
+     });
+-    expect(corpus.reviewManifest.articles).toHaveLength(24);
++    expect(corpus.reviewManifest.articles).toHaveLength(26);
+     expect(corpus.entries.map(({ id, lang }) => `${id}.${lang}`)).toEqual(
+       EXPECTED.map(([id, lang]) => `${id}.${lang}`),
+     );
+     expect(corpus).toMatchObject({
+-      shippedCount: 18,
++      shippedCount: 19,
+       ignoredCount: 0,
+-      previewReviewedCount: 12,
++      previewReviewedCount: 13,
+       ownerRatifiedCount: 6,
+-      recoveryReviewedCount: 18,
++      recoveryReviewedCount: 19,
+       recoveryOwnerRatifiedCount: 0,
+     });
+ 
+diff --git a/dialectical-engine/tests/unit/support-recovery-components.test.ts b/dialectical-engine/tests/unit/support-recovery-components.test.ts
+index 672bb935cf60b18f0fa3cd6dbba04347647ce8ca..b3f1c60140e153db38f739a51bd27c054c1daed2 100644
+--- a/dialectical-engine/tests/unit/support-recovery-components.test.ts
++++ b/dialectical-engine/tests/unit/support-recovery-components.test.ts
+@@ -1,5 +1,5 @@
+ import { createHash } from "node:crypto";
+-import { mkdtempSync,rmSync,writeFileSync } from "node:fs";
++import { mkdtempSync,readFileSync,rmSync,writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { afterEach,describe,expect,it } from "vitest";
+@@ -63,6 +63,23 @@ afterEach(() => {
+ });
+ 
+ describe("reviewed Support recovery components", () => {
++  it("carries an exact bilingual product-identity draft for separate review", () => {
++    const document = JSON.parse(readFileSync(new URL(
++      "../../packages/support-kb/recovery/components.json",import.meta.url
++    ),"utf8")) as { components: Array<Readonly<{ id:string;lang:string;articleSha256:string;
++      modelProjection:string;fallback:string }>> };
++    const identity = document.components.filter(({ id }) => id === "product-identity");
++    expect(identity.map(({ lang }) => lang).sort()).toEqual(["en","ro"]);
++    for (const component of identity) {
++      const article = readFileSync(new URL(
++        `../../packages/support-kb/content/product-identity.${component.lang}.md`,import.meta.url
++      ));
++      expect(component.articleSha256).toBe(sha256(article));
++      expect(component.modelProjection).not.toBe("");
++      expect(component.fallback).not.toBe("");
++    }
++  });
++
+   it("admits a complete exact-hash bilingual component set into an immutable snapshot", () => {
+     const data = fixture();
+     const corpus = loadHelpCorpus(data.directory,{
+diff --git a/dialectical-engine/tests/unit/support-response-policy.test.ts b/dialectical-engine/tests/unit/support-response-policy.test.ts
+index 026ecf475fc4cb60259d08a32599dc6c85c445a1..a519196019ce1bca191a9538521c42b0cebe6e88 100644
+--- a/dialectical-engine/tests/unit/support-response-policy.test.ts
++++ b/dialectical-engine/tests/unit/support-response-policy.test.ts
+@@ -236,7 +236,7 @@ describe("CP1 support model response policy", () => {
+       ...SUPPORT_ACTION_CATALOG.flatMap(({ labels }) => [labels.en,labels.ro]),
+       ...SUPPORT_CAPABILITIES.flatMap(({ labels }) => [labels.en,labels.ro])
+     ];
+-    expect(labels).toHaveLength(52);
++    expect(labels).toHaveLength(54);
+     for (const label of labels) {
+       expect(parseSupportDraft(raw(`Available feature: ${label}.`,{ actionIds: [] })),label)
+         .not.toBeNull();
+diff --git a/dialectical-engine/tests/unit/support-security-guidance.test.ts b/dialectical-engine/tests/unit/support-security-guidance.test.ts
+index 48fc043e9a8e660fcdde23cac0dd6d4ae1a2c179..89a77c3f8185f344220cd406c350d640aca2cb57 100644
+--- a/dialectical-engine/tests/unit/support-security-guidance.test.ts
++++ b/dialectical-engine/tests/unit/support-security-guidance.test.ts
+@@ -10,7 +10,11 @@ describe("CP1 deterministic Forgot password guidance", () => {
+     ["I forgot my password", "en"],
+     ["Can't remember my password", "en"],
+     ["Am uitat parola", "ro"],
+-    ["Am uitat parola and I need a replacement password", "ro"]
++    ["Am uitat parola and I need a replacement password", "ro"],
++    ["Give me the password recovery link", "en"],
++    ["Where is the password reset page?", "en"],
++    ["Vreau linkul de recuperare a parolei", "ro"],
++    ["Unde este pagina pentru resetarea parolei?", "ro"]
+   ] as const)("recognizes %s before generic security routing", (text,language) => {
+     expect(classifySecurityNavigation(text)).toEqual({
+       kind: "FORGOT_PASSWORD",language,actionId: "forgot-password"
+@@ -22,7 +26,9 @@ describe("CP1 deterministic Forgot password guidance", () => {
+     "Unde este codul de recuperare MFA salvat?",
+     "Codurile de autentificare rămân private.",
+     "Authentication codes remain private.",
+-    "How do I change my password?"
++    "How do I change my password?",
++    "Reset my password now",
++    "Validate my password reset token"
+   ])("keeps saved-MFA and ordinary password requests distinct: %s", (text) => {
+     expect(classifySecurityNavigation(text)).toBeNull();
+   });

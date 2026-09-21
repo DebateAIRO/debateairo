@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_FIX38",
+  "attempt": 4,
+  "verdict": "OUTPUT_BOOKKEEPING_REWORK_REQUIRED",
+  "completedBeforeFailure": [
+    "all six browser controls passed",
+    "browser control proof was written"
+  ],
+  "failure": {
+    "stage": "final console summary",
+    "code": "ReferenceError",
+    "detail": "summary referenced removed local name forwardResult"
+  },
+  "productIssueRevealed": false,
+  "operationalTraffic": 0,
+  "disposition": "preserve provisional proof, correct summary reference only, rerun finite controls under fresh artifact names"
+}

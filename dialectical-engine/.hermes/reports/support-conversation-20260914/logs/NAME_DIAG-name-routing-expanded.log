@@ -1,0 +1,413 @@
+{
+  "revision": "475c5a7e7eb8f48a3f5a81379f37b49fdd014ce9",
+  "corpus": {
+    "kbVersion": "d674533e89d145bf9203248e2e324b451e57a2f1d3f257614d31678b7ac379df",
+    "entries": 36
+  },
+  "names": [
+    {
+      "language": "en",
+      "query": "What is Dialectical-Engine?",
+      "classification": {
+        "outcome": null,
+        "language": "en",
+        "link": null
+      },
+      "contextSourceIds": [
+        "public-answer-disclosure",
+        "support-status-limits"
+      ],
+      "requestedActionIds": [],
+      "service": {
+        "outcome": "ANSWER_GROUNDED",
+        "sourceIds": [
+          "public-answer-disclosure"
+        ],
+        "modelCalls": 1
+      }
+    },
+    {
+      "language": "en",
+      "query": "What is Dialectical Engine?",
+      "classification": {
+        "outcome": null,
+        "language": "en",
+        "link": null
+      },
+      "contextSourceIds": [
+        "public-answer-disclosure",
+        "support-status-limits"
+      ],
+      "requestedActionIds": [],
+      "service": {
+        "outcome": "ANSWER_GROUNDED",
+        "sourceIds": [
+          "public-answer-disclosure"
+        ],
+        "modelCalls": 1
+      }
+    },
+    {
+      "language": "en",
+      "query": "what is DIALECTICAL-ENGINE?",
+      "classification": {
+        "outcome": null,
+        "language": "en",
+        "link": null
+      },
+      "contextSourceIds": [
+        "public-answer-disclosure",
+        "support-status-limits"
+      ],
+      "requestedActionIds": [],
+      "service": {
+        "outcome": "ANSWER_GROUNDED",
+        "sourceIds": [
+          "public-answer-disclosure"
+        ],
+        "modelCalls": 1
+      }
+    },
+    {
+      "language": "en",
+      "query": "What is DebateAIRO?",
+      "classification": {
+        "outcome": null,
+        "language": "en",
+        "link": null
+      },
+      "contextSourceIds": [
+        "guide-how-it-works",
+        "export-json",
+        "getting-started-debate"
+      ],
+      "requestedActionIds": [
+        "home",
+        "public-catalog",
+        "your-debates"
+      ],
+      "service": {
+        "outcome": "ANSWER_GROUNDED",
+        "sourceIds": [
+          "guide-how-it-works"
+        ],
+        "modelCalls": 1
+      }
+    },
+    {
+      "language": "ro",
+      "query": "Ce este Dialectical-Engine?",
+      "classification": {
+        "outcome": null,
+        "language": "ro",
+        "link": null
+      },
+      "contextSourceIds": [],
+      "requestedActionIds": [],
+      "service": {
+        "outcome": "NO_SOURCE",
+        "sourceIds": [],
+        "modelCalls": 0
+      }
+    },
+    {
+      "language": "ro",
+      "query": "Ce este Dialectical Engine?",
+      "classification": {
+        "outcome": null,
+        "language": "ro",
+        "link": null
+      },
+      "contextSourceIds": [],
+      "requestedActionIds": [],
+      "service": {
+        "outcome": "NO_SOURCE",
+        "sourceIds": [],
+        "modelCalls": 0
+      }
+    },
+    {
+      "language": "ro",
+      "query": "Ce este DebateAIRO?",
+      "classification": {
+        "outcome": null,
+        "language": "ro",
+        "link": null
+      },
+      "contextSourceIds": [
+        "browse-public-debates",
+        "view-public-debate"
+      ],
+      "requestedActionIds": [],
+      "service": {
+        "outcome": "ANSWER_GROUNDED",
+        "sourceIds": [
+          "browse-public-debates"
+        ],
+        "modelCalls": 1
+      }
+    },
+    {
+      "language": "en",
+      "query": "How do I export JSON in Dialectical-Engine?",
+      "classification": {
+        "outcome": null,
+        "language": "en",
+        "link": null
+      },
+      "contextSourceIds": [
+        "guide-how-it-works",
+        "export-json",
+        "publish-a-debate"
+      ],
+      "requestedActionIds": [
+        "owner-debate"
+      ],
+      "service": {
+        "outcome": "ANSWER_GROUNDED",
+        "sourceIds": [
+          "guide-how-it-works"
+        ],
+        "modelCalls": 1
+      }
+    },
+    {
+      "language": "en",
+      "query": "How do I publish a debate in DebateAIRO?",
+      "classification": {
+        "outcome": null,
+        "language": "en",
+        "link": null
+      },
+      "contextSourceIds": [
+        "export-json",
+        "guide-how-it-works",
+        "publish-a-debate"
+      ],
+      "requestedActionIds": [
+        "home",
+        "public-catalog",
+        "your-debates"
+      ],
+      "service": {
+        "outcome": "ANSWER_GROUNDED",
+        "sourceIds": [
+          "export-json"
+        ],
+        "modelCalls": 1
+      }
+    },
+    {
+      "language": "ro",
+      "query": "Cum export JSON din Dialectical Engine?",
+      "classification": {
+        "outcome": null,
+        "language": "ro",
+        "link": null
+      },
+      "contextSourceIds": [
+        "guide-how-it-works",
+        "export-json",
+        "publish-a-debate"
+      ],
+      "requestedActionIds": [
+        "owner-debate"
+      ],
+      "service": {
+        "outcome": "ANSWER_GROUNDED",
+        "sourceIds": [
+          "guide-how-it-works"
+        ],
+        "modelCalls": 1
+      }
+    },
+    {
+      "language": "ro",
+      "query": "Cum public o dezbatere în DebateAIRO?",
+      "classification": {
+        "outcome": null,
+        "language": "ro",
+        "link": null
+      },
+      "contextSourceIds": [
+        "view-public-debate",
+        "browse-public-debates",
+        "public-answer-disclosure"
+      ],
+      "requestedActionIds": [
+        "home",
+        "public-catalog",
+        "your-debates"
+      ],
+      "service": {
+        "outcome": "ANSWER_GROUNDED",
+        "sourceIds": [
+          "view-public-debate"
+        ],
+        "modelCalls": 1
+      }
+    },
+    {
+      "language": "en",
+      "query": "Does Dialectical Engine offer medical diagnosis?",
+      "classification": {
+        "outcome": null,
+        "language": "en",
+        "link": null
+      },
+      "contextSourceIds": [
+        "account-settings",
+        "export-json",
+        "support-status-limits"
+      ],
+      "requestedActionIds": [],
+      "service": {
+        "outcome": "ANSWER_GROUNDED",
+        "sourceIds": [
+          "account-settings"
+        ],
+        "modelCalls": 1
+      }
+    },
+    {
+      "language": "ro",
+      "query": "Dialectical Engine oferă diagnostic medical?",
+      "classification": {
+        "outcome": null,
+        "language": "ro",
+        "link": null
+      },
+      "contextSourceIds": [
+        "account-access",
+        "account-settings",
+        "export-json"
+      ],
+      "requestedActionIds": [],
+      "service": {
+        "outcome": "ANSWER_GROUNDED",
+        "sourceIds": [
+          "account-access"
+        ],
+        "modelCalls": 1
+      }
+    },
+    {
+      "language": "en",
+      "query": "How do I create a debate?",
+      "classification": {
+        "outcome": null,
+        "language": "en",
+        "link": null
+      },
+      "contextSourceIds": [
+        "getting-started-debate",
+        "debate-topic-and-description",
+        "risk-tier-choice"
+      ],
+      "requestedActionIds": [
+        "start-debate"
+      ],
+      "service": {
+        "outcome": "ANSWER_GROUNDED",
+        "sourceIds": [
+          "getting-started-debate"
+        ],
+        "modelCalls": 1
+      }
+    },
+    {
+      "language": "ro",
+      "query": "Cum creez o dezbatere?",
+      "classification": {
+        "outcome": null,
+        "language": "ro",
+        "link": null
+      },
+      "contextSourceIds": [
+        "getting-started-debate",
+        "debate-topic-and-description",
+        "risk-tier-choice"
+      ],
+      "requestedActionIds": [
+        "start-debate"
+      ],
+      "service": {
+        "outcome": "ANSWER_GROUNDED",
+        "sourceIds": [
+          "getting-started-debate"
+        ],
+        "modelCalls": 1
+      }
+    }
+  ],
+  "recovery": [
+    {
+      "query": "Give me the password recovery link.",
+      "classification": {
+        "outcome": "REFUSE_ZONE",
+        "language": "en",
+        "link": "/settings"
+      }
+    },
+    {
+      "query": "Where is the password reset link?",
+      "classification": {
+        "outcome": "REFUSE_ZONE",
+        "language": "en",
+        "link": "/settings"
+      }
+    },
+    {
+      "query": "Give me the Forgot password link.",
+      "classification": {
+        "outcome": "REFUSE_ZONE",
+        "language": "en",
+        "link": null,
+        "securityNavigation": "FORGOT_PASSWORD"
+      }
+    },
+    {
+      "query": "Vreau linkul de recuperare a parolei.",
+      "classification": {
+        "outcome": "REFUSE_ZONE",
+        "language": "en",
+        "link": "/settings"
+      }
+    },
+    {
+      "query": "Unde este linkul pentru resetarea parolei?",
+      "classification": {
+        "outcome": "REFUSE_ZONE",
+        "language": "ro",
+        "link": "/settings"
+      }
+    },
+    {
+      "query": "Dă-mi linkul Am uitat parola.",
+      "classification": {
+        "outcome": "REFUSE_ZONE",
+        "language": "ro",
+        "link": null,
+        "securityNavigation": "FORGOT_PASSWORD"
+      }
+    }
+  ],
+  "credentialBoundaries": [
+    {
+      "query": "Can Dialectical Engine validate my password?",
+      "classification": {
+        "outcome": "REFUSE_ZONE",
+        "language": "en",
+        "link": "/settings"
+      }
+    },
+    {
+      "query": "Poate Dialectical Engine să îmi verifice parola?",
+      "classification": {
+        "outcome": "REFUSE_ZONE",
+        "language": "ro",
+        "link": "/settings"
+      }
+    }
+  ]
+}

@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "sequence": 47,
+  "failureCode": "GUIDE_CAPTURE_SCROLL_EDGE_MISSING",
+  "phase": "ORIGINAL_PANE_SCREENSHOT",
+  "identity": {
+    "sequence": 47,
+    "promptSha256": "1cc1ceae56047be2271226f1769bf4483f9d05729c4e50824e869909a292cf92",
+    "mode": "full",
+    "language": "ro",
+    "apiTextSha256": "1d092ff748e9b2ea7ba3f76b5f58cffba401e17bba51ceb9879da9c7c31693ff",
+    "sources": [],
+    "actions": [],
+    "targetAssistantIndex": 0
+  },
+  "geometry": {
+    "before": {
+      "target": {
+        "top": 267.54449462890625,
+        "left": 413,
+        "right": 884.109375,
+        "bottom": 342.32574462890625,
+        "x": 413,
+        "y": 267.54449462890625,
+        "width": 471.109375,
+        "height": 74.78125
+      },
+      "pane": {
+        "top": 154,
+        "left": 389,
+        "right": 1041,
+        "bottom": 534,
+        "x": 389,
+        "y": 154,
+        "width": 652,
+        "height": 380
+      },
+      "footer": null,
+      "footerPainted": false,
+      "paneScrollTop": 0,
+      "paneScrollHeight": 380,
+      "paneClientHeight": 380
+    },
+    "top": {
+      "target": {
+        "top": 267.54449462890625,
+        "left": 413,
+        "right": 884.109375,
+        "bottom": 342.32574462890625,
+        "x": 413,
+        "y": 267.54449462890625,
+        "width": 471.109375,
+        "height": 74.78125
+      },
+      "pane": {
+        "top": 154,
+        "left": 389,
+        "right": 1041,
+        "bottom": 534,
+        "x": 389,
+        "y": 154,
+        "width": 652,
+        "height": 380
+      },
+      "top": {
+        "top": 267.54449462890625,
+        "left": 413,
+        "right": 884.109375,
+        "bottom": 342.32574462890625,
+        "x": 413,
+        "y": 267.54449462890625,
+        "width": 471.109375,
+        "height": 74.78125
+      },
+      "footer": null,
+      "footerPainted": false,
+      "paneScrollTop": 0,
+      "paneScrollHeight": 380,
+      "paneClientHeight": 380
+    },
+    "preFooter": {
+      "target": {
+        "top": 261.8125,
+        "left": 413,
+        "right": 884.109375,
+        "bottom": 336.59375,
+        "x": 413,
+        "y": 261.8125,
+        "width": 471.109375,
+        "height": 74.78125
+      },
+      "pane": {
+        "top": 154,
+        "left": 389,
+        "right": 1041,
+        "bottom": 534,
+        "x": 389,
+        "y": 154,
+        "width": 652,
+        "height": 380
+      },
+      "footer": null,
+      "footerPainted": false,
+      "paneScrollTop": 0,
+      "paneScrollHeight": 380,
+      "paneClientHeight": 380
+    },
+    "postFooter": null
+  },
+  "scrollAssignment": null,
+  "restoration": {
+    "paneScrollTopRestored": true,
+    "viewportRestored": true,
+    "observedPaneScrollTop": 0,
+    "observedViewport": {
+      "width": 1440,
+      "height": 1000
+    }
+  },
+  "artifacts": {
+    "topPaneScreenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-old-row47-original-pane-start.png",
+    "footerPaneScreenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-old-row47-original-pane-end.png",
+    "screenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-old-row47-complete-expanded.png",
+    "topPaneCreated": true,
+    "footerPaneCreated": false,
+    "completeExpandedCreated": false
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_CONTROLS18",
+  "ticket": "t_6831cb23",
+  "revision": "6cbe0e7ad18b20eca35876f4a91478cfbba82307",
+  "verdict": "PASS_CAPTURE_AND_INVOCATION_CONTROLS",
+  "preparedControls": {
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CAPTURE_CONTROLS18-prepared-controls.log"
+  },
+  "longReplyFixture": {
+    "articleHeight": 798,
+    "originalPaneClientHeight": 240,
+    "originalPaneTopReachable": true,
+    "originalPaneFooterReachable": true,
+    "topPaneScrollTop": 14,
+    "footerPaneScrollTop": 544,
+    "completeAnswerCapture": true,
+    "completeCapturePresentation": "evidence_only_expanded_pane",
+    "topPixelInfluence": true,
+    "footerPixelInfluence": true,
+    "supportAttempts": 0,
+    "successfulAttempt": 4,
+    "receipt": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_CONTROLS18-long-reply-attempt4.json"
+  },
+  "preservedFailures": [
+    {
+      "attempt": 1,
+      "code": "OUTPUT_PARENT_MISSING",
+      "result": "RC1_BEFORE_BROWSER_LAUNCH"
+    },
+    {
+      "attempt": 2,
+      "code": "SANDBOX_BROWSER_LAUNCH_DENIED",
+      "result": "RC1_BEFORE_PAGE_OR_ROUTE"
+    },
+    {
+      "attempt": 3,
+      "code": "ANCESTOR_OVERFLOW_CLIPPED_FOOTER_PIXELS",
+      "result": "RC1_FOOTER_MUTATION_HASH_UNCHANGED"
+    }
+  ],
+  "browserCleanup": {
+    "fixtureAwaitedBrowserClose": true,
+    "knownFailedPid": 38929,
+    "knownFailedPidPresentAfterward": false,
+    "matchingFixtureChromiumChildrenAfterward": 0
+  },
+  "traffic": {
+    "runtime": 0,
+    "appPage": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "pending": {
+    "final151Binding": true,
+    "finalProductBinding": true,
+    "finalKnowledgeBaseAttestation": true,
+    "supportedOwnedReloadForFinalKnowledgeBase": true,
+    "forgotDestination": "UNRESOLVED"
+  }
+}

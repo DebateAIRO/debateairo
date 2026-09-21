@@ -44,6 +44,7 @@ import {
   buildDevelopmentProviderPanel,
   DEVELOPMENT_UNAVAILABLE_CLI_MODEL
 } from "../../apps/runner/src/dev-provider-panel.js";
+import { SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE } from "../../apps/runner/src/dev-auth-stack-profile.js";
 
 function relay(port: number, maker: string, model: string): DevelopmentCliRelay & {
   close: ReturnType<typeof vi.fn>;
@@ -266,6 +267,27 @@ describe("development real CLI provider panel", () => {
     expect(warnings).toEqual([
       `DEV_PROVIDER_SLOT_UNAVAILABLE class (c) tier=premium model=grok-4.6-build code=${mismatchCode}`
     ]);
+    await handle.stop();
+  });
+
+  it("starts every relay on the selected support-preview port", async () => {
+    const config = loadModelConfig(process.cwd());
+    const previewSlots = developmentProviderSlots(
+      config,
+      SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE
+    ).filter((slot) => slot.transport === "cli");
+    const runtime = operations(previewSlots.map((slot) =>
+      relay(slot.port!, slot.maker, slot.model)
+    ));
+    const handle = await startDevelopmentCliProviderPanel(
+      config,
+      runtime,
+      () => undefined,
+      SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE
+    );
+    for (const [index, start] of runtime.starts.entries()) {
+      expect(start).toHaveBeenCalledWith(previewSlots[index]!.port);
+    }
     await handle.stop();
   });
 });

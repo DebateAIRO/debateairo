@@ -1,0 +1,33 @@
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: answer must reject: Asistența nu cere coduri de autentificare; de asemenea le poate valida.
++ actual - expected
+
++ {
++   actionIds: [],
++   kind: 'answer',
++   sourceIds: [],
++   text: 'Asistența nu cere coduri de autentificare; de asemenea le poate valida.'
++ }
+- null
+
+    at <anonymous> (/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/REV1_P4/correctness-boundary-control.ts:83:10)
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: {
+    kind: 'answer',
+    text: 'Asistența nu cere coduri de autentificare; de asemenea le poate valida.',
+    sourceIds: [],
+    actionIds: []
+  },
+  expected: null,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v22.23.1

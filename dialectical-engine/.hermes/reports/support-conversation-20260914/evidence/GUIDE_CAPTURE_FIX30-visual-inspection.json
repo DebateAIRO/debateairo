@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_FIX30_VISUAL_INSPECTION",
+  "result": "PASS",
+  "image": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_FIX30/control-fixtures/full-ro-long-complete.png",
+    "sha256": "abdeeab4d41d685bf0571d3e6f770e74ded82065120de02dc12e9a46bdc286b6",
+    "width": 760,
+    "height": 562
+  },
+  "observed": {
+    "targetTopMarkerVisible": true,
+    "entireLongAnswerVisible": true,
+    "footerVisible": true,
+    "sourceTextVisible": "Navigheaz\u0103 \u00een Dialectical Engine",
+    "actionTextVisible": "Deschide Ajutor",
+    "blankClippedRemainder": false
+  },
+  "comparison": {
+    "oldClippedPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_FIX30/control-fixtures/full-ro-long-old-clipped-base.png",
+    "oldClippedSha256": "84bacb5535fa54f6433136d036ac3dde5eafb65f95712aa3f621b5ce878218a0",
+    "oldFooterSourceActionPaintMutationChangedHash": false
+  },
+  "qualification": "Visual inspection and discriminating paint mutations apply to the inert fixture only; later LIVE29 remains required for actual public UI evidence."
+}

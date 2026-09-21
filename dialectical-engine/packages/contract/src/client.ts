@@ -268,7 +268,11 @@ export interface ContractClient {
     total: number;
   }>>;
   readPublicDebate(publicationRef: string): Promise<PublicDebate>;
-  readRunVisibility(runId: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
+  readRunVisibility(runId: string): Promise<{
+    state: "PRIVATE" | "PUBLISHED";
+    public_ref: string | null;
+    publish_pending?: true | undefined;
+  }>;
   publishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
   unpublishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
   scheduleAccountErasure(stepUpGrant:string):Promise<{

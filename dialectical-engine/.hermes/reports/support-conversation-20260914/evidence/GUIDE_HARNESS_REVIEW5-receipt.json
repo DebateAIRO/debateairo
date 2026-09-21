@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW5",
+  "ticket": "t_6a1ee530",
+  "runId": 156,
+  "reviewerAgentPath": "/root/baseline",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-17T19:13:32Z",
+  "revision": "5731eb6faac25f9712f04aea029a021f6eee9352",
+  "productRevision": "5731eb6faac25f9712f04aea029a021f6eee9352",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "freezeCommit": "554e776a293840bb1ec50b5a028d0c129fd79cb2",
+  "verdict": "REWORK_BOUNDED",
+  "finding": {
+    "id": "GH5-R1",
+    "title": "Pre-assert observation-building failures can still erase the safe public attempt",
+    "blockingFutureLive": true,
+    "locations": [
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX5/capture-public-guide.mjs:247",
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX5/capture-public-guide.mjs:251",
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX5/capture-public-guide.mjs:263",
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX5/capture-public-guide.mjs:271",
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX5/capture-public-guide.mjs:342"
+    ],
+    "minimalCorrection": [
+      "checkpoint an allowlisted staged attempted-row observation immediately after the sanitized API projection exists",
+      "safely enrich the observation after DOM and diagnostic phases",
+      "persist a phase-specific closed code for missing/invalid DOM or diagnostic construction failures while rows remains unchanged",
+      "add actual-consumer inert controls for missing/invalid response, DOM read, diagnostic failure, assertion failure, privacy exclusion, and honest row accounting",
+      "recompute ordered-eight and adapter pins and bind the eventual exact corrected clean product and KB before live traffic"
+    ]
+  },
+  "retainedDispositions": [
+    {
+      "area": "complete API+DOM+diagnostic tuple predicate persistence",
+      "verdict": "PASS"
+    },
+    {
+      "area": "public-only allowlist and privacy exclusions",
+      "verdict": "PASS"
+    },
+    {
+      "area": "attempted versus completed row accounting",
+      "verdict": "PASS"
+    },
+    {
+      "area": "rows7/8 source policy and production selector binding at revision 5731",
+      "verdict": "PASS"
+    },
+    {
+      "area": "other52 indexed retention",
+      "verdict": "PASS_BY_FROZEN_DELTA"
+    },
+    {
+      "area": "ordered-eight digest and copied adapter pre-import/constructor binding",
+      "verdict": "PASS"
+    },
+    {
+      "area": "GUIDE5 output namespace isolation/absence",
+      "verdict": "PASS"
+    }
+  ],
+  "controlEvidence": {
+    "harnessSha256": "238db0310eb2bdc34245f213f458c35e6e86a0e74efa669548ae3b5125138341",
+    "matrixSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+    "verifierSha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733",
+    "canonicalProofSha256": "c5719c864c94868c83095841402af050f5cca45fb98eaf9a3d1657dd1900256d",
+    "controls": 91,
+    "passed": 91,
+    "uniqueNames": 91,
+    "adapterNegativeControls": 3,
+    "adapterNegativePassed": 3,
+    "adapterImporterCalls": 0,
+    "adapterSuccessfulRows": 0,
+    "inputCount": 128,
+    "inputMismatches": 0,
+    "precision": "GUIDE_HARNESS_FIX5-controls-final.log is the 3/3 adapter-negative record; the canonical schema-2 JSON is the 91-control proof."
+  },
+  "privacyAndFailureCustody": {
+    "admitted": [
+      "canonical row identity",
+      "branch",
+      "HTTP status",
+      "allowlisted public outcome",
+      "final public text",
+      "public sources and closed actions",
+      "rendered public equivalents",
+      "API/DOM equality",
+      "fixed diagnostic status/category/counts",
+      "closed failure code"
+    ],
+    "excluded": [
+      "raw or rejected model drafts",
+      "private/extra fields",
+      "headers",
+      "cookies",
+      "session identities",
+      "capabilities",
+      "credentials",
+      "attempt IDs",
+      "raw runtime bytes"
+    ],
+    "gap": "No staged observation exists until DOM and diagnostic construction complete."
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW5.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW5.md",
+      "sha256": "c0250bf717ed5398cd9d8eba31e797fa859f1b7f4fcb92142507659d990ec24c",
+      "bytes": 6145
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW5.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW5.md",
+      "sha256": "9f90403e778d277b0aad5c0f49a8687c451cfbd3f31a76f821fcf647088343da",
+      "bytes": 3036
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW5-static-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW5-static-custody.json",
+      "sha256": "2678446ffe5b31b2aeda05ffeaeb2d91ecca03120302e4324c0f984010f789c0",
+      "bytes": 4609
+    }
+  ],
+  "limits": [
+    "static review only; no harness/test/probe/browser/runtime/HTTP/DB/Support/model/capacity/lifecycle/product/KB/Git action",
+    "sealed LIVE3 sequence-7 predicate, response origin, and cause remain unknown",
+    "an independent product review reported separate revision-5731 rework; future live evidence must rebind the eventual corrected clean revision",
+    "Forgot remains unresolved/actionless; no readiness, acceptance, checkpoint, or CP2 claim"
+  ],
+  "leases": {
+    "heavy": "not_requested",
+    "git": "not_requested"
+  }
+}

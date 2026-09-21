@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_UI_WRITER_REVIEW45",
+  "ticket": "t_14d061d4",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "freeze": "bc86dbdfd6151c3439ee1c317ebc63d488269841",
+  "authorReceiptSha256": "fae1d9cf45ce19a19fbdfbca35b50199b76e15d88302aa574d9d7a85c7ae330b",
+  "authorConsumptionSha256": "3aa4e8098c542a309633e6857f574b24952477104b56ee5ab3898e32acb45b5c",
+  "uiWriterSha256": "e75e3f040c8f9a64ce5e54f0dd8ff03c84177ea79bf27dfdb163bff9e57659ad",
+  "privateWriterSha256": "df8efe4054581308f4915438b332e337bc7a2098f2e6c8e91eba6b85c2a6e9fb",
+  "actualUiControlSha256": "a2ebfc5c16e8575f6b463517900cff8933b78f421365093f77ebce2219610594",
+  "writerProofSha256": "6222cac9bb21fa8d9d8d27b3d12d535e1f166a99d38a092ef9720bc6b3f67134",
+  "finalControlsSha256": "18f24334d7f419fbfe4143abc34e4931aae8e17cdf0d0dd0dacc8a0ef18fd671",
+  "commandContractSha256": "6067a3f0db32f56a6b072fd2826b1e94da7969bc47151bbb9f762b39f2a02c3b",
+  "operatorSha256": "af7e1d91ac8d7a22f580a7b96bdf1569d44782c9b138b6dc0f92d46aeebbb787",
+  "futurePathsAbsent": 115
+}

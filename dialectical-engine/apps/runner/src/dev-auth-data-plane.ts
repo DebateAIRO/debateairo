@@ -8,14 +8,17 @@ import {
   parseDevelopmentDeploymentRegisterCliOutput,
   type DevelopmentDeploymentRegisterMachineReceiptV1
 } from "./dev-deployment-register.js";
-import { createSupportControlPlanePool } from "@debateai/db";
 import { createPostgresRegisterPublicationPort } from "@debateai/register";
-import { loadDevelopmentSupportConfigCliCredentials } from "./support-config-cli-credentials.js";
+import {
+  createDevelopmentSupportConfigInitializationPool
+} from "./support-config-cli-credentials.js";
 import { initializeDevelopmentSupportConfiguration } from "./dev-support-config.js";
+import {
+  DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  type DevelopmentAuthStackProfile
+} from "./dev-auth-stack-profile.js";
 
 const DATA_PLANE_SERVICES = Object.freeze(["postgres", "hatchet-lite"] as const);
-const LOCAL_MIGRATOR_DATABASE_URL =
-  "postgresql://debateai:debateai-dev-only@127.0.0.1:55432/debateai";
 const MAX_CHILD_OUTPUT_BYTES = 128 * 1024;
 
 export type DevelopmentAuthDataPlaneReceipt = Readonly<{
@@ -265,12 +268,20 @@ function composeArguments(...arguments_: readonly string[]): readonly string[] {
 export function createDevelopmentAuthDataPlaneOperations(
   repositoryRoot: string,
   commandEnvironment: Readonly<Record<string, string>>,
-  providerPanel: DevelopmentProviderPanel
+  providerPanel: DevelopmentProviderPanel,
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): DevelopmentAuthDataPlaneOperations {
   const cwd = resolve(repositoryRoot);
-  const composeEnvironment = Object.freeze({ VLLM_MODEL: "dev-auth-not-started" });
+  const composeEnvironment = Object.freeze({
+    VLLM_MODEL: "dev-auth-not-started",
+    DEBATEAI_DEV_COMPOSE_PROJECT_NAME: profile.composeProjectName,
+    DEBATEAI_DEV_POSTGRES_PORT: String(profile.postgresPort),
+    DEBATEAI_DEV_HATCHET_GRPC_PORT: String(profile.hatchetGrpcPort),
+    DEBATEAI_DEV_HATCHET_API_PORT: String(profile.hatchetApiPort)
+  });
   const migrationEnvironment = Object.freeze({
-    MIGRATION_DATABASE_URL: LOCAL_MIGRATOR_DATABASE_URL
+    MIGRATION_DATABASE_URL:
+      `postgresql://debateai:debateai-dev-only@127.0.0.1:${profile.postgresPort}/debateai`
   });
   const pnpm = commandEnvironment.PNPM_EXECUTABLE?.trim() || "pnpm";
   const runPnpm = (arguments_: readonly string[], failureCode: string, environment = {}) =>
@@ -388,10 +399,10 @@ export function createDevelopmentAuthDataPlaneOperations(
       return parseDevelopmentDeploymentRegisterCliOutput(publishOutput, cwd);
     },
     async initializeSupportConfiguration(registerReceipt) {
-      const credentials = await loadDevelopmentSupportConfigCliCredentials(
-        join(cwd,".local","dev-auth","database-principals.env")
+      const pool = await createDevelopmentSupportConfigInitializationPool(
+        join(cwd,".local","dev-auth","database-principals.env"),
+        String(profile.postgresPort)
       );
-      const pool = createSupportControlPlanePool(credentials.databaseUrl);
       try {
         await initializeDevelopmentSupportConfiguration({
           publication: createPostgresRegisterPublicationPort(pool),

@@ -1,0 +1,13 @@
+{
+  "node": "GUIDE_RECOVERY",
+  "base": "141f04726e12e40c85fccfb75473cfd684bcf230",
+  "at": "2026-09-17T12:23:47.751369+00:00",
+  "addedProductPaths": [],
+  "clarifiedExistingPath": "tests/unit/support-response-policy.test.ts",
+  "authorizedCorrection": "Narrow stale catalog-human-label count assertion: current catalog has60 rather than54 after reviewed menu additions. Author may update or derive the count while retaining all per-label parser and credential-value sink assertions. No runtime changes outside PG-6.",
+  "basis": "Original Sol exact-base START reports812 passed/1failed; necessary immediate test dependency is already within write scope.",
+  "failureLog": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_RECOVERY-start.log",
+    "sha256": "dcdc0f47e328933b581475909a53bea4f333ecbeeba4f9668eedf168db790ae0"
+  }
+}

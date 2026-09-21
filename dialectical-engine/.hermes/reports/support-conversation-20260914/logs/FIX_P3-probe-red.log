@@ -1,0 +1,8 @@
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/FIX_P3/final-security-boundary-probe.ts:287
+  throw new Error(`FIX_P3_BOUNDARY_EXPECTATIONS_FAILED:${expectationFailures.join(",")}`);
+        ^
+
+Error: FIX_P3_BOUNDARY_EXPECTATIONS_FAILED:redaction:coordinator-in-value:ember,policy:positive-finite-after-negative:true,policy:positive-modal-after-negative:true,policy:positive-additive-ro:true,policy:equals-backslash:true,policy:equals-drive:true,policy:equals-unc:true,policy:benign-malformed-percent:false,summary:positive-finite-after-negative:true,summary:positive-modal-after-negative:true,summary:positive-additive-ro:true,summary:equals-backslash:true,summary:equals-drive:true,summary:equals-unc:true,summary:benign-malformed-percent:false,answer:positive-modal-after-negative:fallback,answer:positive-modal-after-negative:completion-in-sink,answer:equals-unc:fallback,answer:equals-unc:completion-in-sink,answer:input-redaction:ember,answer:input-redaction:ember,redaction:safe-negative:changed
+    at <anonymous> (/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/FIX_P3/final-security-boundary-probe.ts:287:9)
+
+Node.js v22.23.1

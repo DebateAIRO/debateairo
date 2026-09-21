@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE25",
+  "ticket": "t_419471a7",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "STOPPED_ZERO_PHASE_ORCHESTRATION_LOADER",
+  "skillsLoaded": ["retained BODY skills and mission floors"],
+  "phaseStatuses": ["NOT_RUN", "NOT_RUN", "NOT_RUN", "NOT_RUN", "NOT_RUN", "NOT_RUN", "NOT_RUN"],
+  "actualCounts": {"attempted": 0, "completed": 0, "sessions": 0, "modelCalls": 0},
+  "runtime": {"pid": 12272, "pgid": 12272, "ordinaryTlsHelpStatus": 200, "detached": true},
+  "finding": "The pre-phase operator wrapper lacked the supported tsx loader even though its narrow public imports were TypeScript.",
+  "upgrade": "Bind and syntax-execute the exact operator invocation, including loader flags, as part of review rather than reviewing only the seven child argv values.",
+  "limits": ["No retry", "No capacity read", "No actual traffic", "Forgot unresolved/actionless"]
+}

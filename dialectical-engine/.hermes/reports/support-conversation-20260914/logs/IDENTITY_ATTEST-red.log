@@ -1,0 +1,29 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ × tests/unit/support-recovery-attestation.test.ts > production Support recovery attestation > admits the exact separately reviewed 38-record corpus as a deterministic immutable snapshot 62ms
+   → component keys must equal shipped article keys
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/support-recovery-attestation.test.ts > production Support recovery attestation > admits the exact separately reviewed 38-record corpus as a deterministic immutable snapshot
+TypedDomainError: component keys must equal shipped article keys
+ ❯ loadHelpCorpus packages/support-kb/src/index.ts:580:11
+    578|     && (recoveryKeys.length !== expectedRecoveryKeys.length
+    579|       || recoveryKeys.some((key,index) => key !== expectedRecoveryKeys…
+    580|     throw new SupportKbError("SUPPORT_KB_RECOVERY_COMPONENT_INVALID","…
+       |           ^
+    581|   }
+    582|   const recoveryReviews = reviewManifest.recovery?.components ?? [];
+ ❯ tests/unit/support-recovery-attestation.test.ts:100:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'SUPPORT_KB_RECOVERY_COMPONENT_INVALID' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  10:42:38
+   Duration  256ms (transform 65ms, setup 0ms, import 87ms, tests 63ms, environment 0ms)
+

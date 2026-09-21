@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CORRECTNESS2",
+  "ticket": "t_51bd1066",
+  "session": "/root/plan_review",
+  "baseRevision": "c34c64d4e643e404cefe96dfaf167536ae364a94",
+  "finalRevision": "2ccb57fa061f74a81c8f2ef42bd33c768f00d4e0",
+  "sourceRevision": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+  "freezeRevision": "b9901446b0d4e6a9e000156bb181bc4d7fe4b087",
+  "freezeReceiptSha256": "5a8923f9a876d6216b761ce8302ce2f01621862954e4647e464d4a11c06cd0a0",
+  "verdict": "REWORK",
+  "findings": [
+    {
+      "id": "B1",
+      "disposition": "BLOCKING",
+      "summary": "Romanian elimin* Support account operation is rejected as navigation by the boundary guard but omitted from the deterministic account-erasure classifier and reaches the ordinary answer path."
+    },
+    {
+      "id": "B2",
+      "disposition": "BLOCKING",
+      "summary": "Support actor proximity misclassifies EN/RO non-operational explanations containing a later user account-operation verb as Support-executed operations."
+    }
+  ],
+  "productChanged": false,
+  "productFiles": [],
+  "heavyLeaseReleased": true,
+  "commentsReadThrough": 3,
+  "usage": "UNAVAILABLE",
+  "verification": {
+    "indexedInputs": {
+      "checked": 45,
+      "matched": 45,
+      "mismatched": 0
+    },
+    "gateProductFiles": {
+      "detachedChecked": 143,
+      "detachedMatched": 143,
+      "primaryChecked": 143,
+      "primaryMatched": 143
+    },
+    "changedPaths": {
+      "expected": 6,
+      "actual": 6,
+      "exact": true
+    },
+    "changedUnits": {
+      "exitCode": 0,
+      "testFiles": 3,
+      "passed": 562,
+      "failed": 0
+    },
+    "independentDiscriminator": {
+      "exitCode": 1,
+      "rows": 20,
+      "comparisons": 44,
+      "passed": 39,
+      "failed": 5,
+      "affectedRows": 3
+    },
+    "retainedFinal33": {
+      "exitCode": 0,
+      "testFiles": 33,
+      "passed": 1535,
+      "failed": 0,
+      "todo": 1
+    },
+    "retainedTypecheck": {
+      "exitCode": 1,
+      "baselineDiagnostics": 76,
+      "currentDiagnostics": 76,
+      "missionAddedDiagnostics": 0,
+      "byteIdentical": true
+    },
+    "retainedStructuralEvaluation": {
+      "exitCode": 1,
+      "runs": 3,
+      "passedPerRun": 60,
+      "failedPerRun": 0,
+      "rubric": "PENDING"
+    },
+    "cleanup": {
+      "temporaryDependencyLinksAbsent": 5,
+      "detachedDirty": 0,
+      "primaryDirty": 0
+    }
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_CORRECTNESS2.md",
+      "sha256": "600613ae8c0c5d1f8feedb5315ad1a209ee060e32d97f1a1fdc2641feb23fd5f",
+      "bytes": 6724
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_CORRECTNESS2.md",
+      "sha256": "07c0136be659ad6be2b91f455f58da714fe91cc4425a418a55c1e0ccc314def8",
+      "bytes": 4128
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CORRECTNESS2/custody.py",
+      "sha256": "08d6d971aa2b2593c9ed78253994e68674efe810d88ccd45d37ce79ddb2db6fe",
+      "bytes": 3744
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CORRECTNESS2/cleanup-custody.py",
+      "sha256": "12f6b0b2f32008b3f3215fee1f9e518f9e521080e3ac154d4a25db398b5a6ed9",
+      "bytes": 995
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CORRECTNESS2/guard-discriminator.mts",
+      "sha256": "4d846ad65679dd59020bdc03ca3626849f6ff4b79bdc00ed1998e39ebe135142",
+      "bytes": 5153
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS2-input-custody.log",
+      "sha256": "0612be117f9fa8485e835a696e5964449450b430dabde579f6a83d22b34e230f",
+      "bytes": 957
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS2-dependency-custody.log",
+      "sha256": "46942d3beb2f8032bed18a76748653812f33640032c51f1267f6b9f48e6f7896",
+      "bytes": 291
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS2-changed-units.log",
+      "sha256": "62c81a51eeca2fdf23b59f1f0f20e3d36d3b0682d7464f413a327e260c9c00ae",
+      "bytes": 100913
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS2-guard-discriminator.log",
+      "sha256": "0c64ee4edefd4a4ef520dbbf7bf98764d1ceae00b0b4e236dd087a1e882ec9c8",
+      "bytes": 7795
+    }
+  ],
+  "receiptExcludesSelf": true,
+  "measuredAt": "2026-09-17T14:31:50Z"
+}

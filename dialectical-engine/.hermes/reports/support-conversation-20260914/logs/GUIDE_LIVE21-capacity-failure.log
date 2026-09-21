@@ -1,0 +1,8 @@
+exitCode=1
+phase=capacity
+stage=ENVIRONMENT_CUSTODY_VALIDATION
+code=GUIDE_CAPTURE_COUNTS_ONLY_CUSTODY_MISSING
+supportedStatusReads=0
+databaseReads=0
+supportRequests=0
+modelCalls=0

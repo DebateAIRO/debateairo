@@ -1,0 +1,14 @@
+node=GUIDE_INJECTION_SERVER_DIAG
+ticket=t_2ddf3990
+revision=0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13
+mode=read-only-static
+product_dirty_before=0
+product_writes=0
+heavy_commands=0
+runtime_requests=0
+database_requests=0
+model_requests=0
+private_logs_read=0
+live6_http500_preserved=true
+live6_first_exception=UNAVAILABLE
+verdict=PROVED_REACHABLE_PRODUCT_DEFECT_LIVE6_FIRST_EXCEPTION_UNOBSERVED

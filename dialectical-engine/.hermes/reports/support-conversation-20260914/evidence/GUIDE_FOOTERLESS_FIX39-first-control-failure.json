@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FOOTERLESS_FIX39",
+  "result": "FIXTURE_ASSERTION_ONLY_FAILURE",
+  "completedBehavioralControlsBeforeFailure": 7,
+  "reason": "Node assert appends comparison text to the supplied call-contract message; the negative correctly rejected but the fixture required exact message equality.",
+  "operationalTraffic": 0
+}

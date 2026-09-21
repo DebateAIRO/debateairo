@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE3",
+  "ticket": "t_eaf4b3eb",
+  "revision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "verdict": "FAILED_CAPTURE_MODEL_RESULT_INVALID",
+  "stages": {
+    "readiness": {
+      "result": "PASS",
+      "observedAt": "2026-09-17T18:06:52.445Z",
+      "pid": 65268,
+      "ordinaryTlsStatus": 200
+    },
+    "capacity": {
+      "result": "PASS",
+      "reads": 1,
+      "measuredAtUtc": "2026-09-17T18:07:24.842Z"
+    },
+    "rowProof": {
+      "result": "GUIDE_ROW_PROOF_ALL_ROWS_PASS",
+      "rows": 54,
+      "traffic": 0
+    },
+    "capture": {
+      "attempts": 1,
+      "retries": 0,
+      "completedRows": 2,
+      "failedSequence": 7,
+      "errorCode": "GUIDE_HARNESS_MODEL_RESULT_INVALID",
+      "supportRequests": 3,
+      "navigations": 0
+    },
+    "postFailure": {
+      "result": "PASS",
+      "observedAt": "2026-09-17T18:11:30.710Z",
+      "pid": 65268,
+      "leftRunning": true
+    }
+  },
+  "bindings": {
+    "template": {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE3-gate-template.json",
+      "sha256": "4573d0e3d284290af76317f1bac2d0a581f6c5dcf2eca6ddff4482dd91ad200b",
+      "bytes": 1716
+    },
+    "capacity": {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE3-runtime-capacity.json",
+      "sha256": "71a56b3b17840dc24712e3c4ea4625cefca0da1c6f91fe48e7f386d8683271e5",
+      "bytes": 1189
+    },
+    "gate": {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE3-gate.json",
+      "sha256": "6ee3de622424e6a682d5c661f8f21574e7a49af94e8dae6fa2ce2a9d180e2cba",
+      "bytes": 1990
+    },
+    "rowProof": {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-LIVE3.json",
+      "sha256": "d116f8d68ef9c620079ff85180872a5a8f2d345545b16e5a894de7233fc6274c",
+      "bytes": 45488
+    },
+    "actualReceipt": {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE2-actual-receipt.json",
+      "sha256": "f112da59816b1357b1b5eb549dddadd71bdc84f44429ce2db5d6446a8b88a603",
+      "bytes": 14316
+    },
+    "screenshots": [
+      {
+        "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE2-row-01.png",
+        "sha256": "dfafb5d5dcb0a33676d74b824834f811b152e1de81a0d25c284d2c6467813186",
+        "bytes": 166550
+      },
+      {
+        "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE2-row-02.png",
+        "sha256": "dd41caff17495bae587f4797a52861474e18cd29c212c05a589c2ea5e407d9de",
+        "bytes": 208726
+      }
+    ],
+    "failure": {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE3-failure.json",
+      "sha256": "63690f11b0d04f704901b1d019f6595da3d8e8c1892c249531467883e45fd2f2",
+      "bytes": 4731
+    }
+  },
+  "excluded": [
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE2-stack.log"
+  ],
+  "limits": [
+    "The ongoing private stack log is referenced by the gate but excluded from sealed artifacts.",
+    "Only two completed responses are persisted; the third response details are unavailable.",
+    "No retry or postfailure Support/model request occurred."
+  ]
+}

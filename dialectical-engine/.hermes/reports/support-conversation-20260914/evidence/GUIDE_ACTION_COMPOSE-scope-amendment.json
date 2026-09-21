@@ -1,0 +1,9 @@
+{
+  "node": "GUIDE_ACTION_COMPOSE",
+  "base": "b0b91a01cf161d17eef75577cbae94c629b7bc49",
+  "writePaths": [
+    "tests/unit/support-answer-context.test.ts"
+  ],
+  "cause": "Author reported exact33 1633 PASS+1 TODO, typecheck baseline76 plus TS2532/TS2493 on zero-argument inferred mock.calls tuple at line194. Product write authority now limited to test mock typing.",
+  "runtimeChangesAllowed": false
+}

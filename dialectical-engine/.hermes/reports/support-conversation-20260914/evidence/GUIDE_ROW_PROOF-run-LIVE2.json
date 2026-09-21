@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_ROW_PROOF_FIX",
+  "verdict": "FAIL",
+  "resultCode": "GUIDE_HARNESS_PROSE_ONLY_ACTION_PROOF_MISMATCH",
+  "traffic": {
+    "browser": false,
+    "sessions": 0,
+    "supportRequests": 0,
+    "modelRequests": 0
+  },
+  "custody": {
+    "targetRevision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+    "matrixSha256": "cea34112498143dcf8b1a571e40e5a24d207b5b47ee9b142048506cc773ca1ae",
+    "matrixCount": 54,
+    "verifierSha256": "a123d265d2070d9ef5929dd30bb752b826412e42b5091c68e4806b276b37a402",
+    "harnessSha256": "f8f2935965cd59b893ab02848cd9db17eeb71fa423f5620b61479e6647ae4917",
+    "harnessFiles": [
+      {
+        "path": "capture-public-guide.mjs",
+        "bytes": 18107,
+        "sha256": "33d46c07dba0f3deab6d2cb76494cfef534e135ea7145a284dbd70f471d4479f"
+      },
+      {
+        "path": "controls.mjs",
+        "bytes": 8812,
+        "sha256": "530c5e8e850b611945719a3563424c595c9a608fcb5a707e818f5da03284e8a3"
+      },
+      {
+        "path": "matrix.mjs",
+        "bytes": 13168,
+        "sha256": "cea34112498143dcf8b1a571e40e5a24d207b5b47ee9b142048506cc773ca1ae"
+      },
+      {
+        "path": "pre-request-verifier.ts",
+        "bytes": 13715,
+        "sha256": "a123d265d2070d9ef5929dd30bb752b826412e42b5091c68e4806b276b37a402"
+      },
+      {
+        "path": "runtime-capacity.mjs",
+        "bytes": 9935,
+        "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87"
+      },
+      {
+        "path": "session-lifecycle.mjs",
+        "bytes": 4254,
+        "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b"
+      },
+      {
+        "path": "verify-final-branches.ts",
+        "bytes": 5131,
+        "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a"
+      },
+      {
+        "path": "verify-guide-harness.mjs",
+        "bytes": 29210,
+        "sha256": "c0f5ffb26b4d0bddc48c5ed7850ea23ff779e8026ba68f8680d997582272d320"
+      }
+    ],
+    "gatePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE2-gate.json",
+    "gateSha256": "d28abdf18521cece83a203e7296560b85b4c21badd07f0adb10d559e3ec62856",
+    "productRoot": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "productInventoryPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL4-manifest.json",
+    "productInventorySha256": "197f2e0abb3d38d24fa8185a439f4d735d703320373b09291586799a133abcca",
+    "attestationPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ACTIONFIX2-snapshot-receipt.json",
+    "attestationSha256": "77fdcea08325543d7a18d9c9ab0defb2ba5ac6ae87110ac1f9a96e731c02c728",
+    "requiredSuiteReceiptPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ACTIONFIX2-required-suites.json",
+    "requiredSuiteReceiptSha256": "a279e640a899818ae5f2890346e1365ee1c3cab6da8a54f859bc50b2c0dc6802",
+    "controlProofPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ACTIONFIX2-harness-controls-final.log",
+    "controlProofSha256": "0922be8a4fdba95502320951a98bbe692342312156d032fbbb477ba327cd7053",
+    "runtimeCapacityPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE2-runtime-capacity.json",
+    "runtimeCapacitySha256": "c44c9106d594acbbef626066a9a082fca18c9fe17a8a0c0dedfc32e5fe5bf68b"
+  },
+  "rows": [],
+  "limitation": "The sealed constructor stops at its first failing proof and exposes per-row prepare(row) only after all 54 proofs derive."
+}

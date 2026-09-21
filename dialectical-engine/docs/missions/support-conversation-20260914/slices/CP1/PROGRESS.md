@@ -1,4 +1,32 @@
-# CP1 progress
+Current: GUIDE_EVAL_FIX consumed at141f0472 (four paths): context74/74, menu40/40, evaluator9/9, A/B26/26 and structural60/60; isolated command rc1 solely rubric PENDING, no full-quality claim. GUIDE_EVAL_RECHECK is next at clean exact revision. Separate immutable public-data boundary review PASS_FINITE_STATIC consumed atcd4. Corpus44/22 remainsfd3c63e4. Recovery, final composition/reviews and live preview follow; Forgot/full CP1 readiness unresolved.
+
+Current: Public-guide blueprint recheck PASS consumed. GUIDE_ACCOUNT committed and focused-green at163f15c5. GUIDE_BOUNDARY is implementing the public-only boundary with scoped DebatePageGate caller amendment; GUIDE_HARNESS prepares disjoint inert capture. Heavy/Git: boundary author. No current new preview or checkpoint readiness; Forgot destination unresolved.
+
+Current: GUIDE_PLANREV consumed REWORK; bounded GUIDE_PLANFIX and separate GUIDE_PLANREV2 queued. Independent Account navigation authorized. No checkpoint acceptance.
+
+Current owner steering: public-only conversational guide to every meaningful app menu, pills optional. GUIDE_GAP confirms private debate/run attachment access must be removed and menu guidance expanded. GUIDE_PLAN is preparing a bounded SPEC-v4 and implementation contracts against clean `479763da1f586a217f36204cc81138aaa81c6f81`. Latest affected tests612pass; separate rechecks retain one negation/navigation family requiring the visible-behavior correction. No updated live capture yet. Forgot destination remains unverified; no acceptance or CP2 advancement.
+
+# Current owner feedback — CP1 correction in progress
+
+The user requested a recovery link on intent and reported that Support cannot answer questions naming Dialectical-Engine. Scoped product-name diagnosis and a read-only check of current feedback/recovery evidence are active at475c5a7e. This feedback is not checkpoint acceptance. The prior testable demonstration and evidence remain below.
+
+# CP1 current progress — 17 September 2026
+
+The corrected preview is testable at https://localhost:3100/help on `codex/support-conversation-cp1`, revision `475c5a7e7eb8f48a3f5a81379f37b49fdd014ce9`. Separate final product/manual review passed the tested functions; the demonstration is waiting for user testing or corrections. Full CP1 remains incomplete because the existing Forgot-password destination is unverified; no acceptance or CP2/CP3 work is implied.
+
+Both separate Sol technical reviews passed their scoped checks after the credential-boundary corrections. The author’s exact-revision final suite passed all 25 files: 1,126 tests passed and one existing Forgot-navigation TODO. Typecheck still reports the same 76 attributed baseline diagnostics. See `reviews/REV-CP1-p5-TECHNICAL.md` and the FIX_P4/REV1_P5/REV2_P5 evidence receipts.
+
+LIVE_P3 sent seven canonical questions once through the actual compiled UI, API and unchanged Support relay. All seven returned grounded accepted drafts whose text, sources and actions matched the UI. EN pointer and compact RO keyboard actions reached `/login?next=%2Fnew`. The separate product reviewer confirmed all seven replies useful and materially accurate and the manual reproducible; the minor Romanian `debata` typo remains. Fifteen HTTP 401 console-event origins remain unknown, and anonymous execution does not establish signed-in authority.
+
+The supported preview remains detached under PID/PGID 6142, PPID 1. Its last sealed ordinary-TLS HTTP 200 and listener-preservation check was 2026-09-17T06:38:59.183Z, after browser exit and ten seconds idle. The current manual is `.hermes/reports/support-conversation-20260914/evidence/LIVE_P3-manual.md` relative to the repository. The captured adapter log declares 58 conceptual controls; the relay receipt retains a stale numeric54 field but binds the correct proof hash. This metadata discrepancy is qualified without changing sealed evidence or resampling.
+
+The latest owner instruction authorizes continued work until testable and supersedes the former review cap. No new permission question is pending. The destination question already asked remains unanswered and is not repeated. A fresh bounded source and login-UI investigation did not verify an existing Forgot opener; this is not a global absence claim, and no replacement was invented.
+
+All current custody checks preserve the observed original dirty source/index and isolated product state for each operation. Historical source-byte continuity and actor/cause remain qualified. Heavy and Git leases are released; all delegated work is consumed. Remain quiet while awaiting user feedback; do not repeat the destination question or advance to CP2.
+
+## Historical status before the latest continuation
+
+The following dated evidence is retained for provenance; its old revisions, preview process, review-cap gate and pending security corrections are superseded by the current section above.
 
 Current status: **BLOCKED — final pass3 security REWORK and the existing Forgot destination require owner decisions.** CP1 is not ready or accepted; CP2/CP3 remain gated.
 

@@ -7,6 +7,7 @@ import {
   provisionDevelopmentHatchetToken,
   type DevelopmentHatchetTokenOperations
 } from "../../apps/runner/src/dev-hatchet-token.js";
+import { SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE } from "../../apps/runner/src/dev-auth-stack-profile.js";
 
 const TENANT_ID = "11111111-1111-4111-8111-111111111111";
 const TOKEN_ID = "22222222-2222-4222-8222-222222222222";
@@ -155,6 +156,21 @@ describe("DEV-10A local Hatchet token custody", () => {
     expect(authority.issueToken).toHaveBeenCalledTimes(1);
     expect(authority.attestToken).toHaveBeenCalledTimes(1);
     await expect(readFile(test.tokenFilePath, "utf8")).rejects.toThrow();
+  });
+
+  it("accepts only the selected support-preview Hatchet authority", async () => {
+    const test = await fixture();
+    const previewToken = tokenFor({
+      aud: "http://localhost:8988",
+      iss: "http://localhost:8988",
+      server_url: "http://localhost:8988",
+      grpc_broadcast_address: "localhost:7177"
+    });
+    await expect(provisionDevelopmentHatchetToken({
+      repositoryRoot: test.repositoryRoot,
+      operations: operations(previewToken),
+      profile: SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE
+    })).resolves.toMatchObject({ authority: "ATTESTED" });
   });
 
   it("keeps token values out of the CLI and uses the supported pinned-image admin path", async () => {

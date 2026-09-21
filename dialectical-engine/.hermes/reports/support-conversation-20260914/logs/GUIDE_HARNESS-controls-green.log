@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "controls": 26,
+  "passed": 26,
+  "names": [
+    "matrix covers twenty approved inventory families",
+    "matrix has exact full compact EN RO family coverage",
+    "matrix includes required lifecycle privacy injection and recovery rows",
+    "duplicate sequence rejected",
+    "changed prompt rejected",
+    "missing surface coverage rejected",
+    "recovery branch drift rejected",
+    "all matrix rows derive an inert pre request proof",
+    "private branch proof rejects public classification",
+    "recovery branch proof rejects changed predicate polarity",
+    "required navigation rejects a missing closed action",
+    "accepted model draft attribution is diagnostic backed",
+    "reviewed fallback attribution is diagnostic backed",
+    "ambiguous model attribution fails closed",
+    "private record request is deterministic and actionless",
+    "unresolved recovery is deterministic and actionless",
+    "deterministic rows reject model diagnostics",
+    "API DOM mismatch fails closed",
+    "gate rejects placeholders and any resolved Forgot connector",
+    "bound receipts pin revision snapshot suite membership and controls",
+    "wrong revision receipt rejected",
+    "missing required suite member rejected",
+    "unsupported worker flag receipt rejected",
+    "stale control count receipt rejected",
+    "declared count derives from completed controls",
+    "future capture parses without executing traffic"
+  ]
+}

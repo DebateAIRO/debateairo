@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FINANCIAL_FALLBACK_REVIEW",
+  "ticket": "t_37700807",
+  "revision": "c683a0c752553fe2b4e226bc3f70879ce2460b74",
+  "baseRevision": "8cdb75d75055ccb41b6325da23bf233b24e2614b",
+  "freeze": "7a2b82f577c3cd6602148b1fe091d8bd5664f0da",
+  "authorReceipt": {
+    "sha256": "6839ec8867ce1cc51bed8990e71003a0e3669566b1958aaf0a5b4e97f22d2dea",
+    "bytes": 6497
+  },
+  "authorConsumption": {
+    "sha256": "c82bde5635ba01b2a31f3cae286b9296a36e111ddad18d1e7b16d490a38c02a4",
+    "bytes": 13675
+  },
+  "product": {
+    "clean": true,
+    "changedPaths": 4,
+    "responsePolicySha256": "d899d38d03acf61c05185cd9b0545123a117653fe488050b327abb1d5d4c7f9a",
+    "responsePolicyTestsSha256": "8dd683ab31daefc1d71dd6dce32ca87e307698b8fde0b571ff10377f87e05a56",
+    "answerContextTestsSha256": "2d392ae83555c2de6f755b72de45b24da249d91d30cccd0e4349bbf6a2dfc50b",
+    "routeTestsSha256": "0eefb4bbe181b7d24a5f4e76437e1c015080e1f0a9cf973b8cbc43cdaff94e9f"
+  },
+  "authorVerification": {
+    "focusedPassed": 248,
+    "focusedFailed": 0,
+    "affectedPassed": 480,
+    "affectedFailed": 0,
+    "affectedFiles": 3,
+    "finalLogSha256": "fca262c6eb4d7d9d8819d60c59dfbff62c04ec8971f6f63fa2ce845319ee90e0",
+    "typecheckRepeated": false,
+    "inheritedNormalizedDiagnostics": 76
+  },
+  "indexedInputs": {
+    "inputs": 27,
+    "verified": 27,
+    "mismatches": 0
+  },
+  "reviewMode": "STATIC_READ_ONLY_DELTA_REVIEW",
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

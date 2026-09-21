@@ -1,0 +1,227 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is Dialectical-Engine? 18ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is Dialectical Engine? 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is DebateAIRO? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is Debate AIRO? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: Why can't Support answer questions about Dialectical-Engine? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds the Romanian identity surface in the Romanian identity article 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded topic at NO_SOURCE without a model call: Does Dialectical Engine offer medical diagnosis? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded topic at NO_SOURCE without a model call: Does DebateAIRO provide investment advice? 0ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a Settings menu question and returns only the server-resolved section action 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a reviewed identity paraphrase through the actual service on the admitted corpus: Is Dialectical Engine a reasoning instrument? 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a reviewed identity paraphrase through the actual service on the admitted corpus: Give me an overview of dialecticalengine. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded claim out of the actual service on the admitted corpus: Does Dialectical Engine support investment advice? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded claim out of the actual service on the admitted corpus: Can DebateAIRO help diagnose medical conditions? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers every rejected ordinary knowledge envelope from the pinned top source: not-json 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers every rejected ordinary knowledge envelope from the pinned top source: {"kind":"tool","text":"ignored","sourceIds":[],"actionIds":[]} 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > maps request-local model references to canonical response provenance 1ms
+ × tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps matching whole reviewed sections above 12,000 and below the 24,000 system cap 4ms
+   → expected 0 to be greater than 12000
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > filters unavailable actions before the model sees the output contract 1ms
+ × tests/unit/support-answer-context.test.ts > CP1 composed answer context > uses the exact immutable snapshot object already resolved by the route 2ms
+   → expected 'NO_SOURCE' to be 'ANSWER_GROUNDED' // Object.is equality
+ × tests/unit/support-answer-context.test.ts > CP1 composed answer context > reports only the closed diagnostic shape for a rejected completion 1ms
+   → expected 'NO_SOURCE' to be 'ANSWER_GROUNDED' // Object.is equality
+ × tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects an internal identifier before canonical assistant storage 2ms
+   → expected { …(6) } to match object { outcome: 'ANSWER_GROUNDED', …(2) }
+(3 matching properties omitted from actual)
+ × tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects a request alias in narrative text before canonical assistant storage 1ms
+   → expected { …(6) } to match object { outcome: 'ANSWER_GROUNDED', …(2) }
+(3 matching properties omitted from actual)
+ × tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects a source reference issued for a prior request 1ms
+   → expected { …(6) } to match object { outcome: 'ANSWER_GROUNDED', …(1) }
+(4 matching properties omitted from actual)
+ × tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Support does not request passwords, plus it could receive them. 0ms
+   → expected "vi.fn()" to be called 1 times, but got 0 times
+ × tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Support does not request passwords, in addition it accepts them. 0ms
+   → expected "vi.fn()" to be called 1 times, but got 0 times
+ × tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere parole, plus le poate primi. 0ms
+   → expected "vi.fn()" to be called 1 times, but got 0 times
+ × tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere parole, în plus le poate primi. 0ms
+   → expected "vi.fn()" to be called 1 times, but got 0 times
+ × tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere coduri de autentificare; de asemenea le poate valida. 0ms
+   → expected "vi.fn()" to be called 1 times, but got 0 times
+ × tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere coduri de securitate; în plus le poate verifica. 0ms
+   → expected "vi.fn()" to be called 1 times, but got 0 times
+ × tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Network=%5C%5Cserver%5Cshare to continue. 0ms
+   → expected "vi.fn()" to be called 1 times, but got 0 times
+ × tests/unit/support-answer-context.test.ts > CP1 composed answer context > assigns distinct opaque identities to separate rejected model attempts 1ms
+   → expected [] to have a length of 2 but got +0
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 14 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps matching whole reviewed sections above 12,000 and below the 24,000 system cap
+AssertionError: expected 0 to be greater than 12000
+ ❯ tests/unit/support-answer-context.test.ts:304:32
+    302|     await service.respond(request(snapshot));
+    303|
+    304|     expect([...system].length).toBeGreaterThan(12_000);
+       |                                ^
+    305|     expect([...system].length).toBeLessThanOrEqual(24_000);
+    306|     expect(system).toContain("alpha-end-marker");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/14]⎯
+
+ FAIL  tests/unit/support-answer-context.test.ts > CP1 composed answer context > uses the exact immutable snapshot object already resolved by the route
+AssertionError: expected 'NO_SOURCE' to be 'ANSWER_GROUNDED' // Object.is equality
+
+Expected: "ANSWER_GROUNDED"
+Received: "NO_SOURCE"
+
+ ❯ tests/unit/support-answer-context.test.ts:369:28
+    367|     });
+    368|
+    369|     expect(result.outcome).toBe("ANSWER_GROUNDED");
+       |                            ^
+    370|     expect(system).toContain("selected-a-end");
+    371|     expect(system).not.toContain("stale-b-end");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/14]⎯
+
+ FAIL  tests/unit/support-answer-context.test.ts > CP1 composed answer context > reports only the closed diagnostic shape for a rejected completion
+AssertionError: expected 'NO_SOURCE' to be 'ANSWER_GROUNDED' // Object.is equality
+
+Expected: "ANSWER_GROUNDED"
+Received: "NO_SOURCE"
+
+ ❯ tests/unit/support-answer-context.test.ts:388:28
+    386|     const result = await service.respond(request(snapshot));
+    387|
+    388|     expect(result.outcome).toBe("ANSWER_GROUNDED");
+       |                            ^
+    389|     expect(reportDraftDiagnostic).toHaveBeenCalledOnce();
+    390|     expect(reportDraftDiagnostic).toHaveBeenCalledWith(expect.objectCo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/14]⎯
+
+ FAIL  tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects an internal identifier before canonical assistant storage
+AssertionError: expected { …(6) } to match object { outcome: 'ANSWER_GROUNDED', …(2) }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "actions": [],
+-   "outcome": "ANSWER_GROUNDED",
+-   "sources": [
+-     {
+-       "id": "selected-a",
+-     },
+-   ],
++   "outcome": "NO_SOURCE",
++   "sources": [],
+  }
+
+ ❯ tests/unit/support-answer-context.test.ts:418:20
+    416|     const result = await service.respond(request(snapshot));
+    417|
+    418|     expect(result).toMatchObject({
+       |                    ^
+    419|       outcome: "ANSWER_GROUNDED",sources: [{ id: "selected-a" }],actio…
+    420|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/14]⎯
+
+ FAIL  tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects a request alias in narrative text before canonical assistant storage
+AssertionError: expected { …(6) } to match object { outcome: 'ANSWER_GROUNDED', …(2) }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "actions": [],
+-   "outcome": "ANSWER_GROUNDED",
+-   "sources": [
+-     {
+-       "id": "selected-a",
+-     },
+-   ],
++   "outcome": "NO_SOURCE",
++   "sources": [],
+  }
+
+ ❯ tests/unit/support-answer-context.test.ts:443:20
+    441|     const result = await service.respond(request(snapshot));
+    442|
+    443|     expect(result).toMatchObject({
+       |                    ^
+    444|       outcome: "ANSWER_GROUNDED",sources: [{ id: "selected-a" }],actio…
+    445|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/14]⎯
+
+ FAIL  tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects a source reference issued for a prior request
+AssertionError: expected { …(6) } to match object { outcome: 'ANSWER_GROUNDED', …(1) }
+(4 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "outcome": "ANSWER_GROUNDED",
+-   "sources": [
+-     {
+-       "id": "selected-a",
+-     },
+-   ],
++   "outcome": "NO_SOURCE",
++   "sources": [],
+  }
+
+ ❯ tests/unit/support-answer-context.test.ts:466:53
+    464|     });
+    465|
+    466|     await expect(service.respond(request(snapshot))).resolves.toMatchO…
+       |                                                     ^
+    467|       outcome: "ANSWER_GROUNDED",sources: [{ id: "selected-a" }]
+    468|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/14]⎯
+
+ FAIL  tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Support does not request passwords, plus it could receive them.
+ FAIL  tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Support does not request passwords, in addition it accepts them.
+ FAIL  tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere parole, plus le poate primi.
+ FAIL  tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere parole, în plus le poate primi.
+ FAIL  tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere coduri de autentificare; de asemenea le poate valida.
+ FAIL  tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere coduri de securitate; în plus le poate verifica.
+ FAIL  tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Network=%5C%5Cserver%5Cshare to continue.
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ tests/unit/support-answer-context.test.ts:511:22
+    509|     const result = await service.respond(request(snapshot));
+    510|
+    511|     expect(complete).toHaveBeenCalledTimes(1);
+       |                      ^
+    512|     expect(result).toMatchObject({
+    513|       outcome: "ANSWER_GROUNDED",text: top.fallback,sources: [{ id: to…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/14]⎯
+
+ FAIL  tests/unit/support-answer-context.test.ts > CP1 composed answer context > assigns distinct opaque identities to separate rejected model attempts
+AssertionError: expected [] to have a length of 2 but got +0
+
+- Expected
++ Received
+
+- 2
++ 0
+
+ ❯ tests/unit/support-answer-context.test.ts:535:21
+    533|     await service.respond(request(snapshot));
+    534|
+    535|     expect(reports).toHaveLength(2);
+       |                     ^
+    536|     expect(new Set(reports.map(({ attemptId }) => attemptId)).size).to…
+    537|     expect(reports.every(({ attemptId }) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/14]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  14 failed | 17 passed (31)
+   Start at  16:04:43
+   Duration  366ms (transform 131ms, setup 0ms, import 212ms, tests 50ms, environment 0ms)
+

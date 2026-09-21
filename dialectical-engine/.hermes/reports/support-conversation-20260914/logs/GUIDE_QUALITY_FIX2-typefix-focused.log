@@ -1,0 +1,69 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is Dialectical-Engine? 19ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is Dialectical Engine? 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is DebateAIRO? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is Debate AIRO? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: Why can't Support answer questions about Dialectical-Engine? 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds the Romanian identity surface in the Romanian identity article 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded topic at NO_SOURCE without a model call: Does Dialectical Engine offer medical diagnosis? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded topic at NO_SOURCE without a model call: Does DebateAIRO provide investment advice? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a Settings menu question and returns only the server-resolved section action 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > repairs omitted visible Account authority through the actual answer boundary 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects unsupported destination promises through the actual answer boundary 5ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical en destination promise through the actual answer service: false 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical ro destination promise through the actual answer service: false 3ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical en destination promise through the actual answer service: false 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical ro destination promise through the actual answer service: false 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical en destination promise through the actual answer service: true 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical ro destination promise through the actual answer service: true 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical en destination promise through the actual answer service: false 9ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical ro destination promise through the actual answer service: false 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical en destination promise through the actual answer service: false 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > binds a canonical ro destination promise through the actual answer service: false 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects human-case and email conflation through the actual answer boundary 9ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > enforces the en case/email relation through the actual answer boundary 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > enforces the ro case/email relation through the actual answer boundary 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > enforces the en case/email relation through the actual answer boundary 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > enforces the ro case/email relation through the actual answer boundary 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers a rejected compound en answer from the required app-navigation source 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers a rejected compound ro answer from the required app-navigation source 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers a rejected compound ro answer from the required app-navigation source 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > enforces required and allowed compound sources independent of accepted-draft order 4ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a reviewed en prose-only guide answer actionless in the actual service 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a reviewed ro prose-only guide answer actionless in the actual service 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a genuine en menu request bound to its relevant closed action 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a genuine ro menu request bound to its relevant closed action 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a negated unrelated en destination out of the model and response action sinks 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a negated unrelated ro destination out of the model and response action sinks 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a reviewed en identity paraphrase through the actual service: Is Dialectical Engine a reasoning instrument? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a reviewed en identity paraphrase through the actual service: Give me an overview of dialecticalengine. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a reviewed en identity paraphrase through the actual service: What is Dialectical-Engine, and what can I do in this app? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a reviewed ro identity paraphrase through the actual service: Ce este Dialectical-Engine și ce pot face în această aplicație? 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded claim out of the actual service on the admitted corpus: Does Dialectical Engine support investment advice? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded claim out of the actual service on the admitted corpus: Can DebateAIRO help diagnose medical conditions? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers every rejected ordinary knowledge envelope from the pinned top source: not-json 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers every rejected ordinary knowledge envelope from the pinned top source: {"kind":"tool","text":"ignored","sourceIds":[],"actionIds":[]} 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > maps request-local model references to canonical response provenance 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps matching whole reviewed sections above 12,000 and below the 24,000 system cap 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > filters unavailable actions before the model sees the output contract 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > uses the exact immutable snapshot object already resolved by the route 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > reports only the closed diagnostic shape for a rejected completion 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects an internal identifier before canonical assistant storage 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects a request alias in narrative text before canonical assistant storage 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects a source reference issued for a prior request 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Support does not request passwords, plus it could receive them. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Support does not request passwords, in addition it accepts them. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere parole, plus le poate primi. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere parole, în plus le poate primi. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere coduri de autentificare; de asemenea le poate valida. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere coduri de securitate; în plus le poate verifica. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Network=%5C%5Cserver%5Cshare to continue. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > assigns distinct opaque identities to separate rejected model attempts 1ms
+
+ Test Files  1 passed (1)
+      Tests  60 passed (60)
+   Start at  22:21:06
+   Duration  405ms (transform 136ms, setup 0ms, import 211ms, tests 114ms, environment 0ms)
+

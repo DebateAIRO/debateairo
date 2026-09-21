@@ -1,0 +1,43 @@
+{
+  "revision": "c34c64d4e643e404cefe96dfaf167536ae364a94",
+  "base": "479763da1f586a217f36204cc81138aaa81c6f81",
+  "product": {
+    "count": 143,
+    "mismatches": []
+  },
+  "inputs": {
+    "count": 155,
+    "mismatches": []
+  },
+  "deleted": {
+    "count": 3,
+    "mismatches": []
+  },
+  "temporaryLinks": [
+    {
+      "path": "node_modules",
+      "exists": false,
+      "symlink": false
+    },
+    {
+      "path": "apps/api/node_modules",
+      "exists": false,
+      "symlink": false
+    },
+    {
+      "path": "apps/ui/node_modules",
+      "exists": false,
+      "symlink": false
+    },
+    {
+      "path": "apps/runner/node_modules",
+      "exists": false,
+      "symlink": false
+    },
+    {
+      "path": "packages/support-kb/node_modules",
+      "exists": false,
+      "symlink": false
+    }
+  ]
+}

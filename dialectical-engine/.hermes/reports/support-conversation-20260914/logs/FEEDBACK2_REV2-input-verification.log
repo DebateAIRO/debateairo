@@ -1,0 +1,22 @@
+{
+  "revision": "9e87fe5859b44fbd62dd485e03045e5bcde96bed",
+  "immutable": {
+    "count": 37,
+    "mismatches": []
+  },
+  "product": {
+    "count": 110,
+    "mismatches": []
+  },
+  "reviewedBytesUnchanged": {
+    "status": 0,
+    "paths": [
+      "packages/support-kb/content",
+      "packages/support-kb/recovery",
+      "packages/support-kb/reviews/manifest.json",
+      "packages/support-kb/src/catalog.ts",
+      "packages/support-kb/src/index.ts"
+    ],
+    "output": ""
+  }
+}

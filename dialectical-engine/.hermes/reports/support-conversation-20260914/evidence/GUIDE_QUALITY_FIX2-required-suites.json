@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "revision": "5d6e028ae5defc24e0690219d6128949e73b750d",
+  "stage": "IMPLEMENTED_REVIEW_REQUIRED",
+  "affected": {
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "tests/unit/support-kb.test.ts",
+      "tests/unit/support-recovery-components.test.ts",
+      "tests/unit/support-recovery-attestation.test.ts",
+      "tests/unit/support-context.test.ts",
+      "tests/unit/support-answer-context.test.ts",
+      "tests/unit/support-response-policy.test.ts",
+      "tests/render/support-assistant-scroll.test.tsx",
+      "tests/render/sup-01-help.test.tsx",
+      "--maxWorkers=1"
+    ],
+    "files": 8,
+    "passed": 513,
+    "failed": 0,
+    "todo": 1,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX2-affected-final3.log"
+  },
+  "typeOnlyFocused": {
+    "file": "tests/unit/support-answer-context.test.ts",
+    "passed": 60,
+    "failed": 0,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX2-typefix-focused.log"
+  },
+  "typecheck": {
+    "exitCode": 1,
+    "diagnostics": 76,
+    "baselineIdentical": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX2-typecheck-final.log"
+  },
+  "structuralEval": {
+    "command": [
+      "pnpm",
+      "run",
+      "support:eval"
+    ],
+    "exitCode": 1,
+    "mode": "deterministic-structural",
+    "runs": [
+      {
+        "run": 1,
+        "passed": 60,
+        "applicable": 60
+      },
+      {
+        "run": 2,
+        "passed": 60,
+        "applicable": 60
+      },
+      {
+        "run": 3,
+        "passed": 60,
+        "applicable": 60
+      }
+    ],
+    "rubric": "PENDING",
+    "realFirstToken": "NOT_APPLICABLE",
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX2-eval-final.log",
+    "preservedSandboxFailure": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX2-eval.log"
+  },
+  "preservedFailures": [
+    {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX2-red.log",
+      "result": "5 failed / 250 passed"
+    },
+    {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX2-red2.log",
+      "result": "13 failed / 244 passed"
+    },
+    {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX2-affected-final.log",
+      "result": "2 stale attestation expectations / 506 passed / 1 TODO"
+    },
+    {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX2-affected-final2.log",
+      "result": "3 owner-prompt retrieval failures / 510 passed / 1 TODO"
+    },
+    {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX2-typecheck.log",
+      "result": "77 diagnostics; 1 introduced test typing diagnostic corrected"
+    },
+    {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_QUALITY_FIX2-eval.log",
+      "result": "sandbox tsx IPC EPERM"
+    }
+  ]
+}

@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_CONTROLS18_LONG_REPLY_FIXTURE",
+  "result": "PASS",
+  "correction": "expanded_evidence_capture_plus_original_pane_top_footer_views",
+  "originalPanePresentationPreserved": true,
+  "completeCapturePresentation": "evidence_only_expanded_pane",
+  "overheight": true,
+  "articleHeight": 798,
+  "paneClientHeight": 240,
+  "exactArticleEvidence": {
+    "schemaVersion": 2,
+    "sequence": 901,
+    "mode": "full",
+    "language": "en",
+    "beforeAssistantCount": 0,
+    "targetAssistantIndex": 0,
+    "afterAssistantCount": 1,
+    "articleCount": 1,
+    "articleRole": "assistant",
+    "projectionEqual": true,
+    "sourceActionLayoutIncluded": true,
+    "originalPaneTopReachable": true,
+    "originalPaneFooterReachable": true,
+    "completeAnswerExpandedCapture": true,
+    "completeCapturePresentation": "evidence_only_expanded_pane",
+    "caseIdentitySha256": "eec7c34b688adfa3a57dd61eeca7c3c1c1874f57c3282ceac7bb8fa2e4f7daff",
+    "completePng": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_CONTROLS18-screenshots/attempt4/long-answer-complete-expanded.png",
+      "sha256": "3320ba199a9cdf59cd0245a81bc07115d86c53cde5ca1308f283b95c05106bc0",
+      "bytes": 9170,
+      "width": 720,
+      "height": 798
+    },
+    "topPanePng": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_CONTROLS18-screenshots/attempt4/long-answer-original-pane-top.png",
+      "sha256": "3ff8d1d0fba34658607f436a360a6de7b510b46f7a8de9bab431188023ab921d",
+      "bytes": 4155,
+      "width": 820,
+      "height": 248
+    },
+    "footerPanePng": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_CONTROLS18-screenshots/attempt4/long-answer-original-pane-footer.png",
+      "sha256": "bf9c3b76de3747aeae4abe79ba43ef67338ca1aa726f6278c79095c495bee656",
+      "bytes": 3847,
+      "width": 820,
+      "height": 248
+    },
+    "before": {
+      "target": {
+        "x": 12,
+        "y": 12,
+        "width": 720,
+        "height": 798
+      },
+      "pane": {
+        "x": 8,
+        "y": 8,
+        "width": 820,
+        "height": 248
+      },
+      "paneScrollTop": 0,
+      "paneScrollHeight": 798,
+      "paneClientHeight": 240
+    },
+    "topView": {
+      "target": {
+        "x": 12,
+        "y": -2,
+        "width": 720,
+        "height": 798
+      },
+      "pane": {
+        "x": 8,
+        "y": 8,
+        "width": 820,
+        "height": 248
+      },
+      "top": {
+        "x": 22,
+        "y": 8,
+        "width": 700,
+        "height": 36
+      },
+      "paneScrollTop": 14
+    },
+    "footerView": {
+      "target": {
+        "x": 12,
+        "y": -532,
+        "width": 720,
+        "height": 798
+      },
+      "pane": {
+        "x": 8,
+        "y": 8,
+        "width": 820,
+        "height": 248
+      },
+      "footer": {
+        "x": 22,
+        "y": 184,
+        "width": 700,
+        "height": 72
+      },
+      "paneScrollTop": 544
+    }
+  },
+  "footerPixelInfluence": true,
+  "topPixelInfluence": true,
+  "supportAttempts": 0
+}

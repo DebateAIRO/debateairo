@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_REVIEW35",
+  "ticket": "t_e7fbe773",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "verdict": "PASS_FINAL_OPERATOR_RUNTIME_BINDING",
+  "dispositions": [
+    {
+      "id": "GOR35-P1",
+      "subject": "embedded final command hash",
+      "disposition": "PASS",
+      "evidence": "FIX35 replaces only stale6269… with actual immutable RECOVER34 command SHA f8a5…; new source contains the final hash exactly once and no stale hash."
+    },
+    {
+      "id": "GOR35-P2",
+      "subject": "operator metadata and literal argv",
+      "disposition": "PASS",
+      "evidence": "Metadata hashes actual41de… script and immutable f8a5… command, launches absolute node --import tsx in exact cwd, requires escalation and tool-captured output."
+    },
+    {
+      "id": "GOR35-P3",
+      "subject": "real non-inert guard regression",
+      "disposition": "PASS",
+      "evidence": "Stale source rejects before intercept; corrected source reaches controlled boundary after hash/absence checks but before private preparation or operational child spawn."
+    },
+    {
+      "id": "GOR35-P4",
+      "subject": "retained command chain",
+      "disposition": "PASS",
+      "evidence": "Immutable RECOVER34 command contract and all seven RECOVER34 phase self paths remain unchanged."
+    },
+    {
+      "id": "GOR35-P5",
+      "subject": "future output custody",
+      "disposition": "PASS",
+      "evidence": "All123 LIVE29/actual GUIDE22 paths remain unique and absent; controls create no outputs."
+    },
+    {
+      "id": "GOR35-P6",
+      "subject": "retained REVIEW34 runtime and accounting",
+      "disposition": "PASS_COMPOSED",
+      "evidence": "Runtime9 health,12listeners,TLSHelp200, exact two startup model requests and corrected diagnostic timestamps remain unchanged."
+    },
+    {
+      "id": "GOR35-P7",
+      "subject": "retained product, corpus and screenshot evidence",
+      "disposition": "PASS_COMPOSED",
+      "evidence": "Full58, FINAL18/KB7ef, fixed31/five-session plan, owner capacity, principal handling and FIX30 screenshot proof remain unchanged."
+    },
+    {
+      "id": "GOR35-L1",
+      "subject": "actual operator result",
+      "disposition": "NOT_ESTABLISHED",
+      "evidence": "The final actual operator has not run; current capacity, actual31 quality and completion are outside this static review."
+    },
+    {
+      "id": "GOR35-L2",
+      "subject": "checkpoint status",
+      "disposition": "NOT_READY_OR_ACCEPTED",
+      "evidence": "Forgot remains unresolved/actionless; no CP1 acceptance or CP2 authorization follows."
+    }
+  ],
+  "hashes": {
+    "commandContract": "f8a5df033841912013df6eda0f13d5811f9e709712e8311f692d7926d9d52030",
+    "oldOperator": "84793f9357933a8e6fbc87a87425698600a57287ca82c2eb4da05e5b94b50ca9",
+    "newOperator": "41de17e7eb11219ca183a4f156e13225ca6a79446035a5450a0e8d3665c4e153",
+    "operatorContract": "1e8169b54d0ce538a527e94e00f95b24423b22b3c4387ca52686a51cb82a774e",
+    "controlProof": "b9591ce98ed1e6a802248851721197cc7b60f3e692e0f382fbc06f40cb1d76d9",
+    "runtimeCustodyContract": "9094ce7d0c9543914bf61cd2d0a28a1965c338771acac0b70f04a9d6d00a25eb",
+    "screenshotHelper": "824e780a1817c198a6ca6ebc6215948241ecccbb5611617a033e650799ac4b29"
+  },
+  "counts": {
+    "indexedInputsMatched": 59,
+    "indexedInputsTotal": 59,
+    "focusedControlsPassed": 10,
+    "focusedControlsTotal": 10,
+    "sourceChangedLines": 1,
+    "phaseCount": 7,
+    "futurePathsAbsent": 123,
+    "futurePathsTotal": 123,
+    "remainingFindings": 0
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

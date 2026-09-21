@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "completed": true,
+  "verdict": "PASS_ZERO_SUPPORT_UI_TRANSITIONS",
+  "transitions": [
+    {
+      "index": 1,
+      "passed": true
+    },
+    {
+      "index": 2,
+      "passed": true
+    },
+    {
+      "index": 3,
+      "passed": true
+    },
+    {
+      "index": 4,
+      "passed": true
+    },
+    {
+      "index": 5,
+      "passed": true
+    }
+  ],
+  "traffic": {
+    "actualSupportRequestsForwarded": 0,
+    "guardedAttempts": {
+      "createSession": 0,
+      "sendMessage": 0,
+      "otherSupport": 0
+    }
+  },
+  "privateControls": [
+    {
+      "index": 1,
+      "passed": true
+    },
+    {
+      "index": 2,
+      "passed": true
+    },
+    {
+      "index": 3,
+      "passed": true
+    },
+    {
+      "index": 4,
+      "passed": true
+    },
+    {
+      "index": 5,
+      "passed": true
+    }
+  ],
+  "inertSentinel": true
+}

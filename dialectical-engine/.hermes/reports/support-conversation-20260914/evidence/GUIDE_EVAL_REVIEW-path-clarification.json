@@ -1,0 +1,8 @@
+{
+  "node": "GUIDE_EVAL_REVIEW",
+  "at": "2026-09-17T11:07:50.510214+00:00",
+  "source": "Original reviewer /root/plan_review native handoff",
+  "producerPath": "packages/support-kb/src/context.ts",
+  "absentPath": "apps/api/src/support/context.ts",
+  "ruling": "Sealed smallest-correction path is correct; consume bare context.ts B2 anchors against packages/support-kb/src/context.ts. No sealed artifact modified."
+}

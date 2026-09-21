@@ -1,0 +1,50 @@
+{
+  "revision": "5731eb6faac25f9712f04aea029a021f6eee9352",
+  "inputManifestRevision": "5731eb6faac25f9712f04aea029a021f6eee9352",
+  "gateRevision": "5731eb6faac25f9712f04aea029a021f6eee9352",
+  "gateBase": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "inputs": {
+    "checked": 82,
+    "failures": []
+  },
+  "detachedProduct": {
+    "checked": 143,
+    "failures": []
+  },
+  "primaryProduct": {
+    "checked": 143,
+    "failures": []
+  },
+  "changedPaths": {
+    "expected": [
+      "apps/api/src/support/answer.ts",
+      "packages/support-kb/src/catalog.ts",
+      "packages/support-kb/src/context.ts",
+      "packages/support-kb/src/index.ts",
+      "packages/support-kb/src/recovery.ts",
+      "tests/architecture/support-catalog-coverage.test.ts",
+      "tests/unit/support-answer-context.test.ts",
+      "tests/unit/support-context.test.ts",
+      "tests/unit/support-recovery-components.test.ts"
+    ],
+    "actual": [
+      "apps/api/src/support/answer.ts",
+      "packages/support-kb/src/catalog.ts",
+      "packages/support-kb/src/context.ts",
+      "packages/support-kb/src/index.ts",
+      "packages/support-kb/src/recovery.ts",
+      "tests/architecture/support-catalog-coverage.test.ts",
+      "tests/unit/support-answer-context.test.ts",
+      "tests/unit/support-context.test.ts",
+      "tests/unit/support-recovery-components.test.ts"
+    ]
+  },
+  "detached": {
+    "head": "5731eb6faac25f9712f04aea029a021f6eee9352",
+    "dirty": 0
+  },
+  "primary": {
+    "head": "5731eb6faac25f9712f04aea029a021f6eee9352",
+    "dirty": 0
+  }
+}

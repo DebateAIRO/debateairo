@@ -1,0 +1,319 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-security/dialectical-engine
+
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is Dialectical-Engine? 19ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is Dialectical Engine? 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is DebateAIRO? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is Debate AIRO? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: Why can't Support answer questions about Dialectical-Engine? 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds the Romanian identity surface in the Romanian identity article 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded topic at NO_SOURCE without a model call: Does Dialectical Engine offer medical diagnosis? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded topic at NO_SOURCE without a model call: Does DebateAIRO provide investment advice? 0ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a Settings menu question and returns only the server-resolved section action 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a reviewed identity paraphrase through the actual service on the admitted corpus: Is Dialectical Engine a reasoning instrument? 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a reviewed identity paraphrase through the actual service on the admitted corpus: Give me an overview of dialecticalengine. 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded claim out of the actual service on the admitted corpus: Does Dialectical Engine support investment advice? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded claim out of the actual service on the admitted corpus: Can DebateAIRO help diagnose medical conditions? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers every rejected ordinary knowledge envelope from the pinned top source: not-json 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers every rejected ordinary knowledge envelope from the pinned top source: {"kind":"tool","text":"ignored","sourceIds":[],"actionIds":[]} 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > maps request-local model references to canonical response provenance 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps matching whole reviewed sections above 12,000 and below the 24,000 system cap 9ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > filters unavailable actions before the model sees the output contract 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > uses the exact immutable snapshot object already resolved by the route 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > reports only the closed diagnostic shape for a rejected completion 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects an internal identifier before canonical assistant storage 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects a request alias in narrative text before canonical assistant storage 0ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects a source reference issued for a prior request 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Support does not request passwords, plus it could receive them. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Support does not request passwords, in addition it accepts them. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere parole, plus le poate primi. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere parole, în plus le poate primi. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere coduri de autentificare; de asemenea le poate valida. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere coduri de securitate; în plus le poate verifica. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Network=%5C%5Cserver%5Cshare to continue. 0ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > assigns distinct opaque identities to separate rejected model attempts 1ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category cod de recuperare 9ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category cod de verificare 4ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category cod de securitate 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category cod de autentificare 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category codul de recuperare 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category codul de verificare 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category codul de securitate 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category codul de autentificare 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category codului de recuperare 1ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category codului de verificare 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category codului de securitate 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category codului de autentificare 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category coduri de recuperare 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category coduri de verificare 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category coduri de securitate 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category coduri de autentificare 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category codurile de recuperare 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category codurile de verificare 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category codurile de securitate 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category codurile de autentificare 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category codurilor de recuperare 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category codurilor de verificare 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category codurilor de securitate 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the shipped Romanian code category codurilor de autentificare 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the Romanian code noun in acronym category coduri TOTP 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the Romanian code noun in acronym category codurilor MFA 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > recognizes the Romanian code noun in acronym category codului OTP 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled password value back to its original source span 1ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled password value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled passcode value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled otp value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled totp value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled mfa value back to its original source span 1ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled authenticator value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled recovery-code value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled verification-code value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled security-code value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled reset-token value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a labelled credentials value back to its original source span 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > retains a supplied credential value inside a recovery-navigation request: Show me the recovery page; my reset token is INERT-RESET-7. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > retains a supplied credential value inside a recovery-navigation request: Arată-mi pagina de recuperare; parola mea este inert-stejar-9. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps original spans across removed control characters: My pass​word is inert-birch-7 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps original spans across removed control characters: Paro​la mea este inert-fag-7 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps original spans across removed control characters: Codul de veri⁠ficare este INERTCODE 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a complete bounded multiword supplied value: My password is "inert horse battery". 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a complete bounded multiword supplied value: Parola mea este „inert cal albastru”. 8ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a complete bounded multiword supplied value: My recovery code is inert horse battery; keep it private. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > maps a complete bounded multiword supplied value: Codul de verificare este inert cal albastru, păstrează-l privat. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > owns the complete supplied-value span without retaining a suffix: My recovery code is "inert amber fern 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > owns the complete supplied-value span without retaining a suffix: My password is amber birch cedar dogwood elm fir grove hazel; keep it private. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > owns the complete supplied-value span without retaining a suffix: My reset token is inert.alpha-beta/gamma; keep it private. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > owns the complete supplied-value span without retaining a suffix: My reset token is quartz and ember; keep it private. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > owns the complete supplied-value span without retaining a suffix: My reset token is quartz, and ember; keep it private. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > owns the complete supplied-value span without retaining a suffix: My reset token is quartz but ember; keep it private. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > owns the complete supplied-value span without retaining a suffix: Codul de verificare este cuarț și chihlimbar; păstrează-l privat. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > stops a supplied value only at an independent subject-led clause: My password is inert horse battery and I need help. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > stops a supplied value only at an independent subject-led clause: My password is inert horse battery, and I need help. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > stops a supplied value only at an independent subject-led clause: Parola mea este inert cal albastru și am nevoie de ajutor. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > stops a supplied value only at an independent subject-led clause: Parola mea este inert cal albastru, păstrează-l privat. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > does not classify a benign unavailable state as a supplied value: My password is unavailable; show ordinary recovery guidance. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > does not classify a benign unavailable state as a supplied value: Parola mea este indisponibilă; arată ghidul obișnuit de recuperare. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > does not carry negation into a later coordinated operation: Support does not receive passwords and also asks you to send them here. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > does not carry negation into a later coordinated operation: Support does not receive passwords, so send them here. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > does not carry negation into a later coordinated operation: Asistența nu primește parole și de asemenea îți cere să le trimiți aici. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > does not carry negation into a later coordinated operation: Asistența nu primește parole, așa că trimite-le aici. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > does not carry negation into a later coordinated operation: Support does not receive passwords while it asks you to send them here. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > does not carry negation into a later coordinated operation: Support does not receive passwords and generally asks you to send them here. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Support does not receive passwords and may receive them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Support cannot accept security codes, but it could validate them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Asistența nu primește parole și poate primi acestea. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Asistența nu verifică un cod de securitate, dar ar putea să îl primească. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Support never asks for OTP codes, plus it accepts them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Support does not request passwords, plus it could receive them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Support does not request passwords, in addition it accepts them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Support does not request passwords, additionally it accepts them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Support does not request passwords, moreover it accepts them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Support does not request passwords, furthermore it accepts them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Asistența nu cere parole, plus le poate primi. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Asistența nu cere parole, în plus le poate primi. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Asistența nu cere parole, de asemenea le poate primi. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > starts a separate positive modal or auxiliary operation group: Asistența nu cere coduri de autentificare; de asemenea le poate valida. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps each additive operation group independently negated: Support does not request passwords, plus it does not accept them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps each additive operation group independently negated: Support does not request passwords, in addition it never receives them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps each additive operation group independently negated: Support does not request passwords, additionally it cannot validate them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps each additive operation group independently negated: Support does not request passwords, moreover it does not use them. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps each additive operation group independently negated: Asistența nu cere parole, în plus nu le primește. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps each additive operation group independently negated: Asistența nu cere parole, de asemenea nu le verifică. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > keeps each additive operation group independently negated: Asistența nu cere coduri de autentificare; de asemenea nu le poate valida. 0ms
+ ✓ tests/unit/support-credentials.test.ts > Support credential lexical facts > emits only closed lexical facts and numeric spans 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en affirmative navigation: show me the recovery page for my password 4ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: reset my password for me, and then show me the recovery page for my password. 1ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: show me the recovery page for my password; but reset my password for me. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: Support must validate the reset token for my password, and then show me the recovery page for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: show me the recovery page for my password; but Support must validate the reset token for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: do not reset my password, and then show me the recovery page for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: show me the recovery page for my password; but do not reset my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: Support must not validate the reset token for my password, and then show me the recovery page for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: show me the recovery page for my password; but Support must not validate the reset token for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: I don’t want Support to submit the reset for my password, and then show me the recovery page for my password. 1ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: show me the recovery page for my password; but I don’t want Support to submit the reset for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en affirmative navigation: where can I find the recovery link for my password 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: reset my password for me, and then where can I find the recovery link for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: where can I find the recovery link for my password; but reset my password for me. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: Support must validate the reset token for my password, and then where can I find the recovery link for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: where can I find the recovery link for my password; but Support must validate the reset token for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: do not reset my password, and then where can I find the recovery link for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: where can I find the recovery link for my password; but do not reset my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: Support must not validate the reset token for my password, and then where can I find the recovery link for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: where can I find the recovery link for my password; but Support must not validate the reset token for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: I don’t want Support to submit the reset for my password, and then where can I find the recovery link for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: where can I find the recovery link for my password; but I don’t want Support to submit the reset for my password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en affirmative operation without navigation: reset my password for me 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en affirmative operation without navigation: Support must validate the reset token for my password 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en negated operation without navigation: do not reset my password 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en negated operation without navigation: Support must not validate the reset token for my password 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en negated operation without navigation: I don’t want Support to submit the reset for my password 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en affirmative navigation: show me the recovery page for a forgotten password 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: reset a forgotten password for me, and then show me the recovery page for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: show me the recovery page for a forgotten password; but reset a forgotten password for me. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: Support must validate the reset token for a forgotten password, and then show me the recovery page for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: show me the recovery page for a forgotten password; but Support must validate the reset token for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: do not reset a forgotten password, and then show me the recovery page for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: show me the recovery page for a forgotten password; but do not reset a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: Support must not validate the reset token for a forgotten password, and then show me the recovery page for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: show me the recovery page for a forgotten password; but Support must not validate the reset token for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: I don’t want Support to submit the reset for a forgotten password, and then show me the recovery page for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: show me the recovery page for a forgotten password; but I don’t want Support to submit the reset for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en affirmative navigation: where can I find the recovery link for a forgotten password 1ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: reset a forgotten password for me, and then where can I find the recovery link for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: where can I find the recovery link for a forgotten password; but reset a forgotten password for me. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: Support must validate the reset token for a forgotten password, and then where can I find the recovery link for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en affirmative operation and navigation by clause order: where can I find the recovery link for a forgotten password; but Support must validate the reset token for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: do not reset a forgotten password, and then where can I find the recovery link for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: where can I find the recovery link for a forgotten password; but do not reset a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: Support must not validate the reset token for a forgotten password, and then where can I find the recovery link for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: where can I find the recovery link for a forgotten password; but Support must not validate the reset token for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: I don’t want Support to submit the reset for a forgotten password, and then where can I find the recovery link for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps en negation attached only to the operation clause: where can I find the recovery link for a forgotten password; but I don’t want Support to submit the reset for a forgotten password. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en affirmative operation without navigation: reset a forgotten password for me 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en affirmative operation without navigation: Support must validate the reset token for a forgotten password 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en negated operation without navigation: do not reset a forgotten password 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en negated operation without navigation: Support must not validate the reset token for a forgotten password 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes en negated operation without navigation: I don’t want Support to submit the reset for a forgotten password 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro affirmative navigation: arată-mi pagina de recuperare pentru parola mea 3ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: resetează parola mea în locul meu, iar apoi arată-mi pagina de recuperare pentru parola mea. 1ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: arată-mi pagina de recuperare pentru parola mea; dar resetează parola mea în locul meu. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: Asistența trebuie să valideze tokenul de resetare pentru parola mea, iar apoi arată-mi pagina de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: arată-mi pagina de recuperare pentru parola mea; dar Asistența trebuie să valideze tokenul de resetare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: nu reseta parola mea, iar apoi arată-mi pagina de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: arată-mi pagina de recuperare pentru parola mea; dar nu reseta parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: Asistența nu trebuie să valideze tokenul de resetare pentru parola mea, iar apoi arată-mi pagina de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: arată-mi pagina de recuperare pentru parola mea; dar Asistența nu trebuie să valideze tokenul de resetare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: nu vreau ca Asistența să trimită resetarea pentru parola mea, iar apoi arată-mi pagina de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: arată-mi pagina de recuperare pentru parola mea; dar nu vreau ca Asistența să trimită resetarea pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro affirmative navigation: unde găsesc linkul de recuperare pentru parola mea 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: resetează parola mea în locul meu, iar apoi unde găsesc linkul de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: unde găsesc linkul de recuperare pentru parola mea; dar resetează parola mea în locul meu. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: Asistența trebuie să valideze tokenul de resetare pentru parola mea, iar apoi unde găsesc linkul de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: unde găsesc linkul de recuperare pentru parola mea; dar Asistența trebuie să valideze tokenul de resetare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: nu reseta parola mea, iar apoi unde găsesc linkul de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: unde găsesc linkul de recuperare pentru parola mea; dar nu reseta parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: Asistența nu trebuie să valideze tokenul de resetare pentru parola mea, iar apoi unde găsesc linkul de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: unde găsesc linkul de recuperare pentru parola mea; dar Asistența nu trebuie să valideze tokenul de resetare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: nu vreau ca Asistența să trimită resetarea pentru parola mea, iar apoi unde găsesc linkul de recuperare pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: unde găsesc linkul de recuperare pentru parola mea; dar nu vreau ca Asistența să trimită resetarea pentru parola mea. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro affirmative operation without navigation: resetează parola mea în locul meu 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro affirmative operation without navigation: Asistența trebuie să valideze tokenul de resetare pentru parola mea 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro negated operation without navigation: nu reseta parola mea 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro negated operation without navigation: Asistența nu trebuie să valideze tokenul de resetare pentru parola mea 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro negated operation without navigation: nu vreau ca Asistența să trimită resetarea pentru parola mea 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro affirmative navigation: arată-mi pagina de recuperare pentru o parolă uitată 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: resetează o parolă uitată în locul meu, iar apoi arată-mi pagina de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: arată-mi pagina de recuperare pentru o parolă uitată; dar resetează o parolă uitată în locul meu. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: Asistența trebuie să valideze tokenul de resetare pentru o parolă uitată, iar apoi arată-mi pagina de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: arată-mi pagina de recuperare pentru o parolă uitată; dar Asistența trebuie să valideze tokenul de resetare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: nu reseta o parolă uitată, iar apoi arată-mi pagina de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: arată-mi pagina de recuperare pentru o parolă uitată; dar nu reseta o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: Asistența nu trebuie să valideze tokenul de resetare pentru o parolă uitată, iar apoi arată-mi pagina de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: arată-mi pagina de recuperare pentru o parolă uitată; dar Asistența nu trebuie să valideze tokenul de resetare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: nu vreau ca Asistența să trimită resetarea pentru o parolă uitată, iar apoi arată-mi pagina de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: arată-mi pagina de recuperare pentru o parolă uitată; dar nu vreau ca Asistența să trimită resetarea pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro affirmative navigation: unde găsesc linkul de recuperare pentru o parolă uitată 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: resetează o parolă uitată în locul meu, iar apoi unde găsesc linkul de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: unde găsesc linkul de recuperare pentru o parolă uitată; dar resetează o parolă uitată în locul meu. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: Asistența trebuie să valideze tokenul de resetare pentru o parolă uitată, iar apoi unde găsesc linkul de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro affirmative operation and navigation by clause order: unde găsesc linkul de recuperare pentru o parolă uitată; dar Asistența trebuie să valideze tokenul de resetare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: nu reseta o parolă uitată, iar apoi unde găsesc linkul de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: unde găsesc linkul de recuperare pentru o parolă uitată; dar nu reseta o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: Asistența nu trebuie să valideze tokenul de resetare pentru o parolă uitată, iar apoi unde găsesc linkul de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: unde găsesc linkul de recuperare pentru o parolă uitată; dar Asistența nu trebuie să valideze tokenul de resetare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: nu vreau ca Asistența să trimită resetarea pentru o parolă uitată, iar apoi unde găsesc linkul de recuperare pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps ro negation attached only to the operation clause: unde găsesc linkul de recuperare pentru o parolă uitată; dar nu vreau ca Asistența să trimită resetarea pentru o parolă uitată. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro affirmative operation without navigation: resetează o parolă uitată în locul meu 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro affirmative operation without navigation: Asistența trebuie să valideze tokenul de resetare pentru o parolă uitată 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro negated operation without navigation: nu reseta o parolă uitată 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro negated operation without navigation: Asistența nu trebuie să valideze tokenul de resetare pentru o parolă uitată 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > recognizes ro negated operation without navigation: nu vreau ca Asistența să trimită resetarea pentru o parolă uitată 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed en clause behavior: Reset my password and give me the recovery link. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed en clause behavior: Do not reset my password; just show me where I can recover it. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed en clause behavior: Can you check where the password reset page is? 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed en clause behavior: I am not asking to reset a password. Where is Help? 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed ro clause behavior: Resetează-mi parola și dă-mi linkul de recuperare. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed ro clause behavior: Nu-mi reseta parola; arată-mi doar unde o pot recupera. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed ro clause behavior: Verifică unde este pagina de resetare a parolei. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > preserves witnessed ro clause behavior: Nu cer resetarea parolei. Unde găsesc Ajutor? 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps benign en vocabulary outside recovery intent: The password policy article describes account safety. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps benign en vocabulary outside recovery intent: Recovery time after a service incident is five minutes. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps benign ro vocabulary outside recovery intent: Articolul despre parole descrie siguranța contului. 0ms
+ ✓ tests/unit/support-recovery-intent.test.ts > CP1 recovery predicate semantics > keeps benign ro vocabulary outside recovery intent: Timpul de recuperare după incident este de cinci minute. 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes Forgot password before generic security routing 5ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes I forgot my password before generic security routing 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes Can't remember my password before generic security routing 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes Am uitat parola before generic security routing 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes Am uitat parola and I need a replacement password before generic security routing 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes Give me the password recovery link before generic security routing 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes Where is the password reset page? before generic security routing 1ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes Where can I find the link to recover my password? before generic security routing 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes Can you show me the recovery page for my password? before generic security routing 1ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes Can you check where the password reset page is? before generic security routing 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes I do not want to validate a reset token; show me the password recovery page. before generic security routing 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes Where is the password reset page? Support cannot perform the reset. before generic security routing 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes Show the p%61ssword recovery link. before generic security routing 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes Vreau linkul de recuperare a parolei before generic security routing 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes Unde este pagina pentru resetarea parolei? before generic security routing 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes Unde găsesc linkul pentru a-mi recupera parola? before generic security routing 3ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes Verifică unde este pagina de resetare a parolei. before generic security routing 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes Nu vreau să validez tokenul de resetare; arată pagina de recuperare a parolei. before generic security routing 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes Unde este pagina de resetare a parolei? Asistența nu poate efectua resetarea. before generic security routing 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > recognizes Arată pagina pentru recuperarea p%61rolei. before generic security routing 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > keeps saved-MFA and ordinary password requests distinct: Where is my saved MFA recovery code? 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > keeps saved-MFA and ordinary password requests distinct: Unde este codul de recuperare MFA salvat? 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > keeps saved-MFA and ordinary password requests distinct: Codurile de autentificare rămân private. 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > keeps saved-MFA and ordinary password requests distinct: Authentication codes remain private. 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > keeps saved-MFA and ordinary password requests distinct: How do I change my password? 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > keeps saved-MFA and ordinary password requests distinct: Reset my password now 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > keeps saved-MFA and ordinary password requests distinct: Validate my password reset token 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > uses concise guidance that claims no reset and names no guessed destination 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > maps en recovery clauses to the closed Show me the password recovery page. decision 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > maps en recovery clauses to the closed Reset my password for me. decision 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > maps en recovery clauses to the closed Reset my password and show me the recovery page. decision 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > maps en recovery clauses to the closed Do not reset my password; show me the recovery page. decision 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > maps ro recovery clauses to the closed Arată-mi pagina de recuperare a parolei. decision 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > maps ro recovery clauses to the closed Resetează-mi parola în locul meu. decision 1ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > maps ro recovery clauses to the closed Resetează-mi parola și arată-mi pagina de recuperare. decision 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > maps ro recovery clauses to the closed Nu-mi reseta parola; arată-mi pagina de recuperare. decision 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > does not divert a solely negated en recovery mention 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > does not divert a solely negated ro recovery mention 0ms
+ ✓ tests/unit/support-security-guidance.test.ts > CP1 deterministic Forgot password guidance > keeps operation refusal and combined guidance fixed, actionless, and destination-free 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps public product guidance public: Where is Your debates? 2ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps public product guidance public: How do I use the debate workspace? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps public product guidance public: Unde găsesc Dezbaterile tale? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps public product guidance public: Cum folosesc meniul dezbaterii? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps account-menu locations public: Where can I manage active sessions? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps account-menu locations public: Where are the account deletion options? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps account-menu locations public: Unde pot gestiona sesiunile active? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps account-menu locations public: Unde găsesc opțiunile de ștergere a contului? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: List my debates 1ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Show the current state of my account 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Summarize my latest debate 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Inspect my account records 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Show my active sessions 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: List the active devices on my account 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Listează dezbaterile mele 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Arată starea curentă a contului meu 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Rezumați ultima mea dezbatere 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Verifică înregistrările contului meu 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Arată sesiunile active ale contului meu 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Listează dispozitivele active ale contului meu 0ms
+ ✓ tests/unit/support-navigation.test.ts > Support navigation > resolves only public first-party actions for a signed-out visitor 2ms
+ ✓ tests/unit/support-navigation.test.ts > Support navigation > uses only trusted owner and public projections for dynamic destinations 0ms
+ ✓ tests/unit/support-navigation.test.ts > Support navigation > resolves the three static Settings sections only for signed-in visitors 0ms
+ ✓ tests/unit/support-navigation.test.ts > Support navigation > drops unknown, unresolved, malformed, external, and token-bearing unknown-action requests 0ms
+ ✓ tests/unit/support-navigation.test.ts > Support navigation > drops unknown, unresolved, malformed, external, and token-bearing forgot-password requests 0ms
+ ✓ tests/unit/support-navigation.test.ts > Support navigation > drops unknown, unresolved, malformed, external, and token-bearing owner-debate requests 0ms
+ ✓ tests/unit/support-navigation.test.ts > Support navigation > drops unknown, unresolved, malformed, external, and token-bearing owner-debate requests 0ms
+ ✓ tests/unit/support-navigation.test.ts > Support navigation > drops unknown, unresolved, malformed, external, and token-bearing public-debate requests 0ms
+ ✓ tests/unit/support-navigation.test.ts > Support navigation > drops unknown, unresolved, malformed, external, and token-bearing public-debate requests 0ms
+ ✓ tests/unit/support-navigation.test.ts > Support navigation > drops unknown, unresolved, malformed, external, and token-bearing active-sessions requests 0ms
+ ✓ tests/unit/support-navigation.test.ts > Support navigation > deduplicates action ids and returns immutable action records 0ms
+
+ Test Files  6 passed (6)
+      Tests  310 passed (310)
+   Start at  16:42:25
+   Duration  1.06s (transform 199ms, setup 0ms, import 357ms, tests 138ms, environment 0ms)
+

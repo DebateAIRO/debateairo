@@ -1,0 +1,8 @@
+file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CONTINUATION_BIND40/phase-preflight.mjs:14
+for(const path of forbidden){try{await access(path);throw new Error("GUIDE_CONTINUATION_FUTURE_PRESENT");}catch(error){if(error?.code!=="ENOENT")throw error;}}
+                                                          ^
+
+Error: GUIDE_CONTINUATION_FUTURE_PRESENT
+    at file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CONTINUATION_BIND40/phase-preflight.mjs:14:59
+
+Node.js v22.23.1

@@ -1,0 +1,16 @@
+{
+  "revision": "9e87fe5859b44fbd62dd485e03045e5bcde96bed",
+  "workspaces": [
+    {
+      "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-correctness/dialectical-engine",
+      "revision": "9e87fe5859b44fbd62dd485e03045e5bcde96bed",
+      "clean": true
+    },
+    {
+      "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-security/dialectical-engine",
+      "revision": "9e87fe5859b44fbd62dd485e03045e5bcde96bed",
+      "clean": true
+    }
+  ],
+  "sourceCurrentStatePreserved": true
+}

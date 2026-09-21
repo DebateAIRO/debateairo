@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW3",
+  "ticket": "t_48fb1ac5",
+  "revision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "sourceRevision": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "harnessSha256": "77b47d705133486ad4d7f520b117c191524cebaaf4131431df512c470177e314",
+  "verdict": "REWORK_CAPTURE_SAME_DESTINATION",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "agentPath": "/root/baseline",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-17T17:49:18Z",
+  "inputCustody": {
+    "manifestSha256": "92761c2ddbb5d4743e668a54c04ae52f9f923b94fa376fd3787e576110148661",
+    "indexed": 71,
+    "matched": 71
+  },
+  "authorEvidence": {
+    "receiptSha256": "7bd2e38b5546170076620cf25838dddcbb7190ee8cdc035af778a71851342f7e",
+    "consumptionSha256": "e13ea4b9662873830453e74df0b34969addc2c95f29fbf25a0e249414ef81c79",
+    "controlProofSha256": "648bd6fba1544ae4cb8f3fa941989e791b92fdc31203bad1a75864b1aa486a4c",
+    "controls": 65,
+    "passed": 65,
+    "scope": "inertHistoricalF3"
+  },
+  "reviewedHarness": [
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX3/capture-public-guide.mjs",
+      "sha256": "421b9c450540a663e5f33420ce91fa28ea5b54aa065a829e10321f48cc9c03db",
+      "bytes": 18107
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX3/controls.mjs",
+      "sha256": "530c5e8e850b611945719a3563424c595c9a608fcb5a707e818f5da03284e8a3",
+      "bytes": 8812
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX3/matrix.mjs",
+      "sha256": "4614aae275462568eed6277c78193d252c441cd47c28bd37021de4d43ba91957",
+      "bytes": 13383
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX3/pre-request-verifier.ts",
+      "sha256": "a123d265d2070d9ef5929dd30bb752b826412e42b5091c68e4806b276b37a402",
+      "bytes": 13715
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX3/runtime-capacity.mjs",
+      "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87",
+      "bytes": 9935
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX3/session-lifecycle.mjs",
+      "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b",
+      "bytes": 4254
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX3/verify-final-branches.ts",
+      "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a",
+      "bytes": 5131
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX3/verify-guide-harness.mjs",
+      "sha256": "cf736c307ec2db932957eaa445a52127974f217970c73acdcaeb8870dc10e94b",
+      "bytes": 31914
+    }
+  ],
+  "adapter": {
+    "directory": ".hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_FIX3",
+    "replaySha256": "2ee693b8736b3b0a16798b96d811044ed93aeb0b11f88307d5d33bad139758a5",
+    "custodySha256": "1a63bf8699447bf09eb2b8a7d469300d8d5be56fa74ae7266baf404939eaa604",
+    "negativeSha256": "a0f45f9725041382fedf6cbb99f175387f92a3bbde38b4610ad4aff23603748e",
+    "aggregateSha256": "b0d68ed0a8a27b3b9c67ba96b70a64e6051387d5a46bf75e886f75ea0643ad58",
+    "disposition": "PASS_STATIC"
+  },
+  "dispositions": [
+    {
+      "id": "rows53-54-oracle",
+      "result": "PASS_STATIC",
+      "summary": "Exact unchanged prompts/class/model/source; required Help pointer for 53 and keyboard for 54."
+    },
+    {
+      "id": "other52-and-recovery",
+      "result": "PASS_STATIC",
+      "summary": "Other 52 retained; eight genuine recovery rows remain deterministic and actionless."
+    },
+    {
+      "id": "proof-and-adapter",
+      "result": "PASS_STATIC",
+      "summary": "Exact f3/KB/ordered-eight binding; preimport adapter digest and constructor equality; mutation negative blocks import/success."
+    },
+    {
+      "id": "capture-same-destination",
+      "result": "REWORK",
+      "summary": "Full row53 starts and ends at /help, but activation waits unconditionally for URL inequality."
+    }
+  ],
+  "finding": {
+    "id": "GHR3-R1",
+    "file": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX3/capture-public-guide.mjs",
+    "lines": "173-175,198-209",
+    "minimalFix": "Validate the exact resolved destination after actual activation, waiting for a transition only when start and destination differ; add shared same-destination positive and wrong-destination/nonactivation negative controls."
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW3.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW3.md",
+      "sha256": "6a6c29424e8d134b632a47faf6187286bb9f7dbc80fde8a43eb426543e950efc",
+      "bytes": 5137
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW3.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW3.md",
+      "sha256": "9d0c5da16c5bd1549f6eef24b74aa27910c558070d047c7f90d0bd73b9c3c35f",
+      "bytes": 2684
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW3-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW3-custody.json",
+      "sha256": "78bcf6f6433b8e092d56cbdf9d573e493df2e674ead526bfda55d675cd7decdc",
+      "bytes": 32027
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW3-static.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW3-static.json",
+      "sha256": "f643ab5a289c10969ccd2cec31694e77796ee5c7d85341867aeee8bd7d4c3fe9",
+      "bytes": 3159
+    }
+  ],
+  "limitations": [
+    "Static/inert review only; no tests, probes, browser, HTTP, database, Support, model, preview, runtime-capacity, Git, product or source action.",
+    "The 65/65 proof is historical at f3 and is not actual 54-row live evidence.",
+    "FIX3 cannot proceed to LIVE3 until GHR3-R1 is corrected and the new harness/adapter binding is independently reviewed.",
+    "No preview-readiness, checkpoint-completion, owner-ratification or acceptance claim."
+  ]
+}

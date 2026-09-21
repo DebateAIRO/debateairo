@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "sequence": 23,
+  "failureCode": "GUIDE_CAPTURE_SCREENSHOT_TARGET_MISMATCH",
+  "phase": "PRE_CAPTURE_IDENTITY",
+  "identity": {
+    "sequence": 23,
+    "promptSha256": "aa12d7a055f9a9b38e1cd869469eef20967ede8f875f8d9de9ff19e5ec7ac0f6",
+    "mode": "full",
+    "language": "ro",
+    "apiTextSha256": "09578cfee38f29591f0e3668a3fc12488fde9f791de71a7dfc170b2bfd01a082",
+    "sources": [
+      "export-json",
+      "guide-how-it-works"
+    ],
+    "actions": [],
+    "targetAssistantIndex": 1
+  },
+  "observed": {
+    "articleCount": 1,
+    "afterAssistantCount": 2,
+    "articleRole": "assistant",
+    "textEqual": false,
+    "apiDomTextEqual": true,
+    "sourceLabelsEqual": true,
+    "actionsEqual": true
+  },
+  "geometry": "NOT_READ",
+  "restoration": "NOT_REQUIRED"
+}

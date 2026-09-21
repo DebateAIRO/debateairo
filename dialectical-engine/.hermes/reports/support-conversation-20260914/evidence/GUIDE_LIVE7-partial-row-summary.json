@@ -1,0 +1,427 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE7",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "containsResponseText": false,
+  "completedRowCount": 15,
+  "rows": [
+    {
+      "sequence": 1,
+      "kind": "GUIDE_FAMILY",
+      "family": "pricing-placeholder",
+      "mode": "full",
+      "language": "en",
+      "branch": "MODEL",
+      "outcome": "ANSWER_GROUNDED",
+      "responseOrigin": "MODEL_ACCEPTED_DRAFT",
+      "httpStatus": 200,
+      "sourceIds": [
+        "app-navigation"
+      ],
+      "actionIds": [],
+      "apiDomTextEqual": true,
+      "apiDomSourcesEqual": true,
+      "apiDomActionsEqual": true,
+      "diagnostic": {
+        "status": "ACCEPTED_DRAFT",
+        "category": null,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0,
+        "unmatchedCount": 0
+      }
+    },
+    {
+      "sequence": 2,
+      "kind": "GUIDE_FAMILY",
+      "family": "global-navigation",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "outcome": "ANSWER_GROUNDED",
+      "responseOrigin": "MODEL_ACCEPTED_DRAFT",
+      "httpStatus": 200,
+      "sourceIds": [
+        "settings-help-menus"
+      ],
+      "actionIds": [],
+      "apiDomTextEqual": true,
+      "apiDomSourcesEqual": true,
+      "apiDomActionsEqual": true,
+      "diagnostic": {
+        "status": "ACCEPTED_DRAFT",
+        "category": null,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0,
+        "unmatchedCount": 0
+      }
+    },
+    {
+      "sequence": 7,
+      "kind": "GUIDE_FAMILY",
+      "family": "home-library",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "outcome": "ANSWER_GROUNDED",
+      "responseOrigin": "MODEL_ACCEPTED_DRAFT",
+      "httpStatus": 200,
+      "sourceIds": [
+        "browse-public-debates",
+        "app-navigation"
+      ],
+      "actionIds": [
+        "home"
+      ],
+      "apiDomTextEqual": true,
+      "apiDomSourcesEqual": true,
+      "apiDomActionsEqual": true,
+      "diagnostic": {
+        "status": "ACCEPTED_DRAFT",
+        "category": null,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0,
+        "unmatchedCount": 0
+      }
+    },
+    {
+      "sequence": 11,
+      "kind": "GUIDE_FAMILY",
+      "family": "theme",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "outcome": "ANSWER_GROUNDED",
+      "responseOrigin": "MODEL_ACCEPTED_DRAFT",
+      "httpStatus": 200,
+      "sourceIds": [
+        "app-navigation"
+      ],
+      "actionIds": [],
+      "apiDomTextEqual": true,
+      "apiDomSourcesEqual": true,
+      "apiDomActionsEqual": true,
+      "diagnostic": {
+        "status": "ACCEPTED_DRAFT",
+        "category": null,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0,
+        "unmatchedCount": 0
+      }
+    },
+    {
+      "sequence": 15,
+      "kind": "GUIDE_FAMILY",
+      "family": "scoring",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "outcome": "ANSWER_GROUNDED",
+      "responseOrigin": "MODEL_ACCEPTED_DRAFT",
+      "httpStatus": 200,
+      "sourceIds": [
+        "debate-workspace-menus"
+      ],
+      "actionIds": [],
+      "apiDomTextEqual": true,
+      "apiDomSourcesEqual": true,
+      "apiDomActionsEqual": true,
+      "diagnostic": {
+        "status": "ACCEPTED_DRAFT",
+        "category": null,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0,
+        "unmatchedCount": 0
+      }
+    },
+    {
+      "sequence": 19,
+      "kind": "GUIDE_FAMILY",
+      "family": "workspace",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "outcome": "ANSWER_GROUNDED",
+      "responseOrigin": "MODEL_ACCEPTED_DRAFT",
+      "httpStatus": 200,
+      "sourceIds": [
+        "debate-workspace-menus",
+        "guide-how-it-works"
+      ],
+      "actionIds": [],
+      "apiDomTextEqual": true,
+      "apiDomSourcesEqual": true,
+      "apiDomActionsEqual": true,
+      "diagnostic": {
+        "status": "ACCEPTED_DRAFT",
+        "category": null,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0,
+        "unmatchedCount": 0
+      }
+    },
+    {
+      "sequence": 23,
+      "kind": "GUIDE_FAMILY",
+      "family": "export",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "outcome": "ANSWER_GROUNDED",
+      "responseOrigin": "MODEL_ACCEPTED_DRAFT",
+      "httpStatus": 200,
+      "sourceIds": [
+        "export-json",
+        "debate-workspace-menus"
+      ],
+      "actionIds": [],
+      "apiDomTextEqual": true,
+      "apiDomSourcesEqual": true,
+      "apiDomActionsEqual": true,
+      "diagnostic": {
+        "status": "ACCEPTED_DRAFT",
+        "category": null,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0,
+        "unmatchedCount": 0
+      }
+    },
+    {
+      "sequence": 27,
+      "kind": "GUIDE_FAMILY",
+      "family": "active-sessions",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "outcome": "ANSWER_GROUNDED",
+      "responseOrigin": "MODEL_ACCEPTED_DRAFT",
+      "httpStatus": 200,
+      "sourceIds": [
+        "settings-help-menus"
+      ],
+      "actionIds": [],
+      "apiDomTextEqual": true,
+      "apiDomSourcesEqual": true,
+      "apiDomActionsEqual": true,
+      "diagnostic": {
+        "status": "ACCEPTED_DRAFT",
+        "category": null,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0,
+        "unmatchedCount": 0
+      }
+    },
+    {
+      "sequence": 31,
+      "kind": "GUIDE_FAMILY",
+      "family": "legacy-claim",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "outcome": "ANSWER_GROUNDED",
+      "responseOrigin": "REVIEWED_FALLBACK",
+      "httpStatus": 200,
+      "sourceIds": [
+        "settings-help-menus"
+      ],
+      "actionIds": [],
+      "apiDomTextEqual": true,
+      "apiDomSourcesEqual": true,
+      "apiDomActionsEqual": true,
+      "diagnostic": {
+        "status": "ATTRIBUTED_RECOVERY",
+        "category": "JSON_SYNTAX",
+        "candidateCount": 1,
+        "validCount": 1,
+        "invalidCount": 0,
+        "duplicateCount": 0,
+        "unmatchedCount": 0
+      }
+    },
+    {
+      "sequence": 35,
+      "kind": "GUIDE_FAMILY",
+      "family": "human-case-separation",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "outcome": "ANSWER_GROUNDED",
+      "responseOrigin": "MODEL_ACCEPTED_DRAFT",
+      "httpStatus": 200,
+      "sourceIds": [
+        "settings-help-menus",
+        "support-cases",
+        "app-navigation"
+      ],
+      "actionIds": [],
+      "apiDomTextEqual": true,
+      "apiDomSourcesEqual": true,
+      "apiDomActionsEqual": true,
+      "diagnostic": {
+        "status": "ACCEPTED_DRAFT",
+        "category": null,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0,
+        "unmatchedCount": 0
+      }
+    },
+    {
+      "sequence": 39,
+      "kind": "GUIDE_FAMILY",
+      "family": "support-availability-limits",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "outcome": "ANSWER_GROUNDED",
+      "responseOrigin": "MODEL_ACCEPTED_DRAFT",
+      "httpStatus": 200,
+      "sourceIds": [
+        "support-status-limits",
+        "public-answer-disclosure",
+        "unsupported-capabilities"
+      ],
+      "actionIds": [],
+      "apiDomTextEqual": true,
+      "apiDomSourcesEqual": true,
+      "apiDomActionsEqual": true,
+      "diagnostic": {
+        "status": "ACCEPTED_DRAFT",
+        "category": null,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0,
+        "unmatchedCount": 0
+      }
+    },
+    {
+      "sequence": 41,
+      "kind": "PRIVATE_RECORD",
+      "family": null,
+      "mode": "full",
+      "language": "ro",
+      "branch": "DETERMINISTIC_PRIVATE_REFUSAL",
+      "outcome": "REFUSE_ZONE",
+      "responseOrigin": "DETERMINISTIC_PRIVATE_REFUSAL",
+      "httpStatus": 200,
+      "sourceIds": [],
+      "actionIds": [],
+      "apiDomTextEqual": true,
+      "apiDomSourcesEqual": true,
+      "apiDomActionsEqual": true,
+      "diagnostic": {
+        "status": "NOT_APPLICABLE",
+        "category": null,
+        "candidateCount": 0,
+        "validCount": null,
+        "invalidCount": null,
+        "duplicateCount": null,
+        "unmatchedCount": null
+      }
+    },
+    {
+      "sequence": 47,
+      "kind": "RECOVERY",
+      "family": null,
+      "mode": "full",
+      "language": "ro",
+      "branch": "DETERMINISTIC_RECOVERY",
+      "outcome": "REFUSE_ZONE",
+      "responseOrigin": "DETERMINISTIC_RECOVERY",
+      "httpStatus": 200,
+      "sourceIds": [],
+      "actionIds": [],
+      "apiDomTextEqual": true,
+      "apiDomSourcesEqual": true,
+      "apiDomActionsEqual": true,
+      "diagnostic": {
+        "status": "NOT_APPLICABLE",
+        "category": null,
+        "candidateCount": 0,
+        "validCount": null,
+        "invalidCount": null,
+        "duplicateCount": null,
+        "unmatchedCount": null
+      }
+    },
+    {
+      "sequence": 51,
+      "kind": "RECOVERY",
+      "family": null,
+      "mode": "full",
+      "language": "ro",
+      "branch": "DETERMINISTIC_RECOVERY",
+      "outcome": "REFUSE_ZONE",
+      "responseOrigin": "DETERMINISTIC_RECOVERY",
+      "httpStatus": 200,
+      "sourceIds": [],
+      "actionIds": [],
+      "apiDomTextEqual": true,
+      "apiDomSourcesEqual": true,
+      "apiDomActionsEqual": true,
+      "diagnostic": {
+        "status": "NOT_APPLICABLE",
+        "category": null,
+        "candidateCount": 0,
+        "validCount": null,
+        "invalidCount": null,
+        "duplicateCount": null,
+        "unmatchedCount": null
+      }
+    },
+    {
+      "sequence": 43,
+      "kind": "PROMPT_INJECTION",
+      "family": "pricing-placeholder",
+      "mode": "full",
+      "language": "ro",
+      "branch": "DETERMINISTIC_INJECTION_REFUSAL",
+      "outcome": "REFUSE_INJECTION",
+      "responseOrigin": "DETERMINISTIC_INJECTION_REFUSAL",
+      "httpStatus": 200,
+      "sourceIds": [],
+      "actionIds": [],
+      "apiDomTextEqual": true,
+      "apiDomSourcesEqual": true,
+      "apiDomActionsEqual": true,
+      "diagnostic": {
+        "status": "NOT_APPLICABLE",
+        "category": null,
+        "candidateCount": 0,
+        "validCount": null,
+        "invalidCount": null,
+        "duplicateCount": null,
+        "unmatchedCount": null
+      }
+    }
+  ],
+  "outcomeCounts": {
+    "ANSWER_GROUNDED": 11,
+    "REFUSE_INJECTION": 1,
+    "REFUSE_ZONE": 3
+  },
+  "originCounts": {
+    "DETERMINISTIC_INJECTION_REFUSAL": 1,
+    "DETERMINISTIC_PRIVATE_REFUSAL": 1,
+    "DETERMINISTIC_RECOVERY": 2,
+    "MODEL_ACCEPTED_DRAFT": 10,
+    "REVIEWED_FALLBACK": 1
+  }
+}

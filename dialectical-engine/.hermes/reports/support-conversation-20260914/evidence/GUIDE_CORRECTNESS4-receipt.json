@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CORRECTNESS4",
+  "ticket": "t_fd9b3fd1",
+  "session": "/root/plan_review",
+  "baseRevision": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  "productRevision": "c8784902f78ed4ba1d637d122e1f32f598415f4e",
+  "sourceHead": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+  "freezeCommit": "5eb254a9b3ef5ba335f26b30e1b47a85e42a6442",
+  "freezeReceiptSha256": "8cc41f8954ddcca3a19985c9e490845e065afbbe1fba3f0c4771760f42cc2f20",
+  "verdict": "REWORK",
+  "scope": "finite three-path navigation admission correction",
+  "commentsReadThrough": 4,
+  "findingDispositions": {
+    "sealedPricingUnrelatedActions": "RESOLVED",
+    "B1": "BLOCKING_CLOSED_LABEL_ACTION_ADMISSION_INCOMPLETE_OR_MISDIRECTED",
+    "B2": "BLOCKING_PREEXISTING_SINGLE_LABEL_SOURCE_ADMISSION_GAP",
+    "priorGuardPass": "RETAINED_UNCHANGED"
+  },
+  "verification": {
+    "custody": {
+      "exitCode": 0,
+      "indexedInputsChecked": 51,
+      "indexedInputsMatched": 51,
+      "detachedProductChecked": 143,
+      "detachedProductMatched": 143,
+      "primaryProductChecked": 143,
+      "primaryProductMatched": 143,
+      "changedPathsExpected": 3,
+      "changedPathsMatched": 3
+    },
+    "changedUnits": {
+      "exitCode": 0,
+      "testFiles": 2,
+      "passed": 149,
+      "failed": 0
+    },
+    "navigationAdmission": {
+      "exitCode": 1,
+      "rows": 28,
+      "rowsPassed": 14,
+      "rowsFailed": 14,
+      "assertionsFailed": 18,
+      "actionRows": 16,
+      "actionRowsPassed": 3,
+      "actionRowsFailed": 13,
+      "actionRowsAlsoMissingSources": 4,
+      "proseRows": 12,
+      "proseRowsActionless": 12,
+      "proseRowsWithUsefulSources": 11,
+      "proseRowsMissingSources": 1
+    },
+    "retainedAuthorEvidence": {
+      "exact33Passed": 1633,
+      "exact33Failed": 0,
+      "exact33Todo": 1,
+      "typecheckExitCode": 1,
+      "typecheckBaselineDiagnostics": 76,
+      "typecheckCurrentDiagnostics": 76,
+      "typecheckByteIdentical": true,
+      "missionAddedDiagnostics": 0,
+      "frozenHarnessPassed": 62,
+      "frozenHarnessTotal": 62,
+      "structuralEvalRunsRetainedFromPriorRevision": 3,
+      "structuralEvalPassedPerRun": 60,
+      "structuralEvalRubric": "PENDING"
+    },
+    "cleanup": {
+      "detachedHeadExact": true,
+      "primaryHeadExact": true,
+      "detachedDirty": 0,
+      "primaryDirty": 0,
+      "temporaryLinksPresent": 0,
+      "heavyLeaseReleased": true
+    }
+  },
+  "limits": [
+    "no full33 or typecheck rerun",
+    "no harness or structural rubric rerun",
+    "no real HTTP, model, provider, browser, DOM, or preview traffic",
+    "Forgot-password destination remains unresolved and actionless",
+    "no readiness, checkpoint, owner-acceptance, or general language-completeness claim"
+  ],
+  "skillsLoaded": [
+    "using-superpowers",
+    "heartbeat-protocol",
+    "receiving-code-review",
+    "heartbeat-worker",
+    "test-driven-development",
+    "systematic-debugging",
+    "verification-before-completion"
+  ],
+  "usage": "UNAVAILABLE",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_CORRECTNESS4.md",
+      "sha256": "b62ca06b95e935da0458c1bc088c37e6f42862aa71ba4b9b769dca015d220997",
+      "bytes": 7762
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_CORRECTNESS4.md",
+      "sha256": "a6fc2a94a9ab2970092a5ed6241166de84c7fe779a43c0cfb90d00e75df08bea",
+      "bytes": 4373
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CORRECTNESS4/custody.py",
+      "sha256": "ea9be8c3e141c90f758d6b376d229de3a14a379c5b4f2ecf4c8bee3f5a5fbe8a",
+      "bytes": 3602
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CORRECTNESS4/cleanup-custody.py",
+      "sha256": "12f6b0b2f32008b3f3215fee1f9e518f9e521080e3ac154d4a25db398b5a6ed9",
+      "bytes": 995
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CORRECTNESS4/navigation-admission.mts",
+      "sha256": "24a66dd53aba3ccba23119310ee6ce3576469b8b604de9b74f561f343e13bfb7",
+      "bytes": 5744
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS4-input-custody.log",
+      "sha256": "b4299129937a2c3ea1aaa872c5ddef2e9dff2d421354717f83cd1c0613c04e6b",
+      "bytes": 973
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS4-changed-units.log",
+      "sha256": "cb9d6626c4397da36b415f9d6597bb81bc08db2c0301267ea7b3dced1afc5d9d",
+      "bytes": 26493
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS4-navigation-admission.log",
+      "sha256": "910478bd0469cb641d848cb8847e1c6af4c35707fdf16f5fbe46ee21fce3fc07",
+      "bytes": 17594
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS4-dependency-custody.log",
+      "sha256": "9f523651efe9bcc60de51f5f48bfffaec3ad8b8c29fc91364bebce137e60961e",
+      "bytes": 291
+    }
+  ],
+  "receiptExcludesSelf": true,
+  "measuredAt": "2026-09-17T16:18:47Z"
+}

@@ -1,0 +1,270 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-gcSpRK/data ... ok
+
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] creating subdirectories ... 
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] selecting dynamic shared memory implementation ... 
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] 
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-gcSpRK/data -l logfile start
+
+
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] 2026-09-17 09:07:03.655 EEST [91186] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] 2026-09-17 09:07:03.657 EEST [91186] LOG:  listening on IPv4 address "127.0.0.1", port 52102
+
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] 2026-09-17 09:07:03.657 EEST [91186] LOG:  listening on IPv6 address "::1", port 52102
+
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] 2026-09-17 09:07:03.658 EEST [91186] LOG:  listening on Unix socket "/tmp/.s.PGSQL.52102"
+
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] 2026-09-17 09:07:03.664 EEST [91192] LOG:  database system was shut down at 2026-09-17 09:07:03 EEST
+
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] 2026-09-17 09:07:03.669 EEST [91186] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] 2026-09-17 09:07:04.041 EEST [91197] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] 2026-09-17 09:07:04.435 EEST [91197] WARNING:  there is no transaction in progress
+
+
+stdout | tests/integration/support-cases.test.ts > SUP-02 cases > rejects future v1 content inserts and ciphertext updates without rewriting legacy rows
+[S00 DB embedded] 2026-09-17 09:07:04.483 EEST [91231] ERROR:  SUPPORT_CONTENT_V2_REQUIRED
+2026-09-17 09:07:04.483 EEST [91231] CONTEXT:  PL/pgSQL function support.enforce_case_message_content_v2() line 5 at RAISE
+2026-09-17 09:07:04.483 EEST [91231] STATEMENT:  
+	      INSERT INTO support.case_message(case_message_id,case_id,role,content_ciphertext,at)
+	      VALUES($1,$2,'user',$3,$4)
+	    
+
+
+stdout | tests/integration/support-cases.test.ts > SUP-02 cases > rejects future v1 content inserts and ciphertext updates without rewriting legacy rows
+[S00 DB embedded] 2026-09-17 09:07:04.486 EEST [91230] ERROR:  SUPPORT_CONTENT_V2_REQUIRED
+2026-09-17 09:07:04.486 EEST [91230] CONTEXT:  PL/pgSQL function support.enforce_case_message_content_v2() line 5 at RAISE
+2026-09-17 09:07:04.486 EEST [91230] STATEMENT:  UPDATE support.case_message SET content_ciphertext=$2 WHERE case_message_id=$1
+
+
+stdout | tests/integration/support-cases.test.ts > SUP-02 cases > rejects future v1 content inserts and ciphertext updates without rewriting legacy rows
+[S00 DB embedded] 2026-09-17 09:07:04.487 EEST [91197] ERROR:  SUPPORT_CONTENT_V2_REQUIRED
+2026-09-17 09:07:04.487 EEST [91197] CONTEXT:  PL/pgSQL function support.enforce_case_content_v2() line 13 at RAISE
+2026-09-17 09:07:04.487 EEST [91197] STATEMENT:  UPDATE support."case" SET summary_ciphertext=$2 WHERE case_id=$1
+
+
+stdout | tests/integration/support-cases.test.ts > SUP-02 cases > rejects debateai_support case INSERTs with either v1 snapshot or v1 summary
+[S00 DB embedded] 2026-09-17 09:07:04.512 EEST [91232] ERROR:  SUPPORT_CONTENT_V2_REQUIRED
+2026-09-17 09:07:04.512 EEST [91232] CONTEXT:  PL/pgSQL function support.enforce_case_content_v2() line 13 at RAISE
+2026-09-17 09:07:04.512 EEST [91232] STATEMENT:  
+	        INSERT INTO support."case"(
+	          case_id,token_sha256,session_id,language,created_at,
+	          transcript_snapshot_ciphertext,state,summary_ciphertext,
+	          summary_at,summary_status
+	        ) VALUES($1,$2,$3,'en',$4,$5,'NEW',$6,$4,'DONE')
+	      
+
+
+stdout | tests/integration/support-cases.test.ts > SUP-02 cases > rejects debateai_support case INSERTs with either v1 snapshot or v1 summary
+[S00 DB embedded] 2026-09-17 09:07:04.513 EEST [91232] ERROR:  SUPPORT_CONTENT_V2_REQUIRED
+2026-09-17 09:07:04.513 EEST [91232] CONTEXT:  PL/pgSQL function support.enforce_case_content_v2() line 7 at RAISE
+2026-09-17 09:07:04.513 EEST [91232] STATEMENT:  
+	        INSERT INTO support."case"(
+	          case_id,token_sha256,session_id,language,created_at,
+	          transcript_snapshot_ciphertext,state
+	        ) VALUES($1,$2,$3,'en',$4,$5,'NEW')
+	      
+
+
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > opens one case for concurrent attempts at the same trigger generation 29ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > replays the owning migration without duplicating named constraints 4ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > persists a complete case and its initial system transition before returning 8ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > rejects future v1 content inserts and ciphertext updates without rewriting legacy rows 29ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > rejects debateai_support case INSERTs with either v1 snapshot or v1 summary 8ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > returns a shredded case discriminator without unwrapping and preserves ciphertext bytes 8ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > atomically rejects a case reply when shred wins after the liveness read 15ms
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] 2026-09-17 09:07:04.615 EEST [91186] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] 2026-09-17 09:07:04.615 EEST [91186] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] 2026-09-17 09:07:04.616 EEST [91186] LOG:  background worker "logical replication launcher" (PID 91195) exited with exit code 1
+
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] 2026-09-17 09:07:04.616 EEST [91190] LOG:  shutting down
+
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] 2026-09-17 09:07:04.616 EEST [91190] LOG:  checkpoint starting: shutdown immediate
+
+
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > enforces the closed state graph and never removes a row 8ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > rejects an illegal transition with a typed error 6ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > stores a non-authoritative one-paragraph advisory summary within the bound 8ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe en advisory summary before seal and persistence 1ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe ro advisory summary before seal and persistence 0ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe en advisory summary before seal and persistence 1ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe en advisory summary before seal and persistence 1ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe en advisory summary before seal and persistence 0ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe ro advisory summary before seal and persistence 1ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe en advisory summary before seal and persistence 0ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe en advisory summary before seal and persistence 0ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe en advisory summary before seal and persistence 1ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe en advisory summary before seal and persistence 1ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe en advisory summary before seal and persistence 0ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe ro advisory summary before seal and persistence 0ms
+ × tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe ro advisory summary before seal and persistence 5ms
+   → expected [ Array(1) ] to deeply equal [ Array(1) ]
+ × tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe ro advisory summary before seal and persistence 1ms
+   → expected [ Array(1) ] to deeply equal [ Array(1) ]
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe en advisory summary before seal and persistence 0ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > screens legacy transcript, reply, and summary plaintext during case access 9ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > marks a relay miss TIMED_OUT without summary bytes and keeps the case in the inbox 11ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > persists the authoritative deadline despite real timer slippage and rejects late DONE 12ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > propagates immediate typed summary failure SUPPORT_MODEL_UNAVAILABLE instead of recording a timeout 0ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > propagates immediate typed summary failure SUPPORT_DISABLED instead of recording a timeout 0ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > aborts at the deadline, persists one timeout, and rejects a late DONE write 8ms
+ ✓ tests/integration/support-cases.test.ts > SUP-02 cases > reports a typed background summary failure through the case-service seam 2ms
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] 2026-09-17 09:07:04.697 EEST [91190] LOG:  checkpoint complete: wrote 1727 buffers (10.5%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.051 s, sync=0.029 s, total=0.081 s; sync files=1143, longest=0.001 s, average=0.001 s; distance=13622 kB, estimate=13622 kB; lsn=0/24D4BB8, redo lsn=0/24D4BB8
+
+
+stdout | tests/integration/support-cases.test.ts
+[S00 DB embedded] 2026-09-17 09:07:04.703 EEST [91186] LOG:  database system is shut down
+
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe ro advisory summary before seal and persistence
+AssertionError: expected [ Array(1) ] to deeply equal [ Array(1) ]
+
+- Expected
++ Received
+
+  [
+-   "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței.",
++   "Asistența nu cere coduri de autentificare; de asemenea le poate valida.",
+  ]
+
+ ❯ tests/integration/support-cases.test.ts:458:20
+    456|
+    457|     expect(complete).toHaveBeenCalledTimes(1);
+    458|     expect(sealed).toEqual([fallback]);
+       |                    ^
+    459|     expect(sealed[0]).not.toContain(hostile);
+    460|     expect(persisted).toHaveLength(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe ro advisory summary before seal and persistence
+AssertionError: expected [ Array(1) ] to deeply equal [ Array(1) ]
+
+- Expected
++ Received
+
+  [
+-   "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței.",
++   "Asistența nu cere coduri de securitate; în plus le poate verifica.",
+  ]
+
+ ❯ tests/integration/support-cases.test.ts:458:20
+    456|
+    457|     expect(complete).toHaveBeenCalledTimes(1);
+    458|     expect(sealed).toEqual([fallback]);
+       |                    ^
+    459|     expect(sealed[0]).not.toContain(hostile);
+    460|     expect(persisted).toHaveLength(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 30 passed (32)
+   Start at  09:07:01
+   Duration  2.87s (transform 259ms, setup 0ms, import 838ms, tests 1.95s, environment 0ms)
+

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_RECOVER34",
+  "ticket": "t_31c5023f",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "approvedMaximumStartupRequests": 2,
+  "invocations": [
+    {
+      "sequence": 1,
+      "kind": "DIAGNOSTIC_START_SUPPORT_MODEL_RELAY",
+      "fixedPrompt": "HERMES-SUPPORT acceptance transport handshake. Reply with the single word: OK",
+      "destination": "configured Z.AI/GLM provider",
+      "startedAtUtc": "2026-09-21T07:55:46.698Z",
+      "completedAtUtc": "2026-09-21T07:56:05.342Z",
+      "toolNumericExitStatus": 0,
+      "toolChunkId": "007eba",
+      "toolWallTimeSeconds": 19.062290375,
+      "outcomeCode": "HERMES_DIAGNOSTIC_READY",
+      "temporaryRelayStopped": true,
+      "port8894FreeAfter": true
+    },
+    {
+      "sequence": 2,
+      "kind": "FULL_SUPPORTED_RUNTIME9_START",
+      "sameFixedStartupPrompt": true,
+      "startedAtUtc": "2026-09-21T07:59:03.445Z",
+      "pid": 9800,
+      "pgid": 9800,
+      "outcomeCode": "DEV_AUTH_STACK_READY",
+      "detached": true
+    }
+  ],
+  "totalStartupHandshakeAttempts": 2,
+  "diagnosticInvocationCount": 1,
+  "fullRuntimeStartCount": 1,
+  "additionalRequests": 0,
+  "correction": {
+    "incorrectCommentaryTimestamps": "07:58:30.812Z to 07:58:49.752Z",
+    "status": "WITHDRAWN_NO_SUCH_INVOCATION",
+    "authoritativeDiagnosticTimestamps": {
+      "startedAtUtc": "2026-09-21T07:55:46.698Z",
+      "completedAtUtc": "2026-09-21T07:56:05.342Z"
+    },
+    "basis": "exact diagnostic artifact plus numeric tool exit/chunk evidence"
+  },
+  "traffic": {
+    "startupModelAttempts": 2,
+    "supportAnswerRequests": 0,
+    "statusReads": 0,
+    "capacityReads": 0,
+    "databaseQueries": 0,
+    "actualCaptureRows": 0
+  },
+  "privateValuesRetained": false,
+  "rawProviderOutputRetained": false
+}

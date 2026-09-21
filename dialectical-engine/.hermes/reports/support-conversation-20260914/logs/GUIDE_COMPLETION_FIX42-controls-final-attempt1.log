@@ -1,0 +1,1 @@
+{"verdict":"FAILED_FIXTURE_EXPECTATION","code":"GUIDE_COMPLETION_FIX42_EXPECTED_CONTRACT_DIGEST_MISTYPED","expected":"ef7f8a58b554df24e6b7cfb8309fcf3bccab1cb59efe74ba2e1763fd119331c3","actual":"2fb449ede1f9fdb76ce8f951625feff6dff57f4505cb707866e11c506a167a45","traffic":{"runtime":0,"browser":0,"http":0,"status":0,"capacity":0,"database":0,"support":0,"model":0}}

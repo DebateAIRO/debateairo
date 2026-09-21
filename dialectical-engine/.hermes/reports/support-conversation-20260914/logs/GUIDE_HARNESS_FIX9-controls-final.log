@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX9",
+  "result": "PASS",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "harnessSha256": "acc2c2cdf503f185ce8a43fcc6b262d144314708085a80e79ac262d99fed6fbc",
+  "controls": 112,
+  "passed": 112,
+  "retainedControlPurposes": 111,
+  "addedControlPurposes": 1,
+  "adapterNegative": {
+    "controls": 3,
+    "passed": 3,
+    "importerCalls": 0,
+    "successfulRows": 0
+  },
+  "syntaxFiles": 10,
+  "unchangedFiles": [
+    "gate-contract.json",
+    "matrix.mjs",
+    "pre-request-verifier.ts",
+    "runtime-capacity.mjs",
+    "session-lifecycle.mjs",
+    "verify-final-branches.ts"
+  ],
+  "futureOutputs": {
+    "receipt": "GUIDE_LIVE_GUIDE9-actual-receipt.json",
+    "screenshots": 54,
+    "profileAbsent": true
+  },
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "database": 0,
+    "supportRequests": 0,
+    "modelRequests": 0
+  }
+}

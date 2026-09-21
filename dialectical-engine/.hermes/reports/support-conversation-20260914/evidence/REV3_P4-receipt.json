@@ -1,0 +1,101 @@
+{
+  "schema": "support-rev3-p4-receipt-v1",
+  "node": "REV3_P4",
+  "ticket": "t_bcd8b6b5",
+  "runId": 78,
+  "pass": 4,
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewerAgent": "/root/baseline",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-17",
+  "productRevision": "475c5a7e7eb8f48a3f5a81379f37b49fdd014ce9",
+  "sourceAdministrativeHead": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+  "contractFreeze": "a779487b2822e483667802778a7751af037cd344",
+  "verdict": "BLOCKED",
+  "technicalProductDemonstrationDisposition": "PASS",
+  "blockingDependency": {
+    "ticket": "t_979fe293",
+    "criterion": "CP1-A05",
+    "reason": "The exact existing owner-confirmed Forgot-password URL or reviewed UI opener remains unknown."
+  },
+  "checks": {
+    "immutableInputsMatched": 25,
+    "immutableInputsExpected": 25,
+    "productFilesMatched": 108,
+    "productFilesExpected": 108,
+    "actualRowsGrounded": 7,
+    "actualRowsExpected": 7,
+    "apiDomExact": 7,
+    "manualUseful": 7,
+    "acceptedDrafts": 7,
+    "exactReviewedFallbacksExercised": 0,
+    "englishPointerCanonicalDestination": true,
+    "compactRomanianKeyboardCanonicalDestination": true,
+    "productCheckoutCleanAfter": true,
+    "primaryDependencyLaneCleanAfter": true,
+    "heavyLeaseUsed": false,
+    "newRuntimeOrModelTraffic": false
+  },
+  "boundInputs": [
+    {
+      "kind": "gateManifest",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_P5-manifest.json",
+      "sha256": "4abdf0b3f9a1af6b66796165ded25207cd84f75f7625504beee4e04afc23350b"
+    },
+    {
+      "kind": "liveConsumption",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE_P3-consumption.json",
+      "sha256": "8fa9e99d630de693eada9d4758983cff78008115c9bdeff8e7eaafaea77d31b8"
+    },
+    {
+      "kind": "actualRelayReceipt",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE_P3-actual-relay-receipt.json",
+      "sha256": "c771f34d978dd1f98e77c2949cf43d8bfc3061e542ec1c2e253d00d405a8d313"
+    },
+    {
+      "kind": "manual",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE_P3-manual.md",
+      "sha256": "1a400a141d04c72b424ca6ba289d217934466b1e96525d7073397120c5ef127c"
+    },
+    {
+      "kind": "forgotInvestigation",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIND_CURRENT-consumption.json",
+      "sha256": "be7a4e24bc4e0bbee94bdf68dbc36135a29453003251392dd6f3ad6665b58e99"
+    }
+  ],
+  "sourceCustody": {
+    "startHead": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "endHead": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "startCachedFullIndexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "endCachedFullIndexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "startWorkingFullIndexDiffSha256": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19",
+    "endWorkingFullIndexDiffSha256": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19",
+    "startTrackedDirtyPathCount": 58,
+    "endTrackedDirtyPathCount": 58,
+    "qualification": "The bounded source custody values remained stable during this read-only review. Historical source byte state, cause and actor remain qualified by prior evidence and were not reinvestigated."
+  },
+  "artifacts": [
+    {
+      "kind": "verdict",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/REV3-p4.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV3-p4.md",
+      "sha256": "c27375efffc628ff973cf75dbe39a991acd1d9d4f80d40fbe97d76be13f90d4b",
+      "bytes": 7001
+    },
+    {
+      "kind": "selfReport",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/REV3_P4.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/REV3_P4.md",
+      "sha256": "9de07d17487d3de2f9973fe58d71d3a178a16e3e8510937fd65070a4a1476778",
+      "bytes": 5318
+    }
+  ],
+  "limits": [
+    "Seven accepted model drafts prove only this finite saved sample; the exact reviewed fallback was not exercised.",
+    "The anonymous actual capture does not establish signed-in ownership or private-data authority.",
+    "The 15 classified HTTP 401 entries do not identify every origin or establish harmlessness.",
+    "Full RO and compact screenshots do not independently display every overflowed row; the structured API/DOM receipt supplies exact content.",
+    "The sealed capture literal controls=54 is stale metadata; the bound proof log declares 58 conceptual controls and was not rerun.",
+    "Historical source byte causality and actual model-token usage remain unavailable."
+  ]
+}

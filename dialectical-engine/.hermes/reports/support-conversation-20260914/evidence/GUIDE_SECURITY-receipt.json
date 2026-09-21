@@ -1,0 +1,104 @@
+{
+  "node": "GUIDE_SECURITY",
+  "ticket": "t_ed3d1878",
+  "session": "/root/forgot_destination",
+  "model": "gpt-5.6-sol",
+  "revision": "c34c64d4e643e404cefe96dfaf167536ae364a94",
+  "base_revision": "479763da1f586a217f36204cc81138aaa81c6f81",
+  "verdict": "REWORK",
+  "comments_read_through": "1789651931",
+  "counts": {
+    "direct_route_cases": 13,
+    "direct_route_expected": 8,
+    "direct_route_policy_failures": 5,
+    "focused_unit_passed": 310,
+    "focused_route_passed": 38,
+    "private_relations_denied_42501": 5,
+    "product_custody_files": 143,
+    "immutable_input_files": 155,
+    "deleted_product_paths": 3
+  },
+  "cleanup": {
+    "temporary_dependency_links_absent": true,
+    "detached_head_exact": true,
+    "detached_clean": true
+  },
+  "artifacts": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_SECURITY.md",
+      "sha256": "d23f6d163dc71ff97f05e846ca1a2706f3ca9203b80eacaa050206e167dd3c22",
+      "bytes": 7153
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_SECURITY.md",
+      "sha256": "f2cde760a8eca218a3dad5d287fba28e9a421e16ddfc3410068af68769cd5fd5",
+      "bytes": 3310
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY-direct-probe.log",
+      "sha256": "1fd47624aa2bcf08ba86ffc8b0d5794a94438f902b47b8912b08729a855e06ae",
+      "bytes": 4819
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY-focused.log",
+      "sha256": "52435e53c203bb47698f4c99301013c3fbb836fce00973c52e4fab7398e49154",
+      "bytes": 63117
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY-routes.log",
+      "sha256": "2a806a4ed8ac310c439630a730483eb8e813d31e5662ca2f7015de5cde396080",
+      "bytes": 23350
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY-routes-retry.log",
+      "sha256": "4e41ab9d4787e2d6d64058245183bba35f5b32a15363f818b62b22e67fad28ef",
+      "bytes": 28940
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY-runtime-role.log",
+      "sha256": "17a43a4efd43cea39295871ab7e9a602ed5e230f5e56735c0d045d06fe54bf5c",
+      "bytes": 481
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY-runtime-role-retry.log",
+      "sha256": "f2a2532320575c4e4b8608492f1b7e8602794a3ca55b070f69ce36d6e3cf4807",
+      "bytes": 5433
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY-custody-post.log",
+      "sha256": "97863994a22938b86a85970b34b6d2d5511f81c5e57be4467c2e8e537c655eb9",
+      "bytes": 809
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY/security-probe.mts",
+      "sha256": "650fb867f1cde04d3c145da7c1c77660d92aff3a1c096763dc42f47be781a1a8",
+      "bytes": 6589
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY/runtime-role-probe.mts",
+      "sha256": "6756fac1ffd400e84e7b007131272b15a4a2a23c6fd862d866e40f4da21c2ede",
+      "bytes": 2370
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY/verify-custody.mjs",
+      "sha256": "4e6b0ab5a229822533b0803a0fff5c933003e6231f06b36f088c8d143a7cbcde",
+      "bytes": 1877
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SECURITY-inputs.json",
+      "sha256": "9f22848d3ff24ad14f07221ced881c60a674e7e20a89027accda881e4488702f",
+      "bytes": 45216
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE-manifest.json",
+      "sha256": "3dcbc504efdbc125952335d2b833acc2217e1f04142ac7e3f79d69f062b6f360",
+      "bytes": 73061
+    }
+  ],
+  "limits": [
+    "finite transformed synthetic controls; no complete language-class proof",
+    "no real Support, model, browser, account, recovery, network, or private production-data traffic",
+    "runtime-role proof is an isolated migrated PostgreSQL fixture, not production deployment attestation",
+    "owner-confirmed Forgot-password destination remains separately unresolved and actionless"
+  ]
+}

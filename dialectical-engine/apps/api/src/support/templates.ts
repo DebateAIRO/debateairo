@@ -10,7 +10,6 @@ export const SUPPORT_TEMPLATE_IDS = Object.freeze([
   "DISCLOSURE", "NO_SOURCE", "REFUSE_ZONE", "REFUSE_INJECTION", "REFUSE_SAFETY",
   "DEGRADED", "DISABLED", "RATE_LIMITED", "RATING", "CASE_OPENED_MINIMAL", "CASE_OPENED",
   "HUMAN_LABEL", "NOT_FOUND", "CLOSED_LABEL", "SUMMARY_LABEL", "SOURCE_LINE",
-  "CONSENT_TOGGLE", "CONSENT_NEEDED", "ANON_CONTEXT", "REFUSE_OTHER_USER", "STATE_SOURCE",
   "INCIDENT_ACTIVE", "NO_INCIDENT", "INCIDENT_NOTICE", "QUEUED"
 ] as const);
 
@@ -106,26 +105,6 @@ export const SUPPORT_TEMPLATES: Readonly<Record<SupportTemplateId, Readonly<Reco
     SOURCE_LINE: Object.freeze({
       en: "Source: {title} ({id})",
       ro: "Sursă: {title} ({id})"
-    }),
-    CONSENT_TOGGLE: Object.freeze({
-      en: "Let the assistant see the status of my debates for this conversation (never their content).",
-      ro: "Permite asistentului să vadă starea dezbaterilor mele în această conversație (niciodată conținutul lor)."
-    }),
-    CONSENT_NEEDED: Object.freeze({
-      en: "I can look at your debates' status only if you switch on the consent toggle above.",
-      ro: "Pot vedea starea dezbaterilor tale doar dacă activezi comutatorul de consimțământ de mai sus."
-    }),
-    ANON_CONTEXT: Object.freeze({
-      en: "Sign in first, then switch on the consent toggle, and I can look at your debates' status.",
-      ro: "Autentifică-te mai întâi, apoi activează comutatorul de consimțământ, și pot vedea starea dezbaterilor tale."
-    }),
-    REFUSE_OTHER_USER: Object.freeze({
-      en: "I can only talk about your own debates, in your own signed-in session.",
-      ro: "Pot vorbi doar despre dezbaterile tale, în sesiunea ta autentificată."
-    }),
-    STATE_SOURCE: Object.freeze({
-      en: "Source: your debate {run_id_short} (status read at {time})",
-      ro: "Sursă: dezbaterea ta {run_id_short} (stare citită la {time})"
     }),
     INCIDENT_ACTIVE: Object.freeze({
       en: "Known incident since {started_at}: {summary_en} (published by the team). If your problem matches, no need to report it; otherwise choose 'Talk to a human'.",

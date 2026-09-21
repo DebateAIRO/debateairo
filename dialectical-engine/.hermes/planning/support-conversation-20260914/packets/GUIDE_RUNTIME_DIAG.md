@@ -1,0 +1,26 @@
+# PACKET GUIDE_RUNTIME_DIAG — bounded actual guide failure diagnosis
+
+Read FIRST this packet then /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md. Resume original Sol /root/requirements; assigned ticket/comments before claim. Retain actual BODY skills and systematic-debugging/receiving-code-review. No subdelegation.
+
+## 1. Node
+- seat: GUIDE_RUNTIME_DIAG; ticket: t_adf8b571; model: gpt-5.6-sol; rework rounds: max 3 under owner continuation.
+- cwd: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine; exact clean product: f3be0af81f1691db6c23494f9e286bb6b10f13bf.
+- inputs: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME_DIAG-inputs.json and indexed sealed LIVE3 failure, exact compiled product inventory and current authored/reviewed contracts; immediate capture observation assertion and product request/answer/context/policy consumers read-only. No whole-app audit.
+- self-report: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_RUNTIME_DIAG.md (new).
+
+## 2. Contract
+- allowed: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME_DIAG.md (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME_DIAG-receipt.json (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_RUNTIME_DIAG.md (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_RUNTIME_DIAG- (new, light static custody only).
+- forbidden: product/source/KB/Git/harness/adapter edits; test/probe/build/install execution until a precise bounded command is approved and a heavy lease granted; browser/runtime/status/capacity/HTTP/DB/Support/model/provider activity; private records/credentials/raw rejected drafts; limit/counter changes; owner questions or readiness.
+- verification: static bounded diagnosis initially, no heavy or Git. Use sealed evidence; do not inspect an ongoing private log or create a new runtime sample. Distinguish reproducible offline proof from actual-model evidence.
+
+## 3. Work
+Investigate the first genuine actual LIVE3 failure, after exact-product all54 preflight PASS: execution3/canonical7 home-library, full RO, expected MODEL/ALLOW_CLOSED, stopped with GUIDE_HARNESS_MODEL_RESULT_INVALID. Two earlier rows completed with accepted drafts and API-DOM equality; sendMessage3, forbidden endpoints0, no retry. Start from the exact sealed failed prompt and whatever final public API response, HTTP status, safe diagnostic attribution and branch/origin evidence were actually retained. Explicitly list unavailable evidence. Never infer a safety refusal, model error, API failure or root cause from the generic assertion code alone.
+
+Trace that assertion's possible predicates to the immediate actual request/response contracts, and compare only relevant f3 classifier/context/source/response-validator behavior. Determine whether evidence establishes a product defect, incorrect test expectation, execution/environment defect, or insufficient retained failure observation. Cite exact paths/lines and evidence. Do not weaken tests or propose speculative product changes to obtain a pass. If an existing recorded response permits a meaningful bounded offline discriminator, send the exact command and needed NEW probe path scope to root before executing; no heavy lease at dispatch.
+
+Return the minimum justified next step. For a proven defect, give exact source-to-decision cause and bounded implementation/test scope. If failure details were lost, identify the exact capture boundary that discarded them and the minimum privacy-preserving recording needed BEFORE response assertions, with discriminating offline controls; retain only final user-visible public response and fixed diagnostics, never raw rejected model drafts, capabilities, credentials or private data. No new Support/model call is authorized here and no favorable resampling. Existing fixed actual receipt/screens now exist and must remain immutable; any future capture requires a NEW separately reviewed output namespace. Preserve prior finite correctness/security evidence while keeping actual model usefulness unverified beyond the two completed rows. Existing Forgot connector and CP2 remain gated.
+
+## 4. Handoff
+Self-report question verbatim:
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
+Return SKILLS LOADED, ticket/session/revision/verdict, proved facts vs missing evidence, exact diagnosis/minimal next scope and retained protections. Receipt node/ticket/revision/verdict/artifacts absolute/sha256/bytes excluding itself. No implementation, self-close or checkpoint claim.

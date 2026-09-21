@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX22",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "result": "PASS",
+  "controls": 13,
+  "passed": 13,
+  "names": [
+    "contract final revision and KB exact",
+    "gate template exact16 and hash bound",
+    "bound receipt membership accepts current final inputs",
+    "seven phases are literal absolute commands",
+    "row proof literal node import tsx argv exact",
+    "capture literal node import tsx argv exact",
+    "UI preflight precedes capacity and binds reviewed controller",
+    "UI preflight aborts every Support API and proves zero forwarded",
+    "Runtime7 custody path and exact11-key schema are finite",
+    "fresh31 actual sequence has31 unique members",
+    "capture uses GUIDE21 outputs and current screenshot successor",
+    "all operation scripts parse",
+    "all operational outputs remain absent before runtime"
+  ],
+  "commandContractSha256": "571bb52477c1ff0826b364109ef61666b69e00e0bde8aba1ae926bebb8ffef98",
+  "gateTemplateSha256": "ab39b37221e7fa8f913864597688642b89b75a53c6cc742e95e6253ca0866650",
+  "operationalTraffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "support": 0,
+    "model": 0,
+    "capacity": 0,
+    "database": 0
+  }
+}

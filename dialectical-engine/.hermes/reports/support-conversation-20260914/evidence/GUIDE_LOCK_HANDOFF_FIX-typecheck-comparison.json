@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LOCK_HANDOFF_FIX",
+  "ticket": "t_532dbedf",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "command": [
+    "pnpm",
+    "typecheck"
+  ],
+  "exitCode": 1,
+  "diagnostics": 76,
+  "log": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX-typecheck.log",
+    "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "bytes": 39611
+  },
+  "acceptedBaseline": {
+    "diagnostics": 76,
+    "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "source": "indexed ATTEST_P2-typecheck-final2.log"
+  },
+  "byteIdentical": true,
+  "introducedDiagnostics": 0
+}

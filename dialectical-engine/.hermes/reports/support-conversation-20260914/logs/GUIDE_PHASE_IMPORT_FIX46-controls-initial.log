@@ -1,0 +1,18 @@
+{
+  "verdict": "FAILED_CONTROL_EXPECTATION_ONLY",
+  "status": 1,
+  "failedControl": "phase.preflight expected boundary",
+  "observedCode": "ERR_INVALID_ARG_TYPE",
+  "cause": "The first control used an omitted contract argument; the retained preflight reads the argument directly instead of calling the reviewed helper first.",
+  "correction": "Use one absolute nonexistent control-contract path for all seven phase entrypoints and require ENOENT after successful module linking.",
+  "traffic": {
+    "runtime": false,
+    "browser": false,
+    "http": false,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

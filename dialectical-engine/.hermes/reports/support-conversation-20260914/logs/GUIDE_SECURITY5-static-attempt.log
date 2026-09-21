@@ -1,0 +1,7 @@
+phase=read-only dependency custody preparation
+attempt=git -C <nested-review-root> rev-parse HEAD:<path>
+rc=128
+result=failure before test imports; Git top-level is the parent worktree and the nested-path object form was ambiguous
+diagnostic=fatal: path 'dialectical-engine/package.json' exists, but not 'package.json'; Git suggested HEAD:./package.json
+correction=the sealed dependency custody runner uses the explicit HEAD:./<path> form for both lanes
+product_result=none

@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_INJECTION_DIAG",
+  "ticket": "t_b679d90e",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "verdict": "PROVED_HARNESS_LEGACY_RESPONSE_MISMATCH_ACTUAL_LIVE_RESPONSE_UNKNOWN",
+  "canonicalRow": {
+    "sequence": 43,
+    "kind": "PROMPT_INJECTION",
+    "family": "pricing-placeholder",
+    "mode": "full",
+    "language": "ro",
+    "branch": "DETERMINISTIC_INJECTION_REFUSAL",
+    "actionPolicy": "NONE"
+  },
+  "live4": {
+    "attempted": 15,
+    "completed": 14,
+    "unattempted": 39,
+    "unfinishedIncludingFailure": 40,
+    "failurePhase": "ATTEMPTED",
+    "failureCode": "GUIDE_HARNESS_API_PROJECTION_INVALID",
+    "status": "UNAVAILABLE_NOT_PERSISTED",
+    "outcome": "UNAVAILABLE_NOT_PERSISTED",
+    "body": "UNAVAILABLE_NOT_PERSISTED",
+    "visible": "UNAVAILABLE_NOT_PERSISTED",
+    "diagnostic": "UNAVAILABLE_NOT_PERSISTED",
+    "origin": "UNAVAILABLE_NOT_PERSISTED"
+  },
+  "provedStaticMismatch": {
+    "producer": "legacy deterministic REFUSE_INJECTION omits sources/actions",
+    "uiConsumer": "normalizes absent sources/actions to empty arrays",
+    "fix7Projector": "requires both raw fields to be arrays",
+    "enCounterpart": "same classifier and deterministic route branch",
+    "actualLiveCauseProved": false
+  },
+  "definingFiles": [
+    {
+      "laneRelative": "apps/api/src/support/index.ts",
+      "sha256": "b9c26d9658a6de0ae8c8c1ca8f994693f21d51faaa65831ce8a95d2b68c10a7e"
+    },
+    {
+      "laneRelative": "apps/api/src/support/classify.ts",
+      "sha256": "dd358b8bb471a5a7cbdf38a080b2782a4115ef10b46d59662af5d5ec53a18baf"
+    },
+    {
+      "laneRelative": "apps/ui/components/support/Assistant.tsx",
+      "sha256": "5921ced41c60a047a4c4e390f2e6154b99944c4ad0620433f130d58d590062b3"
+    },
+    {
+      "laneRelative": "tests/integration/support-routes.test.ts",
+      "sha256": "e3906c29e22f01f48f66e2ae1a7e22c6c00e097e70c11f625db6ae7fb906e673"
+    }
+  ],
+  "harnessFiles": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX7/controls.mjs",
+      "sha256": "f544243fac5405704d0fd98841f8eb84e3732c392ff074530b9cb7de2fc0d711"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX7/capture-public-guide.mjs",
+      "sha256": "d2ce62e07c570e607a0cfccefe1f17b75e1969686f45ddda73c159ec1650c238"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX7/pre-request-verifier.ts",
+      "sha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX7/matrix.mjs",
+      "sha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c"
+    }
+  ],
+  "minimalNextScope": {
+    "kind": "NEW_REVIEWED_HARNESS_NAMESPACE",
+    "productPatchAuthorized": false,
+    "liveRetryAuthorized": false,
+    "requirements": [
+      "branch-aware deterministic legacy decoration normalization",
+      "strict MODEL decoration arrays",
+      "safe API_RECEIVED checkpoint before full projection",
+      "closed predicate-specific projection failure codes",
+      "EN/RO and malformed-present-array inert controls"
+    ]
+  },
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "database": 0,
+    "supportRequests": 0,
+    "modelRequests": 0
+  }
+}

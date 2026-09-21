@@ -1,0 +1,12 @@
+import { closeSync,openSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+const productRoot='/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine';
+const reportRoot='/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914';
+const logPath=`${reportRoot}/logs/GUIDE_RUNTIME8-stack.log`;
+const fd=openSync(logPath,'wx',0o600);
+const child=spawn('/Users/vladmihaimiron/.local/bin/pnpm',['dev:auth:up'],{cwd:productRoot,detached:true,env:{...process.env,DEBATEAI_DEV_AUTH_STACK_PROFILE:'support-preview'},stdio:['ignore',fd,fd]});
+child.unref();closeSync(fd);
+const result={schemaVersion:1,node:'GUIDE_RUNTIME8',revision:'0d34f82f4a2188d0ce1db04655b693798ffd2169',pid:child.pid,pgid:child.pid,commandMarker:'pnpm dev:auth:up',cwd:productRoot,runtimeLogPath:logPath,profile:'support-preview',startedAtUtc:new Date().toISOString(),detached:true};
+await writeFile(`${reportRoot}/evidence/GUIDE_PREVIEW_BIND32-runtime-start.json`,`${JSON.stringify(result,null,2)}\n`,{flag:'wx',mode:0o600});
+console.log(JSON.stringify({pid:child.pid,startedAtUtc:result.startedAtUtc}));

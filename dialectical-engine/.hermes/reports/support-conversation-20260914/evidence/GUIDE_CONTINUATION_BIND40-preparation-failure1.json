@@ -1,0 +1,14 @@
+{
+  "at": "2026-09-21T10:19:45.123400+00:00",
+  "node": "GUIDE_CONTINUATION_BIND40",
+  "stage": "packet-check before freeze/dispatch",
+  "attempts": 2,
+  "errors": [
+    "prose slash lists parsed as /private/capacity/DB/model and /private/external",
+    "first prose correction omitted the status-prefixed instance"
+  ],
+  "correction": "comma-delimited prose; no scope change",
+  "productUnchanged": true,
+  "operationalTraffic": 0,
+  "ticketReused": "t_2cf4e326"
+}

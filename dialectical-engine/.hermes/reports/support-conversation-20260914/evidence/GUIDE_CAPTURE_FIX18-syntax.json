@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_FIX18",
+  "result": "PASS",
+  "scope": "LIGHTWEIGHT_SYNTAX_AND_JSON_PARSE_ONLY",
+  "mjsFiles": [
+    "binding-contract.mjs",
+    "capture-public-guide.mjs",
+    "command-contract.mjs",
+    "materialize-final-gate.mjs",
+    "materialize-runtime-capacity.mjs",
+    "screenshot-evidence.mjs",
+    "verify-prepared-controls.mjs"
+  ],
+  "jsonFiles": [
+    "screenshot-fixtures.json",
+    "final-binding-template.json",
+    "command-contract-template.json",
+    "GUIDE_CAPTURE_FIX18-next-binding-inputs.json"
+  ],
+  "controlsExecuted": 0,
+  "runtimeTraffic": 0
+}

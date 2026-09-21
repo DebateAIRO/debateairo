@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_REVIEW27",
+  "ticket": "t_da0aba1b",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "REWORK_BOUNDED_OPERATOR_ABSENCE_SET",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_OPERATOR_REVIEW27.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_OPERATOR_REVIEW27.md",
+      "sha256": "63f10150eaaae2e30125b4dc817da8870ea8d9aa9dd9670a62cef0842811a03b",
+      "bytes": 5416
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_REVIEW27-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_REVIEW27-dispositions.json",
+      "sha256": "65a9950b6cc4f555f56f16a6a42a153b55a86b328ee9c01506722e4f4bfd0914",
+      "bytes": 3882
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_REVIEW27-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_REVIEW27-custody.json",
+      "sha256": "44c233c5129cf396eeb64f120c924a9112e93badf52bae10ff80458e6772c99d",
+      "bytes": 1664
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_OPERATOR_REVIEW27.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_OPERATOR_REVIEW27.md",
+      "sha256": "b2dbc600a7b4152c248224562a7700f44ad11bf42e374a4e13852be4d2d54d91",
+      "bytes": 2856
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "heavyLeaseHeld": false,
+  "finding": "Actual operator omits rowProof.result and GUIDE_LIVE25-owner-testability.json from its invocation-time future-path absence set.",
+  "retained": [
+    "Exact node --import tsx operator invocation and distinct log ownership pass.",
+    "Real preflight wrapper sentinel, numeric nonzero stop-first and log-collision controls pass.",
+    "FIX27 command contract remains exact and seven-phase self-bound."
+  ]
+}

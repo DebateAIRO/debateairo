@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_UI_WRITER_FIX45",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS",
+  "controls": 11,
+  "passed": 11,
+  "names": [
+    "mechanical command digest",
+    "actual compiled UI writer through real lifecycle consumer",
+    "all preflight writer routes bind0600",
+    "seven self paths",
+    "fresh LIVE34 and retained GUIDE24",
+    "retained owner paths",
+    "115 future paths absent",
+    "operator binding",
+    "current digest accepted",
+    "stale digest rejected",
+    "proof serialized"
+  ],
+  "traffic": {
+    "publicLocalAssets": true,
+    "forwardedDynamic": 0,
+    "support": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "model": 0
+  }
+}

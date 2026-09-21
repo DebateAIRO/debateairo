@@ -217,6 +217,19 @@ export type PublicationKeyCleanupClaim = Readonly<{
   claimToken: string;
 }>;
 
+export type AutoPublishReason =
+  | "AUTO_PUBLISH_NULL_PSEUDONYM"
+  | "AUTO_PUBLISH_CIPHER_FAILED"
+  | "AUTO_PUBLISH_TRANSITION_NULL"
+  | "AUTO_PUBLISH_KEY_PROVISION_FAILED";
+
+export type AutoPublishWork = Readonly<{
+  runId: string;
+  userId: string;
+  ownerRef: string;
+  reason: AutoPublishReason;
+}>;
+
 type PublicationAction = "PUBLISH" | "UNPUBLISH";
 
 type PublicationEventRefs = Readonly<{
@@ -415,6 +428,143 @@ export class PostgresPublicationRepository {
     return result.rows[0]?.pseudonym ?? null;
   }
 
+  async prepareSystemKeyProvision(input: Readonly<{
+    publicationRef: string;
+    runId: string;
+    userId: string;
+    ownerRef: string;
+  }>): Promise<boolean> {
+    const result = await this.pool.query<{ prepared: boolean }>(`
+      SELECT serve.prepare_system_publication_key_provision($1,$2,$3,$4) AS prepared
+    `, [input.publicationRef,input.runId,input.userId,input.ownerRef]);
+    return result.rows[0]?.prepared === true;
+  }
+
+  async abandonSystemKeyProvision(publicationRef: string,userId: string): Promise<boolean> {
+    const result = await this.pool.query<{ abandoned: boolean }>(`
+      SELECT serve.abandon_system_publication_key_provision($1,$2) AS abandoned
+    `, [publicationRef,userId]);
+    return result.rows[0]?.abandoned === true;
+  }
+
+  async claimSystemKeyProvisionCleanup(
+    limit = 100
+  ): Promise<readonly PublicationKeyProvisionCleanup[]> {
+    const result = await this.pool.query<{
+      publication_ref: string;
+      run_id: string;
+      user_id: string;
+      owner_ref: string;
+      claim_token: string;
+    }>("SELECT * FROM serve.claim_system_publication_key_provision_cleanup($1)", [limit]);
+    return Object.freeze(result.rows.map((row) => Object.freeze({
+      publicationRef: row.publication_ref,
+      runId: row.run_id,
+      userId: row.user_id,
+      ownerRef: row.owner_ref,
+      claimToken: row.claim_token
+    })));
+  }
+
+  async completeSystemKeyProvisionCleanup(
+    publicationRef: string,claimToken: string
+  ): Promise<boolean> {
+    const result = await this.pool.query<{ completed: boolean }>(`
+      SELECT serve.complete_system_publication_key_provision_cleanup($1,$2) AS completed
+    `, [publicationRef,claimToken]);
+    return result.rows[0]?.completed === true;
+  }
+
+  async systemPublish(input: Readonly<{
+    eventId: string;
+    runId: string;
+    userId: string;
+    ownerRef: string;
+    publicationRef: string;
+    expectedPseudonym: string;
+    contentCiphertext: CryptoEnvelope;
+    occurredAt: Date;
+    auditId: string;
+    deniedAuditId: string;
+  }>): Promise<string | null> {
+    const result = await this.pool.query<{ publication_ref: string | null }>(`
+      SELECT core.transition_system_run_publication(
+        $1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10
+      ) AS publication_ref
+    `, [
+      input.eventId,input.runId,input.userId,input.ownerRef,input.publicationRef,
+      input.expectedPseudonym,JSON.stringify(input.contentCiphertext),input.occurredAt,
+      input.auditId,input.deniedAuditId
+    ]);
+    return result.rows[0]?.publication_ref ?? null;
+  }
+
+  async auditSystemPublicationAttempt(
+    auditId: string,
+    runId: string,
+    reason: AutoPublishReason,
+    occurredAt: Date,
+    decision: "DENY"
+  ): Promise<boolean> {
+    const result = await this.pool.query<{ appended: boolean }>(`
+      SELECT identity.audit_system_publication_attempt($1,$2,$3,$4,$5) AS appended
+    `, [auditId,runId,reason,occurredAt,decision]);
+    return result.rows[0]?.appended === true;
+  }
+
+  async upsertAutoPublishWork(
+    runId: string,userId: string,ownerRef: string,reason: AutoPublishReason
+  ): Promise<boolean> {
+    const result = await this.pool.query<{ upserted: boolean }>(`
+      SELECT core.upsert_free_public_auto_publish_work($1,$2,$3,$4) AS upserted
+    `, [runId,userId,ownerRef,reason]);
+    return result.rows[0]?.upserted === true;
+  }
+
+  async ensureAutoPublishWork(runId: string,userId: string,ownerRef: string): Promise<boolean> {
+    const result = await this.pool.query<{ ensured: boolean }>(`
+      SELECT core.ensure_free_public_auto_publish_work($1,$2,$3) AS ensured
+    `, [runId,userId,ownerRef]);
+    return result.rows[0]?.ensured === true;
+  }
+
+  async clearAutoPublishWork(runId: string): Promise<boolean> {
+    const result = await this.pool.query<{ cleared: boolean }>(`
+      SELECT core.clear_free_public_auto_publish_work($1) AS cleared
+    `, [runId]);
+    return result.rows[0]?.cleared === true;
+  }
+
+  async claimAutoPublishWork(limit = 100): Promise<readonly AutoPublishWork[]> {
+    const result = await this.pool.query<{
+      run_id: string;
+      user_id: string;
+      owner_ref: string;
+      reason: AutoPublishReason;
+    }>("SELECT * FROM core.claim_free_public_auto_publish_work($1)", [limit]);
+    return Object.freeze(result.rows.map((row) => Object.freeze({
+      runId: row.run_id,
+      userId: row.user_id,
+      ownerRef: row.owner_ref,
+      reason: row.reason
+    })));
+  }
+
+  async countAutoPublishWork(runId: string): Promise<number> {
+    const result = await this.pool.query<{ count: string }>(`
+      SELECT count(*)::text AS count FROM core.free_public_auto_publish_work
+      WHERE run_id=$1 AND cleared_at IS NULL
+    `, [runId]);
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
+  async runIsFreePublicBound(runId: string): Promise<boolean> {
+    const result = await this.pool.query<{ bound: boolean }>(`
+      SELECT core.run_is_free_public_bound($1) AS bound
+    `, [runId]);
+    return result.rows[0]?.bound === true;
+  }
+
   async readOwnedVisibility(
     runId: string,
     userId: string,
@@ -422,13 +572,20 @@ export class PostgresPublicationRepository {
   ): Promise<Readonly<{
     state: "PRIVATE" | "PUBLISHED";
     publicRef: string | null;
+    publishPending?: true;
   }> | null> {
     const result = await this.pool.query<{
       state: "PRIVATE" | "PUBLISHED";
       publication_ref: string | null;
+      publish_pending: boolean;
     }>(`
       SELECT COALESCE(latest.state,'PRIVATE') AS state,
-        CASE WHEN latest.state='PUBLISHED' THEN latest.publication_ref ELSE NULL END AS publication_ref
+        CASE WHEN latest.state='PUBLISHED' THEN latest.publication_ref ELSE NULL END AS publication_ref,
+        EXISTS (
+          SELECT 1 FROM core.free_public_auto_publish_work AS work
+          WHERE work.run_id=run.run_id AND work.cleared_at IS NULL
+            AND latest.state IS DISTINCT FROM 'PUBLISHED'
+        ) AS publish_pending
       FROM core.run AS run
       JOIN identity."user" AS identity_user
         ON identity_user.user_id=$2 AND identity_user.owner_ref=$3
@@ -442,10 +599,11 @@ export class PostgresPublicationRepository {
       WHERE run.run_id=$1 AND core.run_is_owned_by(run.run_id,$3,NULL)
     `, [runId, userId, ownerRef]);
     const row = result.rows[0];
-    return row === undefined ? null : Object.freeze({
-      state: row.state,
-      publicRef: row.publication_ref
-    });
+    if (row === undefined) return null;
+    const visibility = { state: row.state, publicRef: row.publication_ref };
+    return Object.freeze(row.publish_pending
+      ? { ...visibility, publishPending: true as const }
+      : visibility);
   }
 
   async publish(input: PublishTransitionInput): Promise<boolean> {

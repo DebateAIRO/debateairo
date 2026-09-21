@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW9",
+  "ticket": "t_6ffde39b",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "freezeCommit": "714f0b82ad442564620dcebb6c240b6ad0c494f9",
+  "inputCustody": {
+    "count": 99,
+    "mismatches": []
+  },
+  "productCheckout": {
+    "headObserved": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+    "cleanObserved": true
+  },
+  "orderedEight": {
+    "harnessSha256": "acc2c2cdf503f185ce8a43fcc6b262d144314708085a80e79ac262d99fed6fbc",
+    "matchesAuthor": true,
+    "files": [
+      {
+        "path": "capture-public-guide.mjs",
+        "bytes": 18422,
+        "sha256": "e962db1875e6595eb2db67d51f2245c9a4928cee04c0c498cd2455460c0a48ce"
+      },
+      {
+        "path": "controls.mjs",
+        "bytes": 27827,
+        "sha256": "5b04015e7a0eb380471b0cc6be4453acceee9ba03b2b2994b300ba350aeccc93"
+      },
+      {
+        "path": "matrix.mjs",
+        "bytes": 14253,
+        "sha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c"
+      },
+      {
+        "path": "pre-request-verifier.ts",
+        "bytes": 16486,
+        "sha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733"
+      },
+      {
+        "path": "runtime-capacity.mjs",
+        "bytes": 9935,
+        "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87"
+      },
+      {
+        "path": "session-lifecycle.mjs",
+        "bytes": 4254,
+        "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b"
+      },
+      {
+        "path": "verify-final-branches.ts",
+        "bytes": 5131,
+        "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a"
+      },
+      {
+        "path": "verify-guide-harness.mjs",
+        "bytes": 64135,
+        "sha256": "5df50203619f569c08e4170485a0c566b917882c5b654d6a6282f7cdbc921a4d"
+      }
+    ]
+  },
+  "controlProof": {
+    "schemaVersion": 2,
+    "result": "PASS",
+    "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+    "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+    "harnessSha256": "acc2c2cdf503f185ce8a43fcc6b262d144314708085a80e79ac262d99fed6fbc",
+    "controls": 112,
+    "passed": 112,
+    "uniqueNames": 112,
+    "priorNames": 111,
+    "allPriorNamesRetained": true,
+    "addedNames": [
+      "actual response-read boundary retains parse failure as a non-object sentinel"
+    ]
+  },
+  "preserved": {
+    "matrixSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+    "preRequestVerifierSha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733"
+  },
+  "futureOutputAbsence": {
+    "schemaVersion": 1,
+    "node": "GUIDE_HARNESS_FIX9",
+    "checked": 56,
+    "present": [],
+    "futureReceipt": "GUIDE_LIVE_GUIDE9-actual-receipt.json",
+    "futureScreenshots": 54,
+    "browserProfile": "ABSENT",
+    "captureExecuted": false
+  },
+  "findingDisposition": {
+    "id": "GH8-R1",
+    "status": "RESOLVED",
+    "helperLocation": "GUIDE_HARNESS_FIX9/controls.mjs:260-265",
+    "captureCallLocation": "GUIDE_HARNESS_FIX9/capture-public-guide.mjs:238-242",
+    "controlLocation": "GUIDE_HARNESS_FIX9/verify-guide-harness.mjs:684-708",
+    "parseFailureBody": null,
+    "statusRetained": 502,
+    "lastSafePhase": "API_RECEIVED",
+    "failureCode": "GUIDE_HARNESS_API_BODY_INVALID",
+    "rawOrExceptionLeak": false,
+    "validBodyPassThrough": true
+  },
+  "execution": {
+    "staticOnly": true,
+    "tests": false,
+    "probes": false,
+    "browser": false,
+    "runtime": false,
+    "http": false,
+    "database": false,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "gitWrites": false,
+    "heavyLease": false
+  }
+}

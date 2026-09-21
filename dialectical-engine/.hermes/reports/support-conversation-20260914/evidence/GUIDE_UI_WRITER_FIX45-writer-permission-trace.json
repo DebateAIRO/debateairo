@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_UI_WRITER_FIX45",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "actualControl": {
+    "output": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_WRITER_FIX45-actual-ui-control.json",
+      "sha256": "a2ebfc5c16e8575f6b463517900cff8933b78f421365093f77ebce2219610594",
+      "bytes": 1071
+    },
+    "mode": "0o600",
+    "ownerUid": 501,
+    "nlink": 1
+  },
+  "writers": {
+    "prerequisite": {
+      "source": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_UI_WRITER_FIX45/artifact-lifecycle.mjs",
+      "flag": "wx",
+      "mode": "0600"
+    },
+    "uiLog": {
+      "source": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_UI_WRITER_FIX45/phase-preflight.mjs",
+      "flag": "wx",
+      "mode": "0600"
+    },
+    "uiOutput": {
+      "source": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_UI_WRITER_FIX45/proof-writer.mjs",
+      "flag": "wx",
+      "mode": "0600"
+    },
+    "phaseOutput": {
+      "source": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_UI_WRITER_FIX45/phase-preflight.mjs",
+      "flag": "wx",
+      "mode": "0600"
+    },
+    "operatorLog": {
+      "source": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_UI_WRITER_FIX45/run-operator.mjs",
+      "flag": "wx",
+      "mode": "0600"
+    },
+    "stop": {
+      "source": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_UI_WRITER_FIX45/run-operator.mjs",
+      "flag": "wx",
+      "mode": "0600"
+    }
+  }
+}

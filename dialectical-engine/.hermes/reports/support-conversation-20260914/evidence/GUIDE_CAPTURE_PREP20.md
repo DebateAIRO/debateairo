@@ -1,0 +1,15 @@
+# GUIDE_CAPTURE_PREP20 — unbound capture preparation
+
+Verdict: `PREPARED_UNBOUND_CAPTURE`. Revision is intentionally `null`; preparation base is `0f4290c290fd38caa0ccfb3b6781fb8c33999a22`. The subsequently sealed product `456cafb9e56a737de550570b5736ec52d79ddf48` was not inspected or claimed by this disjoint node and must be bound by BIND20.
+
+The prepared capture uses the sealed canonical54 plus owner4 matrix and the independently approved fresh31 plan. It executes five groups, 31 fresh requests, 14 English and 17 Romanian rows, with a 27-model-call ceiling. No historical answer is retained. The first full-English row is followed by the planned full-Romanian language invalidation; each other group receives a deliberate supported session boundary. Request-local actions, API/DOM equality, fixed safe diagnostics, terminal injection placement, 31-second pacing, and Help pointer/keyboard activations remain in the shared capture path.
+
+The screenshot implementation is byte-identical to the PASS CONTROLS18 successor (`696dc176b7a6e1bbd6f5c8b5714bbf2519c7be7809af5fda8f45ca3f085a0b7c`). Each successful row produces original-pane top and footer evidence plus an explicitly labeled evidence-only expanded complete answer. The earlier zero-Support long-answer browser fixture is retained by hash and was not rerun.
+
+Seven absolute phase templates are complete: preflight, readiness, capacity, gate, full58 row proof, fresh31 capture, and idle custody. The future namespace is `GUIDE_LIVE20` with actual receipt/screenshots under `GUIDE_LIVE_GUIDE18`. Preflight checks absence of the receipt, browser profile, phase outputs/logs, and all 93 screenshot segments. Capacity uses one public status response and one counts-only frame, requires API `kb_version` to equal the bound KB, reserves 31 capture messages/five sessions plus six owner messages/two owner sessions, and does not persist the private database connection.
+
+All prior 151 control purposes are indexed without claiming execution. Seven obsolete retained15/fresh39 formulations are explicitly superseded by fixed31 equivalents. Fifteen MJS files, one TypeScript file, and four JSON files passed syntax validation. No behavioral control, full58 proof, browser, runtime, HTTP, status, capacity, database, Support, or model operation ran.
+
+Final BIND20 must replace every placeholder listed in `final-binding-substitutions.json`, materialize new resolved command and gate files, verify the corrected clean product and complete inventory/attestation/final34 suite, run full58 and finite composed controls, reload the supported owned preview so startup-loaded KB is current, and only then run the seven phases. The owner walkthrough must use exposed Help UI and a normal reload/supported session behavior; DevTools, storage deletion, and an invented reset control are excluded.
+
+No runtime readiness, live quality, manual capacity, acceptance, or CP1 completion is claimed. Forgot password remains unresolved and actionless; CP2 remains gated.

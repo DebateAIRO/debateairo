@@ -1,0 +1,33 @@
+{
+  "total": 52,
+  "included": 51,
+  "excluded": 1,
+  "duplicateIds": [],
+  "sourceFiles": 21,
+  "missingSourceFiles": [],
+  "actionModeConflicts": [
+    {
+      "id": "help-free-text",
+      "labelEn": "Support conversation",
+      "labelRo": "Conversație de asistență",
+      "articleId": "app-navigation",
+      "mode": "existing-ui-workflow",
+      "actionId": "help",
+      "href": "/help",
+      "surface": "help"
+    }
+  ],
+  "safeStaticNullHref": [
+    {
+      "id": "landing-start",
+      "labelEn": "Start a round",
+      "labelRo": "Pornește o rundă",
+      "articleId": "app-navigation",
+      "mode": "safe-static-action",
+      "actionId": "start-debate",
+      "href": null,
+      "constraint": "closed resolver returns /new when signed in and /login?next=%2Fnew when signed out",
+      "surface": "landing"
+    }
+  ]
+}

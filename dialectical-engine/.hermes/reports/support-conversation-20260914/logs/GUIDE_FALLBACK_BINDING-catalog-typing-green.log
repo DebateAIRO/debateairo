@@ -1,0 +1,17 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ ✓ tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > accounts for every current page pathname by name 2ms
+ ✓ tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > marks sensitive stateful pages as excluded from ordinary actions 0ms
+ ✓ tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > maps every capability article id to a complete bilingual pair 1ms
+ ✓ tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > keeps product identity public, actionless, and backed by one bilingual article 0ms
+ ✓ tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > maps the public-guide families to bilingual articles and only closed Settings actions 1ms
+ ✓ tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > binds every public guide label to reviewed content and a closed action 2ms
+ ✓ tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > declares the compound debate-library source contract from closed menu actions 0ms
+ ✓ tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > keeps the browser-safe catalog free of Node-only imports and exports it as a subpath 0ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  21:49:52
+   Duration  138ms (transform 30ms, setup 0ms, import 39ms, tests 8ms, environment 0ms)
+

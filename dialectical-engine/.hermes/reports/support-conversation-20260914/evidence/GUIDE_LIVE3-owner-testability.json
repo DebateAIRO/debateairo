@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE3",
+  "revision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "calculationBasis": {
+    "capacityMeasuredAtUtc": "2026-09-17T18:07:24.842Z",
+    "postCaptureCustodyObservedAtUtc": "2026-09-17T18:11:30.710Z",
+    "freshPostWaitMeasurement": false,
+    "preCapture": {
+      "maxAnonSessionEvents1hByIp": 0,
+      "maxAnonMessageEvents10mByIp": 0,
+      "maxAnonMessageEvents24hByIp": 10,
+      "callsToday": 9
+    },
+    "capture": {
+      "sessionsCreated": 2,
+      "messagesSent": 3,
+      "completedRows": 2,
+      "failedRequestSequence": 7,
+      "modelCallsConservativelyAssumed": 3,
+      "sessionEvidenceTimesUtc": [
+        "2026-09-17T18:08:42.465Z",
+        "2026-09-17T18:09:21.143Z"
+      ],
+      "conservativeSessionExpiryUtc": [
+        "2026-09-17T19:08:42.465Z",
+        "2026-09-17T19:09:21.143Z"
+      ]
+    },
+    "limits": {
+      "sessions1h": 5,
+      "messages10m": 20,
+      "messages24h": 100,
+      "messagesPerSession": 40,
+      "dailyCalls": 500
+    }
+  },
+  "manual": {
+    "requiredSessions": 2,
+    "totalMessages": 2,
+    "messagesByLanguage": {
+      "en": 1,
+      "ro": 1
+    },
+    "steps": [
+      {
+        "order": 1,
+        "surface": "full",
+        "language": "en",
+        "action": "Confirm Dialectical Engine identity, public-guide scope, topic menu, status and shortcut UI; submit canonical observed row 1 prompt.",
+        "prompt": "Pricing",
+        "canonicalSequence": 1
+      },
+      {
+        "order": 2,
+        "surface": "full",
+        "language": "ro",
+        "action": "Use the language selector, confirm a new Romanian conversation and translated menus; submit canonical observed row 2 prompt.",
+        "prompt": "Account",
+        "canonicalSequence": 2
+      },
+      {
+        "order": 3,
+        "surface": "full",
+        "language": "ro",
+        "action": "Inspect the Romanian welcome text for the recovery-operation limitation; do not submit credentials or a recovery request.",
+        "prompt": null,
+        "canonicalSequence": null
+      }
+    ]
+  },
+  "projection": {
+    "sessionsAfterManual": 4,
+    "freeSessionSlotsAfterManual": 1,
+    "messages10mAfterManual": 5,
+    "messages24hAfterManual": 15,
+    "dailyCallsAfterManualConservative": 14,
+    "notBeforeUtc": "2026-09-17T18:11:30.710Z",
+    "verdict": "CALCULATED_CAPACITY_AVAILABLE_WITHOUT_WAIT"
+  },
+  "limits": [
+    "This is a conservative calculation from the one pre-capture measurement and captured network/session evidence, not a fresh post-capture capacity read.",
+    "The capture failed at canonical sequence 7; this artifact does not claim full-guide behavior.",
+    "Forgot destination remains unresolved and no recovery action is submitted."
+  ]
+}

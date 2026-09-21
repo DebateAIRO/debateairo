@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_SESSION_TIMES_FIX41",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS",
+  "controls": 13,
+  "passed": 13,
+  "names": [
+    "successor command digest",
+    "all seven self paths",
+    "capture child corrected producer",
+    "producer source records through bounded helper",
+    "exact three public contract",
+    "actual producer composer controls retained",
+    "membership and budgets unchanged",
+    "retained public output paths",
+    "all future paths unique absent",
+    "operator metadata and ownership",
+    "current digest accepted before IO",
+    "stale digest rejected before IO",
+    "proof serialized"
+  ],
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

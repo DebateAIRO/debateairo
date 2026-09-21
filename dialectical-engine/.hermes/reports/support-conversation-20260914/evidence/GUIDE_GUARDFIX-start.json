@@ -1,0 +1,18 @@
+{
+  "node": "GUIDE_GUARDFIX",
+  "ticket": "t_a542b328",
+  "base": "c34c64d4e643e404cefe96dfaf167536ae364a94",
+  "writePaths": [
+    "apps/api/src/support/recovery-intent.ts",
+    "apps/api/src/support/public-guide-boundary.ts",
+    "tests/unit/support-recovery-intent.test.ts",
+    "tests/unit/support-public-guide-boundary.test.ts",
+    "tests/unit/support-classify.test.ts",
+    "tests/integration/support-routes.test.ts"
+  ],
+  "findings": [
+    "GS-1 reset-token/code subjects without password term",
+    "GS-2 comma-separated earlier negation suppresses later affirmative predicate",
+    "GS-3 explicit Support actor accepted as public account location"
+  ]
+}

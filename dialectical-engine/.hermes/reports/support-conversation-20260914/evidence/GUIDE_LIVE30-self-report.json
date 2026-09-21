@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE30",
+  "ticket": "t_67ade796",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "FAILED_CAPTURE_SCREENSHOT_FOOTER_UNREACHABLE_NO_RETRY",
+  "phases": {
+    "preflight": 0,
+    "readiness": 0,
+    "capacity": 0,
+    "gate": 0,
+    "rowProof": 0,
+    "capture": 1,
+    "idle": "NOT_RUN"
+  },
+  "capture": {
+    "consumedRowCount": 58,
+    "attemptedRowCount": 5,
+    "completedRowCount": 5,
+    "attemptedRows": [
+      1,
+      2,
+      15,
+      19,
+      23
+    ],
+    "createSessionCount": 2,
+    "sendMessageCount": 5,
+    "forbiddenAnswers": 0,
+    "forbiddenConsent": 0,
+    "sessionCreationTimesUtc": [
+      {
+        "ordinal": 1,
+        "observedAtUtc": "2026-09-21T08:50:35.959Z"
+      },
+      {
+        "ordinal": 2,
+        "observedAtUtc": "2026-09-21T08:51:07.590Z"
+      }
+    ],
+    "modelBranchRows": 5,
+    "providerCallCount": "UNAVAILABLE",
+    "modelCallCeiling": 27
+  },
+  "failure": {
+    "code": "GUIDE_CAPTURE_ORIGINAL_PANE_FOOTER_UNREACHABLE",
+    "stage": "POST_RESPONSE_SCREENSHOT_ORIGINAL_PANE_FOOTER",
+    "canonicalRow": {
+      "sequence": 23,
+      "kind": "GUIDE_FAMILY",
+      "family": "export",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "actionPolicy": "NONE",
+      "recoveryClass": null
+    },
+    "api": {
+      "status": 200,
+      "outcome": "ANSWER_GROUNDED",
+      "sources": [
+        {
+          "id": "export-json",
+          "label": "Exportă o dezbatere ca JSON"
+        },
+        {
+          "id": "guide-how-it-works",
+          "label": "Cum citești o dezbatere"
+        }
+      ],
+      "actions": []
+    },
+    "apiDomEquality": {
+      "text": true,
+      "sources": true,
+      "actions": true
+    },
+    "diagnostic": {
+      "status": "ACCEPTED_DRAFT",
+      "category": null,
+      "candidateCount": 0,
+      "validCount": 0,
+      "invalidCount": 0,
+      "duplicateCount": 0,
+      "unmatchedCount": 0
+    },
+    "proof": {
+      "branch": "MODEL"
+    },
+    "classification": "CAPTURE_INSTRUMENTATION_FAILURE_AFTER_ACCEPTED_APP_RESPONSE",
+    "productCause": "NOT_ESTABLISHED"
+  },
+  "futureTiming": {
+    "conservativeFiveSessionNotBeforeUtc": "2026-09-21T09:51:12.590Z",
+    "derivation": "second observed session creation + 1h + 5s; not a future capacity PASS",
+    "ownerWalkthroughCreated": false
+  },
+  "limitations": [
+    "ACTUAL31_INCOMPLETE",
+    "POST_FAILURE_CUSTODY_NOT_ESTABLISHED",
+    "PROVIDER_CALL_COUNT_UNAVAILABLE",
+    "OWNER_WALKTHROUGH_NOT_CREATED",
+    "FORGOT_UNRESOLVED",
+    "INDEPENDENT_DIAGNOSIS_REQUIRED"
+  ]
+}

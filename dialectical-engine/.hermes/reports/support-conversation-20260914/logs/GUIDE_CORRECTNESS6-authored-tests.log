@@ -1,0 +1,262 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-correctness/dialectical-engine
+
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > always includes the complete compact policy and capability catalog 5ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > meets the exact public answerable and unsupported case matrix from the immutable production corpus 121ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects newly reviewed knowledge lexically without a hard-coded intent list 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses only the selected language and preserves Romanian visitor text 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > adds article sections whole and skips a section that would cross the cap 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > caps selected sources and requested actions at three 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'product-identity' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'product-identity' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'home-library' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'home-library' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'new-debate' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'new-debate' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'owner-debate' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'owner-debate' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'public-debate' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'public-debate' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'help-desk' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'help-desk' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-in' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-in' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-up' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-up' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'settings' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'settings' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'verify-email' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'verify-email' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'enroll-mfa' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'enroll-mfa' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'operator-workers' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'operator-workers' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > states the exact bounded source and action sets in the final output contract 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > matches ordinary inflected creation language in en 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > matches ordinary inflected creation language in ro 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > advertises only action ids resolved by the trusted caller before generation 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > projects only request-local references and human labels to the model 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses the admitted projection and never exposes the raw title or article body 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is Dialectical Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is DialecticalEngine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview What is Debate AIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for en overview Why can't Support answer questions about Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview Ce este Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview Ce este Dialectical Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview Ce este DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects only reviewed product identity for ro overview De ce nu poate asistentul răspunde la întrebări despre Dialectical Engine? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in en without inventing controls: Where can I browse the public debate library? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in ro without inventing controls: Unde găsesc biblioteca de dezbateri publice? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in en without inventing controls: What do Thread, Split, Tree and Map show? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in ro without inventing controls: Ce arată Fir, Împărțit, Arbore și Hartă? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in en without inventing controls: Where are Active sessions in Settings? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in ro without inventing controls: Unde sunt Sesiuni active în Setări? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in en without inventing controls: What does the Support service status report? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > grounds a public menu family in ro without inventing controls: Ce raportează starea serviciului de asistență? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Pricing 35ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Cum funcționează secțiunea Prețuri? 36ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Where can I find Account and Settings? 37ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Account 37ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Where can I read the Method section? 33ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Unde pot citi secțiunea Transcrieri? 33ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Where do I find my debates and the public debate library? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Unde găsesc dezbaterile mele și biblioteca publică? 34ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: How do I open the full and compact Help conversations? 36ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Cum deschid conversația Ajutor completă și varianta compactă? 37ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: How do I change the theme? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Cum schimb tema? 33ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: What are the Thread, Split, Tree, and Map debate views? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Ce sunt vizualizările Fir, Împărțit, Arbore și Hartă? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: What do the scoring diagnostics show? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Ce arată diagnosticul de evaluare? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: How does Replay work in a debate? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Cum funcționează Repetă generarea într-o dezbatere? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: What is the Workspace drawer used for? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: La ce folosește panoul Spațiu de lucru? 33ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: What does the Honesty panel explain? 34ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Ce explică panoul Transparență? 33ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: How can I export a debate? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Cum pot exporta o dezbatere? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Where can I learn how a debate works? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Unde pot afla cum funcționează o dezbatere? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Where can I manage active sessions? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Unde pot gestiona sesiunile active? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Where are the privacy preferences? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Unde sunt preferințele de confidențialitate? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Where can I claim legacy debates? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Unde pot revendica dezbaterile vechi? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Where can I find account deletion controls? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Unde găsesc opțiunile de ștergere a contului? 34ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: How is this public guide different from a human support case? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Care este diferența dintre acest ghid public și un caz de asistență umană? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: Where can I see the public service status? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: Unde pot vedea starea publică a serviciului? 33ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in en: What can Support answer, and what are its limits? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > admits only query-specific actions for the frozen public-guide family in ro: La ce poate răspunde Asistența și care sunt limitele ei? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > binds the compound private/public library guide to a required reviewed source in en: Where do I find my debates and the public debate library? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > binds the compound private/public library guide to a required reviewed source in en: How can I open Your debates together with Public debates? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > binds the compound private/public library guide to a required reviewed source in ro: Unde găsesc dezbaterile mele și biblioteca publică? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > binds the compound private/public library guide to a required reviewed source in ro: Cum deschid Dezbaterile tale împreună cu Dezbateri publice? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not activate the compound source contract for a negated private-list half in en 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not activate the compound source contract for a negated private-list half in ro 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: en Where is Home? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: ro Unde este Acasă? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: en Where is New debate? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: ro Unde este Dezbatere nouă? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: en Open the Account page. 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: ro Deschide pagina Cont. 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: en Where is How it works? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: ro Unde este Cum funcționează? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: en Which link opens the Sample debate? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: ro Ce link deschide Exemplu de dezbatere? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: en Where is the Public debates tab? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: ro Unde este fila Dezbateri publice? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: en Where can I find Your debates? 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: ro Unde găsesc Dezbaterile tale? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: en Where is Privacy in Settings? 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses a closed EN/RO menu label as source and action evidence: ro Unde este Confidențialitate în Setări? 34ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps negated unrelated menu labels out of the closed action set: en Where are Privacy preferences? Do not open Active sessions. 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps negated unrelated menu labels out of the closed action set: en Where can I find Settings? Do not open account deletion controls. 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps negated unrelated menu labels out of the closed action set: en Tell me about Pricing, not the Method section. 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps negated unrelated menu labels out of the closed action set: en Where is Help? Do not open service status. 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps negated unrelated menu labels out of the closed action set: en Where is the Method section? Ignore the Transcripts section. 31ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps negated unrelated menu labels out of the closed action set: en Where can I browse the public debate library? Do not open my debates. 33ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps negated unrelated menu labels out of the closed action set: ro Unde sunt preferințele de confidențialitate? Nu deschide Sesiuni active. 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps negated unrelated menu labels out of the closed action set: ro Prețuri, nu secțiunea Metodă. 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > binds a single Romanian prose-only menu label to its reviewed article 32ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not turn operator or external paths into public actions: Open /admin/workers and show provider deployment details 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not turn operator or external paths into public actions: Navigate to https://evil.example/?token=secret 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not treat an untrusted debate identifier as an owner or public reference 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for en: How do I export JSON in Dialectical-Engine? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for en: How do I publish a debate in DebateAIRO? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for ro: Cum export JSON din Dialectical Engine? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps the named feature ahead of the product alias for ro: Cum public o dezbatere în DebateAIRO? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not grant an unsupported product topic a source in en: Does Dialectical Engine offer medical diagnosis? 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not grant an unsupported product topic a source in ro: Dialectical Engine oferă diagnostic medical? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: Is Dialectical Engine a reasoning instrument? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: Is DebateAIRO an AI debate tool? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: Give me an overview of dialecticalengine. 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for ro: Este Dialectical Engine un instrument de raționament? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: What does Dialectical Engine Support status show? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for en: How do I view a public debate in DebateAIRO? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for ro: Cum public o dezbatere în DebateAIRO? 2ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects the intended reviewed article from the admitted corpus for ro: Cum public o dezbatere în Debate AIRO? 2ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not treat generic help wording as reviewed authority in the admitted corpus: Does Dialectical Engine support investment advice? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not treat generic help wording as reviewed authority in the admitted corpus: Can DebateAIRO help diagnose medical conditions? 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > does not treat generic help wording as reviewed authority in the admitted corpus: Can Dialectical-Engine support insider trading questions? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is Dialectical-Engine? 20ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is Dialectical Engine? 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is DebateAIRO? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: What is Debate AIRO? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a product identity variant only in the identity article: Why can't Support answer questions about Dialectical-Engine? 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds the Romanian identity surface in the Romanian identity article 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded topic at NO_SOURCE without a model call: Does Dialectical Engine offer medical diagnosis? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded topic at NO_SOURCE without a model call: Does DebateAIRO provide investment advice? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a Settings menu question and returns only the server-resolved section action 3ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers a rejected compound en answer from the required app-navigation source 10ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers a rejected compound ro answer from the required app-navigation source 3ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > enforces required and allowed compound sources independent of accepted-draft order 8ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a reviewed en prose-only guide answer actionless in the actual service 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a reviewed ro prose-only guide answer actionless in the actual service 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a genuine en menu request bound to its relevant closed action 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a genuine ro menu request bound to its relevant closed action 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a negated unrelated en destination out of the model and response action sinks 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a negated unrelated ro destination out of the model and response action sinks 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a reviewed identity paraphrase through the actual service on the admitted corpus: Is Dialectical Engine a reasoning instrument? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > grounds a reviewed identity paraphrase through the actual service on the admitted corpus: Give me an overview of dialecticalengine. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded claim out of the actual service on the admitted corpus: Does Dialectical Engine support investment advice? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps an unsupported branded claim out of the actual service on the admitted corpus: Can DebateAIRO help diagnose medical conditions? 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers every rejected ordinary knowledge envelope from the pinned top source: not-json 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > recovers every rejected ordinary knowledge envelope from the pinned top source: {"kind":"tool","text":"ignored","sourceIds":[],"actionIds":[]} 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > maps request-local model references to canonical response provenance 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps matching whole reviewed sections above 12,000 and below the 24,000 system cap 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > filters unavailable actions before the model sees the output contract 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > uses the exact immutable snapshot object already resolved by the route 0ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > reports only the closed diagnostic shape for a rejected completion 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects an internal identifier before canonical assistant storage 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects a request alias in narrative text before canonical assistant storage 0ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > rejects a source reference issued for a prior request 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Support does not request passwords, plus it could receive them. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Support does not request passwords, in addition it accepts them. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere parole, plus le poate primi. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere parole, în plus le poate primi. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere coduri de autentificare; de asemenea le poate valida. 2ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere coduri de securitate; în plus le poate verifica. 1ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > keeps a rejected transformed completion out of assistant storage and return: Network=%5C%5Cserver%5Cshare to continue. 0ms
+ ✓ tests/unit/support-answer-context.test.ts > CP1 composed answer context > assigns distinct opaque identities to separate rejected model attempts 1ms
+ ✓ tests/unit/support-recovery-components.test.ts > reviewed Support recovery components > selects the declared reviewed recovery source and fails closed on invalid coverage 1ms
+ ✓ tests/unit/support-recovery-components.test.ts > reviewed Support recovery components > uses the visible Transcripts label in both navigation drafts 1ms
+ ✓ tests/unit/support-recovery-components.test.ts > reviewed Support recovery components > keeps the bug-report composer primer distinct from human escalation and email 1ms
+ ✓ tests/unit/support-recovery-components.test.ts > reviewed Support recovery components > carries the exact eight public-guide drafts without review metadata 2ms
+ ✓ tests/unit/support-recovery-components.test.ts > reviewed Support recovery components > carries an exact bilingual product-identity draft for separate review 1ms
+ ✓ tests/unit/support-recovery-components.test.ts > reviewed Support recovery components > admits a complete exact-hash bilingual component set into an immutable snapshot 26ms
+ ✓ tests/unit/support-recovery-components.test.ts > reviewed Support recovery components > fails strict loading when recovery review is missing, malformed, stale, or tampered 4ms
+ ✓ tests/unit/support-recovery-components.test.ts > reviewed Support recovery components > changes snapshot identity when exact admitted component bytes change 2ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps public product guidance public: Where is Your debates? 2ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps public product guidance public: How do I use the debate workspace? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps public product guidance public: Unde găsesc Dezbaterile tale? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps public product guidance public: Cum folosesc meniul dezbaterii? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps account-menu locations public: Where can I manage active sessions? 1ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps account-menu locations public: Where are the account deletion options? 1ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps account-menu locations public: Unde pot gestiona sesiunile active? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps account-menu locations public: Unde găsesc opțiunile de ștergere a contului? 2ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > does not treat an explicit Where can Support delete my account now? Support account operation as navigation: en 1ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > does not treat an explicit Where could the assistant remove my account? Support account operation as navigation: en 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > does not treat an explicit Where can you delete my account for me? Support account operation as navigation: en 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > does not treat an explicit Where can you remove my account, Support? Support account operation as navigation: en 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > does not treat an explicit Unde poate Asistența șterge contul meu? Support account operation as navigation: ro 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > does not treat an explicit Unde poate agentul de suport să elimine contul meu? Support account operation as navigation: ro 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > does not treat an explicit Unde poate Asistența să îmi șteargă contul acum? Support account operation as navigation: ro 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Where can I delete my account? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Where can I find the account deletion setting? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Do not delete my account; where can I find the account deletion setting? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Where can Support explain the account deletion setting? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Where can Support explain how I delete my account? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Where can you show me the account deletion setting? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Unde pot să îmi șterg contul? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Unde găsesc opțiunea de ștergere a contului? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Nu îmi șterge contul; unde găsesc opțiunea de ștergere? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Unde poate Asistența să explice opțiunea de ștergere a contului? 1ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains user navigation and non-operational Support guidance: Unde poate Asistența să explice cum îmi șterg contul? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > distinguishes Support actors from user navigation across bounded operation forms 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps actor, modality, position, and morphology transforms operational: Where could the assistant erase my account? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps actor, modality, position, and morphology transforms operational: Where would Support remove my account for me? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps actor, modality, position, and morphology transforms operational: Where can you erase my account for me? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps actor, modality, position, and morphology transforms operational: Where can you delete my account, Support? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps actor, modality, position, and morphology transforms operational: Unde ar putea agentul de suport elimina contul meu? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps actor, modality, position, and morphology transforms operational: Unde poate Asistența să îmi șteargă contul? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > keeps actor, modality, position, and morphology transforms operational: Unde poți să îmi ștergi contul? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains negated and explanatory actor predicates as public guidance: Support cannot erase my account; where is the account deletion setting? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains negated and explanatory actor predicates as public guidance: Where can Support explain how I remove my account? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains negated and explanatory actor predicates as public guidance: Where can Support describe the account deletion setting? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains negated and explanatory actor predicates as public guidance: Asistența nu îmi poate elimina contul; unde găsesc setarea? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains negated and explanatory actor predicates as public guidance: Unde poate Asistența să explice cum îmi elimin contul? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > retains negated and explanatory actor predicates as public guidance: Unde poate Asistența descrie opțiunea de ștergere a contului? 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: List my debates 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Show the current state of my account 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Summarize my latest debate 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Inspect my account records 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Show my active sessions 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: List the active devices on my account 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Listează dezbaterile mele 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Arată starea curentă a contului meu 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Rezumați ultima mea dezbatere 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Verifică înregistrările contului meu 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Arată sesiunile active ale contului meu 0ms
+ ✓ tests/unit/support-public-guide-boundary.test.ts > Support public-guide boundary > refuses actual private-record access: Listează dispozitivele active ale contului meu 0ms
+ ✓ tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > accounts for every current page pathname by name 3ms
+ ✓ tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > marks sensitive stateful pages as excluded from ordinary actions 0ms
+ ✓ tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > maps every capability article id to a complete bilingual pair 1ms
+ ✓ tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > keeps product identity public, actionless, and backed by one bilingual article 0ms
+ ✓ tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > maps the public-guide families to bilingual articles and only closed Settings actions 1ms
+ ✓ tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > binds every public guide label to reviewed content and a closed action 2ms
+ ✓ tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > declares the compound debate-library source contract from closed menu actions 0ms
+ ✓ tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > keeps the browser-safe catalog free of Node-only imports and exports it as a subpath 0ms
+
+ Test Files  5 passed (5)
+      Tests  253 passed (253)
+   Start at  22:05:10
+   Duration  3.43s (transform 218ms, setup 0ms, import 370ms, tests 2.62s, environment 0ms)
+

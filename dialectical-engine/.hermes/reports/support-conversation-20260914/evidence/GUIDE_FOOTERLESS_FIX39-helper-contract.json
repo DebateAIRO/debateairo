@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FOOTERLESS_FIX39",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PREPARED_UNBOUND_FOOTERLESS_HELPER",
+  "helper": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_FOOTERLESS_FIX39/screenshot-evidence-successor.mjs",
+    "sha256": "10a806c50999a84f3a036375807ef29a29c92ef6368047ec4e14c28af148b3be",
+    "bytes": 24095
+  },
+  "callContract": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_FOOTERLESS_FIX39/capture-call-contract.mjs",
+    "sha256": "1bf78f46a7d3a3dab109f2ae90cfd04b928878d31b03976202a886012a4c5cc6",
+    "bytes": 1079
+  },
+  "interface": {
+    "requiredExpectedLayoutKeys": [
+      "sourceIds",
+      "actionIds",
+      "footerExpected"
+    ],
+    "footerExpectedTrue": "SOURCE_ACTION_FOOTER",
+    "footerExpectedFalse": "BODY_END",
+    "originalPaneCaptures": [
+      "BODY_START",
+      "VALIDATED_END"
+    ],
+    "expandedCapture": "EVIDENCE_ONLY_EXPANDED_PANE",
+    "failureDiagnostic": "SAFE_GEOMETRY_SCROLL_RESTORATION"
+  },
+  "liveBinding": null,
+  "traffic": {
+    "runtime": 0,
+    "http": 0,
+    "support": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "model": 0
+  }
+}

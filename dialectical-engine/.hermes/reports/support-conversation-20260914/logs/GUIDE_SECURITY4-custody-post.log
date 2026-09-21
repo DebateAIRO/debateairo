@@ -1,0 +1,54 @@
+{
+  "phase": "post",
+  "revision": "c8784902f78ed4ba1d637d122e1f32f598415f4e",
+  "base": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  "indexedInputs": 66,
+  "inputBad": [],
+  "productFiles": 143,
+  "productBad": [],
+  "deleted": 3,
+  "deletedBad": [],
+  "detached": {
+    "head": "c8784902f78ed4ba1d637d122e1f32f598415f4e",
+    "dirty": ""
+  },
+  "primary": {
+    "head": "c8784902f78ed4ba1d637d122e1f32f598415f4e",
+    "dirty": ""
+  },
+  "roleDefiningFiles": [
+    "migrations/0050_support_foundation.sql",
+    "migrations/0051_support_cases.sql",
+    "migrations/0052_support_tool_calls.sql",
+    "migrations/0053_support_public_incident.sql",
+    "migrations/0054_support_keys_audit.sql",
+    "tests/support/testDatabase.ts",
+    "packages/db/src/index.ts",
+    "package.json",
+    "pnpm-lock.yaml"
+  ],
+  "roleChanged": [],
+  "dependencyLinks": [
+    {
+      "path": "node_modules",
+      "present": false
+    },
+    {
+      "path": "apps/api/node_modules",
+      "present": false
+    },
+    {
+      "path": "apps/ui/node_modules",
+      "present": false
+    },
+    {
+      "path": "apps/runner/node_modules",
+      "present": false
+    },
+    {
+      "path": "packages/support-kb/node_modules",
+      "present": false
+    }
+  ],
+  "ok": true
+}

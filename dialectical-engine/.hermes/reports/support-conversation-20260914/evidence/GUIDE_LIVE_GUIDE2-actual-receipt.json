@@ -1,0 +1,512 @@
+{
+  "schemaVersion": 1,
+  "completed": false,
+  "finalCommit": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "entryCount": 44,
+  "requiredSuiteFiles": [
+    "tests/unit/support-kb.test.ts",
+    "tests/unit/support-context.test.ts",
+    "tests/unit/support-navigation.test.ts",
+    "tests/architecture/support-catalog-coverage.test.ts",
+    "tests/unit/support-response-policy.test.ts",
+    "tests/unit/support-classify.test.ts",
+    "tests/unit/support-security-guidance.test.ts",
+    "tests/unit/support-model.test.ts",
+    "tests/unit/support-escalation.test.ts",
+    "tests/integration/support-routes.test.ts",
+    "tests/integration/support-metrics.test.ts",
+    "tests/integration/support-degraded.test.ts",
+    "tests/integration/support-relay-reservations.test.ts",
+    "tests/render/sup-01-help.test.tsx",
+    "tests/integration/support-config-convergence.test.ts",
+    "tests/integration/support-own-context.test.ts",
+    "tests/integration/support-shred.test.ts",
+    "tests/unit/support-answer-context.test.ts",
+    "tests/unit/support-redaction.test.ts",
+    "tests/integration/support-cases.test.ts",
+    "tests/unit/support-credentials.test.ts",
+    "tests/unit/support-model-references.test.ts",
+    "tests/unit/support-text-views.test.ts",
+    "tests/unit/support-recovery-components.test.ts",
+    "tests/unit/support-recovery-attestation.test.ts",
+    "tests/render/sup-03-consent.test.tsx",
+    "tests/render/sup-04-widget.test.tsx",
+    "tests/render/support-topbar.test.tsx",
+    "tests/unit/support-public-guide-boundary.test.ts",
+    "tests/unit/support-recovery-intent.test.ts",
+    "tests/unit/s7-authorization.test.ts",
+    "tests/architecture/sup-01-boundary.test.ts",
+    "tests/architecture/sup-03-projection.test.ts"
+  ],
+  "gatePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE3-gate.json",
+  "gateSha256": "6ee3de622424e6a682d5c661f8f21574e7a49af94e8dae6fa2ce2a9d180e2cba",
+  "baseUrl": "https://localhost:3100",
+  "browser": {
+    "driver": "playwright@1.61.1",
+    "executablePath": "/Users/vladmihaimiron/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell",
+    "headless": true,
+    "tlsBypass": false,
+    "freshProfile": true
+  },
+  "supportApi": "actual",
+  "relay": "actual unchanged support-preview relay",
+  "identity": "actual anonymous visitor",
+  "syntheticSupportOverrides": false,
+  "privateRecordsUsed": false,
+  "credentialOrRecoveryOperations": 0,
+  "forgotConnector": "UNRESOLVED_ACTIONLESS",
+  "preRequestControlProof": {
+    "revision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+    "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+    "harnessSha256": "4768a8b5296ca5838fa6e2588be5cebc537b2613513239e434f0cd60bd7c7c9e",
+    "declaredControls": 69,
+    "derivedFromBoundResult": true
+  },
+  "runtimeCapacity": {
+    "measuredAtUtc": "2026-09-17T18:07:24.842Z",
+    "supportRegisterVersion": "8",
+    "supportSchemaVersion": 1,
+    "supportSnapshotSha256": "0b70f96ba473d55fa94baea77b076b1f2712fe47a2e3e9b9bab40b9555add629",
+    "fullSnapshotSha256": "31fc7602bd5d8f92f557194b2ba4a5c92fe9469f46f81969903ab3d40fcb196a",
+    "limits": {
+      "support_limit_anon_msgs_10m": 20,
+      "support_limit_anon_msgs_24h": 100,
+      "support_limit_anon_sessions_1h": 5,
+      "support_limit_session_msgs": 40,
+      "support_limit_msg_chars": 2000,
+      "support_relay_concurrency": 2,
+      "support_queue_depth": 10,
+      "support_daily_call_cap": 500,
+      "support_lock_after_injections": 3,
+      "support_ip_cooldown_minutes": 60
+    },
+    "observed": {
+      "maxAnonSessionEvents1hByIp": 0,
+      "maxAnonMessageEvents10mByIp": 0,
+      "maxAnonMessageEvents24hByIp": 10,
+      "anyIpCooldownActive": false,
+      "callsToday": 9,
+      "liveRelayWaiters": 0,
+      "relayState": "AVAILABLE"
+    }
+  },
+  "matrixCount": 54,
+  "canonicalOrder": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54
+  ],
+  "executionOrder": [
+    1,
+    2,
+    7,
+    11,
+    15,
+    19,
+    23,
+    27,
+    31,
+    35,
+    39,
+    41,
+    47,
+    51,
+    43,
+    3,
+    10,
+    14,
+    18,
+    22,
+    26,
+    30,
+    34,
+    38,
+    46,
+    50,
+    6,
+    54,
+    9,
+    13,
+    17,
+    21,
+    25,
+    29,
+    33,
+    37,
+    45,
+    49,
+    5,
+    53,
+    4,
+    8,
+    12,
+    16,
+    20,
+    24,
+    28,
+    32,
+    36,
+    40,
+    42,
+    48,
+    52,
+    44
+  ],
+  "sessionGroups": [
+    {
+      "id": "lifecycle-full-en",
+      "mode": "full",
+      "language": "en",
+      "sequences": [
+        1
+      ]
+    },
+    {
+      "id": "full-ro",
+      "mode": "full",
+      "language": "ro",
+      "sequences": [
+        2,
+        7,
+        11,
+        15,
+        19,
+        23,
+        27,
+        31,
+        35,
+        39,
+        41,
+        47,
+        51,
+        43
+      ]
+    },
+    {
+      "id": "compact-ro",
+      "mode": "compact",
+      "language": "ro",
+      "sequences": [
+        3,
+        10,
+        14,
+        18,
+        22,
+        26,
+        30,
+        34,
+        38,
+        46,
+        50,
+        6,
+        54
+      ]
+    },
+    {
+      "id": "full-en",
+      "mode": "full",
+      "language": "en",
+      "sequences": [
+        9,
+        13,
+        17,
+        21,
+        25,
+        29,
+        33,
+        37,
+        45,
+        49,
+        5,
+        53
+      ]
+    },
+    {
+      "id": "compact-en",
+      "mode": "compact",
+      "language": "en",
+      "sequences": [
+        4,
+        8,
+        12,
+        16,
+        20,
+        24,
+        28,
+        32,
+        36,
+        40,
+        42,
+        48,
+        52,
+        44
+      ]
+    }
+  ],
+  "pacing": {
+    "requiredRequestStartSpacingMs": 31000,
+    "requestStarts": [
+      {
+        "sequence": 1,
+        "requestStartOffsetMs": 2141
+      },
+      {
+        "sequence": 2,
+        "requestStartOffsetMs": 33147
+      },
+      {
+        "sequence": 7,
+        "requestStartOffsetMs": 64153
+      }
+    ]
+  },
+  "rows": [
+    {
+      "sequence": 1,
+      "kind": "GUIDE_FAMILY",
+      "family": "pricing-placeholder",
+      "mode": "full",
+      "language": "en",
+      "prompt": "Pricing",
+      "branch": "MODEL",
+      "expectedSourceIds": [
+        "app-navigation"
+      ],
+      "actionPolicy": "NONE",
+      "navigation": null,
+      "lifecycleRole": "PRICING_EN_BEFORE_SWITCH",
+      "recoveryClass": null,
+      "proof": {
+        "branch": "MODEL",
+        "sourceIds": [
+          "app-navigation"
+        ],
+        "requestedActionIds": [],
+        "allowedActions": [],
+        "fallbackSha256": "4264551f61745540e92932ee99a99405152e94edf8b167e0ee19c5463526411d",
+        "review": {
+          "reviewedBy": "SOL",
+          "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+          "reviewedOn": "2026-09-17",
+          "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_EDITORIAL_RECHECK.md"
+        }
+      },
+      "api": {
+        "status": 200,
+        "outcome": "ANSWER_GROUNDED",
+        "text": "Pricing on the landing page is informational only — it describes plans and what's included, but it is not a checkout or purchase flow. To actually create debates you'd sign in and use the debate creator from there. I don't have a navigation action for the Pricing page in my current action set, so I can't take you there directly, but the Help desk or Support status options are available if you have questions about plans or need human support.",
+        "sources": [
+          {
+            "id": "app-navigation",
+            "label": "Navigate Dialectical Engine"
+          }
+        ],
+        "actions": []
+      },
+      "visible": {
+        "text": "Pricing on the landing page is informational only — it describes plans and what's included, but it is not a checkout or purchase flow. To actually create debates you'd sign in and use the debate creator from there. I don't have a navigation action for the Pricing page in my current action set, so I can't take you there directly, but the Help desk or Support status options are available if you have questions about plans or need human support.",
+        "sources": [
+          "Navigate Dialectical Engine"
+        ],
+        "actions": []
+      },
+      "diagnostic": {
+        "status": "ACCEPTED_DRAFT",
+        "cursorStart": 722,
+        "cursorEnd": 722,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0,
+        "unmatchedCount": 0
+      },
+      "attribution": {
+        "responseOrigin": "MODEL_ACCEPTED_DRAFT",
+        "apiDomTextEqual": true,
+        "apiDomSourcesEqual": true,
+        "apiDomActionsEqual": true
+      },
+      "selectedLanguage": "en",
+      "sessionCreateCount": 1
+    },
+    {
+      "sequence": 2,
+      "kind": "GUIDE_FAMILY",
+      "family": "global-navigation",
+      "mode": "full",
+      "language": "ro",
+      "prompt": "Account",
+      "branch": "MODEL",
+      "expectedSourceIds": [
+        "settings-help-menus",
+        "app-navigation"
+      ],
+      "actionPolicy": "ALLOW_CLOSED",
+      "navigation": null,
+      "lifecycleRole": "ACCOUNT_RO_AFTER_SWITCH",
+      "recoveryClass": null,
+      "proof": {
+        "branch": "MODEL",
+        "sourceIds": [
+          "settings-help-menus",
+          "app-navigation"
+        ],
+        "requestedActionIds": [],
+        "allowedActions": [],
+        "fallbackSha256": "574aef1c82b5203dcab7fd229ad3c6b9bcaa13c64a55924e7ffc49c5bab2d3cc",
+        "review": {
+          "reviewedBy": "SOL",
+          "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+          "reviewedOn": "2026-09-17",
+          "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_EDITORIAL_RECHECK.md"
+        }
+      },
+      "api": {
+        "status": 200,
+        "outcome": "ANSWER_GROUNDED",
+        "text": "Secțiunea Account (sau Settings) deschide setările contului tău autentificat, deci e disponibilă doar dacă ești autentificat. De acolo poți accesa: Active sessions pentru a examina sau revoca sesiunile active, Privacy pentru preferințele cookie, Claim legacy debates pentru a revendica dezbateri vechi cu un token de acces, și Delete account pentru controalele de programare și anulare a ștergerii contului. Reține că pot explica cerințele fiecărei secțiuni și îți pot indica drumul, dar nu pot citi sesiunile private, tokenurile, starea contului sau starea ștergerii, și nu pot primi credențiale ori coduri de securitate.",
+        "sources": [
+          {
+            "id": "settings-help-menus",
+            "label": "Folosește Setările și Ajutorul uman"
+          }
+        ],
+        "actions": []
+      },
+      "visible": {
+        "text": "Secțiunea Account (sau Settings) deschide setările contului tău autentificat, deci e disponibilă doar dacă ești autentificat. De acolo poți accesa: Active sessions pentru a examina sau revoca sesiunile active, Privacy pentru preferințele cookie, Claim legacy debates pentru a revendica dezbateri vechi cu un token de acces, și Delete account pentru controalele de programare și anulare a ștergerii contului. Reține că pot explica cerințele fiecărei secțiuni și îți pot indica drumul, dar nu pot citi sesiunile private, tokenurile, starea contului sau starea ștergerii, și nu pot primi credențiale ori coduri de securitate.",
+        "sources": [
+          "Folosește Setările și Ajutorul uman"
+        ],
+        "actions": []
+      },
+      "diagnostic": {
+        "status": "ACCEPTED_DRAFT",
+        "cursorStart": 722,
+        "cursorEnd": 722,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0,
+        "unmatchedCount": 0
+      },
+      "attribution": {
+        "responseOrigin": "MODEL_ACCEPTED_DRAFT",
+        "apiDomTextEqual": true,
+        "apiDomSourcesEqual": true,
+        "apiDomActionsEqual": true
+      },
+      "selectedLanguage": "ro",
+      "sessionCreateCount": 2
+    }
+  ],
+  "navigations": [],
+  "networkCounts": {
+    "createSession": 2,
+    "sendMessage": 3,
+    "forbiddenAnswers": 0,
+    "forbiddenConsent": 0
+  },
+  "sessionKbVersions": [
+    "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+    "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278"
+  ],
+  "sessionReplacementEvidence": [
+    {
+      "sequence": 2,
+      "before": 1,
+      "after": 2,
+      "selectedLanguage": "ro"
+    }
+  ],
+  "groupSessionEvidence": [
+    {
+      "groupIndex": 0,
+      "groupId": "lifecycle-full-en",
+      "transition": "FRESH_PROFILE",
+      "createdBefore": 0,
+      "createdAfter": 1,
+      "sessionIdentitySha256": "be74af64ad6d3f25d52fbbe00f49206e04d1a4c7ce62ea83edcdc02905abe447",
+      "firstSequence": 1
+    },
+    {
+      "groupIndex": 1,
+      "groupId": "full-ro",
+      "transition": "LANGUAGE_SELECTOR_RESET",
+      "createdBefore": 1,
+      "createdAfter": 2,
+      "sessionIdentitySha256": "4a639cdd4763debab703ea253f4e24f2bdc31a015a7efe799446e93c7f21f7dc",
+      "firstSequence": 2
+    }
+  ],
+  "noPrivateControls": [
+    {
+      "mode": "full",
+      "checked": true
+    }
+  ],
+  "consoleErrorCount": 5,
+  "consoleErrorCategories": {
+    "HTTP_401": 5,
+    "HTTP_404": 0,
+    "JS_OR_HYDRATION": 0,
+    "OTHER": 0
+  },
+  "screenshots": [
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE2-row-01.png",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE2-row-02.png"
+  ],
+  "failureCode": "GUIDE_HARNESS_MODEL_RESULT_INVALID"
+}

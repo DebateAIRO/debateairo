@@ -1,0 +1,5 @@
+# Explicit owner approval — startup provider requests
+
+The assistant asked permission for up to two paid Z.AI/GLM startup requests using existing configured credentials, each containing only: “HERMES-SUPPORT acceptance transport handshake. Reply with the single word: OK”. The first diagnoses the startup failure; only after success and cleanup does starting the full preview send the second. Automatic approval review had rejected this action pending explicit authorization for the payload, destination and paid side effect. No request had been sent.
+
+The user then replied verbatim: “approved”. This authorizes those two bounded startup requests in the current task. It does not authorize provider, model, credential, configuration or quota changes, additional diagnostic retries, or an arbitrary external payload. Preserve the original bounded diagnostic safeguards and report actual attempts honestly. Existing separately authorized Support verification remains its fixed scope after successful recovery and independent binding review.

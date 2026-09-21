@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW22",
+  "ticket": "t_0be61e3a",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "verdict": "REWORK_BOUNDED_FINAL_CONTRACT_SELF_BINDING",
+  "dispositions": [
+    {"id":"GH22-C1","subject":"actual capture row provenance","disposition":"PASS","evidence":"Real row assembly emits FRESH_GUIDE21_FIXED31 and contains no GUIDE18 row literal."},
+    {"id":"GH22-C2","subject":"current proof labels","disposition":"PASS","evidence":"Focused control and binding proof names use GUIDE21."},
+    {"id":"GH22-C3","subject":"owner output reservation ordering","disposition":"PASS","evidence":"Exact output is opened wx/0600 before readCapacity or validateCapacity."},
+    {"id":"GH22-C4","subject":"existing-output negative","disposition":"PASS","evidence":"Collision returns GUIDE_OWNER_CAPACITY_OUTPUT_EXISTS with zero reader and validator calls and preserves existing bytes."},
+    {"id":"GH22-C5","subject":"failed-reader evidence","disposition":"PASS","evidence":"Reserved output becomes a fixed five-key failure artifact and the original fixed error is rethrown."},
+    {"id":"GH22-C6","subject":"owner output preflight absence","disposition":"PASS_SOURCE","evidence":"FIX22 phase-preflight includes contract.ownerCapacity.output; actual output is absent."},
+    {"id":"GH22-C7","subject":"owner command contract","disposition":"PASS","evidence":"Exact unexecuted argv, cwd, script hash, output, environment key and deferred 2-session/6-message/6-call requirements are bound."},
+    {"id":"GH22-R1","subject":"seven-phase command self-binding","disposition":"REWORK","evidence":"All seven FIX22 argv[2] values point to BIND21 command contract; phase1 cannot consume ownerCapacity and later phases use predecessor bindings."},
+    {"id":"GH22-R1A","subject":"binding proof command hash","disposition":"REWORK","evidence":"Proof reports BIND21 SHA 571bb5..., while actual FIX22 command contract is 7ecae9...."},
+    {"id":"GH22-K1","subject":"full58 and screenshot proof","disposition":"PASS_RETAINED","evidence":"Unchanged current-product and screenshot-helper hashes retained without rerun."},
+    {"id":"GH22-L1","subject":"runtime/live/readiness","disposition":"NOT_ESTABLISHED","evidence":"No runtime/browser/status/capacity/database/Support/model activity occurred."},
+    {"id":"GH22-L2","subject":"Forgot/CP1/CP2","disposition":"UNRESOLVED_ACTIONLESS","evidence":"No destination, readiness, completion, acceptance or CP2 authorization is inferred."}
+  ],
+  "hashes": {
+    "fix22CommandContractActual":"7ecae9657b4c3c55763b94b89e538716ce023b5d9a47941d40a9e65b9ec81c63",
+    "bind21CommandContractWronglyReferenced":"571bb52477c1ff0826b364109ef61666b69e00e0bde8aba1ae926bebb8ffef98",
+    "ownerCapacityContract":"df5580ba8dd47e354a74aa04b8308d7b626564bd116076b682b1f6d0037d03fc",
+    "ownerCapacityScript":"25ef58c50a1386cc2d764c6d6580e8d3b176407a74cf6d11b988f93d45381f8b",
+    "captureSource":"cc493ba08d101899ecd3d3bc66dea6ab6bc6507a0597e5b90b29326259996329",
+    "full58":"79b065500d0f177016d0e82d83d731bf0bda763f5c86c927e5ab1e31b0273759",
+    "screenshotSuccessor":"696dc176b7a6e1bbd6f5c8b5714bbf2519c7be7809af5fda8f45ca3f085a0b7c"
+  },
+  "counts": {"focusedPassed":14,"focusedTotal":14,"syntaxPassed":5,"syntaxTotal":5,"manifestVerified":19,"manifestTotal":19,"inputsVerified":53,"inputsTotal":53,"remainingFindings":1},
+  "traffic": {"runtime":0,"browser":0,"http":0,"status":0,"capacity":0,"database":0,"support":0,"model":0}
+}

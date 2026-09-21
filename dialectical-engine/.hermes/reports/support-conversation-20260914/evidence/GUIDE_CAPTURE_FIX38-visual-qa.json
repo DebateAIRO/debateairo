@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_FIX38",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_VISUAL_QA",
+  "observations": [
+    {
+      "artifact": "GUIDE_CAPTURE_FIX38-final4-corrected-row23-original-pane-top.png",
+      "result": "PASS",
+      "observed": "Current Romanian export answer is visible in the original pane with both source/action labels fully painted inside the pane."
+    },
+    {
+      "artifact": "GUIDE_CAPTURE_FIX38-final4-corrected-row23-original-pane-footer.png",
+      "result": "PASS",
+      "observed": "Already-contained footer capture preserves the same pane and scroll position; image bytes intentionally match the top capture."
+    },
+    {
+      "artifact": "GUIDE_CAPTURE_FIX38-final4-corrected-row23-complete-expanded.png",
+      "result": "PASS",
+      "observed": "Complete current answer text and both footer labels are painted without clipping."
+    },
+    {
+      "artifact": "GUIDE_CAPTURE_FIX38-final4-forward-original-pane-footer.png",
+      "result": "PASS",
+      "observed": "Representative long reply scrolls forward; final lines and both footer labels are visibly painted within the original pane."
+    }
+  ],
+  "qualification": "Offline production-markup/CSS fixture; this proves screenshot-helper rendering behavior, not a fresh live Support answer.",
+  "traffic": {
+    "support": 0,
+    "external": 0,
+    "model": 0
+  }
+}

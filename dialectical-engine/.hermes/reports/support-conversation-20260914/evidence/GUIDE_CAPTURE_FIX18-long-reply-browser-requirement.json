@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_FIX18",
+  "status": "PREPARED_NOT_EXECUTED_REQUIRES_LATER_HEAVY_LEASE",
+  "script": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_FIX18/long-reply-browser-fixture.mjs",
+  "trafficContract": {
+    "supportApiRoutes": "ABORT_ALL",
+    "expectedSupportAttempts": 0,
+    "runtime": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "model": 0
+  },
+  "fixture": {
+    "surface": "LOCAL_PAGE_SET_CONTENT",
+    "nestedPaneHeightCssPixels": 240,
+    "articleMinimumHeightCssPixels": 760,
+    "requiresArticleTallerThanPane": true,
+    "containsTopMarker": true,
+    "containsLongBody": true,
+    "containsSourceAndActionFooter": true
+  },
+  "requiredAssertions": [
+    "production screenshot helper accepts the exact newly appended assistant article",
+    "article scroll height exceeds nested pane client height",
+    "top marker and source/action footer boxes are inside the article box",
+    "exact-article PNG height covers the rendered article height at deviceScaleFactor1",
+    "changing only the footer marker changes the exact-article PNG hash",
+    "changing only the top marker changes the exact-article PNG hash",
+    "all Support API routes remain aborted with zero attempts"
+  ],
+  "gate": "MUST_PASS_BEFORE_ANY_LATER_PAID_OR_LIVE_GUIDE_CAPTURE"
+}

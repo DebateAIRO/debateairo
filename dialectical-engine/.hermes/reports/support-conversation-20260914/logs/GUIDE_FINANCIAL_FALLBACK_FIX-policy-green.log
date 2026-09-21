@@ -1,0 +1,272 @@
+^D[?25l
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+[?2026h
+ ❯ tests/unit/support-response-policy.test.ts [queued]
+
+ Test Files 0 passed (1)
+      Tests 0 passed (0)
+   Start at 09:17:13
+   Duration 0ms
+[?2026l[?2026h[K
+ ❯ tests/unit/support-response-policy.test.ts 0/248
+
+ Test Files 0 passed (1)
+      Tests 0 passed (248)
+   Start at 09:17:13
+   Duration 108ms
+[?2026l[K ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > completes material Account citations from supplied authority without widening ordinary prose 3ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > requires source-backed closed actions for navigation commitments but preserves descriptions 2ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Pricing is informational only, but paying for a debate happens through the debate creator after sign in. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Pricing is not checkout, and payment happens in the debate creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Pricing is not checkout because payment happens in the debate creator after sign in. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Pricing is not checkout, payment happens in the debate creator after sign in. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Pricing nu este checkout deoarece plata are loc în creator după autentificare. 1ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Pricing nu este checkout, plata are loc în creator după autentificare. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Pricing is not checkout yet payment happens in the debate creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Pricing is not checkout or payment happens in the debate creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Pricing nu este checkout, însă plata are loc în creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Pricing nu este checkout sau plata are loc în creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Payment is not available, but checkout happens in the debate creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Plata nu este disponibilă, dar checkout are loc în creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Checkout is unavailable; nevertheless, you can pay in the debate creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Checkoutul nu este disponibil; cu toate acestea, poți plăti în creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Creating a debate happens in the creator, and payment happens there too. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Checkout is completed in the debate creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Payment is not only available in the debate creator; it is immediate. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Checkout isn't merely possible in the debate creator; it is the normal path. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Plata nu este doar posibilă în creator; este imediată. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: A debate is paid for in the debate creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Billing happens in the debate creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Achitarea are loc în creatorul de dezbateri. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Crearea dezbaterii și plata au loc în creator după autentificare. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a financial-capability model draft through reviewed fallback: Poți plăti pentru dezbatere din creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a negative financial paraphrase through reviewed fallback: Pricing is informational and is not a checkout flow. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a negative financial paraphrase through reviewed fallback: Payment may not be available through the debate creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a negative financial paraphrase through reviewed fallback: Plata poate să nu fie disponibilă prin creatorul de dezbateri. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a negative financial paraphrase through reviewed fallback: Payment might not be supported in the debate creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a negative financial paraphrase through reviewed fallback: Plata ar putea să nu fie disponibilă în creatorul de dezbateri. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a negative financial paraphrase through reviewed fallback: Pricing is not checkout, and payment may not be available in the debate creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a negative financial paraphrase through reviewed fallback: Pricing nu este checkout, iar plata poate să nu fie disponibilă în creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a negative financial paraphrase through reviewed fallback: Payment cannot be completed in the debate creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a negative financial paraphrase through reviewed fallback: Payment can't be completed in the debate creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a negative financial paraphrase through reviewed fallback: Payment does not happen in the debate creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a negative financial paraphrase through reviewed fallback: Payment doesn't happen in the debate creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a negative financial paraphrase through reviewed fallback: Payment isn't available in the debate creator. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a negative financial paraphrase through reviewed fallback: Plata nu poate fi finalizată în creatorul de dezbateri. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a negative financial paraphrase through reviewed fallback: You cannot purchase or change a plan from Pricing. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a negative financial paraphrase through reviewed fallback: Public guidance does not establish where payment happens. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a negative financial paraphrase through reviewed fallback: Pricing este informativ și nu este un flux de plată. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > routes a negative financial paraphrase through reviewed fallback: Ghidul public nu stabilește unde are loc plata. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > preserves ordinary nonfinancial guide prose: You can create a debate in the debate creator after sign in. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > preserves ordinary nonfinancial guide prose: Poți crea o dezbatere în creator după autentificare. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > preserves ordinary nonfinancial guide prose: Open Pricing to read the published plan information. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > preserves ordinary nonfinancial guide prose: Dialectical Engine is a platform for structured debates. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > preserves ordinary nonfinancial guide prose: Dialectical Engine este o platformă pentru dezbateri structurate. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > derives every promised destination from the canonical action and guide catalogs 3ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a canonical promise when any request-local authority edge is missing 13ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects case-email conflation while preserving the separate mail workflow 1ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > reports a closed secret-safe rejection shape without completion bytes or identifiers 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > projects a closed per-attempt log record and drops arbitrary hostile fields 1ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > distinguishes syntax, exact-key, provenance, and accepted producer results 1ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts an exact bounded draft and preserves benign public identifiers 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: Settings does not offer controls to replace a password or regenerate MFA. Support cannot accept credentials. 1ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: A fresh sign in may be required in Settings, but Support cannot receive passwords or security codes. 1ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: Setările nu oferă controale pentru înlocuirea parolei sau regenerarea MFA. Asistența nu poate primi date de autentificare. 1ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: În Setări poate fi necesară o autentificare recentă, dar Asistența nu poate primi parole sau coduri de securitate. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: You can change your account name in Settings. Support cannot receive your password. 1ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: Poți schimba numele contului în Setări. Asistența nu poate primi parola. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: Recovery codes are available only after sign in. 1ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: Codurile de recuperare sunt disponibile după autentificare. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: Reset tokens expire and must remain private. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts truthful credential-boundary guidance: Codul de verificare este necesar pentru autentificare. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Send your password to Support. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Give Support your password so it can validate it. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: S​end your password to Support. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Do not share your password with anyone; send it here instead. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Do not share your password with anyone, then send it here. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: I changed your password successfully. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Your password is hunter2. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Trimite parola către Asistență. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Nu partaja parola cu nimeni; trimite-o aici în schimb. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Am schimbat parola ta cu succes. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Parola ta este hunter2. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Send your passwords to Support. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Trimite parolele către Asistență. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Send your security codes to Support. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Support does not receive passwords and you should send your password here. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Asistența nu primește parole și trebuie să trimiți parola aici. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Support cannot receive your password. Send it here instead. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Asistența nu poate primi parola. Trimite-o aici în schimb. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Support does not receive passwords and also asks you to send them here. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Support does not receive passwords, so send them here. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Support does not receive passwords and then asks you to send them here. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Asistența nu primește parole și de asemenea îți cere să le trimiți aici. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Asistența nu primește parole, așa că trimite-le aici. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Send your p%61ssword to Support. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Trimite p%2561rola către Asistență. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Support does not receive passwords while it asks you to send them here. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Support does not receive passwords and generally asks you to send them here. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Send your %EF%BD%90%EF%BD%81%EF%BD%93%EF%BD%93%EF%BD%97%EF%BD%8F%EF%BD%92%EF%BD%84 to Support. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps credential solicitation, execution, and labelled values rejected: Send your pass%E2%80%8Bword to Support. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Support does not receive passwords and may receive them. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Support cannot accept a security code, but it could validate it. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Asistența nu primește parole și poate primi acestea. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Asistența nu verifică un cod de securitate, dar ar putea să îl primească. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Support never asks for OTP codes, plus it accepts them. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Support does not request passwords, plus it could receive them. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Support does not request passwords, in addition it accepts them. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Support does not request passwords, additionally it accepts them. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Support does not request passwords, moreover it accepts them. 1ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Support does not request passwords, furthermore it accepts them. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Asistența nu cere parole, plus le poate primi. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Asistența nu cere parole, în plus le poate primi. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Asistența nu cere parole, de asemenea le poate primi. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Asistența nu cere coduri de recuperare; de asemenea le poate valida. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Asistența nu cere coduri de verificare; de asemenea le poate valida. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Asistența nu cere coduri de securitate; de asemenea le poate valida. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a positive credential operation in a new modal group: Asistența nu cere coduri de autentificare; de asemenea le poate valida. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Support does not request passwords, plus it does not accept them. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Support does not request passwords, in addition it never receives them. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Support does not request passwords, additionally it cannot validate them. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Support does not request passwords, moreover it does not use them. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Asistența nu cere parole, în plus nu le primește. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Asistența nu cere parole, de asemenea nu le verifică. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Asistența nu cere coduri de recuperare; de asemenea nu le poate valida. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Asistența nu cere coduri de verificare; de asemenea nu le poate valida. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Asistența nu cere coduri de securitate; de asemenea nu le poate valida. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts independently negated additive operation groups: Asistența nu cere coduri de autentificare; de asemenea nu le poate valida. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural root backslash after = boundary in answer and summary text 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural drive path after = boundary in answer and summary text 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural UNC path after = boundary in answer and summary text 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural root backslash after : boundary in answer and summary text 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural drive path after : boundary in answer and summary text 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural UNC path after : boundary in answer and summary text 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural root backslash after , boundary in answer and summary text 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural drive path after , boundary in answer and summary text 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural UNC path after , boundary in answer and summary text 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural root backslash after ; boundary in answer and summary text 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural drive path after ; boundary in answer and summary text 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a decoded structural UNC path after ; boundary in answer and summary text 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps benign assignment text usable in answer and summary text: Progress=84% complete. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps benign assignment text usable in answer and summary text: Ratio=3/4 with four observations. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps benign assignment text usable in answer and summary text: Time=14:30 local. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps benign assignment text usable in answer and summary text: Version=1.2.3 is available. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps an explicit noncredential object independent from an older credential: Support cannot receive passwords. You can change this display name in Settings. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps an explicit noncredential object independent from an older credential: Support cannot accept recovery codes. You may edit that profile name in Settings. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps an explicit noncredential object independent from an older credential: Asistența nu primește parole. Poți schimba acest nume afișat în Setări. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps all current human labels neutral in factual framing 5ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a closed internal action identifier in visitor prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a closed internal capability identifier in visitor prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a closed internal selected source identifier in visitor prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a closed internal control-obfuscated action identifier in visitor prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a closed internal formerly excepted action identifier in visitor prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a closed internal formerly excepted action identifier in visitor prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a closed internal formerly excepted action identifier in visitor prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects a closed internal formerly excepted action identifier in visitor prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id start-debate in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id sign-in in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id sign-up in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id support-status in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id sample-transcript in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id active-sessions in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id privacy-preferences in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id claim-legacy in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id delete-account in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id public-catalog in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id your-debates in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id owner-debate in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id public-debate in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id forgot-password in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id product-identity in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id home-library in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id new-debate in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id help-desk in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id verify-email in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id enroll-mfa in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id operator-workers in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id app-navigation in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id browse-public-debates in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id getting-started-debate in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id debate-topic-and-description in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id risk-tier-choice in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id budget-tier-choice in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id guide-how-it-works in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id export-json in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id publish-a-debate in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id debate-workspace-menus in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id unpublish-a-debate in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id delete-a-private-debate in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id unsupported-capabilities in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id view-public-debate in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id public-answer-disclosure in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id settings-help-menus in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id support-cases in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id support-status-limits in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id account-access in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id account-settings in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects exact catalog machine id privacy-consent in narrative prose 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps ambiguous human-facing feature names usable: Open Settings to review the ordinary feature name. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps ambiguous human-facing feature names usable: Deschide Setări pentru a vedea numele obișnuit al funcției. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps ambiguous human-facing feature names usable: Return home after reading Help. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps ambiguous human-facing feature names usable: Select Forgot password to continue. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps ambiguous human-facing feature names usable: Alege Preferințe de confidențialitate pentru a continua. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps ambiguous human-facing feature names usable: Choose Sign in to continue. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps ambiguous human-facing feature names usable: Read Support status for details. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects raw text before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects malformed JSON before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects oversized JSON before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects extra key before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects wrong kind before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects raw URL before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects protocol-relative URL before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects percent-encoded HTTPS URL before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects percent-encoded path before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects double-encoded path before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects triple-encoded URL before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects deeper encoded path before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects malformed structural escape before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects path instruction before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects root backslash before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects relative forward path before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects relative backslash path before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects drive path before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects UNC path before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects encoded backslash before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects Markdown link before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects HTML before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects credential request before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects Romanian credential request before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects grouped code before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects control-obfuscated code before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects secret echo before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects false reset claim before validation 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps benign percentage text usable: Progress is 50% complete. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps benign percentage text usable: The 100% local export remains available. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > keeps benign percentage text usable: Progresul este 50% finalizat. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > accepts only the exact purpose-specific advisory summary envelope 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Open //example.test/reset 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Open https%3A%2F%2Fexample.test/reset 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Open %2Fsettings 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Your password is hunter2 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: I reset the visitor password successfully 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Choose <a href='/new'>Start</a> 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Use [this link](/new) 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: The visitor should use start-debate to continue. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: The visitor should read getting-started-debate for details. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Support does not receive passwords and the visitor should send a password here. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Support does not receive passwords and also asks the visitor to send them here. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Send the visitor p%61ssword to Support. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: Open https%25253A%25252F%25252Fexample.test/reset 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unsafe advisory summary text before sealing: The visitor should use forgot-password to continue. 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects forged source 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects unrequested action 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects missing source 0ms
+ ✓ tests/unit/support-response-policy.test.ts > CP1 support model response policy > rejects duplicate source 0ms
+
+ Test Files  1 passed (1)
+      Tests  248 passed (248)
+   Start at  09:17:13
+   Duration  250ms (transform 59ms, setup 0ms, import 102ms, tests 63ms, environment 0ms)
+
+[?25h

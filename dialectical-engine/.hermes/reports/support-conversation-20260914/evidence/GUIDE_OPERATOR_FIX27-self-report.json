@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_FIX27",
+  "ticket": "t_c68906dd",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "PASS_OPERATOR_LOG_OWNERSHIP",
+  "skillsLoaded": [
+    "retained mission BODY/floor instructions; no new skill read in this bounded node"
+  ],
+  "focusedControls": {
+    "red": 1,
+    "green": 18,
+    "binding": 35
+  },
+  "traffic": {
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "operatorContract": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_FIX27-operator-contract.json",
+  "limitations": [
+    "operational seven phases not executed",
+    "preview readiness and acceptance not claimed",
+    "Forgot password remains unresolved/actionless"
+  ],
+  "heavyLeaseReleased": true
+}

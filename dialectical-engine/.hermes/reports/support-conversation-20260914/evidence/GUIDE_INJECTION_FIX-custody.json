@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_INJECTION_FIX",
+  "ticket": "t_9a52015c",
+  "baseRevision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "finalRevision": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718",
+  "sourceHead": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+  "sourceIndexAtDispatch": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "sourceWorktreeAtDispatch": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19",
+  "productDirtyAtDispatch": 0,
+  "productDirtyAtHandoff": 0,
+  "productCommitCount": 1,
+  "productPaths": [
+    "apps/api/src/support/index.ts",
+    "apps/api/src/support/session.ts",
+    "apps/api/src/main.ts",
+    "packages/db/src/support.ts",
+    "tests/support-eval/run.ts",
+    "tests/integration/support-routes.test.ts",
+    "tests/integration/support-metrics.test.ts",
+    "tests/integration/dev-database-principals.test.ts",
+    "tests/architecture/sup-01-boundary.test.ts"
+  ],
+  "runtimeRequests": 0,
+  "modelRequests": 0,
+  "previewActions": 0,
+  "privateLogsRead": 0,
+  "checkpointAccepted": false
+}

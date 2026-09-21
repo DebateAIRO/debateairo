@@ -1,0 +1,201 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_RECOMPOSE",
+  "ticket": "t_81f12de2",
+  "revision": "8fb8e407b350f9950cdb27a0f4caaf8e178d7cb6",
+  "command": [
+    "pnpm",
+    "run",
+    "typecheck"
+  ],
+  "exitCode": 1,
+  "baseline": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-typecheck-final2.log",
+    "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "bytes": 39611,
+    "diagnostics": 76
+  },
+  "current": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_RECOMPOSE-typecheck.log",
+    "sha256": "5f413ae6ec942172332b439012402866970d76ec821f6a839593ee50225cb255",
+    "bytes": 44478,
+    "diagnostics": 95
+  },
+  "identical": false,
+  "addedCount": 19,
+  "removedCount": 0,
+  "addedDiagnostics": [
+    "apps/api/src/support/recovery-intent.ts(149,84): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.",
+    "tests/architecture/sup-03-projection.test.ts(23,12): error TS18048: 'database' is possibly 'undefined'.",
+    "tests/architecture/support-catalog-coverage.test.ts(100,24): error TS2345: Argument of type '\"pricing\"' is not assignable to parameter of type '\"active-sessions\" | \"claim-legacy\" | \"delete-account\" | \"forgot-password\" | \"help\" | \"home\" | \"method\" | \"owner-debate\" | \"privacy-preferences\" | \"public-catalog\" | \"public-debate\" | ... 6 more ... | \"your-debates\"'.",
+    "tests/architecture/support-catalog-coverage.test.ts(101,24): error TS2345: Argument of type '\"theme\"' is not assignable to parameter of type '\"active-sessions\" | \"claim-legacy\" | \"delete-account\" | \"forgot-password\" | \"help\" | \"home\" | \"method\" | \"owner-debate\" | \"privacy-preferences\" | \"public-catalog\" | \"public-debate\" | ... 6 more ... | \"your-debates\"'.",
+    "tests/architecture/support-catalog-coverage.test.ts(102,24): error TS2345: Argument of type '\"replay\"' is not assignable to parameter of type '\"active-sessions\" | \"claim-legacy\" | \"delete-account\" | \"forgot-password\" | \"help\" | \"home\" | \"method\" | \"owner-debate\" | \"privacy-preferences\" | \"public-catalog\" | \"public-debate\" | ... 6 more ... | \"your-debates\"'.",
+    "tests/integration/support-routes.test.ts(920,57): error TS2345: Argument of type '() => Promise<Readonly<{ messageId: `${string}-${string}-${string}-${string}-${string}`; outcome: \"ANSWER_GROUNDED\"; text: \"Deschide Set\u0103ri.\" | \"Open Settings.\"; canEscalate: false; sources: readonly { id: \"settings-help-menus\"; label: string; }[]; actions: readonly never[]; }>>' is not assignable to parameter of type '(input: Readonly<{ sessionId: string; text: string; language: SupportLanguage; detectedLanguage: SupportLanguage; overrideLanguage: SupportLanguage | null; ... 5 more ...; onQueueProgress?: (notice: string) => void; }>) => Promise<...>'.",
+    "tests/unit/support-context.test.ts(115,34): error TS4104: The type 'readonly string[]' is 'readonly' and cannot be assigned to the mutable type 'WithAsymmetricMatcher<string>[]'.",
+    "tests/unit/support-recovery-intent.test.ts(22,17): error TS7006: Parameter 'subject' implicitly has an 'any' type.",
+    "tests/unit/support-recovery-intent.test.ts(26,27): error TS7006: Parameter 'subject' implicitly has an 'any' type.",
+    "tests/unit/support-recovery-intent.test.ts(30,23): error TS7006: Parameter 'subject' implicitly has an 'any' type.",
+    "tests/unit/support-recovery-intent.test.ts(35,11): error TS7006: Parameter 'left' implicitly has an 'any' type.",
+    "tests/unit/support-recovery-intent.test.ts(35,16): error TS7006: Parameter 'right' implicitly has an 'any' type.",
+    "tests/unit/support-recovery-intent.test.ts(35,22): error TS7006: Parameter 'reverse' implicitly has an 'any' type.",
+    "tests/unit/support-recovery-intent.test.ts(41,17): error TS7006: Parameter 'subject' implicitly has an 'any' type.",
+    "tests/unit/support-recovery-intent.test.ts(45,27): error TS7006: Parameter 'subject' implicitly has an 'any' type.",
+    "tests/unit/support-recovery-intent.test.ts(49,23): error TS7006: Parameter 'subject' implicitly has an 'any' type.",
+    "tests/unit/support-recovery-intent.test.ts(54,11): error TS7006: Parameter 'left' implicitly has an 'any' type.",
+    "tests/unit/support-recovery-intent.test.ts(54,16): error TS7006: Parameter 'right' implicitly has an 'any' type.",
+    "tests/unit/support-recovery-intent.test.ts(54,22): error TS7006: Parameter 'reverse' implicitly has an 'any' type."
+  ],
+  "removedDiagnostics": [],
+  "correctionPaths": [
+    {
+      "laneRelative": "apps/api/src/support/recovery-intent.ts",
+      "diagnostics": [
+        {
+          "line": 149,
+          "column": 84,
+          "code": "TS2345",
+          "message": "Argument of type 'string | undefined' is not assignable to parameter of type 'string'."
+        }
+      ],
+      "minimalTypeOnlyRemedy": "Narrow the indexed word to string with an explicit impossible-index guard before includes; preserve predicate behavior."
+    },
+    {
+      "laneRelative": "tests/architecture/sup-03-projection.test.ts",
+      "diagnostics": [
+        {
+          "line": 23,
+          "column": 12,
+          "code": "TS18048",
+          "message": "'database' is possibly 'undefined'."
+        }
+      ],
+      "minimalTypeOnlyRemedy": "Narrow the Promise.all database result before match; preserve both source-content assertions."
+    },
+    {
+      "laneRelative": "tests/architecture/support-catalog-coverage.test.ts",
+      "diagnostics": [
+        {
+          "line": 100,
+          "column": 24,
+          "code": "TS2345",
+          "message": "Argument of type '\"pricing\"' is not assignable to parameter of type '\"active-sessions\" | \"claim-legacy\" | \"delete-account\" | \"forgot-password\" | \"help\" | \"home\" | \"method\" | \"owner-debate\" | \"privacy-preferences\" | \"public-catalog\" | \"public-debate\" | ... 6 more ... | \"your-debates\"'."
+        },
+        {
+          "line": 101,
+          "column": 24,
+          "code": "TS2345",
+          "message": "Argument of type '\"theme\"' is not assignable to parameter of type '\"active-sessions\" | \"claim-legacy\" | \"delete-account\" | \"forgot-password\" | \"help\" | \"home\" | \"method\" | \"owner-debate\" | \"privacy-preferences\" | \"public-catalog\" | \"public-debate\" | ... 6 more ... | \"your-debates\"'."
+        },
+        {
+          "line": 102,
+          "column": 24,
+          "code": "TS2345",
+          "message": "Argument of type '\"replay\"' is not assignable to parameter of type '\"active-sessions\" | \"claim-legacy\" | \"delete-account\" | \"forgot-password\" | \"help\" | \"home\" | \"method\" | \"owner-debate\" | \"privacy-preferences\" | \"public-catalog\" | \"public-debate\" | ... 6 more ... | \"your-debates\"'."
+        }
+      ],
+      "minimalTypeOnlyRemedy": "Declare the action lookup as Map<string, catalog item> so negative arbitrary-id membership remains type-valid."
+    },
+    {
+      "laneRelative": "tests/integration/support-routes.test.ts",
+      "diagnostics": [
+        {
+          "line": 920,
+          "column": 57,
+          "code": "TS2345",
+          "message": "Argument of type '() => Promise<Readonly<{ messageId: `${string}-${string}-${string}-${string}-${string}`; outcome: \"ANSWER_GROUNDED\"; text: \"Deschide Set\u0103ri.\" | \"Open Settings.\"; canEscalate: false; sources: readonly { id: \"settings-help-menus\"; label: string; }[]; actions: readonly never[]; }>>' is not assignable to parameter of type '(input: Readonly<{ sessionId: string; text: string; language: SupportLanguage; detectedLanguage: SupportLanguage; overrideLanguage: SupportLanguage | null; ... 5 more ...; onQueueProgress?: (notice: string) => void; }>) => Promise<...>'."
+        }
+      ],
+      "minimalTypeOnlyRemedy": "Return canEscalate:true from the NAVFIX SupportAnswerPort fixture, matching the exact port contract."
+    },
+    {
+      "laneRelative": "tests/unit/support-context.test.ts",
+      "diagnostics": [
+        {
+          "line": 115,
+          "column": 34,
+          "code": "TS4104",
+          "message": "The type 'readonly string[]' is 'readonly' and cannot be assigned to the mutable type 'WithAsymmetricMatcher<string>[]'."
+        }
+      ],
+      "minimalTypeOnlyRemedy": "Pass a mutable copy of expected_source_ids to Vitest arrayContaining; preserve source assertions."
+    },
+    {
+      "laneRelative": "tests/unit/support-recovery-intent.test.ts",
+      "diagnostics": [
+        {
+          "line": 22,
+          "column": 17,
+          "code": "TS7006",
+          "message": "Parameter 'subject' implicitly has an 'any' type."
+        },
+        {
+          "line": 26,
+          "column": 27,
+          "code": "TS7006",
+          "message": "Parameter 'subject' implicitly has an 'any' type."
+        },
+        {
+          "line": 30,
+          "column": 23,
+          "code": "TS7006",
+          "message": "Parameter 'subject' implicitly has an 'any' type."
+        },
+        {
+          "line": 35,
+          "column": 11,
+          "code": "TS7006",
+          "message": "Parameter 'left' implicitly has an 'any' type."
+        },
+        {
+          "line": 35,
+          "column": 16,
+          "code": "TS7006",
+          "message": "Parameter 'right' implicitly has an 'any' type."
+        },
+        {
+          "line": 35,
+          "column": 22,
+          "code": "TS7006",
+          "message": "Parameter 'reverse' implicitly has an 'any' type."
+        },
+        {
+          "line": 41,
+          "column": 17,
+          "code": "TS7006",
+          "message": "Parameter 'subject' implicitly has an 'any' type."
+        },
+        {
+          "line": 45,
+          "column": 27,
+          "code": "TS7006",
+          "message": "Parameter 'subject' implicitly has an 'any' type."
+        },
+        {
+          "line": 49,
+          "column": 23,
+          "code": "TS7006",
+          "message": "Parameter 'subject' implicitly has an 'any' type."
+        },
+        {
+          "line": 54,
+          "column": 11,
+          "code": "TS7006",
+          "message": "Parameter 'left' implicitly has an 'any' type."
+        },
+        {
+          "line": 54,
+          "column": 16,
+          "code": "TS7006",
+          "message": "Parameter 'right' implicitly has an 'any' type."
+        },
+        {
+          "line": 54,
+          "column": 22,
+          "code": "TS7006",
+          "message": "Parameter 'reverse' implicitly has an 'any' type."
+        }
+      ],
+      "minimalTypeOnlyRemedy": "Add the declared string/boolean parameter types to the twelve Object.freeze callback parameters; preserve the generated matrix."
+    }
+  ]
+}

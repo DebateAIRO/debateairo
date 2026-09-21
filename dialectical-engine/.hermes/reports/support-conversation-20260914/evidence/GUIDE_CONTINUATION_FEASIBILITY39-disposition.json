@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CONTINUATION_FEASIBILITY39",
+  "ticket": "t_c4586754",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "FEASIBLE_PENDING_INERT_TRANSITION_PROOF",
+  "staticOnly": true,
+  "productEdits": 0,
+  "operationalRequests": 0,
+  "row47RecaptureRequired": false,
+  "remaining": {
+    "requests": 21,
+    "modelBranches": 18,
+    "newSessions": 3,
+    "ownerReservedRequests": 6,
+    "ownerReservedModelCalls": 6,
+    "ownerReservedSessions": 2,
+    "conservativeDailyMessageUpperBoundBeforeContinuation": 67,
+    "conservativeDailyMessageUpperBoundAfterContinuationAndReserve": 94,
+    "conservativeDailyMessagesLeft": 6
+  },
+  "groups": [
+    {
+      "id": "ro-continuation",
+      "sequences": [
+        10,
+        18,
+        26,
+        34,
+        56,
+        58,
+        54,
+        43
+      ],
+      "transition": "compact RO -> keyboard /help -> full RO",
+      "sessionCount": 1
+    },
+    {
+      "id": "full-en",
+      "sequences": [
+        5,
+        13,
+        21,
+        25,
+        29,
+        37,
+        45,
+        53
+      ],
+      "sessionCount": 1
+    },
+    {
+      "id": "compact-en",
+      "sequences": [
+        8,
+        12,
+        42,
+        55,
+        57
+      ],
+      "sessionCount": 1
+    }
+  ],
+  "provedBySource": [
+    "same-origin same-tab navigation preserves sessionStorage",
+    "both surfaces mount the persistent production Assistant",
+    "full Assistant hydrates stored RO language/session/messages before interaction",
+    "same-language remount does not execute the session-clearing language-change path",
+    "activeSession reuses the restored anonymous session",
+    "server message admission uses session id/capability and stored language, not UI surface"
+  ],
+  "currentHarnessBlocker": {
+    "kind": "HARNESS_ONLY",
+    "details": [
+      "the group loop rejects rows whose mode differs from group.mode",
+      "navigation currently nulls controller mode/language instead of proving the destination surface",
+      "the fixed fresh lifecycle names do not express a compact-to-full continuation group"
+    ]
+  },
+  "minimumControllerChange": {
+    "productChangeRequired": false,
+    "steps": [
+      "define the exact first group as compact rows 10,18,26,34,56,58,54 followed by full row43",
+      "after row54 activate the verified keyboard Help action and wait for /help",
+      "do not reset storage, call page.goto/openMode, or select language at the boundary",
+      "prove the full composer, active RO language, restored prior message, and unchanged create-session ordinal",
+      "send row43 through the full root and require the existing group continuation count",
+      "keep row43 last because it is the terminal injection case"
+    ],
+    "appendOnlySuggestedPaths": [
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_CONTINUATION39/matrix.mjs",
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_CONTINUATION39/session-lifecycle.mjs",
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_CONTINUATION39/capture-continuation.mjs",
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_CONTINUATION39/run-ui-transition-control.mjs"
+    ]
+  },
+  "inertControl": {
+    "loadExistingPublicUiAssets": true,
+    "inertMarkupAloneIsInsufficient": true,
+    "supportForwardedRequests": 0,
+    "requirements": [
+      "use the real compiled public React UI and static assets",
+      "seed only a synthetic valid RO stored conversation with the canonical Help action",
+      "intercept and fulfill or abort every Support, status, auth, private, and external request",
+      "activate the rendered Help action by keyboard and wait for the actual /help route",
+      "assert the full Assistant restores RO, the prior article, and the synthetic session",
+      "submit one synthetic row43 request and fulfill the intercepted message response",
+      "assert zero createSession attempts, exactly one messages attempt, and zero forwarded dynamic requests",
+      "record only booleans, counts, and ordinals; never persist session ids or capabilities"
+    ],
+    "outputFields": [
+      "publicUiAssetsLoaded",
+      "navigationPerformed",
+      "destinationHelp",
+      "fullRoRestored",
+      "priorMessageRestored",
+      "sessionIdentityPreserved",
+      "capabilityPreserved",
+      "languageSelectionPerformed",
+      "createSessionAttempts",
+      "messageAttempts",
+      "messageUsedSeededSession",
+      "interceptedStatusAuthPrivateExternal",
+      "forwardedDynamicRequests"
+    ]
+  },
+  "limits": [
+    "No inert transition proof was executed in this read-only node.",
+    "Runtime9 custody and current capacity remain unproven; a fresh frame is mandatory.",
+    "Real continuation identity/capability comparisons must stay in memory and record only booleans/ordinals.",
+    "This does not authorize continuation or accept CP1; Forgot remains unresolved and CP2 gated."
+  ]
+}

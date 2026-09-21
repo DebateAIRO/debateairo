@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE31",
+  "ticket": "t_4f9303e3",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "FAILED_CAPTURE_ROW47_NO_RETRY",
+  "phaseStatuses": {
+    "preflight": 0,
+    "readiness": 0,
+    "capacity": 0,
+    "gate": 0,
+    "rowProof": 0,
+    "capture": 1,
+    "idle": "NOT_RUN"
+  },
+  "counts": {
+    "attemptedRows": 10,
+    "completedReplies": 10,
+    "sendMessage": 10,
+    "createSession": 2,
+    "forbiddenAnswers": 0,
+    "forbiddenConsent": 0,
+    "fullyCapturedRows": 9,
+    "partialScreenshotRows": 1
+  },
+  "completedSequences": [
+    1,
+    2,
+    15,
+    19,
+    23,
+    27,
+    31,
+    35,
+    39,
+    47
+  ],
+  "failure": {
+    "sequence": 47,
+    "prompt": "Resetează-mi parola.",
+    "httpStatus": 200,
+    "outcome": "REFUSE_ZONE",
+    "apiDomTextEqual": true,
+    "apiDomSourcesEqual": true,
+    "apiDomActionsEqual": true,
+    "outerCode": "GUIDE_HARNESS_CAPTURE_FAILED",
+    "screenshotCode": "GUIDE_CAPTURE_SCROLL_EDGE_MISSING",
+    "footerLocator": "ABSENT",
+    "topPaneCreated": true,
+    "footerPaneCreated": false,
+    "completeExpandedCreated": false,
+    "restoration": {
+      "paneScrollTopRestored": true,
+      "viewportRestored": true,
+      "observedPaneScrollTop": 0,
+      "observedViewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "topPaneBodyPainted": "FULL_VISIBLE_REFUSAL_BODY_WITHOUT_SOURCE_OR_ACTION_FOOTER"
+  },
+  "row23": {
+    "allThreeImagesSaved": true,
+    "failureDiagnosticAbsent": true
+  },
+  "sessions": {
+    "creationTimesUtc": [
+      {
+        "ordinal": 1,
+        "observedAtUtc": "2026-09-21T09:52:36.856Z"
+      },
+      {
+        "ordinal": 2,
+        "observedAtUtc": "2026-09-21T09:53:08.483Z"
+      }
+    ],
+    "allUseKbVersion": [
+      "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+      "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af"
+    ],
+    "conservativeFiveSlotNotBeforeUtc": "2026-09-21T10:53:13.483Z"
+  },
+  "capacityAfterAttemptBound": {
+    "measuredMaxAnonMessageEvents24hByIp": 57,
+    "newSends": 10,
+    "upperBoundAfterAttempt": 67,
+    "remainingUnderDailyLimitAtMost": 33,
+    "ownerSixMessageReserveAfterAnotherFull31": false
+  },
+  "evidence": {
+    "gateSha256": "67238998eb7e0308edfab7b6f61586541dbeb9323472d4759a23145fb0485b57",
+    "rowProofSha256": "c6848ff3d302f7f77912c7876f0ce9ad337330268b2e39ad99baaa09413f7966",
+    "partialReceiptSha256": "f0dde45933a40f1836014cc1c187258e8b233228973f1410cbb144eaf8b83951",
+    "row47DiagnosticSha256": "769f6537994df708464f50d79d6f8deb3ec41b233ebf77820e8d9a5db2b69da3"
+  },
+  "qualification": "No retry, no additional capacity read, no idle phase. Runtime9 postfailure custody remains unverified.",
+  "providerCallsExact": "UNAVAILABLE_NO_POST_CAPTURE_MEASUREMENT",
+  "operatorExitStatus": 1,
+  "captureChildStatus": 1,
+  "browserProfileAfterFailure": "ABSENT_BY_REVIEWED_CAPTURE_FINALLY"
+}

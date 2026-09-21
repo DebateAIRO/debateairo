@@ -1,0 +1,23 @@
+{
+  "total": 52,
+  "included": 51,
+  "excluded": 1,
+  "duplicates": [],
+  "help": {
+    "id": "help-free-text",
+    "labelEn": "Support conversation",
+    "labelRo": "Conversație de asistență",
+    "articleId": "app-navigation",
+    "mode": "safe-static-action",
+    "actionId": "help",
+    "href": "/help",
+    "constraint": "verified closed /help action; free text remains the primary interface",
+    "surface": "help"
+  },
+  "actionRuleViolations": [],
+  "minWorkersOccurrences": 3,
+  "maxWorkersOccurrences": 9,
+  "hasPG8A": true,
+  "hasPG8B": true,
+  "eightRecordMentions": 16
+}

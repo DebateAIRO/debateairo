@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_BIND32",
+  "ticket": "t_f068fcad",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_BOUND_OFFLINE_REVIEW_REQUIRED",
+  "controls": 17,
+  "passed": 17,
+  "names": [
+    "exact clean reviewed product revision is bound",
+    "FINAL18 nonempty product inventory is bound",
+    "unchanged reviewed44 KB attestation is rebound",
+    "exact34 membership has current affected-frame custody without single-run overclaim",
+    "current product full58 constructor passes every row",
+    "current full58 proof records zero browser session Support and model traffic",
+    "exact31 order remains31 unique rows",
+    "five-session fourteen-EN seventeen-RO twenty-seven-model plan remains in reviewed matrix",
+    "FIX30 screenshot helper is byte-identical",
+    "actual GUIDE22 and LIVE29 namespaces remain unchanged",
+    "all seven argv self-bind the BIND32 contract",
+    "proof-before-capture reviewed phase remains bound",
+    "Runtime8 exact11-key custody contract is bound",
+    "deferred owner command binds current revision and six-message two-session requirement",
+    "123 reserved future paths are unique and absent",
+    "operator remains node --import tsx require-escalated tool-captured stop-first",
+    "successor scripts pass syntax checks"
+  ],
+  "full58": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-PREVIEW_BIND32.json",
+    "sha256": "67cfc10ca5e079022e8a6c609e95cf2bdf333a077a0fd0c6017587e49b718617",
+    "rows": 58
+  },
+  "futureAbsence": {
+    "count": 123,
+    "allAbsent": true
+  },
+  "traffic": {
+    "runtime": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

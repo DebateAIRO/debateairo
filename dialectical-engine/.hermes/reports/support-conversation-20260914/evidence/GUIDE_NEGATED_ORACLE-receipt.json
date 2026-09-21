@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_NEGATED_ORACLE",
+  "ticket": "t_2aeea03b",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "agentPath": "/root/baseline",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-17T17:32:47Z",
+  "revision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "sourceHead": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+  "verdict": "REWORK_MATRIX_ORACLE",
+  "expectationDisposition": "MATRIX_WRONG_PRODUCT_HELP_ACTION_CORRECT",
+  "rows": [
+    {
+      "sequence": 53,
+      "mode": "full",
+      "language": "en",
+      "prompt": "I am not asking to reset a password. Where is Help?",
+      "retained": {
+        "branch": "MODEL",
+        "expectedSourceIds": [
+          "app-navigation"
+        ],
+        "recoveryClass": "NEGATED_OR_UNRELATED"
+      },
+      "current": {
+        "actionPolicy": "NONE",
+        "navigation": null
+      },
+      "required": {
+        "actionPolicy": "REQUIRE_CLOSED",
+        "navigation": {
+          "kind": "pointer",
+          "actionId": "help"
+        }
+      }
+    },
+    {
+      "sequence": 54,
+      "mode": "compact",
+      "language": "ro",
+      "prompt": "Nu cer resetarea parolei. Unde găsesc Ajutor?",
+      "retained": {
+        "branch": "MODEL",
+        "expectedSourceIds": [
+          "app-navigation"
+        ],
+        "recoveryClass": "NEGATED_OR_UNRELATED"
+      },
+      "current": {
+        "actionPolicy": "NONE",
+        "navigation": null
+      },
+      "required": {
+        "actionPolicy": "REQUIRE_CLOSED",
+        "navigation": {
+          "kind": "keyboard",
+          "actionId": "help"
+        }
+      }
+    }
+  ],
+  "minimalCorrection": {
+    "newCopiedHarnessAndAdapterNamespace": true,
+    "productFiles": 0,
+    "matrixRowsChanged": [
+      53,
+      54
+    ],
+    "otherRowsPreserved": 52,
+    "requiredActionId": "help",
+    "requiredHref": "/help",
+    "separateReviewRequired": true,
+    "recomputeMatrixAndHarnessDigestsRequired": true,
+    "adapterPinsRebindRequired": true
+  },
+  "retainedSafeguards": {
+    "otherRows": 52,
+    "actualRecoveryRowsActionless": true,
+    "modelCallBudget": true,
+    "sessionGroups": 5,
+    "spacingMs": 31000,
+    "capacityAndPretrafficGates": true,
+    "forgotConnector": "UNRESOLVED_ACTIONLESS",
+    "productChangeRequired": false
+  },
+  "verification": {
+    "indexedInputs": 92,
+    "indexedInputsMatched": 92,
+    "detachedCheckoutClean": true
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_NEGATED_ORACLE.md",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_NEGATED_ORACLE.md",
+      "sha256": "1c76453a07464580b4cf764ab6d87ed41998f85098c9a2382e39071b19fa0ee6",
+      "bytes": 7830
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_NEGATED_ORACLE.md",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_NEGATED_ORACLE.md",
+      "sha256": "330c998c6c7964365cbff943607b75fdc222ed9ff3121a0f0d3a0ff56971c067",
+      "bytes": 3465
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_NEGATED_ORACLE-custody.json",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_NEGATED_ORACLE-custody.json",
+      "sha256": "67769da9f6488c262dd1fffac72411e997c94ea60517ac4c57ea1a39cbf4631f",
+      "bytes": 41872
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_NEGATED_ORACLE-static.json",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_NEGATED_ORACLE-static.json",
+      "sha256": "ad0c0ea429386490d9e60a6e8fdda799c0e4a8d43fbef3c694078de29f6a5f59",
+      "bytes": 4655
+    }
+  ],
+  "receiptExcludesItself": true,
+  "heavyLease": "NOT_REQUESTED",
+  "usage": "UNAVAILABLE"
+}

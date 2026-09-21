@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_ORACLE_REVIEW17",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productClean": true,
+  "indexedInputs": 131,
+  "inputMismatches": [],
+  "diagnosisArtifacts": 7,
+  "diagnosisArtifactMismatches": [],
+  "semanticSources": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/content/app-navigation.en.md",
+      "sha256": "a92e96c24c3df6d7a9b3e73a3fafde79321cd7445612588024ea205fb5c6e6db",
+      "bytes": 1489
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/content/app-navigation.ro.md",
+      "sha256": "a6f79cd55e0856780bff01ec3134df02a068b41453f44a8847c5c58050af8a23",
+      "bytes": 1697
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/content/guide-how-it-works.en.md",
+      "sha256": "05316f05e559cd866948ab7f464a681d6875fe8aad5143e956eeb20077bc46c5",
+      "bytes": 893
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/content/guide-how-it-works.ro.md",
+      "sha256": "94acc4db2ccecb9a0d4f5b82350e91d26643b76c6caff879019edc107a3e3000",
+      "bytes": 971
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/content/debate-workspace-menus.en.md",
+      "sha256": "dd5673e995acba7c108c52ff31080880206bdf0d51b2ca9f0113b0828e7be607",
+      "bytes": 1280
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/content/debate-workspace-menus.ro.md",
+      "sha256": "3cd8b0cdabe438779873f8f940cdff4bb2039ff55742f9400f8805320c8cbc39",
+      "bytes": 1445
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/ui/app/page.tsx",
+      "sha256": "e0caa4e5bee015c6f2784544055806edb53750c43b5a470073a175f6d332ec43",
+      "bytes": 4889
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/ui/app/debate/[id]/DebatePageClient.tsx",
+      "sha256": "34fae4bddf9e66231daf7596164916410f6c5927e724d4bd757567acf334144c",
+      "bytes": 78176
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/MENU-COVERAGE-v2.json",
+      "sha256": "32793ff1c7dc9c4a133c52de845f906092f1e7d71e8858b8d907a17abbc03c52",
+      "bytes": 24943
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/matrix.mjs",
+      "sha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+      "bytes": 14253
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/controls.mjs",
+      "sha256": "d9f8b49d05d828ed8963fdfd8529a289a0cd9fb03ba22991d09efe1807ac56bf",
+      "bytes": 45053
+    }
+  ],
+  "observedEvidence": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE8-failed-row-public-evidence.json",
+    "sha256": "e86f1fdb0cdef20f3755da960eba91ab5940eb9255f11cf6e8264ddf2d3cc928",
+    "bytes": 2479
+  },
+  "semanticDisposition": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ORACLE_REVIEW17-semantic-disposition.json",
+    "sha256": "17cc155c404b2b0587e36c8630bfe7913f3aaadc269cfcbbbdce719b15782172",
+    "bytes": 5512
+  },
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "capacity": 0,
+    "database": 0
+  }
+}

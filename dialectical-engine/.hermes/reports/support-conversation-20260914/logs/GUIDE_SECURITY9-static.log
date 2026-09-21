@@ -1,0 +1,55 @@
+GUIDE_SECURITY9 STATIC CUSTODY AND MEMBER TRACE
+captured_at=2026-09-20T13:17:33.689942+00:00
+base=78988fc2e5e24595bd9cd6ec0a3965c6039dc718
+revision=152eed4da1cd3e66b74d8301159ba76427552409
+detached_clean=true
+input_index_sha256=c2d5604a6ec39f1d668207b7e61ffdb9cdc1e8fb8a4c6b92a38b0e28ed2cef30
+indexed_inputs=67 matched=67 mismatched=0
+delta_paths=4
+delta=dialectical-engine/apps/api/src/support/index.ts
+delta=dialectical-engine/packages/db/src/support.ts
+delta=dialectical-engine/tests/integration/support-cases.test.ts
+delta=dialectical-engine/tests/integration/support-routes.test.ts
+author_product_files=4 matched=4
+product=apps/api/src/support/index.ts sha256=34fabe86db422c417a8e479c6274aaa1e070ad9b2b21515168eebecfcbfe5d29 bytes=36957 matched=true
+product=packages/db/src/support.ts sha256=ca7088f7fbc99c1863f2c44d42db9015076025181a86d1c9662fc6a05a32331a bytes=100535 matched=true
+product=tests/integration/support-cases.test.ts sha256=18ca4e4b1a5622b06396259ca2ed973e5cc04c894e6971a1ba6c0da210445dd7 bytes=30440 matched=true
+product=tests/integration/support-routes.test.ts sha256=c90576ca3d6f95ff7def08113c2fab02d069488a0d05510a43d8fe64e3303109 bytes=144256 matched=true
+declared_principal_count=11
+privilege_or_state_update_delta_lines=0
+UNCHANGED OBJECTS
+apps/api/src/main.ts	base=983d03f35b81748ec72689f67b71c25f00a3d9e4	final=983d03f35b81748ec72689f67b71c25f00a3d9e4	equal=true
+apps/api/src/support/session.ts	base=ad84393d123cf72ff80e71da8718c3b03f25e2b4	final=ad84393d123cf72ff80e71da8718c3b03f25e2b4	equal=true
+apps/api/src/support/classify.ts	base=26a06aa385b8cf3d532775cad49f5fc9cec2e618	final=26a06aa385b8cf3d532775cad49f5fc9cec2e618	equal=true
+apps/api/src/support/response-policy.ts	base=dfa153786307717d4c7c2c19b8c8ba53ff4c61fe	final=dfa153786307717d4c7c2c19b8c8ba53ff4c61fe	equal=true
+apps/api/src/support/escalation.ts	base=e928751b9338f0c0171eda6edb435e88aab7151d	final=e928751b9338f0c0171eda6edb435e88aab7151d	equal=true
+apps/api/src/support/answer.ts	base=51cd5d46d5487a58aa37a296d18e082126e1f643	final=51cd5d46d5487a58aa37a296d18e082126e1f643	equal=true
+packages/support-kb/src/context.ts	base=a1a830ee29b0cef55f4b4f0412d7f460efd4382b	final=a1a830ee29b0cef55f4b4f0412d7f460efd4382b	equal=true
+apps/runner/src/dev-database-principals.ts	base=31f1d4e0070d3347447a07bb835d3e52db976be3	final=31f1d4e0070d3347447a07bb835d3e52db976be3	equal=true
+migrations	base=3038f703377f79ca7012e6d5ce72a644f47f6d55	final=3038f703377f79ca7012e6d5ce72a644f47f6d55	equal=true
+tests/architecture/sup-01-boundary.test.ts	base=ddbf852c568840b62b7e42619b7a791d654ee992	final=ddbf852c568840b62b7e42619b7a791d654ee992	equal=true
+tests/integration/dev-database-principals.test.ts	base=9c3cdbffea5f19a3fc601ae95663c0bdb979deaa	final=9c3cdbffea5f19a3fc601ae95663c0bdb979deaa	equal=true
+tests/integration/support-metrics.test.ts	base=9021e3fe7a33435327398ebb5487004f77f42c8f	final=9021e3fe7a33435327398ebb5487004f77f42c8f	equal=true
+tests/support-eval/run.ts	base=d244f9560c0c66cb2c783a7f5229bbe9c3c05d79	final=d244f9560c0c66cb2c783a7f5229bbe9c3c05d79	equal=true
+MEMBERS
+read_threshold=PASS packages/db/src/support.ts:284-308 LOCK EXISTS precedes optional current-threshold fallback
+read_default=PASS packages/db/src/support.ts:292-296 consumes LOCK when threshold argument is absent
+admit=PASS packages/db/src/support.ts:338-367 serializes session then rejects event.locked before quotas/model route
+rate_direct=PASS packages/db/src/support.ts:509-529 locks session and inserts only physical OPEN with no LOCK
+case_once=PASS packages/db/src/support.ts:672-690 session lock plus LOCK-event guard
+case_direct=PASS packages/db/src/support.ts:768-789 session lock plus LOCK-event guard
+rating_route=PASS apps/api/src/support/index.ts:646-660 default read and typed 429 before rating; data guard covers race/direct call
+manual_route=PASS apps/api/src/support/index.ts:683-699 default read and typed 429 before case; data guard covers race/direct call
+threshold_change=PASS existing LOCK remains authoritative regardless new threshold
+threshold_refusal_storage=PASS packages/db/src/support.ts:404-425 threshold injection records INJECTION+LOCK and returns ADMITTED; existing restricted-role control stores six encrypted rows and zero model transit
+status=RETAINED packages/db/src/support.ts:2006-2011 excludes event-locked sessions
+cooldown=RETAINED packages/db/src/support.ts:440-468 consumes LOCK events
+message_storage=INTENTIONAL physical-OPEN storage remains to persist already-admitted threshold refusal; public later requests stop in admission
+AUTHOR EVIDENCE
+red_direct=createCaseOnce opened from physical OPEN plus LOCK
+red_route=threshold3_to4 produced read OPEN; statuses rating/manual/message 200/201/200; rating+1 case+2
+green_focused=2/2 green_affected=225/225 final34=1701_passed+1_TODO fresh_structural_eval=3x60/60 rubric=PENDING
+HEAVY
+heavy_lease_acquired=false
+tests_executed_independently=0
+runtime_or_database_traffic=false
