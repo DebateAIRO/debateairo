@@ -4,14 +4,20 @@ Ruling **V-7** (`V-DECISIONS-PACKET.md`, finding L6-F8): untrack exactly two CLA
 machine recording — never a whole folder — add ignore rules so they cannot return, keep every
 written record, and rewrite no history. This file is the record that ruling asks for.
 
-## The pin commit
+## The pin commits
 
-Every file named below is still in this repository's history, unchanged, at
+Every file named below is still in this repository's history, unchanged, at either of two commits.
+Both trees hold all 132 (counted with `git ls-tree -r --name-only`), and the second is named because
+the first exists only on one branch:
 
-**`5e49e863b064400073e0efb7207185262c5fd0e7`** (short `5e49e863`, *chore(repo): delete the dormant
-husky hook scaffolding (V-8)*) — the last commit whose tree still contains all 132 of them.
+| Commit | What it is | Use it when |
+|---|---|---|
+| `67204a819d8…` (short `67204a81`, *docs(security): execution plan — Tasks 7 to 15*) | the **shared base** this task branched from | always — it survives whatever shape integration takes |
+| `5e49e863b064400073e0efb7207185262c5fd0e7` (short `5e49e863`, *chore(repo): delete the dormant husky hook scaffolding (V-8)*) | the **last commit on `security/t2-hyg-repo`** whose tree still holds them | while that branch is around |
 
-Nothing was rewritten: R1 stands, and the blobs are reachable from that commit for as long as the
+The commands below use the shared base for that reason.
+
+Nothing was rewritten: R1 stands, and the blobs are reachable from those commits for as long as the
 repository exists.
 
 ## What stopped being tracked
@@ -52,18 +58,32 @@ S10 record or the codex-session fixture stops being tracked.
 ## Reading a recording again
 
 The files are still on the machine that made them; `git rm --cached` removed them from the index
-only. On a fresh clone, list what the pin commit holds:
+only. On a fresh clone, list the 22 transcripts the pin commit holds:
 
 ```
-git ls-tree -r --name-only 5e49e863 -- dialectical-engine/.hermes/reports dialectical-engine/docs/missions
+git ls-files --with-tree=67204a81 -- 'dialectical-engine/docs/missions/*/logs/*.jsonl'
 ```
 
-and bring one class back into the working tree (it stays untracked, because the ignore rules
-cover it):
+and the 110 trace archives:
 
 ```
-git restore --source=5e49e863 --worktree -- dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs
+git ls-files --with-tree=67204a81 -- 'dialectical-engine/.hermes/reports/*.zip'
 ```
+
+The same two pathspecs bring a class back into the working tree, where it stays untracked because
+the ignore rules cover it. They are written narrowly on purpose — a pathspec naming the folder
+would also overwrite the 761 written records that share it, which is not what these sentences say:
+
+```
+git restore --source=67204a81 --worktree -- 'dialectical-engine/docs/missions/*/logs/*.jsonl'
+```
+
+```
+git restore --source=67204a81 --worktree -- 'dialectical-engine/.hermes/reports/*.zip'
+```
+
+Checked on 2026-09-22: the transcript pathspec matches 22 paths, all `.jsonl`; the archive pathspec
+matches 110, all `.zip`; neither touches a `.md` record or the codex-session test fixture.
 
 ## Documents that name a recording
 
