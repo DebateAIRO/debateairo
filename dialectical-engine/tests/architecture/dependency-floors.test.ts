@@ -66,6 +66,25 @@ function topLevelScalar(key: string): string | undefined {
   return workspace.match(new RegExp(`^${key}:[ \\t]*(\\S+)[ \\t]*$`, "m"))?.[1];
 }
 
+/**
+ * The `minimumReleaseAgeExclude` entries, each paired with the `drop after YYYY-MM-DD` date of
+ * the nearest comment above it (undefined when no dated comment governs it). The block is absent
+ * when nothing is excluded, which is the resting state the cooldown policy wants.
+ */
+function cooldownExclusions(): Array<{ entry: string; dropAfter: string | undefined }> {
+  const block = workspace.match(/^minimumReleaseAgeExclude:\n((?:  (?:- |#)[^\n]*\n?)+)/m)?.[1] ?? "";
+  const found: Array<{ entry: string; dropAfter: string | undefined }> = [];
+  let dropAfter: string | undefined;
+  for (const line of block.split("\n")) {
+    if (line.trimStart().startsWith("#")) {
+      dropAfter = /drop after (\d{4}-\d{2}-\d{2})/.exec(line)?.[1] ?? dropAfter;
+    } else if (line.startsWith("  - ")) {
+      found.push({ entry: line.replace(/^  - /, "").replace(/^'|'$/g, "").trim(), dropAfter });
+    }
+  }
+  return found;
+}
+
 describe("supply-chain install policy (L6-F3, L6-F12)", () => {
   it("enforces a release-age cooldown of at least 7 days", () => {
     const minutes = Number(topLevelScalar("minimumReleaseAge"));
@@ -76,9 +95,20 @@ describe("supply-chain install policy (L6-F3, L6-F12)", () => {
     expect(topLevelScalar("strictDepBuilds")).toBe("true");
   });
   it("only excludes exact name@version pins from the cooldown, never a range", () => {
-    const block = workspace.match(/^minimumReleaseAgeExclude:\n((?:  (?:- |#)[^\n]*\n?)+)/m)?.[1] ?? "";
-    const entries = block.split("\n").filter((line) => line.startsWith("  - ")).map((line) => line.replace(/^  - /, "").replace(/^'|'$/g, ""));
-    expect(entries.length).toBeGreaterThanOrEqual(5); // the three pre-existing pins plus next and sharp
-    for (const entry of entries) expect(entry).toMatch(/^(@[a-z0-9-]+\/)?[a-z0-9.-]+@\d+\.\d+\.\d+$/);
+    for (const { entry } of cooldownExclusions()) expect(entry).toMatch(/^(@[a-z0-9-]+\/)?[a-z0-9.-]+@\d+\.\d+\.\d+$/);
+  });
+  // V-18 (ruled 2026-09-21): an exclusion from the cooldown is TEMPORARY by definition — it buys a
+  // version time until it is itself 7 days old, and then it is dead weight that silently widens the
+  // window a registry hijack could use. So every entry carries a `drop after YYYY-MM-DD` comment
+  // (the day its version turns 7 days old) and must be gone by that date. Expiry now enforces
+  // itself: this case goes red the morning an exclusion outlives its reason, instead of waiting for
+  // someone to remember. The nearest dated comment above an entry governs it, which is how the
+  // block already grouped the next and sharp families.
+  it("gives every cooldown exclusion an unexpired `drop after YYYY-MM-DD` comment", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    for (const { entry, dropAfter } of cooldownExclusions()) {
+      expect(dropAfter, `${entry}: no "drop after YYYY-MM-DD" comment above it in pnpm-workspace.yaml`).toBeDefined();
+      expect(dropAfter! >= today, `${entry}: its exclusion expired on ${dropAfter} — remove it (V-18)`).toBe(true);
+    }
   });
 });
