@@ -32,8 +32,17 @@ const passwordPolicySchema = z.object({
    * (`AUTH_PASSWORD_MAX_BYTES`, 1024 UTF-8 bytes): UTF-8 bytes are never fewer
    * than UTF-16 code units, so a policy maximum above 1024 could never bind.
    */
-  max_length: z.number().int().min(8).max(1_024).optional()
-}).strict();
+  max_length: z.number().int().positive().max(1_024).optional()
+}).strict().refine(
+  // The two length rules are read TOGETHER. A row that satisfies both members
+  // in isolation but puts the maximum below the minimum would parse cleanly and
+  // then refuse every registration — an outage published as a policy. The
+  // member bound above is deliberately only `positive`, so this comparison is
+  // the rule that decides coherence and stays the rule if `minimum_length` ever
+  // gains a superseding value.
+  (value) => value.max_length === undefined || value.max_length >= value.minimum_length,
+  { message: "max_length is below minimum_length" }
+);
 
 const auditSourceIpKdfPolicySchema = z.object({
   kind: z.literal("AUDIT_SOURCE_IP_KDF_POLICY"),

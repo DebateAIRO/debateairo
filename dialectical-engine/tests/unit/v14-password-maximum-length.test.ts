@@ -108,6 +108,26 @@ describe("V-14 the password maximum length is register policy", () => {
     }
   });
 
+  it("refuses a published row whose maximum is below its own minimum", () => {
+    // A row that parses member by member and then refuses every registration
+    // is not a policy, it is an outage. The two members are read together.
+    const incoherent = AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS.map((row) => row.rowKey !== "passwordPolicy"
+      ? row
+      : { ...row, value: { ...row.value, max_length: 4 } });
+    expect(() => authPolicyFromRegisterRows(incoherent))
+      .toThrowError(expect.objectContaining({ code: "AUTH_POLICY_INVALID" }));
+    // ...and the smallest coherent maximum, exactly the minimum, is admitted.
+    const tight = AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS.map((row) => row.rowKey !== "passwordPolicy"
+      ? row
+      : { ...row, value: { ...row.value, max_length: 8 } });
+    expect(authPolicyFromRegisterRows(tight).password.maximumLength).toBe(8);
+  });
+
+  it("resolves the superseding row through the reader: maximumLength is 1024", () => {
+    expect(authPolicyFromRegisterRows(AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS).password.maximumLength)
+      .toBe(1_024);
+  });
+
   it("resolves the maximum as a policy member, in the same unit as the minimum", () => {
     const policy = authPolicyFromRegisterRows(AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS);
     expect(policy.password.minimumLength).toBe(8);
