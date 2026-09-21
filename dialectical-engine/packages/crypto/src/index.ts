@@ -229,6 +229,81 @@ function readKek(handle: KekHandle): Buffer {
   return copyKey(material);
 }
 
+const KEK_ID_DOMAIN = "debateai:kek-id:v1\0";
+const KEK_ID_BYTES = 8;
+
+/**
+ * V-3. A stable, NON-SECRET label for a KEK, written into every wrapped-key
+ * record so a rotation can tell which master key wrapped it without trying to
+ * decrypt. Eight bytes of a domain-separated SHA-256 over the 32-byte key, the
+ * same shape every key-management system uses for a key id: a 64-bit truncation
+ * of a hash of a high-entropy secret is not a practical route back to it, and
+ * the domain string keeps this digest from colliding with any other use of the
+ * same bytes.
+ */
+export function kekId(kek: KekHandle): string {
+  const material = readKek(kek);
+  try {
+    return createHash("sha256")
+      .update(KEK_ID_DOMAIN, "utf8")
+      .update(material)
+      .digest()
+      .subarray(0, KEK_ID_BYTES)
+      .toString("hex");
+  } finally {
+    material.fill(0);
+  }
+}
+
+/**
+ * The keys a process may unwrap with during a changeover. `previous` is absent
+ * in the steady state, which is the whole point: an operator retires the old
+ * KEK by deleting the setting once a verification pass is clean.
+ */
+export interface KekRing {
+  readonly current: KekHandle;
+  readonly previous?: KekHandle | undefined;
+}
+
+/** Every store still accepts a bare handle, which means "current, no previous". */
+export type KekSource = KekHandle | KekRing;
+
+function toKekRing(source: KekSource): KekRing {
+  return "current" in source ? source : { current: source };
+}
+
+/**
+ * Chooses the KEK for one record and unwraps with it.
+ *
+ * A LABELLED record is authoritative: the label names exactly one key, and a
+ * process holding neither that key nor a previous one refuses rather than
+ * try-decrypting its way in. An UNLABELLED record — everything written before
+ * V-3 — is "wrapped by the original KEK", which during a changeover may be
+ * either key, so those two are tried in turn. That fallback is bounded to the
+ * two keys the process already holds and disappears record by record as the
+ * rotation re-writes each one labelled.
+ */
+function unwrapUnderRing(
+  ring: KekRing,
+  label: string | undefined,
+  envelope: CryptoEnvelope,
+  aad: AeadAad
+): Buffer {
+  if (label === undefined) {
+    try {
+      return unwrapDek(ring.current, envelope, aad);
+    } catch (error) {
+      if (ring.previous === undefined) throw error;
+      return unwrapDek(ring.previous, envelope, aad);
+    }
+  }
+  if (label === kekId(ring.current)) return unwrapDek(ring.current, envelope, aad);
+  if (ring.previous !== undefined && label === kekId(ring.previous)) {
+    return unwrapDek(ring.previous, envelope, aad);
+  }
+  throw new KekUnresolvedError();
+}
+
 /**
  * Zeroes the KEK master copy and forgets the handle (L2-F7). Idempotent, so the
  * shutdown lifecycle may run it on both the signal and the controller path.
@@ -1561,6 +1636,20 @@ async function custodyWriteModes(
   return OWNER_CUSTODY_MODES;
 }
 
+/**
+ * V-3. `undefined` means "this record carries no label" (a v1 record); a present
+ * label must be exactly the 16 hex characters `kekId` produces, because a record
+ * whose label is malformed is a record whose provenance is unknown.
+ */
+function parseRecordKekId(record: Readonly<Record<string, unknown>>): string | undefined {
+  const label = record.kek_id;
+  if (label === undefined) return undefined;
+  if (typeof label !== "string" || !/^[0-9a-f]{16}$/.test(label)) {
+    throw new KekUnresolvedError();
+  }
+  return label;
+}
+
 function assertUserDekStoreUserId(userId: string): void {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
     throw new TypeError("USER_DEK_STORE_USER_ID_INVALID");
@@ -1602,22 +1691,28 @@ async function durableRemoveDirectory(
   return existed ? "DESTROYED" : "ALREADY_ABSENT";
 }
 
+function userDekAad(userId: string): AeadAad {
+  return [
+    "secret-store", "user-dek", userId, "run:none", userId, `user-dek:${userId}`, "1"
+  ];
+}
+
 export class FileUserDekStore implements ReadableUserDekStore {
+  private readonly keks: KekRing;
+
   constructor(
     private readonly root: string,
-    private readonly kek: KekHandle,
+    kek: KekSource,
     private readonly fileSystem: UserDekStoreFileSystem = defaultUserDekStoreFileSystem
   ) {
     if (root.trim() === "") throw new TypeError("USER_DEK_STORE_PATH_REQUIRED");
+    this.keks = toKekRing(kek);
   }
 
   async store(userId: string, dek: Uint8Array): Promise<void> {
     assertUserDekStoreUserId(userId);
-    const aad = [
-      "secret-store", "user-dek", userId, "run:none", userId,
-      `user-dek:${userId}`, "1"
-    ] as const;
-    const envelope = wrapDek(this.kek, dek, aad);
+    const aad = userDekAad(userId);
+    const envelope = wrapDek(this.keks.current, dek, aad);
     const users = join(this.root, "users");
     const directory = join(users, userId);
     const location = join(directory, "dek.v1.json");
@@ -1641,9 +1736,10 @@ export class FileUserDekStore implements ReadableUserDekStore {
       await this.fileSystem.chmod(directory, modes.directory);
       file = await this.fileSystem.open(temporary, "wx", modes.file);
       await file.writeFile(JSON.stringify({
-        version: 1,
+        version: 2,
         user_id: userId,
         key_id: envelope.keyId,
+        kek_id: kekId(this.keks.current),
         wrapped_dek: envelope
       }), "utf8");
       await this.fileSystem.chmod(temporary, modes.file);
@@ -1706,7 +1802,12 @@ export class FileUserDekStore implements ReadableUserDekStore {
       if (typeof parsed !== "object" || parsed === null) throw new KekUnresolvedError();
       const record = parsed as Record<string, unknown>;
       const envelope = record.wrapped_dek;
-      if (record.version !== 1 || record.user_id !== userId || record.key_id !== `user-dek:${userId}`
+      // v1 carries no kek_id and is read as "wrapped by the original KEK";
+      // v2 names its KEK. Any other version is a record this build does not
+      // understand, and a key store fails closed on those.
+      const label = parseRecordKekId(record);
+      if ((record.version !== 1 && record.version !== 2)
+        || record.user_id !== userId || record.key_id !== `user-dek:${userId}`
         || typeof envelope !== "object" || envelope === null) {
         throw new KekUnresolvedError();
       }
@@ -1716,10 +1817,9 @@ export class FileUserDekStore implements ReadableUserDekStore {
         || typeof candidate.tag !== "string") {
         throw new KekUnresolvedError();
       }
-      return unwrapDek(this.kek, candidate as unknown as CryptoEnvelope, [
-        "secret-store", "user-dek", userId, "run:none", userId,
-        `user-dek:${userId}`, "1"
-      ]);
+      return unwrapUnderRing(
+        this.keks, label, candidate as unknown as CryptoEnvelope, userDekAad(userId)
+      );
     } catch (error) {
       if (error instanceof KekUnresolvedError || error instanceof CryptoAuthenticationError) throw error;
       throw new KekUnresolvedError();
@@ -2287,9 +2387,11 @@ export class PublicationKeyUnresolvedError extends CryptoError {
 }
 
 type StoredPublicationKey = Readonly<{
-  version: 1;
+  version: 1 | 2;
   publication_ref: string;
   key_id: string;
+  /** Absent on v1 records, which are read as wrapped by the original corpus KEK. */
+  kek_id: string | undefined;
   wrapped_publication_key: CryptoEnvelope;
 }>;
 
@@ -2322,9 +2424,10 @@ function wrapPublicationKey(
   assertPublicationRef(publicationRef);
   const envelope = wrapDek(corpusKek, key, publicationKeyAad(publicationRef));
   return Object.freeze({
-    version: 1,
+    version: 2,
     publication_ref: publicationRef,
     key_id: envelope.keyId,
+    kek_id: kekId(corpusKek),
     wrapped_publication_key: envelope
   });
 }
@@ -2334,7 +2437,14 @@ function parseStoredPublicationKey(value: unknown, publicationRef: string): Stor
   if (typeof value !== "object" || value === null) throw new PublicationKeyUnresolvedError();
   const record = value as Record<string, unknown>;
   const envelope = record.wrapped_publication_key;
-  if (record.version !== 1 || record.publication_ref !== publicationRef
+  let label: string | undefined;
+  try {
+    label = parseRecordKekId(record);
+  } catch {
+    throw new PublicationKeyUnresolvedError();
+  }
+  if ((record.version !== 1 && record.version !== 2)
+    || record.publication_ref !== publicationRef
     || record.key_id !== `publication-key:${publicationRef}:v1`
     || typeof envelope !== "object" || envelope === null) {
     throw new PublicationKeyUnresolvedError();
@@ -2346,20 +2456,22 @@ function parseStoredPublicationKey(value: unknown, publicationRef: string): Stor
     throw new PublicationKeyUnresolvedError();
   }
   return Object.freeze({
-    version: 1,
+    version: record.version,
     publication_ref: publicationRef,
     key_id: String(record.key_id),
+    kek_id: label,
     wrapped_publication_key: candidate as unknown as CryptoEnvelope
   });
 }
 
 function unwrapPublicationKey(
-  corpusKek: KekHandle,
+  corpusKek: KekRing,
   record: StoredPublicationKey
 ): LoadedPublicationKey {
   try {
-    const key = unwrapDek(
+    const key = unwrapUnderRing(
       corpusKek,
+      record.kek_id,
       record.wrapped_publication_key,
       publicationKeyAad(record.publication_ref)
     );
@@ -2372,18 +2484,23 @@ function unwrapPublicationKey(
 
 export class MemoryPublicationKeyStore implements PublicationKeyStore {
   readonly #records = new Map<string, StoredPublicationKey>();
+  readonly #keks: KekRing;
 
-  constructor(private readonly corpusKek: KekHandle) {}
+  constructor(corpusKek: KekSource) {
+    this.#keks = toKekRing(corpusKek);
+  }
 
   async store(publicationRef: string, key: Uint8Array): Promise<void> {
     if (this.#records.has(publicationRef)) throw new TypeError("PUBLICATION_KEY_EXISTS");
-    this.#records.set(publicationRef, wrapPublicationKey(this.corpusKek, publicationRef, key));
+    this.#records.set(
+      publicationRef, wrapPublicationKey(this.#keks.current, publicationRef, key)
+    );
   }
 
   async load(publicationRef: string): Promise<LoadedPublicationKey> {
     const record = this.#records.get(publicationRef);
     if (record === undefined) throw new PublicationKeyUnresolvedError();
-    return unwrapPublicationKey(this.corpusKek, record);
+    return unwrapPublicationKey(this.#keks, record);
   }
 
   async exists(publicationRef: string): Promise<boolean> {
@@ -2398,16 +2515,19 @@ export class MemoryPublicationKeyStore implements PublicationKeyStore {
 }
 
 export class FilePublicationKeyStore implements PublicationKeyStore {
+  private readonly keks: KekRing;
+
   constructor(
     private readonly root: string,
-    private readonly corpusKek: KekHandle,
+    corpusKek: KekSource,
     private readonly fileSystem: PublicationKeyFileSystem = defaultRunContentKeyFileSystem
   ) {
     if (root.trim() === "") throw new TypeError("PUBLICATION_KEY_STORE_PATH_REQUIRED");
+    this.keks = toKekRing(corpusKek);
   }
 
   async store(publicationRef: string, key: Uint8Array): Promise<void> {
-    const record = wrapPublicationKey(this.corpusKek, publicationRef, key);
+    const record = wrapPublicationKey(this.keks.current, publicationRef, key);
     const publications = join(this.root, "publications");
     const directory = join(publications, publicationRef);
     const location = join(directory, "publication-key.v1.json");
@@ -2495,7 +2615,7 @@ export class FilePublicationKeyStore implements PublicationKeyStore {
         await readCustodyRecord(location, this.fileSystem),
         publicationRef
       );
-      return unwrapPublicationKey(this.corpusKek, record);
+      return unwrapPublicationKey(this.keks, record);
     } catch (error) {
       if (error instanceof PublicationKeyUnresolvedError) throw error;
       throw new PublicationKeyUnresolvedError();
