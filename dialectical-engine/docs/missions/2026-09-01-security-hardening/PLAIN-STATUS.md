@@ -20,7 +20,7 @@ We are going through them together, one at a time. Each answer is written into [
 |---|---|---|
 | Ruled on 18 Sept | V-15 (the server starts with an empty database) and V-23 (we look at the Cloudflare integration together, at the end) | 2 of 2 |
 | A — routine | thirteen small ones | **13 of 13 — all "yes", 21 Sept** |
-| B — switches on your GitHub account | Nine short questions. **Answered:** which branch GitHub watches (`dev` until release day, then back to `main`); a private channel for reporting holes (yes — and the public promise to reply changes from 3 working days to one week). **Still to ask:** automatic fix pull requests; blocking pushes that contain secrets; the code scanner's four notes; pinned automation scripts; two-factor login for everyone; branch rules; the 527 MB of recordings in the repository | 2 of 9 |
+| B — switches on your GitHub account | Nine short questions. **Answered:** which branch GitHub watches (`dev` until release day, then back to `main`); a private channel for reporting holes (yes — and the public promise to reply changes from 3 working days to one week); the bot that prepares package fixes (yes to ready-made fix pull requests, and yes to its weekly routine updates — with a 7-day wait added so the bot obeys your own "packages must be a week old" rule). **Still to ask:** blocking pushes that contain secrets; the code scanner's four notes; pinned automation scripts; two-factor login for everyone; branch rules; the 527 MB of recordings in the repository | 3 of 9 |
 | C — real choices that add work | changing the master key; two server accounts sharing one key folder; the GPU settings; **how the server reaches the AI models**; and three more | 0 of 7 |
 | D — new, from the re-check | support chat on account deletion; a money ceiling per debate; the monitoring agent's permissions; how the support chat reaches the model | 0 of 4 |
 
@@ -39,6 +39,23 @@ The other workstream finished on 21 September. It moved the whole project to a n
 | Node | 22.23.1 | 26.8.2 or newer | take `dev`'s — it was their deliberate decision |
 | vitest (the test tool) | 4.1.11 | 5.0.1 | take `dev`'s, then re-check that the old vitest advisory is really gone |
 | fastify (the web-server library) | 5.12.1 — the security fix | 5.11.2 — the version with known advisories | **keep this branch's**, or the known holes come back |
+
+### What your "yes" answers have put on my to-do list (nothing here is built yet)
+
+I am collecting rulings first and building afterwards, so the questions keep moving. Each item below will be built test-first: a test that fails for the right reason, then the smallest change that makes it pass.
+
+| From | What gets built | Size |
+|---|---|---|
+| V-14 | The 1,024-character password limit written into the official policy, as a new version of that setting | small |
+| V-17 | The code's internal "map" of the database updated with the two missing columns, plus a test that compares map and real database | small |
+| V-18 | The 37 expired exceptions to the "packages must be a week old" rule removed (and 3 newer ones, once each is old enough) | small |
+| V-8 | The never-activated "pre-push checks" folder deleted | tiny |
+| V-4 | The stricter rule for the list of known-failing tests: a listed test that passes three runs in a row makes the check fail until its entry is deleted | small |
+| V-25 | The memory test re-measured under Node 26, per platform, each number recorded as a new version | small, part of the second bringing-up-to-date |
+| V-21 | Three development-only leftovers tidied | small, low priority |
+| Package bot | A 7-day waiting period added to the bot's configuration | tiny |
+
+Already done because it was a one-line wording change: the public promise in [SECURITY.md](../../../../SECURITY.md) now says "within one week".
 
 ### Order of work from here
 
