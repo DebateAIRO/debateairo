@@ -95,6 +95,38 @@ GitHub → the `DebateAIRO` organisation → Settings → Authentication securit
 
 Settings → Actions → General → "Require actions to be pinned to a full-length commit SHA". (The security workflow already pins every action by SHA, so nothing breaks.)
 
+**Ruled 2026-09-22: yes — and a second lock with it.** (a) Require pinning. (b) Restrict which actions may run to GitHub's own plus the one third-party action the workflow uses (`pnpm/action-setup`). Measured 2026-09-22 (read-only): `allowed_actions: all`, `sha_pinning_required: false`; the workflow uses 5 action references, all pinned — `actions/checkout` ×3, `actions/setup-node`, `github/codeql-action` init and analyze, `pnpm/action-setup`. Neither `main` nor `dev` carries a workflow today, so nothing can break between the two calls below.
+
+Both settings can be made from the command line (the repository-level API exposes them), each on the owner's "go". First the policy:
+
+```bash
+gh api -X PUT repos/DebateAIRO/debateairo/actions/permissions -F enabled=true -f allowed_actions=selected -F sha_pinning_required=true
+```
+
+Then the list of what may run:
+
+```bash
+gh api -X PUT repos/DebateAIRO/debateairo/actions/permissions/selected-actions -F github_owned_allowed=true -F verified_allowed=false -f 'patterns_allowed[]=pnpm/action-setup@*'
+```
+
+Check both afterwards (read-only):
+
+```bash
+gh api repos/DebateAIRO/debateairo/actions/permissions
+```
+
+```bash
+gh api repos/DebateAIRO/debateairo/actions/permissions/selected-actions
+```
+
+Undo, back to today's state:
+
+```bash
+gh api -X PUT repos/DebateAIRO/debateairo/actions/permissions -F enabled=true -f allowed_actions=all -F sha_pinning_required=false
+```
+
+If GitHub rejects a field, stop and use the web-interface path above instead; do not improvise. Adding a new third-party action later means adding its pattern to the list first — that friction is the point.
+
 ## Step 6 — the four code-scanning notes on PR #8
 
 Three alerts of the rule `js/missing-rate-limiting` (login, e-mail verification, MFA code check) are false positives: the audit's route table (`findings/L1-api-auth.md`, rows for those routes) records the in-process limiters that guard them, which the scanner cannot recognise. Dismiss each with the reason recorded:
