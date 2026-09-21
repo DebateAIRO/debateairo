@@ -38,3 +38,33 @@ describe("repository hygiene (F-06)", () => {
     }
   });
 });
+
+// V-7 (L6-F8): two classes of bulky machine recording are kept in git HISTORY but are no longer
+// tracked at HEAD — 110 Playwright trace archives (466.0 MiB) and 22 AI-session transcripts
+// (49.1 MiB), measured 2026-09-22. CLASSES, never whole folders: the written records beside the
+// transcripts stay tracked (two architecture tests read S10-erasure-evidence-artifact.md out of
+// the same logs folder), and so does the one .jsonl codex-session test fixture. The commit that
+// still carries every file is named in
+// docs/missions/2026-09-01-security-hardening/UNTRACKED-EVIDENCE-2026-09-22.md.
+const BULKY_RECORDING_CLASSES: ReadonlyArray<readonly [string, RegExp, string]> = [
+  ["Playwright trace archives", /^dialectical-engine\/\.hermes\/reports\/.*\.zip$/, "dialectical-engine/.hermes/reports/**/*.zip"],
+  ["AI-session transcripts", /^dialectical-engine\/docs\/missions\/.*\/logs\/.*\.jsonl$/, "dialectical-engine/docs/missions/**/logs/**/*.jsonl"]
+];
+
+describe("bulky recordings are history, not working tree (V-7)", () => {
+  it("tracks no file of either class", () => {
+    for (const [label, pattern] of BULKY_RECORDING_CLASSES) {
+      expect(tracked.filter((path) => pattern.test(path)), label).toEqual([]);
+    }
+  });
+  it("ignores exactly those two classes, so they cannot return", () => {
+    const rootIgnore = readFileSync(resolve(gitRoot, ".gitignore"), "utf8").split("\n");
+    for (const [label, , rule] of BULKY_RECORDING_CLASSES) expect(rootIgnore, label).toContain(rule);
+  });
+  it("keeps the written records and the codex-session fixture the classes sit beside", () => {
+    expect(tracked, "the S10 erasure-evidence record shares the transcripts' folder")
+      .toContain("dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/S10-erasure-evidence-artifact.md");
+    const fixtures = tracked.filter((path) => path.startsWith("dialectical-engine/acceptance/test-fixtures/codex-sessions/") && path.endsWith(".jsonl"));
+    expect(fixtures.length, "the codex-session .jsonl test fixture").toBeGreaterThan(0);
+  });
+});
