@@ -316,8 +316,6 @@ export class SessionService implements SessionApplication {
       const passwordHash = identity?.passwordHash ?? this.dependencies.dummyPasswordHash;
       // V-22: a stored envelope over twice the password policy is refused here,
       // before a worker slot or an Argon2 arena exists.
-      // V-22: a stored envelope over twice the password policy is refused here,
-      // before a worker slot or an Argon2 arena exists.
       const verified = storedArgon2EnvelopeWithinPolicy(
         passwordHash, this.dependencies.authPolicy.password.argon2id, "password"
       ) && await verifyPassword(this.dependencies.argon2, passwordHash, input.password);
