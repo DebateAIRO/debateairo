@@ -637,9 +637,10 @@ describe("DEV-05 complete development deployment register", () => {
 
   it("seeds exactly every production API boot row, seals it, and reuses it unchanged", async () => {
     const bootstrap = await loadBootstrapRegister();
+    const providerPanel = TEST_DEVELOPMENT_PROVIDER_PANEL;
     const first = await seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      providerPanel,
       repositoryRoot
     });
     expect(first.registerVersion).toBe(String(DEVELOPMENT_REGISTER_VERSION));
@@ -676,11 +677,24 @@ describe("DEV-05 complete development deployment register", () => {
     expect(makers).toMatchObject({
       deploymentMakerCapability: true,
       configuredMakers: [...new Set(
-        TEST_DEVELOPMENT_PROVIDER_PANEL.configuredProviders.map(({ maker }) => maker)
+        providerPanel.configuredProviders.map(({ maker }) => maker)
       )].sort(),
-      configuredProviders: TEST_DEVELOPMENT_PROVIDER_PANEL.configuredProviders.map(
+      configuredProviders: providerPanel.configuredProviders.map(
         ({ providerRef, maker }) => ({ providerRef, maker })
       )
+    });
+    // Property: the default panel's policy is pinned independently of the seed fixture.
+    // Production break: remove or remap one default provider while projecting the expectation from that same fixture.
+    expect(makers).toMatchObject({
+      deploymentMakerCapability: true,
+      configuredMakers: ["Anthropic", "OpenAI", "Z.AI", "xAI"],
+      configuredProviders: [
+        { providerRef: "development:codex-premium-cli", maker: "OpenAI" },
+        { providerRef: "development:claude-premium-cli", maker: "Anthropic" },
+        { providerRef: "development:grok-cli", maker: "xAI" },
+        { providerRef: "development:openai-free-api", maker: "OpenAI" },
+        { providerRef: "development:zai-free-api", maker: "Z.AI" }
+      ]
     });
     expect(discovery).toMatchObject({ probeFreshnessMs: 600_000, probeMaxAttempts: 1 });
     expect(structural).toEqual({

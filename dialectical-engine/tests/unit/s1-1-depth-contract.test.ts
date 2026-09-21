@@ -335,6 +335,59 @@ const OWNING_DECLARATION = Object.freeze({
   text: "export const EXPANSION_DEPTH_MAX = 5;"
 });
 
+/**
+ * Exact non-depth numeric domains admitted by the combined shipped corpus.
+ * Counts bind repeated candidates on one source line; a missing or extra hit
+ * throws, so this cannot become a path-wide or text-prefix suppression.
+ */
+const NON_DEPTH_DOMAIN_EXEMPTIONS = Object.freeze([
+  {
+    site: `packages/obs-capture/scripts/verify-fix09-native-wipe.mjs:55 [DOMAIN_ENUMERATION] const preimage = Buffer.concat([Buffer.from(domain, "ascii"), Buffer.from([0]), u32(parts.length), ...parts.map(lp)]);`,
+    occurrences: 1,
+    reason: "the zero byte is a hash-domain separator, not a selectable depth"
+  },
+  {
+    site: "packages/obs-capture/scripts/verify-fix09-native-wipe.mjs:394 [DOMAIN_ENUMERATION] const families = [",
+    occurrences: 12,
+    reason: "the fixture enumerates twelve cryptographic family vectors, not a depth domain"
+  },
+  {
+    site: "packages/obs-capture/scripts/verify-fix09-native-wipe.mjs:561 [DOMAIN_ENUMERATION] for (const [index, capacity] of [256, 768].entries()) {",
+    occurrences: 1,
+    reason: "the two values are byte capacities for wipe verification"
+  },
+  {
+    site: `packages/obs-capture/src/chain/canonical.ts:255 [DOMAIN_ENUMERATION] return Buffer.concat([Buffer.from(name, "utf8"), Buffer.from([0])]);`,
+    occurrences: 1,
+    reason: "the zero byte terminates a canonical name encoding"
+  },
+  {
+    site: "packages/obs-capture/src/chain/private-key-helper.ts:261 [DOMAIN_ENUMERATION] if (zeroBody.length !== BIND_LENGTH + 3 || !zeroBody.subarray(0, BIND_LENGTH).equals(bind) ||",
+    occurrences: 1,
+    reason: "three is a custody-frame byte-length suffix"
+  },
+  {
+    site: `packages/obs-capture/src/chain/private-key-helper.ts:308 [DOMAIN_ENUMERATION] if (!body.equals(Buffer.concat([bind, Buffer.from([7, 1])]))) fail("FIX09_CUSTODY_CLOSED_ACK");`,
+    occurrences: 1,
+    reason: "seven and one are custody acknowledgement bytes"
+  },
+  {
+    site: `packages/obs-capture/src/chain/verify.ts:90 [DOMAIN_ENUMERATION] return Buffer.concat([Buffer.from(value, "utf8"), Buffer.from([0])]);`,
+    occurrences: 1,
+    reason: "the zero byte terminates a verified string encoding"
+  },
+  {
+    site: `packages/obs-capture/src/chain/witness.ts:131 [DOMAIN_ENUMERATION] return Buffer.concat([Buffer.from(value, "utf8"), Buffer.from([0])]);`,
+    occurrences: 1,
+    reason: "the zero byte terminates a witness string encoding"
+  },
+  {
+    site: "packages/obs-capture/src/spool-index.ts:698 [DOMAIN_ENUMERATION] for (const slot of [0, 1] as const) {",
+    occurrences: 1,
+    reason: "zero and one are the two physical spool index slots"
+  }
+]);
+
 function shippedSourceFiles(): string[] {
   const found: string[] = [];
   const walk = (directory: string): void => {
@@ -349,13 +402,34 @@ function shippedSourceFiles(): string[] {
   return found;
 }
 
-/** Every depth-bound SITE in shipped code, addressed `path:line [KIND] text`. */
-function depthBoundSitesInShippedCode(): string[] {
+/** Every candidate SITE in shipped code, addressed `path:line [KIND] text`. */
+function rawDepthBoundSitesInShippedCode(): string[] {
   return shippedSourceFiles().flatMap((absolute) => {
     const path = relative(REPOSITORY_ROOT, absolute).split(sep).join("/");
     return duplicateBoundSites(path, readFileSync(absolute, "utf8"))
       .map((site) => `${path}:${site.line} [${site.kind}] ${site.text}`);
   }).sort();
+}
+
+/** Every actual depth-bound site after exact, count-checked non-depth admissions. */
+function depthBoundSitesInShippedCode(): string[] {
+  const remaining = new Map(
+    NON_DEPTH_DOMAIN_EXEMPTIONS.map(({ site, occurrences }) => [site, occurrences])
+  );
+  const depthSites: string[] = [];
+  for (const site of rawDepthBoundSitesInShippedCode()) {
+    const count = remaining.get(site);
+    if (count === undefined || count === 0) {
+      depthSites.push(site);
+      continue;
+    }
+    remaining.set(site, count - 1);
+  }
+  const stale = [...remaining.entries()].filter(([, count]) => count !== 0);
+  if (stale.length > 0) {
+    throw new Error(`STALE_NON_DEPTH_DOMAIN_EXEMPTION ${JSON.stringify(stale)}`);
+  }
+  return depthSites;
 }
 
 /** The same scan minus the one owning declaration — must be empty. */
@@ -1778,7 +1852,7 @@ describe("S1-1 · the depth bound has a single source", () => {
     const sites = depthBoundSitesInShippedCode();
     if (process.env.ORACLE_AUDIT === "1") console.log("SHIPPED_SITES " + JSON.stringify(sites));
     expect(sites).toEqual([
-      `${OWNING_DECLARATION.path}:112 [DEPTH_BOUND_LITERAL] ${OWNING_DECLARATION.text}`
+      `${OWNING_DECLARATION.path}:113 [DEPTH_BOUND_LITERAL] ${OWNING_DECLARATION.text}`
     ]);
   });
 

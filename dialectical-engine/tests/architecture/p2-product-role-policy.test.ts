@@ -135,6 +135,9 @@ describe("P2-14 sealed product-role catalog", () => {
     expect(registerSource).toContain("createPostgresRegisterPublicationPort(pool).importHistorical");
     expect(devSeed).toContain("PRODUCT_ROLE_POLICY_REGISTER_ROW");
     expect(devSeed).toContain("buildDevelopmentDeploymentRegisterPublicationRows");
+    // Property: the publication port that publishes the policy rows owns the caller's admin pool.
+    // Production break: construct publicationPort from another pool while retaining the same local call below.
+    expect(devSeed).toContain("const publicationPort = createPostgresRegisterPublicationPort(input.adminPool);");
     expect(devSeed).toContain("publicationPort.publishGeneral");
     const readIndex = apiMain.indexOf("await readProductRolePolicy(pool, environment.REGISTER_VERSION)");
     const workerIndex = apiMain.indexOf("new Argon2WorkerPool()");

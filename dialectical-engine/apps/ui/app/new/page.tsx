@@ -78,14 +78,13 @@ export default function NewDebatePage() {
 function NewDebateForm({ token }: { token: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const planTierControlsAvailable = typeof Reflect.get(contractClient, "readPlanTiers") === "function";
   const [topic, setTopic] = useState(searchParams.get("topic") ?? "");
   const [planTier, setPlanTier] = useState<PlanTier>("free");
   const [planTierRosters, setPlanTierRosters] = useState<PlanTierRosters>(EMPTY_PLAN_TIER_ROSTERS);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [depthMode, setDepthMode] = useState<AdaptiveDepthMode>("fixed");
   const [scrutiny, setScrutiny] = useState<ScrutinyDepth>("standard");
-  const [depth, setDepth] = useState(planTierControlsAvailable ? 2 : 1);
+  const [depth, setDepth] = useState(2);
   const [branching, setBranching] = useState(2);
   const [concurrency, setConcurrency] = useState(3);
   const [maxTokens, setMaxTokens] = useState(800);
@@ -113,11 +112,7 @@ function NewDebateForm({ token }: { token: string }) {
       if (!active) return;
       setSessionDefaultsError(`ASK_SESSION_DEFAULTS_UNAVAILABLE: ${failure instanceof Error ? failure.message : "Session read failed"}`);
     });
-    const readPlanTiers = Reflect.get(contractClient, "readPlanTiers") as
-      | undefined
-      | (() => ReturnType<typeof contractClient.readPlanTiers>);
-    if (typeof readPlanTiers !== "function") return () => { active = false; };
-    void readPlanTiers.call(contractClient).then((rosters) => {
+    void contractClient.readPlanTiers().then((rosters) => {
       if (!active) return;
       setPlanTierRosters({ free: rosters.free, premium: rosters.premium });
       setPlanTierRostersError(null);
@@ -301,8 +296,7 @@ function NewDebateForm({ token }: { token: string }) {
               disabled={planTier === "free"}
               onChange={setDepth}
             />
-            {planTierControlsAvailable ? (
-              <div className="ndRow ndRowSteering">
+            <div className="ndRow ndRowSteering">
                 <div className="ndSteerField">
                   <label className="ndLabel" htmlFor="steeringPresets">Steering menu selections</label>
                   <div className="ndHint" id="steeringPresets-hint">One per line</div>
@@ -340,8 +334,7 @@ function NewDebateForm({ token }: { token: string }) {
                     placeholder="Add a note the run will carry…"
                   />
                 </div>
-              </div>
-            ) : null}
+            </div>
             <p className="ndProvenance">
               Tier source, provenance, and machine as-of are recorded automatically with the run contract.
             </p>

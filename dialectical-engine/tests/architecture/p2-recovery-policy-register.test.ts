@@ -117,6 +117,9 @@ describe("P2-02 sealed recovery-policy register", () => {
     expect(registerSource).toContain("createPostgresRegisterPublicationPort(pool).importHistorical");
     expect(devSeed).toContain("RECOVERY_POLICY_REGISTER_ROW");
     expect(devSeed).toContain("buildDevelopmentDeploymentRegisterPublicationRows");
+    // Property: the publication port that publishes the policy rows owns the caller's admin pool.
+    // Production break: construct publicationPort from another pool while retaining the same local call below.
+    expect(devSeed).toContain("const publicationPort = createPostgresRegisterPublicationPort(input.adminPool);");
     expect(devSeed).toContain("publicationPort.publishGeneral");
     const readIndex = apiMain.indexOf("await readRecoveryPolicy(pool, environment.REGISTER_VERSION)");
     const workerIndex = apiMain.indexOf("new Argon2WorkerPool()");
