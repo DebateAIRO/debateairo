@@ -1,6 +1,14 @@
 # Where things stand, in plain language
 
-*Written 2026-09-17 and updated through 2026-09-20 for the project owner. This page explains the state of the V3 debate engine work without the code names the other files in this folder use. Every claim links to the file that holds the details. When the detailed records change, this page is updated in the same commit.*
+*Written 2026-09-17 and updated through 2026-09-21 for the project owner. This page explains the state of the V3 debate engine work without the code names the other files in this folder use. Every claim links to the file that holds the details. When the detailed records change, this page is updated in the same commit.*
+
+## 2026-09-21: you asked whether anything was left, and to merge with dev and push
+
+**Nothing was left to merge.** GitHub's `dev` already held every piece of this work: I fetched it fresh and compared, and the two were identical. The code on `dev` is exactly the code the last full test run checked, because everything added since that run is notes, not code.
+
+**One small correction went to `dev`.** While checking, I found three slips in the project's own records, all made by the tool that writes them: one row named the wrong commit for the final test run, and two sentences had a leftover placeholder where the actual count belonged. They are fixed, and the next section gained one sentence: the failing-test count can move by one or two between runs without anything changing.
+
+**Left alone on purpose:** a security branch from a different session exists only on this Mac and is not on `dev`. It is a separate job, so it was not merged.
 
 ## 2026-09-19 → 20: "please fix the tests" — and what the failures turned out to be
 
@@ -18,7 +26,7 @@
 | 1 | a structural check you already have a card for (F31) | already tracked |
 | 3 | three measurements in the sign-up tests whose instruments are unreliable, not the code they measure | already tracked, each with its own card |
 
-The three measurement ones are worth one sentence, because they are not bugs in your product: one compares a number against a threshold it recalculates from its own data every run, which makes it fail roughly six times in a hundred for no reason; one watches for memory growth using a calculation that also trips when memory is *released*; and one is a test being cut off after a minute when the work it does takes under two. All three have cards saying what to fix, and in every case what to fix is the measurement, not the thing measured.
+The three measurement ones are worth one sentence, because they are not bugs in your product: one compares a number against a threshold it recalculates from its own data every run, which makes it fail roughly six times in a hundred for no reason; one watches for memory growth using a calculation that also trips when memory is *released*; and one is a test being cut off after a minute when the work it does takes under two. All three have cards saying what to fix, and in every case what to fix is the measurement, not the thing measured. A fourth sign-up measurement of the same kind happened to pass on the run that counted; in the run just before it, that one failed and the six-in-a-hundred one passed. So the next count can move by one or two without anything in your product changing. The fourth one has its own card too: [F-ENUMERATION-TIMING-GATES-SPIKE](board/F-ENUMERATION-TIMING-GATES-SPIKE.md).
 
 **What you decided, and what it produced.** You chose to restore only what a visitor would notice, and separately ruled that the review marks belong on the debate card, that a shared link should open on the summary with the tree one click away, and that the library counter should count the rows on screen. All three of those are built. The review marks are recorded as your decision and left for your website work — the tests for them stay red on purpose, which is an honest "agreed, not yet built" rather than a hidden disagreement.
 

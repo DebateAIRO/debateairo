@@ -477,7 +477,11 @@ seals acceptance register version 3 and is still the first witness of the creden
 
 **THE SUITE WENT 45 → 12 (D79).** V asked to "fix the tests"; three Opus 5 seats read all 45
 reds one by one under the law *never make a test pass by weakening it*. `origin/dev` = the commit that carries these records (the tip of `git log`).
-the reds that remain are the ones V deferred or that are ticketed debt, plus anything the delta names
+The full suite at `a61206dc` on a quiet host: **12 / 0 / 0 / 0** over 5367 tests (NEW 0 · CLEARED 33 · STILL 12 against
+the D78 gate); every remaining red is deferred by V, awaits V's decision, or is ticketed. Two ticketed rows are chance-
+and load-sensitive and traded places between that night's two full runs (LEDGER, the D79 GATE row), so the next
+count can change by a name with nothing changed — re-read the names, never only the number. (Corrected 2026-09-21:
+this paragraph first carried a template fragment where the count belonged.)
 
 **The thing to know before you trust any number in this repository.** Five distinct ways a check can
 look like it is working while checking nothing were found and recorded in

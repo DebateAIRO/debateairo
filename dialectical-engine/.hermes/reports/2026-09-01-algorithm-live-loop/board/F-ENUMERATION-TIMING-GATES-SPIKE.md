@@ -20,7 +20,7 @@ to answer — a user-enumeration side channel. The tolerance is the sealed
 `basePolicy.verification.enumerationToleranceMs` = 100 ms, and it is a security property, **not a
 threshold to be relaxed**.
 
-**The observation.** At the D79 tip `b1c57927`, `S3b keeps live-mail N=1/N=4/N=8 PostgreSQL arms below
+**The observation.** At the first D79 full sample `b1c57927`, `S3b keeps live-mail N=1/N=4/N=8 PostgreSQL arms below
 the separation ceiling` failed at `:5168` with `medianGapMs` **123.86 ≤ 100**. The measured gaps, five
 arms per run:
 
@@ -30,6 +30,7 @@ arms per run:
 | `53a09658` quiet (D78 gate) | 4.0 · 4.6 · 5.0 · 3.4 · 9.8 |
 | `b1c57927` (D79 gate) | 3.3 · 2.5 · **123.9** · 0.8 · **84.7** |
 | `b1c57927`, the row alone | 1.5 · 0.8 · 0.6 · 30.3 · 7.4 — **PASSES** |
+| `a61206dc` (the D79 closing gate, the next full run on the same host; row added 2026-09-21) | not extracted — the row is **not red** there (absent from `closing-runs/four-count-a61206dc-failures.txt`), and the permutation row of `F-S3D-SEPARATION-PERMUTATION-FLAKE` was red instead |
 
 **Why it is a spike and not a leak.** A real timing channel is a property of the code and would show in
 every arm and every run; here three of five arms in the failing run are under 4 ms, three earlier full
