@@ -1,10 +1,10 @@
 # Security work — where we stand, in plain words
 
-*Written 2026-09-18 for the owner. **Last updated: 21 September 2026, late evening.** This is the easy-to-read companion to the technical records in this folder. Every item links to the file that holds the detail. The newest news is in the first section; the dated sections below it are the history.*
+*Written 2026-09-18 for the owner. **Last updated: 22 September 2026.** This is the easy-to-read companion to the technical records in this folder. Every item links to the file that holds the detail. The newest news is in the first section; the dated sections below it are the history.*
 
-## Right now — 21 September, late evening
+## Right now — 22 September
 
-**A new AI session took over today**, starting from the handoff note ([HANDOFF-PROMPT.md](HANDOFF-PROMPT.md)). Before doing anything it checked that the state matches the note:
+**A new AI session took over on 21 September**, starting from the handoff note ([HANDOFF-PROMPT.md](HANDOFF-PROMPT.md)). Before doing anything it checked that the state matches the note:
 
 | Checked | Result |
 |---|---|
@@ -16,13 +16,36 @@
 
 We are going through them together, one at a time. Each answer is written into [V-DECISIONS-PACKET.md](V-DECISIONS-PACKET.md) the moment you give it, so an interruption loses nothing. The plain-language explanation of every decision is [DECISIONS-EXPLAINED.md](DECISIONS-EXPLAINED.md).
 
-| Group | What is in it | Answered |
-|---|---|---|
-| Ruled on 18 Sept | V-15 (the server starts with an empty database) and V-23 (we look at the Cloudflare integration together, at the end) | 2 of 2 |
-| A — routine | thirteen small ones | **13 of 13 — all "yes", 21 Sept** |
-| B — switches on your GitHub account | Nine short questions. **Answered:** which branch GitHub watches (`dev` until release day, then back to `main`); a private channel for reporting holes (yes — and the public promise to reply changes from 3 working days to one week); the bot that prepares package fixes (yes to ready-made fix pull requests, and yes to its weekly routine updates — with a 7-day wait added so the bot obeys your own "packages must be a week old" rule). blocking pushes that contain secrets (yes — switched on *before* this branch is first pushed, so the local commits get checked on their way up). the automatic code reviewer's notes (yes — its three open "high" notes are false alarms, which I confirmed in the code myself before asking you; they get dismissed with written reasons; for future notes I check the code first, fix the real ones, and bring you the false ones — I never dismiss one on my own). the helper scripts your automatic checks use (yes to both locks: GitHub will refuse any script not referenced by its exact fingerprint, and only GitHub's own scripts plus the one from your package installer may run at all). two-factor login for everyone (yes — once your colleague's account has it on; see the note just below this table). branch rules (yes, as two bundles: nobody — not even an administrator — can delete `main` or `dev` or rewrite their history; and changes reach `dev` through a pull request with the checks passing, with administrators exempt at first and that exemption to be tightened, on your separate "go", when real users arrive). the half gigabyte of test recordings and AI transcripts in the repository (yes — those two kinds of file stop being tracked; every written record stays). **Nothing on your GitHub account has been changed yet** — each switch still waits for your "go" at its step, in the order written in the [runbook](GITHUB-SETTINGS-RUNBOOK.md) | **9 of 9 — done, 22 Sept** |
-| C — real choices that add work | Seven, asked from smallest to largest. **Answered:** the planted password record that eats memory (yes — the server will refuse stored records that ask for more than twice the official cost). the GPU settings (yes — they become optional, and the six unused database logins are created already-expired; while checking I found the server kit as written would have stopped the engine from starting on day one, which gets fixed with it). **Still to ask:** two server accounts sharing one key folder (*blocks the server move*); four more places where debate text sits unencrypted; changing the master key; seven weaknesses where the engine talks to the AI models; **how the server reaches the AI models** (*blocks the server move*) | 1 of 7 |
-| D — new, from the re-check | support chat on account deletion; a money ceiling per debate; the monitoring agent's permissions; how the support chat reaches the model | 0 of 4 |
+| Group | Answered |
+|---|---|
+| Ruled on 18 Sept — V-15 (the server starts with an empty database) and V-23 (we look at the Cloudflare integration together, at the end) | 2 of 2 |
+| A — thirteen routine ones | **13 of 13** — all "yes", 21 Sept |
+| B — switches on your GitHub account | **9 of 9** — 22 Sept |
+| C — real choices that add work | 3 of 7 |
+| D — new, from the re-check | 0 of 4 |
+
+**Nothing on your GitHub account has been changed yet.** Each switch still waits for your "go" at its step, in the order written in the [runbook](GITHUB-SETTINGS-RUNBOOK.md).
+
+**Group B — what you ruled** (full wording in the packet; exact commands in the runbook):
+
+- **Which branch GitHub watches:** `dev` until release day, then back to `main`.
+- **A private channel for reporting holes:** yes. The public promise to reply changes from 3 working days to one week.
+- **The bot that prepares package fixes:** yes to ready-made fix pull requests, and yes to its weekly routine updates — with a 7-day wait added, so the bot obeys your own "packages must be a week old" rule.
+- **Blocking pushes that contain secrets:** yes — switched on *before* this branch is first pushed, so the local commits get checked on their way up.
+- **The automatic code reviewer's notes:** its three open "high" notes are false alarms (I confirmed that in the code myself before asking you); they get dismissed with written reasons. For future notes I check the code first, fix the real ones, and bring you the false ones — I never dismiss one on my own.
+- **The helper scripts your automatic checks use:** yes to both locks — GitHub will refuse any script not referenced by its exact fingerprint, and only GitHub's own scripts plus the one from your package installer may run at all.
+- **Two-factor login for everyone:** yes — once your colleague's account has it on (see the note below).
+- **Branch rules:** yes, as two bundles. Nobody — not even an administrator — can delete `main` or `dev` or rewrite their history. And changes reach `dev` through a pull request with the checks passing, with administrators exempt at first; that exemption gets tightened, on your separate "go", when real users arrive.
+- **The half gigabyte of test recordings and AI transcripts:** those two kinds of file stop being tracked; every written record stays.
+
+**Group C — so far** (asked from smallest to largest):
+
+- **V-22, a planted password record that eats memory:** yes — the server will refuse stored records that ask for more than twice the official cost.
+- **V-20, the GPU settings** (*was blocking the server move*): yes — they become optional, and the six unused database logins are created already-expired. While checking I found that the server kit, as written, would have stopped the engine from starting on day one; that gets fixed with it.
+- **V-19, two server accounts sharing one key folder** (*was blocking the server move*): option 1, the "team badge" — a key file may be readable by one named group, everything else stays as strict as today, and nothing changes on your Macs.
+- **Still to ask:** four more places where debate text sits unencrypted (V-6); changing the master key (V-3); seven weaknesses where the engine talks to the AI models (V-11); and **how the server reaches the AI models** (V-9 — *blocks the server move*).
+
+**Group D — still to ask:** the support chat on account deletion (V-26); a money ceiling per debate (V-28); the monitoring agent's permissions (V-29); how the support chat reaches the model (V-30).
 
 (The numbering has no "V-27" — it was skipped. The thirty are V-1 to V-30 without 27, plus one called V-6b.)
 
@@ -57,6 +80,7 @@ I am collecting rulings first and building afterwards, so the questions keep mov
 | V-21 | Three development-only leftovers tidied | small, low priority |
 | Package bot | A 7-day waiting period added to the bot's configuration | tiny |
 | V-7 | The 110 browser-test recordings (466 MB) and 22 AI transcripts (49 MB) stop being tracked; an ignore rule and a guard test keep them from coming back; the records note which commit last holds them | small |
+| V-19 | The "team badge" for key files: readable by one named group when that is switched on, as strict as today in every other respect, with a full table of refusal tests written first; the server kit's setup steps gain the matching group | about half a day |
 | V-20 | The three "GPU server" settings become optional for the engine room, the server kit stops writing a placeholder that would have stopped it from starting, and the six unused database logins are created already-expired | small |
 | V-22 | The server refuses a stored password record that asks for more than twice the official "how hard to work" cost (today it accepts four times: 256 MB per login check instead of 64 MB), with a test proving no real user can be locked out | small |
 | Noticed while checking the code reviewer's notes | The e-mail verification route does one cheap database lookup before its limit check; make it check the per-visitor budget first. Not a hole — a small tightening | tiny |
