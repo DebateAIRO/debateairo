@@ -300,6 +300,12 @@ describe("VPS baseline: encrypted DB + custody backups with separate escrow, res
     ]) expect(script, needle).toContain(needle);
     expect(script).not.toContain("core.runs");
     expect(script.indexOf("RESTORE_DRILL_OK")).toBeGreaterThan(script.indexOf("drill-decrypt-sample.ts"));
+    // V-19: tar restores the live tree's own modes and group, so a host running
+    // the custody group hands the drill 2750/0640 material owned by a group the
+    // postgres user is not in. The drill normalises the WHOLE tree, not just its
+    // top directories, and proves the backup opens under the strictest contract.
+    expect(script).toMatch(/find "\$WORK\/custody" "\$WORK\/keys" -type d -exec chmod 0700 \{\} \+/);
+    expect(script).toMatch(/find "\$WORK\/custody" "\$WORK\/keys" -type f -exec chmod 0600 \{\} \+/);
   });
 
   it("drill-decrypt-sample.ts proves one run row decrypts with the restored keys and never prints plaintext", () => {

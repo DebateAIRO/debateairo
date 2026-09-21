@@ -413,12 +413,6 @@ export function decrypt(dek: Uint8Array, envelope: CryptoEnvelope, aad: AeadAad)
 }
 
 /**
- * V-19: the environment setting a deployment opts into the custody group with.
- * Its value is either a group NAME or a decimal gid.
- */
-export const CUSTODY_GROUP_VARIABLE = "DEBATEAI_CUSTODY_GROUP" as const;
-
-/**
  * The POSIX group database. Not a one-computer path (constraint 7): it is the
  * same location on every Unix host, and a deployment that does not have one can
  * configure the gid as a decimal number instead, which is resolved without
@@ -477,24 +471,35 @@ export function resolveCustodyGroupGid(
   return gid;
 }
 
-// Resolution is cached against the raw setting, not unconditionally: the
-// wrapped-key stores consult the contract on every record read, and a group
-// NAME would otherwise re-read the group database on every request.
-let custodyGroupSetting: string | undefined;
+// Default: no group, so the contract is the single-owner one until a
+// composition root says otherwise. A process that never configures anything
+// therefore gets the STRICTER rule, which is the right way round.
 let custodyGroupGid: number | undefined;
-let custodyGroupResolved = false;
 
-function currentCustodyGid(): number | undefined {
-  const configured = process.env[CUSTODY_GROUP_VARIABLE];
-  if (custodyGroupResolved && custodyGroupSetting === configured) return custodyGroupGid;
-  const gid = resolveCustodyGroupGid(
+/**
+ * V-19. The composition root hands the value of `DEBATEAI_CUSTODY_GROUP`
+ * through, already parsed by the register loader — this package never reads the
+ * process environment itself (the structural purity law), and the group is
+ * resolved ONCE here rather than on every record read, which matters because
+ * the wrapped-key stores consult the contract per request and a group NAME
+ * would otherwise re-read the group database every time.
+ *
+ * Resolving eagerly is also what makes a misconfigured group a boot failure:
+ * `CUSTODY_GROUP_UNRESOLVED` is thrown here, before the first key is opened.
+ * Call it with `undefined` to return to the single-owner contract.
+ */
+export function configureCustodyGroup(configured: string | undefined): void {
+  // Cleared first, so a resolution that throws leaves the STRICTEST contract
+  // behind rather than whatever group happened to be configured before it.
+  custodyGroupGid = undefined;
+  custodyGroupGid = resolveCustodyGroupGid(
     configured,
     () => readFileSync(POSIX_GROUP_DATABASE, "utf8")
   );
-  custodyGroupSetting = configured;
-  custodyGroupGid = gid;
-  custodyGroupResolved = true;
-  return gid;
+}
+
+function currentCustodyGid(): number | undefined {
+  return custodyGroupGid;
 }
 
 export type CustodyFileFacts = Readonly<{

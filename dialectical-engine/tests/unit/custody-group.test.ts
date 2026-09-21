@@ -22,9 +22,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  CUSTODY_GROUP_VARIABLE,
   FilePublicationKeyStore,
   FileUserDekStore,
+  configureCustodyGroup,
   custodyAccepts,
   generateDek,
   loadKek,
@@ -54,7 +54,7 @@ const KEY_BYTES = 32;
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
-  vi.unstubAllEnvs();
+  configureCustodyGroup(undefined);
   await Promise.all(temporaryDirectories.splice(0).map((directory) =>
     rm(directory, { recursive: true, force: true })
   ));
@@ -259,8 +259,22 @@ describe("V-19 custody group: the deployment opts in through its environment", (
 });
 
 describe("V-19 custody group: the live loaders on real files", () => {
-  it("names the setting the deployment opts in with", () => {
-    expect(CUSTODY_GROUP_VARIABLE).toBe("DEBATEAI_CUSTODY_GROUP");
+  it("starts from the single-owner contract until a composition root says otherwise", async () => {
+    const gids = supplementaryGids();
+    if (gids.length === 0) return;
+    const custodyGid = gids[0]!;
+    const directory = await temporaryDirectory("debateai-custody-default-");
+    const keyPath = join(directory, "kek.bin");
+    await writeFile(keyPath, generateDek(), { mode: 0o600 });
+    await chown(keyPath, process.getuid!(), custodyGid);
+    await chmod(keyPath, 0o640);
+    await chown(directory, process.getuid!(), custodyGid);
+    await chmod(directory, 0o750);
+
+    // Nothing configured: the stricter rule, not the looser one.
+    expect(() => loadKek(keyPath)).toThrowError(
+      expect.objectContaining({ code: "KEK_CUSTODY_INVALID" })
+    );
   });
 
   it("opens a 0640 key file in a 0750 directory only while the group is configured", async () => {
@@ -275,11 +289,11 @@ describe("V-19 custody group: the live loaders on real files", () => {
     await chown(directory, process.getuid!(), custodyGid);
     await chmod(directory, 0o750);
 
-    vi.stubEnv(CUSTODY_GROUP_VARIABLE, String(custodyGid));
+    configureCustodyGroup(String(custodyGid));
     expect(loadSecretKey(keyPath)).toHaveLength(KEY_BYTES);
     expect(loadKek(keyPath)).toBeDefined();
 
-    vi.stubEnv(CUSTODY_GROUP_VARIABLE, "");
+    configureCustodyGroup(undefined);
     expect(() => loadKek(keyPath)).toThrowError(
       expect.objectContaining({ code: "KEK_CUSTODY_INVALID" })
     );
@@ -300,7 +314,7 @@ describe("V-19 custody group: the live loaders on real files", () => {
     await chown(directory, process.getuid!(), custodyGid);
     await chmod(directory, 0o750);
 
-    vi.stubEnv(CUSTODY_GROUP_VARIABLE, String(custodyGid));
+    configureCustodyGroup(String(custodyGid));
     expect(() => loadKek(keyPath)).toThrowError(
       expect.objectContaining({ code: "KEK_CUSTODY_INVALID" })
     );
@@ -317,7 +331,7 @@ describe("V-19 custody group: the live loaders on real files", () => {
     await chown(keyPath, uid, custodyGid);
     await chown(directory, uid, custodyGid);
     await chmod(directory, 0o750);
-    vi.stubEnv(CUSTODY_GROUP_VARIABLE, String(custodyGid));
+    configureCustodyGroup(String(custodyGid));
 
     for (const mode of [0o644, 0o660, 0o641, 0o604, 0o650]) {
       await chmod(keyPath, mode);
@@ -360,7 +374,7 @@ describe("V-19 custody group: the live loaders on real files", () => {
     await chown(keyPath, process.getuid!(), custodyGid);
     await chmod(keyPath, 0o640);
     await chown(directory, process.getuid!(), custodyGid);
-    vi.stubEnv(CUSTODY_GROUP_VARIABLE, String(custodyGid));
+    configureCustodyGroup(String(custodyGid));
 
     for (const mode of [0o755, 0o751, 0o770, 0o740]) {
       await chmod(directory, mode);
@@ -372,17 +386,17 @@ describe("V-19 custody group: the live loaders on real files", () => {
     expect(loadKek(keyPath)).toBeDefined();
   });
 
-  it("fails loudly at load time when the configured group cannot be resolved", async () => {
+  it("fails loudly at configuration time when the group cannot be resolved", async () => {
     const directory = await temporaryDirectory("debateai-custody-unresolved-");
     const keyPath = join(directory, "kek.bin");
     await writeFile(keyPath, generateDek(), { mode: 0o600 });
     await chmod(keyPath, 0o600);
     await chmod(directory, 0o700);
 
-    vi.stubEnv(CUSTODY_GROUP_VARIABLE, "debateai-custody-that-does-not-exist-here");
-    expect(() => loadKek(keyPath)).toThrowError(
-      expect.objectContaining({ code: "CUSTODY_GROUP_UNRESOLVED" })
-    );
+    expect(() => configureCustodyGroup("debateai-custody-that-does-not-exist-here"))
+      .toThrowError(expect.objectContaining({ code: "CUSTODY_GROUP_UNRESOLVED" }));
+    // …and the contract is still the single-owner one, never a half-applied group.
+    expect(loadKek(keyPath)).toBeDefined();
   });
 
   /**
@@ -409,7 +423,7 @@ describe("V-19 custody group: the live loaders on real files", () => {
     await chown(root, uid, custodyGid);
     await chmod(root, 0o2750);
 
-    vi.stubEnv(CUSTODY_GROUP_VARIABLE, String(custodyGid));
+    configureCustodyGroup(String(custodyGid));
     const store = new FileUserDekStore(root, loadKek(keyPath));
     const userId = "22222222-2222-4222-8222-222222222222";
     const dek = generateDek();
@@ -446,7 +460,7 @@ describe("V-19 custody group: the live loaders on real files", () => {
     const root = join(directory, "publication-keys");
     await mkdir(root, { mode: 0o700 });
 
-    vi.stubEnv(CUSTODY_GROUP_VARIABLE, String(custodyGid));
+    configureCustodyGroup(String(custodyGid));
     const store = new FilePublicationKeyStore(root, loadKek(keyPath));
     const publicationRef = "33333333-3333-4333-8333-333333333333";
     await store.store(publicationRef, generateDek());
@@ -487,16 +501,16 @@ describe("V-19 custody group: the live loaders on real files", () => {
     await chown(userDirectory, uid, custodyGid);
     await chmod(userDirectory, 0o750);
 
-    vi.stubEnv(CUSTODY_GROUP_VARIABLE, String(custodyGid));
+    configureCustodyGroup(String(custodyGid));
     const loaded = await store.load(userId);
     expect(loaded).toEqual(dek);
 
-    vi.stubEnv(CUSTODY_GROUP_VARIABLE, "");
+    configureCustodyGroup(undefined);
     await expect(store.load(userId)).rejects.toThrowError(
       expect.objectContaining({ code: "KEK_UNRESOLVED" })
     );
 
-    vi.stubEnv(CUSTODY_GROUP_VARIABLE, String(custodyGid));
+    configureCustodyGroup(String(custodyGid));
     await chmod(record, 0o644);
     await expect(store.load(userId)).rejects.toThrowError(
       expect.objectContaining({ code: "KEK_UNRESOLVED" })

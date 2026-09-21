@@ -171,7 +171,8 @@ cannot be: the API writes it continuously and a copy would go stale. V ruled the
 keeping three users, because running one user would hand the runner — the process that talks to
 third-party model CLIs — the identity key material it must never touch.
 
-`@debateai/crypto` now reads `DEBATEAI_CUSTODY_GROUP`. It is **opt-in**: with the setting absent
+Both units now read `DEBATEAI_CUSTODY_GROUP` from their `EnvironmentFile` and hand it to
+`@debateai/crypto` at start-up. It is **opt-in**: with the setting absent
 the contract is exactly what it was — `0600` file owned by the calling uid, one link, exact size,
 inside a `0700` directory owned by the same uid. With it set, one second shape is also accepted:
 

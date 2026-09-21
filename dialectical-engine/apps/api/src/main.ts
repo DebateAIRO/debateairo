@@ -5,6 +5,7 @@ import {
   Argon2WorkerPool,
   AuditContextHasher,
   assertPublicationSecretDomains,
+  configureCustodyGroup,
   ContentCipher,
   FilePublicationKeyStore,
   FileRunContentKeyStore,
@@ -77,6 +78,9 @@ import { SupportDegradedState } from "./support/degraded.js";
 
 const environment = loadApiEnvironment();
 const supportKnowledge = loadHelpCorpus(resolve("packages/support-kb/content"));
+// V-19: before the first key file is opened, so a group this host cannot
+// resolve refuses at boot instead of at the first private debate.
+configureCustodyGroup(environment.DEBATEAI_CUSTODY_GROUP);
 const kek = loadKek(environment.KEK_PATH);
 const corpusKek = environment.PUBLICATION_ENABLED === "true"
   ? loadKek(environment.CORPUS_KEK_PATH!) : undefined;
