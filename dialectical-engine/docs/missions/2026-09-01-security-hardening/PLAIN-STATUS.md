@@ -22,7 +22,7 @@ We are going through them together, one at a time. Each answer is written into [
 | A — thirteen routine ones | **13 of 13** — all "yes", 21 Sept |
 | B — switches on your GitHub account | **9 of 9** — 22 Sept |
 | C — real choices that add work | **7 of 7** — 22 Sept |
-| D — new, from the re-check | 1 of 4 |
+| D — new, from the re-check | 2 of 4 |
 
 **Nothing on your GitHub account has been changed yet.** Each switch still waits for your "go" at its step, in the order written in the [runbook](GITHUB-SETTINGS-RUNBOOK.md).
 
@@ -52,7 +52,8 @@ We are going through them together, one at a time. Each answer is written into [
 **Group D — so far:**
 
 - **V-29, what the monitoring agent may see in the database:** yes — it gets a small window showing only what its health check needs, instead of membership in a built-in group that can watch every command go by (including ones that set passwords). A correction I made before asking: that group does *not* expose your users' debates — the application always sends user text separately from the command text.
-- **Still to ask:** the support chat on account deletion (V-26); how the support chat reaches the model (V-30); a money ceiling per debate (V-28).
+- **V-26, the support chat on account deletion:** yes — deleting an account also erases that person's support conversations, in the same operation; safe to repeat, and an interruption can never leave things half-deleted. (Chats by visitors who were not logged in aren't linked to any account, so the retention timer stays their only way out.)
+- **Still to ask:** how the support chat reaches the model (V-30); a money ceiling per debate (V-28).
 
 (The numbering has no "V-27" — it was skipped. The thirty are V-1 to V-30 without 27, plus one called V-6b.)
 
@@ -92,6 +93,7 @@ I am collecting rulings first and building afterwards, so the questions keep mov
 | V-9 | Two modes enforced by the code: the hosted server accepts only paid, encrypted API connections and refuses the local relays at start-up; local mode keeps the relays and local models. AI-vendor keys move out of a settings variable into the locked key folder (one file per vendor, readable only by the engine room's account). Vendors become configuration: adding one is a settings entry, a key file and one proven test call. Each hosted vendor is checked for how it treats your users' text, and named in the privacy notice | about a day for the foundation, then a little per vendor |
 | V-11 | At every hand-off between AI models, model-written text is wrapped as clearly marked *material to evaluate*, never mixed into the instructions; job inputs are validated; the model's reported name is checked; the data formats get version numbers. Every changed prompt becomes a new sealed version. Ends with a real-model confirmation run (you run it). Plus the five extra layers you approved (unforgeable fences, locked answer forms, the permanent attack test-suite, tripwires), all built on the "safety frame + your instruction text" split that makes editable prompts safe later | two to three days, plus the confirmation run |
 | V-19 | The "team badge" for key files: readable by one named group when that is switched on, as strict as today in every other respect, with a full table of refusal tests written first; the server kit's setup steps gain the matching group | about half a day |
+| V-26 | Deleting an account also erases that person's support conversations — one deletion, everything gone; tests first for "nothing left", "safe to run twice" and "an interruption finishes cleanly on retry" | small |
 | V-29 | The monitoring agent's database login loses its membership in the built-in "monitor" group and gets a narrow window instead; a test proves it can no longer read other sessions' commands, another proves its health check still works | small |
 | V-20 | The three "GPU server" settings become optional for the engine room, the server kit stops writing a placeholder that would have stopped it from starting, and the six unused database logins are created already-expired | small |
 | V-22 | The server refuses a stored password record that asks for more than twice the official "how hard to work" cost (today it accepts four times: 256 MB per login check instead of 64 MB), with a test proving no real user can be locked out | small |
