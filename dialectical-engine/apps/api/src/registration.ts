@@ -52,15 +52,23 @@ export const AUTH_RETRYABLE_UNAVAILABLE_CODE = "AUTH_TEMPORARILY_UNAVAILABLE";
 /**
  * V-22. The gate every stored Argon2id record passes before it is verified.
  *
+ * Named for exactly what it decides: among records the global envelope can
+ * PARSE, this one is not over twice its governing policy. It deliberately does
+ * NOT decide parseability — a malformed, wrong-version or out-of-envelope
+ * record (say a planted `m=1048576`) answers `true` here and is refused
+ * immediately afterwards by `verifyPassword`/`verifyRecoveryCode`, which parse
+ * before they hand anything to a worker. Nothing may read this boolean as
+ * "safe to hash without parsing".
+ *
  * Only the caller knows which sealed cost governs a given record — a password
  * hash answers to `passwordPolicy`, a recovery-code hash to the MFA policy — so
  * the ceiling is derived from the cost passed in here, never from one global
- * number. A refused record is NOT verified, which on every route is the same
+ * number. A refused record is never verified, which on every route is the same
  * outcome as a wrong credential: the visitor learns nothing new, the audit row
  * is written exactly as it would have been, and no worker slot or Argon2 arena
  * is ever occupied by a planted envelope. The operator gets the typed code.
  */
-export function storedArgon2EnvelopeWithinPolicy(
+export function storedArgon2EnvelopeNotOverPolicy(
   encodedHash: string,
   cost: Readonly<{ memoryCostKiB: number; timeCost: number; parallelism: number }>,
   use: "password" | "recovery-code"

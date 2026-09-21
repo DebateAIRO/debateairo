@@ -19,7 +19,7 @@ import {
   type Argon2Executor,
   type ReadableUserDekStore
 } from "@debateai/crypto";
-import { AuthFlowError, storedArgon2EnvelopeWithinPolicy } from "./registration.js";
+import { AuthFlowError, storedArgon2EnvelopeNotOverPolicy } from "./registration.js";
 
 type MfaRepository = Pick<PostgresIdentityRepository,
   | "activateMfaEnrollment"
@@ -369,7 +369,7 @@ export class MfaEnrollmentService implements MfaApplication {
         .readRecoveryCodeForConfirmation(tokenHash, recoveryCodeSlot(code));
       const valid = record !== null
         // V-22: twice the sealed recovery-code cost, and no further.
-        && storedArgon2EnvelopeWithinPolicy(
+        && storedArgon2EnvelopeNotOverPolicy(
           record.codeHash, this.dependencies.policy.recoveryCodes.argon2id, "recovery-code"
         )
         && await verifyRecoveryCode(this.dependencies.argon2, record.codeHash, code);
@@ -412,7 +412,7 @@ export class MfaEnrollmentService implements MfaApplication {
       );
       if (record === null
         // V-22: a planted envelope is refused exactly like a wrong code.
-        || !storedArgon2EnvelopeWithinPolicy(
+        || !storedArgon2EnvelopeNotOverPolicy(
           record.codeHash, this.dependencies.policy.recoveryCodes.argon2id, "recovery-code"
         )
         || !await verifyRecoveryCode(this.dependencies.argon2, record.codeHash, code)) {

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { ARGON2_POLICY_ENVELOPE } from "../../packages/crypto/src/argon2-worker-pool.js";
 import {
@@ -48,11 +49,63 @@ function encodingAt(memoryCostKiB: number, timeCost: number, parallelism: number
     + `$${Buffer.alloc(32, 0x22).toString("base64").replace(/=+$/, "")}`;
 }
 
+/** Minted at exactly the sealed password cost, as `SessionService.create` mints it. */
+const DUMMY_PASSWORD_HASH = encodingAt(65_536, 3, 1);
+
 const SOURCE = Object.freeze({
   ip: "203.0.113.22",
   userAgent: "vitest-v22",
   requestId: "v22-envelope-policy"
 });
+
+/**
+ * Every stored-hash verification, wherever it stands and however it is wrapped:
+ * the call name alone, with no receiver and no line-shape assumption.
+ */
+const VERIFY_CALL = /\bverify(?:Password|RecoveryCode)\s*\(/gu;
+const API_SOURCE_ROOT = "apps/api/src";
+
+/** Every `.ts` file under a directory, depth-first, in a stable order. */
+async function sourceFilesUnder(directory: string): Promise<readonly string[]> {
+  const entries = [...await readdir(directory, { withFileTypes: true })]
+    .sort((left, right) => left.name.localeCompare(right.name));
+  const files: string[] = [];
+  for (const entry of entries) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...await sourceFilesUnder(path));
+    else if (entry.name.endsWith(".ts")) files.push(path);
+  }
+  return files;
+}
+
+/**
+ * Locates every verification call in the API tree and, for each, the text of
+ * its own statement plus the statement immediately before it — the only window
+ * in which its guard may stand.
+ */
+async function verificationCallSites(): Promise<readonly Readonly<{
+  path: string;
+  line: number;
+  statementAndPredecessor: string;
+}>[]> {
+  const sites: { path: string; line: number; statementAndPredecessor: string }[] = [];
+  for (const path of await sourceFilesUnder(API_SOURCE_ROOT)) {
+    const source = await readFile(path, "utf8");
+    for (const call of source.matchAll(VERIFY_CALL)) {
+      const before = source.slice(0, call.index);
+      // Statements end at `;`. Taking the last two segments is exactly "this
+      // statement, or the one immediately before it"; a stray semicolon can
+      // only narrow the window, never widen it into a neighbour's guard.
+      const statements = before.split(";");
+      sites.push({
+        path,
+        line: before.split("\n").length,
+        statementAndPredecessor: statements.slice(-2).join(";") + source.slice(call.index, call.index + 200)
+      });
+    }
+  }
+  return sites;
+}
 
 describe("V-22 a stored Argon2id envelope may not exceed twice its own policy", () => {
   it("derives every ceiling from the policy that governs that use", () => {
@@ -168,7 +221,9 @@ describe("V-22 a stored Argon2id envelope may not exceed twice its own policy", 
 
   it("refuses a planted 4x password record at login, with the audit row unchanged", async () => {
     const planted = encodingAt(262_144, 10, 4);
-    const verifySpy = vi.fn(async () => true);
+    // Answers `true` for the dummy too: the refusal must not depend on the
+    // substituted verification failing.
+    const verifySpy = vi.fn(async (_password: Uint8Array, _encodedHash: string) => true);
     const failures: string[] = [];
     let challenges = 0;
     const service = await SessionService.create({
@@ -213,7 +268,7 @@ describe("V-22 a stored Argon2id envelope may not exceed twice its own policy", 
       ),
       blindIndexKey: Buffer.alloc(32, 0x61),
       bindingKey: Buffer.alloc(32, 0x62),
-      dummyPasswordHash: encodingAt(65_536, 3, 1),
+      dummyPasswordHash: DUMMY_PASSWORD_HASH,
       clock: () => new Date(0)
     });
     const refusals = vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -221,7 +276,12 @@ describe("V-22 a stored Argon2id envelope may not exceed twice its own policy", 
       await expect(service.beginLogin(
         { email: "planted@example.test", password: "correct horse battery staple" }, SOURCE
       )).rejects.toMatchObject({ code: "AUTH_CREDENTIALS_INVALID" });
-      expect(verifySpy).not.toHaveBeenCalled();
+      // The attempt keeps its one-Argon shape — the process dummy is verified
+      // in the planted record's place — and the hostile envelope is never
+      // handed to Argon2, so no attacker-chosen arena is ever allocated.
+      expect(verifySpy).toHaveBeenCalledTimes(1);
+      expect(verifySpy.mock.calls[0]![1]).toBe(DUMMY_PASSWORD_HASH);
+      expect(verifySpy.mock.calls.flatMap((call) => call)).not.toContain(planted);
       expect(challenges).toBe(0);
       // The visitor sees exactly the wrong-password answer, and the same audit
       // row is written, so the refusal is no oracle.
@@ -234,15 +294,39 @@ describe("V-22 a stored Argon2id envelope may not exceed twice its own policy", 
     }
   });
 
-  it("guards every stored-hash verification in the API, not only the tested ones", async () => {
-    for (const path of ["apps/api/src/sessions.ts", "apps/api/src/mfa.ts"]) {
-      const source = await readFile(path, "utf8");
-      const calls = [...source.matchAll(/await verify(?:Password|RecoveryCode)\(this\.dependencies\.argon2/gu)];
-      expect(calls.length, path).toBeGreaterThan(0);
-      for (const call of calls) {
-        const preceding = source.slice(Math.max(0, call.index - 400), call.index);
-        expect(preceding, `${path}@${call.index}`).toContain("storedArgon2EnvelopeWithinPolicy(");
-      }
+  it("cannot be fooled by a call whose receiver a formatter moved onto the next line", () => {
+    // Exactly what a formatter produces when the argument list grows, and what
+    // the first version of this scan silently skipped, because it demanded the
+    // receiver on the same line as the call.
+    const wrapped = [
+      "const verified = await verifyPassword(",
+      "  this.dependencies.argon2, passwordHash, input.password",
+      ");"
+    ].join("\n");
+    expect(wrapped.match(/await verify(?:Password|RecoveryCode)\(this\.dependencies\.argon2/gu)).toBeNull();
+    expect(wrapped.match(VERIFY_CALL)).toHaveLength(1);
+    // ...and the shape it was written to find still matches.
+    expect("&& await verifyRecoveryCode(this.dependencies.argon2, record.codeHash, code);"
+      .match(VERIFY_CALL)).toHaveLength(1);
+  });
+
+  it("guards every stored-hash verification in the whole API tree, and knows how many there are", async () => {
+    const sites = await verificationCallSites();
+    // An EXACT count, so a sixth call site fails loudly here instead of being
+    // quietly skipped by a pattern that no longer matches it.
+    expect(sites.map((site) => `${site.path}:${site.line}`)).toEqual([
+      "apps/api/src/mfa.ts:375",
+      "apps/api/src/mfa.ts:418",
+      "apps/api/src/sessions.ts:325",
+      "apps/api/src/sessions.ts:450",
+      "apps/api/src/sessions.ts:578"
+    ]);
+    for (const site of sites) {
+      // Structural, not "somewhere in the preceding 400 characters": the guard
+      // must stand in this call's own statement or in the one just before it,
+      // so a neighbouring verification's guard cannot vouch for this one.
+      expect(site.statementAndPredecessor, `${site.path}:${site.line}`)
+        .toContain("storedArgon2EnvelopeNotOverPolicy(");
     }
   });
 
