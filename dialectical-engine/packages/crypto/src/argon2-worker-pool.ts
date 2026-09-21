@@ -125,8 +125,11 @@ export function parseEncodedArgon2id(encoded: string): Argon2idEncodingParameter
  * knows WHICH cost governs the record passes it in. Twice, not once, so that
  * records minted under an older, higher cost still verify if the ruled cost is
  * ever lowered — no real user is locked out by a policy change.
+ *
+ * A carrier, like the table above, rather than a bare exported number: the
+ * structural source law refuses those outside published-arithmetic.
  */
-export const ARGON2_POLICY_ENVELOPE_MULTIPLIER = 2;
+export const ARGON2_POLICY_ENVELOPE = Object.freeze({ multiplier: 2 });
 
 /** The sealed cost a stored record is measured against. Shape of every ruled argon2id row. */
 export interface Argon2idPolicyCost {
@@ -141,7 +144,7 @@ function usablePolicyCost(value: unknown): value is number {
 
 /**
  * The typed refusal for a stored record whose memory, time or parallelism
- * exceeds `ARGON2_POLICY_ENVELOPE_MULTIPLIER` times its governing policy, and
+ * exceeds `ARGON2_POLICY_ENVELOPE.multiplier` times its governing policy, and
  * `undefined` for a record this check admits.
  *
  * Deliberately decided on the PARSED costs alone: no salt, no digest, no
@@ -161,7 +164,7 @@ export function argon2EnvelopeRefusal(
     || !usablePolicyCost(cost.parallelism)) {
     return "ARGON2_ENVELOPE_EXCEEDS_POLICY";
   }
-  const multiplier = ARGON2_POLICY_ENVELOPE_MULTIPLIER;
+  const multiplier = ARGON2_POLICY_ENVELOPE.multiplier;
   return parsed.memoryCostKiB > cost.memoryCostKiB * multiplier
     || parsed.timeCost > cost.timeCost * multiplier
     || parsed.parallelism > cost.parallelism * multiplier

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
-import { ARGON2_POLICY_ENVELOPE_MULTIPLIER } from "../../packages/crypto/src/argon2-worker-pool.js";
+import { ARGON2_POLICY_ENVELOPE } from "../../packages/crypto/src/argon2-worker-pool.js";
 import {
   Argon2WorkerPool,
   argon2EnvelopeRefusal,
@@ -56,7 +56,7 @@ const SOURCE = Object.freeze({
 
 describe("V-22 a stored Argon2id envelope may not exceed twice its own policy", () => {
   it("derives every ceiling from the policy that governs that use", () => {
-    expect(ARGON2_POLICY_ENVELOPE_MULTIPLIER).toBe(2);
+    expect(ARGON2_POLICY_ENVELOPE.multiplier).toBe(2);
     // The sealed costs the ceilings are derived from, measured on 2026-09-22.
     expect(SEALED_COSTS.password).toMatchObject({ memoryCostKiB: 65_536, timeCost: 3, parallelism: 1 });
     expect(SEALED_COSTS.recoveryCodes).toMatchObject({ memoryCostKiB: 19_456, timeCost: 2, parallelism: 1 });
