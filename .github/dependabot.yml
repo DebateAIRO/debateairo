@@ -2,15 +2,30 @@
 # L6-F4: the GitHub default branch (main) is 285 commits behind dev and has no /dialectical-engine
 # tree, so every update PR targets dev, the live integration branch. Security updates and the
 # dependency graph still key on the default branch (ASK-V: make dev the default).
+#
+# V-2 item 3 (ruled 2026-09-22): each entry waits out this repository's own release-age cooldown
+# before it proposes a version. `dialectical-engine/pnpm-workspace.yaml` sets
+# `minimumReleaseAge: 10080` MINUTES; 10080 / 1440 = 7 DAYS, which is the number below. Without
+# it the bot would open pull requests for versions `pnpm install` then refuses to resolve, and a
+# version hours old is exactly what a registry hijack ships. The two numbers are compared in
+# tests/architecture/ci-security-gates.test.ts, so they cannot drift apart.
+# Syntax per docs.github.com, Dependabot options reference (read 2026-09-22): `cooldown` is a
+# mapping under an `updates` entry; `default-days` must be between 1 and 90; the npm and
+# github-actions ecosystems both support it; cooldown applies to version updates, never to
+# security updates, which is what we want — a fix for a known advisory must not wait a week.
 version: 2
 updates:
   - package-ecosystem: "npm"
     directory: "/dialectical-engine"
     target-branch: "dev"
     schedule: { interval: "weekly", day: "monday" }
+    cooldown:
+      default-days: 7
     groups: { minor-and-patch: { update-types: ["minor", "patch"] } }
     open-pull-requests-limit: 5
   - package-ecosystem: "github-actions"
     directory: "/"
     target-branch: "dev"
     schedule: { interval: "weekly", day: "monday" }
+    cooldown:
+      default-days: 7

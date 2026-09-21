@@ -25,6 +25,30 @@ describe("CI security gates (F-03)", () => {
     expect(db).toContain('package-ecosystem: "npm"'); expect(db).toContain('directory: "/dialectical-engine"');
     expect(db).toContain('package-ecosystem: "github-actions"'); expect(db.match(/interval: "weekly"/g)?.length).toBe(2);
   });
+  // V-2 item 3 (ruled 2026-09-22): the update bot waits out this repository's OWN release-age
+  // cooldown. Without it Dependabot would open pull requests for versions `pnpm install` then
+  // refuses to resolve — and a version hours old is exactly what a registry hijack ships. The two
+  // numbers live in two files, so they are read from both and compared here and can never drift:
+  // pnpm's `minimumReleaseAge` is in MINUTES, Dependabot's `cooldown.default-days` in DAYS.
+  // Syntax verified against docs.github.com (Dependabot options reference, read 2026-09-22):
+  // `cooldown` is a mapping under an `updates` entry, `default-days` must be between 1 and 90,
+  // and both the npm and the github-actions ecosystems support it. An invalid file stops the bot
+  // silently, so the shape is pinned exactly as documented.
+  it("makes the update bot wait out the workspace's own cooldown (V-2.3)", () => {
+    const minutes = Number(read("dialectical-engine/pnpm-workspace.yaml").match(/^minimumReleaseAge: (\d+)$/m)?.[1]);
+    expect(Number.isInteger(minutes) && minutes > 0, "minimumReleaseAge (minutes) in pnpm-workspace.yaml").toBe(true);
+    const days = minutes / 1440;
+    expect(Number.isInteger(days), `minimumReleaseAge ${minutes} min is not a whole number of days`).toBe(true);
+    expect(days, "Dependabot accepts a cooldown of 1 to 90 days").toBeGreaterThanOrEqual(1);
+    expect(days, "Dependabot accepts a cooldown of 1 to 90 days").toBeLessThanOrEqual(90);
+    const entries = read(".github/dependabot.yml").split(/^updates:$/m)[1]?.split(/^ {2}- /m).slice(1) ?? [];
+    expect(entries.length, "updates entries parsed from .github/dependabot.yml").toBeGreaterThanOrEqual(2);
+    for (const entry of entries) {
+      const ecosystem = entry.match(/package-ecosystem: "([^"]+)"/)?.[1] ?? "(unnamed entry)";
+      expect(entry, `${ecosystem}: no cooldown mapping`).toMatch(/^ {4}cooldown:$/m);
+      expect(entry.match(/^ {6}default-days: (\d+)$/m)?.[1], `${ecosystem}: cooldown.default-days`).toBe(String(days));
+    }
+  });
   it("ships SECURITY.md with a disclosure route", () => {
     expect(existsSync(resolve(gitRoot, "SECURITY.md"))).toBe(true);
     expect(read("SECURITY.md")).toContain("Report a vulnerability");
