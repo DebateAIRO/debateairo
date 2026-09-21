@@ -1,0 +1,2 @@
+      IF v_latest_publication_ref IS NULL
+        OR NOT COALESCE(core.run_is_free_public_bound(p_run_id),false) THEN

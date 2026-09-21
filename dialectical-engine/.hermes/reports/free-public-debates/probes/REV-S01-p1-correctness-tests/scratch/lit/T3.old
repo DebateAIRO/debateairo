@@ -1,0 +1,3 @@
+      await this.repository.upsertAutoPublishWork(
+        input.runId,input.userId,input.ownerRef,"AUTO_PUBLISH_NULL_PSEUDONYM"
+      );

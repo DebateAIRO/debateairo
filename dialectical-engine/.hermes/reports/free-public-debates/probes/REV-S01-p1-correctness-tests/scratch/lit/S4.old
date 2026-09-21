@@ -1,0 +1,6 @@
+  PERFORM identity.append_audit_event_internal(
+    p_audit_id,'system:free-public-auto-publish','debate.publication.denied',
+    'debate.publication_attempt',p_run_id::text,p_occurred_at,
+    '{"schema":"s10-publication-event-v2"}'::jsonb,'DENY',false,p_reason
+  );
+  RETURN true;

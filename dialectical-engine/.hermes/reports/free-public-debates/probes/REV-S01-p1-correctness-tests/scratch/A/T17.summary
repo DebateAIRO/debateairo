@@ -1,0 +1,4 @@
+tests/unit/fpd-s01-c3-unpublish-http.test.ts rc=1 passed=8 failed=2 (expect 10/0)
+tests/unit/s8-publication-http.test.ts rc=0 passed=4 failed=0 (expect 4/0)
+tests/unit/s8-publication.test.ts rc=0 passed=26 failed=0 (expect 26/0)
+CLUSTER_RED

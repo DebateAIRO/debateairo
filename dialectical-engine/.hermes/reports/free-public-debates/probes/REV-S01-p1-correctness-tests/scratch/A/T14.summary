@@ -1,0 +1,4 @@
+tests/integration/fpd-s01-c2-system-publication.test.ts rc=1 passed=15 failed=1 (expect 16/0)
+tests/unit/s8-publication.test.ts rc=1 passed=12 failed=14 (expect 26/0)
+tests/unit/s8-publication-http.test.ts rc=1 passed=3 failed=1 (expect 4/0)
+CLUSTER_RED

@@ -1,0 +1,4 @@
+    const publicDebate = publicDebateFromAnswer(
+      publicationRef,input.ownerRef,input.answer,occurredAt
+    );
+    if (!await this.repository.prepareSystemKeyProvision({

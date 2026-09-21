@@ -1,0 +1,91 @@
+===== T1 =====
+tests/unit/fpd-s01-c2-auto-publish.test.ts rc=1 passed=7 failed=1 (expect 8/0)
+tests/unit/fpd-s01-c3-unpublish-http.test.ts rc=0 passed=10 failed=0 (expect 10/0)
+tests/unit/fpd-s01-c4-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/s8-publication.test.ts rc=0 passed=26 failed=0 (expect 26/0)
+tests/unit/s8-publication-http.test.ts rc=0 passed=4 failed=0 (expect 4/0)
+tests/unit/s10-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+CLUSTER_RED
+restored: clean
+===== T2 =====
+tests/unit/fpd-s01-c2-auto-publish.test.ts rc=1 passed=7 failed=1 (expect 8/0)
+tests/unit/fpd-s01-c3-unpublish-http.test.ts rc=0 passed=10 failed=0 (expect 10/0)
+tests/unit/fpd-s01-c4-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/s8-publication.test.ts rc=0 passed=26 failed=0 (expect 26/0)
+tests/unit/s8-publication-http.test.ts rc=0 passed=4 failed=0 (expect 4/0)
+tests/unit/s10-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+CLUSTER_RED
+restored: clean
+===== T3 =====
+tests/unit/fpd-s01-c2-auto-publish.test.ts rc=1 passed=7 failed=1 (expect 8/0)
+tests/unit/fpd-s01-c3-unpublish-http.test.ts rc=0 passed=10 failed=0 (expect 10/0)
+tests/unit/fpd-s01-c4-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/s8-publication.test.ts rc=0 passed=26 failed=0 (expect 26/0)
+tests/unit/s8-publication-http.test.ts rc=0 passed=4 failed=0 (expect 4/0)
+tests/unit/s10-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+CLUSTER_RED
+restored: clean
+===== T4 =====
+tests/unit/fpd-s01-c2-auto-publish.test.ts rc=1 passed=7 failed=1 (expect 8/0)
+tests/unit/fpd-s01-c3-unpublish-http.test.ts rc=0 passed=10 failed=0 (expect 10/0)
+tests/unit/fpd-s01-c4-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/s8-publication.test.ts rc=0 passed=26 failed=0 (expect 26/0)
+tests/unit/s8-publication-http.test.ts rc=0 passed=4 failed=0 (expect 4/0)
+tests/unit/s10-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+CLUSTER_RED
+restored: clean
+===== T5 =====
+tests/unit/fpd-s01-c2-auto-publish.test.ts rc=1 passed=7 failed=1 (expect 8/0)
+tests/unit/fpd-s01-c3-unpublish-http.test.ts rc=0 passed=10 failed=0 (expect 10/0)
+tests/unit/fpd-s01-c4-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/s8-publication.test.ts rc=0 passed=26 failed=0 (expect 26/0)
+tests/unit/s8-publication-http.test.ts rc=0 passed=4 failed=0 (expect 4/0)
+tests/unit/s10-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+CLUSTER_RED
+restored: clean
+===== T6 =====
+tests/unit/fpd-s01-c2-auto-publish.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/fpd-s01-c3-unpublish-http.test.ts rc=1 passed=8 failed=2 (expect 10/0)
+tests/unit/fpd-s01-c4-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/s8-publication.test.ts rc=0 passed=26 failed=0 (expect 26/0)
+tests/unit/s8-publication-http.test.ts rc=0 passed=4 failed=0 (expect 4/0)
+tests/unit/s10-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+CLUSTER_RED
+restored: clean
+===== T7 =====
+tests/unit/fpd-s01-c2-auto-publish.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/fpd-s01-c3-unpublish-http.test.ts rc=1 passed=8 failed=2 (expect 10/0)
+tests/unit/fpd-s01-c4-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/s8-publication.test.ts rc=0 passed=26 failed=0 (expect 26/0)
+tests/unit/s8-publication-http.test.ts rc=0 passed=4 failed=0 (expect 4/0)
+tests/unit/s10-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+CLUSTER_RED
+restored: clean
+===== T8 =====
+tests/unit/fpd-s01-c2-auto-publish.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/fpd-s01-c3-unpublish-http.test.ts rc=0 passed=10 failed=0 (expect 10/0)
+tests/unit/fpd-s01-c4-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/s8-publication.test.ts rc=0 passed=26 failed=0 (expect 26/0)
+tests/unit/s8-publication-http.test.ts rc=0 passed=4 failed=0 (expect 4/0)
+tests/unit/s10-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+CLUSTER_GREEN
+restored: clean
+===== T10 =====
+tests/unit/fpd-s01-c2-auto-publish.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/fpd-s01-c3-unpublish-http.test.ts rc=0 passed=10 failed=0 (expect 10/0)
+tests/unit/fpd-s01-c4-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/s8-publication.test.ts rc=0 passed=26 failed=0 (expect 26/0)
+tests/unit/s8-publication-http.test.ts rc=0 passed=4 failed=0 (expect 4/0)
+tests/unit/s10-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+CLUSTER_GREEN
+restored: clean
+===== T11 =====
+tests/unit/fpd-s01-c2-auto-publish.test.ts rc=1 passed=7 failed=1 (expect 8/0)
+tests/unit/fpd-s01-c3-unpublish-http.test.ts rc=0 passed=10 failed=0 (expect 10/0)
+tests/unit/fpd-s01-c4-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/s8-publication.test.ts rc=0 passed=26 failed=0 (expect 26/0)
+tests/unit/s8-publication-http.test.ts rc=0 passed=4 failed=0 (expect 4/0)
+tests/unit/s10-erasure-http.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+CLUSTER_RED
+restored: clean
+### BATCH_A_DONE

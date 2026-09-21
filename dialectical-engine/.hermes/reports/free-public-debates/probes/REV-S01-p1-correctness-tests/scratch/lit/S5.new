@@ -1,0 +1,1 @@
+  PERFORM pg_advisory_xact_lock(hashtextextended('identity:account:'||p_user_id::text,0));

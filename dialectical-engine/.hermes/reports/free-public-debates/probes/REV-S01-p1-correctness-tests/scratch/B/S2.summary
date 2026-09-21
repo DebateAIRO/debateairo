@@ -1,0 +1,5 @@
+tests/integration/fpd-s01-c1-binding.test.ts rc=1 passed=7 failed=2 (expect 9/0)
+tests/integration/fpd-s01-c1-privileges.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+tests/integration/fpd-s01-c2-system-publication.test.ts rc=1 passed=15 failed=1 (expect 16/0)
+tests/integration/fpd-s01-c4-delete-published.test.ts rc=1 passed=13 failed=1 (expect 14/0)
+CLUSTER_RED

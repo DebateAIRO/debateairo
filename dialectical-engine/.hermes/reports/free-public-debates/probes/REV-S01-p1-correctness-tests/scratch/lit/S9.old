@@ -1,0 +1,1 @@
+      AND COALESCE(core.run_is_free_public_bound(NEW.run_id),false)

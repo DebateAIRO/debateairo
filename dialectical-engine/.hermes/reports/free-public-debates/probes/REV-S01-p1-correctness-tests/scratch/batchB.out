@@ -1,0 +1,78 @@
+===== T8i =====
+tests/integration/fpd-s01-c1-binding.test.ts rc=0 passed=9 failed=0 (expect 9/0)
+tests/integration/fpd-s01-c1-privileges.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+tests/integration/fpd-s01-c2-system-publication.test.ts rc=0 passed=16 failed=0 (expect 16/0)
+tests/integration/fpd-s01-c4-delete-published.test.ts rc=0 passed=14 failed=0 (expect 14/0)
+CLUSTER_GREEN
+restored: clean
+===== T10i =====
+tests/integration/fpd-s01-c1-binding.test.ts rc=0 passed=9 failed=0 (expect 9/0)
+tests/integration/fpd-s01-c1-privileges.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+tests/integration/fpd-s01-c2-system-publication.test.ts rc=0 passed=16 failed=0 (expect 16/0)
+tests/integration/fpd-s01-c4-delete-published.test.ts rc=0 passed=14 failed=0 (expect 14/0)
+CLUSTER_GREEN
+restored: clean
+===== S1 =====
+tests/integration/fpd-s01-c1-binding.test.ts rc=1 passed=7 failed=2 (expect 9/0)
+tests/integration/fpd-s01-c1-privileges.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+tests/integration/fpd-s01-c2-system-publication.test.ts rc=1 passed=13 failed=3 (expect 16/0)
+tests/integration/fpd-s01-c4-delete-published.test.ts rc=1 passed=12 failed=2 (expect 14/0)
+CLUSTER_RED
+restored: clean
+===== S2 =====
+tests/integration/fpd-s01-c1-binding.test.ts rc=1 passed=7 failed=2 (expect 9/0)
+tests/integration/fpd-s01-c1-privileges.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+tests/integration/fpd-s01-c2-system-publication.test.ts rc=1 passed=15 failed=1 (expect 16/0)
+tests/integration/fpd-s01-c4-delete-published.test.ts rc=1 passed=13 failed=1 (expect 14/0)
+CLUSTER_RED
+restored: clean
+===== S3 =====
+tests/integration/fpd-s01-c1-binding.test.ts rc=0 passed=9 failed=0 (expect 9/0)
+tests/integration/fpd-s01-c1-privileges.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+tests/integration/fpd-s01-c2-system-publication.test.ts rc=1 passed=8 failed=8 (expect 16/0)
+tests/integration/fpd-s01-c4-delete-published.test.ts rc=1 passed=4 failed=10 (expect 14/0)
+CLUSTER_RED
+restored: clean
+===== S4 =====
+tests/integration/fpd-s01-c1-binding.test.ts rc=0 passed=9 failed=0 (expect 9/0)
+tests/integration/fpd-s01-c1-privileges.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+tests/integration/fpd-s01-c2-system-publication.test.ts rc=1 passed=12 failed=4 (expect 16/0)
+tests/integration/fpd-s01-c4-delete-published.test.ts rc=0 passed=14 failed=0 (expect 14/0)
+CLUSTER_RED
+restored: clean
+===== S5 =====
+tests/integration/fpd-s01-c1-binding.test.ts rc=0 passed=9 failed=0 (expect 9/0)
+tests/integration/fpd-s01-c1-privileges.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+tests/integration/fpd-s01-c2-system-publication.test.ts rc=1 passed=15 failed=1 (expect 16/0)
+tests/integration/fpd-s01-c4-delete-published.test.ts rc=0 passed=14 failed=0 (expect 14/0)
+CLUSTER_RED
+restored: clean
+===== S6 =====
+tests/integration/fpd-s01-c1-binding.test.ts rc=0 passed=9 failed=0 (expect 9/0)
+tests/integration/fpd-s01-c1-privileges.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+tests/integration/fpd-s01-c2-system-publication.test.ts rc=1 passed=12 failed=4 (expect 16/0)
+tests/integration/fpd-s01-c4-delete-published.test.ts rc=0 passed=14 failed=0 (expect 14/0)
+CLUSTER_RED
+restored: clean
+===== S7 =====
+tests/integration/fpd-s01-c1-binding.test.ts rc=0 passed=9 failed=0 (expect 9/0)
+tests/integration/fpd-s01-c1-privileges.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+tests/integration/fpd-s01-c2-system-publication.test.ts rc=0 passed=16 failed=0 (expect 16/0)
+tests/integration/fpd-s01-c4-delete-published.test.ts rc=1 passed=12 failed=2 (expect 14/0)
+CLUSTER_RED
+restored: clean
+===== S8 =====
+tests/integration/fpd-s01-c1-binding.test.ts rc=0 passed=9 failed=0 (expect 9/0)
+tests/integration/fpd-s01-c1-privileges.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+tests/integration/fpd-s01-c2-system-publication.test.ts rc=0 passed=16 failed=0 (expect 16/0)
+tests/integration/fpd-s01-c4-delete-published.test.ts rc=1 passed=12 failed=2 (expect 14/0)
+CLUSTER_RED
+restored: clean
+===== S9 =====
+tests/integration/fpd-s01-c1-binding.test.ts rc=0 passed=9 failed=0 (expect 9/0)
+tests/integration/fpd-s01-c1-privileges.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+tests/integration/fpd-s01-c2-system-publication.test.ts rc=0 passed=16 failed=0 (expect 16/0)
+tests/integration/fpd-s01-c4-delete-published.test.ts rc=1 passed=13 failed=1 (expect 14/0)
+CLUSTER_RED
+restored: clean
+### BATCH_B_DONE

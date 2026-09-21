@@ -1,0 +1,6 @@
+      if (!await options.publications.preflightGrant({
+        runId: runId.data,
+        authenticated,
+        grantToken: input.step_up_grant,
+        action: "UNPUBLISH"
+      })) {

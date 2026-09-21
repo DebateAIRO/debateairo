@@ -1,0 +1,8 @@
+      INSERT INTO core.run_visibility_event(
+        run_visibility_event_id,run_id,publication_ref,state,actor_audit_token,
+        actor_ref_version,warning_version,occurred_at,at_seq
+      ) VALUES (
+        gen_random_uuid(),p_run_id,v_latest_publication_ref,'PRIVATE',
+        '00000000-0000-4000-8000-0000000000f2'::uuid,2,
+        'COPIES_MAY_PERSIST_V1',v_now,ledger.allocate_sequence()
+      );
