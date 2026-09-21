@@ -1,0 +1,9 @@
+ours tests/architecture/dev-deployment-register.test.ts rc=0  Tests 3 passed (3)
+ours tests/architecture/register-support-publication.test.ts rc=1  Tests 2 failed | 12 passed (14)
+     × tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > recognizes hostile static SQL concatenation, interpolation, and tagged builders 3
+     × tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > classifies every register relation access and bans open writers, latest selection
+     FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > recognizes hostile static SQL concatenation, interpolation, and tagged builde
+     FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > classifies every register relation access and bans open writers, latest selec
+ours tests/integration/obs-l3-s06-runner-binding.test.ts rc=0  Tests 14 passed (14)
+ours tests/integration/production-database-principals.test.ts rc=0  Tests 32 passed (32)
+ours tests/integration/register-support-publication.test.ts rc=0  Tests 25 passed (25)
