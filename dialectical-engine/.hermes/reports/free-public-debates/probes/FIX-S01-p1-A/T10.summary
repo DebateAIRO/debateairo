@@ -1,0 +1,2 @@
+tests/unit/fpd-s01-c2-auto-publish.test.ts rc=1 passed=13 failed=1 (expect 14/0)
+CLUSTER_RED

@@ -22,3 +22,4 @@
 | 2026-09-21 04:38 | REQ-FIX p3 | t_f58de68f | READY consumed — SPEC-v3.md is the SPEC of record (served answer = any AnswerSchema-serving owner route; R-6's Check rewritten) |
 | 2026-09-21 04:47 | REQ-REV p3 | t_614cf0c1 | REWORK at the cap → V-11 (acceptance step 4 total); findings ADDRESSED; FIX-A unblocked on the SPEC side |
 | 2026-09-21 04:48 | FIX-B | t_544048e9 | READY consumed — `b93b103e` (0069); verified under both locales; FIX-A base measured |
+| 2026-09-21 05:18 | FIX-A | t_728887e1 | READY consumed — `c358d494` (0070); slice verified at head under both locales, zero skips |

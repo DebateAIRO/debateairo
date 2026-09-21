@@ -1,0 +1,10 @@
+ dialectical-engine/apps/api/src/index.ts           |  36 ++-
+ dialectical-engine/apps/api/src/publications.ts    |  90 ++++--
+ .../0069_fix_bound_erasure_and_trigger.sql         | 314 +++++++++++++++++++++
+ .../migrations/0070_fix_system_publication.sql     | 148 ++++++++++
+ dialectical-engine/packages/db/src/publication.ts  |   8 +
+ .../fpd-s01-c2-system-publication.test.ts          | 129 ++++++++-
+ .../fpd-s01-c4-delete-published.test.ts            | 155 ++++++++--
+ .../tests/unit/fpd-s01-c2-auto-publish.test.ts     | 176 +++++++++++-
+ .../tests/unit/fpd-s01-c3-unpublish-http.test.ts   |  21 ++
+ 9 files changed, 1003 insertions(+), 74 deletions(-)

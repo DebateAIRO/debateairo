@@ -1,0 +1,2 @@
+tests/integration/fpd-s01-c2-system-publication.test.ts rc=1 passed=3 failed=1 (expect 4/0)
+CLUSTER_RED
