@@ -262,3 +262,35 @@ Class sweep, member by member (PLAN Revision 3): `PLAN.md:130` (C1-S2, "Expected
 `Ruling:` a guard the slice does not change (one that "fires before" the new behaviour) is asserted as the server answers it TODAY, measured at the lane head — never as the plan's shorthand. Measured at `11184e70`: a body refused by `parseRequest` leaves through the shared error handler as status 400 with the body `{ "error": "MALFORMED_REQUEST", "message": "<the validator's text>" }` (`apps/api/src/index.ts:583-584` at that head: `{ error: errorCode, message: knownError.message }` for every status below 500). The plan's two rows that label that body EXACT without the `message` key are read as **CONTAINS `"error":"MALFORMED_REQUEST"` with status 400**. No requirement of SPEC-v2 asks for a route-local malformed-body branch or a change to the shared error envelope, so neither is authorized (R-15, R-19, R-25: behaviour outside the rule is unchanged). — why: the plan transcribed a shorthand as an exact body — cost if wrong: none to the product; one assertion is looser by one key.
 
 Class sweep, member by member (PLAN Revision 3): `PLAN.md:626` (C3 guard G3) · `PLAN.md:733` (C4 guard G3) — both read as above. Every other guard row in the two tables answers from a direct `reply.send` in the handler, not through the shared error handler; each is still asserted against today's measured answer if a seat finds a difference. Second fact for C3: the plan's line numbers for the unpublish handler predate C2's commit; at lane head `11184e70` the handler block is `apps/api/src/index.ts:1162-1203`.
+
+---
+
+# APPENDED 2026-09-21 by ARCH-FIX-S01-C4GAP (BUILD→ARCH plan-gap G1)
+
+Sections above are not rewritten. Assigned finding G1. C1/C2/C3 steps not edited. `0067` not edited.
+
+## 23. Decisions taken at ARCH-FIX-S01-C4GAP
+
+| date | question | choice | reason | ruled by |
+|---|---|---|---|---|
+| 2026-09-21 | G1 — how erasure inserts PRIVATE through `enforce_publication_v2_ref_binding` | Third admission on the trigger, redefined in **`0068`** (`CREATE OR REPLACE`, same signature, never DROP): `actor_ref_version=2`, actor token `00000000-0000-4000-8000-0000000000f2`, `state='PRIVATE'`, `warning_version='COPIES_MAY_PERSIST_V1'`, `core.run_is_free_public_bound`, and a pending `serve.publication_key_cleanup_intent` for that `publication_ref`. Erasure inserts the cleanup intent first, then the visibility row. No `publication_event_binding`. No UNPUBLISH grant. No `debate.publication.unpublished` audit (erasure's existing `private_erasure_audit_binding` is the trail). | Measured at `11184e70`: trigger `0067:43-69` admits only (a) system PUBLISHED + `…00f1` + PREPARED system intent or (b) a live `publication_event_binding`. Owner UNPUBLISH uses (b) via `reserve_publication_event_refs` (`publication.ts` transition). Erasure holds `DELETE_PRIVATE_DEBATE`, not UNPUBLISH, and PLAN forbids consuming UNPUBLISH. Minting a fake UNPUBLISH binding is R-20.4's class. C2's `0067` is committed and not edited (packet charge 3). | ARCH-FIX-S01-C4GAP |
+
+## 24. Alternatives rejected at ARCH-FIX-S01-C4GAP
+
+| alternative | why not |
+|---|---|
+| Mint `identity.publication_event_binding` with action UNPUBLISH from erasure | Needs `reserve_publication_event_refs` + an UNPUBLISH grant token hash (`publication.ts` transition). PLAN forbids consuming UNPUBLISH. A fabricated grant is a phantom identity row. |
+| Admit `…00f1` on PRIVATE | `…00f1` is the system-publish token; the trigger pins it to `PUBLISHED` + `PUBLIC_INDEXED_V1`. Reusing it would let a crash-orphaned system intent also admit a PRIVATE row. |
+| Skip the PRIVATE insert and only queue key cleanup | `listPublicRefs` is `DISTINCT ON` latest visibility `PUBLISHED`. Latest would stay PUBLISHED; R-17 fails. |
+| Edit `0067` in place | Packet: C2's 0067 is committed and is not edited. Newest definition belongs in 0068. |
+| Write `debate.publication.unpublished` as `system:free-public-auto-publish` | The trigger's audit half (`0067` continuation) has no unpublished system shape. Extending it is a second hole; erasure already writes `private_erasure_audit_binding`. |
+
+## 25. Rows for V
+
+```
+V-ROW: NEW · S01 · t_2e15bf90 · How a bound published Free debate is taken off the public list on delete
+The v2 visibility trigger (0067) admits PRIVATE rows only with a live publication_event_binding, which owner UNPUBLISH mints from an UNPUBLISH grant. Delete uses DELETE_PRIVATE_DEBATE and must not consume UNPUBLISH. The recommended default: 0068 redefines the trigger to admit one more pinned shape — actor token 00000000-0000-4000-8000-0000000000f2, actor_ref_version=2, PRIVATE, COPIES_MAY_PERSIST_V1, bound run, pending key-cleanup intent — written only from prepare_private_run_erasure. No unpublished audit event; the erasure audit binding is the trail.
+Recommended default: the f2 trigger admission in 0068, as frozen in PLAN Revision 4 C4-S4.
+Smallest yes/no for V: "May delete-while-public of a Free debate write PRIVATE through a second pinned actor token, rather than by minting an UNPUBLISH grant?"
+VERDICT: yes, pin f2 in 0068 / CONFIDENCE: high / STRONGEST COUNTER: a second hole in the binding trigger could admit PRIVATE on an unbound run if the bound check is omitted — C4-S2.10 is the RED case that makes that omission visible.
+```

@@ -4,6 +4,8 @@
 
 **Revision 3** — ARCH-FIX-S01-03 after ARCH-REV-S01-p2 REWORK (`docs/missions/free-public-debates/reviews/ARCH-REV-S01-p2.md`). Assigned findings B1-p2, N1-p2, N2-p2, N3-p2 (last lawful pass). Steps changed: C2-S3, C2-S4, C2-S5, C2-S6, C2-S18, C2-S19 · C4-S2 · §1 parallelism (C4 waits on C2). P1–P8 named, not fixed.
 
+**Revision 4** — ARCH-FIX-S01-C4GAP after BUILD-S01-C4 PLAN-GAP (`docs/missions/free-public-debates/reviews/BUILD-S01-C4-PLAN-GAP.md`). Assigned finding G1. Steps changed: C4-S2, C4-S4. File map: still only `migrations/0068_bound_published_erasure.sql` plus the two C4 test files (0068 now also `CREATE OR REPLACE`s `core.enforce_publication_v2_ref_binding`; C2's `0067` is not edited). C1/C2/C3 steps untouched.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: `superpowers:test-driven-development`. RED first on every cluster. The coder is Codex gpt-5.6-sol. Clusters are BUILD units, not review units; `REV(S01)` runs once, after every cluster is green three times (worst run counts).
 
 **Goal:** A Free run created after this slice ships is published by the server when its answer is served, cannot be unpublished, and can be deleted by its creator while public. Premium and every run that exists at deploy keep today's behaviour.
@@ -75,7 +77,7 @@ Mutant class each command detects: §7.
 | `tests/unit/fpd-s01-c2-auto-publish.test.ts` (new) | C2 |
 | `tests/integration/fpd-s01-c2-system-publication.test.ts` (new) | C2 |
 | `tests/unit/fpd-s01-c3-unpublish-http.test.ts` (new) | C3 |
-| `migrations/0068_bound_published_erasure.sql` | C4 |
+| `migrations/0068_bound_published_erasure.sql` (also `CREATE OR REPLACE` `core.enforce_publication_v2_ref_binding`; does not edit `0067`) | C4 |
 | `tests/unit/fpd-s01-c4-erasure-http.test.ts` (new) | C4 |
 | `tests/integration/fpd-s01-c4-delete-published.test.ts` (new) | C4 |
 
@@ -716,9 +718,15 @@ C3 file map only, after C3-S9 GREEN.
 
 ### S01-C4 Delete a bound published run (R-16, R-17, R-18, R-19)
 
-Parallel with C2 after C1. Does not edit `apps/api/src/index.ts` (the handler already maps `outcome==="PUBLISHED"` to 409 `DEBATE_MUST_BE_PRIVATE` at `:787-788`, and `CLEANED`/`PENDING` to 200/202 at `:793-794`). The change is inside `core.prepare_private_run_erasure` so a bound published run no longer returns `'PUBLISHED'`.
+Waits on C2. Does not edit `apps/api/src/index.ts` (the route already maps `outcome==="PUBLISHED"` to 409 `DEBATE_MUST_BE_PRIVATE` at `:787-788`, and `CLEANED`/`PENDING` to 200/202 at `:793-794`). The change is inside `core.prepare_private_run_erasure` so a bound published run no longer returns `'PUBLISHED'`, and inside `core.enforce_publication_v2_ref_binding` so that PRIVATE insert is admitted (G1).
 
-**Files:** `migrations/0068_bound_published_erasure.sql`; the two new test files. `apps/api/src/account-erasure.ts:95-117` is **not** edited unless a new outcome string is introduced — it is not; outcomes stay `CLEANED|PENDING|PUBLISHED|LEGACY_RESIDUAL|NOT_FOUND`.
+**Files:** `migrations/0068_bound_published_erasure.sql` (the only production file; it `CREATE OR REPLACE`s both `core.prepare_private_run_erasure` and `core.enforce_publication_v2_ref_binding`); the two new test files. `migrations/0067_system_run_publication.sql` is not edited. `apps/api/src/account-erasure.ts:95-117` is **not** edited unless a new outcome string is introduced — it is not; outcomes stay `CLEANED|PENDING|PUBLISHED|LEGACY_RESIDUAL|NOT_FOUND`.
+
+Constants (EXACT):
+
+- `ERASURE_VISIBILITY_ACTOR_TOKEN = "00000000-0000-4000-8000-0000000000f2"` — distinct from the system-publish token `…00f1` (`0067` / ADR-0026).
+- Visibility warning on the folded PRIVATE row: `COPIES_MAY_PERSIST_V1` (owner UNPUBLISH at `0040_account_erasure.sql:4086`).
+- `actor_ref_version=2`.
 
 #### C4-S1: Write failing HTTP tests
 
@@ -757,8 +765,25 @@ If omitted, C4-S3 is BROKEN.
 6. Signature still `core.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)` — `has_function_privilege` / `to_regprocedure` of that signature is non-null. No `DROP FUNCTION`.
 7. **B4(b) contention.** A PREPARED row in `serve.system_publication_key_provision_intent` for the run makes `prepare_private_run_erasure` return `'CONTENDED'` (same as the owner intent table at `:4524-4526`), not `'CLEANED'` and not `'PUBLISHED'`.
 8. **B1-p2 expired orphan.** A PREPARED system intent with `expires_at` in the past, after `claim_system_publication_key_provision_cleanup` + `complete_…`, makes `prepare_private_run_erasure` return a success outcome (`'PREPARED'`/`'COMMITTED'`/`'ERASED'`/`'CLEANED'`), not `'CONTENDED'`. Goes RED if the cleanup pair is omitted (the gate at C4-S4 would then see the row forever).
+9. **G1 PRIVATE shape.** After case 1 succeeds, the latest `core.run_visibility_event` for the run is EXACTLY `state='PRIVATE'`, `actor_audit_token='00000000-0000-4000-8000-0000000000f2'`, `actor_ref_version=2`, `warning_version='COPIES_MAY_PERSIST_V1'`, `publication_ref` equal to the previously live public ref. No `identity.publication_event_binding` row is inserted. `SELECT count(*) FROM identity.audit_event WHERE event_type='debate.publication.unpublished' AND target_id=$publication_ref::text` is unchanged from before the call (this path does not write that event type).
+10. **G1 guard — not bound.** `SET ROLE` a superuser test pool (setup only) then `INSERT INTO core.run_visibility_event` with the erasure token, `state='PRIVATE'`, `actor_ref_version=2`, `warning_version='COPIES_MAY_PERSIST_V1'`, a pending `publication_key_cleanup_intent`, on a Premium published run → SQLSTATE `55000` `PUBLICATION_V2_REF_BINDING_REQUIRED`.
+11. **G1 guard — no cleanup intent.** Same INSERT on a bound published run **without** a pending `serve.publication_key_cleanup_intent` for that `publication_ref` → `55000` `PUBLICATION_V2_REF_BINDING_REQUIRED`.
+12. **G1 guard — system token on PRIVATE.** Same INSERT using actor token `…00f1` and `state='PRIVATE'` (even with a pending cleanup intent, even on a bound run) → `55000` `PUBLICATION_V2_REF_BINDING_REQUIRED` (`…00f1` admits only `PUBLISHED` + `PUBLIC_INDEXED_V1` + PREPARED system intent).
 
-RED until C4-S4.
+RED until C4-S4. Mapping to the six intended RED cases already in the C4 coder's uncommitted `fpd-s01-c4-delete-published.test.ts` (BUILD-S01-C4 BLOCKED / `c4-s3-red-attempt-3.log`, `passed=4 failed=6`):
+
+| BUILD `it(` title | PLAN case |
+|---|---|
+| `admits a bound system-published run under debateai_erasure_runtime` | C4-S2.1 |
+| `writes PRIVATE and removes the old public ref from latest membership` | C4-S2.2 (shape pinned by C4-S2.9) |
+| `allows the erasure role and denies an unprivileged role with 42501` | C4-S2.5 |
+| `returns CONTENDED while a system publication intent is PREPARED` | C4-S2.7 |
+| `admits erasure after cleanup removes an expired orphan system intent` | C4-S2.8 |
+| `still contends on a different snapshot with no completed cleanup` | C4-S4 snapshot-cleanup-complete check |
+| *(new)* G1 token/version/warning + no binding + no unpublished audit | C4-S2.9 |
+| *(new)* unbound PRIVATE insert 55000 | C4-S2.10 |
+| *(new)* PRIVATE without cleanup intent 55000 | C4-S2.11 |
+| *(new)* f1 token on PRIVATE 55000 | C4-S2.12 |
 
 #### C4-S3: Run both new files; expect RED
 
@@ -766,21 +791,52 @@ Integration case 1 today returns `'PUBLISHED'` at `0040_account_erasure.sql:4536
 
 #### C4-S4: Migration `0068_bound_published_erasure.sql`
 
-`CREATE OR REPLACE FUNCTION core.prepare_private_run_erasure(p_run_id uuid, p_user_id uuid, p_owner_ref uuid, p_session_id uuid, p_grant_token_hash text)` — **signature unchanged**.
+`CREATE OR REPLACE FUNCTION core.prepare_private_run_erasure(p_run_id uuid, p_user_id uuid, p_owner_ref uuid, p_session_id uuid, p_grant_token_hash text)` — **signature unchanged**. Add `v_latest_publication_ref uuid` to the DECLARE list (today the function only has `v_latest_visibility`).
 
-Replace the block at the equivalent of `:4534-4538`:
+Also `CREATE OR REPLACE FUNCTION core.enforce_publication_v2_ref_binding()` — **same zero-argument trigger signature**, never `DROP`. Copy the body from `migrations/0067_system_run_publication.sql:43-69` (lane HEAD `11184e70`) and add **one** extra admission **before** the existing `actor_ref_version<>2 OR NOT EXISTS (publication_event_binding…)` raise:
 
 ```
-SELECT event.state INTO v_latest_visibility FROM core.run_visibility_event AS event
+IF NEW.actor_ref_version=2
+  AND NEW.actor_audit_token='00000000-0000-4000-8000-0000000000f2'::uuid
+  AND NEW.state='PRIVATE' AND NEW.warning_version='COPIES_MAY_PERSIST_V1'
+  AND COALESCE(core.run_is_free_public_bound(NEW.run_id), false)
+  AND EXISTS (
+    SELECT 1 FROM serve.publication_key_cleanup_intent AS cleanup
+    WHERE cleanup.publication_ref=NEW.publication_ref
+      AND cleanup.cleanup_state='PENDING' AND cleanup.completed_at IS NULL
+  ) THEN
+  RETURN NEW;
+END IF;
+```
+
+Do not admit `…00f1` on PRIVATE. Do not admit `…00f2` on PUBLISHED. Do not admit `…00f2` when `run_is_free_public_bound` is false. Do not admit `…00f2` without a pending cleanup intent. The owner UNPUBLISH path (binding row + `actor_ref_version=2`) stays the second branch and is unchanged. C2's `0067` is not edited; `0068` is the newest definition.
+
+Replace the block at the equivalent of `:4534-4538`. **Order is load-bearing for the trigger** (cleanup intent must exist before the visibility INSERT):
+
+```
+SELECT event.state, event.publication_ref INTO v_latest_visibility, v_latest_publication_ref
+FROM core.run_visibility_event AS event
 WHERE event.run_id=p_run_id ORDER BY event.at_seq DESC LIMIT 1;
 IF v_latest_visibility='PUBLISHED' THEN
   IF NOT COALESCE(core.run_is_free_public_bound(p_run_id), false) THEN
     RETURN QUERY SELECT 'PUBLISHED'::text, NULL::uuid; RETURN;
   END IF;
-  -- bound published: fold the public copy into this erasure
-  -- INSERT visibility PRIVATE, warning_version='COPIES_MAY_PERSIST_V1',
-  -- INSERT serve.publication_key_cleanup_intent as the UNPUBLISH branch at :4096-4103,
-  -- then fall through. Do NOT return 'PUBLISHED'.
+  -- 1. INSERT serve.publication_key_cleanup_intent PENDING for v_latest_publication_ref
+  --    (same UPSERT as owner UNPUBLISH at :4096-4103).
+  -- 2. INSERT core.run_visibility_event:
+  --      run_visibility_event_id = gen_random_uuid()  -- not a publication_event_binding id
+  --      publication_ref = v_latest_publication_ref
+  --      state = 'PRIVATE'
+  --      actor_audit_token = '00000000-0000-4000-8000-0000000000f2'
+  --      actor_ref_version = 2
+  --      warning_version = 'COPIES_MAY_PERSIST_V1'
+  --    This INSERT must not raise 55000 PUBLICATION_V2_REF_BINDING_REQUIRED.
+  -- 3. Do NOT INSERT identity.publication_event_binding.
+  -- 4. Do NOT call identity.append_audit_event_internal for debate.publication.unpublished
+  --    (the trigger's audit half has no erasure-unpublished shape; the trail is the
+  --    existing private_erasure_audit_binding written later in this function).
+  -- 5. Do NOT consume an UNPUBLISH grant. The DELETE_PRIVATE_DEBATE grant is already
+  --    consumed at :4527-4529. Fall through. Do NOT return 'PUBLISHED'.
 END IF;
 ```
 
@@ -792,9 +848,9 @@ Do not consume an `UNPUBLISH` grant. The `DELETE_PRIVATE_DEBATE` grant is alread
 
 `GRANT EXECUTE` is already held by `debateai_erasure_runtime` (`:6435-6436`). Because this is `CREATE OR REPLACE` with the same signature, do not DROP, do not re-GRANT unless `has_function_privilege` is measured false (it must stay true).
 
-Done: `grep DROP FUNCTION migrations/0068_bound_published_erasure.sql` empty; `to_regprocedure('core.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)')` non-null after migrate.
+Done: `grep DROP FUNCTION migrations/0068_bound_published_erasure.sql` empty; `to_regprocedure('core.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)')` non-null after migrate; `grep -F "00000000-0000-4000-8000-0000000000f2" migrations/0068_bound_published_erasure.sql` is ≥ 1; `CREATE OR REPLACE FUNCTION core.enforce_publication_v2_ref_binding()` is in the same file; `grep DROP FUNCTION` still empty (the trigger is replaced, not dropped).
 
-If omitted, C4-S2 case 1 stays `'PUBLISHED'`.
+If omitted, C4-S2 case 1 stays `'PUBLISHED'` or case 2 raises `55000 PUBLICATION_V2_REF_BINDING_REQUIRED` (G1).
 
 #### C4-S5: Public copy gone (R-17)
 
@@ -870,8 +926,8 @@ C4 file map only.
 | R-13 | refusal only after ownership + live grant; everyone else today's 404 | C3-S1 G5/G6/R-13, C3-S4 | S01-C3 |
 | R-14 | refused unpublish changes nothing and does not consume the grant | C3-S1 R-14, C3-S6 | S01-C3 |
 | R-15 | unpublish on a published Premium run still returns 200 | C3-S1 R-15, C3-S5 | S01-C3 |
-| R-16 | creator deletes a bound published run; not 409 | C4-S1 R-16, C4-S2.1, C4-S4, C4-S9 | S01-C4 |
-| R-17 | after the delete the public copy is gone from the list and the read is 404 | C4-S2.2, C4-S5 | S01-C4 |
+| R-16 | creator deletes a bound published run; not 409 | C4-S1 R-16, C4-S2.1, C4-S2.9, C4-S4, C4-S9 | S01-C4 |
+| R-17 | after the delete the public copy is gone from the list and the read is 404 | C4-S2.2, C4-S2.9, C4-S5 | S01-C4 |
 | R-18 | second signed-in user 404 `NOT_FOUND`; no session 401 `SESSION_REQUIRED` before lookup | C4-S1 G1/G5, C4-S7 | S01-C4 |
 | R-19 | delete on a published Premium run still 409 `DEBATE_MUST_BE_PRIVATE` | C4-S1 R-19, C4-S2.3, C4-S6 | S01-C4 |
 | R-20 | system publish records: visibility, ALLOW audit, system actor, no phantom session | C2-S3.4–5, C2-S4 function body, ADR-0026 | S01-C2 |
