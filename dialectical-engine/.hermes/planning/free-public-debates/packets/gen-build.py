@@ -4,7 +4,7 @@ Every line anchor into PLAN.md is COMPUTED here from the headings and the file m
 the step range = the '### S01-<C> ' section; the cluster lines = the §1 table row and the §1.1 map;
 allowed = the map rows this cluster owns, turned into absolute LANE paths ((new) where the map says so)."""
 import sys,re,pathlib,subprocess
-C,TICKET,BASE,FRAME=sys.argv[1:5]; CHARGES=sys.argv[5] if len(sys.argv)>5 else None
+C,TICKET,BASE,FRAME=sys.argv[1:5]; CHARGES=sys.argv[5] if len(sys.argv)>5 else None; READONLY=sys.argv[6] if len(sys.argv)>6 else None
 A="/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine"
 LANE="/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/fpd-s01/dialectical-engine"
 M="free-public-debates"; MR=f"{A}/docs/missions/{M}"; R=f"{A}/.hermes/reports/{M}"; PK=f"{A}/.hermes/planning/{M}/packets"
@@ -49,5 +49,6 @@ CWD_RULE=("- cwd rule, stated once: every PRODUCT command and every code edit ha
  "mission files (PLAN, DECISIONS, your self-report, your probe logs) live under the mission home that COMMON line 3 calls the repo root "
  "— you never run a product command there.")
 s=s.replace("- inputs (read these",CWD_RULE+chr(10)+"- inputs (read these",1)
+if READONLY: s=s.replace("- output (the ONE artifact",pathlib.Path(READONLY).read_text().rstrip(chr(10))+chr(10)+"- output (the ONE artifact",1)
 if CHARGES: s+=chr(10)+"### Charges"+chr(10)+pathlib.Path(CHARGES).read_text()
 out=f"{PK}/BUILD-S01-{C}.md"; pathlib.Path(out).write_text(s); print("wrote",out,"steps",start,end,len(steps),"allowed",len(allowed))
