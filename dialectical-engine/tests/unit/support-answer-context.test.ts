@@ -478,6 +478,36 @@ describe("CP1 composed answer context", () => {
   });
 
   it.each([
+    ["en" as const,"Pricing","Payment may not be available through the debate creator."],
+    ["ro" as const,"Cum funcționează secțiunea Prețuri?","Plata poate să nu fie disponibilă prin creatorul de dezbateri."],
+  ])("recovers a benign %s financial paraphrase to useful reviewed guidance",async (
+    language,text,draftText
+  ) => {
+    const snapshot = productionReviewedCorpus();
+    const complete = vi.fn<SupportModelPort["complete"]>(async () => Object.freeze({
+      text:JSON.stringify({
+        kind:"answer",text:draftText,sourceIds:[SOURCE_REFERENCE],actionIds:[]
+      })
+    }));
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-21T00:30:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({
+      ...request(snapshot),text,language,detectedLanguage:language
+    });
+
+    expect(complete).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      outcome:"ANSWER_GROUNDED",sources:[{ id:"app-navigation" }],actions:[]
+    });
+    expect(result.text).not.toBe(draftText);
+    expect(result.text.trim().length).toBeGreaterThan(0);
+  });
+
+  it.each([
     ["en" as const,"Where can I read the Method section?","method","/#method"],
     ["ro" as const,"Unde pot citi secțiunea Transcrieri?","sample-transcript","/#transcripts"],
   ])("keeps a genuine %s menu request bound to its relevant closed action",async (

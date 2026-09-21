@@ -2682,6 +2682,49 @@ describe("SUP-01 support routes", () => {
     await server.close();
   });
 
+  it("recovers a benign Romanian financial paraphrase through the real POST boundary",async () => {
+    const kbRoot = join(process.cwd(),"packages/support-kb");
+    const snapshot = loadHelpCorpus(join(kbRoot,"content"),{
+      reviewManifest:JSON.parse(await readFile(
+        join(kbRoot,"reviews/manifest.json"),"utf8"
+      )) as unknown,
+      recoveryComponents:await readFile(join(kbRoot,"recovery/components.json")),
+      requireReviewedRecovery:true
+    });
+    const draftText = "Plata poate să nu fie disponibilă prin creatorul de dezbateri.";
+    const complete = vi.fn(async () => Object.freeze({
+      text:JSON.stringify({
+        kind:"answer",text:draftText,
+        sourceIds:[MODEL_SOURCE_REFERENCE],actionIds:[]
+      }),usage:Object.freeze({ input_tokens:5,output_tokens:8,cost_usd:0.001 })
+    }));
+    const answer = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
+      messages:messageCipher,modelFor:() => Object.freeze({ complete }),modelReferenceFactory
+    });
+    const server = api(true,{ answerPort:answer,knowledgePort:Object.freeze({
+      status:async () => Object.freeze({ kbVersion:snapshot.kbVersion,shipped:44,ignored:0 }),
+      snapshot:(version:string) => version === snapshot.kbVersion ? snapshot : undefined
+    }) });
+    const opened = await openSession(server,"203.0.113.248","ro");
+    const response = await sendMessage(
+      server,opened.body,"Cum funcționează secțiunea Prețuri?","203.0.113.248"
+    );
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      outcome:"ANSWER_GROUNDED",sources:[{ id:"app-navigation" }],actions:[]
+    });
+    expect(response.json().text).not.toBe(draftText);
+    expect(response.json().text.trim().length).toBeGreaterThan(0);
+    expect(complete).toHaveBeenCalledOnce();
+    const stored = await database.pool.query<{ model_called:boolean;input_tokens:string }>(`
+      SELECT model_called,input_tokens::text FROM support.message
+      WHERE session_id=$1 AND role='assistant'
+    `,[opened.body.session_id]);
+    expect(stored.rows).toEqual([{ model_called:true,input_tokens:"5" }]);
+    await server.close();
+  });
+
   it("advertises no owner-only action to an anonymous export model request", async () => {
     const article = Object.freeze({
       id: "export-json",lang: "en" as const,title: "Export a debate as JSON",

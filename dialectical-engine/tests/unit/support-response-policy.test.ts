@@ -82,17 +82,21 @@ describe("CP1 support model response policy", () => {
     "Checkoutul nu este disponibil; cu toate acestea, poți plăti în creator.",
     "Creating a debate happens in the creator, and payment happens there too.",
     "Checkout is completed in the debate creator.",
+    "Payment is not only available in the debate creator; it is immediate.",
+    "Checkout isn't merely possible in the debate creator; it is the normal path.",
+    "Plata nu este doar posibilă în creator; este imediată.",
+    "A debate is paid for in the debate creator.",
+    "Billing happens in the debate creator.",
+    "Achitarea are loc în creatorul de dezbateri.",
     "Crearea dezbaterii și plata au loc în creator după autentificare.",
     "Poți plăti pentru dezbatere din creator."
-  ])("rejects an unsupported positive financial capability claim: %s",(text) => {
+  ])("routes a financial-capability model draft through reviewed fallback: %s",(text) => {
     expect(bindSupportDraftAuthority({
       kind:"answer",text,sourceIds:["app-navigation"],actionIds:[]
     },["app-navigation"],[])).toBeNull();
   });
 
   it.each([
-    "You can create a debate in the debate creator after sign in.",
-    "Poți crea o dezbatere în creator după autentificare.",
     "Pricing is informational and is not a checkout flow.",
     "Payment may not be available through the debate creator.",
     "Plata poate să nu fie disponibilă prin creatorul de dezbateri.",
@@ -110,7 +114,19 @@ describe("CP1 support model response policy", () => {
     "Public guidance does not establish where payment happens.",
     "Pricing este informativ și nu este un flux de plată.",
     "Ghidul public nu stabilește unde are loc plata."
-  ])("preserves a bounded negative financial limitation: %s",(text) => {
+  ])("routes a negative financial paraphrase through reviewed fallback: %s",(text) => {
+    expect(bindSupportDraftAuthority({
+      kind:"answer",text,sourceIds:["app-navigation"],actionIds:[]
+    },["app-navigation"],[])).toBeNull();
+  });
+
+  it.each([
+    "You can create a debate in the debate creator after sign in.",
+    "Poți crea o dezbatere în creator după autentificare.",
+    "Open Pricing to read the published plan information.",
+    "Dialectical Engine is a platform for structured debates.",
+    "Dialectical Engine este o platformă pentru dezbateri structurate."
+  ])("preserves ordinary nonfinancial guide prose: %s",(text) => {
     const draft = { kind:"answer" as const,text,sourceIds:["app-navigation"],actionIds:[] };
     expect(bindSupportDraftAuthority(draft,["app-navigation"],[])).toEqual(draft);
   });

@@ -43,10 +43,7 @@ const EMAIL = /\b(?:e-?mail(?:ul)?|mail)\b/u;
 const CASE = /\b(?:human\s+case|support\s+case|case|caz(?:ul)?)\b/u;
 const CASE_CREATION = /\b(?:create[ds]?|open(?:s|ed)?|cre(?:eaza|at|are)|deschide)\b/u;
 const CASE_CREATION_NEGATION = /\b(?:does\s+not|doesn['’]?t|did\s+not|never|cannot|can['’]?t|nu)\b[^.!?;\n]{0,40}\b(?:create|open|cre(?:eaza|a)|deschide)\b/u;
-const FINANCIAL_CAPABILITY = /\b(?:pay(?:ing|ment|ments|ed|s)?|purchas\p{L}*|checkout|buy(?:ing|s)?|plat\p{L}*|cump\p{L}*)\b/gu;
-const FINANCIAL_NEGATION_BEFORE = /(?:\b(?:no|not|without)\s+(?:(?:a|an|the)\s+)?|\b(?:cannot|can['’]?t|does\s+not|doesn['’]?t|did\s+not)\s+|\b(?:is\s+not|isn['’]?t)\s+(?:(?:a|an|the)\s+)?|\bdoes\s+not\s+(?:establish|verify|show|state|confirm)\s+(?:(?:where|whether|that)\s+)?|\b(?:fara|niciun|nicio)\s+(?:(?:un|o)\s+)?|\bnu\s+(?:(?:poate|poti|puteti)\s+|(?:este|e)\s+(?:(?:un|o)\s+)?(?:(?:flux|functie|optiune)\s+de\s+)?|(?:stabileste|verifica|arata|spune|confirma)\s+(?:(?:unde|daca|ca)\s+)?(?:are\s+loc\s+)?))$/u;
-const FINANCIAL_NEGATION_AFTER = /^\s*(?:cannot|can['’]?t|does\s+not|doesn['’]?t|did\s+not|isn['’]?t|is\s+not|(?:(?:may|might|can|could|would|should)\s+)(?:not|never)|(?:poate(?:\s+sa)?|ar\s+putea(?:\s+sa)?)\s+nu|nu\s+(?:este|e|sunt|poate|pot)|(?:is\s+)?(?:unsupported|unavailable|unknown|unverified)|(?:este\s+)?(?:indisponibil|neverificat))\b/u;
-const FINANCIAL_SENTENCE_BOUNDARY = /[.!?;\n:]+|[—–]/u;
+const FINANCIAL_CAPABILITY = /\b(?:pay(?:ing|ment|ments|ed|s)?|paid|purchas\p{L}*|checkout\p{L}*|buy(?:ing|s)?|bill(?:ing|ed|s)?|charg\p{L}*|transaction\p{L}*|plat(?!form)\p{L}*|achit\p{L}*|cump\p{L}*)\b/gu;
 
 function authorityText(value: string): string {
   return value.normalize("NFKD").replace(/\p{M}/gu,"").toLocaleLowerCase("en-US");
@@ -63,17 +60,9 @@ function conflatesCaseAndEmail(value: string): boolean {
   );
 }
 
-function hasUnsupportedPositiveFinancialClaim(value: string): boolean {
-  return authorityText(value).split(FINANCIAL_SENTENCE_BOUNDARY).some((clause) => {
-    FINANCIAL_CAPABILITY.lastIndex = 0;
-    return [...clause.matchAll(FINANCIAL_CAPABILITY)].some((match) => {
-      const at = match.index ?? 0;
-      const before = clause.slice(0,at);
-      const after = clause.slice(at + match[0].length,at + match[0].length + 64);
-      return !FINANCIAL_NEGATION_BEFORE.test(before)
-        && !FINANCIAL_NEGATION_AFTER.test(after);
-    });
-  });
+function hasFinancialCapabilityClaim(value: string): boolean {
+  FINANCIAL_CAPABILITY.lastIndex = 0;
+  return FINANCIAL_CAPABILITY.test(authorityText(value));
 }
 
 type NavigationMatch = Readonly<{
@@ -127,7 +116,7 @@ export function bindSupportDraftAuthority(
   requestedActionIds: readonly (SupportActionId | string)[]
 ): SupportDraft | null {
   const text = authorityText(draft.text);
-  if (conflatesCaseAndEmail(text) || hasUnsupportedPositiveFinancialClaim(text)) return null;
+  if (conflatesCaseAndEmail(text) || hasFinancialCapabilityClaim(text)) return null;
 
   const sourceIds = [...draft.sourceIds];
   if (ACCOUNT_DETAIL_CLAIM.test(text) && !sourceIds.includes("settings-help-menus")) {
