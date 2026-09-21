@@ -20,7 +20,7 @@ We are going through them together, one at a time. Each answer is written into [
 |---|---|---|
 | Ruled on 18 Sept | V-15 (the server starts with an empty database) and V-23 (we look at the Cloudflare integration together, at the end) | 2 of 2 |
 | A — routine | thirteen small ones | **13 of 13 — all "yes", 21 Sept** |
-| B — switches on your GitHub account | Nine short questions: which branch GitHub watches (**answered**); a private channel for reporting holes; automatic fix pull requests; blocking pushes that contain secrets; the code scanner's four notes; pinned automation scripts; two-factor login for everyone; branch rules; the 527 MB of recordings in the repository | 1 of 9 |
+| B — switches on your GitHub account | Nine short questions. **Answered:** which branch GitHub watches (`dev` until release day, then back to `main`); a private channel for reporting holes (yes — and the public promise to reply changes from 3 working days to one week). **Still to ask:** automatic fix pull requests; blocking pushes that contain secrets; the code scanner's four notes; pinned automation scripts; two-factor login for everyone; branch rules; the 527 MB of recordings in the repository | 2 of 9 |
 | C — real choices that add work | changing the master key; two server accounts sharing one key folder; the GPU settings; **how the server reaches the AI models**; and three more | 0 of 7 |
 | D — new, from the re-check | support chat on account deletion; a money ceiling per debate; the monitoring agent's permissions; how the support chat reaches the model | 0 of 4 |
 
