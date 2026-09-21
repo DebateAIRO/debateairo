@@ -169,6 +169,7 @@ The re-check of the 656 newer commits produced four questions that are yours rat
 
 ### V-29 — The monitoring agent can read every query's text
 **About.** The monitoring agent logs into the database with a role that belongs to PostgreSQL's built-in "monitor" group. That group can see the text of every query running on the server — which can include user content — while the agent only ever runs one narrow query of its own.
+**Corrected 22 September, before you ruled.** "Which can include user content" was overstated: the application always sends user text separately from the command text, so the commands that group can watch contain only placeholders. What it *can* watch is administrative commands — including ones that set passwords, while they run — and the server's full configuration. **Ruled 22 September: yes — the small window.**
 **My answer.** Give it exactly the permissions its one query needs and drop the group membership. Small, and it removes a whole class of accidental exposure.
 **Alternative.** Keep it: the agent only listens on the machine itself, so the exposure is limited to someone already on the server.
 

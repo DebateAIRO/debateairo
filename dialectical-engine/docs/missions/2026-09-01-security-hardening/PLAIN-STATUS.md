@@ -22,7 +22,7 @@ We are going through them together, one at a time. Each answer is written into [
 | A — thirteen routine ones | **13 of 13** — all "yes", 21 Sept |
 | B — switches on your GitHub account | **9 of 9** — 22 Sept |
 | C — real choices that add work | **7 of 7** — 22 Sept |
-| D — new, from the re-check | 0 of 4 |
+| D — new, from the re-check | 1 of 4 |
 
 **Nothing on your GitHub account has been changed yet.** Each switch still waits for your "go" at its step, in the order written in the [runbook](GITHUB-SETTINGS-RUNBOOK.md).
 
@@ -49,7 +49,10 @@ We are going through them together, one at a time. Each answer is written into [
 - **Editable prompts — the foundation now, the feature afterwards.** Today the prompts are fixed text inside the source code. You approved the principle for changing that safely: each step's prompt splits into a *safety frame owned by the code* (nobody, human or AI, can edit it out) and *your instruction text* (edit freely); every edit is a new sealed version with instant rollback; a rules gate — the same for a prompt written by a person or by an AI — runs before a version goes live; only owner accounts can activate one. The security work builds on that split now; the editing feature itself (where you edit, who may, whether a second person approves) gets its own short design conversation after the decisions.
 - **V-9, the shape of production** (*was blocking the server move*): the database runs directly on the server (yes); no job-system dashboard on the public internet (yes); and for reaching the AI models you set the direction — **the product must work in two modes.** *Hosted* (the commercial website): paid API keys, a separate key per AI vendor, and many more vendors than today's three. *Local* (anyone who downloads the repository and runs it on their own computer — you included, before launch): local models and personal subscriptions, no API keys needed. So the small command-line relays are not throwaway development code any more; they are the local mode. The one hard rule that follows: **the hosted server must refuse those relays, and the code has to enforce that** — today nothing does.
 
-**Group D — still to ask:** the support chat on account deletion (V-26); a money ceiling per debate (V-28); the monitoring agent's permissions (V-29); how the support chat reaches the model (V-30).
+**Group D — so far:**
+
+- **V-29, what the monitoring agent may see in the database:** yes — it gets a small window showing only what its health check needs, instead of membership in a built-in group that can watch every command go by (including ones that set passwords). A correction I made before asking: that group does *not* expose your users' debates — the application always sends user text separately from the command text.
+- **Still to ask:** the support chat on account deletion (V-26); how the support chat reaches the model (V-30); a money ceiling per debate (V-28).
 
 (The numbering has no "V-27" — it was skipped. The thirty are V-1 to V-30 without 27, plus one called V-6b.)
 
@@ -89,6 +92,7 @@ I am collecting rulings first and building afterwards, so the questions keep mov
 | V-9 | Two modes enforced by the code: the hosted server accepts only paid, encrypted API connections and refuses the local relays at start-up; local mode keeps the relays and local models. AI-vendor keys move out of a settings variable into the locked key folder (one file per vendor, readable only by the engine room's account). Vendors become configuration: adding one is a settings entry, a key file and one proven test call. Each hosted vendor is checked for how it treats your users' text, and named in the privacy notice | about a day for the foundation, then a little per vendor |
 | V-11 | At every hand-off between AI models, model-written text is wrapped as clearly marked *material to evaluate*, never mixed into the instructions; job inputs are validated; the model's reported name is checked; the data formats get version numbers. Every changed prompt becomes a new sealed version. Ends with a real-model confirmation run (you run it). Plus the five extra layers you approved (unforgeable fences, locked answer forms, the permanent attack test-suite, tripwires), all built on the "safety frame + your instruction text" split that makes editable prompts safe later | two to three days, plus the confirmation run |
 | V-19 | The "team badge" for key files: readable by one named group when that is switched on, as strict as today in every other respect, with a full table of refusal tests written first; the server kit's setup steps gain the matching group | about half a day |
+| V-29 | The monitoring agent's database login loses its membership in the built-in "monitor" group and gets a narrow window instead; a test proves it can no longer read other sessions' commands, another proves its health check still works | small |
 | V-20 | The three "GPU server" settings become optional for the engine room, the server kit stops writing a placeholder that would have stopped it from starting, and the six unused database logins are created already-expired | small |
 | V-22 | The server refuses a stored password record that asks for more than twice the official "how hard to work" cost (today it accepts four times: 256 MB per login check instead of 64 MB), with a test proving no real user can be locked out | small |
 | Noticed while checking the code reviewer's notes | The e-mail verification route does one cheap database lookup before its limit check; make it check the per-visitor budget first. Not a hole — a small tightening | tiny |
