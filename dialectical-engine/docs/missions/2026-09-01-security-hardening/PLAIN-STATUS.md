@@ -106,6 +106,22 @@ I am collecting rulings first and building afterwards, so the questions keep mov
 
 Already done because it was a one-line wording change: the public promise in [SECURITY.md](../../../../SECURITY.md) now says "within one week".
 
+### Work in progress (started 22 September, on your instruction)
+
+You asked for the building to be done by a team: **I (Claude Fable 5.1) coordinate, judge and do the final review; Claude Opus 5 agents do the building, each in its own separate copy of the code, in parallel where the work is independent.** I merge only what passes my review. The agents' exact instructions — and the fifteen rules every one of them works under (your rules, plus the mission's) — are in [EXECUTION-PLAN-2026-09-22.md](EXECUTION-PLAN-2026-09-22.md).
+
+| Package | What | State |
+|---|---|---|
+| 1 | The second bringing-up-to-date with `dev` | **an agent is working on it** |
+| 2 | Repository hygiene: the dormant pre-push folder, the half gigabyte of recordings, the expired package exceptions, the package bot's 7-day wait, the stricter rule for the list of known-failing tests | instructions written; starts when package 1 has passed my review |
+| 3 | The memory test re-measured under Node 26 | instructions written; runs alone, on a quiet machine |
+| 4 | Three small hardenings of the login surface (V-14, V-22, the e-mail-verification order) | instructions written; starts after package 1 |
+| 5 | Three database items (V-17, V-29, the tamper check) | instructions written; **needs Docker running on this Mac** — it was not running when I checked |
+| 6 | Keys: the "team badge", then changing a master key | instructions written; starts after package 1 |
+| 7–10 | Data encryption and deletion, the support-chat leftovers, prompt-injection containment, AI vendors and spending ceilings | instructions being written |
+
+Still true: nothing is pushed and no switch on your accounts is flipped without your "go" at that moment.
+
 ### The plan from here (agreed order, 22 September)
 
 Sizes are in "agent-days" — working sessions of an AI agent, not calendar days. Nothing is pushed and no switch on your accounts is flipped without your "go" at that moment.
@@ -119,7 +135,7 @@ Sizes are in "agent-days" — working sessions of an AI agent, not calendar days
 | Step | What happens | Size | What I need from you |
 |---|---|---|---|
 | 1 | **The second bringing-up-to-date with `dev`.** Checked on 22 Sept: `dev` has not moved again (still 36 commits ahead), and a trial run shows 8 files collide — the three version files, the engine room's main file, and four test files both sides had repaired. Rules: take `dev`'s Node 26 and its newer test tool; keep this branch's patched web-server library; then re-check everything and re-measure the memory test | half a day to a day | a "go" to download the packages `dev`'s new list names |
-| 2 | **The small approved items, as one package** — everything marked small or tiny in the to-do table above, plus two leftovers from the first mission (a tamper check on database upgrade files, two small proxy hardenings) | about a day | nothing |
+| 2 | **The small approved items, as one package** — everything marked small or tiny in the to-do table above, plus one leftover from the first mission (a tamper check on database upgrade files). *Correction, 22 Sept:* I had also listed "two small proxy hardenings" here — when I checked the code they turned out to be already built and tested on 19 September, so they are off the list | about a day | nothing |
 | 3 | **First push, and pull request #8 merged into `dev`.** *This is earlier than in your original order, on my recommendation:* this branch has already needed two bringing-up-to-dates because it sat outside `dev`, and every further week outside means more collisions. Once it is in, `dev` carries the automatic checks, and every later package arrives as a small pull request that is checked automatically. The GitHub switches go on around this step, in the order you ruled (secret blocking *before* the push; the rest at and after the merge) | an hour or two of your attention | "go" for each switch, "push", and the merge itself |
 | 4a | **Keys:** the "team badge" (V-19), then the ability to change a master key (V-3), ending with a rehearsal on a copy | about a day and a half | nothing |
 | 4b | **Data:** the remaining readable debate text gets encrypted (V-6); deleting an account also erases its support chats (V-26) | one to two days | I tell you before V-6 passes one day |
