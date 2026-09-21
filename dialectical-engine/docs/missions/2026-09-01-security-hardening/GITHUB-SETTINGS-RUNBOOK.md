@@ -53,6 +53,14 @@ JSON
 
 Undo for each: the same call with `-X DELETE` (reporting, fixes) or `"status":"disabled"` (scanning).
 
+**Rulings, 2026-09-21/22 — and the order they impose.** All three switches in this step are approved, but not at the same moment:
+
+| Switch | When it is turned on (each on the owner's "go") |
+|---|---|
+| Secret scanning + push protection | **First of all — before the first push of the security branch**, so the local commits are checked on their way up. If a push is stopped, the agent stops and shows the owner what was caught; it never bypasses on its own. |
+| Private vulnerability reporting | At the moment PR #8 merges into `dev`, so `SECURITY.md`'s promise and the button appear together. |
+| Dependabot security updates | Only after Step 1 has moved the default-branch label to `dev`; earlier, the fix pull requests would target the old engine on `main`. |
+
 ## Step 3 — V-6b: branch rules on `main` and `dev`, with an owner bypass
 
 What the rule does: no force-push, no deleting the branch, changes arrive through a pull request with the `verify` check of the security workflow passing. The bypass keeps the owner's own pushes working while the rule catches everything else; remove the bypass later if the team grows.
