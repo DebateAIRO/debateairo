@@ -2642,6 +2642,46 @@ describe("SUP-01 support routes", () => {
     await server.close();
   });
 
+  it("recovers an unsupported Pricing payment claim before storage and HTTP",async () => {
+    const kbRoot = join(process.cwd(),"packages/support-kb");
+    const snapshot = loadHelpCorpus(join(kbRoot,"content"),{
+      reviewManifest:JSON.parse(await readFile(
+        join(kbRoot,"reviews/manifest.json"),"utf8"
+      )) as unknown,
+      recoveryComponents:await readFile(join(kbRoot,"recovery/components.json")),
+      requireReviewedRecovery:true
+    });
+    const unsafe = "Pricing is informational and is not checkout, but paying for a debate happens through the debate creator after sign in.";
+    const complete = vi.fn(async () => Object.freeze({
+      text:JSON.stringify({
+        kind:"answer",text:unsafe,
+        sourceIds:[MODEL_SOURCE_REFERENCE],actionIds:[]
+      }),usage:Object.freeze({ input_tokens:7,output_tokens:9,cost_usd:0.001 })
+    }));
+    const answer = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
+      messages:messageCipher,modelFor:() => Object.freeze({ complete }),modelReferenceFactory
+    });
+    const server = api(true,{ answerPort:answer,knowledgePort:Object.freeze({
+      status:async () => Object.freeze({ kbVersion:snapshot.kbVersion,shipped:44,ignored:0 }),
+      snapshot:(version:string) => version === snapshot.kbVersion ? snapshot : undefined
+    }) });
+    const opened = await openSession(server,"203.0.113.247","en");
+    const response = await sendMessage(server,opened.body,"Pricing","203.0.113.247");
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      outcome:"ANSWER_GROUNDED",sources:[{ id:"app-navigation" }],actions:[]
+    });
+    expect(response.json().text).not.toBe(unsafe);
+    expect(complete).toHaveBeenCalledOnce();
+    const stored = await database.pool.query<{ model_called:boolean;input_tokens:string }>(`
+      SELECT model_called,input_tokens::text FROM support.message
+      WHERE session_id=$1 AND role='assistant'
+    `,[opened.body.session_id]);
+    expect(stored.rows).toEqual([{ model_called:true,input_tokens:"7" }]);
+    await server.close();
+  });
+
   it("advertises no owner-only action to an anonymous export model request", async () => {
     const article = Object.freeze({
       id: "export-json",lang: "en" as const,title: "Export a debate as JSON",

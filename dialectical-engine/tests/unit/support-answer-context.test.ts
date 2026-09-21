@@ -453,6 +453,30 @@ describe("CP1 composed answer context", () => {
     expect(system).toContain("actionIds=none");
   });
 
+  it("recovers the observed unsupported Pricing payment claim through the full reviewed corpus",async () => {
+    const snapshot = productionReviewedCorpus();
+    const unsafe = "Pricing on the site is informational only — it describes plans and costs but is not a checkout flow, so you cannot purchase or change a plan from it. If you have questions about what a plan includes, Support can explain the published information, but creating or paying for a debate happens through the debate creator after you sign in.";
+    const complete = vi.fn<SupportModelPort["complete"]>(async () => Object.freeze({
+      text:JSON.stringify({
+        kind:"answer",text:unsafe,sourceIds:[SOURCE_REFERENCE],actionIds:[]
+      })
+    }));
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-21T00:00:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({ ...request(snapshot),text:"Pricing" });
+
+    expect(complete).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      outcome:"ANSWER_GROUNDED",sources:[{ id:"app-navigation" }],actions:[]
+    });
+    expect(result.text).not.toBe(unsafe);
+    expect(result.text).not.toMatch(/paying for a debate happens/iu);
+  });
+
   it.each([
     ["en" as const,"Where can I read the Method section?","method","/#method"],
     ["ro" as const,"Unde pot citi secțiunea Transcrieri?","sample-transcript","/#transcripts"],

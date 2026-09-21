@@ -65,6 +65,32 @@ describe("CP1 support model response policy", () => {
     )).toEqual(navigation);
   });
 
+  it.each([
+    "Pricing is informational only, but paying for a debate happens through the debate creator after sign in.",
+    "Pricing is not checkout, and payment happens in the debate creator.",
+    "Creating a debate happens in the creator, and payment happens there too.",
+    "Checkout is completed in the debate creator.",
+    "Crearea dezbaterii și plata au loc în creator după autentificare.",
+    "Poți plăti pentru dezbatere din creator."
+  ])("rejects an unsupported positive financial capability claim: %s",(text) => {
+    expect(bindSupportDraftAuthority({
+      kind:"answer",text,sourceIds:["app-navigation"],actionIds:[]
+    },["app-navigation"],[])).toBeNull();
+  });
+
+  it.each([
+    "You can create a debate in the debate creator after sign in.",
+    "Poți crea o dezbatere în creator după autentificare.",
+    "Pricing is informational and is not a checkout flow.",
+    "You cannot purchase or change a plan from Pricing.",
+    "Public guidance does not establish where payment happens.",
+    "Pricing este informativ și nu este un flux de plată.",
+    "Ghidul public nu stabilește unde are loc plata."
+  ])("preserves a bounded negative financial limitation: %s",(text) => {
+    const draft = { kind:"answer" as const,text,sourceIds:["app-navigation"],actionIds:[] };
+    expect(bindSupportDraftAuthority(draft,["app-navigation"],[])).toEqual(draft);
+  });
+
   it("derives every promised destination from the canonical action and guide catalogs", () => {
     for (const action of SUPPORT_ACTION_CATALOG) {
       const guideRows = SUPPORT_GUIDE_LABELS.filter(({ actionId }) => actionId === action.id);
