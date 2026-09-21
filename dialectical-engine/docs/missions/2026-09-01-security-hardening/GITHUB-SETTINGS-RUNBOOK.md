@@ -91,6 +91,18 @@ JSON
 
 GitHub → the `DebateAIRO` organisation → Settings → Authentication security → "Require two-factor authentication for everyone in the organisation". Members without 2FA are removed from the organisation when this is switched on; check that every member has it first.
 
+**Ruled 2026-09-22: yes — but only after the second administrator has two-factor on.** Measured that day (read-only): one member, `nokitel` (administrator, 2FA on), and one outside collaborator, `VanillaMint02` (administrator, **2FA off**). Flipping the switch in that state removes `VanillaMint02` immediately. The owner is asking that colleague to enable 2FA; his access level stays administrator by the owner's decision.
+
+Run both checks right before flipping the switch; each must print `0`:
+
+```bash
+gh api 'orgs/DebateAIRO/members?filter=2fa_disabled' --jq 'length'
+```
+
+```bash
+gh api 'orgs/DebateAIRO/outside_collaborators?filter=2fa_disabled' --jq 'length'
+```
+
 ## Step 5 — pinned Actions requirement (V-6b)
 
 Settings → Actions → General → "Require actions to be pinned to a full-length commit SHA". (The security workflow already pins every action by SHA, so nothing breaks.)
