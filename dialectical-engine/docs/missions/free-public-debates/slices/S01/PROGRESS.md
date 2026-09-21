@@ -17,3 +17,4 @@
 | 2026-09-21 03:40 | BUILD C3 | t_8a0918c0 | READY consumed — `63a97f31` (one BLOCKED → ruling §22) |
 | 2026-09-21 03:41 | ARCH-FIX (C4 gap) | t_fd352d8e | READY consumed — PLAN Revision 4; V-7 raised; C4 resumed at base 63a97f31 |
 | 2026-09-21 03:55 | BUILD C4 | t_4990de08 | READY consumed — `db4758da`; the whole slice verified at its head (19 suites as expected, tsc 70, apps/ui 0) |
+| 2026-09-21 03:57 | GATE + REV p1 | t_7c1f1fde, t_af8d9bb2 | package assembled at `db4758da`; three blind lenses dispatched |
