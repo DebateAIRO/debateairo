@@ -1,0 +1,36 @@
+################ tests/architecture/dev-deployment-register.test.ts
+  base    describe=1 cases=3
+  ours    describe=1 cases=3
+  theirs  describe=1 cases=3
+  merged  describe=1 cases=3
+  LOST-FROM-OURS: none
+  LOST-FROM-THEIRS: none
+################ tests/architecture/register-support-publication.test.ts
+  base    describe=1 cases=18
+  ours    describe=1 cases=18
+  theirs  describe=1 cases=18
+  merged  describe=1 cases=18
+  LOST-FROM-OURS: none
+  LOST-FROM-THEIRS: none
+################ tests/integration/obs-l3-s06-runner-binding.test.ts
+  base    describe=3 cases=5
+  ours    describe=3 cases=4
+  theirs  describe=3 cases=6
+  merged  describe=3 cases=5
+  LOST-FROM-OURS: none
+  LOST-FROM-THEIRS (1):
+    - [it] captures one provider occurrence after the real gateway exhausts all attempts
+################ tests/integration/production-database-principals.test.ts
+  base    describe=1 cases=32
+  ours    describe=1 cases=32
+  theirs  describe=1 cases=32
+  merged  describe=1 cases=32
+  LOST-FROM-OURS: none
+  LOST-FROM-THEIRS: none
+################ tests/integration/register-support-publication.test.ts
+  base    describe=1 cases=25
+  ours    describe=1 cases=25
+  theirs  describe=1 cases=27
+  merged  describe=1 cases=27
+  LOST-FROM-OURS: none
+  LOST-FROM-THEIRS: none

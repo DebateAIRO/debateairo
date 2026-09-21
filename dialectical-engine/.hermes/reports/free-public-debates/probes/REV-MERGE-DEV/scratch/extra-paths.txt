@@ -1,0 +1,11 @@
+acceptance/ceremony.test.ts
+apps/ui/app/new/defaults.tsx
+packages/providers/src/provider-probe.ts
+tests/architecture/dev-real-provider-only.test.ts
+tests/architecture/p2-product-role-policy.test.ts
+tests/architecture/p2-recovery-policy-register.test.ts
+tests/integration/dev-deployment-register.test.ts
+tests/integration/t16-algorithm-register.test.ts
+tests/render/tier01-new-plan-tier.test.tsx
+tests/unit/s1-1-depth-contract.test.ts
+tests/unit/t17-envelope.test.ts

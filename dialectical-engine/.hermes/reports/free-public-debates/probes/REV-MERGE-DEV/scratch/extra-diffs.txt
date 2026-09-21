@@ -1,0 +1,387 @@
+################ acceptance/ceremony.test.ts
+diff --git a/dialectical-engine/acceptance/ceremony.test.ts b/dialectical-engine/acceptance/ceremony.test.ts
+index 46495f95..de25abbd 100644
+--- a/dialectical-engine/acceptance/ceremony.test.ts
++++ b/dialectical-engine/acceptance/ceremony.test.ts
+@@ -32,7 +32,7 @@ async function reservePort(): Promise<number> {
+   return port;
+ }
+ 
+-async function startProviderDouble(contents: readonly string[]): Promise<{
++async function startProviderDouble(contents: readonly string[], model: string): Promise<{
+   readonly endpoint: string;
+   stop(): Promise<void>;
+ }> {
+@@ -75,7 +75,7 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
+         calls += 1;
+         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
+           id: `acceptance-panel-${calls}`,
+-          model: "test-layer/model",
++          model,
+           choices: [{ message: { content: panelAssessmentDouble() } }]
+         }));
+         return;
+@@ -128,7 +128,7 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
+       }
+       response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
+         id: `acceptance-test-${calls}`,
+-        model: "test-layer/model",
++        model,
+         choices: [{ message: { content } }]
+       }));
+     });
+@@ -207,7 +207,7 @@ beforeAll(async () => {
+       { segment_id: "segment:verdict", text: "A provisional acceptance answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+       { segment_id: "segment:next", text: "Verify the proposal independently.", node_refs: [], served_number_refs: [] }
+     ] })
+-  ]);
++  ], "gpt-5.6-luna");
+   // PANEL-01: the second maker independently authors a root, grows both
+   // primary-root children, and authors its ordered cross-root response.
+   criticProvider = await startProviderDouble([
+@@ -226,7 +226,7 @@ beforeAll(async () => {
+     // and a second evaluator call would be a real change this fixture should
+     // refuse by name rather than answer.
+     evaluatorSatisfied()
+-  ]);
++  ], "glm-5.3-flash");
+ });
+ 
+ afterAll(async () => {
+@@ -380,13 +380,13 @@ describe("ACC-01 dry-run ceremony", () => {
+       // model id (live: the claude CLI handshake reports it; here: the double).
+       makerRelays: [
+         {
+-          providerRef: "acceptance:codex-cli",baseUrl: provider.endpoint,model: "test-layer/model",
++          providerRef: "acceptance:codex-cli",baseUrl: provider.endpoint,model: "gpt-5.6-luna",
+           authorizationHeader: "Bearer test-primary-relay"
+         },
+         {
+-          providerRef: "acceptance:claude-cli",baseUrl: criticProvider.endpoint,model: "test-layer/model",
++          providerRef: "acceptance:claude-cli",baseUrl: criticProvider.endpoint,model: "glm-5.3-flash",
+           authorizationHeader: "Bearer test-critic-relay"
+-        },
++        }
+       ]
+     });
+     try {
+@@ -397,6 +397,7 @@ describe("ACC-01 dry-run ceremony", () => {
+       headers: acceptanceServiceRequestHeaders(runtime.serviceSession, origin, true),
+       payload: {
+         question_line: "What is the strongest case for adopting this proposal?",
++        plan_tier: "free",
+         risk_tier: "standard",
+         tier_source: "ASKER",
+         tier_provenance_ref: "acceptance:test-layer:asker",
+################ apps/ui/app/new/defaults.tsx
+diff --git a/dialectical-engine/apps/ui/app/new/defaults.tsx b/dialectical-engine/apps/ui/app/new/defaults.tsx
+index 8899eecb..dd7f9f6d 100644
+--- a/dialectical-engine/apps/ui/app/new/defaults.tsx
++++ b/dialectical-engine/apps/ui/app/new/defaults.tsx
+@@ -48,6 +48,8 @@ export type NewDebateAskDefaults = {
+   readonly decisionScope: string;
+   readonly asOf: string;
+   readonly depth: number;
++  readonly steeringPresets?: string;
++  readonly steeringAnnotations?: string;
+   readonly asOfWasEdited: boolean;
+   readonly planTier?: PlanTier;
+   readonly riskTierWasEdited?: boolean;
+@@ -67,10 +69,9 @@ export function buildNewDebateAskConfig(defaults: NewDebateAskDefaults, submitTi
+     depth: defaults.depth,
+     decision_scope: defaults.decisionScope.trim(),
+     as_of: asOf.toISOString(),
+-    // S1-2 · V ruling 2026-09-03: the asker has no steering control, so these
+-    // are always empty. The two contract fields stay PRESENT rather than being
+-    // dropped, so the submitted ask and every already-stored ask stay valid.
+-    steering_presets: [],
+-    steering_annotations: []
++    steering_presets: (defaults.steeringPresets ?? "")
++      .split("\n").map((value) => value.trim()).filter(Boolean),
++    steering_annotations: (defaults.steeringAnnotations ?? "")
++      .split("\n").map((value) => value.trim()).filter(Boolean)
+   };
+ }
+################ packages/providers/src/provider-probe.ts
+diff --git a/dialectical-engine/packages/providers/src/provider-probe.ts b/dialectical-engine/packages/providers/src/provider-probe.ts
+index eb364932..8924dd68 100644
+--- a/dialectical-engine/packages/providers/src/provider-probe.ts
++++ b/dialectical-engine/packages/providers/src/provider-probe.ts
+@@ -79,11 +79,14 @@ export async function observeProviderTarget(input: Readonly<{
+         signal: AbortSignal.timeout(input.timeoutMs),
+         body: JSON.stringify({
+           model: input.target.model,
+-          max_tokens: 8,
++          max_tokens: 64,
+           messages: [{
+             role: "user",
+             content: "DR-181 discovery health probe. Reply exactly: OK"
+-          }]
++          }],
++          ...(input.target.maker === "Z.AI"
++            ? { thinking: { type: "disabled" } }
++            : {})
+         })
+       }
+     );
+################ tests/architecture/dev-real-provider-only.test.ts
+diff --git a/dialectical-engine/tests/architecture/dev-real-provider-only.test.ts b/dialectical-engine/tests/architecture/dev-real-provider-only.test.ts
+index 78a612bc..e77abf3c 100644
+--- a/dialectical-engine/tests/architecture/dev-real-provider-only.test.ts
++++ b/dialectical-engine/tests/architecture/dev-real-provider-only.test.ts
+@@ -62,7 +62,7 @@ describe("development debate provider boundary", () => {
+       readFile("apps/runner/src/dev-provider-set-publish-cli.ts", "utf8")
+     ]);
+     expect(deployment).toContain(
+-      "loadDevelopmentProviderPanelFromEnvironment(loadDevelopmentCommandEnvironment(), loadModelConfigConfiguredProviders(process.cwd()))"
++      "loadDevelopmentProviderPanelFromEnvironment(commandEnvironment, loadModelConfigConfiguredProviders(process.cwd()))"
+     );
+     expect(dataPlane).toContain(
+       "loadDevelopmentProviderPanelFromEnvironment(commandEnvironment, loadModelConfigConfiguredProviders(process.cwd()))"
+################ tests/architecture/p2-product-role-policy.test.ts
+diff --git a/dialectical-engine/tests/architecture/p2-product-role-policy.test.ts b/dialectical-engine/tests/architecture/p2-product-role-policy.test.ts
+index b769146e..fce2f582 100644
+--- a/dialectical-engine/tests/architecture/p2-product-role-policy.test.ts
++++ b/dialectical-engine/tests/architecture/p2-product-role-policy.test.ts
+@@ -135,7 +135,7 @@ describe("P2-14 sealed product-role catalog", () => {
+     expect(registerSource).toContain("createPostgresRegisterPublicationPort(pool).importHistorical");
+     expect(devSeed).toContain("PRODUCT_ROLE_POLICY_REGISTER_ROW");
+     expect(devSeed).toContain("buildDevelopmentDeploymentRegisterPublicationRows");
+-    expect(devSeed).toContain("createPostgresRegisterPublicationPort(input.adminPool).publishGeneral");
++    expect(devSeed).toContain("publicationPort.publishGeneral");
+     const readIndex = apiMain.indexOf("await readProductRolePolicy(pool, environment.REGISTER_VERSION)");
+     const workerIndex = apiMain.indexOf("new Argon2WorkerPool()");
+     expect(readIndex).toBeGreaterThan(-1);
+################ tests/architecture/p2-recovery-policy-register.test.ts
+diff --git a/dialectical-engine/tests/architecture/p2-recovery-policy-register.test.ts b/dialectical-engine/tests/architecture/p2-recovery-policy-register.test.ts
+index 13c40c79..aca798fd 100644
+--- a/dialectical-engine/tests/architecture/p2-recovery-policy-register.test.ts
++++ b/dialectical-engine/tests/architecture/p2-recovery-policy-register.test.ts
+@@ -117,7 +117,7 @@ describe("P2-02 sealed recovery-policy register", () => {
+     expect(registerSource).toContain("createPostgresRegisterPublicationPort(pool).importHistorical");
+     expect(devSeed).toContain("RECOVERY_POLICY_REGISTER_ROW");
+     expect(devSeed).toContain("buildDevelopmentDeploymentRegisterPublicationRows");
+-    expect(devSeed).toContain("createPostgresRegisterPublicationPort(input.adminPool).publishGeneral");
++    expect(devSeed).toContain("publicationPort.publishGeneral");
+     const readIndex = apiMain.indexOf("await readRecoveryPolicy(pool, environment.REGISTER_VERSION)");
+     const workerIndex = apiMain.indexOf("new Argon2WorkerPool()");
+     expect(readIndex).toBeGreaterThan(-1);
+################ tests/integration/dev-deployment-register.test.ts
+diff --git a/dialectical-engine/tests/integration/dev-deployment-register.test.ts b/dialectical-engine/tests/integration/dev-deployment-register.test.ts
+index 0a496a83..8b9c8349 100644
+--- a/dialectical-engine/tests/integration/dev-deployment-register.test.ts
++++ b/dialectical-engine/tests/integration/dev-deployment-register.test.ts
+@@ -38,6 +38,7 @@ import {
+   buildDevelopmentDeploymentRegisterPublicationRows,
+   createDevelopmentDeploymentRegisterMachineReceipt,
+   DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX,
++  DEVELOPMENT_HISTORICAL_REGISTER_VERSION,
+   DEVELOPMENT_REGISTER_VERSION,
+   DEVELOPMENT_SOURCE_REF,
+   developmentPlanTierRosters,
+@@ -73,6 +74,7 @@ import {
+ } from "../../apps/runner/src/dev-provider-panel.js";
+ import {
+   importHistoricalRegisterFixture,
++  readLegacyDevelopmentV4Rows,
+   registerFixtureRow,
+   TEST_PLAN_TIER_ROSTERS
+ } from "../support/registerFixtures.js";
+@@ -122,11 +124,7 @@ const PRE_S03_DEVELOPMENT_PROVIDER_PANEL = Object.freeze({
+ }) as DevelopmentProviderPanel;
+ 
+ async function preS03DevelopmentV4Rows() {
+-  return Object.freeze((await buildDevelopmentDeploymentRegisterPublicationRows(
+-    await loadBootstrapRegister(),
+-    PRE_S03_DEVELOPMENT_PROVIDER_PANEL,
+-    TEST_PLAN_TIER_ROSTERS
+-  )).filter(({ rowKey }) => rowKey !== "planTierRosters"));
++  return readLegacyDevelopmentV4Rows();
+ }
+ 
+ function developmentOperatorUrl(credentialSource: string): string {
+@@ -406,6 +404,7 @@ describe("DEV-05 complete development deployment register", () => {
+   it("initializes the complete 16-key development support snapshot enabled from the explicit deployed receipt", async () => {
+     const deployed = await seedDevelopmentDeploymentRegister({
+       adminPool: database.pool,
++      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+       repositoryRoot
+     });
+     const publicationId = randomUUID();
+@@ -574,7 +573,7 @@ describe("DEV-05 complete development deployment register", () => {
+     await expect(seedDevelopmentDeploymentRegister({
+       adminPool: database.pool,
+       repositoryRoot
+-    })).resolves.toMatchObject({ registerVersion: String(DEVELOPMENT_REGISTER_VERSION) });
++    })).resolves.toMatchObject({ registerVersion: String(DEVELOPMENT_HISTORICAL_REGISTER_VERSION) });
+     expect((await database.pool.query(
+       "SELECT row_key,value_json,source_ref FROM register.register_row WHERE register_version=$1",
+       [bootstrap.registerVersion]
+@@ -640,6 +639,7 @@ describe("DEV-05 complete development deployment register", () => {
+     const bootstrap = await loadBootstrapRegister();
+     const first = await seedDevelopmentDeploymentRegister({
+       adminPool: database.pool,
++      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+       repositoryRoot
+     });
+     expect(first.registerVersion).toBe(String(DEVELOPMENT_REGISTER_VERSION));
+@@ -675,12 +675,12 @@ describe("DEV-05 complete development deployment register", () => {
+     expect(roles.roles.slice(2).every((role) => role.grants.length === 0)).toBe(true);
+     expect(makers).toMatchObject({
+       deploymentMakerCapability: true,
+-      configuredMakers: ["Anthropic", "OpenAI", "xAI"],
+-      configuredProviders: [
+-        { providerRef: "development:codex-cli", maker: "OpenAI" },
+-        { providerRef: "development:claude-cli", maker: "Anthropic" },
+-        { providerRef: "development:grok-cli", maker: "xAI" }
+-      ]
++      configuredMakers: [...new Set(
++        TEST_DEVELOPMENT_PROVIDER_PANEL.configuredProviders.map(({ maker }) => maker)
++      )].sort(),
++      configuredProviders: TEST_DEVELOPMENT_PROVIDER_PANEL.configuredProviders.map(
++        ({ providerRef, maker }) => ({ providerRef, maker })
++      )
+     });
+     expect(discovery).toMatchObject({ probeFreshnessMs: 600_000, probeMaxAttempts: 1 });
+     expect(structural).toEqual({
+@@ -850,6 +850,7 @@ describe("DEV-05 complete development deployment register", () => {
+   it("F33 — the policy the shipped entry point loads lets a multi-maker run past the panel gate", async () => {
+     const seeded = await seedDevelopmentDeploymentRegister({
+       adminPool: database.pool,
++      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+       repositoryRoot
+     });
+     const policy = await readDevelopmentRunnerPolicy(database.pool, registerVersionToSafeLegacyNumber(seeded.registerVersion));
+################ tests/integration/t16-algorithm-register.test.ts
+diff --git a/dialectical-engine/tests/integration/t16-algorithm-register.test.ts b/dialectical-engine/tests/integration/t16-algorithm-register.test.ts
+index 553ee904..3379592e 100644
+--- a/dialectical-engine/tests/integration/t16-algorithm-register.test.ts
++++ b/dialectical-engine/tests/integration/t16-algorithm-register.test.ts
+@@ -1,7 +1,7 @@
+ import * as registerModule from "../../packages/register/src/index.js";
+ import { randomUUID } from "node:crypto";
+ import { spawn } from "node:child_process";
+-import { mkdir, mkdtemp, rm } from "node:fs/promises";
++import { copyFile, mkdir, mkdtemp, rm } from "node:fs/promises";
+ import { createRequire } from "node:module";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+@@ -110,13 +110,13 @@ const T16_EXPECTED_ROWS = [
+     family: "synthesisRoles",
+     rowKey: "synthesizerRoleRef",
+     rulingRef: RULING_J8,
+-    value: { kind: "SYNTHESIZER_ROLE_REF", providerRef: "development:codex-cli", provisional: true }
++    value: { kind: "SYNTHESIZER_ROLE_REF", providerRef: "development:codex-premium-cli", provisional: true }
+   },
+   {
+     family: "synthesisRoles",
+     rowKey: "evaluatorRoleRef",
+     rulingRef: RULING_J8,
+-    value: { kind: "EVALUATOR_ROLE_REF", providerRef: "development:claude-cli", provisional: true }
++    value: { kind: "EVALUATOR_ROLE_REF", providerRef: "development:claude-premium-cli", provisional: true }
+   },
+   {
+     family: "synthesisRoles",
+@@ -166,9 +166,13 @@ const T16_EXPECTED_ROWS = [
+     value: {
+       kind: "PROVIDER_FAMILY_MAP",
+       families: [
+-        { familyRef: "OpenAI", providerRefs: ["development:codex-cli"] },
+-        { familyRef: "Anthropic", providerRefs: ["development:claude-cli"] },
+-        { familyRef: "xAI", providerRefs: ["development:grok-cli"] }
++        {
++          familyRef: "OpenAI",
++          providerRefs: ["development:codex-premium-cli", "development:openai-free-api"]
++        },
++        { familyRef: "Anthropic", providerRefs: ["development:claude-premium-cli"] },
++        { familyRef: "xAI", providerRefs: ["development:grok-cli"] },
++        { familyRef: "Z.AI", providerRefs: ["development:zai-free-api"] }
+       ],
+       unmappedFamilyKind: "UNKNOWN",
+       unmappedReason: "PROVIDER_FAMILY_UNMAPPED",
+@@ -634,6 +638,8 @@ async function runSeedingCli(extra: NodeJS.ProcessEnv): Promise<Readonly<{
+   const cwd = await mkdtemp(join(tmpdir(), "debateai-t16-cli-"));
+   cliRoots.push(cwd);
+   await mkdir(join(cwd, ".local", "dev-auth"), { recursive: true, mode: 0o700 });
++  await mkdir(join(cwd, "config"), { recursive: true });
++  await copyFile(join(sourceRoot, "config", "models.yaml"), join(cwd, "config", "models.yaml"));
+   const environment: NodeJS.ProcessEnv = {
+     ...process.env,
+     MIGRATION_DATABASE_URL: database.connectionString,
+@@ -663,13 +669,13 @@ const countWarnings = (text: string): number =>
+ describe("T16 startup warning on the seeding entrypoint (ruling J7)", () => {
+   it("warns exactly once on the dev seeding CLI's own process path when the role refs are identical", async () => {
+     const cli = await runSeedingCli({
+-      DEBATEAI_DEV_SYNTHESIZER_ROLE_REF: "development:codex-cli",
+-      DEBATEAI_DEV_EVALUATOR_ROLE_REF: "development:codex-cli"
++      DEBATEAI_DEV_SYNTHESIZER_ROLE_REF: "development:codex-premium-cli",
++      DEBATEAI_DEV_EVALUATOR_ROLE_REF: "development:codex-premium-cli"
+     });
+     expect(cli.exitCode).toBe(0);
+     expect(cli.stdout).toContain("DEV_DEPLOYMENT_REGISTER_RECEIPT_V1=");
+     expect(countWarnings(cli.stderr)).toBe(1);
+-    expect(cli.stderr).toContain("development:codex-cli");
++    expect(cli.stderr).toContain("development:codex-premium-cli");
+     expect(cli.stderr).not.toContain(database.connectionString);
+   }, 120_000);
+ 
+################ tests/render/tier01-new-plan-tier.test.tsx
+diff --git a/dialectical-engine/tests/render/tier01-new-plan-tier.test.tsx b/dialectical-engine/tests/render/tier01-new-plan-tier.test.tsx
+index f08ff7b6..ba118070 100644
+--- a/dialectical-engine/tests/render/tier01-new-plan-tier.test.tsx
++++ b/dialectical-engine/tests/render/tier01-new-plan-tier.test.tsx
+@@ -248,6 +248,8 @@ describe("S01 /new plan tier", () => {
+   it("S03-24 R16 renders the Free card from the plan-tier roster response", async () => {
+     vi.resetModules();
+     vi.doMock("@debateai/contract", () => ({
++      EXPANSION_DEPTH_MIN: 1,
++      EXPANSION_DEPTH_MAX: 5,
+       PLAN_TIER_ROSTERS: {
+         free: ["gpt-5.6-luna", "claude-sonnet-5"],
+         premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build"]
+################ tests/unit/s1-1-depth-contract.test.ts
+diff --git a/dialectical-engine/tests/unit/s1-1-depth-contract.test.ts b/dialectical-engine/tests/unit/s1-1-depth-contract.test.ts
+index d1661d9a..83f1c1b8 100644
+--- a/dialectical-engine/tests/unit/s1-1-depth-contract.test.ts
++++ b/dialectical-engine/tests/unit/s1-1-depth-contract.test.ts
+@@ -161,6 +161,7 @@ function buildAskApi(application: AskApplication = fixtureApplication()) {
+ function askWithout(depthParams: unknown): Record<string, unknown> {
+   return {
+     question_line: "What follows from this evidence?",
++    plan_tier: "free",
+     risk_tier: "casual",
+     tier_source: "ASKER",
+     tier_provenance_ref: "asker-declaration:s1-1",
+@@ -236,6 +237,7 @@ describe("S1-1 · depth enforced at the contract door", () => {
+         const accepted = await createDebate(
+           "What follows from this evidence?",
+           {
++            plan_tier: "free",
+             risk_tier: "casual", tier_source: "ASKER", tier_provenance_ref: "asker:ui-selection",
+             composition_budget_tier: "low", depth, decision_scope: "personal",
+             as_of: "2026-09-01T00:00:00.000Z"
+################ tests/unit/t17-envelope.test.ts
+diff --git a/dialectical-engine/tests/unit/t17-envelope.test.ts b/dialectical-engine/tests/unit/t17-envelope.test.ts
+index a8438838..77dca270 100644
+--- a/dialectical-engine/tests/unit/t17-envelope.test.ts
++++ b/dialectical-engine/tests/unit/t17-envelope.test.ts
+@@ -377,6 +377,7 @@ describe("T17 · the receipt may not be self-contradictory (S09B)", () => {
+ describe("T17 · an over-bound input still refuses loudly at admission", () => {
+   const ask: AskRequest = {
+     question_line: "What follows from this evidence?",
++    plan_tier: "free",
+     risk_tier: "standard",
+     tier_source: "ASKER",
+     tier_provenance_ref: "asker:test",
+@@ -394,7 +395,10 @@ describe("T17 · an over-bound input still refuses loudly at admission", () => {
+       registerVersion: 1,
+       batteryVersion: "battery:test",
+       settlementWatchHandle: "watch:test",
+-      resolveDiscoveredPanel: async () => fixtureDiscoveredPanel(2),
++      resolveDiscoveredPanel: async () => fixtureDiscoveredPanel(2).map((member, index) => Object.freeze({
++        ...member,
++        model_id: index === 0 ? "gpt-5.6-luna" : "glm-5.3-flash"
++      })),
+       resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
+         ...ceilingInput(input.panelSize, Number(input.depthParams.depth))
+       }),

@@ -1,1 +1,11 @@
 head df06aedf parents 64d052b4 cbf1b281 dirty 0 markers 0
+CLUSTER_RED
+tests/unit/s7-authorization.test.ts rc=1 passed=30 failed=1 (expect 30/1)
+CLUSTER_RED
+tests/architecture/dev-deployment-register.test.ts rc=0  Tests 3 passed (3)
+tests/integration/obs-l3-s06-runner-binding.test.ts rc=0  Tests 15 passed (15)
+tests/integration/production-database-principals.test.ts rc=0  Tests 32 passed (32)
+tests/integration/register-support-publication.test.ts rc=0  Tests 27 passed (27)
+skipped-lines 0
+tsc=13
+orchestrator reading: the ONE mismatch is tests/unit/dev-auth-stack.test.ts 39/0 against my expected 28/0 — my expectation was ours-only (28); dev added cases; 0 failed. Every other pair matches; 0 skipped; tsc 13.

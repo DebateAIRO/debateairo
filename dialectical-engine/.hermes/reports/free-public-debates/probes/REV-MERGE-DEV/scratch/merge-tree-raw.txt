@@ -1,0 +1,143 @@
+95d141043c5800308934604a7f79caae1812fd54
+100644 a3b3da4ed2de90ba1e1ec1ea671bd8cddbc8daa4 1	.hermes/TOOLING-TRAPS.md
+100644 224cc076e44a6600315ad5b60afb082daddae7b9 2	.hermes/TOOLING-TRAPS.md
+100644 b25ae9ba18507e4cdffd766f63d9da7b6fec83ce 3	.hermes/TOOLING-TRAPS.md
+100644 7ce7cc94a2f7752e854475d5f41c52ed199f6c16 1	acceptance/claude-relay.ts
+100644 3b8c5595aaf5e29578c5f8d690d57c2d3abf19ed 2	acceptance/claude-relay.ts
+100644 561f7f3d5254ec967679bdebff3ed7556c0a7ad1 3	acceptance/claude-relay.ts
+100644 a904af2f9dba2308c0edba7db6ef6640d0ed9a98 1	acceptance/grok-relay.ts
+100644 9792438ac5fcd92f832b9a780a1db25a1ef7ec71 2	acceptance/grok-relay.ts
+100644 3a95fa4854caf8332c72cc529a70d87974f18c88 3	acceptance/grok-relay.ts
+100644 3b2d88005da93b374e859d4d74d767edb6bd03b1 1	acceptance/model-shim.ts
+100644 2402ac09f131933bdd0613cd5157f5d4c09d0d3b 2	acceptance/model-shim.ts
+100644 7dc6bbd4d2856477d2f45f416a76f55791b55e99 3	acceptance/model-shim.ts
+100644 d318200cb44e71e629a5734495e7b57043faeaad 1	apps/api/src/provider-discovery.ts
+100644 fe9691d48c6e30b7de451aeea98d94bd48391963 2	apps/api/src/provider-discovery.ts
+100644 7512e335b7bfbccd812324d3071b9e812c5b10b4 3	apps/api/src/provider-discovery.ts
+100644 9c4617e390c168ca85f9617c4212963c1f5a05f5 1	apps/runner/src/dev-api-environment-cli.ts
+100644 4980e767cc8e44333cf8462dab0ecdf85c453e2a 2	apps/runner/src/dev-api-environment-cli.ts
+100644 fbc2cd56469a8148944fff34208afa7188f29e01 3	apps/runner/src/dev-api-environment-cli.ts
+100644 9778bcc29090213e29ddafb6726ec4532fd3e820 1	apps/runner/src/dev-deployment-register-cli.ts
+100644 d995fb1793eba84d328612354454258015f278d4 2	apps/runner/src/dev-deployment-register-cli.ts
+100644 f1ab4d3cbcd2c9ce66095f11fb4afe55b1723cdb 3	apps/runner/src/dev-deployment-register-cli.ts
+100644 6712bbc7b4906041c709ce16b739ec07d200550f 1	apps/runner/src/dev-deployment-register.ts
+100644 63dcf10bbac67ce2b6c0c1ae64f71f2e93277847 2	apps/runner/src/dev-deployment-register.ts
+100644 bfa669fe4a4db79d1d696f7af69fd02d92038ccd 3	apps/runner/src/dev-deployment-register.ts
+100644 f711a089ea76b0897d111459c59fda35357a252f 1	apps/runner/src/index.ts
+100644 d592e4f3841e2734baa9febcb53598a3b5b197d5 2	apps/runner/src/index.ts
+100644 71389122933cd928b11f55b4a45ccfa8e90a08b7 3	apps/runner/src/index.ts
+100644 1060854116d109404721294158d6de5e4e92d98a 1	apps/ui/app/debate/[id]/DebatePageClient.tsx
+100644 1c9756608f68f2d0d88ea2a63d18b7a0ecb545fb 2	apps/ui/app/debate/[id]/DebatePageClient.tsx
+100644 c2b04420c86984b49ca55e0aaf01836bb96a915a 3	apps/ui/app/debate/[id]/DebatePageClient.tsx
+100755 7f5408a608b0ac1d465d9d6b79e0e1604b4b002c 1	apps/ui/app/new/page.tsx
+100755 07c6dbd1387a633630899c9b3c7b3d68f28810a7 2	apps/ui/app/new/page.tsx
+100755 600520b3ce46ec835c3d0e10f759c6f8af4d9940 3	apps/ui/app/new/page.tsx
+100644 a85c0bed9872b218ea1422063dbce7db972572f4 1	apps/ui/components/DebateMap.tsx
+100644 d092020c6d78c6a95ab462aced2f4f7f5b129d65 2	apps/ui/components/DebateMap.tsx
+100644 a93b20ac08ce8e0c076b0e40c2074c26a7989e55 3	apps/ui/components/DebateMap.tsx
+100644 6de0280d51da0f02c149ebcd9f47a4ecb2e934b6 1	apps/ui/components/VerdictBanner.tsx
+100644 5ba614f785505392bdc33677351fa57936386c05 2	apps/ui/components/VerdictBanner.tsx
+100644 5baddf7c2d42d8549cdced1b307a0e751d907b21 3	apps/ui/components/VerdictBanner.tsx
+100644 e608b8540fae6d4fc78f4309777784803b22eaa8 1	package.json
+100644 039134d55559147e628f33c288eced2dd5a27bce 2	package.json
+100644 097d315ef5318e08c9b5d70eb421eccc2a62ad99 3	package.json
+100644 74b2250ca4818504543326880e17cc663baa88fe 1	packages/contract/src/index.ts
+100644 313f70d9f0ef8ad2e628554558e46195a9e50eef 2	packages/contract/src/index.ts
+100644 e64245387b5dcc9cb058ac097ed9c408996b75f1 3	packages/contract/src/index.ts
+100644 dfad4692b85f1589bcc70e0e21d8828b47bb2b37 1	tests/architecture/dev-deployment-register.test.ts
+100644 e0ba5b7c5dafaadb86e5e963abc321a0b83cdf86 2	tests/architecture/dev-deployment-register.test.ts
+100644 700b4ec5f3f8346895f754877a5a15cdba9d76ec 3	tests/architecture/dev-deployment-register.test.ts
+100644 abb796231220d8667c9af2876f2d86c7e884ddb2 1	tests/architecture/register-support-publication.test.ts
+100644 3c33562b7a877d90dd4ecff761e61bbbc6071231 2	tests/architecture/register-support-publication.test.ts
+100644 9e183ab257f3c7dc30b3a0a4c7a96f8beec4ae54 3	tests/architecture/register-support-publication.test.ts
+100644 509926418560687f58d4b07e33f1c55aa1972165 1	tests/integration/obs-l3-s06-runner-binding.test.ts
+100644 f835395633d641ad79eae0a3ebd5d0e64f9e99c6 2	tests/integration/obs-l3-s06-runner-binding.test.ts
+100644 e7afc5e2afb40150bc0271fbe05692a0a15529b0 3	tests/integration/obs-l3-s06-runner-binding.test.ts
+100644 42ca593f0fe7a33a5edec397705c7a6593f33476 1	tests/integration/production-database-principals.test.ts
+100644 c6412ad5baae0a9fb73020f206eab27d99fb6b12 2	tests/integration/production-database-principals.test.ts
+100644 13f297ba5870e474fc63940b258ea6425991a244 3	tests/integration/production-database-principals.test.ts
+100644 bf2ebe0a6cc764ca7a1bcbc1a725544b071d0bfe 1	tests/integration/register-support-publication.test.ts
+100644 fdcb1adfb29f7884d9c885f9b0df3660b9ddcb84 2	tests/integration/register-support-publication.test.ts
+100644 793de7bb44b1360b1e292a7f95af1a0c8e34f5f6 3	tests/integration/register-support-publication.test.ts
+
+Auto-merging dialectical-engine/.hermes/TOOLING-TRAPS.md
+CONFLICT (content): Merge conflict in dialectical-engine/.hermes/TOOLING-TRAPS.md
+Auto-merging dialectical-engine/acceptance/claude-relay.test.ts
+Auto-merging dialectical-engine/acceptance/claude-relay.ts
+CONFLICT (content): Merge conflict in dialectical-engine/acceptance/claude-relay.ts
+Auto-merging dialectical-engine/acceptance/grok-relay.test.ts
+Auto-merging dialectical-engine/acceptance/grok-relay.ts
+CONFLICT (content): Merge conflict in dialectical-engine/acceptance/grok-relay.ts
+Auto-merging dialectical-engine/acceptance/hermes-relay.test.ts
+Auto-merging dialectical-engine/acceptance/hermes-relay.ts
+Auto-merging dialectical-engine/acceptance/model-shim.test.ts
+Auto-merging dialectical-engine/acceptance/model-shim.ts
+CONFLICT (content): Merge conflict in dialectical-engine/acceptance/model-shim.ts
+Auto-merging dialectical-engine/acceptance/run-acceptance.ts
+Auto-merging dialectical-engine/apps/api/src/index.ts
+Auto-merging dialectical-engine/apps/api/src/main.ts
+Auto-merging dialectical-engine/apps/api/src/provider-discovery.ts
+CONFLICT (content): Merge conflict in dialectical-engine/apps/api/src/provider-discovery.ts
+Auto-merging dialectical-engine/apps/api/src/support/model.ts
+Auto-merging dialectical-engine/apps/runner/package.json
+Auto-merging dialectical-engine/apps/runner/src/dev-api-environment-cli.ts
+CONFLICT (content): Merge conflict in dialectical-engine/apps/runner/src/dev-api-environment-cli.ts
+Auto-merging dialectical-engine/apps/runner/src/dev-api-environment.ts
+Auto-merging dialectical-engine/apps/runner/src/dev-auth-stack.ts
+Auto-merging dialectical-engine/apps/runner/src/dev-deployment-register-cli.ts
+CONFLICT (content): Merge conflict in dialectical-engine/apps/runner/src/dev-deployment-register-cli.ts
+Auto-merging dialectical-engine/apps/runner/src/dev-deployment-register.ts
+CONFLICT (content): Merge conflict in dialectical-engine/apps/runner/src/dev-deployment-register.ts
+Auto-merging dialectical-engine/apps/runner/src/index.ts
+CONFLICT (content): Merge conflict in dialectical-engine/apps/runner/src/index.ts
+Auto-merging dialectical-engine/apps/runner/src/main.ts
+Auto-merging dialectical-engine/apps/ui/app/debate/[id]/DebatePageClient.tsx
+CONFLICT (content): Merge conflict in dialectical-engine/apps/ui/app/debate/[id]/DebatePageClient.tsx
+Auto-merging dialectical-engine/apps/ui/app/globals.css
+Auto-merging dialectical-engine/apps/ui/app/new/defaults.tsx
+Auto-merging dialectical-engine/apps/ui/app/new/page.tsx
+CONFLICT (content): Merge conflict in dialectical-engine/apps/ui/app/new/page.tsx
+Auto-merging dialectical-engine/apps/ui/app/page.tsx
+Auto-merging dialectical-engine/apps/ui/components/AnswerHonestyDrawer.tsx
+Auto-merging dialectical-engine/apps/ui/components/DebateCanvas.tsx
+Auto-merging dialectical-engine/apps/ui/components/DebateMap.tsx
+CONFLICT (content): Merge conflict in dialectical-engine/apps/ui/components/DebateMap.tsx
+Auto-merging dialectical-engine/apps/ui/components/DebatesBuffer.tsx
+Auto-merging dialectical-engine/apps/ui/components/NodeDetailDrawer.tsx
+Auto-merging dialectical-engine/apps/ui/components/VerdictBanner.tsx
+CONFLICT (content): Merge conflict in dialectical-engine/apps/ui/components/VerdictBanner.tsx
+Auto-merging dialectical-engine/apps/ui/components/support/SupportWidget.tsx
+Auto-merging dialectical-engine/apps/ui/package.json
+Auto-merging dialectical-engine/deploy/dev-auth/tls-front-door.mjs
+Auto-merging dialectical-engine/package.json
+CONFLICT (content): Merge conflict in dialectical-engine/package.json
+Auto-merging dialectical-engine/packages/contract/src/index.ts
+CONFLICT (content): Merge conflict in dialectical-engine/packages/contract/src/index.ts
+Auto-merging dialectical-engine/packages/db/src/index.ts
+Auto-merging dialectical-engine/packages/db/src/schema.ts
+Auto-merging dialectical-engine/packages/kernel/src/index.ts
+Auto-merging dialectical-engine/packages/providers/src/index.ts
+Auto-merging dialectical-engine/packages/register/src/runtime-environment.ts
+Auto-merging dialectical-engine/pnpm-lock.yaml
+Auto-merging dialectical-engine/tests/architecture/dev-deployment-register.test.ts
+CONFLICT (content): Merge conflict in dialectical-engine/tests/architecture/dev-deployment-register.test.ts
+Auto-merging dialectical-engine/tests/architecture/register-support-publication.test.ts
+CONFLICT (content): Merge conflict in dialectical-engine/tests/architecture/register-support-publication.test.ts
+Auto-merging dialectical-engine/tests/architecture/s6-content-encryption-contract.test.ts
+Auto-merging dialectical-engine/tests/integration/dev-api-environment.test.ts
+Auto-merging dialectical-engine/tests/integration/dev-deployment-register.test.ts
+Auto-merging dialectical-engine/tests/integration/dev-tls-readiness.test.ts
+Auto-merging dialectical-engine/tests/integration/obs-l3-s06-runner-binding.test.ts
+CONFLICT (content): Merge conflict in dialectical-engine/tests/integration/obs-l3-s06-runner-binding.test.ts
+Auto-merging dialectical-engine/tests/integration/production-database-principals.test.ts
+CONFLICT (content): Merge conflict in dialectical-engine/tests/integration/production-database-principals.test.ts
+Auto-merging dialectical-engine/tests/integration/register-support-publication.test.ts
+CONFLICT (content): Merge conflict in dialectical-engine/tests/integration/register-support-publication.test.ts
+Auto-merging dialectical-engine/tests/integration/s6-content-encryption-database.test.ts
+Auto-merging dialectical-engine/tests/support/registerFixtures.ts
+Auto-merging dialectical-engine/tests/unit/contract.test.ts
+Auto-merging dialectical-engine/tests/unit/dev-auth-stack.test.ts
+Auto-merging dialectical-engine/tests/unit/obs-l2-s02-registry.test.ts
+Auto-merging dialectical-engine/tests/unit/v2ui-data-layer.test.ts
+Auto-merging dialectical-engine/tests/unit/v2ui-pages.test.ts
+Auto-merging dialectical-engine/tools/orphan-audit/src/index.ts
