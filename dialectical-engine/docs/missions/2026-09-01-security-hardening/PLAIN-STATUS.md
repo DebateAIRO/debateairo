@@ -106,14 +106,32 @@ I am collecting rulings first and building afterwards, so the questions keep mov
 
 Already done because it was a one-line wording change: the public promise in [SECURITY.md](../../../../SECURITY.md) now says "within one week".
 
-### Order of work from here
+### The plan from here (agreed order, 22 September)
 
-1. Finish your decisions (in progress).
-2. The second bringing-up-to-date with `dev`, then re-run every check.
-3. The remaining fix packages, plus whatever you approve in Groups C and D.
-4. Update pull request #8 — only when you say "push".
-5. The GitHub switches — only when you say "go" for each one.
-6. The new server.
+Sizes are in "agent-days" — working sessions of an AI agent, not calendar days. Nothing is pushed and no switch on your accounts is flipped without your "go" at that moment.
+
+**Three things only you can do — they can start any time, in parallel:**
+
+1. Ask your colleague to turn on two-factor login; tell me when it is done; I check that nobody would be removed; you flip "require two-factor" in the organisation's settings.
+2. Choose the first AI vendors for the hosted site, open a paid API account with each, and set a monthly spending cap on each vendor's dashboard. Keep the keys to yourself — I never see them; you place them on the server yourself, following steps I write.
+3. When you are ready: the server (which provider, which operating system, and whether I get access or you run my steps).
+
+| Step | What happens | Size | What I need from you |
+|---|---|---|---|
+| 1 | **The second bringing-up-to-date with `dev`.** Checked on 22 Sept: `dev` has not moved again (still 36 commits ahead), and a trial run shows 8 files collide — the three version files, the engine room's main file, and four test files both sides had repaired. Rules: take `dev`'s Node 26 and its newer test tool; keep this branch's patched web-server library; then re-check everything and re-measure the memory test | half a day to a day | a "go" to download the packages `dev`'s new list names |
+| 2 | **The small approved items, as one package** — everything marked small or tiny in the to-do table above, plus two leftovers from the first mission (a tamper check on database upgrade files, two small proxy hardenings) | about a day | nothing |
+| 3 | **First push, and pull request #8 merged into `dev`.** *This is earlier than in your original order, on my recommendation:* this branch has already needed two bringing-up-to-dates because it sat outside `dev`, and every further week outside means more collisions. Once it is in, `dev` carries the automatic checks, and every later package arrives as a small pull request that is checked automatically. The GitHub switches go on around this step, in the order you ruled (secret blocking *before* the push; the rest at and after the merge) | an hour or two of your attention | "go" for each switch, "push", and the merge itself |
+| 4a | **Keys:** the "team badge" (V-19), then the ability to change a master key (V-3), ending with a rehearsal on a copy | about a day and a half | nothing |
+| 4b | **Data:** the remaining readable debate text gets encrypted (V-6); deleting an account also erases its support chats (V-26) | one to two days | I tell you before V-6 passes one day |
+| 4c | **Leftovers from the September re-check** — mostly the support chat: fair sharing of its AI budget between visitors, an origin check on anonymous requests, a proper salt on stored address fingerprints | about a day | nothing |
+| 4d | **Where the engine talks to the AI models:** prompt-injection containment plus the five extra layers, built on the "safety frame + your instruction text" split (V-11) | two to three days | nothing until the confirmation run |
+| 4e | **AI vendors:** the two modes enforced by the code, vendor keys in the locked key folder, vendors as configuration, the support chat on the paid path (V-9, V-30), and the spending ceilings (V-28) | two to three days, then a little per vendor | the vendor list |
+| 5 | **Your confirmation run** — one paid real-model run that proves the verdicts did not move, proves the paid connections work, and measures for the first time what a debate costs in money; the real ceiling numbers are set from it | about two hours of yours | you run it; you choose the two ceiling numbers |
+| 6 | **The server:** refresh the server kit for everything decided here → you provide the server → set it up and harden it → rehearse restoring a backup and changing a master key → you place the vendor keys → test → we look at the Cloudflare integration together (V-23) → go-live checklist → the branch rule gets tightened so even administrators go through pull requests → release day: the old engine is bookmarked, V3 reaches `main`, and GitHub's label moves back to `main` | two to three days plus your part | the server; "go" at each outward-facing step |
+
+Each of 4a–4e is its own small pull request into `dev`, written test-first. Roughly ten to fourteen agent-days in all, plus your parts.
+
+**Alongside, not blocking anything:** the design conversation for prompts you can edit yourselves (you asked for it; the security work lays its foundation in step 4d), and the three extra prompt-injection safeguards that cost money or change the product, which I will bring to you with numbers.
 
 ## The one-paragraph version
 
