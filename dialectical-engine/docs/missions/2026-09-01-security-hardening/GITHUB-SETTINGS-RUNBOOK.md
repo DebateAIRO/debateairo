@@ -61,31 +61,58 @@ Undo for each: the same call with `-X DELETE` (reporting, fixes) or `"status":"d
 | Private vulnerability reporting | At the moment PR #8 merges into `dev`, so `SECURITY.md`'s promise and the button appear together. |
 | Dependabot security updates | Only after Step 1 has moved the default-branch label to `dev`; earlier, the fix pull requests would target the old engine on `main`. |
 
-## Step 3 — V-6b: branch rules on `main` and `dev`, with an owner bypass
+## Step 3 — V-6b: branch rules on `main` and `dev`, as two bundles
 
-What the rule does: no force-push, no deleting the branch, changes arrive through a pull request with the `verify` check of the security workflow passing. The bypass keeps the owner's own pushes working while the rule catches everything else; remove the bypass later if the team grows.
+**Ruled 2026-09-22: two bundles instead of one.** GitHub's bypass applies to a whole bundle of rules (a "ruleset"), not to single rules. Both accounts that push are repository administrators, and every AI session pushes under one of them — so the original design, one bundle with an administrator bypass, would have bound nobody who actually pushes, not even against the likeliest accident (a force-push over `dev`).
+
+### Bundle 1 — nobody deletes or rewrites `main` or `dev`; no exemptions
+
+Depends on nothing; can be applied at any time, on the owner's "go". It never blocks honest work (the project's own rule is already "merge, never rewrite"), and release day does not need a rewrite: V3 reaches `main` as a normal merge. If a rewrite is ever genuinely needed, an administrator disables this bundle on purpose in the settings — a deliberate, logged act.
 
 ```bash
 gh api -X POST repos/DebateAIRO/debateairo/rulesets --input - <<'JSON'
 {
-  "name": "protect-main-and-dev",
+  "name": "no-delete-no-rewrite",
   "target": "branch",
   "enforcement": "active",
   "conditions": { "ref_name": { "include": ["refs/heads/main", "refs/heads/dev"], "exclude": [] } },
+  "rules": [ { "type": "deletion" }, { "type": "non_fast_forward" } ],
+  "bypass_actors": []
+}
+JSON
+```
+
+### Bundle 2 — changes reach `dev` through a pull request with the checks passing; administrators exempt at first
+
+Apply only AFTER PR #8 has merged into `dev`: the two required checks, `verify` (install, compile, the test gate, known-vulnerable packages) and `secrets` (the secret scan), must exist on `dev` before GitHub can require them. Both are pinned to the GitHub Actions app (id 15368, read from PR #8's own check runs on 2026-09-22), so no other integration can report a fake pass under those names. **Tightening at go-live** — administrators also go through pull requests (change `bypass_mode` to `pull_request`, or empty the bypass list) — is a separate "go" from the owner. `main` gets this rule on release day, when it carries the workflow.
+
+```bash
+gh api -X POST repos/DebateAIRO/debateairo/rulesets --input - <<'JSON'
+{
+  "name": "dev-changes-by-pull-request",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": { "ref_name": { "include": ["refs/heads/dev"], "exclude": [] } },
   "rules": [
-    { "type": "deletion" },
-    { "type": "non_fast_forward" },
     { "type": "pull_request", "parameters": { "required_approving_review_count": 0, "dismiss_stale_reviews_on_push": false, "require_code_owner_review": false, "require_last_push_approval": false, "required_review_thread_resolution": false } },
-    { "type": "required_status_checks", "parameters": { "strict_required_status_checks_policy": false, "required_status_checks": [ { "context": "verify" } ] } }
+    { "type": "required_status_checks", "parameters": { "strict_required_status_checks_policy": false, "required_status_checks": [ { "context": "verify", "integration_id": 15368 }, { "context": "secrets", "integration_id": 15368 } ] } }
   ],
   "bypass_actors": [ { "actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always" } ]
 }
 JSON
 ```
 
-(`actor_id: 5` with `RepositoryRole` is GitHub's fixed id for the repository *admin* role.) Undo: `gh api -X DELETE repos/DebateAIRO/debateairo/rulesets/<id>`; list ids with `gh api repos/DebateAIRO/debateairo/rulesets`.
+(`actor_id: 5` with `RepositoryRole` is GitHub's fixed id for the repository *admin* role — today that is both `nokitel` and `VanillaMint02`.)
 
-**Note for `main`:** the `verify` check only exists on branches that carry `.github/workflows/security.yml` — that is `dev` after PR #8 merges. Until then, a required check on `main` would block `main` entirely. Apply the ruleset to `dev` first; add `main` when its workflow exists (or leave `main` frozen on purpose, since V3 replaces it).
+List the bundles and their numbers (read-only):
+
+```bash
+gh api repos/DebateAIRO/debateairo/rulesets --jq '.[] | {id, name, enforcement}'
+```
+
+Undo: delete a bundle by its number. The number comes from the list command above, so the delete command is written out at that moment rather than here — a placeholder in a pasteable command is how accidents happen.
+
+**Note for `main`:** the `verify` and `secrets` checks only exist on branches that carry `.github/workflows/security.yml` — that is `dev` after PR #8 merges. A required check on `main` before then would block `main` entirely, which is why Bundle 2 names `dev` alone.
 
 ## Step 4 — organisation two-factor requirement (web interface, owner only)
 
