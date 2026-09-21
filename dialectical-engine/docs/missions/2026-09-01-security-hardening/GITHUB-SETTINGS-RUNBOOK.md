@@ -27,6 +27,8 @@ gh api -X PATCH repos/DebateAIRO/debateairo -f default_branch=dev
 
 Undo: the same command with `main`.
 
+**Ruled 2026-09-21 (V-5, option A):** this is a TEMPORARY switch. Run it right after PR #8 merges into `dev`, on the owner's "go". On release day — when V3 reaches `main` as one deliberate, owner-approved step, with V2's last state tagged first — run the undo so the label follows the product back to `main`. Re-measured 2026-09-21: neither `main` nor `dev` carries a `.github/` directory (no scheduled job can stop), and no script on either branch depends on the default-branch setting.
+
 ## Step 2 — V-2 / V-6b: the repository switches
 
 Private vulnerability reporting:
