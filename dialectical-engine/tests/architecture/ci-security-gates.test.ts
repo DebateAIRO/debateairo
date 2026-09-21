@@ -30,17 +30,23 @@ describe("CI security gates (F-03)", () => {
   // refuses to resolve — and a version hours old is exactly what a registry hijack ships. The two
   // numbers live in two files, so they are read from both and compared here and can never drift:
   // pnpm's `minimumReleaseAge` is in MINUTES, Dependabot's `cooldown.default-days` in DAYS.
-  // Syntax verified against docs.github.com (Dependabot options reference, read 2026-09-22):
-  // `cooldown` is a mapping under an `updates` entry, `default-days` must be between 1 and 90,
-  // and both the npm and the github-actions ecosystems support it. An invalid file stops the bot
-  // silently, so the shape is pinned exactly as documented.
+  // Syntax verified against docs.github.com, two pages, both read 2026-09-22. "Dependabot options
+  // reference" (/en/code-security/reference/supply-chain-security/dependabot-options-reference)
+  // gives the shape: `cooldown` is a mapping under an `updates` entry, `default-days` is its key,
+  // and both the npm and the github-actions ecosystems support it. That page does NOT state a day
+  // range; "The number of cooldown days must be between 1 and 90" is from the tutorial
+  // /en/code-security/tutorials/secure-your-dependencies/optimizing-pr-creation-version-updates,
+  // heading "Setting up a cooldown period for dependency updates" — which is the only claim the
+  // 1-90 assertion below rests on. An invalid file stops the bot in silence, so the shape is
+  // pinned exactly as documented.
   it("makes the update bot wait out the workspace's own cooldown (V-2.3)", () => {
     const minutes = Number(read("dialectical-engine/pnpm-workspace.yaml").match(/^minimumReleaseAge: (\d+)$/m)?.[1]);
     expect(Number.isInteger(minutes) && minutes > 0, "minimumReleaseAge (minutes) in pnpm-workspace.yaml").toBe(true);
     const days = minutes / 1440;
     expect(Number.isInteger(days), `minimumReleaseAge ${minutes} min is not a whole number of days`).toBe(true);
-    expect(days, "Dependabot accepts a cooldown of 1 to 90 days").toBeGreaterThanOrEqual(1);
-    expect(days, "Dependabot accepts a cooldown of 1 to 90 days").toBeLessThanOrEqual(90);
+    const cited = "docs.github.com, optimizing-pr-creation-version-updates: \"The number of cooldown days must be between 1 and 90\"";
+    expect(days, cited).toBeGreaterThanOrEqual(1);
+    expect(days, cited).toBeLessThanOrEqual(90);
     const entries = read(".github/dependabot.yml").split(/^updates:$/m)[1]?.split(/^ {2}- /m).slice(1) ?? [];
     expect(entries.length, "updates entries parsed from .github/dependabot.yml").toBeGreaterThanOrEqual(2);
     for (const entry of entries) {
