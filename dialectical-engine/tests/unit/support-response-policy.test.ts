@@ -97,6 +97,24 @@ describe("CP1 support model response policy", () => {
   });
 
   it.each([
+    "A debate was bought in the debate creator.",
+    "Achiziția are loc în creatorul de dezbateri.",
+    "Achiziționarea are loc în creatorul de dezbateri.",
+    "Facturarea are loc în creatorul de dezbateri.",
+    "Dezbaterea este facturată în creatorul de dezbateri.",
+    "Tranzacția are loc în creatorul de dezbateri.",
+    "Tranzacțiile au loc în creatorul de dezbateri.",
+    "Debitarea are loc în creatorul de dezbateri.",
+    "Contul este debitat în creatorul de dezbateri.",
+    "Taxarea are loc în creatorul de dezbateri.",
+    "Contul este taxat în creatorul de dezbateri."
+  ])("routes every declared EN/RO financial family through reviewed fallback: %s",(text) => {
+    expect(bindSupportDraftAuthority({
+      kind:"answer",text,sourceIds:["app-navigation"],actionIds:[]
+    },["app-navigation"],[])).toBeNull();
+  });
+
+  it.each([
     "Pricing is informational and is not a checkout flow.",
     "Payment may not be available through the debate creator.",
     "Plata poate să nu fie disponibilă prin creatorul de dezbateri.",
@@ -125,7 +143,10 @@ describe("CP1 support model response policy", () => {
     "Poți crea o dezbatere în creator după autentificare.",
     "Open Pricing to read the published plan information.",
     "Dialectical Engine is a platform for structured debates.",
-    "Dialectical Engine este o platformă pentru dezbateri structurate."
+    "Dialectical Engine este o platformă pentru dezbateri structurate.",
+    "Taxonomia grupează subiectele publice de ajutor.",
+    "Clasificarea taxonomică organizează meniurile publice.",
+    "Debitul fluxului este afișat ca rată tehnică."
   ])("preserves ordinary nonfinancial guide prose: %s",(text) => {
     const draft = { kind:"answer" as const,text,sourceIds:["app-navigation"],actionIds:[] };
     expect(bindSupportDraftAuthority(draft,["app-navigation"],[])).toEqual(draft);

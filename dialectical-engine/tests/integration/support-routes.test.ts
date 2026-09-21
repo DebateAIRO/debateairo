@@ -2691,7 +2691,7 @@ describe("SUP-01 support routes", () => {
       recoveryComponents:await readFile(join(kbRoot,"recovery/components.json")),
       requireReviewedRecovery:true
     });
-    const draftText = "Plata poate să nu fie disponibilă prin creatorul de dezbateri.";
+    const draftText = "Tranzacția are loc în creatorul de dezbateri.";
     const complete = vi.fn(async () => Object.freeze({
       text:JSON.stringify({
         kind:"answer",text:draftText,

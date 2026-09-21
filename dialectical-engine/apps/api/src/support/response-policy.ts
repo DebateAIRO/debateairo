@@ -43,7 +43,7 @@ const EMAIL = /\b(?:e-?mail(?:ul)?|mail)\b/u;
 const CASE = /\b(?:human\s+case|support\s+case|case|caz(?:ul)?)\b/u;
 const CASE_CREATION = /\b(?:create[ds]?|open(?:s|ed)?|cre(?:eaza|at|are)|deschide)\b/u;
 const CASE_CREATION_NEGATION = /\b(?:does\s+not|doesn['’]?t|did\s+not|never|cannot|can['’]?t|nu)\b[^.!?;\n]{0,40}\b(?:create|open|cre(?:eaza|a)|deschide)\b/u;
-const FINANCIAL_CAPABILITY = /\b(?:pay(?:ing|ment|ments|ed|s)?|paid|purchas\p{L}*|checkout\p{L}*|buy(?:ing|s)?|bill(?:ing|ed|s)?|charg\p{L}*|transaction\p{L}*|plat(?!form)\p{L}*|achit\p{L}*|cump\p{L}*)\b/gu;
+const FINANCIAL_CAPABILITY = /\b(?:pay(?:ing|ment|ments|ed|s)?|paid|purchas\p{L}*|buy(?:ing|s)?|bought|bill(?:ing|ed|s)?|charg\p{L}*|transaction\p{L}*|checkout\p{L}*|plat(?!form)\p{L}*|achit\p{L}*|cump\p{L}*|achiz\p{L}*|factur\p{L}*|tranzact\p{L}*|debit(?:are\p{L}*|at\p{L}*)|tax(?:are\p{L}*|at\p{L}*))\b/gu;
 
 function authorityText(value: string): string {
   return value.normalize("NFKD").replace(/\p{M}/gu,"").toLocaleLowerCase("en-US");

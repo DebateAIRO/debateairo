@@ -479,7 +479,7 @@ describe("CP1 composed answer context", () => {
 
   it.each([
     ["en" as const,"Pricing","Payment may not be available through the debate creator."],
-    ["ro" as const,"Cum funcționează secțiunea Prețuri?","Plata poate să nu fie disponibilă prin creatorul de dezbateri."],
+    ["ro" as const,"Cum funcționează secțiunea Prețuri?","Facturarea poate să nu fie disponibilă prin creatorul de dezbateri."],
   ])("recovers a benign %s financial paraphrase to useful reviewed guidance",async (
     language,text,draftText
   ) => {
