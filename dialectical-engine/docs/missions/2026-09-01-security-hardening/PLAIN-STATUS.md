@@ -21,7 +21,7 @@ We are going through them together, one at a time. Each answer is written into [
 | Ruled on 18 Sept — V-15 (the server starts with an empty database) and V-23 (we look at the Cloudflare integration together, at the end) | 2 of 2 |
 | A — thirteen routine ones | **13 of 13** — all "yes", 21 Sept |
 | B — switches on your GitHub account | **9 of 9** — 22 Sept |
-| C — real choices that add work | 4 of 7 |
+| C — real choices that add work | 5 of 7 |
 | D — new, from the re-check | 0 of 4 |
 
 **Nothing on your GitHub account has been changed yet.** Each switch still waits for your "go" at its step, in the order written in the [runbook](GITHUB-SETTINGS-RUNBOOK.md).
@@ -44,7 +44,8 @@ We are going through them together, one at a time. Each answer is written into [
 - **V-20, the GPU settings** (*was blocking the server move*): yes — they become optional, and the six unused database logins are created already-expired. While checking I found that the server kit, as written, would have stopped the engine from starting on day one; that gets fixed with it.
 - **V-19, two server accounts sharing one key folder** (*was blocking the server move*): option 1, the "team badge" — a key file may be readable by one named group, everything else stays as strict as today, and nothing changes on your Macs.
 - **V-6, more places where debate text sits unencrypted:** yes — encrypt them too, and do it *before* the server goes live, so that no readable row ever exists there (the server starts with an empty database).
-- **Still to ask:** changing the master key (V-3); seven weaknesses where the engine talks to the AI models (V-11); and **how the server reaches the AI models** (V-9 — *blocks the server move*).
+- **V-3, being able to change the master key:** yes, now — built before go-live, for all the master keys, ending with a full rehearsal on a copy (today the software has no way at all to replace a master key that leaked).
+- **Still to ask:** seven weaknesses where the engine talks to the AI models (V-11); and **how the server reaches the AI models** (V-9 — *blocks the server move*).
 
 **Group D — still to ask:** the support chat on account deletion (V-26); a money ceiling per debate (V-28); the monitoring agent's permissions (V-29); how the support chat reaches the model (V-30).
 
@@ -81,6 +82,7 @@ I am collecting rulings first and building afterwards, so the questions keep mov
 | V-21 | Three development-only leftovers tidied | small, low priority |
 | Package bot | A 7-day waiting period added to the bot's configuration | tiny |
 | V-7 | The 110 browser-test recordings (466 MB) and 22 AI transcripts (49 MB) stop being tracked; an ignore rule and a guard test keep them from coming back; the records note which commit last holds them | small |
+| V-3 | The ability to replace a master key: every stored small key gets a label saying which master key locked it, a `rotate` command re-locks them all under a new one (the private content itself is never touched), old records keep working, and the package ends with a rehearsal on a copy. Built right after the "team badge", because both touch the same code | about a day |
 | V-6 | The remaining readable pieces of debate text (per-segment results, progress events, the "who weighs this value" notes, the alias memory, notes on stored model outputs) get encrypted with the same mechanism as the verdicts — before go-live. Ends with a full debate run and a speed measurement of the live progress display | about a day; I tell you before it passes one day |
 | V-19 | The "team badge" for key files: readable by one named group when that is switched on, as strict as today in every other respect, with a full table of refusal tests written first; the server kit's setup steps gain the matching group | about half a day |
 | V-20 | The three "GPU server" settings become optional for the engine room, the server kit stops writing a placeholder that would have stopped it from starting, and the six unused database logins are created already-expired | small |
