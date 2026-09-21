@@ -294,3 +294,63 @@ Recommended default: the f2 trigger admission in 0068, as frozen in PLAN Revisio
 Smallest yes/no for V: "May delete-while-public of a Free debate write PRIVATE through a second pinned actor token, rather than by minting an UNPUBLISH grant?"
 VERDICT: yes, pin f2 in 0068 / CONFIDENCE: high / STRONGEST COUNTER: a second hole in the binding trigger could admit PRIVATE on an unbound run if the bound check is omitted — C4-S2.10 is the RED case that makes that omission visible.
 ```
+
+---
+
+# APPENDED 2026-09-21 by REQ-FIX-03 (pass 3 of 3 — the rework cap, after the REV(S01) pass-1 union REWORK)
+
+Sections 1–25 above are earlier seats' and are not rewritten. This section is appended.
+
+## 26. Re-pointing — every SPEC reference above now means `SPEC-v3.md`
+
+`SPEC-v3.md` is the SPEC of record. `SPEC.md` and `SPEC-v2.md` stay byte-identical (both verified
+against their freeze commits by `spec-v3-check.sh`: `06e4eceb` and `69d119c5`). Requirement ids are
+unchanged — exactly **R-1…R-25** — so every `R-n` cited in §1–§25 still names the same requirement,
+and `PLAN.md` §3's trace rows apply as they stand. Acceptance steps 1–16 keep their numbers; steps
+**3b, 3c and 11b** are new and step **11**'s expected total is amended. §10's corrections (N1-p2,
+N2-p2) are now folded into the SPEC text itself, so a reader no longer needs §10 to resolve the two
+stale pointers; §10 stays as the record of when that happened.
+
+## 27. Decisions taken at pass 3
+
+| date | question | choice | reason | ruled by |
+|---|---|---|---|---|
+| 2026-09-21 | P-B2 / V-10 — what "the answer is served" means | The trigger is **any answer-serving route**, and a route is answer-serving exactly when a success reply of it sends a body parsed by `AnswerSchema` | V-10's default is V's own I-1 wording. Naming routes one by one would rot the moment a route is added; a predicate over the reply schema is decidable for any route that exists or ever will, by a reviewer with `grep`. Measured at `db4758da`: exactly 2 such send sites in the whole API. | REQ-FIX-03, on row V-10's default |
+| 2026-09-21 | Which routes in the answer family are triggers | `GET /v1/runs/{id}/answer` (`:1115`) and `GET /v1/answers/{id}` (`:1007`) — those two and no others | The product-truth lens measured two and listed `inspection` and `nodes/{nodeId}` for the sweep without asserting them. Measured here: they send `InspectionSchema` and `NodeSchema`, and `GET /v1/answers` sends `AnswerIndexSchema`. A projection is not the answer, so publishing on it would publish a debate the owner never read. | REQ-FIX-03 |
+| 2026-09-21 | Whether R-4's and R-9's Checks may name one route | No — R-4's Check runs once per answer-serving route, R-9's names whichever route the test used | The same defect shape as P-B2 one level down: a Check pinned to one route lets a build satisfy the SPEC on one route and fail V's sentence on another. This is the class sweep, not new scope. | REQ-FIX-03 |
+| 2026-09-21 | S-N7 — R-6's Check scanned user-authored text | Replaced by three assertions: identity, parity between the two paths, and the machine-filled fields. R-6 explicitly does **not** govern the owner's own words | The lens measured it: a debate whose question line contains an email address failed the old check on the **owner-driven** path too, so the check condemned behaviour this slice does not cause and cannot fix. Parity is the property the shared builder actually gives. | REQ-FIX-03, accepting the finding |
+| 2026-09-21 | C-B1 (oracle half) — where R-6's Check must be asserted | Against the **decrypted snapshot the system path wrote**, never against the transition's parameters; and at least one test must turn RED under the `ownerRef` mutant | `core.transition_system_run_publication` validates `p_expected_pseudonym` against `identity."user".pseudonym` (`0067:336`) — the parameter, never the ciphertext. A build can pass the right parameter and encrypt the owner ref, which is the mutant that left every suite green. | REQ-FIX-03, accepting the finding |
+| 2026-09-21 | Whether to fold §10's stale pointers while here | Yes, and declared on the supersession line as folded, not new scope | The orchestrator had already ruled them (N1-p2, N2-p2). Copying a pointer into a new file that the record says is wrong would be shipping a known defect for the sake of a narrow reading of "change only what the findings force". | REQ-FIX-03 |
+
+## 28. Alternatives rejected at pass 3
+
+| alternative | why not |
+|---|---|
+| Enumerate the two trigger routes and stop | Rots on the next route. The product-truth lens found this exact failure: the SPEC named one route, the builder implemented it faithfully, and a second route served the same answer. An enumeration is the same bug with a larger number. |
+| Define the trigger as "any route under `/v1/answers` or `/v1/runs/{id}/answer`" | Path shape is not the property. Three routes under `/v1/answers` return projections, and publishing a debate because its owner fetched one node would publish a debate nobody read. |
+| Make `inspection` and `nodes/{nodeId}` triggers too, to be safe | They do not return the answer, so they do not satisfy V's "when a Free run's answer is served". Being safe in the wrong direction publishes debates earlier than V asked. |
+| Keep the old R-6 email scan as well as the new assertions | It fails on the owner path for a debate that merely quotes an email address — a false RED on input the owner chose, on a path this slice does not touch. The lens measured both directions. |
+| Add a new requirement for the second route | The requirement set is frozen at R-1…R-25 (charge 1, `DECISIONS.md` §10 N3-p2). R-4 already says what must happen when the answer is served; the defect was the definition of *served*, not a missing requirement. |
+| Renumber acceptance steps 4–16 after inserting the new ones | The union verdict and three lens files cite "acceptance step 5" by number. Letter-suffixed steps (3b, 3c, 11b) keep every existing citation resolvable. |
+| Leave the second Free debate public at the end of the walk | Step 11 asserts the public list returns to its step-1 total. Adding a trigger step without a matching cleanup step would have made V's own walk fail at step 11 — the acceptance would have been unrunnable again, which is what pass 2 was about. |
+
+## 29. Residue — named, not fixed (outside this node's assignment)
+
+Every other row of `reviews/REV-S01-p1-UNION.md` belongs to FIX-A, FIX-B, V or an orchestrator
+ticket: C-B1's *implementation* half (the test itself), C-B2, P-B3, C-B4=P-N3=S-N5, C-B3 (row V-9),
+P-B1 (row V-8), S-N1…S-N4, P-N1, P-N2=C-N3, C-N1, C-N2, and the packet-defect rows. This node changed
+the SPEC only. Two of them are worth naming here because SPEC-v3 makes them **larger**, and no seat
+should discover that late:
+
+- **P-B3 / C-B2 now apply to two routes, not one.** Whatever FIX-A does to enqueue before the attempt
+  and to re-read visibility on the losing serve must be done wherever the trigger is invoked, which
+  is now both answer-serving routes. If the trigger is called from two places, the fix belongs below
+  both, not beside one.
+- **C-B1's test must be written against the decrypted snapshot.** R-6's Check now says where; the test
+  is still FIX-A's to write, and `rev-s01-p1-snapshot-probe.test.ts` is the lens's ready one-case
+  implementation.
+
+## 30. Rows for V
+
+None new. This pass consumed row **V-10**'s default and raised no new contested product question:
+every choice above follows from V-10, from a measurement, or from a finding this node was assigned.

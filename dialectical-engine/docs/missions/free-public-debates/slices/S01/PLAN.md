@@ -14,7 +14,7 @@
 
 **Tech Stack:** TypeScript, Fastify, PostgreSQL `SECURITY DEFINER` functions, Drizzle column on `core.run`, Vitest + Testcontainers/embedded postgres, `run-suites.sh`.
 
-**Spec:** `docs/missions/free-public-debates/slices/S01/SPEC-v2.md` (SPEC of record). `SPEC.md` is superseded. Binding set: I-1…I-4 and V-1…V-6 (`DECISIONS.md` §10 N1-p2).
+**Spec:** `docs/missions/free-public-debates/slices/S01/SPEC-v3.md` (**SPEC of record**, frozen at REQ-FIX-03's READY, pass 3 — the cap). `SPEC.md` and `SPEC-v2.md` are superseded and stay byte-identical. Binding set: I-1…I-4 and **V-1…V-10**. What changed at v3, and is therefore the only part of this plan that needs re-reading: §1's definition of the **served answer** (row **V-10** — *any* answer-serving route, not one named route), R-4's and R-9's Checks (swept off a single route), R-6's Check (rewritten), and acceptance steps 3b/3c/11b/11. Requirement ids are unchanged: exactly R-1…R-25.
 
 ## Global Constraints
 
@@ -584,7 +584,7 @@ Named:
 
 1. GET hook (C2-S7): `buildApi` GET `/v1/runs/:id/answer` on a bound Free run with a served non-BLOCKED answer, then visibility is `PUBLISHED`, with no `POST /v1/runs/:id/publish`. If the hook is omitted, this test is RED.
 2. Interval (B2 / C2-S18): `grep -F 'reconcileFreePublicAutoPublish' apps/api/src/main.ts` returns 2. If either the boot `await` or the `setInterval` `Promise.all` member is removed, this grep is RED.
-3. Reconciler publishes without a further GET (N1-p2 / R-10): a bound publishable run with a served answer, outstanding work row present, **no** subsequent `GET /v1/runs/:id/answer`; one `reconcileFreePublicAutoPublish()`; latest visibility is `PUBLISHED`. If `readServedAnswer` is omitted or the method returns 0 without reading, this case is RED.
+3. Reconciler publishes without a further GET (N1-p2 / R-10): a bound publishable run with a served answer, outstanding work row present, **no** subsequent read through any answer-serving route (`GET /v1/runs/:id/answer` or `GET /v1/answers/:id` — SPEC-v3 §1); one `reconcileFreePublicAutoPublish()`; latest visibility is `PUBLISHED`. If `readServedAnswer` is omitted or the method returns 0 without reading, this case is RED.
 4. Orphan-intent cleanup in production (B1-p2): `grep -F 'reconcileSystemKeyProvisionCleanup' apps/api/src/main.ts` returns 2. If either the boot `await` or the interval member is removed, this grep is RED. C2-S3 case 16 is RED if the SQL functions are omitted.
 
 #### C2-S20: Three-run C2 command
@@ -914,9 +914,9 @@ C4 file map only.
 | R-1 | a run's own persisted state decides whether the rule binds it | C1-S1 cases 1–2, C1-S3 column, C1-S5, C1-S6, C1-S10 | S01-C1 |
 | R-2 | `free` + created after the rule; `premium` and NULL are never bound | C1-S1 cases 3–4, C1-S3 function, C1-S10 | S01-C1 |
 | R-3 | no run that exists at deploy changes visibility | C1-S1 case 6, C1-S10; C4-S2 case 4 (pre-rule published still not deletable-as-bound) | S01-C1, S01-C4 |
-| R-4 | served answer → `PUBLISHED`, no publish request, no PUBLISH grant | C2-S1.2, C2-S3.1, C2-S6, C2-S7, C2-S19 | S01-C2 |
+| R-4 | served answer → `PUBLISHED`, no publish request, no PUBLISH grant. **v3: the trigger is ANY answer-serving route (§1, V-10) — `GET /v1/runs/{id}/answer` AND `GET /v1/answers/{id}`; the Check runs once per route. The listed steps cover one route only; the second route is an open step for the FIX-A seat** | C2-S1.2, C2-S3.1, C2-S6, C2-S7, C2-S19 · **+ the second answer-serving route (unassigned)** | S01-C2 |
 | R-5 | a published bound run's publication appears in the public list exactly once | C2-S3.2, C2-S3.14, C2-S12 | S01-C2 |
-| R-6 | same `author_pseudonym` as the owner-driven path; nothing else naming the owner | C2-S3.3 | S01-C2 |
+| R-6 | same `author_pseudonym` as the owner-driven path; the machinery adds no owner identifier. **v3: the Check is rewritten — identity + parity + machine-filled fields, asserted on the DECRYPTED system-path snapshot, never on the transition's parameters. C2-S3.3 invokes the SQL function and so does not execute the snapshot builder (correctness B1): an open step for the FIX-A seat** | C2-S3.3 · **+ a decrypted-snapshot assertion that goes RED under the `ownerRef` mutant (unassigned)** | S01-C2 |
 | R-7 | no pseudonym on a publishable bound run → not published, outstanding instead | C2-S1.4, C2-S6 step 4 | S01-C2 |
 | R-8 | BLOCKED answer is not published and is not retried forever; R-9 does not apply | C2-S1.1, C2-S13 | S01-C2 |
 | R-9 | publishable bound run: publish failure never fails the run; PUBLISHED or PRIVATE+outstanding | C2-S1.3, C2-S6 steps 6–8, C2-S7 try/catch | S01-C2 |
@@ -937,13 +937,13 @@ C4 file map only.
 | R-24 | no `apps/ui` file written | file map; slice verification SV-2 | REV(S01) |
 | R-25 | Premium path unchanged end to end | C1-S1.3, C2-S3.9, C2-S9, C3-S5, C4-S6, slice verification SV-3 | all, REV(S01) |
 
-Requirement set of S01 is exactly R-1…R-25 (`DECISIONS.md` §10 N3-p2). Unique-R-id count on SPEC-v2.md = 25.
+Requirement set of S01 is exactly R-1…R-25 (`DECISIONS.md` §10 N3-p2). Unique-R-id count on SPEC-v3.md = 25, asserted by `spec-v3-check.sh`.
 
 ---
 
 ## 4. Suite assertions carried from the SPEC
 
-`SPEC-v2.md` §3 is the list. Cluster commands name the suite and the SPEC row:
+`SPEC-v3.md` §3 is the list (unchanged from `SPEC-v2.md` §3). Cluster commands name the suite and the SPEC row:
 
 | suite | SPEC row | cluster that runs it |
 |---|---|---|
@@ -996,7 +996,7 @@ Requirement set of S01 is exactly R-1…R-25 (`DECISIONS.md` §10 N3-p2). Unique
 - `core.transition_run_publication` 14-parameter signature (ADR-0024 / ADR-0026).
 - Live databases and no-touch listeners (intake: `:3100` `:3101` `:8890`–`:8896` `:55433` `:7177` `:8988` `:9797` `:11434`). Database tests use embedded/testcontainer fixtures as `tests/integration/s8-publication-database.test.ts` does.
 - `.local/**`, the main checkout `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine`.
-- `SPEC.md` / `SPEC-v2.md`.
+- `SPEC.md` / `SPEC-v2.md` / `SPEC-v3.md` (the SPEC of record).
 
 **ADRs**
 
@@ -1059,9 +1059,9 @@ Unpublish from a second user against a bound published run is byte-identical to 
 `SELECT count(*) FROM identity.step_up_grant WHERE action='PUBLISH' AND target_run_id=$auto_published_run` is 0. No `identity.session` row inserted by the system publish (count of sessions for that user unchanged across the publish).
 
 **SV-10 Unique R-ids.**  
-`grep -oE '\*\*R-[0-9]+' docs/missions/free-public-debates/slices/S01/SPEC-v2.md | sort -u | wc -l` = 25.
+`grep -oE '\*\*R-[0-9]+' docs/missions/free-public-debates/slices/S01/SPEC-v3.md | sort -u | wc -l` = 25.
 
-**SV-11 V's acceptance walk** is `SPEC-v2.md` §4, run once by V against a served lane. REV does not impersonate V. Numbered steps 1–16 in that file are the product-truth oracle.
+**SV-11 V's acceptance walk** is `SPEC-v3.md` §4, run once by V against a served lane. REV does not impersonate V. Numbered steps 1–16 **plus 3b, 3c and 11b** in that file are the product-truth oracle.
 
 No-touch: do not bind `:3100` `:3101` `:8890`–`:8896` `:55433` `:7177` `:8988` `:9797` `:11434`. Do not open anything on V's desktop.
 
@@ -1142,4 +1142,4 @@ Lane dirty count after all four runs: 0. Scripts: `probes/ARCH-S01/s01-c{1,2,3,4
 
 ## 9. Screens
 
-`ui: no`. No screen, element or token is added. There is no MOCK node. V's oracle is `SPEC-v2.md` §4, once.
+`ui: no`. No screen, element or token is added. There is no MOCK node. V's oracle is `SPEC-v3.md` §4, once.

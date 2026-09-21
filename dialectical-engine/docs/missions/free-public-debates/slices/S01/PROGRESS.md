@@ -19,3 +19,4 @@
 | 2026-09-21 03:55 | BUILD C4 | t_4990de08 | READY consumed — `db4758da`; the whole slice verified at its head (19 suites as expected, tsc 70, apps/ui 0) |
 | 2026-09-21 03:57 | GATE + REV p1 | t_7c1f1fde, t_af8d9bb2 | package assembled at `db4758da`; three blind lenses dispatched |
 | 2026-09-21 04:21 | REV p1 | t_af8d9bb2 | UNION = REWORK (C REWORK · S PASS · P REWORK); V-8…V-10 raised; FIX-B ∥ REQ-FIX p3 → REQ-REV p3 → FIX-A → REV p2 |
+| 2026-09-21 04:38 | REQ-FIX p3 | t_f58de68f | READY consumed — SPEC-v3.md is the SPEC of record (served answer = any AnswerSchema-serving owner route; R-6's Check rewritten) |
