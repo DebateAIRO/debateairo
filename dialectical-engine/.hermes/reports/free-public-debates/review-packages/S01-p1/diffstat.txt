@@ -1,0 +1,20 @@
+ dialectical-engine/apps/api/src/index.ts           |  24 +
+ dialectical-engine/apps/api/src/main.ts            |   7 +-
+ dialectical-engine/apps/api/src/publications.ts    | 217 +++++++-
+ .../migrations/0066_free_public_rule.sql           | 120 +++++
+ .../migrations/0067_system_run_publication.sql     | 480 +++++++++++++++++
+ .../migrations/0068_bound_published_erasure.sql    | 303 +++++++++++
+ dialectical-engine/packages/contract/src/client.ts |   6 +-
+ dialectical-engine/packages/contract/src/index.ts  |   3 +-
+ .../packages/db/src/free-public-binding.ts         |  12 +
+ dialectical-engine/packages/db/src/index.ts        |  47 +-
+ dialectical-engine/packages/db/src/publication.ts  | 160 +++++-
+ dialectical-engine/packages/db/src/schema.ts       |   1 +
+ .../tests/integration/fpd-s01-c1-binding.test.ts   | 364 +++++++++++++
+ .../integration/fpd-s01-c1-privileges.test.ts      | 109 ++++
+ .../fpd-s01-c2-system-publication.test.ts          | 572 +++++++++++++++++++++
+ .../fpd-s01-c4-delete-published.test.ts            | 566 ++++++++++++++++++++
+ .../tests/unit/fpd-s01-c2-auto-publish.test.ts     | 333 ++++++++++++
+ .../tests/unit/fpd-s01-c3-unpublish-http.test.ts   | 382 ++++++++++++++
+ .../tests/unit/fpd-s01-c4-erasure-http.test.ts     | 249 +++++++++
+ 19 files changed, 3913 insertions(+), 42 deletions(-)

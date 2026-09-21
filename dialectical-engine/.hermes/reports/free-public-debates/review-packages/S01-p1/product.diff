@@ -1,0 +1,4270 @@
+diff --git a/dialectical-engine/apps/api/src/index.ts b/dialectical-engine/apps/api/src/index.ts
+index 50caa78e..8907ff78 100644
+--- a/dialectical-engine/apps/api/src/index.ts
++++ b/dialectical-engine/apps/api/src/index.ts
+@@ -1098,6 +1098,20 @@ export function buildApi(options: ApiOptions): FastifyInstance {
+     const runId = ResourceIdSchema.safeParse(request.params.id);
+     if (!runId.success) return reply.status(404).send({ error: "ANSWER_NOT_SERVED" });
+     const answer = await options.application.readRunAnswer(runId.data, request.session, ownershipFor(request));
++    if (answer !== null && options.publications !== undefined
++      && options.publications.tryAutoPublish !== undefined
++      && request.authenticatedSession !== undefined) {
++      try {
++        await options.publications.tryAutoPublish({
++          runId: runId.data,
++          answer,
++          userId: request.authenticatedSession.userId,
++          ownerRef: request.authenticatedSession.ownerRef
++        });
++      } catch {
++        // Publication is best-effort here: the served answer remains available.
++      }
++    }
+     return answer === null ? reply.status(404).send({ error: "ANSWER_NOT_SERVED" }) : reply.send(AnswerSchema.parse(answer));
+   });
+   api.post<{ Params: { id: string } }>(
+@@ -1176,6 +1190,16 @@ export function buildApi(options: ApiOptions): FastifyInstance {
+         ownershipFor(request)
+       );
+       if (owned === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
++      const visibility = await options.publications.readOwnedVisibility({
++        runId: runId.data,
++        authenticated
++      });
++      if (visibility !== null
++        && visibility.state === "PUBLISHED"
++        && options.publications.isFreePublicBound !== undefined
++        && await options.publications.isFreePublicBound(runId.data)) {
++        return reply.status(409).send({ error: "FREE_DEBATE_CANNOT_BE_UNPUBLISHED" });
++      }
+       const unpublished = await options.publications.unpublish({
+         runId: runId.data,
+         authenticated,
+diff --git a/dialectical-engine/apps/api/src/main.ts b/dialectical-engine/apps/api/src/main.ts
+index f02a314b..4f6fa931 100644
+--- a/dialectical-engine/apps/api/src/main.ts
++++ b/dialectical-engine/apps/api/src/main.ts
+@@ -286,7 +286,8 @@ const publications = publicationCipher === undefined
+       new PostgresPublicationRepository(pool, auditContextHasher),
+       publicationCipher,
+       undefined,
+-      new PostgresPublicationRepository(publicationCleanupPool,auditContextHasher)
++      new PostgresPublicationRepository(publicationCleanupPool,auditContextHasher),
++      (runId,ownership) => application.readRunAnswer(runId,undefined as never,ownership)
+     );
+ let publicationCleanupTimer: ReturnType<typeof setInterval> | undefined;
+ if (publications !== undefined) {
+@@ -295,10 +296,14 @@ if (publications !== undefined) {
+   // process is live; an item failure is reported only after later items in the
+   // same batch were given a chance to complete.
+   await publications.reconcileKeyProvisionCleanup();
++  await publications.reconcileSystemKeyProvisionCleanup();
++  await publications.reconcileFreePublicAutoPublish();
+   await publications.reconcileKeyCleanup();
+   publicationCleanupTimer = setInterval(() => {
+     void Promise.all([
+       publications.reconcileKeyProvisionCleanup(),
++      publications.reconcileSystemKeyProvisionCleanup(),
++      publications.reconcileFreePublicAutoPublish(),
+       publications.reconcileKeyCleanup()
+     ]).catch(() => console.error("[PUBLICATION_KEY_CLEANUP_PENDING]"));
+   },30_000);
+diff --git a/dialectical-engine/apps/api/src/publications.ts b/dialectical-engine/apps/api/src/publications.ts
+index 1b6da1be..806b0b85 100644
+--- a/dialectical-engine/apps/api/src/publications.ts
++++ b/dialectical-engine/apps/api/src/publications.ts
+@@ -9,11 +9,13 @@ import {
+ } from "@debateai/contract";
+ import {
+   hashVerificationToken,
+-  PublicationCipher
++  PublicationCipher,
++  type CryptoEnvelope
+ } from "@debateai/crypto";
+ import {
+   PostgresPublicationRepository,
+-  type AuthSourceContext
++  type AuthSourceContext,
++  type RunOwnershipAccess
+ } from "@debateai/db";
+ import type { AuthenticatedSession } from "./sessions.js";
+ type LabeledNumber = Node["base_score"];
+@@ -91,9 +93,46 @@ function redactEdgeForPublic(edge: Edge): Edge {
+   };
+ }
+ 
++function publicDebateFromAnswer(
++  publicationRef: string,
++  pseudonym: string,
++  answer: Answer,
++  occurredAt: Date
++): PublicDebate {
++  return PublicDebateSchema.parse({
++    public_ref: publicationRef,
++    author_pseudonym: pseudonym,
++    question: answer.question_line,
++    published_at: occurredAt.toISOString(),
++    answer: {
++      terminal: answer.terminal,
++      verdict: answer.verdict_state,
++      verdict_available: answer.verdict_state !== null,
++      confidence_band: answer.confidence_band,
++      summary_segments: answer.composed_text.map((segment) => ({ text: segment.text })),
++      badges: answer.badges,
++      residual_objections: answer.residual_objections,
++      reversal_point: answer.reversal_point,
++      as_of: answer.as_of,
++      nodes: answer.nodes.map(redactNodeForPublic),
++      edges: answer.edges.map(redactEdgeForPublic),
++      tree_included: true
++    }
++  });
++}
++
+ export interface PublicationApplication {
+   reconcileKeyCleanup(limit?: number): Promise<number>;
+   reconcileKeyProvisionCleanup(limit?: number): Promise<number>;
++  reconcileSystemKeyProvisionCleanup?(limit?: number): Promise<number>;
++  reconcileFreePublicAutoPublish?(limit?: number): Promise<number>;
++  isFreePublicBound?(runId: string): Promise<boolean>;
++  tryAutoPublish?(input: Readonly<{
++    runId: string;
++    answer: Answer;
++    userId: string;
++    ownerRef: string;
++  }>): Promise<void>;
+   preflightGrant(input: Readonly<{
+     runId: string;
+     authenticated: AuthenticatedSession;
+@@ -110,6 +149,7 @@ export interface PublicationApplication {
+   }>): Promise<Readonly<{
+     state: "PRIVATE" | "PUBLISHED";
+     public_ref: string | null;
++    publish_pending?: true;
+   }> | null>;
+   publish(input: Readonly<{
+     runId: string;
+@@ -144,9 +184,125 @@ export class PostgresPublicationApplication implements PublicationApplication {
+     private readonly repository: PostgresPublicationRepository,
+     private readonly cipher: PublicationCipher,
+     private readonly clock: () => Date = () => new Date(),
+-    private readonly cleanupRepository: PostgresPublicationRepository = repository
++    private readonly cleanupRepository: PostgresPublicationRepository = repository,
++    private readonly readServedAnswer: (
++      runId: string,ownership: RunOwnershipAccess
++    ) => Promise<Answer | null> = async () => null
+   ) {}
+ 
++  async isFreePublicBound(runId: string): Promise<boolean> {
++    return this.repository.runIsFreePublicBound(runId);
++  }
++
++  async tryAutoPublish(input: Readonly<{
++    runId: string;
++    answer: Answer;
++    userId: string;
++    ownerRef: string;
++  }>): Promise<void> {
++    if (input.answer.terminal === "BLOCKED") {
++      await this.repository.clearAutoPublishWork(input.runId);
++      return;
++    }
++    if (!await this.isFreePublicBound(input.runId)) return;
++    const visibility = await this.repository.readOwnedVisibility(
++      input.runId,input.userId,input.ownerRef
++    );
++    if (visibility?.state === "PUBLISHED") {
++      await this.repository.clearAutoPublishWork(input.runId);
++      return;
++    }
++    const pseudonym = await this.repository.readAuthorPseudonym(
++      input.runId,input.userId,input.ownerRef
++    );
++    if (pseudonym === null) {
++      await this.repository.upsertAutoPublishWork(
++        input.runId,input.userId,input.ownerRef,"AUTO_PUBLISH_NULL_PSEUDONYM"
++      );
++      await this.repository.auditSystemPublicationAttempt(
++        randomUUID(),input.runId,"AUTO_PUBLISH_NULL_PSEUDONYM",this.clock(),"DENY"
++      );
++      return;
++    }
++    const publicationRef = randomUUID();
++    const occurredAt = this.clock();
++    const publicDebate = publicDebateFromAnswer(
++      publicationRef,pseudonym,input.answer,occurredAt
++    );
++    if (!await this.repository.prepareSystemKeyProvision({
++      publicationRef,
++      runId: input.runId,
++      userId: input.userId,
++      ownerRef: input.ownerRef
++    })) {
++      await this.repository.upsertAutoPublishWork(
++        input.runId,input.userId,input.ownerRef,"AUTO_PUBLISH_KEY_PROVISION_FAILED"
++      );
++      await this.repository.auditSystemPublicationAttempt(
++        randomUUID(),input.runId,"AUTO_PUBLISH_KEY_PROVISION_FAILED",occurredAt,"DENY"
++      );
++      return;
++    }
++    let prepared: Awaited<ReturnType<PublicationCipher["create"]>> | undefined;
++    let contentCiphertext: CryptoEnvelope;
++    try {
++      prepared = await this.cipher.create(publicationRef,input.runId);
++      contentCiphertext = prepared.encrypt(publicDebate);
++    } catch {
++      prepared?.close();
++      await this.repository.abandonSystemKeyProvision(publicationRef,input.userId)
++        .catch(() => false);
++      await this.repository.upsertAutoPublishWork(
++        input.runId,input.userId,input.ownerRef,"AUTO_PUBLISH_CIPHER_FAILED"
++      );
++      await this.repository.auditSystemPublicationAttempt(
++        randomUUID(),input.runId,"AUTO_PUBLISH_CIPHER_FAILED",occurredAt,"DENY"
++      );
++      return;
++    }
++    prepared.close();
++    const published = await this.repository.systemPublish({
++      eventId: randomUUID(),
++      runId: input.runId,
++      userId: input.userId,
++      ownerRef: input.ownerRef,
++      publicationRef,
++      expectedPseudonym: pseudonym,
++      contentCiphertext,
++      occurredAt,
++      auditId: randomUUID(),
++      deniedAuditId: randomUUID()
++    });
++    if (published === null) {
++      await this.repository.abandonSystemKeyProvision(publicationRef,input.userId);
++      await this.repository.upsertAutoPublishWork(
++        input.runId,input.userId,input.ownerRef,"AUTO_PUBLISH_TRANSITION_NULL"
++      );
++      return;
++    }
++    await this.repository.clearAutoPublishWork(input.runId);
++  }
++
++  async reconcileFreePublicAutoPublish(limit = 100): Promise<number> {
++    const claimed = await this.repository.claimAutoPublishWork(limit);
++    let processed = 0;
++    for (const work of claimed) {
++      const answer = await this.readServedAnswer(work.runId, {
++        ownerRef: work.ownerRef,
++        legacyAskerId: null
++      });
++      if (answer === null) continue;
++      await this.tryAutoPublish({
++        runId: work.runId,
++        answer,
++        userId: work.userId,
++        ownerRef: work.ownerRef
++      });
++      processed += 1;
++    }
++    return processed;
++  }
++
+   async preflightGrant(input: Readonly<{
+     runId: string;
+     authenticated: AuthenticatedSession;
+@@ -179,16 +335,18 @@ export class PostgresPublicationApplication implements PublicationApplication {
+   }>): Promise<Readonly<{
+     state: "PRIVATE" | "PUBLISHED";
+     public_ref: string | null;
++    publish_pending?: true;
+   }> | null> {
+     const visibility = await this.repository.readOwnedVisibility(
+       input.runId,
+       input.authenticated.userId,
+       input.authenticated.ownerRef
+     );
+-    return visibility === null ? null : Object.freeze({
+-      state: visibility.state,
+-      public_ref: visibility.publicRef
+-    });
++    if (visibility === null) return null;
++    const response = { state: visibility.state, public_ref: visibility.publicRef };
++    return Object.freeze(visibility.publishPending === true
++      ? { ...response, publish_pending: true as const }
++      : response);
+   }
+ 
+   async publish(input: Readonly<{
+@@ -228,26 +386,9 @@ export class PostgresPublicationApplication implements PublicationApplication {
+       sessionId: input.authenticated.session.session_id,
+       grantTokenHash
+     })) return null;
+-    const publicDebate = PublicDebateSchema.parse({
+-      public_ref: publicationRef,
+-      author_pseudonym: pseudonym,
+-      question: input.answer.question_line,
+-      published_at: occurredAt.toISOString(),
+-      answer: {
+-        terminal: input.answer.terminal,
+-        verdict: input.answer.verdict_state,
+-        verdict_available: input.answer.verdict_state !== null,
+-        confidence_band: input.answer.confidence_band,
+-        summary_segments: input.answer.composed_text.map((segment) => ({ text: segment.text })),
+-        badges: input.answer.badges,
+-        residual_objections: input.answer.residual_objections,
+-        reversal_point: input.answer.reversal_point,
+-        as_of: input.answer.as_of,
+-        nodes: input.answer.nodes.map(redactNodeForPublic),
+-        edges: input.answer.edges.map(redactEdgeForPublic),
+-        tree_included: true
+-      }
+-    });
++    const publicDebate = publicDebateFromAnswer(
++      publicationRef,pseudonym,input.answer,occurredAt
++    );
+     let prepared: Awaited<ReturnType<PublicationCipher["create"]>>;
+     try {
+       prepared = await this.cipher.create(publicationRef, input.runId);
+@@ -379,6 +520,28 @@ export class PostgresPublicationApplication implements PublicationApplication {
+     return completed;
+   }
+ 
++  async reconcileSystemKeyProvisionCleanup(limit = 100): Promise<number> {
++    const claimed = await this.cleanupRepository.claimSystemKeyProvisionCleanup(limit);
++    let completed = 0;
++    let failed = false;
++    for (const intent of claimed) {
++      try {
++        await this.cleanupRepository.withContentLease(intent.publicationRef,async () => {
++          await this.cipher.destroy(intent.publicationRef);
++          if (await this.cipher.exists(intent.publicationRef)) return;
++          if (await this.cleanupRepository.completeSystemKeyProvisionCleanup(
++            intent.publicationRef,intent.claimToken
++          )) completed += 1;
++        });
++      } catch {
++        failed = true;
++        continue;
++      }
++    }
++    if (failed) throw new TypeError("SYSTEM_PUBLICATION_KEY_PROVISION_CLEANUP_PENDING");
++    return completed;
++  }
++
+   async readPublicDebate(publicationRef: string): Promise<PublicDebate | null> {
+     return this.repository.withContentLease(publicationRef,async () => {
+       const snapshot = await this.repository.readPublic(publicationRef);
+diff --git a/dialectical-engine/migrations/0066_free_public_rule.sql b/dialectical-engine/migrations/0066_free_public_rule.sql
+new file mode 100644
+index 00000000..97689181
+--- /dev/null
++++ b/dialectical-engine/migrations/0066_free_public_rule.sql
+@@ -0,0 +1,120 @@
++ALTER TABLE core.run
++  ADD COLUMN IF NOT EXISTS free_public_rule boolean NOT NULL DEFAULT false;
++
++CREATE OR REPLACE FUNCTION core.run_is_free_public_bound(p_run_id uuid)
++RETURNS boolean
++LANGUAGE sql
++STABLE
++SECURITY DEFINER
++SET search_path = pg_catalog
++AS $$
++  SELECT COALESCE(
++    run.plan_tier='free' AND run.free_public_rule=true,
++    false
++  )
++  FROM core.run AS run
++  WHERE run.run_id=p_run_id;
++$$;
++
++REVOKE ALL ON FUNCTION core.run_is_free_public_bound(uuid) FROM PUBLIC;
++GRANT EXECUTE ON FUNCTION core.run_is_free_public_bound(uuid) TO debateai_runtime;
++GRANT EXECUTE ON FUNCTION core.run_is_free_public_bound(uuid) TO debateai_erasure_runtime;
++
++CREATE OR REPLACE FUNCTION core.create_encrypted_run(
++  p_run jsonb,p_user_id uuid,p_owner_ref uuid,p_battery_rows jsonb
++)
++RETURNS boolean
++LANGUAGE plpgsql
++VOLATILE
++SECURITY DEFINER
++SET search_path = pg_catalog
++AS $$
++DECLARE
++  v_run_id uuid;
++  v_execution_ref uuid;
++  v_battery_row jsonb;
++BEGIN
++  IF jsonb_typeof(p_run)<>'object' OR p_run-ARRAY[
++    'runId','questionLine','askerId','executionRef','callerScope','asOf',
++    'askerRiskTier','riskTier','tierSource','tierProvenanceRef',
++    'compositionBudgetTier','planTier','freePublicRule','depthParams','discoveredPanel',
++    'strangerSampleRate','envelopeBasis','registerVersion','batteryVersion','askContract',
++    'contentCiphertext','contentAttestation','contentAttestationSecret'
++  ]::text[]<>'{}'::jsonb
++    OR jsonb_typeof(p_battery_rows)<>'array'
++    OR jsonb_array_length(p_battery_rows)>100 THEN
++    RETURN false;
++  END IF;
++  v_run_id := (p_run->>'runId')::uuid;
++  v_execution_ref := (p_run->>'executionRef')::uuid;
++  IF p_run->>'questionLine'<>'⟦DEBATEAI:CIPHERTEXT:V1⟧'
++    OR p_run->>'askerId'<>'owner:'||p_owner_ref::text
++    OR p_run->'askContract'<>'{"ciphertext":true,"v":1}'::jsonb
++    OR NOT core.lock_run_key_provision_for_commit(
++      v_run_id,p_user_id,p_owner_ref,v_execution_ref
++    ) THEN
++    RETURN false;
++  END IF;
++  IF octet_length(decode(p_run->>'contentAttestationSecret','base64'))<>32
++    OR octet_length(decode(p_run->>'contentAttestation','base64'))<>32 THEN
++    RETURN false;
++  END IF;
++  FOR v_battery_row IN SELECT value FROM jsonb_array_elements(p_battery_rows)
++  LOOP
++    IF jsonb_typeof(v_battery_row)<>'object' OR v_battery_row-ARRAY[
++      'batteryRowId','predicateRef','openingState','predicateInputs','skipEvidence'
++    ]::text[]<>'{}'::jsonb THEN
++      RETURN false;
++    END IF;
++  END LOOP;
++  INSERT INTO core.run_content_attestation_secret(run_id,secret,created_at)
++  VALUES (v_run_id,decode(p_run->>'contentAttestationSecret','base64'),clock_timestamp());
++  INSERT INTO core.run(
++    run_id,question_line,asker_id,session_id,caller_scope,as_of,
++    asker_risk_tier,risk_tier,tier_source,tier_provenance_ref,
++    composition_budget_tier,plan_tier,free_public_rule,depth_params,agent_count,
++    discovered_panel,stranger_sample_rate,envelope_basis,register_version,battery_version,
++    ask_contract,created_at_seq,content_encryption_version,
++    question_blind_index_version,question_blind_index,content_ciphertext,content_attestation
++  ) VALUES (
++    v_run_id,p_run->>'questionLine',p_run->>'askerId',v_execution_ref::text,
++    p_run->>'callerScope',(p_run->>'asOf')::timestamptz,
++    p_run->>'askerRiskTier',p_run->>'riskTier',p_run->>'tierSource',
++    p_run->>'tierProvenanceRef',p_run->>'compositionBudgetTier',p_run->>'planTier',
++    COALESCE((p_run->>'freePublicRule')::boolean,false),
++    p_run->'depthParams',jsonb_array_length(p_run->'discoveredPanel'),
++    p_run->'discoveredPanel',(p_run->>'strangerSampleRate')::double precision,
++    p_run->'envelopeBasis',(p_run->>'registerVersion')::bigint,
++    p_run->>'batteryVersion',p_run->'askContract',ledger.allocate_sequence(),
++    1,2,NULL,p_run->'contentCiphertext',decode(p_run->>'contentAttestation','base64')
++  );
++  PERFORM core.append_run_ownership_event(v_run_id,p_owner_ref);
++  INSERT INTO core.question_liveness_event(run_id,kind,occurred_at,at_seq)
++  VALUES (v_run_id,'QUERY',clock_timestamp(),ledger.allocate_sequence());
++  INSERT INTO core.run_progress_event(run_id,at_seq,kind,value_json) VALUES
++    (v_run_id,ledger.allocate_sequence(),'PHASE',to_jsonb('EMPIRICAL'::text)),
++    (v_run_id,ledger.allocate_sequence(),'ENVELOPE_STATE',to_jsonb('WITHIN'::text)),
++    (v_run_id,ledger.allocate_sequence(),'ENVELOPE_CONSUMED',to_jsonb(0));
++  FOR v_battery_row IN SELECT value FROM jsonb_array_elements(p_battery_rows)
++  LOOP
++    INSERT INTO core.run_row_activation(run_id,battery_row_id,predicate_ref)
++    VALUES (v_run_id,v_battery_row->>'batteryRowId',v_battery_row->>'predicateRef');
++    INSERT INTO core.run_row_activation_event(
++      run_id,battery_row_id,at_seq,state,predicate_inputs,skip_evidence
++    ) VALUES (
++      v_run_id,v_battery_row->>'batteryRowId',ledger.allocate_sequence(),
++      v_battery_row->>'openingState',v_battery_row->'predicateInputs',
++      CASE WHEN jsonb_typeof(v_battery_row->'skipEvidence')='null'
++        THEN NULL ELSE v_battery_row->'skipEvidence' END
++    );
++  END LOOP;
++  IF NOT core.complete_run_key_provision(
++    v_run_id,p_user_id,p_owner_ref,v_execution_ref
++  ) THEN
++    RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='RUN_KEY_PROVISION_INTENT_INCOMPLETE';
++  END IF;
++  RETURN true;
++EXCEPTION WHEN invalid_text_representation OR check_violation OR not_null_violation THEN
++  RETURN false;
++END;
++$$;
+diff --git a/dialectical-engine/migrations/0067_system_run_publication.sql b/dialectical-engine/migrations/0067_system_run_publication.sql
+new file mode 100644
+index 00000000..4139656e
+--- /dev/null
++++ b/dialectical-engine/migrations/0067_system_run_publication.sql
+@@ -0,0 +1,480 @@
++CREATE TABLE IF NOT EXISTS serve.system_publication_key_provision_intent (
++  publication_ref uuid PRIMARY KEY,
++  run_id uuid NOT NULL REFERENCES core.run(run_id),
++  user_id uuid NOT NULL REFERENCES identity."user"(user_id) ON DELETE CASCADE,
++  owner_ref uuid NOT NULL,
++  requested_at timestamptz NOT NULL,
++  expires_at timestamptz NOT NULL,
++  cleanup_state text NOT NULL DEFAULT 'PREPARED'
++    CHECK (cleanup_state IN ('PREPARED','RECONCILING')),
++  cleanup_claim_token uuid,
++  cleanup_claimed_at timestamptz,
++  CHECK (
++    (cleanup_state='PREPARED' AND cleanup_claim_token IS NULL AND cleanup_claimed_at IS NULL)
++    OR (cleanup_state='RECONCILING' AND cleanup_claim_token IS NOT NULL AND cleanup_claimed_at IS NOT NULL)
++  )
++);
++
++CREATE TABLE IF NOT EXISTS core.free_public_auto_publish_work (
++  run_id uuid PRIMARY KEY REFERENCES core.run(run_id),
++  user_id uuid NOT NULL,
++  owner_ref uuid NOT NULL,
++  reason text NOT NULL CHECK (reason IN (
++    'AUTO_PUBLISH_NULL_PSEUDONYM',
++    'AUTO_PUBLISH_CIPHER_FAILED',
++    'AUTO_PUBLISH_TRANSITION_NULL',
++    'AUTO_PUBLISH_KEY_PROVISION_FAILED'
++  )),
++  attempt_count integer NOT NULL DEFAULT 0 CHECK (attempt_count>=0),
++  next_attempt_at timestamptz NOT NULL,
++  claim_token uuid,
++  claimed_at timestamptz,
++  claim_expires_at timestamptz,
++  cleared_at timestamptz,
++  CHECK (
++    (claim_token IS NULL AND claimed_at IS NULL AND claim_expires_at IS NULL)
++    OR (claim_token IS NOT NULL AND claimed_at IS NOT NULL AND claim_expires_at IS NOT NULL)
++  )
++);
++
++-- Publication v2 normally proves actor/target integrity through an owner-created
++-- publication_event_binding. The system path has no session from which such a
++-- binding could be minted, so admit only its pinned actor and exact event shapes.
++CREATE OR REPLACE FUNCTION core.enforce_publication_v2_ref_binding()
++RETURNS trigger
++LANGUAGE plpgsql
++SECURITY DEFINER
++SET search_path = pg_catalog
++AS $$
++BEGIN
++  IF TG_TABLE_SCHEMA='core' AND TG_TABLE_NAME='run_visibility_event' THEN
++    IF NEW.actor_ref_version=2
++      AND NEW.actor_audit_token='00000000-0000-4000-8000-0000000000f1'::uuid
++      AND NEW.state='PUBLISHED' AND NEW.warning_version='PUBLIC_INDEXED_V1'
++      AND EXISTS (
++        SELECT 1 FROM serve.system_publication_key_provision_intent AS intent
++        WHERE intent.publication_ref=NEW.publication_ref AND intent.run_id=NEW.run_id
++          AND intent.cleanup_state='PREPARED'
++      ) THEN
++      RETURN NEW;
++    END IF;
++    IF NEW.actor_ref_version<>2 OR NOT EXISTS (
++      SELECT 1 FROM identity.publication_event_binding AS binding
++      WHERE binding.visibility_event_id=NEW.run_visibility_event_id
++        AND binding.visibility_actor_ref=NEW.actor_audit_token
++        AND binding.run_id=NEW.run_id AND binding.consumed_at IS NULL
++        AND binding.expires_at>clock_timestamp()
++    ) THEN
++      RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='PUBLICATION_V2_REF_BINDING_REQUIRED';
++    END IF;
++  ELSIF TG_TABLE_SCHEMA='identity' AND TG_TABLE_NAME='audit_event'
++    AND NEW.event_type LIKE 'debate.publication.%' THEN
++    IF NEW.actor_key_ref='system:free-public-auto-publish'
++      AND NEW.source_context='{"schema":"s10-publication-event-v2"}'::jsonb
++      AND (
++        (NEW.event_type='debate.publication.published'
++          AND NEW.target_type='debate.publication_event_ref'
++          AND NEW.decision='ALLOW' AND NEW.success=true AND NEW.justification IS NULL
++          AND EXISTS (
++            SELECT 1 FROM serve.system_publication_key_provision_intent AS intent
++            WHERE intent.publication_ref::text=NEW.target_id
++              AND intent.cleanup_state='PREPARED'
++          ))
++        OR (NEW.event_type='debate.publication.denied'
++          AND NEW.target_type='debate.publication_attempt'
++          AND NEW.decision='DENY' AND NEW.success=false
++          AND NEW.justification IN (
++            'AUTO_PUBLISH_NULL_PSEUDONYM','AUTO_PUBLISH_CIPHER_FAILED',
++            'AUTO_PUBLISH_TRANSITION_NULL','AUTO_PUBLISH_KEY_PROVISION_FAILED'
++          )
++          AND EXISTS (
++            SELECT 1 FROM core.run AS run WHERE run.run_id::text=NEW.target_id
++          ))
++      ) THEN
++      RETURN NEW;
++    END IF;
++    IF NOT EXISTS (
++      SELECT 1 FROM identity.publication_event_binding AS binding
++      WHERE binding.consumed_at IS NULL AND binding.expires_at>clock_timestamp()
++        AND (
++          (NEW.event_type IN ('debate.publication.published','debate.publication.unpublished')
++            AND binding.audit_id=NEW.audit_id
++            AND binding.audit_actor_ref::text=NEW.actor_key_ref
++            AND binding.audit_target_ref::text=NEW.target_id)
++          OR (NEW.event_type='debate.publication.denied'
++            AND binding.denied_audit_id=NEW.audit_id
++            AND binding.denied_audit_actor_ref::text=NEW.actor_key_ref
++            AND binding.denied_audit_target_ref::text=NEW.target_id)
++          OR (NEW.event_type='debate.publication.preflight_denied'
++            AND binding.action='PREFLIGHT_DENIAL' AND binding.audit_id=NEW.audit_id
++            AND binding.audit_actor_ref::text=NEW.actor_key_ref
++            AND binding.audit_target_ref::text=NEW.target_id)
++        )
++    ) THEN
++      RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='PUBLICATION_V2_AUDIT_BINDING_REQUIRED';
++    END IF;
++  END IF;
++  RETURN NEW;
++END;
++$$;
++
++CREATE OR REPLACE FUNCTION serve.prepare_system_publication_key_provision(
++  p_publication_ref uuid,p_run_id uuid,p_user_id uuid,p_owner_ref uuid
++)
++RETURNS boolean
++LANGUAGE plpgsql
++VOLATILE
++SECURITY DEFINER
++SET search_path = pg_catalog
++AS $$
++DECLARE
++  v_now timestamptz := clock_timestamp();
++  v_latest_state text;
++BEGIN
++  PERFORM 1 FROM core.run AS run WHERE run.run_id=p_run_id FOR UPDATE;
++  IF NOT FOUND OR NOT core.run_is_owned_by(p_run_id,p_owner_ref,NULL)
++    OR NOT core.run_private_content_is_live(p_run_id) THEN
++    RETURN false;
++  END IF;
++  PERFORM pg_advisory_xact_lock(hashtextextended('identity:account:'||p_user_id::text,0));
++  PERFORM 1 FROM identity."user" AS identity_user
++  WHERE identity_user.user_id=p_user_id AND identity_user.owner_ref=p_owner_ref
++    AND identity_user.state='active'
++  FOR KEY SHARE;
++  IF NOT FOUND THEN RETURN false; END IF;
++  SELECT event.state INTO v_latest_state
++  FROM core.run_visibility_event AS event
++  WHERE event.run_id=p_run_id ORDER BY event.at_seq DESC LIMIT 1;
++  IF v_latest_state='PUBLISHED' THEN RETURN false; END IF;
++  INSERT INTO core.publication_ref_tombstone(ref,ref_kind,created_at)
++  VALUES (p_publication_ref,'publication_ref',v_now)
++  ON CONFLICT (ref) DO NOTHING;
++  PERFORM 1 FROM core.publication_ref_tombstone AS tombstone
++  WHERE tombstone.ref=p_publication_ref AND tombstone.ref_kind='publication_ref';
++  IF NOT FOUND THEN RETURN false; END IF;
++  INSERT INTO serve.system_publication_key_provision_intent(
++    publication_ref,run_id,user_id,owner_ref,requested_at,expires_at,cleanup_state
++  ) VALUES (
++    p_publication_ref,p_run_id,p_user_id,p_owner_ref,v_now,v_now+interval '5 minutes','PREPARED'
++  ) ON CONFLICT (publication_ref) DO NOTHING;
++  RETURN FOUND;
++END;
++$$;
++
++CREATE OR REPLACE FUNCTION serve.abandon_system_publication_key_provision(
++  p_publication_ref uuid,p_user_id uuid
++)
++RETURNS boolean
++LANGUAGE plpgsql
++VOLATILE
++SECURITY DEFINER
++SET search_path = pg_catalog
++AS $$
++BEGIN
++  DELETE FROM serve.system_publication_key_provision_intent AS intent
++  WHERE intent.publication_ref=p_publication_ref AND intent.user_id=p_user_id
++    AND NOT EXISTS (
++      SELECT 1 FROM serve.publication_snapshot AS snapshot
++      WHERE snapshot.publication_ref=intent.publication_ref
++    );
++  RETURN FOUND;
++END;
++$$;
++
++CREATE OR REPLACE FUNCTION serve.claim_system_publication_key_provision_cleanup(p_limit integer)
++RETURNS TABLE(
++  publication_ref uuid,run_id uuid,user_id uuid,owner_ref uuid,claim_token uuid
++)
++LANGUAGE plpgsql
++VOLATILE
++SECURITY DEFINER
++SET search_path = pg_catalog
++AS $$
++DECLARE
++  v_now timestamptz := clock_timestamp();
++BEGIN
++  RETURN QUERY
++  WITH candidates AS (
++    SELECT intent.publication_ref
++    FROM serve.system_publication_key_provision_intent AS intent
++    WHERE NOT EXISTS (
++      SELECT 1 FROM serve.publication_snapshot AS snapshot
++      WHERE snapshot.publication_ref=intent.publication_ref
++    ) AND (
++      (intent.cleanup_state='PREPARED' AND intent.expires_at<=v_now)
++      OR (intent.cleanup_state='RECONCILING'
++        AND intent.cleanup_claimed_at<=v_now-interval '5 minutes')
++    )
++    ORDER BY intent.requested_at,intent.publication_ref
++    LIMIT GREATEST(0,LEAST(COALESCE(p_limit,100),100))
++    FOR UPDATE SKIP LOCKED
++  ), claimed AS (
++    UPDATE serve.system_publication_key_provision_intent AS intent SET
++      cleanup_state='RECONCILING',cleanup_claim_token=gen_random_uuid(),
++      cleanup_claimed_at=v_now
++    FROM candidates
++    WHERE intent.publication_ref=candidates.publication_ref
++    RETURNING intent.publication_ref,intent.run_id,intent.user_id,
++      intent.owner_ref,intent.cleanup_claim_token
++  )
++  SELECT claimed.publication_ref,claimed.run_id,claimed.user_id,
++    claimed.owner_ref,claimed.cleanup_claim_token
++  FROM claimed;
++END;
++$$;
++
++CREATE OR REPLACE FUNCTION serve.complete_system_publication_key_provision_cleanup(
++  p_publication_ref uuid,p_claim_token uuid
++)
++RETURNS boolean
++LANGUAGE plpgsql
++VOLATILE
++SECURITY DEFINER
++SET search_path = pg_catalog
++AS $$
++BEGIN
++  DELETE FROM serve.system_publication_key_provision_intent AS intent
++  WHERE intent.publication_ref=p_publication_ref
++    AND intent.cleanup_state='RECONCILING'
++    AND intent.cleanup_claim_token=p_claim_token
++    AND NOT EXISTS (
++      SELECT 1 FROM serve.publication_snapshot AS snapshot
++      WHERE snapshot.publication_ref=intent.publication_ref
++    );
++  RETURN FOUND;
++END;
++$$;
++
++CREATE OR REPLACE FUNCTION identity.audit_system_publication_attempt(
++  p_audit_id uuid,p_run_id uuid,p_reason text,p_occurred_at timestamptz,p_decision text
++)
++RETURNS boolean
++LANGUAGE plpgsql
++VOLATILE
++SECURITY DEFINER
++SET search_path = pg_catalog
++AS $$
++BEGIN
++  IF p_audit_id IS NULL OR p_run_id IS NULL OR p_occurred_at IS NULL
++    OR p_decision<>'DENY' OR p_reason NOT IN (
++      'AUTO_PUBLISH_NULL_PSEUDONYM',
++      'AUTO_PUBLISH_CIPHER_FAILED',
++      'AUTO_PUBLISH_TRANSITION_NULL',
++      'AUTO_PUBLISH_KEY_PROVISION_FAILED'
++    ) THEN
++    RETURN false;
++  END IF;
++  PERFORM identity.append_audit_event_internal(
++    p_audit_id,'system:free-public-auto-publish','debate.publication.denied',
++    'debate.publication_attempt',p_run_id::text,p_occurred_at,
++    '{"schema":"s10-publication-event-v2"}'::jsonb,'DENY',false,p_reason
++  );
++  RETURN true;
++END;
++$$;
++
++CREATE OR REPLACE FUNCTION core.transition_system_run_publication(
++  p_event_id uuid,
++  p_run_id uuid,
++  p_user_id uuid,
++  p_owner_ref uuid,
++  p_publication_ref uuid,
++  p_expected_pseudonym text,
++  p_content_ciphertext jsonb,
++  p_presented_at timestamptz,
++  p_audit_id uuid,
++  p_denied_audit_id uuid
++)
++RETURNS uuid
++LANGUAGE plpgsql
++VOLATILE
++SECURITY DEFINER
++SET search_path = pg_catalog
++AS $$
++DECLARE
++  v_content_encryption_version integer;
++  v_latest_state text;
++  v_pseudonym text;
++  v_at_seq bigint;
++BEGIN
++  IF p_event_id IS NULL OR p_run_id IS NULL OR p_user_id IS NULL
++    OR p_owner_ref IS NULL OR p_publication_ref IS NULL
++    OR p_expected_pseudonym IS NULL OR p_content_ciphertext IS NULL
++    OR p_presented_at IS NULL OR p_audit_id IS NULL OR p_denied_audit_id IS NULL THEN
++    RETURN NULL;
++  END IF;
++  SELECT run.content_encryption_version INTO v_content_encryption_version
++  FROM core.run AS run WHERE run.run_id=p_run_id FOR UPDATE;
++  IF NOT FOUND THEN RETURN NULL; END IF;
++  IF NOT core.run_is_free_public_bound(p_run_id) THEN
++    PERFORM identity.audit_system_publication_attempt(
++      p_denied_audit_id,p_run_id,'AUTO_PUBLISH_TRANSITION_NULL',p_presented_at,'DENY'
++    );
++    RETURN NULL;
++  END IF;
++  IF NOT core.run_private_content_is_live(p_run_id) THEN
++    PERFORM identity.audit_system_publication_attempt(
++      p_denied_audit_id,p_run_id,'AUTO_PUBLISH_TRANSITION_NULL',p_presented_at,'DENY'
++    );
++    RETURN NULL;
++  END IF;
++  SELECT event.state INTO v_latest_state
++  FROM core.run_visibility_event AS event
++  WHERE event.run_id=p_run_id ORDER BY event.at_seq DESC LIMIT 1;
++  IF v_latest_state='PUBLISHED' THEN
++    PERFORM identity.audit_system_publication_attempt(
++      p_denied_audit_id,p_run_id,'AUTO_PUBLISH_TRANSITION_NULL',p_presented_at,'DENY'
++    );
++    RETURN NULL;
++  END IF;
++  PERFORM pg_advisory_xact_lock(hashtextextended('identity:account:'||p_user_id::text,0));
++  SELECT identity_user.pseudonym INTO v_pseudonym
++  FROM identity."user" AS identity_user
++  WHERE identity_user.user_id=p_user_id AND identity_user.owner_ref=p_owner_ref
++    AND identity_user.state='active'
++  FOR KEY SHARE;
++  IF NOT FOUND OR v_pseudonym IS DISTINCT FROM p_expected_pseudonym
++    OR NOT core.run_is_owned_by(p_run_id,p_owner_ref,NULL) THEN
++    PERFORM identity.audit_system_publication_attempt(
++      p_denied_audit_id,p_run_id,'AUTO_PUBLISH_TRANSITION_NULL',p_presented_at,'DENY'
++    );
++    RETURN NULL;
++  END IF;
++  PERFORM 1
++  FROM serve.system_publication_key_provision_intent AS intent
++  JOIN core.publication_ref_tombstone AS tombstone
++    ON tombstone.ref=intent.publication_ref AND tombstone.ref_kind='publication_ref'
++  WHERE intent.publication_ref=p_publication_ref AND intent.run_id=p_run_id
++    AND intent.user_id=p_user_id AND intent.owner_ref=p_owner_ref
++    AND intent.cleanup_state='PREPARED' AND intent.expires_at>clock_timestamp()
++  FOR UPDATE OF intent;
++  IF NOT FOUND THEN
++    PERFORM identity.audit_system_publication_attempt(
++      p_denied_audit_id,p_run_id,'AUTO_PUBLISH_TRANSITION_NULL',p_presented_at,'DENY'
++    );
++    RETURN NULL;
++  END IF;
++  INSERT INTO serve.publication_snapshot(
++    publication_ref,run_id,format_version,content_ciphertext,created_at
++  ) VALUES (p_publication_ref,p_run_id,1,p_content_ciphertext,p_presented_at);
++  SELECT ledger.allocate_sequence() INTO v_at_seq;
++  INSERT INTO core.run_visibility_event(
++    run_visibility_event_id,run_id,publication_ref,state,actor_audit_token,
++    actor_ref_version,warning_version,occurred_at,at_seq
++  ) VALUES (
++    p_event_id,p_run_id,p_publication_ref,'PUBLISHED',
++    '00000000-0000-4000-8000-0000000000f1'::uuid,2,
++    'PUBLIC_INDEXED_V1',p_presented_at,v_at_seq
++  );
++  PERFORM identity.append_audit_event_internal(
++    p_audit_id,'system:free-public-auto-publish','debate.publication.published',
++    'debate.publication_event_ref',p_publication_ref::text,p_presented_at,
++    '{"schema":"s10-publication-event-v2"}'::jsonb,'ALLOW',true,NULL
++  );
++  DELETE FROM serve.system_publication_key_provision_intent AS intent
++  WHERE intent.publication_ref=p_publication_ref AND intent.run_id=p_run_id
++    AND intent.user_id=p_user_id AND intent.owner_ref=p_owner_ref
++    AND intent.cleanup_state='PREPARED';
++  IF NOT FOUND THEN
++    RAISE EXCEPTION USING ERRCODE='40001', MESSAGE='SYSTEM_PUBLICATION_KEY_PROVISION_INTENT_INCOMPLETE';
++  END IF;
++  RETURN p_publication_ref;
++END;
++$$;
++
++CREATE OR REPLACE FUNCTION core.upsert_free_public_auto_publish_work(
++  p_run_id uuid,p_user_id uuid,p_owner_ref uuid,p_reason text
++)
++RETURNS boolean
++LANGUAGE plpgsql
++VOLATILE
++SECURITY DEFINER
++SET search_path = pg_catalog
++AS $$
++BEGIN
++  INSERT INTO core.free_public_auto_publish_work(
++    run_id,user_id,owner_ref,reason,attempt_count,next_attempt_at,
++    claim_token,claimed_at,claim_expires_at,cleared_at
++  ) VALUES (
++    p_run_id,p_user_id,p_owner_ref,p_reason,1,clock_timestamp(),NULL,NULL,NULL,NULL
++  )
++  ON CONFLICT (run_id) DO UPDATE SET
++    user_id=EXCLUDED.user_id,owner_ref=EXCLUDED.owner_ref,reason=EXCLUDED.reason,
++    attempt_count=core.free_public_auto_publish_work.attempt_count+1,
++    next_attempt_at=clock_timestamp(),claim_token=NULL,claimed_at=NULL,
++    claim_expires_at=NULL,cleared_at=NULL;
++  RETURN true;
++EXCEPTION WHEN check_violation OR foreign_key_violation THEN
++  RETURN false;
++END;
++$$;
++
++CREATE OR REPLACE FUNCTION core.clear_free_public_auto_publish_work(p_run_id uuid)
++RETURNS boolean
++LANGUAGE plpgsql
++VOLATILE
++SECURITY DEFINER
++SET search_path = pg_catalog
++AS $$
++BEGIN
++  UPDATE core.free_public_auto_publish_work AS work SET
++    cleared_at=clock_timestamp(),claim_token=NULL,claimed_at=NULL,claim_expires_at=NULL
++  WHERE work.run_id=p_run_id AND work.cleared_at IS NULL;
++  RETURN FOUND;
++END;
++$$;
++
++CREATE OR REPLACE FUNCTION core.claim_free_public_auto_publish_work(p_limit integer)
++RETURNS TABLE(run_id uuid,user_id uuid,owner_ref uuid,reason text)
++LANGUAGE plpgsql
++VOLATILE
++SECURITY DEFINER
++SET search_path = pg_catalog
++AS $$
++DECLARE
++  v_now timestamptz := clock_timestamp();
++BEGIN
++  RETURN QUERY
++  WITH candidates AS (
++    SELECT work.run_id
++    FROM core.free_public_auto_publish_work AS work
++    WHERE work.cleared_at IS NULL AND work.next_attempt_at<=v_now
++      AND (work.claim_expires_at IS NULL OR work.claim_expires_at<=v_now)
++    ORDER BY work.next_attempt_at,work.run_id
++    LIMIT GREATEST(0,LEAST(COALESCE(p_limit,100),100))
++    FOR UPDATE SKIP LOCKED
++  ), claimed AS (
++    UPDATE core.free_public_auto_publish_work AS work SET
++      claim_token=gen_random_uuid(),claimed_at=v_now,
++      claim_expires_at=v_now+interval '5 minutes'
++    FROM candidates WHERE work.run_id=candidates.run_id
++    RETURNING work.run_id,work.user_id,work.owner_ref,work.reason
++  )
++  SELECT claimed.run_id,claimed.user_id,claimed.owner_ref,claimed.reason FROM claimed;
++END;
++$$;
++
++REVOKE ALL ON FUNCTION serve.prepare_system_publication_key_provision(uuid,uuid,uuid,uuid) FROM PUBLIC;
++REVOKE ALL ON FUNCTION serve.abandon_system_publication_key_provision(uuid,uuid) FROM PUBLIC;
++REVOKE ALL ON FUNCTION serve.claim_system_publication_key_provision_cleanup(integer) FROM PUBLIC;
++REVOKE ALL ON FUNCTION serve.complete_system_publication_key_provision_cleanup(uuid,uuid) FROM PUBLIC;
++REVOKE ALL ON FUNCTION identity.audit_system_publication_attempt(uuid,uuid,text,timestamptz,text) FROM PUBLIC;
++REVOKE ALL ON FUNCTION core.transition_system_run_publication(uuid,uuid,uuid,uuid,uuid,text,jsonb,timestamptz,uuid,uuid) FROM PUBLIC;
++REVOKE ALL ON FUNCTION core.upsert_free_public_auto_publish_work(uuid,uuid,uuid,text) FROM PUBLIC;
++REVOKE ALL ON FUNCTION core.clear_free_public_auto_publish_work(uuid) FROM PUBLIC;
++REVOKE ALL ON FUNCTION core.claim_free_public_auto_publish_work(integer) FROM PUBLIC;
++
++GRANT EXECUTE ON FUNCTION serve.prepare_system_publication_key_provision(uuid,uuid,uuid,uuid),
++  serve.abandon_system_publication_key_provision(uuid,uuid),
++  identity.audit_system_publication_attempt(uuid,uuid,text,timestamptz,text),
++  core.transition_system_run_publication(uuid,uuid,uuid,uuid,uuid,text,jsonb,timestamptz,uuid,uuid),
++  core.upsert_free_public_auto_publish_work(uuid,uuid,uuid,text),
++  core.clear_free_public_auto_publish_work(uuid),
++  core.claim_free_public_auto_publish_work(integer)
++  TO debateai_runtime;
++
++GRANT SELECT ON TABLE core.free_public_auto_publish_work TO debateai_runtime;
++
++GRANT EXECUTE ON FUNCTION serve.claim_system_publication_key_provision_cleanup(integer),
++  serve.complete_system_publication_key_provision_cleanup(uuid,uuid)
++  TO debateai_publication_cleanup;
+diff --git a/dialectical-engine/migrations/0068_bound_published_erasure.sql b/dialectical-engine/migrations/0068_bound_published_erasure.sql
+new file mode 100644
+index 00000000..50afdeb9
+--- /dev/null
++++ b/dialectical-engine/migrations/0068_bound_published_erasure.sql
+@@ -0,0 +1,303 @@
++-- Bound free/public erasure uses a separate, pinned visibility capability.
++-- Cleanup is made durable before the PRIVATE event is admitted.
++CREATE OR REPLACE FUNCTION core.enforce_publication_v2_ref_binding()
++RETURNS trigger
++LANGUAGE plpgsql
++SECURITY DEFINER
++SET search_path = pg_catalog
++AS $$
++BEGIN
++  IF TG_TABLE_SCHEMA='core' AND TG_TABLE_NAME='run_visibility_event' THEN
++    IF NEW.actor_ref_version=2
++      AND NEW.actor_audit_token='00000000-0000-4000-8000-0000000000f1'::uuid
++      AND NEW.state='PUBLISHED' AND NEW.warning_version='PUBLIC_INDEXED_V1'
++      AND EXISTS (
++        SELECT 1 FROM serve.system_publication_key_provision_intent AS intent
++        WHERE intent.publication_ref=NEW.publication_ref AND intent.run_id=NEW.run_id
++          AND intent.cleanup_state='PREPARED'
++      ) THEN
++      RETURN NEW;
++    END IF;
++    IF NEW.actor_ref_version=2
++      AND NEW.actor_audit_token='00000000-0000-4000-8000-0000000000f2'::uuid
++      AND NEW.state='PRIVATE' AND NEW.warning_version='COPIES_MAY_PERSIST_V1'
++      AND COALESCE(core.run_is_free_public_bound(NEW.run_id),false)
++      AND EXISTS (
++        SELECT 1 FROM serve.publication_key_cleanup_intent AS cleanup
++        WHERE cleanup.publication_ref=NEW.publication_ref
++          AND cleanup.cleanup_state='PENDING' AND cleanup.completed_at IS NULL
++      ) THEN
++      RETURN NEW;
++    END IF;
++    IF NEW.actor_ref_version<>2 OR NOT EXISTS (
++      SELECT 1 FROM identity.publication_event_binding AS binding
++      WHERE binding.visibility_event_id=NEW.run_visibility_event_id
++        AND binding.visibility_actor_ref=NEW.actor_audit_token
++        AND binding.run_id=NEW.run_id AND binding.consumed_at IS NULL
++        AND binding.expires_at>clock_timestamp()
++    ) THEN
++      RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='PUBLICATION_V2_REF_BINDING_REQUIRED';
++    END IF;
++  ELSIF TG_TABLE_SCHEMA='identity' AND TG_TABLE_NAME='audit_event'
++    AND NEW.event_type LIKE 'debate.publication.%' THEN
++    IF NEW.actor_key_ref='system:free-public-auto-publish'
++      AND NEW.source_context='{"schema":"s10-publication-event-v2"}'::jsonb
++      AND (
++        (NEW.event_type='debate.publication.published'
++          AND NEW.target_type='debate.publication_event_ref'
++          AND NEW.decision='ALLOW' AND NEW.success=true AND NEW.justification IS NULL
++          AND EXISTS (
++            SELECT 1 FROM serve.system_publication_key_provision_intent AS intent
++            WHERE intent.publication_ref::text=NEW.target_id
++              AND intent.cleanup_state='PREPARED'
++          ))
++        OR (NEW.event_type='debate.publication.denied'
++          AND NEW.target_type='debate.publication_attempt'
++          AND NEW.decision='DENY' AND NEW.success=false
++          AND NEW.justification IN (
++            'AUTO_PUBLISH_NULL_PSEUDONYM','AUTO_PUBLISH_CIPHER_FAILED',
++            'AUTO_PUBLISH_TRANSITION_NULL','AUTO_PUBLISH_KEY_PROVISION_FAILED'
++          )
++          AND EXISTS (
++            SELECT 1 FROM core.run AS run WHERE run.run_id::text=NEW.target_id
++          ))
++      ) THEN
++      RETURN NEW;
++    END IF;
++    IF NOT EXISTS (
++      SELECT 1 FROM identity.publication_event_binding AS binding
++      WHERE binding.consumed_at IS NULL AND binding.expires_at>clock_timestamp()
++        AND (
++          (NEW.event_type IN ('debate.publication.published','debate.publication.unpublished')
++            AND binding.audit_id=NEW.audit_id
++            AND binding.audit_actor_ref::text=NEW.actor_key_ref
++            AND binding.audit_target_ref::text=NEW.target_id)
++          OR (NEW.event_type='debate.publication.denied'
++            AND binding.denied_audit_id=NEW.audit_id
++            AND binding.denied_audit_actor_ref::text=NEW.actor_key_ref
++            AND binding.denied_audit_target_ref::text=NEW.target_id)
++          OR (NEW.event_type='debate.publication.preflight_denied'
++            AND binding.action='PREFLIGHT_DENIAL' AND binding.audit_id=NEW.audit_id
++            AND binding.audit_actor_ref::text=NEW.actor_key_ref
++            AND binding.audit_target_ref::text=NEW.target_id)
++        )
++    ) THEN
++      RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='PUBLICATION_V2_AUDIT_BINDING_REQUIRED';
++    END IF;
++  END IF;
++  RETURN NEW;
++END;
++$$;
++
++CREATE OR REPLACE FUNCTION core.prepare_private_run_erasure(
++  p_run_id uuid,
++  p_user_id uuid,
++  p_owner_ref uuid,
++  p_session_id uuid,
++  p_grant_token_hash text
++)
++RETURNS TABLE(outcome text,erasure_id uuid)
++LANGUAGE plpgsql
++VOLATILE
++SECURITY DEFINER
++SET search_path = pg_catalog
++AS $$
++DECLARE
++  v_now timestamptz := clock_timestamp();
++  v_account record;
++  v_content_encryption_version integer;
++  v_first_owner uuid;
++  v_latest_owner uuid;
++  v_latest_visibility text;
++  v_latest_publication_ref uuid;
++  v_grant_id uuid;
++  v_audit_token uuid;
++  v_request_ref uuid;
++  v_audit_id uuid;
++  v_audit_actor_ref uuid;
++  v_audit_target_ref uuid;
++  v_cleanup_publication_refs uuid[];
++  v_attempt integer := 0;
++BEGIN
++  BEGIN
++    -- Opaque, nonlocking preauthorization happens before the NOWAIT run lock.
++    -- It may reject a stale/racing request, but it cannot reveal whether a
++    -- guessed foreign run exists or is currently locked. Every predicate is
++    -- repeated after the canonical run-first lock before mutation.
++    IF NOT EXISTS (
++      SELECT 1
++      FROM identity."user" AS account
++      JOIN identity.session AS session
++        ON session.user_id=account.user_id
++       AND session.session_id=p_session_id
++      JOIN identity.step_up_grant AS step_grant
++        ON step_grant.user_id=account.user_id
++       AND step_grant.session_id=session.session_id
++      WHERE account.user_id=p_user_id
++        AND account.owner_ref=p_owner_ref
++        AND account.state='active'
++        AND session.revoked_at IS NULL
++        AND session.idle_expires_at>v_now
++        AND session.absolute_expires_at>v_now
++        AND step_grant.token_hash=p_grant_token_hash
++        AND step_grant.action='DELETE_PRIVATE_DEBATE'
++        AND step_grant.target_run_id=p_run_id
++        AND step_grant.target_account_id IS NULL
++        AND step_grant.consumed_at IS NULL
++        AND step_grant.issued_at<=v_now
++        AND step_grant.expires_at>v_now
++        AND p_owner_ref=(
++          SELECT ownership.owner_ref FROM core.run_ownership_event AS ownership
++          WHERE ownership.run_id=p_run_id ORDER BY ownership.at_seq ASC LIMIT 1
++        )
++        AND p_owner_ref=(
++          SELECT ownership.owner_ref FROM core.run_ownership_event AS ownership
++          WHERE ownership.run_id=p_run_id ORDER BY ownership.at_seq DESC LIMIT 1
++        )
++    ) THEN
++      RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN;
++    END IF;
++    SELECT run.content_encryption_version INTO v_content_encryption_version
++    FROM core.run AS run WHERE run.run_id=p_run_id FOR UPDATE NOWAIT;
++    IF NOT FOUND THEN RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN; END IF;
++    PERFORM pg_advisory_xact_lock(hashtextextended('identity:account:'||p_user_id::text,0));
++    SELECT * INTO v_account FROM identity.lock_account_t9_internal(p_user_id,true);
++    IF v_account.owner_ref IS DISTINCT FROM p_owner_ref THEN
++      RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN;
++    END IF;
++    v_audit_token := v_account.audit_token;
++
++    -- Authorization is deliberately completed before revealing whether the
++    -- locked run is legacy, published, already erased, or owned by another
++    -- account. All unauthenticated cases are the same opaque NOT_FOUND.
++    PERFORM 1 FROM identity.session AS session
++    WHERE session.session_id=p_session_id AND session.user_id=p_user_id
++      AND session.revoked_at IS NULL AND session.idle_expires_at>v_now
++      AND session.absolute_expires_at>v_now FOR KEY SHARE NOWAIT;
++    IF NOT FOUND THEN RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN; END IF;
++    SELECT step_grant.step_up_grant_id INTO v_grant_id
++    FROM identity.step_up_grant AS step_grant
++    WHERE step_grant.token_hash=p_grant_token_hash
++      AND step_grant.session_id=p_session_id AND step_grant.user_id=p_user_id
++      AND step_grant.action='DELETE_PRIVATE_DEBATE'
++      AND step_grant.target_run_id=p_run_id AND step_grant.target_account_id IS NULL
++      AND step_grant.consumed_at IS NULL AND step_grant.issued_at<=v_now
++      AND step_grant.expires_at>v_now FOR UPDATE NOWAIT;
++    IF NOT FOUND THEN RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN; END IF;
++    SELECT event.owner_ref INTO v_first_owner FROM core.run_ownership_event AS event
++    WHERE event.run_id=p_run_id ORDER BY event.at_seq ASC LIMIT 1;
++    SELECT event.owner_ref INTO v_latest_owner FROM core.run_ownership_event AS event
++    WHERE event.run_id=p_run_id ORDER BY event.at_seq DESC LIMIT 1;
++    IF v_first_owner IS DISTINCT FROM p_owner_ref OR v_latest_owner IS DISTINCT FROM p_owner_ref THEN
++      RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN;
++    END IF;
++    PERFORM 1 FROM serve.publication_key_provision_intent AS provision
++    WHERE provision.run_id=p_run_id FOR UPDATE NOWAIT;
++    IF FOUND THEN RETURN QUERY SELECT 'CONTENDED'::text,NULL::uuid; RETURN; END IF;
++    PERFORM 1 FROM serve.system_publication_key_provision_intent AS provision
++    WHERE provision.run_id=p_run_id FOR UPDATE NOWAIT;
++    IF FOUND THEN RETURN QUERY SELECT 'CONTENDED'::text,NULL::uuid; RETURN; END IF;
++    UPDATE identity.step_up_grant SET consumed_at=v_now
++    WHERE step_up_grant_id=v_grant_id AND consumed_at IS NULL;
++    IF NOT FOUND THEN RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN; END IF;
++
++    IF v_content_encryption_version IS DISTINCT FROM 1 THEN
++      RETURN QUERY SELECT 'LEGACY_PLAINTEXT_RETAINED'::text,NULL::uuid; RETURN;
++    END IF;
++    SELECT event.state,event.publication_ref
++    INTO v_latest_visibility,v_latest_publication_ref
++    FROM core.run_visibility_event AS event
++    WHERE event.run_id=p_run_id ORDER BY event.at_seq DESC LIMIT 1;
++    IF v_latest_visibility='PUBLISHED' THEN
++      IF v_latest_publication_ref IS NULL
++        OR NOT COALESCE(core.run_is_free_public_bound(p_run_id),false) THEN
++        RETURN QUERY SELECT 'PUBLISHED'::text,NULL::uuid; RETURN;
++      END IF;
++      INSERT INTO serve.publication_key_cleanup_intent(
++        publication_ref,requested_at,completed_at,cleanup_state,
++        cleanup_claim_token,cleanup_claim_expires_at,destroy_result
++      ) VALUES (v_latest_publication_ref,v_now,NULL,'PENDING',NULL,NULL,NULL)
++      ON CONFLICT (publication_ref) DO UPDATE
++      SET requested_at=LEAST(serve.publication_key_cleanup_intent.requested_at,EXCLUDED.requested_at),
++        completed_at=NULL,cleanup_state='PENDING',cleanup_claim_token=NULL,
++        cleanup_claim_expires_at=NULL,destroy_result=NULL;
++      INSERT INTO core.run_visibility_event(
++        run_visibility_event_id,run_id,publication_ref,state,actor_audit_token,
++        actor_ref_version,warning_version,occurred_at,at_seq
++      ) VALUES (
++        gen_random_uuid(),p_run_id,v_latest_publication_ref,'PRIVATE',
++        '00000000-0000-4000-8000-0000000000f2'::uuid,2,
++        'COPIES_MAY_PERSIST_V1',v_now,ledger.allocate_sequence()
++      );
++    ELSE
++      v_latest_publication_ref := NULL;
++    END IF;
++    IF EXISTS (SELECT 1 FROM serve.private_run_erasure_tombstone WHERE run_id=p_run_id)
++      OR EXISTS (SELECT 1 FROM serve.private_run_key_cleanup_intent WHERE run_id=p_run_id) THEN
++      RETURN QUERY SELECT 'ERASED'::text,NULL::uuid; RETURN;
++    END IF;
++    SELECT COALESCE(array_agg(snapshot.publication_ref ORDER BY snapshot.publication_ref),
++      ARRAY[]::uuid[])
++    INTO v_cleanup_publication_refs
++    FROM serve.publication_snapshot AS snapshot WHERE snapshot.run_id=p_run_id;
++    IF EXISTS (
++      SELECT 1 FROM unnest(v_cleanup_publication_refs) AS candidate(publication_ref)
++      LEFT JOIN serve.publication_key_cleanup_intent AS cleanup
++        ON cleanup.publication_ref=candidate.publication_ref
++          AND cleanup.completed_at IS NOT NULL
++      WHERE cleanup.publication_ref IS NULL
++        AND candidate.publication_ref IS DISTINCT FROM v_latest_publication_ref
++    ) THEN
++      RETURN QUERY SELECT 'CONTENDED'::text,NULL::uuid; RETURN;
++    END IF;
++
++    LOOP
++      v_attempt := v_attempt+1;
++      v_request_ref := gen_random_uuid();
++      v_audit_id := gen_random_uuid();
++      v_audit_actor_ref := gen_random_uuid();
++      v_audit_target_ref := gen_random_uuid();
++      CONTINUE WHEN (SELECT count(DISTINCT value) FROM unnest(ARRAY[
++        v_request_ref,v_audit_id,v_audit_actor_ref,v_audit_target_ref
++      ]) AS value)<>4 OR v_request_ref=ANY(ARRAY[
++        p_run_id,p_user_id,p_owner_ref,p_session_id,v_grant_id,v_audit_token
++      ]) OR v_audit_id=ANY(ARRAY[
++        p_run_id,p_user_id,p_owner_ref,p_session_id,v_grant_id,v_audit_token
++      ]) OR v_audit_actor_ref=ANY(ARRAY[
++        p_run_id,p_user_id,p_owner_ref,p_session_id,v_grant_id,v_audit_token
++      ]) OR v_audit_target_ref=ANY(ARRAY[
++        p_run_id,p_user_id,p_owner_ref,p_session_id,v_grant_id,v_audit_token
++      ]);
++      BEGIN
++        INSERT INTO core.publication_ref_tombstone(ref,ref_kind,created_at) VALUES
++          (v_request_ref,'private_erasure_request',v_now),
++          (v_audit_id,'private_erasure_audit_id',v_now),
++          (v_audit_actor_ref,'private_erasure_audit_actor',v_now),
++          (v_audit_target_ref,'private_erasure_audit_target',v_now);
++        INSERT INTO identity.private_erasure_audit_binding(
++          request_ref,user_id,session_id,run_id,grant_id,audit_id,
++          audit_actor_ref,audit_target_ref,created_at
++        ) VALUES (
++          v_request_ref,p_user_id,p_session_id,p_run_id,v_grant_id,v_audit_id,
++          v_audit_actor_ref,v_audit_target_ref,v_now
++        );
++        INSERT INTO serve.private_run_key_cleanup_intent(
++          request_ref,user_id,run_id,requested_at,cleanup_publication_refs
++        ) VALUES (v_request_ref,p_user_id,p_run_id,v_now,v_cleanup_publication_refs);
++        DELETE FROM core.run_content_attestation_secret WHERE run_id=p_run_id;
++        IF NOT FOUND THEN
++          RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='CONTENT_ATTESTATION_SECRET_UNRESOLVED';
++        END IF;
++        RETURN QUERY SELECT 'PREPARED'::text,v_request_ref;
++        RETURN;
++      EXCEPTION WHEN unique_violation THEN
++        IF v_attempt>=8 THEN
++          RETURN QUERY SELECT 'INVALID_EVIDENCE'::text,NULL::uuid; RETURN;
++        END IF;
++      END;
++    END LOOP;
++  EXCEPTION WHEN lock_not_available THEN
++    RETURN QUERY SELECT 'CONTENDED'::text,NULL::uuid;
++  END;
++END;
++$$;
+diff --git a/dialectical-engine/packages/contract/src/client.ts b/dialectical-engine/packages/contract/src/client.ts
+index 5923aa31..27e1c7bb 100644
+--- a/dialectical-engine/packages/contract/src/client.ts
++++ b/dialectical-engine/packages/contract/src/client.ts
+@@ -268,7 +268,11 @@ export interface ContractClient {
+     total: number;
+   }>>;
+   readPublicDebate(publicationRef: string): Promise<PublicDebate>;
+-  readRunVisibility(runId: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
++  readRunVisibility(runId: string): Promise<{
++    state: "PRIVATE" | "PUBLISHED";
++    public_ref: string | null;
++    publish_pending?: true | undefined;
++  }>;
+   publishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
+   unpublishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
+   scheduleAccountErasure(stepUpGrant:string):Promise<{
+diff --git a/dialectical-engine/packages/contract/src/index.ts b/dialectical-engine/packages/contract/src/index.ts
+index 211085d4..ea18bbff 100644
+--- a/dialectical-engine/packages/contract/src/index.ts
++++ b/dialectical-engine/packages/contract/src/index.ts
+@@ -248,7 +248,8 @@ export const LegacyRunClaimResultSchema = z.object({
+ 
+ export const PublicationTransitionSchema = z.object({
+   state: z.enum(["PRIVATE", "PUBLISHED"]),
+-  public_ref: z.uuid().nullable()
++  public_ref: z.uuid().nullable(),
++  publish_pending: z.literal(true).optional()
+ }).strict();
+ 
+ export const PublicDebateSummarySchema = z.object({
+diff --git a/dialectical-engine/packages/db/src/free-public-binding.ts b/dialectical-engine/packages/db/src/free-public-binding.ts
+new file mode 100644
+index 00000000..5bdf880c
+--- /dev/null
++++ b/dialectical-engine/packages/db/src/free-public-binding.ts
+@@ -0,0 +1,12 @@
++import type { Pool } from "pg";
++
++export async function runIsFreePublicBound(
++  pool: Pick<Pool, "query">,
++  runId: string
++): Promise<boolean> {
++  const result = await pool.query<{ bound: boolean | null }>(
++    "SELECT core.run_is_free_public_bound($1::uuid) AS bound",
++    [runId]
++  );
++  return result.rows[0]?.bound === true;
++}
+diff --git a/dialectical-engine/packages/db/src/index.ts b/dialectical-engine/packages/db/src/index.ts
+index f9da50bd..c1624404 100644
+--- a/dialectical-engine/packages/db/src/index.ts
++++ b/dialectical-engine/packages/db/src/index.ts
+@@ -25,6 +25,8 @@ export {
+   type LegacyRunClaimOutcome
+ } from "./legacy-claim.js";
+ 
++export { runIsFreePublicBound } from "./free-public-binding.js";
++
+ export {
+   assertSupportKeyCoverage,
+   assertSupportDatabaseRole,
+@@ -662,6 +664,19 @@ async function planTierColumnIsApplied(
+   return result.rows[0]?.applied === true;
+ }
+ 
++async function freePublicRuleColumnIsApplied(
++  executor: Pick<Pool, "query"> | PoolClient
++): Promise<boolean> {
++  const result = await executor.query<{ applied: boolean }>(
++    `SELECT EXISTS (
++       SELECT 1 FROM information_schema.columns
++       WHERE table_schema='core' AND table_name='run'
++         AND column_name='free_public_rule'
++     ) AS applied`
++  );
++  return result.rows[0]?.applied === true;
++}
++
+ type UntypedMethod = (...args: unknown[]) => unknown;
+ 
+ function typedPoolFailure(error: unknown): TypedDomainError {
+@@ -1162,6 +1177,8 @@ export class RunRepository {
+     }
+     const planTierColumnApplied = input.principal.kind === "legacy"
+       && await planTierColumnIsApplied(this.pool);
++    const freePublicRuleColumnApplied = input.principal.kind === "legacy"
++      && await freePublicRuleColumnIsApplied(this.pool);
+     const askContract = input.askContract ?? {};
+     let storedQuestionLine = input.questionLine;
+     let storedAskContract: Readonly<Record<string, unknown>> = askContract;
+@@ -1222,6 +1239,7 @@ export class RunRepository {
+         const created = await provisionExecutor.query<{
+           created: boolean;
+           plan_tier_supported: boolean;
++          free_public_rule_supported: boolean;
+         }>(
+           `WITH capability AS (
+              SELECT COALESCE(
+@@ -1229,14 +1247,26 @@ export class RunRepository {
+                  to_regprocedure('core.create_encrypted_run(jsonb,uuid,uuid,jsonb)')
+                ) LIKE '%''planTier''%',
+                false
+-             ) AS plan_tier_supported
++             ) AS plan_tier_supported,
++             COALESCE(
++               pg_get_functiondef(
++                 to_regprocedure('core.create_encrypted_run(jsonb,uuid,uuid,jsonb)')
++               ) LIKE '%''freePublicRule''%',
++               false
++             ) AS free_public_rule_supported
+            )
+            SELECT core.create_encrypted_run(
+-             CASE WHEN capability.plan_tier_supported
+-               THEN $1::jsonb ELSE $1::jsonb-'planTier' END,
++             CASE
++               WHEN capability.plan_tier_supported
++                 AND capability.free_public_rule_supported THEN $1::jsonb
++               WHEN capability.plan_tier_supported THEN $1::jsonb-'freePublicRule'
++               WHEN capability.free_public_rule_supported THEN $1::jsonb-'planTier'
++               ELSE $1::jsonb-'planTier'-'freePublicRule'
++             END,
+              $2,$3,$4::jsonb
+            ) AS created,
+-           capability.plan_tier_supported
++           capability.plan_tier_supported,
++           capability.free_public_rule_supported
+            FROM capability`,
+           [JSON.stringify({
+             runId,
+@@ -1251,6 +1281,7 @@ export class RunRepository {
+             tierProvenanceRef: input.tierProvenanceRef,
+             compositionBudgetTier: input.compositionBudgetTier,
+             planTier: input.planTier ?? null,
++            freePublicRule: true,
+             depthParams: input.depthParams,
+             discoveredPanel: input.discoveredPanel,
+             strangerSampleRate: input.strangerSampleRate,
+@@ -1302,23 +1333,25 @@ export class RunRepository {
+         input.askerRiskTier, input.effectiveRiskTier, input.tierSource, input.tierProvenanceRef,
+         input.compositionBudgetTier,
+         ...(planTierColumnApplied ? [input.planTier ?? null] : []),
++        ...(freePublicRuleColumnApplied ? [true] : []),
+         JSON.stringify(input.depthParams),
+         JSON.stringify(input.discoveredPanel), input.strangerSampleRate,
+         JSON.stringify(input.envelopeBasis), input.registerVersion,
+         input.batteryVersion, JSON.stringify(storedAskContract), createdAtSeq
+       ];
+-      const bindOffset = planTierColumnApplied ? 1 : 0;
++      const planTierBindOffset = planTierColumnApplied ? 1 : 0;
++      const bindOffset = planTierBindOffset + (freePublicRuleColumnApplied ? 1 : 0);
+       await client.query(
+         `INSERT INTO core.run (
+           run_id, question_line, asker_id, session_id, caller_scope, as_of,
+           asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
+-          composition_budget_tier${planTierColumnApplied ? ", plan_tier" : ""},
++          composition_budget_tier${planTierColumnApplied ? ", plan_tier" : ""}${freePublicRuleColumnApplied ? ", free_public_rule" : ""},
+           depth_params, agent_count, discovered_panel,
+           stranger_sample_rate, envelope_basis, register_version,
+           battery_version, ask_contract, created_at_seq
+         ) VALUES (
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+-          $11${planTierColumnApplied ? ", $12" : ""},
++          $11${planTierColumnApplied ? ", $12" : ""}${freePublicRuleColumnApplied ? `, $${12 + planTierBindOffset}` : ""},
+           $${12 + bindOffset}::jsonb,
+           jsonb_array_length($${13 + bindOffset}::jsonb),
+           $${13 + bindOffset}::jsonb, $${14 + bindOffset},
+diff --git a/dialectical-engine/packages/db/src/publication.ts b/dialectical-engine/packages/db/src/publication.ts
+index bcd4f9bd..d71c2ec2 100644
+--- a/dialectical-engine/packages/db/src/publication.ts
++++ b/dialectical-engine/packages/db/src/publication.ts
+@@ -217,6 +217,19 @@ export type PublicationKeyCleanupClaim = Readonly<{
+   claimToken: string;
+ }>;
+ 
++export type AutoPublishReason =
++  | "AUTO_PUBLISH_NULL_PSEUDONYM"
++  | "AUTO_PUBLISH_CIPHER_FAILED"
++  | "AUTO_PUBLISH_TRANSITION_NULL"
++  | "AUTO_PUBLISH_KEY_PROVISION_FAILED";
++
++export type AutoPublishWork = Readonly<{
++  runId: string;
++  userId: string;
++  ownerRef: string;
++  reason: AutoPublishReason;
++}>;
++
+ type PublicationAction = "PUBLISH" | "UNPUBLISH";
+ 
+ type PublicationEventRefs = Readonly<{
+@@ -415,6 +428,136 @@ export class PostgresPublicationRepository {
+     return result.rows[0]?.pseudonym ?? null;
+   }
+ 
++  async prepareSystemKeyProvision(input: Readonly<{
++    publicationRef: string;
++    runId: string;
++    userId: string;
++    ownerRef: string;
++  }>): Promise<boolean> {
++    const result = await this.pool.query<{ prepared: boolean }>(`
++      SELECT serve.prepare_system_publication_key_provision($1,$2,$3,$4) AS prepared
++    `, [input.publicationRef,input.runId,input.userId,input.ownerRef]);
++    return result.rows[0]?.prepared === true;
++  }
++
++  async abandonSystemKeyProvision(publicationRef: string,userId: string): Promise<boolean> {
++    const result = await this.pool.query<{ abandoned: boolean }>(`
++      SELECT serve.abandon_system_publication_key_provision($1,$2) AS abandoned
++    `, [publicationRef,userId]);
++    return result.rows[0]?.abandoned === true;
++  }
++
++  async claimSystemKeyProvisionCleanup(
++    limit = 100
++  ): Promise<readonly PublicationKeyProvisionCleanup[]> {
++    const result = await this.pool.query<{
++      publication_ref: string;
++      run_id: string;
++      user_id: string;
++      owner_ref: string;
++      claim_token: string;
++    }>("SELECT * FROM serve.claim_system_publication_key_provision_cleanup($1)", [limit]);
++    return Object.freeze(result.rows.map((row) => Object.freeze({
++      publicationRef: row.publication_ref,
++      runId: row.run_id,
++      userId: row.user_id,
++      ownerRef: row.owner_ref,
++      claimToken: row.claim_token
++    })));
++  }
++
++  async completeSystemKeyProvisionCleanup(
++    publicationRef: string,claimToken: string
++  ): Promise<boolean> {
++    const result = await this.pool.query<{ completed: boolean }>(`
++      SELECT serve.complete_system_publication_key_provision_cleanup($1,$2) AS completed
++    `, [publicationRef,claimToken]);
++    return result.rows[0]?.completed === true;
++  }
++
++  async systemPublish(input: Readonly<{
++    eventId: string;
++    runId: string;
++    userId: string;
++    ownerRef: string;
++    publicationRef: string;
++    expectedPseudonym: string;
++    contentCiphertext: CryptoEnvelope;
++    occurredAt: Date;
++    auditId: string;
++    deniedAuditId: string;
++  }>): Promise<string | null> {
++    const result = await this.pool.query<{ publication_ref: string | null }>(`
++      SELECT core.transition_system_run_publication(
++        $1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10
++      ) AS publication_ref
++    `, [
++      input.eventId,input.runId,input.userId,input.ownerRef,input.publicationRef,
++      input.expectedPseudonym,JSON.stringify(input.contentCiphertext),input.occurredAt,
++      input.auditId,input.deniedAuditId
++    ]);
++    return result.rows[0]?.publication_ref ?? null;
++  }
++
++  async auditSystemPublicationAttempt(
++    auditId: string,
++    runId: string,
++    reason: AutoPublishReason,
++    occurredAt: Date,
++    decision: "DENY"
++  ): Promise<boolean> {
++    const result = await this.pool.query<{ appended: boolean }>(`
++      SELECT identity.audit_system_publication_attempt($1,$2,$3,$4,$5) AS appended
++    `, [auditId,runId,reason,occurredAt,decision]);
++    return result.rows[0]?.appended === true;
++  }
++
++  async upsertAutoPublishWork(
++    runId: string,userId: string,ownerRef: string,reason: AutoPublishReason
++  ): Promise<boolean> {
++    const result = await this.pool.query<{ upserted: boolean }>(`
++      SELECT core.upsert_free_public_auto_publish_work($1,$2,$3,$4) AS upserted
++    `, [runId,userId,ownerRef,reason]);
++    return result.rows[0]?.upserted === true;
++  }
++
++  async clearAutoPublishWork(runId: string): Promise<boolean> {
++    const result = await this.pool.query<{ cleared: boolean }>(`
++      SELECT core.clear_free_public_auto_publish_work($1) AS cleared
++    `, [runId]);
++    return result.rows[0]?.cleared === true;
++  }
++
++  async claimAutoPublishWork(limit = 100): Promise<readonly AutoPublishWork[]> {
++    const result = await this.pool.query<{
++      run_id: string;
++      user_id: string;
++      owner_ref: string;
++      reason: AutoPublishReason;
++    }>("SELECT * FROM core.claim_free_public_auto_publish_work($1)", [limit]);
++    return Object.freeze(result.rows.map((row) => Object.freeze({
++      runId: row.run_id,
++      userId: row.user_id,
++      ownerRef: row.owner_ref,
++      reason: row.reason
++    })));
++  }
++
++  async countAutoPublishWork(runId: string): Promise<number> {
++    const result = await this.pool.query<{ count: string }>(`
++      SELECT count(*)::text AS count FROM core.free_public_auto_publish_work
++      WHERE run_id=$1 AND cleared_at IS NULL
++    `, [runId]);
++    return Number(result.rows[0]?.count ?? 0);
++  }
++
++  async runIsFreePublicBound(runId: string): Promise<boolean> {
++    const result = await this.pool.query<{ bound: boolean }>(`
++      SELECT core.run_is_free_public_bound($1) AS bound
++    `, [runId]);
++    return result.rows[0]?.bound === true;
++  }
++
+   async readOwnedVisibility(
+     runId: string,
+     userId: string,
+@@ -422,13 +565,19 @@ export class PostgresPublicationRepository {
+   ): Promise<Readonly<{
+     state: "PRIVATE" | "PUBLISHED";
+     publicRef: string | null;
++    publishPending?: true;
+   }> | null> {
+     const result = await this.pool.query<{
+       state: "PRIVATE" | "PUBLISHED";
+       publication_ref: string | null;
++      publish_pending: boolean;
+     }>(`
+       SELECT COALESCE(latest.state,'PRIVATE') AS state,
+-        CASE WHEN latest.state='PUBLISHED' THEN latest.publication_ref ELSE NULL END AS publication_ref
++        CASE WHEN latest.state='PUBLISHED' THEN latest.publication_ref ELSE NULL END AS publication_ref,
++        EXISTS (
++          SELECT 1 FROM core.free_public_auto_publish_work AS work
++          WHERE work.run_id=run.run_id AND work.cleared_at IS NULL
++        ) AS publish_pending
+       FROM core.run AS run
+       JOIN identity."user" AS identity_user
+         ON identity_user.user_id=$2 AND identity_user.owner_ref=$3
+@@ -442,10 +591,11 @@ export class PostgresPublicationRepository {
+       WHERE run.run_id=$1 AND core.run_is_owned_by(run.run_id,$3,NULL)
+     `, [runId, userId, ownerRef]);
+     const row = result.rows[0];
+-    return row === undefined ? null : Object.freeze({
+-      state: row.state,
+-      publicRef: row.publication_ref
+-    });
++    if (row === undefined) return null;
++    const visibility = { state: row.state, publicRef: row.publication_ref };
++    return Object.freeze(row.publish_pending
++      ? { ...visibility, publishPending: true as const }
++      : visibility);
+   }
+ 
+   async publish(input: PublishTransitionInput): Promise<boolean> {
+diff --git a/dialectical-engine/packages/db/src/schema.ts b/dialectical-engine/packages/db/src/schema.ts
+index ba56e700..fe926ae3 100644
+--- a/dialectical-engine/packages/db/src/schema.ts
++++ b/dialectical-engine/packages/db/src/schema.ts
+@@ -119,6 +119,7 @@ export const run = core.table("run", {
+   tierProvenanceRef: text("tier_provenance_ref").notNull(),
+   compositionBudgetTier: text("composition_budget_tier").notNull(),
+   planTier: text("plan_tier"),
++  freePublicRule: boolean("free_public_rule").notNull().default(false),
+   depthParams: jsonb("depth_params").notNull(),
+   agentCount: integer("agent_count").notNull(),
+   discoveredPanel: jsonb("discovered_panel").notNull(),
+diff --git a/dialectical-engine/tests/integration/fpd-s01-c1-binding.test.ts b/dialectical-engine/tests/integration/fpd-s01-c1-binding.test.ts
+new file mode 100644
+index 00000000..5266725b
+--- /dev/null
++++ b/dialectical-engine/tests/integration/fpd-s01-c1-binding.test.ts
+@@ -0,0 +1,364 @@
++import { randomBytes, randomUUID } from "node:crypto";
++import { mkdtemp, rm } from "node:fs/promises";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { afterAll, beforeAll, describe, expect, it } from "vitest";
++import {
++  ContentCipher,
++  FileRunContentKeyStore,
++  FileUserDekStore,
++  generateDek,
++  loadKek
++} from "../../packages/crypto/src/index.js";
++import {
++  CONTENT_CIPHERTEXT_SENTINEL,
++  CONTENT_JSON_SENTINEL,
++  configureContentEncryption,
++  migrate,
++  RunRepository,
++  type Pool
++} from "@debateai/db";
++import { run as runSchema } from "../../packages/db/src/schema.js";
++import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
++import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
++
++let database: TestDatabase;
++let secretRoot: string;
++let userId: string;
++let ownerRef: string;
++let sessionId: string;
++let cipher: ContentCipher;
++
++function runInput(
++  planTier: "free" | "premium" | undefined,
++  principal: Parameters<RunRepository["startRun"]>[0]["principal"]
++): Parameters<RunRepository["startRun"]>[0] {
++  return {
++    questionLine: `FPD S01 binding ${randomUUID()}`,
++    askContract: { audience: "fpd-s01-c1-integration" },
++    principal,
++    sessionId,
++    callerScope: "ASKER",
++    asOf: new Date("2026-09-20T00:00:00.000Z"),
++    askerRiskTier: "casual",
++    effectiveRiskTier: "casual",
++    tierSource: "ASKER",
++    tierProvenanceRef: "fpd-s01-c1:integration",
++    compositionBudgetTier: "low",
++    ...(planTier === undefined ? {} : { planTier }),
++    depthParams: { depth: 1 },
++    discoveredPanel: fixtureDiscoveredPanel(1),
++    strangerSampleRate: 1,
++    envelopeBasis: { source: "fpd-s01-c1:integration" },
++    registerVersion: 1,
++    batteryVersion: "fpd-s01-c1:integration",
++    batteryRows: []
++  };
++}
++
++async function insertPreRuleFreeRun(): Promise<string> {
++  const runId = randomUUID();
++  await database.pool.query(
++    `INSERT INTO core.run (
++       run_id,question_line,asker_id,session_id,caller_scope,as_of,
++       asker_risk_tier,risk_tier,tier_source,tier_provenance_ref,
++       composition_budget_tier,plan_tier,
++       depth_params,agent_count,discovered_panel,stranger_sample_rate,
++       envelope_basis,register_version,battery_version,ask_contract,created_at_seq
++     ) VALUES (
++       $1,$2,$3,$4,'ASKER',$5,'casual','casual','ASKER',$6,
++       'low','free','{}'::jsonb,1,$8::jsonb,1,
++       '{}'::jsonb,1,$7,'{}'::jsonb,ledger.allocate_sequence()
++     )`,
++    [
++      runId,
++      `FPD pre-rule ${runId}`,
++      `fpd-pre-rule-${runId}`,
++      randomUUID(),
++      new Date("2026-09-19T00:00:00.000Z"),
++      "fpd-s01-c1:pre-rule",
++      "fpd-s01-c1:pre-rule",
++      JSON.stringify(fixtureDiscoveredPanel(1))
++    ]
++  );
++  return runId;
++}
++
++async function queryBound(pool: Pick<Pool, "query">, runId: string): Promise<boolean> {
++  const result = await pool.query<{ bound: boolean | null }>(
++    "SELECT core.run_is_free_public_bound($1::uuid) AS bound",
++    [runId]
++  );
++  return result.rows[0]?.bound === true;
++}
++
++async function exportedBound(pool: Pick<Pool, "query">, runId: string): Promise<boolean> {
++  const db = await import("@debateai/db") as typeof import("@debateai/db") & {
++    readonly runIsFreePublicBound: (
++      candidatePool: Pick<Pool, "query">,
++      candidateRunId: string
++    ) => Promise<boolean>;
++  };
++  return db.runIsFreePublicBound(pool, runId);
++}
++
++async function callCreateEncryptedRun(options: {
++  readonly freePublicRule: boolean | undefined;
++  readonly extraKey?: boolean;
++}): Promise<{ readonly created: boolean; readonly runId: string }> {
++  const runId = randomUUID();
++  const intent = await database.pool.query<{ execution_ref: string | null }>(
++    "SELECT core.prepare_run_key_provision($1,$2,$3,$4) AS execution_ref",
++    [runId, userId, ownerRef, sessionId]
++  );
++  const executionRef = intent.rows[0]?.execution_ref;
++  if (executionRef === null || executionRef === undefined) {
++    throw new Error("RUN_KEY_PROVISION_INTENT_MISSING");
++  }
++
++  await cipher.provisionRun(runId, { userId, ownerRef });
++  const prepared = await cipher.prepareRun(runId);
++  try {
++    const contentCiphertext = prepared.encrypt("core.run", runId, {
++      questionLine: `FPD direct create ${runId}`,
++      askContract: {}
++    });
++    const contentAttestation = prepared.attestEnvelope(
++      "core.run",
++      runId,
++      "content_ciphertext",
++      contentCiphertext
++    );
++    const contentAttestationSecret = prepared.databaseAttestationSecret();
++    const payload = {
++      runId,
++      questionLine: CONTENT_CIPHERTEXT_SENTINEL,
++      askerId: `owner:${ownerRef}`,
++      executionRef,
++      callerScope: "ASKER",
++      asOf: new Date("2026-09-20T00:00:00.000Z").toISOString(),
++      askerRiskTier: "casual",
++      riskTier: "casual",
++      tierSource: "ASKER",
++      tierProvenanceRef: "fpd-s01-c1:direct-create",
++      compositionBudgetTier: "low",
++      planTier: "free",
++      ...(options.freePublicRule === undefined
++        ? {}
++        : { freePublicRule: options.freePublicRule }),
++      depthParams: {},
++      discoveredPanel: fixtureDiscoveredPanel(1),
++      strangerSampleRate: 1,
++      envelopeBasis: {},
++      registerVersion: 1,
++      batteryVersion: "fpd-s01-c1:direct-create",
++      askContract: CONTENT_JSON_SENTINEL,
++      contentCiphertext,
++      contentAttestation: contentAttestation.toString("base64"),
++      contentAttestationSecret: contentAttestationSecret.toString("base64"),
++      ...(options.extraKey === true ? { notAColumn: true } : {})
++    };
++    const result = await database.pool.query<{ created: boolean }>(
++      "SELECT core.create_encrypted_run($1::jsonb,$2,$3,'[]'::jsonb) AS created",
++      [JSON.stringify(payload), userId, ownerRef]
++    );
++    contentAttestation.fill(0);
++    contentAttestationSecret.fill(0);
++    return { created: result.rows[0]?.created === true, runId };
++  } finally {
++    prepared.close();
++  }
++}
++
++beforeAll(async () => {
++  database = await startTestDatabase();
++  await migrate(database.pool);
++
++  userId = randomUUID();
++  ownerRef = randomUUID();
++  sessionId = randomUUID();
++  await database.pool.query(
++    `INSERT INTO identity."user" (
++       user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
++       phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,
++       adult_affirmed_at,created_at
++     ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$3,$4,$5,
++       'active',now(),now())`,
++    [userId, Buffer.alloc(32, 0x66), `fpd-s01-c1-${randomUUID()}`, randomUUID(), ownerRef]
++  );
++  await database.pool.query(
++    `INSERT INTO identity.session (
++       session_id,user_id,token_hash,csrf_token_hash,binding_context,
++       created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at
++     ) VALUES ($1,$2,$3,$4,'{}'::jsonb,now(),now(),now()+interval '1 hour',
++       now()+interval '2 hours',now())`,
++    [
++      sessionId,
++      userId,
++      `sha256:${randomBytes(32).toString("hex")}`,
++      `sha256:${randomBytes(32).toString("hex")}`
++    ]
++  );
++
++  secretRoot = await mkdtemp(join(tmpdir(), "debateai-fpd-s01-c1-"));
++  const users = new FileUserDekStore(secretRoot, loadKek(generateDek()));
++  await users.store(userId, generateDek());
++  const keys = new FileRunContentKeyStore(secretRoot, users, async (candidate) => {
++    const result = await database.pool.query<{ user_id: string }>(
++      `SELECT user_id FROM identity."user" WHERE owner_ref=$1 AND state='active'`,
++      [candidate]
++    );
++    const resolved = result.rows[0]?.user_id;
++    if (resolved === undefined) throw new Error("OWNER_REF_UNRESOLVED");
++    return resolved;
++  });
++  cipher = new ContentCipher(keys);
++  configureContentEncryption(database.pool, cipher);
++}, 120_000);
++
++afterAll(async () => {
++  await database?.stop();
++  if (secretRoot !== undefined) await rm(secretRoot, { recursive: true, force: true });
++});
++
++describe("S01 C1 free-public binding", () => {
++  it("maps free_public_rule in the Drizzle run schema", () => {
++    const schemaColumn = (runSchema as unknown as {
++      readonly freePublicRule?: { readonly name?: unknown };
++    }).freePublicRule?.name;
++
++    expect(schemaColumn).toBe("free_public_rule");
++  });
++
++  it("pre-rule free row is not bound", async () => {
++    const runId = await insertPreRuleFreeRun();
++
++    await expect(queryBound(database.pool, runId)).resolves.toBe(false);
++  });
++
++  it("post-rule free startRun is bound", async () => {
++    const runId = await new RunRepository(database.pool).startRun(
++      runInput("free", { kind: "server", userId, ownerRef })
++    );
++    const row = await database.pool.query<{
++      free_public_rule: boolean;
++      plan_tier: string | null;
++    }>("SELECT free_public_rule,plan_tier FROM core.run WHERE run_id=$1", [runId]);
++
++    expect({
++      freePublicRule: row.rows[0]?.free_public_rule,
++      planTier: row.rows[0]?.plan_tier,
++      bound: await exportedBound(database.pool, runId)
++    }).toEqual({ freePublicRule: true, planTier: "free", bound: true });
++  });
++
++  it("post-rule premium startRun is not bound", async () => {
++    const runId = await new RunRepository(database.pool).startRun(
++      runInput("premium", { kind: "server", userId, ownerRef })
++    );
++    const row = await database.pool.query<{
++      free_public_rule: boolean;
++      plan_tier: string | null;
++    }>("SELECT free_public_rule,plan_tier FROM core.run WHERE run_id=$1", [runId]);
++
++    expect({
++      freePublicRule: row.rows[0]?.free_public_rule,
++      planTier: row.rows[0]?.plan_tier,
++      bound: await exportedBound(database.pool, runId)
++    }).toEqual({ freePublicRule: true, planTier: "premium", bound: false });
++  });
++
++  it("post-rule null plan_tier startRun is not bound", async () => {
++    const runId = await new RunRepository(database.pool).startRun(
++      runInput(undefined, { kind: "server", userId, ownerRef })
++    );
++    const row = await database.pool.query<{
++      free_public_rule: boolean;
++      plan_tier: string | null;
++    }>("SELECT free_public_rule,plan_tier FROM core.run WHERE run_id=$1", [runId]);
++
++    expect({
++      freePublicRule: row.rows[0]?.free_public_rule,
++      planTier: row.rows[0]?.plan_tier,
++      bound: await exportedBound(database.pool, runId)
++    }).toEqual({ freePublicRule: true, planTier: null, bound: false });
++  });
++
++  it("legacy startRun writes free_public_rule true", async () => {
++    const runId = await new RunRepository(database.pool).startRun(
++      runInput("free", { kind: "legacy", legacyAskerId: `fpd-legacy-${randomUUID()}` })
++    );
++    const row = await database.pool.query<{
++      free_public_rule: boolean;
++      plan_tier: string | null;
++    }>("SELECT free_public_rule,plan_tier FROM core.run WHERE run_id=$1", [runId]);
++
++    expect({
++      freePublicRule: row.rows[0]?.free_public_rule,
++      planTier: row.rows[0]?.plan_tier,
++      bound: await exportedBound(database.pool, runId)
++    }).toEqual({ freePublicRule: true, planTier: "free", bound: true });
++  });
++
++  it("pre-rule visibility event count is unchanged by the predicate", async () => {
++    const runId = await insertPreRuleFreeRun();
++    const visibilityEventId = randomUUID();
++    const visibilityActorRef = randomUUID();
++    const publicationRef = randomUUID();
++    const client = await database.pool.connect();
++    try {
++      await client.query("BEGIN");
++      await client.query("SET LOCAL session_replication_role = replica");
++      await client.query(
++        `INSERT INTO serve.publication_snapshot (
++           publication_ref,run_id,format_version,content_ciphertext,created_at
++         ) VALUES ($1,$2,1,'{}'::jsonb,now())`,
++        [publicationRef, runId]
++      );
++      await client.query(
++        `INSERT INTO core.run_visibility_event (
++           run_visibility_event_id,run_id,publication_ref,state,actor_audit_token,
++           warning_version,occurred_at,at_seq,actor_ref_version
++         ) VALUES ($1,$2,$3,'PRIVATE',$4,'COPIES_MAY_PERSIST_V1',now(),ledger.allocate_sequence(),2)`,
++        [visibilityEventId, runId, publicationRef, visibilityActorRef]
++      );
++      await client.query("COMMIT");
++    } catch (error) {
++      await client.query("ROLLBACK");
++      throw error;
++    } finally {
++      client.release();
++    }
++    const before = await database.pool.query<{ count: string }>(
++      "SELECT count(*)::text AS count FROM core.run_visibility_event WHERE run_id=$1",
++      [runId]
++    );
++    const bound = await queryBound(database.pool, runId);
++    const after = await database.pool.query<{ count: string }>(
++      "SELECT count(*)::text AS count FROM core.run_visibility_event WHERE run_id=$1",
++      [runId]
++    );
++
++    expect({ before: before.rows[0]?.count, bound, after: after.rows[0]?.count })
++      .toEqual({ before: "1", bound: false, after: "1" });
++  });
++
++  it("create_encrypted_run accepts a missing freePublicRule key as false", async () => {
++    const result = await callCreateEncryptedRun({ freePublicRule: undefined });
++    const row = await database.pool.query<{ free_public_rule: boolean }>(
++      "SELECT free_public_rule FROM core.run WHERE run_id=$1",
++      [result.runId]
++    );
++
++    expect({ created: result.created, freePublicRule: row.rows[0]?.free_public_rule })
++      .toEqual({ created: true, freePublicRule: false });
++  });
++
++  it("create_encrypted_run rejects an extra payload key", async () => {
++    const rejected = await callCreateEncryptedRun({ freePublicRule: true, extraKey: true });
++    const accepted = await callCreateEncryptedRun({ freePublicRule: true });
++
++    expect({ rejected: rejected.created, acceptedWithoutExtraKey: accepted.created })
++      .toEqual({ rejected: false, acceptedWithoutExtraKey: true });
++  });
++});
+diff --git a/dialectical-engine/tests/integration/fpd-s01-c1-privileges.test.ts b/dialectical-engine/tests/integration/fpd-s01-c1-privileges.test.ts
+new file mode 100644
+index 00000000..f92816e1
+--- /dev/null
++++ b/dialectical-engine/tests/integration/fpd-s01-c1-privileges.test.ts
+@@ -0,0 +1,109 @@
++import { randomUUID } from "node:crypto";
++import { afterAll, beforeAll, describe, expect, it } from "vitest";
++import { createPool, migrate, type Pool } from "@debateai/db";
++import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
++import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
++
++let database: TestDatabase;
++let runtimePool: Pool;
++let erasurePool: Pool;
++let unprivilegedPool: Pool;
++
++async function insertBoundFreeRun(): Promise<string> {
++  const runId = randomUUID();
++  await database.pool.query(
++    `INSERT INTO core.run (
++       run_id,question_line,asker_id,session_id,caller_scope,as_of,
++       asker_risk_tier,risk_tier,tier_source,tier_provenance_ref,
++       composition_budget_tier,plan_tier,free_public_rule,
++       depth_params,agent_count,discovered_panel,stranger_sample_rate,
++       envelope_basis,register_version,battery_version,ask_contract,created_at_seq
++     ) VALUES (
++       $1,$2,$3,$4,'ASKER',now(),'casual','casual','ASKER',$5,
++       'low','free',true,'{}'::jsonb,1,$7::jsonb,1,
++       '{}'::jsonb,1,$6,'{}'::jsonb,ledger.allocate_sequence()
++     )`,
++    [
++      runId,
++      `FPD privilege ${runId}`,
++      `fpd-privilege-${runId}`,
++      randomUUID(),
++      "fpd-s01-c1:privilege",
++      "fpd-s01-c1:privilege",
++      JSON.stringify(fixtureDiscoveredPanel(1))
++    ]
++  );
++  return runId;
++}
++
++beforeAll(async () => {
++  database = await startTestDatabase();
++  await migrate(database.pool);
++  await database.pool.query("CREATE ROLE debateai_fpd_s01_nobody NOLOGIN NOINHERIT");
++  await database.pool.query("GRANT USAGE ON SCHEMA core TO debateai_fpd_s01_nobody");
++
++  runtimePool = createPool(database.connectionString, { max: 1 });
++  erasurePool = createPool(database.connectionString, { max: 1 });
++  unprivilegedPool = createPool(database.connectionString, { max: 1 });
++  await runtimePool.query("SET ROLE debateai_runtime");
++  await erasurePool.query("SET ROLE debateai_erasure_runtime");
++  await unprivilegedPool.query("SET ROLE debateai_fpd_s01_nobody");
++}, 120_000);
++
++afterAll(async () => {
++  await runtimePool?.end();
++  await erasurePool?.end();
++  await unprivilegedPool?.end();
++  await database?.stop();
++});
++
++describe("S01 C1 bound-predicate privileges", () => {
++  it("debateai_runtime can read the bound predicate", async () => {
++    const runId = await insertBoundFreeRun();
++    const result = await runtimePool.query<{ bound: boolean }>(
++      "SELECT core.run_is_free_public_bound($1::uuid) AS bound",
++      [runId]
++    );
++    const preservedGrant = await database.pool.query<{
++      content_provision_allowed: boolean;
++      unprivileged_allowed: boolean;
++    }>(
++      `SELECT has_function_privilege(
++         'debateai_content_provision',
++         'core.create_encrypted_run(jsonb,uuid,uuid,jsonb)',
++         'execute'
++       ) AS content_provision_allowed,
++       has_function_privilege(
++         'debateai_fpd_s01_nobody',
++         'core.create_encrypted_run(jsonb,uuid,uuid,jsonb)',
++         'execute'
++       ) AS unprivileged_allowed`
++    );
++
++    expect({
++      bound: result.rows[0]?.bound,
++      contentProvisionExecute: preservedGrant.rows[0]?.content_provision_allowed,
++      unprivilegedContentProvisionExecute: preservedGrant.rows[0]?.unprivileged_allowed
++    }).toEqual({
++      bound: true,
++      contentProvisionExecute: true,
++      unprivilegedContentProvisionExecute: false
++    });
++  });
++
++  it("debateai_erasure_runtime can read the bound predicate", async () => {
++    const runId = await insertBoundFreeRun();
++
++    await expect(
++      erasurePool.query("SELECT core.run_is_free_public_bound($1::uuid) AS bound", [runId])
++    ).resolves.toMatchObject({ rows: [{ bound: true }] });
++  });
++
++  it("a role without a grant cannot read the bound predicate", async () => {
++    const runId = await insertBoundFreeRun();
++
++    await expect(
++      unprivilegedPool.query("SELECT core.run_is_free_public_bound($1::uuid) AS bound", [runId])
++    ).rejects.toMatchObject({ code: "42501" });
++  });
++});
+diff --git a/dialectical-engine/tests/integration/fpd-s01-c2-system-publication.test.ts b/dialectical-engine/tests/integration/fpd-s01-c2-system-publication.test.ts
+new file mode 100644
+index 00000000..7c7608b4
+--- /dev/null
++++ b/dialectical-engine/tests/integration/fpd-s01-c2-system-publication.test.ts
+@@ -0,0 +1,572 @@
++import { randomUUID } from "node:crypto";
++import { mkdtemp } from "node:fs/promises";
++import { createServer } from "node:net";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import EmbeddedPostgres from "embedded-postgres";
++import { Pool, type PoolClient } from "pg";
++import { afterAll, beforeAll, describe, expect, it } from "vitest";
++import { PublicDebateSchema } from "@debateai/contract";
++import { migrate } from "@debateai/db";
++
++type Seed = Readonly<{
++  runId: string;
++  userId: string;
++  ownerRef: string;
++  pseudonym: string;
++}>;
++
++let embedded: EmbeddedPostgres;
++let databaseDirectory: string;
++let databasePort: number;
++let pool: Pool;
++
++async function unusedPort(): Promise<number> {
++  const server = createServer();
++  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
++  const address = server.address();
++  if (address === null || typeof address === "string") throw new TypeError("TEST_PORT_UNAVAILABLE");
++  await new Promise<void>((resolve, reject) => server.close((error) => {
++    if (error === undefined) resolve(); else reject(error);
++  }));
++  return address.port;
++}
++
++async function withRole<T>(
++  databasePool: Pool,
++  role: "debateai_runtime" | "debateai_publication_cleanup" | "debateai_c2_unprivileged",
++  use: (client: PoolClient) => Promise<T>
++): Promise<T> {
++  const client = await databasePool.connect();
++  try {
++    await client.query(`SET ROLE ${role}`);
++    return await use(client);
++  } finally {
++    await client.query("RESET ROLE").catch(() => undefined);
++    client.release();
++  }
++}
++
++async function seedRun(input: Readonly<{
++  planTier?: "free" | "premium" | null;
++  freePublicRule?: boolean;
++  privateContentLive?: boolean;
++}> = {}): Promise<Seed> {
++  const runId = randomUUID();
++  const userId = randomUUID();
++  const ownerRef = randomUUID();
++  const auditToken = randomUUID();
++  const identitySessionId = randomUUID();
++  const pseudonym = `Public Thinker ${runId}`;
++  const planTier = input.planTier === undefined ? "free" : input.planTier;
++  const freePublicRule = input.freePublicRule ?? true;
++  const privateContentLive = input.privateContentLive ?? true;
++  await pool.query(`
++    INSERT INTO identity."user"(
++      user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
++      password_hash,pseudonym,state,adult_affirmed_at,audit_token,owner_ref
++    ) VALUES ($1::uuid,decode(md5(($1::uuid)::text)||md5(($1::uuid)::text||':email'),'hex'),'{}'::jsonb,'{}'::jsonb,
++      'test-password-hash',$2,'active',clock_timestamp(),$3,$4)
++  `, [userId, pseudonym, auditToken, ownerRef]);
++  const client = await pool.connect();
++  try {
++    await client.query("BEGIN");
++    await client.query("SET CONSTRAINTS ALL DEFERRED");
++    await client.query(`
++      INSERT INTO identity.session(
++        session_id,user_id,token_hash,binding_context,idle_expires_at,
++        absolute_expires_at,csrf_token_hash,last_mfa_at
++      ) VALUES ($1,$2,repeat('a',64),'{}'::jsonb,clock_timestamp()+interval '1 hour',
++        clock_timestamp()+interval '2 hours','sha256:'||repeat('b',64),clock_timestamp())
++    `, [identitySessionId, userId]);
++    await client.query(`
++      INSERT INTO identity.run_execution_binding(
++        execution_ref,user_id,identity_session_id,run_id,created_at
++      ) VALUES ($1,$2,$1,$3,clock_timestamp())
++    `, [identitySessionId, userId, runId]);
++    await client.query(`
++      INSERT INTO core.run_key_provision_intent(
++        run_id,user_id,owner_ref,identity_session_id,execution_ref,
++        requested_at,expires_at,cleanup_state
++      ) VALUES ($1,$2,$3,$4,$4,clock_timestamp(),clock_timestamp()+interval '5 minutes','PREPARED')
++    `, [runId, userId, ownerRef, identitySessionId]);
++    await client.query(`
++      INSERT INTO core.run_content_attestation_secret(run_id,secret,created_at)
++      VALUES ($1::uuid,decode(md5(($1::uuid)::text||':secret')||md5(($1::uuid)::text||':secret:2'),'hex'),clock_timestamp())
++    `, [runId]);
++    await client.query(`
++      INSERT INTO core.run(
++        run_id,question_line,ask_contract,asker_id,session_id,caller_scope,as_of,
++        asker_risk_tier,risk_tier,tier_source,tier_provenance_ref,
++        composition_budget_tier,plan_tier,free_public_rule,depth_params,agent_count,
++        discovered_panel,stranger_sample_rate,envelope_basis,register_version,battery_version,
++        created_at_seq,content_encryption_version,question_blind_index_version,
++        content_ciphertext,content_attestation
++      ) VALUES (
++        $1::uuid,
++        CASE WHEN $6::integer IS NULL THEN 'Should a public square need a gatekeeper?'
++          ELSE '⟦DEBATEAI:CIPHERTEXT:V1⟧' END,
++        CASE WHEN $6::integer IS NULL THEN '{}'::jsonb ELSE '{"ciphertext":true,"v":1}'::jsonb END,
++        'owner:'||$2::text,$3::text,'ASKER',clock_timestamp(),'standard','standard','ASKER',
++        'c2-test','low',$4,$5,'{}'::jsonb,1,'[{}]'::jsonb,0.1,'{}'::jsonb,1,'c2-test',
++        ledger.allocate_sequence(),$6::integer,CASE WHEN $6::integer IS NULL THEN NULL ELSE 2 END,
++        CASE WHEN $6::integer IS NULL THEN NULL
++          ELSE '{"v":1,"keyId":"c2-key","nonce":"c2-nonce","ct":"c2-ciphertext","tag":"c2-tag"}'::jsonb END,
++        CASE WHEN $6::integer IS NULL THEN NULL ELSE audit_crypto_internal.hmac(
++          core.content_envelope_attestation_bytes(
++            $1::uuid,'core.run',($1::uuid)::text,'content_ciphertext',
++            '{"v":1,"keyId":"c2-key","nonce":"c2-nonce","ct":"c2-ciphertext","tag":"c2-tag"}'::jsonb
++          ),
++          decode(md5(($1::uuid)::text||':secret')||md5(($1::uuid)::text||':secret:2'),'hex'),
++          'sha256'
++        ) END
++      )
++    `, [runId, ownerRef, identitySessionId, planTier, freePublicRule, 1]);
++    await client.query(`
++      INSERT INTO core.run_ownership_event(run_id,owner_ref,at_seq)
++      VALUES ($1,$2,ledger.allocate_sequence())
++    `, [runId, ownerRef]);
++    await client.query("COMMIT");
++    await pool.query("DELETE FROM identity.session WHERE session_id=$1", [identitySessionId]);
++    if (!privateContentLive) {
++      await pool.query(`
++        INSERT INTO serve.private_run_key_cleanup_intent(
++          request_ref,user_id,run_id,requested_at,cleanup_publication_refs
++        ) VALUES ($1,$2,$3,clock_timestamp(),ARRAY[]::uuid[])
++      `, [randomUUID(), userId, runId]);
++    }
++  } catch (error) {
++    await client.query("ROLLBACK");
++    throw error;
++  } finally {
++    client.release();
++  }
++  return { runId, userId, ownerRef, pseudonym };
++}
++
++function publicDebate(seed: Seed, publicationRef: string, publishedAt: Date) {
++  return {
++    public_ref: publicationRef,
++    author_pseudonym: seed.pseudonym,
++    question: "Should a public square need a gatekeeper?",
++    published_at: publishedAt.toISOString(),
++    answer: {
++      terminal: "SERVED",
++      verdict: "SUPPORTED",
++      verdict_available: true,
++      confidence_band: "high",
++      summary_segments: [{ text: "A public answer." }],
++      badges: [],
++      residual_objections: [],
++      reversal_point: "New evidence",
++      as_of: publishedAt.toISOString(),
++      nodes: [],
++      edges: [],
++      tree_included: true
++    }
++  } as const;
++}
++
++async function insertPreparedIntent(seed: Seed, publicationRef: string): Promise<void> {
++  await pool.query(`
++    INSERT INTO core.publication_ref_tombstone(ref,ref_kind,created_at)
++    VALUES ($1,'publication_ref',clock_timestamp()) ON CONFLICT (ref) DO NOTHING
++  `, [publicationRef]);
++  await pool.query(`
++    INSERT INTO serve.system_publication_key_provision_intent(
++      publication_ref,run_id,user_id,owner_ref,requested_at,expires_at,cleanup_state
++    ) VALUES ($1,$2,$3,$4,clock_timestamp(),clock_timestamp()+interval '5 minutes','PREPARED')
++  `, [publicationRef, seed.runId, seed.userId, seed.ownerRef]);
++}
++
++async function prepare(seed: Seed, publicationRef: string, databasePool = pool): Promise<boolean> {
++  return withRole(databasePool, "debateai_runtime", async (client) => {
++    const result = await client.query<{ prepared: boolean }>(`
++      SELECT serve.prepare_system_publication_key_provision($1,$2,$3,$4) AS prepared
++    `, [publicationRef, seed.runId, seed.userId, seed.ownerRef]);
++    return result.rows[0]?.prepared === true;
++  });
++}
++
++async function systemPublish(
++  seed: Seed,
++  publicationRef: string,
++  presentedAt = new Date("2026-09-21T00:00:00.000Z"),
++  databasePool = pool
++): Promise<string | null> {
++  const content = publicDebate(seed, publicationRef, presentedAt);
++  return withRole(databasePool, "debateai_runtime", async (client) => {
++    const result = await client.query<{ publication_ref: string | null }>(`
++      SELECT core.transition_system_run_publication(
++        $1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10
++      ) AS publication_ref
++    `, [
++      randomUUID(), seed.runId, seed.userId, seed.ownerRef, publicationRef,
++      seed.pseudonym, JSON.stringify(content), presentedAt, randomUUID(), randomUUID()
++    ]);
++    return result.rows[0]?.publication_ref ?? null;
++  });
++}
++
++async function count(query: string, values: readonly unknown[]): Promise<number> {
++  const result = await pool.query<{ count: string }>(query, [...values]);
++  return Number(result.rows[0]?.count ?? 0);
++}
++
++beforeAll(async () => {
++  databasePort = await unusedPort();
++  databaseDirectory = await mkdtemp(join(tmpdir(), "debateai-c2-postgres-"));
++  embedded = new EmbeddedPostgres({
++    databaseDir: join(databaseDirectory, "data"),
++    user: "postgres",
++    password: "postgres",
++    port: databasePort,
++    persistent: false,
++    onLog(message) { process.stderr.write(`[C2 DB] ${message}\n`); },
++    onError(message) { process.stderr.write(`[C2 DB error] ${message}\n`); }
++  });
++  await embedded.initialise();
++  await embedded.start();
++  await embedded.createDatabase("debateai_c2");
++  pool = new Pool({
++    host: "127.0.0.1",
++    port: databasePort,
++    database: "debateai_c2",
++    user: "postgres",
++    password: "postgres",
++    max: 8
++  });
++  await migrate(pool);
++  await pool.query(`
++    DO $$ BEGIN
++      IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='debateai_c2_unprivileged') THEN
++        CREATE ROLE debateai_c2_unprivileged NOLOGIN;
++      END IF;
++    END $$
++  `);
++}, 30_000);
++
++afterAll(async () => {
++  await pool?.end();
++  await embedded?.stop();
++}, 30_000);
++
++describe("S01-C2 system publication on real PostgreSQL", () => {
++  it("system-publishes a bound served run with no session or PUBLISH grant", async () => {
++    // PROPERTY: the runtime system function publishes a bound run without identity grant state.
++    // CATCHES: session/grant reads in the system transition. NEIGHBOUR: owner transition stays gated.
++    const seed = await seedRun();
++    const publicationRef = randomUUID();
++    const prepared = await prepare(seed, publicationRef);
++    const published = await systemPublish(seed, publicationRef);
++    const latest = await pool.query<{ state: string }>(`
++      SELECT state FROM core.run_visibility_event WHERE run_id=$1 ORDER BY at_seq DESC LIMIT 1
++    `, [seed.runId]);
++    const grantCount = await count(
++      "SELECT count(*) FROM identity.step_up_grant WHERE target_run_id=$1 AND action='PUBLISH'",
++      [seed.runId]
++    );
++    expect({ prepared, published, state: latest.rows[0]?.state, grantCount }).toEqual({
++      prepared: true, published: publicationRef, state: "PUBLISHED", grantCount: 0
++    });
++  });
++
++  it("lists a successful system publication exactly once across the full page", async () => {
++    // PROPERTY: latest-wins public membership contains one live ref for the run.
++    // CATCHES: duplicate snapshots/events. NEIGHBOUR: another run remains independently listable.
++    const seed = await seedRun();
++    const publicationRef = randomUUID();
++    await prepare(seed, publicationRef);
++    await systemPublish(seed, publicationRef);
++    const membership = await count(`
++      WITH latest AS (
++        SELECT DISTINCT ON (run_id) run_id,publication_ref,state
++        FROM core.run_visibility_event ORDER BY run_id,at_seq DESC
++      ) SELECT count(*) FROM latest WHERE state='PUBLISHED' AND publication_ref=$1
++    `, [publicationRef]);
++    expect(membership).toBe(1);
++  });
++
++  it("stores the account pseudonym and no owner identity value in the system snapshot", async () => {
++    // PROPERTY: the public snapshot carries only the pseudonym from the account.
++    // CATCHES: copying user/session/owner/email identifiers. NEIGHBOUR: pseudonym remains present.
++    const seed = await seedRun();
++    const publicationRef = randomUUID();
++    await prepare(seed, publicationRef);
++    await systemPublish(seed, publicationRef);
++    const snapshot = await pool.query<{ content_ciphertext: unknown }>(`
++      SELECT content_ciphertext FROM serve.publication_snapshot WHERE publication_ref=$1
++    `, [publicationRef]);
++    const serialized = JSON.stringify(snapshot.rows[0]?.content_ciphertext);
++    expect({
++      pseudonym: serialized.includes(seed.pseudonym),
++      userId: serialized.includes(seed.userId),
++      ownerRef: serialized.includes(seed.ownerRef),
++      email: serialized.includes("@")
++    }).toEqual({ pseudonym: true, userId: false, ownerRef: false, email: false });
++  });
++
++  it("writes the system ALLOW audit shape and PUBLIC_INDEXED_V1 visibility", async () => {
++    // PROPERTY: success is attributable to the named system actor from the audit row alone.
++    // CATCHES: UUID actor/default actor_ref_version/wrong warning. NEIGHBOUR: DENY uses a different event.
++    const seed = await seedRun();
++    const publicationRef = randomUUID();
++    await prepare(seed, publicationRef);
++    await systemPublish(seed, publicationRef);
++    const result = await pool.query<{
++      actor_key_ref: string;
++      decision: string;
++      success: boolean;
++      event_type: string;
++      warning_version: string;
++      actor_ref_version: number;
++    }>(`
++      SELECT audit.actor_key_ref,audit.decision,audit.success,audit.event_type,
++        visibility.warning_version,visibility.actor_ref_version
++      FROM identity.audit_event AS audit
++      JOIN core.run_visibility_event AS visibility
++        ON visibility.publication_ref=audit.target_id::uuid
++      WHERE visibility.run_id=$1 AND audit.actor_key_ref='system:free-public-auto-publish'
++    `, [seed.runId]);
++    expect(result.rows[0]).toEqual({
++      actor_key_ref: "system:free-public-auto-publish",
++      decision: "ALLOW",
++      success: true,
++      event_type: "debate.publication.published",
++      warning_version: "PUBLIC_INDEXED_V1",
++      actor_ref_version: 2
++    });
++  });
++
++  it("creates no identity session, publication binding, or PUBLISH grant", async () => {
++    // PROPERTY: system publication creates no phantom owner authorization records.
++    // CATCHES: fabricating session/grant/binding rows. NEIGHBOUR: audit row is still created.
++    const seed = await seedRun();
++    const publicationRef = randomUUID();
++    const before = await count("SELECT count(*) FROM identity.session", []);
++    await prepare(seed, publicationRef);
++    await systemPublish(seed, publicationRef);
++    const after = await count("SELECT count(*) FROM identity.session", []);
++    const grants = await count(
++      "SELECT count(*) FROM identity.step_up_grant WHERE target_run_id=$1 AND action='PUBLISH'",
++      [seed.runId]
++    );
++    const bindings = await count(
++      "SELECT count(*) FROM identity.publication_event_binding WHERE run_id=$1",
++      [seed.runId]
++    );
++    expect({ before, after, grants, bindings }).toEqual({ before, after: before, grants: 0, bindings: 0 });
++  });
++
++  it("counts two failed system attempts as two typed DENY audit rows", async () => {
++    // PROPERTY: every pre-transition failure is independently countable for the run.
++    // CATCHES: silent retry or overwrite. NEIGHBOUR: BLOCKED never calls this wrapper.
++    const seed = await seedRun();
++    await withRole(pool, "debateai_runtime", async (client) => {
++      for (const reason of ["AUTO_PUBLISH_CIPHER_FAILED", "AUTO_PUBLISH_KEY_PROVISION_FAILED"]) {
++        await client.query(
++          "SELECT identity.audit_system_publication_attempt($1,$2,$3,clock_timestamp(),'DENY')",
++          [randomUUID(), seed.runId, reason]
++        );
++      }
++    });
++    const denied = await count(`
++      SELECT count(*) FROM identity.audit_event
++      WHERE actor_key_ref='system:free-public-auto-publish' AND decision='DENY'
++        AND target_type='debate.publication_attempt' AND target_id=$1
++    `, [seed.runId]);
++    expect(denied).toBe(2);
++  });
++
++  it("keeps the pre-slice public contract parseable and aligns published_at with snapshot created_at", async () => {
++    // PROPERTY: both old and system snapshots satisfy the unchanged public schema and timestamp invariant.
++    // CATCHES: a required marker or second clock. NEIGHBOUR: optional visibility metadata is separate.
++    const seed = await seedRun();
++    const publicationRef = randomUUID();
++    const presentedAt = new Date("2026-09-21T00:00:00.000Z");
++    const old = PublicDebateSchema.parse(publicDebate(seed, randomUUID(), presentedAt));
++    await prepare(seed, publicationRef);
++    await systemPublish(seed, publicationRef, presentedAt);
++    const snapshot = await pool.query<{ content_ciphertext: unknown; created_at: Date }>(`
++      SELECT content_ciphertext,created_at FROM serve.publication_snapshot WHERE publication_ref=$1
++    `, [publicationRef]);
++    const parsed = PublicDebateSchema.parse(snapshot.rows[0]?.content_ciphertext);
++    expect({ old: old.author_pseudonym, publishedAt: parsed.published_at, createdAt: snapshot.rows[0]?.created_at.toISOString() }).toEqual({
++      old: seed.pseudonym,
++      publishedAt: presentedAt.toISOString(),
++      createdAt: presentedAt.toISOString()
++    });
++  });
++
++  it("grants the system transition only to debateai_runtime", async () => {
++    // PROPERTY: runtime can execute the transition and an unrelated role receives 42501.
++    // CATCHES: missing runtime grant or PUBLIC execute. NEIGHBOUR: SECURITY DEFINER owns table access.
++    const seed = await seedRun();
++    const publicationRef = randomUUID();
++    await prepare(seed, publicationRef);
++    const runtimeResult = await systemPublish(seed, publicationRef);
++    let sqlstate: string | undefined;
++    try {
++      await withRole(pool, "debateai_c2_unprivileged", async (client) => {
++        await client.query(`SELECT core.transition_system_run_publication(
++          $1,$2,$3,$4,$5,$6,$7::jsonb,clock_timestamp(),$8,$9
++        )`, [randomUUID(), seed.runId, seed.userId, seed.ownerRef, randomUUID(), seed.pseudonym, "{}", randomUUID(), randomUUID()]);
++      });
++    } catch (error) {
++      sqlstate = (error as { code?: string }).code;
++    }
++    expect({ runtimeResult, sqlstate }).toEqual({ runtimeResult: publicationRef, sqlstate: "42501" });
++  });
++
++  it("leaves the 14-argument owner transition intact while rejecting Premium system publish", async () => {
++    // PROPERTY: 0067 neither replaces the owner signature nor opens Premium to the system path.
++    // CATCHES: DROP/redefine owner transition or missing bound guard. NEIGHBOUR: bound Free system publish succeeds.
++    const seed = await seedRun({ planTier: "premium" });
++    const publicationRef = randomUUID();
++    await insertPreparedIntent(seed, publicationRef);
++    const systemResult = await systemPublish(seed, publicationRef);
++    const signature = await pool.query<{ arguments: string }>(`
++      SELECT pg_catalog.pg_get_function_identity_arguments(procedure.oid) AS arguments
++      FROM pg_catalog.pg_proc AS procedure
++      JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid=procedure.pronamespace
++      WHERE namespace.nspname='core' AND procedure.proname='transition_run_publication'
++    `);
++    expect({ systemResult, argumentCount: signature.rows[0]?.arguments.split(",").length }).toEqual({
++      systemResult: null, argumentCount: 14
++    });
++  });
++
++  it("returns NULL for Premium with one DENY and no snapshot or visibility event", async () => {
++    // PROPERTY: a prepared intent cannot bypass the bound predicate for Premium.
++    // CATCHES: deleting core.run_is_free_public_bound. NEIGHBOUR: bound Free passes.
++    const seed = await seedRun({ planTier: "premium" });
++    const publicationRef = randomUUID();
++    await insertPreparedIntent(seed, publicationRef);
++    const result = await systemPublish(seed, publicationRef);
++    const snapshots = await count("SELECT count(*) FROM serve.publication_snapshot WHERE run_id=$1", [seed.runId]);
++    const visibility = await count("SELECT count(*) FROM core.run_visibility_event WHERE run_id=$1", [seed.runId]);
++    const denied = await count(`SELECT count(*) FROM identity.audit_event
++      WHERE actor_key_ref='system:free-public-auto-publish' AND decision='DENY' AND target_id=$1`, [seed.runId]);
++    expect({ result, snapshots, visibility, denied }).toEqual({ result: null, snapshots: 0, visibility: 0, denied: 1 });
++  });
++
++  it("returns NULL for a NULL tier with one DENY and no publication", async () => {
++    // PROPERTY: legacy NULL-tier runs remain unbound even with a prepared system intent.
++    // CATCHES: treating NULL as Free. NEIGHBOUR: explicit Free plus rule true passes.
++    const seed = await seedRun({ planTier: null });
++    const publicationRef = randomUUID();
++    await insertPreparedIntent(seed, publicationRef);
++    const result = await systemPublish(seed, publicationRef);
++    const snapshots = await count("SELECT count(*) FROM serve.publication_snapshot WHERE run_id=$1", [seed.runId]);
++    const denied = await count("SELECT count(*) FROM identity.audit_event WHERE decision='DENY' AND target_id=$1", [seed.runId]);
++    expect({ result, snapshots, denied }).toEqual({ result: null, snapshots: 0, denied: 1 });
++  });
++
++  it("returns NULL for a pre-rule Free run with one DENY and no publication", async () => {
++    // PROPERTY: Free alone is insufficient; the persisted rule bit must also be true.
++    // CATCHES: testing tier without free_public_rule. NEIGHBOUR: post-rule Free passes.
++    const seed = await seedRun({ planTier: "free", freePublicRule: false });
++    const publicationRef = randomUUID();
++    await insertPreparedIntent(seed, publicationRef);
++    const result = await systemPublish(seed, publicationRef);
++    const snapshots = await count("SELECT count(*) FROM serve.publication_snapshot WHERE run_id=$1", [seed.runId]);
++    const denied = await count("SELECT count(*) FROM identity.audit_event WHERE decision='DENY' AND target_id=$1", [seed.runId]);
++    expect({ result, snapshots, denied }).toEqual({ result: null, snapshots: 0, denied: 1 });
++  });
++
++  it("returns NULL after private content is erased", async () => {
++    // PROPERTY: a bound run without live private content cannot create a public snapshot.
++    // CATCHES: deleting run_private_content_is_live. NEIGHBOUR: identical live content passes.
++    const seed = await seedRun({ privateContentLive: false });
++    const publicationRef = randomUUID();
++    await insertPreparedIntent(seed, publicationRef);
++    const live = await pool.query<{ live: boolean }>("SELECT core.run_private_content_is_live($1) AS live", [seed.runId]);
++    const result = await systemPublish(seed, publicationRef);
++    const snapshots = await count("SELECT count(*) FROM serve.publication_snapshot WHERE run_id=$1", [seed.runId]);
++    const published = await count("SELECT count(*) FROM core.run_visibility_event WHERE run_id=$1 AND state='PUBLISHED'", [seed.runId]);
++    expect({ live: live.rows[0]?.live, result, snapshots, published }).toEqual({ live: false, result: null, snapshots: 0, published: 0 });
++  });
++
++  it("serializes two completed prepares into exactly one system publication", async () => {
++    // PROPERTY: the under-lock latest-state guard admits one transition after both prepares finish.
++    // CATCHES: removing the in-transaction PUBLISHED guard. NEIGHBOUR: two distinct runs both publish.
++    const seed = await seedRun();
++    const firstRef = randomUUID();
++    const secondRef = randomUUID();
++    const secondPool = new Pool({
++      host: "127.0.0.1", port: databasePort, database: "debateai_c2",
++      user: "postgres", password: "postgres", max: 2
++    });
++    try {
++      const prepared = await Promise.all([prepare(seed, firstRef, pool), prepare(seed, secondRef, secondPool)]);
++      const settled = await Promise.all([
++        systemPublish(seed, firstRef, new Date("2026-09-21T00:00:00.000Z"), pool),
++        systemPublish(seed, secondRef, new Date("2026-09-21T00:00:01.000Z"), secondPool)
++      ]);
++      const snapshots = await count("SELECT count(*) FROM serve.publication_snapshot WHERE run_id=$1", [seed.runId]);
++      expect({ prepared, successful: settled.filter((value) => value !== null).length, snapshots }).toEqual({
++        prepared: [true, true], successful: 1, snapshots: 1
++      });
++    } finally {
++      await secondPool.end();
++    }
++  });
++
++  it("grants the failed-attempt audit wrapper only to debateai_runtime", async () => {
++    // PROPERTY: runtime has the narrow wrapper while unrelated roles cannot append system audit rows.
++    // CATCHES: missing runtime grant or PUBLIC execute. NEIGHBOUR: runtime still cannot call append_internal.
++    const seed = await seedRun();
++    const runtime = await withRole(pool, "debateai_runtime", async (client) => {
++      const result = await client.query<{ appended: boolean }>(`
++        SELECT identity.audit_system_publication_attempt(
++          $1,$2,'AUTO_PUBLISH_CIPHER_FAILED',clock_timestamp(),'DENY'
++        ) AS appended
++      `, [randomUUID(), seed.runId]);
++      return result.rows[0]?.appended === true;
++    });
++    let sqlstate: string | undefined;
++    try {
++      await withRole(pool, "debateai_c2_unprivileged", async (client) => {
++        await client.query(`SELECT identity.audit_system_publication_attempt(
++          $1,$2,'AUTO_PUBLISH_CIPHER_FAILED',clock_timestamp(),'DENY'
++        )`, [randomUUID(), seed.runId]);
++      });
++    } catch (error) {
++      sqlstate = (error as { code?: string }).code;
++    }
++    expect({ runtime, sqlstate }).toEqual({ runtime: true, sqlstate: "42501" });
++  });
++
++  it("claims and completes an expired orphan system key-provision intent", async () => {
++    // PROPERTY: publication cleanup can claim then delete an expired PREPARED system intent.
++    // CATCHES: either cleanup function or either review-mandated claim column omitted.
++    // NEIGHBOUR: a future PREPARED intent is not claimed.
++    const seed = await seedRun();
++    const publicationRef = randomUUID();
++    await pool.query(`
++      INSERT INTO core.publication_ref_tombstone(ref,ref_kind,created_at)
++      VALUES ($1,'publication_ref',clock_timestamp())
++    `, [publicationRef]);
++    await pool.query(`
++      INSERT INTO serve.system_publication_key_provision_intent(
++        publication_ref,run_id,user_id,owner_ref,requested_at,expires_at,cleanup_state
++      ) VALUES ($1,$2,$3,$4,clock_timestamp()-interval '10 minutes',
++        clock_timestamp()-interval '5 minutes','PREPARED')
++    `, [publicationRef, seed.runId, seed.userId, seed.ownerRef]);
++    const result = await withRole(pool, "debateai_publication_cleanup", async (client) => {
++      const claimed = await client.query<{ publication_ref: string; claim_token: string }>(`
++        SELECT * FROM serve.claim_system_publication_key_provision_cleanup(100)
++      `);
++      const claim = claimed.rows.find((row) => row.publication_ref === publicationRef);
++      const completed = claim === undefined ? false : (await client.query<{ completed: boolean }>(`
++        SELECT serve.complete_system_publication_key_provision_cleanup($1,$2) AS completed
++      `, [publicationRef, claim.claim_token])).rows[0]?.completed === true;
++      return { claimed: claim?.publication_ref, completed };
++    });
++    const remaining = await count(
++      "SELECT count(*) FROM serve.system_publication_key_provision_intent WHERE run_id=$1",
++      [seed.runId]
++    );
++    expect({ ...result, remaining }).toEqual({ claimed: publicationRef, completed: true, remaining: 0 });
++  });
++});
+diff --git a/dialectical-engine/tests/integration/fpd-s01-c4-delete-published.test.ts b/dialectical-engine/tests/integration/fpd-s01-c4-delete-published.test.ts
+new file mode 100644
+index 00000000..b57c0be0
+--- /dev/null
++++ b/dialectical-engine/tests/integration/fpd-s01-c4-delete-published.test.ts
+@@ -0,0 +1,566 @@
++import { randomUUID } from "node:crypto";
++import { afterAll, beforeAll, describe, expect, it } from "vitest";
++import { createPool, migrate, type Pool } from "@debateai/db";
++import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
++
++type Seed = Readonly<{
++  runId: string;
++  userId: string;
++  ownerRef: string;
++  sessionId: string;
++  pseudonym: string;
++}>;
++
++type PrepareResult = Readonly<{
++  outcome: string;
++  erasure_id: string | null;
++}>;
++
++let database: TestDatabase;
++let runtimePool: Pool;
++let erasurePool: Pool;
++let cleanupPool: Pool;
++let unprivilegedPool: Pool;
++
++const SYSTEM_PUBLISH_ACTOR = "00000000-0000-4000-8000-0000000000f1";
++const BOUND_ERASURE_ACTOR = "00000000-0000-4000-8000-0000000000f2";
++
++function tokenHash(): string {
++  return `sha256:${randomUUID().replaceAll("-", "").repeat(2)}`;
++}
++
++async function seedRun(input: Readonly<{
++  planTier?: "free" | "premium" | null;
++  freePublicRule?: boolean;
++}> = {}): Promise<Seed> {
++  const runId = randomUUID();
++  const userId = randomUUID();
++  const ownerRef = randomUUID();
++  const sessionId = randomUUID();
++  const auditToken = randomUUID();
++  const pseudonym = `C4 Creator ${runId}`;
++  const planTier = input.planTier === undefined ? "free" : input.planTier;
++  const freePublicRule = input.freePublicRule ?? true;
++
++  await database.pool.query(`
++    INSERT INTO identity."user"(
++      user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
++      password_hash,pseudonym,state,adult_affirmed_at,audit_token,owner_ref
++    ) VALUES (
++      $1::uuid,
++      decode(md5(($1::uuid)::text)||md5(($1::uuid)::text||':email'),'hex'),
++      '{}'::jsonb,'{}'::jsonb,'test-password-hash',$2,'active',
++      clock_timestamp(),$3,$4
++    )
++  `, [userId, pseudonym, auditToken, ownerRef]);
++
++  const client = await database.pool.connect();
++  try {
++    await client.query("BEGIN");
++    await client.query("SET CONSTRAINTS ALL DEFERRED");
++    await client.query(`
++      INSERT INTO identity.session(
++        session_id,user_id,token_hash,binding_context,idle_expires_at,
++        absolute_expires_at,csrf_token_hash,last_mfa_at
++      ) VALUES (
++        $1,$2,md5(($1::uuid)::text)||md5(($1::uuid)::text||':session'),'{}'::jsonb,
++        clock_timestamp()+interval '1 hour',clock_timestamp()+interval '2 hours',
++        'sha256:'||md5(($1::uuid)::text||':csrf')||md5(($1::uuid)::text||':csrf:2'),
++        clock_timestamp()
++      )
++    `, [sessionId, userId]);
++    await client.query(`
++      INSERT INTO identity.run_execution_binding(
++        execution_ref,user_id,identity_session_id,run_id,created_at
++      ) VALUES ($1,$2,$1,$3,clock_timestamp())
++    `, [sessionId, userId, runId]);
++    await client.query(`
++      INSERT INTO core.run_key_provision_intent(
++        run_id,user_id,owner_ref,identity_session_id,execution_ref,
++        requested_at,expires_at,cleanup_state
++      ) VALUES (
++        $1,$2,$3,$4,$4,clock_timestamp(),
++        clock_timestamp()+interval '5 minutes','PREPARED'
++      )
++    `, [runId, userId, ownerRef, sessionId]);
++    await client.query(`
++      INSERT INTO core.run_content_attestation_secret(run_id,secret,created_at)
++      VALUES (
++        $1::uuid,
++        decode(md5(($1::uuid)::text||':secret')||md5(($1::uuid)::text||':secret:2'),'hex'),
++        clock_timestamp()
++      )
++    `, [runId]);
++    await client.query(`
++      INSERT INTO core.run(
++        run_id,question_line,ask_contract,asker_id,session_id,caller_scope,as_of,
++        asker_risk_tier,risk_tier,tier_source,tier_provenance_ref,
++        composition_budget_tier,plan_tier,free_public_rule,depth_params,agent_count,
++        discovered_panel,stranger_sample_rate,envelope_basis,register_version,battery_version,
++        created_at_seq,content_encryption_version,question_blind_index_version,
++        content_ciphertext,content_attestation
++      ) VALUES (
++        $1::uuid,'⟦DEBATEAI:CIPHERTEXT:V1⟧','{"ciphertext":true,"v":1}'::jsonb,
++        'owner:'||$2::text,$3::text,'ASKER',clock_timestamp(),
++        'standard','standard','ASKER','c4-test','low',$4,$5,'{}'::jsonb,1,
++        '[{}]'::jsonb,0.1,'{}'::jsonb,1,'c4-test',ledger.allocate_sequence(),1,2,
++        '{"v":1,"keyId":"c4-key","nonce":"c4-nonce","ct":"c4-ciphertext","tag":"c4-tag"}'::jsonb,
++        audit_crypto_internal.hmac(
++          core.content_envelope_attestation_bytes(
++            $1::uuid,'core.run',($1::uuid)::text,'content_ciphertext',
++            '{"v":1,"keyId":"c4-key","nonce":"c4-nonce","ct":"c4-ciphertext","tag":"c4-tag"}'::jsonb
++          ),
++          decode(md5(($1::uuid)::text||':secret')||md5(($1::uuid)::text||':secret:2'),'hex'),
++          'sha256'
++        )
++      )
++    `, [runId, ownerRef, sessionId, planTier, freePublicRule]);
++    await client.query(`
++      INSERT INTO core.run_ownership_event(run_id,owner_ref,at_seq)
++      VALUES ($1,$2,ledger.allocate_sequence())
++    `, [runId, ownerRef]);
++    await client.query("COMMIT");
++  } catch (error) {
++    await client.query("ROLLBACK");
++    throw error;
++  } finally {
++    client.release();
++  }
++  return { runId, userId, ownerRef, sessionId, pseudonym };
++}
++
++async function issueGrant(
++  seed: Seed,
++  targetRunId = seed.runId,
++  action: "DELETE_PRIVATE_DEBATE" | "PUBLISH" = "DELETE_PRIVATE_DEBATE"
++): Promise<Readonly<{
++  grantId: string;
++  grantTokenHash: string;
++}>> {
++  const grantId = randomUUID();
++  const grantTokenHash = tokenHash();
++  await database.pool.query(`
++    INSERT INTO identity.step_up_grant(
++      step_up_grant_id,session_id,user_id,action,target_run_id,target_account_id,
++      token_hash,issued_at,expires_at,consumed_at
++    ) VALUES (
++      $1,$2,$3,$6,$4,NULL,$5,
++      clock_timestamp(),clock_timestamp()+interval '5 minutes',NULL
++    )
++  `, [grantId, seed.sessionId, seed.userId, targetRunId, grantTokenHash, action]);
++  return { grantId, grantTokenHash };
++}
++
++async function prepareErasure(seed: Seed, targetRunId = seed.runId): Promise<PrepareResult> {
++  const grant = await issueGrant(seed, targetRunId);
++  const result = await erasurePool.query<PrepareResult>(`
++    SELECT outcome,erasure_id
++    FROM core.prepare_private_run_erasure($1,$2,$3,$4,$5)
++  `, [targetRunId, seed.userId, seed.ownerRef, seed.sessionId, grant.grantTokenHash]);
++  const row = result.rows[0];
++  if (row === undefined) throw new TypeError("C4_ERASURE_RESULT_MISSING");
++  return row;
++}
++
++async function prepareSystemPublication(seed: Seed, publicationRef: string): Promise<void> {
++  const prepared = await runtimePool.query<{ prepared: boolean }>(`
++    SELECT serve.prepare_system_publication_key_provision($1,$2,$3,$4) AS prepared
++  `, [publicationRef, seed.runId, seed.userId, seed.ownerRef]);
++  if (prepared.rows[0]?.prepared !== true) throw new TypeError("C4_SYSTEM_PREPARE_FAILED");
++}
++
++async function systemPublish(seed: Seed): Promise<string> {
++  const publicationRef = randomUUID();
++  await prepareSystemPublication(seed, publicationRef);
++  const published = await runtimePool.query<{ publication_ref: string | null }>(`
++    SELECT core.transition_system_run_publication(
++      $1,$2,$3,$4,$5,$6,$7::jsonb,clock_timestamp(),$8,$9
++    ) AS publication_ref
++  `, [
++    randomUUID(), seed.runId, seed.userId, seed.ownerRef, publicationRef,
++    seed.pseudonym, JSON.stringify({ public_ref: publicationRef }),
++    randomUUID(), randomUUID()
++  ]);
++  if (published.rows[0]?.publication_ref !== publicationRef) {
++    throw new TypeError("C4_SYSTEM_PUBLISH_FAILED");
++  }
++  return publicationRef;
++}
++
++async function markPublishedForOwnerPath(seed: Seed): Promise<string> {
++  const publicationRef = randomUUID();
++  const eventId = randomUUID();
++  const auditId = randomUUID();
++  const deniedAuditId = randomUUID();
++  const reservationId = randomUUID();
++  const visibilityActorRef = randomUUID();
++  const auditActorRef = randomUUID();
++  const auditTargetRef = randomUUID();
++  const deniedAuditActorRef = randomUUID();
++  const deniedAuditTargetRef = randomUUID();
++  const grant = await issueGrant(seed, seed.runId, "PUBLISH");
++  await database.pool.query(`
++    INSERT INTO core.publication_ref_tombstone(ref,ref_kind,created_at)
++    VALUES ($1,'publication_ref',clock_timestamp())
++  `, [publicationRef]);
++  await database.pool.query(`
++    INSERT INTO serve.publication_key_provision_intent(
++      publication_ref,run_id,user_id,owner_ref,session_id,grant_token_hash,
++      requested_at,expires_at,cleanup_state
++    ) VALUES (
++      $1,$2,$3,$4,$5,$6,clock_timestamp(),
++      clock_timestamp()+interval '5 minutes','PREPARED'
++    )
++  `, [
++    publicationRef, seed.runId, seed.userId, seed.ownerRef,
++    seed.sessionId, grant.grantTokenHash
++  ]);
++  await database.pool.query(`
++    INSERT INTO identity.publication_event_binding(
++      reservation_id,user_id,session_id,run_id,action,grant_token_hash,
++      visibility_event_id,visibility_actor_ref,audit_id,audit_actor_ref,audit_target_ref,
++      denied_audit_id,denied_audit_actor_ref,denied_audit_target_ref,grant_id,
++      created_at,expires_at,consumed_at
++    ) VALUES (
++      $1,$2,$3,$4,'PUBLISH',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
++      clock_timestamp(),clock_timestamp()+interval '5 minutes',NULL
++    )
++  `, [
++    reservationId, seed.userId, seed.sessionId, seed.runId, grant.grantTokenHash,
++    eventId, visibilityActorRef, auditId, auditActorRef, auditTargetRef,
++    deniedAuditId, deniedAuditActorRef, deniedAuditTargetRef, grant.grantId
++  ]);
++  const published = await runtimePool.query<{ publication_ref: string | null }>(`
++    SELECT core.transition_run_publication(
++      $1,$2,$3,$4,$5,$6,'PUBLISH',$7,$8,$9::jsonb,clock_timestamp(),$10,$11,$12
++    ) AS publication_ref
++  `, [
++    eventId, seed.runId, seed.userId, seed.ownerRef, seed.sessionId,
++    grant.grantTokenHash, publicationRef, seed.pseudonym,
++    JSON.stringify({ public_ref: publicationRef }), auditId, deniedAuditId, reservationId
++  ]);
++  if (published.rows[0]?.publication_ref !== publicationRef) {
++    throw new TypeError("C4_OWNER_PUBLISH_FAILED");
++  }
++  return publicationRef;
++}
++
++async function insertSystemIntent(
++  seed: Seed,
++  input: Readonly<{ expired?: boolean }> = {}
++): Promise<string> {
++  const publicationRef = randomUUID();
++  await database.pool.query(`
++    INSERT INTO core.publication_ref_tombstone(ref,ref_kind,created_at)
++    VALUES ($1,'publication_ref',clock_timestamp())
++  `, [publicationRef]);
++  await database.pool.query(`
++    INSERT INTO serve.system_publication_key_provision_intent(
++      publication_ref,run_id,user_id,owner_ref,requested_at,expires_at,cleanup_state
++    ) VALUES (
++      $1,$2,$3,$4,clock_timestamp()-interval '10 minutes',
++      clock_timestamp()+CASE WHEN $5::boolean THEN -interval '5 minutes' ELSE interval '5 minutes' END,
++      'PREPARED'
++    )
++  `, [publicationRef, seed.runId, seed.userId, seed.ownerRef, input.expired ?? false]);
++  return publicationRef;
++}
++
++async function insertPendingCleanup(publicationRef: string): Promise<void> {
++  await database.pool.query(`
++    INSERT INTO serve.publication_key_cleanup_intent(
++      publication_ref,requested_at,completed_at,cleanup_state,
++      cleanup_claim_token,cleanup_claim_expires_at,destroy_result
++    ) VALUES ($1,clock_timestamp(),NULL,'PENDING',NULL,NULL,NULL)
++    ON CONFLICT (publication_ref) DO UPDATE
++    SET requested_at=LEAST(serve.publication_key_cleanup_intent.requested_at,EXCLUDED.requested_at),
++      completed_at=NULL,cleanup_state='PENDING',cleanup_claim_token=NULL,
++      cleanup_claim_expires_at=NULL,destroy_result=NULL
++  `, [publicationRef]);
++}
++
++async function directPrivateVisibility(
++  seed: Seed,
++  publicationRef: string,
++  actorAuditToken: string
++): Promise<string | undefined> {
++  try {
++    await database.pool.query(`
++      INSERT INTO core.run_visibility_event(
++        run_visibility_event_id,run_id,publication_ref,state,actor_audit_token,
++        actor_ref_version,warning_version,occurred_at,at_seq
++      ) VALUES (
++        $1,$2,$3,'PRIVATE',$4,2,'COPIES_MAY_PERSIST_V1',
++        clock_timestamp(),ledger.allocate_sequence()
++      )
++    `, [randomUUID(), seed.runId, publicationRef, actorAuditToken]);
++    return undefined;
++  } catch (error) {
++    return (error as { code?: string }).code;
++  }
++}
++
++async function count(query: string, values: readonly unknown[]): Promise<number> {
++  const result = await database.pool.query<{ count: string }>(query, [...values]);
++  return Number(result.rows[0]?.count ?? 0);
++}
++
++beforeAll(async () => {
++  database = await startTestDatabase();
++  await migrate(database.pool);
++  await database.pool.query(`
++    CREATE ROLE debateai_c4_unprivileged NOLOGIN NOINHERIT;
++    GRANT USAGE ON SCHEMA core TO debateai_c4_unprivileged
++  `);
++  runtimePool = createPool(database.connectionString, { max: 1 });
++  erasurePool = createPool(database.connectionString, { max: 1 });
++  cleanupPool = createPool(database.connectionString, { max: 1 });
++  unprivilegedPool = createPool(database.connectionString, { max: 1 });
++  await runtimePool.query("SET ROLE debateai_runtime");
++  await erasurePool.query("SET ROLE debateai_erasure_runtime");
++  await cleanupPool.query("SET ROLE debateai_publication_cleanup");
++  await unprivilegedPool.query("SET ROLE debateai_c4_unprivileged");
++}, 120_000);
++
++afterAll(async () => {
++  await runtimePool?.end();
++  await erasurePool?.end();
++  await cleanupPool?.end();
++  await unprivilegedPool?.end();
++  await database?.stop();
++});
++
++describe("S01-C4 published-run erasure on real PostgreSQL", () => {
++  it("admits a bound system-published run under debateai_erasure_runtime", async () => {
++    // PROPERTY: bound PUBLISHED bypasses only the historical PUBLISHED return.
++    // CATCHES: omitting the bound carve-out. NEIGHBOUR: Premium remains PUBLISHED.
++    const seed = await seedRun();
++    await systemPublish(seed);
++    const result = await prepareErasure(seed);
++    expect(["PREPARED", "COMMITTED", "ERASED", "CLEANED"]).toContain(result.outcome);
++    expect(result.outcome).not.toBe("CONTENDED");
++  });
++
++  it("writes PRIVATE and removes the old public ref from latest membership", async () => {
++    // PROPERTY: admitted deletion makes the live public ref unreachable by latest visibility.
++    // CATCHES: falling through without the PRIVATE event. NEIGHBOUR: the snapshot remains cleanup evidence.
++    const seed = await seedRun();
++    const publicationRef = await systemPublish(seed);
++    const result = await prepareErasure(seed);
++    const latest = await database.pool.query<{ state: string; publication_ref: string | null }>(`
++      SELECT state,publication_ref FROM core.run_visibility_event
++      WHERE run_id=$1 ORDER BY at_seq DESC LIMIT 1
++    `, [seed.runId]);
++    const publicMembership = await count(`
++      WITH latest AS (
++        SELECT DISTINCT ON (run_id) run_id,publication_ref,state
++        FROM core.run_visibility_event ORDER BY run_id,at_seq DESC
++      ) SELECT count(*) FROM latest WHERE publication_ref=$1 AND state='PUBLISHED'
++    `, [publicationRef]);
++    expect({ outcome: result.outcome, latest: latest.rows[0], publicMembership }).toMatchObject({
++      outcome: "PREPARED",
++      latest: { state: "PRIVATE", publication_ref: publicationRef },
++      publicMembership: 0
++    });
++  });
++
++  it("uses only the pinned bound-erasure visibility shape", async () => {
++    // PROPERTY: bound erasure emits exactly f2/v2/PRIVATE/COPIES while minting no owner binding or audit.
++    // CATCHES: reusing f1, fabricating UNPUBLISH authority, or emitting a system unpublished audit.
++    // NEIGHBOUR: the existing system PUBLISHED event retains f1 and PUBLIC_INDEXED_V1.
++    const seed = await seedRun();
++    const publicationRef = await systemPublish(seed);
++    const unpublishedBefore = await count(`
++      SELECT count(*) FROM identity.audit_event
++      WHERE event_type='debate.publication.unpublished'
++    `, []);
++    const result = await prepareErasure(seed);
++    const latest = await database.pool.query<{
++      state: string;
++      publication_ref: string | null;
++      actor_audit_token: string;
++      actor_ref_version: number;
++      warning_version: string;
++    }>(`
++      SELECT state,publication_ref,actor_audit_token,actor_ref_version,warning_version
++      FROM core.run_visibility_event
++      WHERE run_id=$1 ORDER BY at_seq DESC LIMIT 1
++    `, [seed.runId]);
++    const bindingCount = await count(`
++      SELECT count(*) FROM identity.publication_event_binding WHERE run_id=$1
++    `, [seed.runId]);
++    const unpublishedAfter = await count(`
++      SELECT count(*) FROM identity.audit_event
++      WHERE event_type='debate.publication.unpublished'
++    `, []);
++    expect({
++      outcome: result.outcome,
++      latest: latest.rows[0],
++      bindingCount,
++      unpublishedDelta: unpublishedAfter - unpublishedBefore
++    }).toEqual({
++      outcome: "PREPARED",
++      latest: {
++        state: "PRIVATE",
++        publication_ref: publicationRef,
++        actor_audit_token: BOUND_ERASURE_ACTOR,
++        actor_ref_version: 2,
++        warning_version: "COPIES_MAY_PERSIST_V1"
++      },
++      bindingCount: 0,
++      unpublishedDelta: 0
++    });
++  });
++
++  it("rejects the f2 PRIVATE shape for a Premium run even with pending cleanup", async () => {
++    // PROPERTY: cleanup state cannot turn an unbound run into a bound-erasure transition.
++    // CATCHES: omitting run_is_free_public_bound from the f2 admission.
++    // NEIGHBOUR: the same shape is admitted for a bound run with pending cleanup.
++    const seed = await seedRun({ planTier: "premium" });
++    const publicationRef = await markPublishedForOwnerPath(seed);
++    await insertPendingCleanup(publicationRef);
++    await expect(
++      directPrivateVisibility(seed, publicationRef, BOUND_ERASURE_ACTOR)
++    ).resolves.toBe("55000");
++  });
++
++  it("rejects the f2 PRIVATE shape for a bound run without pending cleanup", async () => {
++    // PROPERTY: the pinned actor is authorized only after cleanup is durably pending.
++    // CATCHES: admitting f2 on bound membership alone.
++    // NEIGHBOUR: prepare_private_run_erasure writes cleanup before visibility.
++    const seed = await seedRun();
++    const publicationRef = await systemPublish(seed);
++    await expect(
++      directPrivateVisibility(seed, publicationRef, BOUND_ERASURE_ACTOR)
++    ).resolves.toBe("55000");
++  });
++
++  it("rejects the system-publish f1 actor for bound PRIVATE even with pending cleanup", async () => {
++    // PROPERTY: f1 authorizes only system PUBLISHED; bound erasure has a distinct f2 capability.
++    // CATCHES: broadening the pre-existing f1 exception to PRIVATE.
++    // NEIGHBOUR: the exact f2 shape is admitted inside the erasure function.
++    const seed = await seedRun();
++    const publicationRef = await systemPublish(seed);
++    await insertPendingCleanup(publicationRef);
++    await expect(
++      directPrivateVisibility(seed, publicationRef, SYSTEM_PUBLISH_ACTOR)
++    ).resolves.toBe("55000");
++  });
++
++  it("keeps a Premium published run at PUBLISHED", async () => {
++    // PROPERTY: Premium never enters the bound-public erasure carve-out.
++    // CATCHES: deleting the bound predicate. NEIGHBOUR: bound Free is admitted.
++    const seed = await seedRun({ planTier: "premium" });
++    await markPublishedForOwnerPath(seed);
++    await expect(prepareErasure(seed)).resolves.toMatchObject({ outcome: "PUBLISHED" });
++  });
++
++  it("keeps a pre-rule Free published run at PUBLISHED", async () => {
++    // PROPERTY: Free tier alone cannot authorize published erasure.
++    // CATCHES: ignoring free_public_rule. NEIGHBOUR: rule=true is admitted.
++    const seed = await seedRun({ planTier: "free", freePublicRule: false });
++    await markPublishedForOwnerPath(seed);
++    await expect(prepareErasure(seed)).resolves.toMatchObject({ outcome: "PUBLISHED" });
++  });
++
++  it("allows the erasure role and denies an unprivileged role with 42501", async () => {
++    // PROPERTY: CREATE OR REPLACE preserves the product-role grant but grants nothing to unrelated roles.
++    // CATCHES: DROP/recreate or PUBLIC execute. NEIGHBOUR: invalid product inputs remain typed, not 42501.
++    const seed = await seedRun();
++    await systemPublish(seed);
++    const runtime = await prepareErasure(seed);
++    let sqlstate: string | undefined;
++    try {
++      await unprivilegedPool.query(
++        "SELECT * FROM core.prepare_private_run_erasure($1,$2,$3,$4,$5)",
++        [seed.runId, seed.userId, seed.ownerRef, seed.sessionId, tokenHash()]
++      );
++    } catch (error) {
++      sqlstate = (error as { code?: string }).code;
++    }
++    expect({ runtime: runtime.outcome, sqlstate }).toEqual({ runtime: "PREPARED", sqlstate: "42501" });
++  });
++
++  it("preserves the five-argument function identity and EXECUTE grant", async () => {
++    // PROPERTY: migration 0068 replaces the existing signature in place.
++    // CATCHES: DROP or overload. NEIGHBOUR: unrelated roles remain denied.
++    const result = await database.pool.query<{
++      signature: string | null;
++      erasure_allowed: boolean;
++      unprivileged_allowed: boolean;
++    }>(`
++      SELECT
++        to_regprocedure('core.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)')::text AS signature,
++        has_function_privilege(
++          'debateai_erasure_runtime',
++          'core.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)',
++          'execute'
++        ) AS erasure_allowed,
++        has_function_privilege(
++          'debateai_c4_unprivileged',
++          'core.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)',
++          'execute'
++        ) AS unprivileged_allowed
++    `);
++    expect(result.rows[0]).toEqual({
++      signature: "core.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)",
++      erasure_allowed: true,
++      unprivileged_allowed: false
++    });
++  });
++
++  it("returns CONTENDED while a system publication intent is PREPARED", async () => {
++    // PROPERTY: erasure serializes against both owner and system publication intents.
++    // CATCHES: omitting the 0067 intent gate. NEIGHBOUR: an expired intent removed by cleanup does not contend.
++    const seed = await seedRun();
++    await systemPublish(seed);
++    await insertSystemIntent(seed);
++    await expect(prepareErasure(seed)).resolves.toMatchObject({ outcome: "CONTENDED" });
++  });
++
++  it("admits erasure after cleanup removes an expired orphan system intent", async () => {
++    // PROPERTY: only a live system publication intent contends erasure.
++    // CATCHES: treating an expired orphan as permanent contention. NEIGHBOUR: a future PREPARED row contends.
++    const seed = await seedRun();
++    await systemPublish(seed);
++    const orphanRef = await insertSystemIntent(seed, { expired: true });
++    const claimed = await cleanupPool.query<{ publication_ref: string; claim_token: string }>(`
++      SELECT * FROM serve.claim_system_publication_key_provision_cleanup(100)
++    `);
++    const orphan = claimed.rows.find((row) => row.publication_ref === orphanRef);
++    const completed = orphan === undefined ? false : (await cleanupPool.query<{ completed: boolean }>(`
++      SELECT serve.complete_system_publication_key_provision_cleanup($1,$2) AS completed
++    `, [orphanRef, orphan.claim_token])).rows[0]?.completed === true;
++    const result = await prepareErasure(seed);
++    expect({ claimed: orphan?.publication_ref, completed, outcome: result.outcome }).toEqual({
++      claimed: orphanRef, completed: true, outcome: "PREPARED"
++    });
++  });
++
++  it("returns NOT_FOUND for a different authenticated owner", async () => {
++    // PROPERTY: ownership is checked before the bound-public carve-out.
++    // CATCHES: applying bound deletion to a non-owner. NEIGHBOUR: the creator is admitted.
++    const creator = await seedRun();
++    const other = await seedRun();
++    await systemPublish(creator);
++    await expect(prepareErasure(other, creator.runId)).resolves.toMatchObject({ outcome: "NOT_FOUND" });
++  });
++
++  it("still contends on a different snapshot with no completed cleanup", async () => {
++    // PROPERTY: the carve-out excludes only the public ref it just scheduled for cleanup.
++    // CATCHES: exempting every snapshot of the run. NEIGHBOUR: the current public ref is admitted.
++    const seed = await seedRun();
++    await systemPublish(seed);
++    const otherRef = randomUUID();
++    await database.pool.query(`
++      INSERT INTO core.publication_ref_tombstone(ref,ref_kind,created_at)
++      VALUES ($1,'publication_ref',clock_timestamp())
++    `, [otherRef]);
++    await database.pool.query(`
++      INSERT INTO serve.publication_snapshot(
++        publication_ref,run_id,format_version,content_ciphertext,created_at
++      ) VALUES ($1,$2,1,'{}'::jsonb,clock_timestamp())
++    `, [otherRef, seed.runId]);
++    await expect(prepareErasure(seed)).resolves.toMatchObject({ outcome: "CONTENDED" });
++  });
++});
+diff --git a/dialectical-engine/tests/unit/fpd-s01-c2-auto-publish.test.ts b/dialectical-engine/tests/unit/fpd-s01-c2-auto-publish.test.ts
+new file mode 100644
+index 00000000..77b0b239
+--- /dev/null
++++ b/dialectical-engine/tests/unit/fpd-s01-c2-auto-publish.test.ts
+@@ -0,0 +1,333 @@
++import { describe, expect, it } from "vitest";
++import { PublicationTransitionSchema, type Answer } from "@debateai/contract";
++import type { PostgresPublicationRepository } from "@debateai/db";
++import { buildApi, SESSION_COOKIE_NAME } from "../../apps/api/src/index.js";
++import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
++
++const RUN_ID = "10000000-0000-4000-8000-000000000001";
++const USER_ID = "10000000-0000-4000-8000-000000000002";
++const OWNER_REF = "10000000-0000-4000-8000-000000000003";
++
++function answer(terminal: Answer["terminal"] = "SERVED"): Answer {
++  return {
++    answer_id: "answer-c2",
++    answer_version: 1,
++    run_ref: RUN_ID,
++    terminal,
++    question_line: "Should a public square need a gatekeeper?",
++    verdict_state: "SUPPORTED",
++    verdict_unavailable: null,
++    confidence_band: "high",
++    band_ceiling: {
++      label: "high",
++      basis: { LOOKED_UP: 1, RAN: 0, REASONING: 0 },
++      register_row_key: "c2-band",
++      register_version: 1,
++      source_ref: "c2-source",
++      lift_path: "none"
++    },
++    answer_form: null,
++    serve_state: "COMPOSED",
++    composed_text: [{
++      segment_id: "segment-c2",
++      text: "A public answer.",
++      load_bearing: true,
++      served_number_refs: []
++    }],
++    number_slots: [],
++    abstention: null,
++    shadow_suppressions: [],
++    badges: [],
++    residual_objections: [],
++    value_hinges: [],
++    condition_marks: [],
++    condition_mark_records: [],
++    reversal_point: "New evidence",
++    builds_on_previous: { value: false, answer_ref: null },
++    memory_disclosure: null,
++    risk_tier: "standard",
++    tier_source: "ASKER",
++    tier_provenance_ref: "c2-tier",
++    cost_envelope: {
++      basis: {},
++      state: "WITHIN",
++      consumed_model_attempts: 1,
++      protected_core: "NEVER_SKIPPABLE"
++    },
++    composition_budget_tier: "low",
++    conformance_outcome: "PASS",
++    ledger_digest_handle: "c2-ledger",
++    inspection_handle: "c2-inspection",
++    as_of: "2026-09-20T12:00:00.000Z",
++    staleness_state: "FRESH",
++    relevant_as_of: "2026-09-20T12:00:00.000Z",
++    nodes: [],
++    edges: []
++  } as Answer;
++}
++
++type WorkRow = Readonly<{
++  runId: string;
++  userId: string;
++  ownerRef: string;
++  reason: string;
++}>;
++
++function harness() {
++  const state = {
++    bound: true,
++    pseudonym: "Public Thinker",
++    cipherFails: false,
++    transitionReturnsNull: false,
++    visibility: { state: "PRIVATE" as "PRIVATE" | "PUBLISHED", publicRef: null as string | null },
++    work: undefined as WorkRow | undefined,
++    preflightCalls: 0,
++    systemPublishCalls: 0,
++    audits: [] as string[],
++    prepared: new Set<string>()
++  };
++  const repository = {
++    async preflightGrant() {
++      state.preflightCalls += 1;
++      return true;
++    },
++    async runIsFreePublicBound() {
++      return state.bound;
++    },
++    async readAuthorPseudonym() {
++      return state.pseudonym;
++    },
++    async readOwnedVisibility() {
++      return {
++        ...state.visibility,
++        publishPending: state.work !== undefined
++      };
++    },
++    async prepareSystemKeyProvision(input: { publicationRef: string }) {
++      state.prepared.add(input.publicationRef);
++      return true;
++    },
++    async abandonSystemKeyProvision(publicationRef: string) {
++      return state.prepared.delete(publicationRef);
++    },
++    async systemPublish(input: { publicationRef: string }) {
++      state.systemPublishCalls += 1;
++      if (state.transitionReturnsNull) return null;
++      state.visibility = { state: "PUBLISHED", publicRef: input.publicationRef };
++      state.prepared.delete(input.publicationRef);
++      return input.publicationRef;
++    },
++    async auditSystemPublicationAttempt(
++      _auditId: string,
++      _runId: string,
++      reason: string
++    ) {
++      state.audits.push(reason);
++      return true;
++    },
++    async upsertAutoPublishWork(
++      runId: string,
++      userId: string,
++      ownerRef: string,
++      reason: string
++    ) {
++      state.work = { runId, userId, ownerRef, reason };
++    },
++    async clearAutoPublishWork() {
++      state.work = undefined;
++      return true;
++    },
++    async claimAutoPublishWork() {
++      return state.work === undefined ? [] : [state.work];
++    },
++    async countAutoPublishWork() {
++      return state.work === undefined ? 0 : 1;
++    },
++    async claimSystemKeyProvisionCleanup() {
++      return [];
++    }
++  };
++  const cipher = {
++    async create() {
++      if (state.cipherFails) throw new TypeError("CIPHER_DOWN");
++      return {
++        encrypt(value: unknown) {
++          return { schema: "test-envelope", value };
++        },
++        close() {}
++      };
++    },
++    async destroy() {
++      return "ALREADY_ABSENT" as const;
++    },
++    async exists() {
++      return false;
++    }
++  };
++  const application = new PostgresPublicationApplication(
++    repository as unknown as PostgresPublicationRepository,
++    cipher as never,
++    () => new Date("2026-09-20T12:00:00.000Z"),
++    repository as unknown as PostgresPublicationRepository,
++    async () => answer()
++  );
++  return { application, state };
++}
++
++const authenticated = {
++  userId: USER_ID,
++  ownerRef: OWNER_REF,
++  session: {
++    session_id: "10000000-0000-4000-8000-000000000004",
++    asker_id: `owner:${OWNER_REF}`,
++    caller_scope: "ASKER",
++    ownership_provenance: "server_session",
++    provisional_identity_model: false
++  }
++} as never;
++
++describe("S01-C2 free-public auto publication", () => {
++  it("BLOCKED answer does not publish and outstanding stays 0 across two reconcilers", async () => {
++    // PROPERTY: BLOCKED is a terminal no-op and never becomes retry work.
++    // CATCHES: removing the first BLOCKED return. NEIGHBOUR: a served answer may publish.
++    const { application, state } = harness();
++    await application.tryAutoPublish({
++      runId: RUN_ID, answer: answer("BLOCKED"), userId: USER_ID, ownerRef: OWNER_REF
++    });
++    const first = await application.reconcileFreePublicAutoPublish();
++    const second = await application.reconcileFreePublicAutoPublish();
++    expect({ calls: state.systemPublishCalls, work: state.work, first, second }).toEqual({
++      calls: 0, work: undefined, first: 0, second: 0
++    });
++  });
++
++  it("publishable bound answer system-publishes with no PUBLISH grant", async () => {
++    // PROPERTY: the system path publishes without invoking the owner grant preflight.
++    // CATCHES: routing through preflightGrant. NEIGHBOUR: owner publish remains grant-gated.
++    const { application, state } = harness();
++    await application.tryAutoPublish({
++      runId: RUN_ID, answer: answer(), userId: USER_ID, ownerRef: OWNER_REF
++    });
++    expect({
++      state: state.visibility.state,
++      calls: state.systemPublishCalls,
++      preflightCalls: state.preflightCalls,
++      work: state.work
++    }).toEqual({ state: "PUBLISHED", calls: 1, preflightCalls: 0, work: undefined });
++  });
++
++  it("cipher create throw leaves outstanding AUTO_PUBLISH_CIPHER_FAILED and does not throw", async () => {
++    // PROPERTY: a cipher outage is observable retry work but is invisible to the GET caller.
++    // CATCHES: rethrowing the cipher error. NEIGHBOUR: success clears work.
++    const { application, state } = harness();
++    state.cipherFails = true;
++    let threw = false;
++    try {
++      await application.tryAutoPublish({
++        runId: RUN_ID, answer: answer(), userId: USER_ID, ownerRef: OWNER_REF
++      });
++    } catch {
++      threw = true;
++    }
++    expect({ threw, reason: state.work?.reason, audits: state.audits }).toEqual({
++      threw: false,
++      reason: "AUTO_PUBLISH_CIPHER_FAILED",
++      audits: ["AUTO_PUBLISH_CIPHER_FAILED"]
++    });
++  });
++
++  it("null pseudonym leaves outstanding AUTO_PUBLISH_NULL_PSEUDONYM", async () => {
++    // PROPERTY: absence of a pseudonym prevents publication and records one typed denial.
++    // CATCHES: substituting an identity or silently returning. NEIGHBOUR: live pseudonym publishes.
++    const { application, state } = harness();
++    state.pseudonym = null as unknown as string;
++    await application.tryAutoPublish({
++      runId: RUN_ID, answer: answer(), userId: USER_ID, ownerRef: OWNER_REF
++    });
++    expect({ calls: state.systemPublishCalls, reason: state.work?.reason, audits: state.audits }).toEqual({
++      calls: 0,
++      reason: "AUTO_PUBLISH_NULL_PSEUDONYM",
++      audits: ["AUTO_PUBLISH_NULL_PSEUDONYM"]
++    });
++  });
++
++  it("reconcileFreePublicAutoPublish retries without AuthenticatedSession", async () => {
++    // PROPERTY: durable owner identifiers suffice for a background retry after the owner stops polling.
++    // CATCHES: requiring AuthenticatedSession or omitting readServedAnswer. NEIGHBOUR: null answer stays queued.
++    const { application, state } = harness();
++    state.cipherFails = true;
++    await application.tryAutoPublish({
++      runId: RUN_ID, answer: answer(), userId: USER_ID, ownerRef: OWNER_REF
++    });
++    state.cipherFails = false;
++    const processed = await application.reconcileFreePublicAutoPublish();
++    expect({ processed, state: state.visibility.state, work: state.work, preflight: state.preflightCalls }).toEqual({
++      processed: 1, state: "PUBLISHED", work: undefined, preflight: 0
++    });
++  });
++
++  it("outstanding visibility carries publish_pending true; premium never-published does not", async () => {
++    // PROPERTY: publish_pending is present exactly while outstanding, never as false.
++    // CATCHES: omitting true or serializing false. NEIGHBOUR: ordinary PRIVATE stays byte-stable.
++    const { application, state } = harness();
++    state.work = {
++      runId: RUN_ID,
++      userId: USER_ID,
++      ownerRef: OWNER_REF,
++      reason: "AUTO_PUBLISH_CIPHER_FAILED"
++    };
++    const pending = await application.readOwnedVisibility({ runId: RUN_ID, authenticated });
++    state.work = undefined;
++    state.bound = false;
++    const premium = await application.readOwnedVisibility({ runId: RUN_ID, authenticated });
++    expect({ pending, premium }).toEqual({
++      pending: { state: "PRIVATE", public_ref: null, publish_pending: true },
++      premium: { state: "PRIVATE", public_ref: null }
++    });
++  });
++
++  it("GET answer invokes auto-publish but still returns 200 when auto-publish throws", async () => {
++    // PROPERTY: the served-answer response is independent of publication availability.
++    // CATCHES: omitting the GET hook or awaiting it outside try/catch. NEIGHBOUR: null answer remains 404.
++    let calls = 0;
++    const api = buildApi({
++      application: {
++        async readRunAnswer() { return answer(); }
++      } as never,
++      sessions: {
++        async authenticate() { return authenticated; },
++        verifyCsrf() { return true; }
++      } as never,
++      publications: {
++        async tryAutoPublish() {
++          calls += 1;
++          throw new TypeError("AUTO_PUBLISH_DOWN");
++        }
++      } as never
++    });
++    const response = await api.inject({
++      method: "GET",
++      url: `/v1/runs/${RUN_ID}/answer`,
++      headers: { cookie: `${SESSION_COOKIE_NAME}=${"a".repeat(43)}` }
++    });
++    await api.close();
++    expect({ status: response.statusCode, calls }).toEqual({ status: 200, calls: 1 });
++  });
++
++  it("wire schema accepts only absent or literal-true publish_pending", () => {
++    // PROPERTY: outstanding is an optional true marker, never a third state or false flag.
++    // CATCHES: omitting the key or accepting false. NEIGHBOUR: the pre-slice body remains valid.
++    const ordinary = PublicationTransitionSchema.safeParse({ state: "PRIVATE", public_ref: null });
++    const pending = PublicationTransitionSchema.safeParse({
++      state: "PRIVATE", public_ref: null, publish_pending: true
++    });
++    const falsePending = PublicationTransitionSchema.safeParse({
++      state: "PRIVATE", public_ref: null, publish_pending: false
++    });
++    const thirdState = PublicationTransitionSchema.safeParse({ state: "PENDING", public_ref: null });
++    expect({ ordinary: ordinary.success, pending: pending.success,
++      falsePending: falsePending.success, thirdState: thirdState.success }).toEqual({
++      ordinary: true, pending: true, falsePending: false, thirdState: false
++    });
++  });
++});
+diff --git a/dialectical-engine/tests/unit/fpd-s01-c3-unpublish-http.test.ts b/dialectical-engine/tests/unit/fpd-s01-c3-unpublish-http.test.ts
+new file mode 100644
+index 00000000..98d3de23
+--- /dev/null
++++ b/dialectical-engine/tests/unit/fpd-s01-c3-unpublish-http.test.ts
+@@ -0,0 +1,382 @@
++import { afterEach, describe, expect, it, vi } from "vitest";
++
++import {
++  buildApi,
++  CSRF_COOKIE_NAME,
++  SESSION_COOKIE_NAME,
++  type ApiOptions
++} from "../../apps/api/src/index.js";
++
++const ORIGIN = "https://ui.example.test";
++const RUN_ID = "11111111-1111-4111-8111-111111111111";
++const MISSING_RUN_ID = "00000000-0000-4000-8000-000000000000";
++const OWNER_SESSION_TOKEN = "s".repeat(43);
++const SECOND_SESSION_TOKEN = "t".repeat(43);
++const CSRF_TOKEN = "c".repeat(43);
++const GRANT_TOKEN = "g".repeat(43);
++
++const OWNER_AUTHENTICATED = Object.freeze({
++  session: Object.freeze({
++    session_id: "22222222-2222-4222-8222-222222222222",
++    asker_id: "owner:owner-one",
++    caller_scope: "user",
++    ownership_provenance: "server_session"
++  }),
++  userId: "33333333-3333-4333-8333-333333333333",
++  ownerRef: "owner-one"
++});
++const SECOND_AUTHENTICATED = Object.freeze({
++  session: Object.freeze({
++    session_id: "44444444-4444-4444-8444-444444444444",
++    asker_id: "owner:owner-two",
++    caller_scope: "user",
++    ownership_provenance: "server_session"
++  }),
++  userId: "55555555-5555-4555-8555-555555555555",
++  ownerRef: "owner-two"
++});
++
++type PublicationApplication = NonNullable<ApiOptions["publications"]>;
++type PreflightInput = Parameters<PublicationApplication["preflightGrant"]>[0];
++
++type HarnessInput = Readonly<{
++  withoutPublications?: boolean;
++  preflight?: (input: PreflightInput) => boolean;
++  owned?: object | null | ((runId: string) => object | null);
++  visibility?: Readonly<{
++    state: "PRIVATE" | "PUBLISHED";
++    public_ref: string | null;
++  }> | null;
++  bound?: boolean | ((runId: string) => boolean);
++}>;
++
++const openedApis: ReturnType<typeof buildApi>[] = [];
++
++afterEach(async () => {
++  await Promise.all(openedApis.splice(0).map(async (api) => api.close()));
++});
++
++function authenticatedHeaders(sessionToken = OWNER_SESSION_TOKEN): Readonly<Record<string, string>> {
++  return Object.freeze({
++    cookie: `${SESSION_COOKIE_NAME}=${sessionToken}; ${CSRF_COOKIE_NAME}=${CSRF_TOKEN}`,
++    origin: ORIGIN,
++    "x-csrf-token": CSRF_TOKEN
++  });
++}
++
++function validBody(): Readonly<Record<string, unknown>> {
++  return Object.freeze({
++    step_up_grant: GRANT_TOKEN,
++    copies_may_persist_acknowledged: true
++  });
++}
++
++function makeHarness(input: HarnessInput = {}) {
++  const readRun = vi.fn(async (runId: string) => input.owned === undefined
++    ? Object.freeze({})
++    : typeof input.owned === "function" ? input.owned(runId) : input.owned);
++  const application = Object.freeze({ readRun }) as unknown as ApiOptions["application"];
++  const preflightGrant = vi.fn(async (candidate: PreflightInput) => input.preflight?.(candidate) ?? true);
++  const auditPreflightDenial = vi.fn(async () => undefined);
++  const readOwnedVisibility = vi.fn(async () => input.visibility ?? Object.freeze({
++    state: "PUBLISHED" as const,
++    public_ref: RUN_ID
++  }));
++  const isFreePublicBound = vi.fn(async (runId: string) => typeof input.bound === "function"
++    ? input.bound(runId)
++    : input.bound ?? true);
++  const unpublish = vi.fn(async () => Object.freeze({
++    state: "PRIVATE" as const,
++    public_ref: null
++  }));
++  const publications = Object.freeze({
++    preflightGrant,
++    auditPreflightDenial,
++    readOwnedVisibility,
++    isFreePublicBound,
++    unpublish
++  }) as unknown as PublicationApplication;
++  const sessions = Object.freeze({
++    authenticate: vi.fn(async (sessionToken: string) => sessionToken === OWNER_SESSION_TOKEN
++      ? OWNER_AUTHENTICATED
++      : sessionToken === SECOND_SESSION_TOKEN ? SECOND_AUTHENTICATED : null),
++    verifyCsrf: vi.fn(() => true)
++  }) as unknown as NonNullable<ApiOptions["sessions"]>;
++  const api = buildApi({
++    application,
++    sessions,
++    allowedOrigin: ORIGIN,
++    ...(input.withoutPublications ? {} : { publications })
++  });
++  openedApis.push(api);
++  return {
++    api,
++    readRun,
++    preflightGrant,
++    auditPreflightDenial,
++    readOwnedVisibility,
++    isFreePublicBound,
++    unpublish
++  };
++}
++
++async function postUnpublish(
++  api: ReturnType<typeof buildApi>,
++  input: Readonly<{
++    runId?: string;
++    headers?: Readonly<Record<string, string>>;
++    payload?: Readonly<Record<string, unknown>>;
++  }> = {}
++) {
++  return api.inject({
++    method: "POST",
++    url: `/v1/runs/${input.runId ?? RUN_ID}/unpublish`,
++    ...(input.headers === undefined ? {} : { headers: input.headers }),
++    payload: input.payload ?? validBody()
++  });
++}
++
++describe("S01-C3 Free-public unpublish HTTP boundary", () => {
++  // PROPERTY G1: unauthenticated unpublish is rejected before any publication dependency is consulted.
++  it("G1 returns the exact 401 face without a session cookie", async () => {
++    const harness = makeHarness();
++    const response = await postUnpublish(harness.api);
++
++    expect({
++      status: response.statusCode,
++      body: response.body,
++      preflightCalls: harness.preflightGrant.mock.calls.length,
++      visibilityCalls: harness.readOwnedVisibility.mock.calls.length,
++      boundCalls: harness.isFreePublicBound.mock.calls.length,
++      unpublishCalls: harness.unpublish.mock.calls.length
++    }).toEqual({
++      status: 401,
++      body: '{"error":"SESSION_REQUIRED"}',
++      preflightCalls: 0,
++      visibilityCalls: 0,
++      boundCalls: 0,
++      unpublishCalls: 0
++    });
++  });
++
++  // PROPERTY G2: every invalid origin/CSRF permutation is rejected before route logic.
++  it("G2 returns the exact 403 face for missing or foreign origin and CSRF mismatch", async () => {
++    const harness = makeHarness();
++    const valid = authenticatedHeaders();
++    const invalidHeaders = [
++      { cookie: valid.cookie!, "x-csrf-token": valid["x-csrf-token"]! },
++      { ...valid, origin: "https://foreign.example.test" },
++      { ...valid, "x-csrf-token": "x".repeat(43) }
++    ];
++    const outcomes = [];
++    for (const headers of invalidHeaders) {
++      const response = await postUnpublish(harness.api, { headers });
++      outcomes.push({ status: response.statusCode, body: response.body });
++    }
++
++    expect({
++      outcomes,
++      preflightCalls: harness.preflightGrant.mock.calls.length,
++      visibilityCalls: harness.readOwnedVisibility.mock.calls.length,
++      boundCalls: harness.isFreePublicBound.mock.calls.length,
++      unpublishCalls: harness.unpublish.mock.calls.length
++    }).toEqual({
++      outcomes: Array.from({ length: 3 }, () => ({
++        status: 403,
++        body: '{"error":"CSRF_VALIDATION_FAILED"}'
++      })),
++      preflightCalls: 0,
++      visibilityCalls: 0,
++      boundCalls: 0,
++      unpublishCalls: 0
++    });
++  });
++
++  // PROPERTY G3: the acknowledgement is required before publication availability or ownership is disclosed.
++  it("G3 returns 400 with the malformed-request code when copies acknowledgement is absent", async () => {
++    const harness = makeHarness();
++    const response = await postUnpublish(harness.api, {
++      headers: authenticatedHeaders(),
++      payload: { step_up_grant: GRANT_TOKEN }
++    });
++
++    expect({
++      status: response.statusCode,
++      body: response.json(),
++      preflightCalls: harness.preflightGrant.mock.calls.length,
++      visibilityCalls: harness.readOwnedVisibility.mock.calls.length,
++      boundCalls: harness.isFreePublicBound.mock.calls.length,
++      unpublishCalls: harness.unpublish.mock.calls.length
++    }).toMatchObject({
++      status: 400,
++      body: { error: "MALFORMED_REQUEST" },
++      preflightCalls: 0,
++      visibilityCalls: 0,
++      boundCalls: 0,
++      unpublishCalls: 0
++    });
++  });
++
++  // PROPERTY G4: an authenticated valid request reports publication unavailability before grant preflight.
++  it("G4 returns the exact 503 face when the publication application is absent", async () => {
++    const harness = makeHarness({ withoutPublications: true });
++    const response = await postUnpublish(harness.api, { headers: authenticatedHeaders() });
++
++    expect({ status: response.statusCode, body: response.body }).toEqual({
++      status: 503,
++      body: '{"error":"PUBLICATION_UNAVAILABLE"}'
++    });
++  });
++
++  // PROPERTY G5: a failed live-grant/owner preflight has the uniform 404 face and stops every later read.
++  it("G5 returns the exact 404 face when grant preflight fails", async () => {
++    const harness = makeHarness({ preflight: () => false });
++    const response = await postUnpublish(harness.api, { headers: authenticatedHeaders() });
++
++    expect({
++      status: response.statusCode,
++      body: response.body,
++      auditCalls: harness.auditPreflightDenial.mock.calls.length,
++      readRunCalls: harness.readRun.mock.calls.length,
++      visibilityCalls: harness.readOwnedVisibility.mock.calls.length,
++      boundCalls: harness.isFreePublicBound.mock.calls.length,
++      unpublishCalls: harness.unpublish.mock.calls.length
++    }).toEqual({
++      status: 404,
++      body: '{"error":"RUN_NOT_FOUND"}',
++      auditCalls: 1,
++      readRunCalls: 0,
++      visibilityCalls: 0,
++      boundCalls: 0,
++      unpublishCalls: 0
++    });
++  });
++
++  // PROPERTY G6: an owner read that finds no run has the same 404 face and stops visibility classification.
++  it("G6 returns the exact 404 face when the owned run read is null", async () => {
++    const harness = makeHarness({ owned: null });
++    const response = await postUnpublish(harness.api, { headers: authenticatedHeaders() });
++
++    expect({
++      status: response.statusCode,
++      body: response.body,
++      preflightCalls: harness.preflightGrant.mock.calls.length,
++      readRunCalls: harness.readRun.mock.calls.length,
++      visibilityCalls: harness.readOwnedVisibility.mock.calls.length,
++      boundCalls: harness.isFreePublicBound.mock.calls.length,
++      unpublishCalls: harness.unpublish.mock.calls.length
++    }).toEqual({
++      status: 404,
++      body: '{"error":"RUN_NOT_FOUND"}',
++      preflightCalls: 1,
++      readRunCalls: 1,
++      visibilityCalls: 0,
++      boundCalls: 0,
++      unpublishCalls: 0
++    });
++  });
++
++  // PROPERTY R-12: a live-granted owner cannot unpublish a bound run whose latest visibility is PUBLISHED.
++  it("R-12 returns the exact typed 409 and never calls unpublish", async () => {
++    const harness = makeHarness();
++    const response = await postUnpublish(harness.api, { headers: authenticatedHeaders() });
++
++    expect({
++      status: response.statusCode,
++      body: response.body,
++      preflightCalls: harness.preflightGrant.mock.calls.length,
++      readRunCalls: harness.readRun.mock.calls.length,
++      visibilityCalls: harness.readOwnedVisibility.mock.calls.length,
++      boundCalls: harness.isFreePublicBound.mock.calls.length,
++      unpublishCalls: harness.unpublish.mock.calls.length
++    }).toEqual({
++      status: 409,
++      body: '{"error":"FREE_DEBATE_CANNOT_BE_UNPUBLISHED"}',
++      preflightCalls: 1,
++      readRunCalls: 1,
++      visibilityCalls: 1,
++      boundCalls: 1,
++      unpublishCalls: 0
++    });
++  });
++
++  // PROPERTY R-13: a second signed-in user cannot distinguish a bound existing run from a missing run.
++  it("R-13 gives a second user the byte-identical missing-run 404 face", async () => {
++    const harness = makeHarness({
++      preflight: ({ runId, authenticated }) => runId === RUN_ID
++        && authenticated === OWNER_AUTHENTICATED as never,
++      owned: (runId) => runId === RUN_ID ? Object.freeze({}) : null,
++      bound: (runId) => runId === RUN_ID
++    });
++    const foreign = await postUnpublish(harness.api, {
++      headers: authenticatedHeaders(SECOND_SESSION_TOKEN)
++    });
++    const missing = await postUnpublish(harness.api, {
++      runId: MISSING_RUN_ID,
++      headers: authenticatedHeaders()
++    });
++
++    expect({
++      foreign: { status: foreign.statusCode, body: foreign.body },
++      missing: { status: missing.statusCode, body: missing.body },
++      readRunCalls: harness.readRun.mock.calls.length,
++      visibilityCalls: harness.readOwnedVisibility.mock.calls.length,
++      boundCalls: harness.isFreePublicBound.mock.calls.length,
++      unpublishCalls: harness.unpublish.mock.calls.length
++    }).toEqual({
++      foreign: { status: 404, body: '{"error":"RUN_NOT_FOUND"}' },
++      missing: { status: 404, body: '{"error":"RUN_NOT_FOUND"}' },
++      readRunCalls: 0,
++      visibilityCalls: 0,
++      boundCalls: 0,
++      unpublishCalls: 0
++    });
++  });
++
++  // PROPERTY R-14: refusing a bound run is non-consuming, so the same live grant receives the same 409 twice.
++  it("R-14 preserves the grant across two sequential refusals", async () => {
++    const harness = makeHarness();
++    const first = await postUnpublish(harness.api, { headers: authenticatedHeaders() });
++    const second = await postUnpublish(harness.api, { headers: authenticatedHeaders() });
++
++    expect({
++      responses: [first, second].map((response) => ({
++        status: response.statusCode,
++        body: response.body
++      })),
++      preflightCalls: harness.preflightGrant.mock.calls.length,
++      visibilityCalls: harness.readOwnedVisibility.mock.calls.length,
++      boundCalls: harness.isFreePublicBound.mock.calls.length,
++      unpublishCalls: harness.unpublish.mock.calls.length
++    }).toEqual({
++      responses: Array.from({ length: 2 }, () => ({
++        status: 409,
++        body: '{"error":"FREE_DEBATE_CANNOT_BE_UNPUBLISHED"}'
++      })),
++      preflightCalls: 2,
++      visibilityCalls: 2,
++      boundCalls: 2,
++      unpublishCalls: 0
++    });
++  });
++
++  // PROPERTY R-15: a published Premium run follows the existing unpublish path and exposes no pending key.
++  it("R-15 keeps Premium unpublish at 200 with the private projection", async () => {
++    const harness = makeHarness({ bound: false });
++    const response = await postUnpublish(harness.api, { headers: authenticatedHeaders() });
++
++    expect({
++      status: response.statusCode,
++      body: response.json(),
++      preflightCalls: harness.preflightGrant.mock.calls.length,
++      readRunCalls: harness.readRun.mock.calls.length,
++      unpublishCalls: harness.unpublish.mock.calls.length
++    }).toEqual({
++      status: 200,
++      body: { state: "PRIVATE", public_ref: null },
++      preflightCalls: 1,
++      readRunCalls: 1,
++      unpublishCalls: 1
++    });
++  });
++});
+diff --git a/dialectical-engine/tests/unit/fpd-s01-c4-erasure-http.test.ts b/dialectical-engine/tests/unit/fpd-s01-c4-erasure-http.test.ts
+new file mode 100644
+index 00000000..b0c06ea4
+--- /dev/null
++++ b/dialectical-engine/tests/unit/fpd-s01-c4-erasure-http.test.ts
+@@ -0,0 +1,249 @@
++import { describe, expect, it, vi } from "vitest";
++import {
++  buildApi,
++  CSRF_COOKIE_NAME,
++  SESSION_COOKIE_NAME,
++  type AskApplication
++} from "@debateai/api";
++import type { AccountErasureApplication } from "../../apps/api/src/account-erasure.js";
++import type {
++  AuthenticatedSession,
++  SessionApplication
++} from "../../apps/api/src/sessions.js";
++
++const ORIGIN = "https://app.debateai.test";
++const SESSION_TOKEN = "s".repeat(43);
++const CSRF_TOKEN = "c".repeat(43);
++const GRANT_TOKEN = "g".repeat(43);
++const RUN_ID = "11111111-1111-4111-8111-111111111111";
++const authenticated = Object.freeze({
++  session: Object.freeze({
++    asker_id: "owner:22222222-2222-4222-8222-222222222222",
++    session_id: "33333333-3333-4333-8333-333333333333",
++    caller_scope: "ASKER" as const,
++    ownership_provenance: "server_session" as const,
++    provisional_identity_model: false as const
++  }),
++  userId: "44444444-4444-4444-8444-444444444444",
++  ownerRef: "22222222-2222-4222-8222-222222222222",
++  tokenHash: "sha256:session",
++  csrfTokenHash: "sha256:csrf",
++  authKind: "cookie" as const
++}) satisfies AuthenticatedSession;
++
++function application(): AskApplication {
++  return {
++    withContentLease: async (_runId, use) => use(),
++    submit: async () => ({ run_ref: RUN_ID, status: "QUEUED" }),
++    readAnswer: async () => null,
++    readRunAnswer: async () => null,
++    readRun: async () => null,
++    readAnswerIndex: async (_session, limit, offset) => ({
++      items: [], open_runs: [], limit, offset, total: 0
++    }),
++    readInspection: async () => null,
++    readLedgerDigest: async () => null,
++    readNode: async () => null,
++    recordInvestigation: async () => null,
++    unlinkMemoryLink: async () => null,
++    readDeployment: async () => ({
++      register: { register_version: 1, rows: [] },
++      scorecards: [],
++      model_ledger: [],
++      fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
++    }),
++    events: async function*() {}
++  };
++}
++
++function sessions(): SessionApplication {
++  return {
++    authenticate: async (token) => token === SESSION_TOKEN ? authenticated : null,
++    verifyCsrf: (_session, token) => token === CSRF_TOKEN,
++    beginLogin: async () => ({ status: "mfa_required", challengeToken: "m".repeat(43) }),
++    completeLogin: async () => ({
++      status: "authenticated",
++      sessionToken: SESSION_TOKEN,
++      csrfToken: CSRF_TOKEN,
++      session: authenticated.session
++    }),
++    logout: async () => true,
++    listSessions: async () => [],
++    revokeSession: async () => true,
++    revokeAllSessions: async () => 1,
++    stepUp: async () => ({ sessionToken: SESSION_TOKEN, csrfToken: CSRF_TOKEN })
++  };
++}
++
++function erasure(
++  outcome: Awaited<ReturnType<AccountErasureApplication["deletePrivateDebate"]>> = "CLEANED"
++): AccountErasureApplication {
++  return {
++    schedule: async () => ({
++      status: "SCHEDULED",
++      executeAt: new Date("2026-08-31T00:00:00.000Z"),
++      cancellationRef: "55555555-5555-4555-8555-555555555555"
++    }),
++    current: async () => ({ status: "NONE" }),
++    cancel: async () => false,
++    deletePrivateDebate: async () => outcome
++  };
++}
++
++const cookie = `${SESSION_COOKIE_NAME}=${SESSION_TOKEN}; ${CSRF_COOKIE_NAME}=${CSRF_TOKEN}`;
++const headers = Object.freeze({
++  cookie,
++  origin: ORIGIN,
++  "x-csrf-token": CSRF_TOKEN,
++  "user-agent": "fpd-s01-c4-test-browser"
++});
++
++describe("S01-C4 published-run erasure HTTP boundary", () => {
++  it("rejects a caller with no session before looking up the run", async () => {
++    // PROPERTY: authentication precedes private-debate lookup.
++    // CATCHES: routing an unauthenticated delete into account erasure.
++    // NEIGHBOUR: an authenticated owner reaches the typed outcome mapping.
++    const deletePrivateDebate = vi.fn<AccountErasureApplication["deletePrivateDebate"]>();
++    const api = buildApi({
++      application: application(),
++      sessions: sessions(),
++      accountErasure: { ...erasure(), deletePrivateDebate },
++      allowedOrigin: ORIGIN
++    });
++    const response = await api.inject({
++      method: "DELETE",
++      url: `/v1/debates/${RUN_ID}`,
++      headers: { origin: ORIGIN, "x-csrf-token": CSRF_TOKEN },
++      payload: { step_up_grant: GRANT_TOKEN }
++    });
++    expect(response.statusCode).toBe(401);
++    expect(response.json()).toEqual({ error: "SESSION_REQUIRED" });
++    expect(deletePrivateDebate).not.toHaveBeenCalled();
++    await api.close();
++  });
++
++  it("rejects a signed-in request that fails CSRF validation", async () => {
++    // PROPERTY: origin and CSRF validation precede deletion.
++    // CATCHES: accepting a cookie-authenticated cross-site delete.
++    // NEIGHBOUR: the same cookie with the matching token reaches the route.
++    const deletePrivateDebate = vi.fn<AccountErasureApplication["deletePrivateDebate"]>();
++    const api = buildApi({
++      application: application(), sessions: sessions(),
++      accountErasure: { ...erasure(), deletePrivateDebate }, allowedOrigin: ORIGIN
++    });
++    const response = await api.inject({
++      method: "DELETE", url: `/v1/debates/${RUN_ID}`,
++      headers: { cookie, origin: ORIGIN }, payload: { step_up_grant: GRANT_TOKEN }
++    });
++    expect(response.statusCode).toBe(403);
++    expect(response.json()).toEqual({ error: "CSRF_VALIDATION_FAILED" });
++    expect(deletePrivateDebate).not.toHaveBeenCalled();
++    await api.close();
++  });
++
++  it("rejects an extra deletion-body key", async () => {
++    // PROPERTY: the private-debate deletion body is strict.
++    // CATCHES: forwarding unrecognized request data to the erasure boundary.
++    // NEIGHBOUR: the exact one-key body is accepted.
++    const deletePrivateDebate = vi.fn<AccountErasureApplication["deletePrivateDebate"]>();
++    const api = buildApi({
++      application: application(), sessions: sessions(),
++      accountErasure: { ...erasure(), deletePrivateDebate }, allowedOrigin: ORIGIN
++    });
++    const response = await api.inject({
++      method: "DELETE", url: `/v1/debates/${RUN_ID}`, headers,
++      payload: { step_up_grant: GRANT_TOKEN, extra: true }
++    });
++    expect(response.statusCode).toBe(400);
++    expect(response.json()).toMatchObject({ error: "MALFORMED_REQUEST" });
++    expect(deletePrivateDebate).not.toHaveBeenCalled();
++    await api.close();
++  });
++
++  it("returns the typed unavailable response when account erasure is not configured", async () => {
++    // PROPERTY: a missing erasure application is an explicit service failure.
++    // CATCHES: treating missing configuration as a successful deletion.
++    // NEIGHBOUR: a configured application returns its typed result.
++    const api = buildApi({
++      application: application(), sessions: sessions(), allowedOrigin: ORIGIN
++    });
++    const response = await api.inject({
++      method: "DELETE", url: `/v1/debates/${RUN_ID}`, headers,
++      payload: { step_up_grant: GRANT_TOKEN }
++    });
++    expect(response.statusCode).toBe(503);
++    expect(response.json()).toEqual({ error: "ACCOUNT_ERASURE_UNAVAILABLE" });
++    await api.close();
++  });
++
++  it("keeps a second signed-in user opaque as NOT_FOUND", async () => {
++    // PROPERTY: SQL ownership refusal remains opaque at HTTP.
++    // CATCHES: revealing that another user's run exists.
++    // NEIGHBOUR: the creator's successful outcome remains distinguishable.
++    const deletePrivateDebate = vi.fn<AccountErasureApplication["deletePrivateDebate"]>(
++      async () => "NOT_FOUND"
++    );
++    const api = buildApi({
++      application: application(), sessions: sessions(),
++      accountErasure: { ...erasure(), deletePrivateDebate }, allowedOrigin: ORIGIN
++    });
++    const response = await api.inject({
++      method: "DELETE", url: `/v1/debates/${RUN_ID}`, headers,
++      payload: { step_up_grant: GRANT_TOKEN }
++    });
++    expect(response.statusCode).toBe(404);
++    expect(response.json()).toEqual({ error: "NOT_FOUND" });
++    await api.close();
++  });
++
++  it("maps a completed bound-public deletion to CLEANED", async () => {
++    // PROPERTY: a successful erasure remains the existing 200 CLEANED response.
++    // CATCHES: retaining the published-only 409 after SQL admits the bound run.
++    // NEIGHBOUR: incomplete cleanup remains PENDING.
++    const api = buildApi({
++      application: application(), sessions: sessions(),
++      accountErasure: erasure("CLEANED"), allowedOrigin: ORIGIN
++    });
++    const response = await api.inject({
++      method: "DELETE", url: `/v1/debates/${RUN_ID}`, headers,
++      payload: { step_up_grant: GRANT_TOKEN }
++    });
++    expect(response.statusCode).toBe(200);
++    expect(response.json()).toEqual({ status: "CLEANED" });
++    await api.close();
++  });
++
++  it("maps an admitted deletion with outstanding cleanup to PENDING", async () => {
++    // PROPERTY: admitted asynchronous cleanup keeps the existing 202 response.
++    // CATCHES: converting a typed pending result into a published-only conflict.
++    // NEIGHBOUR: completed cleanup returns 200.
++    const api = buildApi({
++      application: application(), sessions: sessions(),
++      accountErasure: erasure("PENDING"), allowedOrigin: ORIGIN
++    });
++    const response = await api.inject({
++      method: "DELETE", url: `/v1/debates/${RUN_ID}`, headers,
++      payload: { step_up_grant: GRANT_TOKEN }
++    });
++    expect(response.statusCode).toBe(202);
++    expect(response.json()).toEqual({ status: "PENDING" });
++    await api.close();
++  });
++
++  it("keeps an unbound published run at DEBATE_MUST_BE_PRIVATE", async () => {
++    // PROPERTY: only the bound-public SQL carve-out can escape the published conflict.
++    // CATCHES: making every published run deletable.
++    // NEIGHBOUR: CLEANED and PENDING retain their success mappings.
++    const api = buildApi({
++      application: application(), sessions: sessions(),
++      accountErasure: erasure("PUBLISHED"), allowedOrigin: ORIGIN
++    });
++    const response = await api.inject({
++      method: "DELETE", url: `/v1/debates/${RUN_ID}`, headers,
++      payload: { step_up_grant: GRANT_TOKEN }
++    });
++    expect(response.statusCode).toBe(409);
++    expect(response.json()).toEqual({ error: "DEBATE_MUST_BE_PRIVATE" });
++    await api.close();
++  });
++});

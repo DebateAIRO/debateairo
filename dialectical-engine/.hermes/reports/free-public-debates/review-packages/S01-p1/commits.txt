@@ -1,0 +1,4 @@
+31d6dee5 2026-09-20 22:44:45 +0300 feat(db): add S01 C1 free-public binding
+11184e70 2026-09-21 03:06:47 +0300 feat(publication): add free public auto-publish
+63a97f31 2026-09-21 03:37:15 +0300 feat(api): refuse unpublishing bound free debates
+db4758da 2026-09-21 03:52:26 +0300 feat: erase bound published debates

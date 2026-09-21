@@ -16,3 +16,4 @@
 | 2026-09-21 03:11 | BUILD C2 | t_57af421c | READY consumed — `11184e70` (two BLOCKED → rulings §21 and typecheck-delta); C3 ∥ C4 base frames measured |
 | 2026-09-21 03:40 | BUILD C3 | t_8a0918c0 | READY consumed — `63a97f31` (one BLOCKED → ruling §22) |
 | 2026-09-21 03:41 | ARCH-FIX (C4 gap) | t_fd352d8e | READY consumed — PLAN Revision 4; V-7 raised; C4 resumed at base 63a97f31 |
+| 2026-09-21 03:55 | BUILD C4 | t_4990de08 | READY consumed — `db4758da`; the whole slice verified at its head (19 suites as expected, tsc 70, apps/ui 0) |
