@@ -26,6 +26,7 @@ import {
   wrapDek
 } from "../../packages/crypto/src/index.js";
 import type { KekHandle } from "../../packages/crypto/src/index.js";
+import { createSupportKeyPort } from "../../apps/api/src/support/keys.js";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const PUBLICATION_REF = "22222222-2222-4222-8222-222222222222";
@@ -205,6 +206,169 @@ describe("V-3 rotation: the kek_id label", () => {
     }
     // 16 hex characters is 8 bytes; a 32-byte key cannot be in there.
     expect(label).toHaveLength(16);
+  });
+});
+
+/**
+ * The support KEK's records are not files: they are `bytea` columns whose length
+ * (61) and version byte (1) are pinned by a CHECK constraint in migration 0054
+ * and re-asserted in packages/db. The coordinator ruled that format stays
+ * byte-for-byte v1 — no migration — so the port reads by trying the current KEK
+ * and then the previous one, and a re-wrap produces the same 61-byte shape.
+ */
+describe("V-3 rotation: the support KEK, whose format cannot carry a label", () => {
+  const SESSION = Object.freeze({ kind: "session", ref: USER_ID } as const);
+
+  async function supportKekPath(directory: string, name: string): Promise<string> {
+    const holder = join(directory, name);
+    await mkdir(holder, { recursive: true, mode: 0o700 });
+    await chmod(holder, 0o700);
+    // The loader pins the basename, so a second KEK lives in its own directory.
+    const path = join(holder, "support-kek.bin");
+    await writeFile(path, generateDek(), { mode: 0o600 });
+    await chmod(path, 0o600);
+    return path;
+  }
+
+  it("opens a row wrapped under the previous KEK, and refuses it once that key is gone", async () => {
+    const directory = await temporaryDirectory("debateai-rotation-support-");
+    const originalPath = await supportKekPath(directory, "original");
+    const replacementPath = await supportKekPath(directory, "replacement");
+
+    const before = await createSupportKeyPort({ supportKekPath: originalPath });
+    const lease = await before.createDataKey(SESSION);
+    const wrapped = Buffer.from(lease.wrapped.bytes);
+    const dataKey = Buffer.from(lease.dataKey);
+    lease.close();
+    await before.close();
+
+    const during = await createSupportKeyPort({
+      supportKekPath: replacementPath,
+      previousSupportKekPath: originalPath
+    });
+    expect(await during.unwrapDataKey(SESSION, wrapped)).toEqual(dataKey);
+    await during.close();
+
+    const after = await createSupportKeyPort({ supportKekPath: replacementPath });
+    await expect(after.unwrapDataKey(SESSION, wrapped)).rejects.toThrowError(
+      expect.objectContaining({ code: "SUPPORT_KEY_AUTHENTICATION_FAILED" })
+    );
+    await after.close();
+  });
+
+  it("re-wraps a previous-KEK row into the same 61-byte v1 shape", async () => {
+    const directory = await temporaryDirectory("debateai-rotation-support-rewrap-");
+    const originalPath = await supportKekPath(directory, "original");
+    const replacementPath = await supportKekPath(directory, "replacement");
+
+    const before = await createSupportKeyPort({ supportKekPath: originalPath });
+    const lease = await before.createDataKey(SESSION);
+    const wrapped = Buffer.from(lease.wrapped.bytes);
+    const dataKey = Buffer.from(lease.dataKey);
+    lease.close();
+    await before.close();
+
+    const during = await createSupportKeyPort({
+      supportKekPath: replacementPath,
+      previousSupportKekPath: originalPath
+    });
+    const rotated = await during.rewrapDataKey(SESSION, wrapped);
+    expect(rotated.outcome).toBe("REWRAPPED");
+    const rewrapped = rotated.outcome === "REWRAPPED"
+      ? Buffer.from(rotated.wrapped.bytes) : Buffer.alloc(0);
+    // The database CHECK is the reason this matters: 61 bytes, version byte 1.
+    expect(rewrapped).toHaveLength(61);
+    expect(rewrapped[0]).toBe(1);
+    expect(rewrapped.equals(wrapped)).toBe(false);
+    await during.close();
+
+    // The new bytes open under the new KEK alone — the changeover is complete
+    // for this row.
+    const after = await createSupportKeyPort({ supportKekPath: replacementPath });
+    expect(await after.unwrapDataKey(SESSION, rewrapped)).toEqual(dataKey);
+    await after.close();
+  });
+
+  it("is idempotent: a row already under the current KEK is not re-wrapped", async () => {
+    const directory = await temporaryDirectory("debateai-rotation-support-idempotent-");
+    const originalPath = await supportKekPath(directory, "original");
+    const replacementPath = await supportKekPath(directory, "replacement");
+
+    const port = await createSupportKeyPort({
+      supportKekPath: replacementPath,
+      previousSupportKekPath: originalPath
+    });
+    const lease = await port.createDataKey(SESSION);
+    const wrapped = Buffer.from(lease.wrapped.bytes);
+    lease.close();
+
+    expect((await port.rewrapDataKey(SESSION, wrapped)).outcome).toBe("ALREADY_CURRENT");
+    // Running the whole pass twice must reach the same place.
+    expect((await port.rewrapDataKey(SESSION, wrapped)).outcome).toBe("ALREADY_CURRENT");
+    await port.close();
+  });
+
+  it("skips a destroyed-key tombstone instead of re-wrapping or failing on it", async () => {
+    const directory = await temporaryDirectory("debateai-rotation-support-tombstone-");
+    const port = await createSupportKeyPort({
+      supportKekPath: await supportKekPath(directory, "current"),
+      previousSupportKekPath: await supportKekPath(directory, "previous")
+    });
+    // SUP-07's irreversible tombstone: 61 zero bytes, with destroyed_at set.
+    const tombstone = Buffer.alloc(61);
+    expect((await port.rewrapDataKey(SESSION, tombstone)).outcome).toBe("TOMBSTONE");
+    await port.close();
+  });
+
+  it("refuses a row neither key opens, loudly and typed — never silently skipped", async () => {
+    const directory = await temporaryDirectory("debateai-rotation-support-stranger-");
+    const strangerPath = await supportKekPath(directory, "stranger");
+    const stranger = await createSupportKeyPort({ supportKekPath: strangerPath });
+    const lease = await stranger.createDataKey(SESSION);
+    const wrapped = Buffer.from(lease.wrapped.bytes);
+    lease.close();
+    await stranger.close();
+
+    const port = await createSupportKeyPort({
+      supportKekPath: await supportKekPath(directory, "current"),
+      previousSupportKekPath: await supportKekPath(directory, "previous")
+    });
+    await expect(port.rewrapDataKey(SESSION, wrapped)).rejects.toThrowError(
+      expect.objectContaining({ code: "SUPPORT_KEY_AUTHENTICATION_FAILED" })
+    );
+    await port.close();
+  });
+
+  it("labels its current KEK in the same vocabulary the file stores use", async () => {
+    const directory = await temporaryDirectory("debateai-rotation-support-label-");
+    const currentPath = await supportKekPath(directory, "current");
+    const port = await createSupportKeyPort({ supportKekPath: currentPath });
+    const label = port.currentKekId();
+    expect(label).toMatch(/^[0-9a-f]{16}$/);
+    // Same construction as @debateai/crypto's kekId, so an operator reads one
+    // vocabulary of key ids across all three KEKs.
+    expect(label).toBe(kekId(loadKek(await readFile(currentPath))));
+    // And it is a label, not the key.
+    expect(label).not.toContain((await readFile(currentPath)).toString("hex"));
+    await port.close();
+  });
+
+  it("refuses a previous path that is the same key as the current one", async () => {
+    const directory = await temporaryDirectory("debateai-rotation-support-same-");
+    const path = await supportKekPath(directory, "current");
+    const copyDirectory = join(directory, "copy");
+    await mkdir(copyDirectory, { recursive: true, mode: 0o700 });
+    await chmod(copyDirectory, 0o700);
+    const copy = join(copyDirectory, "support-kek.bin");
+    await writeFile(copy, await readFile(path), { mode: 0o600 });
+    await chmod(copy, 0o600);
+
+    await expect(createSupportKeyPort({
+      supportKekPath: path,
+      previousSupportKekPath: copy
+    })).rejects.toThrowError(
+      expect.objectContaining({ code: "SUPPORT_KEK_CUSTODY_INVALID" })
+    );
   });
 });
 

@@ -1,4 +1,6 @@
-import { createCipheriv, createDecipheriv, randomBytes, timingSafeEqual } from "node:crypto";
+import {
+  createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual
+} from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
@@ -63,10 +65,30 @@ export type NewSupportDataKey = Readonly<{
   close(): void;
 }>;
 
+/**
+ * V-3. What one row's re-wrap did. `ALREADY_CURRENT` is what makes the rotation
+ * idempotent and resumable — a row the current KEK already opens is left alone,
+ * so re-running an interrupted pass costs one unwrap per finished row and
+ * changes nothing. `TOMBSTONE` is a destroyed key (SUP-07's 61 zero bytes): it
+ * is skipped, never re-wrapped, and never counted as a failure.
+ */
+export type SupportKeyRewrap =
+  | Readonly<{ outcome: "REWRAPPED";wrapped: WrappedSupportKey }>
+  | Readonly<{ outcome: "ALREADY_CURRENT" }>
+  | Readonly<{ outcome: "TOMBSTONE" }>;
+
 export interface SupportKeyPort {
   createDataKey(handle: SupportKeyHandle): Promise<NewSupportDataKey>;
   wrapDataKey(handle: SupportKeyHandle, dataKey: Uint8Array): WrappedSupportKey;
   unwrapDataKey(handle: SupportKeyHandle, wrapped: Uint8Array): Promise<Buffer>;
+  /**
+   * Re-wraps one stored key under the CURRENT support KEK. The envelope shape
+   * is unchanged — 61 bytes, version byte 1 — because `support.session_key` and
+   * `support.case_key` pin exactly that in a CHECK constraint.
+   */
+  rewrapDataKey(handle: SupportKeyHandle, wrapped: Uint8Array): Promise<SupportKeyRewrap>;
+  /** A non-secret label for the current KEK, for the rotation's own report. */
+  currentKekId(): string;
   seal(handle: SupportKeyHandle, dataKey: Uint8Array, plaintext: Uint8Array): Buffer;
   open(handle: SupportKeyHandle, dataKey: Uint8Array, ciphertext: Uint8Array): Buffer;
   sealContent(context: SupportContentContext,dataKey: Uint8Array,plaintext: Uint8Array): Buffer;
@@ -96,6 +118,13 @@ export class SupportKeyError extends TypedDomainError {
 
 export type CreateSupportKeyPortInput = Readonly<{
   supportKekPath: string;
+  /**
+   * V-3. The support KEK that was current before a rotation. Absent in the
+   * steady state; set only for the length of a changeover, so that rows not yet
+   * re-wrapped still open. Its basename is `support-kek.bin` like the current
+   * one, so it lives in its own 0700 directory.
+   */
+  previousSupportKekPath?: string | undefined;
   protectedKeyPaths?: readonly string[];
 }>;
 
@@ -360,13 +389,51 @@ async function readProtectedKeyIdentity(path: string): Promise<KeyFileIdentity> 
   return identity;
 }
 
+const SUPPORT_KEK_ID_DOMAIN = "debateai:kek-id:v1\0";
+
 class FileSupportKeyPort implements SupportKeyPort {
   readonly #kek: Buffer;
+  readonly #previousKek: Buffer | undefined;
   readonly #closedLeaseKeys = new WeakSet<object>();
   #closed = false;
 
-  constructor(kek: Buffer) {
+  constructor(kek: Buffer, previousKek?: Buffer) {
     this.#kek = kek;
+    this.#previousKek = previousKek;
+  }
+
+  /**
+   * The same construction `@debateai/crypto`'s `kekId` uses — eight bytes of a
+   * domain-separated SHA-256 — so an operator reads one vocabulary of key ids
+   * across all three KEKs. Nothing is stored under it: the support envelope has
+   * no room for a label, which is exactly why unwrapping tries both keys.
+   */
+  currentKekId(): string {
+    this.#assertOpen();
+    return createHash("sha256")
+      .update(SUPPORT_KEK_ID_DOMAIN, "utf8")
+      .update(this.#kek)
+      .digest()
+      .subarray(0, 8)
+      .toString("hex");
+  }
+
+  /** Decrypts under `kek`, or returns undefined if that key does not open it. */
+  #openUnder(
+    kek: Buffer,
+    handle: SupportKeyHandle,
+    envelope: Readonly<{ nonce: Buffer;encrypted: Buffer;tag: Buffer }>
+  ): Buffer | undefined {
+    try {
+      const decipher = createDecipheriv("aes-256-gcm", kek, envelope.nonce, {
+        authTagLength: AUTH_TAG_BYTES
+      });
+      decipher.setAAD(aad("support", handle));
+      decipher.setAuthTag(envelope.tag);
+      return Buffer.concat([decipher.update(envelope.encrypted), decipher.final()]);
+    } catch {
+      return undefined;
+    }
   }
 
   #assertOpen(): void {
@@ -435,15 +502,49 @@ class FileSupportKeyPort implements SupportKeyPort {
     this.#assertOpen();
     assertHandle(handle);
     const envelope = parseWrappedEnvelope(wrapped);
+    // V-3: the envelope carries no key label — its 61 bytes are pinned by a
+    // database CHECK — so a row wrapped before a rotation is found by trying the
+    // current KEK and then the previous one. Bounded to the two keys this
+    // process holds, and the previous one is absent outside a changeover.
+    const opened = this.#openUnder(this.#kek, handle, envelope)
+      ?? (this.#previousKek === undefined
+        ? undefined
+        : this.#openUnder(this.#previousKek, handle, envelope));
+    if (opened === undefined) fail("SUPPORT_KEY_AUTHENTICATION_FAILED");
+    return opened;
+  }
+
+  async rewrapDataKey(
+    handle: SupportKeyHandle,
+    wrapped: Uint8Array
+  ): Promise<SupportKeyRewrap> {
+    this.#assertOpen();
+    assertHandle(handle);
+    if (!(wrapped instanceof Uint8Array) || wrapped.byteLength !== WRAPPED_KEY_BYTES) {
+      fail("SUPPORT_WRAPPED_KEY_INVALID");
+    }
+    // A destroyed key is an irreversible tombstone (SUP-07). Re-wrapping it
+    // would manufacture a key where the shred removed one, so it is recognised
+    // before the envelope is parsed at all and left exactly as it is.
+    if (bytesView(wrapped).every((byte) => byte === 0)) {
+      return Object.freeze({ outcome: "TOMBSTONE" as const });
+    }
+    const envelope = parseWrappedEnvelope(wrapped);
+    // Current first: a row already re-wrapped opens here and is left untouched,
+    // which is what makes the pass idempotent and an interrupted one resumable.
+    if (this.#openUnder(this.#kek, handle, envelope) !== undefined) {
+      return Object.freeze({ outcome: "ALREADY_CURRENT" as const });
+    }
+    if (this.#previousKek === undefined) fail("SUPPORT_KEY_AUTHENTICATION_FAILED");
+    const dataKey = this.#openUnder(this.#previousKek, handle, envelope);
+    if (dataKey === undefined) fail("SUPPORT_KEY_AUTHENTICATION_FAILED");
     try {
-      const decipher = createDecipheriv("aes-256-gcm", this.#kek, envelope.nonce, {
-        authTagLength: AUTH_TAG_BYTES
+      return Object.freeze({
+        outcome: "REWRAPPED" as const,
+        wrapped: this.wrapDataKey(handle, dataKey)
       });
-      decipher.setAAD(aad("support", handle));
-      decipher.setAuthTag(envelope.tag);
-      return Buffer.concat([decipher.update(envelope.encrypted), decipher.final()]);
-    } catch {
-      fail("SUPPORT_KEY_AUTHENTICATION_FAILED");
+    } finally {
+      dataKey.fill(0);
     }
   }
 
@@ -541,6 +642,7 @@ class FileSupportKeyPort implements SupportKeyPort {
     if (this.#closed) return;
     this.#closed = true;
     this.#kek.fill(0);
+    this.#previousKek?.fill(0);
   }
 }
 
@@ -549,6 +651,7 @@ export async function createSupportKeyPort(
 ): Promise<SupportKeyPort> {
   if (input === null || typeof input !== "object") fail("SUPPORT_KEK_PATH_INVALID");
   const support = await readSupportKek(input.supportKekPath);
+  let previous: KeyFileIdentity | undefined;
   try {
     for (const protectedPath of input.protectedKeyPaths ?? []) {
       const protectedIdentity = await readProtectedKeyIdentity(protectedPath);
@@ -562,9 +665,21 @@ export async function createSupportKeyPort(
         protectedIdentity.material.fill(0);
       }
     }
-    return new FileSupportKeyPort(support.material);
+    if (input.previousSupportKekPath !== undefined) {
+      previous = await readSupportKek(input.previousSupportKekPath);
+      // A "previous" key that is the current one is not a changeover — it is a
+      // misconfiguration that would make a verification pass meaningless, since
+      // every row would look already-current whichever key really wrapped it.
+      if (support.canonicalPath === previous.canonicalPath
+        || support.device === previous.device && support.inode === previous.inode
+        || timingSafeEqual(support.material, previous.material)) {
+        fail("SUPPORT_KEK_CUSTODY_INVALID");
+      }
+    }
+    return new FileSupportKeyPort(support.material, previous?.material);
   } catch (error) {
     support.material.fill(0);
+    previous?.material.fill(0);
     throw error;
   }
 }
