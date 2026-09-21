@@ -20,7 +20,7 @@ We are going through them together, one at a time. Each answer is written into [
 |---|---|---|
 | Ruled on 18 Sept | V-15 (the server starts with an empty database) and V-23 (we look at the Cloudflare integration together, at the end) | 2 of 2 |
 | A — routine | thirteen small ones | **13 of 13 — all "yes", 21 Sept** |
-| B — switches on your GitHub account | Nine short questions. **Answered:** which branch GitHub watches (`dev` until release day, then back to `main`); a private channel for reporting holes (yes — and the public promise to reply changes from 3 working days to one week); the bot that prepares package fixes (yes to ready-made fix pull requests, and yes to its weekly routine updates — with a 7-day wait added so the bot obeys your own "packages must be a week old" rule). blocking pushes that contain secrets (yes — switched on *before* this branch is first pushed, so the local commits get checked on their way up). **Still to ask:** the code scanner's four notes; pinned automation scripts; two-factor login for everyone; branch rules; the 527 MB of recordings in the repository | 4 of 9 |
+| B — switches on your GitHub account | Nine short questions. **Answered:** which branch GitHub watches (`dev` until release day, then back to `main`); a private channel for reporting holes (yes — and the public promise to reply changes from 3 working days to one week); the bot that prepares package fixes (yes to ready-made fix pull requests, and yes to its weekly routine updates — with a 7-day wait added so the bot obeys your own "packages must be a week old" rule). blocking pushes that contain secrets (yes — switched on *before* this branch is first pushed, so the local commits get checked on their way up). the automatic code reviewer's notes (yes — its three open "high" notes are false alarms, which I confirmed in the code myself before asking you; they get dismissed with written reasons; for future notes I check the code first, fix the real ones, and bring you the false ones — I never dismiss one on my own). **Still to ask:** pinned automation scripts; two-factor login for everyone; branch rules; the 527 MB of recordings in the repository | 5 of 9 |
 | C — real choices that add work | changing the master key; two server accounts sharing one key folder; the GPU settings; **how the server reaches the AI models**; and three more | 0 of 7 |
 | D — new, from the re-check | support chat on account deletion; a money ceiling per debate; the monitoring agent's permissions; how the support chat reaches the model | 0 of 4 |
 
@@ -54,6 +54,7 @@ I am collecting rulings first and building afterwards, so the questions keep mov
 | V-25 | The memory test re-measured under Node 26, per platform, each number recorded as a new version | small, part of the second bringing-up-to-date |
 | V-21 | Three development-only leftovers tidied | small, low priority |
 | Package bot | A 7-day waiting period added to the bot's configuration | tiny |
+| Noticed while checking the code reviewer's notes | The e-mail verification route does one cheap database lookup before its limit check; make it check the per-visitor budget first. Not a hole — a small tightening | tiny |
 
 Already done because it was a one-line wording change: the public promise in [SECURITY.md](../../../../SECURITY.md) now says "within one week".
 

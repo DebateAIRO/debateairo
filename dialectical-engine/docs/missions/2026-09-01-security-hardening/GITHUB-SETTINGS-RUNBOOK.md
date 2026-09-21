@@ -103,7 +103,17 @@ Three alerts of the rule `js/missing-rate-limiting` (login, e-mail verification,
 for n in 2 3 4; do gh api -X PATCH "repos/DebateAIRO/debateairo/code-scanning/alerts/$n" -f state=dismissed -f dismissed_reason="false positive" -f dismissed_comment="In-process limiter guards this route (MfaVerificationLimiter / InProcessAuthRateLimiter); see docs/missions/2026-09-01-security-hardening/findings/L1-api-auth.md route table."; done
 ```
 
-The fourth (`#1`, a loose HTML-filtering pattern in `tests/integration/s5-ui-security-smoke.mjs`) is fixed in code, not dismissed.
+The fourth (`#1`, a loose HTML-filtering pattern in `tests/integration/s5-ui-security-smoke.mjs`) is fixed in code, not dismissed. Read from GitHub on 2026-09-22: `#1` is `fixed`; `#2`, `#3`, `#4` are `open`.
+
+**Ruled 2026-09-22: dismiss the three, with written reasons, on the owner's "go" at this step.** The false-positive claim was re-verified first-hand on the current branch before the owner was asked:
+
+| Alert | Route | Where the limit check is |
+|---|---|---|
+| #2 | `POST /v1/auth/login` | `apps/api/src/sessions.ts` — `beginLogin` calls `requireRateBudget` before `verifyPassword`; `completeLogin` calls it before the TOTP / recovery-code check |
+| #3 | `POST /v1/auth/verify-email` | `apps/api/src/registration.ts` — `runVerifyEmail` calls `limiter.consume` (per IP and per address) before `consumeVerification` |
+| #4 | `POST /v1/auth/mfa/totp/verify` | `apps/api/src/mfa.ts` — `verifyTotp` calls `rateLimit` before the repository read |
+
+**Standing rule for every future code-scanning alert (owner-approved):** check it in the code first; fix the real ones test-first; bring the false ones to the owner with the evidence; dismiss only on the owner's approval — never on the agent's own initiative. Expect new alerts when the synced branch is first pushed: the scanner has never seen the 656 newer commits, and the support chat uses the same in-process limiter the scanner cannot recognise.
 
 ## Step 7 — verify (read-only)
 
