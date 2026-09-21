@@ -354,3 +354,13 @@ should discover that late:
 
 None new. This pass consumed row **V-10**'s default and raised no new contested product question:
 every choice above follows from V-10, from a measurement, or from a finding this node was assigned.
+
+## 31. Orchestrator folds — REQ-REV pass 3 (REWORK at the cap → V row V-11; N1-p3 … N4-p3), 2026-09-21
+
+Appended by the orchestrator. The requirements review reached its cap (three passes). Its pass-3 verdict found the three slice-review findings ADDRESSED in SPEC-v3 and one NEW blocking finding in V's acceptance text only. SPEC-v3.md is frozen and is not edited; THIS section is the correction every later seat and V's test point read.
+
+- **B1-p3 → V-11** — `SPEC-v3.md:390` (acceptance step 4) expects "step 1's total plus 1"; steps 3b/3c publish a second Free debate before it, so the total is **plus 2**. Default (binding until V rules): plus 2. No requirement changes; no coder is affected.
+- **N1-p3** — R-6's Check header says "the run row alone" while its assertion 1 joins the session and assertion 2 reads a second snapshot: the assertions govern, the header is loose wording.
+- **N2-p3** — `PLAN.md:316` (C2-S3.3) still scans for an email in the snapshot; under SPEC-v3 that scan is NOT R-6's Check (the PLAN's own trace row says so). FIX-A reads SPEC-v3's R-6 Check as its oracle for C-B1.
+- **N3-p3** — `spec-v3-check.sh` does not pin step 4's total; the pass-2 lenses check step 4 against this section.
+- **N4-p3** — acceptance step 3b reads the public list with `limit=25&offset=0` only; on a list longer than 25 the step needs the pagination step 11b already spells out.

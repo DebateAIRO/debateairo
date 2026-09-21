@@ -1,0 +1,40 @@
+CHECKS: 45 assertions over docs/missions/free-public-debates/slices/S01/SPEC-v2.md
+RESULT: FAIL
+  - SHAPE supersession line does not name P-B2
+  - SHAPE supersession line does not name S-N7
+  - SHAPE supersession line does not name C-B1
+  - SHAPE supersession line does not name V-10
+  - SHAPE supersession line does not name N1-p2
+  - SHAPE supersession line does not name N2-p2
+  - SHAPE supersession line does not name R-1…R-25
+  - SHAPE line 1 must title this as SPEC-v3, found '# SPEC-v2 — S01 · A Free debate is made '
+  - P-B2 answer-serving route defined: MISSING ['An **answer-serving route** is a route that returns the *whole* answer']
+  - P-B2 mechanical test: MISSING ['a route is answer-serving exactly when a success reply of that route sends a body parsed by `AnswerSchema`']
+  - P-B2 any route triggers: MISSING ['The **served answer** is the state in which **any** answer-serving route first returns 200']
+  - P-B2 route table row 1: MISSING ['| `GET /v1/runs/{id}/answer` | `apps/api/src/index.ts:163` | `:1115` |']
+  - P-B2 route table row 2: MISSING ['| `GET /v1/answers/{id}` | `apps/api/src/index.ts:154` | `:1007` |']
+  - P-B2 projections excluded: MISSING ['AnswerIndexSchema', 'InspectionSchema', 'NodeSchema']
+  - P-B2 future route obligation: MISSING ['A route added later is bound by the same test']
+  - P-B2 V-10 cited: MISSING ['V-10']
+  - P-B2 old one-route definition: PRESENT but must not be ['The **served answer** is the state in which `GET /v1/runs/{id}/answer` first returns 200']
+  - P-B2 sweep: R-4's Check does not run once per answer-serving route
+  - P-B2 sweep: R-9's Check is still pinned to one named route
+  - P-B2 acceptance 3b: MISSING ['3b. Start a **second** Free debate']
+  - P-B2 acceptance 3c: MISSING ['3c. `GET $API/v1/answers/<free_answer2>` as the owner']
+  - P-B2 acceptance cleans up: MISSING ['11b. Delete `<free_run2>`']
+  - S-N7 user text disclaimed: MISSING ['*What this requirement does NOT govern:* the words the owner wrote']
+  - S-N7 email case named: MISSING ['is not a violation of R-6 — on either path']
+  - S-N7 old text-scan check: PRESENT but must not be ['the decrypted snapshot contains no user id, owner ref, session id or email\n  address anywhere in it']
+  - S-N7 parity assertion: MISSING ['**Parity.**', 'field-for-field equal to the snapshot the **owner-driven** path writes']
+  - C-B1 system path named: MISSING ['against the **decrypted snapshot** a **system** publish wrote']
+  - C-B1 not the parameters: MISSING ['never against the parameters handed to the transition function']
+  - C-B1 the parameter trap cited: MISSING ['migrations/0067_system_run_publication.sql:336']
+  - C-B1 ownerRef mutant killed: MISSING ["is **not equal to** any of that run's `run_id`, the owner's `user_id`, `owner_ref`"]
+  - C-B1 a test must go RED: MISSING ['turns **RED** under the B1 mutant']
+
+=== repo facts the spec pins ===
+R-23 route table count (expect 52): 52
+R-24 apps/ui files changed since base (expect 0): 0
+SPEC.md byte-identical to the 06e4eceb freeze: YES
+SPEC-v2.md byte-identical to the 69d119c5 freeze: YES
+answer-serving routes in the API (AnswerSchema.parse send sites; SPEC §1 expects 2): 2

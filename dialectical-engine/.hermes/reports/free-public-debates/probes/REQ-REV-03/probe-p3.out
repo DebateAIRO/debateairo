@@ -1,0 +1,25 @@
+PROBE REQ-REV-03 2026-09-21T01:42:00Z
+cwd packet cwd; lane head db4758da
+
+AnswerSchema.parse at db4758da:
+  1007 GET /v1/answers/:id  -> reply.send(AnswerSchema.parse(answer))
+  1115 GET /v1/runs/:id/answer -> reply.send(AnswerSchema.parse(answer))
+policy rows: :154 GET /v1/answers/{id}; :163 GET /v1/runs/{id}/answer
+projections send AnswerIndexSchema / InspectionSchema / ExecutionLedgerDigestSchema / NodeSchema
+mission-home parse sites: 1007 and 1101 (line drift vs lane 1115; SPEC pins db4758da :1115 correctly)
+
+0067_system_run_publication.sql:336 = IF NOT FOUND OR v_pseudonym IS DISTINCT FROM p_expected_pseudonym
+
+spec-v3-check.sh SPEC-v3.md RESULT PASS rc 0
+  R-23 52; R-24 0; SPEC.md freeze YES; SPEC-v2.md freeze YES; AnswerSchema.parse count 2
+spec-v3-check.sh SPEC-v2.md RESULT FAIL (P-B2/S-N7/C-B1 needles + old one-route definition PRESENT)
+mutant-r26.md RESULT FAIL N3-p2 found 26 ids (pass-2 gap closed)
+mutant-one-route.md RESULT FAIL (old definition PRESENT; any-route needle MISSING)
+step 4 "plus 1" still in SPEC-v3.md:390 after 3c publishes a second debate — checker does not pin this
+
+git diff --stat 5ffdfa13..22d115bc -- slices/S01 INSTRUCTIONS.md
+  6 files, 755 insertions, 17 deletions (INSTRUCTIONS, DECISIONS, PLAN, PROGRESS, SPEC-v3, spec-v3-check.sh)
+SPEC.md vs 06e4eceb: empty; SPEC-v2.md vs 69d119c5: empty
+unique R-ids 1-25; INSTRUCTIONS 94; SPEC-v3 banned NO_HITS
+AnswerSummarySchema has answer_id + run_ref (contract:382-392)
+GET /v1/runs/:id/answer at db4758da calls tryAutoPublish; GET /v1/answers/:id does not (P-B2 product gap, FIX-A)

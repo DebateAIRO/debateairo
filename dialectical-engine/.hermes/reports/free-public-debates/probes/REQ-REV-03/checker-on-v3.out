@@ -1,0 +1,9 @@
+CHECKS: 45 assertions over /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine/docs/missions/free-public-debates/slices/S01/SPEC-v3.md
+RESULT: PASS
+
+=== repo facts the spec pins ===
+R-23 route table count (expect 52): 52
+R-24 apps/ui files changed since base (expect 0): 0
+SPEC.md byte-identical to the 06e4eceb freeze: YES
+SPEC-v2.md byte-identical to the 69d119c5 freeze: YES
+answer-serving routes in the API (AnswerSchema.parse send sites; SPEC §1 expects 2): 2
