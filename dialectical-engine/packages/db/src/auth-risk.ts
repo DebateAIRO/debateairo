@@ -36,7 +36,52 @@ const opaqueRef=/^argon2id-audit:v1:[0-9a-f]{64}$/;
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const kindSet=new Set<string>(AUTHENTICATION_RISK_SIGNAL_KINDS);
 
-function poisoned():never{throw new TypeError("AUTH_RISK_SIGNAL_POISONED");}
+/**
+ * Which stage rejected. Bounded by construction: five constants of this module, carrying
+ * no ciphertext, no plaintext, no key material and no parser message.
+ *
+ * The list is a VOCABULARY, not an execution order, and must not be read as one: reading a
+ * stored row decrypts and parses its context BEFORE the evaluator is called at all, so
+ * `context-decrypt` and `context-parse` can precede every other member on that path. Within
+ * the evaluator the argument checks do precede the per-row check, but that is a local fact
+ * about one function, not a property of this array.
+ */
+export const AUTHENTICATION_RISK_SIGNAL_POISON_CATEGORIES=Object.freeze([
+  "policy-shape","evaluated-at-shape","signal-shape","context-decrypt","context-parse"
+] as const);
+export type AuthenticationRiskSignalPoisonCategory=
+  typeof AUTHENTICATION_RISK_SIGNAL_POISON_CATEGORIES[number];
+const poisonCategorySet=new Set<string>(AUTHENTICATION_RISK_SIGNAL_POISON_CATEGORIES);
+
+/**
+ * The internal category of a poisoned rejection, or null for anything that is not one or
+ * whose cause is not one of the constants above. A caller/log path reads the stage through
+ * this function, so no caller has to reach into `cause` and decide what is safe to print.
+ */
+export function authenticationRiskSignalPoisonCategory(
+  error:unknown
+):AuthenticationRiskSignalPoisonCategory|null{
+  if(!(error instanceof TypeError)||error.message!=="AUTH_RISK_SIGNAL_POISONED") return null;
+  const cause=(error as {readonly cause?:unknown}).cause;
+  return typeof cause==="string"&&poisonCategorySet.has(cause)
+    ?cause as AuthenticationRiskSignalPoisonCategory
+    :null;
+}
+
+/**
+ * PUBLIC classification unchanged: a TypeError whose message is exactly
+ * AUTH_RISK_SIGNAL_POISONED. The stage rides on `cause` as one of the constants above —
+ * never the parser's message, the ciphertext, the plaintext or a key.
+ *
+ * The category is REQUIRED and carries no default. A default is not a neutral
+ * convenience here: it is a label a call site inherits without deciding, so a stage
+ * added later is mis-reported as whichever stage the default happens to name, and the
+ * mis-report is silent. Requiring the argument makes naming the stage part of adding
+ * the call site, and the compiler asks the question.
+ */
+function poisoned(
+  category:AuthenticationRiskSignalPoisonCategory
+):never{throw new TypeError("AUTH_RISK_SIGNAL_POISONED",{cause:category});}
 function exactKeys(value:Record<string,unknown>,keys:readonly string[]):boolean{
   const actual=Object.keys(value).sort();
   const expected=[...keys].sort();
@@ -47,11 +92,20 @@ export function evaluateAuthenticationRiskSignals(
   signals:readonly DecryptedAuthenticationRiskSignal[],evaluatedAt:Date,
   retentionMs:number,maxSignals:number
 ):AuthenticationRiskSummary{
-  if(!Number.isInteger(maxSignals)||maxSignals<1) poisoned();
+  if(!Number.isInteger(maxSignals)||maxSignals<1) poisoned("policy-shape");
   if(signals.length>maxSignals){
     throw new TypeError("AUTH_RISK_SIGNAL_SCAN_SATURATED");
   }
-  if(!(evaluatedAt instanceof Date)||!Number.isFinite(evaluatedAt.getTime())) poisoned();
+  if(!(evaluatedAt instanceof Date)||!Number.isFinite(evaluatedAt.getTime())) poisoned("evaluated-at-shape");
+  // F-AUTH-RISK-RETENTION-LOOP. `retentionMs` is a POLICY argument, held beside
+  // `maxSignals` on the repository (:170-171) and read from the same register row. Its
+  // shape was checked INSIDE the per-signal loop below, which cost two things: a policy
+  // defect was reported under `signal-shape`, and an EMPTY signal list never ran the loop
+  // so the policy went unchecked entirely. Checked once, here, with the other policy
+  // argument. The per-signal AGREEMENT check further down
+  // (`expiresAt - observedAt === retentionMs`) stays in the loop: that is a property of a
+  // SIGNAL, not of the policy.
+  if(!Number.isInteger(retentionMs)||retentionMs<1) poisoned("policy-shape");
   const counts:Record<AuthenticationRiskSignalKind,number>={
     LOGIN_SUCCESS:0,SESSION_CONTEXT_CHANGED:0,RECOVERY_STARTED:0,
     RECOVERY_PROOF_FAILED:0,RECOVERY_COMPLETED:0
@@ -69,7 +123,6 @@ export function evaluateAuthenticationRiskSignals(
       ||!kindSet.has(signal.kind)
       ||!(signal.observedAt instanceof Date)||!Number.isFinite(signal.observedAt.getTime())
       ||!(signal.expiresAt instanceof Date)||!Number.isFinite(signal.expiresAt.getTime())
-      ||!Number.isInteger(retentionMs)||retentionMs<1
       ||signal.expiresAt.getTime()-signal.observedAt.getTime()!==retentionMs
       ||signal.expiresAt.getTime()<=evaluatedAt.getTime()
       ||typeof signal.context!=="object"||signal.context===null
@@ -79,7 +132,7 @@ export function evaluateAuthenticationRiskSignals(
       ||signal.context.v!==1
       ||!(signal.context.networkRef===null||opaqueRef.test(signal.context.networkRef))
       ||!(signal.context.clientRef===null||opaqueRef.test(signal.context.clientRef))){
-      poisoned();
+      poisoned("signal-shape");
     }
     ids.add(signal.riskSignalId);
     counts[signal.kind]++;
@@ -204,12 +257,16 @@ export class PostgresAuthenticationRiskSignalRepository{
     const key=await this.users.load(userId);
     try{
       const decoded=result.rows.map((row):DecryptedAuthenticationRiskSignal=>{
+        // One catch around both stages made a key/ciphertext mismatch and a malformed
+        // plaintext the same failure. Separate catches, one bounded category each.
+        let plaintext:Buffer;
+        try{
+          plaintext=decrypt(key,row.context_ciphertext,authenticationRiskSignalAad(userId));
+        }catch{poisoned("context-decrypt");}
         let context:unknown;
         try{
-          context=JSON.parse(decrypt(
-            key,row.context_ciphertext,authenticationRiskSignalAad(userId)
-          ).toString("utf8"));
-        }catch{poisoned();}
+          context=JSON.parse(plaintext.toString("utf8"));
+        }catch{poisoned("context-parse");}
         return Object.freeze({
           riskSignalId:row.risk_signal_id,kind:row.signal_kind,
           context:context as AuthenticationRiskSignalContext,

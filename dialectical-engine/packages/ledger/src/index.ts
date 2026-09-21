@@ -275,6 +275,13 @@ export class LedgerRepository {
     readonly transmissionReductions: readonly unknown[];
     readonly liftRecords: readonly unknown[];
     readonly judgementSelectionRule: Readonly<Record<string, unknown>>;
+    /**
+     * T10 (goal 188-195): the served-root decision — which root won, on what
+     * rule, by what MARGIN over the runner-up, and whether the documented
+     * tiebreak was applied. `null` on the DR-184 review catch-up path, which
+     * re-propagates without re-selecting a root.
+     */
+    readonly servedRootSelection?: Readonly<Record<string, unknown>> | null;
     readonly sensitivityRecords?: readonly {
       readonly removedNodeId: string;
       readonly leverage: number;
@@ -298,8 +305,6 @@ export class LedgerRepository {
       readonly operatorLevel?: OperatorSupplyingLevel | null;
       readonly positionLabel?: string | null;
       readonly liftMarker?: readonly unknown[];
-      readonly rivalOperator?: ScoringOperator | null;
-      readonly rivalStrength?: number | null;
       readonly reducedJudgementRef?: string | null;
     }[];
   }): Promise<string> {
@@ -336,8 +341,8 @@ export class LedgerRepository {
           arrow_order, cluster_records, operator_by_parent, transmission_reductions,
           lift_records, judgement_selection_rule,
           judgement_selection_rule_key, judgement_selection_rule_register_version,
-          judgement_selection_rule_source_ref, at_seq
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::jsonb,$11::jsonb,$12::jsonb,$13::jsonb,$14,$15,$16,$17)
+          judgement_selection_rule_source_ref, served_root_selection, at_seq
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::jsonb,$11::jsonb,$12::jsonb,$13::jsonb,$14,$15,$16,$17::jsonb,$18)
         RETURNING propagation_run_id`,
         [
           propagationRunId,
@@ -356,6 +361,7 @@ export class LedgerRepository {
           typeof input.judgementSelectionRule.rowKey === "string" ? input.judgementSelectionRule.rowKey : null,
           typeof input.judgementSelectionRule.registerVersion === "number" ? input.judgementSelectionRule.registerVersion : null,
           typeof input.judgementSelectionRule.sourceRef === "string" ? input.judgementSelectionRule.sourceRef : null,
+          input.servedRootSelection == null ? null : JSON.stringify(input.servedRootSelection),
           propagationSequence
         ]
       );
@@ -367,8 +373,8 @@ export class LedgerRepository {
             source_ref, producer, replay_handle, way_of_knowing,
             tau_source, cluster_id, judged_by, abstained, supported_by,
             attacked_by, operator_used, operator_level, position_label,
-            lift_marker, rival_operator, rival_strength, reduced_judgement_ref
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15,$16,$17,$18::jsonb,$19,$20,$21)`,
+            lift_marker, reduced_judgement_ref
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15,$16,$17,$18::jsonb,$19)`,
           [
             storedPropagationRunId,
             strength.nodeId,
@@ -388,8 +394,6 @@ export class LedgerRepository {
             strength.operatorLevel ?? null,
             strength.positionLabel ?? null,
             JSON.stringify(strength.liftMarker ?? []),
-            strength.rivalOperator ?? null,
-            strength.rivalStrength ?? null,
             strength.reducedJudgementRef ?? null
           ]
         );

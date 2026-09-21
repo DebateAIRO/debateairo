@@ -8,7 +8,13 @@ import {
   runWithObsContext,
 } from "@debateai/obs-capture";
 
-export const MODEL_ROLES = ["JUDGE", "COMPOSER", "CONFORMANCE", "CLASSIFIER"] as const;
+// T9 (goal 232-235): SYNTHESIZER and EVALUATOR are NAMED PROVIDER ROLES,
+// not organ aliases. A debater's model may hold either role; the CALL is
+// fresh-context, and the ledger records which role made it under its own
+// name rather than under COMPOSER/CONFORMANCE, which mean other things.
+export const MODEL_ROLES = [
+  "JUDGE", "COMPOSER", "CONFORMANCE", "CLASSIFIER", "SYNTHESIZER", "EVALUATOR"
+] as const;
 export type TypedRole = typeof MODEL_ROLES[number];
 export type Lane = "served" | "uniform-panel" | "critic-exempt" | "evaluator";
 
@@ -29,9 +35,36 @@ export type ContentClassification =
   | { readonly parseStatus: "PARSED"; readonly parseError: null }
   | { readonly parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED"; readonly parseError: string };
 
+/**
+ * W10/1 (`board/W10-call-budget-truthfulness.md`, audit
+ * `audits/token-budget-reasoning.md`): the OpenAI-compatible completion that
+ * was cut off at `max_tokens` reports it, and until this row existed nobody
+ * read it. A truncated body fails the contract classifier exactly as bad JSON
+ * does, so the two were recorded under one name and a length failure looked
+ * like a model that cannot follow a schema.
+ */
+export const PROVIDER_FINISH_REASON_LENGTH = "length" as const;
+export const PROVIDER_CONTENT_LENGTH_EXCEEDED = "LENGTH_EXCEEDED" as const;
+
+/**
+ * How a provider's content was REFUSED. `LENGTH_EXCEEDED` is its own member and
+ * is never collapsed into `PARSE_FAILED`.
+ *
+ * It is deliberately NOT a `raw_artifact.parse_status` value: that column's
+ * CHECK constraint seals four names (`migrations/0004_s04.sql:14-21`) and the
+ * erasure-redaction constraint pins their `parse_error` pairs
+ * (`migrations/0040_account_erasure.sql:338-340`). Widening the column is a
+ * migration this ticket does not own, so the truncation travels on the typed
+ * refusal and in the artifact's unconstrained `metadata.finish_reason`.
+ */
+export type ProviderContentRejectionStatus =
+  | "PARSE_FAILED"
+  | "SCHEMA_FAILED"
+  | typeof PROVIDER_CONTENT_LENGTH_EXCEEDED;
+
 export interface RejectedProviderContent {
   readonly rawText: string;
-  readonly parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED";
+  readonly parseStatus: ProviderContentRejectionStatus;
   readonly parseError: string;
 }
 
@@ -70,7 +103,7 @@ export class ProviderContentUnacceptedError extends TypedDomainError {
 
   constructor(
     readonly attempts: number,
-    readonly lastParseStatus: "PARSE_FAILED" | "SCHEMA_FAILED",
+    readonly lastParseStatus: ProviderContentRejectionStatus,
     readonly lastParseError: string,
     readonly lastRawArtifactRef: string,
     readonly lastLedgerEntryRef: string
@@ -284,9 +317,50 @@ const responseSchema = z.object({
   model: z.string().min(1),
   usage: usageSchema.nullable().optional(),
   choices: z.array(z.object({
-    message: z.object({ content: z.string() })
+    message: z.object({ content: z.string() }),
+    // W10/1: carried, never required — a provider that omits it is still a
+    // lawful response, and its absence is recorded as absent rather than as
+    // "not truncated".
+    finish_reason: z.string().nullable().optional()
   })).min(1)
 });
+
+/**
+ * W10/1: the finish reason read LENIENTLY, off the decoded body, so a response
+ * the strict schema rejects still records why it was cut off. The strict parse
+ * happens later and throws; this read must survive it.
+ */
+const observedFinishReasonSchema = z.object({
+  choices: z.array(z.object({ finish_reason: z.string().nullable().optional() }).passthrough()).min(1)
+}).passthrough();
+
+function observedFinishReason(decoded: unknown): string | null {
+  const parsed = observedFinishReasonSchema.safeParse(decoded);
+  return parsed.success ? parsed.data.choices[0]!.finish_reason ?? null : null;
+}
+
+/**
+ * W10/2 (D58 — the outcome is the ticket's, the mechanism is this seat's): the
+ * bound a retry asks for after `n` length failures on the same call.
+ *
+ * At the base a truncation routed to the schema-repair path, which APPENDS a
+ * correction and reuses the same bound: attempt 2 had a longer input, the
+ * identical `max_tokens`, and the same schema to satisfy — output at least as
+ * long as the one just cut. Attempts 2 and 3 were byte-identical requests, so
+ * all three calls burned producing one failure, reported as a contract error.
+ *
+ * The escalation is LINEAR in the number of length failures, so every attempt
+ * of a truncating call is distinct and the worst case is bounded by
+ * `maxAttempts` (3 attempts → at most 3x the sealed ceiling). The SEALED
+ * `tokenCeiling` itself is untouched: this is a per-attempt ask made only after
+ * a measured truncation, never a new default.
+ */
+export function lengthRetryTokenCeiling(sealedTokenCeiling: number, lengthFailures: number): number {
+  if (!Number.isInteger(lengthFailures) || lengthFailures < 0) {
+    throw new TypeError("PROVIDER_LENGTH_RETRY_FAILURE_COUNT_INVALID");
+  }
+  return sealedTokenCeiling * (lengthFailures + 1);
+}
 
 function digest(value: string): string {
   return createHash("sha256").update(value).digest("hex");
@@ -360,15 +434,18 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     let lastLedgerEntryRef = "PROVIDER_LEDGER_ENTRY_UNRESOLVED";
     let lastAttemptId = "PROVIDER_ATTEMPT_UNRESOLVED";
     let attemptPacket = request.packet;
+    /** W10/2: how many attempts of THIS call were cut off at the bound. */
+    let lengthFailures = 0;
     let lastContentRejection: {
       attempts: number;
-      parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED";
+      parseStatus: ProviderContentRejectionStatus;
       parseError: string;
       rawArtifactRef: string;
       ledgerEntryRef: string;
     } | null = null;
 
     for (let attempt = 1; attempt <= request.bound.maxAttempts; attempt += 1) {
+      const attemptTokenCeiling = lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures);
       const inputHash = digest(JSON.stringify(attemptPacket));
       const attemptId = randomUUID();
       lastAttemptId = attemptId;
@@ -386,7 +463,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           signal: AbortSignal.timeout(request.bound.deadlineMs),
           body: JSON.stringify({
             model: this.#options.model,
-            max_tokens: request.bound.tokenCeiling,
+            max_tokens: attemptTokenCeiling,
             messages: attemptPacket.messages
           })
         });
@@ -401,6 +478,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         const observedUsage = z.object({ usage: usageSchema.nullable().optional() })
           .passthrough().safeParse(decoded);
         const strict = responseSchema.safeParse(decoded);
+        const finishReason = observedFinishReason(decoded);
         const content = strict.success ? strict.data.choices[0]!.message.content : null;
         let classifiedContent: ContentClassification | {
           readonly parseStatus: "UNPARSED";
@@ -432,7 +510,15 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           metadata: {
             status: response.status,
             attempt,
-            usage: observedUsage.success ? observedUsage.data.usage ?? null : null
+            usage: observedUsage.success ? observedUsage.data.usage ?? null : null,
+            // W10/1: the reason this completion stopped, recorded on EVERY
+            // attempt. `raw_artifact.metadata` is unconstrained jsonb, so the
+            // truncation is durable even though `parse_status` cannot name it.
+            finish_reason: finishReason,
+            // W10/2: the bound this attempt actually asked for. Without it the
+            // ledger cannot tell a raised retry from a repeat of the attempt
+            // that was just cut off.
+            token_ceiling: attemptTokenCeiling
           },
           parseStatus: classifiedContent.parseStatus,
           parseError: classifiedContent.parseError,
@@ -441,11 +527,33 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           contentHash: digest(rawText)
         });
         if (!response.ok) throw new Error(`PROVIDER_HTTP_STATUS_${response.status}`);
-        const responseJson = responseSchema.parse(decoded);
-        if (
-          request.classifyContent !== undefined
-          && (classifiedContent.parseStatus === "PARSE_FAILED" || classifiedContent.parseStatus === "SCHEMA_FAILED")
-        ) {
+        // W10/1: a refusal that arrived with `finish_reason: "length"` is a
+        // TRUNCATION, and it is named as one. The classifier's own verdict
+        // (PARSE_FAILED on a half-written object) describes the symptom; the
+        // finish reason describes the cause, and only the cause is actionable.
+        //
+        // W10 fix round 1 (F7): the truncation WINS even when the cut landed
+        // before a body the strict response schema will accept. Previously that
+        // case fell through to `responseSchema.parse`, which threw and surfaced
+        // as PROVIDER_CALL_FAILED — a transport-shaped name for a length
+        // failure, which is the very confusion this ticket exists to remove.
+        const truncated = finishReason === PROVIDER_FINISH_REASON_LENGTH;
+        const contentRejection: {
+          readonly parseStatus: ProviderContentRejectionStatus;
+          readonly parseError: string;
+        } | null =
+          classifiedContent.parseStatus === "PARSE_FAILED" || classifiedContent.parseStatus === "SCHEMA_FAILED"
+            ? {
+                parseStatus: truncated ? PROVIDER_CONTENT_LENGTH_EXCEEDED : classifiedContent.parseStatus,
+                parseError: classifiedContent.parseError
+              }
+            : truncated && !strict.success
+              ? {
+                  parseStatus: PROVIDER_CONTENT_LENGTH_EXCEEDED,
+                  parseError: "The completion was cut off at the token bound before a parseable response body"
+                }
+              : null;
+        if (request.classifyContent !== undefined && contentRejection !== null) {
           const ledgerEntryRef = await this.#options.appendLedgerEntry({
             attemptId,
             runId: request.runId,
@@ -464,21 +572,32 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           ledgerRecorded = true;
           lastContentRejection = {
             attempts: attempt,
-            parseStatus: classifiedContent.parseStatus,
-            parseError: classifiedContent.parseError,
+            parseStatus: contentRejection.parseStatus,
+            parseError: contentRejection.parseError,
             rawArtifactRef,
             ledgerEntryRef
           };
-          if (attempt < request.bound.maxAttempts && request.buildRepairPacket !== undefined) {
+          if (contentRejection.parseStatus === PROVIDER_CONTENT_LENGTH_EXCEEDED) {
+            // W10/2: a truncation is NOT repaired by asking again for the same
+            // thing. Appending a correction is strictly counterproductive here
+            // — it lengthens the input the model must re-read while the output
+            // it owes stays the same — so the next attempt re-sends the
+            // ORIGINAL packet under a raised bound.
+            lengthFailures += 1;
+            attemptPacket = request.packet;
+          } else if (attempt < request.bound.maxAttempts && request.buildRepairPacket !== undefined) {
             attemptPacket = request.buildRepairPacket({
-              rawText: responseJson.choices[0]!.message.content,
-              parseStatus: classifiedContent.parseStatus,
-              parseError: classifiedContent.parseError
+              // `content` is the strict parse's, or the raw body when the cut
+              // landed before one existed. Either way it is what arrived.
+              rawText: content ?? rawText,
+              parseStatus: contentRejection.parseStatus,
+              parseError: contentRejection.parseError
             });
           }
           continue;
         }
         lastContentRejection = null;
+        const responseJson = responseSchema.parse(decoded);
         const ledgerEntryRef = await this.#options.appendLedgerEntry({
           attemptId,
           runId: request.runId,
@@ -568,3 +687,12 @@ export class VllmOpenAICompatibleProviderGateway implements ProviderGateway {
     return this.#delegate.call(request);
   }
 }
+
+// DR-181/DR-182's provider health probe (moved here by ruling J21 so the API and
+// the runner share ONE implementation). See ./provider-probe.ts.
+export {
+  observeProviderTarget,
+  probeTarget,
+  type ProviderProbeObservation,
+  type ProviderProbeRecorder
+} from "./provider-probe.js";

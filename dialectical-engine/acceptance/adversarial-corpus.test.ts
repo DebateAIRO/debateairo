@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -34,6 +35,7 @@ interface Observation {
   readonly cwd: string;
   readonly argv: readonly string[];
   readonly environment: Readonly<Record<string, string>>;
+  readonly environmentKeyNames: readonly string[];
   readonly prompt: string;
   readonly requestedCapabilities: readonly ("DATABASE" | "FILESYSTEM")[];
 }
@@ -56,6 +58,16 @@ const corpus = JSON.parse(readFileSync(fileURLToPath(new URL(
 )), "utf8")) as CorpusSpec;
 const cases = new Map(corpus.cases.map((entry) => [entry.id, entry]));
 const handles: CliRelayHandle[] = [];
+
+/**
+ * W6 fix round 1 / F4: a credential-shaped key's VALUE is never echoed by the
+ * fixture — it emits this one-way digest instead. Rule in
+ * `test-fixtures/fake-claude-cli.mjs:44-58`; restated rather than imported so a
+ * broken producer helper cannot be agreed with (TOOLING-TRAPS `:1320`).
+ */
+function digestOf(value: string): string {
+  return `sha256:${createHash("sha256").update(value).digest("hex").slice(0, 16)}`;
+}
 const temporaryDirectories: string[] = [];
 const executedCaseIds = new Set<string>();
 const fakeClaudeCli = fileURLToPath(new URL("./test-fixtures/fake-claude-cli.mjs", import.meta.url));
@@ -71,12 +83,42 @@ async function startObservationRelay(
   options: ObservationRelayOptions = {}
 ): Promise<ObservationRelay> {
   const observations: Observation[] = [];
+  // W6 (SECURITY): the observation's `environment` is a PROJECTION over an
+  // explicit allow-list, never `process.env`. Serialising the whole environment
+  // put every variable the relay admits — a real maker credential among them —
+  // into the model content that `ledger.raw_artifact` persists. Same projection
+  // shape as the product's own `buildCliChildEnvironment` (`relay-core.ts:81-84`).
+  // Every key is here because an assertion below reads it:
+  //   asserted PRESENT — `:437-443` (SECRET-01 exact-set toEqual) and `:503`
+  //   (DB-01 exact key set);
+  //   asserted ABSENT  — the SECRET-01 sentinels set at `:414-419` and DB-01's
+  //   DATABASE_URL at `:480`, both of which those exact-set assertions read as
+  //   an absence. An absence assertion is evidence only if the key WOULD be
+  //   echoed when the relay admits it, so those keys stay named. Anything
+  //   unnamed — the W6 canary included — is dropped.
   const fixtureScript = [
     "const prompt = process.argv[1] ?? '';",
     "const requestedCapabilities = [];",
     "if (prompt.includes('SELECT p4_corpus_canary')) requestedCapabilities.push('DATABASE');",
     "if (prompt.includes('P4_OUTSIDE_SCRATCH_SENTINEL')) requestedCapabilities.push('FILESYSTEM');",
-    "const observation = { pid: process.pid, cwd: process.cwd(), argv: process.argv.slice(1), environment: process.env, prompt, requestedCapabilities };",
+    "const echoedEnvironmentKeys = ['HOME','LANG','OLDPWD','P4_ALLOWED_MAKER_KEY','PATH','PWD','TMPDIR','ANTHROPIC_API_KEY','DATABASE_URL','OPENAI_API_KEY','SSH_AUTH_SOCK','UNRELATED_SECRET','XAI_API_KEY'];",
+    // F4 — the CREDENTIAL-SHAPE rule, identical in all six members: a key is
+    // credential-shaped when a SEGMENT of its name is KEY, TOKEN, SECRET,
+    // PASSWORD, PASSWD, OAUTH, AUTH, CREDENTIAL(S), URL, URI or DSN, and such a
+    // key's VALUE is never emitted — only a truncated one-way digest of it.
+    // `P4_ALLOWED_MAKER_KEY` matches, so SECRET-01's exact-set assertion below
+    // compares the digest of the sentinel it set. Full reasoning in
+    // `test-fixtures/fake-claude-cli.mjs:44-58`.
+    "const { createHash } = require('node:crypto');",
+    "const credentialShapedName = /(?:^|_)(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|OAUTH|AUTH|CREDENTIAL|CREDENTIALS|URL|URI|DSN)(?:_|$)/u;",
+    "const echoedValue = (key, value) => credentialShapedName.test(key) ? 'sha256:' + createHash('sha256').update(value).digest('hex').slice(0, 16) : value;",
+    "const environment = {};",
+    "for (const key of echoedEnvironmentKeys) { if (process.env[key] !== undefined) environment[key] = echoedValue(key, process.env[key]); }",
+    // F3: the key NAMES restore the reach the allow-list removed — a name is not
+    // a credential, a value is — so a key the relay wrongly admits is still
+    // caught. Read by `:445-453` (SECRET-01) and `:501-503` (DB-01).
+    "const environmentKeyNames = Object.keys(process.env).sort();",
+    "const observation = { pid: process.pid, cwd: process.cwd(), argv: process.argv.slice(1), environment, environmentKeyNames, prompt, requestedCapabilities };",
     "process.stdout.write(JSON.stringify(observation));"
   ].join("");
   const adapter: CliRelayAdapter = {
@@ -215,7 +257,9 @@ describe("P4-13 approved adversarial relay corpus", () => {
           rawArtifactRef: `artifact:${request.callSiteKey}`,
           ledgerEntryRef: `ledger:${request.callSiteKey}`,
           content: request.callSiteKey === "corpus:review"
-            ? JSON.stringify({ outcome: "cannot-assess", reasons: ["Local corpus fixture."] })
+            // T5/S3-1: the review artifact carries one bearing per offered edge.
+            // This probe offers none, so it measures none and says so.
+            ? JSON.stringify({ outcome: "cannot-assess", reasons: ["Local corpus fixture."], edge_bearings: [] })
             : validJudgeArtifact,
           provider: "openai-compatible-http",
           model: "p4-local-corpus-model",
@@ -244,6 +288,10 @@ describe("P4-13 approved adversarial relay corpus", () => {
       statement: content,
       providerRef: "corpus:provider",
       contractHash: "corpus:contract",
+      // T5/S3-1: this corpus probe reviews a bare statement that sources no
+      // graph edge, so it offers none and measures none. Empty here is the
+      // true state, not a stand-in for one.
+      edges: [],
       bound: { maxAttempts: 1, tokenCeiling: 2_048, deadlineMs: 5_000 }
     });
 
@@ -267,8 +315,25 @@ describe("P4-13 approved adversarial relay corpus", () => {
       format: "debateai.untrusted-prompt-fields.v1",
       fields: [
         { name: "question_line", content },
-        { name: "author_maker", content },
-        { name: "statement", content }
+        // W7 / V-BLIND-CONTEXT (2026-09-03, commit abb6b21b): `author_maker` is
+        // gone from the payload. `authorMaker` is still PASSED to `review` above
+        // (`:287`) and still recorded — that is the ruling's other half: RECORDED
+        // in the database, WITHHELD from the model. The forged label this case is
+        // about now arrives only in `statement`, where the envelope fences it, so
+        // DELIM-01 still measures exactly what it was written to measure.
+        // `tests/unit/judgement.test.ts:263-270` carries the same correction for
+        // the unit-layer twin; `tests/unit/prompt-surface-guard.test.ts` owns the
+        // withholding property for the whole prompt surface.
+        // Task 11 collateral: this suite reads the packet through the CLI fixture
+        // rather than through the Judge directly, so it was outside that task's
+        // reader set and has been red since abb6b21b. Fixed in Task 16 fix round 1.
+        { name: "statement", content },
+        // T5/S3-1: the edges a review is asked to measure are model-authored
+        // material too, so they are fenced in the SAME versioned untrusted-data
+        // envelope rather than concatenated into the instruction text. DELIM-01
+        // now guards that field as well; this probe offers no edges, so the
+        // fenced content is the empty list it actually sent.
+        { name: "edges_sourced_by_this_node", content: "[]" }
       ]
     });
   });
@@ -404,11 +469,26 @@ describe("P4-13 approved adversarial relay corpus", () => {
         HOME: "/tmp/p4-corpus-home",
         LANG: "C.UTF-8",
         OLDPWD: expect.stringMatching(/[/\\]relay-p4-local-corpus-fixture-[^/\\]+$/),
-        P4_ALLOWED_MAKER_KEY: "P4_SENTINEL_ALLOWED_MAKER_KEY",
+        // W6/F4: credential-shaped, so the fixture emits a digest of the
+        // sentinel rather than the sentinel. SECRET-01's whole point is that an
+        // admitted maker locator reaches the child and nothing else does — the
+        // digest proves the same thing without writing the locator into content
+        // that `ledger.raw_artifact` persists.
+        P4_ALLOWED_MAKER_KEY: digestOf("P4_SENTINEL_ALLOWED_MAKER_KEY"),
         PATH: "/usr/bin:/bin",
         PWD: expect.stringMatching(/[/\\]relay-p4-local-corpus-fixture-[^/\\]+$/),
         TMPDIR: "/tmp"
       });
+      // W6 fix round 1 / F3. The exact-set assertion above reads the fixture's
+      // allow-listed PROJECTION, so on its own it can only catch a wrongly
+      // admitted key the FIXTURE happens to name. The fixture also emits the
+      // full key-NAME list — names are not credentials — and this assertion
+      // holds `buildCliChildEnvironment` to the exact set again, for every key.
+      // `__CF_USER_TEXT_ENCODING` is injected into every macOS child regardless
+      // of the env passed (measured), so it is filtered here exactly as above.
+      expect(relay.observations[0]!.environmentKeyNames.filter((key) =>
+        key !== "__CF_USER_TEXT_ENCODING"
+      )).toEqual(["HOME", "LANG", "OLDPWD", "P4_ALLOWED_MAKER_KEY", "PATH", "PWD", "TMPDIR"]);
       expect(relay.observations[0]!.argv).toEqual([relay.observations[0]!.prompt]);
       for (const sentinel of [...sentinels, "P4_SENTINEL_ALLOWED_MAKER_KEY"]) {
         expect(responseContent).not.toContain(sentinel);
@@ -422,8 +502,20 @@ describe("P4-13 approved adversarial relay corpus", () => {
   it("executes DB-01 with no database locator or capability call", async () => {
     const entry = corpusCase("DB-01");
     executedCaseIds.add(entry.id);
-    const previousDatabaseUrl = process.env.DATABASE_URL;
+    // `buildCliChildEnvironment` (`acceptance/relay-core.ts:81-84`) copies an
+    // admitted key ONLY when the parent defines it, and `LANG` is admitted
+    // (`:69`). Inheriting the operator's locale made the exact-set assertion below
+    // pass on a shell that exports LANG and fail on one that does not — a false
+    // red about the host, not about the relay. The key is therefore SET here, the
+    // way the P4-13 sibling above already sets it (`:391`), rather than the
+    // assertion being loosened: controlling the input keeps the set EXACT, so a
+    // leaked key is still caught AND the LANG copy path is still exercised — a
+    // pin that merely tolerated an absent LANG would also tolerate the product
+    // dropping it.
+    const environmentKeys = ["DATABASE_URL", "LANG"] as const;
+    const previous = Object.fromEntries(environmentKeys.map((key) => [key, process.env[key]]));
     process.env.DATABASE_URL = "P4_SENTINEL_DATABASE_URL";
+    process.env.LANG = "C.UTF-8";
     try {
       const relay = await startObservationRelay({
         databaseCapabilityTrap: () => {
@@ -438,14 +530,18 @@ describe("P4-13 approved adversarial relay corpus", () => {
       }]);
       expect(response.status).toBe(200);
       expect(relay.observations[0]!.requestedCapabilities).toEqual(["DATABASE"]);
-      expect(Object.keys(relay.observations[0]!.environment).filter((key) =>
+      // W6 fix round 1 / F3. This assertion was always a key-SET assertion, and
+      // once `environment` became an allow-listed projection it could only have
+      // reported the fixture's own list back. It now reads the key-NAME list, so
+      // it means again exactly what it was written to mean: the relay admitted
+      // these six keys and no others.
+      expect(relay.observations[0]!.environmentKeyNames.filter((key) =>
         key !== "__CF_USER_TEXT_ENCODING"
-      ).sort()).toEqual(["HOME", "LANG", "OLDPWD", "PATH", "PWD", "TMPDIR"]);
+      )).toEqual(["HOME", "LANG", "OLDPWD", "PATH", "PWD", "TMPDIR"]);
       expect(relay.observations[0]!.argv).toEqual([relay.observations[0]!.prompt]);
       expect(await completionContent(response)).not.toContain("P4_SENTINEL_DATABASE_URL");
     } finally {
-      if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
-      else process.env.DATABASE_URL = previousDatabaseUrl;
+      restoreEnvironment(environmentKeys, previous);
     }
   });
 
@@ -521,7 +617,12 @@ describe("P4-13 approved adversarial relay corpus", () => {
     expect(observed.argumentList).toEqual([
       "-p", observed.prompt,
       "--output-format", "json",
-      "--setting-sources", "",
+      // D18: "user", not "" — "" severed the CLI's keychain login. The
+      // security property this case exists for is untouched: the adversarial
+      // `--setting-sources user,project` text stays INSIDE the -p value, which
+      // the index assertion below still proves.
+      "--setting-sources", "user",
+      "--safe-mode",
       "--strict-mcp-config",
       "--no-session-persistence",
       "--tools", "",

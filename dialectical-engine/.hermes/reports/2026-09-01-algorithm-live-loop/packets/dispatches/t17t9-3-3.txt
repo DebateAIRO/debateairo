@@ -1,0 +1,54 @@
+# DISPATCH t17t9-3-3 · 2026-09-05 18:42 · F-T17T9-3 round 3 of 3 (AMENDMENT 2) · same seat resumed (conversation-mode)
+
+# ---- AMENDMENT 2 (2026-09-05 18:41) — ROUND 3 OF MAX 3, THE LAST · after codex r1 CHANGES (B1, B2) · original + AMENDMENT 1 preserved above ----
+
+codex verdict: /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t17t9-3-codex-r1.md   (B1, B2 blocking; F1–F4 follow-ups ticketed separately, NOT in this round unless comment-only)
+parent gate (machine-readable, cite THESE, not the prose): /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5/31-fourcount-run2.log · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5/27-suite-run2.log
+your b14: /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t17t9-3/14-b14-full-suite.log (the 19 AUTH_MAIL_BUSY blocks from line ~47679; the capacity aggregate at line 659 is on the fixture's controlled clock, not the wall clock)
+
+**The 106 derivation STANDS** (codex: "the 106 correction is supported"). Two evidence/coverage blockers remain.
+
+## B1 — attribution of the 19 unhandled AUTH_MAIL_BUSY rejections (evidence blocker)
+
+Keep the literal four-count **80/1/0/20**. RETRACT the "one contention event, proven" sentence: the log carries no wall-clock
+timestamps or waiter/queue correlation ids, and the parent has ZERO such rejections, not a smaller count. What clears it,
+in the reviewer's words: comparable parent/tip evidence tying the waiter timeouts (`apps/api/src/registration.ts:1094`,
+the individual waiter's timeout) and the S3d test failure to the same load episode, with REAL timing/correlation and
+observed promise settlement. Another isolated pass alone does not settle it.
+
+**Bounded instrumentation is AUTHORIZED (this is the grant the reviewer asked for):** you may instrument the TEST
+harness — `tests/integration/registration-database.test.ts` and the mail-queue fixture/support it uses under
+`tests/support/` — to record wall-clock timestamps and a waiter/queue correlation id per rejection, then run the
+smallest experiment that discriminates load from defect (e.g. that file alone vs. that file under the same concurrency
+the full suite imposes, on the tip AND on the parent 2af816f1 in a scratch checkout you make and remove). Production
+code (`apps/api/src/registration.ts`) stays read-only. If your evidence shows the rejections are NOT load, say so — that
+is a finding, and B1 becomes "cause unknown, not this lane's" only if you can show the same behaviour on the parent
+under the same conditions. Record everything under `/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t17t9-3/`. Normalise the b14 four-count file's blank skips
+field to an explicit 0.
+
+## B2 — the S06 receipt fixture (coverage blocker)
+
+`tests/integration/obs-l3-s06-runner-binding.test.ts:262-265` still supplies `serve: 7`, the three retired composition
+fields and `selected: "COMPOSITION"` — the strict parser refuses it as RUN_COST_ENVELOPE_UNRESOLVED before the test's
+intended provider-exhaustion path. It was hidden behind the inherited advisory-lock stub failure (b14 line 44397, parent
+44369 — both stop at `UNEXPECTED_CLIENT_QUERY: SELECT pg_try_advisory_lock`). Update the fixture to six serve sites and
+the two-field synthesis receipt, keep its deliberately small ceiling and provider-attempt setup, and ESTABLISH that its
+receipt parses independently of the lease-stub failure (a direct parse of the fixture's basis is enough). Add the
+old→new entry to your report. **My AMENDMENT 1 consumer list omitted this file — orchestrator defect #27; the generic
+affected-pin grant already covered it, so this is a factual correction, not a new permission.**
+
+## Also in this round (cheap, in files you hold)
+- F4 narrowing, COMMENT-ONLY if you choose to take it: describe the parser as checking shape, chain identity and
+  disclosed-count consistency — not as proving every accepted receipt could have been minted by the constructor
+  (`tests/unit/t17-envelope.test.ts:461`, `packages/budget/src/index.ts:96`). Not required for MERGEABLE.
+- F1's two comments you already flagged (`panel01`/`xrev01-depth1-proof.ts:37`) stay OUT of contract; they are ticketed.
+
+## Contract — unchanged from AMENDMENT 1, plus
+allowed +: tests/integration/obs-l3-s06-runner-binding.test.ts · tests/integration/registration-database.test.ts
+(instrumentation only) · tests/support/* mail-queue fixtures (instrumentation only) · a scratch checkout of 2af816f1
+OUTSIDE the mission worktrees for the parent comparison, removed afterwards.
+readonly +: apps/api/src/registration.ts · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t17t9-3-codex-r1.md · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5/31-fourcount-run2.log · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5/27-suite-run2.log
+Markers: `comments read through: t17t9-3-codex-r1-2026-09-05`. `REWORK READY FOR REVIEW` or `BLOCKED <reason>`.
+After this round nothing is re-dispatched: whatever is open goes to V.
+
+<!-- NOTE appended 18:42: the two `tools/mutate.sh` mentions in the round-1/round-2 text above mean /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/tools/mutate.sh (a mission-dir tool). Sent text is preserved; this note is the correction. -->

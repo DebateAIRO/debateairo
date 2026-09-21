@@ -62,6 +62,15 @@ export interface DualMakerProofOptions {
   /** …or provision the standing acceptance database on this port. */
   readonly databasePort?: number;
   readonly testOnlyCodexCommand?: CommandSpec;
+  /**
+   * Test-only mirror of the Codex rollout tree that belongs to
+   * {@link testOnlyCodexCommand}. Codex is the only maker whose model id is read
+   * from a PERSISTED store rather than from its own stdout, so substituting its
+   * CLI without also substituting that store sends the lookup to the operator's
+   * real ~/.codex/sessions, where a fake CLI's thread id can never appear.
+   * Unset — the live case — keeps the real rollout tree, unchanged.
+   */
+  readonly testOnlyCodexSessionsRoot?: string;
   readonly testOnlyClaudeCommand?: CommandSpec;
 }
 
@@ -126,7 +135,10 @@ export async function runDualMakerProof(options: DualMakerProofOptions): Promise
     shim = await startModelShim({
       port: 0,
       timeoutMs: policy.bounds.JUDGE.deadlineMs,
-      ...(options.testOnlyCodexCommand !== undefined ? { testOnlyCommand: options.testOnlyCodexCommand } : {})
+      ...(options.testOnlyCodexCommand !== undefined ? { testOnlyCommand: options.testOnlyCodexCommand } : {}),
+      ...(options.testOnlyCodexSessionsRoot !== undefined
+        ? { testOnlySessionsRoot: options.testOnlyCodexSessionsRoot }
+        : {})
     });
     relay = await startClaudeRelay({
       port: 0,

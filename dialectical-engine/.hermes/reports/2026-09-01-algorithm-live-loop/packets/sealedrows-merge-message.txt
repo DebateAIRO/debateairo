@@ -1,0 +1,21 @@
+Merge branch 'lane/sealedrows' into mission/2026-09-01-algorithm-live-loop
+
+F-SEALEDROWS-A: both deployment seeders build again. The conformance locator that
+quoted the prompt's own words (and then matched the first `criteria`, and then
+balanced braces over raw text) is deleted; the evaluator prompt is a named export
+the runner SENDS and both seeders DIGEST. Per V's ruling 2026-09-04 the conformance
+hash covers the evaluator prompt alone. Sealed value unchanged (339 bytes,
+sha256 2364b1b5…): no deployment re-seeds.
+
+F-T9B-3 / F-SEALEDROWS-D: a floored band names its own reason — a new sealed
+emptyBasisFloor entry, REQUIRED on the one remaining type and both strict schemas.
+
+F-SEALEDROWS-C closed structurally (one definition). mutant-index.py v4: a
+non-crediting NOT-RUN class; a refused mutation is never scored as a kill.
+
+Six review rounds (codex r1–r6); rework cap 3/3 plus two V-authorized post-cap
+rounds (V-SEALEDROWS-1, -2), both test-only. Both seeder hashes and every
+evaluator wire attempt — initial and repair — are proven behaviourally to lead
+with the exported constant.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>

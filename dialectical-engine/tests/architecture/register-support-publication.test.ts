@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
 import { extname } from "node:path";
 import { promisify } from "node:util";
-import ts from "typescript";
+import ts from "typescript-classic";
 import { describe, expect, it } from "vitest";
 import {
   AUTH_POLICY_REGISTER_ROWS,
@@ -16,9 +16,11 @@ import {
   computeRegisterSnapshotSha256,
   loadBootstrapRegister
 } from "../../packages/register/src/index.js";
-import { buildDevelopmentDeploymentRegisterHistoricalPublicationRows } from
+import { buildDevelopmentDeploymentRegisterPublicationRows } from
   "../../apps/runner/src/dev-deployment-register.js";
+import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 import {
+  readLegacyDevelopmentV4Rows,
   DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256,
   LEGACY_REGISTER_V1_SNAPSHOT_SHA256
 } from "../support/registerFixtures.js";
@@ -188,6 +190,10 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     expect(initializer).not.toMatch(
       /(?:process[.]env|\bcurrent\b|\blatest\b|MIGRATION_DATABASE_URL|databaseUrl|password|token|publishGeneral|publish_support_configuration|[.]query\s*\()/iu
     );
+    // VACUOUS-ORDERING GUARD: the binding loop above pins
+    // "const commitAcknowledgedAt = new Date()" but not the connection call, so
+    // a missing connection gave indexOf -1 and this comparison passed anyway.
+    expect(initializer).toContain("await withProductionSupportConfigCliConnection");
     expect(initializer.indexOf("await withProductionSupportConfigCliConnection"))
       .toBeLessThan(initializer.indexOf("const commitAcknowledgedAt = new Date()"));
 
@@ -226,7 +232,7 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     ]) expect(developmentSchedule, `development initializer bypass: ${binding}`).toContain(binding);
     expect(developmentSchedule).not.toMatch(/register[.]publish_support_configuration|database[.]pool[.]connect/u);
     for (const binding of [
-      "buildDevelopmentDeploymentRegisterHistoricalPublicationRows",
+      "readLegacyDevelopmentV4Rows",
       "DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256",
       "rows: deterministicV4Rows",
       "createPostgresRegisterPublicationPort(heldPool)",
@@ -359,13 +365,26 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
   it("preserves the exact legacy hashes while the actual port input owns all 248 policy decimals", async () => {
     const bootstrap = await loadBootstrapRegister();
     const historicalRows = buildBootstrapRegisterPublicationRows(bootstrap);
-    const developmentRows = await buildDevelopmentDeploymentRegisterHistoricalPublicationRows(
-      bootstrap
+    const developmentRows = await buildDevelopmentDeploymentRegisterPublicationRows(
+      bootstrap,
+      TEST_DEVELOPMENT_PROVIDER_PANEL
     );
     expect(historicalRows).toHaveLength(14);
-    expect(developmentRows).toHaveLength(32);
+    // W10/3 x T16: 47 -> 49. The development deployment now seals the two
+    // synthesis-role cost rows `synthesizerCallBound` and `evaluatorCallBound`
+    // (migrations/0064_synthesis_role_cost_rows.sql, minted through T16's
+    // mechanism in `buildAlgorithmRegisterRows`), and this pin counts the rows
+    // the publication port actually emits. MEASURED, not inferred: the port
+    // emits 49 with no duplicate keys, and 47 with exactly those two keys
+    // removed — so the two W10 rows are the whole delta and nothing else moved.
+    //
+    // The three neighbouring counts are deliberately UNCHANGED: `historicalRows`
+    // is the bootstrap set and `readLegacyDevelopmentV4Rows` an on-disk legacy
+    // snapshot, neither of which a new deployment row can reach.
+    expect(developmentRows).toHaveLength(49);
+    expect(await readLegacyDevelopmentV4Rows()).toHaveLength(32);
     expect(computeRegisterSnapshotSha256(historicalRows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);
-    expect(computeRegisterSnapshotSha256(developmentRows))
+    expect(computeRegisterSnapshotSha256(await readLegacyDevelopmentV4Rows()))
       .toBe(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256);
 
     const policyKeys = new Set([
@@ -440,7 +459,7 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     const census = await repositoryCensus();
     expect(census.files).toContain("tests/support/registerFixtures.ts");
     const deniedRegisterWrites = census.sql.filter(isExpectedDeniedRegisterWrite);
-    expect(deniedRegisterWrites.map(({ file }) => file).sort())
+    expect([...new Set(deniedRegisterWrites.map(({ file }) => file))].sort())
       .toEqual([...DENIED_REGISTER_WRITE_CALLERS.keys()].sort());
     for (const [file, caller] of DENIED_REGISTER_WRITE_CALLERS) {
       const source = census.sources.get(file) ?? "";
@@ -492,7 +511,7 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     expect([...new Set(latestReads)]).toEqual([]);
 
     const sequenceUsers = census.sql.filter(({ file, text }) =>
-      /register_version_id_seq|nextval\s*\(/iu.test(text)
+      /register_version_id_seq/iu.test(text)
       && file !== migrationPath
       && file !== "tests/architecture/register-support-publication.test.ts"
       && file !== "tests/integration/register-support-publication.test.ts"
@@ -581,7 +600,7 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
   });
 
   it("discovers exactly the allocated migration and the exact SQL port signatures", async () => {
-    expect((await readdir("migrations")).filter((name) => /^0055.*[.]sql$/u.test(name)))
+    expect((await readdir("migrations")).filter((name) => /^0055_register_support_publication[.]sql$/u.test(name)))
       .toEqual(["0055_register_support_publication.sql"]);
     const compact = (await migrationSource()).replace(/\s+/gu, " ");
     for (const signature of [

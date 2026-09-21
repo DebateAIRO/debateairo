@@ -1,0 +1,31 @@
+# CODEX REVIEWER PACKET — lane/dev-health · F-ORACLE-CORPUS-COUNT + F-RUNNER-MISSING-VALUATION-DEP + F-POISONED-REQUIRED-CATEGORY · round 1 · gpt-6-astra (D65) · plus one side question on F-TOOL-MUTATE-3
+
+```
+mission dir   : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop
+lane worktree : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-dev-health   (branch lane/dev-health; base dev 80559019; tip 8252bca1 — verify; three commits: 865d7fca the fix, c4af525a and 8252bca1 traps entries)
+working dir   : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-dev-health/dialectical-engine
+worker packet : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/packets/dev-health-worker.md · dispatch /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/packets/dispatches/dev-health-worker-1.txt
+seat filing   : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/dev-health.md · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/dev-health-self.md · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/dev-health/
+tickets       : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/board/F-ORACLE-CORPUS-COUNT.md · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/board/F-RUNNER-MISSING-VALUATION-DEP.md · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/board/F-POISONED-REQUIRED-CATEGORY.md · side: /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/board/F-TOOL-MUTATE-3.md
+```
+
+## The seat's claims (verify by artifact)
+- Corpus: `tests/support/shipped-corpus.manifest.txt` (233 sorted repository-relative paths; packages 75, apps 157, web 1; 59 tsx) + `tests/support/shippedCorpusManifest.ts`; the oracle row compares the scanned SET to the manifest and prints `added`/`missing`; the instrument (roots/exclusions/extensions, shippedSourceFiles) untouched; the one added path derived from git (risk-signal-identity.ts). Mutants a (entry removed → `added`) and a2 (phantom entry → `missing`) caught; c (rename) survives.
+- Runner: `@debateai/valuation` declared in the neighbours' form; a three-line tool-generated lockfile diff; `pnpm install --frozen-lockfile` exit 0 ×3.
+- poisoned(category) required; the three defaulted sites named; public message unchanged; p2-auth-risk 12/12 ×3. Mutant b (restore the default on the DECLARATION) SURVIVES — the seat calls my packet's §5(b) a packet defect (a declaration-level default cannot be pinned when every call site passes an argument) and substituted b2 (strip the argument at :91 → TS2554); it reported the substitution rather than hiding it.
+- Gates: s1-1 whole file 1 failed / 1009 passed ×3 (the inherited architecture-audit ENOENT row, named); typecheck identity by hash; stamp-check 17 records, 1 = the orchestrator's provisioning record.
+
+## Questions
+1. Corpus: is the manifest comparison exact (set equality, order-insensitive, path form identical to the scan's), does the row still parse every file first, and could a manifest edit hide a real change (e.g. a deleted shipped file whose manifest line is also deleted — is that visible anywhere)? Is the manifest's path form robust to the OS separator? STRENGTH.
+2. Runner dep: is the declared form byte-consistent with the neighbours; is the lockfile diff exactly what the tool produces (no hand edit)?
+3. poisoned(): are the three new category names bounded and true to what each site checks? Is the seat right that §5(b) was unpinnable at the declaration, and is b2 the right substitute? Charge or clear the packet on it.
+4. **Side question — F-TOOL-MUTATE-3:** `/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/tools/stamp-check.sh` now reads the LAST `commit=` stamp in a record (v1 at `/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/tooling/stamp-check.sh.v1-before-F-TOOL-MUTATE-3`; self-test `/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/tooling/st3-selftest.log`). Is that the right semantics given mutate.sh appends, and does it weaken any custody property (could a stale record be made to pass by appending a fresh stamp without a fresh run)? APPROVE or CHANGES for that tool change, separately.
+5. Packet audit of the worker packet: contract reach; facts; provisioning. Charge or clear.
+6. Landing: mergeable into dev 80559019? Isolated merge-tree; state the tree.
+
+## Output — ONLY these two files
+```
+/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/dev-health-codex-r1.md
+/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/dev-health-codex-r1-self.md
+```
+Line 1 exactly: `CODEX REVIEW DEV-HEALTH r1 — <APPROVE|CHANGES> · comments read through: dev-health-r1-2026-09-07`; counts; per-finding File/line · Input → wrong outcome · Required fix · STRENGTH; `## Side question F-TOOL-MUTATE-3` with its own APPROVE/CHANGES; `## Packet audit`; `## Landing`; `## Not verified`; final line `REVIEW: approve|changes — <one sentence>`. Static plus saved artifacts; you may run the two unit files once; no git mutation, no install, no push; no edits to the board or the DECISIONS file.

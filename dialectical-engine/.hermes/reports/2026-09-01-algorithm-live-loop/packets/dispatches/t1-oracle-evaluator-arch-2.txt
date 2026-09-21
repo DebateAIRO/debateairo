@@ -1,0 +1,25 @@
+# DISPATCH t1-oracle-evaluator-arch-2 · 2026-09-06 09:19 · architecture round 2 (AMENDMENT 1) · same seat resumed
+
+# ---- AMENDMENT 1 (09:19 2026-09-06) — ARCHITECTURE ROUND 2 OF 3 · after codex PLAN review r1 (CHANGES: 8 blocking, 2 follow-ups) ----
+verdict (final snapshot): /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-evaluator/codex-plan-r1-verdict.final-snapshot.md — read it WHOLE; its section "Exact revision requested
+from the architecture seat" is this round's contract, and B1–B8 are the reasons. In one line each:
+B1 successful lexing is not evidence of correct lexical context (specify the successful-token contract: control-condition vs expression parentheses,
+JSX tags/attributes/text/expression containers, nested templates, balanced transitions; assertions on the named inputs) · B2 NOT_NUMBERS absorbs
+incorrectly across value-producing callbacks (distinguish "all current elements nonnumeric" from "later results cannot be numeric"; re-evaluate
+map/flatMap output sort independently; UNKNOWN where concrete info was discarded; define joins) · B3 an opaque filter is not necessarily a
+subsequence of the pre-call values (subsequence only for callbacks proven unable to mutate/invalidate; arbitrary bodies → UNKNOWN; state purity and
+built-in-binding assumptions) · B4 no complete expression-ownership / wrapper-binding grammar (closed expression/binding grammar with parse-result and
+consumed-span contracts; which parent acts on which value; where evaluation stops; rule-1 precedence; unknown surrounding constructs → UNKNOWN
+without losing the occurrence) · B5 token punctuation still does not identify the enclosing statement/occurrence (obtain the owning statement
+structurally or revise the address policy to candidate offsets/lines; stable occurrence identity by offsets; ceiling-arm dedup separate; assert
+exact addresses/spans/cardinality incl. ASI cases) · B6 the "zero cost" measurement used the OLD candidate population (state candidate eligibility
+incl. empty/mixed arrays and numeric syntax; inventory the population; measure exact candidate/verdict/reason/site lists for the selected design;
+model proven nonnumeric uses such as includes or account for them) · B7 the promised acceptance and round states are mutually inconsistent
+(complete the five callback fixtures and four group entries with their wrapping/comment variation; separate truncated-input conservative controls;
+declare the floor adaptation; replace round-2 predictions with an exact list generated from the defined stub or give round 2 a different explicit
+acceptance) · B8 twelve mutants neither cover every clause nor discriminate (build a clause → non-equivalent mutant → exact discriminating control
+matrix after B1–B7; remap m4/m7; derive m3′'s failing set; cover unassigned clauses; separate m6's expected-survival check; twelve is not a ceiling).
+F1: retaining the old ceiling lexer for the other arms is acceptable scope, with its inherited limit stated concretely.
+The plan is REVISED IN PLACE by dated sections (a "Revision 2" block per affected section; the original text preserved and marked superseded where
+it is), not rewritten — the reviewer cites line numbers. Same grants (the plan and your self-report). STRENGTH on every claim. No code.
+Markers: `comments read through: t1-oracle-evaluator-plan-codex-r1-2026-09-06`; end with `PLAN READY FOR REVIEW` or `BLOCKED <reason>`.

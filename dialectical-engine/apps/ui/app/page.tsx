@@ -28,7 +28,6 @@ export default async function HomePage({
       : token !== null ? "yours" : "public";
   const userAgent = (await headers()).get("user-agent") ?? undefined;
   let debates: DebateSummary[] = [];
-  let total: number | null = null;
   let error: string | null = null;
   let sessionConfirmed = false;
   let published: Awaited<ReturnType<ContractClient["readPublicDebates"]>> = { items: [], total: 0 };
@@ -44,16 +43,24 @@ export default async function HomePage({
     try {
       const page = await listDebatesPageServer(token, undefined, userAgent);
       debates = page.summaries;
-      total = page.total;
       sessionConfirmed = true;
     } catch {
       error = "Your signed-in session could not be confirmed. Refresh once, or sign in again.";
     }
   }
 
-  const count = tab === "yours"
-    ? (total ?? debates.length)
-    : published.total;
+  // V's ruling of 2026-09-20: the chip counts what is on screen. It used to
+  // show the account-wide or corpus-wide aggregate, so a reader saw "41 TOTAL"
+  // standing over four rows and "37 TOTAL" over three. fd82d84e had already
+  // derived it from the rendered rows; the 690ebe14 merge kept that slice's
+  // test and dropped the change.
+  const count = tab === "yours" ? debates.length : published.items.length;
+
+  // The list wrappers carry `recentList` beside `libList`. `recentList` is the
+  // name the T3-C2 slice used and the one t3-library still selects on; the
+  // 690ebe14 merge discarded it with the rest of that side. The two rules are
+  // identical (globals.css:2325 and :6765), so carrying both recovers the
+  // dropped name with no visual change.
 
   return (
     <div className="screen scroll libScreen">
@@ -107,7 +114,7 @@ export default async function HomePage({
 
         {tab === "yours" ? (
           sessionConfirmed ? (
-            <div className="libList">
+            <div className="libList recentList">
               <DebatesBuffer debates={debates} />
             </div>
           ) : (
@@ -116,7 +123,7 @@ export default async function HomePage({
         ) : (
           <>
             {publishedError ? <div className="error">{publishedError}</div> : null}
-            <div className="libList">
+            <div className="libList recentList">
               <PublicDebatesBuffer debates={published.items} />
             </div>
             <p className="libPublicNote">

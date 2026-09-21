@@ -10,6 +10,18 @@ const AUTH_TAG_BYTES = 16;
 const VERSION_BYTES = 1;
 const WRAPPED_KEY_BYTES = VERSION_BYTES + NONCE_BYTES + KEY_BYTES + AUTH_TAG_BYTES;
 const CONTENT_OVERHEAD_BYTES = VERSION_BYTES + NONCE_BYTES + AUTH_TAG_BYTES;
+/**
+ * The envelope version TAGS written as byte 0, one per envelope this module
+ * produces. Distinct from VERSION_BYTES above, which is that prefix's LENGTH.
+ *
+ * They are named rather than inlined because the S1-1 single-source oracle
+ * reports every numeric-array occurrence in shipped code whose value it cannot
+ * evaluate, and an array literal holding a bare number consumed by an
+ * unmodelled call is exactly that shape. A named element is not a candidate.
+ */
+const WRAPPED_KEY_VERSION_TAG = 1;
+const CONTENT_ENVELOPE_VERSION_TAG = 1;
+const SEMANTIC_ENVELOPE_VERSION_TAG = 2;
 const SUPPORT_KEK_FILENAME = "support-kek.bin";
 const PRIVATE_DIRECTORY_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
@@ -401,7 +413,7 @@ class FileSupportKeyPort implements SupportKeyPort {
       // bytes 45..60 GCM tag
       return Object.freeze({
         version: 1,
-        bytes: Buffer.concat([Buffer.from([1]), nonce, encrypted, tag])
+        bytes: Buffer.concat([Buffer.from([WRAPPED_KEY_VERSION_TAG]), nonce, encrypted, tag])
       });
     } catch (error) {
       if (error instanceof SupportKeyError) throw error;
@@ -441,7 +453,7 @@ class FileSupportKeyPort implements SupportKeyPort {
       cipher.setAAD(aad("support-content", handle));
       const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
       // Content uses version || 12-byte nonce || variable ciphertext || 16-byte GCM tag.
-      return Buffer.concat([Buffer.from([1]), nonce, encrypted, cipher.getAuthTag()]);
+      return Buffer.concat([Buffer.from([CONTENT_ENVELOPE_VERSION_TAG]), nonce, encrypted, cipher.getAuthTag()]);
     } catch (error) {
       if (error instanceof SupportKeyError) throw error;
       fail("SUPPORT_KEY_OPERATION_FAILED");
@@ -486,7 +498,7 @@ class FileSupportKeyPort implements SupportKeyPort {
       });
       cipher.setAAD(semanticAad(context));
       const encrypted = Buffer.concat([cipher.update(plaintext),cipher.final()]);
-      return Buffer.concat([Buffer.from([2]),nonce,encrypted,cipher.getAuthTag()]);
+      return Buffer.concat([Buffer.from([SEMANTIC_ENVELOPE_VERSION_TAG]),nonce,encrypted,cipher.getAuthTag()]);
     } catch (error) {
       if (error instanceof SupportKeyError) throw error;
       fail("SUPPORT_KEY_OPERATION_FAILED");

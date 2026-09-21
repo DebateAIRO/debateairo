@@ -21,13 +21,10 @@ import { createPool, migrate, type Pool } from "../../packages/db/src/index.js";
 import {
   computeRegisterSnapshotSha256,
   createPostgresRegisterPublicationPort,
-  loadBootstrapRegister,
   parseCanonicalRegisterJson,
   parseRegisterVersionText,
   SUPPORT_CONFIGURATION_KEYS
 } from "../../packages/register/src/index.js";
-import { buildDevelopmentDeploymentRegisterHistoricalPublicationRows } from
-  "../../apps/runner/src/dev-deployment-register.js";
 import {
   PRODUCTION_DATABASE_PRINCIPAL_CREDENTIAL_FORMAT,
   cleanupProductionSupportConfigOperator,
@@ -38,9 +35,7 @@ import {
   withProductionSupportConfigCliConnection
 } from "../../apps/runner/src/support-config-cli-credentials.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
-import {
-  DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256
-} from "../support/registerFixtures.js";
+import { readLegacyDevelopmentV4Rows, DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 } from "../support/registerFixtures.js";
 
 const MANIFEST_PATH =
   "docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json";
@@ -2747,9 +2742,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       ({ principalId }) => principalId === "support-config-operator"
     )!.databaseUrl;
     const adminRegister = createPostgresRegisterPublicationPort(adminPool);
-    const deterministicV4Rows = await buildDevelopmentDeploymentRegisterHistoricalPublicationRows(
-      await loadBootstrapRegister()
-    );
+    const deterministicV4Rows = await readLegacyDevelopmentV4Rows();
     expect(computeRegisterSnapshotSha256(deterministicV4Rows))
       .toBe(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256);
     await adminRegister.importHistorical({

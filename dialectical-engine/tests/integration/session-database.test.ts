@@ -429,7 +429,17 @@ describe("S5 sessions on real PostgreSQL", () => {
   });
 
   it("runs the password-to-TOTP challenge through real Argon2 and creates one hash-only session", async () => {
-    const now = new Date("2026-08-23T10:00:00.000Z");
+    // The risk-signal scope query filters on the DATABASE clock — clock_timestamp(), in
+    // identity.prepare_authentication_risk_signal_for_session (migrations/0046) — while the
+    // service runs on the clock injected below. A fixed calendar date therefore ROTS: once
+    // wall-clock time passed that date plus the 14-day idle TTL, the session this test had
+    // just created was already expired at the database, the scope resolved to no row, and
+    // the login's risk signal could not be recorded. Anchor `now` to the database's own
+    // clock so the two agree; every advance below stays relative to it.
+    const databaseClock = await database.pool.query<{ epoch_ms: string }>(
+      `SELECT (extract(epoch FROM clock_timestamp())*1000)::bigint::text AS epoch_ms`
+    );
+    const now = new Date(Number(databaseClock.rows[0]!.epoch_ms));
     let currentTime = now;
     const email = `s5-login-${randomUUID()}@example.test`;
     const password = "correct horse battery staple for S5";
@@ -480,7 +490,12 @@ describe("S5 sessions on real PostgreSQL", () => {
           RECOVERY_POLICY_REGISTER_ROW.value.risk_signals.raw_signal_retention_ms,
           RECOVERY_POLICY_REGISTER_ROW.value.risk_signals.maximum_evaluator_signals
         ),
-        onRiskSignalFailure:()=>{throw new Error("UNEXPECTED_RISK_SIGNAL_FAILURE");},
+        onRiskSignalFailure:(error:unknown)=>{
+          // still fatal — the risk signal must be recorded; the cause is now named in the
+          // failure message instead of being discarded by the service's catch.
+          const named=error instanceof Error?`${error.name}: ${error.message}`:String(error);
+          throw new Error(`UNEXPECTED_RISK_SIGNAL_FAILURE (${named})`);
+        },
         dekStore,
         argon2,
         authPolicy,

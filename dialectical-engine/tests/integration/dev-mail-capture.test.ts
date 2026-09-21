@@ -26,7 +26,16 @@ function permissions(path: string): number {
   return lstatSync(path).mode & 0o777;
 }
 
-describe.sequential("DEV-06 local sendmail-compatible capture", () => {
+// vitest 5 removed `describe.sequential` (the `sequential` test/suite option is
+// gone in favour of `concurrent`). The old call guaranteed that these cases never
+// ran concurrently with each other even if a parent suite or the config had
+// turned concurrency on; they share one process-wide environment variable
+// (`DEBATEAI_DEV_MAIL_CAPTURE_DIR`, restored in the `afterEach` above), so an
+// overlap would let one case read another's spool. What guarantees it now is
+// `concurrent: false` declared on the suite — the same non-concurrent run, said
+// in the vocabulary vitest 5 kept, and still explicit rather than relying on the
+// default.
+describe("DEV-06 local sendmail-compatible capture", { concurrent: false }, () => {
   it("preflights private spool custody without creating or reading a message", () => {
     const root = mkdtempSync(join(tmpdir(), "debateai-dev-mail-"));
     const spool = join(root, "mail");

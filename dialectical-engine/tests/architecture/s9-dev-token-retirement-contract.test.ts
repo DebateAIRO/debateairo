@@ -64,6 +64,10 @@ describe("S9 dev-token retirement architecture contract", () => {
     ]);
     for (const control of [uiControl]) {
       expect(control).toContain("client.claimLegacyRuns(submittedToken)");
+      // VACUOUS-ORDERING GUARD: only the right-hand needle was pinned present.
+      // Without this, dropping the token clear entirely gave indexOf -1 and the
+      // "clears before claiming" ordering passed with no clear at all.
+      expect(control).toContain('setLegacyToken("")');
       expect(control.indexOf('setLegacyToken("")')).toBeLessThan(
         control.indexOf("client.claimLegacyRuns(submittedToken)")
       );

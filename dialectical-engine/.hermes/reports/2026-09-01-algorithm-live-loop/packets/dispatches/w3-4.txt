@@ -1,0 +1,22 @@
+[filed before sending — D64]  lane/w3b · dispatch 4 · 2026-09-05 14:40 EEST · two post-merge loose ends, test-only
+
+W3 is MERGED into integration at fd3bf47a6877d86e2c0ee977412a65a222d16aae (codex r1 APPROVE on gpt-6-astra; the merged-tree gate showed only already-ticketed failures). T1's lane landed with it; T01, T1B and F-T1B-6 are closed. Two small test-only items remain in your area, and you hold the context.
+
+FIRST: fast-forward your worktree. lane/w3b at e8fc0335 is an ancestor of fd3bf47a, so `git merge --ff-only fd3bf47a` succeeds; the lockfile moved in that range, so run `pnpm install --frozen-lockfile` and `pnpm run generate:contract` after (D9 ADDENDUM) and confirm the contract hash equals integration's 59a57922dd1ab796. Verify `git rev-parse HEAD` is fd3bf47a before touching anything.
+
+ITEM 1 — F-T1B-5 (board/F-T1B-5-conjunct-depth-fixture-pinned.md). T1's oracle is in integration and scans real files — but the ticket's charge is narrower: does a mutant on the CONJUNCT rule die on a REAL site (the oracle itself names apps/ui/app/new/page.tsx:73-75 as the real conjunct example) rather than only on the planted m10 control? No mutant record from T1's lane shows it. Run that mutant through tools/mutate.sh against the landed oracle: mutate the conjunct arm's rule (not the control) and see what kills it. If a real site kills it — report the transcript and the ticket closes. If ONLY the planted control kills it — add the real-site pin (test-only) and re-run until the real site kills it. Do not touch the control; do not narrow the rule.
+
+ITEM 2 — F-GATE-1 (board/F-GATE-1-t16-envelope-key-drift.md, DIAGNOSED). tests/integration/t16-algorithm-register.test.ts 'seeds every ruled algorithm row' expects nine envelopeFormulaInputs keys; the seeder emits ten — maxDepth, added by T17's rework 4bbb13e5 a day after the expectation was written, hidden since by the conformance break. STALE TEST. Fix: add `maxDepth: EXPANSION_DEPTH_MAX` to the expectation — IMPORT the owner from @debateai/contract, never restate 5, so T1's oracle stays green — with a comment naming 4bbb13e5. RED first (it is red today on integration), GREEN after, and T1's oracle still 46/46 after your edit.
+
+Contract for this dispatch: tests/unit/s1-1-depth-contract.test.ts (ONLY if item 1 needs a real-site pin), tests/integration/t16-algorithm-register.test.ts, logs/w3/** (r4- prefix), your two agent-reports (append new h1 sections), TOOLING-TRAPS.md at its ABSOLUTE main-checkout path /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/TOOLING-TRAPS.md, append-only (the lane copy is stale — D61 with the path this time). No product file. No acceptance/ file — another lane's review is running there.
+
+Stall guard stands. Both items together should be under an hour. Commit your own work (you did last time); report the tip. This is W3 round 4, a fresh scope, not a rework.
+
+# ---- CORRECTION appended 2026-09-05 (F-W3-R4-3, codex W3 r4 N3) — the original above is preserved ----
+# The instruction "add the real-site pin … re-run until" prescribed a MECHANISM whose outcome could not exist:
+# no shipped file distinguishes the conjunct rule's depth refinement from its shallower mutant. The acceptance
+# branch should have read: establish what the boundary and the refinement each protect; identify the killing
+# assertion and the real source if any; if the distinguishing production shape is absent, validate and document
+# the control-only disposition. Never mandate production changes to manufacture a fixture (D58).
+# Line 9's rationale was also wrong: the source oracle does not scan tests; the t16 import is justified by owner
+# consistency plus the separate numeric pin, as the seat explained.

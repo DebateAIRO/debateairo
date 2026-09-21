@@ -1,0 +1,29 @@
+#!/bin/bash
+# gate-run.sh — emits a COMPLETE gate record. Use this for every acceptance gate (D45).
+# Usage: gate-run.sh <worktree-being-measured> <out.log> <label> <cmd...>
+# Emits, in order: the MEASURED checkout's commit and tree · porcelain BEFORE · the exact command
+#   (unpiped) · raw output between markers · the command's own exit · porcelain AFTER · a clean
+#   verdict. Proves its own provisioning rather than asserting it; refuses nothing, records
+#   everything, so a dirty measurement is visible instead of invisible.
+set -u
+WT=${1:?worktree}; OUT=${2:?out}; LABEL=${3:?label}; shift 3
+COMMIT=$(git -C "$WT" rev-parse HEAD); TREE=$(git -C "$WT" rev-parse HEAD^{tree})
+PRE=$(git -C "$WT" status --porcelain | tr '\n' ';')
+{
+  echo "commit=$COMMIT tree=$TREE  gate=$LABEL  $(date '+%F %T %Z')"
+  echo "measured worktree : $WT"
+  echo "porcelain BEFORE  : [${PRE}]"
+  echo "\$ $*"
+  echo "<<<OUTPUT"
+} > "$OUT"
+( cd "$WT" && "$@" ) >> "$OUT" 2>&1
+rc=$?
+POST=$(git -C "$WT" status --porcelain | tr '\n' ';')
+{
+  echo "OUTPUT>>>"
+  echo "EXIT = $rc"
+  echo "porcelain AFTER   : [${POST}]"
+  if [ "$PRE" = "$POST" ]; then echo "CLEAN-STATE: unchanged across the run"; else echo "CLEAN-STATE: CHANGED — this measurement is suspect"; fi
+} >> "$OUT"
+echo "$OUT: exit=$rc clean=$([ "$PRE" = "$POST" ] && echo yes || echo NO)"
+exit $rc

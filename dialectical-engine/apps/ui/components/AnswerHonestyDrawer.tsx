@@ -242,17 +242,8 @@ export function AnswerHonestyDrawer({
                   <li key={index} className="drawerFindingItem">
                     {slot.status === "PRESENT" ? (
                       <div className="drawerFindingText">{labeledNumberLine(slot.number)}</div>
-                    ) : slot.status === "EVICTED" ? (
-                      <div className="drawerFindingText">{conditionMarkLabel(slot.mark)}</div>
                     ) : (
-                      <>
-                        <div className="drawerFindingText">Withheld: {slot.reason}</div>
-                        {slot.components.map((component, componentIndex) => (
-                          <div key={componentIndex} className="drawerFindingText">
-                            {labeledNumberLine(component)}
-                          </div>
-                        ))}
-                      </>
+                      <div className="drawerFindingText">{conditionMarkLabel(slot.mark)}</div>
                     )}
                   </li>
                 ))}

@@ -1,0 +1,33 @@
+Merge branch 'lane/t17t9' into mission/2026-09-01-algorithm-live-loop
+
+F-T17-T9: the acceptance runtime reads and passes T9's sealed synthesis roles,
+and the class that produced this defect is closed at the compiler.
+
+synthesisRolePolicy was built only in dev-runner-policy.ts and wired only in
+main.ts; acceptance/main.ts never passed it, so every acceptance path reaching
+synthesis refused with SYNTHESIS_ROLE_CONTROLS_UNRESOLVED. Fifth instance of one
+class (an optional field on a shared settings object, one lane adds, another
+deployment never supplies, compiler silent); the dev side had this exact fix as
+F33 with a comment describing it word for word.
+
+acceptance/runtime-policy.ts reads all five T16 families through T16's readers
+and checks every family's provenance (it had checked one); acceptance/main.ts
+passes the synthesis-role family. WalkingSkeletonSettings.synthesisRolePolicy is
+now REQUIRED — one character — with the four fixtures that then failed to
+compile repaired; a mutant that omits the field on the acceptance path fails
+tsc. A guard that derives the obligation set from the runner's own refusal gates
+stays as interim coverage for the four gated fields still optional.
+
+The T17 maximum-path double had answered satisfied:true every round, so its
+"94 observed" was a one-round run. It now reads the round from the runner's
+packet and throws rather than defaulting; the test asserts six role sites and a
+106-attempt ledger total, measured identically three times, against a sealed
+ceiling of 109 (~3% conservative). The stale seven-site / tightness assertions
+stay RED pending V's ruling on F-T17T9-3.
+
+Of six acceptance tests, T17B is green; the rest fail one wall further on
+F-T17T9-1 and F-SEALEDROWS-B (the next lane, test-only) and F-T17T9-3 (V's).
+
+Reviewed by codex r1 (gpt-5.6-sol, CHANGES) and r2 (gpt-6-astra, D65).
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>

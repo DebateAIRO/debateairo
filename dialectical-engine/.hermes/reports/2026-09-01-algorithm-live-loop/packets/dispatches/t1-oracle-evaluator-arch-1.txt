@@ -1,0 +1,62 @@
+# DISPATCH t1-oracle-evaluator-arch-1 · 2026-09-06 08:04 · architecture seat (Opus 5), plan only
+
+# ARCHITECTURE PACKET — F-T1-ORACLE-EVALUATOR · a sound evaluator for the depth oracle's derivation arm · V-ruled (D68) · plan only, no code
+
+```
+mission dir   : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop
+ticket        : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/board/F-T1-ORACLE-EVALUATOR.md
+V's ruling    : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/V-DECISIONS-PACKET.md — row "F-T1-ORACLE-LOGINFP — V's ruling" · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/DECISIONS.md — D68
+the history   : lane/t1-oracle-loginfp (/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-t1-oracle-loginfp @ 60641339) — three rounds of heuristics, each fixing the reported false positive and each with a hole codex could name:
+                r1 /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-loginfp/codex-r1-verdict.final-snapshot.md · r2 …/codex-r2-verdict.final-snapshot.md · r3 …/codex-r3-verdict.final-snapshot.md
+                the seat's reports: /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t1-oracle-loginfp.md · -self.md   (read the three verdicts FIRST; they are the specification's negative space)
+the oracle    : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-t1-oracle-loginfp/dialectical-engine/tests/unit/s1-1-depth-contract.test.ts at 60641339 (its 27 layout classes, three bare option-domain controls and eight mutants are your control corpus) and at 2af816f1 (the pre-lane oracle)
+the corpus    : the shipped files the oracle scans (packages/, apps/, web/ under /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-t1-oracle-loginfp/dialectical-engine; six skipped directory names declared in the scan configuration)
+role          : heartbeat-architecture (read /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.claude/skills/heartbeat-architecture/SKILL.md as markdown if the Skill tool cannot load it) · load superpowers:brainstorming and superpowers:writing-plans
+output        : ONE plan file — /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t1-oracle-evaluator-plan.md — plus /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t1-oracle-evaluator-arch-self.md. No code. No worktree needed; read only.
+```
+
+## OUTCOME (D58)
+A plan a worker seat can execute in rounds of max 3 and codex can review for soundness BEFORE any code exists, for an evaluator that decides
+"does this single declaration derive the ruled option domain 1..5?" soundly for a DECLARED grammar, conservatively outside it, with one
+occurrence decision per declaration and a lexer that knows what is not syntax.
+
+## What the three verdicts require (turn each into a plan section with an acceptance test)
+1. **Lexical structure first (r3 B3):** strings, template literals and regex literals are not syntax; occurrence addressing and declaration
+   boundaries come from a token stream, not from punctuation in raw text. Comments handled once, in place. State how regex-vs-division
+   ambiguity is resolved or bounded, and what the existing lexer already does (`kindOfCeilingLiteral`, `kindOfExclusiveBound`, the
+   declaration lexer — reuse or replace, say which and why).
+2. **One occurrence, one decision (r2 B2, r3 B3):** a single classification per declaration with source correspondence carried to every
+   reporting window; no second pass over a normalised representation that can disagree.
+3. **A declared grammar with real semantics (r2 B1, r3 B1, r3 B2):** array literal (with trailing comma, `as const`, parenthesised),
+   member operations by NAME not position (`slice` with integer-literal args incl. negatives, `reverse`, `sort` default and comparator-
+   unknown, `map` with a declared callback subset — identity, `n => n || k`, arithmetic on n — else unknown, `filter` unknown, computed access
+   `["slice"]`), composition in order (permutation THEN slice), wrapping (`new Set(...)`, spread, destructuring with rest, sentinel drop),
+   terminal selection (a terminal operation can still yield the domain — r3 B1). Give the abstract domain (concrete value list; ordered;
+   plus `unknown` with a "can a later selector reach 1..5 from this" answer) and the rule for every operator. OUTSIDE the grammar →
+   `undetermined` → REPORTED as a site (a false positive is visible; a miss is not).
+4. **The ruled domain:** a run spelling 1,2,3,4,5 is a site wherever it sits and however wrapped (the three bare option-domain controls);
+   `[1,2,3,4,5,6]` bare is NOT (a six-page list); `[1..6].slice(0,-1)` IS.
+5. **dev's LoginFlow six login slots** (`apps/ui/components/LoginFlow.tsx:252`, `{[0, 1, 2, 3, 4, 5].map((slot) => (<span …/>))}`): a MODELLED
+   case — a 0-based index run whose terminal callback renders JSX and whose result is not a selector — not a filename or shape exemption.
+   Say exactly which rule makes it negative and prove the same rule keeps `[0..5].map(n => n || 1)` inside `new Set` positive.
+6. **Controls and mutants:** the 27 layout classes and eight mutants from 60641339 are the floor; add codex r3's classes (terminal selection,
+   permutation-then-slice, literal punctuation in strings/templates/regexes). Each mutant must map to one clause of the design.
+7. **Module boundary:** where the evaluator lives (inside the test file as now, or a `tests/support/` module the test imports — the
+   oracle scans packages/apps/web, not tests, so this is test infrastructure), its size, and how the existing arm is replaced without
+   touching the ceiling-literal and exclusive-bound arms (codex confirmed they are intact and must stay so).
+8. **Rounds:** split the work into worker rounds of ≤ 1 file each with RED-first acceptance per round; name what each round's codex review
+   must check. Say plainly what is day-scale and what is not.
+9. **STRENGTH (D67):** every claim in the plan carries entailed / consistent-with / undetermined; unknowns are listed, not smoothed.
+
+## Method
+Read the three verdicts and the round-3 test; brainstorm alternatives (superpowers:brainstorming) before committing — at least: a hand-written
+recursive evaluator over a tiny AST vs. using TypeScript's own parser (`typescript` is in the repo's dependencies — say whether it is
+available to tests and what it costs) vs. keeping heuristics with declared limits (V rejected this; say why it fails on r3's classes so the
+record shows it was weighed). Recommend one. Do not write code. Do not run suites.
+
+## Contract (D61)
+allowed  : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t1-oracle-evaluator-plan.md · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t1-oracle-evaluator-arch-self.md
+readonly : everything named above · the repo at /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-t1-oracle-loginfp (read only; do not create a worktree; do not run pnpm)
+forbidden: all_others · no code · no git mutation · no edits to the board or the DECISIONS file · no credential values (D18)
+Markers: `comments read through: t1-oracle-loginfp-codex-r3-2026-09-06`; end with `PLAN READY FOR REVIEW` or `BLOCKED <reason>`.
+Self-report: the router §3 question verbatim ("treat it like a murder case…").

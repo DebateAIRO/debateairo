@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import type { PublicDebate } from "@debateai/contract";
 import DebatePageClient from "@/app/debate/[id]/DebatePageClient";
+import { PublicAnswerDisclosure } from "@/components/PublicAnswerDisclosure";
 import { PublicDebateOverview } from "@/components/PublicDebateOverview";
 import { PublicHonestyDrawer } from "@/components/PublicHonestyDrawer";
 import { SupportWidget } from "@/components/support/SupportWidget";
@@ -63,6 +64,34 @@ export function PublicDebatePageClient({ debate }: { debate: PublicDebate }) {
     };
   }, [debate]);
 
+  // The Turn-3b overview re-emits verdict, confidence and summary, but the
+  // rest of the published envelope — pseudonym, published date, badges,
+  // residual objections, the reversal point and the indexing disclosure — has
+  // no other public home. It collapses behind one summary line rather than
+  // being dropped. A closed <details> keeps its children in the DOM, so
+  // nothing stops being reachable or assertable.
+  const publicHeader = (
+    <details className="publicationDetails">
+      <summary>
+        Public debate · by {debate.author_pseudonym} · published{" "}
+        {new Date(debate.published_at).toLocaleDateString()}
+      </summary>
+      <section className="card">
+        <PublicAnswerDisclosure answer={debate.answer} />
+      </section>
+      {debate.answer.badges.length > 0 ? (
+        <section className="card"><h2>Badges</h2><p>{debate.answer.badges.join(" · ")}</p></section>
+      ) : null}
+      {debate.answer.residual_objections.length > 0 ? (
+        <section className="card">
+          <h2>Residual objections</h2>
+          {debate.answer.residual_objections.map((objection, index) => <p key={index}>{objection}</p>)}
+        </section>
+      ) : null}
+      <section className="card"><h2>What could reverse this answer?</h2><p>{debate.answer.reversal_point}</p></section>
+    </details>
+  );
+
   return (
     <>
       <DebatePageClient
@@ -73,6 +102,7 @@ export function PublicDebatePageClient({ debate }: { debate: PublicDebate }) {
       publicMode
       publicNodesById={projection.nodesById}
       publicExport={publicExport}
+      publicHeader={publicHeader}
       publicOverview={({ onDetails, onRead }) => (
         <PublicDebateOverview debate={debate} onDetails={onDetails} onRead={onRead} />
       )}

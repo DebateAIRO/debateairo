@@ -1,0 +1,28 @@
+#!/bin/bash
+# mutant-index.sh — DERIVES a campaign index from raw tools/mutate.sh transcripts (D46).
+# Usage: mutant-index.sh <transcript-glob-prefix> [expected-file]
+# Reads only the raw transcripts. For each: the gate counts, the command's exit, and whether the
+# run FAILED AN ASSERTION or THREW BEFORE ANY ASSERTION (decided by the presence of a vitest
+# assertion frame in the captured output, not by prose). Prints a table and a tally.
+set -u
+PREFIX=${1:?transcript prefix}
+printf '%-28s %-6s %-6s %-9s %s\n' TRANSCRIPT EXIT GATES OUTCOME "FIRST FAILING FRAME"
+red=0; green=0; n=0
+for f in "$PREFIX"*; do
+  [ -f "$f" ] || continue
+  case "$f" in *INDEX*|*.md) continue;; esac
+  n=$((n+1))
+  ex=$(grep -m1 -oE '^EXIT = [0-9]+' "$f" | grep -oE '[0-9]+'); ex=${ex:-?}
+  pre=$(grep -m1 -oE 'GATE pre  = [0-9]+' "$f" | grep -oE '[0-9]+$')
+  app=$(grep -m1 -oE 'GATE applied = [0-9]+' "$f" | grep -oE '[0-9]+$')
+  res=$(grep -m1 -oE 'GATE restored = [0-9]+' "$f" | grep -oE '[0-9]+$')
+  gates="${pre:-?}/${app:-?}/${res:-?}"
+  frame=$(grep -m1 -E 'AssertionError|expected .* to |Error:|error TS[0-9]+' "$f" | sed 's/^[[:space:]]*//' | cut -c1-70)
+  if grep -qE 'AssertionError|expected .* to ' "$f"; then outcome="ASSERTION"; else
+     if [ "$ex" = "0" ]; then outcome="SURVIVED"; else outcome="THREW"; fi; fi
+  [ "$ex" = "0" ] && green=$((green+1)) || red=$((red+1))
+  printf '%-28s %-6s %-6s %-9s %s\n' "$(basename "$f")" "$ex" "$gates" "$outcome" "${frame:-（none captured）}"
+done
+echo
+echo "TALLY: transcripts=$n  exit-nonzero(killed)=$red  exit-zero(survived)=$green"
+echo "DERIVED BY: tools/mutant-index.sh reading raw transcripts only — no prose input"

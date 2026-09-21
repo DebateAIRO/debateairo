@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   CliRelayFailure,
   invokeCli,
+  resolveConfiguredBinary,
   resolveTestGuardedCommand,
   startCliRelayServer,
   type CliRelayAdapter,
@@ -19,7 +20,25 @@ export const HERMES_MAKER = "Z.AI" as const;
 export const HERMES_SUPPORT_PORT = 8_794 as const;
 export const HERMES_HANDSHAKE_PROMPT =
   "HERMES-SUPPORT acceptance transport handshake. Reply with the single word: OK" as const;
-export const HERMES_BINARY = join(homedir(),".local","bin","hermes");
+/** The NAME this maker's CLI is looked up by; never a path (D10, 2026-09-17). */
+export const HERMES_BINARY_NAME = "hermes" as const;
+/**
+ * D10 host override for {@link HERMES_BINARY_NAME}. Unset ⇒ this host's own
+ * `hermes`, deduced from PATH. Until 2026-09-17 this maker had no resolver at
+ * all: its binary was a home-relative path computed once at module load, so it
+ * could neither be pointed elsewhere nor refuse a broken launcher.
+ */
+const HERMES_BINARY_ENV_KEY = "ACCEPTANCE_HERMES_BINARY" as const;
+const HERMES_BINARY_UNRESOLVED = "HERMES_CLI_BINARY_UNRESOLVED" as const;
+
+export function resolveHermesBinary(source: NodeJS.ProcessEnv = process.env): string {
+  return resolveConfiguredBinary(
+    HERMES_BINARY_NAME,
+    HERMES_BINARY_ENV_KEY,
+    HERMES_BINARY_UNRESOLVED,
+    source
+  );
+}
 
 const PRIVATE_DIRECTORY_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
@@ -137,8 +156,33 @@ export async function startHermesSupportRelay(
     throw new TypeError("TEST_ONLY_HERMES_CREDENTIAL_FORBIDDEN");
   }
   const glmApiKey = options.testOnlyGlmApiKey ?? await readGlmCredential();
+  // LAZY, like the other three makers: the resolver can refuse on its own
+  // account now, and an eagerly built default would let a configuration error
+  // pre-empt `resolveTestGuardedCommand`'s authority over the test seam — that
+  // function's own doc block states the rule once.
+  //
+  // The refusal is re-thrown as a CliRelayFailure because this maker's START
+  // path has a caller outside `acceptance/` (`startSupportModelRelay` in the dev
+  // auth stack) that supplies no test seam, and because `probeProvider` in
+  // `discovery.ts` RE-THROWS anything that is not a CliRelayFailure instead of
+  // recording an ABSENT probe. Before the resolver could refuse, an unresolvable
+  // hermes reached `spawn` and failed as CliRelayFailure(FAILED,
+  // HERMES_CLI_FAILED); keeping that CLASS keeps a host with no hermes degrading
+  // as it did, while the typed message carries the reason and the path into the
+  // log.
   const command = resolveTestGuardedCommand(
-    { binary: HERMES_BINARY,prefixArguments: Object.freeze([]) },
+    () => {
+      try {
+        return { binary: resolveHermesBinary(),prefixArguments: Object.freeze([]) };
+      } catch (error) {
+        throw new CliRelayFailure(
+          "FAILED",
+          error instanceof Error && error.message.trim() !== ""
+            ? error.message
+            : HERMES_BINARY_UNRESOLVED
+        );
+      }
+    },
     options.testOnlyCommand,
     "TEST_ONLY_HERMES_COMMAND_FORBIDDEN"
   );

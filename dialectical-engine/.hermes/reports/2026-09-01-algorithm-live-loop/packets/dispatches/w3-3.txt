@@ -1,0 +1,12 @@
+[filed before sending — D64]  lane/w3b · dispatch 3 · 2026-09-05
+
+Round 2 accepted. Your finding about the audit is right and it is the one that matters: an import the edge table cannot see is an undeclared dependency, and the grant I gave you was derived from your own mispredicted mechanism — D61 met its limit exactly as you said. GRANTED, as a coupled pair with the row-17 line you already hold:
+
+  - dialectical-engine/packages/register/package.json — add "@debateai/contract": "workspace:*" (and nothing else)
+  - dialectical-engine/pnpm-lock.yaml — because that declaration changes the lockfile's importers section, and `--frozen-lockfile` would then refuse. Run `pnpm install` ONCE unfrozen to regenerate it, then prove `pnpm install --frozen-lockfile` passes on the result, then commit both files together with row 17 in ONE commit so the pair cannot land half.
+
+After that commit: re-run `pnpm run generate:contract` and compare the hash to integration's (59a57922dd1ab796) — a declared dependency should not move it, and if it does, that is a finding. Re-run the oracle once more on the final tree (three-run law already satisfied on the derivation; one run confirms the pair changed nothing there). Re-run `audit:architecture` alone — per your own prediction, check for the ABSENCE of a `register -> contract` violation, not for exit 0, since the three obs-capture violations predate you.
+
+Report the resulting tip. I will run the full `pnpm test` on your final tree myself, in the background, since it exceeds your stall guard — you do not owe it.
+
+Then READY FOR PEER REVIEW; codex r1 follows on the complete change. Nothing else in scope this dispatch.

@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { ObservationQueryClient } from "../../apps/observation-agent/src/core/database.js";
+import { observationRepoRoot } from "../../apps/observation-agent/src/core/paths.js";
 
 const fixturePath = "tests/acceptance/obs-agent-03-fixture.ts";
 const clockRows = new Map<string, {
@@ -132,7 +133,8 @@ describe("OBS-03 stimulus-only acceptance fixture", () => {
     });
     const context = (now: Date) => ({
       now, timeoutMs: 2_000, database,
-      stateDir: "/tmp/state", targets: [], targetFragment: null, configuration: {},
+      stateDir: "/tmp/state", repoRoot: observationRepoRoot(),
+      targets: [], targetFragment: null, configuration: {},
       thresholds: {
         claim_grace_s: 15, ready_age_s: 120, no_progress_s: 300,
         heartbeat_age_s: 30, worker_ref: "debateai-dev-runner",

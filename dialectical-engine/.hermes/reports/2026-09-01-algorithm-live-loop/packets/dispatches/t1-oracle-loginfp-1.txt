@@ -1,0 +1,57 @@
+# DISPATCH t1-oracle-loginfp-1 · 2026-09-05 16:25 · F-T1-ORACLE-LOGINFP · seat: Opus 5 worker (Agent) · lane from 2af816f1 (D66)
+
+# F-T1-ORACLE-LOGINFP — WORKER PACKET (codex W5 r2 F1 CONFIRMED the false positive, 2026-09-05)
+
+```
+mission dir   : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop
+lane worktree : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-t1-oracle-loginfp   (branch lane/t1-oracle-loginfp, cut from the dev-reconciled tip 2af816f1 — contains the oracle AND dev's LoginFlow; D66)
+ticket        : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/board/F-T1-ORACLE-LOGINFP.md
+filed by      : lane/devsync round 3 (/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/w5-dev-reconciliation.md — search LoginFlow)
+confirmation  : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/w5-codex-r2.md — question 3
+rework rounds : max 3
+```
+
+## The shape, exactly (read from the reconciled tree 2af816f1 and from W5's report line 431)
+
+`apps/ui/components/LoginFlow.tsx:252` — `{[0, 1, 2, 3, 4, 5].map((slot) => (` — six auth-code boxes. The
+oracle's **DOMAIN_ENUMERATION** arm reads a six-element integer array as a duplicate definition of the depth
+domain. It is an index array over UI slots, not a depth domain: nothing in that file touches depth, and the
+values are 0-based slots, not 1..6 depths.
+
+## OUTCOME (D58)
+
+T1's depth oracle (`tests/unit/s1-1-depth-contract.test.ts`) no longer reads dev's six-slot login array at
+`LoginFlow.tsx:252` as an exclusive-six depth bound, AND it still catches every real depth site it caught
+before (the planted controls die; the whole-tree assertions still name `apps/ui/app/new/page.tsx`). The fix
+is a sensitivity change in the DOMAIN_ENUMERATION arm, justified in a comment by the shape it now excludes
+(a 0-based index array with no depth token in reach) and the shape it must keep (the ruled domain's literal
+values near a depth token) — not an allow-list of file names. RED first: the oracle red on this tree naming LoginFlow.tsx:252.
+Mutants: (m1) re-loosen the lexer → LoginFlow returns as a site; (m2) plant a real exclusive-six depth bound
+in a shipped file → still caught. Both via `tools/mutate.sh` v2 (slashes allowed now).
+
+## Contract (D61)
+
+allowed  : tests/unit/s1-1-depth-contract.test.ts · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t1-oracle-loginfp.md · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t1-oracle-loginfp-self.md · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-loginfp/* · .hermes/TOOLING-TRAPS.md (append-only)
+readonly : apps/ui (dev's LoginFlow.tsx) · apps/ui/app/new/page.tsx · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/w3.md (the lexer's history, rounds 1–4) · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/w3-codex-r4.md
+forbidden: all_others · never push · never merge · never edit the board or the DECISIONS file · no credential values (D18)
+
+## Records
+Report, self-report (the router §3 question verbatim), markers with `comments read through: w5-codex-r2-2026-09-05`, `READY FOR PEER REVIEW` or `BLOCKED`.
+
+## Provisioning and gates (D9 ADDENDUM; D66 accounting)
+`pnpm install --frozen-lockfile` exit 0 · `pnpm run generate:contract` exit 0 (this tree's hash is 842c6c4e…; report it) ·
+typecheck as a DIFFERENTIAL against W5's 8 inherited `s14-ui` errors · the oracle file's own suite verbatim `passed/total`
+before and after · then ONE `pnpm test` on your tip with the four-count accounting (test failures / suite-load / skips /
+unhandled), every failing name attributed to dev b5a6b6eb, integration 1485b9e2, or W5's round-3 accounting
+(/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/w5-dev-reconciliation.md), NO unexplained name — T0's closed list does not describe this tree.
+Skills: if the Skill tool cannot load `heartbeat-worker`, read `/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-t1-oracle-loginfp/dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md`
+and say so in SKILLS LOADED. TOOLING-TRAPS means the LANE's copy, append-only. `tools/mutate.sh` v2 accepts `/`.
+rework rounds: max 3. Markers with `comments read through: w5-codex-r2-2026-09-05`.
+
+# ---- CORRECTION appended 19:09 (codex r1 N3/N4/N5; the original above is preserved) ----
+# N3: lines 25/28 prescribed a MECHANISM ("near a depth token") that codex W5 r2 F1 had forbidden; the OUTCOME and the
+#     forbidden mechanisms are restated in AMENDMENT 1 of /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/packets/t1-oracle-loginfp-worker.md. The expected owner
+#     site "apps/ui/app/new/page.tsx" was stale on this tree; the failure kind is DOMAIN_ENUMERATION, not exclusive-six.
+# N4: "tools/mutate.sh" at lines 30/48 means /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/tools/mutate.sh (mission-dir tool).
+# N5: the m2 duty required planting into a shipped file with no mutation grant; AMENDMENT 1 grants LoginFlow.tsx as a
+#     named TEMPORARY mutant target with restoration + hash checks, separate from any permanent edit scope.

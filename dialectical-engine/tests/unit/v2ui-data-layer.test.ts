@@ -943,11 +943,73 @@ describe("token unlock failures never assert a verdict the coordinator did not g
     expect(classified.message).toContain("500");
   });
 
-  it("says plainly that it cannot classify a non-contract failure", () => {
-    const classified = classifyTokenUnlockFailure(new Error("something else broke"));
+  /**
+   * F-DIAG-TOKEN-UNLOCK-UNCLASSIFIED. This assertion used to REQUIRE the raw
+   * caught message in the operator-facing sentence ("something else broke"), so
+   * it pinned the defect rather than the property. The sink is real:
+   * `apps/ui/app/debate/[id]/DebatePageClient.tsx:564` puts this string straight
+   * into the page's error banner via `setError(tokenUnlockFailureMessage(error))`.
+   */
+  it("says plainly that it cannot classify a non-contract failure, and quotes nothing", () => {
+    // Synthetic only (D18): nothing here is or resembles a real credential.
+    const SYNTHETIC_SENSITIVE =
+      "unlock failed for asker synthetic.person@example.invalid with cookie sid=synthetic-a1b2c3";
+    const classified = classifyTokenUnlockFailure(new Error(SYNTHETIC_SENSITIVE));
     expect(classified.kind).toBe("UNCLASSIFIED");
-    expect(classified.message).toContain("something else broke");
+    expect(classified.message).not.toContain("synthetic-a1b2c3");
+    expect(classified.message).not.toContain("example.invalid");
+    expect(classified.message).not.toContain(SYNTHETIC_SENSITIVE);
+    // Fixed text, byte for byte — an output alphabet of exactly one string.
+    expect(classified.message).toBe(
+      "Token check failed before any verdict arrived. The token was not rejected."
+    );
     expect(classified.message).toContain("not rejected");
+  });
+
+  it("bounds a non-Error throw the same way", () => {
+    const classified = classifyTokenUnlockFailure("synthetic-a1b2c3 raw string throw");
+    expect(classified.kind).toBe("UNCLASSIFIED");
+    expect(classified.message).not.toContain("synthetic-a1b2c3");
+    expect(classified.message).toBe(
+      "Token check failed before any verdict arrived. The token was not rejected."
+    );
+  });
+
+  /**
+   * The control the fix must not disturb: every branch ABOVE the UNCLASSIFIED
+   * one is user-facing text that is out of contract to change. The expected
+   * strings are written out here independently — they are not imported from
+   * `tokenUnlock.ts`, because a list re-exported by the thing under test is not
+   * an independent derivation (codex's qualification on the landed pattern).
+   */
+  it("leaves every classified branch byte-identical", () => {
+    const cases: readonly (readonly [ContractHttpError, string])[] = [
+      [new ContractHttpError("SESSION_REQUIRED", 401, "denied"),
+        "The coordinator rejected this token."],
+      [new ContractHttpError("FORBIDDEN", 403, "denied"),
+        "The coordinator rejected this token."],
+      [new ContractHttpError("SERVER_FAILURE", 502, "up", "API_UPSTREAM_UNREACHABLE"),
+        "Could not reach the coordinator, so the token was never checked. Is the API running?"],
+      [new ContractHttpError("SERVER_FAILURE", 503, "gateway"),
+        "Could not reach the coordinator, so the token was never checked. Is the API running?"],
+      [new ContractHttpError("NETWORK_FAILURE", 0, "ECONNREFUSED 127.0.0.1:8790"),
+        "Could not reach the coordinator, so the token was never checked. Is the API running?"],
+      [new ContractHttpError("RATE_LIMITED", 429, "slow down"),
+        "The coordinator is rate-limiting requests, so the token was not checked. Try again shortly."],
+      [new ContractHttpError("SERVER_FAILURE", 500, "boom"),
+        "The coordinator failed while checking the token (HTTP 500). The token was not rejected."],
+      [new ContractHttpError("NOT_FOUND", 404, "nope"),
+        "The coordinator has no session endpoint at this address (HTTP 404). The token was not checked."],
+      [new ContractHttpError("MALFORMED_REQUEST", 400, "bad"),
+        "The coordinator's reply could not be read, so the token's validity is unknown."],
+      [new ContractHttpError("UNPROCESSABLE", 422, "bad"),
+        "The coordinator's reply could not be read, so the token's validity is unknown."],
+      [new ContractHttpError("INVALID_RESPONSE", 200, "bad"),
+        "The coordinator's reply could not be read, so the token's validity is unknown."]
+    ];
+    for (const [error, expected] of cases) {
+      expect(tokenUnlockFailureMessage(error)).toBe(expected);
+    }
   });
 
   it("classifies every ContractErrorCode — no code falls through unnamed", () => {

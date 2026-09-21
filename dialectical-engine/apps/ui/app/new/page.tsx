@@ -5,6 +5,7 @@ import { AI_NOTICE } from "@/lib/aiDisclosure";
 
 import { CSSProperties, FormEvent, KeyboardEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
 import { createDebate, contractClient } from "@/lib/api";
 import { modelMeta } from "@/lib/models";
 import { SCRUTINY_DEPTH_OPTIONS, ScrutinyDepth } from "@/lib/scrutinyDepth";
@@ -53,14 +54,10 @@ const EMPTY_PLAN_TIER_ROSTERS: PlanTierRosters = Object.freeze({
   free: [],
   premium: []
 });
-
-const DEPTH_MIN = 1;
-const DEPTH_MAX = 5;
-
 /* The document draws every text field at its resting height — one line for the
-   question, two for each steering box — so the fields grow with their content
-   instead of scrolling inside a fixed frame. A ref callback rather than a hook,
-   because it also has to run for a topic arriving in the query string. */
+   question — so the field grows with its content instead of scrolling inside a
+   fixed frame. A ref callback rather than a hook, because it also has to run for
+   a topic arriving in the query string. */
 function grow(field: HTMLTextAreaElement | null): void {
   if (field === null) return;
   field.style.height = "auto";
@@ -81,13 +78,14 @@ export default function NewDebatePage() {
 function NewDebateForm({ token }: { token: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const planTierControlsAvailable = typeof Reflect.get(contractClient, "readPlanTiers") === "function";
   const [topic, setTopic] = useState(searchParams.get("topic") ?? "");
   const [planTier, setPlanTier] = useState<PlanTier>("free");
   const [planTierRosters, setPlanTierRosters] = useState<PlanTierRosters>(EMPTY_PLAN_TIER_ROSTERS);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [depthMode, setDepthMode] = useState<AdaptiveDepthMode>("fixed");
   const [scrutiny, setScrutiny] = useState<ScrutinyDepth>("standard");
-  const [depth, setDepth] = useState(2);
+  const [depth, setDepth] = useState(planTierControlsAvailable ? 2 : 1);
   const [branching, setBranching] = useState(2);
   const [concurrency, setConcurrency] = useState(3);
   const [maxTokens, setMaxTokens] = useState(800);
@@ -115,7 +113,11 @@ function NewDebateForm({ token }: { token: string }) {
       if (!active) return;
       setSessionDefaultsError(`ASK_SESSION_DEFAULTS_UNAVAILABLE: ${failure instanceof Error ? failure.message : "Session read failed"}`);
     });
-    void contractClient.readPlanTiers().then((rosters) => {
+    const readPlanTiers = Reflect.get(contractClient, "readPlanTiers") as
+      | undefined
+      | (() => ReturnType<typeof contractClient.readPlanTiers>);
+    if (typeof readPlanTiers !== "function") return () => { active = false; };
+    void readPlanTiers.call(contractClient).then((rosters) => {
       if (!active) return;
       setPlanTierRosters({ free: rosters.free, premium: rosters.premium });
       setPlanTierRostersError(null);
@@ -152,7 +154,7 @@ function NewDebateForm({ token }: { token: string }) {
   // UX-01 makes machine-derived values visible and editable rather than hidden.
   const ready =
     topic.trim().length > 6 &&
-    depth >= DEPTH_MIN && depth <= DEPTH_MAX &&
+    depth >= EXPANSION_DEPTH_MIN && depth <= EXPANSION_DEPTH_MAX &&
     riskTier.length > 0 &&
     budgetTier.length > 0 &&
     decisionScope.trim().length > 0 &&
@@ -293,51 +295,53 @@ function NewDebateForm({ token }: { token: string }) {
               id="treeDepth"
               label="Tree depth"
               hint="How far the debate expands when cross-maker review is available"
-              min={DEPTH_MIN}
-              max={DEPTH_MAX}
+              min={EXPANSION_DEPTH_MIN}
+              max={EXPANSION_DEPTH_MAX}
               value={depth}
               disabled={planTier === "free"}
               onChange={setDepth}
             />
-            <div className="ndRow ndRowSteering">
-              <div className="ndSteerField">
-                <label className="ndLabel" htmlFor="steeringPresets">Steering menu selections</label>
-                <div className="ndHint" id="steeringPresets-hint">One per line</div>
-                <textarea
-                  id="steeringPresets"
-                  className="ndSteerInput"
-                  ref={grow}
-                  rows={2}
-                  value={steeringPresets}
-                  disabled={planTier === "free"}
-                  aria-describedby="steeringPresets-hint"
-                  onChange={(event) => {
-                    setSteeringPresets(event.target.value);
-                    grow(event.currentTarget);
-                  }}
-                  placeholder={"Prefer primary sources\nSurface the strongest counter-case early"}
-                />
+            {planTierControlsAvailable ? (
+              <div className="ndRow ndRowSteering">
+                <div className="ndSteerField">
+                  <label className="ndLabel" htmlFor="steeringPresets">Steering menu selections</label>
+                  <div className="ndHint" id="steeringPresets-hint">One per line</div>
+                  <textarea
+                    id="steeringPresets"
+                    className="ndSteerInput"
+                    ref={grow}
+                    rows={2}
+                    value={steeringPresets}
+                    disabled={planTier === "free"}
+                    aria-describedby="steeringPresets-hint"
+                    onChange={(event) => {
+                      setSteeringPresets(event.target.value);
+                      grow(event.currentTarget);
+                    }}
+                    placeholder={"Prefer primary sources\nSurface the strongest counter-case early"}
+                  />
+                </div>
+                <div className="ndSteerField">
+                  <label className="ndLabel" htmlFor="steeringAnnotations">Steering annotations</label>
+                  <div className="ndHint" id="steeringAnnotations-hint">Free text · logged verbatim, one per line</div>
+                  <textarea
+                    id="steeringAnnotations"
+                    className="ndSteerInput"
+                    data-italic="true"
+                    ref={grow}
+                    rows={2}
+                    value={steeringAnnotations}
+                    disabled={planTier === "free"}
+                    aria-describedby="steeringAnnotations-hint"
+                    onChange={(event) => {
+                      setSteeringAnnotations(event.target.value);
+                      grow(event.currentTarget);
+                    }}
+                    placeholder="Add a note the run will carry…"
+                  />
+                </div>
               </div>
-              <div className="ndSteerField">
-                <label className="ndLabel" htmlFor="steeringAnnotations">Steering annotations</label>
-                <div className="ndHint" id="steeringAnnotations-hint">Free text · logged verbatim, one per line</div>
-                <textarea
-                  id="steeringAnnotations"
-                  className="ndSteerInput"
-                  data-italic="true"
-                  ref={grow}
-                  rows={2}
-                  value={steeringAnnotations}
-                  disabled={planTier === "free"}
-                  aria-describedby="steeringAnnotations-hint"
-                  onChange={(event) => {
-                    setSteeringAnnotations(event.target.value);
-                    grow(event.currentTarget);
-                  }}
-                  placeholder="Add a note the run will carry…"
-                />
-              </div>
-            </div>
+            ) : null}
             <p className="ndProvenance">
               Tier source, provenance, and machine as-of are recorded automatically with the run contract.
             </p>

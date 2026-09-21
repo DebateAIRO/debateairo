@@ -48,7 +48,8 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
   it("declares the complete strict artifact schema so a provider can return ruled judge JSON", async () => {
     const requiredSchemaFragments = [
       '"statement": non-empty string',
-      '"way_of_knowing": "LOOKED_UP" | "RAN" | "REASONING"',
+      // S2-3 (goal-v4 T4): RAN left the declared schema with the strict parser.
+      '"way_of_knowing": "LOOKED_UP" | "REASONING"',
       '"locator": non-empty string | null',
       '"restatement_text": non-empty string',
       '"restatement_status": "PASS" | "FAIL" | "NOT_SAMPLED"',
@@ -202,7 +203,7 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
       runId: null, subjectItemId: "node:test", callSiteKey: "fixture:review",
       questionLine: "Test-layer question", statement: "Test-layer statement", authorMaker: "maker:a",
       providerRef: "provider:test", contractHash: "contract:test",
-      bound: { maxAttempts: 3, tokenCeiling: 64, deadlineMs: 5_000 }
+      bound: { maxAttempts: 3, tokenCeiling: 64, deadlineMs: 5_000 }, edges: []
     })).rejects.toMatchObject({ code: "NODE_REVIEW_SCHEMA_FAILURE", message: "last review schema error" });
   });
 
@@ -246,7 +247,8 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
       authorMaker,
       providerRef: "provider:test",
       contractHash: "contract:test",
-      bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 }
+      bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 },
+      edges: []
     })).rejects.toMatchObject({ code: "NODE_REVIEW_SCHEMA_FAILURE" });
 
     expect(captured.map(({ user }) => JSON.parse(user))).toEqual([
@@ -258,8 +260,18 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
         format: "debateai.untrusted-prompt-fields.v1",
         fields: [
           { name: "question_line", content: questionLine },
-          { name: "author_maker", content: authorMaker },
-          { name: "statement", content: statement }
+          // W7 / V-BLIND-CONTEXT (2026-09-03): `author_maker` is gone from the
+          // payload. `authorMaker` is still PASSED to `review` above and still
+          // recorded — that is the ruling's other half: RECORDED in the
+          // database, WITHHELD from the model. The forged label this case is
+          // about now arrives only in `statement`, where the envelope fences it.
+          // `tests/unit/prompt-surface-guard.test.ts` owns the withholding
+          // property for the whole prompt surface.
+          { name: "statement", content: statement },
+          // T5/S3-1: the edge material the reviewer measures is model-authored
+          // too, so it is fenced in the same versioned untrusted-data envelope
+          // rather than concatenated into the instruction text.
+          { name: "edges_sourced_by_this_node", content: "[]" }
         ]
       }
     ]);

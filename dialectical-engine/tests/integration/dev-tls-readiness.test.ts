@@ -124,7 +124,20 @@ describe("DEV-10D attested trusted local HTTPS front door", () => {
     expect(source).toContain("setDefaultCACertificates");
     expect(source).not.toMatch(/rejectUnauthorized\s*:/u);
     expect(source).not.toMatch(/\bca\s*:/u);
-    expect(source.indexOf("await startAttestedDevTlsFrontDoor"))
-      .toBeLessThan(source.indexOf("DEV_TLS_FRONT_DOOR_READY"));
+    // Both indices are named and guarded before they are compared. indexOf
+    // returns -1 for a needle that no longer exists and -1 is less than every
+    // real index, so the unguarded left-hand form this replaced was a
+    // tautology waiting to happen: measured here by making the needle
+    // unfindable, the whole file stayed GREEN (5/5) with the awaited front
+    // door provably absent from the assertion's reach. The right-hand form
+    // did fail, but as `expected 12668 to be less than -1`, which names a
+    // file offset instead of the missing emission.
+    const attestedStartIndex = source.indexOf("await startAttestedDevTlsFrontDoor");
+    const readySignalIndex = source.indexOf("DEV_TLS_FRONT_DOOR_READY");
+    expect(attestedStartIndex, "deploy/dev-auth/tls-front-door.mjs never awaits startAttestedDevTlsFrontDoor")
+      .toBeGreaterThan(-1);
+    expect(readySignalIndex, "deploy/dev-auth/tls-front-door.mjs never emits DEV_TLS_FRONT_DOOR_READY")
+      .toBeGreaterThan(-1);
+    expect(attestedStartIndex).toBeLessThan(readySignalIndex);
   });
 });

@@ -46,6 +46,7 @@ describe("V3 canvas census", () => {
         call_site_key: null,
         planned_leg_count: null,
         terminal_transport_outcome: null,
+        review_outcome: null,
         hidden_strength: null,
         hidden_score_threshold: null,
         hidden_score_threshold_source_ref: null,

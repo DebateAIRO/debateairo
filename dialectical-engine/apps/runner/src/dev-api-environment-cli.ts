@@ -1,4 +1,7 @@
-import { assembleDevelopmentApiEnvironment } from "./dev-api-environment.js";
+import {
+  assembleDevelopmentApiEnvironment,
+  developmentApiEnvironmentErrorCode
+} from "./dev-api-environment.js";
 import {
   loadDevelopmentProviderPanelFromEnvironment,
   loadModelConfigConfiguredProviders
@@ -30,9 +33,9 @@ try {
   });
   console.log(`DEV_API_ENVIRONMENT_READY=${receipt.keyCount}:${receipt.reused ? "REUSED" : "CREATED"}`);
 } catch (error) {
-  const code = error instanceof TypeError && /^DEV_API_ENVIRONMENT_[A-Z_]+$/u.test(error.message)
-    ? error.message
-    : "DEV_API_ENVIRONMENT_FAILED";
+  // F-DIAG-DEV-API-CLI. The decision lives in `developmentApiEnvironmentErrorCode`, beside the
+  // throws it enumerates; this file holds the call and the printed contract, nothing else.
+  const code = developmentApiEnvironmentErrorCode(error);
   console.error(code);
   process.exitCode = 1;
 }

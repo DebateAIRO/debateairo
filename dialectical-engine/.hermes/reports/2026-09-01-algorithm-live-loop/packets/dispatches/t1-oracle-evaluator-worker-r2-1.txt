@@ -1,0 +1,86 @@
+# DISPATCH t1-oracle-evaluator-worker-r2-1 · 2026-09-07 01:12 · F-T1-ORACLE-EVALUATOR round 2 (the complete evaluator) · same seat resumed · manifest gate OPEN (codex r1c)
+
+# F-T1-ORACLE-EVALUATOR — WORKER PACKET, ROUND 2: the complete evaluator · dispatched after codex r1c (MANIFEST GATE OPEN, 2026-09-07)
+
+```
+mission dir      : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop
+lane worktree    : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-t1-oracle-evaluator   (branch lane/t1-oracle-evaluator; round-2 base = the gate-opening tip 90cf5089; clean)
+working directory: /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-t1-oracle-evaluator/dialectical-engine
+the plan         : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t1-oracle-evaluator-plan.md — REVISION 4: §3 R3/R4 (primitives, purity gate, operation split, ownership walk), §8.10 R3 / §8.16 R4 (round 2), §6 R4 + the manifest
+the manifest     : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t1-oracle-evaluator-manifest.md — the codex-gated version at 90cf5089 (D68 ADDENDUM 3)
+codex            : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-evaluator/codex-r1-verdict.final-snapshot.md ("## Round-2 dispatch contents", nine points — this round's specification) · r1b · r1c (final snapshot; its round-2 amendments govern where they differ)
+evidence dir     : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-evaluator/r2/   (named, absolute)
+rework rounds    : this ticket's worker rounds: 0, 1 done; round 2 is the third work round; its rework cap is 3
+```
+
+## NAMED FACT (D68 ADDENDUM 2), carried verbatim
+Node 22.23.1 UNVERIFIED (V, 2026-09-06): the pinned parser was installed and imported under Node 25.7.0 only.
+
+## OUTCOME (D58) — codex's nine points, restated as what must be TRUE at your handoff
+1. **Tip and boundaries pinned:** base 90cf5089; the one implementation module `tests/support/depthOracle.ts` + the oracle test co-touch; the worker
+   reports and the manifest; evidence under the named directory. Dependency pins, the smoke's shared accessor and the ceiling floor preserved.
+   `apps/ui/components/LoginFlow.tsx` READ-ONLY in round 2 (production mutation is round 3's).
+2. **Baselines before evaluator edits:** the repaired selector's MEASURED count (60 at 90cf5089 — re-measure), the two inherited selected failures, the
+   separate J10 failure, the eight named compiler diagnostics; the round-1 raw 81/1/0/1 evidence plus the parent and r0 comparisons; provision only
+   missing setup outputs; tracked cleanliness verified before baselines.
+3. **`EvaluatedCandidate` as the real extension:** `candidatesOf` stays discovery-only; `evaluatedCandidatesOf` adds consumedStart/End, Value, verdict,
+   reason — no placeholder fields or casts; every fixture bound to canonical source; real candidate count/identity, verdict, exact cells where
+   applicable, consumed spans asserted at the stage that creates them.
+4. **The semantic stub RED before transfer rules:** every operation and wrapper yields UNKNOWN, rule-1 precedence kept; the named RED five —
+   `[0,1,2,3,4,5].slice(1)`, the even filter, reverse then slice(1), Array.from/Set/map-or/slice, `[1,2,3,4,5,6].slice(0,-1)` — assert their expected
+   RULED/OTHER verdicts and fail BY WRONG VERDICT (not missing API, not malformed fixture); bare 0–5 and 1–6 stay OTHER; rule-1 controls stay RULED;
+   expected-UNKNOWN cases stay green.
+5. **Semantic coverage before implementation:** K48–K51 and the control-only rows written first (K50 is GREEN under the stub); the repaired
+   K9/K10/K31/K43/K7d fixtures included; then finite primitive payloads, total Cell→Prim, known boolean/string/null/undefined handling, signed zero,
+   UNKNOWN propagation, SameValueZero incl. typed sentinel contrasts, unavailable object identity; binary string arithmetic conservative, unary
+   coercion per R4.
+6. **The complete declared evaluator:** the purity gate; the exact `{ return e; }` form; isolated parameter/body/async/assignment rejection; recorded
+   node/depth limits; operation arities and the return-kind split; NOT_ARRAY continuation; collection kinds; order-sensitive slice/splice/reverse/sort;
+   binding elisions and any-RULED output aggregation; nested payloads; transparent wrappers; the comma role; unknown enclosing calls; Object.freeze,
+   includes and the JSX model IN THIS ROUND. No source callback execution.
+7. **Callee roles and spans pinned:** K45's current canonical bytes and its computed-member twin; receiver vs callee vs argument identity; the array at
+   (64,77), the outer call textually 16–87 — verify the AST consumed span explicitly (not the old spaced (16,94)); §3's other operation and binding
+   boundaries asserted. Displayed site text/line and A3/A9 emitted cardinality stay round 3's.
+8. **K28 and K38 run with observables captured** via `/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/tools/mutate.sh` v3 (MUT_EXPECT where applicable): per planted source, baseline zero
+   candidates → mutant one evaluated UNDETERMINED candidate → restored zero; full commands, output, cmd_exit, RESULT line, pre/applied/restored, hashes,
+   porcelain. Round-1 v2 records stay valid history.
+9. **Complete evidence at close:** from the working directory, separately: the smoke; `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts -t
+   "the depth bound has a single source"`; `pnpm typecheck` — raw names, counts, diagnostic identities, tip and runtime; then ONE `pnpm test` with the
+   four-count (fourcount4) against round-1's 81/1/None/1 and the parent's 80/1/0/1, every name attributed with STRENGTH, none unexplained. The old
+   emitter and the WHOLE_DOMAIN fallback stay ACTIVE through round 2 while the three bare controls gain RULED evaluated-candidate assertions; shipped
+   DOMAIN emission is NOT to be fixed before round 3. Remaining mutation transcripts recounted from the corrected manifest (never "42" as a fixed total).
+
+## Contract (D61)
+allowed  : tests/support/depthOracle.ts · tests/unit/s1-1-depth-contract.test.ts · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t1-oracle-evaluator.md (append) ·
+           /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t1-oracle-evaluator-self.md (append) · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t1-oracle-evaluator-manifest.md (append-only: round-2 execution
+           columns; no row rewritten) · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-evaluator/r2/* · the lane's .hermes/TOOLING-TRAPS.md (append-only) ·
+           temporary mutant targets: the two files above only (K28/K38), applied and restored inside one v3 transcript
+readonly : the plan · all verdict snapshots · the manifest as gated · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-evaluator/r0/* and r1/* · the parent logs · apps/ui/components/LoginFlow.tsx ·
+           the donor test at 60641339 · tsconfig.json
+forbidden: all_others · no shipped-emitter change (round 3) · never push · never merge · never touch integration, lane-devsync or lane-t1-oracle-loginfp ·
+           no edits to the board or the DECISIONS file · no credential values (D18) · not the TS 7 scanner · no execution of source callbacks
+skills   : heartbeat-worker floor (markdown fallback at /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-t1-oracle-evaluator/dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md — say which); D67 + ADDENDA 2/3.
+
+## Records you owe
+Report/self-report appended; the manifest's execution columns; markers with `comments read through: t1-oracle-evaluator-r1c-2026-09-07`;
+end with `READY FOR PEER REVIEW` or `BLOCKED <which point, why>`; return ONLY at that marker. Nothing pushed, nothing merged.
+
+## Codex r1c's amendments to the nine points (they govern where they differ from the restatement above)
+- Point 2: the selected population is **60** (two inherited failures, 13 unrelated file skips), the smoke **5** separately; carry raw 81/1/0/1 and 2371/2452.
+- Point 4: the five named RED cases with their exact expected outcomes — 0–5 slice(1) → RULED; the even filter → OTHER with cells [0,2,4]; reverse then
+  slice(1) → OTHER; Array.from/Set/OR-map then slice(1) → OTHER; 1–6 slice(0,-1) → RULED. "Five named cases" is not a promise of exactly five failures.
+- Point 5: all SEVEN active controls (K7b combined, K7c async-only, **K7d = `const choices = [0,1,2,3,4,5].map(n => (n = n));`**, K20b, K34, K35, K37) and
+  the repaired K9/K10/K31/K43/K47; round 2 must instantiate the REAL assignment-rejection assertion with candidate identity and reason (a generic
+  UNKNOWN stub also makes K7d green and is not evidence that rejection ran).
+- Point 6: node budget **64** / depth limit **32** with body-inclusive forEachChild semantics.
+- Point 7: K45 from its own bytes — literal (64,77), textual outer call (16,87); its computed-member twin via ["includes"]: literal (64,77), call (16,90);
+  never inherit M17's (16,94). K3's final emitted count (24) is remeasured at round 3's emission stage.
+- Point 8: existing K23/K25/K27 v3 transcripts discharge their round-1 obligation; after K28/K38 the remaining obligation is 43 + m6 = 44.
+- Point 9: the checker is **fourcount4.py**; resolve F2-R2 (enforce at least one nonempty category segment; reject leading/trailing/doubled separators and
+  duplicate category names; recognise a present Errors heading before validating it; add the cases to the matrix) or state its validation limits before
+  shared adoption; keep independent raw reconciliation. **The full suite IS required at this round's close** (the evaluator changes what executes);
+  comparison logs: round-1's r1/25-… four-count, round-0's, the parent's. Keep the old emitter and WHOLE_DOMAIN fallback active through round 2.
+- Records duties carried from r1c (non-gating): **F2-R2** as above; **F3-R2** — withdraw or historicise the surviving recurrence instruction, reconcile the
+  listed stale facts in place, keep "may recur / exact cause undetermined", correct the sweep's claim and the advice that grep replaces reading; run
+  the broader search and the re-read (D67 ADDENDUM 3).
+Markers: `comments read through: t1-oracle-evaluator-r1c-2026-09-07` (supersedes the line above).

@@ -9,6 +9,7 @@ import {
   createObservationDatabasePort,
   type ObservationDatabasePort
 } from "../../apps/observation-agent/src/core/database.js";
+import { observationRepoRoot } from "../../apps/observation-agent/src/core/paths.js";
 import { signalSchema, type ObservationSignal } from "../../apps/observation-agent/src/core/signals.js";
 import type {
   Module,
@@ -196,6 +197,7 @@ function moduleContext(
     timeoutMs: 2_000,
     database,
     stateDir,
+    repoRoot: observationRepoRoot(),
     targets: Object.freeze([]),
     targetFragment: Object.freeze({
       basename: "OBS-03.json", targets: Object.freeze([]), configuration: Object.freeze({})

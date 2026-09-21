@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createObservationDatabasePort } from "../../apps/observation-agent/src/core/database.js";
+import { observationRepoRoot } from "../../apps/observation-agent/src/core/paths.js";
 import type { RouterCurrentContext } from "../../apps/observation-agent/src/core/routing.js";
 import { migrate } from "../../packages/db/src/index.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -432,6 +433,7 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
       const initialThresholds = Object.freeze({ storm_count: 5, storm_window_seconds: 60 });
       const router = await createOwnedSignalRouter(catalog.routerContribution!, {
         stateDir: moduleStateDir,
+        repoRoot: observationRepoRoot(),
         delivery: new DeliveryCoordinator({ journal, mirror }),
         osascript: createOsaScriptDeliveryExecutor(async () => { notifications += 1; }),
         moduleName: "routing",
@@ -495,6 +497,7 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
           timeoutMs: 2_000,
           database: createObservationDatabasePort(database.pool),
           stateDir: moduleStateDir,
+          repoRoot: observationRepoRoot(),
           targets: [],
           moduleThresholds: { routing: currentModule.thresholds },
           thresholdVersion: currentModule.thresholdVersion

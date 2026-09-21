@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import pg, { type Pool } from "pg";
 import { migrate } from "../../packages/db/src/index.js";
 import { createObservationDatabasePort } from "../../apps/observation-agent/src/core/database.js";
+import { observationRepoRoot } from "../../apps/observation-agent/src/core/paths.js";
 import { ObservationModuleRuntime } from "../../apps/observation-agent/src/core/runtime.js";
 import type { ModuleStatusProjection } from "../../apps/observation-agent/src/core/types.js";
 import { ObservationJournal } from "../../apps/observation-agent/src/journal/journal.js";
@@ -182,6 +183,7 @@ export async function runOpenAnomalyFixture(input: Readonly<{
     timeoutMs: 2_000,
     database: createObservationDatabasePort(input.pool),
     stateDir: input.stateDir,
+    repoRoot: observationRepoRoot(),
     targets: Object.freeze([target]),
     targetFragments: Object.freeze([Object.freeze({
       basename: "OBS-06.json",
