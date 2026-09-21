@@ -1532,22 +1532,36 @@ export class RegistrationService implements RegistrationApplication {
     }
     const source = sourceContext(rawSource);
     const tokenHash = hashToken("verification", input.token);
-    const identity = await this.dependencies.repository.findAuditIdentityByVerificationHash(tokenHash);
-    const now = this.clock();
+    // V-2 (5). The visitor's OWN budget is charged first, before the indexed
+    // repository lookup below, so an exhausted source can no longer buy a
+    // database read per attempt. The ruled admission budget is source-owned
+    // (S3c D2: an attacker-supplied token can never own one), so the key it
+    // needs is the token hash, which is knowable without the lookup and is the
+    // same value for a given token whether or not an account holds it — the
+    // refusal is therefore identical either way and carries no enumeration
+    // signal.
+    const admittedAt = this.clock();
     const limit = this.dependencies.limiter.consume({
       route: "verify",
       ip: source.ip,
-      addressKey: identity?.addressKey ?? tokenHash,
-      now
+      addressKey: tokenHash,
+      now: admittedAt
     });
     if (!limit.allowed) {
       await this.refuseRateLimit({
         route: "verify",
         scope: limit.scope,
-        now,
+        now: admittedAt,
         source
       });
     }
+    // The stable address-limiter key lives behind this lookup. Nothing is
+    // charged against it today; a per-address budget can only be charged AFTER
+    // this await, never before it, which is why the read stays here.
+    await this.dependencies.repository.findAuditIdentityByVerificationHash(tokenHash);
+    // S3 rework4: the clock is re-read after the repository await, so the
+    // consumed-at instant is the one the mutation actually happens at.
+    const now = this.clock();
     if (!await this.dependencies.repository.consumeVerification({ tokenHash, occurredAt: now, source })) {
       throw new AuthFlowError("VERIFICATION_TOKEN_INVALID");
     }
