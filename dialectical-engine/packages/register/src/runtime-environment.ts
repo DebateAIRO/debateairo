@@ -110,6 +110,13 @@ const hatchetShape = {
 const apiEnvironmentShape = {
     KEK_PATH: kekPath,
     SUPPORT_KEK_PATH: kekPath,
+    // V-19: opt-in custody group. Absent, every key file and wrapped-key record
+    // must be 0600 owned by this uid inside a 0700 directory owned by this uid.
+    // Present (a group name or a decimal gid), @debateai/crypto additionally
+    // accepts a 0640 file whose gid is that group's inside a 0750 directory
+    // whose gid is that group's, so a second principal can READ the shared
+    // user-DEK store without being able to replace anything in it.
+    DEBATEAI_CUSTODY_GROUP: z.string().min(1).optional(),
     BLIND_INDEX_KEY_PATH: z.string().min(1),
     AUDIT_KEY_STORE_PATH: z.string().min(1),
     AUDIT_SOURCE_IP_SALT_PATH: z.string().min(1),
@@ -307,6 +314,9 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
     CONTENT_ENCRYPTION_ENABLED: z.enum(["true", "false"]).default("false"),
     CONTENT_BLIND_INDEX_KEY_PATH: z.string().min(1).optional(),
     USER_DEK_STORE_PATH: z.string().min(1).optional(),
+    // V-19: the runner reads the API's user-DEK store and owns none of it, so
+    // this is the setting that lets it in. Same shape and meaning as the API's.
+    DEBATEAI_CUSTODY_GROUP: z.string().min(1).optional(),
     CLAIM_MS: positiveInteger, CLAIM_MARGIN_MS: nonNegativeInteger,
     JUDGE_MAX_ATTEMPTS: positiveInteger, JUDGE_TOKEN_CEILING: positiveInteger, JUDGE_DEADLINE_MS: positiveInteger,
     COMPOSER_MAX_ATTEMPTS: positiveInteger, COMPOSER_TOKEN_CEILING: positiveInteger, COMPOSER_DEADLINE_MS: positiveInteger,

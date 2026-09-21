@@ -368,6 +368,32 @@ describe("VPS baseline: runbook and environment templates", () => {
     for (const [key] of env) expect(key).not.toMatch(/^DEBATEAI_DEV_|^EVALUATOR_DEV_MENU/);
   });
 
+  it("README provisions the V-19 custody group and no longer leaves the question open", () => {
+    const readme = read("deploy/vps/README.md");
+    for (const needle of [
+      "DEBATEAI_CUSTODY_GROUP", "debateai-custody", "0750", "0640",
+      // The group is created and BOTH principals that read the user-DEK store join it.
+      "groupadd --system debateai-custody",
+      "usermod -a -G debateai-custody debateai-api",
+      "usermod -a -G debateai-custody debateai-runner"
+    ]) expect(readme, needle).toContain(needle);
+    // V-19 is ruled: the runbook must no longer present the two-principal custody
+    // problem as an open question for the owner.
+    expect(readme).not.toContain("Custody and the three service users — **OPEN, needs V**");
+    // The relaxation is opt-in and bounded: the key files that only the API reads
+    // stay 0600 in a 0700 directory.
+    for (const needle of ["0600", "0700"]) expect(readme, needle).toContain(needle);
+  });
+
+  it("api.env.example and runner.env.example both opt into the custody group (V-19)", () => {
+    const api = envKeys(read("deploy/vps/env/api.env.example"));
+    const runner = envKeys(read("deploy/vps/env/runner.env.example"));
+    expect(api.get("DEBATEAI_CUSTODY_GROUP")).toBe("debateai-custody");
+    expect(runner.get("DEBATEAI_CUSTODY_GROUP")).toBe("debateai-custody");
+    const ui = envKeys(read("deploy/vps/env/ui.env.example"));
+    expect(ui.has("DEBATEAI_CUSTODY_GROUP")).toBe(false);
+  });
+
   it("runner.env.example and ui.env.example carry only what those services need", () => {
     const runner = envKeys(read("deploy/vps/env/runner.env.example"));
     for (const key of ["NODE_ENV", "KEK_PATH", "DATABASE_URL", "RUNNER_WORKER_ID", "REGISTER_VERSION", "CONTENT_ENCRYPTION_ENABLED", "USER_DEK_STORE_PATH", "HATCHET_CLIENT_TOKEN", "HATCHET_TLS_STRATEGY", "VLLM_BASE_URL", "PROVIDER_REF"]) {

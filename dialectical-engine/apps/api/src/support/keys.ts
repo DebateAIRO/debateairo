@@ -241,6 +241,16 @@ function parseContentEnvelope(ciphertext: Uint8Array): Readonly<{
   };
 }
 
+/**
+ * V-19 deliberately does NOT reach this loader. The custody group exists for a
+ * key store two OS principals must both read; checked 2026-09-22, `SUPPORT_KEK_PATH`
+ * has exactly one reader — `apps/api/src/main.ts` — it is absent from the runner's
+ * environment shape and from `deploy/vps/env/runner.env.example`, and the material
+ * it wraps lives in `support.session_key` / `support.case_key` rows reached through
+ * `SUPPORT_DATABASE_URL`, which is likewise API-only. One principal, so the support
+ * KEK stays single-owner: 0600 owned by this uid inside a 0700 directory. Widen this
+ * only when a second principal genuinely needs it.
+ */
 async function readSupportKek(supportKekPath: string): Promise<KeyFileIdentity> {
   if (typeof supportKekPath !== "string") fail("SUPPORT_KEK_PATH_INVALID");
   let resolvedPath: string;

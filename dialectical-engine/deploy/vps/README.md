@@ -83,17 +83,26 @@ swapoff -a
 apt install postgresql-18 caddy docker.io docker-compose-v2 age rclone postfix
 ```
 
-Create the three service users and the runtime trees:
+Create the three service users, the custody group and the runtime trees:
 
 ```sh
 for service in api ui runner; do
   adduser --system --group --no-create-home --home /nonexistent "debateai-$service"
 done
 adduser debateai-api postdrop     # postfix maildrop is setgid; NoNewPrivileges neuters setgid
+groupadd --system debateai-custody
+usermod -a -G debateai-custody debateai-api
+usermod -a -G debateai-custody debateai-runner
 install -d -m 0700 -o debateai-api -g debateai-api \
-  /var/lib/debateai/api/user-deks /var/lib/debateai/api/publication-keys \
-  /var/lib/debateai/api/audit-keys
+  /var/lib/debateai/api/publication-keys /var/lib/debateai/api/audit-keys
+install -d -m 2750 -o debateai-api -g debateai-custody /var/lib/debateai/api/user-deks
 ```
+
+The user-DEK store is the one tree two principals read, so it is the one tree that gets the
+custody group (V-19, below). The other two are written and read by `debateai-api` alone and stay
+`0700`. The setgid bit on the store is load-bearing: without it, a record the API creates takes
+the API's own primary group and the runner is locked out again. Group membership is read at
+process start, so restart both units after `usermod`.
 
 ---
 
@@ -112,7 +121,9 @@ install -d -m 0700 -o debateai-api -g debateai-api \
 | `/etc/debateai/hatchet-tls/` | `0755` | `root:root` | `server.crt`, `server.key` (`0640 root:docker`), `ca.crt` |
 | `/etc/debateai/ui-edge.secret` | `0400` | `debateai-ui` | the C2b edge secret (a second `0640 root:caddy` copy for Caddy) |
 | `/etc/debateai/backup.conf` | `0600` | `root:root` | age **public** keys and paths — see `backup.conf.example` |
-| `/var/lib/debateai/api/*` | `0700` | `debateai-api` | user-DEK store, publication-key store, audit-key store |
+| `/var/lib/debateai/api/user-deks` | `2750` | `debateai-api:debateai-custody` | user-DEK store — the one tree the runner also reads (V-19) |
+| `/var/lib/debateai/api/publication-keys` | `0700` | `debateai-api` | publication-key store |
+| `/var/lib/debateai/api/audit-keys` | `0700` | `debateai-api` | audit-key store |
 
 `/etc/default/caddy` carries `DEBATEAI_PUBLIC_HOSTNAME` and `DEBATEAI_ACME_EMAIL`.
 
@@ -144,30 +155,60 @@ openssl rand -base64 32 | tr '+/' '-_' | tr -d '=' > /etc/debateai/ui-edge.secre
 At least 43 base64url characters. Caddy sends it as `X-Debateai-Edge-Secret`; the UI compares it
 with `timingSafeEqual` and only then believes `X-Forwarded-For`.
 
-### Custody and the three service users — **OPEN, needs V**
+### Custody and the three service users — the custody group (V-19, ruled 2026-09-22)
 
 One OS user per service is right for almost everything: the UI cannot read `api.env`, and the
 runner cannot read the blind-index key, the audit key store or the audit source-IP salt.
 
-It does **not** work for one thing. With `CONTENT_ENCRYPTION_ENABLED=true` the runner reads the
+It did **not** work for one thing. With `CONTENT_ENCRYPTION_ENABLED=true` the runner reads the
 **same** user-DEK store the API writes (`apps/runner/src/main.ts:23-26`). `FileUserDekStore.load`
-requires mode **exactly `0600`**, so only the file's owner can read it — two OS users cannot share
-that store, and a POSIX ACL does not help because the ACL mask surfaces in the group bits and the
-exact-`0600` check then fails.
+required mode **exactly `0600`**, so only the file's owner could read it — two OS users could not
+share that store, and a POSIX ACL does not help because the ACL mask surfaces in the group bits
+and the exact-`0600` check then fails.
 
 The KEK is worked around by giving the runner its own `0600` copy of the same bytes. The DEK store
-cannot be: the API writes it continuously and a copy would go stale. One of these must be ruled
-before go-live:
+cannot be: the API writes it continuously and a copy would go stale. V ruled the custody group,
+keeping three users, because running one user would hand the runner — the process that talks to
+third-party model CLIs — the identity key material it must never touch.
 
-1. **Run the API and the runner as one OS user** (`debateai-app`). No code change; gives up the
-   runner/identity-key separation, since that user also owns the blind-index and audit keys.
-2. **Teach `@debateai/crypto` a custody group** — accept `0640` owned by the service user with a
-   shared custody group, alongside the existing `0600` path. A code change in `packages/crypto`,
-   adjacent to task B14, outside this task's bounds.
+`@debateai/crypto` now reads `DEBATEAI_CUSTODY_GROUP`. It is **opt-in**: with the setting absent
+the contract is exactly what it was — `0600` file owned by the calling uid, one link, exact size,
+inside a `0700` directory owned by the same uid. With it set, one second shape is also accepted:
 
-Recommendation: (2), because (1) hands the runner — the process that talks to third-party model
-CLIs — the identity key material it currently cannot touch. Until it is ruled, the units here ship
-three users and the deployment is blocked on this point.
+| | Accepted without the setting | Also accepted with the setting |
+|---|---|---|
+| key file / wrapped-key record | `0600`, owned by the caller | `0640`, group = the custody group |
+| its directory | `0700`, owned by the caller | `0750`, group = the custody group |
+
+Nothing else relaxes. Any world bit, any group-write bit, any execute bit, a group that is not
+the named one, a symlink, a second hard link or a wrong size is refused exactly as before. The
+group grants **read**, never write: only the tree's owner (`debateai-api`) can replace a record,
+and the runner unit's `ReadOnlyPaths` pins that from the other side too.
+
+Set the same value in both `api.env` and `runner.env`. A decimal gid is accepted in place of the
+name, which is what a host without a POSIX group database should use. A name that the host cannot
+resolve refuses at boot with `CUSTODY_GROUP_UNRESOLVED` rather than quietly falling back.
+
+The store follows its own root: `@debateai/crypto` writes the group modes only into a store root
+that already carries the custody group, so the publication-key and audit-key trees keep the
+single-owner modes with the same setting on. Check the tree after provisioning:
+
+```sh
+stat -c '%a %U %G %n' /var/lib/debateai/api/user-deks
+find /var/lib/debateai/api/user-deks -type d ! -perm 2750 -print -o -type f ! -perm 0640 -print
+```
+
+The `find` printing nothing is the pass. If the API wrote records before the group existed, they
+are `0600` in `0700` directories and the runner cannot read them; re-set the tree once, with the
+API stopped:
+
+```sh
+systemctl stop debateai-api debateai-runner
+chgrp -R debateai-custody /var/lib/debateai/api/user-deks
+find /var/lib/debateai/api/user-deks -type d -exec chmod 2750 {} +
+find /var/lib/debateai/api/user-deks -type f -exec chmod 0640 {} +
+systemctl start debateai-api debateai-runner
+```
 
 ---
 

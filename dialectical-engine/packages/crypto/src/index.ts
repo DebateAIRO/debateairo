@@ -13,6 +13,7 @@ import {
   constants as fsConstants,
   fstatSync,
   openSync,
+  readFileSync,
   readSync,
   realpathSync,
   statSync
@@ -137,6 +138,19 @@ export class CryptoCustodyError extends CryptoError {
   constructor(code: "KEK_CUSTODY_INVALID" | "SECRET_CUSTODY_INVALID") {
     super(code, code);
     this.name = "CryptoCustodyError";
+  }
+}
+
+/**
+ * `DEBATEAI_CUSTODY_GROUP` is configured but does not name a group this host
+ * knows. Deliberately NOT a silent fall-back to the single-owner contract:
+ * an operator who mistypes the group would otherwise get a deployment that
+ * boots and then refuses every key file for an unrelated-looking reason.
+ */
+export class CustodyGroupUnresolvedError extends CryptoError {
+  constructor() {
+    super("CUSTODY_GROUP_UNRESOLVED", "CUSTODY_GROUP_UNRESOLVED");
+    this.name = "CustodyGroupUnresolvedError";
   }
 }
 
@@ -399,6 +413,161 @@ export function decrypt(dek: Uint8Array, envelope: CryptoEnvelope, aad: AeadAad)
 }
 
 /**
+ * V-19: the environment setting a deployment opts into the custody group with.
+ * Its value is either a group NAME or a decimal gid.
+ */
+export const CUSTODY_GROUP_VARIABLE = "DEBATEAI_CUSTODY_GROUP" as const;
+
+/**
+ * The POSIX group database. Not a one-computer path (constraint 7): it is the
+ * same location on every Unix host, and a deployment that does not have one can
+ * configure the gid as a decimal number instead, which is resolved without
+ * reading any file at all.
+ */
+const POSIX_GROUP_DATABASE = "/etc/group";
+
+/** `name:password:gid:members` — POSIX group-database name grammar. */
+const GROUP_NAME = /^[A-Za-z_][A-Za-z0-9_.-]*\$?$/;
+
+/**
+ * Finds `name`'s gid in the text of a POSIX group database. Pure, so the whole
+ * grammar is testable without a host that happens to have the group.
+ */
+export function parseGroupDatabaseGid(database: string, name: string): number | undefined {
+  if (typeof database !== "string" || typeof name !== "string" || name === "") return undefined;
+  for (const line of database.split("\n")) {
+    if (line === "" || line.startsWith("#")) continue;
+    const fields = line.split(":");
+    if (fields.length < 3 || fields[0] !== name) continue;
+    const gid = fields[2]!;
+    if (!/^[0-9]+$/.test(gid)) return undefined;
+    const parsed = Number(gid);
+    return Number.isSafeInteger(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Resolves the configured custody group to a gid. `undefined` means the group
+ * mode is OFF and the contract is exactly the single-owner one. Anything that
+ * is configured but cannot be resolved throws: a custody rule must never be
+ * decided by a value nobody could read.
+ */
+export function resolveCustodyGroupGid(
+  configured: string | undefined,
+  readGroupDatabase: () => string
+): number | undefined {
+  if (configured === undefined) return undefined;
+  const value = configured.trim();
+  if (value === "") return undefined;
+  if (/^[0-9]+$/.test(value)) {
+    const gid = Number(value);
+    if (!Number.isSafeInteger(gid)) throw new CustodyGroupUnresolvedError();
+    return gid;
+  }
+  if (!GROUP_NAME.test(value)) throw new CustodyGroupUnresolvedError();
+  let database: string;
+  try {
+    database = readGroupDatabase();
+  } catch {
+    throw new CustodyGroupUnresolvedError();
+  }
+  const gid = parseGroupDatabaseGid(database, value);
+  if (gid === undefined) throw new CustodyGroupUnresolvedError();
+  return gid;
+}
+
+// Resolution is cached against the raw setting, not unconditionally: the
+// wrapped-key stores consult the contract on every record read, and a group
+// NAME would otherwise re-read the group database on every request.
+let custodyGroupSetting: string | undefined;
+let custodyGroupGid: number | undefined;
+let custodyGroupResolved = false;
+
+function currentCustodyGid(): number | undefined {
+  const configured = process.env[CUSTODY_GROUP_VARIABLE];
+  if (custodyGroupResolved && custodyGroupSetting === configured) return custodyGroupGid;
+  const gid = resolveCustodyGroupGid(
+    configured,
+    () => readFileSync(POSIX_GROUP_DATABASE, "utf8")
+  );
+  custodyGroupSetting = configured;
+  custodyGroupGid = gid;
+  custodyGroupResolved = true;
+  return gid;
+}
+
+export type CustodyFileFacts = Readonly<{
+  isFile: boolean;
+  nlink: number;
+  mode: number;
+  uid: number;
+  gid: number;
+  size: number;
+}>;
+
+export type CustodyParentFacts = Readonly<{
+  isDirectory: boolean;
+  mode: number;
+  uid: number;
+  gid: number;
+}>;
+
+export type CustodyContract = Readonly<{
+  /** `undefined` on a platform without uids, exactly as the uid rule has always been. */
+  callerUid: number | undefined;
+  /** `undefined` = the group mode is off and the contract is the single-owner one. */
+  custodyGid: number | undefined;
+  /** `undefined` for the JSON wrapped-key records, which are not 32-byte keys. */
+  expectedSize: number | undefined;
+}>;
+
+/**
+ * One accepted mode owned by the caller, or — only while a custody group is
+ * configured — one accepted mode whose gid is that group's. Exact equality, so
+ * a world bit, a group-write bit, an execute bit or a stranger's gid can never
+ * pass: the refusals are consequences of the equality, not separate branches
+ * that could drift apart from it.
+ */
+function custodyMemberAccepts(
+  facts: Readonly<{ mode: number;uid: number;gid: number }>,
+  ownerMode: number,
+  groupMode: number,
+  contract: CustodyContract
+): boolean {
+  const permissions = facts.mode & 0o777;
+  if (permissions === ownerMode) {
+    return contract.callerUid === undefined || facts.uid === contract.callerUid;
+  }
+  if (contract.custodyGid !== undefined && permissions === groupMode) {
+    return facts.gid === contract.custodyGid;
+  }
+  return false;
+}
+
+/**
+ * The V-19 custody contract, as one decision over facts already taken from the
+ * opened descriptor. With `custodyGid: undefined` it decides byte-for-byte what
+ * the single-owner rule decided before the group mode existed:
+ * 0600 file owned by the caller, one link, exact size, inside a 0700 directory
+ * owned by the caller. With a custody group configured it additionally accepts
+ * a 0640 file whose gid is that group's inside a 0750 directory whose gid is
+ * that group's — which is how a second read-only principal reads the store
+ * without ever being able to replace what is in it.
+ */
+export function custodyAccepts(
+  file: CustodyFileFacts,
+  parent: CustodyParentFacts,
+  contract: CustodyContract
+): boolean {
+  if (!file.isFile || file.nlink !== 1) return false;
+  if (contract.expectedSize !== undefined && file.size !== contract.expectedSize) return false;
+  if (!parent.isDirectory) return false;
+  if (!custodyMemberAccepts(file, 0o600, 0o640, contract)) return false;
+  return custodyMemberAccepts(parent, 0o700, 0o750, contract);
+}
+
+/**
  * The production custody contract for a raw 32-byte secret file (L2-F6). It is
  * the discipline `apps/runner/src/dev-secret-files.ts` already enforced for dev
  * secrets, which the production loaders did not:
@@ -431,15 +600,27 @@ function readCustodyKey(
   try {
     const metadata = fstatSync(descriptor);
     const parent = statSync(dirname(resolve(path)));
-    const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
-    if (!metadata.isFile()
-      || metadata.nlink !== 1
-      || (metadata.mode & 0o777) !== 0o600
-      || metadata.size !== KEY_BYTES
-      || (uid !== undefined && metadata.uid !== uid)
-      || !parent.isDirectory()
-      || (parent.mode & 0o777) !== 0o700
-      || (uid !== undefined && parent.uid !== uid)) {
+    if (!custodyAccepts(
+      {
+        isFile: metadata.isFile(),
+        nlink: metadata.nlink,
+        mode: metadata.mode,
+        uid: metadata.uid,
+        gid: metadata.gid,
+        size: metadata.size
+      },
+      {
+        isDirectory: parent.isDirectory(),
+        mode: parent.mode,
+        uid: parent.uid,
+        gid: parent.gid
+      },
+      {
+        callerUid: typeof process.getuid === "function" ? process.getuid() : undefined,
+        custodyGid: currentCustodyGid(),
+        expectedSize: KEY_BYTES
+      }
+    )) {
       throw new CryptoCustodyError(code);
     }
     material = Buffer.allocUnsafeSlow(KEY_BYTES);
@@ -449,6 +630,9 @@ function readCustodyKey(
     return material;
   } catch (error) {
     material?.fill(0);
+    // A misconfigured custody group is an operator error, not an unsafe key:
+    // it keeps its own code all the way out so the boot message names it.
+    if (error instanceof CustodyGroupUnresolvedError) throw error;
     if (error instanceof CryptoCustodyError || error instanceof KekUnresolvedError) throw error;
     throw new CryptoCustodyError(code);
   } finally {
@@ -1300,20 +1484,76 @@ async function readCustodyRecord(
   try {
     const metadata = await handle.stat();
     const parent = await fileSystem.stat(dirname(location));
-    const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
-    if (!metadata.isFile()
-      || metadata.nlink !== 1
-      || (metadata.mode & 0o777) !== 0o600
-      || (uid !== undefined && metadata.uid !== uid)
-      || !parent.isDirectory()
-      || (parent.mode & 0o777) !== 0o700
-      || (uid !== undefined && parent.uid !== uid)) {
+    if (!custodyAccepts(
+      {
+        isFile: metadata.isFile(),
+        nlink: metadata.nlink,
+        mode: metadata.mode,
+        uid: metadata.uid,
+        gid: metadata.gid,
+        size: metadata.size
+      },
+      {
+        isDirectory: parent.isDirectory(),
+        mode: parent.mode,
+        uid: parent.uid,
+        gid: parent.gid
+      },
+      {
+        callerUid: typeof process.getuid === "function" ? process.getuid() : undefined,
+        custodyGid: currentCustodyGid(),
+        // A wrapped-key record is a JSON envelope, not a 32-byte key.
+        expectedSize: undefined
+      }
+    )) {
       throw new TypeError("SECRET_CUSTODY_INVALID");
     }
     return JSON.parse(await handle.readFile("utf8")) as unknown;
   } finally {
     await handle.close();
   }
+}
+
+/**
+ * V-19, the write half. The read relaxation is inert unless the writer produces
+ * records the second principal can read, and the store used to impose 0700/0600
+ * on every directory and record it created — including the store root an
+ * operator had just provisioned for the custody group.
+ *
+ * The decision follows the store ROOT rather than the setting alone, so one
+ * setting cannot widen a store that no second principal reads: the user-DEK
+ * store's root carries the custody group and gets the group modes, while the
+ * publication-key store's root (group `debateai-api`) keeps the single-owner
+ * modes even with the same setting on.
+ *
+ * The directory mode carries setgid on purpose. A new file in a non-setgid
+ * directory takes the WRITING process's primary group on Linux, which is the
+ * API's own group, not the custody group; with setgid it takes the directory's.
+ * `mode & 0o777` is still 0o750, which is what the read contract checks.
+ */
+type CustodyWriteModes = Readonly<{ directory: number;file: number }>;
+
+const OWNER_CUSTODY_MODES: CustodyWriteModes = Object.freeze({
+  directory: 0o700, file: 0o600
+});
+const GROUP_CUSTODY_MODES: CustodyWriteModes = Object.freeze({
+  directory: 0o2750, file: 0o640
+});
+
+async function custodyWriteModes(
+  root: string,
+  fileSystem: Pick<UserDekStoreFileSystem, "stat">
+): Promise<CustodyWriteModes> {
+  const custodyGid = currentCustodyGid();
+  if (custodyGid === undefined) return OWNER_CUSTODY_MODES;
+  try {
+    const metadata = await fileSystem.stat(root);
+    if (metadata.isDirectory() && metadata.gid === custodyGid) return GROUP_CUSTODY_MODES;
+  } catch {
+    // No store root yet. The operator provisions the group ON the root, so a
+    // tree this process creates out of nothing stays single-owner.
+  }
+  return OWNER_CUSTODY_MODES;
 }
 
 function assertUserDekStoreUserId(userId: string): void {
@@ -1382,20 +1622,26 @@ export class FileUserDekStore implements ReadableUserDekStore {
     let parentHandle: Awaited<ReturnType<typeof open>> | undefined;
     let directoryCreated = false;
     let published = false;
+    const modes = await custodyWriteModes(this.root, this.fileSystem);
     try {
-      await this.fileSystem.mkdir(this.root, { recursive: true, mode: 0o700 });
-      await this.fileSystem.chmod(this.root, 0o700);
-      await this.fileSystem.mkdir(users, { recursive: true, mode: 0o700 });
-      await this.fileSystem.chmod(users, 0o700);
-      await this.fileSystem.mkdir(directory, { recursive: false, mode: 0o700 });
+      await this.fileSystem.mkdir(this.root, { recursive: true, mode: modes.directory });
+      await this.fileSystem.chmod(this.root, modes.directory);
+      await this.fileSystem.mkdir(users, { recursive: true, mode: modes.directory });
+      await this.fileSystem.chmod(users, modes.directory);
+      await this.fileSystem.mkdir(directory, { recursive: false, mode: modes.directory });
       directoryCreated = true;
-      file = await this.fileSystem.open(temporary, "wx", 0o600);
+      // The units run with UMask=0077, which would strip a mode passed to
+      // mkdir/open down to 0700/0600 and leave the second principal locked out.
+      // Widening after the restrictive creation never exposes an open moment.
+      await this.fileSystem.chmod(directory, modes.directory);
+      file = await this.fileSystem.open(temporary, "wx", modes.file);
       await file.writeFile(JSON.stringify({
         version: 1,
         user_id: userId,
         key_id: envelope.keyId,
         wrapped_dek: envelope
       }), "utf8");
+      await this.fileSystem.chmod(temporary, modes.file);
       await file.sync();
       await file.close();
       file = undefined;
@@ -1724,15 +1970,18 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
     let parentHandle: Awaited<ReturnType<typeof open>> | undefined;
     let directoryCreated = false;
     let published = false;
+    const modes = await custodyWriteModes(this.root, this.fileSystem);
     try {
-      await this.fileSystem.mkdir(this.root, { recursive: true, mode: 0o700 });
-      await this.fileSystem.chmod(this.root, 0o700);
-      await this.fileSystem.mkdir(runs, { recursive: true, mode: 0o700 });
-      await this.fileSystem.chmod(runs, 0o700);
-      await this.fileSystem.mkdir(directory, { recursive: false, mode: 0o700 });
+      await this.fileSystem.mkdir(this.root, { recursive: true, mode: modes.directory });
+      await this.fileSystem.chmod(this.root, modes.directory);
+      await this.fileSystem.mkdir(runs, { recursive: true, mode: modes.directory });
+      await this.fileSystem.chmod(runs, modes.directory);
+      await this.fileSystem.mkdir(directory, { recursive: false, mode: modes.directory });
       directoryCreated = true;
-      file = await this.fileSystem.open(temporary, "wx", 0o600);
+      await this.fileSystem.chmod(directory, modes.directory);
+      file = await this.fileSystem.open(temporary, "wx", modes.file);
       await file.writeFile(JSON.stringify(record), "utf8");
+      await this.fileSystem.chmod(temporary, modes.file);
       await file.sync();
       await file.close();
       file = undefined;
@@ -2163,15 +2412,18 @@ export class FilePublicationKeyStore implements PublicationKeyStore {
     let parentHandle: Awaited<ReturnType<typeof open>> | undefined;
     let directoryCreated = false;
     let published = false;
+    const modes = await custodyWriteModes(this.root, this.fileSystem);
     try {
-      await this.fileSystem.mkdir(this.root, { recursive: true, mode: 0o700 });
-      await this.fileSystem.chmod(this.root, 0o700);
-      await this.fileSystem.mkdir(publications, { recursive: true, mode: 0o700 });
-      await this.fileSystem.chmod(publications, 0o700);
-      await this.fileSystem.mkdir(directory, { recursive: false, mode: 0o700 });
+      await this.fileSystem.mkdir(this.root, { recursive: true, mode: modes.directory });
+      await this.fileSystem.chmod(this.root, modes.directory);
+      await this.fileSystem.mkdir(publications, { recursive: true, mode: modes.directory });
+      await this.fileSystem.chmod(publications, modes.directory);
+      await this.fileSystem.mkdir(directory, { recursive: false, mode: modes.directory });
       directoryCreated = true;
-      file = await this.fileSystem.open(temporary, "wx", 0o600);
+      await this.fileSystem.chmod(directory, modes.directory);
+      file = await this.fileSystem.open(temporary, "wx", modes.file);
       await file.writeFile(JSON.stringify(record), "utf8");
+      await this.fileSystem.chmod(temporary, modes.file);
       await file.sync();
       await file.close();
       file = undefined;
