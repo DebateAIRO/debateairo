@@ -22,7 +22,17 @@ const passwordPolicySchema = z.object({
     time_cost: z.number().int().min(2).max(10),
     parallelism: z.number().int().positive().max(4),
     hash_length: z.number().int().min(32).max(64)
-  }).strict()
+  }).strict(),
+  /**
+   * V-14. OPTIONAL, because the sealed row (register version 1) carries no
+   * maximum and must keep parsing byte-for-byte; the superseding DEPLOYMENT row
+   * below carries 1024. The unit is the one `minimum_length` is enforced in —
+   * `String.prototype.length`, i.e. UTF-16 code units — so the two password
+   * rules read the same way. The ceiling is the route's own request-shape bound
+   * (`AUTH_PASSWORD_MAX_BYTES`, 1024 UTF-8 bytes): UTF-8 bytes are never fewer
+   * than UTF-16 code units, so a policy maximum above 1024 could never bind.
+   */
+  max_length: z.number().int().min(8).max(1_024).optional()
 }).strict();
 
 const auditSourceIpKdfPolicySchema = z.object({
@@ -830,6 +840,40 @@ export const AUTH_POLICY_REGISTER_ROWS = Object.freeze(AUTH_POLICY_PUBLICATION_R
   })
 ));
 
+/**
+ * V-14, ruled 2026-09-21: the password maximum length becomes policy.
+ *
+ * The rows above are the SEALED historical set (register version 1, sealed by
+ * hash); nothing in them may move. This is the superseding DEPLOYMENT set: the
+ * same five row keys, with `passwordPolicy` republished as a new version that
+ * adds `max_length` and changes no other member. A deployment publishes these
+ * rows at its own register version; the sealed rows stay as history.
+ */
+const PASSWORD_POLICY_MAXIMUM_LENGTH = "1024";
+const PASSWORD_POLICY_MAXIMUM_LENGTH_SOURCE_REF =
+  " + V-14 ruled 2026-09-21 (V, chat): versioned passwordPolicy row with"
+  + " max_length 1024, superseding the sealed row without altering it";
+
+const AUTH_POLICY_DEPLOYMENT_PUBLICATION_ROWS = Object.freeze(
+  AUTH_POLICY_PUBLICATION_ROWS.map((row) => row.rowKey !== "passwordPolicy" ? row : Object.freeze({
+    rowKey: row.rowKey,
+    value: Object.freeze({
+      ...row.value,
+      "max_length": canonicalDecimal(PASSWORD_POLICY_MAXIMUM_LENGTH)
+    }),
+    sourceRef: `${row.sourceRef}${PASSWORD_POLICY_MAXIMUM_LENGTH_SOURCE_REF}`
+  }))
+);
+
+export const AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS = Object.freeze(
+  AUTH_POLICY_DEPLOYMENT_PUBLICATION_ROWS.map((row) => Object.freeze({
+    rowKey: row.rowKey,
+    valueAst: row.value,
+    value: JSON.parse(canonicalRegisterJson(row.value)) as Readonly<Record<string, unknown>>,
+    sourceRef: row.sourceRef
+  }))
+);
+
 export interface AuthRouteLimit {
   readonly windowMs: number;
   readonly admissionPerSource: number;
@@ -838,6 +882,12 @@ export interface AuthRouteLimit {
 export interface AuthPolicy {
   readonly password: {
     readonly minimumLength: 8;
+    /**
+     * V-14. `null` when the resolved register version carries no maximum (the
+     * sealed row): the route's request-shape bound is then the only ceiling.
+     * Counted in `String.prototype.length` units, exactly like the minimum.
+     */
+    readonly maximumLength: number | null;
     readonly argon2id: {
       readonly memoryCostKiB: number;
       readonly timeCost: number;
@@ -1141,6 +1191,7 @@ export function authPolicyFromRegisterRows(rows: readonly AuthPolicyRegisterRow[
   return Object.freeze({
     password: Object.freeze({
       minimumLength: password.data.minimum_length,
+      maximumLength: password.data.max_length ?? null,
       argon2id: Object.freeze({
         memoryCostKiB: password.data.argon2id.memory_cost_kib,
         timeCost: password.data.argon2id.time_cost,

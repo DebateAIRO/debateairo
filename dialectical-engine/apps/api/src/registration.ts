@@ -1335,9 +1335,14 @@ export class RegistrationService implements RegistrationApplication {
     let releaseAdmission: (() => void) | undefined;
     try {
       try {
+        const maximumPasswordLength = this.dependencies.policy.password.maximumLength;
         if (!validEmail(input.email) || !validEmail(input.recoveryEmail)
           || typeof input.password !== "string"
           || input.password.length < this.dependencies.policy.password.minimumLength
+          // V-14: the ruled maximum, in the same unit as the minimum. The route
+          // keeps its own 1024-byte request-shape bound ahead of this; a
+          // register version that publishes no maximum leaves that bound alone.
+          || (maximumPasswordLength !== null && input.password.length > maximumPasswordLength)
           || input.adultAffirmed !== true) {
           throw new AuthFlowError("AUTH_INPUT_INVALID");
         }
