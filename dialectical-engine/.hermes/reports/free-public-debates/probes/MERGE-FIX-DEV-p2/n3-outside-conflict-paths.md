@@ -1,0 +1,15 @@
+# N3 — prior edits outside the 20 conflicted paths
+
+These are the 11 clean-merged paths changed by MERGE-FIX-DEV, with the combination frame that forced each edit.
+
+1. `acceptance/ceremony.test.ts` — the merged Ask contract required `plan_tier`, and the merged provider-panel gate required real roster model ids. The ceremony first rejected the malformed ask, then rejected the missing Premium/Grok member, then produced an empty claim panel; the fixture was bound to Free plus the two real Free model ids and passed 2/2.
+2. `apps/ui/app/new/defaults.tsx` — the plan-tier `/new` parent supplies steering text while the dev parent's builder hard-coded empty arrays. The merge had to carry `steeringPresets`/`steeringAnnotations` through the Ask builder. V-12 now confirms that later ruling and p2 removes only the client-shape gate.
+3. `packages/providers/src/provider-probe.ts` — dev moved discovery probing out of `apps/api`, while ours' local probe used `max_tokens: 64` and disabled Z.AI thinking. The shared owner initially lost both values; its two readers were RED, then the combined shared implementation passed 23/23.
+4. `tests/architecture/dev-real-provider-only.test.ts` — CLI composition changed from an inline environment call to the shared `commandEnvironment` local while retaining the file-config fallback. Its exact source oracle was updated to that combined call.
+5. `tests/architecture/p2-product-role-policy.test.ts` — the register port became a local so historical import and current general publication could share it. The source oracle followed the local invocation; p2 additionally binds its construction to `input.adminPool`.
+6. `tests/architecture/p2-recovery-policy-register.test.ts` — same shared-port forcing frame as product-role policy; p2 additionally binds the construction and invocation as a pair.
+7. `tests/integration/dev-deployment-register.test.ts` — historical callers needed the sealed V4 fixture while current callers required the configured provider panel, plan-tier rows, and algorithm rows. Fixtures/calls were split by that frame; p2 adds an independent literal default-panel oracle.
+8. `tests/integration/t16-algorithm-register.test.ts` — merged model configuration replaced retired `development:codex-cli`/`development:claude-cli` refs with Premium CLI refs plus Free API families, and the CLI fixture needed `config/models.yaml`. The updated suite passed 25/25.
+9. `tests/render/tier01-new-plan-tier.test.tsx` — `/new` began importing contract-owned depth bounds and reading plan-tier rosters. The dynamic contract/client doubles lacked those shipped members; they were completed and the suite passed 34/34 at merge handoff.
+10. `tests/unit/s1-1-depth-contract.test.ts` — the merged Ask schema required `plan_tier`, so both Ask fixtures gained `free`. The later full-corpus run exposed B2's 51-added/3-missing manifest drift and 20 non-depth detector hits; p2 resolves those separately.
+11. `tests/unit/t17-envelope.test.ts` — the merged Ask requires `plan_tier`, and the discovered Free panel requires real model ids. The fixture gained `free`, `gpt-5.6-luna`, and `glm-5.3-flash`; the suite passed 46/46.

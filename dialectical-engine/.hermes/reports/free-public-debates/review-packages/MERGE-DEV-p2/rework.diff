@@ -1,0 +1,695 @@
+diff --git a/dialectical-engine/apps/ui/app/new/page.tsx b/dialectical-engine/apps/ui/app/new/page.tsx
+index fd330acf..da7e1c65 100755
+--- a/dialectical-engine/apps/ui/app/new/page.tsx
++++ b/dialectical-engine/apps/ui/app/new/page.tsx
+@@ -78,14 +78,13 @@ export default function NewDebatePage() {
+ function NewDebateForm({ token }: { token: string }) {
+   const router = useRouter();
+   const searchParams = useSearchParams();
+-  const planTierControlsAvailable = typeof Reflect.get(contractClient, "readPlanTiers") === "function";
+   const [topic, setTopic] = useState(searchParams.get("topic") ?? "");
+   const [planTier, setPlanTier] = useState<PlanTier>("free");
+   const [planTierRosters, setPlanTierRosters] = useState<PlanTierRosters>(EMPTY_PLAN_TIER_ROSTERS);
+   const [optionsOpen, setOptionsOpen] = useState(false);
+   const [depthMode, setDepthMode] = useState<AdaptiveDepthMode>("fixed");
+   const [scrutiny, setScrutiny] = useState<ScrutinyDepth>("standard");
+-  const [depth, setDepth] = useState(planTierControlsAvailable ? 2 : 1);
++  const [depth, setDepth] = useState(2);
+   const [branching, setBranching] = useState(2);
+   const [concurrency, setConcurrency] = useState(3);
+   const [maxTokens, setMaxTokens] = useState(800);
+@@ -113,11 +112,7 @@ function NewDebateForm({ token }: { token: string }) {
+       if (!active) return;
+       setSessionDefaultsError(`ASK_SESSION_DEFAULTS_UNAVAILABLE: ${failure instanceof Error ? failure.message : "Session read failed"}`);
+     });
+-    const readPlanTiers = Reflect.get(contractClient, "readPlanTiers") as
+-      | undefined
+-      | (() => ReturnType<typeof contractClient.readPlanTiers>);
+-    if (typeof readPlanTiers !== "function") return () => { active = false; };
+-    void readPlanTiers.call(contractClient).then((rosters) => {
++    void contractClient.readPlanTiers().then((rosters) => {
+       if (!active) return;
+       setPlanTierRosters({ free: rosters.free, premium: rosters.premium });
+       setPlanTierRostersError(null);
+@@ -301,8 +296,7 @@ function NewDebateForm({ token }: { token: string }) {
+               disabled={planTier === "free"}
+               onChange={setDepth}
+             />
+-            {planTierControlsAvailable ? (
+-              <div className="ndRow ndRowSteering">
++            <div className="ndRow ndRowSteering">
+                 <div className="ndSteerField">
+                   <label className="ndLabel" htmlFor="steeringPresets">Steering menu selections</label>
+                   <div className="ndHint" id="steeringPresets-hint">One per line</div>
+@@ -340,8 +334,7 @@ function NewDebateForm({ token }: { token: string }) {
+                     placeholder="Add a note the run will carry…"
+                   />
+                 </div>
+-              </div>
+-            ) : null}
++            </div>
+             <p className="ndProvenance">
+               Tier source, provenance, and machine as-of are recorded automatically with the run contract.
+             </p>
+diff --git a/dialectical-engine/tests/architecture/p2-product-role-policy.test.ts b/dialectical-engine/tests/architecture/p2-product-role-policy.test.ts
+index fce2f582..8731fbc5 100644
+--- a/dialectical-engine/tests/architecture/p2-product-role-policy.test.ts
++++ b/dialectical-engine/tests/architecture/p2-product-role-policy.test.ts
+@@ -135,6 +135,9 @@ describe("P2-14 sealed product-role catalog", () => {
+     expect(registerSource).toContain("createPostgresRegisterPublicationPort(pool).importHistorical");
+     expect(devSeed).toContain("PRODUCT_ROLE_POLICY_REGISTER_ROW");
+     expect(devSeed).toContain("buildDevelopmentDeploymentRegisterPublicationRows");
++    // Property: the publication port that publishes the policy rows owns the caller's admin pool.
++    // Production break: construct publicationPort from another pool while retaining the same local call below.
++    expect(devSeed).toContain("const publicationPort = createPostgresRegisterPublicationPort(input.adminPool);");
+     expect(devSeed).toContain("publicationPort.publishGeneral");
+     const readIndex = apiMain.indexOf("await readProductRolePolicy(pool, environment.REGISTER_VERSION)");
+     const workerIndex = apiMain.indexOf("new Argon2WorkerPool()");
+diff --git a/dialectical-engine/tests/architecture/p2-recovery-policy-register.test.ts b/dialectical-engine/tests/architecture/p2-recovery-policy-register.test.ts
+index aca798fd..b63e6f78 100644
+--- a/dialectical-engine/tests/architecture/p2-recovery-policy-register.test.ts
++++ b/dialectical-engine/tests/architecture/p2-recovery-policy-register.test.ts
+@@ -117,6 +117,9 @@ describe("P2-02 sealed recovery-policy register", () => {
+     expect(registerSource).toContain("createPostgresRegisterPublicationPort(pool).importHistorical");
+     expect(devSeed).toContain("RECOVERY_POLICY_REGISTER_ROW");
+     expect(devSeed).toContain("buildDevelopmentDeploymentRegisterPublicationRows");
++    // Property: the publication port that publishes the policy rows owns the caller's admin pool.
++    // Production break: construct publicationPort from another pool while retaining the same local call below.
++    expect(devSeed).toContain("const publicationPort = createPostgresRegisterPublicationPort(input.adminPool);");
+     expect(devSeed).toContain("publicationPort.publishGeneral");
+     const readIndex = apiMain.indexOf("await readRecoveryPolicy(pool, environment.REGISTER_VERSION)");
+     const workerIndex = apiMain.indexOf("new Argon2WorkerPool()");
+diff --git a/dialectical-engine/tests/integration/dev-deployment-register.test.ts b/dialectical-engine/tests/integration/dev-deployment-register.test.ts
+index 8b9c8349..2a794d0f 100644
+--- a/dialectical-engine/tests/integration/dev-deployment-register.test.ts
++++ b/dialectical-engine/tests/integration/dev-deployment-register.test.ts
+@@ -637,9 +637,10 @@ describe("DEV-05 complete development deployment register", () => {
+ 
+   it("seeds exactly every production API boot row, seals it, and reuses it unchanged", async () => {
+     const bootstrap = await loadBootstrapRegister();
++    const providerPanel = TEST_DEVELOPMENT_PROVIDER_PANEL;
+     const first = await seedDevelopmentDeploymentRegister({
+       adminPool: database.pool,
+-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
++      providerPanel,
+       repositoryRoot
+     });
+     expect(first.registerVersion).toBe(String(DEVELOPMENT_REGISTER_VERSION));
+@@ -676,12 +677,25 @@ describe("DEV-05 complete development deployment register", () => {
+     expect(makers).toMatchObject({
+       deploymentMakerCapability: true,
+       configuredMakers: [...new Set(
+-        TEST_DEVELOPMENT_PROVIDER_PANEL.configuredProviders.map(({ maker }) => maker)
++        providerPanel.configuredProviders.map(({ maker }) => maker)
+       )].sort(),
+-      configuredProviders: TEST_DEVELOPMENT_PROVIDER_PANEL.configuredProviders.map(
++      configuredProviders: providerPanel.configuredProviders.map(
+         ({ providerRef, maker }) => ({ providerRef, maker })
+       )
+     });
++    // Property: the default panel's policy is pinned independently of the seed fixture.
++    // Production break: remove or remap one default provider while projecting the expectation from that same fixture.
++    expect(makers).toMatchObject({
++      deploymentMakerCapability: true,
++      configuredMakers: ["Anthropic", "OpenAI", "Z.AI", "xAI"],
++      configuredProviders: [
++        { providerRef: "development:codex-premium-cli", maker: "OpenAI" },
++        { providerRef: "development:claude-premium-cli", maker: "Anthropic" },
++        { providerRef: "development:grok-cli", maker: "xAI" },
++        { providerRef: "development:openai-free-api", maker: "OpenAI" },
++        { providerRef: "development:zai-free-api", maker: "Z.AI" }
++      ]
++    });
+     expect(discovery).toMatchObject({ probeFreshnessMs: 600_000, probeMaxAttempts: 1 });
+     expect(structural).toEqual({
+       judgeMaxAttempts: 3,
+diff --git a/dialectical-engine/tests/render/ux01-new-debate-form.test.tsx b/dialectical-engine/tests/render/ux01-new-debate-form.test.tsx
+index 6cea8a2c..5159dcae 100644
+--- a/dialectical-engine/tests/render/ux01-new-debate-form.test.tsx
++++ b/dialectical-engine/tests/render/ux01-new-debate-form.test.tsx
+@@ -12,8 +12,10 @@ process.env.TZ = "UTC";
+ 
+ const pageMocks = vi.hoisted(() => ({
+   authToken: "token:test-user-alpha",
++  contractClientHasPlanTierReader: true,
+   createDebate: vi.fn(),
+   readDeployment: vi.fn(),
++  readPlanTiers: vi.fn(),
+   readSession: vi.fn(),
+   push: vi.fn()
+ }));
+@@ -75,11 +77,23 @@ vi.mock("next/navigation", () => ({
+ vi.mock("@/components/AuthGate", () => ({
+   AuthGate: ({ children }: { children: (token: string) => React.ReactNode }) => children(pageMocks.authToken)
+ }));
+-vi.mock("@/lib/api", async (importOriginal) => ({
+-  ...(await importOriginal<typeof import("../../apps/ui/lib/api.js")>()),
+-  contractClient: { readDeployment: pageMocks.readDeployment, readSession: pageMocks.readSession },
+-  createDebate: pageMocks.createDebate
+-}));
++vi.mock("@/lib/api", async (importOriginal) => {
++  const contractClient = {
++    readDeployment: pageMocks.readDeployment,
++    readPlanTiers: pageMocks.readPlanTiers,
++    readSession: pageMocks.readSession
++  };
++  return {
++    ...(await importOriginal<typeof import("../../apps/ui/lib/api.js")>()),
++    contractClient: new Proxy(contractClient, {
++      get(target, property, receiver) {
++        if (property === "readPlanTiers" && !pageMocks.contractClientHasPlanTierReader) return undefined;
++        return Reflect.get(target, property, receiver);
++      }
++    }),
++    createDebate: pageMocks.createDebate
++  };
++});
+ 
+ const session: Session = {
+   asker_id: "asker:test-user-alpha",
+@@ -162,8 +176,10 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
+   beforeEach(() => {
+     hooks.reset();
+     pageMocks.authToken = "token:test-user-alpha";
++    pageMocks.contractClientHasPlanTierReader = true;
+     pageMocks.createDebate.mockReset().mockResolvedValue({ id: "run:new" });
+     pageMocks.readDeployment.mockReset();
++    pageMocks.readPlanTiers.mockReset().mockResolvedValue({ free: [], premium: [] });
+     pageMocks.readSession.mockReset().mockResolvedValue(session);
+     pageMocks.push.mockReset();
+   });
+@@ -175,7 +191,8 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
+       tier_source: "ASKER",
+       tier_provenance_ref: "asker:ui-selection",
+       composition_budget_tier: "low",
+-      depth: 1,
++      // V-12: M10 supersedes dev's depth-1 default with Free depth 2.
++      depth: 2,
+       decision_scope: "personal"
+     });
+     expect(config).not.toHaveProperty("agent_count");
+@@ -256,163 +273,75 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
+     expect(openHtml).toContain('id="additionalRunOptions"');
+   });
+ 
+-  /* S1-2 · V ruling 2026-09-03, applied during the W5 dev reconciliation.
+-     Reworked in round 3 after codex B1 (w5-codex-r1.md).
+-
+-     PROPERTY (the substantive one, asserted by the first test below): text an
+-     asker types into ANY editable text control this form renders — in either
+-     reachable state of the form, Options closed and Options open — never
+-     reaches `steering_presets` or `steering_annotations`. Both arrive at the
+-     ask as empty arrays, while the two contract fields stay PRESENT so
+-     already-stored asks remain valid.
+-
+-     WHAT THE CLAIM IS LIMITED TO, precisely. The enumeration selects controls
+-     by ELEMENT SHAPE — `textarea`, and `input` whose `type` is a text-entry
+-     type — never by anything about their name, id, or label. So a steering
+-     control re-added under any spelling is filled and caught. It does NOT
+-     cover shapes this test cannot type into: contenteditable hosts, custom
+-     widgets that take text without a text-entry element, file or date inputs.
+-     The second test below pins the absence of the one shape that would
+-     silently escape (contenteditable), so the enumeration is complete for what
+-     this form can render — but if a future control takes asker text through
+-     some other shape, this test does not see it. That is the honest boundary.
+-
+-     WHY THE CONTROL WAS REMOVED, TWICE. The steering inputs were collected and
+-     DISCARDED. Nothing downstream reads either field — not propagation, not
+-     judgement, not serve, not the runner; the API persists them and no consumer
+-     ever looks. A control that appears to steer a debate it cannot steer is
+-     worse than no control, because it invites the asker to spend care on it.
+-     The mission removed it from the legacy web/ form under goal task T2; the UI
+-     overhaul then rebuilt it here, on a form that survived while the legacy one
+-     was deleted. V ruled it out a second time rather than let the merge ship it.
+-
+-     If you are here because you want to add steering: it needs a design in which
+-     the value actually reaches the debate — that is its own mission, and the
+-     goal's non-goals exclude it. This test is the record of two removals, not an
+-     obstacle to route around. */
+-
+-  /* Text-entry `input` types, plus the absent/implicit default. `range`,
+-     `checkbox`, `radio`, `file`, `date`, `hidden` and friends are excluded
+-     because a change event on them does not carry asker prose. */
+-  const TEXT_ENTRY_INPUT_TYPES = new Set(["", "text", "search", "email", "url", "tel", "password"]);
+-
+-  function isEditableTextControl(element: ReactElement): boolean {
+-    if (element.type === "textarea") return true;
+-    if (element.type !== "input") return false;
+-    const type = String((element.props as { type?: unknown }).type ?? "").toLowerCase();
+-    return TEXT_ENTRY_INPUT_TYPES.has(type);
+-  }
+-
+-  /* Types one distinct sentinel into every editable text control in the tree,
+-     by shape. Returns the sentinels actually typed, so a test can prove the
+-     harness typed at all instead of passing vacuously on an empty enumeration. */
+-  function typeIntoEveryTextControl(tree: ReactNode, tag: string): string[] {
+-    const controls = collectElements(tree, isEditableTextControl);
+-    return controls.map((field, index) => {
+-      const sentinel = `asker-typed-${tag}-${index}`;
+-      const node = { value: sentinel, style: { height: "" }, scrollHeight: 50 };
+-      (field.props as { onChange?: (event: unknown) => void })
+-        .onChange?.({ target: node, currentTarget: node });
+-      return sentinel;
+-    });
+-  }
+-
+-  function openOptionsPanel(tree: ReactNode): void {
+-    const toggle = findElement(tree, (element) =>
+-      element.type === "button" && (element.props as { className?: string }).className === "ndOptionsToggle");
+-    expect(toggle, "Options toggle missing — the panel state is no longer reachable").not.toBeNull();
+-    (toggle!.props as { onClick: () => void }).onClick();
+-  }
++  /* S1-2 was superseded by V-12: the later DONE(S01) ruling keeps both
++     steering boxes for every client shape. Free owns their empty defaults and
++     native lock; Premium makes the same fields editable and carries their text. */
++  it("V-12 renders both empty steering boxes locked on Free for a client without readPlanTiers", async () => {
++    pageMocks.contractClientHasPlanTierReader = false;
++    try {
++      hooks.beginRender();
++      const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
++      const tree = evaluateElementTree(<NewDebatePage />);
++      const steering = collectElements(tree, (element) =>
++        ["steeringPresets", "steeringAnnotations"].includes(
++          String((element.props as { id?: string }).id ?? "")
++        ));
++
++      // V-12: both controls exist independently of the mocked client's methods.
++      expect(steering.map((element) => (element.props as { id?: string }).id)).toEqual([
++        "steeringPresets",
++        "steeringAnnotations"
++      ]);
++      // V-12: Free applies the native lock to both controls.
++      expect(steering.every((element) => (element.props as { disabled?: boolean }).disabled === true)).toBe(true);
++      // V-12: M10 opens with both steering defaults empty.
++      expect(steering.map((element) => (element.props as { value?: string }).value)).toEqual(["", ""]);
++      const depth = findElement(tree, (element) => (element.props as { id?: string }).id === "treeDepth");
++      // V-12: M10 opens Free at Tree depth 2.
++      expect((depth?.props as { value?: number }).value).toBe(2);
++    } finally {
++      pageMocks.contractClientHasPlanTierReader = true;
++    }
++  });
+ 
+-  it("sends empty steering lists whatever the asker types into any text control, in either form state", async () => {
++  it("V-12 enables both steering boxes on Premium and carries their text", async () => {
+     const initial = await renderRealNewDebatePageState();
+-    chooseRiskTier(initial.tree, "standard");
++    const premium = findElement(initial.tree, (element) =>
++      (element.props as Record<string, unknown>)["data-field"] === "planTier"
++      && (element.props as Record<string, unknown>)["data-value"] === "premium");
++    // V-12: Premium remains a reachable tier from the same screen.
++    expect(premium).not.toBeNull();
++    (premium!.props as { onClick: () => void }).onClick();
+ 
+-    // STATE 1 — Options closed.
+-    const closedSentinels = typeIntoEveryTextControl(initial.tree, "closed");
+-    expect(closedSentinels.length, "no editable text control found with Options closed").toBeGreaterThan(0);
+-
+-    // STATE 2 — Options open. Controls inside the panel only exist in this
+-    // state; codex's counterexample hid there precisely because the old test
+-    // never opened it.
+-    openOptionsPanel(initial.tree);
+     hooks.beginRender();
+     const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
+-    const openTree = evaluateElementTree(<NewDebatePage />);
+-    expect(
+-      findElement(openTree, (element) => (element.props as { id?: string }).id === "additionalRunOptions"),
+-      "Options panel did not open — controls inside it would go unexercised"
+-    ).not.toBeNull();
+-    const openSentinels = typeIntoEveryTextControl(openTree, "open");
+-    expect(openSentinels.length, "no editable text control found with Options open").toBeGreaterThan(0);
+-
++    const premiumTree = evaluateElementTree(<NewDebatePage />);
++    const steering = collectElements(premiumTree, (element) =>
++      ["steeringPresets", "steeringAnnotations"].includes(
++        String((element.props as { id?: string }).id ?? "")
++      ));
++    // V-12: Premium exposes both textareas without the Free lock.
++    expect(steering).toHaveLength(2);
++    // V-12: neither Premium textarea is disabled.
++    expect(steering.every((element) => (element.props as { disabled?: boolean }).disabled !== true)).toBe(true);
++
++    const typed = ["Prefer primary sources", "Flag unsupported claims"];
++    steering.forEach((field, index) => {
++      const node = { value: typed[index], style: { height: "" }, scrollHeight: 50 };
++      (field.props as { onChange: (event: unknown) => void }).onChange({ target: node, currentTarget: node });
++    });
+     hooks.beginRender();
+     const form = findElement(evaluateElementTree(<NewDebatePage />), (element) => element.type === "form");
++    // V-12: the rendered Premium screen still has its real submit boundary.
+     expect(form).not.toBeNull();
+     await (form!.props as { onSubmit: (event: { preventDefault: () => void }) => Promise<void> })
+       .onSubmit({ preventDefault: vi.fn() });
+-
+-    const call = pageMocks.createDebate.mock.calls.at(-1)!;
+-    const config = call[1] as Record<string, unknown>;
+-    const everySentinel = [...closedSentinels, ...openSentinels];
+-
+-    // POSITIVE CONTROL, and the guard against a vacuous pass: one legitimate
+-    // field really does carry asker text to the ask. If the harness ever stops
+-    // typing, this fails and the steering assertions stop being meaningful in
+-    // silence. Identified by where its value LANDS, not by its name.
+-    expect(everySentinel, "no typed value reached the ask — the harness typed nothing")
+-      .toContain(String(call[0]));
+-
+-    // The two contract fields stay present and empty.
+-    expect(Object.keys(config)).toEqual(
+-      expect.arrayContaining(["steering_presets", "steering_annotations"])
+-    );
+-    expect(config).toMatchObject({ steering_presets: [], steering_annotations: [] });
+-
+-    // THE SUBSTANTIVE ASSERTION. Generalised over the CONTROL's name — the
+-    // enumeration above selected by shape, so a steering box re-added under any
+-    // spelling, in either state, was typed into — and scoped on the SINK side to
+-    // the steering fields: the two canonical contract names, plus any further
+-    // key spelt like steering. It is deliberately NOT a sweep of the whole
+-    // config: an unrelated future field that legitimately carries asker text is
+-    // not a violation of THIS property, and asserting over every key would fire
+-    // on it (round 2 corrected exactly that over-broadness; m3 re-proves it).
+-    const steeringKeys = [...new Set([
+-      "steering_presets",
+-      "steering_annotations",
+-      ...Object.keys(config).filter((key) => /steer/i.test(key))
+-    ])].sort();
+-    expect(steeringKeys).toEqual(["steering_annotations", "steering_presets"]);
+-    for (const key of steeringKeys) {
+-      for (const sentinel of everySentinel) {
+-        expect(JSON.stringify(config[key]) ?? "", `${key} carried asker text typed into a form control`)
+-          .not.toContain(sentinel);
+-      }
+-    }
+-  });
+-
+-  it("renders no steering-named control and no shape this enumeration cannot type into", async () => {
+-    const initial = await renderRealNewDebatePageState();
+-
+-    // Weaker, separate claim about SPELLING. Kept apart from the property above
+-    // so a mutant that adds a differently-named control fails the substantive
+-    // test rather than dying here on a name check — which is exactly what made
+-    // the round-2 m2 evidence unsound (codex B1).
+-    expect(initial.html).not.toMatch(/steering/i);
+-    expect(collectElements(initial.tree, (element) =>
+-      /steer/i.test(String((element.props as { id?: string }).id ?? "")))).toEqual([]);
+-
+-    // Completeness of the shape enumeration: no contenteditable host, in either
+-    // state, so "every editable text control" above is not silently partial.
+-    openOptionsPanel(initial.tree);
+-    hooks.beginRender();
+-    const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
+-    for (const tree of [initial.tree, evaluateElementTree(<NewDebatePage />)]) {
+-      expect(collectElements(tree, (element) => {
+-        const editable = (element.props as { contentEditable?: unknown }).contentEditable;
+-        return editable === true || editable === "true" || editable === "plaintext-only";
+-      })).toEqual([]);
+-    }
++    const config = pageMocks.createDebate.mock.calls.at(-1)![1] as Record<string, unknown>;
++    // V-12: Premium carries the two independently derived literal values.
++    expect(config).toMatchObject({
++      steering_presets: ["Prefer primary sources"],
++      steering_annotations: ["Flag unsupported claims"]
++    });
+   });
+ 
+   it("renders depth 1..5 while keeping retired apparatus and all machine-owned fields out of the DOM", async () => {
+diff --git a/dialectical-engine/tests/support/shipped-corpus.manifest.txt b/dialectical-engine/tests/support/shipped-corpus.manifest.txt
+index 5b4fe84c..1abacf15 100644
+--- a/dialectical-engine/tests/support/shipped-corpus.manifest.txt
++++ b/dialectical-engine/tests/support/shipped-corpus.manifest.txt
+@@ -18,6 +18,7 @@ apps/api/src/legacy-claim.ts
+ apps/api/src/mail-channel.ts
+ apps/api/src/main.ts
+ apps/api/src/mfa.ts
++apps/api/src/obs-client-report.ts
+ apps/api/src/provider-discovery.ts
+ apps/api/src/publications.ts
+ apps/api/src/recovery.ts
+@@ -35,10 +36,14 @@ apps/api/src/support/incidents.ts
+ apps/api/src/support/index.ts
+ apps/api/src/support/keys.ts
+ apps/api/src/support/limits.ts
++apps/api/src/support/model-references.ts
+ apps/api/src/support/model-reservation.ts
+ apps/api/src/support/model.ts
+-apps/api/src/support/own-context.ts
++apps/api/src/support/public-guide-boundary.ts
+ apps/api/src/support/queue.ts
++apps/api/src/support/recovery-intent.ts
++apps/api/src/support/response-policy.ts
++apps/api/src/support/security-guidance.ts
+ apps/api/src/support/session.ts
+ apps/api/src/support/shred.ts
+ apps/api/src/support/templates.ts
+@@ -158,6 +163,7 @@ apps/runner/src/dev-api-process.ts
+ apps/runner/src/dev-auth-data-plane-cli.ts
+ apps/runner/src/dev-auth-data-plane.ts
+ apps/runner/src/dev-auth-stack-cli.ts
++apps/runner/src/dev-auth-stack-profile.ts
+ apps/runner/src/dev-auth-stack.ts
+ apps/runner/src/dev-cli-provider-panel.ts
+ apps/runner/src/dev-database-principals-cli.ts
+@@ -166,7 +172,9 @@ apps/runner/src/dev-deployment-register-cli.ts
+ apps/runner/src/dev-deployment-register.ts
+ apps/runner/src/dev-hatchet-token-cli.ts
+ apps/runner/src/dev-hatchet-token.ts
++apps/runner/src/dev-provider-keys.ts
+ apps/runner/src/dev-provider-panel.ts
++apps/runner/src/dev-provider-set-publish-cli.ts
+ apps/runner/src/dev-runner-policy.ts
+ apps/runner/src/dev-runner-process.ts
+ apps/runner/src/dev-secret-files-cli.ts
+@@ -193,12 +201,15 @@ apps/runner/src/support-switch-cli.ts
+ apps/scheduler/src/cli.ts
+ apps/scheduler/src/index.ts
+ apps/ui/app/admin/workers/page.tsx
++apps/ui/app/ai-transparency/page.tsx
+ apps/ui/app/api/[...path]/route.ts
+ apps/ui/app/debate/[id]/DebatePageClient.tsx
+ apps/ui/app/debate/[id]/DebatePageGate.tsx
+ apps/ui/app/debate/[id]/loading.tsx
+ apps/ui/app/debate/[id]/page.tsx
+ apps/ui/app/enroll-mfa/page.tsx
++apps/ui/app/error.tsx
++apps/ui/app/global-error.tsx
+ apps/ui/app/help/page.tsx
+ apps/ui/app/layout.tsx
+ apps/ui/app/login/page.tsx
+@@ -211,6 +222,7 @@ apps/ui/app/settings/page.tsx
+ apps/ui/app/sign-up/page.tsx
+ apps/ui/app/verify-email/page.tsx
+ apps/ui/components/AccountErasureControls.tsx
++apps/ui/components/AiNotice.tsx
+ apps/ui/components/AnswerHonestyDrawer.tsx
+ apps/ui/components/ArgumentFocusView.tsx
+ apps/ui/components/AuthGate.tsx
+@@ -266,10 +278,9 @@ apps/ui/components/modeTransition.test.mjs
+ apps/ui/components/modeTransition.ts
+ apps/ui/components/support/Assistant.tsx
+ apps/ui/components/support/CaseView.tsx
+-apps/ui/components/support/ConsentToggle.tsx
+-apps/ui/components/support/DebatePicker.tsx
+ apps/ui/components/support/SupportWidget.tsx
+ apps/ui/components/support/http.ts
++apps/ui/lib/aiDisclosure.ts
+ apps/ui/lib/api.ts
+ apps/ui/lib/authNavigationGuard.ts
+ apps/ui/lib/canvasViewport.ts
+@@ -281,6 +292,8 @@ apps/ui/lib/format.ts
+ apps/ui/lib/makerIdentity.ts
+ apps/ui/lib/mfaEnrollment.ts
+ apps/ui/lib/models.ts
++apps/ui/lib/obs/enums.ts
++apps/ui/lib/obs/reporter.ts
+ apps/ui/lib/observability/index.ts
+ apps/ui/lib/observability/logger.ts
+ apps/ui/lib/observability/suspiciousScoring.ts
+@@ -324,12 +337,14 @@ packages/budget/src/index.ts
+ packages/contract/src/client.ts
+ packages/contract/src/generate.ts
+ packages/contract/src/index.ts
++packages/contract/src/plan-tiers.ts
+ packages/critique/src/index.ts
+ packages/crypto/src/argon2-worker-pool.ts
+ packages/crypto/src/argon2-worker.ts
+ packages/crypto/src/index.ts
+ packages/db/src/account-erasure.ts
+ packages/db/src/auth-risk.ts
++packages/db/src/free-public-binding.ts
+ packages/db/src/identity.ts
+ packages/db/src/index.ts
+ packages/db/src/legacy-claim.ts
+@@ -353,23 +368,52 @@ packages/graph/src/index.ts
+ packages/judgement/src/index.ts
+ packages/judgement/src/s04.ts
+ packages/kernel/src/index.ts
++packages/kernel/src/support-credentials.ts
++packages/kernel/src/support-text-views.ts
+ packages/ledger/src/index.ts
+ packages/liveness/src/index.ts
+ packages/memory/src/index.ts
++packages/model-config/src/generate-plan-tier-rosters.ts
++packages/model-config/src/index.ts
++packages/model-config/src/load.ts
++packages/model-config/src/shape.ts
+ packages/obs-capture/install/api.ts
+ packages/obs-capture/install/evaluator-lib.ts
+ packages/obs-capture/install/runner.ts
+ packages/obs-capture/install/scheduler.ts
+ packages/obs-capture/install/ui-client.ts
++packages/obs-capture/scripts/verify-fix09-native-wipe.mjs
++packages/obs-capture/src/cause-chain.ts
++packages/obs-capture/src/chain/agent-action-gateway.ts
++packages/obs-capture/src/chain/canonical.ts
++packages/obs-capture/src/chain/fixagent-delivery.ts
++packages/obs-capture/src/chain/index.ts
++packages/obs-capture/src/chain/locks.ts
++packages/obs-capture/src/chain/occurrence-gateway.ts
++packages/obs-capture/src/chain/private-key-helper.ts
++packages/obs-capture/src/chain/signer.ts
++packages/obs-capture/src/chain/unique-json.ts
++packages/obs-capture/src/chain/verify.ts
++packages/obs-capture/src/chain/witness.ts
+ packages/obs-capture/src/context.ts
+ packages/obs-capture/src/emit.ts
++packages/obs-capture/src/envelope-contract.ts
+ packages/obs-capture/src/flusher.ts
+ packages/obs-capture/src/health.ts
+ packages/obs-capture/src/index.ts
++packages/obs-capture/src/kinds.ts
+ packages/obs-capture/src/queue.ts
+ packages/obs-capture/src/redactor.ts
+ packages/obs-capture/src/registry/index.ts
++packages/obs-capture/src/runtime/config.ts
++packages/obs-capture/src/runtime/control.ts
++packages/obs-capture/src/runtime/drain.ts
++packages/obs-capture/src/runtime/index.ts
++packages/obs-capture/src/runtime/sink.ts
++packages/obs-capture/src/safe-metadata.ts
++packages/obs-capture/src/spool-index.ts
+ packages/obs-capture/src/spool.ts
++packages/obs-capture/src/trace-frames.ts
+ packages/obs-capture/src/zone/classifier.ts
+ packages/obs-capture/src/zone/counter.ts
+ packages/obs-capture/src/zone/index.ts
+@@ -393,6 +437,10 @@ packages/register/src/support-config.ts
+ packages/serve/src/index.ts
+ packages/serve/src/synthesis.ts
+ packages/settlement/src/index.ts
++packages/support-kb/src/catalog.ts
++packages/support-kb/src/context.ts
+ packages/support-kb/src/index.ts
++packages/support-kb/src/navigation.ts
++packages/support-kb/src/recovery.ts
+ packages/valuation/src/index.ts
+ web/next.config.mjs
+diff --git a/dialectical-engine/tests/unit/s1-1-depth-contract.test.ts b/dialectical-engine/tests/unit/s1-1-depth-contract.test.ts
+index 83f1c1b8..38bbe148 100644
+--- a/dialectical-engine/tests/unit/s1-1-depth-contract.test.ts
++++ b/dialectical-engine/tests/unit/s1-1-depth-contract.test.ts
+@@ -335,6 +335,59 @@ const OWNING_DECLARATION = Object.freeze({
+   text: "export const EXPANSION_DEPTH_MAX = 5;"
+ });
+ 
++/**
++ * Exact non-depth numeric domains admitted by the combined shipped corpus.
++ * Counts bind repeated candidates on one source line; a missing or extra hit
++ * throws, so this cannot become a path-wide or text-prefix suppression.
++ */
++const NON_DEPTH_DOMAIN_EXEMPTIONS = Object.freeze([
++  {
++    site: `packages/obs-capture/scripts/verify-fix09-native-wipe.mjs:55 [DOMAIN_ENUMERATION] const preimage = Buffer.concat([Buffer.from(domain, "ascii"), Buffer.from([0]), u32(parts.length), ...parts.map(lp)]);`,
++    occurrences: 1,
++    reason: "the zero byte is a hash-domain separator, not a selectable depth"
++  },
++  {
++    site: "packages/obs-capture/scripts/verify-fix09-native-wipe.mjs:394 [DOMAIN_ENUMERATION] const families = [",
++    occurrences: 12,
++    reason: "the fixture enumerates twelve cryptographic family vectors, not a depth domain"
++  },
++  {
++    site: "packages/obs-capture/scripts/verify-fix09-native-wipe.mjs:561 [DOMAIN_ENUMERATION] for (const [index, capacity] of [256, 768].entries()) {",
++    occurrences: 1,
++    reason: "the two values are byte capacities for wipe verification"
++  },
++  {
++    site: `packages/obs-capture/src/chain/canonical.ts:255 [DOMAIN_ENUMERATION] return Buffer.concat([Buffer.from(name, "utf8"), Buffer.from([0])]);`,
++    occurrences: 1,
++    reason: "the zero byte terminates a canonical name encoding"
++  },
++  {
++    site: "packages/obs-capture/src/chain/private-key-helper.ts:261 [DOMAIN_ENUMERATION] if (zeroBody.length !== BIND_LENGTH + 3 || !zeroBody.subarray(0, BIND_LENGTH).equals(bind) ||",
++    occurrences: 1,
++    reason: "three is a custody-frame byte-length suffix"
++  },
++  {
++    site: `packages/obs-capture/src/chain/private-key-helper.ts:308 [DOMAIN_ENUMERATION] if (!body.equals(Buffer.concat([bind, Buffer.from([7, 1])]))) fail("FIX09_CUSTODY_CLOSED_ACK");`,
++    occurrences: 1,
++    reason: "seven and one are custody acknowledgement bytes"
++  },
++  {
++    site: `packages/obs-capture/src/chain/verify.ts:90 [DOMAIN_ENUMERATION] return Buffer.concat([Buffer.from(value, "utf8"), Buffer.from([0])]);`,
++    occurrences: 1,
++    reason: "the zero byte terminates a verified string encoding"
++  },
++  {
++    site: `packages/obs-capture/src/chain/witness.ts:131 [DOMAIN_ENUMERATION] return Buffer.concat([Buffer.from(value, "utf8"), Buffer.from([0])]);`,
++    occurrences: 1,
++    reason: "the zero byte terminates a witness string encoding"
++  },
++  {
++    site: "packages/obs-capture/src/spool-index.ts:698 [DOMAIN_ENUMERATION] for (const slot of [0, 1] as const) {",
++    occurrences: 1,
++    reason: "zero and one are the two physical spool index slots"
++  }
++]);
++
+ function shippedSourceFiles(): string[] {
+   const found: string[] = [];
+   const walk = (directory: string): void => {
+@@ -349,8 +402,8 @@ function shippedSourceFiles(): string[] {
+   return found;
+ }
+ 
+-/** Every depth-bound SITE in shipped code, addressed `path:line [KIND] text`. */
+-function depthBoundSitesInShippedCode(): string[] {
++/** Every candidate SITE in shipped code, addressed `path:line [KIND] text`. */
++function rawDepthBoundSitesInShippedCode(): string[] {
+   return shippedSourceFiles().flatMap((absolute) => {
+     const path = relative(REPOSITORY_ROOT, absolute).split(sep).join("/");
+     return duplicateBoundSites(path, readFileSync(absolute, "utf8"))
+@@ -358,6 +411,27 @@ function depthBoundSitesInShippedCode(): string[] {
+   }).sort();
+ }
+ 
++/** Every actual depth-bound site after exact, count-checked non-depth admissions. */
++function depthBoundSitesInShippedCode(): string[] {
++  const remaining = new Map(
++    NON_DEPTH_DOMAIN_EXEMPTIONS.map(({ site, occurrences }) => [site, occurrences])
++  );
++  const depthSites: string[] = [];
++  for (const site of rawDepthBoundSitesInShippedCode()) {
++    const count = remaining.get(site);
++    if (count === undefined || count === 0) {
++      depthSites.push(site);
++      continue;
++    }
++    remaining.set(site, count - 1);
++  }
++  const stale = [...remaining.entries()].filter(([, count]) => count !== 0);
++  if (stale.length > 0) {
++    throw new Error(`STALE_NON_DEPTH_DOMAIN_EXEMPTION ${JSON.stringify(stale)}`);
++  }
++  return depthSites;
++}
++
+ /** The same scan minus the one owning declaration — must be empty. */
+ function duplicateBoundSitesInShippedCode(): string[] {
+   return depthBoundSitesInShippedCode().filter(
+@@ -1778,7 +1852,7 @@ describe("S1-1 · the depth bound has a single source", () => {
+     const sites = depthBoundSitesInShippedCode();
+     if (process.env.ORACLE_AUDIT === "1") console.log("SHIPPED_SITES " + JSON.stringify(sites));
+     expect(sites).toEqual([
+-      `${OWNING_DECLARATION.path}:112 [DEPTH_BOUND_LITERAL] ${OWNING_DECLARATION.text}`
++      `${OWNING_DECLARATION.path}:113 [DEPTH_BOUND_LITERAL] ${OWNING_DECLARATION.text}`
+     ]);
+   });
+ 
