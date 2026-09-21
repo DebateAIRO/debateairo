@@ -13,7 +13,7 @@
  * No real key material is ever read here. Every key is generated into a
  * `mkdtemp` directory and the directory is removed afterwards.
  */
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -216,6 +216,125 @@ describe("V-3 rotation: the kek_id label", () => {
  * byte-for-byte v1 — no migration — so the port reads by trying the current KEK
  * and then the previous one, and a re-wrap produces the same 61-byte shape.
  */
+describe("V-3 rotation: re-wrapping a file store, one record at a time", () => {
+  it("re-wraps a v1 record, labels it, and leaves an already-current one alone", async () => {
+    const directory = await temporaryDirectory("debateai-rotation-rewrap-");
+    const original = await throwawayKek(directory, "kek.bin");
+    const replacement = await throwawayKek(directory, "kek-new.bin");
+    const root = join(directory, "user-deks");
+    await mkdir(root, { mode: 0o700 });
+    const legacyDek = generateDek();
+    await writeLegacyUserDekRecord(root, original, USER_ID, legacyDek);
+
+    const store = new FileUserDekStore(root, { current: replacement, previous: original });
+    expect(await store.rewrapUnderCurrentKek(USER_ID)).toBe("REWRAPPED");
+
+    const record = JSON.parse(
+      await readFile(join(root, "users", USER_ID, "dek.v1.json"), "utf8")
+    ) as Record<string, unknown>;
+    expect(record.version).toBe(2);
+    expect(record.kek_id).toBe(kekId(replacement));
+    expect(record.user_id).toBe(USER_ID);
+
+    // Same DEK, now readable by the new KEK on its own.
+    expect(await new FileUserDekStore(root, replacement).load(USER_ID)).toEqual(legacyDek);
+    // Idempotent: running the pass again is a no-op.
+    expect(await store.rewrapUnderCurrentKek(USER_ID)).toBe("ALREADY_CURRENT");
+    expect(await store.rewrapUnderCurrentKek(USER_ID)).toBe("ALREADY_CURRENT");
+  });
+
+  it("verifies a record under the current KEK ALONE, ignoring the previous one", async () => {
+    const directory = await temporaryDirectory("debateai-rotation-verify-");
+    const original = await throwawayKek(directory, "kek.bin");
+    const replacement = await throwawayKek(directory, "kek-new.bin");
+    const root = join(directory, "user-deks");
+    await mkdir(root, { mode: 0o700 });
+    await writeLegacyUserDekRecord(root, original, USER_ID, generateDek());
+
+    // The ring can still READ it through the previous key — but a verification
+    // pass that accepted that would certify a rotation that had not happened.
+    const store = new FileUserDekStore(root, { current: replacement, previous: original });
+    expect(await store.load(USER_ID)).toBeInstanceOf(Buffer);
+    await expect(store.verifyUnderCurrentKek(USER_ID)).rejects.toThrowError();
+
+    expect(await store.rewrapUnderCurrentKek(USER_ID)).toBe("REWRAPPED");
+    await expect(store.verifyUnderCurrentKek(USER_ID)).resolves.toBeUndefined();
+  });
+
+  it("lists every record each store holds, and nothing else", async () => {
+    const directory = await temporaryDirectory("debateai-rotation-list-");
+    const kek = await throwawayKek(directory, "kek.bin");
+    const corpusKek = await throwawayKek(directory, "corpus-kek.bin");
+    const users = join(directory, "user-deks");
+    const publications = join(directory, "publication-keys");
+    await mkdir(users, { mode: 0o700 });
+    await mkdir(publications, { mode: 0o700 });
+
+    const userStore = new FileUserDekStore(users, kek);
+    expect(await userStore.listKeyRefs()).toEqual([]);
+    const second = "44444444-4444-4444-8444-444444444444";
+    await userStore.store(USER_ID, generateDek());
+    await userStore.store(second, generateDek());
+    expect([...await userStore.listKeyRefs()].sort()).toEqual([USER_ID, second].sort());
+
+    const publicationStore = new FilePublicationKeyStore(publications, corpusKek);
+    expect(await publicationStore.listKeyRefs()).toEqual([]);
+    await publicationStore.store(PUBLICATION_REF, generateDek());
+    expect(await publicationStore.listKeyRefs()).toEqual([PUBLICATION_REF]);
+  });
+
+  it("re-wraps a publication key and verifies it under the new corpus KEK alone", async () => {
+    const directory = await temporaryDirectory("debateai-rotation-rewrap-corpus-");
+    const original = await throwawayKek(directory, "corpus-kek.bin");
+    const replacement = await throwawayKek(directory, "corpus-kek-new.bin");
+    const root = join(directory, "publication-keys");
+    await mkdir(root, { mode: 0o700 });
+    const key = generateDek();
+    await writeLegacyPublicationKeyRecord(root, original, PUBLICATION_REF, key);
+
+    const store = new FilePublicationKeyStore(root, {
+      current: replacement, previous: original
+    });
+    expect(await store.rewrapUnderCurrentKek(PUBLICATION_REF)).toBe("REWRAPPED");
+    await expect(store.verifyUnderCurrentKek(PUBLICATION_REF)).resolves.toBeUndefined();
+    expect((await new FilePublicationKeyStore(root, replacement).load(PUBLICATION_REF)).key)
+      .toEqual(key);
+    expect(await store.rewrapUnderCurrentKek(PUBLICATION_REF)).toBe("ALREADY_CURRENT");
+  });
+
+  it("leaves the original record in place when a record cannot be opened at all", async () => {
+    const directory = await temporaryDirectory("debateai-rotation-unreadable-");
+    const original = await throwawayKek(directory, "kek.bin");
+    const stranger = await throwawayKek(directory, "kek-stranger.bin");
+    const replacement = await throwawayKek(directory, "kek-new.bin");
+    const root = join(directory, "user-deks");
+    await mkdir(root, { mode: 0o700 });
+    await writeLegacyUserDekRecord(root, original, USER_ID, generateDek());
+    const before = await readFile(join(root, "users", USER_ID, "dek.v1.json"), "utf8");
+
+    // Neither held key opens it: refuse, and do not touch what is on disk.
+    const store = new FileUserDekStore(root, { current: replacement, previous: stranger });
+    await expect(store.rewrapUnderCurrentKek(USER_ID)).rejects.toThrowError();
+    expect(await readFile(join(root, "users", USER_ID, "dek.v1.json"), "utf8")).toBe(before);
+  });
+
+  it("keeps the custody modes of the record it rewrites", async () => {
+    const directory = await temporaryDirectory("debateai-rotation-modes-");
+    const original = await throwawayKek(directory, "kek.bin");
+    const replacement = await throwawayKek(directory, "kek-new.bin");
+    const root = join(directory, "user-deks");
+    await mkdir(root, { mode: 0o700 });
+    await writeLegacyUserDekRecord(root, original, USER_ID, generateDek());
+
+    const store = new FileUserDekStore(root, { current: replacement, previous: original });
+    await store.rewrapUnderCurrentKek(USER_ID);
+    const location = join(root, "users", USER_ID, "dek.v1.json");
+    expect((await stat(location)).mode & 0o777).toBe(0o600);
+    // No temporary file is left behind for a backup to pick up.
+    expect(await readdir(join(root, "users", USER_ID))).toEqual(["dek.v1.json"]);
+  });
+});
+
 describe("V-3 rotation: the support KEK, whose format cannot carry a label", () => {
   const SESSION = Object.freeze({ kind: "session", ref: USER_ID } as const);
 

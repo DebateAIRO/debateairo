@@ -1529,6 +1529,8 @@ export interface UserDekStoreFileSystem {
   readonly open: typeof open;
   readonly readFile: typeof readFile;
   readonly lstat: typeof lstat;
+  /** V-3: only the rotation enumerates the store; ordinary reads are by id. */
+  readonly readdir: typeof readdir;
   readonly rename: typeof rename;
   readonly rm: typeof rm;
   readonly stat: typeof stat;
@@ -1540,10 +1542,88 @@ const defaultUserDekStoreFileSystem: UserDekStoreFileSystem = Object.freeze({
   open,
   readFile,
   lstat,
+  readdir,
   rename,
   rm,
   stat
 });
+
+/** What one record's re-wrap did. See `RotatableKeyStore`. */
+export type KeyRotationOutcome = "REWRAPPED" | "ALREADY_CURRENT";
+
+/**
+ * V-3. The three operations a KEK rotation needs from a key store, and nothing
+ * else. `verifyUnderCurrentKek` deliberately returns nothing: the rotation must
+ * never hold plaintext key material, so each store opens its own record, proves
+ * it opens, and zeroes what it read before returning.
+ */
+export interface RotatableKeyStore {
+  listKeyRefs(): Promise<readonly string[]>;
+  rewrapUnderCurrentKek(ref: string): Promise<KeyRotationOutcome>;
+  verifyUnderCurrentKek(ref: string): Promise<void>;
+}
+
+/**
+ * Replaces one already-published record in place. The directory exists, so this
+ * is deliberately NOT the create path: write a temporary beside it, fsync,
+ * rename over the old name, fsync the directory. The rename is atomic, so an
+ * interrupted rotation leaves the ORIGINAL record intact and the pass simply
+ * re-does that record — which is what "resumable" means here.
+ */
+async function republishRecord(
+  root: string,
+  directory: string,
+  location: string,
+  payload: string,
+  fileSystem: Pick<UserDekStoreFileSystem, "chmod" | "open" | "rename" | "rm" | "stat">
+): Promise<void> {
+  const modes = await custodyWriteModes(root, fileSystem);
+  // A distinct suffix from the create path's, so a rotation and a concurrent
+  // first write can never contend for one temporary name.
+  const temporary = `${location}.rotate.tmp`;
+  let file: Awaited<ReturnType<typeof open>> | undefined;
+  try {
+    await fileSystem.rm(temporary, { force: true });
+    file = await fileSystem.open(temporary, "wx", modes.file);
+    await file.writeFile(payload, "utf8");
+    await fileSystem.chmod(temporary, modes.file);
+    await file.sync();
+    await file.close();
+    file = undefined;
+    await fileSystem.rename(temporary, location);
+    const directoryHandle = await fileSystem.open(directory, "r");
+    try {
+      await directoryHandle.sync();
+    } finally {
+      await directoryHandle.close();
+    }
+  } catch (error) {
+    if (file !== undefined) {
+      try { await file.close(); } catch { /* the throw below is the real fault */ }
+    }
+    try { await fileSystem.rm(temporary, { force: true }); } catch { /* as above */ }
+    throw error;
+  }
+}
+
+/** The sub-directory names of `parent` that are canonical UUIDs, sorted. */
+async function listRecordRefs(
+  parent: string,
+  fileSystem: Pick<UserDekStoreFileSystem, "readdir">,
+  accepts: (name: string) => boolean
+): Promise<readonly string[]> {
+  let entries: Dirent<string>[];
+  try {
+    entries = await fileSystem.readdir(parent, { withFileTypes: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return Object.freeze([]);
+    throw error;
+  }
+  return Object.freeze(entries
+    .filter((entry) => typeof entry !== "string" && entry.isDirectory() && accepts(entry.name))
+    .map((entry) => entry.name)
+    .sort());
+}
 
 /**
  * The async half of the custody contract (L2-F6), for the wrapped-key JSON
@@ -1650,8 +1730,11 @@ function parseRecordKekId(record: Readonly<Record<string, unknown>>): string | u
   return label;
 }
 
+const USER_DEK_STORE_USER_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function assertUserDekStoreUserId(userId: string): void {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
+  if (!USER_DEK_STORE_USER_ID.test(userId)) {
     throw new TypeError("USER_DEK_STORE_USER_ID_INVALID");
   }
 }
@@ -1697,6 +1780,55 @@ function userDekAad(userId: string): AeadAad {
   ];
 }
 
+type StoredUserDek = Readonly<{
+  /** Absent on v1 records, which are read as wrapped by the original KEK. */
+  kek_id: string | undefined;
+  wrapped_dek: CryptoEnvelope;
+}>;
+
+/**
+ * One parser for the user-DEK record, used by the read path and by the
+ * rotation, so the two can never disagree about what a valid record is.
+ */
+function parseStoredUserDek(value: unknown, userId: string): StoredUserDek {
+  if (typeof value !== "object" || value === null) throw new KekUnresolvedError();
+  const record = value as Record<string, unknown>;
+  const envelope = record.wrapped_dek;
+  const label = parseRecordKekId(record);
+  // v1 carries no kek_id and is read as "wrapped by the original KEK"; v2 names
+  // its KEK. Any other version is a record this build does not understand, and
+  // a key store fails closed on those.
+  if ((record.version !== 1 && record.version !== 2)
+    || record.user_id !== userId || record.key_id !== `user-dek:${userId}`
+    || typeof envelope !== "object" || envelope === null) {
+    throw new KekUnresolvedError();
+  }
+  const candidate = envelope as Record<string, unknown>;
+  if (candidate.v !== 1 || candidate.keyId !== `user-dek:${userId}`
+    || typeof candidate.nonce !== "string" || typeof candidate.ct !== "string"
+    || typeof candidate.tag !== "string") {
+    throw new KekUnresolvedError();
+  }
+  return Object.freeze({
+    kek_id: label,
+    wrapped_dek: candidate as unknown as CryptoEnvelope
+  });
+}
+
+function userDekRecordJson(
+  userId: string,
+  kek: KekHandle,
+  envelope: CryptoEnvelope
+): string {
+  return JSON.stringify({
+    version: 2,
+    user_id: userId,
+    key_id: envelope.keyId,
+    kek_id: kekId(kek),
+    wrapped_dek: envelope
+  });
+}
+
 export class FileUserDekStore implements ReadableUserDekStore {
   private readonly keks: KekRing;
 
@@ -1735,13 +1867,7 @@ export class FileUserDekStore implements ReadableUserDekStore {
       // Widening after the restrictive creation never exposes an open moment.
       await this.fileSystem.chmod(directory, modes.directory);
       file = await this.fileSystem.open(temporary, "wx", modes.file);
-      await file.writeFile(JSON.stringify({
-        version: 2,
-        user_id: userId,
-        key_id: envelope.keyId,
-        kek_id: kekId(this.keks.current),
-        wrapped_dek: envelope
-      }), "utf8");
+      await file.writeFile(userDekRecordJson(userId, this.keks.current, envelope), "utf8");
       await this.fileSystem.chmod(temporary, modes.file);
       await file.sync();
       await file.close();
@@ -1798,32 +1924,65 @@ export class FileUserDekStore implements ReadableUserDekStore {
     assertUserDekStoreUserId(userId);
     const location = join(this.root, "users", userId, "dek.v1.json");
     try {
-      const parsed = await readCustodyRecord(location, this.fileSystem);
-      if (typeof parsed !== "object" || parsed === null) throw new KekUnresolvedError();
-      const record = parsed as Record<string, unknown>;
-      const envelope = record.wrapped_dek;
-      // v1 carries no kek_id and is read as "wrapped by the original KEK";
-      // v2 names its KEK. Any other version is a record this build does not
-      // understand, and a key store fails closed on those.
-      const label = parseRecordKekId(record);
-      if ((record.version !== 1 && record.version !== 2)
-        || record.user_id !== userId || record.key_id !== `user-dek:${userId}`
-        || typeof envelope !== "object" || envelope === null) {
-        throw new KekUnresolvedError();
-      }
-      const candidate = envelope as Record<string, unknown>;
-      if (candidate.v !== 1 || candidate.keyId !== `user-dek:${userId}`
-        || typeof candidate.nonce !== "string" || typeof candidate.ct !== "string"
-        || typeof candidate.tag !== "string") {
-        throw new KekUnresolvedError();
-      }
+      const record = parseStoredUserDek(
+        await readCustodyRecord(location, this.fileSystem), userId
+      );
       return unwrapUnderRing(
-        this.keks, label, candidate as unknown as CryptoEnvelope, userDekAad(userId)
+        this.keks, record.kek_id, record.wrapped_dek, userDekAad(userId)
       );
     } catch (error) {
       if (error instanceof KekUnresolvedError || error instanceof CryptoAuthenticationError) throw error;
       throw new KekUnresolvedError();
     }
+  }
+
+  async listKeyRefs(): Promise<readonly string[]> {
+    return listRecordRefs(
+      join(this.root, "users"),
+      this.fileSystem,
+      (name) => USER_DEK_STORE_USER_ID.test(name)
+    );
+  }
+
+  async rewrapUnderCurrentKek(userId: string): Promise<KeyRotationOutcome> {
+    assertUserDekStoreUserId(userId);
+    const directory = join(this.root, "users", userId);
+    const location = join(directory, "dek.v1.json");
+    const record = parseStoredUserDek(
+      await readCustodyRecord(location, this.fileSystem), userId
+    );
+    // A record already labelled with the current KEK needs no work and is not
+    // even decrypted: the label is authoritative, and the verification pass at
+    // the end of the rotation opens every record anyway.
+    if (record.kek_id === kekId(this.keks.current)) return "ALREADY_CURRENT";
+    const dek = unwrapUnderRing(
+      this.keks, record.kek_id, record.wrapped_dek, userDekAad(userId)
+    );
+    try {
+      const envelope = wrapDek(this.keks.current, dek, userDekAad(userId));
+      await republishRecord(
+        this.root, directory, location,
+        userDekRecordJson(userId, this.keks.current, envelope),
+        this.fileSystem
+      );
+      return "REWRAPPED";
+    } finally {
+      dek.fill(0);
+    }
+  }
+
+  async verifyUnderCurrentKek(userId: string): Promise<void> {
+    assertUserDekStoreUserId(userId);
+    const location = join(this.root, "users", userId, "dek.v1.json");
+    const record = parseStoredUserDek(
+      await readCustodyRecord(location, this.fileSystem), userId
+    );
+    // The CURRENT key alone. Accepting the previous one here would certify a
+    // rotation that had not happened.
+    const dek = unwrapUnderRing(
+      { current: this.keks.current }, record.kek_id, record.wrapped_dek, userDekAad(userId)
+    );
+    dek.fill(0);
   }
 
   async exists(userId: string): Promise<boolean> {
@@ -2639,6 +2798,51 @@ export class FilePublicationKeyStore implements PublicationKeyStore {
     return durableRemoveDirectory(
       join(publications, publicationRef),publications,this.fileSystem
     );
+  }
+
+  async listKeyRefs(): Promise<readonly string[]> {
+    return listRecordRefs(
+      join(this.root, "publications"), this.fileSystem, (name) => UUID_V4.test(name)
+    );
+  }
+
+  async #read(publicationRef: string): Promise<StoredPublicationKey> {
+    assertPublicationRef(publicationRef);
+    const location = join(
+      this.root, "publications", publicationRef, "publication-key.v1.json"
+    );
+    return parseStoredPublicationKey(
+      await readCustodyRecord(location, this.fileSystem), publicationRef
+    );
+  }
+
+  async rewrapUnderCurrentKek(publicationRef: string): Promise<KeyRotationOutcome> {
+    const record = await this.#read(publicationRef);
+    if (record.kek_id === kekId(this.keks.current)) return "ALREADY_CURRENT";
+    const key = unwrapUnderRing(
+      this.keks, record.kek_id, record.wrapped_publication_key,
+      publicationKeyAad(publicationRef)
+    );
+    try {
+      const directory = join(this.root, "publications", publicationRef);
+      await republishRecord(
+        this.root, directory, join(directory, "publication-key.v1.json"),
+        JSON.stringify(wrapPublicationKey(this.keks.current, publicationRef, key)),
+        this.fileSystem
+      );
+      return "REWRAPPED";
+    } finally {
+      key.fill(0);
+    }
+  }
+
+  async verifyUnderCurrentKek(publicationRef: string): Promise<void> {
+    const record = await this.#read(publicationRef);
+    const key = unwrapUnderRing(
+      { current: this.keks.current }, record.kek_id, record.wrapped_publication_key,
+      publicationKeyAad(publicationRef)
+    );
+    key.fill(0);
   }
 }
 
