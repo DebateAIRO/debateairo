@@ -44,8 +44,9 @@ const CASE = /\b(?:human\s+case|support\s+case|case|caz(?:ul)?)\b/u;
 const CASE_CREATION = /\b(?:create[ds]?|open(?:s|ed)?|cre(?:eaza|at|are)|deschide)\b/u;
 const CASE_CREATION_NEGATION = /\b(?:does\s+not|doesn['’]?t|did\s+not|never|cannot|can['’]?t|nu)\b[^.!?;\n]{0,40}\b(?:create|open|cre(?:eaza|a)|deschide)\b/u;
 const FINANCIAL_CAPABILITY = /\b(?:pay(?:ing|ment|ments|ed|s)?|purchas\p{L}*|checkout|buy(?:ing|s)?|plat\p{L}*|cump\p{L}*)\b/gu;
-const FINANCIAL_NEGATION_BEFORE = /\b(?:no|not|never|cannot|can['’]?t|does\s+not|doesn['’]?t|did\s+not|is\s+not|isn['’]?t|without|unsupported|unavailable|unknown|unverified|nu|fara|niciun|nicio|indisponibil|neverificat)\b/u;
-const FINANCIAL_NEGATION_AFTER = /^\s*(?:is\s+not|isn['’]?t|cannot|can['’]?t|does\s+not|doesn['’]?t|nu\s+(?:este|e|sunt)|(?:is\s+)?(?:unsupported|unavailable|unknown|unverified)|(?:este\s+)?(?:indisponibil|neverificat))\b/u;
+const FINANCIAL_NEGATION_BEFORE = /\b(?:no|not|never|cannot|can['’]?t|does\s+not|doesn['’]?t|did\s+not|is\s+not|isn['’]?t|without|unsupported|unavailable|unknown|unverified|nu|fara|niciun|nicio|indisponibil|neverificat)\b/gu;
+const FINANCIAL_NEGATION_AFTER = /^\s*(?:(?:(?:may|might|can|could|would|should)\s+)?(?:not|never)|(?:is|are|was|were|remains?)\s+not|(?:poate(?:\s+sa)?|ar\s+putea(?:\s+sa)?)\s+nu|nu\s+(?:este|e|sunt)|(?:is\s+)?(?:unsupported|unavailable|unknown|unverified)|(?:este\s+)?(?:indisponibil|neverificat))\b/u;
+const FINANCIAL_SENTENCE_BOUNDARY = /[.!?;\n:]+|[—–]/u;
 
 function authorityText(value: string): string {
   return value.normalize("NFKD").replace(/\p{M}/gu,"").toLocaleLowerCase("en-US");
@@ -62,16 +63,24 @@ function conflatesCaseAndEmail(value: string): boolean {
   );
 }
 
+function hasLocalFinancialNegationBefore(value: string): boolean {
+  FINANCIAL_NEGATION_BEFORE.lastIndex = 0;
+  const negations = [...value.matchAll(FINANCIAL_NEGATION_BEFORE)];
+  const last = negations.at(-1);
+  if (last === undefined) return false;
+  const afterNegation = value.slice((last.index ?? 0) + last[0].length);
+  FINANCIAL_CAPABILITY.lastIndex = 0;
+  return !FINANCIAL_CAPABILITY.test(afterNegation);
+}
+
 function hasUnsupportedPositiveFinancialClaim(value: string): boolean {
-  return authorityText(value).split(
-    /[.!?;\n]+|\b(?:and|but|whereas|while|si|dar|iar|insa|in timp ce)\b/u
-  ).some((clause) => {
+  return authorityText(value).split(FINANCIAL_SENTENCE_BOUNDARY).some((clause) => {
     FINANCIAL_CAPABILITY.lastIndex = 0;
     return [...clause.matchAll(FINANCIAL_CAPABILITY)].some((match) => {
       const at = match.index ?? 0;
       const before = clause.slice(Math.max(0,at - 96),at);
       const after = clause.slice(at + match[0].length,at + match[0].length + 64);
-      return !FINANCIAL_NEGATION_BEFORE.test(before)
+      return !hasLocalFinancialNegationBefore(before)
         && !FINANCIAL_NEGATION_AFTER.test(after);
     });
   });
