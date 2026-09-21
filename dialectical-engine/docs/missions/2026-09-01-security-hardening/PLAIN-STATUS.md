@@ -1,6 +1,51 @@
 # Security work — where we stand, in plain words
 
-*Written 2026-09-18 for the owner, updated the same night after the merge. This is the easy-to-read companion to the technical records in this folder. Every item links to the file that holds the detail.*
+*Written 2026-09-18 for the owner. **Last updated: 21 September 2026, late evening.** This is the easy-to-read companion to the technical records in this folder. Every item links to the file that holds the detail. The newest news is in the first section; the dated sections below it are the history.*
+
+## Right now — 21 September, late evening
+
+**A new AI session took over today**, starting from the handoff note ([HANDOFF-PROMPT.md](HANDOFF-PROMPT.md)). Before doing anything it checked that the state matches the note:
+
+| Checked | Result |
+|---|---|
+| The work branch | `security/dev-sync-2026-09-18`, clean, **nothing pushed anywhere** |
+| This Mac's Node version (Node is the program that runs the code) | 26.8.2 — exactly what `dev` now requires |
+| `dev`, the main V3 line | has moved on by 36 commits since this branch last absorbed it |
+
+### Your decisions — progress
+
+We are going through them together, one at a time. Each answer is written into [V-DECISIONS-PACKET.md](V-DECISIONS-PACKET.md) the moment you give it, so an interruption loses nothing. The plain-language explanation of every decision is [DECISIONS-EXPLAINED.md](DECISIONS-EXPLAINED.md).
+
+| Group | What is in it | Answered |
+|---|---|---|
+| Ruled on 18 Sept | V-15 (the server starts with an empty database) and V-23 (we look at the Cloudflare integration together, at the end) | 2 of 2 |
+| A — routine | thirteen small ones | **13 of 13 — all "yes", 21 Sept** |
+| B — switches on your GitHub account | GitHub's protections; which branch GitHub treats as the main one; the 527 MB of recordings in the repository | 0 of 3 |
+| C — real choices that add work | changing the master key; two server accounts sharing one key folder; the GPU settings; **how the server reaches the AI models**; and three more | 0 of 7 |
+| D — new, from the re-check | support chat on account deletion; a money ceiling per debate; the monitoring agent's permissions; how the support chat reaches the model | 0 of 4 |
+
+(The numbering has no "V-27" — it was skipped. The thirty are V-1 to V-30 without 27, plus one called V-6b.)
+
+**One recommendation changed before you ruled on it — V-25, the memory test.** One test measures how much memory the login limiter uses during a flood and compares it with a number measured once, on one laptop, under Node 22. The old advice was "install Node 22 on this Mac". That stopped making sense when the project itself moved to Node 26. What you approved instead: measure again under Node 26 — once on this Mac, once on GitHub's Linux machines — and record each number as a *new version* of the setting. The old Node 22 number stays as history; a sealed value is never edited, only superseded.
+
+### What is owed before anything can be merged: a second bringing-up-to-date with `dev`
+
+The other workstream finished on 21 September. It moved the whole project to a newer Node and a newer test tool, and it deliberately did not take this security branch in. So three settings now disagree, and they need judgement rather than a mechanical merge:
+
+| Setting | This branch | `dev` now | What I will do |
+|---|---|---|---|
+| Node | 22.23.1 | 26.8.2 or newer | take `dev`'s — it was their deliberate decision |
+| vitest (the test tool) | 4.1.11 | 5.0.1 | take `dev`'s, then re-check that the old vitest advisory is really gone |
+| fastify (the web-server library) | 5.12.1 — the security fix | 5.11.2 — the version with known advisories | **keep this branch's**, or the known holes come back |
+
+### Order of work from here
+
+1. Finish your decisions (in progress).
+2. The second bringing-up-to-date with `dev`, then re-run every check.
+3. The remaining fix packages, plus whatever you approve in Groups C and D.
+4. Update pull request #8 — only when you say "push".
+5. The GitHub switches — only when you say "go" for each one.
+6. The new server.
 
 ## The one-paragraph version
 
@@ -44,7 +89,7 @@ Full list of findings and what happened to each: [findings/CONSOLIDATED.md](find
 
 Eight local commits of work, from `6fb99707` (the merge) to `979e009f`, plus the update of these two documents. The technical record of every decision is [DEV-SYNC-2026-09-18.md](DEV-SYNC-2026-09-18.md).
 
-**Two honest notes.** (1) I made one slip along the way — a test I added in the wrong place broke the compile check; I caught it on the next check and repaired it in the following commit. (2) This Mac runs Node 26, while the project pins Node 22.23.1. One measurement test times out here because of that (it does the same on untouched `dev`). Installing Node 22.23.1 on this Mac — already on your owed list — would make local results match GitHub's.
+**Two honest notes.** (1) I made one slip along the way — a test I added in the wrong place broke the compile check; I caught it on the next check and repaired it in the following commit. (2) This Mac runs Node 26, while the project pins Node 22.23.1. One measurement test times out here because of that (it does the same on untouched `dev`). Installing Node 22.23.1 on this Mac — already on your owed list — would make local results match GitHub's. *(Superseded on 21 September: the project itself has since moved to Node 26, and this Mac now runs exactly that. Nothing to install. See "Right now" at the top.)*
 
 ## What was done on 19 September — the re-check, and what it found
 
@@ -121,16 +166,16 @@ The 656 new commits arrived after the inspection. The biggest piece by far is th
 ### 3. GitHub's own scanner left four notes on pull request #8
 Three are marked "high: missing rate limiting" on login, e-mail verification and the MFA code check. The audit's own table shows all three **are** rate-limited — by the project's built-in limiter, which the scanner cannot recognise. They are false alarms and should be dismissed on GitHub with that reason written down (that changes something on GitHub, so it waits for your OK). The fourth is a loose text pattern in a test file — trivial to tidy.
 
-### 4. Your 26 decisions — see the next section
+### 4. Your 30 decisions (26 from the first check, 4 from the re-check) — see "Your decisions" below, and the progress table at the top
 
 ### 5. Then: the move to the new server
 The deployment kit exists but was written before the support chat and the monitoring agent. It needs a refresh: their settings, a fifth master key in the backup-and-escrow list (without it, backed-up support conversations could never be decrypted), a service definition for the monitoring agent, and the step that publishes the settings register on the server (without the "usage caps" setting the API deliberately refuses to start). Three of your decisions block go-live (marked **blocks go-live** below), and I will need the server's details.
 
 ## Your decisions
 
-**Each decision is explained in full — what it is about, my answer, the alternatives, the cost — in [DECISIONS-EXPLAINED.md](DECISIONS-EXPLAINED.md).** The technical version with exact values is [V-DECISIONS-PACKET.md](V-DECISIONS-PACKET.md). Below, the short form, grouped so you can answer quickly. Two are already ruled (V-15: the server starts empty, no sweep; V-23: Cloudflare together, at the end). You can reply "yes to all of group A" and only discuss the ones you want to.
+**Each decision is explained in full — what it is about, my answer, the alternatives, the cost — in [DECISIONS-EXPLAINED.md](DECISIONS-EXPLAINED.md).** The technical version with exact values is [V-DECISIONS-PACKET.md](V-DECISIONS-PACKET.md). Below, the short form, by group. Two were ruled on 18 September (V-15: the server starts empty, no sweep; V-23: Cloudflare together, at the end). Progress is tracked in the table at the top of this file.
 
-### Group A — routine; I recommend "yes" to all thirteen
+### Group A — routine — **all thirteen answered "yes" on 21 September**
 
 | ID | In plain words | Recommended |
 |---|---|---|
@@ -138,15 +183,15 @@ The deployment kit exists but was written before the support chat and the monito
 | V-12 | Same idea for "forgot my password": 3 requests per hour per e-mail address, 15 per internet address. | Accept |
 | V-14 | Make "a password can be at most 1,024 characters" an official policy line instead of an unwritten limit. | Yes |
 | V-13 | A database helper tool nobody used was removed because it pulled in a vulnerable package. | Accept |
-| V-4 | About 12 tests were already failing before the security work began. The new automatic check fails only when a *new* test breaks; the list of old failures is written down and may only shrink. Otherwise every change would be blocked forever. | Adopt |
+| V-4 | About 12 tests were already failing before the security work began. The new automatic check fails only when a *new* test breaks; the list of old failures is written down and may only shrink. Otherwise every change would be blocked forever. | Adopt — plus: a listed test that passes three runs in a row makes the check fail until its entry is deleted, so a stale entry cannot hide a real problem |
 | V-24 | The secret scanner flagged 13 old items in the history. All 13 were looked at: none is a real secret (fingerprints, throw-away development keys, sample text). Each is recorded with its reason. | Accept |
 | V-8 | A never-activated folder of "pre-push checks" that would block every push if someone turned it on. | Delete it |
-| V-18 | 37 temporary exceptions to the "packages must be 7 days old" rule, each with an expiry date. Both dates (2 and 7 Sept) have now passed. | Remove them now |
+| V-18 | 37 temporary exceptions to the "packages must be 7 days old" rule, each with an expiry date. Both dates (2 and 7 Sept) have now passed. Checked 21 Sept: all 37 are still in the file, plus 3 newer ones with no expiry note. | Remove the 37 now; remove each of the 3 newer ones once it is confirmed to be over 7 days old |
 | V-16 | A fine point of how answer versions are digitally sealed. Good enough today; note it for the next rewrite of that part. | Accept for now |
-| V-17 | One internal description of the database was not updated with two new columns. May already be done on `dev`. | Fix during the merge |
+| V-17 | One internal description of the database was not updated with two new columns. Checked 21 Sept: still missing. | Update it, with a test that compares it against the real database so it cannot drift again |
 | V-10 | Grading only: do other user accounts on your own Mac count as a threat? | No on your Mac; yes on the server |
 | V-21 | Three leftovers that only affect the development setup, not the real site. | Tidy in a follow-up |
-| V-25 | One memory-use test only makes sense on the Mac it was measured on; on GitHub's Linux machines it is skipped (loudly). | Measure once per platform so it runs everywhere |
+| V-25 | One memory-use test only makes sense on the Mac *and the Node version* it was measured on; on GitHub's Linux machines it is skipped (loudly). | **Changed on 21 Sept, then approved:** measure again under Node 26, once per platform, each as a new version of the setting. No Node 22 install. See "Right now" at the top |
 
 ### Group B — switches on your GitHub and Cloudflare accounts (only you can authorise; all reversible)
 
@@ -167,10 +212,21 @@ The deployment kit exists but was written before the support chat and the monito
 | V-9 — **blocks go-live** | The shape of production: (a) the database installed directly on the server rather than inside Docker — the deployment kit already assumes this; (b) no admin dashboard for the job system exposed in production; (c) **the big one: how will the server reach the AI models?** In development the engine talks to them through command-line tools logged in with personal subscriptions — that is development-only code. A server needs a proper path (for example paid API keys), and that choice decides where those keys live and how spending is capped. | (a) yes, (b) yes, (c) needs a conversation | (c) depends on the answer |
 | V-11 | Seven findings in the part that talks to the AI models. The main one: a model's answer is pasted as-is into the next model's instructions, so an answer containing "ignore your instructions and…" could steer the next model. They were meant to be handed to the other workstream because it was rewriting those files; its records show no sign they were picked up. That workstream is finished now, so the files are stable. | Do them here, as the next work package after the merge | 1–2 days |
 | V-6 | After the verdict text was encrypted, four more tables still hold pieces of debate text in readable form (progress events, per-segment results and two others). | Encrypt them too, same method | about a day |
-| V-15 | Rows written *before* the encryption fix still hold readable verdict text. **My note:** if the new server starts with an empty database, there are no old rows there and this does not matter. It only matters if you plan to move existing debates across. | Tell me whether old data moves to the server | small script if yes |
+| V-15 — **ruled 18 Sept** | Rows written *before* the encryption fix still hold readable verdict text. You ruled: existing debates are development data and do not move; the new server starts with an empty database. | Nothing to do. If data is ever moved later, the clean-up script runs first | none |
 | V-22 | A person who could already write to the database could plant a password record that makes the server use four times the normal memory per login check. | Tighten the accepted range | small |
 
+### Group D — four new decisions from the 19 September re-check
+
+| ID | In plain words | Recommended | Cost |
+|---|---|---|---|
+| V-26 | When someone deletes their account, their support-chat conversation stays behind. (The only command that could erase it had never worked; that part is now fixed.) | Make account deletion erase the support conversation too — one deletion, everything gone | small |
+| V-28 | Your cap limits *how many* debates start, not what one debate can *cost*. Worst case measured: up to 2,748 AI calls for one deep debate. Like a phone plan that limits the number of calls but not their length. | Before any paid AI key is configured, set a per-debate ceiling in tokens or in money | half a day, plus your choice of the number |
+| V-29 | The monitoring agent's database login can read the text of every query on the server, though it only ever runs one narrow query of its own. | Give it exactly the permissions that one query needs | small |
+| V-30 | The support chat reaches the AI model through the development command-line tools, which expose the visitor's message to other accounts on the same machine. Harmless on your single-user Macs; a real leak on a shared server. | Rule that those tools are development-only and never run on the server (ties into V-9) | none in development |
+
 ## One thing this mission did not cover
+
+**Ruled on 18 September:** the old engine gets no separate check-up, because V3 on the new server replaces it. The paragraph below is kept as the record of what was asked.
 
 All of the above is about the **new engine (V3)**. The site that is live today at dezbatere.ro runs the **old engine (V2)** from this Mac through a Cloudflare tunnel, and it was not part of this inspection. If the plan is for V3 on the new server to replace it soon, that is fine. If V2 stays live for a while, it deserves its own, smaller check-up.
 

@@ -20,6 +20,8 @@ Something in your Cloudflare account tries to build the site on every push and f
 
 ## Group A — routine. My answer to all thirteen is "yes"
 
+**Ruled 21 September 2026: "yes to all" — all thirteen, with V-25 in its updated form (see that item).** Each ruling is written in its row of [V-DECISIONS-PACKET.md](V-DECISIONS-PACKET.md).
+
 ### V-1 — How much use is "too much"? (usage caps)
 **About.** Every debate someone starts costs real money in AI calls. Before the security work, one account could start an unlimited number of debates — a runaway script or a hostile user could run up a large bill in a night. The fix adds caps: **20 new debates per hour per account**, and **120 public page reads per 15 minutes per internet address** (each public read decrypts content, which costs server work). Past the cap, the person sees "too many requests, try again in a few minutes", with the exact wait time.
 **Example.** A keen user who starts a debate every five minutes stays under the cap. A script firing one per second hits it after 20 seconds. A classroom of 30 pupils on one school internet address browsing the public library could hit the 120-per-15-minutes reading cap — that's the one number I'd watch after launch.
@@ -75,6 +77,7 @@ Something in your Cloudflare account tries to build the site on every push and f
 ### V-25 — A memory measurement that only works on one machine
 **About.** One test measures how much memory the login rate-limiter uses under a flood and compares it against a number sealed on the laptop where it was measured (Node 22 on Apple silicon). On GitHub's Linux machines it's skipped loudly. On this Mac mini it fails — because the Mac runs Node 26, which the number was never sealed for; the measurement times out.
 **My answer.** Two things: seal the number per platform *and* per Node version so the test can run everywhere it has a number; and install the project's pinned Node 22.23.1 on this Mac (already on your owed list), which makes local results match GitHub's.
+**Updated 21 September — this is the form you approved.** The project itself has since moved to Node 26 (the other workstream's deliberate decision), and this Mac now runs exactly that, so "install Node 22" is dropped. Instead: measure again under Node 26 — once on this Mac, once on GitHub's Linux machines — and record each number as a *new version* of the setting, keyed by platform and Node version. The old Node 22 number stays as history; a sealed value is superseded, never edited.
 
 ---
 
