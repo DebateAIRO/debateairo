@@ -4,6 +4,7 @@ import type { PostgresIdentityRepository, AuthSourceContext } from "@debateai/db
 import type { AuthPolicy, AuthRouteLimit } from "@debateai/register";
 import {
   Argon2InfrastructureError,
+  argon2EnvelopeRefusal,
   createEmailBlindIndex,
   encrypt,
   generateDek,
@@ -47,6 +48,28 @@ export interface RegistrationApplication {
  * envelope to a pool failure that never passed through this service.
  */
 export const AUTH_RETRYABLE_UNAVAILABLE_CODE = "AUTH_TEMPORARILY_UNAVAILABLE";
+
+/**
+ * V-22. The gate every stored Argon2id record passes before it is verified.
+ *
+ * Only the caller knows which sealed cost governs a given record — a password
+ * hash answers to `passwordPolicy`, a recovery-code hash to the MFA policy — so
+ * the ceiling is derived from the cost passed in here, never from one global
+ * number. A refused record is NOT verified, which on every route is the same
+ * outcome as a wrong credential: the visitor learns nothing new, the audit row
+ * is written exactly as it would have been, and no worker slot or Argon2 arena
+ * is ever occupied by a planted envelope. The operator gets the typed code.
+ */
+export function storedArgon2EnvelopeWithinPolicy(
+  encodedHash: string,
+  cost: Readonly<{ memoryCostKiB: number; timeCost: number; parallelism: number }>,
+  use: "password" | "recovery-code"
+): boolean {
+  const refusal = argon2EnvelopeRefusal(encodedHash, cost);
+  if (refusal === undefined) return true;
+  console.error(`[${refusal}] use=${use}`);
+  return false;
+}
 
 export class AuthFlowError extends Error {
   constructor(readonly code:

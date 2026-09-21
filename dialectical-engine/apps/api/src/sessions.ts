@@ -27,7 +27,7 @@ import {
   type ReadableUserDekStore,
   type TokenKind
 } from "@debateai/crypto";
-import { AuthFlowError } from "./registration.js";
+import { AuthFlowError, storedArgon2EnvelopeWithinPolicy } from "./registration.js";
 import { MfaVerificationLimiter } from "./mfa.js";
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
@@ -314,7 +314,13 @@ export class SessionService implements SessionApplication {
         createEmailBlindIndex(this.dependencies.blindIndexKey, normalizedEmail)
       );
       const passwordHash = identity?.passwordHash ?? this.dependencies.dummyPasswordHash;
-      const verified = await verifyPassword(this.dependencies.argon2, passwordHash, input.password);
+      // V-22: a stored envelope over twice the password policy is refused here,
+      // before a worker slot or an Argon2 arena exists.
+      // V-22: a stored envelope over twice the password policy is refused here,
+      // before a worker slot or an Argon2 arena exists.
+      const verified = storedArgon2EnvelopeWithinPolicy(
+        passwordHash, this.dependencies.authPolicy.password.argon2id, "password"
+      ) && await verifyPassword(this.dependencies.argon2, passwordHash, input.password);
       if (!verified || identity === null) {
         await this.dependencies.repository.recordLoginFailure({
           ...(identity === null ? {} : { actorToken: identity.auditToken }),
@@ -431,6 +437,10 @@ export class SessionService implements SessionApplication {
           challengeTokenHash!, recoveryCodeSlot(recoveryCode)
         );
         const verified = record !== null
+          // V-22: twice the MFA recovery-code policy, derived from that policy.
+          && storedArgon2EnvelopeWithinPolicy(
+            record.codeHash, this.dependencies.mfaPolicy.recoveryCodes.argon2id, "recovery-code"
+          )
           && await verifyRecoveryCode(this.dependencies.argon2, record.codeHash, recoveryCode);
         if (verified && record !== null) {
           replacementRecoveryCode = generateRecoveryCode(record.codeSlot);
@@ -553,6 +563,10 @@ export class SessionService implements SessionApplication {
         throw new AuthFlowError("MFA_RATE_LIMITED");
       }
       const passwordVerified = identity !== null
+        // V-22, as in beginLogin: the password policy governs this record.
+        && storedArgon2EnvelopeWithinPolicy(
+          identity.passwordHash, this.dependencies.authPolicy.password.argon2id, "password"
+        )
         && await verifyPassword(this.dependencies.argon2, identity.passwordHash, input.password);
       if (!passwordVerified || identity === null) throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
       const challenge: LoginChallengeRecord = Object.freeze({

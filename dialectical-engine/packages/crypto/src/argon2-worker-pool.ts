@@ -114,6 +114,62 @@ export function parseEncodedArgon2id(encoded: string): Argon2idEncodingParameter
 }
 
 /**
+ * V-22, ruled 2026-09-22: a STORED envelope may not exceed twice the sealed
+ * policy that governs its own use.
+ *
+ * The table above is one global envelope — it has to be, because it is applied
+ * where no policy is in hand (here, and in the worker). It accepts 4x the
+ * password cost, which is what let a DB-write actor plant a 256 MiB record. The
+ * ceiling below is the per-use one: Argon2id runs under several sealed costs
+ * (password, MFA recovery codes, audit source hashing), so the caller that
+ * knows WHICH cost governs the record passes it in. Twice, not once, so that
+ * records minted under an older, higher cost still verify if the ruled cost is
+ * ever lowered — no real user is locked out by a policy change.
+ */
+export const ARGON2_POLICY_ENVELOPE_MULTIPLIER = 2;
+
+/** The sealed cost a stored record is measured against. Shape of every ruled argon2id row. */
+export interface Argon2idPolicyCost {
+  readonly memoryCostKiB: number;
+  readonly timeCost: number;
+  readonly parallelism: number;
+}
+
+function usablePolicyCost(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+/**
+ * The typed refusal for a stored record whose memory, time or parallelism
+ * exceeds `ARGON2_POLICY_ENVELOPE_MULTIPLIER` times its governing policy, and
+ * `undefined` for a record this check admits.
+ *
+ * Deliberately decided on the PARSED costs alone: no salt, no digest, no
+ * password, no allocation — so it can be answered before a worker slot is
+ * occupied. An encoding the global envelope already refuses is not this
+ * check's question and stays `undefined`, so the existing parse refusal keeps
+ * its own meaning. A policy cost that is not a usable positive integer is
+ * refused rather than turned into a ceiling.
+ */
+export function argon2EnvelopeRefusal(
+  encodedHash: string,
+  cost: Argon2idPolicyCost
+): "ARGON2_ENVELOPE_EXCEEDS_POLICY" | undefined {
+  const parsed = parseEncodedArgon2id(encodedHash);
+  if (parsed === undefined) return undefined;
+  if (!usablePolicyCost(cost?.memoryCostKiB) || !usablePolicyCost(cost.timeCost)
+    || !usablePolicyCost(cost.parallelism)) {
+    return "ARGON2_ENVELOPE_EXCEEDS_POLICY";
+  }
+  const multiplier = ARGON2_POLICY_ENVELOPE_MULTIPLIER;
+  return parsed.memoryCostKiB > cost.memoryCostKiB * multiplier
+    || parsed.timeCost > cost.timeCost * multiplier
+    || parsed.parallelism > cost.parallelism * multiplier
+    ? "ARGON2_ENVELOPE_EXCEEDS_POLICY"
+    : undefined;
+}
+
+/**
  * PROVISIONAL engineering bounds — candidate values only.
  *
  * These are NOT ruled auth policy and are deliberately not persisted as a
