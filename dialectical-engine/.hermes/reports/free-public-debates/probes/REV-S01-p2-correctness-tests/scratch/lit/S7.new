@@ -1,0 +1,1 @@
+      IF v_latest_publication_ref IS NULL THEN

@@ -1,0 +1,3 @@
+export const PublicDebateSchema = z.object({
+  rev_probe_required_key: z.string(),
+  public_ref: z.uuid(),

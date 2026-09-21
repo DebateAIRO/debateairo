@@ -1,0 +1,6 @@
+    next_attempt_at=v_now+LEAST(
+      interval '30 seconds' * power(
+        2.0,LEAST(core.free_public_auto_publish_work.attempt_count,7)
+      ),
+      interval '1 hour'
+    ),

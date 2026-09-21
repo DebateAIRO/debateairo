@@ -23,3 +23,5 @@
 | 2026-09-21 04:47 | REQ-REV p3 | t_614cf0c1 | REWORK at the cap → V-11 (acceptance step 4 total); findings ADDRESSED; FIX-A unblocked on the SPEC side |
 | 2026-09-21 04:48 | FIX-B | t_544048e9 | READY consumed — `b93b103e` (0069); verified under both locales; FIX-A base measured |
 | 2026-09-21 05:18 | FIX-A | t_728887e1 | READY consumed — `c358d494` (0070); slice verified at head under both locales, zero skips |
+
+- 2026-09-21 — REV(S01) pass 2 (scoped) = **PASS** (3/3 lenses) at `c358d494` · union `reviews/REV-S01-p2-UNION.md` · residue t_09a194c6 · t_154f3a17 · t_4b66f080 · **next: TEST(S01) — V's personal walk of SPEC-v3 §4 (step 4 per DECISIONS §31). Not Done until V's veto.**

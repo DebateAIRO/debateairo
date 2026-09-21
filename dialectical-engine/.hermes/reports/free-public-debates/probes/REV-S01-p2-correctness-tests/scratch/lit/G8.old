@@ -1,0 +1,5 @@
+    ) OR NOT core.run_is_free_public_bound(p_run_id)
+    OR NOT EXISTS (
+      SELECT 1 FROM core.free_public_auto_publish_work AS work
+      WHERE work.run_id=p_run_id AND work.cleared_at IS NULL
+    ) THEN

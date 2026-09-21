@@ -1,0 +1,5 @@
+    })) return null;
+    const publicDebate = publicDebateFromAnswer(
+      publicationRef,pseudonym,input.answer,occurredAt
+    );
+    let prepared: Awaited<ReturnType<PublicationCipher["create"]>>;

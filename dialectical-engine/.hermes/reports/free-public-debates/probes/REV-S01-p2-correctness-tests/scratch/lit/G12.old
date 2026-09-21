@@ -1,0 +1,3 @@
+    const inspection = await options.application.readInspection(
+      answerId.data, request.session, version, ownershipFor(request)
+    );

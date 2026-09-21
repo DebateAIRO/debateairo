@@ -1,0 +1,1 @@
+if (input.answer.terminal === "BLOCKED_NEVER") {

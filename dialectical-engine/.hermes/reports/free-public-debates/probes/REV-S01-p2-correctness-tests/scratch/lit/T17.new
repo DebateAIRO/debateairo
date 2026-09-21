@@ -1,0 +1,12 @@
+      const unpublished = await options.publications.unpublish({
+        runId: runId.data,
+        authenticated,
+        grantToken: input.step_up_grant,
+        source: sourceFor(request)
+      });
+      if (visibility !== null
+        && visibility.state === "PUBLISHED"
+        && options.publications.isFreePublicBound !== undefined
+        && await options.publications.isFreePublicBound(runId.data)) {
+        return reply.status(409).send({ error: "FREE_DEBATE_CANNOT_BE_UNPUBLISHED" });
+      }

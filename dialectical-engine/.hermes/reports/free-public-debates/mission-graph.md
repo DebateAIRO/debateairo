@@ -1,0 +1,105 @@
+```mermaid
+flowchart LR
+  t_2e15bf90[["(V) S01 — a Free debate is public from the moment its answer is served"]]:::slice
+  t_5b60146e["(claude-opus-5) REQ — mission compass + frozen SPEC(S01)"]:::done
+  t_cee53fe7["(grok-4.6) REQ-REV — blind review of the SPEC and the REQ packet"]:::done
+  t_eff46252["(grok-4.6) ARCH S01 — PLAN, clusters, boundaries, ADRs"]:::done
+  t_b82d832e["(claude-opus-5) ARCH-REV S01 — blind review of PLAN(S01) and the ARCH "]:::done
+  t_0ecdb3a6["(orchestrator) FINDING REQ-01/P1+P2 — packet inputs: a dead range (02-"]:::ready
+  t_be93ad6e["(orchestrator) FINDING REQ-01/P3 — COMMON §2 asked an Agent-tool seat "]:::done
+  t_1b89661c["(orchestrator) FINDING REQ-01/P4 — REQ charge 5 sketched 'see unpublis"]:::done
+  t_9e5427b1["(claude-opus-5) REQ-FIX p2 — SPEC-v2(S01) after REQ-REV p1 REWORK (B1-"]:::done
+  t_7c3bd32e["(grok-4.6) REQ-REV p2 — scoped to the p1 findings and SPEC-v2"]:::done
+  t_a281c4be["(REQ-REV-01) FINDINGS p1 — B1 R-8 vs R-9 contradiction · B2 R-11 unnam"]:::done
+  t_5b665910["(orchestrator) FINDING REQ-REV-01/N8 — packet spans MISLABELED (index."]:::done
+  t_e85e12a3["(orchestrator) FINDING REQ-FIX-02/P1-P4 — REQ-FIX template: 're-run th"]:::ready
+  t_9bbd4b39["(REQ-REV-02) FINDINGS p2 (non-blocking) — N1-p2 rows V-1…V-5 stale aft"]:::done
+  t_6fb82ae4["(orchestrator) FINDING ARCH-S01/P1-P4 — ARCH packet: charge 1 said V-1"]:::ready
+  t_552c5401["(grok-4.6) ARCH-FIX S01 p2 — PLAN revised after ARCH-REV p1 REWORK (B1"]:::done
+  t_616ddb75["(claude-opus-5) ARCH-REV S01 p2 — scoped to the p1 findings and the re"]:::done
+  t_047a21bf["(ARCH-REV-S01) FINDINGS p1 — B1 no callable system-audit path (REVOKE "]:::done
+  t_95333b69["(orchestrator) FINDING ARCH-REV-S01/P5-P8 — ARCH packet: 0061:1-70 nam"]:::ready
+  t_7b0c12ad["(grok-4.6) ARCH-FIX S01 p3 — PLAN Revision 3 after ARCH-REV p2 REWORK "]:::done
+  t_cfd2f03b["(claude-opus-5) ARCH-REV S01 p3 — FINAL scoped pass (a REWORK here is "]:::done
+  t_9bab4a9d["(ARCH-REV-S01-02) FINDINGS p2 — B1-p2 0067 grants EXECUTE on system ke"]:::done
+  t_0e8b69ee["(ARCH-REV-S01-03) FINDINGS p3 (non-blocking) — N1-p3 intent table lack"]:::done
+  t_35c9b921["(codex gpt-5.6-sol) BUILD S01-C1 — binding column and predicate (migra"]:::done
+  t_57af421c["(codex gpt-5.6-sol) BUILD S01-C2 — system publish, outstanding, publis"]:::done
+  t_8a0918c0["(codex gpt-5.6-sol) BUILD S01-C3 — unpublish 409 after a live grant"]:::done
+  t_4990de08["(codex gpt-5.6-sol) BUILD S01-C4 — delete a bound published run (migra"]:::done
+  t_7c1f1fde["(orchestrator) GATE S01 — assemble the review package"]:::done
+  t_af8d9bb2["(claude-opus-5 ×3) REV S01 p1 — correctness/tests · security/data-safe"]:::done
+  t_b1b6b0ee["(orchestrator) FINDING BUILD-S01-C1/P — BUILD packet: DECISIONS sectio"]:::ready
+  t_681f8498["(orchestrator) FINDING — seat launchers ran without caffeinate: clamsh"]:::ready
+  t_fe4dc229["(BUILD-S01-C2) FINDING (plan) — C2-S2 demands CLUSTER_RED for an expec"]:::done
+  t_dc955a68["(BUILD-S01-C2) FINDINGS (plan + packet) — PLAN.md:331 omitted the exis"]:::done
+  t_e9b790e0["(orchestrator) FINDING BUILD-S01-C4/P — BUILD packets carry no READ-ON"]:::ready
+  t_e0574ee7["(BUILD-S01-C3) FINDING (plan) — guard rows G3 label '{error:MALFORMED_"]:::done
+  t_fd352d8e["(grok-4.6) ARCH-FIX S01 (C4 plan gap) — the erasure's PRIVATE visibili"]:::done
+  t_cb8f758f["(BUILD-S01-C4) FINDING (plan, blocking) — C4-S4 orders a PRIVATE visib"]:::done
+  t_d3cd954d["(BUILD-S01-C3) FINDINGS (plan + packet, non-blocking) — PLAN.md:614,65"]:::done
+  t_544048e9["(codex gpt-5.6-sol) FIX S01 p1-B — erasure CONTENDED 202 (C-B3, V-9) +"]:::done
+  t_f58de68f["(claude-opus-5) REQ-FIX p3 — SPEC-v3: what 'served' means (P-B2, V-10)"]:::done
+  t_614cf0c1["(grok-4.6) REQ-REV p3 — FINAL scoped pass over SPEC-v3"]:::done
+  t_728887e1["(codex gpt-5.6-sol) FIX S01 p1-A — auto-publish correctness (C-B1, C-B"]:::done
+  t_873e67ef["(claude-opus-5 ×3) REV S01 p2 — scoped to the p1 findings + the promot"]:::done
+  t_f02c9026["(REV-S01-p1) FINDINGS correctness/tests — B1 R-6 untested · B2 PUBLISH"]:::ready
+  t_a2c2af48["(REV-S01-p1) FINDINGS security/data-safety (lens PASS) — N1 boundness "]:::ready
+  t_8b48d29e["(REV-S01-p1) FINDINGS product-truth — B1 UI cannot delete a public Fre"]:::ready
+  t_401582fb["(orchestrator) FINDINGS REV-S01-p1 packet/tool defects — cursor '0 com"]:::ready
+  t_ff155aeb["(orchestrator) FINDING FIX-S01-p1-B/P — the packet ordered 'read its R"]:::ready
+  t_aee3410a["(orchestrator) FINDING REQ-FIX-03/P1-P5 — packet: no instruction for a"]:::ready
+  t_feec4fb2["(REQ-REV-03) FINDINGS p3 — B1-p3 acceptance step 4 total (plus 1 vs pl"]:::done
+  t_d2c8d5fc["(claude-opus-5 ×3) REV S01 p2 — scoped to the p1 findings + the promot"]:::done
+  t_09a194c6["(residue) S01 tests: pin R-6 owner/system snapshot parity + SPEC-v3 §1"]:::ready
+  t_154f3a17["(residue) S01 SQL: boundness admission in ensure_free_public_auto_publ"]:::ready
+  t_4b66f080["(residue) S01 API: the two pre-enqueue queries in tryAutoPublish can t"]:::ready
+  t_d9dfea7b["(orchestrator defect) REV p2 packets: cursor read before the DISPATCHE"]:::ready
+  t_5b60146e --> t_cee53fe7
+  t_eff46252 --> t_b82d832e
+  t_cee53fe7 --> t_9e5427b1
+  t_9e5427b1 --> t_7c3bd32e
+  t_7c3bd32e --> t_eff46252
+  t_7c3bd32e --> t_a281c4be
+  t_b82d832e --> t_552c5401
+  t_552c5401 --> t_616ddb75
+  t_616ddb75 --> t_047a21bf
+  t_616ddb75 --> t_7b0c12ad
+  t_7b0c12ad --> t_cfd2f03b
+  t_cfd2f03b --> t_9bab4a9d
+  t_cfd2f03b --> t_35c9b921
+  t_35c9b921 --> t_57af421c
+  t_57af421c --> t_8a0918c0
+  t_57af421c --> t_4990de08
+  t_8a0918c0 --> t_7c1f1fde
+  t_4990de08 --> t_7c1f1fde
+  t_7c1f1fde --> t_af8d9bb2
+  t_af8d9bb2 --> t_0e8b69ee
+  t_af8d9bb2 --> t_fe4dc229
+  t_af8d9bb2 --> t_dc955a68
+  t_af8d9bb2 --> t_e0574ee7
+  t_fd352d8e --> t_7c1f1fde
+  t_af8d9bb2 --> t_cb8f758f
+  t_af8d9bb2 --> t_d3cd954d
+  t_af8d9bb2 --> t_544048e9
+  t_af8d9bb2 --> t_f58de68f
+  t_f58de68f --> t_614cf0c1
+  t_614cf0c1 --> t_728887e1
+  t_544048e9 --> t_728887e1
+  t_728887e1 --> t_873e67ef
+  t_d2c8d5fc --> t_2e15bf90
+  t_d2c8d5fc --> t_f02c9026
+  t_d2c8d5fc --> t_a2c2af48
+  t_d2c8d5fc --> t_8b48d29e
+  classDef done fill:#dfe9df,stroke:#3E7A4E
+  classDef running fill:#f3ece0,stroke:#A8823E
+  classDef ready fill:#fdfbf6,stroke:#6E675C
+  classDef review fill:#e6e8e8,stroke:#3D5A80
+  classDef blocked fill:#f4e5de,stroke:#B0432F
+  classDef todo fill:#efe9e0,stroke:#6E675C
+  classDef scheduled fill:#efe9e0,stroke:#6E675C
+  classDef triage fill:#efe9e0,stroke:#6E675C
+  classDef slice fill:#d6e4f5,stroke:#2F5D9E,stroke-width:2px
+```
+
+_rendered 2026-09-21 05:38 from board `free-public-debates` — 55 nodes, 36 edges_

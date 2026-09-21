@@ -1,0 +1,2 @@
+      AND NEW.state='PUBLISHED' AND NEW.warning_version='PUBLIC_INDEXED_V1'
+      AND COALESCE(core.run_is_free_public_bound(NEW.run_id),false)

@@ -1,0 +1,2 @@
+          AND intent.cleanup_state='PREPARED'
+          AND intent.expires_at>clock_timestamp()

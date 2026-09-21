@@ -1,0 +1,1 @@
+      AND NEW.state='PUBLISHED' AND NEW.warning_version='PUBLIC_INDEXED_V1'

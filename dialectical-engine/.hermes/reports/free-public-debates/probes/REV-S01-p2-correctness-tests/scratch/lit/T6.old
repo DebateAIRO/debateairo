@@ -1,0 +1,1 @@
+return reply.status(409).send({ error: "FREE_DEBATE_CANNOT_BE_UNPUBLISHED" });

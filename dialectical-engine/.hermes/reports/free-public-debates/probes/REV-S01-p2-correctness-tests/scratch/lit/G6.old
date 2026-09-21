@@ -1,0 +1,2 @@
+  IF NOT FOUND OR NOT core.run_is_free_public_bound(p_run_id)
+    OR NOT core.run_is_owned_by(p_run_id,p_owner_ref,NULL)

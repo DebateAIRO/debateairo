@@ -1,0 +1,3 @@
+    if (!await this.repository.ensureAutoPublishWork(
+      input.runId,input.userId,input.ownerRef
+    )) return;

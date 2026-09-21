@@ -1,0 +1,8 @@
+    const visibility = await this.repository.readOwnedVisibility(
+      input.runId,input.userId,input.ownerRef
+    );
+    if (visibility?.state === "PUBLISHED") {
+      await this.repository.clearAutoPublishWork(input.runId);
+      return;
+    }
+    await this.repository.upsertAutoPublishWork(

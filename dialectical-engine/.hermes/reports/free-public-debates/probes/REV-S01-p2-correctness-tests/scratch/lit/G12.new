@@ -1,0 +1,6 @@
+    const inspection = await options.application.readInspection(
+      answerId.data, request.session, version, ownershipFor(request)
+    );
+    if (request.query.version === "__rev_probe__") {
+      return reply.send(AnswerSchema.parse(inspection));
+    }

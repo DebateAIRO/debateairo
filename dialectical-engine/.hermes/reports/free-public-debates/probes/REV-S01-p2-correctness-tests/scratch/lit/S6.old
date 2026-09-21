@@ -1,0 +1,6 @@
+  IF NOT core.run_is_free_public_bound(p_run_id) THEN
+    PERFORM identity.audit_system_publication_attempt(
+      p_denied_audit_id,p_run_id,'AUTO_PUBLISH_TRANSITION_NULL',p_presented_at,'DENY'
+    );
+    RETURN NULL;
+  END IF;
