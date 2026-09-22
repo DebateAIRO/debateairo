@@ -65,8 +65,14 @@ export async function runKeyRotation(): Promise<string> {
   const keys = await createSupportKeyPort({
     supportKekPath: environment.SUPPORT_KEK_PATH,
     previousSupportKekPath: environment.SUPPORT_KEK_PREVIOUS_PATH,
-    // The support KEK must never be one of the other master keys.
-    protectedKeyPaths: [environment.KEK_PATH]
+    // The support KEK must never be one of the other master keys — the same
+    // separation apps/api/src/main.ts asserts at boot, over the two keys this
+    // command knows about. A rotation that pointed two domains at one key would
+    // report a clean pass over a deployment that had quietly lost a boundary.
+    protectedKeyPaths: [
+      environment.KEK_PATH,
+      ...(environment.CORPUS_KEK_PATH === undefined ? [] : [environment.CORPUS_KEK_PATH])
+    ]
   });
   try {
     reports.push(await rotateSupportKeys(
