@@ -742,9 +742,9 @@ export async function createSupportKeyPort(
     // Both keys this port will hold are checked against every protected key
     // (fix round 1). The previous one used to be exempt, so a changeover could
     // hand the support domain the user-DEK or corpus KEK as its previous key
-    // and nothing would say so. The basename rule already refuses a path that
-    // is not `support-kek.bin`; what it cannot see is a correctly named file
-    // whose 32 bytes are another domain's key.
+    // and nothing would say so. The basename rule (SUPPORT_KEK_FILENAME above)
+    // already refuses a path with any other name; what it cannot see is a
+    // correctly named file whose 32 bytes are another domain's key.
     const held = previous === undefined ? [support] : [support, previous];
     for (const protectedPath of input.protectedKeyPaths ?? []) {
       const protectedIdentity = await readProtectedKeyIdentity(protectedPath);
