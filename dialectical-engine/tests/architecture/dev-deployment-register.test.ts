@@ -46,6 +46,9 @@ describe("DEV-05 development deployment register source contract", () => {
     expect(source).toContain("RECOVERY_POLICY_REGISTER_ROW");
     expect(source).toContain("PRODUCT_ROLE_POLICY_REGISTER_ROW");
     expect(source).toContain("buildDevelopmentDeploymentRegisterHistoricalPublicationRows");
+    // Property: both publication branches share the port constructed from the caller's admin pool.
+    // Production break: construct the shared port from another pool while keeping both local calls.
+    expect(source).toContain("const publicationPort = createPostgresRegisterPublicationPort(input.adminPool);");
     expect(source).toContain("publicationPort.importHistorical");
     expect(source).toContain("publicationPort.publishGeneral");
     expect(source).toContain("buildDevelopmentDeploymentRegisterPublicationRows");
@@ -54,12 +57,18 @@ describe("DEV-05 development deployment register source contract", () => {
   });
 
   it("publishes one canonical receipt only after the closed port resolves and verifies custody", async () => {
+    const historicalCall = "publicationPort.importHistorical";
     const source = await readFile("apps/runner/src/dev-deployment-register.ts", "utf8");
     const port = source.indexOf("return publicationPort.publishGeneral");
+    const historicalPort = source.indexOf(historicalCall);
     const receipt = source.indexOf("createDevelopmentDeploymentRegisterMachineReceipt", port);
     const custody = source.indexOf("await writeDevelopmentDeploymentRegisterReceipt", receipt);
     expect(port).toBeGreaterThan(-1);
+    // Property: the historical-import branch occurs before the shared receipt and custody path.
+    // Production break: move importHistorical after receipt creation while the current branch stays ordered.
+    expect(historicalPort).toBeGreaterThan(-1);
     expect(receipt).toBeGreaterThan(port);
+    expect(receipt).toBeGreaterThan(historicalPort);
     expect(custody).toBeGreaterThan(receipt);
     expect(source).toContain("O_NOFOLLOW");
     expect(source).toContain("metadata.nlink !== 1");
