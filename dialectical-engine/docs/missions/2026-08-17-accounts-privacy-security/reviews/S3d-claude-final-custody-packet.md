@@ -37,6 +37,12 @@ SHA-256:
 
 `b0e57a2815e0620b0d044ca6009797a3a084aed4005b9bb9ca1b7b7980432fe9`
 
+Note added 2026-09-22 (ruling V-7): that transcript is one of 22 AI-session recordings that stopped
+being tracked at HEAD on this date. It is preserved unchanged in history — same path, same SHA-256,
+no rewrite — at commit `67204a81`, the shared base this change branched from, and at
+`5e49e863b064400073e0efb7207185262c5fd0e7` on `security/t2-hyg-repo`. See
+`docs/missions/2026-09-01-security-hardening/UNTRACKED-EVIDENCE-2026-09-22.md`.
+
 Hermes completed only read/analysis work:
 
 - read the final verifier packet and both final reviewer verdicts;
