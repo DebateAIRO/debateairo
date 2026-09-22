@@ -291,16 +291,26 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PRODUCT_ROLE_POLICY_REGISTER_COUNT_MISMATCH",
   "PRODUCT_ROLE_POLICY_REGISTER_UNSEALED",
   "PRODUCT_ROLE_POLICY_UNRESOLVED",
-  // FW-B / F-I2: the door's own refusals (packages/providers/src/prompt-frame.ts).
-  // They short-circuit the gateway, are re-thrown by the phase catches and reach
-  // the task boundary, so without these rows a refused packet became
-  // `RUNNER_EXECUTION_FAILED:UNRECOGNIZED_DOMAIN_ERROR` — durable state naming
-  // nothing, the exact defect codex r1b F3 closed for the provider subclasses.
+  // FW-B / F-I2: every refusal `packages/providers/src/prompt-frame.ts` can raise
+  // — the BUILDER's six as well as the DOOR's five. Both reach this boundary the
+  // same way: they short-circuit the gateway, are re-thrown by the phase catches
+  // and arrive at the task boundary, so without these rows a refused packet
+  // became `RUNNER_EXECUTION_FAILED:UNRECOGNIZED_DOMAIN_ERROR` — durable state
+  // naming nothing, the exact defect codex r1b F3 closed for the provider
+  // subclasses. Fix round 1: the first pass added the door's five only, and a
+  // builder refusal (a bad owner edit, a colliding fence, a malformed locator)
+  // was still anonymous. The sweep row below is what stops that recurring.
+  "PROMPT_CANARY_UNAVAILABLE",
+  "PROMPT_CONTRACT_INCOMPLETE",
+  "PROMPT_FENCE_UNAVAILABLE",
   "PROMPT_FRAME_ABSENT",
   "PROMPT_FRAME_FENCE_FORGED",
   "PROMPT_FRAME_FENCE_MISMATCH",
   "PROMPT_FRAME_FOREIGN_TURN",
   "PROMPT_FRAME_MATERIAL_MALFORMED",
+  "PROMPT_INSTRUCTION_RESERVED_TOKEN",
+  "PROMPT_MATERIAL_FIELD_NAME_INVALID",
+  "PROMPT_REPAIR_NOT_A_LOCATOR",
   "PROPAGATION_MAGNITUDE_INVALID",
   "PROPAGATION_RECEIPT_INVALID",
   "PROPAGATION_RECEIPT_MISSING",
@@ -867,6 +877,47 @@ describe("API operational error diagnostics", () => {
     for (const code of swept) {
       expect(apiOperationalErrorDiagnostic(new TypedDomainError(code, "swept"))).toBe(code);
     }
+  });
+
+  /**
+   * FW-B fix round 1, IMPORTANT 1 — EVERY REFUSAL THE FRAME MODULE CAN RAISE,
+   * SWEPT FROM THE FILE THAT RAISES THEM.
+   *
+   * The first pass at F-I2 added the DOOR's five codes by hand and stopped
+   * there, so the frame BUILDER's six — a reserved token in an owner's
+   * instruction, an incomplete contract, a bad material field name, a fence or
+   * canary that could not be minted, a repair packet that is not a locator —
+   * were still absent from the alphabet and still reached
+   * `core.work_item.terminal_reason` as `UNRECOGNIZED_DOMAIN_ERROR`. A
+   * hand-copied list is exactly the instrument that lets half a family through.
+   *
+   * This row copies nothing. It reads `prompt-frame.ts` and requires every
+   * `new TypedDomainError("<CODE>"` literal in it to be recognised, so a
+   * SEVENTH refusal added to that module reddens this row on the day it is
+   * written rather than on the day an operator reads a terminal reason that
+   * names nothing. It is the V-28 sweep above, applied to the frame family.
+   *
+   * SCOPE, stated rather than implied: one file, the module the V-11 addendum
+   * made the single producer of every prompt packet. The whole-tree sweep is
+   * still the separate piece of work the V-28 row names.
+   */
+  it("recognises every refusal the frame module can raise (V-11 addendum)", async () => {
+    const source = await readFile("packages/providers/src/prompt-frame.ts", "utf8");
+    const swept = new Set<string>();
+    for (const match of source.matchAll(/new TypedDomainError\(\s*"([A-Z][A-Z0-9_]*)"/gu)) {
+      swept.add(match[1]!);
+    }
+    // The sweep must actually find something, or it is a test that cannot fail.
+    // Eleven today: five at the door, six in the builder and the repair append.
+    expect(swept.size).toBeGreaterThanOrEqual(11);
+    for (const code of swept) {
+      expect(apiOperationalErrorDiagnostic(new TypedDomainError(code, "swept"))).toBe(code);
+    }
+    // ...and the sweep's own regex is measured, not assumed: the module's door
+    // codes are known by name and must be among what it found.
+    expect([...swept].sort()).toEqual(expect.arrayContaining([
+      "PROMPT_FRAME_ABSENT", "PROMPT_INSTRUCTION_RESERVED_TOKEN", "PROMPT_REPAIR_NOT_A_LOCATOR"
+    ]));
   });
 
   it("preserves a declared provider subclass code without its raw fields", () => {
