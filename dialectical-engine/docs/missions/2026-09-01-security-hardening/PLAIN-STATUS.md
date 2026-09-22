@@ -117,7 +117,7 @@ You asked for the building to be done by a team: **I (Claude Fable 5.1) coordina
 | 3 | The memory test re-measured under Node 26 | instructions written; runs alone, on a quiet machine |
 | 4 | Three small hardenings of the login surface (V-14, V-22, the e-mail-verification order) | **done, reviewed, merged** — approved on every point of your rulings; one safety-net test was fragile and was hardened and re-reviewed |
 | 5 | Three database items (V-17, V-29, the tamper check) | instructions written; **needs Docker running on this Mac** — it was not running when I checked |
-| 6 | Keys: the "team badge", then changing a master key | the "team badge" is **built and reviewed** (sound; two gaps in the server kit to fix); master-key rotation is **being built** — the agent found the support chat's keys use a different record format and I ruled how to handle it without a database change |
+| 6 | Keys: the "team badge", then changing a master key | **done, reviewed, merged** — the hardest package so far. Three review rounds: the reviewer caught two "green report that lies" holes in the rotation (the support chat's final check would have accepted the *old* key; a key store the command never opened counted as a clean pass) — both fixed and re-checked. Rotation covers all three master keys; the rehearsal runs on a throwaway copy. One test that needs a database has not run yet (Docker) |
 | 7–10 | Data encryption and deletion, the support-chat leftovers, prompt-injection containment, AI vendors and spending ceilings | instructions being written |
 
 Still true: nothing is pushed and no switch on your accounts is flipped without your "go" at that moment.
