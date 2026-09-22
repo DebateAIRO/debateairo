@@ -94,6 +94,13 @@ const corpusKek = environment.PUBLICATION_ENABLED === "true"
   ? boot.holdKek(loadKek(environment.CORPUS_KEK_PATH!)) : undefined;
 const blindIndexKey = loadSecretKey(environment.BLIND_INDEX_KEY_PATH);
 const sourceIpSalt = loadSecretKey(environment.AUDIT_SOURCE_IP_SALT_PATH);
+// DL7-F7: two plain secret buffers, held the moment they exist. Each has an
+// owner LATER in the boot — the salt is zeroed once the hasher has copied it,
+// the blind-index key once the session service holds it — and every stage in
+// between can reject. Zeroing twice is harmless; not zeroing once is the
+// finding.
+boot.hold({ end: async () => { blindIndexKey.fill(0); } });
+boot.hold({ end: async () => { sourceIpSalt.fill(0); } });
 // L2-F8: this guarded the whole check on publication being enabled, so a
 // private-only deployment could point KEK_PATH and BLIND_INDEX_KEY_PATH at one
 // file and boot. The private domains are always checked; the corpus KEK and

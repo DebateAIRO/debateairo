@@ -141,3 +141,48 @@ describe("DL7-F7 every awaited boot stage runs under an owner", () => {
       .toBeGreaterThan(source.indexOf("installStartupResourceOwner({"));
   });
 });
+
+/**
+ * Review round. The ledger held the three KEKs but not the two plain secret
+ * buffers beside them: the blind-index key and the audit source-IP salt, both
+ * loaded before the first stage. The salt's own `fill(0)` sits ten `boot.run`
+ * stages later, after the six register reads and the Argon2 handshake, any of
+ * which can reject; the blind-index key is zeroed later still, inside the
+ * session service. So the very failure this finding is about — a mis-published
+ * register — left both of them live in memory, exactly as it used to leave the
+ * KEKs.
+ */
+describe("DL7-F7 the ledger holds every secret the boot loads, not only the keys", () => {
+  it("zeroes a held secret buffer when a stage fails, before the keys", async () => {
+    const order: string[] = [];
+    const boot = installBootCustody({ logger: { error: vi.fn() } });
+    const handle = boot.holdKek(heldKek());
+    const secret = Buffer.alloc(32, 0x5a);
+    boot.hold({ end: async () => { order.push("secret"); secret.fill(0); } });
+    boot.hold({ end: async () => { order.push("pool"); } });
+
+    await boot.run("auth-policy", async () => { throw new Error("boom"); })
+      .catch(() => undefined);
+
+    expect(secret).toEqual(Buffer.alloc(32));
+    // Newest-first among the closables, and the keys last of all.
+    expect(order).toEqual(["pool", "secret"]);
+    expect(() => kekId(handle)).toThrowError(
+      expect.objectContaining({ code: "KEK_DESTROYED" })
+    );
+  });
+
+  it("holds the blind-index key and the audit salt before the first stage can reject", async () => {
+    const source = await readFile("apps/api/src/main.ts", "utf8");
+    for (const secret of ["blindIndexKey", "sourceIpSalt"]) {
+      const held = source.indexOf(`boot.hold({ end: async () => { ${secret}.fill(0); } })`);
+      expect(held, `${secret} is held by the boot ledger`).toBeGreaterThan(-1);
+      // Held BEFORE the first awaited stage: a hold that comes after the stage
+      // which rejects is no hold at all.
+      expect(held, `${secret} is held before the first stage`)
+        .toBeLessThan(source.indexOf("await boot.run("));
+      expect(held, `${secret} is held after it is loaded`)
+        .toBeGreaterThan(source.indexOf(`const ${secret} = loadSecretKey(`));
+    }
+  });
+});
