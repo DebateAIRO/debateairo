@@ -606,6 +606,37 @@ export interface ProviderLedgerInput {
   readonly finishedAt: Date;
 }
 
+/**
+ * V-28 (DL4-F2) — THE MONEY SEAM.
+ *
+ * The gateway holds the two facts only it knows (the exact bytes about to be
+ * sent, and this attempt's own token bound) and the usage the vendor reported;
+ * the POLICY — prices, ceilings, the running total, whether this deployment
+ * requires reported usage — lives entirely behind this interface, in
+ * `@debateai/budget`. That is what keeps this package free of the ledger and
+ * keeps every money rule testable without a database.
+ *
+ * Both members may refuse by throwing a typed error. A refusal from
+ * `assertCallAllowed` is raised BEFORE the request is sent, so nothing is
+ * recorded for it — exactly like `assertAttemptAllowed`. A refusal from
+ * `recordCall` is raised AFTER a call that has already been made and paid for,
+ * so the attempt is in the ledger with its artifact first. Neither is retried:
+ * see `PROVIDER_COST_ENVELOPE_REFUSAL_CODES`.
+ */
+export interface ProviderCostEnvelopeSeam {
+  readonly assertCallAllowed: (projection: Readonly<{
+    /** Bytes of the request body that is about to be sent, measured exactly. */
+    requestBytes: number;
+    /** This attempt's `max_tokens`, which a length retry raises (W10/2). */
+    completionTokenCeiling: number;
+  }>) => void | Promise<void>;
+  readonly recordCall: (observed: Readonly<{
+    providerRef: string;
+    /** The vendor's usage block as it arrived, or `null` if it reported none. */
+    usage: unknown;
+  }>) => void | Promise<void>;
+}
+
 export interface OpenAICompatibleGatewayOptions {
   readonly endpoint: string;
   readonly model: string;
@@ -617,7 +648,26 @@ export interface OpenAICompatibleGatewayOptions {
   readonly fetchImplementation?: typeof fetch;
   /** L4-F8: seam for the bounded backoff between HTTP attempts; real time by default. */
   readonly sleepImplementation?: (milliseconds: number) => Promise<void>;
+  /**
+   * V-28: absent means NO money bound, which is local mode's behaviour
+   * byte-for-byte — the relays and loopback model servers spend nothing this
+   * control could bound, and the attempt ceiling still applies to them.
+   */
+  readonly costEnvelope?: ProviderCostEnvelopeSeam;
 }
+
+/**
+ * V-28: refusals the money seam raises. Neither is repaired by asking again — a
+ * ceiling already reached is still reached one backoff later, and a vendor that
+ * reports no usage will report none on the retry — so both leave the attempt
+ * loop unwrapped rather than being absorbed into it and re-emerging as
+ * PROVIDER_CALL_FAILED after the ceiling is spent, which is the confusion the
+ * model-identity short-circuit exists to avoid.
+ */
+export const PROVIDER_COST_ENVELOPE_REFUSAL_CODES = Object.freeze([
+  "RUN_COST_ENVELOPE_MONEY_REACHED",
+  "PROVIDER_USAGE_UNREPORTED"
+] as const);
 
 /** L4-F3: a provider body is streamed and abandoned past this many bytes; nothing of it is persisted. */
 const MAX_PROVIDER_RESPONSE_BYTES = 4 * 1024 * 1024;
@@ -803,8 +853,30 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       // taken on the freshest state rather than on state read up to a backoff ago.
       if (attempt > 1) await sleep(providerBackoffMs(attempt));
       await request.assertAttemptAllowed?.();
-      attemptsMade = attempt;
       const attemptTokenCeiling = lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures);
+      // The packet cap (L4-F2) is taken on the body actually sent, which carries the
+      // per-attempt bound a length retry raised (W10/2).
+      const body = JSON.stringify({
+        model: this.#options.model,
+        max_tokens: attemptTokenCeiling,
+        messages: attemptPacket.messages
+      });
+      /**
+       * V-28 (DL4-F2) — THE MONEY DECISION, TAKEN BEFORE THE CALL.
+       *
+       * Vendor usage is only known AFTER the response, so "refuse the call that
+       * would cross" is decided on the sum so far plus this call's configured
+       * MAXIMUM: the bytes right there in `body`, and the bound this attempt
+       * will ask for. Outside the try on purpose — a refusal here is not an
+       * attempt that failed, it is an attempt that never happened, so it writes
+       * no ledger row and burns nothing of the attempt ceiling, exactly as
+       * `assertAttemptAllowed` above does.
+       */
+      await this.#options.costEnvelope?.assertCallAllowed({
+        requestBytes: Buffer.byteLength(body, "utf8"),
+        completionTokenCeiling: attemptTokenCeiling
+      });
+      attemptsMade = attempt;
       const inputHash = digest(JSON.stringify(attemptPacket));
       const attemptId = randomUUID();
       const startedAt = new Date();
@@ -815,13 +887,6 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         if (this.#options.authorizationHeader !== undefined) {
           headers.authorization = this.#options.authorizationHeader;
         }
-        // The packet cap (L4-F2) is taken on the body actually sent, which carries the
-        // per-attempt bound a length retry raised (W10/2).
-        const body = JSON.stringify({
-          model: this.#options.model,
-          max_tokens: attemptTokenCeiling,
-          messages: attemptPacket.messages
-        });
         if (Buffer.byteLength(body, "utf8") > MAX_PROVIDER_REQUEST_PACKET_BYTES) {
           packetRefused = true;
           throw new TypedDomainError(
@@ -911,6 +976,21 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         });
         if (!response.ok) throw new Error(`PROVIDER_HTTP_STATUS_${response.status}`);
         assertBoundedProviderResponse(decoded);
+        /**
+         * V-28 — THE CHARGE, TAKEN ON EVERY COMPLETED CALL.
+         *
+         * Here and not beside the `OK` return: a truncated or unparseable answer
+         * cost the same money as a good one, so it must be billed too, and this
+         * is the one point every completed, well-formed HTTP attempt passes
+         * through. It sits AFTER the `!response.ok` throw so a 500 with no body
+         * is a transport failure rather than a usage refusal, and after the
+         * artifact has been persisted so the money is never charged against a
+         * call the ledger cannot show.
+         */
+        await this.#options.costEnvelope?.recordCall({
+          providerRef: request.providerRef,
+          usage: observedUsage.success ? observedUsage.data.usage ?? null : null
+        });
         // W10/1: a refusal that arrived with `finish_reason: "length"` is a
         // TRUNCATION, and it is named as one. The classifier's own verdict
         // (PARSE_FAILED on a half-written object) describes the symptom; the
@@ -1042,9 +1122,16 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          *    proved it answers with the wrong model. Retrying it was three real
          *    calls, three artifacts and three ledger rows for an answer that
          *    cannot become correct.
+         *  · V-28: a MONEY refusal from the cost-envelope seam. A ceiling that
+         *    is already reached is still reached one backoff later, and a vendor
+         *    that reported no usage will report none again, so retrying either
+         *    only spends the attempt ceiling to arrive at the same refusal —
+         *    under a name (PROVIDER_CALL_FAILED) that hides which control spoke.
          */
         const shortCircuit = error instanceof TypedDomainError
-          && (error.code.startsWith("PROMPT_FRAME_") || error.code === "PROVIDER_MODEL_IDENTITY_CHANGED");
+          && (error.code.startsWith("PROMPT_FRAME_")
+            || error.code === "PROVIDER_MODEL_IDENTITY_CHANGED"
+            || (PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).includes(error.code));
         lastContentRejection = null;
         lastError = error;
         if (!ledgerRecorded) {
