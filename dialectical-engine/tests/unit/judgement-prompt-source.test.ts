@@ -110,3 +110,49 @@ describe("a prompt contract may not contain a reserved frame token", () => {
     })).not.toThrow();
   });
 });
+
+/**
+ * THE RULING, 2026-09-22 round 2 — `claimClassificationLine` is deleted, and
+ * the DR-140(b) property it used to carry is pinned where it now lives.
+ *
+ * The parameter had 0 production call sites and 2 test call sites, and both
+ * tests passed a CONCATENATED question line with `leg: {kind: "primary-root"}` —
+ * a shape production can no longer assemble. They exercised a parameter, not the
+ * engine. The property itself is real and load-bearing: ONE debate has ONE claim
+ * frame, and it is the debate's own question, never the wording of a position
+ * embedded in a leg. These rows pin that at the call sites that carry it.
+ */
+describe("FAIR-01 / DR-140(b) — one debate, one claim frame, carried by the leg", () => {
+  const RUNNER_SRC = fileURLToPath(new URL("../../apps/runner/src/index.ts", import.meta.url));
+  const JUDGEMENT_INDEX = fileURLToPath(new URL("../../packages/judgement/src/index.ts", import.meta.url));
+
+  it("no call site anywhere passes or reads a classification line", () => {
+    // The identifier may still be NAMED, in the comment that records why it was
+    // removed — that prose is the disclosure. What may not exist is a property
+    // assignment or a read: the two shapes that would make it live code again.
+    for (const source of [RUNNER_SRC, JUDGEMENT_INDEX, PROMPTS_SRC]) {
+      const text = readFileSync(source, "utf8");
+      expect(text).not.toMatch(/claimClassificationLine\s*:/u);
+      expect(text).not.toContain("input.claimClassificationLine");
+      expect(text).not.toContain("readonly claimClassificationLine");
+    }
+  });
+
+  it("every judge call in the runner classifies the RUN's question line", () => {
+    const runner = readFileSync(RUNNER_SRC, "utf8");
+    // Each `judge.judge({ … })` call must hand it `run.questionLine` and nothing
+    // else. A leg that passed its own composed line would re-open exactly the
+    // defect DR-140(b) closed, and it would do so silently.
+    const calls = runner.split(/\.judge\.judge\(\{/u).slice(1);
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+    for (const call of calls) {
+      const head = call.slice(0, call.indexOf("})"));
+      expect(head).toContain("questionLine: run.questionLine");
+    }
+  });
+
+  it("the classifier reads questionLine directly, with no override left", () => {
+    const judgement = readFileSync(JUDGEMENT_INDEX, "utf8");
+    expect(judgement).toContain("const classificationLine = input.questionLine;");
+  });
+});

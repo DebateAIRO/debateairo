@@ -154,9 +154,14 @@ function captureGuardVerdict(source: string): {
   // Every use beyond the definition is a real call site.
   const builderUses = Math.max(0, (source.split(/captureFailureEnvelope\(/u).length - 1) - 1);
   // ...and `error` must not appear in an emit's argument list under ANY
-  // spelling — `dev`'s sites are `capture?.emit({ …, error, … })`, which the
-  // old `Object.freeze({` pattern did not match at all.
-  const carriesRawError = /\bcapture\??\.?emit\(\s*(?:Object\.freeze\(\s*)?\{[\s\S]{0,400}?(?:^|[\s,{])error\s*[,}]/mu.test(source);
+  // spelling. Round 2: `dev`'s SECOND site writes `error: recordingFailure` — a
+  // NAMED property, not shorthand — so a pattern that only matched shorthand let
+  // a PARTIAL conversion (sites 1 and 3 done, site 2 left) go green with a raw
+  // error still emitted. An `error` KEY is what is forbidden, whatever it is
+  // bound to.
+  const carriesRawError =
+    /\bcapture\??\.?emit\(\s*(?:Object\.freeze\(\s*)?\{[\s\S]{0,600}?(?:^|[\s,{])error\s*(?:[,}]|:)/mu
+      .test(source);
   return { emissions, builderUses, carriesRawError };
 }
 
@@ -179,8 +184,14 @@ describe("the 2026-09-22 amendment — no capture site may carry a raw error", (
    * site in its task body, so this row measures the guard against the exact text
    * it exists to catch rather than against a paraphrase of it.
    */
-  it("goes RED on dev's own unconverted spelling", () => {
-    const devSite = `
+  /**
+   * `dev` @ `cbf1b281`'s THREE sites, verbatim (`:5454`, `:5476`, `:5568`). Read
+   * with `git show cbf1b281:dialectical-engine/apps/runner/src/index.ts` and
+   * pasted unaltered, so this measures the guard against the exact text it
+   * exists to catch rather than against a paraphrase of it.
+   */
+  const DEV_SITES = [
+    ["site 1 — the task body, shorthand `error,`", `
         } catch (error) {
           capture?.emit(Object.freeze({
             code: error instanceof TypedDomainError ? error.code : "OBS_CAPTURE_SELF",
@@ -191,17 +202,67 @@ describe("the 2026-09-22 amendment — no capture site may carry a raw error", (
             source: "hatchet",
             attempt_index: attemptIndex
           }));
+`],
+    ["site 2 — the unrecorded-state alarm, NAMED `error: recordingFailure`", `
+            capture?.emit(Object.freeze({
+              code: recordingFailure.code,
+              error: recordingFailure,
+              taxonomy_class: "JOB_FAILURE",
+              capture_point: "job",
+              disposition: "HANDLED",
+              source: "hatchet",
+              attempt_index: attemptIndex
+            }));
+`],
+    ["site 3 — the gateway wrapper, shorthand `error,`", `
+        capture?.emit(Object.freeze({
+          code: error instanceof TypedDomainError ? error.code : "OBS_CAPTURE_SELF",
+          error,
+          taxonomy_class: "PROVIDER_EXHAUSTED",
+          capture_point: "provider",
+          disposition: "THROWN",
+          source: "first_party"
+        }));
+`]
+  ] as const;
+
+  it.each(DEV_SITES.map(([name, text]) => [name, text] as const))(
+    "goes RED on %s",
+    (_name, text) => {
+      const verdict = captureGuardVerdict(text);
+      expect(verdict.carriesRawError).toBe(true);
+      expect(verdict.emissions).toBe(1);
+      expect(verdict.builderUses).toBe(0);
+      expect(verdict.emissions).toBeGreaterThan(verdict.builderUses);
+    }
+  );
+
+  /**
+   * ROUND 2, the case the review named: sites 1 and 3 converted, site 2 — the
+   * NAMED `error: recordingFailure` — left. Before the fix `carriesRawError`
+   * read false here, so the whole guard rested on the arithmetic; the moment a
+   * merger balanced the counts, a raw error would have shipped unseen. Both
+   * halves fire now, and the row asserts the KEY half explicitly, because it is
+   * the half that does not depend on counting anything.
+   */
+  it("goes RED on a PARTIAL conversion that leaves the named-property site", () => {
+    const partial = `
+      export function captureFailureEnvelope(input) { return {}; }
+      capture?.emit(captureFailureEnvelope({ error, taxonomyClass: "JOB_FAILURE" }));
+      capture?.emit(captureFailureEnvelope({ error, taxonomyClass: "PROVIDER_EXHAUSTED" }));
+${DEV_SITES[1]![1]}
 `;
-    const verdict = captureGuardVerdict(devSite);
+    const verdict = captureGuardVerdict(partial);
+    expect(verdict.emissions).toBe(3);
+    expect(verdict.builderUses).toBe(2);
+    // The half that matters: the named property is seen for what it is.
     expect(verdict.carriesRawError).toBe(true);
-    // ...and the count half fires too: one emission, no builder use.
-    expect(verdict.emissions).toBe(1);
-    expect(verdict.builderUses).toBe(0);
-    expect(verdict.emissions).toBeGreaterThan(verdict.builderUses);
   });
 
   it("goes RED on the un-frozen spelling as well", () => {
     expect(captureGuardVerdict(`capture?.emit({ code: "X", error, source: "hatchet" });`).carriesRawError)
+      .toBe(true);
+    expect(captureGuardVerdict(`capture?.emit({ code: "X", error: thing, source: "x" });`).carriesRawError)
       .toBe(true);
   });
 

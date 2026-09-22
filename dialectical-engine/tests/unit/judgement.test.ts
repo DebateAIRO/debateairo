@@ -342,9 +342,16 @@ describe("FAIR-01 / DR-140(b) — one debate, one claim frame", () => {
       runId: null,
       subjectItemId: "work:counter",
       callSiteKey: "JUDGE:critic",
-      questionLine: "State the strongest genuine counter-position. Position: adopting the proposal leads to higher retention.",
-      leg: { kind: "primary-root" },
-      claimClassificationLine: "What is the strongest case for adopting this proposal?",
+      // FAIR-01 through the LEG, which is how production assembles it now: the
+      // debate's question is the question, and the position it critiques is its
+      // own fenced field. The position's wording ("leads to higher retention")
+      // would code-classify "causal" on its own; the debate's claim frame is the
+      // question, which classifies unknown, so the model claim_type is consulted.
+      questionLine: "What is the strongest case for adopting this proposal?",
+      leg: {
+        kind: "attack",
+        positionUnderDebate: "adopting the proposal leads to higher retention"
+      },
       providerRef: "provider:test",
       contractHash: "contract:test",
       bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 }
@@ -374,9 +381,8 @@ describe("FAIR-01 / DR-140(b) — one debate, one claim frame", () => {
       runId: null,
       subjectItemId: "work:counter",
       callSiteKey: "JUDGE:critic",
-      questionLine: "State the strongest genuine counter-position. Position: the observed data is decisive.",
-      leg: { kind: "primary-root" },
-      claimClassificationLine: "Ought the proposal be adopted?",
+      questionLine: "Ought the proposal be adopted?",
+      leg: { kind: "attack", positionUnderDebate: "the observed data is decisive" },
       providerRef: "provider:test",
       contractHash: "contract:test",
       bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 }

@@ -195,14 +195,6 @@ export interface JudgeInput {
   readonly questionLine: string;
   /** Which authoring leg this is. Selects the code-owned directive. */
   readonly leg: JudgeLeg;
-  /**
-   * FAIR-01 (DR-140(b)): the text the code-first claim classifier runs on when
-   * it differs from the prompt line. One debate has ONE claim frame — the
-   * counter-position judgement is classified on the debate's own question
-   * line, not on the wording of the position it embeds. Defaults to
-   * questionLine, which keeps the position-side behavior byte-identical.
-   */
-  readonly claimClassificationLine?: string;
   readonly providerRef: string;
   readonly contractHash: string;
   readonly bound: CallBound;
@@ -324,7 +316,17 @@ export class Judge {
   constructor(private readonly provider: ProviderGateway) {}
 
   async judge(input: JudgeInput): Promise<JudgedNode> {
-    const classificationLine = input.claimClassificationLine ?? input.questionLine;
+    /**
+     * FAIR-01 (DR-140(b)): one debate has ONE claim frame, and it is the
+     * debate's own question. `claimClassificationLine` used to carry that when
+     * the prompt line differed — it differed because the runner concatenated the
+     * directive and the position INTO the prompt line. RUN1 removed the
+     * concatenation, so `questionLine` IS the debate's question on every leg and
+     * the override had no production caller left. It is deleted rather than kept
+     * alive by tests: the property now rides the leg types, and
+     * `tests/unit/judgement.test.ts` asserts it through them.
+     */
+    const classificationLine = input.questionLine;
     const codeClaim = classifyClaimText(classificationLine);
     const framed = buildFramedPrompt({
       contract: judgePromptContract(input.leg.kind, codeClaim.claimType === "unknown" ? "unknown" : "resolved"),
