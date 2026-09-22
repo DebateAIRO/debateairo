@@ -1791,6 +1791,17 @@ async function listRecordRefs(
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return Object.freeze([]);
     throw error;
   }
+  // A record directory that is a SYMLINK is refused, never skipped. The dirent
+  // of a symlink answers `isDirectory()` false, so it used to fall out of the
+  // listing silently while `load` followed it happily: the record was neither
+  // re-wrapped nor verified and the rotation still printed a clean pass — the
+  // "never opened store reports clean" class, one record at a time. Only an
+  // operator can put a symlink here, and a custody refusal is what a link in a
+  // key store means everywhere else in this module.
+  if (entries.some((entry) =>
+    typeof entry !== "string" && entry.isSymbolicLink() && accepts(entry.name))) {
+    throw new CryptoCustodyError("SECRET_CUSTODY_INVALID");
+  }
   return Object.freeze(entries
     .filter((entry) => typeof entry !== "string" && entry.isDirectory() && accepts(entry.name))
     .map((entry) => entry.name)

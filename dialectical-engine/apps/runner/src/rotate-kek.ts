@@ -129,10 +129,20 @@ export function rotationFailed(
 }
 
 /**
- * Re-wraps every record of one file store, then verifies each one under the
- * current KEK alone. An unreadable record is counted and named rather than
- * thrown, so one bad record cannot hide how many others are fine — and the run
- * still fails, because `rotationFailed` looks at the count.
+ * Re-wraps every record of one file store, then verifies — against a SECOND
+ * listing — that every record in the store opens under the current KEK alone.
+ * An unreadable record is counted and named rather than thrown, so one bad
+ * record cannot hide how many others are fine — and the run still fails,
+ * because `rotationFailed` looks at the count.
+ *
+ * The second listing is the whole safety of the pass and mirrors the support
+ * half (`rotateSupportKeys` below). Verifying each record right after its own
+ * re-wrap looks equivalent and is not: a record written under the PREVIOUS key
+ * after the first `listKeyRefs()` returned — an API instance still holding the
+ * old key as current, which is precisely what a rolling restart produces — is
+ * never seen, never verified, and the run ends `KEYS_ROTATE_KEK_OK` over a
+ * record the new key cannot open. The runbook keys key-retirement to that
+ * answer, so a record the pass never saw must fail it.
  */
 export async function rotateFileStore(
   store: string,
@@ -141,7 +151,6 @@ export async function rotateFileStore(
 ): Promise<RotationStoreReport> {
   let rewrapped = 0;
   let alreadyCurrent = 0;
-  let verified = 0;
   const unreadableRefs: RotationRefusal[] = [];
   for (const ref of await keys.listKeyRefs()) {
     let outcome: KeyRotationOutcome;
@@ -155,6 +164,15 @@ export async function rotateFileStore(
       continue;
     }
     if (outcome === "REWRAPPED") rewrapped += 1; else alreadyCurrent += 1;
+  }
+
+  // Against what the store NOW holds, and through verifyUnderCurrentKek, which
+  // ignores the previous key: a ref first seen here is verified like any other,
+  // and one that does not open is named with the code that refused it.
+  let verified = 0;
+  const alreadyRefused = new Set(unreadableRefs.map((refusal) => refusal.ref));
+  for (const ref of await keys.listKeyRefs()) {
+    if (alreadyRefused.has(ref)) continue;
     try {
       await keys.verifyUnderCurrentKek(ref);
       verified += 1;
@@ -162,6 +180,7 @@ export async function rotateFileStore(
       unreadableRefs.push(Object.freeze({ ref, code: refusalCode(error) }));
     }
   }
+
   return Object.freeze({
     store,
     kekId,
