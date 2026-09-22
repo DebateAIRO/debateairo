@@ -38,7 +38,14 @@ import {
 
 export const DUAL_MAKER_PROOF_CONTRACT_TEXT =
   "FAIR-02 dual-maker transport proof (DR-140). You are one of two independent model makers; answer the user's request directly." as const;
-const PROOF_USER_LINE = "Reply with the single word: OK";
+/**
+ * The proof's required answer, in ONE place. Before RUN1 this line was the
+ * user message; RUN1 made it the contract's answer form, and round 3 (review
+ * item G) stopped sending it a second time as material. Round 4: the old
+ * `PROOF_USER_LINE` constant, dead since then, is this one — derived once, not
+ * spelled twice.
+ */
+const PROOF_ANSWER_FORM = "Reply with the single word: OK" as const;
 
 /**
  * V-11 addendum (RUN1): the transport proof goes through the same door as every
@@ -49,7 +56,7 @@ const PROOF_USER_LINE = "Reply with the single word: OK";
 const DUAL_MAKER_PROOF_PROMPT_CONTRACT: PromptContract = Object.freeze({
   contractId: "acceptance.dual-maker-proof.v1",
   instruction: DUAL_MAKER_PROOF_CONTRACT_TEXT,
-  answerForm: "Reply with the single word: OK"
+  answerForm: PROOF_ANSWER_FORM
 });
 
 const digest = (text: string): string => createHash("sha256").update(text).digest("hex");

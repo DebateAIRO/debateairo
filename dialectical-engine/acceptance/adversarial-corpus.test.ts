@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { Judge } from "@debateai/judgement";
 import type { ProviderGateway } from "@debateai/providers";
+import { readFramedMaterial, wirePacket } from "../tests/support/framed-packet.js";
 import { startClaudeRelay, type ClaudeRelayHandle } from "./claude-relay.js";
 import { startGrokRelay, type GrokRelayHandle } from "./grok-relay.js";
 import {
@@ -297,64 +298,42 @@ describe("P4-13 approved adversarial relay corpus", () => {
     });
 
     expect(relay.observations).toHaveLength(2);
-    const observedPackets = relay.observations.map((observation) => {
-      const transcript = JSON.parse(observation.prompt) as {
-        messages: readonly { readonly role: string; readonly content: string }[];
-      };
-      const systemMessage = transcript.messages.find((message) => message.role === "system");
-      const userMessage = transcript.messages.find((message) => message.role === "user");
-      if (userMessage === undefined || systemMessage === undefined) {
-        throw new Error("P4_CORPUS_USER_MESSAGE_MISSING");
-      }
-      // RUN1 (V-11 addendum): the user message is now one block delimited by the
-      // per-call boundary marker the system message declares, and the envelope
-      // lives INSIDE it. DELIM-01 measures the same property it always did —
-      // that a forged label stays inside the compartment — through the real
-      // transport, so it reads the envelope out of the fence rather than
-      // assuming the whole message is the envelope.
-      const fence = /#\|DEBATEAI-FENCE-[0-9a-f]{32}\|#/u.exec(systemMessage.content)?.[0];
-      if (fence === undefined) throw new Error("P4_CORPUS_FENCE_MISSING");
-      const lines = userMessage.content.split("\n");
-      if (lines[0] !== fence || lines[lines.length - 1] !== fence) {
-        throw new Error("P4_CORPUS_BLOCK_NOT_FENCED");
-      }
-      return JSON.parse(lines.slice(1, -1).join("\n")) as {
-        format: string;
-        frame: string;
-        fields: readonly { readonly name: string; readonly content: string }[];
-      };
-    });
-    expect(observedPackets[0]).toEqual({
-      format: "debateai.framed-material.v1",
-      frame: "debateai.prompt-frame.v1",
-      fields: [{ name: "question_line", content }]
-    });
-    expect(observedPackets[1]).toEqual({
-      format: "debateai.framed-material.v1",
-      frame: "debateai.prompt-frame.v1",
-      fields: [
-        { name: "question_line", content },
-        // W7 / V-BLIND-CONTEXT (2026-09-03, commit abb6b21b): `author_maker` is
-        // gone from the payload. `authorMaker` is still PASSED to `review` above
-        // (`:287`) and still recorded — that is the ruling's other half: RECORDED
-        // in the database, WITHHELD from the model. The forged label this case is
-        // about now arrives only in `statement`, where the envelope fences it, so
-        // DELIM-01 still measures exactly what it was written to measure.
-        // `tests/unit/judgement.test.ts:263-270` carries the same correction for
-        // the unit-layer twin; `tests/unit/prompt-surface-guard.test.ts` owns the
-        // withholding property for the whole prompt surface.
-        // Task 11 collateral: this suite reads the packet through the CLI fixture
-        // rather than through the Judge directly, so it was outside that task's
-        // reader set and has been red since abb6b21b. Fixed in Task 16 fix round 1.
-        { name: "statement", content },
-        // T5/S3-1: the edges a review is asked to measure are model-authored
-        // material too, so they are fenced in the SAME versioned untrusted-data
-        // envelope rather than concatenated into the instruction text. DELIM-01
-        // now guards that field as well; this probe offers no edges, so the
-        // fenced content is the empty list it actually sent.
-        { name: "edges_sourced_by_this_node", content: "[]" }
-      ]
-    });
+    // RUN1 (V-11 addendum): the user message is now one block delimited by the
+    // per-call boundary marker the system message declares, and the envelope
+    // lives INSIDE it. DELIM-01 measures the same property it always did —
+    // that a forged label stays inside the compartment — through the real
+    // transport. Round 4: it reads the block through `readFramedMaterial`, the
+    // exact reader the gateway's door runs (fence declared, block opened and
+    // closed by it, envelope format and frame version checked, the marker
+    // absent from every field), instead of a private regex-and-split copy of
+    // that layout that would drift the moment the layout moved.
+    const observedPackets = relay.observations.map((observation) =>
+      readFramedMaterial(wirePacket(observation.prompt)));
+    expect(observedPackets[0]!.contractId).toMatch(/^judge\.primary-root\./u);
+    expect(observedPackets[0]!.fields).toEqual([{ name: "question_line", content }]);
+    expect(observedPackets[1]!.contractId).toBe("judge.review.v1");
+    expect(observedPackets[1]!.fields).toEqual([
+      { name: "question_line", content },
+      // W7 / V-BLIND-CONTEXT (2026-09-03, commit abb6b21b): `author_maker` is
+      // gone from the payload. `authorMaker` is still PASSED to `review` above
+      // (`:287`) and still recorded — that is the ruling's other half: RECORDED
+      // in the database, WITHHELD from the model. The forged label this case is
+      // about now arrives only in `statement`, where the envelope fences it, so
+      // DELIM-01 still measures exactly what it was written to measure.
+      // `tests/unit/judgement.test.ts:263-270` carries the same correction for
+      // the unit-layer twin; `tests/unit/prompt-surface-guard.test.ts` owns the
+      // withholding property for the whole prompt surface.
+      // Task 11 collateral: this suite reads the packet through the CLI fixture
+      // rather than through the Judge directly, so it was outside that task's
+      // reader set and has been red since abb6b21b. Fixed in Task 16 fix round 1.
+      { name: "statement", content },
+      // T5/S3-1: the edges a review is asked to measure are model-authored
+      // material too, so they are fenced in the SAME versioned untrusted-data
+      // envelope rather than concatenated into the instruction text. DELIM-01
+      // now guards that field as well; this probe offers no edges, so the
+      // fenced content is the empty list it actually sent.
+      { name: "edges_sourced_by_this_node", content: "[]" }
+    ]);
   });
 
   it("executes CTRL-01 at the real HTTP schema with zero invalid spawns", async () => {
