@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
-import { OpenAICompatibleProviderGateway } from "@debateai/providers";
+import { buildFramedRepairPrompt, OpenAICompatibleProviderGateway } from "@debateai/providers";
+import { framedFixture, framedFixturePacket } from "../support/framed-packet.js";
 
 const servers: Array<ReturnType<typeof createServer>> = [];
 
@@ -27,7 +28,7 @@ describe("FX-HR-H1 — one provider interface", () => {
     const request = {
       runId: null, subjectItemId: "node:test", callSiteKey: "fixture", role: "JUDGE" as const,
       lane: "served" as const, bound: { maxAttempts: 1, tokenCeiling: 8, deadlineMs: 1000 },
-      contractHash: "contract", providerRef: "provider", packet: { messages: [{ role: "user" as const, content: "x" }] }
+      contractHash: "contract", providerRef: "provider", packet: framedFixturePacket("x")
     };
     await gateway.call(request);
     responseUsage = null;
@@ -55,7 +56,7 @@ describe("FX-HR-H1 — one provider interface", () => {
       runId: null, subjectItemId: "node:test", callSiteKey: "fixture", role: "JUDGE",
       lane: "served", bound: { maxAttempts: 1, tokenCeiling: 8, deadlineMs: 1000 },
       contractHash: "contract", providerRef: "provider",
-      packet: { messages: [{ role: "user", content: "x" }] }
+      packet: framedFixturePacket("x")
     })).rejects.toThrow("PROVIDER_CALL_FAILED");
     expect(metadata[0]?.usage).toEqual({ prompt_tokens: 7, completion_tokens: 1, total_tokens: 8 });
   });
@@ -79,7 +80,7 @@ describe("FX-HR-H1 — one provider interface", () => {
     const result = await gateway.call({
       runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
       bound: { maxAttempts: 2, tokenCeiling: 64, deadlineMs: 5_000 }, contractHash: "contract:test",
-      providerRef: "provider:test", packet: { messages: [{ role: "user", content: "fixture" }] },
+      providerRef: "provider:test", packet: framedFixturePacket("fixture"),
       classifyContent: (content) => content === "accepted-json"
         ? { parseStatus: "PARSED", parseError: null }
         : { parseStatus: "SCHEMA_FAILED", parseError: "test-layer schema mismatch" }
@@ -113,7 +114,7 @@ describe("FX-HR-H1 — one provider interface", () => {
     const result = await gateway.call({
       runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
       bound: { maxAttempts: 2, tokenCeiling: 64, deadlineMs: 5_000 }, contractHash: "contract:test",
-      providerRef: "provider:test", packet: { messages: [{ role: "user", content: "fixture" }] },
+      providerRef: "provider:test", packet: framedFixturePacket("fixture"),
       classifyContent: (content) => content === "accepted"
         ? { parseStatus: "PARSED", parseError: null }
         : { parseStatus: "SCHEMA_FAILED", parseError: "first schema error" }
@@ -149,7 +150,7 @@ describe("FX-HR-H1 — one provider interface", () => {
     await expect(gateway.call({
       runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
       bound: { maxAttempts: 2, tokenCeiling: 64, deadlineMs: 5_000 }, contractHash: "contract:test",
-      providerRef: "provider:test", packet: { messages: [{ role: "user", content: "fixture" }] },
+      providerRef: "provider:test", packet: framedFixturePacket("fixture"),
       classifyContent: (content) => ({ parseStatus: "SCHEMA_FAILED", parseError: `error:${content}` })
     })).rejects.toMatchObject({
       code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 2, lastParseStatus: "SCHEMA_FAILED",
@@ -162,6 +163,7 @@ describe("FX-HR-H1 — one provider interface", () => {
       let attempt = 0;
       const bodies: string[] = [];
       const ledger: Array<{ inputHash: string; contractHash: string }> = [];
+      const framed = framedFixture("base");
       const server = createServer((request, response) => {
         let body = "";
         request.on("data", (chunk) => { body += String(chunk); });
@@ -187,13 +189,16 @@ describe("FX-HR-H1 — one provider interface", () => {
       await gateway.call({
         runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
         bound: { maxAttempts: 2, tokenCeiling: 64, deadlineMs: 5_000 }, contractHash: "contract:fixed",
-        providerRef: "provider:test", packet: { messages: [{ role: "user", content: "base" }] },
+        providerRef: "provider:test", packet: framed.packet,
         classifyContent: (content) => content === "accepted"
           ? { parseStatus: "PARSED", parseError: null }
           : { parseStatus: "SCHEMA_FAILED", parseError: "machine-only-error" },
         ...(withBuilder ? {
-          buildRepairPacket: ({ parseError }: { parseError: string }) => ({
-            messages: [{ role: "user" as const, content: `base\nSchema error: ${parseError}` }]
+          // V-11 layer 3: the repair carries a typed CODE and a machine PATH.
+          // The parse error itself — which quotes the model's own output — is
+          // exactly what may no longer ride back to the provider.
+          buildRepairPacket: () => buildFramedRepairPrompt(framed, {
+            code: "SCHEMA_FAILED", path: "segments.0.text"
           })
         } : {})
       });
@@ -247,7 +252,7 @@ describe("FX-HR-H1 — one provider interface", () => {
       bound: { maxAttempts: 3, tokenCeiling: 64, deadlineMs: 5_000 },
       contractHash: "contract:test",
       providerRef: "provider:test",
-      packet: { messages: [{ role: "user", content: "test fixture only" }] }
+      packet: framedFixturePacket("test fixture only")
     });
 
     expect(result.rawArtifactRef).toBe("artifact:test");
@@ -290,7 +295,7 @@ describe("FX-HR-H1 — one provider interface", () => {
       bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 },
       contractHash: "contract:test",
       providerRef: "provider:test",
-      packet: { messages: [{ role: "user", content: "test fixture only" }] }
+      packet: framedFixturePacket("test fixture only")
     })).rejects.toThrow("PROVIDER_CALL_FAILED");
     expect(calls).toEqual([
       "outside-transaction",
@@ -331,7 +336,7 @@ describe("FX-HR-H1 — one provider interface", () => {
       bound: { maxAttempts: 2, tokenCeiling: 64, deadlineMs: 5_000 },
       contractHash: "contract:test",
       providerRef: "provider:test",
-      packet: { messages: [{ role: "user", content: "fixture" }] }
+      packet: framedFixturePacket("fixture")
     })).rejects.toThrow("PROVIDER_CALL_FAILED");
     expect(artifacts).toHaveLength(2);
     expect(ledgerAttempts).toEqual(artifacts);

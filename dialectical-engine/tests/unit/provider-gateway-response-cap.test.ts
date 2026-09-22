@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { OpenAICompatibleProviderGateway, ProviderCallFailedError } from "@debateai/providers";
+import { framedFixturePacket } from "../support/framed-packet.js";
 
 const MIB = 1024 * 1024;
 const CHUNK_BYTES = 64 * 1024;
@@ -9,7 +10,7 @@ function callRequest(maxAttempts = 1) {
     runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE" as const,
     lane: "served" as const, bound: { maxAttempts, tokenCeiling: 64, deadlineMs: 5_000 },
     contractHash: "contract:test", providerRef: "provider:test",
-    packet: { messages: [{ role: "user" as const, content: "fixture" }] }
+    packet: framedFixturePacket("fixture")
   };
 }
 

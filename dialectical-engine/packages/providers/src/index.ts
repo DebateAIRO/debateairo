@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { TypedDomainError } from "@debateai/kernel";
+import { assertFramedPrompt } from "./prompt-frame.js";
+import { scanPromptTripwires } from "./prompt-tripwire.js";
 
 // T9 (goal 232-235): SYNTHESIZER and EVALUATOR are NAMED PROVIDER ROLES,
 // not organ aliases. A debater's model may hold either role; the CALL is
@@ -485,6 +487,14 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     if (!Number.isInteger(request.bound.maxAttempts) || request.bound.maxAttempts < 1) {
       throw new TypeError("CallBound.maxAttempts must be a positive integer");
     }
+    /**
+     * V-11 addendum, layer 1 — THE DOOR. Every hand-off in the engine passes
+     * through this method, so holding the frame HERE is what makes "no call
+     * site can assemble a prompt without the frame" a property of the system
+     * rather than of a list of remembered call sites. It runs before the first
+     * byte leaves the process and it is re-run on every repair packet below.
+     */
+    const frame = assertFramedPrompt(request.packet);
     const fetcher = this.#options.fetchImplementation ?? fetch;
     const sleep = this.#options.sleepImplementation ?? realSleep;
     let attemptsMade = 0;
@@ -570,6 +580,20 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             parseError: error instanceof Error ? error.message : String(error)
           };
         }
+        /**
+         * V-11 addendum, layer 5. SIGNALS, never gates: the scan runs, the
+         * result is recorded on the run's artifact, and the call proceeds
+         * exactly as it would have. `raw_artifact.metadata` is unconstrained
+         * jsonb — the same durable home W10/1 gave `finish_reason` — so no
+         * migration is needed and no column constraint has to learn a new word.
+         * Constraint 6: the signals carry codes, the code-owned field name and
+         * a capped count; never the material and never the answer.
+         */
+        const tripwires = scanPromptTripwires({
+          frame,
+          contractId: frame.contractId,
+          answer: content ?? rawText
+        });
         rawArtifactRef = await this.#options.persistRawArtifact({
           artifactId: randomUUID(),
           attemptId,
@@ -583,6 +607,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           metadata: {
             status: response.status,
             attempt,
+            ...(tripwires.length === 0 ? {} : { prompt_tripwires: tripwires }),
             usage: observedUsage.success ? observedUsage.data.usage ?? null : null,
             // W10/1: the reason this completion stopped, recorded on EVERY
             // attempt. `raw_artifact.metadata` is unconstrained jsonb, so the
@@ -660,13 +685,18 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             lengthFailures += 1;
             attemptPacket = request.packet;
           } else if (attempt < request.bound.maxAttempts && request.buildRepairPacket !== undefined) {
-            attemptPacket = request.buildRepairPacket({
+            const repair = request.buildRepairPacket({
               // `content` is the strict parse's, or the raw body when the cut
               // landed before one existed. Either way it is what arrived.
               rawText: content ?? rawText,
               parseStatus: contentRejection.parseStatus,
               parseError: contentRejection.parseError
             });
+            // The repair path is the one that used to carry the model's own
+            // rejected output back into the instruction compartment. It goes
+            // through the same door as the first packet, with no exception.
+            assertFramedPrompt(repair);
+            attemptPacket = repair;
           }
           continue;
         }
@@ -698,6 +728,11 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           modelVersion: responseJson.model
         };
       } catch (error) {
+        // A frame refusal is not a provider failure and must never be absorbed
+        // into one: the packet was never sent, retrying cannot repair it, and
+        // the caller has to see WHICH containment rule its builder broke. It is
+        // the only error raised inside this block that is about our own code.
+        if (error instanceof TypedDomainError && error.code.startsWith("PROMPT_FRAME_")) throw error;
         lastContentRejection = null;
         lastError = error;
         if (!ledgerRecorded) {

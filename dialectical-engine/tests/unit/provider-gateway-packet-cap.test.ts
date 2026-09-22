@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { OpenAICompatibleProviderGateway, ProviderCallFailedError, type PromptPacket } from "@debateai/providers";
+import { framedFixturePacket, framedPacketOfWireSize } from "../support/framed-packet.js";
 
 const KIB = 1024;
 const MODEL = "configured/model";
@@ -10,9 +11,13 @@ function wireBytes(messages: PromptPacket["messages"]): number {
   return Buffer.byteLength(JSON.stringify({ model: MODEL, max_tokens: TOKEN_CEILING, messages }), "utf8");
 }
 
+/**
+ * V-11 layer 1: the gateway refuses an unframed packet, so the byte cap is now
+ * measured on a REAL framed packet padded to the target size — which is also
+ * the honest measurement, because the frame is bytes the engine really sends.
+ */
 function userMessageOfWireSize(totalBytes: number): PromptPacket {
-  const overhead = wireBytes([{ role: "user", content: "" }]);
-  return { messages: [{ role: "user", content: "a".repeat(totalBytes - overhead) }] };
+  return framedPacketOfWireSize(totalBytes, wireBytes);
 }
 
 function gatewayWith(fetchImplementation: typeof fetch) {
@@ -71,11 +76,11 @@ describe("L4-F2 — request packet cap", () => {
   it("measures the whole wire packet in UTF-8 bytes, not characters", async () => {
     let fetchCalls = 0;
     const { gateway } = gatewayWith(async () => { fetchCalls += 1; return okCompletion(); });
-    const overhead = wireBytes([{ role: "user", content: "" }]);
+    const overhead = wireBytes(framedFixturePacket("").messages);
     // 3-byte characters, enough of them to put the packet at least one byte over the cap once
     // serialised whatever the overhead leaves as a remainder.
     const content = "€".repeat(Math.ceil((256 * KIB - overhead + 1) / 3));
-    const packet: PromptPacket = { messages: [{ role: "user", content }] };
+    const packet: PromptPacket = framedFixturePacket(content);
     // Well under the cap counted in characters, over it counted in UTF-8 bytes.
     expect(content.length).toBeLessThan(256 * KIB);
     expect(wireBytes(packet.messages)).toBeGreaterThan(256 * KIB);
@@ -88,7 +93,7 @@ describe("L4-F2 — request packet cap", () => {
     let fetchCalls = 0;
     const { gateway, ledger } = gatewayWith(async () => { fetchCalls += 1; return okCompletion(); });
 
-    const failure = await gateway.call(callRequest({ messages: [{ role: "user", content: "base" }] }, 3, {
+    const failure = await gateway.call(callRequest(framedFixturePacket("base"), 3, {
       classifyContent: () => ({ parseStatus: "SCHEMA_FAILED", parseError: "fixture" }),
       buildRepairPacket: () => userMessageOfWireSize(300 * KIB)
     })).catch((error: unknown) => error);

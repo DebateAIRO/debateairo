@@ -4,9 +4,12 @@ import { describe, expect, it } from "vitest";
 import {
   OpenAICompatibleProviderGateway,
   ProviderContentUnacceptedError,
+  buildFramedRepairPrompt,
+  type FramedPrompt,
   type ProviderCallRequest,
   type RawArtifactInput
 } from "@debateai/providers";
+import { framedFixture, framedFixturePacket } from "../support/framed-packet.js";
 // The module that OWNS these symbols, exactly as `tests/integration/
 // t16-algorithm-register.test.ts:64` reaches them: the register barrel's export
 // list is not this seat's surface, so the test reads the owner directly.
@@ -103,7 +106,7 @@ function w10Request(overrides: Partial<ProviderCallRequest> = {}): ProviderCallR
     bound: { maxAttempts: 1, tokenCeiling: 2_048, deadlineMs: 180_000 },
     contractHash: "contract:w10",
     providerRef: "provider:w10",
-    packet: { messages: [{ role: "user", content: "compose the served answer" }] },
+    packet: framedFixturePacket("compose the served answer"),
     classifyContent: (content) => jsonClassifier(content) as never,
     ...overrides
   };
@@ -147,14 +150,13 @@ describe("W10 C1 · a length failure is classified as a length failure", () => {
  * `buildSchemaRepairPacket`): it APPENDS a correction to the existing messages
  * and reuses the same bound. For a truncation that makes attempt 2 strictly
  * worse — longer input, identical `max_tokens`, the same schema to satisfy.
+ *
+ * V-11 layer 3 changed WHAT it appends — a typed code and a machine path rather
+ * than the parse-error text — but not THAT it appends, which is the property
+ * every case below measures.
  */
-function appendingRepairPacket(packet: ProviderCallRequest["packet"], parseError: string): ProviderCallRequest["packet"] {
-  return {
-    messages: [...packet.messages, {
-      role: "user",
-      content: `The previous response violated the declared JSON contract. Machine parse error: ${parseError}`
-    }]
-  };
+function appendingRepairPacket(framed: FramedPrompt): ProviderCallRequest["packet"] {
+  return buildFramedRepairPrompt(framed, { code: "SCHEMA_FAILED", path: "segments.0.text" });
 }
 
 describe("W10 C2 · a truncation is not retried into the identical truncation", () => {
@@ -162,11 +164,12 @@ describe("W10 C2 · a truncation is not retried into the identical truncation", 
     const { gateway, attempts } = scriptedGateway([
       { finish_reason: "length", content: TRUNCATED_JSON }
     ]);
-    const packet = { messages: [{ role: "user" as const, content: "compose the served answer" }] };
+    const framed = framedFixture("compose the served answer");
+    const packet = framed.packet;
     await gateway.call(w10Request({
       bound: { maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 },
       packet,
-      buildRepairPacket: ({ parseError }) => appendingRepairPacket(packet, parseError)
+      buildRepairPacket: () => appendingRepairPacket(framed)
     })).catch(() => undefined);
     expect(attempts).toHaveLength(3);
     // Asserted from the RECORDED attempts, not from the fixture's own bookkeeping.
@@ -179,11 +182,12 @@ describe("W10 C2 · a truncation is not retried into the identical truncation", 
     const { gateway, attempts } = scriptedGateway([
       { finish_reason: "length", content: TRUNCATED_JSON }
     ]);
-    const packet = { messages: [{ role: "user" as const, content: "compose the served answer" }] };
+    const framed = framedFixture("compose the served answer");
+    const packet = framed.packet;
     await gateway.call(w10Request({
       bound: { maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 },
       packet,
-      buildRepairPacket: ({ parseError }) => appendingRepairPacket(packet, parseError)
+      buildRepairPacket: () => appendingRepairPacket(framed)
     })).catch(() => undefined);
     const rendered = attempts.map((attempt) => JSON.stringify(attempt.body));
     expect(new Set(rendered).size).toBe(rendered.length);
@@ -193,11 +197,12 @@ describe("W10 C2 · a truncation is not retried into the identical truncation", 
     const { gateway, attempts } = scriptedGateway([
       { finish_reason: "length", content: TRUNCATED_JSON }
     ]);
-    const packet = { messages: [{ role: "user" as const, content: "compose the served answer" }] };
+    const framed = framedFixture("compose the served answer");
+    const packet = framed.packet;
     await gateway.call(w10Request({
       bound: { maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 },
       packet,
-      buildRepairPacket: ({ parseError }) => appendingRepairPacket(packet, parseError)
+      buildRepairPacket: () => appendingRepairPacket(framed)
     })).catch(() => undefined);
     for (const attempt of attempts) {
       expect(attempt.body.messages).toEqual(packet.messages);
@@ -208,14 +213,19 @@ describe("W10 C2 · a truncation is not retried into the identical truncation", 
     const { gateway, attempts } = scriptedGateway([
       { finish_reason: "stop", content: "this is not json at all" }
     ]);
-    const packet = { messages: [{ role: "user" as const, content: "compose the served answer" }] };
+    const framed = framedFixture("compose the served answer");
+    const packet = framed.packet;
     await gateway.call(w10Request({
       bound: { maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 },
       packet,
-      buildRepairPacket: ({ parseError }) => appendingRepairPacket(packet, parseError)
+      buildRepairPacket: () => appendingRepairPacket(framed)
     })).catch(() => undefined);
     expect(attempts.map((attempt) => attempt.body.max_tokens)).toEqual([2_048, 2_048, 2_048]);
-    expect(attempts.map((attempt) => attempt.body.messages.length)).toEqual([1, 2, 2]);
+    // A framed packet is 2 messages (the instruction compartment and one fenced
+    // material block); the repair appends a second fenced block carrying the
+    // code and the path. The PROPERTY is unchanged: the schema path appends
+    // once and the sealed bound never moves.
+    expect(attempts.map((attempt) => attempt.body.messages.length)).toEqual([2, 3, 3]);
   });
 });
 
