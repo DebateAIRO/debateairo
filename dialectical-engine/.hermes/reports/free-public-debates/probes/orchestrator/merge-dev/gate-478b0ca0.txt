@@ -1,1 +1,10 @@
 head 478b0ca0 parents df06aedf dirty 0 markers 0
+CLUSTER_GREEN
+tests/unit/s7-authorization.test.ts rc=1 passed=30 failed=1 (expect 30/1)
+CLUSTER_GREEN
+tests/architecture/dev-deployment-register.test.ts rc=0  Tests 3 passed (3)
+tests/integration/obs-l3-s06-runner-binding.test.ts rc=0  Tests 15 passed (15)
+tests/integration/production-database-principals.test.ts rc=0  Tests 32 passed (32)
+tests/integration/register-support-publication.test.ts rc=0  Tests 27 passed (27)
+skipped-lines 0
+tsc=13
