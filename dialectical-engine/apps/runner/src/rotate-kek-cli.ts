@@ -18,7 +18,7 @@
  */
 import { pathToFileURL } from "node:url";
 import {
-  assertSupportDatabaseRole,
+  assertSupportPrincipalRole,
   createPool,
   PostgresSupportKeyRotationRepository
 } from "@debateai/db";
@@ -117,7 +117,6 @@ export async function runKeyRotation(): Promise<string> {
   }
 
   const pool = createPool(environment.SUPPORT_DATABASE_URL);
-  const runtimePool = createPool(environment.DATABASE_URL);
   const keys = await createSupportKeyPort({
     supportKekPath: environment.SUPPORT_KEK_PATH,
     previousSupportKekPath: environment.SUPPORT_KEK_PREVIOUS_PATH,
@@ -131,18 +130,17 @@ export async function runKeyRotation(): Promise<string> {
     ]
   });
   try {
-    // M3: the same two-sided assertion the API makes before it serves support
-    // traffic — the support principal IS a support member and the ordinary
-    // runtime principal is NOT — so this rotation cannot write those columns as
-    // the wrong principal.
-    await assertSupportDatabaseRole(runtimePool, pool);
+    // M3, as ruled: this command writes two support key columns and opens no
+    // other pool, so it asserts the SUPPORT role alone and never holds the
+    // runtime credential. The API keeps the two-sided assertion, which is its
+    // to make because it holds both.
+    await assertSupportPrincipalRole(pool);
     reports.push(await rotateSupportKeys(
       new PostgresSupportKeyRotationRepository(pool), keys
     ));
   } finally {
     await keys.close();
     await pool.end().catch(() => undefined);
-    await runtimePool.end().catch(() => undefined);
   }
 
   const text = renderRotationReport(reports, declined);

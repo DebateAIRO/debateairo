@@ -21,6 +21,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  assertSupportPrincipalRole,
   PostgresSupportKeyRotationRepository,
   PostgresSupportSessionRepository
 } from "../../packages/db/src/index.js";
@@ -117,6 +118,15 @@ describe("V-3 support-KEK rotation against the real columns", () => {
       expect(repeat.counts.rewrapped).toBe(0);
       expect(repeat.counts.unreadable).toBe(0);
     }
+  }, 600_000);
+
+  it("refuses a connection that is not the debateai_support principal", async () => {
+    // The test database connects as its own superuser, which is emphatically
+    // NOT the support principal: the assertion must refuse it. A rotation that
+    // ran as the wrong role would be writing key columns it has no business in.
+    await expect(assertSupportPrincipalRole(database.pool)).rejects.toThrowError(
+      expect.objectContaining({ message: "SUPPORT_DATABASE_ROLE_INVALID" })
+    );
   }, 600_000);
 
   it("refuses to replace a row whose bytes changed under the rotation", async () => {

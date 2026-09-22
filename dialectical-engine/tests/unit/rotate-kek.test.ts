@@ -10,7 +10,7 @@
  * No real key material: every key in this file is generated into a temporary
  * directory that is removed afterwards.
  */
-import { chmod, cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -30,6 +30,7 @@ import {
   rotationFailed
 } from "../../apps/runner/src/rotate-kek.js";
 import { keyRotationEnvironmentCode } from "../../apps/runner/src/rotate-kek-cli.js";
+import { parseKeyRotationEnvironment } from "../../packages/register/src/runtime-environment.js";
 import type {
   SupportKeyReplacement,
   SupportKeyRotationRepository,
@@ -677,5 +678,43 @@ describe("V-3 rotate: what the operator is told", () => {
     }]);
     expect(text).toContain("KEYS_ROTATE_KEK_OK");
     expect(text).not.toContain("KEYS_ROTATE_KEK_FAILED");
+  });
+});
+
+describe("V-3 rotate: least privilege on the database", () => {
+  const ROTATION_ENVIRONMENT = Object.freeze({
+    KEK_PATH: "/run/secrets/kek",
+    USER_DEK_STORE_PATH: "/run/secrets/user-deks",
+    SUPPORT_KEK_PATH: "/run/secrets/support-kek",
+    SUPPORT_DATABASE_URL: "postgresql://support:pass@127.0.0.1:5432/debateai"
+  });
+
+  /**
+   * The coordinator's ruling on M3: a key rotation must require only what it
+   * uses. It writes two support columns and never touches the runtime pool, so
+   * it must not need the runtime credential to start.
+   */
+  it("starts without the runtime credential", () => {
+    const parsed = parseKeyRotationEnvironment({ ...ROTATION_ENVIRONMENT });
+    expect(parsed.SUPPORT_DATABASE_URL).toBe(ROTATION_ENVIRONMENT.SUPPORT_DATABASE_URL);
+    expect(parsed).not.toHaveProperty("DATABASE_URL");
+  });
+
+  it("asserts the support role alone, and leaves the API's two-sided call alone", async () => {
+    const cli = await readFile(
+      new URL("../../apps/runner/src/rotate-kek-cli.ts", import.meta.url), "utf8"
+    );
+    // The support-only half, and no runtime pool anywhere in the command.
+    expect(cli).toContain("assertSupportPrincipalRole");
+    expect(cli).not.toContain("assertSupportDatabaseRole");
+    // The RUNTIME url specifically — SUPPORT_DATABASE_URL is the one pool this
+    // command legitimately opens, so the check has to name the other one.
+    expect(cli).not.toContain("environment.DATABASE_URL");
+    expect(cli).not.toContain("runtimePool");
+    // The API still makes the two-sided assertion sup-01-boundary.test.ts pins.
+    const main = await readFile(
+      new URL("../../apps/api/src/main.ts", import.meta.url), "utf8"
+    );
+    expect(main).toContain("assertSupportDatabaseRole(pool, supportPool)");
   });
 });

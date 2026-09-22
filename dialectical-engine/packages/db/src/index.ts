@@ -27,6 +27,7 @@ export {
 export {
   assertSupportKeyCoverage,
   assertSupportDatabaseRole,
+  assertSupportPrincipalRole,
   lockSupportOwners,
   lockSupportSessions,
   PostgresSupportCaseRepository,

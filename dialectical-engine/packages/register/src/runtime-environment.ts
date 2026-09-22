@@ -315,13 +315,10 @@ const keyRotationEnvironmentShape = {
   PUBLICATION_KEY_STORE_PATH: z.string().min(1).optional(),
   SUPPORT_KEK_PATH: kekPath,
   SUPPORT_KEK_PREVIOUS_PATH: z.string().min(1).optional(),
+  // The ONLY database this command opens. It writes two support key columns and
+  // touches nothing else, so it asserts the support role alone
+  // (assertSupportPrincipalRole) and never holds the runtime credential.
   SUPPORT_DATABASE_URL: z.string().url(),
-  // assertSupportDatabaseRole is two-sided: it proves the support principal IS
-  // a support member AND that the ordinary runtime principal is NOT. The
-  // rotation asserts the same thing the API asserts at boot before it writes to
-  // support.session_key / support.case_key, so it needs both URLs. Both are
-  // already in the environment file the runbook tells the operator to load.
-  DATABASE_URL: z.string().url(),
   DEBATEAI_CUSTODY_GROUP: z.string().min(1).optional()
 } as const;
 

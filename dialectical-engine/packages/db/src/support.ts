@@ -2558,6 +2558,36 @@ async function supportRoleWitness(pool: Pool): Promise<SupportRoleWitness | unde
   `)).rows[0];
 }
 
+/**
+ * The SUPPORT half, on its own: this connection really is the `debateai_support`
+ * principal, with exactly the privileges that role is meant to have and nothing
+ * outside the support schema.
+ *
+ * Exported for a caller that only ever touches support data and should not hold
+ * the runtime credential to prove it — `apps/runner/src/rotate-kek-cli.ts` writes
+ * two support key columns and opens no other pool. `assertSupportDatabaseRole`
+ * below adds the runtime half for the API, which DOES hold both.
+ */
+export async function assertSupportPrincipalRole(supportPool: Pool): Promise<void> {
+  const support = await supportRoleWitness(supportPool);
+  if (support === undefined
+    || support.session_principal !== support.principal
+    || support.rolsuper || support.rolcreaterole || support.rolcreatedb
+    || support.rolreplication || support.rolbypassrls
+    || !support.support_member || support.forbidden_member
+    || support.dangerous_builtin_member || support.owns_database_or_schema
+    || support.direct_support_acl
+    || JSON.stringify(support.direct_roles) !== JSON.stringify(["debateai_support"])
+    || support.support_select_count !== "16" || support.support_insert_count !== "16"
+    || support.support_relation_count !== "17"
+    || !support.support_application_matrix_valid || !support.support_guard_inaccessible
+    || support.support_column_update_count !== "13"
+    || support.support_forbidden_column_update
+    || support.support_forbidden_privilege || support.outside_table_privilege) {
+    throw new TypeError("SUPPORT_DATABASE_ROLE_INVALID");
+  }
+}
+
 /** Fail closed before the API begins accepting support traffic. */
 export async function assertSupportDatabaseRole(
   runtimePool: Pool,
@@ -2597,24 +2627,13 @@ export async function assertSupportDatabaseRole(
           current_user,oid,'SELECT,INSERT')) FROM resolved),false)
           AS support_table_privilege
     `).then(({ rows }) => rows[0]),
-    supportRoleWitness(supportPool)
+    assertSupportPrincipalRole(supportPool)
   ]);
+  // The support half is asserted above, by the one implementation of it; what
+  // remains here is the runtime half — the ordinary principal must NOT be able
+  // to reach support data.
   if (runtime === undefined || runtime.support_member || runtime.support_schema_usage
-    || !runtime.support_structure_valid || runtime.support_table_privilege
-    || support === undefined
-    || support.session_principal !== support.principal
-    || support.rolsuper || support.rolcreaterole || support.rolcreatedb
-    || support.rolreplication || support.rolbypassrls
-    || !support.support_member || support.forbidden_member
-    || support.dangerous_builtin_member || support.owns_database_or_schema
-    || support.direct_support_acl
-    || JSON.stringify(support.direct_roles) !== JSON.stringify(["debateai_support"])
-    || support.support_select_count !== "16" || support.support_insert_count !== "16"
-    || support.support_relation_count !== "17"
-    || !support.support_application_matrix_valid || !support.support_guard_inaccessible
-    || support.support_column_update_count !== "13"
-    || support.support_forbidden_column_update
-    || support.support_forbidden_privilege || support.outside_table_privilege) {
+    || !runtime.support_structure_valid || runtime.support_table_privilege) {
     throw new TypeError("SUPPORT_DATABASE_ROLE_INVALID");
   }
 }

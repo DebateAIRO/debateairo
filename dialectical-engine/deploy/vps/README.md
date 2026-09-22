@@ -262,6 +262,10 @@ systemd-run --pipe --wait --collect \
   /usr/bin/pnpm exec tsx apps/runner/src/rotate-kek-cli.ts
 ```
 
+The command opens exactly one database — `SUPPORT_DATABASE_URL`, to re-wrap the two support key
+columns — and refuses unless that connection really is the `debateai_support` principal. It never
+opens the runtime pool and never needs the runtime credential.
+
 The report goes to stdout, which `--pipe` puts on your terminal; `systemd-run` also records it in
 the journal under the transient unit. It contains counts, key **ids** (not keys) and the record
 ids of anything it could not open — user and session UUIDs, the same identifiers that are already
