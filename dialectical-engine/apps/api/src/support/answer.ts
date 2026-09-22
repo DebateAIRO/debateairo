@@ -101,23 +101,25 @@ function retrieve(
 
 /**
  * FW-B / B-I1 — THE OWNERS' INSTRUCTION SLOT for the chat answer, exported so
- * the injection corpus drives the text the engine really sends rather than a
- * fixture that resembles it.
+ * the injection corpus and the byte pins drive the text the engine really
+ * sends rather than a fixture that resembles it.
  *
  * Byte for byte the system text this service has always built: the language
  * preamble and the retrieved, ratified entries, bounded at
  * `MAX_SYSTEM_CODE_POINTS`. It is INSTRUCTION only. The visitor's message used
  * to be a bare `user` turn beside it; it is material now, inside the fence, in
  * its own named field (`./prompt.ts`).
+ *
+ * FIX ROUND 1, MINOR 7. This was briefly a one-line wrapper around a private
+ * `boundedSystem`, with the production call site still on the private one —
+ * two names for one text, which is the drift a wrapper is supposed to prevent,
+ * not create. There is one function now, and `respond` below calls THIS one, so
+ * a test that pins these bytes pins what the vendor receives.
  */
 export function supportAnswerInstruction(
   entries: readonly HelpCorpusEntry[],
   language: SupportLanguage
 ): string {
-  return boundedSystem(entries,language);
-}
-
-function boundedSystem(entries: readonly HelpCorpusEntry[], language: SupportLanguage): string {
   const preamble = language === "ro"
     ? "Răspunde numai în română și numai cu fapte din intrările furnizate. Nu inventa surse și nu include linii Sursă."
     : "Answer only in English and only with facts from the supplied entries. Do not invent sources or include Source lines.";
@@ -228,7 +230,7 @@ export function createSupportAnswerService(input: Readonly<{
            * instruction as a bare `user` turn.
            */
           const framed = buildSupportAnswerPrompt({
-            instruction: boundedSystem(entries,request.language),
+            instruction: supportAnswerInstruction(entries,request.language),
             visitorMessage: safeText
           });
           const complete = (signal?: AbortSignal) => {

@@ -78,3 +78,80 @@ describe("support relay response boundary", () => {
     expect(cancelled).toBe(true);
   });
 });
+
+/**
+ * FW-B fix round 1, IMPORTANT 2 — THE DOOR, AND WHERE IT STANDS.
+ *
+ * B-I1 put `assertFramedPrompt` in this transport and put it BEFORE the try on
+ * purpose, but nothing drove it: the door's presence was read, never exercised,
+ * and its PLACEMENT was pinned by a comment. Both halves matter and they fail
+ * differently.
+ *
+ *  - Presence: without the door an unframed packet is posted, which is the
+ *    defect B-I1 exists to close — the row below proves the fetch never runs.
+ *  - Placement: `complete`'s catch turns anything that is not a
+ *    `SupportModelError` into `SUPPORT_MODEL_UNAVAILABLE` (`unavailable()`).
+ *    Move the door one line down, inside the try, and a call-site defect stops
+ *    being a typed `PROMPT_FRAME_*` refusal and starts looking like the vendor
+ *    being down: the visitor gets DEGRADED, `answer.ts` calls
+ *    `markUnavailable` and the circuit opens for everyone. The two rows below
+ *    discriminate exactly those two outcomes, so the placement is measured
+ *    rather than described.
+ *
+ * Driven against the REAL `RelayAdapter` with a capturing fetch, not a double:
+ * a door that only a double holds is not a door.
+ */
+describe("FW-B — the support transport refuses an unframed packet before it posts", () => {
+  it("raises the door's own typed refusal, and never reaches the vendor", async () => {
+    let calls = 0;
+    const fetchImplementation = vi.fn(async () => {
+      calls += 1;
+      return new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }] }),{
+        status: 200,headers: { "content-type": "application/json" }
+      });
+    }) as typeof fetch;
+
+    // The exact shape this transport assembled for itself before B-I1: an
+    // instruction and the visitor's words as a bare `user` turn.
+    await expect(adapter(fetchImplementation).complete({
+      packet: { messages: [
+        { role: "system",content: "Answer only from the supplied entries." },
+        { role: "user",content: "help" }
+      ] },
+      language: "en"
+    })).rejects.toMatchObject({ code: "PROMPT_FRAME_ABSENT" });
+
+    // Nothing left the process. This is the whole property: the refusal is not
+    // a vendor's answer being rejected, it is a call that never happened.
+    expect(calls).toBe(0);
+  });
+
+  it("refuses as a call-site defect, not as a vendor outage", async () => {
+    const fetchImplementation = vi.fn(async () => new Response("{}",{ status: 200 })) as typeof fetch;
+    /**
+     * `name` says which class refused, positively: `TypedDomainError` is the
+     * door's, `SupportModelError` is the transport's own vocabulary and the
+     * only thing `answer.ts` degrades on. Asserting the name rather than
+     * negating a class keeps this one statement, which is what the packet-shape
+     * scanner's door allowance reads.
+     */
+    await expect(adapter(fetchImplementation).complete({
+      packet: { messages: [{ role: "user",content: "help" }] },
+      language: "en"
+    })).rejects.toMatchObject({ name: "TypedDomainError",code: "PROMPT_FRAME_ABSENT" });
+  });
+
+  it("refuses a framed packet whose material block was tampered with", async () => {
+    const fetchImplementation = vi.fn(async () => new Response("{}",{ status: 200 })) as typeof fetch;
+    const framed = buildSupportAnswerPrompt({ instruction: "bounded",visitorMessage: "help" });
+    // A real frame, a real system message — and a user block that no longer
+    // opens and closes with the boundary marker the frame declares.
+    await expect(adapter(fetchImplementation).complete({
+      packet: { messages: [
+        framed.packet.messages[0]!,
+        { role: "user",content: "help, with the markers stripped" }
+      ] },
+      language: "en"
+    })).rejects.toMatchObject({ code: "PROMPT_FRAME_FENCE_MISMATCH" });
+  });
+});

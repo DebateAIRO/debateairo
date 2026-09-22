@@ -30,6 +30,16 @@ import { describe, expect, it } from "vitest";
  *
  * Scanned as an AST, not as text, so a comment naming either shape — this
  * docblock included — does not trip it.
+ *
+ * FIX ROUND 1, MINOR 2 — ONE FALSE POSITIVE, KEPT ON PURPOSE. The door is
+ * required in the SAME function as the post, so moving the `fetch` into a
+ * private helper (`#post(...)`) while the door stays in `complete` reads as an
+ * offence even though the call is still framed. That is the fail-closed
+ * direction and it is the right trade: the alternative is following the call
+ * graph, and a scanner that reasons about which function called which is a
+ * scanner that can be talked out of an offence. The repair is to move the door
+ * with the post, which is where it belongs anyway, and this paragraph is here
+ * so the next person reads a deliberate rule rather than a bug.
  */
 
 const SUPPORT_ROOT = "apps/api/src/support";
