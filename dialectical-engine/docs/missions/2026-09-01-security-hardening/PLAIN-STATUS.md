@@ -118,12 +118,18 @@ You asked for the building to be done by a team: **I (Claude Fable 5.1) coordina
 | 4 | Three small hardenings of the login surface (V-14, V-22, the e-mail-verification order) | **done, reviewed, merged** — approved on every point of your rulings; one safety-net test was fragile and was hardened and re-reviewed |
 | 5 | Three database items (V-17, V-29, the tamper check) | instructions written; **needs Docker running on this Mac** — it was not running when I checked |
 | 6 | Keys: the "team badge", then changing a master key | **done, reviewed, merged** — the hardest package so far. Three review rounds: the reviewer caught two "green report that lies" holes in the rotation (the support chat's final check would have accepted the *old* key; a key store the command never opened counted as a clean pass) — both fixed and re-checked. Rotation covers all three master keys; the rehearsal runs on a throwaway copy. One test that needs a database has not run yet (Docker) |
-| 8 | The support-chat leftovers from the September re-check (eight findings) | **an agent is working on it** |
-| 9 | Prompt-injection containment plus the five extra layers, on the "safety frame + your instruction text" split | **an agent is working on it** (the largest package) |
-| 10 | The two deployment modes enforced in code; AI-vendor keys in the locked key folder; vendors as configuration; the GPU settings made optional | **an agent is working on it** |
+| 8 | The support-chat leftovers from the September re-check (eight findings) | **built and reviewed; fix round in progress** — the reviewer found the three new usage budgets would have shipped switched off (a wiring line in a file I had fenced off), an IPv6 visitor could sidestep one budget, and the model-call share missed one door; all being fixed |
+| 9 | Prompt-injection containment plus the five extra layers, on the "safety frame + your instruction text" split | **built, reviewed, fix round under re-review** — the core held up (the reviewer called the "door" design better than asked); two evaluator paths had slipped past it and are now covered; the permanent attack test-suite grew to 210 cases across all 14 hand-offs. Note: five prompt sentences changed to name the material explicitly — listed for your confirmation run |
+| 10 | The two deployment modes enforced in code; AI-vendor keys in the locked key folder; vendors as configuration; the GPU settings made optional | **done, reviewed, merged** — two review rounds: the "no local model servers on the hosted site" check first recognised only four spellings of "this machine"; it now refuses every loopback and link-local address form (33 spellings probed). Two small choices for you below |
 | 7, 11, 12, 14, 15 | Data encryption and deletion (needs Docker); the spending ceilings; the support chat on the paid path; the server kit; dev leftovers | instructions written; queued behind the packages above |
 
 Still true: nothing is pushed and no switch on your accounts is flipped without your "go" at that moment.
+
+**Two small choices from package 10 (my defaults apply unless you say otherwise):**
+- **One or two credential files per AI vendor on the server?** The kit stores two — one for the website's API, one for the debate engine — so neither service can replace the other's; the cost is that rotating a vendor key is two steps. One shared file (readable by both through the "team badge") would also work. Default: two.
+- **Adding a vendor needs no code only if its API address ends in `/v1`** (the common shape). A vendor with a different shape still needs a small code change. Nothing to decide now; just so you know.
+
+**One number for you to ratify later (extends your V-1 ruling):** package 8 adds three usage budgets for the support chat — 240 page reads per 15 minutes per visitor network, 10 support sessions per hour per account, and a 40-calls-per-day share of the AI budget per visitor network (8 % of the 500-a-day ceiling). The reviewer judged the magnitudes right. I will put them to you with the final review.
 
 ### The plan from here (agreed order, 22 September)
 
