@@ -22,7 +22,9 @@ import {
   loadKek
 } from "../../packages/crypto/src/index.js";
 import type { KekHandle } from "../../packages/crypto/src/index.js";
-import { createSupportKeyPort } from "../../apps/api/src/support/keys.js";
+import {
+  createSupportKeyPort, type SupportContentContext
+} from "../../apps/api/src/support/keys.js";
 import {
   renderRotationReport,
   rotateFileStore,
@@ -461,8 +463,13 @@ describe("V-3 rotate: the rehearsal, on a throwaway copy", () => {
 
     const oldSupport = await createSupportKeyPort({ supportKekPath: oldSupportPath });
     const lease = await oldSupport.createDataKey({ kind: "session", ref: USER_A });
-    const sealed = oldSupport.seal(
-      { kind: "session", ref: USER_A }, lease.dataKey, Buffer.from("rehearsal", "utf8")
+    const sealedContext = Object.freeze({
+      kind: "session-message", sessionId: USER_A,
+      messageId: "88888888-8888-4888-8888-888888888888",
+      role: "user", outcome: "ANSWER_GROUNDED", purpose: "content"
+    }) satisfies SupportContentContext;
+    const sealed = oldSupport.sealContent(
+      sealedContext, lease.dataKey, Buffer.from("rehearsal", "utf8")
     );
     const repository = new FakeSupportKeyRepository([
       { kind: "session", ref: USER_A, wrappedKey: Buffer.from(lease.wrapped.bytes), destroyed: false }
@@ -507,8 +514,8 @@ describe("V-3 rotate: the rehearsal, on a throwaway copy", () => {
       { kind: "session", ref: USER_A }, rotatedRow.wrappedKey
     );
     // The CONTENT was never re-encrypted: the same ciphertext still opens.
-    expect(newSupport.open(
-      { kind: "session", ref: USER_A }, rotatedDataKey, sealed
+    expect(newSupport.openContent(
+      sealedContext, rotatedDataKey, sealed
     ).toString("utf8")).toBe("rehearsal");
     await newSupport.close();
 

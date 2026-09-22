@@ -22,7 +22,7 @@ const CONTENT_OVERHEAD_BYTES = VERSION_BYTES + NONCE_BYTES + AUTH_TAG_BYTES;
  * unmodelled call is exactly that shape. A named element is not a candidate.
  */
 const WRAPPED_KEY_VERSION_TAG = 1;
-const CONTENT_ENVELOPE_VERSION_TAG = 1;
+// DL2-F3: the retired content-envelope version 1 has no writer and no reader.
 const SEMANTIC_ENVELOPE_VERSION_TAG = 2;
 const SUPPORT_KEK_FILENAME = "support-kek.bin";
 const PRIVATE_DIRECTORY_MODE = 0o700;
@@ -98,8 +98,6 @@ export interface SupportKeyPort {
   verifyUnderCurrentKek(handle: SupportKeyHandle, wrapped: Uint8Array): Promise<void>;
   /** A non-secret label for the current KEK, for the rotation's own report. */
   currentKekId(): string;
-  seal(handle: SupportKeyHandle, dataKey: Uint8Array, plaintext: Uint8Array): Buffer;
-  open(handle: SupportKeyHandle, dataKey: Uint8Array, ciphertext: Uint8Array): Buffer;
   sealContent(context: SupportContentContext,dataKey: Uint8Array,plaintext: Uint8Array): Buffer;
   openContent(context: SupportContentContext,dataKey: Uint8Array,ciphertext: Uint8Array): Buffer;
   close(): Promise<void>;
@@ -171,7 +169,7 @@ function lengthPrefixed(value: string): Buffer {
   return Buffer.concat([length, bytes]);
 }
 
-function aad(domain: "support" | "support-content", handle: SupportKeyHandle): Buffer {
+function aad(domain: "support", handle: SupportKeyHandle): Buffer {
   assertHandle(handle);
   return Buffer.concat([
     lengthPrefixed("domain"),
@@ -260,8 +258,16 @@ function parseWrappedEnvelope(wrapped: Uint8Array): Readonly<{
   };
 }
 
+/**
+ * DL2-F3. The accepted version set is the WRITTEN one: version 2 alone. The
+ * retired version 1 bound only {domain, kind, ref}, so one of its ciphertexts
+ * opened under any semantic context of that handle — a downgrade path that no
+ * shipped writer ever produced (v1 and v2 landed together in `b300ee91`) and
+ * that migration `0054_support_keys_audit.sql` already refuses on every content
+ * column. Reading it was the last thing keeping it alive.
+ */
 function parseContentEnvelope(ciphertext: Uint8Array): Readonly<{
-  version: 1 | 2;
+  version: 2;
   nonce: Buffer;
   encrypted: Buffer;
   tag: Buffer;
@@ -270,9 +276,9 @@ function parseContentEnvelope(ciphertext: Uint8Array): Readonly<{
     fail("SUPPORT_CONTENT_ENVELOPE_INVALID");
   }
   const bytes = bytesView(ciphertext);
-  if (bytes[0] !== 1 && bytes[0] !== 2) fail("SUPPORT_CONTENT_ENVELOPE_INVALID");
+  if (bytes[0] !== SEMANTIC_ENVELOPE_VERSION_TAG) fail("SUPPORT_CONTENT_ENVELOPE_INVALID");
   return {
-    version: bytes[0],
+    version: SEMANTIC_ENVELOPE_VERSION_TAG,
     nonce: bytes.subarray(1, 1 + NONCE_BYTES),
     encrypted: bytes.subarray(1 + NONCE_BYTES, bytes.byteLength - AUTH_TAG_BYTES),
     tag: bytes.subarray(bytes.byteLength - AUTH_TAG_BYTES)
@@ -576,51 +582,6 @@ class FileSupportKeyPort implements SupportKeyPort {
     }
   }
 
-  seal(
-    handle: SupportKeyHandle,
-    dataKey: Uint8Array,
-    plaintext: Uint8Array
-  ): Buffer {
-    this.#assertOpen();
-    this.#assertDataKey(dataKey);
-    if (!(plaintext instanceof Uint8Array)) fail("SUPPORT_KEY_OPERATION_FAILED");
-    const nonce = randomBytes(NONCE_BYTES);
-    try {
-      const cipher = createCipheriv("aes-256-gcm", dataKey, nonce, {
-        authTagLength: AUTH_TAG_BYTES
-      });
-      cipher.setAAD(aad("support-content", handle));
-      const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-      // Content uses version || 12-byte nonce || variable ciphertext || 16-byte GCM tag.
-      return Buffer.concat([Buffer.from([CONTENT_ENVELOPE_VERSION_TAG]), nonce, encrypted, cipher.getAuthTag()]);
-    } catch (error) {
-      if (error instanceof SupportKeyError) throw error;
-      fail("SUPPORT_KEY_OPERATION_FAILED");
-    }
-  }
-
-  open(
-    handle: SupportKeyHandle,
-    dataKey: Uint8Array,
-    ciphertext: Uint8Array
-  ): Buffer {
-    this.#assertOpen();
-    this.#assertDataKey(dataKey);
-    assertHandle(handle);
-    const envelope = parseContentEnvelope(ciphertext);
-    if (envelope.version !== 1) fail("SUPPORT_CONTENT_ENVELOPE_INVALID");
-    try {
-      const decipher = createDecipheriv("aes-256-gcm", dataKey, envelope.nonce, {
-        authTagLength: AUTH_TAG_BYTES
-      });
-      decipher.setAAD(aad("support-content", handle));
-      decipher.setAuthTag(envelope.tag);
-      return Buffer.concat([decipher.update(envelope.encrypted), decipher.final()]);
-    } catch {
-      fail("SUPPORT_KEY_AUTHENTICATION_FAILED");
-    }
-  }
-
   sealContent(
     context: SupportContentContext,
     dataKey: Uint8Array,
@@ -651,14 +612,13 @@ class FileSupportKeyPort implements SupportKeyPort {
   ): Buffer {
     this.#assertOpen();
     this.#assertDataKey(dataKey);
-    const handle = semanticHandle(context);
+    semanticHandle(context);
     const envelope = parseContentEnvelope(ciphertext);
     try {
       const decipher = createDecipheriv("aes-256-gcm",dataKey,envelope.nonce,{
         authTagLength: AUTH_TAG_BYTES
       });
-      decipher.setAAD(envelope.version === 1
-        ? aad("support-content",handle) : semanticAad(context));
+      decipher.setAAD(semanticAad(context));
       decipher.setAuthTag(envelope.tag);
       return Buffer.concat([decipher.update(envelope.encrypted),decipher.final()]);
     } catch {

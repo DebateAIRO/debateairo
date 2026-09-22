@@ -1,3 +1,4 @@
+import { createCipheriv, randomBytes } from "node:crypto";
 import { chmod, link, lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -66,7 +67,7 @@ afterEach(async () => {
 });
 
 describe("SUP-07 support-only key envelopes", () => {
-  it("writes semantic content v2, rejects AAD replay, and dual-reads legacy v1", async () => {
+  it("writes semantic content v2 and rejects AAD replay", async () => {
     const port = await makePort();
     const lease = await port.createDataKey(SESSION_HANDLE);
     const plaintext = Buffer.from("semantic support content","utf8");
@@ -91,22 +92,23 @@ describe("SUP-07 support-only key envelopes", () => {
           "SUPPORT_KEY_AUTHENTICATION_FAILED"
         );
       }
-
-      const legacyV1 = port.seal(SESSION_HANDLE,lease.dataKey,plaintext);
-      expect(legacyV1[0]).toBe(1);
-      expect(port.openContent(context,lease.dataKey,legacyV1)).toEqual(plaintext);
     } finally {
       plaintext.fill(0);
       lease.close();
     }
   });
 
-  it("creates fresh 32-byte DEKs and round-trips exact version-1 GCM envelopes", async () => {
+  it("creates fresh 32-byte DEKs and round-trips exact GCM envelopes", async () => {
     const port = await makePort();
     const first = await port.createDataKey(SESSION_HANDLE);
     const second = await port.createDataKey(SESSION_HANDLE);
     const plaintext = Buffer.from("caller-owned support plaintext", "utf8");
     const openedBuffers: Buffer[] = [];
+    const context = Object.freeze({
+      kind: "session-message",sessionId: SESSION_HANDLE.ref,
+      messageId: "55555555-5555-4555-8555-555555555555",
+      role: "user",outcome: "ANSWER_GROUNDED",purpose: "content"
+    }) satisfies SupportContentContext;
     try {
       expect(first.dataKey).toHaveLength(32);
       expect(second.dataKey).toHaveLength(32);
@@ -122,14 +124,14 @@ describe("SUP-07 support-only key envelopes", () => {
       unwrapped.fill(0x77);
       expect(first.dataKey.equals(unwrapped)).toBe(false);
 
-      const ciphertext = port.seal(SESSION_HANDLE, first.dataKey, plaintext);
+      const ciphertext = port.sealContent(context, first.dataKey, plaintext);
       expect(ciphertext).toHaveLength(plaintext.byteLength + 29);
-      expect(ciphertext[0]).toBe(1);
-      const opened = port.open(SESSION_HANDLE, first.dataKey, ciphertext);
+      expect(ciphertext[0]).toBe(2);
+      const opened = port.openContent(context, first.dataKey, ciphertext);
       openedBuffers.push(opened);
       expect(opened).toEqual(plaintext);
       opened.fill(0x78);
-      const reopened = port.open(SESSION_HANDLE, first.dataKey, ciphertext);
+      const reopened = port.openContent(context, first.dataKey, ciphertext);
       openedBuffers.push(reopened);
       expect(reopened).toEqual(plaintext);
     } finally {
@@ -178,21 +180,26 @@ describe("SUP-07 support-only key envelopes", () => {
     }
   });
 
-  it("binds content to kind and ref and authenticates nonce, ciphertext, and tag", async () => {
+  it("binds content to its semantic context and authenticates nonce, ciphertext, and tag", async () => {
     const port = await makePort();
     const lease = await port.createDataKey(SESSION_HANDLE);
     const plaintext = Buffer.from("sensitive support message", "utf8");
+    const context = Object.freeze({
+      kind: "session-message",sessionId: SESSION_HANDLE.ref,
+      messageId: "66666666-6666-4666-8666-666666666666",
+      role: "user",outcome: "ANSWER_GROUNDED",purpose: "content"
+    }) satisfies SupportContentContext;
     try {
-      const ciphertext = port.seal(SESSION_HANDLE, lease.dataKey, plaintext);
-      for (const [handle, malformed] of [
-        [{ kind: "case", ref: SESSION_HANDLE.ref }, ciphertext],
-        [{ kind: "session", ref: CASE_HANDLE.ref }, ciphertext],
-        [SESSION_HANDLE, changedAt(ciphertext, 1)],
-        [SESSION_HANDLE, changedAt(ciphertext, 13)],
-        [SESSION_HANDLE, changedAt(ciphertext, ciphertext.byteLength - 1)]
+      const ciphertext = port.sealContent(context, lease.dataKey, plaintext);
+      for (const [replayed, malformed] of [
+        [{ ...context, sessionId: CASE_HANDLE.ref }, ciphertext],
+        [{ ...context, role: "assistant" }, ciphertext],
+        [context, changedAt(ciphertext, 1)],
+        [context, changedAt(ciphertext, 13)],
+        [context, changedAt(ciphertext, ciphertext.byteLength - 1)]
       ] as const) {
         const error = await expectSupportFailure(
-          () => port.open(handle, lease.dataKey, malformed),
+          () => port.openContent(replayed, lease.dataKey, malformed),
           "SUPPORT_KEY_AUTHENTICATION_FAILED"
         );
         for (const forbidden of [
@@ -203,11 +210,11 @@ describe("SUP-07 support-only key envelopes", () => {
         ]) expect(error.message).not.toContain(forbidden);
       }
       await expectSupportFailure(
-        () => port.open(SESSION_HANDLE, lease.dataKey, changedAt(ciphertext, 0)),
+        () => port.openContent(context, lease.dataKey, changedAt(ciphertext, 0)),
         "SUPPORT_CONTENT_ENVELOPE_INVALID"
       );
       await expectSupportFailure(
-        () => port.open(SESSION_HANDLE, lease.dataKey, ciphertext.subarray(0, 28)),
+        () => port.openContent(context, lease.dataKey, ciphertext.subarray(0, 28)),
         "SUPPORT_CONTENT_ENVELOPE_INVALID"
       );
     } finally {
@@ -225,7 +232,11 @@ describe("SUP-07 support-only key envelopes", () => {
     const plaintext = Buffer.from("must never be encrypted", "utf8");
     try {
       const error = await expectSupportFailure(
-        () => port.seal(SESSION_HANDLE, lease.dataKey, plaintext),
+        () => port.sealContent(Object.freeze({
+          kind: "session-message",sessionId: SESSION_HANDLE.ref,
+          messageId: "77777777-7777-4777-8777-777777777777",
+          role: "user",outcome: "ANSWER_GROUNDED",purpose: "content"
+        }) satisfies SupportContentContext, lease.dataKey, plaintext),
         "SUPPORT_DATA_KEY_CLOSED"
       );
       expect(error.message).not.toContain(plaintext.toString("utf8"));
@@ -239,12 +250,13 @@ describe("SUP-07 support-only key envelopes", () => {
     await port.close();
     await port.close();
     const malformedHandle = { kind: "invalid", ref: "" } as unknown as SupportKeyHandle;
+    const malformedContext = { kind: "invalid" } as unknown as SupportContentContext;
     const operations = [
       () => port.createDataKey(malformedHandle),
       () => port.wrapDataKey(malformedHandle, Buffer.alloc(0)),
       () => port.unwrapDataKey(malformedHandle, Buffer.alloc(0)),
-      () => port.seal(malformedHandle, Buffer.alloc(0), Buffer.alloc(0)),
-      () => port.open(malformedHandle, Buffer.alloc(0), Buffer.alloc(0))
+      () => port.sealContent(malformedContext, Buffer.alloc(0), Buffer.alloc(0)),
+      () => port.openContent(malformedContext, Buffer.alloc(0), Buffer.alloc(0))
     ];
     for (const operation of operations) {
       await expectSupportFailure(operation, "SUPPORT_KEY_PORT_CLOSED");
@@ -363,5 +375,79 @@ describe("SUP-07 support-only key envelopes", () => {
         "SUPPORT_KEK_CUSTODY_INVALID"
       );
     }
+  });
+});
+
+/**
+ * DL2-F3. The reader's accepted version set was wider than the writer's: no
+ * shipped code ever wrote a v1 content envelope (v1 and v2 landed in the same
+ * commit, `b300ee91`) and migration 0054 refuses v1 bytes on every content
+ * column, yet `openContent` still opened one — under an AAD that binds only
+ * {domain, kind, ref}, so a v1 ciphertext sealed for a session or case handle
+ * opened under ANY semantic context of that handle. The downgrade path is
+ * retired: `openContent` reads version 2 alone, and the v1-only `seal`/`open`
+ * pair — which had no production caller — is gone from the port.
+ */
+describe("DL2-F3 the v1 content envelope is not a readable form", () => {
+  function lengthPrefixed(value: string): Buffer {
+    const bytes = Buffer.from(value, "utf8");
+    const length = Buffer.allocUnsafe(4);
+    length.writeUInt32BE(bytes.byteLength);
+    return Buffer.concat([length, bytes]);
+  }
+
+  /** The retired v1 AAD: {domain, kind, ref} and nothing semantic. */
+  function legacyAad(handle: SupportKeyHandle): Buffer {
+    return Buffer.concat([
+      lengthPrefixed("domain"), lengthPrefixed("support-content"),
+      lengthPrefixed("kind"), lengthPrefixed(handle.kind),
+      lengthPrefixed("ref"), lengthPrefixed(handle.ref)
+    ]);
+  }
+
+  /** Builds exactly the bytes the retired writer produced, without the port. */
+  function sealLegacyV1(
+    handle: SupportKeyHandle, dataKey: Uint8Array, plaintext: Uint8Array
+  ): Buffer {
+    const nonce = randomBytes(12);
+    const cipher = createCipheriv("aes-256-gcm", dataKey, nonce, { authTagLength: 16 });
+    cipher.setAAD(legacyAad(handle));
+    const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+    return Buffer.concat([Buffer.from([1]), nonce, encrypted, cipher.getAuthTag()]);
+  }
+
+  it("refuses a v1 content envelope instead of opening it under a semantic context", async () => {
+    const port = await makePort();
+    const lease = await port.createDataKey(SESSION_HANDLE);
+    const plaintext = Buffer.from("planted v1 content", "utf8");
+    const context = Object.freeze({
+      kind: "session-message", sessionId: SESSION_HANDLE.ref,
+      messageId: "33333333-3333-4333-8333-333333333333",
+      role: "user", outcome: "ANSWER_GROUNDED", purpose: "content"
+    }) satisfies SupportContentContext;
+    try {
+      const legacyV1 = sealLegacyV1(SESSION_HANDLE, lease.dataKey, plaintext);
+      expect(legacyV1[0]).toBe(1);
+      await expectSupportFailure(
+        () => port.openContent(context, lease.dataKey, legacyV1),
+        "SUPPORT_CONTENT_ENVELOPE_INVALID"
+      );
+      // The version the writer produces still round-trips untouched.
+      const v2 = port.sealContent(context, lease.dataKey, plaintext);
+      expect(v2[0]).toBe(2);
+      expect(port.openContent(context, lease.dataKey, v2)).toEqual(plaintext);
+    } finally {
+      plaintext.fill(0);
+      lease.close();
+    }
+  });
+
+  it("exposes no v1 writer or reader on the port", async () => {
+    const port = await makePort();
+    const members = port as unknown as Readonly<Record<string, unknown>>;
+    expect(members.seal).toBeUndefined();
+    expect(members.open).toBeUndefined();
+    expect(typeof members.sealContent).toBe("function");
+    expect(typeof members.openContent).toBe("function");
   });
 });
