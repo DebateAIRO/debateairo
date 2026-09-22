@@ -276,6 +276,21 @@ const hatchetShape = {
 const apiEnvironmentShape = {
     KEK_PATH: kekPath,
     SUPPORT_KEK_PATH: kekPath,
+    /**
+     * V-3, fix wave A-C2. The three previous-key paths a CHANGEOVER sets, each
+     * OPTIONAL because their absence is the steady state: the operator sets one
+     * for the length of a rotation and removes it once a verification pass is
+     * clean. Absent, every store this root builds is the single-key store it
+     * has always been. Present, reads try the current key and then the previous
+     * one, and every WRITE still uses the current key.
+     *
+     * Same custody rules as the current paths — they are read by the same
+     * loaders — so a previous key the API cannot open refuses at boot rather
+     * than at the first private debate.
+     */
+    KEK_PREVIOUS_PATH: z.string().min(1).optional(),
+    CORPUS_KEK_PREVIOUS_PATH: z.string().min(1).optional(),
+    SUPPORT_KEK_PREVIOUS_PATH: z.string().min(1).optional(),
     // V-19: opt-in custody group. Absent, every key file and wrapped-key record
     // must be 0600 owned by this uid inside a 0700 directory owned by this uid.
     // Present (a group name or a decimal gid), @debateai/crypto additionally
@@ -522,7 +537,17 @@ export function loadRunnerEnvironment() {
 
 export function parseRunnerEnvironment(source: EnvironmentSource) {
   const environment = parseEnvironmentSource({
-    KEK_PATH: kekPath, DATABASE_URL: z.string().url(), RUNNER_WORKER_ID: z.string().min(1),
+    KEK_PATH: kekPath,
+    /**
+     * V-3, fix wave A-C2. The runner's half of a changeover. It holds ONE
+     * master key — its own copy of the user-DEK KEK — so this is the only
+     * previous path its shape carries: `CORPUS_KEK_PREVIOUS_PATH` and
+     * `SUPPORT_KEK_PREVIOUS_PATH` are refused here exactly as their current
+     * halves are, because this principal has no corpus and no support key.
+     * Absent is the steady state and the single-key behaviour of today.
+     */
+    KEK_PREVIOUS_PATH: z.string().min(1).optional(),
+    DATABASE_URL: z.string().url(), RUNNER_WORKER_ID: z.string().min(1),
     REGISTER_VERSION: legacyRegisterVersion, NODE_ENV: nodeEnvironment,
     CONTENT_ENCRYPTION_ENABLED: z.enum(["true", "false"]).default("false"),
     CONTENT_BLIND_INDEX_KEY_PATH: z.string().min(1).optional(),

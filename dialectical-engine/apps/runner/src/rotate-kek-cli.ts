@@ -26,12 +26,13 @@ import {
 } from "@debateai/db";
 import {
   configureCustodyGroup,
+  destroyKek,
   FilePublicationKeyStore,
   FileUserDekStore,
   kekId,
-  loadKek
+  loadKekRing
 } from "@debateai/crypto";
-import type { KekRing } from "@debateai/crypto";
+import type { KekHandle, KekRing } from "@debateai/crypto";
 import { loadKeyRotationEnvironment } from "@debateai/register";
 import { createSupportKeyPort } from "../../api/src/support/keys.js";
 import {
@@ -117,14 +118,38 @@ export function keyRotationRefusalLine(error: unknown): string {
   return `KEYS_ROTATE_KEK_REFUSED ${typeof code === "string" && code !== "" ? code : "UNKNOWN"}`;
 }
 
-function ring(currentPath: string, previousPath: string | undefined): KekRing {
-  const current = loadKek(currentPath);
-  return previousPath === undefined
-    ? { current }
-    : { current, previous: loadKek(previousPath) };
+export async function runKeyRotation(): Promise<string> {
+  /**
+   * Minor (final review A): the file-store KEK handles used to live until the
+   * process exited, against this command's own promise that no plaintext key
+   * material is retained. They are collected as they are loaded — the same
+   * `hold` seam the services hand to the boot ledger — and zeroed in the
+   * `finally` below, whichever way the run ends.
+   */
+  const handles: KekHandle[] = [];
+  const hold = (handle: KekHandle): KekHandle => {
+    handles.push(handle);
+    return handle;
+  };
+  const ring = (currentPath: string, previousPath: string | undefined): KekRing =>
+    loadKekRing(currentPath, previousPath, hold);
+  try {
+    return await rotateEveryStore(ring);
+  } finally {
+    // Newest first, and never letting one failed zeroisation hide the next.
+    for (const handle of [...handles].reverse()) {
+      try {
+        destroyKek(handle);
+      } catch {
+        // Nothing downstream can act on a failed zeroisation.
+      }
+    }
+  }
 }
 
-export async function runKeyRotation(): Promise<string> {
+async function rotateEveryStore(
+  ring: (currentPath: string, previousPath: string | undefined) => KekRing
+): Promise<string> {
   // M5: every missing or malformed variable leaves by a typed code naming it,
   // rather than as a ZodError printed as UNKNOWN.
   let environment: ReturnType<typeof loadKeyRotationEnvironment>;

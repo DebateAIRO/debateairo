@@ -812,6 +812,32 @@ export function loadKek(pathOrBuffer: string | Uint8Array): KekHandle {
 }
 
 /**
+ * V-3 — the changeover ring a SERVICE builds from the two paths it is
+ * configured with. `previousPath` absent is the steady state and answers a ring
+ * that is byte-for-byte today's single-key behaviour.
+ *
+ * `hold` exists because of DL7-F7: each handle is offered to the owner the
+ * MOMENT it exists, so a refusal on the previous key can never leave the
+ * current key live in memory with nothing responsible for it. The default is
+ * identity, for callers that own the handles themselves.
+ *
+ * The two keys being the same file, or the same bytes under two names, is
+ * refused here (`KEK_RING_NOT_A_CHANGEOVER`, via `toKekRing`) rather than at the
+ * first store construction: during a changeover that mistake makes every record
+ * look already-current whichever key really wrapped it, so a verification pass
+ * over it would mean nothing.
+ */
+export function loadKekRing(
+  currentPath: string,
+  previousPath: string | undefined,
+  hold: (handle: KekHandle) => KekHandle = (handle) => handle
+): KekRing {
+  const current = hold(loadKek(currentPath));
+  if (previousPath === undefined) return Object.freeze({ current });
+  return Object.freeze(toKekRing({ current, previous: hold(loadKek(previousPath)) }));
+}
+
+/**
  * V-9(2). A provider credential is text, not 32 raw bytes, so it is bounded
  * rather than sized exactly. Four kilobytes is far above any vendor's token and
  * far below anything worth loading by accident.

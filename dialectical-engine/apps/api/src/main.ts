@@ -10,7 +10,7 @@ import {
   FilePublicationKeyStore,
   FileRunContentKeyStore,
   FileUserDekStore,
-  loadKek,
+  loadKekRing,
   loadSecretKey,
   PublicationCipher,
   readCustodyAuthorizationHeader
@@ -105,9 +105,25 @@ configureCustodyGroup(environment.DEBATEAI_CUSTODY_GROUP);
  * row no longer exits with three KEKs live in memory.
  */
 const boot = installBootCustody();
-const kek = boot.holdKek(loadKek(environment.KEK_PATH));
-const corpusKek = environment.PUBLICATION_ENABLED === "true"
-  ? boot.holdKek(loadKek(environment.CORPUS_KEK_PATH!)) : undefined;
+/**
+ * V-3 (fix wave A-C2). The KEK a service holds is a RING: the current key and,
+ * for the length of a changeover, the previous one. Reads try current then
+ * previous; every write uses the current key; verification is current-alone.
+ * With no `*_KEK_PREVIOUS_PATH` set — the steady state — each ring is exactly
+ * the single key this root has always built.
+ *
+ * Both handles are held by the boot ledger the moment they exist (DL7-F7), so a
+ * stage that rejects mid-boot zeroes the previous key too.
+ */
+const userKeks = loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH, (handle) => boot.holdKek(handle));
+const kek = userKeks.current;
+const corpusKeks = environment.PUBLICATION_ENABLED === "true"
+  ? loadKekRing(
+      environment.CORPUS_KEK_PATH!, environment.CORPUS_KEK_PREVIOUS_PATH,
+      (handle) => boot.holdKek(handle)
+    )
+  : undefined;
+const corpusKek = corpusKeks?.current;
 const blindIndexKey = loadSecretKey(environment.BLIND_INDEX_KEY_PATH);
 const sourceIpSalt = loadSecretKey(environment.AUDIT_SOURCE_IP_SALT_PATH);
 // DL7-F7: two plain secret buffers, held the moment they exist. Each has an
@@ -272,7 +288,9 @@ const resolveProviderPanel = createProviderDiscoveryResolver({
   probeTimeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS
 });
 const deploymentRiskTier = await boot.run("deployment-risk-tier", () => readDeploymentRiskTier(pool, environment.REGISTER_VERSION));
-const dekStore = new FileUserDekStore(environment.USER_DEK_STORE_PATH, kek);
+// V-3: over the RING, so a record still wrapped by the previous key opens for
+// the length of a changeover. Writes stay under the current key.
+const dekStore = new FileUserDekStore(environment.USER_DEK_STORE_PATH, userKeks);
 const authenticationRiskSignals = new PostgresAuthenticationRiskSignalRepository(
   pool,auditContextHasher,dekStore,recoveryPolicy.riskSignals.rawSignalRetentionMs,
   recoveryPolicy.riskSignals.maximumEvaluatorSignals
@@ -385,7 +403,7 @@ const application = new PostgresAskApplication(pool, dispatcher, {
 }));
 const publicationCipher = environment.PUBLICATION_ENABLED === "true"
   ? new PublicationCipher(new FilePublicationKeyStore(
-      environment.PUBLICATION_KEY_STORE_PATH!,corpusKek!
+      environment.PUBLICATION_KEY_STORE_PATH!,corpusKeks!
     ))
   : undefined;
 const publications = publicationCipher === undefined
@@ -472,6 +490,10 @@ const supportRelayLeasePool = boot.hold(
 );
 const supportKeys = await boot.run("support-keys", () => createSupportKeyPort({
   supportKekPath: environment.SUPPORT_KEK_PATH,
+  // V-3: the support envelope carries no key label, so a row written before a
+  // changeover is opened by trying the current key and then this one. Absent
+  // outside a changeover, which is the steady state.
+  previousSupportKekPath: environment.SUPPORT_KEK_PREVIOUS_PATH,
   protectedKeyPaths: [
     environment.KEK_PATH,
     environment.CORPUS_KEK_PATH,
@@ -692,8 +714,15 @@ const startup = installStartupResourceOwner({
     { end: () => supportKeys.close() },
     { end: () => supportConfiguration.close() }
   ],
-  // L2-F7: zeroed after every pool that borrows from them has closed.
-  kekHandles: [kek, ...(corpusKek === undefined ? [] : [corpusKek])]
+  // L2-F7: zeroed after every pool that borrows from them has closed. A
+  // changeover's PREVIOUS keys are in this list for the same reason the current
+  // ones are: the process holds them, so the process zeroes them (V-3).
+  kekHandles: [
+    kek,
+    ...(userKeks.previous === undefined ? [] : [userKeks.previous]),
+    ...(corpusKek === undefined ? [] : [corpusKek]),
+    ...(corpusKeks?.previous === undefined ? [] : [corpusKeks.previous])
+  ]
 });
 // DL7-F7: the boot ledger hands everything it held to the startup resource
 // owner, which is the lifecycle from here on. Exactly one owner at a time:

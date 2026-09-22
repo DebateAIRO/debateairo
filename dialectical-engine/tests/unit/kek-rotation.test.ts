@@ -23,10 +23,19 @@ import {
   generateDek,
   kekId,
   loadKek,
+  loadKekRing,
   wrapDek
 } from "../../packages/crypto/src/index.js";
 import type { KekHandle } from "../../packages/crypto/src/index.js";
 import { createSupportKeyPort } from "../../apps/api/src/support/keys.js";
+import {
+  parseApiEnvironment,
+  parseRunnerEnvironment
+} from "../../packages/register/src/runtime-environment.js";
+import {
+  validApiEnvironmentFixture,
+  validRunnerEnvironmentFixture
+} from "../support/apiEnvironmentFixture.js";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const PUBLICATION_REF = "22222222-2222-4222-8222-222222222222";
@@ -549,5 +558,168 @@ describe("V-3 rotation: records written now carry their kek_id", () => {
 
     const during = new FileUserDekStore(root, { current: replacement, previous: original });
     expect(await during.load(USER_ID)).toEqual(dek);
+  });
+});
+
+/**
+ * FIX WAVE A-C2 (final review A, second Critical). The ring existed and NOTHING
+ * built it but the rotation command: neither environment shape carried a
+ * `*_KEK_PREVIOUS_PATH`, and both composition roots constructed single-key
+ * stores. So the runbook's central promise — "both services read both keys for
+ * the length of the changeover" — was false, and the only order that avoided a
+ * total outage was the order in which the rotation loses records.
+ *
+ * The changeover is a SERVICE capability here: the two paths a service is
+ * configured with become one ring, both handles owned from the moment they
+ * exist, reads try current then previous, writes always use the current key.
+ */
+describe("V-3 changeover: the ring a service builds from its two configured paths", () => {
+  it("reads a record wrapped under the PREVIOUS key and writes the new one under the current", async () => {
+    const directory = await temporaryDirectory("debateai-ring-service-");
+    const previousPath = join(directory, "kek-previous.bin");
+    const currentPath = join(directory, "kek.bin");
+    await writeFile(previousPath, generateDek(), { mode: 0o600 });
+    await writeFile(currentPath, generateDek(), { mode: 0o600 });
+    await chmod(previousPath, 0o600);
+    await chmod(currentPath, 0o600);
+    await chmod(directory, 0o700);
+    const root = join(directory, "user-deks");
+    await mkdir(root, { mode: 0o700 });
+
+    // The steady state before the changeover: one record under the old key.
+    const dek = generateDek();
+    await new FileUserDekStore(root, loadKek(previousPath)).store(USER_ID, dek);
+
+    // What a restarted service does once the operator has set both paths.
+    const ring = loadKekRing(currentPath, previousPath);
+    const store = new FileUserDekStore(root, ring);
+    expect(await store.load(USER_ID)).toEqual(dek);
+
+    // Writes go under the CURRENT key even while the previous one is held, so
+    // the changeover shrinks with every write instead of growing.
+    const second = generateDek();
+    await store.store(PUBLICATION_REF, second);
+    const written = JSON.parse(await readFile(
+      join(root, "users", PUBLICATION_REF, "dek.v1.json"), "utf8"
+    )) as Record<string, unknown>;
+    expect(written.kek_id).toBe(kekId(ring.current));
+  });
+
+  it("holds each handle the moment it exists, so a refused previous key leaks nothing", async () => {
+    const directory = await temporaryDirectory("debateai-ring-hold-");
+    const currentPath = join(directory, "kek.bin");
+    await writeFile(currentPath, generateDek(), { mode: 0o600 });
+    await chmod(currentPath, 0o600);
+    await chmod(directory, 0o700);
+    const held: KekHandle[] = [];
+
+    // The previous path names nothing: the current key was already loaded, and
+    // an owner that only sees the finished ring would never zero it.
+    expect(() => loadKekRing(currentPath, join(directory, "absent.bin"), (handle) => {
+      held.push(handle);
+      return handle;
+    })).toThrowError(expect.objectContaining({ code: "KEK_UNRESOLVED" }));
+    expect(held).toHaveLength(1);
+    expect(kekId(held[0]!)).toMatch(/^[0-9a-f]{16}$/u);
+  });
+
+  it("refuses a previous path that is the current key: that is not a changeover", async () => {
+    const directory = await temporaryDirectory("debateai-ring-same-");
+    const currentPath = join(directory, "kek.bin");
+    const copyPath = join(directory, "kek-copy.bin");
+    const material = generateDek();
+    await writeFile(currentPath, material, { mode: 0o600 });
+    await writeFile(copyPath, material, { mode: 0o600 });
+    await chmod(currentPath, 0o600);
+    await chmod(copyPath, 0o600);
+    await chmod(directory, 0o700);
+
+    expect(() => loadKekRing(currentPath, copyPath)).toThrowError(
+      expect.objectContaining({ code: "KEK_RING_NOT_A_CHANGEOVER" })
+    );
+  });
+
+  it("is the single-key store, exactly as today, when no previous path is set", async () => {
+    const directory = await temporaryDirectory("debateai-ring-single-");
+    const currentPath = join(directory, "kek.bin");
+    await writeFile(currentPath, generateDek(), { mode: 0o600 });
+    await chmod(currentPath, 0o600);
+    await chmod(directory, 0o700);
+    const ring = loadKekRing(currentPath, undefined);
+    expect(ring.previous).toBeUndefined();
+
+    const root = join(directory, "user-deks");
+    await mkdir(root, { mode: 0o700 });
+    const dek = generateDek();
+    const store = new FileUserDekStore(root, ring);
+    await store.store(USER_ID, dek);
+    expect(await store.load(USER_ID)).toEqual(dek);
+  });
+});
+
+describe("V-3 changeover: both services are configured for it", () => {
+  const PREVIOUS_PATHS = Object.freeze({
+    KEK_PREVIOUS_PATH: "/run/secrets/previous/kek",
+    CORPUS_KEK_PREVIOUS_PATH: "/run/secrets/previous/corpus-kek",
+    SUPPORT_KEK_PREVIOUS_PATH: "/run/secrets/previous/support-kek"
+  });
+
+  it("the API accepts all three previous paths, and none of them is required", () => {
+    const during = parseApiEnvironment({
+      ...validApiEnvironmentFixture(), ...PREVIOUS_PATHS,
+      CORPUS_KEK_PATH: "/run/secrets/corpus-kek"
+    });
+    expect(during.KEK_PREVIOUS_PATH).toBe(PREVIOUS_PATHS.KEK_PREVIOUS_PATH);
+    expect(during.CORPUS_KEK_PREVIOUS_PATH).toBe(PREVIOUS_PATHS.CORPUS_KEK_PREVIOUS_PATH);
+    expect(during.SUPPORT_KEK_PREVIOUS_PATH).toBe(PREVIOUS_PATHS.SUPPORT_KEK_PREVIOUS_PATH);
+    // Absent is the steady state, and it must stay the ordinary single-key one.
+    const steady = parseApiEnvironment(validApiEnvironmentFixture());
+    expect(steady.KEK_PREVIOUS_PATH).toBeUndefined();
+    expect(steady.SUPPORT_KEK_PREVIOUS_PATH).toBeUndefined();
+  });
+
+  it("the runner accepts the user-DEK previous path, and only that one", () => {
+    const during = parseRunnerEnvironment({
+      ...validRunnerEnvironmentFixture(), KEK_PREVIOUS_PATH: PREVIOUS_PATHS.KEK_PREVIOUS_PATH
+    });
+    expect(during.KEK_PREVIOUS_PATH).toBe(PREVIOUS_PATHS.KEK_PREVIOUS_PATH);
+    expect(parseRunnerEnvironment(validRunnerEnvironmentFixture()).KEK_PREVIOUS_PATH)
+      .toBeUndefined();
+    // The runner holds neither the corpus nor the support KEK — SUPPORT_KEK_PATH
+    // is deliberately absent from its shape for exactly that reason — so the
+    // previous halves of those two are not in its environment at all. A value
+    // an operator pasted into runner.env by mistake never becomes a key this
+    // principal holds.
+    const stray = parseRunnerEnvironment({
+      ...validRunnerEnvironmentFixture(),
+      CORPUS_KEK_PREVIOUS_PATH: "/run/secrets/previous/corpus-kek",
+      SUPPORT_KEK_PREVIOUS_PATH: "/run/secrets/previous/support-kek"
+    });
+    for (const key of [
+      "CORPUS_KEK_PATH", "CORPUS_KEK_PREVIOUS_PATH",
+      "SUPPORT_KEK_PATH", "SUPPORT_KEK_PREVIOUS_PATH"
+    ]) expect(stray, key).not.toHaveProperty(key);
+  });
+
+  it("both composition roots build the ring and hold both handles", async () => {
+    const api = await readFile(
+      new URL("../../apps/api/src/main.ts", import.meta.url), "utf8"
+    );
+    // The user-DEK ring, held by the DL7-F7 boot ledger — both handles, so a
+    // stage that rejects mid-boot zeroes the previous key too.
+    expect(api).toContain(
+      "loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH, (handle) => boot.holdKek(handle))"
+    );
+    expect(api).toContain("environment.CORPUS_KEK_PREVIOUS_PATH");
+    // The support port takes its previous key the same way the rotation does.
+    expect(api).toContain("previousSupportKekPath: environment.SUPPORT_KEK_PREVIOUS_PATH");
+    // And the store the runner shares is built over the ring, not a bare handle.
+    expect(api).toContain("new FileUserDekStore(environment.USER_DEK_STORE_PATH, userKeks)");
+
+    const runner = await readFile(
+      new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8"
+    );
+    expect(runner).toContain("loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH)");
+    expect(runner).not.toContain("loadKek(environment.KEK_PATH)");
   });
 });

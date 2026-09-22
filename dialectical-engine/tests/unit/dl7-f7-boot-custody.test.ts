@@ -132,7 +132,9 @@ describe("DL7-F7 every awaited boot stage runs under an owner", () => {
     const source = await readFile("apps/api/src/main.ts", "utf8");
     expect(source).toContain("installBootCustody");
     for (const held of [
-      "boot.holdKek(loadKek(environment.KEK_PATH))",
+      // V-3 (A-C2): the first key load is a RING now — current and, during a
+      // changeover, previous — and `hold` runs on each handle as it is made.
+      "loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH, (handle) => boot.holdKek(handle))",
       "boot.hold(",
       "boot.release()"
     ]) expect(source).toContain(held);

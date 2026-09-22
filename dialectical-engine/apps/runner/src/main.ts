@@ -5,7 +5,7 @@ import {
   ContentCipher,
   FileRunContentKeyStore,
   FileUserDekStore,
-  loadKek,
+  loadKekRing,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
 import { configureContentEncryption, createPool, RunRepository } from "@debateai/db";
@@ -40,7 +40,12 @@ assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE);
 // the custody group every load below refuses. Configured before the first open
 // so an unresolvable group is a boot failure, not a mid-run one.
 configureCustodyGroup(environment.DEBATEAI_CUSTODY_GROUP);
-const kek = loadKek(environment.KEK_PATH);
+// V-3 (fix wave A-C2): the runner reads the store the API writes, so it must
+// hold the same ring for the length of a KEK changeover — its own copy of the
+// current key and, while `KEK_PREVIOUS_PATH` is set, of the previous one.
+// Absent, this is the single key it has always loaded. The runner only ever
+// READS this store, so no write ever chooses between the two.
+const kek = loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH);
 const pool = createPool(environment.DATABASE_URL);
 if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
   const users = new FileUserDekStore(environment.USER_DEK_STORE_PATH!, kek);
