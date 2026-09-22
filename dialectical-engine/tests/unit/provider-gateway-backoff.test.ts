@@ -155,12 +155,17 @@ describe("DL4-F3 — the runner's gateway factory supplies the per-attempt hook"
     expect(body).toContain("const leasedRunId = request.runId");
   });
 
-  it("fails on the mutation it exists to catch", async () => {
+  it("wires it exactly once, so the pin above names one site and not a family", async () => {
     const body = factoryBody(await readFile(
       new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8"
     ));
-    // Drop the hook and nothing else: the pin above must not survive it.
-    expect(body.replace(HOOK, "")).not.toContain(HOOK);
+    // Uniqueness, not a mutation test: `toContain` would pass on two hooks as
+    // readily as on one, and a second wiring of the same ceiling would be a
+    // double charge rather than a second guard. The mutation evidence — the
+    // pin failing when the hook is replaced by `undefined`, while every
+    // behavioural case in this file stays green — was measured by hand at INT2
+    // and lives in the INT2 report; it is not reproduced here, because doing so
+    // would mean a test that edits product source.
     expect(body.split(HOOK)).toHaveLength(2);
   });
 });

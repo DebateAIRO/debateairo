@@ -138,9 +138,10 @@ describe("the 2026-09-22 amendment — an obs-capture envelope never carries the
    * the builder would still have been green.
    *
    * This row is the joint, measured at full strength: the real builder's
-   * output through the real redactor. `tests/integration/` is in neither
-   * `test:ci-gate` nor `test:s00`, so the S06 case that first caught this does
-   * not gate anything; this one does.
+   * output through the real redactor. `test:ci-gate`, the only suite CI runs
+   * (`.github/workflows/security.yml:27`), does not cover `tests/integration`;
+   * `test:s00` does, but CI does not run it. So the S06 case that first caught
+   * this gates nothing in CI; this row does.
    */
   it("survives the shared redactor unminimised, carrying its own code (INT2)", () => {
     const envelope = captureFailureEnvelope({
@@ -177,16 +178,19 @@ describe("the 2026-09-22 amendment — an obs-capture envelope never carries the
  * `dev` @ `cbf1b281` restored an S06 capture binding with THREE
  * `capture?.emit({ ..., error, ... })` sites in `apps/runner/src/index.ts` —
  * two in the task body and one in the gateway wrapper — each carrying the RAW
- * error. That binding is NOT on this branch (SYNC2's own result,
- * `security/dev-sync-2026-09-22` @ `e8e03b08`, does not carry it either), so
- * there is nothing here to convert and a behavioural test would be vacuous —
- * green because it measured nothing.
+ * error.
  *
- * This row is the honest instrument instead: a SOURCE property that is true now
- * and goes RED the moment those three sites arrive unconverted. The conversion
- * is mechanical — replace the object literal with `captureFailureEnvelope({
- * error, taxonomyClass, capturePoint, disposition, source, attemptIndex })`,
- * whose return type has no `error` member at all.
+ * WRITTEN AHEAD OF THEM, AND THEY HAVE SINCE ARRIVED. When this row was written
+ * the binding was not yet on this branch, so it could only be a source property;
+ * at INT2 (2026-09-22) the merge brought all three sites in, the row went RED
+ * (`expected 3 to be less than or equal to 0`), and the conversion turned it
+ * green. It stays a SOURCE property because that is what it is for: it goes RED
+ * again the moment a later merge re-introduces an unconverted site, which no
+ * behavioural test of today's three call sites would notice.
+ *
+ * The conversion is mechanical — replace the object literal with
+ * `captureFailureEnvelope({ error, taxonomyClass, capturePoint, disposition,
+ * source, attemptIndex })`, whose return type has no `error` member at all.
  */
 /** The two properties the guard holds, applied to any source text. */
 function captureGuardVerdict(source: string): {

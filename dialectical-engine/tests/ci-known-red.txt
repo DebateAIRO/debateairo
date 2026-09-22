@@ -18,21 +18,25 @@
 #     two commits between it and cbf1b281 are records-only, so that list is dev's state at
 #     cbf1b281. Every entry below appears in it, so none is caused by this branch.
 #
-# What this re-baseline changed (12 entries in, 5 out — the list shrank by 7):
+# What this re-baseline changed (of the 12 entries it started from, 7 were removed and 5
+# remain — the list may only ever shrink on its own side):
 #   - THE THREE role-token-map ENTRIES WERE RENAMED BY THE TOOL, not fixed and not renamed
 #     by dev. Corrected at INT2, 2026-09-22, because the first account named the wrong
 #     cause and a future re-baseline would have looked in the wrong place:
 #     `git log 7bae9806..cbf1b281 -- tests/architecture/role-token-map.test.ts` is EMPTY and
 #     the template `it.each(expected)("$surface binds its $role role", …)` is byte-identical
 #     at both ends. The rename came from the vitest 4.1.10 -> 5.0.1 upgrade (dev's D78):
-#     vitest 5's `formatAttribute` prints a string value WITHOUT quotes, where 4.x routed it
+#     vitest 5's title formatter prints a string value WITHOUT quotes, where 4.x routed it
 #     through `inspect()`, which quoted it. That silently renamed EVERY `$prop`-interpolated
-#     title in the repository — 7 templates in 5 files — and only role-token-map had entries
-#     here, which is why the list is otherwise correct. Two are re-listed below under the
-#     exact names vitest prints today; the third ('DebateMap root hub') is GREEN since dev's
-#     830b1331 and is simply gone. A renamed entry is the quietest way for a list like this
-#     to rot: it neither fails nor goes stale, it just stops meaning anything — and a
-#     TEST-RUNNER upgrade can do it to every templated title at once, without a diff.
+#     title in the repository whose substituted value is a string — AT LEAST 52 templates
+#     across 12 files (a floor, not a census; the largest is s1-1-depth-contract.test.ts
+#     with 38). THE OPERATIVE POINT: the blast radius is large, and this list is correct
+#     afterwards only because role-token-map was the ONLY renamed file with entries on it.
+#     Two are re-listed below under the exact names vitest prints today; the third
+#     ('DebateMap root hub') is GREEN since dev's 830b1331 and is simply gone. A renamed
+#     entry is the quietest way for a list like this to rot: it neither fails nor goes
+#     stale, it just stops meaning anything — and a TEST-RUNNER upgrade can do it to dozens
+#     of templated titles at once, with no diff anywhere to read.
 #   - green on the merged tree, deleted: s7-authorization-contract "hardens every immutable
 #     memory scope carrier" (dev's D79 (e)2 — the assertion was VACUOUS LIVE and was
 #     repaired); s8-publication-contract "ships the deliberate controls…" (dev's 84f94f17

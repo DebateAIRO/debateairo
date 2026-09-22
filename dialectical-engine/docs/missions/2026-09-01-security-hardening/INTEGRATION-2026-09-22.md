@@ -52,15 +52,28 @@ attacker-controllable; if the binding ran first, an unvalidated `runId` string w
 L4-F6 first costs nothing (a malformed dispatch has no run to attribute anyway) and closes that
 path. The reverse order — binding first — would have been the tidy merge and the wrong one.
 
-Everything below the hunk auto-merged and was re-read to confirm it survived:
+Everything below the hunk auto-merged and was re-read to confirm it survived. **Every line
+number in this table is measured in `apps/runner/src/index.ts` at `345eb7d0`**, not at the merge
+commit `c0e43afc`, and each was re-checked by grep when this row was written. No later commit on
+this branch touches that file, so they hold at the tip too. The first draft of this table mixed
+the two commits and one number was already stale by two lines.
 
-| Behaviour | Owner | Where it lives after the merge |
+| Behaviour | Owner | Where it lives after the merge (at `345eb7d0`) |
 |---|---|---|
-| `scrubbedTaskFailure` at the single trailing `throw` | DL4-F1, re-seated by SYNC2 | `:5591`, reached on every failing path including `dev`'s `!recorded` path |
-| `assertAttemptAllowed: () => budget.assertModelAttemptAllowed(leasedRunId)` | DL4-F3, re-seated by SYNC2 | `:5678`, inside `http.call` — now pinned, §7 |
 | `captureFailureEnvelope` | Task 9 (the amendment) | `:5477`, and now used at all three sites |
-| `EVALUATOR_PROMPT_CONTRACT`, the dispatch-input schema, the frame-builder call sites | Task 9 | auto-merged, intact |
-| `runBodyBudgetStop`, `envelopeStopKind`, spend-stop routing, `buildMakerPositionDisclosure` | Task 11 | auto-merged, intact |
+| `scrubbedTaskFailure` at the single trailing `throw` | DL4-F1, re-seated by SYNC2 | `:5593`, reached on every failing path including `dev`'s `!recorded` path |
+| `assertAttemptAllowed: () => budget.assertModelAttemptAllowed(leasedRunId)` | DL4-F3, re-seated by SYNC2 | `:5678`, inside `http.call` — now pinned, §7 |
+| `EVALUATOR_PROMPT_CONTRACT`, the dispatch-input schema, the frame-builder call sites | Task 9 | `:194` (the contract), `:4256` (the evaluator call site) |
+| The cost-envelope decision path | Task 11 | `evaluateEnvelope` `:3968`, `recordEnvelope` `:3978`, `makeEnvelopeTerminal` `:3986`; the `RUN_COST_ENVELOPE_EXHAUSTED` catch `:4306` → `evaluateEnvelope(1)` `:4314` → terminal `:4323`; the final decision `:4326` |
+
+**Correction, recorded rather than quietly fixed.** The first draft of the Task 11 row named
+`runBodyBudgetStop`, `envelopeStopKind` and `buildMakerPositionDisclosure` as "auto-merged,
+intact". Those three identifiers **exist nowhere in the tree** — not at HEAD and not at the
+pre-merge integration tip `f8419b4c`; `git grep` returns only this document's own row. They came
+from Task 11's report §11, which describes the design in the vocabulary of its rounds, and were
+copied here as if they were code. Naming a symbol that does not exist is worse than naming
+nothing: it reads as verification and is the opposite. The row above names anchors that were
+each grepped at HEAD before being written down.
 
 ## 3. `tests/ci-known-red.txt` — the union, then the reconciliation
 
@@ -101,11 +114,23 @@ durable record with no code, no capture point and no attempt index: the amendmen
 silently destroyed exactly the signal the S06 binding exists to record, while every unit test of
 the builder stayed green.
 
-`path` is allowlisted (it is the bounded operational diagnostic — a closed alphabet derived from
-the error's class and SQLSTATE, never its text — and, like every other key there, it is read for
-the decision and never copied into the post-redaction envelope). A new unit row drives the real
-builder through the real redactor, because `tests/integration/` is in neither `test:ci-gate` nor
-`test:s00` and so gates nothing. RED was `expected true to be false` on `fallback_minimized`.
+`path` is allowlisted **so that the payload is not minimised, and for nothing else.** It is the
+bounded operational diagnostic — a closed alphabet derived from the error's class and SQLSTATE,
+never its text — but `redact` never reads it, `PostRedactionEnvelope` has no `path` field, and
+`flusher.ts:75` is its only caller, so **the diagnostic the runner computes at
+`apps/runner/src/index.ts:5489` is discarded at the redaction boundary and reaches no durable
+record today.** Said plainly because the first draft of this section claimed the opposite — that
+`path` was "read for the decision" — which would have left a reader believing a signal exists
+where none does. What the envelope actually preserves past the redactor is the `code`, the
+capture point, the disposition, the source and the attempt index; what it removes is the error.
+Both halves of that are the point: the error is gone, and the code survives. The runner is not
+changed here — computing `path` costs nothing, it is the right value to carry if the durable
+shape ever grows a field for it, and it is what makes the envelope self-describing at the
+emission site.
+
+A new unit row drives the real builder through the real redactor. `test:ci-gate`, the only suite
+CI runs (`.github/workflows/security.yml:27`), does not cover `tests/integration`; `test:s00`
+does, but CI does not run it. RED was `expected true to be false` on `fallback_minimized`.
 
 ### `obs-l3-s06-runner-binding.test.ts`
 
@@ -157,10 +182,26 @@ and false:
 
 The rename came from **vitest 4.1.10 → 5.0.1** (`dev`'s D78). Vitest 5's title formatter returns
 a string value as itself; 4.x routed it through `inspect()`, which quoted it. So taking D78
-renamed **every `$prop`-interpolated test title in the repository at once** — 7 templates in 5
-files: `role-token-map.test.ts`, `s5-session-http.test.ts`, `s1-1-depth-contract.test.ts` ×3,
-`v2ui-pages.test.ts`, `obs-agent-01-restart-lifecycle.test.ts`. The list is correct today only
-because `role-token-map` happened to be the one of them with entries.
+renamed **every `$prop`-interpolated test title in the repository whose substituted value is a
+string** — all at once, in one dependency bump.
+
+**How many, stated as a FLOOR and not a census.** A scan for `.each(…)("…$prop…")` finds **at
+least 52 such templates across 12 files**, the largest being `s1-1-depth-contract.test.ts` with
+38, and including `s5-session-http.test.ts`, `s7-authorization.test.ts` (`$method $url`),
+`support-kb.test.ts` (`$name`, `$filename`), `v2ui-pages.test.ts`, `role-token-map.test.ts`,
+`api.test.ts`, `t17-envelope.test.ts`, `obs-agent-01-runtime.test.ts`,
+`obs-agent-01-restart-lifecycle.test.ts`, `obs-agent-03-defect-detectors.test.ts` and
+`dev-deployment-register.test.ts`. It is a floor in both directions and deliberately not
+resolved further: the scanner only sees titles it can reach from the `.each(` call, and only
+templates whose substituted value is a *string* actually renamed — numbers and objects went
+through `inspect()` before and after. An exact count would need the run itself, and nothing here
+turns on it.
+
+**The first draft of this section said "7 templates in 5 files", and that was wrong** — it came
+from a single-line grep that could not see a multi-line `.each`, reported as though it were the
+whole population. The correction matters less for the number than for what the number is for:
+the blast radius is *large*, and the reason the known-red list is nevertheless correct today is
+narrow and lucky — **`role-token-map` was the only renamed file with entries on the list.**
 
 The entries are unchanged; the SOURCE NOTE is corrected in both places that carry it, so a future
 re-baseline looks at the runner rather than at `dev`'s history. **The general lesson belongs with
@@ -267,9 +308,15 @@ declaration is the root manifest's `"vitest": "5.0.1"`.
    but the episode shows the allowlist and the envelope builders can drift apart silently. A
    structural pin — every key any shipped envelope builder can emit is in `INPUT_ALLOWLIST` —
    would close the class rather than this instance. Out of scope here.
-4. **`tests/integration/` gates nothing.** Neither `test:ci-gate` nor `test:s00` covers the S06
-   file, which is why both of its defects (§4) reached a merged tree. The new unit row covers the
-   redaction joint specifically; the general gap stands.
+4. **CI runs one suite, and it is not the one that covers `tests/integration`.**
+   `.github/workflows/security.yml:27` runs `pnpm run test:ci-gate`, which is
+   `tests/unit tests/architecture` only. `test:s00` (`package.json:15`) does cover
+   `tests/integration` — but nothing in CI invokes it, so in practice those files gate nothing
+   and are run only when someone remembers to. That is why both S06 defects (§4) reached a
+   merged tree, one of them a stale stub that had made a security ordering pin vacuous since
+   Task 11. The new unit row covers the redaction joint specifically; the general gap stands,
+   and the cheapest close is a CI step that runs `test:s00` — a decision for whoever owns the
+   workflow, since it changes CI's runtime.
 5. Everything `DEV-SYNC-2026-09-22.md` §8 left open is unaffected by this merge, except its item
    1 (the RSS row, fixed here by Task 3 and now recorded as such in the list) and its item 2 (the
    three capture sites, routed here — §4).
