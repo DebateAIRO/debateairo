@@ -327,8 +327,8 @@ describe("V-30 the hosted credential cannot escape", () => {
     // The header rides in a private field: nothing that stringifies the adapter
     // — a log line, a diagnostic, a crash report — can carry it out.
     expect(JSON.stringify(adapter!)).not.toContain(VENDOR_CREDENTIAL);
-    expect(Object.values(process.env).join(" ")).not.toContain(VENDOR_CREDENTIAL);
-    expect(process.argv.join(" ")).not.toContain(VENDOR_CREDENTIAL);
+    expect(Object.values(process.env).join("\u0000")).not.toContain(VENDOR_CREDENTIAL);
+    expect(process.argv.join("\u0000")).not.toContain(VENDOR_CREDENTIAL);
   });
 
   it("keeps each transport on its own endpoint shape", () => {

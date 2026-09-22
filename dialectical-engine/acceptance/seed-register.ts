@@ -21,10 +21,36 @@ import {
 
 /**
  * T16 · version 1 is HISTORICAL and sealed in every ceremony database created
- * before this lane; it is never re-opened. The fifteen algorithm rows land in a
- * NEWLY MINTED version 2, which becomes the current ceremony register.
+ * before this lane; it is never re-opened. The fifteen algorithm rows landed in
+ * a newly minted version 2, and version 2 is now sealed history in its own
+ * right: it is what the owner's 2026-09-17 run (`d7b73d79`) read.
+ *
+ * D77 (c) refitted two of those rows — globalStopDelta 0.02 -> 0.01 and
+ * branchFreezeEpsilon 0.01 -> 0.005 — and `seedAcceptanceRegister` carries the
+ * rows in through `importHistorical`, which is replay-only: a version that
+ * already exists must match the supplied snapshot byte for byte, or it raises
+ * `REGISTER_PUBLICATION_SEAL_INVALID: historical replay drift`
+ * (`migrations/0055_register_support_publication.sql:1343-1374`). Sealed means
+ * immutable PER VERSION, so a refit is a NEW VERSION, never an edit: the pin
+ * moves to 3, which becomes the current ceremony register, and a standing data
+ * directory keeps every earlier version exactly as the run that used it left
+ * it. Raising this constant is the whole of the change — the historical import
+ * needs no base and no contiguity, and the mandatory-row profile for the new
+ * version is declared by `register._algorithm_publication_profile_guard`
+ * (`migrations/0061_algorithm_publication_profiles.sql:10-37`) as it is sealed.
+ *
+ * NOTE for the next refit: `importHistorical` refuses any version above 4
+ * (`packages/register/src/register-publication.ts:777`,
+ * `migrations/0055_register_support_publication.sql:1288`), so exactly ONE rung
+ * is left on this ladder. A refit after that one needs the ceremony's seeding
+ * path changed, not this number.
  */
-export const ACCEPTANCE_REGISTER_VERSION = 2 as const;
+export const ACCEPTANCE_REGISTER_VERSION = 3 as const;
+/**
+ * The version that predates the T16 lane — the one a ceremony database created
+ * before it holds. It names that fact, not "the version below the pin", so the
+ * refit does not move it; nothing reads it (grep: this line only).
+ */
 export const ACCEPTANCE_HISTORICAL_REGISTER_VERSION = 1 as const;
 export const ACCEPTANCE_REGISTER_SOURCE_REF = "acceptance:DR-133:V-approved" as const;
 export const ACCEPTANCE_CONVERGENCE_SOURCE_REF = "acceptance:DR-136:V-approved" as const;

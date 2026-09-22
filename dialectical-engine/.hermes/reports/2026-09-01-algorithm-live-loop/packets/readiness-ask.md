@@ -1,3 +1,5 @@
+> **SUPERSEDED.** This is the 2026-09-07 packet, kept as history. The current one is `readiness-ask-2026-09-16.md`. The command below still passes the credential on the command line, which the ceremony has refused since 2026-09-18 (D77 f) — do not paste it.
+
 # READINESS ASK — revised 10:20 2026-09-07 for the DEV target (V's rulings: reconciled tree; merges delegated D70). Send after the dev gate's four-count lands.
 
 V, two different "runs" exist and only one of them is yours to authorize.

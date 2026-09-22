@@ -30,7 +30,17 @@ test("Turn 1 tree uses the coded 392px card grid and compact card anatomy", () =
   assert.match(canvas, /data-reference-tree-footer/);
   assert.match(canvas, /initialAnchorTop=\{allCardsMeasured \? layout\.placed\[0\]\?\.y \?\? null : null\}/);
   assert.match(viewport, /surface\.scrollTo\(\{ left: 0, top: Math\.max\(0, initialAnchorTop \* fitStateRef\.current\.zoom - 120\) \}\)/);
-  assert.doesNotMatch(canvas, /className="nodeReviewBadges"/);
+  // REMOVED by V's ruling of 2026-09-20: the canvas card SHALL show the review
+  // marks. This line asserted the opposite — it was introduced by 2b670d30
+  // ("chore: checkpoint local development state", no body) alongside the
+  // deletion of the review block that 8230bc27 had built, and it then held the
+  // deletion in place against t1-canvas, role-token-map and v2ui-pages, which
+  // all demand the marks. V chose the card over the drawer-only alternative
+  // knowing this assertion existed. Removing it does not build the feature; it
+  // stops one gate from forbidding what another gate requires. The positive
+  // rows stay RED on purpose — they now read "ruled, not yet built" instead of
+  // "two gates fighting". The build is ticketed as
+  // F-T4-UI-8-REVIEW-VOCABULARY-CARD.
   assert.match(css, /\.nodeWrap \{[\s\S]*?padding: 6px;/);
   assert.match(css, /\.node \{[\s\S]*?border-radius: 11px;[\s\S]*?padding: 16px 15px 11px;/);
   assert.match(css, /\.nodeClaim \{[\s\S]*?font-size: 15\.5px;[\s\S]*?line-height: 1\.4;/);
@@ -79,7 +89,16 @@ test("Turn 3 library shares one row anatomy and carries real public model metada
 
 test("Turn 3 public Tree is verdict-first while the other three reading views remain live", () => {
   assert.match(publicPage, /<PublicDebateOverview/);
-  assert.match(debatePage, /publicMode && view === "tree" && publicOverview/);
+  // V's ruling of 2026-09-20 settled what this line encodes. The overview used
+  // to REPLACE the public Tree view, so a visitor could read the conclusion or
+  // the argument tree but never both. The ruling is "summary first, the
+  // argument tree one click away": the overview is now its own view and Tree is
+  // the canvas again. The pin still does its job — the public overview must be
+  // mounted by the workspace and gated on publicMode — only the view it answers
+  // to changed. (The test name above still says "public Tree is verdict-first";
+  // that wording is superseded by the same ruling and is left for the UI
+  // program to retitle rather than churned here.)
+  assert.match(debatePage, /publicMode && view === "overview" && publicOverview/);
   assert.match(debatePage, /view === "thread"/);
   assert.match(debatePage, /view === "split"/);
   assert.match(debatePage, /view === "map"/);

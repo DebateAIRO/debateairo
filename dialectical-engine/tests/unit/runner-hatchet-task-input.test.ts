@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { TypedDomainError } from "@debateai/kernel";
+import { createSharedRedactor } from "@debateai/obs-capture";
 import {
   captureFailureEnvelope,
   declareHatchetWalkingSkeletonTask,
@@ -123,6 +124,52 @@ describe("the 2026-09-22 amendment — an obs-capture envelope never carries the
     expect(envelope.code).toBe("RUN_COST_ENVELOPE_EXHAUSTED");
     expect(JSON.stringify(envelope)).not.toContain("MARKER-7733");
   });
+
+  /**
+   * INT2 (SYNC2 into integration), 2026-09-22 — the defect the routing exposed.
+   *
+   * The builder and the sink were written apart: `captureFailureEnvelope` was
+   * unit-tested on its own, and the redactor rejects a payload carrying ANY key
+   * outside its input allowlist by minimising the WHOLE envelope to
+   * `OBS_CAPTURE_SELF`. `path` was not in that allowlist, so every routed
+   * capture would have reached the durable record with no code, no capture
+   * point and no attempt index — the amendment would have silently destroyed
+   * exactly the signal the S06 binding exists to record, and every unit test of
+   * the builder would still have been green.
+   *
+   * This row is the joint, measured at full strength: the real builder's
+   * output through the real redactor. `test:ci-gate`, the only suite CI runs
+   * (`.github/workflows/security.yml:27`), does not cover `tests/integration`;
+   * `test:s00` does, but CI does not run it. So the S06 case that first caught
+   * this gates nothing in CI; this row does.
+   */
+  it("survives the shared redactor unminimised, carrying its own code (INT2)", () => {
+    const envelope = captureFailureEnvelope({
+      error: new TypedDomainError("CALL_BUDGET_EXHAUSTED", "MARKER-7733"),
+      taxonomyClass: "PROVIDER_EXHAUSTED",
+      capturePoint: "provider",
+      disposition: "THROWN",
+      source: "first_party",
+      attemptIndex: 2
+    });
+    const redacted = createSharedRedactor({
+      environment: "test",
+      build_ref: "UNTRACKED-DEV:int2",
+      build_dirty: true,
+      runtime: "runner",
+      component: { process: "runner", package: "@debateai/runner" },
+      writer_identity: "int2-test",
+      redaction_policy_version: "g0",
+      allowlist_set_id: "g0-empty-parameters"
+    }).redact({ kind: "envelope", payload_ref: envelope } as never);
+
+    expect(redacted.fallback_minimized).toBe(false);
+    expect(redacted.code).toBe("CALL_BUDGET_EXHAUSTED");
+    expect(redacted.capture_point).toBe("provider");
+    expect(redacted.taxonomy_class).toBe("PROVIDER_EXHAUSTED");
+    expect(redacted.attempt_index).toBe(2);
+    expect(JSON.stringify(redacted)).not.toContain("MARKER-7733");
+  });
 });
 
 /**
@@ -131,16 +178,19 @@ describe("the 2026-09-22 amendment — an obs-capture envelope never carries the
  * `dev` @ `cbf1b281` restored an S06 capture binding with THREE
  * `capture?.emit({ ..., error, ... })` sites in `apps/runner/src/index.ts` —
  * two in the task body and one in the gateway wrapper — each carrying the RAW
- * error. That binding is NOT on this branch (SYNC2's own result,
- * `security/dev-sync-2026-09-22` @ `e8e03b08`, does not carry it either), so
- * there is nothing here to convert and a behavioural test would be vacuous —
- * green because it measured nothing.
+ * error.
  *
- * This row is the honest instrument instead: a SOURCE property that is true now
- * and goes RED the moment those three sites arrive unconverted. The conversion
- * is mechanical — replace the object literal with `captureFailureEnvelope({
- * error, taxonomyClass, capturePoint, disposition, source, attemptIndex })`,
- * whose return type has no `error` member at all.
+ * WRITTEN AHEAD OF THEM, AND THEY HAVE SINCE ARRIVED. When this row was written
+ * the binding was not yet on this branch, so it could only be a source property;
+ * at INT2 (2026-09-22) the merge brought all three sites in, the row went RED
+ * (`expected 3 to be less than or equal to 0`), and the conversion turned it
+ * green. It stays a SOURCE property because that is what it is for: it goes RED
+ * again the moment a later merge re-introduces an unconverted site, which no
+ * behavioural test of today's three call sites would notice.
+ *
+ * The conversion is mechanical — replace the object literal with
+ * `captureFailureEnvelope({ error, taxonomyClass, capturePoint, disposition,
+ * source, attemptIndex })`, whose return type has no `error` member at all.
  */
 /** The two properties the guard holds, applied to any source text. */
 function captureGuardVerdict(source: string): {

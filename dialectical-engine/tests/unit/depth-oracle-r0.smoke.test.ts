@@ -14,9 +14,15 @@ import { parseModule } from "../support/depthOracle.js";
  * Authority: D68 ADDENDUM (the alias grant); plan REVISION 4 §8.8 R3, §9.12 R3,
  * §9.15 R4; codex plan-r4 verdict "## F2".
  *
- * NAMED FACT, carried per D68 ADDENDUM 2:
- *   Node 22.23.1 UNVERIFIED (V, 2026-09-06): the pinned parser was installed and
- *   imported under Node 25.7.0 only.
+ * NAMED FACT, carried per D68 ADDENDUM 2, verbatim:
+ *   "Node 22.23.1 UNVERIFIED (V, 2026-09-06): the pinned parser was installed and
+ *   imported under Node 25.7.0 only."
+ *
+ * CLOSED (2026-09-18, the D78 runtime upgrade): the runtime this project DECLARES
+ *   is `package.json` engines, and it now says the Node 26.8.2 line; this file was
+ *   run under Node 26.8.2 on vitest 5.0.1. The sealed bootstrap register version 1
+ *   still reads "v22.23.1", which is a dated 2026-08-07 measurement sealed with
+ *   that version, not a declaration of today's runtime.
  *
  * NO evaluator code lives here. Round 1 creates `tests/support/depthOracle.ts`.
  */

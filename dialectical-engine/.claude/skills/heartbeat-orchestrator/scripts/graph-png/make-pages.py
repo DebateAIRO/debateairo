@@ -7,6 +7,14 @@ document.title starts with DONE; the PNGs land in out-dir. Send them with SendUs
 Why a browser page: headless Chrome hangs on this machine (2026-09-10) and V cannot open .mmd files."""
 import pathlib,sys,shutil
 R=pathlib.Path(sys.argv[1]); O=pathlib.Path(sys.argv[2]); PORT=sys.argv[3]; O.mkdir(parents=True,exist_ok=True)
+# VENDORED: mermaid.min.js is hand-vendored beside this script (no fetch step) and is copied
+# verbatim into out-dir. 2026-09-19: upstream's minifier emitted ONE RAW 0x01 byte inside the
+# string literal `_ge="<0x01>"` (the same statement already escapes two NULs as `"\0"`). The raw
+# byte was replaced with the equivalent escape `"\x01"` so the repository carries no invisible
+# control byte -- the HYG-01 guard (tools/check-text-control-bytes.ts) scans tracked text and
+# this bundle is tracked. The parsed value is unchanged (U+0001) and every other byte is
+# identical; `node --check` passes before and after. If a future re-download reintroduces the
+# raw byte, HYG-01 will go red again: re-apply the same escape, do not exclude the file.
 shutil.copy(pathlib.Path(__file__).parent/'mermaid.min.js', O/'mermaid.min.js')
 for name in ('nodes','full'):
     mm=(R/f'mission-graph-{name}.mmd').read_text()

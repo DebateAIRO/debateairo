@@ -42,6 +42,19 @@ const SOURCE_SET: ReadonlySet<string> = new Set(SOURCES);
 const INPUT_ALLOWLIST: ReadonlySet<string> = new Set([
   "code",
   "error",
+  // The bounded operational diagnostic that replaces `error` at a scrubbed
+  // failure boundary (the 2026-09-22 V-11 amendment; the runner's
+  // `captureFailureEnvelope`). It is drawn from a CLOSED alphabet derived from
+  // the error's class and SQLSTATE, never from its text.
+  //
+  // It is allowlisted so the payload is NOT MINIMISED — nothing more. `redact`
+  // below never reads it and `PostRedactionEnvelope` has no `path` field, so it
+  // carries no signal past this boundary today; the diagnostic the runner
+  // computes is discarded here. Added at INT2, where its absence from this list
+  // was rejecting the whole payload and minimising every routed capture to
+  // OBS_CAPTURE_SELF — destroying the code, capture point and attempt index the
+  // S06 binding exists to record.
+  "path",
   "taxonomy_class",
   "capture_point",
   "disposition",

@@ -11,6 +11,7 @@ import {
   ACCEPTANCE_ALGORITHM_SOURCE_REF,
   ACCEPTANCE_REGISTER_VERSION,
   buildAcceptanceAlgorithmRegisterRows,
+  buildAcceptanceRegisterPublicationRows,
   buildAcceptanceRegisterRows,
   resolveAcceptanceSynthesisRoleRefs,
   seedAcceptanceRegister
@@ -318,4 +319,63 @@ describe("T9 × F33 — the acceptance runtime policy carries the sealed synthes
       expect(policy.envelopeFormulaInputs.registerVersion).toBe(ACCEPTANCE_REGISTER_VERSION);
     });
   });
+
+  /**
+   * D77 (c) · O2 — the END of the chain, not the register in isolation.
+   *
+   * The ceremony does not read rows itself: `readAcceptanceRuntimePolicy` reads
+   * all five T16 families at the pinned version and `acceptance/main.ts:503,598`
+   * hands `stoppingPolicy` to the runner whole. The database below is shaped
+   * like the owner's standing one — version 2 already sealed with the pre-refit
+   * pair — so this proves the refit reaches the runner on a database that
+   * already held the old numbers, without that version being touched.
+   *
+   * The literal 2 is the version the owner's standing database holds, not the
+   * pin; it must keep saying 2 the next time the pin moves.
+   */
+  const STANDING_ACCEPTANCE_REGISTER_VERSION = 2;
+
+  it("hands the runner the D77-refitted thresholds on a standing pre-refit database", async () => {
+    const supersededRef = `${ACCEPTANCE_ALGORITHM_SOURCE_REF}+goal-v4-2026-09-01:80-96`;
+    const standingRows = (await buildAcceptanceRegisterPublicationRows()).map((row) => {
+      if (row.rowKey === "globalStopDelta") {
+        return registerFixtureRow(row.rowKey, { kind: "GLOBAL_STOP_DELTA", delta: 0.02 }, supersededRef);
+      }
+      if (row.rowKey === "branchFreezeEpsilon") {
+        return registerFixtureRow(row.rowKey, { kind: "BRANCH_FREEZE_EPSILON", epsilon: 0.01 }, supersededRef);
+      }
+      return row;
+    });
+    const directory = await mkdtemp(join(tmpdir(), "debateai-acc-standing-refit-"));
+    const standing = await startStandingDatabase({ port: await reservePort(), dataDirectory: directory });
+    try {
+      await importHistoricalRegisterFixture(
+        standing.pool, STANDING_ACCEPTANCE_REGISTER_VERSION, standingRows
+      );
+
+      await seedAcceptanceRegister(standing.pool);
+      const policy = await readAcceptanceRuntimePolicy(standing.pool);
+
+      expect(policy.stoppingPolicy.registerVersion).toBe(ACCEPTANCE_REGISTER_VERSION);
+      expect(policy.stoppingPolicy.delta).toBe(0.01);
+      expect(policy.stoppingPolicy.epsilon).toBe(0.005);
+      expect(policy.stoppingPolicy.sourceRefs).toEqual({
+        globalStopDelta: `${ACCEPTANCE_ALGORITHM_SOURCE_REF}+algorithm-live-loop-DECISIONS.md#D77`,
+        branchFreezeEpsilon: `${ACCEPTANCE_ALGORITHM_SOURCE_REF}+algorithm-live-loop-DECISIONS.md#D77`
+      });
+      // The version the owner's run used is still there, still the old pair.
+      const standingStopping = await standing.pool.query<{ row_key: string; value_json: unknown }>(
+        `SELECT row_key,value_json FROM register.register_row
+         WHERE register_version=$1 AND row_key=ANY($2::text[]) ORDER BY row_key`,
+        [STANDING_ACCEPTANCE_REGISTER_VERSION, ["branchFreezeEpsilon", "globalStopDelta"]]
+      );
+      expect(standingStopping.rows.map((row) => row.value_json)).toEqual([
+        { kind: "BRANCH_FREEZE_EPSILON", epsilon: 0.01 },
+        { kind: "GLOBAL_STOP_DELTA", delta: 0.02 }
+      ]);
+    } finally {
+      await standing.stop();
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 180_000);
 });

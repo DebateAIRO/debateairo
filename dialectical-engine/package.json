@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@11.20.0",
   "engines": {
-    "node": "22.23.1",
+    "node": ">=26.8.2 <27",
     "pnpm": "11.20.0"
   },
   "scripts": {
@@ -22,6 +22,7 @@
     "generate:contract": "tsx packages/contract/src/generate.ts",
     "db:migrate": "tsx apps/runner/src/migrate-cli.ts",
     "db:provision-principals": "tsx apps/runner/src/production-database-principals-cli.ts",
+    "keys:rotate-kek": "tsx apps/runner/src/rotate-kek-cli.ts",
     "dev:auth:provision-principals": "tsx apps/runner/src/dev-database-principals-cli.ts",
     "dev:auth:generate-secrets": "tsx apps/runner/src/dev-secret-files-cli.ts",
     "dev:auth:seed-register": "tsx apps/runner/src/dev-deployment-register-cli.ts",
@@ -58,28 +59,28 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@debateai/battery-decision": "workspace:*",
-    "@debateai/battery": "workspace:*",
-    "@debateai/budget": "workspace:*",
     "@debateai/api": "workspace:*",
+    "@debateai/battery": "workspace:*",
+    "@debateai/battery-decision": "workspace:*",
+    "@debateai/budget": "workspace:*",
     "@debateai/contract": "workspace:*",
-    "@debateai/crypto": "workspace:*",
     "@debateai/critique": "workspace:*",
+    "@debateai/crypto": "workspace:*",
     "@debateai/db": "workspace:*",
     "@debateai/graph": "workspace:*",
+    "@debateai/judgement": "workspace:*",
     "@debateai/kernel": "workspace:*",
     "@debateai/ledger": "workspace:*",
     "@debateai/liveness": "workspace:*",
     "@debateai/memory": "workspace:*",
     "@debateai/obs-capture": "workspace:*",
-    "@debateai/judgement": "workspace:*",
     "@debateai/propagation": "workspace:*",
-    "@debateai/published-arithmetic": "workspace:*",
     "@debateai/providers": "workspace:*",
+    "@debateai/published-arithmetic": "workspace:*",
     "@debateai/register": "workspace:*",
     "@debateai/runner": "workspace:*",
-    "@debateai/settlement": "workspace:*",
     "@debateai/serve": "workspace:*",
+    "@debateai/settlement": "workspace:*",
     "@debateai/valuation": "workspace:*",
     "@types/node": "26.2.0",
     "@types/pg": "8.21.0",
@@ -90,6 +91,6 @@
     "tsx": "4.23.11",
     "typescript": "7.0.2",
     "typescript-classic": "npm:typescript@5.9.3",
-    "vitest": "4.1.11"
+    "vitest": "5.0.1"
   }
 }

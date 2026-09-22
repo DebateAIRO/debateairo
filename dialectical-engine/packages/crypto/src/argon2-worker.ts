@@ -3,7 +3,7 @@
 // It runs only inside a worker thread, so every Argon2 compute happens off the
 // request/event-loop thread. It is deliberately written in strip-only
 // TypeScript — type annotations and interfaces only, no enums, namespaces,
-// decorators or parameter properties — so Node 22.23.1 can execute it directly
+// decorators or parameter properties — so Node 26.8.2 can execute it directly
 // with `execArgv: []`. It must never import ./index.ts, or the main-thread
 // crypto surface would be pulled into the worker and hash-wasm would become
 // reachable from the request path again.

@@ -164,6 +164,38 @@ describe("Accounts S8 publication architecture", () => {
     }
     expect(publicRows).toContain("/public/debate/");
     expect(publicRows).toContain("author_pseudonym");
+
+    // RESTORED 2026-09-20. Merge 690ebe14 resolved this file by taking one side
+    // whole and discarded 10 of 10 lines of the branch side, among them the two
+    // STRUCTURAL laws below. What survived is presence only, so a home page that
+    // printed the indexing disclosure five times, above the list, satisfied this
+    // contract completely. A discarded test cannot notice its own absence, and
+    // the one other guard on this property (tests/render/t3-library.test.tsx) is
+    // itself red because the same merge dropped the `data-library-row` attribute
+    // it selects on -- so the law was guarded by a red test and nothing else.
+    //
+    // ADAPTED, not pasted. The discarded lines anchored on an inline
+    // `published.items.map` and the `</article>` that closed each card. That
+    // markup is gone for a real reason: the rows moved into
+    // apps/ui/components/DebatesBuffer.tsx and the page now composes
+    // `<PublicDebatesBuffer debates={published.items} />` inside `div.libList`.
+    // The laws are therefore expressed against the list CONTAINER that replaced
+    // the inline map. Both indices are pinned > -1 so the ordering cannot decay
+    // into the vacuous shape swept in round 3: indexOf returns -1 for a missing
+    // needle, and -1 is less than every real position.
+    const disclosure =
+      "Published debates may be indexed by search engines. Copies may persist after unpublishing.";
+    const cardListStart = applicationHome.indexOf("<PublicDebatesBuffer");
+    const cardListEnd = applicationHome.indexOf("</div>", cardListStart);
+    const disclosureAt = applicationHome.indexOf(disclosure);
+    expect(cardListStart).toBeGreaterThan(-1);
+    expect(cardListEnd).toBeGreaterThan(cardListStart);
+    expect(disclosureAt).toBeGreaterThan(-1);
+    // LAW 1 — stated exactly once, so the page cannot repeat the warning.
+    expect(applicationHome.match(/Published debates may be indexed by search engines/g) ?? [])
+      .toHaveLength(1);
+    // LAW 2 — stated AFTER the card list, so it reads as a note on the list.
+    expect(disclosureAt).toBeGreaterThan(cardListEnd);
     const applicationPublicClient = await read("apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx");
     for (const page of [applicationPublic + applicationPublicClient]) {
       expect(page).toContain("readPublicDebate(id)");

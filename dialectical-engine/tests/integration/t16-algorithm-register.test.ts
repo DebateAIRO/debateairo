@@ -27,7 +27,9 @@ import {
   seedDevelopmentDeploymentRegister
 } from "../../apps/runner/src/dev-deployment-register.js";
 import {
+  ACCEPTANCE_ALGORITHM_SOURCE_REF,
   ACCEPTANCE_REGISTER_VERSION,
+  buildAcceptanceRegisterPublicationRows,
   buildAcceptanceRegisterRows,
   seedAcceptanceRegister
 } from "../../acceptance/seed-register.js";
@@ -50,6 +52,13 @@ const DEVELOPMENT_ALGORITHM_SOURCE_REF = "DEV-T16-algorithm-register.md#goal-v4:
  * source_ref is asserted for EXACT equality, never containment.
  */
 const RULING_GOAL = "goal-v4-2026-09-01:80-96";
+/**
+ * D77 (c): V refitted the two adaptive-stopping thresholds from the first real
+ * M>=2 run — delta 0.02 -> 0.01, epsilon 0.01 -> 0.005. The goal SEEDED the
+ * coarse pair; D77 CHOSE the values these two rows now carry, so these two rows
+ * — and only these two — cite D77 instead of the goal.
+ */
+const RULING_D77 = "algorithm-live-loop-DECISIONS.md#D77";
 const RULING_J1 = "algorithm-live-loop-DECISIONS.md#J1";
 const RULING_J8 = "algorithm-live-loop-DECISIONS.md#J8+configured-provider-set-derivation";
 const RULING_BANDS =
@@ -68,13 +77,14 @@ const loadAlgorithmPolicy = async (): Promise<AlgorithmPolicyModule> =>
 
 /**
  * T16 · every new sealed row, its ruled default, and the family it belongs to.
- * Values: goal-v4 lines 80-96 (δ, ε, γ, high, low, evaluator-loop max) and mission
- * DECISIONS.md J1 (dispersion scale, disagreement threshold, repeated-family
- * multiplier, downgrade bands, provider/model→family map).
+ * Values: goal-v4 lines 80-96 (γ, high, low, evaluator-loop max — and the SEEDS
+ * for δ and ε), mission DECISIONS.md J1 (dispersion scale, disagreement
+ * threshold, repeated-family multiplier, downgrade bands, provider/model→family
+ * map), and D77 (c), which REFITTED δ and ε from the first real M≥2 run.
  */
 const T16_EXPECTED_ROWS = [
-  { family: "stopping", rowKey: "globalStopDelta", rulingRef: RULING_GOAL, value: { kind: "GLOBAL_STOP_DELTA", delta: 0.02 } },
-  { family: "stopping", rowKey: "branchFreezeEpsilon", rulingRef: RULING_GOAL, value: { kind: "BRANCH_FREEZE_EPSILON", epsilon: 0.01 } },
+  { family: "stopping", rowKey: "globalStopDelta", rulingRef: RULING_D77, value: { kind: "GLOBAL_STOP_DELTA", delta: 0.01 } },
+  { family: "stopping", rowKey: "branchFreezeEpsilon", rulingRef: RULING_D77, value: { kind: "BRANCH_FREEZE_EPSILON", epsilon: 0.005 } },
   { family: "verdictLabel", rowKey: "verdictMarginGamma", rulingRef: RULING_GOAL, value: { kind: "VERDICT_MARGIN_GAMMA", gamma: 0.05 } },
   { family: "verdictLabel", rowKey: "verdictHighCut", rulingRef: RULING_GOAL, value: { kind: "VERDICT_HIGH_CUT", highCut: 0.7 } },
   { family: "verdictLabel", rowKey: "verdictLowCut", rulingRef: RULING_GOAL, value: { kind: "VERDICT_LOW_CUT", lowCut: 0.35 } },
@@ -232,6 +242,21 @@ describe("T16 algorithm register rows + seeding", () => {
     expect((await database.pool.query("SELECT register_version FROM register.register_version WHERE register_version > 4")).rows).toEqual([]);
   });
 
+  /**
+   * The literal 2 here is the manifest-DECLARED acceptance version
+   * (`migrations/0050_t16_algorithm_register_rows.sql:49-52` declares 2 and 5),
+   * NOT the ceremony's pin — `ACCEPTANCE_REGISTER_VERSION` is 3 since D77 (c).
+   * The two differ, so this case no longer covers the version the ceremony
+   * actually seeds: at the pin, a seal carrying NOT ONE required row is not
+   * refused, because version 3 is undeclared and the publication trigger only
+   * declares a profile for a version that already carries a required row
+   * (`migrations/0061_algorithm_publication_profiles.sql:10-37`). Only the
+   * all-missing case is unguarded there: a seal at 3 carrying SOME required rows
+   * trips the same `REGISTER_REQUIRED_ROW_MISSING`, measured, and no test pins
+   * that yet. Ticket `F-REGISTER-V3-REQUIRED-ROW-PROFILE` adds 3 to the manifest;
+   * when it lands, this literal becomes `ACCEPTANCE_REGISTER_VERSION` and the gap
+   * closes.
+   */
   it("rolls back historical acceptance publication when all required algorithm rows are missing", async () => {
     await expect(importHistoricalRegisterFixture(database.pool, 2, [
       registerFixtureRow("riskTier", "standard", "test:incomplete-acceptance")
@@ -293,6 +318,30 @@ describe("T16 algorithm register rows + seeding", () => {
     expect(citesJ8).toEqual(["evaluatorRoleRef", "synthesizerRoleRef"]);
   });
 
+  it("cites D77 on exactly the two thresholds it refitted and leaves the goal on the rest", async () => {
+    await seedDevelopmentDeploymentRegister({
+      adminPool: database.pool,
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      repositoryRoot
+    });
+    const persisted = await database.pool.query<{ row_key: string; source_ref: string }>(
+      `SELECT row_key,source_ref FROM register.register_row
+       WHERE register_version=$1 AND row_key=ANY($2::text[])`,
+      [DEVELOPMENT_REGISTER_VERSION, T16_EXPECTED_ROWS.map((row) => row.rowKey)]
+    );
+    const citing = (ruling: string): readonly string[] => persisted.rows
+      .filter((row) => row.source_ref.endsWith(`+${ruling}`))
+      .map((row) => row.row_key)
+      .sort();
+    // D77 (c) refitted TWO values and nothing else. A row citing a ruling that
+    // never chose its value is audit poison (J8), in both directions.
+    expect(citing(RULING_D77)).toEqual(["branchFreezeEpsilon", "globalStopDelta"]);
+    expect(citing(RULING_GOAL)).toEqual([
+      "disagreementQuantity", "evaluatorLoopMaxRounds",
+      "verdictHighCut", "verdictLowCut", "verdictMarginGamma"
+    ]);
+  });
+
   it("refuses to seal a register version that omits any algorithm row family", async () => {
     for (const omitted of T16_FAMILIES) {
       const before = (await database.pool.query("SELECT count(*)::int AS count FROM register.required_row_version")).rows;
@@ -312,6 +361,9 @@ describe("T16 algorithm register rows + seeding", () => {
 
   it("leaves a version the manifest does not govern untouched", async () => {
     // Historical versions (dev 4, ceremony 1) are ungoverned by construction.
+    // Not an exhaustive list of ungoverned versions: since D77 (c) moved the
+    // ceremony pin to 3, that version is ungoverned too until it carries a
+    // required row — see the note above and `F-REGISTER-V3-REQUIRED-ROW-PROFILE`.
     await expect(database.pool.query("SELECT register.assert_required_rows($1)", [4]))
       .resolves.toBeDefined();
     await expect(database.pool.query("SELECT register.assert_required_rows($1)", [1]))
@@ -349,7 +401,7 @@ describe("T16 algorithm register rows + seeding", () => {
       repositoryRoot
     });
     await expect(policy.readAdaptiveStoppingControls(database.pool, DEVELOPMENT_REGISTER_VERSION))
-      .resolves.toMatchObject({ delta: 0.02, epsilon: 0.01 });
+      .resolves.toMatchObject({ delta: 0.01, epsilon: 0.005 });
     await expect(policy.readVerdictLabelControls(database.pool, DEVELOPMENT_REGISTER_VERSION))
       .resolves.toMatchObject({ gamma: 0.05, highCut: 0.7, lowCut: 0.35, disagreementThreshold: 0.25 });
     await expect(policy.readPanelWeightingControls(database.pool, DEVELOPMENT_REGISTER_VERSION))
@@ -485,6 +537,80 @@ describe("T16 sealed-version identity — historical versions are never re-opene
     for (const rowKey of ALGORITHM_REGISTER_ROW_KEYS) {
       expect(current.rows.map((row) => row.row_key), rowKey).toContain(rowKey);
     }
+  }, 120_000);
+
+  /**
+   * D77 (c) · O2 — what a STANDING ceremony database does with the refit.
+   *
+   * `seedAcceptanceRegister` imports the ceremony rows into a PINNED version
+   * (`ACCEPTANCE_REGISTER_VERSION`) through `importHistorical`, and that path is
+   * replay-only: a version that already exists must match the supplied snapshot
+   * byte for byte (`migrations/0055_register_support_publication.sql:1343-1374`).
+   * Sealed therefore means immutable PER VERSION — the seed can neither
+   * overwrite nor merge — so a refit IS a new version. The pin moves and the
+   * owner's standing version is left exactly as their run left it, instead of
+   * the standing data directory being reset and the run database destroyed.
+   *
+   * The version below is a LITERAL, never the pin: it is the version the
+   * owner's standing database holds (the 2026-09-17 run `d7b73d79`), and it
+   * must keep saying 2 the next time the pin moves.
+   */
+  const STANDING_ACCEPTANCE_REGISTER_VERSION = 2;
+
+  it("mints the refit beside a standing version sealed with the pre-refit thresholds", async () => {
+    const supersededRef = `${ACCEPTANCE_ALGORITHM_SOURCE_REF}+${RULING_GOAL}`;
+    const standingRows = (await buildAcceptanceRegisterPublicationRows()).map((row) => {
+      if (row.rowKey === "globalStopDelta") {
+        return registerFixtureRow(row.rowKey, { kind: "GLOBAL_STOP_DELTA", delta: 0.02 }, supersededRef);
+      }
+      if (row.rowKey === "branchFreezeEpsilon") {
+        return registerFixtureRow(row.rowKey, { kind: "BRANCH_FREEZE_EPSILON", epsilon: 0.01 }, supersededRef);
+      }
+      return row;
+    });
+    await importHistoricalRegisterFixture(
+      database.pool, STANDING_ACCEPTANCE_REGISTER_VERSION, standingRows
+    );
+    const before = await readVersionSnapshot(STANDING_ACCEPTANCE_REGISTER_VERSION);
+
+    const receipt = await seedAcceptanceRegister(database.pool);
+
+    // The refit lands in a NEW sealed version beside the standing one.
+    expect(ACCEPTANCE_REGISTER_VERSION).toBeGreaterThan(STANDING_ACCEPTANCE_REGISTER_VERSION);
+    const current = await readVersionSnapshot(ACCEPTANCE_REGISTER_VERSION);
+    expect(current.version).toEqual({ row_count: receipt.rowCount, sealed: true });
+    // Never re-opened: the owner's run database keeps the pair its run used.
+    expect(await readVersionSnapshot(STANDING_ACCEPTANCE_REGISTER_VERSION)).toEqual(before);
+
+    const policy = await loadAlgorithmPolicy();
+    await expect(
+      policy.readAdaptiveStoppingControls(database.pool, STANDING_ACCEPTANCE_REGISTER_VERSION)
+    ).resolves.toMatchObject({ delta: 0.02, epsilon: 0.01 });
+    const refitted = await policy.readAdaptiveStoppingControls(database.pool, ACCEPTANCE_REGISTER_VERSION);
+    expect(refitted).toMatchObject({ delta: 0.01, epsilon: 0.005 });
+    expect(refitted.sourceRefs).toEqual({
+      globalStopDelta: `${ACCEPTANCE_ALGORITHM_SOURCE_REF}+${RULING_D77}`,
+      branchFreezeEpsilon: `${ACCEPTANCE_ALGORITHM_SOURCE_REF}+${RULING_D77}`
+    });
+  }, 120_000);
+
+  it("seeds a FRESH ceremony database at the pin alone, inventing no earlier version", async () => {
+    const receipt = await seedAcceptanceRegister(database.pool);
+
+    const current = await readVersionSnapshot(ACCEPTANCE_REGISTER_VERSION);
+    expect(current.version).toEqual({ row_count: receipt.rowCount, sealed: true });
+    // `import_historical_register_version` creates exactly the version it is
+    // given: no base, no contiguity requirement, nothing below it imported
+    // (`migrations/0055_register_support_publication.sql:1343-1409`). So on a
+    // fresh database the versions under the pin simply never exist.
+    for (const absent of [1, STANDING_ACCEPTANCE_REGISTER_VERSION]) {
+      const snapshot = await readVersionSnapshot(absent);
+      expect(snapshot.version, `version ${absent}`).toBeUndefined();
+      expect(snapshot.rows, `version ${absent}`).toEqual([]);
+    }
+    const policy = await loadAlgorithmPolicy();
+    await expect(policy.readAdaptiveStoppingControls(database.pool, ACCEPTANCE_REGISTER_VERSION))
+      .resolves.toMatchObject({ delta: 0.01, epsilon: 0.005 });
   }, 120_000);
 });
 

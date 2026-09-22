@@ -2788,40 +2788,47 @@ a:focus-visible {
   white-space: nowrap;
 }
 
-.debateInlineActions {
+.debateInlineActions,
+.debateUtilityActions {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.debateOverflow {
+.debateOverflow,
+.debateUtilityOverflow {
   display: none;
 }
 
-.debateView[data-actions-collapsed="true"] .debateInlineActions {
+.debateView[data-actions-collapsed="true"] .debateInlineActions,
+.debateView[data-actions-collapsed="true"] .debateUtilityActions {
   position: absolute;
   width: max-content;
   visibility: hidden;
   pointer-events: none;
 }
 
-.debateView[data-actions-collapsed="true"] .debateOverflow {
+.debateView[data-actions-collapsed="true"] .debateOverflow,
+.debateView[data-actions-collapsed="true"] .debateUtilityOverflow {
   position: relative;
   display: block;
   width: 44px;
 }
 
-.debateOverflow > summary {
+.debateOverflow > summary,
+.debateUtilityOverflow > summary {
   display: inline-flex;
   list-style: none;
   cursor: pointer;
 }
 
-.debateOverflow > summary::-webkit-details-marker {
+.debateOverflow > summary::-webkit-details-marker,
+.debateUtilityOverflow > summary::-webkit-details-marker {
   display: none;
 }
 
-.debateOverflow:not([open]) .debateOverflowMenu {
+.debateOverflow:not([open]) .debateOverflowMenu,
+.debateUtilityOverflow:not([open]) .debateOverflowMenu {
   display: none;
 }
 
@@ -4527,7 +4534,8 @@ a:focus-visible {
   .debateOverflowMenu {
     gap: 8px;
   }
-  .debateInlineActions :where(.btn, .btnGhost) {
+  .debateInlineActions :where(.btn, .btnGhost),
+  .debateUtilityActions :where(.btn, .btnGhost) {
     width: 44px;
     padding-inline: 0;
     justify-content: center;
@@ -4611,10 +4619,12 @@ a:focus-visible {
     grid-template-columns: minmax(0, 1fr) 44px 44px;
     gap: 8px;
   }
-  .debateInlineActions {
+  .debateInlineActions,
+  .debateUtilityActions {
     display: none;
   }
-  .debateOverflow {
+  .debateOverflow,
+  .debateUtilityOverflow {
     position: relative;
     display: block;
     width: 44px;
@@ -6867,11 +6877,22 @@ a:focus-visible {
   display: none;
 }
 
+/* V's ruling 2026-09-20: the header's utility actions are NOT hidden chrome.
+   2b670d30 clipped them to one pixel and marked them aria-hidden, which took
+   Library, Replay, Workspace, Honesty, Export, How-it-works and Settings away
+   from sighted and screen-reader users alike — and those are their ONLY render
+   sites, so the actions were unreachable, not merely relocated.
+
+   They keep the .debateUtilityActions / .debateUtilityOverflow names rather
+   than reverting to the DR-160 names, because T1-C1 (25155f3a) ruled that the
+   compact instrument chrome must contain no element matching
+   .debateInlineActions or .debateOverflow, and t1-canvas.test.tsx:192-193
+   enforces that. The DR-160 collapse machinery is therefore extended to these
+   names instead of the markup being renamed to it — same behaviour, one source
+   of truth, neither ruling broken. */
 .debateView > .tokenDock,
 .debateView > .scoringInsightsPanel,
-.debateView > section.card,
-.debateUtilityActions,
-.debateUtilityOverflow {
+.debateView > section.card {
   position: absolute !important;
   width: 1px !important;
   height: 1px !important;
