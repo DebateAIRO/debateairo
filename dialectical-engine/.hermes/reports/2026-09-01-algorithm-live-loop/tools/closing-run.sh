@@ -1,8 +1,15 @@
 #!/bin/bash
 # closing-run.sh — the acceptance ceremony on the REAL relays, run ONCE, everything captured (D60) before anything else touches it.
-# Usage:  ACCEPTANCE_SERVICE_CREDENTIAL='<43 chars, minted by V>' bash closing-run.sh [--depth-params '{"depth":2}'] [--serve]
+# Usage:  export ACCEPTANCE_SERVICE_CREDENTIAL=REPLACE_WITH_THE_43_CHARACTER_CREDENTIAL   # in YOUR OWN shell, first
+#         bash closing-run.sh [--depth-params '{"depth":2}'] [--serve]
 #         PREFLIGHT_ONLY=1 bash closing-run.sh            # only the checks below; needs no credential; exit 0 = may start, 5 = may not
 # The credential is READ FROM THE ENVIRONMENT of whoever runs this; this script never prints, stores or logs it (D18).
+# F-CREDENTIAL-ON-ARGV (2026-09-18): the credential is NEVER passed as a command-line argument, here or to
+# the ceremony. A process's arguments are readable by every user of the machine through the process list for
+# the whole of the run; its environment is not. The ceremony refuses `--service-credential` on argv by name,
+# and so does this script, at its very first statement and with exit 7, because the header block below
+# writes this script's own arguments into the ceremony log. The variable checked further down is inherited
+# by the ceremony process this script starts.
 # HOST-INDEPENDENT (2026-09-16, Task 18): the mission dir comes from this script's own location, the
 # engine from the mission dir, and the repo root from git. Export R=<checkout> to run against another
 # checkout; note that inside a linked worktree `--show-toplevel` is that WORKTREE's root, which is the
@@ -18,6 +25,18 @@
 # bytes are a program header (a `#!` shebang, or a Mach-O / universal-binary magic number). A file
 # that is not a program is refused by name and never run. The definition of done needs M>=2 makers.
 set -u
+# F-CREDENTIAL-ON-ARGV, FIRST, before this script computes a path, runs anything or opens a log.
+# The header block below interpolates "$*" into "$LOG" and flushes it BEFORE the ceremony starts, so a
+# credential typed at THIS script would come to rest in the mission's evidence log — the one durable
+# resting place this ticket exists to prevent — no matter how loudly the ceremony refuses it later.
+# Both spellings are refused, the offered value is never printed, and nothing has been written yet.
+for a in "$@"; do
+  case "$a" in
+    --service-credential|--service-credential=*)
+      echo "ACCEPTANCE_SERVICE_CREDENTIAL_ON_ARGV_REFUSED: the credential is never a command-line argument, here or to the ceremony; export ACCEPTANCE_SERVICE_CREDENTIAL in your own shell instead. Nothing was started, and nothing was written to any log." >&2
+      exit 7 ;;
+  esac
+done
 M="$(cd "$(dirname "$0")/.." && pwd)"; DE="$(cd "$M/../../.." && pwd)"
 R="${R:-$(git -C "$DE" rev-parse --show-toplevel)}"; OUTDIR=$M/logs/closing-run
 # Maker binaries: DISCOVERED on PATH, never a hard-coded home directory. An ACCEPTANCE_*_BINARY the
@@ -88,6 +107,11 @@ if [ "${PREFLIGHT_ONLY:-0}" = "1" ]; then
 fi
 : "${ACCEPTANCE_SERVICE_CREDENTIAL:?export ACCEPTANCE_SERVICE_CREDENTIAL in this shell first (43 chars, [A-Za-z0-9_-]); this script never writes it}"
 printf '%s' "$ACCEPTANCE_SERVICE_CREDENTIAL" | grep -qE '^[A-Za-z0-9_-]{43}$' || { echo "the credential is not 43 chars of [A-Za-z0-9_-]"; exit 2; }
+# The ceremony reads the credential from its own environment (F-CREDENTIAL-ON-ARGV). Both normal launch
+# shapes already put it in this script's environment, and therefore in its children's — a variable the
+# operator set WITHOUT exporting never reaches this script at all, and the check above would already have
+# refused. This line makes the inheritance explicit at the point of use, and covers the sourced case.
+export ACCEPTANCE_SERVICE_CREDENTIAL
 mkdir -p "$OUTDIR"; STAMP=$(date '+%Y%m%d-%H%M%S'); LOG="$OUTDIR/ceremony-$STAMP.log"
 COMMIT=$(git -C "$R" rev-parse HEAD); TREE=$(git -C "$R" rev-parse HEAD^{tree}); DIRTY=$(git -C "$R" status --porcelain | grep -v '^??' | wc -l | tr -d ' ')
 [ "$DIRTY" = "0" ] || { echo "dev has tracked changes — refusing to run the ceremony on a dirty tree"; exit 3; }
@@ -97,14 +121,15 @@ COMMIT=$(git -C "$R" rev-parse HEAD); TREE=$(git -C "$R" rev-parse HEAD^{tree});
   echo "binaries: ACCEPTANCE_CLAUDE_BINARY=$CLAUDE_BIN ACCEPTANCE_CODEX_BINARY=$CODEX_BIN ACCEPTANCE_GROK_BINARY=$GROK_BIN (runnable: $RUNNABLE of 3)"
   echo "ports: DB 55432 · API 58080 · SHIM 58090 · GROK RELAY 58091 · stranger sample rate 0"
   echo "credential: present in the environment (length $(printf '%s' "$ACCEPTANCE_SERVICE_CREDENTIAL" | wc -c | tr -d ' ')); never logged"
-  echo "\$ ./node_modules/.bin/tsx acceptance/run-acceptance.ts --service-credential <env> $*"
+  echo "\$ ./node_modules/.bin/tsx acceptance/run-acceptance.ts $*"
+  echo "the credential is not on that command line; the ceremony inherits ACCEPTANCE_SERVICE_CREDENTIAL from this script's environment (F-CREDENTIAL-ON-ARGV)"
   echo "<<<OUTPUT"
 } > "$LOG"
 cd "$DE" || exit 4
 ACCEPTANCE_DB_PORT=55432 ACCEPTANCE_API_HOST=127.0.0.1 ACCEPTANCE_API_PORT=58080 ACCEPTANCE_SHIM_PORT=58090 ACCEPTANCE_GROK_RELAY_PORT=58091 \
 ACCEPTANCE_STRANGER_SAMPLE_RATE=0 ACCEPTANCE_BATTERY_VERSION=acceptance-v1 ACCEPTANCE_SETTLEMENT_WATCH_HANDLE=acceptance:standing-watch \
 ACCEPTANCE_CLAUDE_BINARY="$CLAUDE_BIN" ACCEPTANCE_CODEX_BINARY="$CODEX_BIN" ACCEPTANCE_GROK_BINARY="$GROK_BIN" \
-./node_modules/.bin/tsx acceptance/run-acceptance.ts --service-credential "$ACCEPTANCE_SERVICE_CREDENTIAL" "$@" >> "$LOG" 2>&1
+./node_modules/.bin/tsx acceptance/run-acceptance.ts "$@" >> "$LOG" 2>&1
 rc=$?
 { echo "OUTPUT>>>"; echo "EXIT = $rc"; echo "finished $(date '+%F %T %Z')"; echo "porcelain AFTER: [$(git -C "$R" status --porcelain | grep -v '^??' | tr '\n' ';')]"; } >> "$LOG"
 # capture any artifacts the ceremony wrote under the engine tree (untracked files) — copy, never move

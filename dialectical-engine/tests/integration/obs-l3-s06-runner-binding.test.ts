@@ -186,10 +186,12 @@ describe("S06 runner task binding", () => {
         return {};
       },
     };
-    const failure = new TypedDomainError(
-      "JUDGEMENT_POLICY_UNRESOLVED",
-      "private failure that must reach Hatchet",
-    );
+    // DL4-F1: this message stands in for model-derived text. Until 2026-09-22 this fixture
+    // read "private failure that must reach Hatchet" — the one thing DL4-F1 forbids, since
+    // the SDK writes whatever is thrown into Hatchet's own Postgres and to stderr, outside
+    // the AEAD store. It must NOT reach Hatchet, and the assertion below now says so.
+    const privateText = "private failure text that must not reach Hatchet";
+    const failure = new TypedDomainError("JUDGEMENT_POLICY_UNRESOLVED", privateText);
     const order: string[] = [];
     const captured = installRecordingEmitter(order);
     const recordTerminalFailure = vi.fn(async () => {
@@ -218,17 +220,27 @@ describe("S06 runner task binding", () => {
       observed = error;
     }
 
-    const chainContainsFailure = causeChainContains(observed, failure);
+    // pin updated 2026-09-22 (DEV-SYNC, DL4-F1), exactly as 097f7bbb adapted the sibling row
+    // above: what OBS-R064 protects here is that the unrecorded state never REPLACES the
+    // task's own failure — the code that escapes is still the task's, never
+    // RUNNER_FAILURE_STATE_NOT_RECORDED, which is emitted as an alarm beside it. What it
+    // may no longer assert is OBJECT identity: the runner rethrows a scrubbed error that
+    // carries the code and drops the text, the stack and the cause
+    // (apps/runner/src/index.ts, `scrubbedTaskFailure`;
+    // tests/unit/runner-failure-redaction.test.ts owns that contract). So the chain is now
+    // pinned ABSENT rather than present, which also proves the scrub left no route back to
+    // the original object, and the private text is pinned absent from what does escape.
     expect.soft({
-      chainContainsFailure,
-      replacementCode: chainContainsFailure
-        ? "CHAIN_PRESERVED"
-        : observed instanceof TypedDomainError
-          ? observed.code
-          : "NOT_TYPED_DOMAIN_ERROR",
+      escapedCode: observed instanceof TypedDomainError ? observed.code : "NOT_TYPED_DOMAIN_ERROR",
+      chainContainsFailure: causeChainContains(observed, failure),
+      carriesPrivateText: JSON.stringify({
+        message: (observed as Error | undefined)?.message,
+        stack: (observed as Error | undefined)?.stack,
+      }).includes(privateText),
     }).toEqual({
-      chainContainsFailure: true,
-      replacementCode: "CHAIN_PRESERVED",
+      escapedCode: "JUDGEMENT_POLICY_UNRESOLVED",
+      chainContainsFailure: false,
+      carriesPrivateText: false,
     });
     expect.soft(order).toEqual(["capture", "terminal", "capture"]);
     expect.soft(captured.map((entry) => {
@@ -428,11 +440,28 @@ console.log(JSON.stringify({
   });
 
   it("evaluates the runner installer before the DB dependency in the real production entrypoint", () => {
+    // The stub's export set must match what apps/runner/src/main.ts actually
+    // imports: ESM reports a missing binding at LINK time, before any module
+    // in the graph evaluates, so one stale name silences the whole probe.
+    // 2d1f86b8 rewrote that import list (`RunRepository` onto @debateai/db,
+    // `createTerminalActivationEvaluator` onto @debateai/battery, and
+    // loadBootstrapRegister/readClaimTypeCompositionMap off @debateai/register)
+    // and this table stayed at the pre-2d1f86b8 shape.
+    //
+    // The install-first gate is re-keyed per s06-rework-1.md §7 (A3): the L2
+    // addendum DELETED the unhandledRejection registration from all three
+    // installers because it superseded Node's crash-on-rejection, and
+    // tests/architecture/obs-l2-s05-import-graph.test.ts:423 now forbids it.
+    // uncaughtExceptionMonitor already observes rejections and suppresses
+    // nothing, so the property is keyed on it plus the exit sink — both
+    // observed BEFORE @debateai/db evaluates, not by reading source text.
     const throwingDb = `data:text/javascript,${encodeURIComponent(`
 export function createPool() {}
-const unhandled = process.listenerCount("unhandledRejection");
+export function configureContentEncryption() {}
+export class RunRepository {}
 const uncaught = process.listenerCount("uncaughtExceptionMonitor");
-if (unhandled < 1 || uncaught < 1) throw new Error("RUNNER_INSTALLER_NOT_FIRST");
+const exitSink = process.listenerCount("exit");
+if (uncaught < 1 || exitSink < 1) throw new Error("RUNNER_INSTALLER_NOT_FIRST");
 throw new Error("DB_IMPORT_AFTER_RUNNER_INSTALL");`)} `;
     const loaderSource = `
 export async function resolve(specifier, context, nextResolve) {
@@ -443,8 +472,8 @@ export async function resolve(specifier, context, nextResolve) {
     const stubs = {
       "@hatchet-dev/typescript-sdk": "export class Hatchet {}",
       "../../../packages/crypto/src/index.js": "export function loadKek() {}",
-      "@debateai/battery": "export class WorkItemRepository {}",
-      "@debateai/register": "export function loadBootstrapRegister() {} export function loadRunnerEnvironment() {} export function readClaimTypeCompositionMap() {}",
+      "@debateai/battery": "export class WorkItemRepository {} export function createTerminalActivationEvaluator() {}",
+      "@debateai/register": "export function loadRunnerEnvironment() {}",
       "./index.js": "export function createPostgresProviderGateway() {} export function declareHatchetWalkingSkeletonTask() {} export class WalkingSkeletonRunner {}",
     };
     if (Object.hasOwn(stubs, specifier)) {
@@ -463,6 +492,7 @@ try {
     message: error?.message,
     unhandled: process.listenerCount("unhandledRejection"),
     uncaught: process.listenerCount("uncaughtExceptionMonitor"),
+    exitSink: process.listenerCount("exit"),
   }));
 }`;
     const result = spawnSync(
@@ -480,10 +510,21 @@ try {
     );
 
     expect(result.status, `stdout=${result.stdout}\nstderr=${result.stderr}`).toBe(0);
-    expect(JSON.parse(result.stdout.trim())).toMatchObject({
-      message: "DB_IMPORT_AFTER_RUNNER_INSTALL",
-      unhandled: 1,
-      uncaught: 1,
-    });
+    const linkage = JSON.parse(result.stdout.trim()) as Readonly<{
+      message: string;
+      unhandled: number;
+      uncaught: number;
+      exitSink: number;
+    }>;
+    // Reaching DB_IMPORT_AFTER_RUNNER_INSTALL at all is the install-first
+    // proof: the stub refuses with RUNNER_INSTALLER_NOT_FIRST unless both
+    // boundary listeners are already on the process when @debateai/db
+    // evaluates.
+    expect(linkage.message).toBe("DB_IMPORT_AFTER_RUNNER_INSTALL");
+    expect(linkage.uncaught).toBeGreaterThanOrEqual(1);
+    expect(linkage.exitSink).toBeGreaterThanOrEqual(1);
+    // The deleted registration stays deleted: a surviving process is never
+    // acceptable evidence of capture on any boundary path.
+    expect(linkage.unhandled).toBe(0);
   });
 });

@@ -21,6 +21,23 @@ export function selectAdditionalRecommendations(
   return sortUsableRecommendations(recommendations).slice(1);
 }
 
+/**
+ * S14 / W19: the tiebreak must not depend on the host's locale. A collation
+ * comparison reads ICU tables, so the same two recommendations can order one
+ * way on the Mac mini and the other way in CI — the same class of defect as a
+ * machine-specific path. A code-unit comparison is total, stable and identical
+ * on every machine. The five InvestigationAction values are distinct
+ * lowercase ASCII, so their order is unchanged by this.
+ *
+ * Both lines reached this fix independently — S14 / W19 on `dev` and B30 on the
+ * security line — with byte-identical bodies and no textual conflict, so the
+ * 2026-09-22 merge silently kept BOTH declarations and the module stopped
+ * parsing. One declaration, both ticket ids.
+ */
+function compareCodeUnits(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function sortUsableRecommendations(
   recommendations: RecommendedInvestigation[] | null | undefined
 ): RecommendedInvestigation[] {
@@ -31,11 +48,6 @@ function sortUsableRecommendations(
     if (left.action !== right.action) return compareCodeUnits(left.action, right.action);
     return compareCodeUnits(left.reason, right.reason);
   });
-}
-
-/** UTF-16 code-unit order: the same on every host, whatever its locale (B30). */
-function compareCodeUnits(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 export function formatRecommendationAction(action: InvestigationAction): string {

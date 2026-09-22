@@ -1,5 +1,5 @@
 import type { AbstentionKind, Answer, ConditionMark, StalenessState } from "@debateai/contract";
-import type { VerdictSummary } from "../types.js";
+import type { LiveVerdictState } from "../types.js";
 
 export function riskTierSourceLabel(source: Answer["tier_source"]): string {
   switch (source) {
@@ -59,21 +59,22 @@ export function conditionMarkLabel(mark: ConditionMark): string {
 }
 
 /**
- * T11 confirm-item 4 — the live banner's verdict vocabulary, wired to the
- * engine's three-state label. VOCABULARY WIRING ONLY: the banner, its bands and
- * its copy are untouched, and renaming the UI vocabulary (the last pairing
- * stretches the existing string's meaning) is UI-owned work for another lane.
+ * T11 confirm-item 4 — the live banner's verdict vocabulary IS the engine's
+ * own, lower-cased: V ruled "rename now" (D77 of 2026-09-18), declining the
+ * goal's "accept the mapping now, rename later". The retired words came from
+ * the older evidence gate and made the banner say something false about a
+ * label derived from propagated strength alone.
  *
  * The switch is exhaustive over the engine's label union — a fourth state fails
  * typecheck here rather than rendering as an unnamed verdict.
  */
 export function liveVerdictState(
   label: NonNullable<Answer["verdict_state"]>
-): NonNullable<VerdictSummary["verdictState"]> {
+): LiveVerdictState {
   switch (label) {
-    case "SUPPORTED": return "endorsed";
-    case "CONTESTED": return "endorsed_with_caveat";
-    case "UNSUPPORTED": return "suppressed_no_evidence";
+    case "SUPPORTED": return "supported";
+    case "CONTESTED": return "contested";
+    case "UNSUPPORTED": return "unsupported";
   }
 }
 

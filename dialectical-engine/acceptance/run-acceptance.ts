@@ -30,8 +30,20 @@ export interface AcceptanceArguments {
   readonly serve: boolean;
 }
 
+/**
+ * F-CREDENTIAL-ON-ARGV. The argument name that carries the service credential is
+ * deliberately ABSENT from this set and must never return to it: the credential
+ * is read from the environment and from nowhere else. The name is refused by
+ * `parseAcceptanceArguments` before any other check, so an operator who still
+ * types the old shape reads the specific reason rather than a generic
+ * unknown-argument line.
+ */
+const credentialArgument = "--service-credential";
+
+/** The environment key the operator exports in their own shell before the run. */
+const credentialEnvironmentKey = "ACCEPTANCE_SERVICE_CREDENTIAL";
+
 const supportedArguments = new Set([
-  "--service-credential",
   "--question",
   "--risk-tier",
   "--tier-provenance-ref",
@@ -43,16 +55,55 @@ const supportedArguments = new Set([
   "--steering-annotations"
 ]);
 
+/** The shape of a service credential: 43 characters of `[A-Za-z0-9_-]`. */
+const credentialPattern = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * The length past which a token stops being quoted: the longest name this parser
+ * actually supports, DEDUCED from the set above rather than written down (V's
+ * rule, 2026-09-17 — "if it needs to be set to something local, it needs to be
+ * deduced first, never set in stone"). A literal drifts in both directions: above
+ * the longest name it quotes tokens it should redact, and the day a longer flag is
+ * added it redacts the operator's own flag instead of naming it. A token longer
+ * than every supported name is either a typo or a value in a name's place, and a
+ * value is the thing that must never be quoted.
+ */
+const longestSupportedArgumentLength = Math.max(
+  ...[...supportedArguments].map((argument) => argument.length)
+);
+
+/**
+ * F-CREDENTIAL-ON-ARGV, the second mouth of the leak. A refusal has to name the
+ * argument it refused to be any use, but `main()` has no catch, so whatever it
+ * names reaches stderr — which `closing-run.sh` redirects into the persisted
+ * ceremony log. An operator can put the credential where a NAME is expected: bare
+ * (`tsx run-acceptance.ts <credential>` puts it at an even index) or joined to
+ * another flag (`--unknown=<credential>`). So a token that looks like a credential
+ * is described rather than quoted, and one too long to be any supported name is
+ * reported by its length alone — never by a prefix of itself, since the first
+ * characters are exactly what the process listing gave away in the first place.
+ */
+function describeToken(token: string): string {
+  if (credentialPattern.test(token)) return "[redacted: looks like a credential]";
+  if (token.length > longestSupportedArgumentLength) {
+    return `[redacted: ${String(token.length)}-character token]`;
+  }
+  return token;
+}
+
 function argumentMap(arguments_: readonly string[]): ReadonlyMap<string, string> {
   const output = new Map<string, string>();
   for (let index = 0; index < arguments_.length; index += 2) {
     const name = arguments_[index];
     if (name === undefined || !supportedArguments.has(name)) {
-      throw new Error(`UNKNOWN_ACCEPTANCE_ARGUMENT:${String(name)}`);
+      throw new Error(`UNKNOWN_ACCEPTANCE_ARGUMENT:${name === undefined ? "undefined" : describeToken(name)}`);
     }
+    // Every refusal that names a token names it through the same gate, so the
+    // derived bound is what guarantees a SUPPORTED name is always reported in
+    // full — rather than that guarantee resting on which throw happens to redact.
     const value = arguments_[index + 1];
-    if (value === undefined) throw new Error(`ACCEPTANCE_ARGUMENT_VALUE_REQUIRED:${name}`);
-    if (output.has(name)) throw new Error(`DUPLICATE_ACCEPTANCE_ARGUMENT:${name}`);
+    if (value === undefined) throw new Error(`ACCEPTANCE_ARGUMENT_VALUE_REQUIRED:${describeToken(name)}`);
+    if (output.has(name)) throw new Error(`DUPLICATE_ACCEPTANCE_ARGUMENT:${describeToken(name)}`);
     output.set(name, value);
   }
   return output;
@@ -68,17 +119,38 @@ function parseJson(value: string, label: string): unknown {
 
 export function parseAcceptanceArguments(
   arguments_: readonly string[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  environment: NodeJS.ProcessEnv = process.env
 ): AcceptanceArguments {
+  /**
+   * F-CREDENTIAL-ON-ARGV, decided FIRST — before the unknown-argument check and
+   * before the missing-value check — so the operator reads this reason and not a
+   * generic one. A process's arguments are readable by every user of the machine
+   * through the process list for the whole of the run; its environment is not.
+   * The offered value is never repeated in the message, in any form.
+   *
+   * BOTH spellings. `--service-credential=<value>` is the one an operator is
+   * likeliest to reach for, and it is the dangerous one: an exact-token test lets
+   * it through to the unknown-argument throw, which would quote the whole token —
+   * credential and all — onto the stream `closing-run.sh` writes to the ceremony
+   * log. Matching the `=`-joined prefix here is what keeps the value off that log.
+   */
+  if (arguments_.some((argument) =>
+    argument === credentialArgument || argument.startsWith(`${credentialArgument}=`))) {
+    throw new Error(
+      `ACCEPTANCE_SERVICE_CREDENTIAL_ON_ARGV_REFUSED:${credentialArgument} is no longer read from the ` +
+      `command line; export ${credentialEnvironmentKey} in your own shell instead`
+    );
+  }
   // "--serve" is the one value-less flag; extract it before pair parsing.
   const serveCount = arguments_.filter((argument) => argument === "--serve").length;
   if (serveCount > 1) throw new Error("DUPLICATE_ACCEPTANCE_ARGUMENT:--serve");
   const values = argumentMap(arguments_.filter((argument) => argument !== "--serve"));
-  const serviceCredential = values.get("--service-credential");
+  const serviceCredential = environment[credentialEnvironmentKey];
   if (serviceCredential === undefined || serviceCredential.trim().length === 0) {
     throw new Error("ACCEPTANCE_SERVICE_CREDENTIAL_REQUIRED");
   }
-  if (!/^[A-Za-z0-9_-]{43}$/.test(serviceCredential)) {
+  if (!credentialPattern.test(serviceCredential)) {
     throw new Error("ACCEPTANCE_SERVICE_CREDENTIAL_INVALID");
   }
   const ask = AskRequestSchema.parse({

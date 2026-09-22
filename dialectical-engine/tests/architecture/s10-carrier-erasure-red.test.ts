@@ -92,11 +92,27 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       source("migrations/0040_account_erasure.sql")
     ]);
 
-    // pin updated 2026-09-02: the completed-tombstone filter moved from inline carrier SQL into core.run_private_content_is_live (migration 0040), which both carriers consult in their candidate reads before any key load (dev drift, see docs/missions/2026-09-01-security-hardening/VERIFICATION.md)
-    expect(liveness.includes("core.run_private_content_is_live(")).toBe(true);
-    expect(memory.includes("core.run_private_content_is_live(")).toBe(true);
-    expect(/FUNCTION core\.run_private_content_is_live\(p_run_id uuid\)[\s\S]{0,900}serve\.private_run_erasure_tombstone/
-      .test(migration)).toBe(true);
+    // DEV-11E(3) / commit 2d1f86b8: the restricted runtime principal is denied
+    // SELECT on the private erasure carriers, so liveness and memory naming
+    // serve.private_run_erasure_tombstone themselves is now a 42501, not a
+    // safeguard. The completed-tombstone filter moved into the SECURITY DEFINER
+    // predicate core.run_private_content_is_live, which both owner-scoped reads
+    // apply before any lease or key load. The filter is pinned at both call
+    // sites AND in the predicate's body, so the whole path stays guarded; the
+    // direct carrier read is now pinned ABSENT, which the old pair never did.
+    expect(liveness.includes("core.run_private_content_is_live")).toBe(true);
+    expect(memory.includes("core.run_private_content_is_live")).toBe(true);
+    expect(liveness.includes("serve.private_run_erasure_tombstone")).toBe(false);
+    expect(memory.includes("serve.private_run_erasure_tombstone")).toBe(false);
+
+    const predicate = migration.slice(
+      migration.indexOf("CREATE OR REPLACE FUNCTION core.run_private_content_is_live"),
+      migration.indexOf("REVOKE ALL ON FUNCTION core.run_private_content_is_live")
+    );
+    expect(predicate).toContain("SECURITY DEFINER");
+    expect(predicate).toMatch(
+      /NOT EXISTS \(\s*SELECT 1 FROM serve\.private_run_erasure_tombstone/
+    );
   });
 
   it("holds a PostgreSQL session content lease across prepared decrypt and use", async () => {

@@ -210,13 +210,14 @@ informative; on 2026-09-08 it was not.
 
 ## 5. The exact command
 
-Run from `/Users/stefannour/DebateAIRO/debateairo/.claude/worktrees/algo-loop-2026-09-16/dialectical-engine`,
+Run from the engine root — the `dialectical-engine/` folder of whichever checkout you are in (amended
+2026-09-18: a path that exists on one computer only is never written into a command, V's rule, D75 a) —
 on a **clean** tracked tree, in the shell where you exported the credential.
 
 **The short form — the mission tool, which captures everything before anything else touches it (D60):**
 
 ```bash
-bash /Users/stefannour/DebateAIRO/debateairo/.claude/worktrees/algo-loop-2026-09-16/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/tools/closing-run.sh --depth-params '{"depth":2}'
+bash .hermes/reports/2026-09-01-algorithm-live-loop/tools/closing-run.sh --depth-params '{"depth":2}'
 ```
 
 **Amended 2026-09-17 (orchestrator): the depth argument is not optional.** The Global definition
@@ -230,9 +231,9 @@ structural ceiling the T17 line prints is computed for the depth requested, so e
 `N/ceiling` pair than the 2026-09-08 run's `30/106`.
 
 It now resolves the repo root and all three binaries itself — nothing to edit. It refuses a dirty
-tracked tree (exit 3), writes a stamped log under
-`/Users/stefannour/DebateAIRO/debateairo/.claude/worktrees/algo-loop-2026-09-16/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/closing-run/`,
-copies the run's untracked artifacts beside it, and prints the exit status. Append `--serve` to keep
+tracked tree (exit 3), writes a stamped log under `logs/closing-run/` inside this mission's report
+folder (the folder this packet lives in, one level up — deduced from the script's own location, never
+a fixed path), copies the run's untracked artifacts beside it, and prints the exit status. Append `--serve` to keep
 the stack standing afterwards for the UI. Export `R=<checkout>` only if you want it to measure a
 different checkout than the one it lives in.
 
@@ -250,12 +251,15 @@ ACCEPTANCE_SETTLEMENT_WATCH_HANDLE=acceptance:standing-watch \
 ACCEPTANCE_CLAUDE_BINARY="${ACCEPTANCE_CLAUDE_BINARY:-$(command -v claude)}" \
 ACCEPTANCE_CODEX_BINARY="${ACCEPTANCE_CODEX_BINARY:-$(command -v codex)}" \
 ACCEPTANCE_GROK_BINARY="${ACCEPTANCE_GROK_BINARY:-$(command -v grok)}" \
-./node_modules/.bin/tsx acceptance/run-acceptance.ts --service-credential "$ACCEPTANCE_SERVICE_CREDENTIAL" --depth-params '{"depth":2}'
+./node_modules/.bin/tsx acceptance/run-acceptance.ts --depth-params '{"depth":2}'
 ```
 
-`--service-credential` is the only required argument, `--depth-params '{"depth":2}'` the one the
-definition of done makes mandatory (amendment above), and `--serve` the only value-less flag
-(`acceptance/run-acceptance.ts:29,68-72`). **There is no `--approve-spend` on the ceremony** — that
+**Amended 2026-09-18 (D77 f): the credential is no longer an argument.** The ceremony reads
+`ACCEPTANCE_SERVICE_CREDENTIAL` from the environment — the variable you exported in section 3 — and
+refuses `--service-credential` on the command line with `ACCEPTANCE_SERVICE_CREDENTIAL_ON_ARGV_REFUSED`.
+The reason: a process's arguments are visible to every user of the machine through the process list
+for the whole run; its environment is not. `--depth-params '{"depth":2}'` is the one argument the
+definition of done makes mandatory (amendment above), and `--serve` is the only value-less flag. **There is no `--approve-spend` on the ceremony** — that
 flag belongs to T15's evaluation harness. The ceremony's only spend gate is that you start it.
 
 ## 6. The four-count gate — AFTER the ceremony, never beside it
@@ -289,3 +293,18 @@ ADDENDUM 8: a known-red list is derived, never remembered). Then, per D72, keep 
   `/Users/stefannour/DebateAIRO/debateairo/.claude/worktrees/algo-loop-2026-09-16/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/cont-t17-grok-sandbox.md`.
 - **The tree to run on is yours to name.** This packet is written at base `6cdc14b2…`; the ceremony
   should run on whatever tip you bless, with a clean tracked tree.
+
+## 8. What changed on 2026-09-18, for the next run (D77)
+
+- **The credential is never typed on a command line.** Export it (section 3) and run the command in
+  section 5 as printed. The ceremony refuses `--service-credential` in every spelling with
+  `ACCEPTANCE_SERVICE_CREDENTIAL_ON_ARGV_REFUSED`, and the tool refuses it itself, with exit **7**,
+  before anything is written to a log. Neither message repeats what was typed.
+- **The two adaptive-stopping thresholds were refitted** from the real run of 2026-09-17: δ 0.02 → 0.01,
+  ε 0.01 → 0.005. Sealed values are immutable per version, so the next run seals a NEW register version
+  (3) beside the old one (2) in the standing acceptance database; the run of 2026-09-17 stays intact and
+  nothing has to be reset. At depth 2 the δ-stop cannot fire at all (D77 b/6), so a depth-2 run exercises
+  only ε, and only on the last root's two branches.
+- **The next run is also the first witness** of two things no test can show: that the child process
+  inherits the exported credential through the tool, and that a log written under the new rules holds no
+  trace of it.

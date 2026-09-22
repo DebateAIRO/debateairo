@@ -1,7 +1,7 @@
-# V DECISIONS PACKET — Algorithm Live Loop (goal-v4 sha256 78238eeb…) · LIVING DRAFT
-Orchestrator + judge: Fable 5.1. Rows accumulate as lanes close; the packet is FINAL only
-at W12 closure (judge whole-goal verdict attached). Every row: DECISION REQUIRED · judge
-recommendation · what happens by default if V says nothing.
+# V DECISIONS PACKET — Algorithm Live Loop (goal-v4 sha256 78238eeb…) · FINAL (2026-09-18)
+Orchestrator + judge: Fable 5.1. FINAL since 2026-09-18: the judge's whole-goal verdict is attached
+(`agent-reports/w12-whole-goal-verdict-2026-09-18.md`). Rows keep their recorded defaults and their
+veto windows. Every row: DECISION REQUIRED · judge recommendation · what happens by default if V says nothing.
 
 ## A. Rows requiring V's decision (verbatim shapes from DECISIONS.md)
 | row | decision required | judge recommendation | default if silent |
@@ -35,22 +35,31 @@ recommendation · what happens by default if V says nothing.
 | V-SEC-1 (HIGH, from the peer security session) | Encrypted runs persist the full verdict text in plaintext in serve.answer.answer_form (serve/src/index.ts insert ~:1113-1127, projection ~:1600, source ~:550). The regions belong to pending mission lanes (T6/S06/T9/T13). | Fold the peer's self-contained patch + test as a codex-reviewed fold-lane FL-1 after W8 and before W12b (D26: handoff branch security/handoff-b21-serve-answer @40d1e3a3; placeholder migration 0057 renumbered at fold; the serve edits are a PORT onto the post-W8 file, not a git am); do not let merge order delay a plaintext-at-rest fix. | Folded before W12b. |
 | V-J15-ADD2 (veto window) | J15 ADDENDUM-2: freeze records must state their true effect (no false BRANCH-FROZEN marks after a branch already expanded). | Uphold — goal line 26 repeals false marks categorically. | Upheld. |
 
-## B. Confirm-items 1–7 (R7-3: goal-v4's recommendations were run as operative defaults)
-| # | topic | default applied | where it bit |
+## B. Confirm-items 1–7 — RULED by V on 2026-09-18 (D77 d)
+The verbatim text of all seven is `slices/S12-closure/SPEC.md:52-74` (= goal-v4 lines 42–66). Until
+2026-09-18 the goal's own recommendations ran as operative defaults (R7-3); they are now V's decisions.
+| # | topic | V's ruling | what it means in the code |
 |---|---|---|---|
-| 1 | (yes) | applied | — |
-| 2 | standing objection → visible mark (yes) | applied | T9 loop (W7) |
-| 3 | round-3 objection as label input (NO) | objection stays a MARK, never a label input — ladder acyclic | T11 rung set (S06) |
-| 4 | live-UI mapping (accept mapping now) | SUPPORTED→endorsed, CONTESTED→endorsed_with_caveat, UNSUPPORTED→suppressed_no_evidence — vocabulary wiring only | T11 banner (S06) |
-| 5 | panel middle arm (yes) | PANEL-PARTIAL ratified canonical (J11) | T3 |
-| 6 | solo voice can never print SUPPORTED (yes) | ladder rung 0 → CONTESTED + LABEL-BASIS-INCOMPLETE | T11 |
-| 7 | (park) | parked | — |
-(Items 1 and 7 text to be quoted verbatim from goal-v4 at closure.)
+| 1 | S7-1 split: label from code, statement from the synthesizer, agreement enforced | **YES** | as built (T9, T11). Witnessed in the real run: label CONTESTED from code, the statement accepted by the evaluator at round 2 after a first rejection |
+| 2 | a round-3 standing evaluator objection serves WITH a visible condition mark | **YES** | as built (T9's loop). The mark did not fire in the real run — the evaluator was satisfied at round 2 |
+| 3 | does that objection also force the label to CONTESTED? | **NO** | the label derives from numbers only, before synthesis; the ladder stays acyclic; the objection stays a mark |
+| 4 | live-UI verdict vocabulary | **RENAME NOW** — V declined the goal's "accept now, rename later" | Task 3 of the D77 plan: supported / contested / unsupported, and the sentence that was false for UNSUPPORTED goes. Measured first: the mapping has no caller in the app and the label reaches the page only as a raw word in the honesty drawer — ticket `F-UI-VERDICT-LABEL-DRAWER-ONLY`, for V's UI program |
+| 5 | panel-member failure policy — the voices that parsed plus `PANEL-PARTIAL`; all fail → `PANEL-DEGRADED-SINGLE-VOICE` plus one band step down; never a silent self-grade | **YES** | as built (T3, J11). Not exercised by the real run: 27 of 27 panels were complete |
+| 6 | a solo voice can never print SUPPORTED → CONTESTED plus `LABEL-BASIS-INCOMPLETE` | **YES** | as built (T11, rung 0). Its only possible demonstration is the mono-maker run, which V waived (D77 e) — unit-pinned, never witnessed live |
+| 7 | run-level claim frame | **PARK** | stays in Non-goals; revisit with live calibration data |
 
-## C. Dev-provisional tunables (J1/J2 — refit duty at closure from the flagship run)
-dispersion scale 1.0 · disagreementThreshold 0.25 · repeated-family multiplier 0.5 ·
-bands ["CAPPED","FULL"] FULL→CAPPED · 3-family map + UNKNOWN · δ/ε per T16 rows;
-γ=0.05, high=0.70, low=0.35 (T11). Closure attaches measured values + recommendations.
+## C. Tunables — the refit of 2026-09-18 (D77 b–c)
+**δ (`globalStopDelta`) 0.02 → 0.01 and ε (`branchFreezeEpsilon`) 0.01 → 0.005, RULED by V** from the
+real run's measurements: root movements over the run 0.0005 / 0.0119 / 0.0018, the served root's margin
+0.0113, the six plan branches' root-scoped leverage 0.0003 to 0.0132. 0.02 would have called "converged"
+a round that moved a root by more than the margin that decided the winner; 0.01 would have frozen four of
+six branches, two of them within reach of that margin. Two facts to read beside the numbers: at depth 2
+the δ-stop cannot fire at all (it binds from depth 3), and the run persisted nothing about its two
+round-boundary decisions, so the fit is from the final graph (ticket `F-STOPPING-DECISIONS-UNPERSISTED`).
+**Not refitted, and said so:** dispersion scale 1.0 · disagreementThreshold 0.25 · repeated-family
+multiplier 0.5 — one run in which no panel disagreed at the threshold gives nothing to fit from; γ=0.05,
+high=0.70, low=0.35 (T11); bands ["CAPPED","FULL"] FULL→CAPPED; the 3-family map + UNKNOWN. All remain
+sealed register rows, tunable without code.
 
 ## D. Known flake families (never counted as regressions; set-equality vs T0's 23-stable-red authority)
 F13 · F21 · F22 (+2) · F31 · F-T5-3 — full table attached at closure from LEDGER/DECISIONS.
@@ -297,3 +306,27 @@ verbatim so the presentation can be made.
   "repair first" — then run `PREFLIGHT_ONLY=1` again before spending.
 - **Default 8.** Nothing in the old engine (`main`, tmux workers) was changed: the evidence shows it
   was not involved (D75 d/4). Veto = a separate task on the V2 code, with its own review.
+
+## 2026-09-18 — V ruled; the packet is FINAL
+
+### A. What V decided (D77) — nothing here is a default any more
+
+The two thresholds (§C above), the seven confirm-items (§B above), the mono-maker run waived, and
+`F-CREDENTIAL-ON-ARGV` fixed before the push. Ten questions, ten answers, one session.
+
+### B. Defaults the orchestrator applied on V's behalf while landing the three changes — each has a veto window
+
+| # | default | where | veto = |
+|---|---|---|---|
+| 1 | The site's three verdict words are the engine's own: supported / contested / unsupported. The two sentences a reader will see — contested: *"The run did not settle this either way: the positions were too close, the judges disagreed, the leading position was not strong enough, or part of the comparison was missing."* · unsupported: *"Even the leading position here came out weak once the arguments were weighed against each other — a weak case, not a disproved one."* | `apps/ui/components/VerdictBanner.tsx:31-37`; D77 ADDENDUM 1 a/3 | other words or sentences → a one-commit change, no review round needed for copy |
+| 2 | The credential is read from the environment only; the ticket's "or stdin" was not built | D77 ADDENDUM 1 a/2 | "add stdin" → a small task |
+| 3 | The refit is acceptance register version 3 beside version 2; the standing data directory was not reset | D77 ADDENDUM 1 a/1 | none sensible — a reset would destroy the real run's database |
+| 4 | All eight findings of the credential review were fixed, including the README's bare `<`/`>` placeholders (the 2026-09-17 incident's shape) and the rule that a placeholder keeps the meaning of what it replaces | D77 ADDENDUM 1 a/2 | none needed |
+| 5 | `migrations/**` was not touched at closure; two tickets carry the one migration that is owed (`F-REGISTER-V3-REQUIRED-ROW-PROFILE`, `F-T16-MANIFEST-PROVENANCE-STALE`) | D77 ADDENDUM 1 d/5 | "do it now" → a task with its own review |
+| 6 | On your measured-spend rows `V-T7-r2-1` / `V-T7-r4-2`: the round-major replan stays DEFERRED — at depth 2 the plan ran whole and the δ-stop has nothing to cut; the replan only pays from depth 3 | D77 ADDENDUM 1 h | "replan now" → a task |
+
+### C. Status
+
+**FINAL.** The judge's whole-goal verdict is attached: `agent-reports/w12-whole-goal-verdict-2026-09-18.md`
+— MET, with the mono-maker bullet UNWITNESSED by your waiver and the Node-26 caveat on every suite
+number. The rows of §A keep their recorded defaults and their veto windows.

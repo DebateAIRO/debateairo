@@ -16,6 +16,7 @@ import {
 import { ModelMetaLine } from "@/components/ModelPresentation";
 import { SCRUTINY_STATUS } from "@/lib/scrutiny";
 import {
+  formatIndependencePill,
   formatScoreBadgeLabel,
   formatScorePercent,
   formatStrengthPill,
@@ -257,6 +258,9 @@ function CanvasCard({
   // typed reason there are none (never 0, never a dash — DR-115).
   const v3Scores =
     v3NodesById === undefined ? null : v3ScorePresentation(v3NodeScoreState(node, v3NodesById));
+  // Evidence sourcing breadth. Null below one distinct source, so a card with
+  // no record stays silent rather than printing "sources: 0".
+  const independencePill = formatIndependencePill(node.evidence_independence);
 
   // Additive, flag-gated low-strength dimming (Phase 9 Task 4). Never replaces
   // the existing abandoned/scoreFilterMatch terms -- a node can be abandoned
@@ -279,14 +283,14 @@ function CanvasCard({
     boxShadow: "var(--shadow-card)",
     boxSizing: "border-box",
     border: "1px solid var(--line-strong)",
-    borderRadius: 16,
-    padding: role === "root" ? 7 : 6
+    borderRadius: "var(--r-card)",
+    padding: 4
   };
 
   const innerStyle: CSSProperties = scrutiny
     ? {
         background: "var(--core)",
-        borderRadius: role === "root" ? 10 : 11,
+        borderRadius: "var(--r-card)",
         position: "relative",
         borderColor: scrutiny.color,
         boxShadow: `0 0 0 4px ${scrutiny.bg}, var(--shadow-card)`
@@ -294,7 +298,7 @@ function CanvasCard({
     : role === "root"
       ? {
           background: "var(--core)",
-          borderRadius: 11,
+          borderRadius: "var(--r-card)",
           position: "relative",
           borderColor: "var(--line-2)",
           boxShadow: "var(--shadow-card)"
@@ -345,9 +349,9 @@ function CanvasCard({
             display: "block",
             position: "absolute",
             top: 0,
-            left: role === "root" ? 20 : 15,
-            width: role === "root" ? 52 : 44,
-            height: 4,
+            left: 0,
+            width: "100%",
+            height: 3,
             borderRadius: "var(--r-tab)",
             background: stanceLine
           }}
@@ -451,6 +455,15 @@ function CanvasCard({
                   <V3ScoreBadges node={node} presentation={v3Scores} openNodeDetails={openNodeDetails} />
                 ) : null}
               </ScoringErrorBoundary>
+              {independencePill ? (
+                <span
+                  className="scoreBadge independence"
+                  aria-label={`Evidence sourcing for ${node.claim}: ${independencePill.title}`}
+                  title={independencePill.title}
+                >
+                  {independencePill.pillText}
+                </span>
+              ) : null}
             </div>
 
             {state === "pending" ? (
@@ -467,6 +480,27 @@ function CanvasCard({
               <>
                 <div className="nodeClaim treePreview">{node.claim}</div>
                 <div className="nodeControls nodeReferenceFooter" data-reference-tree-footer>
+                  {onChallengeNode ? (
+                    <button
+                      type="button"
+                      className="nodeCtrl challenge"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onChallengeNode(node, event.currentTarget);
+                      }}
+                    >
+                      ⚐ Challenge
+                    </button>
+                  ) : (
+                    <span
+                      className="nodeCtrl challenge"
+                      aria-disabled="true"
+                      tabIndex={-1}
+                      style={{ opacity: 0.55 }}
+                    >
+                      🔒 Challenge
+                    </span>
+                  )}
                   {onChallengeNode ? (
                     <button
                       type="button"

@@ -299,15 +299,25 @@ describe("UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps", () => {
     expect(client).toContain("v3NodesById={v3NodeById}");
   });
 
+  /**
+   * ADDRESS CHANGE, not a relaxation. 2b670d30 split the single `nodeHeader`
+   * into `nodeArgHeader` (role badge + maker line) and `nodeScoreRow` (the
+   * score badges), and deleted `independencePill`, which was MUT-A's end
+   * marker. Nothing a reader sees moved — the same things sit on the card in
+   * the same order — so the coordinator ruled on 2026-09-20 to follow the
+   * regions rather than rename the component back. Each guard still watches
+   * exactly one deletable thing, and each region is still bounded on both
+   * sides so a deletion cannot hide by drifting out of the window.
+   */
   it("kills MUT-A: deleting the V3ScoreBadges JSX render site", () => {
-    const nodeHeader = region(canvas, '<div className="nodeHeader">', "{independencePill ? (");
-    expect(nodeHeader).toContain("<V3ScoreBadges");
-    expect(nodeHeader).toContain("presentation={v3Scores}");
+    const scoreRow = region(canvas, '<div className="nodeScoreRow">', "</ScoringErrorBoundary>");
+    expect(scoreRow).toContain("<V3ScoreBadges");
+    expect(scoreRow).toContain("presentation={v3Scores}");
   });
 
   it("kills MUT-C: deleting the maker meta line from the contentful node header", () => {
-    const nodeHeader = region(canvas, '<div className="nodeHeader">', "<ScoringErrorBoundary>");
-    expect(nodeHeader).toMatch(/\{generation \|\| node\.maker !== undefined \? \([\s\S]*?<ModelMetaLine[\s\S]*?maker=\{node\.maker\}[\s\S]*?\) : null\}/);
+    const argHeader = region(canvas, '<div className="nodeArgHeader">', '<div className="nodeScoreRow">');
+    expect(argHeader).toMatch(/\{generation \|\| node\.maker !== undefined \? \([\s\S]*?<ModelMetaLine[\s\S]*?maker=\{node\.maker\}[\s\S]*?\) : null\}/);
   });
 
   it("uses DR-160 content-aware overflow instead of a fixed collapse breakpoint", () => {
@@ -573,12 +583,23 @@ describe("UI-02d — every non-canvas maker surface preserves its recorded maker
     const map = source("components/DebateMap.tsx");
     const drawer = source("components/NodeDetailDrawer.tsx");
 
+    const meta = source("components/ReferenceNodeMeta.tsx");
+
+    // ADDRESS CHANGE, not a relaxation (coordinator's ruling, 2026-09-20).
+    // 2b670d30 moved Thread's and Split's maker readout into the shared
+    // ReferenceAuthorPill and gave the drawer's two a className. The recorded
+    // maker prop is still carried at all eight sites — that is what this row
+    // is named for and it is still what is checked. The shared component is
+    // pinned FIRST and on purpose: three of the eight sites now sit behind it,
+    // so dropping `maker` there would strip all three at once, and without
+    // this line re-pointing would have been a quiet weakening.
+    expect(meta).toMatch(/export function ReferenceAuthorPill\([\s\S]*?<ModelMetaLine[\s\S]*?maker=\{node\.maker\}[\s\S]*?\/>/);
     expect(tree).toContain('<ModelBadge modelId={generation?.model_id ?? null} maker={node.maker} />');
-    expect(thread).toContain('<ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} />');
+    expect(thread).toContain("<ReferenceAuthorPill node={node} />");
     expect(outline).toContain('<ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} />');
-    expect(split.match(/<ModelMetaLine modelId=\{(?:focus|node)\.active_generation\?\.model_id \?\? null\} maker=\{(?:focus|node)\.maker\} \/>/g)).toHaveLength(2);
+    expect(split.match(/<ReferenceAuthorPill node=\{(?:focus|node)\} \/>/g)).toHaveLength(2);
     expect(map).toMatch(/<ModelMetaLine\s+modelId=\{readoutNode\.active_generation\?\.model_id \?\? null\}\s+maker=\{readoutNode\.maker\}\s+\/>/);
-    expect(drawer.match(/<ModelMetaLine modelId=\{generation\?\.model_id \?\? null\} maker=\{node\.maker\} \/>/g)).toHaveLength(2);
+    expect(drawer.match(/<ModelMetaLine\s+modelId=\{generation\?\.model_id \?\? null\}\s+maker=\{node\.maker\}\s+className="modelPill metaLine"\s*\/>/g)).toHaveLength(2);
   });
 });
 
