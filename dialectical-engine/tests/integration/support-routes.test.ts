@@ -2668,7 +2668,7 @@ describe("SUP-01 support routes", () => {
     expect(firstBody.next_cursor).toEqual(expect.any(String));
     const second = await server.inject({
       method: "GET",
-      url: "/v1/support/case?limit=1&cursor=${encodeURIComponent(firstBody.next_cursor!)}",
+      url: `/v1/support/case?limit=1&cursor=${encodeURIComponent(firstBody.next_cursor!)}`,
       headers: { "x-support-case-token": caseToken }
     });
     expect(second.statusCode).toBe(200);
@@ -2689,7 +2689,9 @@ describe("SUP-01 support routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
       outcome: "REFUSE_SAFETY",case_token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u),
-      sla_hours: 48,link: expect.stringMatching(/^\/help[?]case=/u),
+      // DL3-F4: the API mints the FRAGMENT form; a query bearer reaches the
+      // address bar, browser history and any future access log.
+      sla_hours: 48,link: expect.stringMatching(/^\/help#case=/u),
       case_acknowledgement: expect.any(String)
     });
     const responseBody = response.json<{ case_token: string;case_acknowledgement: string }>();
@@ -2752,7 +2754,9 @@ describe("SUP-01 support routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
       outcome: "REFUSE_ZONE",case_token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u),
-      sla_hours: 48,link: expect.stringMatching(/^\/help[?]case=/u),
+      // DL3-F4: the API mints the FRAGMENT form; a query bearer reaches the
+      // address bar, browser history and any future access log.
+      sla_hours: 48,link: expect.stringMatching(/^\/help#case=/u),
       case_acknowledgement: expect.any(String)
     });
     expect(response.json().text).toEqual(supportTemplate("REFUSE_ZONE",language).replace(
@@ -2772,7 +2776,9 @@ describe("SUP-01 support routes", () => {
   it("returns opaque SLA/link receipts for newly opened E3, E6, E7, and E8 cases", async () => {
     const receipt = {
       case_token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u),
-      sla_hours: 48,link: expect.stringMatching(/^\/help[?]case=/u),
+      // DL3-F4: the API mints the FRAGMENT form; a query bearer reaches the
+      // address bar, browser history and any future access log.
+      sla_hours: 48,link: expect.stringMatching(/^\/help#case=/u),
       case_acknowledgement: expect.any(String)
     };
 
@@ -2886,7 +2892,9 @@ describe("SUP-01 support routes", () => {
     expect(ratingReceipts[0]).not.toHaveProperty("case_token");
     expect(ratingReceipts[1]).toMatchObject({
       case_opened: true,case_token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u),
-      sla_hours: 48,link: expect.stringMatching(/^\/help[?]case=/u),
+      // DL3-F4: the API mints the FRAGMENT form; a query bearer reaches the
+      // address bar, browser history and any future access log.
+      sla_hours: 48,link: expect.stringMatching(/^\/help#case=/u),
       case_acknowledgement: expect.any(String)
     });
     await server.close();

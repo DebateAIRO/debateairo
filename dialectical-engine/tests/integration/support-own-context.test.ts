@@ -293,7 +293,8 @@ describe("SUP-03 consent and anonymous own-context behavior", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
       case_token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u),sla_hours: 48,
-      link: expect.stringMatching(/^\/help[?]case=/u),
+      // DL3-F4: the fragment form, which never reaches a server or a log.
+      link: expect.stringMatching(/^\/help#case=/u),
       case_acknowledgement: expect.stringContaining("I've opened case")
     });
     expect(openOnce).toHaveBeenCalledWith(expect.objectContaining({
