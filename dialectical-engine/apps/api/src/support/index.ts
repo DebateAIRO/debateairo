@@ -32,8 +32,9 @@ export const SUPPORT_ROUTE_PATHS = Object.freeze([
   "POST /v1/support/messages/{id}/rating",
   "POST /v1/support/sessions/{id}/escalate",
   "GET /v1/support/cases",
-  "GET /v1/support/cases/{token}",
-  "POST /v1/support/cases/{token}/messages",
+  // DL1-F5c/DL3-F4: the case bearer rides `x-support-case-token`, never a path.
+  "GET /v1/support/case",
+  "POST /v1/support/case/messages",
   "GET /v1/support/status"
 ] as const);
 
@@ -101,6 +102,20 @@ function capabilityFrom(request: FastifyRequest): string | null {
   return typeof raw === "string" ? hashSupportCapability("support-session",raw) : null;
 }
 
+/**
+ * DL1-F5c/DL3-F4. The case bearer, out of the URL. It used to be a path
+ * segment, `/v1/support/cases/<token>`, which puts the sole capability to read
+ * a whole support case — and to reply as the reporter — into every access log,
+ * proxy log and referrer a request passes. A header reaches none of those by
+ * default. A missing or malformed value is null and the route answers the same
+ * unknown-token 404 a wrong token gets, so nothing about the header's shape is
+ * an oracle.
+ */
+function caseCapabilityFrom(request: FastifyRequest): string | null {
+  const raw = request.headers["x-support-case-token"];
+  return typeof raw === "string" ? hashSupportCapability("support-case",raw) : null;
+}
+
 function publicSession(record: SupportSessionRecord): Readonly<Record<string, unknown>> {
   return Object.freeze({
     session_id: record.sessionId,
@@ -154,6 +169,18 @@ const SUPPORT_MESSAGE_BYTE_CEILING = 16 * 1_024;
  * flood costs one aggregate per second instead of one per request.
  */
 const SUPPORT_STATUS_CACHE_MS = 1_000;
+
+/**
+ * DL3-F4. The link the API writes into its own acknowledgement sentence. The
+ * FRAGMENT form: a fragment is never sent to a server or a proxy, so the bearer
+ * cannot be logged upstream, and `apps/ui/components/support/caseLink.ts` takes
+ * it out of navigation state before the first request. It used to put the same
+ * token in the QUERY string instead, which sits in the address bar, in browser
+ * history and in every shared screenshot for the case's whole lifetime.
+ */
+function supportCaseLink(token: string): string {
+  return `/help#case=${token}`;
+}
 
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
@@ -243,7 +270,7 @@ function openedCaseReceipt(
   language: SupportLanguage
 ) {
   if (opened?.kind !== "OPENED") return Object.freeze({});
-  const link = `/help?case=${opened.token}`;
+  const link = supportCaseLink(opened.token);
   const acknowledgement = supportTemplate("CASE_OPENED",language)
     .replace("{token}",opened.token)
     .replace("{sla}",String(opened.record.slaHours))
@@ -725,7 +752,7 @@ export function installSupportRoutes(
             outcome: "CASE_ALREADY_OPENED",case_id: opened.record.caseId
           });
         }
-        const link = `/help?case=${opened.token}`;
+        const link = supportCaseLink(opened.token);
         const text = supportTemplate("CASE_OPENED",responseLanguage)
           .replace("{token}",opened.token)
           .replace("{sla}",String(opened.record.slaHours))
@@ -960,7 +987,7 @@ export function installSupportRoutes(
           outcome: "CASE_ALREADY_OPENED",case_id: opened.record.caseId
         });
       }
-      const link = `/help?case=${opened.token}`;
+      const link = supportCaseLink(opened.token);
       const text = supportTemplate("CASE_OPENED",language)
         .replace("{token}",opened.token)
         .replace("{sla}",String(opened.record.slaHours ?? 48))
@@ -996,19 +1023,19 @@ export function installSupportRoutes(
       })) });
     }
   );
-  api.get<{ Params: { token: string };Querystring: { limit?: string;cursor?: string } }>(
-    "/v1/support/cases/:token",
-    policy("GET /v1/support/cases/{token}"),
+  api.get<{ Querystring: { limit?: string;cursor?: string } }>(
+    "/v1/support/case",
+    policy("GET /v1/support/case"),
     async (request, reply) => {
       if (application?.caseAccess === undefined) return unavailable(reply);
-      if (!admit.gate(reply, "supportReads", "GET /v1/support/cases/{token}", clientIp(request))) {
+      if (!admit.gate(reply, "supportReads", "GET /v1/support/case", clientIp(request))) {
         return reply;
       }
       const configuration = await application.configuration.current();
       if (configuration.kind !== "AVAILABLE") {
         return reply.status(503).send({ error: configuration.code });
       }
-      const tokenSha256 = hashSupportCapability("support-case",request.params.token);
+      const tokenSha256 = caseCapabilityFrom(request);
       if (tokenSha256 === null) return reply.status(404).send({ error: "NOT_FOUND" });
       const rawLimit = request.query.limit;
       const limit = rawLimit === undefined
@@ -1062,16 +1089,16 @@ export function installSupportRoutes(
       });
     }
   );
-  api.post<{ Params: { token: string } }>(
-    "/v1/support/cases/:token/messages",
-    policy("POST /v1/support/cases/{token}/messages"),
+  api.post(
+    "/v1/support/case/messages",
+    policy("POST /v1/support/case/messages"),
     async (request,reply) => {
       if (application?.caseAccess === undefined) return unavailable(reply);
       const configuration = await application.configuration.current();
       if (configuration.kind !== "AVAILABLE") {
         return reply.status(503).send({ error: configuration.code });
       }
-      const tokenSha256 = hashSupportCapability("support-case",request.params.token);
+      const tokenSha256 = caseCapabilityFrom(request);
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Readonly<Record<string,unknown>> : {};
       if (tokenSha256 === null || typeof body.text !== "string" || body.text.trim() === "") {

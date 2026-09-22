@@ -250,7 +250,7 @@ describe("SUP-02 cases", () => {
 
   /**
    * DL1-F5(a). A case token is a bearer capability that travels in a URL — the
-   * API path and the `/help?case=` link — so it reaches browser history, shared
+   * API path and the help link — so it reached browser history, shared
    * links and proxy access logs, and it authorised the whole decrypted
    * transcript forever. It now expires thirty days after the creation
    * timestamp already on the row, as the same typed 404 an unknown token gets.

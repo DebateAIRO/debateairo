@@ -92,10 +92,14 @@ describe("SUP-02 case browser surfaces", () => {
     await supportCaseClient.reply(token,"I still need help");
 
     expect(calls).toHaveLength(1);
-    expect(calls[0]!.url).toBe(`/api/v1/support/cases/${token}/messages`);
+    // DL1-F5c/DL3-F4: the bearer is a header, and the path names no token at
+    // all, so no access log, proxy log or referrer can ever carry it.
+    expect(calls[0]!.url).toBe("/api/v1/support/case/messages");
+    expect(calls[0]!.url).not.toContain(token);
     expect(calls[0]!.init).toMatchObject({ method: "POST",credentials: "same-origin" });
     const headers = new Headers(calls[0]!.init.headers);
     expect(headers.get("x-csrf-token")).toBe(csrf);
+    expect(headers.get("x-support-case-token")).toBe(token);
     expect(headers.get("x-support-session-token")).toBeNull();
     expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ text: "I still need help" });
     vi.unstubAllGlobals();

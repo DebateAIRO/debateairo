@@ -21,6 +21,8 @@ const REQUEST_HEADER_ALLOWLIST = Object.freeze([
   "user-agent",
   "x-csrf-token"
   ,"x-support-session-token"
+  // DL1-F5c/DL3-F4: the case bearer travels in a header now, never in a path.
+  ,"x-support-case-token"
 ] as const);
 const RESPONSE_HEADER_ALLOWLIST = Object.freeze([
   "accept-ranges",
@@ -43,7 +45,9 @@ const CSRF_COOKIE_NAME = "__Host-debateai-csrf";
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
 /** The API's support capability grammar (apps/api/src/support/session.ts CAPABILITY_PATTERN). */
 const SUPPORT_SESSION_TOKEN_HEADER = "x-support-session-token";
-const SUPPORT_SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+/** DL1-F5c/DL3-F4: the case bearer, which used to travel in the path. */
+const SUPPORT_CASE_TOKEN_HEADER = "x-support-case-token";
+const SUPPORT_CAPABILITY_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 /**
  * L3-F6: server.mjs strips every inbound forwarded header and re-stamps the client
  * address itself, then sets this marker before Next starts. Without the marker (a bare
@@ -90,7 +94,8 @@ function createUpstreamHeaders(request: Request): Headers {
     const value = request.headers.get(name);
     if (value === null) continue;
     // DL3-F5: the support capability travels only in its exact grammar (as the cookies do).
-    if (name === SUPPORT_SESSION_TOKEN_HEADER && !SUPPORT_SESSION_TOKEN_PATTERN.test(value)) continue;
+    if ((name === SUPPORT_SESSION_TOKEN_HEADER || name === SUPPORT_CASE_TOKEN_HEADER)
+      && !SUPPORT_CAPABILITY_PATTERN.test(value)) continue;
     headers.set(name, value);
   }
   const cookie = filteredSessionCookies(request.headers.get("cookie"));

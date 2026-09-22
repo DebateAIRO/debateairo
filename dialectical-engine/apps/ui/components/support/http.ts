@@ -37,7 +37,9 @@ function csrfToken(): string | null {
  * the host CSRF cookie.
  */
 export async function supportPost(
-  path: string,body: Readonly<Record<string,unknown>>,supportSessionToken?: string
+  path: string,body: Readonly<Record<string,unknown>>,supportSessionToken?: string,
+  /** DL1-F5c/DL3-F4: a case bearer, which never travels in the path. */
+  supportCaseToken?: string
 ): Promise<Response> {
   if (!SUPPORT_API_PATH.test(path) || path.includes("\\")) {
     throw new Error("SUPPORT_SAME_ORIGIN_PATH_REQUIRED");
@@ -50,6 +52,8 @@ export async function supportPost(
       "content-type": "application/json",
       ...(supportSessionToken === undefined
         ? {} : { "x-support-session-token": supportSessionToken }),
+      ...(supportCaseToken === undefined
+        ? {} : { "x-support-case-token": supportCaseToken }),
       ...(csrf === null ? {} : { "x-csrf-token": csrf })
     },
     body: JSON.stringify(body)

@@ -232,8 +232,8 @@ describe("SUP-01 support capability boundary", () => {
       "POST /v1/support/messages/{id}/rating",
       "POST /v1/support/sessions/{id}/escalate",
       "GET /v1/support/cases",
-      "GET /v1/support/cases/{token}",
-      "POST /v1/support/cases/{token}/messages",
+      "GET /v1/support/case",
+      "POST /v1/support/case/messages",
       "GET /v1/support/status"
     ]);
     expect(SUPPORT_ROUTE_PATHS.some((route) =>

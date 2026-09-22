@@ -1043,8 +1043,9 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/support/messages/{id}/rating", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "rate" },
   { route: "POST /v1/support/sessions/{id}/escalate", auth: "public", origin: "trusted", session: "optional", resource: "support-case", action: "create" },
   { route: "GET /v1/support/cases", auth: "user", resource: "support-case", action: "list" },
-  { route: "GET /v1/support/cases/{token}", auth: "public", session: "optional", resource: "support-case", action: "read" },
-  { route: "POST /v1/support/cases/{token}/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-case", action: "reply" },
+  // DL1-F5c/DL3-F4: the bearer is `x-support-case-token`, never a path segment.
+  { route: "GET /v1/support/case", auth: "public", session: "optional", resource: "support-case", action: "read" },
+  { route: "POST /v1/support/case/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-case", action: "reply" },
   { route: "GET /v1/support/status", auth: "public", session: "optional", resource: "support-status", action: "read" },
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },

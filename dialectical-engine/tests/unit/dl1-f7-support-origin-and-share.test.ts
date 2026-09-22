@@ -127,8 +127,7 @@ const MUTATING_SUPPORT_ROUTES = Object.freeze([
     { session_id: "11111111-1111-4111-8111-111111111111", rating: "yes" }],
   ["POST /v1/support/sessions/{id}/escalate",
     "/v1/support/sessions/11111111-1111-4111-8111-111111111111/escalate", {}],
-  ["POST /v1/support/cases/{token}/messages",
-    `/v1/support/cases/${"A".repeat(43)}/messages`, { text: "hello" }]
+  ["POST /v1/support/case/messages", "/v1/support/case/messages", { text: "hello" }]
 ] as const);
 
 describe("DL1-F7 anonymous mutating support POSTs need a trusted Origin", () => {

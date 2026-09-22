@@ -240,7 +240,7 @@ export type SupportCaseAccessPort = Readonly<{
 
 /**
  * DL1-F5(a). A case token is a 256-bit bearer capability that travels in a URL
- * — the API path and the `/help?case=` link — so it survives in browser
+ * — the API path and the help link — so it survived in browser
  * history, shared links and proxy access logs. It now stops authorising the
  * decrypted transcript thirty days after the creation timestamp already on the
  * row, with no migration and no new column.
