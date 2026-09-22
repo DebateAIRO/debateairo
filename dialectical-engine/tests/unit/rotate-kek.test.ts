@@ -10,7 +10,7 @@
  * No real key material: every key in this file is generated into a temporary
  * directory that is removed afterwards.
  */
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -307,6 +307,116 @@ describe("V-3 rotate: the support rows behind the repository seam", () => {
     // a full-table scan that serialises on a guard row.
     expect(repository.batches).toEqual([SUPPORT_ROTATION_BATCH_SIZE, 3]);
     await during.close();
+  });
+});
+
+/**
+ * The rehearsal V-3 asks for, as an automated test: take a COPY of a populated
+ * custody tree, rotate it, prove every record still opens, and prove the old KEK
+ * alone now opens nothing. It runs against a `mkdtemp` copy and never touches
+ * any real custody folder.
+ */
+describe("V-3 rotate: the rehearsal, on a throwaway copy", () => {
+  it("rotates a copy of a populated tree, and the old KEK then opens nothing", async () => {
+    const directory = await temporaryDirectory("debateai-rehearsal-");
+    const oldKek = await throwawayKek(directory, "kek.bin");
+    const newKek = await throwawayKek(directory, "kek-new.bin");
+    const oldCorpusKek = await throwawayKek(directory, "corpus-kek.bin");
+    const newCorpusKek = await throwawayKek(directory, "corpus-kek-new.bin");
+    const oldSupportPath = await supportKekPath(directory, "support-old");
+    const newSupportPath = await supportKekPath(directory, "support-new");
+
+    // --- a live-shaped tree under the OLD keys --------------------------------
+    const live = join(directory, "live");
+    const users = join(live, "user-deks");
+    const publications = join(live, "publication-keys");
+    await mkdir(users, { recursive: true, mode: 0o700 });
+    await mkdir(publications, { recursive: true, mode: 0o700 });
+    const userDeks = new Map<string, Buffer>();
+    for (const userId of [USER_A, USER_B]) {
+      const dek = generateDek();
+      userDeks.set(userId, Buffer.from(dek));
+      await new FileUserDekStore(users, oldKek).store(userId, dek);
+    }
+    const publicationKey = generateDek();
+    await new FilePublicationKeyStore(publications, oldCorpusKek)
+      .store(USER_A, publicationKey);
+
+    const oldSupport = await createSupportKeyPort({ supportKekPath: oldSupportPath });
+    const lease = await oldSupport.createDataKey({ kind: "session", ref: USER_A });
+    const sealed = oldSupport.seal(
+      { kind: "session", ref: USER_A }, lease.dataKey, Buffer.from("rehearsal", "utf8")
+    );
+    const repository = new FakeSupportKeyRepository([
+      { kind: "session", ref: USER_A, wrappedKey: Buffer.from(lease.wrapped.bytes), destroyed: false }
+    ]);
+    lease.close();
+    await oldSupport.close();
+
+    // --- the COPY the rehearsal runs on ---------------------------------------
+    const copy = join(directory, "copy");
+    await cp(live, copy, { recursive: true });
+    const copiedUsers = join(copy, "user-deks");
+    const copiedPublications = join(copy, "publication-keys");
+
+    // --- rotate ---------------------------------------------------------------
+    const duringSupport = await createSupportKeyPort({
+      supportKekPath: newSupportPath, previousSupportKekPath: oldSupportPath
+    });
+    const reports = [
+      await rotateFileStore("user-deks", new FileUserDekStore(
+        copiedUsers, { current: newKek, previous: oldKek }
+      )),
+      await rotateFileStore("publication-keys", new FilePublicationKeyStore(
+        copiedPublications, { current: newCorpusKek, previous: oldCorpusKek }
+      )),
+      await rotateSupportKeys(repository, duringSupport)
+    ];
+    await duringSupport.close();
+    expect(rotationFailed(reports)).toBe(false);
+    expect(reports.map((report) => report.counts.rewrapped)).toEqual([2, 1, 1]);
+    expect(reports.map((report) => report.counts.unreadable)).toEqual([0, 0, 0]);
+
+    // --- everything still opens, under the NEW keys alone ---------------------
+    const rotatedUsers = new FileUserDekStore(copiedUsers, newKek);
+    for (const [userId, dek] of userDeks) {
+      expect(await rotatedUsers.load(userId)).toEqual(dek);
+    }
+    expect((await new FilePublicationKeyStore(copiedPublications, newCorpusKek)
+      .load(USER_A)).key).toEqual(publicationKey);
+    const newSupport = await createSupportKeyPort({ supportKekPath: newSupportPath });
+    const rotatedRow = repository.rows()[0]!;
+    const rotatedDataKey = await newSupport.unwrapDataKey(
+      { kind: "session", ref: USER_A }, rotatedRow.wrappedKey
+    );
+    // The CONTENT was never re-encrypted: the same ciphertext still opens.
+    expect(newSupport.open(
+      { kind: "session", ref: USER_A }, rotatedDataKey, sealed
+    ).toString("utf8")).toBe("rehearsal");
+    await newSupport.close();
+
+    // --- and the OLD keys alone now open nothing ------------------------------
+    const retiredUsers = new FileUserDekStore(copiedUsers, oldKek);
+    for (const userId of userDeks.keys()) {
+      await expect(retiredUsers.load(userId)).rejects.toThrowError(
+        expect.objectContaining({ code: "KEK_UNRESOLVED" })
+      );
+    }
+    await expect(new FilePublicationKeyStore(copiedPublications, oldCorpusKek)
+      .load(USER_A)).rejects.toThrowError(
+      expect.objectContaining({ code: "PUBLICATION_KEY_UNRESOLVED" })
+    );
+    const retiredSupport = await createSupportKeyPort({ supportKekPath: oldSupportPath });
+    await expect(retiredSupport.unwrapDataKey(
+      { kind: "session", ref: USER_A }, rotatedRow.wrappedKey
+    )).rejects.toThrowError(
+      expect.objectContaining({ code: "SUPPORT_KEY_AUTHENTICATION_FAILED" })
+    );
+    await retiredSupport.close();
+
+    // --- the ORIGINAL tree is untouched: a rehearsal rehearses ---------------
+    expect(await new FileUserDekStore(users, oldKek).load(USER_A))
+      .toEqual(userDeks.get(USER_A));
   });
 });
 

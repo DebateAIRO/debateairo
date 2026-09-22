@@ -299,6 +299,34 @@ export function parseApiEnvironment(
   return validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source));
 }
 
+/**
+ * V-3. What `apps/runner/src/rotate-kek-cli.ts` needs. Each `*_KEK_PREVIOUS_PATH`
+ * is OPTIONAL because its absence is the steady state: an operator sets it only
+ * for the length of a changeover and removes it once a verification pass is
+ * clean. A store path without its KEK (or the other way round) simply means that
+ * store is not part of this rotation; the command says which stores it covered.
+ */
+const keyRotationEnvironmentShape = {
+  KEK_PATH: kekPath,
+  KEK_PREVIOUS_PATH: z.string().min(1).optional(),
+  USER_DEK_STORE_PATH: z.string().min(1),
+  CORPUS_KEK_PATH: z.string().min(1).optional(),
+  CORPUS_KEK_PREVIOUS_PATH: z.string().min(1).optional(),
+  PUBLICATION_KEY_STORE_PATH: z.string().min(1).optional(),
+  SUPPORT_KEK_PATH: kekPath,
+  SUPPORT_KEK_PREVIOUS_PATH: z.string().min(1).optional(),
+  SUPPORT_DATABASE_URL: z.string().url(),
+  DEBATEAI_CUSTODY_GROUP: z.string().min(1).optional()
+} as const;
+
+export function parseKeyRotationEnvironment(source: EnvironmentSource) {
+  return parseEnvironmentSource(keyRotationEnvironmentShape, source);
+}
+
+export function loadKeyRotationEnvironment() {
+  return parseEnvironment(keyRotationEnvironmentShape);
+}
+
 export function loadApiEnvironment() {
   return validateApiEnvironment(parseEnvironment(apiEnvironmentShape));
 }

@@ -211,6 +211,65 @@ find /var/lib/debateai/api/user-deks -type f -exec chmod 0640 {} +
 systemctl start debateai-api debateai-runner
 ```
 
+### Changing a master key (V-3)
+
+Three master keys wrap stored keys: `KEK_PATH` (the per-user DEKs),
+`CORPUS_KEK_PATH` (the publication keys) and `SUPPORT_KEK_PATH` (the support
+session and case keys, which live in Postgres). One command rotates all three.
+It re-wraps keys and **never re-encrypts content**: a master key wraps data keys
+only, so once a user's DEK is re-wrapped every debate under it opens exactly as
+before, untouched.
+
+Provision the new key beside the old one, then point the service at the new key
+and name the old one as the previous key. Both services read both keys for the
+length of the changeover:
+
+```sh
+install -d -m 0700 -o debateai-api -g debateai-api /etc/debateai/api-previous
+cp -a /etc/debateai/api/kek.bin /etc/debateai/api-previous/kek.bin
+head -c 32 /dev/urandom > /etc/debateai/api/kek.bin.new
+chown debateai-api:debateai-api /etc/debateai/api/kek.bin.new
+chmod 0600 /etc/debateai/api/kek.bin.new
+mv /etc/debateai/api/kek.bin.new /etc/debateai/api/kek.bin
+```
+
+Add `KEK_PREVIOUS_PATH=/etc/debateai/api-previous/kek.bin` to `api.env` and
+`runner.env`, restart both units, then run the rotation as the API user:
+
+```sh
+sudo -u debateai-api /usr/bin/pnpm --dir /opt/debateai/dialectical-engine \
+  exec tsx apps/runner/src/rotate-kek-cli.ts
+```
+
+`CORPUS_KEK_PREVIOUS_PATH` and `SUPPORT_KEK_PREVIOUS_PATH` work the same way for
+the other two keys; the support KEK's file is always named `support-kek.bin`, so
+its previous copy lives in its own `0700` directory. The support half connects as
+`debateai_support`, which is the only principal granted `UPDATE` on those two
+columns.
+
+The command prints one line per store — re-wrapped, already current, tombstones
+skipped, unreadable, and how many records verified under the **current key
+alone** — and ends with `KEYS_ROTATE_KEK_OK` or `KEYS_ROTATE_KEK_FAILED`. It is
+idempotent and resumable: a record already under the current key is skipped, so
+an interrupted run is finished by running it again.
+
+**Retire the old key only after a clean `KEYS_ROTATE_KEK_OK`.** On
+`KEYS_ROTATE_KEK_FAILED` the output names every record that opened under no key;
+keep the previous key in place, investigate those records, and run it again.
+Once the pass is clean, remove the `*_KEK_PREVIOUS_PATH` lines, restart the
+units and destroy the old key files — their absence is the normal steady state:
+
+```sh
+shred -u /etc/debateai/api-previous/kek.bin
+rmdir /etc/debateai/api-previous
+```
+
+Run it in a maintenance window. Every support row it writes re-runs a
+consistency check that briefly serialises support writes, so a rotation and a
+busy support hour should not overlap. Rehearse it first: take a copy of the
+custody tree and a scratch database, rotate the copy, and confirm the pass is
+clean before touching the live tree.
+
 ---
 
 ## 4. PostgreSQL

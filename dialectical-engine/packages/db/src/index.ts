@@ -33,6 +33,7 @@ export {
   PostgresSupportCaseSummaryRepository,
   PostgresSupportMessageRepository,
   PostgresSupportOwnContextRepository,
+  PostgresSupportKeyRotationRepository,
   PostgresSupportRelayReservationRepository,
   PostgresSupportShredRepository,
   PostgresSupportSessionRepository,
@@ -46,8 +47,10 @@ export {
   type SupportMessageRole,
   type SupportMessageWrite,
   type SupportOwnRunStateRow,
+  type SupportKeyReplacement,
   type SupportRepositoryRecord,
   type SupportRepositoryStatus,
+  type SupportWrappedKeyRow,
   type SupportRelayReservationResult,
   type SupportShredCounts,
   type SupportShredResult

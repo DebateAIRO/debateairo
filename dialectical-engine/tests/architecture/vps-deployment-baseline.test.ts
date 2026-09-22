@@ -391,6 +391,19 @@ describe("VPS baseline: runbook and environment templates", () => {
     for (const needle of ["0600", "0700"]) expect(readme, needle).toContain(needle);
   });
 
+  it("README documents the V-3 master-key rotation and its retirement rule", () => {
+    const readme = read("deploy/vps/README.md");
+    for (const needle of [
+      "rotate-kek-cli.ts", "KEK_PREVIOUS_PATH", "CORPUS_KEK_PREVIOUS_PATH",
+      "SUPPORT_KEK_PREVIOUS_PATH", "KEYS_ROTATE_KEK_OK", "KEYS_ROTATE_KEK_FAILED"
+    ]) expect(readme, needle).toContain(needle);
+    // The rule the whole design turns on: the old key is retired only AFTER a
+    // clean verification pass, never before.
+    expect(readme).toMatch(/only after .*KEYS_ROTATE_KEK_OK/i);
+    // Content is never re-encrypted — an operator must not expect a content pass.
+    expect(readme).toContain("never re-encrypt");
+  });
+
   it("api.env.example and runner.env.example both opt into the custody group (V-19)", () => {
     const api = envKeys(read("deploy/vps/env/api.env.example"));
     const runner = envKeys(read("deploy/vps/env/runner.env.example"));
