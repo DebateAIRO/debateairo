@@ -112,7 +112,12 @@ describe("V-9 a target names a credential FILE (task 10b)", () => {
       provider_ref: "vendor-a",
       base_url: "https://api.vendor-a.example/v1",
       model: "vendor-a-large",
-      authorization_file: "/etc/debateai/runner/providers/vendor-a.header"
+      authorization_file: "/etc/debateai/runner/providers/vendor-a.header",
+      // V-28 (task 11): hosted also requires the vendor's price, or its calls
+      // cannot be billed against the cost envelopes. Its own rule is pinned in
+      // `v28-provider-target-price.test.ts`; here it is fixture furniture.
+      input_price_micros_per_million: 3_000_000,
+      output_price_micros_per_million: 15_000_000
     }]);
     expect(() => assertDeploymentProviderTargets(withFile, {
       mode: "hosted", nodeEnv: "production"

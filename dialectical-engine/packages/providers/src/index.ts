@@ -147,7 +147,47 @@ export type ProviderDiscoveryTarget = Readonly<{
    * downstream can re-open it and no gateway carries a file name.
    */
   authorizationFile?: string;
+  /**
+   * V-28: this vendor's price, in USD micro-units per MILLION tokens — the unit
+   * every vendor publishes. Integers, because money is never a float, and BOTH
+   * sides or neither, because input and output are priced differently and half a
+   * price cannot bill a call.
+   *
+   * Optional here and REQUIRED in hosted mode (`assertHostedProviderTargets`): a
+   * local relay or loopback model server costs no money, so demanding a price of
+   * it would be an outage rather than a protection.
+   */
+  inputPriceMicrosPerMillionTokens?: number;
+  outputPriceMicrosPerMillionTokens?: number;
 }>;
+
+/**
+ * The target's price in the shape `@debateai/budget` charges with, or `null`
+ * when the target declares none. One reader, so no call site re-derives the
+ * field names or the unit.
+ */
+export function providerTargetPrice(target: ProviderDiscoveryTarget): Readonly<{
+  inputMicrosPerMillionTokens: number;
+  outputMicrosPerMillionTokens: number;
+}> | null {
+  if (target.inputPriceMicrosPerMillionTokens === undefined
+    || target.outputPriceMicrosPerMillionTokens === undefined) {
+    return null;
+  }
+  return Object.freeze({
+    inputMicrosPerMillionTokens: target.inputPriceMicrosPerMillionTokens,
+    outputMicrosPerMillionTokens: target.outputPriceMicrosPerMillionTokens
+  });
+}
+
+/** An integer price in micro-units per million tokens, or a typed refusal. */
+function providerTargetPriceAmount(value: unknown): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0
+    || value > Number.MAX_SAFE_INTEGER) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_PRICE_INVALID");
+  }
+  return value;
+}
 
 function requiredProviderTargetText(value: unknown, code: string): string {
   if (typeof value !== "string" || value.trim() === "" || value !== value.trim()) {
@@ -214,10 +254,29 @@ export function parseProviderDiscoveryTargets(
     }
     const row = candidate as Readonly<Record<string, unknown>>;
     if (Object.keys(row).some((key) => ![
-      "provider_ref", "base_url", "model", "authorization_header", "authorization_file"
+      "provider_ref", "base_url", "model", "authorization_header", "authorization_file",
+      // V-28: the vendor's price, declared beside the vendor.
+      "input_price_micros_per_million", "output_price_micros_per_million"
     ].includes(key))) {
       throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
     }
+    // Both sides or neither. A target with one half declared is an operator's
+    // half-finished edit, and billing a call at half its price is worse than
+    // refusing to start: the envelope would under-count every call for as long
+    // as nobody noticed.
+    const declaresInputPrice = row.input_price_micros_per_million !== undefined;
+    const declaresOutputPrice = row.output_price_micros_per_million !== undefined;
+    if (declaresInputPrice !== declaresOutputPrice) {
+      throw new TypeError("PROVIDER_DISCOVERY_TARGET_PRICE_INVALID");
+    }
+    const price = declaresInputPrice
+      ? Object.freeze({
+          inputPriceMicrosPerMillionTokens:
+            providerTargetPriceAmount(row.input_price_micros_per_million),
+          outputPriceMicrosPerMillionTokens:
+            providerTargetPriceAmount(row.output_price_micros_per_million)
+        })
+      : undefined;
     const providerRef = requiredProviderTargetText(
       row.provider_ref,
       "PROVIDER_DISCOVERY_TARGET_PROVIDER_REF_INVALID"
@@ -256,7 +315,8 @@ export function parseProviderDiscoveryTargets(
       baseUrl: normalizedProviderBaseUrl(row.base_url),
       model: requiredProviderTargetText(row.model, "PROVIDER_DISCOVERY_TARGET_MODEL_INVALID"),
       ...(authorizationHeader === undefined ? {} : { authorizationHeader }),
-      ...(authorizationFile === undefined ? {} : { authorizationFile })
+      ...(authorizationFile === undefined ? {} : { authorizationFile }),
+      ...(price === undefined ? {} : price)
     }));
   }
   if (targetsByRef.size !== configuredByRef.size) {
@@ -449,6 +509,17 @@ export function assertHostedProviderTargets(
     }
     if (target.authorizationHeader !== undefined) {
       throw new TypeError(`PROVIDER_INLINE_CREDENTIAL_REFUSED:${target.providerRef}`);
+    }
+    /**
+     * V-28: a hosted target with no declared price cannot be billed against the
+     * per-run or the daily envelope, so its spend is unbounded in exactly the
+     * way V-28(3) refuses to allow — and it would be unbounded SILENTLY, since
+     * every one of its calls would charge zero. The same fail-closed reasoning
+     * as the vendor that reports no usage, one step earlier: refuse at boot,
+     * where the operator can fix the declaration, rather than mid-debate.
+     */
+    if (providerTargetPrice(target) === null) {
+      throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
     }
   }
 }
