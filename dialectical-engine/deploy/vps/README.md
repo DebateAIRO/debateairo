@@ -25,11 +25,13 @@ a first provision, so read this list before following the section:
   missing from it: `PROVIDER_TARGET_PRICE_REQUIRED`, `PROVIDER_TARGET_PRICE_ZERO`,
   `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID`, `COST_ENVELOPE_POLICY_UNRESOLVED`,
   `COST_ENVELOPE_POLICY_INVALID` and `SUPPORT_ADMISSION_SCOPES_NOT_SEALED`.
-- **"the envelopes are not published yet" (§10) is out of date** as a statement
-  of what the code does: a hosted deployment refuses to start until they are
-  sealed, and the daily call cap is no longer the only ceiling.
-- **"KEK rotation is not implemented" (§10) is false.** It shipped as
-  `pnpm keys:rotate-kek`; §3 "Changing a master key" is the procedure.
+- **"the daily call cap is the only ceiling" (§11, the support-chat note) is out
+  of date** as a statement of what the code does: a hosted deployment refuses to
+  start until the cost envelopes are sealed. (§10's own envelope bullet is
+  accurate — it already names `COST_ENVELOPES_NOT_SEALED`.)
+- **"KEK rotation is not implemented" (§10, "What is deliberately absent") is
+  false.** It shipped as `pnpm keys:rotate-kek`; §3 "Changing a master key" is
+  the procedure.
 - **`deploy/vps/env/api.env.example`** lacked `SUPPORT_KEK_PATH` and
   `SUPPORT_DATABASE_URL`, both REQUIRED by the API's shape and by the
   rotation's. Both keys are in the example now; the §3 layout table below still
@@ -305,6 +307,14 @@ If the chain stops at the first `test`, a changeover is already in progress:
 finish or retire that one (last step) before starting another. Nothing has been
 written when it stops there.
 
+**Between this step and step 3 the new key is on disk and no unit knows about
+the old one yet.** A unit that restarts in that window — `Restart=on-failure`
+after a crash, or an operator restarting something else — comes up holding the
+NEW key alone, and every existing record is unreadable to it until steps 2 and 3
+are done. Nothing is lost (the previous key is on disk, named in step 2), but it
+is an outage while it lasts, so keep the window short and, after step 3, check
+that both units are running and reading records again before going on.
+
 The corpus and support KEKs have no runner copy — only the API and the rotation
 command ever open them — so their previous copies live beside the API's. The
 support KEK's file name is checked: it must be exactly `support-kek.bin`
@@ -416,6 +426,15 @@ Equal counts, `0 unreadable` and no `NOT COVERED` line is the pass. A count
 LOWER than the directory count means the command was pointed at a store it did
 not fully see — the wrong path, or a record directory it refused — and the old
 key must not be retired.
+
+**This count check is what closes the last window, so do not skip it.** The
+second listing is taken at a moment in time: a record that lands AFTER it — a
+registration completing while the report is being printed — is written under the
+new key by a service that restarted in step 3, so it is not a danger, but it
+does make the store hold one more record than the pass verified. That shows up
+here as a count mismatch, never as a failed run. Re-run the rotation (it is
+idempotent) and compare again; retire the old key only from a run whose numbers
+match.
 
 #### Step 6 — retire the previous key
 
