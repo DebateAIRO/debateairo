@@ -15,7 +15,10 @@ import { LedgerRepository } from "@debateai/ledger";
 import { BudgetRepository } from "@debateai/budget";
 import { ProviderProbeRepository, RunRepository, migrate } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
-import { JudgementRepository } from "@debateai/judgement";
+import { JUDGE_LEG_KINDS, JudgementRepository } from "@debateai/judgement";
+import { EVALUATOR_INSTRUCTIONS, SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
+import { framedFixturePacket, readFramedMaterial, wirePacket } from "../support/framed-packet.js";
+import { requestedReviewEdges, type RequestedReviewEdge } from "../support/reviewBearings.js";
 import {
   CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY,
   assertBootstrapEquality,
@@ -34,6 +37,7 @@ import {
   createPostgresProviderGateway,
   createPostgresReviewCatchUpDependencies,
   EVALUATOR_CONTRACT_TEXT,
+  EVALUATOR_PROMPT_CONTRACT,
   projectJudgedStanding,
   reviewCatchUpCallSiteKey,
   WalkingSkeletonRunner,
@@ -342,33 +346,16 @@ function reviewDouble(
   return JSON.stringify({ outcome, reasons: [reason], edge_bearings: { __policy: bearings } });
 }
 
-interface RequestedReviewEdge {
-  readonly ordinal: number;
-  readonly relation: "support" | "attack";
-  readonly target_statement: string;
-}
-
-/** The edges THIS review call offered, read off the wire, never assumed. */
-function requestedReviewEdges(body: string): readonly RequestedReviewEdge[] {
-  let request: { messages?: readonly { role: string; content: string }[] };
-  try {
-    request = JSON.parse(body) as typeof request;
-  } catch {
-    return [];
-  }
-  for (const message of request.messages ?? []) {
-    if (message.role !== "user") continue;
-    try {
-      const envelope = JSON.parse(message.content) as {
-        fields?: readonly { name: string; content: string }[];
-      };
-      const field = (envelope.fields ?? []).find((entry) => entry.name === "edges_sourced_by_this_node");
-      if (field !== undefined) return JSON.parse(field.content) as readonly RequestedReviewEdge[];
-    } catch { /* a non-envelope user message is not the one carrying the edges */ }
-  }
-  return [];
-}
-
+/**
+ * RUN1 round 4: this file carried its own copy of `requestedReviewEdges`, and
+ * the copy `JSON.parse(message.content)`-ed the user message and swallowed the
+ * throw. Once the user message became a fenced block the parse ALWAYS threw,
+ * the copy returned `[]` silently, and every `reviewDouble(...)` fixture below
+ * answered with `edge_bearings: []` — which the strict `.length(edgeCount)`
+ * schema rejects for any node that sources an edge. The copy is gone; the one
+ * shared helper reads the frame the door reads, and an absent field is a loud
+ * failure rather than an empty default.
+ */
 function withRequestDerivedBearings(content: string, edges: readonly RequestedReviewEdge[]): string {
   let value: { edge_bearings?: { __policy?: ReviewBearingPolicy } | unknown };
   try {
@@ -701,7 +688,10 @@ describe("BUG-01 content-rejection retry accounting", () => {
         runId, subjectItemId: workItemId, role: "JUDGE" as const, lane: "served" as const,
         bound: { maxAttempts: 3, tokenCeiling: 256, deadlineMs: 5_000 },
         contractHash, providerRef: "provider:test-layer:reviewer",
-        packet: { messages: [{ role: "user" as const, content: "Review an existing debate node" }] }
+        // RUN1 round 4: a packet the shipped frame builder made — the door
+        // refuses a hand-built one PROMPT_FRAME_ABSENT before any attempt, and
+        // this case counts attempts that REACH the provider.
+        packet: framedFixturePacket("Review an existing debate node")
       };
 
       await expect(gateway.call({ ...request, callSiteKey: inRunKey }))
@@ -745,7 +735,7 @@ describe("BUG-01 content-rejection retry accounting", () => {
         callSiteKey: "JUDGE:review:ceiling-seed", role: "JUDGE" as const, lane: "served" as const,
         bound: { maxAttempts: 2, tokenCeiling: 256, deadlineMs: 5_000 },
         contractHash, providerRef: "provider:test-layer:reviewer",
-        packet: { messages: [{ role: "user" as const, content: "Review an existing debate node" }] }
+        packet: framedFixturePacket("Review an existing debate node")
       };
       await expect(ceilingGateway.call(ceilingRequest)).rejects.toMatchObject({ attempts: 2 });
       expect(ceilingProvider.calls()).toBe(2);
@@ -783,7 +773,7 @@ describe("BUG-01 content-rejection retry accounting", () => {
         callSiteKey: "JUDGE:review:dl4-f3", role: "JUDGE" as const, lane: "served" as const,
         bound: { maxAttempts: 3, tokenCeiling: 256, deadlineMs: 5_000 },
         contractHash: "contract:dl4-f3", providerRef: "provider:test-layer:reviewer",
-        packet: { messages: [{ role: "user" as const, content: "Review an existing debate node" }] }
+        packet: framedFixturePacket("Review an existing debate node")
       })).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_EXHAUSTED" });
       expect(provider.calls()).toBe(1);
       expect(await new BudgetRepository(database.pool).countRunModelAttempts(runId)).toBe(1);
@@ -807,7 +797,7 @@ describe("BUG-01 content-rejection retry accounting", () => {
         runId, subjectItemId: workItemId, callSiteKey: "JUDGE", role: "JUDGE", lane: "served",
         bound: { maxAttempts: 3, tokenCeiling: 64, deadlineMs: 5_000 },
         contractHash: "contract:bug01-accounting", providerRef: "provider:test-layer",
-        packet: { messages: [{ role: "user", content: "test-layer accounting fixture" }] },
+        packet: framedFixturePacket("test-layer accounting fixture"),
         classifyContent: (content) => content === "accepted-three"
           ? { parseStatus: "PARSED", parseError: null }
           : { parseStatus: "SCHEMA_FAILED", parseError: `schema:${content}` }
@@ -853,7 +843,7 @@ describe("BUG-01 content-rejection retry accounting", () => {
         runId, subjectItemId: workItemId, callSiteKey: "JUDGE:retry", role: "JUDGE", lane: "served",
         bound: { maxAttempts: 3, tokenCeiling: 64, deadlineMs: 5_000 },
         contractHash: "contract:bug01-exhaustion", providerRef: "provider:test-layer",
-        packet: { messages: [{ role: "user", content: "test-layer exhaustion fixture" }] },
+        packet: framedFixturePacket("test-layer exhaustion fixture"),
         classifyContent: (content) => ({ parseStatus: "SCHEMA_FAILED", parseError: `schema:${content}` })
       })).rejects.toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 3 });
       const exhausted = await ledger.findExhaustedModelAttempt({
@@ -4281,16 +4271,26 @@ describe("apps/runner — legal command lifecycle", () => {
        * selection and pass vacuously.
        */
       const attempts = provider.bodies()
-        .map((body) => JSON.parse(body) as { messages: { role: string; content: string }[] })
-        .filter((packet) => packet.messages.some((message) => {
-          // EVERY user message is scanned, never just the first: a legitimate
-          // repair may place its user message before the serialised envelope,
-          // and assuming a position would drop that attempt out of the
-          // selection — which is a vacuous pass wearing a filter.
-          if (message.role !== "user") return false;
-          try { return (JSON.parse(message.content) as { role?: string }).role === "EVALUATOR"; }
-          catch { return false; }
-        }));
+        .map((body) => wirePacket(body))
+        .filter((packet) => {
+          // RUN1 (V-11 addendum): `role` left the model-visible payload — the
+          // routing identity is withheld — and every user message is now a
+          // FENCED block, so neither a bare parse of a message nor a
+          // `.role === "EVALUATOR"` test can find anything. The selector reads
+          // the frame instead, which is what the packet actually is; the
+          // EVALUATOR is identified by its own prompt contract id.
+          //
+          // EVERY message is still scanned, never just the first, for the
+          // reason the old comment gave: a repair appends a second block, and
+          // assuming a position would drop that attempt out of the selection —
+          // a vacuous pass wearing a filter.
+          //
+          // Round 4: through the one reader, and WITHOUT the `catch` that
+          // round 3 wrapped around it. Every body on this wire passed the
+          // gateway's door, so an unframed one is a defect to see, not a row
+          // to drop from the selection.
+          return readFramedMaterial(packet).contractId === EVALUATOR_PROMPT_CONTRACT.contractId;
+        });
 
       /**
        * THE COUNT IS THE VACUITY GUARD, and it is the only one (codex r6 B2).
@@ -4309,19 +4309,31 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(evaluatorCalls).toHaveLength(1);   // the wrapper saw ONE of the three
 
       // THE INVARIANT, and the whole of it: every attempt LEADS with the
-      // exported contract. Role and exact content, nothing else.
+      // exported contract.
+      //
+      // RUN1 changed WHERE it leads. The system message is now the owners'
+      // instruction slot followed by the code-owned safety frame, and
+      // `EVALUATOR_CONTRACT_TEXT` is the contract's ANSWER FORM inside that
+      // frame. Byte-equality with the whole message is therefore no longer the
+      // right assertion; CONTAINMENT of the exported constant in the leading
+      // system message is, and it still fails the moment the runner sends
+      // different text — which is the property this case was written for.
       for (const [index, packet] of attempts.entries()) {
         expect(packet.messages[0]?.role, `attempt ${index}`).toBe("system");
-        expect(packet.messages[0]?.content, `attempt ${index}`).toBe(EVALUATOR_CONTRACT_TEXT);
+        expect(packet.messages[0]?.content, `attempt ${index}`).toContain(EVALUATOR_CONTRACT_TEXT);
+        expect(packet.messages[0]?.content, `attempt ${index}`).toContain(EVALUATOR_INSTRUCTIONS);
       }
 
       const messages = evaluatorCalls[0]!.packet.messages;
       const system = messages.filter((message) => message.role === "system");
       expect(system).toHaveLength(1);
-      expect(system[0]!.content).toBe(EVALUATOR_CONTRACT_TEXT);
+      // RUN1: the exported constant is the contract's answer form, carried
+      // inside the one system message. Containment, not byte-equality — see the
+      // note on the invariant above.
+      expect(system[0]!.content).toContain(EVALUATOR_CONTRACT_TEXT);
       // and it leads the packet, so no earlier instruction can displace it
       expect(messages[0]?.role).toBe("system");
-      expect(messages[0]?.content).toBe(EVALUATOR_CONTRACT_TEXT);
+      expect(messages[0]?.content).toContain(EVALUATOR_CONTRACT_TEXT);
       // the fingerprinted contract and the sent contract are the same value
       expect(evaluatorCalls[0]!.contractHash).toBe(runnerSettings().conformanceContractHash);
     } finally { await provider.stop(); }
@@ -4980,12 +4992,22 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
       const chunks: Buffer[] = [];
       request.on("data", (chunk: Buffer) => chunks.push(chunk));
       request.on("end", () => {
-        const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as {
-          messages: readonly { role: string; content: string }[];
-        };
+        const body = wirePacket(Buffer.concat(chunks).toString("utf8"));
         const system = body.messages.find((message) => message.role === "system")?.content ?? "";
+        // RUN1 round 4: every packet on this wire carries the frame, and the
+        // frame names its prompt CONTRACT. The double dispatches on that id —
+        // never on the opening words of the system message, which is the
+        // owners' editable instruction slot. Round 3 had repaired the judge
+        // branch that way and left the composer branch on
+        // `system.startsWith("Return only JSON with a segments array")`: the
+        // synthesizer's system message opens with SYNTHESIZER_INSTRUCTIONS
+        // now, so that branch routed nothing, `composerCalls` stayed 0 and the
+        // case below could never pass.
+        const { contractId } = readFramedMaterial(body);
         let content: string;
-        if (system.startsWith("Return only one JSON object")) {
+        // A judge LEG is `judge.<leg>.<claimType>.v1`; the review and the panel
+        // carry their own ids and neither occurs in this one-maker, depth-1 run.
+        if (JUDGE_LEG_KINDS.some((leg) => contractId.startsWith(`judge.${leg}.`))) {
           content = JSON.stringify({
             statement: "A reasoning-only provisional answer.", way_of_knowing: "REASONING",
             locator: null, restatement_text: "A reasoning-only provisional answer.",
@@ -4996,7 +5018,7 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
             context: { fit: 0.72, ambiguityFlags: [] },
             fallacy: { severity: 0.28, fatalFlags: [] }
           });
-        } else if (system.startsWith("Return only JSON with a segments array")) {
+        } else if (contractId === SYNTHESIZER_PROMPT_CONTRACT.contractId) {
           composerSystemPrompt = system;
           const contractDeclared = reasoningContractFragments.every((fragment) => system.includes(fragment));
           composerCalls += 1;
@@ -5011,12 +5033,18 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
             : JSON.stringify({ segments: [
                 { segment_id: "segment:verdict", text: "A reasoning-only provisional answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] }
               ] });
-        } else {
+        } else if (contractId === EVALUATOR_PROMPT_CONTRACT.contractId) {
           // T9: the CONFORMANCE and post-compose-R9 prompts no longer exist on
           // the serve path; the EVALUATOR's is the only non-composer prompt a
-          // served run can produce, and it is matched by its own text rather
-          // than by falling through to a retired organ's shape.
+          // served run can produce, and it is matched by its own contract id
+          // rather than by falling through to a retired organ's shape.
           content = evaluatorSatisfied();
+        } else {
+          // Any other contract is a call this double was not written for: a
+          // loud 500 with a typed code, never a misrouted answer.
+          response.writeHead(500, { "content-type": "application/json" })
+            .end(JSON.stringify({ error: "COMPOSER_CONTRACT_DOUBLE_UNCLASSIFIED_CALL" }));
+          return;
         }
         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
           id: "composer-contract-double", model: "test-layer/model",

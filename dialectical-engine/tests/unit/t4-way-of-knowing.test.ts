@@ -67,6 +67,7 @@ function judgeInput(subjectItemId: string) {
     subjectItemId,
     callSiteKey: "fixture:t4-way-of-knowing",
     questionLine: "Test-layer question",
+    leg: { kind: "primary-root" },
     providerRef: "provider:test",
     contractHash: "contract:test",
     bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 }

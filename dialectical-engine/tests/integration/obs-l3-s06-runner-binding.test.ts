@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Pool, PoolClient } from "pg";
@@ -20,6 +21,7 @@ import {
   declareHatchetWalkingSkeletonTask,
   type RunnerExecutionResult,
 } from "@debateai/runner";
+import { framedFixturePacket } from "../support/framed-packet.js";
 
 const ROOT = process.cwd();
 
@@ -133,8 +135,14 @@ describe("S06 runner task binding", () => {
     // into its own Postgres and to stderr, outside the AEAD store, so the runner rethrows a
     // scrubbed error carrying the code and no model text (apps/runner/src/index.ts,
     // `scrubbedTaskFailure`; tests/unit/runner-failure-redaction.test.ts owns that contract).
+    // RUN1 (L4-F6): the dispatch is validated against a strict UUID schema BEFORE
+    // the runner runs, so the ids are real UUIDs — a `run:s06` string is refused
+    // RUNNER_WORKFLOW_INPUT_INVALID and the task never reaches the failure this
+    // case is about.
+    const runId = randomUUID();
+    const workItemId = randomUUID();
     await expect(taskFn(
-      { runId: "run:s06", workItemId: "work:s06" },
+      { runId, workItemId },
       { retryCount: () => 2 },
     )).rejects.toMatchObject({ code: failure.code });
 
@@ -152,8 +160,8 @@ describe("S06 runner task binding", () => {
         attempt_index: 2,
       },
       ambient_context_ref: {
-        run_ref: { kind: "run", value: "run:s06" },
-        work_item_ref: { kind: "work_item", value: "work:s06" },
+        run_ref: { kind: "run", value: runId },
+        work_item_ref: { kind: "work_item", value: workItemId },
       },
     });
     expect(createSharedRedactor({
@@ -208,10 +216,13 @@ describe("S06 runner task binding", () => {
     });
     if (taskFn === undefined) throw new Error("TASK_FN_NOT_DECLARED");
 
+    // RUN1 (L4-F6): real UUIDs, for the reason given in the case above.
+    const runId = randomUUID();
+    const workItemId = randomUUID();
     let observed: unknown;
     try {
       await taskFn(
-        { runId: "run:s06:record-failure", workItemId: "work:s06:record-failure" },
+        { runId, workItemId },
         { retryCount: () => 1 },
       );
     } catch (error) {
@@ -251,8 +262,8 @@ describe("S06 runner task binding", () => {
         attempt_index: 1,
       },
       ambient_context_ref: {
-        run_ref: { kind: "run", value: "run:s06:record-failure" },
-        work_item_ref: { kind: "work_item", value: "work:s06:record-failure" },
+        run_ref: { kind: "run", value: runId },
+        work_item_ref: { kind: "work_item", value: workItemId },
       },
     });
   });
@@ -353,7 +364,11 @@ describe("S06 provider gateway binding", () => {
         bound: { maxAttempts: 2, tokenCeiling: 64, deadlineMs: 1_000 },
         contractHash: "c".repeat(64),
         providerRef: "provider:s06",
-        packet: { messages: [{ role: "user", content: "fixture" }] },
+        // RUN1 (V-11 addendum): the gateway is the door, and a hand-built
+        // packet is refused PROMPT_FRAME_ABSENT before any fetch — which is a
+        // different failure from the exhaustion this case exists to capture.
+        // A packet the shipped frame builder made reaches the transport.
+        packet: framedFixturePacket("fixture"),
       }));
     } catch (error) {
       observed = error;

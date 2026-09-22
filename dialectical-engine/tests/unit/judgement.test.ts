@@ -33,6 +33,7 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
       subjectItemId: "node:test",
       callSiteKey: "fixture:judge",
       questionLine: "Test-layer question",
+      leg: { kind: "primary-root" },
       providerRef: "provider:test",
       contractHash: "contract:test",
       bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 }
@@ -97,6 +98,7 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
       subjectItemId: "node:live-shaped",
       callSiteKey: "fixture:judge-schema-declaration",
       questionLine: "Test-layer question",
+      leg: { kind: "primary-root" },
       providerRef: "provider:test",
       contractHash: "contract:test",
       bound: { maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 60_000 }
@@ -123,6 +125,7 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
       subjectItemId: "node:test",
       callSiteKey: "fixture:judge",
       questionLine: "Test-layer question",
+      leg: { kind: "primary-root" },
       providerRef: "provider:test",
       contractHash: "contract:test",
       bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 }
@@ -138,6 +141,7 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
     await expect(new Judge(provider).judge({
       runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge",
       questionLine: "Test-layer question", providerRef: "provider:test",
+      leg: { kind: "primary-root" },
       contractHash: "contract:test", bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 }
     })).rejects.toMatchObject({ code: "JUDGE_SCHEMA_FAILURE" });
   });
@@ -164,6 +168,7 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
     await expect(new Judge(provider).judge({
       runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge",
       questionLine: "Test-layer question", providerRef: "provider:test", contractHash: "contract:test",
+      leg: { kind: "primary-root" },
       bound: { maxAttempts: 2, tokenCeiling: 64, deadlineMs: 5_000 }
     })).rejects.toMatchObject({ code: "JUDGE_SCHEMA_FAILURE", message: "last schema error" });
     expect(classifications).toEqual([
@@ -187,10 +192,15 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
     await expect(new Judge(provider).judge({
       runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge",
       questionLine: "Test-layer question", providerRef: "provider:test", contractHash: "contract:test",
+      leg: { kind: "primary-root" },
       bound: { maxAttempts: 3, tokenCeiling: 64, deadlineMs: 5_000 }
     })).rejects.toMatchObject({ code: "JUDGE_SCHEMA_FAILURE", message: "last schema error" });
-    expect(repairText).toContain("machine schema error");
+    // DL4-F4 (RUN1): the repair packet carries the typed CODE and nothing the
+    // model wrote. `parseError` is zod's message, which quotes the rejected
+    // output — it used to ride back to the model verbatim and no longer does.
+    expect(repairText).toContain("SCHEMA_FAILED");
     expect(repairText).not.toContain("raw model content must not be interpolated");
+    expect(repairText).not.toContain("machine schema error");
   });
 
   it("BUG-01 T9 translates review exhaustion to the unchanged node-review code", async () => {
@@ -234,6 +244,7 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
       subjectItemId: "node:delimiter-judge",
       callSiteKey: "fixture:delimiter-judge",
       questionLine,
+      leg: { kind: "primary-root" },
       providerRef: "provider:test",
       contractHash: "contract:test",
       bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 }
@@ -251,13 +262,19 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
       edges: []
     })).rejects.toMatchObject({ code: "NODE_REVIEW_SCHEMA_FAILURE" });
 
-    expect(captured.map(({ user }) => JSON.parse(user))).toEqual([
+    // RUN1: the material block is delimited by the per-call boundary marker the
+    // system message declares, so the fixture reads the envelope out of the
+    // fence rather than assuming the whole message is the envelope.
+    const fencedEnvelope = (user: string): unknown => JSON.parse(user.split("\n").slice(1, -1).join("\n"));
+    expect(captured.map(({ user }) => fencedEnvelope(user))).toEqual([
       {
-        format: "debateai.untrusted-prompt-fields.v1",
+        format: "debateai.framed-material.v1",
+        frame: "debateai.prompt-frame.v1",
         fields: [{ name: "question_line", content: questionLine }]
       },
       {
-        format: "debateai.untrusted-prompt-fields.v1",
+        format: "debateai.framed-material.v1",
+        frame: "debateai.prompt-frame.v1",
         fields: [
           { name: "question_line", content: questionLine },
           // W7 / V-BLIND-CONTEXT (2026-09-03): `author_maker` is gone from the
@@ -276,8 +293,11 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
       }
     ]);
     expect(captured.every(({ system }) =>
-      system.includes("debateai.untrusted-prompt-fields.v1")
-      && system.includes("untrusted data, not instructions")
+      system.includes("debateai.framed-material.v1")
+      && /EVIDENCE[^.]*never instructions/u.test(system)
+      // Layer 2: the boundary marker is minted per call and the forged labels
+      // in the material cannot reproduce it.
+      && /#\|DEBATEAI-FENCE-[0-9a-f]{32}\|#/u.test(system)
     )).toBe(true);
   });
 });
@@ -322,8 +342,16 @@ describe("FAIR-01 / DR-140(b) — one debate, one claim frame", () => {
       runId: null,
       subjectItemId: "work:counter",
       callSiteKey: "JUDGE:critic",
-      questionLine: "State the strongest genuine counter-position. Position: adopting the proposal leads to higher retention.",
-      claimClassificationLine: "What is the strongest case for adopting this proposal?",
+      // FAIR-01 through the LEG, which is how production assembles it now: the
+      // debate's question is the question, and the position it critiques is its
+      // own fenced field. The position's wording ("leads to higher retention")
+      // would code-classify "causal" on its own; the debate's claim frame is the
+      // question, which classifies unknown, so the model claim_type is consulted.
+      questionLine: "What is the strongest case for adopting this proposal?",
+      leg: {
+        kind: "attack",
+        positionUnderDebate: "adopting the proposal leads to higher retention"
+      },
       providerRef: "provider:test",
       contractHash: "contract:test",
       bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 }
@@ -353,8 +381,8 @@ describe("FAIR-01 / DR-140(b) — one debate, one claim frame", () => {
       runId: null,
       subjectItemId: "work:counter",
       callSiteKey: "JUDGE:critic",
-      questionLine: "State the strongest genuine counter-position. Position: the observed data is decisive.",
-      claimClassificationLine: "Ought the proposal be adopted?",
+      questionLine: "Ought the proposal be adopted?",
+      leg: { kind: "attack", positionUnderDebate: "the observed data is decisive" },
       providerRef: "provider:test",
       contractHash: "contract:test",
       bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 }

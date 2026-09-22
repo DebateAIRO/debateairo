@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { createHash } from "node:crypto";
+import { promptContractFingerprintText } from "@debateai/providers";
 
 /**
  * F-SEALEDROWS-A · codex r3 B1, part 1 — THE DATAFLOW PROPERTY, TESTED AS
@@ -28,9 +29,23 @@ import { createHash } from "node:crypto";
  */
 const SENTINEL = "SENTINEL evaluator contract text — not the shipped prompt.";
 
+/**
+ * RUN1 (V-11 addendum): the seeders now fingerprint the evaluator's PROMPT
+ * CONTRACT — the owners' instruction slot plus the code-owned answer form plus
+ * the frame version — rather than one bare string. The property this file owns
+ * is unchanged and is asserted the same way: the fingerprint FOLLOWS the object
+ * the runner sends, so replacing that object here must move both deployments'
+ * hash. A source scan would be blind to this substitution, which is the point.
+ */
+const SENTINEL_CONTRACT = Object.freeze({
+  contractId: "serve.evaluator.v1",
+  instruction: "SENTINEL evaluator instructions — not the shipped text.",
+  answerForm: SENTINEL
+});
+
 vi.mock("@debateai/runner", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
-  return { ...actual, EVALUATOR_CONTRACT_TEXT: SENTINEL };
+  return { ...actual, EVALUATOR_CONTRACT_TEXT: SENTINEL, EVALUATOR_PROMPT_CONTRACT: SENTINEL_CONTRACT };
 });
 
 const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
@@ -39,13 +54,13 @@ describe("F-SEALEDROWS-A · the fingerprint FOLLOWS the constant, in both deploy
   it("acceptance digests the imported constant, not the runner's source text", async () => {
     const { buildAcceptanceRegisterRows } = await import("../../acceptance/seed-register.js");
     const rows = Object.fromEntries((await buildAcceptanceRegisterRows()).map((r) => [r.rowKey, r.value]));
-    expect(rows.conformanceContractHash).toBe(sha256(SENTINEL));
+    expect(rows.conformanceContractHash).toBe(sha256(promptContractFingerprintText(SENTINEL_CONTRACT)));
   });
 
   it("development digests the imported constant, not the runner's source text", async () => {
     const { buildDevelopmentRunnerRegisterRows } = await import("../../apps/runner/src/dev-deployment-register.js");
     const rows = Object.fromEntries((await buildDevelopmentRunnerRegisterRows()).map((r) => [r.rowKey, r.value]));
-    expect(rows.conformanceContractHash).toBe(sha256(SENTINEL));
+    expect(rows.conformanceContractHash).toBe(sha256(promptContractFingerprintText(SENTINEL_CONTRACT)));
   });
 });
 

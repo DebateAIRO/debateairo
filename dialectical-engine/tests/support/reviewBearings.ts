@@ -13,6 +13,8 @@
  * exactly as they were — which is what makes this a contract repair rather
  * than a change to any lane's assertions.
  */
+import { framedField, readFramedMaterial, wirePacket } from "./framed-packet.js";
+
 export type ReviewBearingPolicy = "cannot-assess" | { readonly support: number; readonly attack: number };
 
 export interface RequestedReviewEdge {
@@ -21,25 +23,21 @@ export interface RequestedReviewEdge {
   readonly target_statement: string;
 }
 
-/** The edges THIS review call offered, read off the wire, never assumed. */
+/**
+ * The edges THIS review call offered, read off the wire, never assumed.
+ *
+ * RUN1 (V-11 addendum) round 4: this used to `JSON.parse(message.content)`
+ * and swallow the throw. Once every user message became a fenced block the
+ * parse ALWAYS threw, the helper returned `[]` silently, and every scripted
+ * review — in `acceptance/ceremony.test.ts`, the owner's confirmation run, and
+ * in `panel-multi-maker.test.ts` — would have answered `edge_bearings: []`,
+ * which the strict `.length(edgeCount)` schema rejects for any node that
+ * sources an edge. It now reads the frame the gateway's door reads, and an
+ * absent field is a loud failure rather than an empty default.
+ */
 export function requestedReviewEdges(body: string): readonly RequestedReviewEdge[] {
-  let request: { messages?: readonly { role: string; content: string }[] };
-  try {
-    request = JSON.parse(body) as typeof request;
-  } catch {
-    return [];
-  }
-  for (const message of request.messages ?? []) {
-    if (message.role !== "user") continue;
-    try {
-      const envelope = JSON.parse(message.content) as {
-        fields?: readonly { name: string; content: string }[];
-      };
-      const field = (envelope.fields ?? []).find((entry) => entry.name === "edges_sourced_by_this_node");
-      if (field !== undefined) return JSON.parse(field.content) as readonly RequestedReviewEdge[];
-    } catch { /* a non-envelope user message is not the one carrying the edges */ }
-  }
-  return [];
+  const material = readFramedMaterial(wirePacket(body));
+  return JSON.parse(framedField(material, "edges_sourced_by_this_node")) as readonly RequestedReviewEdge[];
 }
 
 /** One bearing per offered edge, honouring each edge's own polarity. */

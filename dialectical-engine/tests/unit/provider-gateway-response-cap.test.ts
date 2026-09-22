@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { OpenAICompatibleProviderGateway, ProviderCallFailedError } from "@debateai/providers";
+import { framedFixturePacket } from "../support/framed-packet.js";
 
 const MIB = 1024 * 1024;
 const CHUNK_BYTES = 64 * 1024;
@@ -9,7 +10,7 @@ function callRequest(maxAttempts = 1) {
     runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE" as const,
     lane: "served" as const, bound: { maxAttempts, tokenCeiling: 64, deadlineMs: 5_000 },
     contractHash: "contract:test", providerRef: "provider:test",
-    packet: { messages: [{ role: "user" as const, content: "fixture" }] }
+    packet: framedFixturePacket("fixture")
   };
 }
 
@@ -39,18 +40,19 @@ function streamingBody(text: string) {
 }
 
 /** A syntactically valid completion whose serialised UTF-8 length is exactly `totalBytes`. */
-function completionOfExactly(totalBytes: number, model = "fixture") {
+// L4-F10: the response must assert the model this target is pinned to.
+function completionOfExactly(totalBytes: number, model = "configured/model") {
   const head = `{"id":"call","model":${JSON.stringify(model)},"choices":[{"message":{"content":"`;
   const tail = "\"}}]}";
   const contentLength = totalBytes - Buffer.byteLength(head) - Buffer.byteLength(tail);
   return { text: `${head}${"a".repeat(contentLength)}${tail}`, contentLength };
 }
 
-function gatewayWith(fetchImplementation: typeof fetch) {
+function gatewayWith(fetchImplementation: typeof fetch, pinnedModel = "configured/model") {
   const artifacts: Array<{ rawText: string; model: string; modelVersion: string | null; metadata: Readonly<Record<string, unknown>> }> = [];
   const ledger: Array<{ outcome: string; rawArtifactRef: string | null }> = [];
   const gateway = new OpenAICompatibleProviderGateway({
-    endpoint: "http://fixture/v1", model: "configured/model", maker: "fixture",
+    endpoint: "http://fixture/v1", model: pinnedModel, maker: "fixture",
     fetchImplementation,
     persistRawArtifact: async (artifact) => { artifacts.push(artifact); return artifact.artifactId; },
     appendLedgerEntry: async (entry) => { ledger.push(entry); return `ledger:${ledger.length}`; },
@@ -97,13 +99,13 @@ describe("L4-F3 — provider response body cap", () => {
 
   it("does not add the body cap to the stub-less non-streaming path: a small Response still works", async () => {
     const { gateway } = gatewayWith(async () => new Response(completionOfExactly(256).text));
-    await expect(gateway.call(callRequest())).resolves.toMatchObject({ model: "fixture" });
+    await expect(gateway.call(callRequest())).resolves.toMatchObject({ model: "configured/model" });
   });
 });
 
 describe("L4-F3 — strict, bounded usage", () => {
   const completionWithUsage = (usage: unknown) => JSON.stringify({
-    id: "call", model: "fixture", choices: [{ message: { content: "ok" } }], usage
+    id: "call", model: "configured/model", choices: [{ message: { content: "ok" } }], usage
   });
 
   it("refuses usage with unknown keys as PROVIDER_USAGE_INVALID and never persists them", async () => {
@@ -150,8 +152,13 @@ describe("L4-F3 — bounded response model id", () => {
   });
 
   it("accepts a 256-character model id", async () => {
+    // L4-F10: the asserted model must also BE the pinned one, so the target is
+    // pinned to the same 256-character id this case is about.
     const model = "m".repeat(256);
-    const { gateway, artifacts } = gatewayWith(async () => new Response(completionOfExactly(512, model).text));
+    const { gateway, artifacts } = gatewayWith(
+      async () => new Response(completionOfExactly(512, model).text),
+      model
+    );
     await expect(gateway.call(callRequest())).resolves.toMatchObject({ model, modelVersion: model });
     expect(artifacts[0]).toMatchObject({ model, modelVersion: model });
   });

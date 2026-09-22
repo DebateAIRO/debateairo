@@ -44,7 +44,7 @@ describe("DL4-F1 — failures carry codes and paths, never model text", () => {
       engineRetries: 0
     } as never);
 
-    const failure = await taskFn!({ runId: "run:test", workItemId: "work:test" }).then(
+    const failure = await taskFn!({ runId: "11111111-1111-4111-8111-111111111111", workItemId: "22222222-2222-4222-8222-222222222222" }).then(
       () => { throw new Error("EXPECTED_REJECTION"); },
       (error: unknown) => error as Error & { code?: string; cause?: unknown }
     );
@@ -67,7 +67,7 @@ describe("DL4-F1 — failures carry codes and paths, never model text", () => {
       workflowName: "runner:test",
       engineRetries: 0
     } as never);
-    const failure = await taskFn!({ runId: "run:test", workItemId: "work:test" }).then(
+    const failure = await taskFn!({ runId: "11111111-1111-4111-8111-111111111111", workItemId: "22222222-2222-4222-8222-222222222222" }).then(
       () => { throw new Error("EXPECTED_REJECTION"); },
       (error: unknown) => error as Error
     );

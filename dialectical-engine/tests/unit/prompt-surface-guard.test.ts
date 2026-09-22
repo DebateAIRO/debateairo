@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { buildFramedPrompt } from "@debateai/providers";
 import { Judge } from "@debateai/judgement";
 import {
   ProviderContentUnacceptedError,
@@ -14,7 +15,7 @@ import {
   buildEvaluatorRequest,
   buildSynthesisDigest,
   buildSynthesizerRequest,
-  toSynthesisPromptPayload,
+  toSynthesisPromptMaterial,
   type SynthesisCodeLabel,
   type SynthesisDigest,
   type SynthesisLoopControls
@@ -122,6 +123,7 @@ const BUILDERS = [
         subjectItemId: SUBJECT.subjectItemId,
         callSiteKey: SUBJECT.callSiteKey,
         questionLine: QUESTION_LINE,
+        leg: { kind: "primary-root" },
         providerRef: SUBJECT.providerRef,
         contractHash: SUBJECT.contractHash,
         bound: BOUND
@@ -175,12 +177,17 @@ describe("V-BLIND-CONTEXT — the judgement prompt surface withholds authorship"
     // property of today's tree that this row may rely on.
     // `encoding` is not decoration: the `recursive` overload without it is
     // typed `string[] | Buffer[]`, and `tsc` — never vitest — is what says so.
-    const systemSites = readdirSync(JUDGEMENT_SRC, { encoding: "utf8", recursive: true })
+    // RUN1 (V-11 addendum): a prompt builder is no longer a `role: "system"`
+    // literal — the ONE frame builder owns that string, and a hand-off is a
+    // `buildFramedPrompt` call. The row counts the same thing it always did:
+    // how many prompts this package can produce.
+    const source = readdirSync(JUDGEMENT_SRC, { encoding: "utf8", recursive: true })
       .filter((entry) => entry.endsWith(".ts"))
       .map((entry) => readFileSync(`${JUDGEMENT_SRC}/${entry}`, "utf8"))
-      .join("\n")
-      .split(/\brole: "system"/).length - 1;
-    expect(systemSites).toBe(BUILDERS.length);
+      .join("\n");
+    expect(source.split(/\bbuildFramedPrompt\(\{/u).length - 1).toBe(BUILDERS.length);
+    // ...and no builder may go back to assembling a packet by hand.
+    expect(source.split(/\brole: "system"/u).length - 1).toBe(0);
 
     // And the instrument must actually have run: one initial packet plus one
     // repair packet per builder, every packet carrying messages.
@@ -361,46 +368,70 @@ function guardDigest(): SynthesisDigest {
 const SYNTHESIS_PAYLOADS = [
   {
     name: "SYNTHESIZER:INITIAL",
-    projectedKeys: ["codeLabel", "digest", "instructions", "role"],
-    material: [SYNTHESIZER_INSTRUCTIONS, DIGEST_NODE_TEXT, VERDICT_LABEL, String(SERVED_STRENGTH), String(MARGIN)],
+    projectedKeys: ["code_label", "digest"],
+    material: [DIGEST_NODE_TEXT, VERDICT_LABEL, String(SERVED_STRENGTH), String(MARGIN)],
     foreignOrganTokens: FOREIGN_ORGAN_TOKENS,
-    render: (): string => toSynthesisPromptPayload(buildSynthesizerRequest({
+    render: (): string => renderMaterial(toSynthesisPromptMaterial(buildSynthesizerRequest({
       controls: SYNTHESIS_CONTROLS,
       round: MACHINERY.round,
       digest: guardDigest(),
       codeLabel: SYNTHESIS_CODE_LABEL,
       prior: null
-    }))
+    })))
   },
   {
     name: "SYNTHESIZER:RETRY",
-    projectedKeys: ["codeLabel", "digest", "instructions", "priorObjection", "role"],
+    projectedKeys: ["code_label", "digest", "prior_objection"],
     // D71 boundary: `priorObjection` is ADMITTED (without it a rewrite is blind
     // and can only repeat itself); `round` is REJECTED from the same payload.
-    material: [SYNTHESIZER_INSTRUCTIONS, DIGEST_NODE_TEXT, VERDICT_LABEL, PRIOR_OBJECTION],
+    material: [DIGEST_NODE_TEXT, VERDICT_LABEL, PRIOR_OBJECTION],
     foreignOrganTokens: FOREIGN_ORGAN_TOKENS,
-    render: (): string => toSynthesisPromptPayload(buildSynthesizerRequest({
+    render: (): string => renderMaterial(toSynthesisPromptMaterial(buildSynthesizerRequest({
       controls: SYNTHESIS_CONTROLS,
       round: MACHINERY.round,
       digest: guardDigest(),
       codeLabel: SYNTHESIS_CODE_LABEL,
       prior: { objection: PRIOR_OBJECTION, candidateRef: MACHINERY.priorCandidateRef }
-    }))
+    })))
   },
   {
     name: "EVALUATOR",
-    projectedKeys: ["candidateStatement", "codeLabel", "digest", "instructions", "role"],
-    material: [EVALUATOR_INSTRUCTIONS, DIGEST_NODE_TEXT, VERDICT_LABEL, CANDIDATE_STATEMENT],
+    projectedKeys: ["candidate_statement", "code_label", "digest"],
+    material: [DIGEST_NODE_TEXT, VERDICT_LABEL, CANDIDATE_STATEMENT],
     foreignOrganTokens: FOREIGN_ORGAN_TOKENS,
-    render: (): string => toSynthesisPromptPayload(buildEvaluatorRequest({
+    render: (): string => renderMaterial(toSynthesisPromptMaterial(buildEvaluatorRequest({
       controls: SYNTHESIS_CONTROLS,
       round: MACHINERY.round,
       digest: guardDigest(),
       codeLabel: SYNTHESIS_CODE_LABEL,
       candidateStatement: CANDIDATE_STATEMENT
-    }))
+    })))
   }
 ] as const;
+
+/**
+ * RUN1: the projection returns MATERIAL FIELDS, and what the provider sees is
+ * the fenced block the frame builder renders around them. The guard renders the
+ * real thing, so nothing it asserts about is a shape the engine does not send.
+ */
+function renderMaterial(fields: readonly { readonly name: string; readonly content: string }[]): string {
+  const framed = buildFramedPrompt({
+    contract: {
+      contractId: "guard.synthesis.v1",
+      instruction: "Guard instruction.",
+      answerForm: "Guard answer form."
+    },
+    material: fields
+  });
+  return framed.packet.messages[1]!.content;
+}
+
+function parsedFields(block: string): readonly { readonly name: string; readonly content: string }[] {
+  const envelope = JSON.parse(block.split("\n").slice(1, -1).join("\n")) as {
+    fields: { name: string; content: string }[];
+  };
+  return envelope.fields;
+}
 
 /** Every key name in a parsed payload, at every depth, arrays included. */
 function everyKeyIn(value: unknown): string[] {
@@ -427,10 +458,12 @@ describe("V-MINIMUM-PAYLOAD — the synthesis prompt surface withholds the machi
     // may serialise the request whole. A third call site added later is caught
     // by the same two counts, in either direction.
     expect(occurrences(runner, "JSON.stringify(request)")).toBe(0);
-    expect(occurrences(runner, "toSynthesisPromptPayload(request)")).toBe(SYNTHESIS_CALL_SITES);
+    expect(occurrences(runner, "toSynthesisPromptMaterial(request)")).toBe(SYNTHESIS_CALL_SITES);
     // ...and there is exactly ONE projection, so the allow-list cannot be forked
     // into a second copy that quietly readmits a field.
-    expect(occurrences(readFileSync(SYNTHESIS_SRC, "utf8"), "export function toSynthesisPromptPayload")).toBe(1);
+    expect(occurrences(readFileSync(SYNTHESIS_SRC, "utf8"), "export function toSynthesisPromptMaterial")).toBe(1);
+    // RUN1: and both sites build the packet with the ONE frame builder.
+    expect(occurrences(runner, "buildFramedPrompt({")).toBe(SYNTHESIS_CALL_SITES);
   });
 
   it.each(SYNTHESIS_PAYLOADS.map(({ name }) => name))(
@@ -439,7 +472,10 @@ describe("V-MINIMUM-PAYLOAD — the synthesis prompt surface withholds the machi
       const raw = payloadRow(name).render();
 
       // By KEY, at every depth — this is what catches `codeLabel.registerVersion`.
-      const leakedKeys = everyKeyIn(JSON.parse(raw) as unknown)
+      const leakedKeys = parsedFields(raw)
+        .flatMap((field) => {
+          try { return everyKeyIn(JSON.parse(field.content) as unknown); } catch { return []; }
+        })
         .filter((key) => (WITHHELD_SYNTHESIS_KEYS as readonly string[]).includes(key));
       expect(leakedKeys).toEqual([]);
 
@@ -459,11 +495,12 @@ describe("V-MINIMUM-PAYLOAD — the synthesis prompt surface withholds the machi
   it.each(SYNTHESIS_PAYLOADS.map(({ name, projectedKeys }) => [name, projectedKeys] as const))(
     "%s emits EXACTLY its projected key set",
     (name, projectedKeys) => {
-      const parsed = JSON.parse(payloadRow(name).render()) as Record<string, unknown>;
-      expect(Object.keys(parsed).sort()).toEqual([...projectedKeys]);
+      const fields = parsedFields(payloadRow(name).render());
+      expect(fields.map(({ name: field }) => field).sort()).toEqual([...projectedKeys]);
       // The code label's REAL NUMBERS, and only those: the ruling keeps the
       // label, the node, the strength and the margin, and drops the version.
-      expect(Object.keys(parsed["codeLabel"] as Record<string, unknown>).sort())
+      const codeLabel = fields.find(({ name: field }) => field === "code_label");
+      expect(Object.keys(JSON.parse(codeLabel!.content) as Record<string, unknown>).sort())
         .toEqual(["margin", "servedNodeId", "servedStrength", "verdictLabel"]);
     }
   );

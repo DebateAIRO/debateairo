@@ -14,7 +14,13 @@ import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import {
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
+  buildFramedPrompt,
+  buildFramedRepairPrompt,
+  schemaFailureLocator,
   type CallBound,
+  type FramedPrompt,
+  type PromptPacket,
+  type PromptContract,
   type ProviderGateway
 } from "@debateai/providers";
 import { createBlindEvaluationSample } from "./blind-sample.js";
@@ -522,15 +528,13 @@ export async function runEvaluatorJudgeAddon(input: {
   });
   let stage: "PROVIDER_CALL" | "EXECUTION" = "PROVIDER_CALL";
   try {
-    const packet = {
-      messages: [
-        {
-          role: "system" as const,
-          content: "Grade the supplied anonymous judge output. Return strict JSON only with score in [0,1], verdict UPHOLD, REVISE, or UNASSESSABLE, and one or more non-empty reasons. Do not infer authorship."
-        },
-        { role: "user" as const, content: JSON.stringify(blinded) }
-      ]
-    };
+    // V-11 addendum: the blinded sample is another model's output. It is
+    // material, it rides the fence, and the grading instruction is code's.
+    const framed = buildFramedPrompt({
+      contract: BLIND_JUDGE_GRADE_PROMPT_CONTRACT,
+      material: [{ name: "blinded_judge_output", content: JSON.stringify(blinded) }]
+    });
+    const packet = framed.packet;
     const response = await input.provider.call({
       runId: input.runId,
       subjectItemId: `evaluator:addon-attempt:${attemptId}`,
@@ -545,12 +549,11 @@ export async function runEvaluatorJudgeAddon(input: {
       contractHash: createHash("sha256").update("evaluator-blind-judge-grade/v1").digest("hex"),
       providerRef: input.family.value.providerRef,
       packet,
-      buildRepairPacket: ({ parseError }) => ({
-        messages: [...packet.messages, {
-          role: "user",
-          content: `The response violated the anonymous grading JSON contract (${parseError}). Return corrected strict JSON only.`
-        }]
-      }),
+      // REVIEW ITEM 1: this used to append a bare user turn carrying
+      // `parseError`. The gateway's door refuses that shape and re-throws frame
+      // refusals out of the attempt loop, so the add-on did not merely keep a
+      // leak — it LOST its one repair attempt and recorded ADDON_PROVIDER_FAILED.
+      buildRepairPacket: (rejected) => buildAddonRepairPacket(framed, rejected),
       classifyContent: (content) => {
         const parsed = addonGradeSchema.safeParse((() => {
           try { return JSON.parse(content); } catch { return null; }
@@ -1542,24 +1545,21 @@ export async function runEvaluatorQuestionTagger(input: {
       bound: input.bound,
       contractHash: createHash("sha256").update("evaluator-domain-tagger/v1").digest("hex"),
       providerRef: input.family.value.providerRef,
-      packet: {
-        messages: [
+      // V-11 addendum: `rawQuestion` is a visitor's text — the other untrusted
+      // source — and the domain list is the engine's. Two fields, one fence.
+      packet: buildFramedPrompt({
+        contract: DOMAIN_TAGGER_PROMPT_CONTRACT,
+        material: [
+          { name: "raw_question", content: input.rawQuestion },
           {
-            role: "system",
-            content: "Classify the raw question. Return strict JSON only: SELECT_EXISTING with domain_id, PROPOSE_NEW with proposed_name, or REFUSED with reason. Never invent an existing domain id."
-          },
-          {
-            role: "user",
-            content: JSON.stringify({
-              raw_question: input.rawQuestion,
-              domains: domains.map(({ domainId, canonicalName }) => ({
-                domain_id: domainId,
-                canonical_name: canonicalName
-              }))
-            })
+            name: "known_domains",
+            content: JSON.stringify(domains.map(({ domainId, canonicalName }) => ({
+              domain_id: domainId,
+              canonical_name: canonicalName
+            })))
           }
         ]
-      },
+      }).packet,
       classifyContent: (content) => {
         const parsed = taggerDecisionSchema.safeParse((() => {
           try { return JSON.parse(content); } catch { return null; }
@@ -3649,4 +3649,39 @@ export async function reconcileEvaluatorMetering(
   })), window);
   await repository.recordRelativeCostCells(cells);
   return Object.freeze({ callsProjected, callsFailed, relativeCostCellsDerived: cells.length });
+}
+
+
+/* ------------------------------------- V-11 addendum: the two prompt contracts */
+
+/**
+ * The evaluator add-on's own hand-offs. Both texts are the ones this package
+ * already sent, split into the owners' instruction slot and the code-owned
+ * answer form and moved onto the frame — the same treatment the debate legs
+ * received, for the same reason: what they grade is model-written.
+ */
+export const BLIND_JUDGE_GRADE_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: "evaluator.blind-judge-grade.v1",
+  instruction: "Grade the supplied anonymous judge output. Do not infer authorship.",
+  answerForm: "Return strict JSON only with score in [0,1], verdict UPHOLD, REVISE, or UNASSESSABLE, and one or more non-empty reasons."
+});
+
+export const DOMAIN_TAGGER_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: "evaluator.domain-tagger.v1",
+  instruction: "Classify the raw question. Never invent an existing domain id.",
+  answerForm: "Return strict JSON only: SELECT_EXISTING with domain_id, PROPOSE_NEW with proposed_name, or REFUSED with reason."
+});
+
+
+/**
+ * REVIEW ITEM 1 — the add-on's repair packet, framed. Exported so a test can
+ * drive it: the defect survived because `evaluator-addon.test.ts` never called
+ * `buildRepairPacket`, and a repair builder nothing exercises is a repair
+ * builder nobody knows is broken.
+ */
+export function buildAddonRepairPacket(framed: FramedPrompt, rejected: {
+  readonly parseStatus: string;
+  readonly parseError: string;
+}): PromptPacket {
+  return buildFramedRepairPrompt(framed, schemaFailureLocator(rejected));
 }

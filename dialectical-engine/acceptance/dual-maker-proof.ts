@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Pool } from "pg";
 import { RunRepository } from "@debateai/db";
 import { createPostgresProviderGateway } from "@debateai/runner";
+import { buildFramedPrompt, type PromptContract } from "@debateai/providers";
 import { startClaudeRelay, type ClaudeRelayHandle } from "./claude-relay.js";
 import { startModelShim, type ModelShimHandle } from "./model-shim.js";
 import type { CommandSpec } from "./relay-core.js";
@@ -37,7 +38,26 @@ import {
 
 export const DUAL_MAKER_PROOF_CONTRACT_TEXT =
   "FAIR-02 dual-maker transport proof (DR-140). You are one of two independent model makers; answer the user's request directly." as const;
-const PROOF_USER_LINE = "Reply with the single word: OK";
+/**
+ * The proof's required answer, in ONE place. Before RUN1 this line was the
+ * user message; RUN1 made it the contract's answer form, and round 3 (review
+ * item G) stopped sending it a second time as material. Round 4: the old
+ * `PROOF_USER_LINE` constant, dead since then, is this one — derived once, not
+ * spelled twice.
+ */
+const PROOF_ANSWER_FORM = "Reply with the single word: OK" as const;
+
+/**
+ * V-11 addendum (RUN1): the transport proof goes through the same door as every
+ * other hand-off — the gateway refuses a packet the frame builder did not make.
+ * The proof text is unchanged and stays the instruction slot, so
+ * `DUAL_MAKER_PROOF_CONTRACT_TEXT` remains the thing this file fingerprints.
+ */
+const DUAL_MAKER_PROOF_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: "acceptance.dual-maker-proof.v1",
+  instruction: DUAL_MAKER_PROOF_CONTRACT_TEXT,
+  answerForm: PROOF_ANSWER_FORM
+});
 
 const digest = (text: string): string => createHash("sha256").update(text).digest("hex");
 
@@ -98,12 +118,15 @@ async function callThroughMaker(input: {
     bound: input.policy.bounds.JUDGE,
     contractHash: digest(DUAL_MAKER_PROOF_CONTRACT_TEXT),
     providerRef: input.provider.providerRef,
-    packet: {
-      messages: [
-        { role: "system", content: DUAL_MAKER_PROOF_CONTRACT_TEXT },
-        { role: "user", content: PROOF_USER_LINE }
-      ]
-    }
+    packet: buildFramedPrompt({
+      contract: DUAL_MAKER_PROOF_PROMPT_CONTRACT,
+      // ROUND 3 (review item G): this field used to carry `PROOF_USER_LINE`,
+      // which is ALSO the contract's answer form — so the model was told the
+      // same sentence twice, once as an instruction and once as evidence. The
+      // material is the proof's SUBJECT; the instruction to reply "OK" belongs
+      // to the answer form alone.
+      material: [{ name: "request", content: "dual-maker transport proof" }]
+    }).packet
   });
   return Object.freeze({
     providerRef: input.provider.providerRef,

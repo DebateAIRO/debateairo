@@ -3,7 +3,10 @@ import { constants } from "node:fs";
 import { lstat, open, readFile, rename, unlink } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { Pool, PoolClient } from "pg";
-import { EVALUATOR_CONTRACT_TEXT } from "./index.js";
+import { EVALUATOR_PROMPT_CONTRACT } from "./index.js";
+import { JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT } from "@debateai/judgement";
+import { promptContractFingerprintText } from "@debateai/providers";
+import { SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
 import { CLAIM_TYPES } from "@debateai/kernel";
 import {
   ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW,
@@ -61,9 +64,16 @@ export const DEVELOPMENT_RUN_DEATH_POLICY = Object.freeze({
   max_cooldown_holds_per_run: 2,
   applies_to: "TRANSPORT_EXHAUSTION" as const
 });
-/** First allocated version on a fresh database; runtime pins use the returned receipt. */
-export const DEVELOPMENT_REGISTER_VERSION = 5 as const;
-export const DEVELOPMENT_HISTORICAL_REGISTER_VERSION = 4 as const;
+/**
+ * First allocated version on a fresh database; runtime pins use the returned receipt.
+ *
+ * 5 -> 6 (RUN1, V-11 addendum, 2026-09-22): every prompt contract moved onto the
+ * code-owned safety frame, so `judgeContractHash`, `composerContractHash` and
+ * `conformanceContractHash` all move. Constraint 5: a sealed value is
+ * SUPERSEDED by a new version, never edited — version 5 stays as history.
+ */
+export const DEVELOPMENT_REGISTER_VERSION = 6 as const;
+export const DEVELOPMENT_HISTORICAL_REGISTER_VERSION = 5 as const;
 export const DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_SCHEMA =
   "debateai.dev-deployment-register-receipt.v1" as const;
 /**
@@ -479,28 +489,24 @@ export function buildDevelopmentAlgorithmRegisterRows(
 
 const digest = (text: string): string => createHash("sha256").update(text).digest("hex");
 
-function requireMatch(source: string, expression: RegExp, label: string): string {
-  const value = source.match(expression)?.[1];
-  if (value === undefined) throw new TypeError(`DEV_RUNNER_CONTRACT_TEXT_UNRESOLVED:${label}`);
-  return value;
-}
 
 
 async function computeDevelopmentContractRows(): Promise<readonly DevelopmentDeploymentRegisterRow[]> {
-  const [judge, runner, propagation, serve] = await Promise.all([
-    readFile(new URL("../../../packages/judgement/src/index.ts", import.meta.url), "utf8"),
-    readFile(new URL("./index.ts", import.meta.url), "utf8"),
+  const [propagation, serve] = await Promise.all([
     readFile(new URL("../../../packages/propagation/src/index.ts", import.meta.url), "utf8"),
     readFile(new URL("../../../packages/serve/src/index.ts", import.meta.url), "utf8")
   ]);
   const values = Object.freeze({
-    judgeContractHash: digest(requireMatch(judge, /content: `([\s\S]*?)`/, "judge")),
-    composerContractHash: digest(requireMatch(
-      runner,
-      /content: "(Return only JSON with a segments array[^"]+)"/,
-      "composer"
-    )),
-    conformanceContractHash: digest(EVALUATOR_CONTRACT_TEXT),
+    // RUN1 (V-11 addendum): every prompt is now `SAFETY FRAME OWNED BY CODE +
+    // INSTRUCTION TEXT`, so a fingerprint taken over a SEARCH of the source no
+    // longer describes what is sent. Each row is the digest of the prompt
+    // contracts themselves, through `promptContractFingerprintText`, which
+    // folds in the frame version — so a change to the frame, to a code-owned
+    // answer form, or to an owner's instruction slot is a NEW sealed version
+    // and none of them can ship under an old hash.
+    judgeContractHash: digest(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT),
+    composerContractHash: digest(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT)),
+    conformanceContractHash: digest(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT)),
     // codex r2 B1a: the fingerprint is taken from the constant the runner
     // SENDS, not from a search of the runner's source. There is nothing left
     // for a comment, string, regex or template literal to confuse.

@@ -33,6 +33,7 @@ import {
   type CompositionMapRegisterRow,
   type JudgeAssessment,
   type JudgeFamily,
+  type JudgeLeg,
   type JudgementSelectionRule,
   type WayOfKnowingDowngradeRecord
 } from "@debateai/judgement";
@@ -72,6 +73,11 @@ import {
   type WeightSource
 } from "@debateai/valuation";
 import {
+  buildFramedPrompt,
+  buildFramedRepairPrompt,
+  schemaFailureLocator,
+  type FramedPrompt,
+  type PromptContract,
   OpenAICompatibleProviderGateway,
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
@@ -93,7 +99,9 @@ import {
   PROTECTED_CORE_GUARD_RETIRED_MARK,
   runServeGateChain,
   ServeRepository,
-  toSynthesisPromptPayload,
+  toSynthesisPromptMaterial,
+  SYNTHESIZER_PROMPT_CONTRACT,
+  EVALUATOR_INSTRUCTIONS,
   type BandCeilingRegisterRow,
   type ComposedSegment,
   type CompositionBudgetResolution,
@@ -176,6 +184,18 @@ const compositionSchema = z.object({
  */
 export const EVALUATOR_CONTRACT_TEXT =
   "Return only JSON {satisfied,objection,criteria} where criteria is {fairness_to_losers,statement_label_agreement,no_overstatement,restatement,citation_tracing}, each a boolean. Set satisfied true only when every criterion is true. When satisfied is false, objection must state the objection in full; when it is true, objection must be null.";
+
+/**
+ * V-11 (RUN1): the EVALUATOR's prompt contract. `EVALUATOR_CONTRACT_TEXT` is
+ * the answer form — code's half — and `EVALUATOR_INSTRUCTIONS` (which already
+ * shipped, inside the payload's `instructions` member) is the owners' slot.
+ * Neither string is reworded; what moved is which compartment each sits in.
+ */
+export const EVALUATOR_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: "serve.evaluator.v1",
+  instruction: EVALUATOR_INSTRUCTIONS,
+  answerForm: EVALUATOR_CONTRACT_TEXT
+});
 
 // codex r3 B1 part 2: EXPORTED so the schema/prompt agreement check can read the
 // DECLARED criterion keys at runtime rather than scanning this file for them.
@@ -1300,13 +1320,18 @@ function classifyStructuredContent<T>(content: string, schema: z.ZodType<T>): Co
     : { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message };
 }
 
-function buildSchemaRepairPacket(packet: PromptPacket, parseError: string): PromptPacket {
-  return {
-    messages: [...packet.messages, {
-      role: "user",
-      content: `The previous response violated the declared JSON contract. Machine parse error: ${parseError}\nReturn a new response that follows the system schema exactly.`
-    }]
-  };
+/**
+ * L4-F11 / DL4-F4: the serve-chain repair packet used to append
+ * `Machine parse error: ${parseError}` — the zod message, which quotes the
+ * model's own rejected output — into a fresh user turn. It now appends one
+ * fenced block carrying the typed code and the schema path, and
+ * `buildFramedRepairPrompt` refuses anything that is not a machine locator.
+ */
+function buildSchemaRepairPacket(framed: FramedPrompt, rejected: {
+  readonly parseStatus: string;
+  readonly parseError: string;
+}): PromptPacket {
+  return buildFramedRepairPrompt(framed, schemaFailureLocator(rejected));
 }
 
 /**
@@ -2829,7 +2854,10 @@ export class WalkingSkeletonRunner {
         runId: run.runId,
         subjectItemId: claimed.workItemId,
         callSiteKey: "JUDGE",
+        // DL4-F4: the question travels as the question, in its own fenced
+        // field; the leg's directive is code's and rides the system message.
         questionLine: run.questionLine,
+        leg: { kind: "primary-root" },
         providerRef: primaryMaker.providerRef,
         contractHash: this.settings.judgeContractHash,
         bound: { ...this.settings.judgeBound, maxAttempts }
@@ -2984,7 +3012,15 @@ export class WalkingSkeletonRunner {
 
     const authorPosition = async (input: {
       readonly authorIndex: number;
-      readonly questionLine: string;
+      /**
+       * DL4-F4: the authoring leg, TYPED. This parameter used to be a
+       * `questionLine: string` that the four call sites below built by
+       * concatenating a directive, the run's question and a previous model's
+       * statement — the string the judge envelope then wrapped whole as one
+       * "untrusted" field. There is no longer a parameter that can carry a
+       * directive into the data or a statement into the directive.
+       */
+      readonly leg: JudgeLeg;
       readonly callSiteKey: string;
       readonly role: string;
       readonly parentNodeId: string | null;
@@ -3013,7 +3049,7 @@ export class WalkingSkeletonRunner {
           stanceAtAction: "UNASSIGNED",
           outcome: "OK",
           actorRef: this.settings.workerId,
-          inputHash: hash({ questionLine: input.questionLine, workItemId: claimed.workItemId }),
+          inputHash: hash({ leg: input.leg, questionLine: run.questionLine, workItemId: claimed.workItemId }),
           contractHash: this.settings.judgeContractHash,
           startedAt: new Date(),
           finishedAt: new Date()
@@ -3027,8 +3063,8 @@ export class WalkingSkeletonRunner {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
           callSiteKey: input.callSiteKey,
-          questionLine: input.questionLine,
-          claimClassificationLine: run.questionLine,
+          questionLine: run.questionLine,
+          leg: input.leg,
           providerRef: selectedMaker.providerRef,
           contractHash: this.settings.judgeContractHash,
           bound: { ...this.settings.judgeBound, maxAttempts }
@@ -3054,7 +3090,10 @@ export class WalkingSkeletonRunner {
           claimType: childJudged.normalizedClaim.claimType,
           statement: childJudged.statement,
           callSiteKey: `PANEL:${input.callSiteKey}`,
-          questionLine: input.questionLine
+          // The PANEL assesses a node against THE DEBATE'S QUESTION. It used to
+          // receive the leg's concatenated instruction string, so a parent's
+          // statement rode into the panel prompt as well (DL4-F4).
+          questionLine: run.questionLine
         });
         const { created: childNodeId, minted: childSourcedEdges } = await this.#graph.withGraphWrite(run.runId, async (writer) => {
           const created = await writer.addNode({
@@ -3147,10 +3186,7 @@ export class WalkingSkeletonRunner {
     if (effectiveMakerCount > 1) {
       const secondary = await authorPosition({
         authorIndex: 1,
-        questionLine: [
-          "Independently author your own position on the question. Do not grade or imitate another maker.",
-          `Question under debate: ${run.questionLine}`
-        ].join("\n"),
+        leg: { kind: "independent-root" },
         callSiteKey: "JUDGE:root:secondary",
         role: "secondary root author",
         parentNodeId: null,
@@ -3172,10 +3208,7 @@ export class WalkingSkeletonRunner {
     for (let makerIndex = 2; makerIndex < effectiveMakerCount; makerIndex += 1) {
       const additionalRoot = await authorPosition({
         authorIndex: makerIndex,
-        questionLine: [
-          "Independently author your own position on the question. Do not grade or imitate another maker.",
-          `Question under debate: ${run.questionLine}`
-        ].join("\n"),
+        leg: { kind: "independent-root" },
         callSiteKey: `JUDGE:root:${makerIndex}`,
         role: "additional maker root author",
         parentNodeId: null,
@@ -3372,22 +3405,15 @@ export class WalkingSkeletonRunner {
       }
       const role = leg.polarity === "support" ? "defender" : "critic";
       const plannedSubtreeIndices = subtreeIndices(leg.childIndex);
-      const childQuestionLine = leg.polarity === "support"
-        ? [
-            "A fair debate requires a genuine supporting case for every position, judged on its own merits.",
-            `Question under debate: ${run.questionLine}`,
-            `Position to defend: ${parent.statement}`,
-            "State and defend the strongest genuine supporting reason for that position."
-          ].join("\n")
-        : [
-            "A fair debate requires the strongest genuine counter-position, judged on its own merits.",
-            `Question under debate: ${run.questionLine}`,
-            `Position under critique: ${parent.statement}`,
-            "State and defend the strongest genuine counter-position to that position."
-          ].join("\n");
       const authored = await authorPosition({
         authorIndex: leg.authorIndex,
-        questionLine: childQuestionLine,
+        // DL4-F4, the leg that carried the injection: `parent.statement` is the
+        // PREVIOUS model's output. It is material, it gets its own fenced
+        // field, and the directive it used to be glued to is code's.
+        leg: {
+          kind: leg.polarity === "support" ? "support" : "attack",
+          positionUnderDebate: parent.statement
+        },
         callSiteKey: `JUDGE:${role}:root${leg.rootIndex}:r${leg.round}:p${leg.parentIndex}`,
         role,
         parentNodeId: parent.nodeId,
@@ -3427,12 +3453,11 @@ export class WalkingSkeletonRunner {
       }
       const authored = await authorPosition({
         authorIndex: exchange.authorIndex,
-        questionLine: [
-          "Author one direct cross-root response: defend your own position and attack the other maker's position.",
-          `Question under debate: ${run.questionLine}`,
-          `Your position: ${authorRoot.statement}`,
-          `Other maker's position: ${targetRoot.statement}`
-        ].join("\n"),
+        leg: {
+          kind: "cross-root",
+          ownPosition: authorRoot.statement,
+          otherMakersPosition: targetRoot.statement
+        },
         callSiteKey: `JUDGE:cross-root:${exchange.authorRootIndex}->${exchange.targetRootIndex}`,
         role: "cross-root response",
         parentNodeId: authorRoot.nodeId,
@@ -4142,10 +4167,15 @@ export class WalkingSkeletonRunner {
         const synthesizerCallSiteKey = synthesisCallSiteKey({
           role: "SYNTHESIZER", stage: request.stage, round: request.round
         });
-        const packet: PromptPacket = { messages: [
-          { role: "system", content: "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. node_refs must name the node ids of the digest nodes whose facts the segment asserts, so every load-bearing claim traces to a digest node. Preserve the digest and add no facts. When the digest nodes a segment cites rest on reasoning alone, with no measured or looked-up evidence behind them, return at least two segments in order: the first segment states the provisional answer as a hypothesis; the second segment states the research plan that would lift it." },
-          { role: "user", content: toSynthesisPromptPayload(request) }
-        ] };
+        // DL4-F4 / L4-F11: the packet used to be a bare instruction plus one
+        // `JSON.stringify` of the whole request — the model-authored digest
+        // summaries and the prior objection sat in the same compartment as the
+        // engine's own `instructions`, with nothing saying which was which.
+        const framed = buildFramedPrompt({
+          contract: SYNTHESIZER_PROMPT_CONTRACT,
+          material: toSynthesisPromptMaterial(request)
+        });
+        const packet = framed.packet;
         const response = await callSynthesisRole(role.provider, {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
@@ -4169,7 +4199,7 @@ export class WalkingSkeletonRunner {
           providerRef: role.providerRef,
           packet,
           classifyContent: (content) => classifyStructuredContent(content, compositionSchema),
-          buildRepairPacket: ({ parseError }) => buildSchemaRepairPacket(packet, parseError)
+          buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
         }, "COMPOSITION_CONTRACT_ERROR");
         const parsed = parseComposerOutput(response.content);
         const composedSegments = parsed.segments.map((segment) => {
@@ -4222,10 +4252,11 @@ export class WalkingSkeletonRunner {
       evaluate: async (request: EvaluatorRequest) => {
         const role = resolveSynthesisRoleMaker(request.roleRef, "EVALUATOR");
         const evaluatorCallSiteKey = synthesisCallSiteKey({ role: "EVALUATOR", round: request.round });
-        const packet: PromptPacket = { messages: [
-          { role: "system", content: EVALUATOR_CONTRACT_TEXT },
-          { role: "user", content: toSynthesisPromptPayload(request) }
-        ] };
+        const framed = buildFramedPrompt({
+          contract: EVALUATOR_PROMPT_CONTRACT,
+          material: toSynthesisPromptMaterial(request)
+        });
+        const packet = framed.packet;
         const response = await callSynthesisRole(role.provider, {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
@@ -4242,7 +4273,7 @@ export class WalkingSkeletonRunner {
           providerRef: role.providerRef,
           packet,
           classifyContent: (content) => classifyStructuredContent(content, evaluatorVerdictSchema),
-          buildRepairPacket: ({ parseError }) => buildSchemaRepairPacket(packet, parseError)
+          buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
         }, "EVALUATOR_CONTRACT_ERROR");
         conformanceRawArtifactRefs.push(response.rawArtifactRef);
         const parsed = parseContent(response.content, evaluatorVerdictSchema, "EVALUATOR_CONTRACT_ERROR");
@@ -5420,6 +5451,50 @@ function scrubbedTaskFailure(error: unknown): TypedDomainError {
   return scrubbed;
 }
 
+/**
+ * L4-F6: the workflow input, validated before anything reads it. `.strict()` so
+ * an extra key is a refusal rather than a silently ignored surprise, and the
+ * refusal never quotes the value it refused (constraint 6) — a dispatch is
+ * attacker-controllable, so its contents are exactly the class of text that
+ * must not reach a log.
+ */
+const walkingSkeletonDispatchSchema = z.object({
+  runId: z.string().uuid(),
+  workItemId: z.string().uuid()
+}).strict();
+
+/**
+ * AMENDMENT 2026-09-22 (SYNC2 §6.2). `@debateai/obs-capture` is a SECOND sink
+ * for error text beside the job system's own Postgres and stderr, and it
+ * carries whatever it is handed as `payload_ref` once an emitter is installed.
+ * DL4-F1 scrubbed the first sink; this is the same treatment for the second:
+ * a code and a machine PATH, never the error, whose message can hold model
+ * output.
+ *
+ * EVERY `capture.emit` at a failure boundary goes through this builder. There
+ * is no parameter for an error object on the envelope it returns.
+ */
+export function captureFailureEnvelope(input: {
+  readonly error: unknown;
+  readonly taxonomyClass: string;
+  readonly capturePoint: string;
+  readonly disposition: string;
+  readonly source: string;
+  readonly attemptIndex?: number;
+}): Readonly<Record<string, unknown>> & { readonly code: string; readonly path: string } {
+  return Object.freeze({
+    code: input.error instanceof TypedDomainError ? input.error.code : "OBS_CAPTURE_SELF",
+    // The bounded operational diagnostic: a closed alphabet derived from the
+    // error's CLASS and SQLSTATE, never from its text.
+    path: operationalDiagnosticOf(input.error),
+    taxonomy_class: input.taxonomyClass,
+    capture_point: input.capturePoint,
+    disposition: input.disposition,
+    source: input.source,
+    ...(input.attemptIndex === undefined ? {} : { attempt_index: input.attemptIndex })
+  });
+}
+
 export function declareHatchetWalkingSkeletonTask(input: {
   readonly client: Pick<Hatchet, "task">;
   readonly runner: WalkingSkeletonRunner;
@@ -5433,7 +5508,17 @@ export function declareHatchetWalkingSkeletonTask(input: {
   return input.client.task({
     name: input.workflowName,
     retries: input.engineRetries,
-    fn: async (dispatch: { runId: string; workItemId: string }) => {
+    fn: async (rawDispatch: { runId: string; workItemId: string }) => {
+      // L4-F6: BEFORE the runner, before the repository, before anything reads
+      // a field. A malformed dispatch is a typed refusal that names no value.
+      const parsed = walkingSkeletonDispatchSchema.safeParse(rawDispatch);
+      if (!parsed.success) {
+        throw new TypedDomainError(
+          "RUNNER_WORKFLOW_INPUT_INVALID",
+          "RUNNER_WORKFLOW_INPUT_INVALID"
+        );
+      }
+      const dispatch = parsed.data;
       try {
         const result = await input.runner.executeWorkItem(dispatch.workItemId);
         return result.kind === "COMPLETED"

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TypedDomainError } from "@debateai/kernel";
-import type { PromptPacket } from "@debateai/providers";
+import { appendFramedRejection, assertFramedPrompt, type PromptPacket } from "@debateai/providers";
 import type { PublicAggregateProvider } from "./consumer.js";
 
 const providerResponseSchema = z.object({
@@ -50,14 +50,15 @@ function validateContent(content: string, allowedAdjacentDomainRefs: readonly st
   }
 }
 
+/**
+ * REVIEW ITEM 2. This appended a BARE user turn to a framed packet, so on a
+ * content refusal the retry carried instructions OUTSIDE the boundary markers —
+ * the one shape the frame exists to make impossible. It now appends a fenced
+ * block carrying the refusal CODE, through the same builder the gateway's
+ * callers use, and that builder asserts the frame before it appends.
+ */
 function repairPacket(packet: PromptPacket, code: string): PromptPacket {
-  return Object.freeze({ messages: Object.freeze([
-    ...packet.messages,
-    Object.freeze({
-      role: "user" as const,
-      content: `The response violated the public aggregate contract (${code}). Return corrected strict JSON only.`
-    })
-  ]) });
+  return appendFramedRejection(packet, { code, path: "" });
 }
 
 /**
@@ -88,6 +89,18 @@ export function createOpenAiPublicAggregateProvider(options: Readonly<{
           "CONSUMER_AUTHORIZATION_FAILED"
         );
       }
+      /**
+       * REVIEW ITEM 2 — THE DOOR, held here too.
+       *
+       * This is a SECOND production transport: it posts `packet.messages` by
+       * direct `fetch` with no `ProviderGateway` between it and the model, so
+       * the gateway's own assertion never ran for it and an unframed packet
+       * would have gone on the wire. It is wired live at
+       * `apps/evaluator-worker/src/index.ts`. The assertion runs before the
+       * first byte is posted, and `appendFramedRejection` re-runs it on every
+       * repair, exactly as the gateway does.
+       */
+      assertFramedPrompt(input.packet);
       let packet = input.packet;
       for (let attempt = 1; attempt <= input.bound.maxAttempts; attempt += 1) {
         try {
