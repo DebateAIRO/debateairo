@@ -105,20 +105,24 @@ const routeLimitSchema = z.object({
  * class of leak this case exists for. The sealed node 22 entry keeps its original
  * 256 under its original rule, as history.
  */
-const AUTH_ISOLATED_LIMITER_CEILING_RULES = Object.freeze({
-  WORST_MEASURED_CURVE_POINT_ROUNDED_UP_TO_INCREMENT:
-    (worstMib: number, incrementMib: number) => Math.ceil(worstMib / incrementMib) * incrementMib,
-  WORST_OF_AT_LEAST_TEN_ROUNDS_PLUS_ONE_INCREMENT_ROUNDED_UP:
-    (worstMib: number, incrementMib: number) =>
-      Math.ceil((worstMib + incrementMib) / incrementMib) * incrementMib
-}) satisfies Readonly<Record<string, (worstMib: number, incrementMib: number) => number>>;
-
-const AUTH_ISOLATED_LIMITER_CEILING_RULE_NAMES = Object.freeze(
-  Object.keys(AUTH_ISOLATED_LIMITER_CEILING_RULES)
-) as readonly [
+const AUTH_ISOLATED_LIMITER_CEILING_RULE_NAMES = Object.freeze([
   "WORST_MEASURED_CURVE_POINT_ROUNDED_UP_TO_INCREMENT",
   "WORST_OF_AT_LEAST_TEN_ROUNDS_PLUS_ONE_INCREMENT_ROUNDED_UP"
-];
+] as const);
+
+/**
+ * The names are the source of truth and the map is typed by them, so a rule
+ * added to one and not the other does not compile. Nothing here is a cast.
+ */
+const AUTH_ISOLATED_LIMITER_CEILING_RULES: Readonly<Record<
+  (typeof AUTH_ISOLATED_LIMITER_CEILING_RULE_NAMES)[number],
+  (worstMib: number, incrementMib: number) => number
+>> = Object.freeze({
+  WORST_MEASURED_CURVE_POINT_ROUNDED_UP_TO_INCREMENT:
+    (worstMib, incrementMib) => Math.ceil(worstMib / incrementMib) * incrementMib,
+  WORST_OF_AT_LEAST_TEN_ROUNDS_PLUS_ONE_INCREMENT_ROUNDED_UP:
+    (worstMib, incrementMib) => Math.ceil((worstMib + incrementMib) / incrementMib) * incrementMib
+});
 
 const rateLimitPolicySchema = z.object({
   kind: z.literal("AUTH_RATE_LIMIT_POLICY"),
@@ -245,12 +249,17 @@ const rateLimitPolicySchema = z.object({
       // The ceiling is DERIVED by the rule the entry names, never asserted. A
       // hand-edited ceiling — or one derived under a rule the entry does not
       // claim — is refused here.
-      (value) => Object.values(value.by_runtime).every((version) =>
-        version.measurement.isolated_measurement_ceiling_mib
-          === AUTH_ISOLATED_LIMITER_CEILING_RULES[version.ceiling_rule](
+      (value) => Object.values(value.by_runtime).every((version) => {
+        // Total by construction — the enum admits only names the map holds —
+        // but read defensively anyway, so a future rule added to one and not
+        // the other is a typed refusal here rather than a crash.
+        const derive = AUTH_ISOLATED_LIMITER_CEILING_RULES[version.ceiling_rule];
+        return derive !== undefined
+          && version.measurement.isolated_measurement_ceiling_mib === derive(
             version.measurement.max_measured_curve_rss_mib,
             value.measurement_rounding_increment_mib
-          )),
+          );
+      }),
       { message: "a runtime measurement's ceiling is not what its own rule derives" }
     ).refine(
       // The amended rule's precondition, enforced rather than trusted: it may
