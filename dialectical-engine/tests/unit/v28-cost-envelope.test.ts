@@ -18,7 +18,7 @@ import {
   assertHostedCostEnvelopesSealed,
   assertHostedSupportAdmissionSealed,
   costEnvelopePolicyFromValue,
-  readSealedCostEnvelopeStatus
+  readCostEnvelopePolicy
 } from "@debateai/register";
 
 /**
@@ -244,27 +244,54 @@ describe("V-28 the envelopes ship as a versioned register row with a temporary v
 });
 
 /**
- * FAIL CLOSED. Task 10 left one named seam and made it the FIRST start-up
- * decision of both shipped roots. Now that the rows exist the seam answers from
- * them — and it still answers NOT_SEALED if the row is ever removed or broken,
- * because "unsealed" and "absent" must stay indistinguishable to a hosted boot.
+ * FAIL CLOSED — AND WHICH CHECK ACTUALLY DOES IT (I3, review round 2).
+ *
+ * Task 10's seam runs before a pool exists, so the only thing it can read is the
+ * row this BUILD ships — a frozen in-source constant, which always parses. Round
+ * 1 presented it as the live fail-closed gate and wrote two tests that could not
+ * fail; both are gone, and the seam is documented for what it is: a check that
+ * this build still carries an envelope row at all.
+ *
+ * The LIVE gate is `readCostEnvelopePolicy`, which reads the row IN FORCE at the
+ * deployment's own register version — the state that actually varies between
+ * hosts, and the one a host pinned to an older `REGISTER_VERSION` fails. It is
+ * exercised below against a fake pool, so the refusal is proven without Docker.
  */
 describe("V-28 hosted start-up fails closed on the envelopes", () => {
-  it("reports the envelopes as sealed now that the rows are published", () => {
-    expect(readSealedCostEnvelopeStatus()).toBe("SEALED");
-  });
-
-  it("admits a hosted start-up once they are sealed", () => {
-    expect(() => assertHostedCostEnvelopesSealed("hosted")).not.toThrow();
-  });
-
-  it("still refuses hosted when the seam cannot find a sound envelope row", () => {
+  it("refuses hosted whenever the build-integrity seam does not say SEALED", () => {
     expect(() => assertHostedCostEnvelopesSealed("hosted", () => "NOT_SEALED"))
       .toThrowError(expect.objectContaining({ code: "COST_ENVELOPES_NOT_SEALED" }));
   });
 
   it("leaves local mode alone — envelopes are a hosted-spend control", () => {
     expect(() => assertHostedCostEnvelopesSealed("local", () => "NOT_SEALED")).not.toThrow();
+  });
+
+  it("refuses a register version that never sealed the row", async () => {
+    const emptyPool = { query: async () => ({ rows: [] }) } as never;
+    await expect(readCostEnvelopePolicy(emptyPool, 7))
+      .rejects.toThrowError(expect.objectContaining({ code: "COST_ENVELOPE_POLICY_UNRESOLVED" }));
+  });
+
+  it("refuses a register version that sealed something malformed", async () => {
+    const brokenPool = {
+      query: async () => ({ rows: [{ value_json: { kind: "COST_ENVELOPE_POLICY" }, source_ref: "x" }] })
+    } as never;
+    await expect(readCostEnvelopePolicy(brokenPool, 7))
+      .rejects.toThrowError(expect.objectContaining({ code: "COST_ENVELOPE_POLICY_INVALID" }));
+  });
+
+  it("reads the row in force when the version has one", async () => {
+    const sealedPool = {
+      query: async () => ({
+        rows: [{
+          value_json: COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW.value,
+          source_ref: COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef
+        }]
+      })
+    } as never;
+    await expect(readCostEnvelopePolicy(sealedPool, 7))
+      .resolves.toMatchObject({ provisional: true });
   });
 });
 

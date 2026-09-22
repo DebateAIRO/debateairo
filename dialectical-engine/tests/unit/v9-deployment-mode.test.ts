@@ -5,7 +5,6 @@ import {
   assertHostedCostEnvelopesSealed,
   parseApiEnvironment,
   parseRunnerEnvironment,
-  readSealedCostEnvelopeStatus,
   resolveDeploymentMode
 } from "../../packages/register/src/runtime-environment.js";
 import {
@@ -350,10 +349,6 @@ describe("V-9 mode x provider target (task 10a)", () => {
  * The envelopes' own behaviour is pinned in `v28-cost-envelope.test.ts`.
  */
 describe("V-28 seam: hosted refuses unless the cost envelopes are sealed (task 11)", () => {
-  it("reports the envelopes as sealed now that task 11 published the rows", () => {
-    expect(readSealedCostEnvelopeStatus()).toBe("SEALED");
-  });
-
   it("refuses a hosted start-up whenever the seam does not say SEALED", () => {
     expect(() => assertHostedCostEnvelopesSealed("hosted", () => "NOT_SEALED"))
       .toThrowError(expect.objectContaining({ code: "COST_ENVELOPES_NOT_SEALED" }));

@@ -103,24 +103,28 @@ export function resolveDeploymentMode(
 export type SealedCostEnvelopeStatus = "SEALED" | "NOT_SEALED";
 
 /**
- * TASK 11 SEAM (V-28), now FILLED. Task 10 left this as the one named function
- * a hosted boot asks "are the money ceilings in place?"; task 11 published the
- * rows, so it answers from them.
+ * TASK 11 SEAM (V-28) — A BUILD-INTEGRITY CHECK, AND THAT IS ALL IT IS.
  *
- * It reads the SHIPPED deployment row rather than the database on purpose. This
- * is the FIRST decision of both start-ups — before a pool exists, before a
- * credential file is opened — and it is the question "does this build carry
- * envelopes at all?". The row IN FORCE at the deployment's register version is a
- * separate, later question, answered by `readCostEnvelopePolicy` where the pool
- * is; a deployment whose register version never sealed the row refuses there, by
- * name.
+ * Review round 2, I3, was right about this and the honest thing is to say so
+ * plainly rather than let the name carry a promise the code cannot keep. This is
+ * the FIRST decision of both start-ups — before a pool exists, before a
+ * credential file is opened — so the only thing it CAN read is the row this
+ * build ships. That row is a frozen in-source constant, so with the shipped
+ * source it always parses and `COST_ENVELOPES_NOT_SEALED` is unreachable at
+ * runtime. What it does catch is a BUILD whose constant was removed, emptied or
+ * edited into something invalid, which is a real failure mode and a cheap one to
+ * close, and it keeps task 10's seam where task 10 put it.
  *
- * It still fails CLOSED: the shipped row is parsed through the same validator
- * every reader uses, and anything that does not parse — a removed row, an edit
- * that put a float in it, a zero ceiling — is `NOT_SEALED`, because an unsealed
- * envelope and an absent one must stay indistinguishable to a hosted boot. Local
- * mode is untouched: the relays and loopback model servers spend nothing this
- * control could bound.
+ * THE LIVE FAIL-CLOSED GATE IS ELSEWHERE, and it is the one that matters: a
+ * hosted deployment reads the `costEnvelopePolicy` row IN FORCE at its own
+ * register version through `readCostEnvelopePolicy`, which refuses
+ * `COST_ENVELOPE_POLICY_UNRESOLVED` when that version never sealed one and
+ * `COST_ENVELOPE_POLICY_INVALID` when it sealed something malformed. Both
+ * shipped roots call it in hosted mode before any work is claimed or admitted.
+ * A host pinned to an older `REGISTER_VERSION` is refused THERE, by name.
+ *
+ * Local mode is untouched by either: the relays and loopback model servers spend
+ * nothing this control could bound.
  */
 export function readSealedCostEnvelopeStatus(): SealedCostEnvelopeStatus {
   try {

@@ -41,10 +41,17 @@ Start-up fails closed, with a named code, in each of these cases:
 
 | Condition | Refusal code |
 |---|---|
-| The build carries no sound cost-envelope row | `COST_ENVELOPES_NOT_SEALED` |
-| The register version in force carries no `costEnvelopePolicy` row | `COST_ENVELOPE_POLICY_UNRESOLVED` |
+| The register version in force carries no `costEnvelopePolicy` row — the one an operator actually meets, by pinning an older `REGISTER_VERSION` | `COST_ENVELOPE_POLICY_UNRESOLVED` |
+| That row exists but is malformed | `COST_ENVELOPE_POLICY_INVALID` |
 | The admission row in force lacks any of the three support budgets | `SUPPORT_ADMISSION_SCOPES_NOT_SEALED` |
 | A provider target declares no price | `PROVIDER_TARGET_PRICE_REQUIRED` followed by the provider's name |
+| A provider target declares a price of zero, which would bound nothing | `PROVIDER_TARGET_PRICE_ZERO` followed by the provider's name |
+| This build ships no envelope row at all — a packaging fault, not a configuration one | `COST_ENVELOPES_NOT_SEALED` |
+
+The first two are the ones an operator meets. The last is a build-integrity
+check that runs before the database is opened; with a correctly packaged build it
+cannot fire, and it is listed so that nobody reading a log has to guess what it
+would mean.
 
 And while a debate is running:
 
@@ -55,6 +62,10 @@ And while a debate is running:
 | A vendor answered but reported no usage figures | `PROVIDER_USAGE_UNREPORTED` |
 
 The last one is why each hosted vendor must declare a price **and** report usage: a call whose cost cannot be read cannot be counted, and a cost that cannot be counted is not bounded by anything.
+
+**What a debate does when one of these fires.** It stops where it is, keeps everything it has produced, and is served as a components-only answer that says why. That is true wherever the ceiling is reached — while the makers are still writing, while the debate is being expanded or reviewed, or at the very end while the answer is being composed. It is not an error, and nothing is thrown away. A vendor that reports no usage ends the debate the same clean way, under its own name, because that is the vendor's fault or the configuration's and not the asker's.
+
+**A request that arrives after the day is spent** is answered `429` with a `Retry-After` header naming the next UTC midnight: it is a well-formed request that would succeed tomorrow, not a broken one.
 
 ## What an operator has to configure
 
