@@ -36,7 +36,17 @@ import type { SupportAssistantLanguage, SupportAssistantOutcome } from "./Assist
  * code and the link from there, and shows a token-free notice once it is gone.
  */
 
-export const SUPPORT_CONVERSATION_STORAGE_KEY = "debateai.support.conversation.v1";
+export const SUPPORT_CONVERSATION_STORAGE_KEY = "debateai.support.conversation.v2";
+
+/**
+ * DL1-F5c, fix round 1. The names no build may read again, erased on every
+ * read. `v1` is the pre-fix key: its payload could carry a case bearer in an
+ * id, a sentence and a link, and a tab that was open across the deploy keeps
+ * its `sessionStorage` until it is closed — so reusing the name would have left
+ * the decision to a reader, and a reader only governs what it hands to the
+ * page. Retiring the name is what removes the bearer.
+ */
+const RETIRED_STORAGE_KEYS = Object.freeze(["debateai.support.conversation.v1"]);
 
 export type SupportConversationMessage = Readonly<{
   id: string;
@@ -127,14 +137,24 @@ function ownContextOf(value: unknown): SupportOwnContext {
 }
 
 /**
- * The stored transcript, or null. A payload from the pre-fix build carries a
- * `session` — that is a capability, so it is erased rather than ignored: a tab
- * that was open across the deploy keeps its sessionStorage.
+ * The stored transcript, or null — and nothing this function refuses is left
+ * where it was. A payload from the pre-fix build carries a `session`, a shape
+ * this build does not recognise, or JSON that will not parse; each of those can
+ * still hold a capability as text, and "nothing reads it any more" is not the
+ * same as "nothing holds it". So every path that does not return a transcript
+ * erases first, and the retired keys go on every read.
  */
 export function readStoredSupportConversation(
   storage: SupportConversationStorage | null
 ): StoredSupportConversation | null {
   if (storage === null) return null;
+  for (const key of RETIRED_STORAGE_KEYS) {
+    try {
+      storage.removeItem(key);
+    } catch {
+      // A storage that refuses to forget costs continuity, never correctness.
+    }
+  }
   try {
     const raw = storage.getItem(SUPPORT_CONVERSATION_STORAGE_KEY);
     if (raw === null) return null;
@@ -145,7 +165,10 @@ export function readStoredSupportConversation(
     }
     if ((value.language !== "en" && value.language !== "ro")
       || typeof value.identityBound !== "boolean"
-      || !Array.isArray(value.messages) || !value.messages.every(isMessage)) return null;
+      || !Array.isArray(value.messages) || !value.messages.every(isMessage)) {
+      clearStoredSupportConversation(storage);
+      return null;
+    }
     return Object.freeze({
       language: value.language,
       identityBound: value.identityBound,
@@ -155,6 +178,8 @@ export function readStoredSupportConversation(
       ownContext: ownContextOf(value.ownContext)
     });
   } catch {
+    // Unparsable is still readable as text: erase it rather than step over it.
+    clearStoredSupportConversation(storage);
     return null;
   }
 }

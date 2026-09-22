@@ -240,11 +240,30 @@ describe("SUP-01 /help assistant", () => {
     }
     await submit("ordinary safety request");
     expect(document.body.textContent).toContain(acknowledgement);
-    // DL3-F4: the API still writes the retired ?case= form into its sentence;
-    // what the browser can navigate to is the fragment form, which never
-    // reaches a server, a proxy log or the address bar as a query.
+    // DL1-F5c: the anchor is built from the bearer this page holds in memory
+    // (`supportCaseLink(bearer.token)`), never from the `link` the body carried
+    // and never from anything persisted — so whatever form the body used, what
+    // the browser can navigate to is the fragment, which reaches no server, no
+    // proxy log and no address bar as a query.
     expect(document.querySelector<HTMLAnchorElement>(`a[href="/help#case=${token}"]`)).not.toBeNull();
     expect(document.querySelector(`a[href="${link}"]`)).toBeNull();
+  });
+
+  it("normalises a case link carried by an ordinary reply to the fragment form", async () => {
+    // DL3-F4: `safeFirstPartyLink`'s case branch, which the acknowledgement no
+    // longer exercises. A reply can still carry a `link` that is a case bearer
+    // — a saved `?case=` address echoed back, a refusal link — with none of the
+    // acknowledgement fields to validate it. It becomes `/help#case=…` or it
+    // becomes nothing; the query form never becomes an href.
+    const token = "F".repeat(43);
+    await render(<Assistant client={client({
+      messageId: "m-case-link",outcome: "ANSWER_GROUNDED",text: "Your case is here.",
+      link: `/help?case=${token}`
+    })} />);
+    await submit("where do I read my case?");
+
+    expect(document.querySelector<HTMLAnchorElement>(`a[href="/help#case=${token}"]`)).not.toBeNull();
+    expect(document.querySelector(`a[href="/help?case=${token}"]`)).toBeNull();
   });
 
   it("retains automated token/SLA/link fields from the browser client contract", async () => {
@@ -319,6 +338,36 @@ describe("SUP-01 /help assistant", () => {
     expect(stored).not.toContain(token);
     expect(stored).not.toMatch(/[A-Za-z0-9_-]{43}/u);
     expect(stored).toContain("A case is open for a person to read.");
+  });
+
+  it("erases a pre-fix transcript, bearer and all, the first time the widget mounts", async () => {
+    // Fix round 1. A tab open across the deploy keeps its `sessionStorage`. The
+    // retired key held the acknowledgement the old build wrote — the token in
+    // the id, in the sentence and in the link — and nothing read it any more,
+    // which is not the same as nothing holding it.
+    const token = "G".repeat(43);
+    sessionStorage.setItem("debateai.support.conversation.v1",JSON.stringify({
+      language: "en",identityBound: false,ownContext: { latest: true },
+      messages: [
+        { id: "disclosure",role: "assistant",text: "Prior disclosure." },
+        {
+          id: `case-${token}`,role: "assistant",
+          text: `I've opened case ${token} for a person. Check replies at /help#case=${token}.`,
+          link: `/help#case=${token}`
+        }
+      ]
+    }));
+    vi.stubGlobal("fetch",vi.fn(async (url: string) => url === "/api/v1/session"
+      ? new Response("{}",{ status: 401 })
+      : new Response(JSON.stringify({ error: "NOT_FOUND" }),{ status: 404 })));
+
+    await render(<Assistant client={supportAssistantClient} />);
+
+    expect(sessionStorage.getItem("debateai.support.conversation.v1")).toBeNull();
+    const everything = Object.entries(sessionStorage).map(([key,value]) => `${key}=${String(value)}`).join("\n");
+    expect(everything).not.toContain(token);
+    expect(everything).not.toMatch(/[A-Za-z0-9_-]{43}/u);
+    expect(document.body.textContent).not.toContain("Prior disclosure.");
   });
 
   it("returns a structured RATE_LIMITED outcome from a real 429 response", async () => {

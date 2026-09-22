@@ -8,7 +8,9 @@ const httpUrl = new URL("./http.ts", import.meta.url).href;
 const loadHttp = () => import(`${httpUrl}?cacheBust=${Date.now()}`);
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
-const KEY = "debateai.support.conversation.v1";
+const KEY = "debateai.support.conversation.v2";
+/** The name the pre-fix build wrote under, which no build may read again. */
+const RETIRED_KEY = "debateai.support.conversation.v1";
 const MESSAGES = [
   { id: "disclosure", role: "assistant", text: "Hi — I'm the support assistant." },
   { id: "user-1", role: "user", text: "Why is my debate stuck?" }
@@ -187,6 +189,42 @@ test("DL1-F5c: a bearer left by the pre-fix build is never read back into the pa
   assert.ok(!raw.includes(CASE_TOKEN), "a tab open across the deploy hands its bearer to nobody");
   assert.doesNotMatch(raw, TOKEN_SHAPED);
   assert.equal(restored.messages.at(-1).link, undefined);
+});
+
+/**
+ * Fix round 1. The reader stripped what it RETURNED, so the page was clean —
+ * but a payload it refused (a shape it does not recognise, JSON it cannot
+ * parse) was left exactly where it was, and the key itself was reused across
+ * the deploy. A bearer the reader will not hand to the page is still a bearer
+ * resting in the browser: the tab that wrote it keeps its `sessionStorage`
+ * until it is closed. So the key is retired and every non-success path erases.
+ */
+test("DL1-F5c: the retired key and any payload the reader refuses are erased, not left behind", async () => {
+  const { readStoredSupportConversation, SUPPORT_CONVERSATION_STORAGE_KEY } = await loadConversation();
+  assert.equal(SUPPORT_CONVERSATION_STORAGE_KEY, KEY, "the pre-fix key name is not reused");
+
+  const legacy = JSON.stringify({
+    language: "en",
+    identityBound: false,
+    messages: [...MESSAGES, CASE_ACKNOWLEDGEMENT],
+    ownContext: { latest: true }
+  });
+  // (a) A tab open across the deploy: the old key, written by the old build.
+  const carried = memoryStorage({ [RETIRED_KEY]: legacy });
+  assert.equal(readStoredSupportConversation(carried), null, "the retired key is not read");
+  assert.equal(carried.getItem(RETIRED_KEY), null, "it does not outlive the deploy either");
+  assert.doesNotMatch(JSON.stringify(carried.entries()), TOKEN_SHAPED);
+
+  // (b) Under the current key: a shape the reader refuses, and unparsable JSON.
+  for (const raw of [
+    JSON.stringify({ language: "de", identityBound: false, messages: [CASE_ACKNOWLEDGEMENT] }),
+    `{"language":"en","messages":[${JSON.stringify(CASE_ACKNOWLEDGEMENT)}`
+  ]) {
+    const refused = memoryStorage({ [KEY]: raw });
+    assert.equal(readStoredSupportConversation(refused), null);
+    assert.equal(refused.getItem(KEY), null, "a payload the reader will not use is erased");
+    assert.doesNotMatch(JSON.stringify(refused.entries()), TOKEN_SHAPED);
+  }
 });
 
 test("DL1-F5c: the assistant holds the case bearer in memory and stores a token-free notice", () => {
