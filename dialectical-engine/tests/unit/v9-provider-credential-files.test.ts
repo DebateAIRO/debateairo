@@ -18,6 +18,7 @@ import {
   parseProviderDiscoveryTargets,
   resolveProviderTargetCredentials
 } from "../../packages/providers/src/index.js";
+import { framedFixturePacket } from "../support/framed-packet.js";
 
 /**
  * V-9(2) and V-9(3), task 10b/10c.
@@ -536,7 +537,12 @@ describe("V-9 a new OpenAI-compatible vendor needs no code (task 10c)", () => {
       bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 },
       contractHash: "contract-1",
       providerRef: "vendor-new",
-      packet: { messages: [{ role: "user", content: "ping" }] }
+      // V-11 addendum, layer 1: the gateway's door refuses any packet the frame
+      // builder did not make, so the vendor is reached with a REAL framed packet
+      // (`tests/support/framed-packet.ts` calls `buildFramedPrompt` itself). What
+      // this case measures is the credential and the target, not the packet: a
+      // hand-built one measured the door instead and never left the process.
+      packet: framedFixturePacket("ping")
     });
     expect(result.content).toBe("{\"ok\":true}");
     expect(result.maker).toBe("maker-new");
