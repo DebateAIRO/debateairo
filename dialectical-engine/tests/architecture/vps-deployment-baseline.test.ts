@@ -300,6 +300,12 @@ describe("VPS baseline: encrypted DB + custody backups with separate escrow, res
     ]) expect(script, needle).toContain(needle);
     expect(script).not.toContain("core.runs");
     expect(script.indexOf("RESTORE_DRILL_OK")).toBeGreaterThan(script.indexOf("drill-decrypt-sample.ts"));
+    // V-19: tar restores the live tree's own modes and group, so a host running
+    // the custody group hands the drill 2750/0640 material owned by a group the
+    // postgres user is not in. The drill normalises the WHOLE tree, not just its
+    // top directories, and proves the backup opens under the strictest contract.
+    expect(script).toMatch(/find "\$WORK\/custody" "\$WORK\/keys" -type d -exec chmod 0700 \{\} \+/);
+    expect(script).toMatch(/find "\$WORK\/custody" "\$WORK\/keys" -type f -exec chmod 0600 \{\} \+/);
   });
 
   it("drill-decrypt-sample.ts proves one run row decrypts with the restored keys and never prints plaintext", () => {
@@ -366,6 +372,75 @@ describe("VPS baseline: runbook and environment templates", () => {
     });
     expect(new Set(roles).size).toBe(5);
     for (const [key] of env) expect(key).not.toMatch(/^DEBATEAI_DEV_|^EVALUATOR_DEV_MENU/);
+  });
+
+  it("units declare the custody group, so it does not depend on a lookup systemd may skip", () => {
+    // Both units set User= AND Group= explicitly, which is exactly the case
+    // where systemd does not consult the group database for the user's other
+    // groups. `usermod -a -G` alone would leave the runner outside the group at
+    // runtime, and every key read would refuse.
+    for (const unit of ["debateai-api", "debateai-runner"]) {
+      expect(read(`deploy/vps/systemd/${unit}.service`), unit)
+        .toMatch(/^SupplementaryGroups=.*\bdebateai-custody\b/m);
+    }
+    // The UI touches no key material and must not be in the group.
+    expect(read("deploy/vps/systemd/debateai-ui.service")).not.toContain("debateai-custody");
+  });
+
+  it("README provisions the tree the runner must traverse, with an explicit mode", () => {
+    const readme = read("deploy/vps/README.md");
+    // The runner has to walk /var/lib/debateai and /var/lib/debateai/api to
+    // reach the store. Today they exist only as a by-product of `install -d` on
+    // the leaf, so nothing pins what they are.
+    expect(readme).toMatch(
+      /install -d -m 0755 -o root -g root \/var\/lib\/debateai \/var\/lib\/debateai\/api/
+    );
+    expect(readme).toContain("| `/var/lib/debateai/api` |");
+  });
+
+  it("README's custody check tests the group, not only the mode", () => {
+    // A 2750 directory whose group is debateai-api passes a mode-only check and
+    // is refused at runtime, which is the worst kind of green.
+    expect(read("deploy/vps/README.md")).toMatch(/! -group debateai-custody -print/);
+  });
+
+  it("README provisions the V-19 custody group and no longer leaves the question open", () => {
+    const readme = read("deploy/vps/README.md");
+    for (const needle of [
+      "DEBATEAI_CUSTODY_GROUP", "debateai-custody", "0750", "0640",
+      // The group is created and BOTH principals that read the user-DEK store join it.
+      "groupadd --system debateai-custody",
+      "usermod -a -G debateai-custody debateai-api",
+      "usermod -a -G debateai-custody debateai-runner"
+    ]) expect(readme, needle).toContain(needle);
+    // V-19 is ruled: the runbook must no longer present the two-principal custody
+    // problem as an open question for the owner.
+    expect(readme).not.toContain("Custody and the three service users — **OPEN, needs V**");
+    // The relaxation is opt-in and bounded: the key files that only the API reads
+    // stay 0600 in a 0700 directory.
+    for (const needle of ["0600", "0700"]) expect(readme, needle).toContain(needle);
+  });
+
+  it("README documents the V-3 master-key rotation and its retirement rule", () => {
+    const readme = read("deploy/vps/README.md");
+    for (const needle of [
+      "rotate-kek-cli.ts", "KEK_PREVIOUS_PATH", "CORPUS_KEK_PREVIOUS_PATH",
+      "SUPPORT_KEK_PREVIOUS_PATH", "KEYS_ROTATE_KEK_OK", "KEYS_ROTATE_KEK_FAILED"
+    ]) expect(readme, needle).toContain(needle);
+    // The rule the whole design turns on: the old key is retired only AFTER a
+    // clean verification pass, never before.
+    expect(readme).toMatch(/only after .*KEYS_ROTATE_KEK_OK/i);
+    // Content is never re-encrypted — an operator must not expect a content pass.
+    expect(readme).toContain("never re-encrypt");
+  });
+
+  it("api.env.example and runner.env.example both opt into the custody group (V-19)", () => {
+    const api = envKeys(read("deploy/vps/env/api.env.example"));
+    const runner = envKeys(read("deploy/vps/env/runner.env.example"));
+    expect(api.get("DEBATEAI_CUSTODY_GROUP")).toBe("debateai-custody");
+    expect(runner.get("DEBATEAI_CUSTODY_GROUP")).toBe("debateai-custody");
+    const ui = envKeys(read("deploy/vps/env/ui.env.example"));
+    expect(ui.has("DEBATEAI_CUSTODY_GROUP")).toBe(false);
   });
 
   it("runner.env.example and ui.env.example carry only what those services need", () => {

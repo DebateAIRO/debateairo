@@ -1,6 +1,7 @@
 import "@debateai/obs-capture/install/runner";
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import {
+  configureCustodyGroup,
   ContentCipher,
   FileRunContentKeyStore,
   FileUserDekStore,
@@ -17,6 +18,10 @@ import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
 import { reconcileRunnerStartupWork } from "./runner-startup-reconciliation.js";
 
 const environment = loadRunnerEnvironment();
+// V-19: this principal owns nothing in the user-DEK store it reads, so without
+// the custody group every load below refuses. Configured before the first open
+// so an unresolvable group is a boot failure, not a mid-run one.
+configureCustodyGroup(environment.DEBATEAI_CUSTODY_GROUP);
 const kek = loadKek(environment.KEK_PATH);
 const pool = createPool(environment.DATABASE_URL);
 if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {

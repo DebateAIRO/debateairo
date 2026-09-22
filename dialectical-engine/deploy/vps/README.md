@@ -83,17 +83,37 @@ swapoff -a
 apt install postgresql-18 caddy docker.io docker-compose-v2 age rclone postfix
 ```
 
-Create the three service users and the runtime trees:
+Create the three service users, the custody group and the runtime trees:
 
 ```sh
 for service in api ui runner; do
   adduser --system --group --no-create-home --home /nonexistent "debateai-$service"
 done
 adduser debateai-api postdrop     # postfix maildrop is setgid; NoNewPrivileges neuters setgid
+groupadd --system debateai-custody
+usermod -a -G debateai-custody debateai-api
+usermod -a -G debateai-custody debateai-runner
+install -d -m 0755 -o root -g root /var/lib/debateai /var/lib/debateai/api
 install -d -m 0700 -o debateai-api -g debateai-api \
-  /var/lib/debateai/api/user-deks /var/lib/debateai/api/publication-keys \
-  /var/lib/debateai/api/audit-keys
+  /var/lib/debateai/api/publication-keys /var/lib/debateai/api/audit-keys
+install -d -m 2750 -o debateai-api -g debateai-custody /var/lib/debateai/api/user-deks
 ```
+
+The user-DEK store is the one tree two principals read, so it is the one tree that gets the
+custody group (V-19, below). The other two are written and read by `debateai-api` alone and stay
+`0700`.
+
+The two directories above them are created explicitly and left `0755 root:root`. The runner has
+to traverse both to reach the store, they hold nothing secret at their own level, and a tree that
+exists only as a by-product of creating its leaves has a mode nobody chose.
+
+The setgid bit on the store is load-bearing: without it, a record the API creates takes the API's
+own primary group and the runner is locked out again.
+
+Both units also declare `SupplementaryGroups=debateai-custody`. Each sets `User=` and `Group=`
+explicitly, and systemd then does not consult the group database for that user's other groups, so
+`usermod -a -G` alone would leave the process outside the group. Group membership is read at
+process start: restart both units after either change.
 
 ---
 
@@ -112,7 +132,11 @@ install -d -m 0700 -o debateai-api -g debateai-api \
 | `/etc/debateai/hatchet-tls/` | `0755` | `root:root` | `server.crt`, `server.key` (`0640 root:docker`), `ca.crt` |
 | `/etc/debateai/ui-edge.secret` | `0400` | `debateai-ui` | the C2b edge secret (a second `0640 root:caddy` copy for Caddy) |
 | `/etc/debateai/backup.conf` | `0600` | `root:root` | age **public** keys and paths — see `backup.conf.example` |
-| `/var/lib/debateai/api/*` | `0700` | `debateai-api` | user-DEK store, publication-key store, audit-key store |
+| `/var/lib/debateai` | `0755` | `root:root` | the tree below (traversable; nothing secret at this level) |
+| `/var/lib/debateai/api` | `0755` | `root:root` | the tree below (traversable; nothing secret at this level) |
+| `/var/lib/debateai/api/user-deks` | `2750` | `debateai-api:debateai-custody` | user-DEK store — the one tree the runner also reads (V-19) |
+| `/var/lib/debateai/api/publication-keys` | `0700` | `debateai-api` | publication-key store |
+| `/var/lib/debateai/api/audit-keys` | `0700` | `debateai-api` | audit-key store |
 
 `/etc/default/caddy` carries `DEBATEAI_PUBLIC_HOSTNAME` and `DEBATEAI_ACME_EMAIL`.
 
@@ -144,30 +168,147 @@ openssl rand -base64 32 | tr '+/' '-_' | tr -d '=' > /etc/debateai/ui-edge.secre
 At least 43 base64url characters. Caddy sends it as `X-Debateai-Edge-Secret`; the UI compares it
 with `timingSafeEqual` and only then believes `X-Forwarded-For`.
 
-### Custody and the three service users — **OPEN, needs V**
+### Custody and the three service users — the custody group (V-19, ruled 2026-09-22)
 
 One OS user per service is right for almost everything: the UI cannot read `api.env`, and the
 runner cannot read the blind-index key, the audit key store or the audit source-IP salt.
 
-It does **not** work for one thing. With `CONTENT_ENCRYPTION_ENABLED=true` the runner reads the
+It did **not** work for one thing. With `CONTENT_ENCRYPTION_ENABLED=true` the runner reads the
 **same** user-DEK store the API writes (`apps/runner/src/main.ts:23-26`). `FileUserDekStore.load`
-requires mode **exactly `0600`**, so only the file's owner can read it — two OS users cannot share
-that store, and a POSIX ACL does not help because the ACL mask surfaces in the group bits and the
-exact-`0600` check then fails.
+required mode **exactly `0600`**, so only the file's owner could read it — two OS users could not
+share that store, and a POSIX ACL does not help because the ACL mask surfaces in the group bits
+and the exact-`0600` check then fails.
 
 The KEK is worked around by giving the runner its own `0600` copy of the same bytes. The DEK store
-cannot be: the API writes it continuously and a copy would go stale. One of these must be ruled
-before go-live:
+cannot be: the API writes it continuously and a copy would go stale. V ruled the custody group,
+keeping three users, because running one user would hand the runner — the process that talks to
+third-party model CLIs — the identity key material it must never touch.
 
-1. **Run the API and the runner as one OS user** (`debateai-app`). No code change; gives up the
-   runner/identity-key separation, since that user also owns the blind-index and audit keys.
-2. **Teach `@debateai/crypto` a custody group** — accept `0640` owned by the service user with a
-   shared custody group, alongside the existing `0600` path. A code change in `packages/crypto`,
-   adjacent to task B14, outside this task's bounds.
+Both units now read `DEBATEAI_CUSTODY_GROUP` from their `EnvironmentFile` and hand it to
+`@debateai/crypto` at start-up. It is **opt-in**: with the setting absent
+the contract is exactly what it was — `0600` file owned by the calling uid, one link, exact size,
+inside a `0700` directory owned by the same uid. With it set, one second shape is also accepted:
 
-Recommendation: (2), because (1) hands the runner — the process that talks to third-party model
-CLIs — the identity key material it currently cannot touch. Until it is ruled, the units here ship
-three users and the deployment is blocked on this point.
+| | Accepted without the setting | Also accepted with the setting |
+|---|---|---|
+| key file / wrapped-key record | `0600`, owned by the caller | `0640`, group = the custody group |
+| its directory | `0700`, owned by the caller | `0750`, group = the custody group |
+
+Nothing else relaxes. Any world bit, any group-write bit, any execute bit, a group that is not
+the named one, a symlink, a second hard link or a wrong size is refused exactly as before. The
+group grants **read**, never write: only the tree's owner (`debateai-api`) can replace a record,
+and the runner unit's `ReadOnlyPaths` pins that from the other side too.
+
+Set the same value in both `api.env` and `runner.env`. A decimal gid is accepted in place of the
+name, which is what a host without a POSIX group database should use. A name that the host cannot
+resolve refuses at boot with `CUSTODY_GROUP_UNRESOLVED` rather than quietly falling back.
+
+The store follows its own root: `@debateai/crypto` writes the group modes only into a store root
+that already carries the custody group, so the publication-key and audit-key trees keep the
+single-owner modes with the same setting on. Check the tree after provisioning:
+
+```sh
+stat -c '%a %U %G %n' /var/lib/debateai/api/user-deks
+find /var/lib/debateai/api/user-deks ! -group debateai-custody -print
+find /var/lib/debateai/api/user-deks -type d ! -perm 2750 -print -o -type f ! -perm 0640 -print
+```
+
+The `find` printing nothing is the pass. If the API wrote records before the group existed, they
+are `0600` in `0700` directories and the runner cannot read them; re-set the tree once, with the
+API stopped:
+
+```sh
+systemctl stop debateai-api debateai-runner
+chgrp -R debateai-custody /var/lib/debateai/api/user-deks
+find /var/lib/debateai/api/user-deks -type d -exec chmod 2750 {} +
+find /var/lib/debateai/api/user-deks -type f -exec chmod 0640 {} +
+systemctl start debateai-api debateai-runner
+```
+
+### Changing a master key (V-3)
+
+Three master keys wrap stored keys: `KEK_PATH` (the per-user DEKs),
+`CORPUS_KEK_PATH` (the publication keys) and `SUPPORT_KEK_PATH` (the support
+session and case keys, which live in Postgres). One command rotates all three.
+It re-wraps keys and **never re-encrypts content**: a master key wraps data keys
+only, so once a user's DEK is re-wrapped every debate under it opens exactly as
+before, untouched.
+
+Provision the new key beside the old one, then point the service at the new key
+and name the old one as the previous key. Both services read both keys for the
+length of the changeover:
+
+```sh
+install -d -m 0700 -o debateai-api -g debateai-api /etc/debateai/api-previous
+cp -a /etc/debateai/api/kek.bin /etc/debateai/api-previous/kek.bin
+head -c 32 /dev/urandom > /etc/debateai/api/kek.bin.new
+chown debateai-api:debateai-api /etc/debateai/api/kek.bin.new
+chmod 0600 /etc/debateai/api/kek.bin.new
+mv /etc/debateai/api/kek.bin.new /etc/debateai/api/kek.bin
+```
+
+Add `KEK_PREVIOUS_PATH=/etc/debateai/api-previous/kek.bin` to `api.env` and
+`runner.env`, restart both units, then run the rotation as the API user:
+
+`sudo -u` does not read the unit's `EnvironmentFile`, so the command needs it loaded explicitly.
+`systemd-run` does that without ever putting a secret on a command line or in the process list:
+
+```sh
+systemd-run --pipe --wait --collect \
+  --uid=debateai-api --gid=debateai-api \
+  --property=SupplementaryGroups=debateai-custody \
+  --property=EnvironmentFile=/etc/debateai/api.env \
+  --working-directory=/opt/debateai/dialectical-engine \
+  /usr/bin/pnpm exec tsx apps/runner/src/rotate-kek-cli.ts
+```
+
+The command opens exactly one database — `SUPPORT_DATABASE_URL`, to re-wrap the two support key
+columns — and refuses unless that connection really is the `debateai_support` principal. It never
+opens the runtime pool and never needs the runtime credential.
+
+The report goes to stdout, which `--pipe` puts on your terminal; `systemd-run` also records it in
+the journal under the transient unit. It contains counts, key **ids** (not keys) and the record
+ids of anything it could not open — user and session UUIDs, the same identifiers that are already
+directory names in the store. It contains no key material. Keep it until the retirement step is
+done: on a failure it is the list of records to investigate.
+
+`CORPUS_KEK_PREVIOUS_PATH` and `SUPPORT_KEK_PREVIOUS_PATH` work the same way for
+the other two keys; the support KEK's file is always named `support-kek.bin`, so
+its previous copy lives in its own `0700` directory. The support half connects as
+`debateai_support`, which is the only principal granted `UPDATE` on those two
+columns.
+
+The command prints one line per store, prefixed with the key id it rotated **to** — so a swapped
+current and previous is visible rather than inferred — and five counts: re-wrapped, already
+current, tombstones skipped, declined by a concurrent change (a shred that landed mid-rotation
+wins, correctly), and unreadable. Each line ends with how many records verified under the
+**current key alone**. The run ends with `KEYS_ROTATE_KEK_OK` or `KEYS_ROTATE_KEK_FAILED`.
+
+A store the command did not cover is named too. `declined by configuration` means this deployment
+does not have that store — publication was never enabled — and does not fail the run. `NOT COVERED`
+means the store exists and the command could not rotate it, and always does.
+
+It is idempotent and resumable: a record already under the current key is skipped, so an
+interrupted run is finished by running it again.
+
+**Retire the old key only after a clean `KEYS_ROTATE_KEK_OK`.** On
+`KEYS_ROTATE_KEK_FAILED` the output names every record that opened under no key, each with the
+typed code that refused it, and names any store the command could **not** cover — a store it never
+opened is never a clean store;
+keep the previous key in place, investigate those records, and run it again.
+Once the pass is clean, remove the `*_KEK_PREVIOUS_PATH` lines, restart the
+units and destroy the old key files — their absence is the normal steady state:
+
+```sh
+shred -u /etc/debateai/api-previous/kek.bin
+rmdir /etc/debateai/api-previous
+```
+
+Run it in a maintenance window. Every support row it writes re-runs a
+consistency check that briefly serialises support writes, so a rotation and a
+busy support hour should not overlap. Rehearse it first: take a copy of the
+custody tree and a scratch database, rotate the copy, and confirm the pass is
+clean before touching the live tree.
 
 ---
 

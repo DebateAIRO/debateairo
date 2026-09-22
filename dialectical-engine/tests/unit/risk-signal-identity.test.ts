@@ -33,6 +33,12 @@ const ALLOWED_REASONS = [
   "CRYPTO_KEY_INVALID",
   "CRYPTO_AUTHENTICATION_FAILED",
   "KEK_UNRESOLVED",
+  // V-19 gave a custody refusal its own code instead of collapsing it into
+  // KEK_UNRESOLVED. CryptoCustodyError is a CryptoError like the rest, so both
+  // of its codes belong in this set or a custody refusal degrades to the
+  // fallback — the exact degradation this enumeration exists to prevent.
+  "SECRET_CUSTODY_INVALID",
+  "KEK_CUSTODY_INVALID",
   // Fixed codes of the audit-context hashing pool.
   "ARGON2_POOL_CAPACITY_EXHAUSTED",
   "ARGON2_POOL_UNAVAILABLE",
@@ -155,6 +161,12 @@ describe("F-RISK-IDENTITY-LOG risk-signal failure diagnostics", () => {
     expect(riskSignalFailureIdentity(Object.assign(
       new Error("some driver prose"), { name: "error", code: "23505" }
     ))).toBe("reason=unrecognized-error category=database");
+    // A custody refusal is a NAMED crypto reason, never the fallback.
+    for (const code of ["SECRET_CUSTODY_INVALID", "KEK_CUSTODY_INVALID"]) {
+      expect(riskSignalFailureIdentity(Object.assign(
+        new Error(code), { name: "CryptoCustodyError", code }
+      )), code).toBe(`reason=${code} category=crypto`);
+    }
   });
 
   it("does not accept a message merely SHAPED like a reason constant", () => {

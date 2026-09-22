@@ -640,7 +640,13 @@ describe("S3 password, token, pseudonym, and secret-store primitives", () => {
       expect((await stat(file)).mode & 0o777).toBe(0o600);
       const stored = await readFile(file, "utf8");
       expect(stored).not.toContain(dek.toString("base64"));
-      expect(JSON.parse(stored)).toMatchObject({ version: 1, user_id: userId });
+      // V-3: records written now are v2 and name the KEK that wrapped them. The
+      // label is a truncated domain-separated digest, never the key bytes, and a
+      // v1 record without one still opens — tests/unit/kek-rotation.test.ts.
+      const record = JSON.parse(stored) as Record<string, unknown>;
+      expect(record).toMatchObject({ version: 2, user_id: userId });
+      expect(record.kek_id).toMatch(/^[0-9a-f]{16}$/);
+      expect(stored).not.toContain(Buffer.alloc(32, 0x5a).toString("base64"));
     } finally {
       await rm(root, { recursive: true, force: true });
     }

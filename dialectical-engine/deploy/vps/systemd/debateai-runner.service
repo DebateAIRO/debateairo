@@ -14,6 +14,11 @@ Requires=postgresql.service debateai-hatchet.service
 Type=simple
 User=debateai-runner
 Group=debateai-runner
+# V-19. User= and Group= are both set, which is exactly the case where systemd
+# does not consult the group database for this user's other groups: `usermod -a
+# -G debateai-custody debateai-runner` alone would NOT put the process in the
+# group, and every user-DEK read would refuse. Declared here so it cannot be.
+SupplementaryGroups=debateai-custody
 WorkingDirectory=/opt/debateai/dialectical-engine
 EnvironmentFile=/etc/debateai/runner.env
 Environment=NODE_ENV=production

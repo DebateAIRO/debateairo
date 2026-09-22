@@ -110,6 +110,13 @@ const hatchetShape = {
 const apiEnvironmentShape = {
     KEK_PATH: kekPath,
     SUPPORT_KEK_PATH: kekPath,
+    // V-19: opt-in custody group. Absent, every key file and wrapped-key record
+    // must be 0600 owned by this uid inside a 0700 directory owned by this uid.
+    // Present (a group name or a decimal gid), @debateai/crypto additionally
+    // accepts a 0640 file whose gid is that group's inside a 0750 directory
+    // whose gid is that group's, so a second principal can READ the shared
+    // user-DEK store without being able to replace anything in it.
+    DEBATEAI_CUSTODY_GROUP: z.string().min(1).optional(),
     BLIND_INDEX_KEY_PATH: z.string().min(1),
     AUDIT_KEY_STORE_PATH: z.string().min(1),
     AUDIT_SOURCE_IP_SALT_PATH: z.string().min(1),
@@ -292,6 +299,44 @@ export function parseApiEnvironment(
   return validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source));
 }
 
+/**
+ * V-3. What `apps/runner/src/rotate-kek-cli.ts` needs. Each `*_KEK_PREVIOUS_PATH`
+ * is OPTIONAL because its absence is the steady state: an operator sets it only
+ * for the length of a changeover and removes it once a verification pass is
+ * clean.
+ *
+ * The corpus pair is NOT optional in the way it looks. The command applies the
+ * API's own rule: with `PUBLICATION_ENABLED=true` both `CORPUS_KEK_PATH` and
+ * `PUBLICATION_KEY_STORE_PATH` are required and their absence fails the run,
+ * and half a pair fails it whatever the flag says. Only a host that never
+ * enabled publication may leave both unset, and the command prints that store
+ * as declined by configuration rather than counting it as a clean zero.
+ */
+const keyRotationEnvironmentShape = {
+  KEK_PATH: kekPath,
+  KEK_PREVIOUS_PATH: z.string().min(1).optional(),
+  USER_DEK_STORE_PATH: z.string().min(1),
+  CORPUS_KEK_PATH: z.string().min(1).optional(),
+  CORPUS_KEK_PREVIOUS_PATH: z.string().min(1).optional(),
+  PUBLICATION_KEY_STORE_PATH: z.string().min(1).optional(),
+  PUBLICATION_ENABLED: z.enum(["true", "false"]).default("false"),
+  SUPPORT_KEK_PATH: kekPath,
+  SUPPORT_KEK_PREVIOUS_PATH: z.string().min(1).optional(),
+  // The ONLY database this command opens. It writes two support key columns and
+  // touches nothing else, so it asserts the support role alone
+  // (assertSupportPrincipalRole) and never holds the runtime credential.
+  SUPPORT_DATABASE_URL: z.string().url(),
+  DEBATEAI_CUSTODY_GROUP: z.string().min(1).optional()
+} as const;
+
+export function parseKeyRotationEnvironment(source: EnvironmentSource) {
+  return parseEnvironmentSource(keyRotationEnvironmentShape, source);
+}
+
+export function loadKeyRotationEnvironment() {
+  return parseEnvironment(keyRotationEnvironmentShape);
+}
+
 export function loadApiEnvironment() {
   return validateApiEnvironment(parseEnvironment(apiEnvironmentShape));
 }
@@ -307,6 +352,9 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
     CONTENT_ENCRYPTION_ENABLED: z.enum(["true", "false"]).default("false"),
     CONTENT_BLIND_INDEX_KEY_PATH: z.string().min(1).optional(),
     USER_DEK_STORE_PATH: z.string().min(1).optional(),
+    // V-19: the runner reads the API's user-DEK store and owns none of it, so
+    // this is the setting that lets it in. Same shape and meaning as the API's.
+    DEBATEAI_CUSTODY_GROUP: z.string().min(1).optional(),
     CLAIM_MS: positiveInteger, CLAIM_MARGIN_MS: nonNegativeInteger,
     JUDGE_MAX_ATTEMPTS: positiveInteger, JUDGE_TOKEN_CEILING: positiveInteger, JUDGE_DEADLINE_MS: positiveInteger,
     COMPOSER_MAX_ATTEMPTS: positiveInteger, COMPOSER_TOKEN_CEILING: positiveInteger, COMPOSER_DEADLINE_MS: positiveInteger,

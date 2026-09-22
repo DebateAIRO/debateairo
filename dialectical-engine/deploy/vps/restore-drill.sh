@@ -129,8 +129,16 @@ DRILL_KEK="$WORK/keys/$(basename "$KEK_PATH")"
 # The probe runs as the postgres OS user (peer auth is the only way into the scratch database),
 # so the restored custody must be readable by it and by nobody else: the crypto loaders require
 # exactly 0600 on key files and 0700 on their directory.
+#
+# The normalisation is RECURSIVE on purpose (V-19). tar restores the live tree's own modes and
+# group, so a deployment running the custody group hands this drill 2750 directories and 0640
+# records owned by a group the postgres user is not in. The drill deliberately does not opt into
+# the custody group: it proves the escrowed KEK opens the backup under the strictest contract
+# there is, whichever shape the live host happens to use.
 chown -R postgres:postgres "$WORK/custody" "$WORK/keys"
 chmod 0700 "$WORK/custody" "$WORK/keys" "$DRILL_STORE"
+find "$WORK/custody" "$WORK/keys" -type d -exec chmod 0700 {} +
+find "$WORK/custody" "$WORK/keys" -type f -exec chmod 0600 {} +
 chmod 0600 "$DRILL_KEK"
 chmod 0711 "$WORK"
 

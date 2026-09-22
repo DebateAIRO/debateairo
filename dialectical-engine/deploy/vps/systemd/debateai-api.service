@@ -16,7 +16,8 @@ User=debateai-api
 Group=debateai-api
 # Postfix's sendmail is setgid postdrop; NoNewPrivileges=true neuters setgid, so the maildrop
 # write has to be reachable by group membership instead (README §7, MAIL_SENDMAIL_PATH).
-SupplementaryGroups=postdrop
+# V-19: the custody group, for the same reason — see debateai-runner.service.
+SupplementaryGroups=postdrop debateai-custody
 WorkingDirectory=/opt/debateai/dialectical-engine
 EnvironmentFile=/etc/debateai/api.env
 Environment=NODE_ENV=production
