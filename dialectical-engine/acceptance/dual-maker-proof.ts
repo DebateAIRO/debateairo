@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Pool } from "pg";
 import { RunRepository } from "@debateai/db";
 import { createPostgresProviderGateway } from "@debateai/runner";
+import { buildFramedPrompt, type PromptContract } from "@debateai/providers";
 import { startClaudeRelay, type ClaudeRelayHandle } from "./claude-relay.js";
 import { startModelShim, type ModelShimHandle } from "./model-shim.js";
 import type { CommandSpec } from "./relay-core.js";
@@ -38,6 +39,18 @@ import {
 export const DUAL_MAKER_PROOF_CONTRACT_TEXT =
   "FAIR-02 dual-maker transport proof (DR-140). You are one of two independent model makers; answer the user's request directly." as const;
 const PROOF_USER_LINE = "Reply with the single word: OK";
+
+/**
+ * V-11 addendum (RUN1): the transport proof goes through the same door as every
+ * other hand-off — the gateway refuses a packet the frame builder did not make.
+ * The proof text is unchanged and stays the instruction slot, so
+ * `DUAL_MAKER_PROOF_CONTRACT_TEXT` remains the thing this file fingerprints.
+ */
+const DUAL_MAKER_PROOF_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: "acceptance.dual-maker-proof.v1",
+  instruction: DUAL_MAKER_PROOF_CONTRACT_TEXT,
+  answerForm: "Reply with the single word: OK"
+});
 
 const digest = (text: string): string => createHash("sha256").update(text).digest("hex");
 
@@ -98,12 +111,10 @@ async function callThroughMaker(input: {
     bound: input.policy.bounds.JUDGE,
     contractHash: digest(DUAL_MAKER_PROOF_CONTRACT_TEXT),
     providerRef: input.provider.providerRef,
-    packet: {
-      messages: [
-        { role: "system", content: DUAL_MAKER_PROOF_CONTRACT_TEXT },
-        { role: "user", content: PROOF_USER_LINE }
-      ]
-    }
+    packet: buildFramedPrompt({
+      contract: DUAL_MAKER_PROOF_PROMPT_CONTRACT,
+      material: [{ name: "request", content: PROOF_USER_LINE }]
+    }).packet
   });
   return Object.freeze({
     providerRef: input.provider.providerRef,
