@@ -4,13 +4,27 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 const gitRoot = resolve(import.meta.dirname, "../../..");
 const read = (p: string) => readFileSync(resolve(gitRoot, p), "utf8");
+
+/**
+ * The single Node version humans and CI install. Since dev's 932ed6b5 `engines.node` is a
+ * RANGE, not an exact version — an exact single-patch pin names one host's Homebrew bottle,
+ * which V's 2026-09-17 rule forbids — so the version to install is the range's FLOOR, and
+ * that is the one number `.nvmrc` and the workflow may carry.
+ */
+function declaredNodeFloor(): string {
+  const engines = JSON.parse(read("dialectical-engine/package.json")).engines.node as string;
+  const match = /^>=(\d+\.\d+\.\d+) <\d+$/.exec(engines);
+  expect(match, `engines.node must be a ">=x.y.z <major" range, got ${engines}`).not.toBeNull();
+  return match![1]!;
+}
+
 describe("CI security gates (F-03)", () => {
   it("ships the workflow, dependabot and gitleaks config", () => {
     for (const p of [".github/workflows/security.yml", ".github/dependabot.yml", ".gitleaks.toml"]) expect(existsSync(resolve(gitRoot, p)), p).toBe(true);
   });
   it("pins the ruled Node and runs every gate", () => {
     const wf = read(".github/workflows/security.yml");
-    for (const needle of ["node-version: 22.23.1", "pnpm audit --audit-level=moderate", "gitleaks", "pnpm run typecheck", "pnpm run test:ci-gate", "github/codeql-action/analyze"]) expect(wf).toContain(needle);
+    for (const needle of [`node-version: ${declaredNodeFloor()}`, "pnpm audit --audit-level=moderate", "gitleaks", "pnpm run typecheck", "pnpm run test:ci-gate", "github/codeql-action/analyze"]) expect(wf).toContain(needle);
   });
   it("runs the recorded known-red gate, not a raw vitest sweep (B31)", () => {
     const wf = read(".github/workflows/security.yml");
@@ -59,13 +73,26 @@ describe("CI security gates (F-03)", () => {
     expect(wf).toMatch(/gitleaks" git [^\n]*--redact[^\n]*--config \.gitleaks\.toml[^\n]*--log-opts="--all"/);
     expect(wf).toContain("fetch-depth: 0");
   });
+  // L6-F13, AMENDED 2026-09-22 (DEV-SYNC). Humans and CI must still install exactly one
+  // Node version and it must be the one the project declares — now the floor of the
+  // engines range rather than an exact engines string.
+  //
+  // The rule's third leg is STRUCK, mirroring dev's 53a09658: it used to demand that
+  // register.bootstrap.json's nodeRuntimeVersion equal the declared runtime. That file is
+  // the description of SEALED register version 1. Its nodeRuntimeVersion is a DATED
+  // measurement ("node --version on 2026-08-07"), not a declaration of today's runtime,
+  // and editing it moves the v1 snapshot hash that the production runbook tells the
+  // operator to confirm against the deployed database — dev tried it in 7e9a85a0 and
+  // reverted it for exactly that reason. A new runtime pin is a NEW register version
+  // (dev's open ticket F-BOOTSTRAP-REGISTER-V2-RUNTIME-PINS), never an edit to a sealed
+  // one. What the project DECLARES is engines. So the sealed row is pinned UNCHANGED
+  // below, which turns this leg from a demand to edit a seal into a guard on it.
   it("pins one Node version for humans, CI and the register (L6-F13)", () => {
-    const engines = JSON.parse(read("dialectical-engine/package.json")).engines.node as string;
-    expect(engines).toMatch(/^\d+\.\d+\.\d+$/);
+    const floor = declaredNodeFloor();
     expect(existsSync(resolve(gitRoot, ".nvmrc")), ".nvmrc at the git root").toBe(true);
-    expect(read(".nvmrc").trim()).toBe(engines);
-    expect(read(".github/workflows/security.yml")).toContain(`node-version: ${engines}`);
-    expect(JSON.parse(read("dialectical-engine/register.bootstrap.json")).values.nodeRuntimeVersion).toBe(`v${engines}`);
+    expect(read(".nvmrc").trim()).toBe(floor);
+    expect(read(".github/workflows/security.yml")).toContain(`node-version: ${floor}`);
+    expect(JSON.parse(read("dialectical-engine/register.bootstrap.json")).values.nodeRuntimeVersion).toBe("v22.23.1");
   });
   it("pins every action to a full commit SHA with its release tag as a comment (L6-F7)", () => {
     const uses = read(".github/workflows/security.yml").split("\n").filter((line) => /^\s*-?\s*uses:/.test(line));
