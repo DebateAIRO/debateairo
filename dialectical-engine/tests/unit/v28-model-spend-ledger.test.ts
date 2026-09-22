@@ -111,11 +111,16 @@ describe("V-28 the per-run seam reads and writes the persisted spend", () => {
       runId: "run-1", price: PRICE, requireReportedUsage: true
     });
 
+    // I4: the two duties are separate. CHARGING never refuses — it records money
+    // already taken — and writes nothing for a call that reported nothing,
+    // because a zero row would read as "this call was free". The REFUSAL is its
+    // own question, asked only of a successful completion.
     await expect(seam.recordCall({ providerRef: "provider-1", usage: null }))
-      .rejects.toThrowError(expect.objectContaining({ code: "PROVIDER_USAGE_UNREPORTED" }));
-    // Nothing is written for a call that cannot be billed: a zero row would read
-    // as "this call was free", which is the falsehood the refusal exists to stop.
+      .resolves.toBeUndefined();
     expect(rows).toEqual([]);
+
+    await expect(seam.assertUsageReported({ providerRef: "provider-1", usage: null }))
+      .rejects.toThrowError(expect.objectContaining({ code: "PROVIDER_USAGE_UNREPORTED" }));
   });
 
   it("records nothing and refuses nothing when reported usage is not required", async () => {
@@ -125,6 +130,8 @@ describe("V-28 the per-run seam reads and writes the persisted spend", () => {
     });
 
     await expect(seam.recordCall({ providerRef: "provider-1", usage: null }))
+      .resolves.toBeUndefined();
+    await expect(seam.assertUsageReported({ providerRef: "provider-1", usage: null }))
       .resolves.toBeUndefined();
     expect(rows).toEqual([]);
   });

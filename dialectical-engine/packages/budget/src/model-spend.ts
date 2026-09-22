@@ -70,7 +70,10 @@ export interface ProviderCostSeam {
     requestBytes: number;
     completionTokenCeiling: number;
   }>): Promise<void>;
+  /** I4: charges what the vendor billed, and never refuses. */
   recordCall(observed: Readonly<{ providerRef: string; usage: unknown }>): Promise<void>;
+  /** I4: the hosted requirement, asked only of a successful completion. */
+  assertUsageReported(observed: Readonly<{ providerRef: string; usage: unknown }>): Promise<void>;
 }
 
 export interface CostEnvelopeGuardInput {
@@ -152,15 +155,12 @@ export class CostEnvelopeGuard {
         });
         if (decision.kind === "WOULD_CROSS") throw runCostEnvelopeReached(decision);
       },
+      // I4: charging never refuses. Nothing is written for a call that reported
+      // nothing — a zero row would read as "this call was free", which is the
+      // falsehood the hosted refusal below exists to prevent.
       recordCall: async (observed) => {
         const usage = readReportedUsage(observed.usage);
-        if (usage === null) {
-          // Nothing is written for a call that cannot be billed. A zero row
-          // would read as "this call was free", which is precisely the
-          // falsehood the hosted refusal exists to prevent.
-          if (input.requireReportedUsage) throw providerUsageUnreported(observed.providerRef);
-          return;
-        }
+        if (usage === null) return;
         await this.#store.recordSpend(Object.freeze({
           spendId: randomUUID(),
           spendSource: "RUN",
@@ -171,6 +171,12 @@ export class CostEnvelopeGuard {
           inputTokens: usage.promptTokens,
           outputTokens: usage.completionTokens
         }));
+      },
+      assertUsageReported: async (observed) => {
+        if (!input.requireReportedUsage) return;
+        if (readReportedUsage(observed.usage) === null) {
+          throw providerUsageUnreported(observed.providerRef);
+        }
       }
     };
   }

@@ -101,15 +101,20 @@ function meteredSeam(ceilingMicros: number, requireReportedUsage = false) {
       });
       if (decision.kind === "WOULD_CROSS") throw runCostEnvelopeReached(decision);
     },
+    // I4: charging NEVER refuses. It records money the vendor has already
+    // taken, and a refusal here would be a reason not to record it.
     recordCall: (observed) => {
       const usage = readReportedUsage(observed.usage);
-      if (usage === null) {
-        if (requireReportedUsage) throw providerUsageUnreported(observed.providerRef);
-        return;
-      }
+      if (usage === null) return;
       const charge = chargeMicrosForUsage(PRICE, usage);
       state.charges.push(charge);
       state.spentMicros += charge;
+    },
+    assertUsageReported: (observed) => {
+      if (!requireReportedUsage) return;
+      if (readReportedUsage(observed.usage) === null) {
+        throw providerUsageUnreported(observed.providerRef);
+      }
     }
   };
   return { seam, state };
@@ -155,7 +160,8 @@ describe("V-28 the gateway refuses the call that would cross, BEFORE making it",
       vendorReporting({ prompt_tokens: 1, completion_tokens: 1 }, calls),
       {
         assertCallAllowed: (projection) => { checks += 1; seam.assertCallAllowed(projection); },
-        recordCall: (observed) => seam.recordCall(observed)
+        recordCall: (observed) => seam.recordCall(observed),
+        assertUsageReported: (observed) => seam.assertUsageReported(observed)
       }
     );
 
@@ -251,6 +257,70 @@ describe("V-28 a hosted target whose vendor reports no usage is refused", () => 
     );
 
     expect(calls.count).toBe(1);
+  });
+
+  /**
+   * I4 (review round 2) — A CALL THE VENDOR BILLED MUST BE CHARGED, EVEN WHEN
+   * THE ENGINE THEN REFUSES ITS BODY.
+   *
+   * Round 1 charged after `assertBoundedProviderResponse`, so a 200 the vendor
+   * had already billed — an over-long model id, a usage block with an unknown
+   * field — threw before the charge and was never added to either total. The
+   * attempt was then RETRIED, and the same thing happened again: real money,
+   * spent repeatedly, invisible to both ceilings. The charge moves to the point
+   * every completed attempt passes, right after the artifact is recorded.
+   */
+  it("charges a 200 whose body the engine then refuses", async () => {
+    const calls = { count: 0 };
+    const { seam, state } = meteredSeam(1_000_000_000);
+    const { gateway } = gatewayWith(async () => {
+      calls.count += 1;
+      return new Response(JSON.stringify({
+        id: "fixture-1",
+        // Over-long: `assertBoundedProviderResponse` refuses it AFTER the call
+        // was made and billed.
+        model: "m".repeat(300),
+        usage: { prompt_tokens: 1_000, completion_tokens: 500 },
+        choices: [{ message: { content: "{}" }, finish_reason: "stop" }]
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }, seam);
+
+    await expect(gateway.call()).rejects.toThrowError();
+
+    expect(calls.count).toBeGreaterThan(0);
+    // Every attempt the vendor billed is on the run's total.
+    expect(state.charges).toHaveLength(calls.count);
+    expect(state.spentMicros).toBe(1_500 * calls.count);
+  });
+
+  it("charges a non-OK response that still reported usage", async () => {
+    const calls = { count: 0 };
+    const { seam, state } = meteredSeam(1_000_000_000);
+    const { gateway } = gatewayWith(async () => {
+      calls.count += 1;
+      return new Response(JSON.stringify({
+        id: "fixture-1", model: MODEL,
+        usage: { prompt_tokens: 10, completion_tokens: 0 },
+        choices: [{ message: { content: "{}" } }]
+      }), { status: 429, headers: { "content-type": "application/json" } });
+    }, seam);
+
+    await expect(gateway.call()).rejects.toThrowError();
+
+    expect(state.charges).toHaveLength(calls.count);
+  });
+
+  it("does NOT turn a transport failure into a usage refusal", async () => {
+    // A 503 with an empty body reports no usage, and must stay a transport
+    // failure: the "vendor cannot be billed" refusal belongs to a SUCCESSFUL
+    // completion, not to an error page.
+    const { seam } = meteredSeam(1_000_000_000, true);
+    const { gateway } = gatewayWith(
+      async () => new Response("upstream is down", { status: 503 }), seam
+    );
+
+    const error = await gateway.call().then(() => null, (thrown: unknown) => thrown);
+    expect(error).not.toMatchObject({ code: "PROVIDER_USAGE_UNREPORTED" });
   });
 
   it("admits the same answer when the seam does not require reported usage (local mode)", async () => {

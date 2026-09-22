@@ -742,9 +742,26 @@ export interface ProviderCostEnvelopeSeam {
     /** This attempt's `max_tokens`, which a length retry raises (W10/2). */
     completionTokenCeiling: number;
   }>) => void | Promise<void>;
+  /**
+   * CHARGE what the vendor billed. Called for every attempt that produced a
+   * response body, whatever the engine then decides about it, and it NEVER
+   * refuses: it records money already taken, and a refusal here would be a
+   * reason not to record it (I4).
+   */
   readonly recordCall: (observed: Readonly<{
     providerRef: string;
     /** The vendor's usage block as it arrived, or `null` if it reported none. */
+    usage: unknown;
+  }>) => void | Promise<void>;
+  /**
+   * The HOSTED requirement, asked only of a SUCCESSFUL completion: a vendor that
+   * answered and reported no usage cannot be billed, so nothing that follows can
+   * be bounded. Separate from `recordCall` because an error page reports no
+   * usage either, and a transport failure must not be renamed as an unbillable
+   * vendor (I4).
+   */
+  readonly assertUsageReported: (observed: Readonly<{
+    providerRef: string;
     usage: unknown;
   }>) => void | Promise<void>;
 }
@@ -1016,6 +1033,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         const candidate = z.object({ id: z.string(), model: modelIdSchema }).passthrough().safeParse(decoded);
         const observedUsage = z.object({ usage: usageSchema.nullable().optional() })
           .passthrough().safeParse(decoded);
+        /** Read ONCE: the artifact's record, the charge and the hosted check agree by construction. */
+        const reportedUsage = observedUsage.success ? observedUsage.data.usage ?? null : null;
         const strict = responseSchema.safeParse(decoded);
         const finishReason = observedFinishReason(decoded);
         const content = strict.success ? strict.data.choices[0]!.message.content : null;
@@ -1064,7 +1083,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             status: response.status,
             attempt,
             ...(tripwires.length === 0 ? {} : { prompt_tripwires: tripwires }),
-            usage: observedUsage.success ? observedUsage.data.usage ?? null : null,
+            usage: reportedUsage,
             // W10/1: the reason this completion stopped, recorded on EVERY
             // attempt. `raw_artifact.metadata` is unconstrained jsonb, so the
             // truncation is durable even though `parse_status` cannot name it.
@@ -1080,22 +1099,35 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           contractHash: request.contractHash,
           contentHash: digest(rawText)
         });
-        if (!response.ok) throw new Error(`PROVIDER_HTTP_STATUS_${response.status}`);
-        assertBoundedProviderResponse(decoded);
         /**
-         * V-28 — THE CHARGE, TAKEN ON EVERY COMPLETED CALL.
-         *
-         * Here and not beside the `OK` return: a truncated or unparseable answer
-         * cost the same money as a good one, so it must be billed too, and this
-         * is the one point every completed, well-formed HTTP attempt passes
-         * through. It sits AFTER the `!response.ok` throw so a 500 with no body
-         * is a transport failure rather than a usage refusal, and after the
-         * artifact has been persisted so the money is never charged against a
-         * call the ledger cannot show.
+         * V-28 / I4 — THE CHARGE, at the one point every attempt with a body
+         * passes through, and BEFORE any decision the engine takes about that
+         * body. The vendor has already billed for this call; whether the engine
+         * goes on to accept, refuse or retry it changes nothing about the money.
+         * It sits after `persistRawArtifact` so a charge is never recorded
+         * against a call the ledger cannot show.
          */
         await request.costEnvelope?.recordCall({
           providerRef: request.providerRef,
-          usage: observedUsage.success ? observedUsage.data.usage ?? null : null
+          usage: reportedUsage
+        });
+        if (!response.ok) throw new Error(`PROVIDER_HTTP_STATUS_${response.status}`);
+        assertBoundedProviderResponse(decoded);
+        /**
+         * V-28 — THE HOSTED REQUIREMENT, asked only of a SUCCESSFUL completion.
+         *
+         * The CHARGE is taken earlier, right after the artifact is recorded
+         * (I4): a 200 the engine then refuses — an over-long model id, a usage
+         * block with an unknown field — was still billed by the vendor and is
+         * still retried, so charging here missed real money, repeatedly. This
+         * check stays here, after `assertBoundedProviderResponse`, so a
+         * malformed usage block is still named PROVIDER_USAGE_INVALID rather
+         * than collapsed into "the vendor reported nothing", and after the
+         * `!response.ok` throw so an error page stays a transport failure.
+         */
+        await request.costEnvelope?.assertUsageReported({
+          providerRef: request.providerRef,
+          usage: reportedUsage
         });
         // W10/1: a refusal that arrived with `finish_reason: "length"` is a
         // TRUNCATION, and it is named as one. The classifier's own verdict
