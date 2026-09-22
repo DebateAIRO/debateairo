@@ -771,7 +771,29 @@ export {
 } from "./algorithm-policy.js";
 
 export {
+  CONFIGURED_PROVIDER_SET_DEPLOYMENT_SOURCE_REF,
+  CONFIGURED_PROVIDER_SET_DEPLOYMENT_VERSION,
+  CONFIGURED_PROVIDER_SET_ROW_KEY,
+  CONFIGURED_PROVIDER_SET_SEALED_VERSION,
+  buildConfiguredProviderSetDeploymentRow,
+  buildConfiguredProviderSetSealedRow,
+  type ConfiguredProvider,
+  type ConfiguredProviderSetRow,
+  type ConfiguredProviderVetting,
+  type VettedConfiguredProvider
+} from "./configured-provider-set.js";
+
+export {
+  DEPLOYMENT_MODES,
+  assertHostedCostEnvelopesSealed,
   assertProductionFloors,
+  readSealedCostEnvelopeStatus,
+  resolveDeploymentMode,
+  CostEnvelopesNotSealedError,
+  DeploymentModeInvalidError,
+  DeploymentModeUnresolvedError,
+  type DeploymentMode,
+  type SealedCostEnvelopeStatus,
   loadApiEnvironment,
   loadDevelopmentCommandEnvironment,
   loadKeyRotationEnvironment,

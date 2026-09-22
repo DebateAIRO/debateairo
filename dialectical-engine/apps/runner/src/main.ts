@@ -5,19 +5,32 @@ import {
   ContentCipher,
   FileRunContentKeyStore,
   FileUserDekStore,
-  loadKek
+  loadKek,
+  readCustodyAuthorizationHeader
 } from "@debateai/crypto";
 import { configureContentEncryption, createPool, RunRepository } from "@debateai/db";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
-import { loadRunnerEnvironment } from "@debateai/register";
+import { assertHostedCostEnvelopesSealed, loadRunnerEnvironment } from "@debateai/register";
 import { readDeploymentMakerCapability } from "@debateai/critique";
-import { assertProductionProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets } from "@debateai/providers";
+// ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
+// import line so `probeTarget` — the persisting probe — cannot enter this module under
+// any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
+import { assertDeploymentProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, resolveProviderTargetCredentials } from "@debateai/providers";
 import { createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, WalkingSkeletonRunner } from "./index.js";
-import { createRunnerProviderTopology } from "./provider-topology.js";
+import {
+  assertRunnerPrimaryProviderConfiguration,
+  createRunnerProviderTopology
+} from "./provider-topology.js";
 import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
 import { reconcileRunnerStartupWork } from "./runner-startup-reconciliation.js";
 
 const environment = loadRunnerEnvironment();
+// V-9(c) / V-28: a hosted deployment spends money on paid vendor APIs, so it may
+// not claim work until the per-run and daily cost envelopes are sealed. The seam
+// is `readSealedCostEnvelopeStatus` in @debateai/register — task 11 publishes the
+// rows behind it; until then hosted refuses here, before anything is opened.
+// Local mode spends nothing this control could bound and is untouched.
+assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE);
 // V-19: this principal owns nothing in the user-DEK store it reads, so without
 // the custody group every load below refuses. Configured before the first open
 // so an unresolvable group is a boot failure, not a mid-run one.
@@ -48,11 +61,20 @@ const deploymentMakers = await readDeploymentMakerCapability(pool, environment.R
 if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
   throw new TypeError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
 }
-const providerTargets = parseProviderDiscoveryTargets(
+const declaredProviderTargets = parseProviderDiscoveryTargets(
   environment.PROVIDER_DISCOVERY_TARGETS_JSON,
   deploymentMakers.configuredProviders
 );
-assertProductionProviderTargets(providerTargets, environment.NODE_ENV);
+// The mode decision is taken on what the operator DECLARED, before any credential
+// is resolved: that is what makes an inline `authorization_header` refusable in
+// hosted mode even though a resolved target legitimately carries a header.
+assertDeploymentProviderTargets(declaredProviderTargets, {
+  mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
+});
+// V-9(2): each vendor's credential file, read once under the custody contract.
+const providerTargets = resolveProviderTargetCredentials(
+  declaredProviderTargets, readCustodyAuthorizationHeader
+);
 const hatchet = new Hatchet({
   token: environment.HATCHET_CLIENT_TOKEN, host_port: environment.HATCHET_HOST_PORT,
   api_url: environment.HATCHET_API_URL, tenant_id: environment.HATCHET_TENANT_ID,
@@ -68,13 +90,14 @@ const providerTopology = createRunnerProviderTopology(providerTargets, (target) 
   })
 );
 const runRepository = new RunRepository(pool);
-if (providerTopology.primary.providerRef !== environment.PROVIDER_REF
-  || providerTopology.primary.maker !== environment.VLLM_MAKER
-  || providerTargets[0]?.baseUrl !== environment.VLLM_BASE_URL.replace(/\/$/u, "")
-  || providerTargets[0]?.model !== environment.VLLM_MODEL
-  || providerTargets[0]?.authorizationHeader !== environment.VLLM_AUTHORIZATION) {
-  throw new TypeError("RUNNER_PRIMARY_PROVIDER_CONFIGURATION_DRIFT");
-}
+// V-20: taken on the DECLARED targets, because the three optional keys describe
+// what the operator wrote, credential included — a credential resolved from a
+// file was never in this environment to compare against.
+assertRunnerPrimaryProviderConfiguration({
+  primary: providerTopology.primary,
+  firstTarget: declaredProviderTargets[0],
+  declared: environment
+});
 const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {
   workerId: environment.RUNNER_WORKER_ID, claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS,
   judgeBound: policy.bounds.JUDGE,

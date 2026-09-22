@@ -36,6 +36,100 @@ const kekPath = z.preprocess((value) => {
 type EnvironmentSource = Readonly<Record<string, string | undefined>>;
 const nodeEnvironment = z.enum(["development", "test", "production"]).optional();
 
+/**
+ * V-9(c), ruled 2026-09-22. The engine has TWO supported deployments and the
+ * choice is configuration, never an inference from `NODE_ENV`:
+ *
+ * - `hosted` — the commercial website. Paid vendor APIs over `https:` only, one
+ *   credential FILE per vendor, and the cost envelopes sealed before any work is
+ *   claimed. The loopback relay path is refused here.
+ * - `local` — anyone running this repository on their own computer, the owners
+ *   before launch included: the command-line relays, loopback model servers and,
+ *   optionally, the user's own API keys. This is a SUPPORTED product path, not
+ *   development-only code, and its behaviour is byte-for-byte what this codebase
+ *   did before the mode existed.
+ */
+export const DEPLOYMENT_MODES = Object.freeze(["hosted", "local"] as const);
+export type DeploymentMode = typeof DEPLOYMENT_MODES[number];
+
+/**
+ * Production did not say which deployment it is. Deliberately NOT a default:
+ * defaulting to `local` would silently permit relay targets on the hosted site,
+ * and defaulting to `hosted` would break every operator's first boot with an
+ * unrelated-looking provider refusal.
+ */
+export class DeploymentModeUnresolvedError extends TypeError {
+  readonly code = "DEPLOYMENT_MODE_UNRESOLVED";
+
+  constructor() {
+    super("DEPLOYMENT_MODE_UNRESOLVED");
+    this.name = "DeploymentModeUnresolvedError";
+  }
+}
+
+/** A value that is not one of the two modes — a typo, in every environment. */
+export class DeploymentModeInvalidError extends TypeError {
+  readonly code = "DEPLOYMENT_MODE_INVALID";
+
+  constructor() {
+    super("DEPLOYMENT_MODE_INVALID");
+    this.name = "DeploymentModeInvalidError";
+  }
+}
+
+/**
+ * `DEBATEAI_DEPLOYMENT_MODE` -> the mode. Absent outside production is `local`,
+ * which is exactly what this codebase did before the setting existed; absent in
+ * production refuses. Unknown refuses everywhere, untrimmed included: a stray
+ * space in an `EnvironmentFile` must name itself rather than pick a deployment.
+ */
+export function resolveDeploymentMode(
+  configured: string | undefined,
+  nodeEnv: string | undefined
+): DeploymentMode {
+  if (configured === undefined || configured.trim() === "") {
+    if (nodeEnv === "production") throw new DeploymentModeUnresolvedError();
+    return "local";
+  }
+  const mode = DEPLOYMENT_MODES.find((candidate) => candidate === configured);
+  if (mode === undefined) throw new DeploymentModeInvalidError();
+  return mode;
+}
+
+export type SealedCostEnvelopeStatus = "SEALED" | "NOT_SEALED";
+
+/**
+ * TASK 11 SEAM (V-28). The single named function task 11 replaces when it
+ * publishes the per-run and daily cost envelopes as sealed register rows.
+ *
+ * Until then it reports `NOT_SEALED`, so a hosted start-up refuses: a commercial
+ * deployment that can spend money on paid vendor APIs without a ceiling is the
+ * risk V-9 asked to be closed in code, and an unsealed envelope is indis-
+ * tinguishable from no envelope at all. Local mode is untouched — the relays and
+ * loopback model servers spend nothing this control could bound.
+ */
+export function readSealedCostEnvelopeStatus(): SealedCostEnvelopeStatus {
+  return "NOT_SEALED";
+}
+
+export class CostEnvelopesNotSealedError extends TypeError {
+  readonly code = "COST_ENVELOPES_NOT_SEALED";
+
+  constructor() {
+    super("COST_ENVELOPES_NOT_SEALED");
+    this.name = "CostEnvelopesNotSealedError";
+  }
+}
+
+/** The hosted-mode half of the start-up decision; `readStatus` is the task 11 seam. */
+export function assertHostedCostEnvelopesSealed(
+  mode: DeploymentMode,
+  readStatus: () => SealedCostEnvelopeStatus = readSealedCostEnvelopeStatus
+): void {
+  if (mode !== "hosted") return;
+  if (readStatus() !== "SEALED") throw new CostEnvelopesNotSealedError();
+}
+
 export function parseMigrationEnvironment(source: EnvironmentSource) {
   return withProductionFloors(parseEnvironmentSource({ MIGRATION_DATABASE_URL: z.string().url(), NODE_ENV: nodeEnvironment }, source));
 }
@@ -117,6 +211,10 @@ const apiEnvironmentShape = {
     // whose gid is that group's, so a second principal can READ the shared
     // user-DEK store without being able to replace anything in it.
     DEBATEAI_CUSTODY_GROUP: z.string().min(1).optional(),
+    // V-9(c): which of the two supported deployments this process is. Resolved
+    // by the loader (see `resolveDeploymentMode`) so no composition root can
+    // forget to ask; the resolved value rides on `DEPLOYMENT_MODE`.
+    DEBATEAI_DEPLOYMENT_MODE: z.string().min(1).optional(),
     BLIND_INDEX_KEY_PATH: z.string().min(1),
     AUDIT_KEY_STORE_PATH: z.string().min(1),
     AUDIT_SOURCE_IP_SALT_PATH: z.string().min(1),
@@ -290,7 +388,12 @@ function validateApiEnvironment(
     throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
   }
   assertProductionFloors(environment);
-  return environment;
+  return {
+    ...environment,
+    DEPLOYMENT_MODE: resolveDeploymentMode(
+      environment.DEBATEAI_DEPLOYMENT_MODE, environment.NODE_ENV
+    )
+  };
 }
 
 export function parseApiEnvironment(
@@ -355,6 +458,8 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
     // V-19: the runner reads the API's user-DEK store and owns none of it, so
     // this is the setting that lets it in. Same shape and meaning as the API's.
     DEBATEAI_CUSTODY_GROUP: z.string().min(1).optional(),
+    // V-9(c): see the API shape. Same key, same meaning, one deployment.
+    DEBATEAI_DEPLOYMENT_MODE: z.string().min(1).optional(),
     CLAIM_MS: positiveInteger, CLAIM_MARGIN_MS: nonNegativeInteger,
     JUDGE_MAX_ATTEMPTS: positiveInteger, JUDGE_TOKEN_CEILING: positiveInteger, JUDGE_DEADLINE_MS: positiveInteger,
     COMPOSER_MAX_ATTEMPTS: positiveInteger, COMPOSER_TOKEN_CEILING: positiveInteger, COMPOSER_DEADLINE_MS: positiveInteger,
@@ -366,7 +471,13 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
     JUDGEMENT_NUMBER_KIND: z.string().min(1), JUDGEMENT_PRODUCER: z.string().min(1),
     PROPAGATION_NUMBER_KIND: z.string().min(1), PROPAGATION_PRODUCER: z.string().min(1),
     HATCHET_ENGINE_RETRIES: nonNegativeInteger, HATCHET_WORKER_NAME: z.string().min(1),
-    VLLM_BASE_URL: z.string().url(), VLLM_MODEL: z.string().min(1), VLLM_MAKER: z.string().min(1),
+    // V-20, ruled 2026-09-22: despite their name these three describe the
+    // PRIMARY provider, and a hosted deployment has no self-hosted inference
+    // server to describe. Absent, `PROVIDER_DISCOVERY_TARGETS_JSON` is the
+    // single source; present (development), the cross-check is unchanged.
+    VLLM_BASE_URL: z.string().url().optional(),
+    VLLM_MODEL: z.string().min(1).optional(),
+    VLLM_MAKER: z.string().min(1).optional(),
     VLLM_AUTHORIZATION: z.string().min(1).optional(),
     PROVIDER_DISCOVERY_TARGETS_JSON: z.string().min(1).optional(),
     // T3C / F34: the runner re-probes each pinned panel member at claim time
@@ -382,8 +493,26 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
     && environment.USER_DEK_STORE_PATH === undefined) {
     throw new TypeError("CONTENT_ENCRYPTION_KEY_PATHS_REQUIRED");
   }
+  // V-20: the three keys are one declaration, all or none. Half a set is neither
+  // source of truth — the cross-check would compare a declared primary against
+  // values nobody finished writing — so it refuses here rather than at the first
+  // claim, and `VLLM_AUTHORIZATION` alone declares a credential for nothing.
+  const declaredPrimary = [
+    environment.VLLM_BASE_URL, environment.VLLM_MODEL, environment.VLLM_MAKER
+  ].filter((value) => value !== undefined).length;
+  if (declaredPrimary !== 0 && declaredPrimary !== 3) {
+    throw new TypeError("RUNNER_PRIMARY_PROVIDER_KEYS_INCOMPLETE");
+  }
+  if (declaredPrimary === 0 && environment.VLLM_AUTHORIZATION !== undefined) {
+    throw new TypeError("RUNNER_PRIMARY_PROVIDER_KEYS_INCOMPLETE");
+  }
   assertProductionFloors(environment);
-  return environment;
+  return {
+    ...environment,
+    DEPLOYMENT_MODE: resolveDeploymentMode(
+      environment.DEBATEAI_DEPLOYMENT_MODE, environment.NODE_ENV
+    )
+  };
 }
 
 export function loadObservationAgentEnvironment() {

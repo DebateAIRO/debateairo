@@ -138,6 +138,13 @@ export type ProviderDiscoveryTarget = Readonly<{
   baseUrl: string;
   model: string;
   authorizationHeader?: string;
+  /**
+   * V-9(2) / task 10b: an absolute path to the vendor's credential FILE, one per
+   * vendor per environment. It is the DECLARED form; `resolveProviderTargetCredentials`
+   * turns it into `authorizationHeader` in memory and drops the path, so nothing
+   * downstream can re-open it and no gateway carries a file name.
+   */
+  authorizationFile?: string;
 }>;
 
 function requiredProviderTargetText(value: unknown, code: string): string {
@@ -205,7 +212,7 @@ export function parseProviderDiscoveryTargets(
     }
     const row = candidate as Readonly<Record<string, unknown>>;
     if (Object.keys(row).some((key) => ![
-      "provider_ref", "base_url", "model", "authorization_header"
+      "provider_ref", "base_url", "model", "authorization_header", "authorization_file"
     ].includes(key))) {
       throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
     }
@@ -224,12 +231,30 @@ export function parseProviderDiscoveryTargets(
           row.authorization_header,
           "PROVIDER_DISCOVERY_AUTHORIZATION_INVALID"
         );
+    // V-9(2): a vendor's credential is named ONE way. Two declarations are an
+    // operator's half-finished migration off the inline form, and guessing which
+    // one is live is exactly how a retired key keeps being used.
+    if (authorizationHeader !== undefined && row.authorization_file !== undefined) {
+      throw new TypeError("PROVIDER_DISCOVERY_AUTHORIZATION_CONFLICT");
+    }
+    const authorizationFile = row.authorization_file === undefined
+      ? undefined
+      : requiredProviderTargetText(
+          row.authorization_file,
+          "PROVIDER_DISCOVERY_AUTHORIZATION_FILE_INVALID"
+        );
+    // Absolute, because a credential resolved against whatever directory the
+    // unit happened to start in is not a credential anyone can audit.
+    if (authorizationFile !== undefined && !authorizationFile.startsWith("/")) {
+      throw new TypeError("PROVIDER_DISCOVERY_AUTHORIZATION_FILE_INVALID");
+    }
     targetsByRef.set(providerRef, Object.freeze({
       providerRef,
       maker,
       baseUrl: normalizedProviderBaseUrl(row.base_url),
       model: requiredProviderTargetText(row.model, "PROVIDER_DISCOVERY_TARGET_MODEL_INVALID"),
-      ...(authorizationHeader === undefined ? {} : { authorizationHeader })
+      ...(authorizationHeader === undefined ? {} : { authorizationHeader }),
+      ...(authorizationFile === undefined ? {} : { authorizationFile })
     }));
   }
   if (targetsByRef.size !== configuredByRef.size) {
@@ -242,12 +267,141 @@ export function parseProviderDiscoveryTargets(
   }));
 }
 
+/**
+ * The four exact spellings L4-F7 has always PERMITTED as a cleartext relay host.
+ *
+ * It stays a narrow permit-list ON PURPOSE. Widening it would ADMIT more `http:`
+ * targets in a local production deployment, which relaxes a floor; the hosted
+ * rule below is a DENY-list, where the broad reading is the strict one. Two sets,
+ * opposite polarity, each chosen so that the stricter reading wins.
+ */
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "[::1]", "localhost"]);
+
+/** 8 groups of an IPv6 address, or `undefined` if `value` is not one. */
+function ipv6Groups(value: string): readonly number[] | undefined {
+  if (!value.includes(":")) return undefined;
+  let text = value;
+  // A trailing dotted-quad (`::ffff:127.0.0.1`) is two more groups.
+  const dotted = /:((?:\d{1,3}\.){3}\d{1,3})$/u.exec(text);
+  if (dotted !== null) {
+    const octets = ipv4Octets(dotted[1]!);
+    if (octets === undefined) return undefined;
+    const high = ((octets[0]! << 8) | octets[1]!).toString(16);
+    const low = ((octets[2]! << 8) | octets[3]!).toString(16);
+    text = `${text.slice(0, dotted.index)}:${high}:${low}`;
+  }
+  const halves = text.split("::");
+  if (halves.length > 2) return undefined;
+  const part = (half: string) => (half === "" ? [] : half.split(":"));
+  const head = part(halves[0]!);
+  const tail = halves.length === 2 ? part(halves[1]!) : [];
+  const explicit = [...head, ...tail];
+  if (explicit.some((group) => !/^[0-9a-f]{1,4}$/u.test(group))) return undefined;
+  if (halves.length === 1) {
+    return explicit.length === 8 ? explicit.map((group) => Number.parseInt(group, 16)) : undefined;
+  }
+  if (explicit.length > 7) return undefined;
+  return [
+    ...head.map((group) => Number.parseInt(group, 16)),
+    ...Array.from({ length: 8 - explicit.length }, () => 0),
+    ...tail.map((group) => Number.parseInt(group, 16))
+  ];
+}
+
+/** Four octets of a dotted-quad, or `undefined`. Node canonicalises every other IPv4 form to this. */
+function ipv4Octets(value: string): readonly number[] | undefined {
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/u.exec(value);
+  if (match === null) return undefined;
+  const octets = match.slice(1, 5).map((part) => Number(part));
+  return octets.every((octet) => octet <= 255) ? octets : undefined;
+}
+
+/**
+ * Names that mean this machine on the kit's own platform: `localhost` plus the
+ * three aliases a stock Debian/Ubuntu `/etc/hosts` ships with. `.localhost` is
+ * handled as a suffix below — RFC 6761 reserves the whole subtree.
+ */
+const THIS_MACHINE_NAMES = new Set([
+  "localhost", "localhost.localdomain", "ip6-localhost", "ip6-loopback"
+]);
+
+/**
+ * An IPv4 address that cannot leave this machine or this link:
+ * `127.0.0.0/8` (loopback), `0.0.0.0/8` ("this network", which the stack treats
+ * as the local host) and `169.254.0.0/16` (link-local, where a relay bound to the
+ * web server's own autoconfigured address would sit).
+ */
+function isThisMachineIpv4(octets: readonly number[]): boolean {
+  return octets[0] === 127
+    || octets[0] === 0
+    || (octets[0] === 169 && octets[1] === 254);
+}
+
+/**
+ * V-9(c), review finding 1 — "is this address THIS MACHINE?", decided on the
+ * PARSED address rather than on the spelling.
+ *
+ * It reads the LITERAL address written in the target's `base_url` and performs
+ * NO NAME RESOLUTION: a public hostname whose A record points at `127.0.0.1` is
+ * admitted here, and the operator is told so in the kit (README §11). A
+ * resolved-address check is a separate control this function does not pretend to
+ * be.
+ *
+ * The four-spelling permit-list above, read as a deny-list, admitted every alias
+ * of loopback: `127.0.0.2`, `127.1`, `localhost.`, `relay.localhost`,
+ * `[::ffff:127.0.0.1]` (which Node normalises to `[::ffff:7f00:1]`), `0.0.0.0`
+ * and `[::]`. `https:` is no backstop on a host that installs its own CA
+ * (`NODE_EXTRA_CA_CERTS`) and already runs internal TLS on loopback, so a TLS
+ * relay on any of those aliases would have passed the hosted check.
+ *
+ * Refused: `127.0.0.0/8`, `0.0.0.0/8` and `169.254.0.0/16`; `::`, `::1` and
+ * `fe80::/10`; an IPv4-mapped or IPv4-compatible IPv6 form of any of the IPv4
+ * ranges; and the names `localhost`, `localhost.localdomain`, `ip6-localhost`,
+ * `ip6-loopback` or anything under `.localhost`. Case and one trailing dot are
+ * normalised away first.
+ *
+ * NOT refused: a real vendor whose name merely looks loopback-ish, such as
+ * `127.0.0.1.vendor.example`, `notlocalhost.example` or
+ * `localhost.localdomain.example`; and addresses just outside each range, such as
+ * `169.253.0.1`, `1.0.0.1`, `[fe00::1]` and `[fec0::1]`. A deny-list that refused
+ * those would be an outage rather than a protection.
+ */
+export function isThisMachineHost(hostname: string): boolean {
+  const bare = hostname.startsWith("[") && hostname.endsWith("]")
+    ? hostname.slice(1, -1)
+    : hostname;
+  const host = bare.toLowerCase().replace(/\.$/u, "");
+  if (THIS_MACHINE_NAMES.has(host) || host.endsWith(".localhost")) return true;
+  const octets = ipv4Octets(host);
+  if (octets !== undefined) return isThisMachineIpv4(octets);
+  const groups = ipv6Groups(host);
+  if (groups === undefined) return false;
+  // fe80::/10 — the link-local block, where an interface's autoconfigured
+  // address lives. A relay bound to the web server's own fe80: address is on
+  // this machine by any reading.
+  if ((groups[0]! & 0xffc0) === 0xfe80) return true;
+  const leadingZeroes = groups.slice(0, 5).every((group) => group === 0);
+  if (leadingZeroes && groups[5] === 0 && groups[6] === 0 && groups[7] === 1) return true;
+  // `::ffff:a.b.c.d` (mapped) and `::a.b.c.d` (compatible) both carry an IPv4
+  // address in the last two groups — `::` itself is `::0.0.0.0` — so the same
+  // IPv4 decision settles them. That is what keeps the two families in step.
+  if (leadingZeroes && (groups[5] === 0xffff || groups[5] === 0)) {
+    return isThisMachineIpv4([
+      groups[6]! >> 8, groups[6]! & 0xff, groups[7]! >> 8, groups[7]! & 0xff
+    ]);
+  }
+  return false;
+}
 
 /**
  * L4-F7: in production a cleartext `http:` base URL may only point at a loopback relay; any
  * other `http:` target would carry the bearer `authorization_header` and every prompt off-box
  * unencrypted. `https:` targets and non-production environments are untouched.
+ *
+ * V-9(c): this is the LOCAL deployment's floor and nothing else. Local mode is a supported
+ * product path — the command-line relays and loopback model servers — so loopback `http:` stays
+ * lawful here, byte-for-byte as before the mode existed. The hosted deployment's own rule is
+ * `assertHostedProviderTargets`, and `assertDeploymentProviderTargets` picks between them.
  */
 export function assertProductionProviderTargets(
   targets: readonly ProviderDiscoveryTarget[],
@@ -260,6 +414,137 @@ export function assertProductionProviderTargets(
       throw new TypeError(`PROVIDER_BASE_URL_TLS_REQUIRED:${target.providerRef}`);
     }
   }
+}
+
+/**
+ * V-9(c) / task 10a — the HOSTED deployment's provider rule.
+ *
+ * The commercial website reaches paid vendor APIs and nothing else:
+ *
+ * - every base URL is `https:` — a cleartext hop would carry the vendor credential and every
+ *   prompt in the clear, and there is no loopback exception here (see below);
+ * - no target whose base URL NAMES this machine (`isThisMachineHost`, decided on the parsed
+ *   LITERAL address and not on the spelling; it does no name resolution, so a public hostname
+ *   pointed at loopback is the operator's responsibility — README §11 says so) — a relay or a
+ *   local model server on the web server is precisely the local-mode path V ruled must not run
+ *   hosted (V-30(1) says the same for the support chat);
+ * - no credential inline in `PROVIDER_DISCOVERY_TARGETS_JSON`. Hosted credentials live in
+ *   custody-checked FILES (`authorization_file`, task 10b), so a bearer token can never sit in
+ *   an `EnvironmentFile`, in `/proc/<pid>/environ` or in a process listing.
+ *
+ * Every refusal names the provider ref and NOTHING of the credential.
+ */
+export function assertHostedProviderTargets(
+  targets: readonly ProviderDiscoveryTarget[]
+): void {
+  for (const target of targets) {
+    const parsed = new URL(target.baseUrl);
+    if (parsed.protocol !== "https:") {
+      throw new TypeError(`PROVIDER_BASE_URL_TLS_REQUIRED:${target.providerRef}`);
+    }
+    if (isThisMachineHost(parsed.hostname)) {
+      throw new TypeError(`PROVIDER_TARGET_LOOPBACK_REFUSED:${target.providerRef}`);
+    }
+    if (target.authorizationHeader !== undefined) {
+      throw new TypeError(`PROVIDER_INLINE_CREDENTIAL_REFUSED:${target.providerRef}`);
+    }
+  }
+}
+
+/**
+ * The ONE decision both shipped composition roots take over their parsed targets. The mode comes
+ * from the register loader (`DEPLOYMENT_MODE`), so it is resolved before the first target is read.
+ */
+export function assertDeploymentProviderTargets(
+  targets: readonly ProviderDiscoveryTarget[],
+  deployment: Readonly<{ mode: "hosted" | "local"; nodeEnv: string | undefined }>
+): void {
+  if (deployment.mode === "hosted") {
+    assertHostedProviderTargets(targets);
+    return;
+  }
+  assertProductionProviderTargets(targets, deployment.nodeEnv);
+}
+
+/**
+ * Nothing was provisioned at the declared path. It gets its OWN top-level
+ * refusal rather than a line in the `UNUSABLE` bucket, because the operator
+ * action differs: provision the file, rather than inspect the one that is there.
+ */
+const PROVIDER_CREDENTIAL_ABSENT_CODE = "PROVIDER_CREDENTIAL_FILE_ABSENT";
+
+/**
+ * The refusal codes `resolveProviderTargetCredentials` will repeat; anything else
+ * is UNKNOWN. This is an INVENTORY of what the shipped reader can emit, and the
+ * kit's §11 table is pinned against it, so the two cannot drift.
+ *
+ * `KEK_UNRESOLVED` was dropped here: `readCustodyAuthorizationHeader` translates
+ * it to `PROVIDER_CREDENTIAL_FILE_ABSENT` at source, so nothing on this path can
+ * produce it any more and listing it would promise an operator a code they will
+ * never see. `CUSTODY_GROUP_UNRESOLVED` stays: the group is resolved eagerly at
+ * boot today, but `@debateai/crypto`'s own reader deliberately carries that error
+ * through its catch rather than collapsing it, and if that resolution ever
+ * becomes lazy the operator must still be told the real reason instead of UNKNOWN.
+ */
+const PROVIDER_CREDENTIAL_REFUSAL_CODES = Object.freeze([
+  "SECRET_CUSTODY_INVALID",
+  "CUSTODY_GROUP_UNRESOLVED",
+  "PROVIDER_CREDENTIAL_FILE_INVALID"
+] as const);
+
+/** One printable header line — the same shape `@debateai/crypto` enforces on the file. */
+const PRINTABLE_HEADER_LINE = /^[\x20-\x7e]+$/u;
+
+function providerCredentialRefusalCode(error: unknown): string {
+  const code = (error as Readonly<{ code?: unknown }>)?.code;
+  return typeof code === "string"
+    && (PROVIDER_CREDENTIAL_REFUSAL_CODES as readonly string[]).includes(code)
+    ? code
+    : "UNKNOWN";
+}
+
+/**
+ * V-9(2) / task 10b — the ONE place a declared credential FILE becomes an
+ * in-memory `authorization` header.
+ *
+ * `readAuthorizationHeader` is the seam: the shipped composition roots pass
+ * `readCustodyAuthorizationHeader` from `@debateai/crypto`, so the file is read
+ * under the same custody contract as every key file and the bytes are zeroed
+ * after the header is built. Nothing here opens a file, which is what keeps this
+ * decision testable without one.
+ *
+ * The resolved target DROPS `authorizationFile`: after this, no gateway, probe,
+ * log line or error carries a credential path, and nothing downstream can re-open
+ * it. A refusal names the provider ref and a code from a CLOSED set — never the
+ * path, never the thrown message, never a byte of the credential.
+ */
+export function resolveProviderTargetCredentials(
+  targets: readonly ProviderDiscoveryTarget[],
+  readAuthorizationHeader: (path: string) => string
+): readonly ProviderDiscoveryTarget[] {
+  return Object.freeze(targets.map((target) => {
+    if (target.authorizationFile === undefined) return target;
+    const { authorizationFile, ...rest } = target;
+    let authorizationHeader: string;
+    try {
+      authorizationHeader = readAuthorizationHeader(authorizationFile);
+    } catch (error) {
+      if ((error as Readonly<{ code?: unknown }>)?.code === PROVIDER_CREDENTIAL_ABSENT_CODE) {
+        throw new TypeError(`PROVIDER_AUTHORIZATION_FILE_ABSENT:${target.providerRef}`);
+      }
+      throw new TypeError(
+        `PROVIDER_AUTHORIZATION_FILE_UNUSABLE:${target.providerRef}:${providerCredentialRefusalCode(error)}`
+      );
+    }
+    if (typeof authorizationHeader !== "string"
+      || !PRINTABLE_HEADER_LINE.test(authorizationHeader)
+      || authorizationHeader !== authorizationHeader.trim()) {
+      throw new TypeError(
+        `PROVIDER_AUTHORIZATION_FILE_UNUSABLE:${target.providerRef}:PROVIDER_CREDENTIAL_FILE_INVALID`
+      );
+    }
+    return Object.freeze({ ...rest, authorizationHeader });
+  }));
 }
 
 export interface ProviderAdapterRegistration {

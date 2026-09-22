@@ -12,13 +12,15 @@ import {
   FileUserDekStore,
   loadKek,
   loadSecretKey,
-  PublicationCipher
+  PublicationCipher,
+  readCustodyAuthorizationHeader
 } from "@debateai/crypto";
 import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportOwnContextRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
 import type { RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
+  assertHostedCostEnvelopesSealed,
   loadApiEnvironment,
   createSupportConfigurationPort,
   readDeploymentRiskTier,
@@ -58,9 +60,10 @@ import { installStartupResourceOwner } from "./startup-resource-owner.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 import { RecoveryStartService } from "./recovery.js";
 import {
-  assertProductionProviderTargets,
+  assertDeploymentProviderTargets,
   createProviderDiscoveryResolver,
-  parseProviderDiscoveryTargets
+  parseProviderDiscoveryTargets,
+  resolveProviderTargetCredentials
 } from "./provider-discovery.js";
 import { riskSignalFailureIdentity } from "./risk-signal-identity.js";
 import { createSupportKeyPort } from "./support/keys.js";
@@ -77,6 +80,11 @@ import { SupportRelayQueue } from "./support/queue.js";
 import { SupportDegradedState } from "./support/degraded.js";
 
 const environment = loadApiEnvironment();
+// V-9(c) / V-28: a hosted deployment may not admit an ask — nor probe a paid
+// vendor, which is itself a model call — until the per-run and daily cost
+// envelopes are sealed. The seam is `readSealedCostEnvelopeStatus` in
+// @debateai/register, which task 11 replaces. Local mode is untouched.
+assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE);
 const supportKnowledge = loadHelpCorpus(resolve("packages/support-kb/content"));
 // V-19: before the first key file is opened, so a group this host cannot
 // resolve refuses at boot instead of at the first private debate.
@@ -189,11 +197,20 @@ const structuralInputs = await readStructuralCeilingPolicyInputs(pool, environme
  */
 const envelopeFormulaInputs = await readEnvelopeFormulaInputs(pool, environment.REGISTER_VERSION);
 const probes = new ProviderProbeRepository(pool);
-const providerDiscoveryTargets = parseProviderDiscoveryTargets(
+const declaredProviderTargets = parseProviderDiscoveryTargets(
   environment.PROVIDER_DISCOVERY_TARGETS_JSON,
   deploymentMakers.configuredProviders
 );
-assertProductionProviderTargets(providerDiscoveryTargets, environment.NODE_ENV);
+// V-9(c): the same mode decision the runner takes, over the same target set, and
+// taken on the DECLARED targets — before any credential file is resolved.
+assertDeploymentProviderTargets(declaredProviderTargets, {
+  mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
+});
+// V-9(2): the ask-time health probe needs the same credential the runner uses, so
+// it resolves each vendor's file through the same custody-checked seam.
+const providerDiscoveryTargets = resolveProviderTargetCredentials(
+  declaredProviderTargets, readCustodyAuthorizationHeader
+);
 const resolveProviderPanel = createProviderDiscoveryResolver({
   configuredProviders: deploymentMakers.configuredProviders,
   targets: providerDiscoveryTargets,

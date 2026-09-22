@@ -212,12 +212,23 @@ describe("production provider targets refuse cleartext off-box (L4-F7)", () => {
     }
   });
 
-  it("is applied where both process roots parse their targets", async () => {
+  /**
+   * V-9(c) / task 10a: the roots now take ONE mode-aware decision, and its local
+   * arm is this rule, unchanged. The pin follows the call rather than the name,
+   * so "both roots floor their targets in production" stays enforced while the
+   * hosted arm (`assertHostedProviderTargets`) adds its own stricter refusals.
+   */
+  it("is applied where both process roots parse their targets, through the mode", async () => {
     for (const path of ["../../apps/api/src/main.ts", "../../apps/runner/src/main.ts"]) {
       const source = await readFile(new URL(path, import.meta.url), "utf8");
-      expect(source).toContain("assertProductionProviderTargets(");
+      expect(source).toContain("assertDeploymentProviderTargets(");
       expect(source).toContain("environment.NODE_ENV");
+      expect(source).toContain("environment.DEPLOYMENT_MODE");
     }
+    const dispatcher = await readFile(
+      new URL("../../packages/providers/src/index.ts", import.meta.url), "utf8"
+    );
+    expect(dispatcher).toContain("assertProductionProviderTargets(targets, deployment.nodeEnv)");
   });
 });
 

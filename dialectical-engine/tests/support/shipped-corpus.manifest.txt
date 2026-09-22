@@ -404,6 +404,7 @@ packages/published-arithmetic/src/index.ts
 packages/register/src/algorithm-policy.ts
 packages/register/src/auth-policy.ts
 packages/register/src/compose-env.ts
+packages/register/src/configured-provider-set.ts
 packages/register/src/engine-shape.ts
 packages/register/src/index.ts
 packages/register/src/mfa-policy.ts
