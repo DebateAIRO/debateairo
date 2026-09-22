@@ -19,6 +19,7 @@ function deferred<T>() {
 function apiEnvironment(): Readonly<Record<string, string>> {
   return Object.freeze({
     PROVIDER_DISCOVERY_TARGETS_JSON: TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson,
+    PROVIDER_PROBE_TIMEOUT_MS: "180000",
     REGISTER_VERSION: "424242",
     REGISTER_DEPLOYMENT_RECEIPT_SHA256: "a".repeat(64),
     REGISTER_DEPLOYMENT_RECEIPT_FILE: "/workspace/.local/dev-auth/deployment-register-receipt.v1.json",
@@ -80,7 +81,7 @@ describe("development runner process lifecycle", () => {
   it("accepts only the exact readiness receipt and passes a bounded explicit environment", async () => {
     const runtime = operations();
     const runner = await startDevelopmentRunnerProcess({
-      repositoryRoot: "/workspace",
+      repositoryRoot: process.cwd(),
       commandEnvironment: Object.freeze({ PATH: "/usr/bin" }),
       operations: runtime
     });
@@ -91,12 +92,15 @@ describe("development runner process lifecycle", () => {
     });
     expect(runtime.environment).toHaveLength(1);
     expect(runtime.environment[0]).toMatchObject({
-      PROVIDER_REF: "development:codex-cli",
-      VLLM_BASE_URL: "http://127.0.0.1:8791/v1",
-      VLLM_MODEL: "gpt-test-real",
+      PROVIDER_REF: "development:codex-premium-cli",
+      VLLM_BASE_URL: "http://127.0.0.1:8795/v1",
+      VLLM_MODEL: "gpt-5.6-sol",
       VLLM_MAKER: "OpenAI",
-      VLLM_AUTHORIZATION: "Bearer test-codex",
+      VLLM_AUTHORIZATION: "test-codex-relay-header",
       HATCHET_WORKER_NAME: "debateai-dev-runner",
+      // The claim-time probe waits as long as the API's ask-time probe; the
+      // runtime default (5 s) refused every Codex-synthesized run at claim.
+      PROVIDER_PROBE_TIMEOUT_MS: "180000",
       REGISTER_VERSION: "424242",
       REGISTER_DEPLOYMENT_RECEIPT_SHA256: "a".repeat(64),
       REGISTER_DEPLOYMENT_RECEIPT_FILE: "/workspace/.local/dev-auth/deployment-register-receipt.v1.json"
@@ -113,7 +117,7 @@ describe("development runner process lifecycle", () => {
   ] as const)("terminates on %s readiness", async (_label, ready) => {
     const runtime = operations({ ready });
     await expect(startDevelopmentRunnerProcess({
-      repositoryRoot: "/workspace", commandEnvironment: {}, operations: runtime
+      repositoryRoot: process.cwd(), commandEnvironment: {}, operations: runtime
     })).rejects.toThrow("DEV_RUNNER_PROCESS_READINESS_INVALID");
     expect(runtime.terminate).toHaveBeenCalledTimes(1);
   });
@@ -121,7 +125,7 @@ describe("development runner process lifecycle", () => {
   it("terminates and refuses when the child exits before readiness", async () => {
     const runtime = operations({ exitFirst: true });
     await expect(startDevelopmentRunnerProcess({
-      repositoryRoot: "/workspace", commandEnvironment: {}, operations: runtime
+      repositoryRoot: process.cwd(), commandEnvironment: {}, operations: runtime
     })).rejects.toThrow("DEV_RUNNER_PROCESS_EXITED");
     expect(runtime.terminate).toHaveBeenCalledTimes(1);
   });
@@ -129,7 +133,7 @@ describe("development runner process lifecycle", () => {
   it("wraps a synchronous spawn failure without claiming readiness", async () => {
     const runtime = operations({ startError: new Error("sensitive spawn detail") });
     await expect(startDevelopmentRunnerProcess({
-      repositoryRoot: "/workspace", commandEnvironment: {}, operations: runtime
+      repositoryRoot: process.cwd(), commandEnvironment: {}, operations: runtime
     })).rejects.toThrow("DEV_RUNNER_PROCESS_START_FAILED");
     expect(runtime.terminate).not.toHaveBeenCalled();
   });
@@ -138,7 +142,7 @@ describe("development runner process lifecycle", () => {
     const { REGISTER_DEPLOYMENT_RECEIPT_SHA256: _dropped, ...withoutReceipt } = apiEnvironment();
     const runtime = operations({ apiEnvironment: withoutReceipt });
     await expect(startDevelopmentRunnerProcess({
-      repositoryRoot: "/workspace", commandEnvironment: {}, operations: runtime
+      repositoryRoot: process.cwd(), commandEnvironment: {}, operations: runtime
     })).rejects.toThrow("DEV_RUNNER_PROCESS_START_FAILED");
     expect(runtime.environment).toEqual([]);
   });

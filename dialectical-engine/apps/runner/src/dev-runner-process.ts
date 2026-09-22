@@ -79,6 +79,7 @@ function createRunnerEnvironment(
     || registerVersion === undefined
     || apiEnvironment.REGISTER_DEPLOYMENT_RECEIPT_SHA256 === undefined
     || apiEnvironment.REGISTER_DEPLOYMENT_RECEIPT_FILE === undefined
+    || apiEnvironment.PROVIDER_PROBE_TIMEOUT_MS === undefined
     || apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON !== providerPanel.targetsJson) {
     throw new DevelopmentRunnerProcessError("DEV_RUNNER_PROCESS_ENVIRONMENT_INVALID");
   }
@@ -123,6 +124,10 @@ function createRunnerEnvironment(
     ...(primary.authorizationHeader === undefined
       ? {} : { VLLM_AUTHORIZATION: primary.authorizationHeader }),
     PROVIDER_DISCOVERY_TARGETS_JSON: apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON!,
+    // The claim-time re-probe must wait as long as the ask-time probe does: the
+    // runtime default (5 s) is shorter than a real Codex CLI answer, so without
+    // this every run whose sealed role is Codex was refused at claim.
+    PROVIDER_PROBE_TIMEOUT_MS: apiEnvironment.PROVIDER_PROBE_TIMEOUT_MS,
     HATCHET_CLIENT_TOKEN: apiEnvironment.HATCHET_CLIENT_TOKEN!,
     HATCHET_HOST_PORT: apiEnvironment.HATCHET_HOST_PORT!,
     HATCHET_API_URL: apiEnvironment.HATCHET_API_URL!,
