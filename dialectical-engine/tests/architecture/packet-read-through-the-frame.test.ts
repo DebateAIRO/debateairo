@@ -40,7 +40,54 @@ import { describe, expect, it } from "vitest";
  * which is model output and not a packet) must not trip it.
  */
 
-const SCANNED_ROOTS = ["tests/integration", "tests/support", "acceptance"] as const;
+/**
+ * INT1 (2026-09-22), T9 x T10. `tests/unit` joined the scan after the two
+ * packages clashed there: task 10c's "reaches the new vendor with the header
+ * built from its key file" posted `packet: { messages: [...] }` to the real
+ * `OpenAICompatibleProviderGateway`, task 9's door refused it
+ * `PROMPT_FRAME_ABSENT`, and neither review saw it coming because shape 3 was
+ * not looked for in this tree. It is now.
+ */
+const SCANNED_ROOTS = ["tests/integration", "tests/support", "acceptance", "tests/unit"] as const;
+
+/**
+ * Shape 4 — the frame's own spelling written out in a literal — is looked for
+ * in the three trees the UNIT GATE DOES NOT RUN, which is the whole reason this
+ * row exists: a private copy of the block layout rots there unseen, for months.
+ *
+ * `tests/unit` is deliberately not among them. This narrows the RULE; it is not
+ * a hole in the directory, because shapes 1–3 still apply there. Four unit
+ * suites have the frame's spelling as their SUBJECT and cannot express what
+ * they measure without writing it out:
+ *
+ *   - `prompt-frame.test.ts` — the builder's own tests: the minted fence's
+ *     pattern, a forced collision, a tampered boundary marker;
+ *   - `prompt-injection-corpus.test.ts` — layer 4's attack payloads, which forge
+ *     the fence and the envelope on purpose, and the mask that strips both
+ *     before the clean and attacked renders are compared;
+ *   - `judgement-prompt-source.test.ts` — contracts carrying a reserved frame
+ *     token, which `buildFramedPrompt` must refuse at build time;
+ *   - `judgement.test.ts` — the exact envelope a hand-off emits, pinned.
+ *
+ * Every one of those runs in `pnpm run test:ci-gate` on every commit, so a
+ * spelling that drifts from `prompt-frame.ts` goes red within seconds — the
+ * opposite of the silent rot shape 4 was written for.
+ *
+ * INT1 review, finding 3 — THE RESIDUAL GAP, named rather than papered over.
+ * Shapes 1–3 do NOT cover everything shape 4 would have caught here: a reader
+ * that splits on the fence and parses a LOCAL identifier —
+ * `tests/unit/prompt-frame.test.ts:73-75` (`block.split(framed.fence)[1]`, then
+ * `JSON.parse(inner)`) is exactly that — is matched by none of them, because the
+ * parse's receiver is neither a `messages` member nor bound by iterating one.
+ * Under `tests/unit` such a reader is covered by the GATE RUNNING THE FILE, not
+ * by this row. That is the whole trade, and it is only sound for a tree the gate
+ * runs: the exemption below must never grow to one it does not.
+ *
+ * Written as an EXEMPT list, not an include list (INT1 review, finding 2), so a
+ * fifth entry added to `SCANNED_ROOTS` inherits shape 4 by default and has to be
+ * exempted deliberately, in this comment, to lose it.
+ */
+const FRAME_LITERAL_EXEMPT_ROOTS = ["tests/unit"] as const;
 
 const ITERATION_METHODS = new Set([
   "find", "findLast", "findIndex", "map", "filter", "some", "every", "forEach", "flatMap"
@@ -81,7 +128,88 @@ function unwrap(node: ts.Expression): ts.Expression {
 
 const NAMES_MESSAGES = /\bmessages\b/u;
 
-export function scanPacketShapes(file: string, source: string): readonly PacketShapeOffence[] {
+/**
+ * THE ONE ALLOWANCE for shape 3: a packet built by hand is permitted only where
+ * the statement around it ASSERTS one of the door's own refusals. Such a case is
+ * proving that `assertFramedPrompt` REFUSES the packet, so by construction the
+ * call never leaves the process and cannot be a hand-off that skipped the frame.
+ *
+ * INT1 review, finding 1 — WHY THIS IS STRUCTURAL AND NOT A REGEX. The first
+ * version of this allowance tested `/PROMPT_FRAME_[A-Z_]+/` against the enclosing
+ * statement's `getText()`. That is the raw source span: interior comments, string
+ * BODIES and identifiers all count. Four ways of spelling the token without
+ * asserting anything therefore bought a free hand-built packet — an explanatory
+ * comment (which is exactly the ceiling shape repaired in `pro01-runner-tree` and
+ * `xrev01-node-review`, re-admitted by one sentence of prose), a NEGATED refusal
+ * that actually asserts success, the token sitting in the packet's own payload,
+ * and the token as an identifier. The allowance now reads the TREE:
+ *
+ *   (i)   the statement performs a refusal assertion — a `rejects`, `toThrow` or
+ *         `toThrowError` member — and contains no `not`;
+ *   (ii)  a door code appears as a STRING LITERAL's `.text` (the parsed value, so
+ *         a comment or an identifier spelling it is not a string at all);
+ *   (iii) that literal is OUTSIDE the `packet:` initializer, so material the case
+ *         hands the door cannot vouch for the case.
+ *
+ * All three must hold. It still needs no annotation in the test: the assertion
+ * already says what the case is for, which is one fewer marker to keep honest.
+ */
+const DOOR_REFUSAL_CODE = /^PROMPT_FRAME_[A-Z_]+$/u;
+const REFUSAL_MEMBERS = new Set(["rejects", "toThrow", "toThrowError"]);
+
+function isWithin(node: ts.Node, ancestor: ts.Node): boolean {
+  for (let cursor: ts.Node | undefined = node; cursor !== undefined; cursor = cursor.parent) {
+    if (cursor === ancestor) return true;
+  }
+  return false;
+}
+
+function assertsDoorRefusal(statement: ts.Node, payload: ts.Node): boolean {
+  let refuses = false;
+  let negated = false;
+  let named = false;
+  const walk = (node: ts.Node): void => {
+    if (ts.isPropertyAccessExpression(node)) {
+      if (REFUSAL_MEMBERS.has(node.name.text)) refuses = true;
+      if (node.name.text === "not") negated = true;
+    }
+    // `.text` is the PARSED value of a string literal — never `getText()`, which
+    // would drag the surrounding source back in and reopen (ii).
+    if (ts.isStringLiteralLike(node) && DOOR_REFUSAL_CODE.test(node.text) && !isWithin(node, payload)) {
+      named = true;
+    }
+    ts.forEachChild(node, walk);
+  };
+  walk(statement);
+  return refuses && !negated && named;
+}
+
+/**
+ * The smallest complete statement around a node: walk up until the parent is a
+ * statement container. Scoped this tightly so the allowance reads ONE `expect`,
+ * never a whole `describe` block that happens to mention a frame code elsewhere.
+ */
+function enclosingStatement(node: ts.Node): ts.Node {
+  let cursor = node;
+  while (cursor.parent !== undefined && !ts.isBlock(cursor.parent) && !ts.isSourceFile(cursor.parent)
+    && !ts.isModuleBlock(cursor.parent) && !ts.isCaseClause(cursor.parent)
+    && !ts.isDefaultClause(cursor.parent)) {
+    cursor = cursor.parent;
+  }
+  return cursor;
+}
+
+export interface PacketShapeScanOptions {
+  /** Shape 4. False under `tests/unit` — see `FRAME_LITERAL_EXEMPT_ROOTS`. */
+  readonly frameLiterals?: boolean;
+}
+
+export function scanPacketShapes(
+  file: string,
+  source: string,
+  options: PacketShapeScanOptions = {}
+): readonly PacketShapeOffence[] {
+  const frameLiterals = options.frameLiterals ?? true;
   const root = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   const offences: PacketShapeOffence[] = [];
   const lineOf = (node: ts.Node): number => root.getLineAndCharacterOfPosition(node.getStart(root)).line + 1;
@@ -131,13 +259,15 @@ export function scanPacketShapes(file: string, source: string): readonly PacketS
     if (ts.isPropertyAssignment(node) && node.name.getText(root) === "packet") {
       const value = unwrap(node.initializer);
       if (ts.isObjectLiteralExpression(value)
-        && value.properties.some((property) => property.name?.getText(root) === "messages")) {
+        && value.properties.some((property) => property.name?.getText(root) === "messages")
+        && !assertsDoorRefusal(enclosingStatement(node), node.initializer)) {
         offences.push({ file, line: lineOf(node), rule: "HAND_BUILT_GATEWAY_PACKET" });
       }
     }
     // Shape 4: the fence or the envelope format spelled in a literal
-    if (ts.isStringLiteralLike(node) || ts.isRegularExpressionLiteral(node) || ts.isTemplateHead(node)
-      || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) {
+    if (frameLiterals
+      && (ts.isStringLiteralLike(node) || ts.isRegularExpressionLiteral(node) || ts.isTemplateHead(node)
+      || ts.isTemplateMiddle(node) || ts.isTemplateTail(node))) {
       const text = node.getText(root);
       if (FRAME_LITERALS.some((literal) => literal.test(text))) {
         offences.push({ file, line: lineOf(node), rule: "HAND_ROLLED_FRAME_READER" });
@@ -189,6 +319,26 @@ describe("a model packet is read through the frame, never parsed bare (V-11 adde
     expect(offend("gateway.call({ packet: buildFramedPrompt({ contract, material }).packet });")).toEqual([]);
     // A relay probe posts messages to the relay's own HTTP surface: allowed.
     expect(offend("postMessages(relay.handle, [{ role: 'user', content }]);")).toEqual([]);
+    // Shape 3, THE ONE ALLOWANCE: a case proving the DOOR refuses the packet.
+    expect(offend([
+      "await expect(provider.classify({",
+      "  packet: { messages: [{ role: 'user', content: 'samples' }] }",
+      "})).rejects.toMatchObject({ code: 'PROMPT_FRAME_ABSENT' });"
+    ].join("\n"))).toEqual([]);
+    expect(offend([
+      "expect(() => gateway.call({ packet: { messages: [notTheFence] } }))",
+      "  .toThrow(expect.objectContaining({ code: 'PROMPT_FRAME_FENCE_MISMATCH' }));"
+    ].join("\n"))).toEqual([]);
+    // ...and it reaches ONE statement, never a neighbour that merely names a code.
+    expect(offend([
+      "await expect(a.call({ packet: unframed })).rejects.toMatchObject({ code: 'PROMPT_FRAME_ABSENT' });",
+      "await b.call({ packet: { messages: [{ role: 'user', content: 'ping' }] } });"
+    ].join("\n"))).toEqual(["2:HAND_BUILT_GATEWAY_PACKET"]);
+    // A refusal that is not the door's does not buy a hand-built packet.
+    expect(offend([
+      "await expect(gateway.call({ packet: { messages: [{ role: 'user', content: 'x' }] } }))",
+      "  .rejects.toMatchObject({ code: 'RUN_COST_ENVELOPE_EXHAUSTED' });"
+    ].join("\n"))).toEqual(["1:HAND_BUILT_GATEWAY_PACKET"]);
     // Shape 4.
     expect(offend("const fence = /#\\|DEBATEAI-FENCE-[0-9a-f]{32}\\|#/u.exec(system)?.[0];"))
       .toEqual(["1:HAND_ROLLED_FRAME_READER"]);
@@ -201,7 +351,88 @@ describe("a model packet is read through the frame, never parsed bare (V-11 adde
     ].join("\n"))).toEqual([]);
   });
 
-  it("finds none of them under tests/integration/, tests/support/ or acceptance/", async () => {
+  /**
+   * INT1 review, finding 1. The allowance was first written as a REGEX over the
+   * enclosing statement's `getText()` — which is the whole source span, comments
+   * and string bodies and identifiers included. Four ways to spell the token
+   * without asserting anything therefore bought a free hand-built packet. These
+   * are the four, each an offence; a fifth (leading trivia, outside `getStart()`)
+   * never suppressed and is kept as the control that proves the difference is
+   * the RULE and not the probe.
+   */
+  it("gives the shape-3 allowance only to a real door assertion", () => {
+    const HAND_BUILT = "packet: { messages: [{ role: 'user', content: 'x' }] }";
+    /**
+     * Every row is asserted in ONE comparison so a regression reports all of
+     * them at once: a rule this subtle is read through its whole table, not
+     * through whichever probe happens to throw first.
+     */
+    const PROBES = [
+      // (a) An INTERIOR COMMENT naming the code — verbatim the ceiling shape
+      // repaired in pro01/xrev01. One explanatory comment must not re-admit it.
+      ["an interior comment naming the code", [
+        "await expect(gateway.call({",
+        "  // the door would raise PROMPT_FRAME_ABSENT before the ceiling does",
+        `  ${HAND_BUILT}`,
+        "})).rejects.toMatchObject({ code: 'RUN_COST_ENVELOPE_EXHAUSTED' });"
+      ], ["3:HAND_BUILT_GATEWAY_PACKET"]],
+      // (b) A SUCCESS assertion that merely NEGATES the refusal.
+      ["a negated refusal, which asserts success", [
+        `expect(() => gateway.call({ ${HAND_BUILT} }))`,
+        "  .not.toThrow(expect.objectContaining({ code: 'PROMPT_FRAME_ABSENT' }));"
+      ], ["1:HAND_BUILT_GATEWAY_PACKET"]],
+      // (c) The token inside the packet's OWN payload, under a real but
+      // unrelated refusal.
+      ["the code inside the packet's own payload", [
+        "await expect(gateway.call({",
+        "  packet: { messages: [{ role: 'user', content: 'PROMPT_FRAME_ABSENT' }] }",
+        "})).rejects.toMatchObject({ code: 'RUN_COST_ENVELOPE_EXHAUSTED' });"
+      ], ["2:HAND_BUILT_GATEWAY_PACKET"]],
+      // (d) The token as an IDENTIFIER rather than a string asserted on.
+      ["the code as an identifier", [
+        `await expect(gateway.call({ ${HAND_BUILT} }))`,
+        "  .rejects.toMatchObject({ code: PROMPT_FRAME_ABSENT });"
+      ], ["1:HAND_BUILT_GATEWAY_PACKET"]],
+      // (e) Control: leading trivia sits outside `getStart()` and never
+      // suppressed, before or after this change.
+      ["a leading comment (control — never suppressed)", [
+        "// PROMPT_FRAME_ABSENT is what the door raises for an unframed packet",
+        `await gateway.call({ ${HAND_BUILT} });`
+      ], ["2:HAND_BUILT_GATEWAY_PACKET"]],
+      // ...and the two real door assertions stay admitted.
+      ["a rejects-on-the-door assertion (admitted)", [
+        `await expect(provider.classify({ ${HAND_BUILT} }))`,
+        "  .rejects.toMatchObject({ code: 'PROMPT_FRAME_ABSENT' });"
+      ], []],
+      ["a toThrow-on-the-door assertion (admitted)", [
+        `expect(() => gateway.call({ ${HAND_BUILT} }))`,
+        "  .toThrow(expect.objectContaining({ code: 'PROMPT_FRAME_FENCE_MISMATCH' }));"
+      ], []]
+    ] as const;
+
+    expect(PROBES.map(([name, lines]) => [
+      name,
+      scanPacketShapes("fixture.ts", lines.join("\n")).map((o) => `${o.line}:${o.rule}`)
+    ])).toEqual(PROBES.map(([name, , expected]) => [name, expected]));
+  });
+
+  /**
+   * Shape 4 off is a narrowing of ONE shape, never of the file: shapes 1–3 keep
+   * their full force on the same source. This is what `tests/unit` is scanned
+   * with, so the pair below is the whole difference between the two roots.
+   */
+  it("drops only shape 4 where the frame's spelling is the subject", () => {
+    const source = [
+      "expect(framed.fence).toMatch(/#\\|DEBATEAI-FENCE-[0-9a-f]{32}\\|#/u);",
+      "await gateway.call({ packet: { messages: [{ role: 'user', content: 'ping' }] } });"
+    ].join("\n");
+    const rules = (options: { readonly frameLiterals?: boolean }): readonly string[] =>
+      scanPacketShapes("fixture.ts", source, options).map((offence) => `${offence.line}:${offence.rule}`);
+    expect(rules({})).toEqual(["1:HAND_ROLLED_FRAME_READER", "2:HAND_BUILT_GATEWAY_PACKET"]);
+    expect(rules({ frameLiterals: false })).toEqual(["2:HAND_BUILT_GATEWAY_PACKET"]);
+  });
+
+  it("finds none of them under tests/integration/, tests/support/, acceptance/ or tests/unit/", async () => {
     const files = (await Promise.all(SCANNED_ROOTS.map((rootDirectory) => typescriptFiles(rootDirectory)))).flat().sort();
     // Vacuity guard: the trees are large; an empty scan is a broken scan.
     expect(files.length).toBeGreaterThan(80);
@@ -211,7 +442,9 @@ describe("a model packet is read through the frame, never parsed bare (V-11 adde
 
     const offenders: string[] = [];
     for (const file of files) {
-      for (const offence of scanPacketShapes(file, await readFile(file, "utf8"))) {
+      const frameLiterals = !FRAME_LITERAL_EXEMPT_ROOTS
+        .some((rootDirectory) => file.startsWith(`${rootDirectory}/`));
+      for (const offence of scanPacketShapes(file, await readFile(file, "utf8"), { frameLiterals })) {
         offenders.push(`${offence.file}:${offence.line} ${offence.rule}`);
       }
     }

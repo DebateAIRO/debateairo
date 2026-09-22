@@ -11,6 +11,7 @@ import {
   resolveExpansionDepth
 } from "@debateai/runner";
 import { fixtureStructuralCeiling } from "../support/discoveredPanel.js";
+import { framedFixturePacket } from "../support/framed-packet.js";
 
 describe("PANEL-01 multi-maker root authorship", () => {
   it("keeps discovery N-generic beyond the historical two-maker ceiling", () => {
@@ -228,7 +229,11 @@ describe("PRO-01 depth-driven pro/con expansion", () => {
       bound: { maxAttempts: 3, tokenCeiling: 64, deadlineMs: 1_000 },
       contractHash: "a".repeat(64),
       providerRef: "provider:test",
-      packet: { messages: [{ role: "user", content: "defend" }] }
+      // A REAL framed packet (V-11 addendum, layer 1). The run-ceiling refusal
+      // under test is raised before the gateway's door, so a hand-built packet
+      // passed here by accident -- and would have started measuring the door,
+      // silently, the day the two checks changed order.
+      packet: framedFixturePacket("defend")
     })).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_EXHAUSTED" });
   });
 });

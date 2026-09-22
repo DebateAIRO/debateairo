@@ -18,6 +18,7 @@ import {
   parseProviderDiscoveryTargets,
   resolveProviderTargetCredentials
 } from "../../packages/providers/src/index.js";
+import { framedFixturePacket } from "../support/framed-packet.js";
 
 /**
  * V-9(2) and V-9(3), task 10b/10c.
@@ -469,7 +470,11 @@ describe("V-9 both roots resolve credentials AFTER the mode decision (task 10b)"
 describe("V-9 a new OpenAI-compatible vendor needs no code (task 10c)", () => {
   let server: Server;
   let baseUrl: string;
-  const seen: { authorization: string | undefined; model: string | undefined }[] = [];
+  const seen: {
+    authorization: string | undefined;
+    model: string | undefined;
+    url: string | undefined;
+  }[] = [];
 
   beforeAll(async () => {
     server = createServer((request, response) => {
@@ -479,7 +484,11 @@ describe("V-9 a new OpenAI-compatible vendor needs no code (task 10c)", () => {
         const decoded = JSON.parse(body) as { model?: string };
         seen.push({
           authorization: request.headers.authorization,
-          model: decoded.model
+          model: decoded.model,
+          // The path the adapter actually posted to, recorded rather than
+          // assumed: this vendor's server answers any route, so an unrecorded
+          // URL is an unmeasured one.
+          url: request.url
         });
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify({
@@ -490,7 +499,15 @@ describe("V-9 a new OpenAI-compatible vendor needs no code (task 10c)", () => {
       });
     });
     await new Promise<void>((resolve) => { server.listen(0, "127.0.0.1", resolve); });
-    baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`;
+    /**
+     * A MULTI-SEGMENT prefix on purpose. `normalizedProviderBaseUrl` requires a
+     * base path ending in `/v1`, so `/api/v1` is as lawful as `/v1` — and only a
+     * gateway that appends to whatever base the target row names can answer it.
+     * A bare `/v1` would be satisfied by an adapter with `/v1/chat/completions`
+     * written into it, which is the one thing "vendors are configuration, not
+     * code" must not be able to hide.
+     */
+    baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1`;
   });
 
   afterAll(async () => {
@@ -536,12 +553,24 @@ describe("V-9 a new OpenAI-compatible vendor needs no code (task 10c)", () => {
       bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 },
       contractHash: "contract-1",
       providerRef: "vendor-new",
-      packet: { messages: [{ role: "user", content: "ping" }] }
+      // V-11 addendum, layer 1: the gateway's door refuses any packet the frame
+      // builder did not make, so the vendor is reached with a REAL framed packet
+      // (`tests/support/framed-packet.ts` calls `buildFramedPrompt` itself). What
+      // this case measures is the credential and the target, not the packet: a
+      // hand-built one measured the door instead and never left the process.
+      packet: framedFixturePacket("ping")
     });
     expect(result.content).toBe("{\"ok\":true}");
     expect(result.maker).toBe("maker-new");
     expect(result.model).toBe("vendor-new-large");
-    expect(seen).toEqual([{ authorization: CREDENTIAL, model: "vendor-new-large" }]);
+    // V-9(3) on the PATH as well as the header: the vendor is reached at its own
+    // configured prefix plus the adapter's one route, with no code that knows
+    // this vendor exists.
+    expect(seen).toEqual([{
+      authorization: CREDENTIAL,
+      model: "vendor-new-large",
+      url: "/api/v1/chat/completions"
+    }]);
   });
 
   it("refuses the vendor when the register row does not name it", () => {

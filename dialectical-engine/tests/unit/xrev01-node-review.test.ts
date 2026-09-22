@@ -6,6 +6,7 @@ import type { ProviderGateway } from "@debateai/providers";
 import type { Pool } from "pg";
 import { createPostgresProviderGateway } from "@debateai/runner";
 import { fixtureStructuralCeiling } from "../support/discoveredPanel.js";
+import { framedFixturePacket } from "../support/framed-packet.js";
 
 describe("XREV-01 cross-maker node review", () => {
   it("mints the closed outcome vocabulary once in the kernel", () => {
@@ -129,7 +130,11 @@ describe("XREV-01 cross-maker node review", () => {
       bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 1_000 },
       contractHash: "c".repeat(64),
       providerRef: "provider:reviewer",
-      packet: { messages: [{ role: "user", content: "review" }] }
+      // A REAL framed packet (V-11 addendum, layer 1) -- see the same note in
+      // tests/unit/pro01-runner-tree.test.ts: the ceiling refusal under test is
+      // raised before the gateway's door, so a hand-built packet passed here by
+      // accident rather than on purpose.
+      packet: framedFixturePacket("review")
     })).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_EXHAUSTED" });
   });
 });
