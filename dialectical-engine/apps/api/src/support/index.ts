@@ -68,14 +68,14 @@ export interface SupportApplication {
   readonly reportDiagnostic?: (diagnostic: SupportDiagnostic) => void;
 }
 
-/**
- * DL1-F2. The API's own admission bridge: it charges the sealed budget for
- * `scope` and, when it is spent, sends the API's typed 429 and answers false.
- * A deployment whose register version publishes no such budget always admits,
- * so support behaves exactly as it does today until the row is published.
- */
+/** The sealed budgets the support surface charges (DL1-F2, DL1-F7). */
 export type SupportAdmissionScope = "supportReads" | "supportSessions" | "supportModelCalls";
 
+/**
+ * DL1-F2. The API's own admission bridge. A deployment whose resolved register
+ * version publishes no budget for a scope always admits, so support behaves
+ * exactly as it does today until the superseding row is published.
+ */
 export type SupportAdmission = Readonly<{
   /** Charges the budget and, when it is spent, sends the API's own typed 429. */
   gate(
