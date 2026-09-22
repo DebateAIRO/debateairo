@@ -163,7 +163,11 @@ export const SUPPORT_GUIDE_LABELS: readonly SupportGuideLabel[] = Object.freeze(
   guideLabel("budget-tier-choice",null,["Budget tier"],["Nivel de buget"]),
   guideLabel("debate-workspace-menus",null,["Thread","Split","Tree","Map","Scoring diagnostics","Replay","Workspace","Honesty"],["Fir","Împărțit","Arbore","Hartă","Diagnostic de evaluare","Repetă generarea","Spațiu de lucru","Transparență"]),
   guideLabel("export-json",null,["Export"],["Exportă"]),
-  guideLabel("guide-how-it-works",null,["How it works"],["Cum funcționează"]),
+  guideLabel(
+    "guide-how-it-works",null,
+    ["How it works","How a debate works"],
+    ["Cum funcționează","Cum funcționează o dezbatere"]
+  ),
   guideLabel("support-cases",null,["Report a bug","Email support"],["Raportează o eroare","Asistență prin email"]),
   guideLabel("settings-help-menus",null,["Human support cases"],["Cazuri de asistență umană"]),
   guideLabel("account-access",null,["Verify email","Enroll MFA"],["Verifică emailul","Configurează MFA"]),

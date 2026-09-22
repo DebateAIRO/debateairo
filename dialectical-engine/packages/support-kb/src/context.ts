@@ -17,6 +17,7 @@ export type SupportKnowledgeContext = Readonly<{
   sourceReferences: readonly SupportKnowledgeReference[];
   actionReferences: readonly SupportKnowledgeReference<SupportActionId>[];
   sourcePolicy: SupportSourcePolicy | null;
+  recoverySourceIds: readonly string[];
 }>;
 
 const POLICY: Readonly<Record<SupportLanguage, readonly string[]>> = Object.freeze({
@@ -322,6 +323,12 @@ export function buildSupportKnowledgeContext(input: Readonly<{
       const matched = item.actionId === null
         ? phraseScore(affirmative,label)
         : canonicalActionPhraseScore(affirmative,label);
+      if (item.articleId === "guide-how-it-works" && item.actionId === null
+        && /^(?:how\s+it\s+works|cum\s+functioneaza)$/u.test(normalizedText(label))
+        && !endsWithPhrase(affirmative,label)) return 0;
+      if (item.actionId === "method"
+        && /^(?:how\s+it\s+works|cum\s+functioneaza)$/u.test(normalizedText(label))
+        && (!hasActionIntent || !endsWithPhrase(affirmative,label))) return 0;
       return item.actionId !== null && matched === 1
         && GENERIC_SINGLE_ACTION_LABEL.test(normalizedText(label)) && !hasActionIntent
         ? 0 : matched;
@@ -499,6 +506,16 @@ export function buildSupportKnowledgeContext(input: Readonly<{
     sourceReferences.splice(0);
     text = base;
   }
+  const directGuideCandidates = [...guideArticleEvidence.entries()]
+    .filter(([id,score]) => score > 0 && sourceIds.includes(id))
+    .sort((left,right) => right[1] - left[1] || left[0].localeCompare(right[0],"en"));
+  const highestDirectGuideScore = directGuideCandidates[0]?.[1];
+  const unambiguousDirectGuide = highestDirectGuideScore === undefined ? []
+    : directGuideCandidates.filter(([,score]) => score === highestDirectGuideScore);
+  const recoverySourceIds = sourcePolicy === null
+    ? unambiguousDirectGuide.length === 1
+      ? Object.freeze([unambiguousDirectGuide[0]![0]]) : Object.freeze([])
+    : Object.freeze([...sourcePolicy.recoverySourceIds]);
   text += outputContract(
     sourceReferences.map(({ reference }) => reference),
     actionReferences.map(({ reference }) => reference)
@@ -522,6 +539,6 @@ export function buildSupportKnowledgeContext(input: Readonly<{
     requestedActionIds: Object.freeze(actionIds),
     sourceReferences: Object.freeze(sourceReferences),
     actionReferences: Object.freeze(actionReferences),
-    sourcePolicy
+    sourcePolicy,recoverySourceIds
   });
 }

@@ -253,7 +253,9 @@ export function createSupportAnswerService(input: Readonly<{
         });
       }
       const recoveryEntry = structured
-        ? selectSupportRecoveryEntry(entries,context!.sourcePolicy) : undefined;
+        ? selectSupportRecoveryEntry(
+          entries,context!.sourcePolicy,context!.recoverySourceIds
+        ) : undefined;
       const sourceActionIds = recoveryEntry === undefined ? Object.freeze([]) : Object.freeze(
         context!.requestedActionIds.filter((id) => SUPPORT_CAPABILITIES.some(({ articleIds,actionIds }) =>
           articleIds.includes(recoveryEntry.id) && actionIds.includes(id)
