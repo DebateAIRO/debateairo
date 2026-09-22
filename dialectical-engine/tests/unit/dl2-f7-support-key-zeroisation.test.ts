@@ -187,6 +187,44 @@ describe("DL2-F7 the support key module leaves no key material behind", () => {
     }
   });
 
+  /**
+   * FIX WAVE A-I1 (final review A). `rewrapDataKey` decides ALREADY_CURRENT by
+   * opening the row under the current KEK and then DISCARDED the plaintext data
+   * key without zeroing it — while `verifyUnderCurrentKek` zeroes the same
+   * buffer and `decryptSecret` hands it back on its own `allocUnsafeSlow`
+   * allocation precisely so that zeroing it is the whole erasure. A resumed or
+   * idempotent rotation pass over N already-current rows therefore left N
+   * unwrapped 32-byte support data keys on the heap: the class DL2-F7 closed.
+   */
+  it("zeroes the data key it unwrapped to decide a row is ALREADY_CURRENT", async () => {
+    const port = await makePort();
+    const lease = await port.createDataKey(SESSION_HANDLE);
+    // The buffer at issue is the one `decryptSecret` hands back on its own
+    // `allocUnsafeSlow` allocation — the caller's to zero, and this caller
+    // dropped it. It never leaves `rewrapDataKey`, so it is observed where it
+    // is made rather than where it was returned.
+    const plaintexts: Buffer[] = [];
+    const allocUnsafeSlow = Buffer.allocUnsafeSlow;
+    try {
+      Buffer.allocUnsafeSlow = ((size: number) => {
+        const buffer = allocUnsafeSlow(size);
+        if (size === 32) plaintexts.push(buffer);
+        return buffer;
+      }) as typeof Buffer.allocUnsafeSlow;
+      const outcome = await port.rewrapDataKey(SESSION_HANDLE, lease.wrapped.bytes);
+      Buffer.allocUnsafeSlow = allocUnsafeSlow;
+
+      expect(outcome).toEqual({ outcome: "ALREADY_CURRENT" });
+      // The decision really is taken on the plaintext: one 32-byte data key was
+      // unwrapped to reach it, and it is zero now.
+      expect(plaintexts).toHaveLength(1);
+      expect(plaintexts[0]).toEqual(Buffer.alloc(32));
+    } finally {
+      Buffer.allocUnsafeSlow = allocUnsafeSlow;
+      lease.close();
+    }
+  });
+
   it("hands back decrypted content on its own allocation and zeroes every cipher output", async () => {
     const port = await makePort();
     const lease = await port.createDataKey(SESSION_HANDLE);

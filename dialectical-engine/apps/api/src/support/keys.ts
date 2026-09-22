@@ -641,7 +641,15 @@ class FileSupportKeyPort implements SupportKeyPort {
     const envelope = parseWrappedEnvelope(wrapped);
     // Current first: a row already re-wrapped opens here and is left untouched,
     // which is what makes the pass idempotent and an interrupted one resumable.
-    if (this.#openUnder(this.#kek, handle, envelope) !== undefined) {
+    //
+    // DL2-F7: the data key that decision is taken on is zeroed, exactly as
+    // `verifyUnderCurrentKek` zeroes its own. `decryptSecret` hands it back on
+    // an allocation of its own so that this `fill(0)` is the whole erasure;
+    // dropping it left one unwrapped support data key on the heap per
+    // already-current row — a whole resumed pass of them.
+    const current = this.#openUnder(this.#kek, handle, envelope);
+    if (current !== undefined) {
+      current.fill(0);
       return Object.freeze({ outcome: "ALREADY_CURRENT" as const });
     }
     if (this.#previousKek === undefined) fail("SUPPORT_KEY_AUTHENTICATION_FAILED");
