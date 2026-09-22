@@ -1,0 +1,235 @@
+/**
+ * V-28 (DL4-F2) — THE PERSISTED SPEND, AND THE TWO GUARDS BUILT ON IT.
+ *
+ * The daily envelope is application-wide: it must survive a restart and it must
+ * be the SAME number for the API and for the runner, which are separate
+ * processes. So the running totals live in the database — `ledger.model_spend`,
+ * migration 0066 — and everything above them is expressed against the
+ * `ModelSpendStore` seam in this file, which is what makes every rule testable
+ * without Docker.
+ *
+ * ONE LEDGER FOR THE WHOLE APPLICATION. `spendSource` distinguishes a debate
+ * run's calls from the support chat's, and the DAILY total deliberately sums
+ * both: V-28(2) rules an envelope "across all runs and vendors", and a daily
+ * ceiling that ignored half the application's model spend would not be one. This
+ * package writes the `RUN` rows only — task 12 owns the support chat's transport
+ * and its own per-message accounting (`support.message.cost_usd`,
+ * `SUPPORT_MODEL_COST_UNREPORTED`), and duplicating that accounting here is
+ * exactly what this task was told not to do. The column and the sum are in
+ * place, so wiring support in is one call at task 12's own seam and needs no
+ * further migration.
+ */
+import { randomUUID } from "node:crypto";
+import { TypedDomainError } from "@debateai/kernel";
+import type { Pool } from "pg";
+import {
+  chargeMicrosForUsage,
+  costEnvelopeDay,
+  dailyCostEnvelopeReached,
+  decideDailyCostEnvelope,
+  decideRunCostEnvelope,
+  projectedCallCeilingMicros,
+  providerUsageUnreported,
+  readReportedUsage,
+  runCostEnvelopeReached,
+  type ProviderTargetPrice
+} from "./cost-envelope.js";
+
+/** Where a charge came from. `RUN` is a debate; `SUPPORT` is the help chat. */
+export type ModelSpendSource = "RUN" | "SUPPORT";
+
+export interface ModelSpendEntry {
+  readonly spendId: string;
+  readonly spendSource: ModelSpendSource;
+  /** The debate this charge belongs to; `null` for support-chat spend. */
+  readonly runId: string | null;
+  readonly providerRef: string;
+  /** The UTC day, `YYYY-MM-DD`, as `costEnvelopeDay` names it. */
+  readonly chargedOn: string;
+  readonly chargeMicros: number;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+}
+
+/**
+ * The two questions and the one write the envelopes need. A seam rather than a
+ * pool so the rules above it are unit-testable, and so a future caller (task 12's
+ * support transport, an offline reconciliation) can supply its own.
+ */
+export interface ModelSpendStore {
+  recordSpend(entry: ModelSpendEntry): Promise<void>;
+  /** Everything this ONE run has been charged, across every vendor it touched. */
+  readRunSpentMicros(runId: string): Promise<number>;
+  /** Everything the WHOLE application has been charged on that UTC day. */
+  readDaySpentMicros(day: string): Promise<number>;
+}
+
+/** The shape `@debateai/providers` asks a gateway's cost seam for, structurally. */
+export interface ProviderCostSeam {
+  assertCallAllowed(projection: Readonly<{
+    requestBytes: number;
+    completionTokenCeiling: number;
+  }>): Promise<void>;
+  recordCall(observed: Readonly<{ providerRef: string; usage: unknown }>): Promise<void>;
+}
+
+export interface CostEnvelopeGuardInput {
+  readonly store: ModelSpendStore;
+  readonly policy: Readonly<{ perRunCeilingMicros: number; dailyCeilingMicros: number }>;
+  /** Seam for "now", so the day boundary is testable without waiting for midnight. */
+  readonly clock?: () => Date;
+}
+
+export interface ProviderSeamInput {
+  readonly runId: string;
+  readonly price: ProviderTargetPrice;
+  /**
+   * HOSTED requires it: a vendor that reports no usage cannot be billed, so its
+   * answer is refused rather than charged as zero. LOCAL does not — the relays
+   * and loopback model servers report nothing and cost nothing.
+   */
+  readonly requireReportedUsage: boolean;
+}
+
+/**
+ * The two V-28 guards, over one store and one sealed policy.
+ *
+ * Both read the persisted total at the moment they decide rather than caching
+ * it: the API and the runner spend against the same day from different
+ * processes, and a cached total would be a ceiling only one of them respected.
+ */
+export class CostEnvelopeGuard {
+  readonly #store: ModelSpendStore;
+  readonly #policy: Readonly<{ perRunCeilingMicros: number; dailyCeilingMicros: number }>;
+  readonly #clock: () => Date;
+
+  constructor(input: CostEnvelopeGuardInput) {
+    if (input?.store === undefined || input?.policy === undefined) {
+      throw new TypeError("COST_ENVELOPE_GUARD_INPUT_INVALID");
+    }
+    this.#store = input.store;
+    this.#policy = input.policy;
+    this.#clock = input.clock ?? (() => new Date());
+  }
+
+  /**
+   * THE PER-RUN GUARD, in the shape the provider gateway consumes.
+   *
+   * `assertCallAllowed` runs before the request is sent and refuses the call
+   * whose configured maximum would take this run past its ceiling.
+   * `recordCall` runs after a completed call and charges what the vendor
+   * reported. Neither consults the DAILY ceiling: a run already under way
+   * finishes, which is V-28(2) in as many words.
+   */
+  providerSeam(input: ProviderSeamInput): ProviderCostSeam {
+    if (typeof input?.runId !== "string" || input.runId.trim() === "") {
+      throw new TypeError("COST_ENVELOPE_RUN_REQUIRED");
+    }
+    return {
+      assertCallAllowed: async (projection) => {
+        const decision = decideRunCostEnvelope({
+          spentMicros: await this.#store.readRunSpentMicros(input.runId),
+          projectedMicros: projectedCallCeilingMicros(input.price, projection),
+          ceilingMicros: this.#policy.perRunCeilingMicros
+        });
+        if (decision.kind === "WOULD_CROSS") throw runCostEnvelopeReached(decision);
+      },
+      recordCall: async (observed) => {
+        const usage = readReportedUsage(observed.usage);
+        if (usage === null) {
+          // Nothing is written for a call that cannot be billed. A zero row
+          // would read as "this call was free", which is precisely the
+          // falsehood the hosted refusal exists to prevent.
+          if (input.requireReportedUsage) throw providerUsageUnreported(observed.providerRef);
+          return;
+        }
+        await this.#store.recordSpend(Object.freeze({
+          spendId: randomUUID(),
+          spendSource: "RUN",
+          runId: input.runId,
+          providerRef: observed.providerRef,
+          chargedOn: costEnvelopeDay(this.#clock()),
+          chargeMicros: chargeMicrosForUsage(input.price, usage),
+          inputTokens: usage.promptTokens,
+          outputTokens: usage.completionTokens
+        }));
+      }
+    };
+  }
+
+  /**
+   * THE DAILY GUARD, asked when a NEW run is requested and at no other time.
+   *
+   * It is deliberately not consulted per call: V-28(2) stops the next run, not
+   * the current one, and a mid-run daily refusal would throw away work the
+   * application has already paid for.
+   */
+  async assertDailyEnvelopeAdmitsNewRun(): Promise<void> {
+    const decision = decideDailyCostEnvelope({
+      spentMicrosToday: await this.#store.readDaySpentMicros(costEnvelopeDay(this.#clock())),
+      ceilingMicros: this.#policy.dailyCeilingMicros
+    });
+    if (decision.kind === "REACHED") throw dailyCostEnvelopeReached(decision);
+  }
+}
+
+/**
+ * `ledger.model_spend` (migration 0066), the shipped store.
+ *
+ * Both totals are SUMS OVER THE ROWS rather than a separate counter column. A
+ * counter kept beside the rows is a second source of truth that can drift from
+ * them — silently, and in the direction that matters — and the rows are the
+ * record an operator reconciles a vendor invoice against. The two indexes the
+ * migration creates are what make the sums cheap.
+ */
+export class PostgresModelSpendStore implements ModelSpendStore {
+  constructor(private readonly pool: Pool) {}
+
+  async recordSpend(entry: ModelSpendEntry): Promise<void> {
+    if (entry.spendSource === "RUN" && entry.runId === null) {
+      throw new TypedDomainError("MODEL_SPEND_RUN_REQUIRED", "A run charge must name its run");
+    }
+    await this.pool.query(
+      `INSERT INTO ledger.model_spend (
+         spend_id, spend_source, run_id, provider_ref,
+         charged_on, charge_micros, input_tokens, output_tokens
+       ) VALUES ($1,$2,$3,$4,$5::date,$6,$7,$8)`,
+      [
+        entry.spendId, entry.spendSource, entry.runId, entry.providerRef,
+        entry.chargedOn, entry.chargeMicros, entry.inputTokens, entry.outputTokens
+      ]
+    );
+  }
+
+  async readRunSpentMicros(runId: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      "SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend WHERE run_id = $1",
+      [runId]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  async readDaySpentMicros(day: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      "SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend WHERE charged_on = $1::date",
+      [day]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  /**
+   * `sum(bigint)` comes back as `numeric`, read as TEXT and narrowed here so an
+   * accumulated total that has outgrown a double refuses loudly instead of
+   * quietly rounding a ceiling in the deployment's favour.
+   */
+  #total(text: string | undefined): number {
+    const total = Number(text ?? "0");
+    if (!Number.isSafeInteger(total) || total < 0) {
+      throw new TypedDomainError(
+        "MODEL_SPEND_TOTAL_UNREPRESENTABLE",
+        "The accumulated model spend cannot be represented exactly"
+      );
+    }
+    return total;
+  }
+}

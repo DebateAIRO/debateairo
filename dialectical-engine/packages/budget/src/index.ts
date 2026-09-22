@@ -35,6 +35,22 @@ export {
   type RunCostEnvelopeDecision
 } from "./cost-envelope.js";
 
+/**
+ * V-28: the persisted spend (migration 0066) and the two guards built on it —
+ * the gateway's per-call seam and the daily gate a NEW run passes through.
+ */
+export {
+  CostEnvelopeGuard,
+  PostgresModelSpendStore,
+  type CostEnvelopeGuardInput,
+  type ModelSpendEntry,
+  type ModelSpendSource,
+  type ModelSpendStore,
+  type ProviderCostSeam,
+  type ProviderSeamInput
+} from "./model-spend.js";
+
+
 export const RATIFIED_BATTERY_ROW_IDS = [
   "Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10",
   "Q11", "Q12", "Q13", "Q14", "Q15", "Q16", "Q17", "Q18", "Q19", "Q20",
