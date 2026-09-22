@@ -16,6 +16,8 @@ import { BudgetRepository } from "@debateai/budget";
 import { ProviderProbeRepository, RunRepository, migrate } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
 import { JudgementRepository } from "@debateai/judgement";
+import { readPromptFrame, type PromptPacket } from "@debateai/providers";
+import { EVALUATOR_INSTRUCTIONS } from "@debateai/serve";
 import {
   CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY,
   assertBootstrapEquality,
@@ -4282,15 +4284,22 @@ describe("apps/runner — legal command lifecycle", () => {
        */
       const attempts = provider.bodies()
         .map((body) => JSON.parse(body) as { messages: { role: string; content: string }[] })
-        .filter((packet) => packet.messages.some((message) => {
-          // EVERY user message is scanned, never just the first: a legitimate
-          // repair may place its user message before the serialised envelope,
-          // and assuming a position would drop that attempt out of the
-          // selection — which is a vacuous pass wearing a filter.
-          if (message.role !== "user") return false;
-          try { return (JSON.parse(message.content) as { role?: string }).role === "EVALUATOR"; }
-          catch { return false; }
-        }));
+        .filter((packet) => {
+          // RUN1 (V-11 addendum): `role` left the model-visible payload — the
+          // routing identity is withheld — and every user message is now a
+          // FENCED block, so neither `JSON.parse(message.content)` nor a
+          // `.role === "EVALUATOR"` test can find anything. The selector reads
+          // the frame instead, which is what the packet actually is; the
+          // EVALUATOR is identified by its own prompt contract id.
+          //
+          // EVERY message is still scanned, never just the first, for the
+          // reason the old comment gave: a repair appends a second block, and
+          // assuming a position would drop that attempt out of the selection —
+          // a vacuous pass wearing a filter.
+          try {
+            return readPromptFrame(packet as PromptPacket).contractId === "serve.evaluator.v1";
+          } catch { return false; }
+        });
 
       /**
        * THE COUNT IS THE VACUITY GUARD, and it is the only one (codex r6 B2).
@@ -4309,19 +4318,31 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(evaluatorCalls).toHaveLength(1);   // the wrapper saw ONE of the three
 
       // THE INVARIANT, and the whole of it: every attempt LEADS with the
-      // exported contract. Role and exact content, nothing else.
+      // exported contract.
+      //
+      // RUN1 changed WHERE it leads. The system message is now the owners'
+      // instruction slot followed by the code-owned safety frame, and
+      // `EVALUATOR_CONTRACT_TEXT` is the contract's ANSWER FORM inside that
+      // frame. Byte-equality with the whole message is therefore no longer the
+      // right assertion; CONTAINMENT of the exported constant in the leading
+      // system message is, and it still fails the moment the runner sends
+      // different text — which is the property this case was written for.
       for (const [index, packet] of attempts.entries()) {
         expect(packet.messages[0]?.role, `attempt ${index}`).toBe("system");
-        expect(packet.messages[0]?.content, `attempt ${index}`).toBe(EVALUATOR_CONTRACT_TEXT);
+        expect(packet.messages[0]?.content, `attempt ${index}`).toContain(EVALUATOR_CONTRACT_TEXT);
+        expect(packet.messages[0]?.content, `attempt ${index}`).toContain(EVALUATOR_INSTRUCTIONS);
       }
 
       const messages = evaluatorCalls[0]!.packet.messages;
       const system = messages.filter((message) => message.role === "system");
       expect(system).toHaveLength(1);
-      expect(system[0]!.content).toBe(EVALUATOR_CONTRACT_TEXT);
+      // RUN1: the exported constant is the contract's answer form, carried
+      // inside the one system message. Containment, not byte-equality — see the
+      // note on the invariant above.
+      expect(system[0]!.content).toContain(EVALUATOR_CONTRACT_TEXT);
       // and it leads the packet, so no earlier instruction can displace it
       expect(messages[0]?.role).toBe("system");
-      expect(messages[0]?.content).toBe(EVALUATOR_CONTRACT_TEXT);
+      expect(messages[0]?.content).toContain(EVALUATOR_CONTRACT_TEXT);
       // the fingerprinted contract and the sent contract are the same value
       expect(evaluatorCalls[0]!.contractHash).toBe(runnerSettings().conformanceContractHash);
     } finally { await provider.stop(); }
@@ -4985,7 +5006,11 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
         };
         const system = body.messages.find((message) => message.role === "system")?.content ?? "";
         let content: string;
-        if (system.startsWith("Return only one JSON object")) {
+        // RUN1: the judge's system message now OPENS with the leg directive and
+        // carries the schema block in the frame's answer-form line, so a
+        // `startsWith` on the schema's first words routes nothing. The dispatch
+        // key is a token unique to the judge's answer form.
+        if (system.includes('"restatement_status"')) {
           content = JSON.stringify({
             statement: "A reasoning-only provisional answer.", way_of_knowing: "REASONING",
             locator: null, restatement_text: "A reasoning-only provisional answer.",

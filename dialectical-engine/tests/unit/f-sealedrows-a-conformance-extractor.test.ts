@@ -75,6 +75,33 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
       .toBe("80753d1a25f5c771a2fecb7f80c4f6f687dfa78f2ca410f572fb1acf39d8b447");
   });
 
+  /**
+   * ROUND 3 — the OTHER two sealed rows, pinned as literals.
+   *
+   * `conformanceContractHash` has been pinned by value since 2026-09-04 and that
+   * is what made RUN1's move of it VISIBLE. `judgeContractHash` and
+   * `composerContractHash` moved in RUN1 with no literal anywhere: every test
+   * that touched them recomputed them from the same objects they were checking,
+   * so a later prompt edit would have moved a sealed register value with zero
+   * tests red. Constraint 5 says a sealed value is superseded, never edited —
+   * these two rows are what make an edit impossible to miss.
+   *
+   * Both are register version 6 (RUN1); the version 5 values are recorded in
+   * the RUN1 report's hash table as history.
+   */
+  it("pins the judge and composer fingerprints as sealed VALUES, not derivations", async () => {
+    const acceptance = Object.fromEntries((await buildAcceptanceRegisterRows()).map((r) => [r.rowKey, r.value]));
+    const development = Object.fromEntries((await buildDevelopmentRunnerRegisterRows()).map((r) => [r.rowKey, r.value]));
+    expect(acceptance.judgeContractHash)
+      .toBe("3c9c32a61a510ef6a27d5c1fcd9797e669cacc475a15d6072e8f9c5efb450a69");
+    expect(acceptance.composerContractHash)
+      .toBe("9482cbb7bc9251d121f26cccf7141022caab4521b08b2a67f09ac07381443888");
+    // Both deployments seal the same values, or one of them is seeding a prompt
+    // the other never sends.
+    expect(development.judgeContractHash).toBe(acceptance.judgeContractHash);
+    expect(development.composerContractHash).toBe(acceptance.composerContractHash);
+  });
+
   it("keeps the writer's prompt in its own slot — evaluator ALONE (V 2026-09-04)", async () => {
     const acceptance = Object.fromEntries((await buildAcceptanceRegisterRows()).map((r) => [r.rowKey, r.value]));
     // RUN1: the writer's prompt is its own CONTRACT now, not a literal in the

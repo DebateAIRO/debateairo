@@ -5,7 +5,11 @@ import {
   reviewPromptContract,
   JUDGE_LEG_KINDS
 } from "@debateai/judgement";
-import { SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
+import {
+  EVALUATOR_INSTRUCTIONS,
+  SYNTHESIZER_INSTRUCTIONS,
+  SYNTHESIZER_PROMPT_CONTRACT
+} from "@debateai/serve";
 import { EVALUATOR_PROMPT_CONTRACT } from "@debateai/runner";
 import {
   BLIND_JUDGE_GRADE_PROMPT_CONTRACT,
@@ -156,6 +160,32 @@ describe("REVIEW ITEM 4 — the panel prompt, reordered but not reworded", () =>
 });
 
 describe("REVIEW ITEM 4 — the serve prompts, byte-identical to base", () => {
+  /**
+   * ROUND 3: these two had NO exact-string pin anywhere. `prompt-surface-guard`
+   * held regex fragments of the synthesizer's duties and the composer-hash test
+   * was tautological — it digests the very object it checks. An owner could
+   * therefore have edited either instruction and moved a SEALED register row
+   * with zero tests red, which is the one thing constraint 5 exists to prevent.
+   */
+  it("pins SYNTHESIZER_INSTRUCTIONS exactly — byte-identical to base", () => {
+    expect(SYNTHESIZER_INSTRUCTIONS).toBe(
+      "Write the served statement from the digest below. Every load-bearing claim must trace to a "
+      + "digest node. Do not overstate the evidence, and state the losing positions fairly. Your "
+      + "statement must agree with the supplied code label, and must claim no more confidence than "
+      + "that label carries."
+    );
+    expect(SYNTHESIZER_PROMPT_CONTRACT.instruction).toBe(SYNTHESIZER_INSTRUCTIONS);
+  });
+
+  it("pins EVALUATOR_INSTRUCTIONS exactly — byte-identical to base", () => {
+    expect(EVALUATOR_INSTRUCTIONS).toBe(
+      "Judge the candidate statement against the digest and the code label. Check fairness to the "
+      + "losing positions, agreement between the statement and the code label, and overstatement. "
+      + "Return an objection whenever you are not satisfied."
+    );
+    expect(EVALUATOR_PROMPT_CONTRACT.instruction).toBe(EVALUATOR_INSTRUCTIONS);
+  });
+
   it("the synthesizer's answer form is the runner's base system string", () => {
     expect(SYNTHESIZER_PROMPT_CONTRACT.answerForm).toBe(
       "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} "

@@ -113,7 +113,12 @@ async function callThroughMaker(input: {
     providerRef: input.provider.providerRef,
     packet: buildFramedPrompt({
       contract: DUAL_MAKER_PROOF_PROMPT_CONTRACT,
-      material: [{ name: "request", content: PROOF_USER_LINE }]
+      // ROUND 3 (review item G): this field used to carry `PROOF_USER_LINE`,
+      // which is ALSO the contract's answer form — so the model was told the
+      // same sentence twice, once as an instruction and once as evidence. The
+      // material is the proof's SUBJECT; the instruction to reply "OK" belongs
+      // to the answer form alone.
+      material: [{ name: "request", content: "dual-maker transport proof" }]
     }).packet
   });
   return Object.freeze({
