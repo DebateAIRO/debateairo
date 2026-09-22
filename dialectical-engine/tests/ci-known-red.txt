@@ -43,6 +43,22 @@
 #   - carried, unchanged and still dev's: scaffold "27 dependency-edge rows", v2ui-pages
 #     DR-160 and v2ui-pages XREV-01.
 #
+# RECONCILED at INT2, 2026-09-22 (SYNC2 merged into the integration branch, see
+# INTEGRATION-2026-09-22.md). The union of the two sides: SYNC2's five entries above,
+# unchanged and each with its source note, plus the integration branch's own RSS paragraph
+# below. The gate was then re-run on the merged tree and reported `new=2`. NEITHER was
+# listed — a failure that exists only on the merged tree is a defect of the merge, so both
+# were fixed in the commit that found them:
+#   - sup-06-no-zone-limiter "isolates long-lived relay leases…": a semantic conflict with
+#     no marker. dev's vacuity sweep (bcb2adb2) pinned a declaration present using dev's
+#     spelling; this line's DL7-F7 had wrapped the same declaration in boot.hold(). Neither
+#     diff touched the other's line. The pin is re-fitted; both survive.
+#   - text-control-bytes: two RAW NUL bytes in this line's own tests/unit/
+#     v30-support-provider.test.ts, escaped. Not a merge defect — it surfaced because the
+#     entry that had been covering it was correctly deleted above. An entry that outlives
+#     the defect it was written for hides the next one.
+# Gate after the reconciliation → new=0 known=5 stale=0.
+#
 # Deliberately NOT listed:
 #   - the two load-coupled `registration-database` cases ("deep-queue slack", "post-hash RSS
 #     tripwire"): they pass solo; listing them would hide a real regression. Integration
