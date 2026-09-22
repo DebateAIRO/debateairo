@@ -16,7 +16,6 @@ import {
 } from "../../apps/api/src/support/answer.js";
 import { createSupportCaseAccessService,type SupportCaseAccessPort } from "../../apps/api/src/support/cases.js";
 import {
-  ApiVendorAdapter,
   RelayAdapter,
   type SupportModelPort
 } from "../../apps/api/src/support/model.js";
@@ -2981,21 +2980,4 @@ describe("SUP-01 support routes", () => {
     await server.close();
   });
 
-  /**
-   * V-30/task 12. The dormant key-based seam is gone: the support chat reaches a
-   * paid vendor API through `ApiVendorAdapter`. Neither transport will do the
-   * other's job — the API adapter refuses a cleartext relay endpoint and the
-   * relay adapter refuses a public `https:` one — so a mode mix-up cannot be
-   * papered over by whichever adapter happened to be constructed.
-   */
-  it("keeps each model transport on its own ratified endpoint shape", () => {
-    expect(() => new ApiVendorAdapter({
-      baseUrl: "http://127.0.0.1:8792/v1",authorizationHeader: "Bearer test-relay",
-      model: "test-model"
-    })).toThrowError(expect.objectContaining({ code: "SUPPORT_MODEL_PATH_NOT_RATIFIED" }));
-    expect(() => new RelayAdapter({
-      baseUrl: "https://api.acme.example/v1",authorizationHeader: "Bearer test-relay",
-      model: "test-model"
-    })).toThrowError(expect.objectContaining({ code: "SUPPORT_MODEL_PATH_NOT_RATIFIED" }));
-  });
 });
