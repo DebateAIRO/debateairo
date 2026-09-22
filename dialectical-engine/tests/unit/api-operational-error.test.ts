@@ -211,6 +211,10 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "INSTRUMENT_REF_REQUIRED",
   "INVALID_COMPOSITION_ATTEMPT",
   "JUDGEMENT_POLICY_UNRESOLVED",
+  // FW-B / F-I2: the judgement package's own closed-table refusal
+  // (packages/judgement/src/index.ts) and the five door refusals below reach
+  // this boundary through the gateway, so they belong in the alphabet.
+  "JUDGE_LEG_MATERIAL_UNDECLARED",
   "JUDGE_PARSE_FAILURE",
   "JUDGE_SCHEMA_FAILURE",
   "LABEL_BASIS_DISCLOSURE_MISMATCH",
@@ -287,6 +291,16 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PRODUCT_ROLE_POLICY_REGISTER_COUNT_MISMATCH",
   "PRODUCT_ROLE_POLICY_REGISTER_UNSEALED",
   "PRODUCT_ROLE_POLICY_UNRESOLVED",
+  // FW-B / F-I2: the door's own refusals (packages/providers/src/prompt-frame.ts).
+  // They short-circuit the gateway, are re-thrown by the phase catches and reach
+  // the task boundary, so without these rows a refused packet became
+  // `RUNNER_EXECUTION_FAILED:UNRECOGNIZED_DOMAIN_ERROR` — durable state naming
+  // nothing, the exact defect codex r1b F3 closed for the provider subclasses.
+  "PROMPT_FRAME_ABSENT",
+  "PROMPT_FRAME_FENCE_FORGED",
+  "PROMPT_FRAME_FENCE_MISMATCH",
+  "PROMPT_FRAME_FOREIGN_TURN",
+  "PROMPT_FRAME_MATERIAL_MALFORMED",
   "PROPAGATION_MAGNITUDE_INVALID",
   "PROPAGATION_RECEIPT_INVALID",
   "PROPAGATION_RECEIPT_MISSING",

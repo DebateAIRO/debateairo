@@ -5280,6 +5280,10 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "INSTRUMENT_REF_REQUIRED",
   "INVALID_COMPOSITION_ATTEMPT",
   "JUDGEMENT_POLICY_UNRESOLVED",
+  // FW-B / F-I2: the judgement package's closed leg table refuses an undeclared
+  // material name (packages/judgement/src/index.ts) on the way INTO the frame,
+  // so the refusal travels the same path a schema failure does.
+  "JUDGE_LEG_MATERIAL_UNDECLARED",
   "JUDGE_PARSE_FAILURE",
   "JUDGE_SCHEMA_FAILURE",
   "LABEL_BASIS_DISCLOSURE_MISMATCH",
@@ -5356,6 +5360,16 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PRODUCT_ROLE_POLICY_REGISTER_COUNT_MISMATCH",
   "PRODUCT_ROLE_POLICY_REGISTER_UNSEALED",
   "PRODUCT_ROLE_POLICY_UNRESOLVED",
+  // FW-B / F-I2: the frame door's own refusals (packages/providers/src/prompt-frame.ts).
+  // A refused packet short-circuits the gateway, is re-thrown by the phase catch
+  // and reaches the task boundary; without these rows it became
+  // `UNRECOGNIZED_DOMAIN_ERROR` — durable state naming nothing, which is the
+  // defect codex r1b F3 closed for the provider subclasses.
+  "PROMPT_FRAME_ABSENT",
+  "PROMPT_FRAME_FENCE_FORGED",
+  "PROMPT_FRAME_FENCE_MISMATCH",
+  "PROMPT_FRAME_FOREIGN_TURN",
+  "PROMPT_FRAME_MATERIAL_MALFORMED",
   "PROPAGATION_MAGNITUDE_INVALID",
   "PROPAGATION_RECEIPT_INVALID",
   "PROPAGATION_RECEIPT_MISSING",
