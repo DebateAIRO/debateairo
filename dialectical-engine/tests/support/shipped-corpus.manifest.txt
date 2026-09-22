@@ -165,7 +165,6 @@ apps/runner/src/dev-auth-data-plane.ts
 apps/runner/src/dev-auth-stack-cli.ts
 apps/runner/src/dev-auth-stack.ts
 apps/runner/src/dev-cli-provider-panel.ts
-apps/runner/src/dev-compose-secrets.ts
 apps/runner/src/dev-database-principals-cli.ts
 apps/runner/src/dev-database-principals.ts
 apps/runner/src/dev-deployment-register-cli.ts

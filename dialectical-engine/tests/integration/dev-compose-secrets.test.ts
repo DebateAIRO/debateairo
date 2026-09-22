@@ -5,8 +5,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   DEVELOPMENT_COMPOSE_SECRET_KEYS,
   developmentComposeSecretsPath,
-  ensureDevelopmentComposeSecrets
-} from "../../apps/runner/src/dev-compose-secrets.js";
+  ensureDevelopmentComposeSecrets,
+  readDevelopmentComposeSecret
+} from "../../deploy/dev-auth/compose-secrets.mjs";
 
 const roots: string[] = [];
 
@@ -70,5 +71,33 @@ describe("development compose secrets custody (L7-F2, L7-F3, L7-F4)", () => {
     );
     await expect(ensureDevelopmentComposeSecrets(partial))
       .rejects.toThrow("DEV_COMPOSE_SECRETS_INCOMPLETE");
+  });
+
+  // V-21a review (minor 2): "not generated yet" and "generated before the fifth key existed"
+  // are different faults with different remedies — run the data plane, versus recreate the
+  // volume and the file. One code for both sent a reader of the README to the wrong one.
+  it("tells a secret set that was never generated from one that is stale", async () => {
+    const absent = await custodyRoot();
+    await expect(readDevelopmentComposeSecret(absent, "POSTGRES_SUPERUSER_PASSWORD"))
+      .rejects.toMatchObject({ code: "DEV_COMPOSE_SECRETS_NOT_GENERATED" });
+
+    const stale = await custodyRoot();
+    await writeFile(
+      developmentComposeSecretsPath(stale),
+      "HATCHET_DATABASE_PASSWORD=a\nHATCHET_ADMIN_EMAIL=b\n"
+      + "HATCHET_ADMIN_PASSWORD=c\nVLLM_API_KEY=d\n",
+      { encoding: "utf8", mode: 0o600 }
+    );
+    await expect(readDevelopmentComposeSecret(stale, "POSTGRES_SUPERUSER_PASSWORD"))
+      .rejects.toMatchObject({ code: "DEV_COMPOSE_SECRETS_INCOMPLETE" });
+    // A four-key file is refused, never topped up: the volume already holds the old password.
+    await expect(ensureDevelopmentComposeSecrets(stale))
+      .rejects.toThrow("DEV_COMPOSE_SECRETS_INCOMPLETE");
+
+    // A complete set still reads back the value it generated.
+    const whole = await custodyRoot();
+    await ensureDevelopmentComposeSecrets(whole);
+    const value = await readDevelopmentComposeSecret(whole, "POSTGRES_SUPERUSER_PASSWORD");
+    expect(value.length).toBeGreaterThanOrEqual(16);
   });
 });

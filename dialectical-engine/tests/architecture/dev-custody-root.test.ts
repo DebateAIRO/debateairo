@@ -8,6 +8,7 @@ import {
   assertDevCustodyRootCustody,
   DEV_CUSTODY_ROOT_ENV,
   DevCustodyRootError,
+  ensureDevCustodyDirectory,
   resolveDevCustodyRoot
 } from "../../deploy/dev-auth/custody-root.mjs";
 
@@ -233,6 +234,105 @@ describe("dev custody root (F-05, L2-F1, L2-F2)", () => {
       expect(text, source).toContain(helper);
       expect(text, source).not.toMatch(/\bchmod\(\s*(?:credentialRoot|resolvedPath)/u);
     }
+  });
+
+  // V-21(c), 2026-09-22: the token and principals commands already delegated, but three dev
+  // launchers still spelled "a real directory you own, at exactly 0700" for themselves —
+  // kept under the single-line edit rule when L7-F10 landed. Three copies of one refusal are
+  // three chances to drift apart, and the drift would be invisible: each copy has its own
+  // typed code, so a weakened copy still refuses convincingly. The rule now lives in one
+  // place; a launcher keeps only the code it reports.
+  it("leaves no second copy of the directory-custody rule in the dev launchers (V-21c)", async () => {
+    // The 0600 FILE rule is a different policy (size, link count, per-file bounds) and
+    // deliberately stays with the command that owns the file; only the DIRECTORY rule moves.
+    const spellsTheDirectoryRule = /PRIVATE_DIRECTORY_MODE|0o700|isDirectory\(\)/u;
+    const delegates = /\bassert(?:DevCustodyDirectory|DevCustodyRootCustody)\b|\bensureDevCustodyDirectory\b/u;
+    for (const source of [
+      "apps/runner/src/dev-api-environment.ts",
+      "apps/runner/src/dev-api-process.ts",
+      "apps/runner/src/dev-secret-files.ts"
+    ]) {
+      const text = await readFile(join(REPOSITORY_ROOT, source), "utf8");
+      expect(text, `${source} must ask the shared custody helper`).toMatch(delegates);
+      expect(text, `${source} must not spell the 0700 directory rule again`)
+        .not.toMatch(spellsTheDirectoryRule);
+    }
+  });
+
+  // The secret generator creates the custody tree before it checks it, so the create arm
+  // belongs to the same authority: one mkdir mode, one refusal, and still no repair.
+  it("creates a missing custody directory at 0700 and refuses a drifted or symlinked one (V-21c)", async () => {
+    const root = await temporaryRoot();
+    const created = join(root, "custody");
+    await ensureDevCustodyDirectory(created);
+    expect((await lstat(created)).mode & 0o777).toBe(0o700);
+
+    // Idempotent: a second call accepts the directory it made.
+    await expect(ensureDevCustodyDirectory(created)).resolves.toBeUndefined();
+
+    await chmod(created, 0o750);
+    await expect(ensureDevCustodyDirectory(created)).rejects.toMatchObject({
+      name: "DevCustodyRootError",
+      code: "DEV_AUTH_CUSTODY_ROOT_INVALID"
+    });
+    expect((await lstat(created)).mode & 0o777).toBe(0o750);
+
+    const escape = join(root, "escape");
+    await mkdir(escape, { mode: 0o700 });
+    const linked = join(root, "linked");
+    await symlink(escape, linked);
+    await expect(ensureDevCustodyDirectory(linked)).rejects.toMatchObject({
+      code: "DEV_AUTH_CUSTODY_ROOT_INVALID"
+    });
+    expect(await readdir(escape)).toEqual([]);
+  });
+
+  // V-21c review (minor 3): the arm this replaced re-threw the filesystem error itself, so a
+  // permission problem was distinguishable from a mode problem. A typed refusal that discards
+  // the errno turns "you cannot write here" into the same sentence as "the mode drifted".
+  it("keeps the errno of a failed create as the refusal's cause (V-21c)", async () => {
+    const root = await temporaryRoot();
+    const locked = join(root, "locked");
+    await mkdir(locked, { mode: 0o500 });
+    try {
+      const error: unknown = await ensureDevCustodyDirectory(join(locked, "child"))
+        .then(() => undefined, (reason: unknown) => reason);
+      expect(error).toMatchObject({
+        name: "DevCustodyRootError",
+        code: "DEV_AUTH_CUSTODY_ROOT_INVALID"
+      });
+      expect((error as { cause?: NodeJS.ErrnoException }).cause?.code).toBe("EACCES");
+    } finally {
+      await chmod(locked, 0o700);
+    }
+  });
+
+  // V-21a review (Important 1): the compose project owns the volume (`name: debateai-v3`,
+  // `volumes: postgres-data`), so moving the custody root does NOT move the database. A new
+  // root generates a new superuser password while the volume keeps the old one — and
+  // POSTGRES_PASSWORD is honoured at first initdb only, so the stack starts and then migrate
+  // fails with a bare DEV_AUTH_DATA_PLANE_MIGRATION_FAILED: the data plane counts the child's
+  // stderr but never retains it, so "password authentication failed" is never printed. The
+  // README must say so where both halves of the trap are read.
+  it("warns that changing the custody root while a volume exists needs a rebuild (V-21a)", async () => {
+    const readme = await readFile(join(REPOSITORY_ROOT, "deploy/dev-auth/README.md"), "utf8");
+    const section = (heading: string): string => {
+      const start = readme.indexOf(`\n## ${heading}\n`);
+      expect(start, heading).toBeGreaterThan(-1);
+      const rest = readme.slice(start + 1);
+      const end = rest.indexOf("\n## ", 1);
+      return end === -1 ? rest : rest.slice(0, end);
+    };
+    const upgrade = section("Upgrading an existing dev stack");
+    // Not merely "the variable appears" — the compose commands in that section already spell
+    // it. The REASON must be there: changing the root is itself a cause of the rebuild.
+    expect(upgrade, "states changing the root as a reason, not just as a shell default")
+      .toMatch(new RegExp(`[Cc]hanging \`?${DEV_CUSTODY_ROOT_ENV}\`?`, "u"));
+    expect(upgrade, "gives the rebuild remedy").toContain("down -v");
+    expect(upgrade, "names the bare failure the owner will actually see")
+      .toContain("DEV_AUTH_DATA_PLANE_MIGRATION_FAILED");
+    expect(section("Moving to a new machine"), "cross-references the rebuild")
+      .toContain("Upgrading an existing dev stack");
   });
 
   it("forwards the override to every child through the allow-listed command environment", async () => {

@@ -6,7 +6,7 @@ import { access, lstat, open, rename, unlink } from "node:fs/promises";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { HatchetClient } from "@hatchet-dev/typescript-sdk/v1/client/client.js";
-import { developmentComposeSecretsPath } from "./dev-compose-secrets.js";
+import { developmentComposeSecretsPath } from "../../../deploy/dev-auth/compose-secrets.mjs";
 import {
   assertDevCustodyRootCustody,
   resolveDevCustodyRoot

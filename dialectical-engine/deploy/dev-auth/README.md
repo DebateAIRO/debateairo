@@ -116,9 +116,11 @@ closes only the front door created by this command.
 
 Every development secret lives under one custody root: the KEK, corpus KEK,
 blind-index key and audit source-IP salt, the wrapped user and run keys, the
-Hatchet token, the database principal URLs, the assembled `api.env`, captured
-mail, and the TLS key pair. Every script resolves that root through
-`deploy/dev-auth/custody-root.mjs`; nothing else spells the path.
+Hatchet token, the compose service credentials, the database principal URLs, the
+assembled `api.env`, captured mail, and the TLS key pair. Every script resolves
+that root through `deploy/dev-auth/custody-root.mjs`; nothing else spells the
+path, and nothing else decides what "private" means — that module owns the
+exactly-0700 directory rule for every command (V-21c).
 
 - Default: `<repository>/.local/dev-auth` (git-ignored).
 - Override: `DEBATEAI_DEV_CUSTODY_ROOT=<absolute path>`. The recommended value
@@ -184,18 +186,122 @@ Then run the one-time trust setup above (`mkcert -install`,
 the old machine's keys — dev users, runs, publications — is not portable by
 design; recreate it.
 
-## Upgrading an existing dev stack (2026-09-02 hardening)
+**Setting that variable on a machine that already has a dev volume is a
+different thing**, and it needs the volume rebuilt first: the volume belongs to
+the compose project, not to the custody root, so it keeps the superuser password
+the old root generated. See reason 3 of "Upgrading an existing dev stack" below.
 
-`deploy/postgres/init-hatchet.sql` now creates the dedicated `debateai_dev_hatchet`
-role at **first initdb only**. A PostgreSQL volume created before this change has no
-such role, so `hatchet-lite` fails to connect (fail-closed). Recreate the dev volume
-once:
+## Compose service credentials
+
+`compose-secrets.env` (under the custody root, mode 0600) is generated once by the
+data-plane command and passed to every compose call as a second `--env-file`. It
+holds five values, and the repository holds none of them:
+
+| Key | Used by |
+|---|---|
+| `POSTGRES_SUPERUSER_PASSWORD` | `POSTGRES_PASSWORD` at first initdb, and the migrator/principal/register children |
+| `HATCHET_DATABASE_PASSWORD` | `debateai_dev_hatchet`, created by `deploy/postgres/init-hatchet.sql` |
+| `HATCHET_ADMIN_EMAIL` | the hatchet-lite seeded dashboard admin |
+| `HATCHET_ADMIN_PASSWORD` | the same admin's password |
+| `VLLM_API_KEY` | vLLM's `--api-key` |
+
+Every one is a `${NAME:?…}` reference in `compose.dev.yaml`, so a bare
+`docker compose up` without the file refuses to start rather than booting a
+default-credentialled service. A compose call you make by hand needs both env
+files; run it from `dialectical-engine/`:
 
 ```sh
-docker compose -f compose.dev.yaml down -v
+docker compose --env-file .env.compose \
+  --env-file "${DEBATEAI_DEV_CUSTODY_ROOT:-$PWD/.local/dev-auth}/compose-secrets.env" \
+  -f compose.dev.yaml ps
+```
+
+A command that needs one of these values rather than the whole file — the data
+plane's migrator URL, `oactl provision` — refuses with one of two codes, because
+the remedies differ:
+
+- `DEV_COMPOSE_SECRETS_NOT_GENERATED` — there is no file under this custody root
+  yet. Run `pnpm dev:auth:up` (or `pnpm dev:auth:data-plane`) first; `oactl
+  provision` runs after the stack, never before it.
+- `DEV_COMPOSE_SECRETS_INCOMPLETE` — a file is there but predates one of the five
+  keys, so the database it belongs to already holds the older credentials. Another
+  run cannot fix that; rebuild the volume as below.
+
+## Upgrading an existing dev stack
+
+A PostgreSQL volume keeps the roles and passwords it was created with, because
+`POSTGRES_PASSWORD` is honoured at **first initdb only**. Three situations
+therefore need the volume rebuilt:
+
+1. **2026-09-02 hardening.** `deploy/postgres/init-hatchet.sql` creates the
+   dedicated `debateai_dev_hatchet` role at first initdb only. An older volume
+   has no such role, so `hatchet-lite` fails to connect.
+2. **2026-09-22 (V-21a).** The PostgreSQL superuser password is generated into
+   `compose-secrets.env` instead of being the fixed literal that used to sit in
+   `compose.dev.yaml`. An older volume still has the old password, and an older
+   `compose-secrets.env` has four keys rather than five — the data plane refuses it
+   with `DEV_COMPOSE_SECRETS_INCOMPLETE` rather than inventing the missing value.
+3. **Changing `DEBATEAI_DEV_CUSTODY_ROOT` while a volume exists** — including the
+   very common case of moving custody out of a cloud-synced checkout. The volume
+   belongs to the **compose project** (`name: debateai-v3`, volume
+   `postgres-data`), not to the custody root, so it does not move with your keys.
+   The new root gets a freshly generated `POSTGRES_SUPERUSER_PASSWORD` while the
+   volume keeps the old one. Nothing refuses at startup: PostgreSQL and
+   `hatchet-lite` come up, and the run then stops at
+   `DEV_AUTH_DATA_PLANE_MIGRATION_FAILED` with no further detail, because the data
+   plane never prints a child's stderr. That bare code, right after you changed the
+   variable, means this.
+
+Recreate the volume and the secrets file once, in this order, from
+`dialectical-engine/` (the `down` still needs the old secrets file, so it comes
+first):
+
+```sh
+docker compose --env-file .env.compose \
+  --env-file "${DEBATEAI_DEV_CUSTODY_ROOT:-$PWD/.local/dev-auth}/compose-secrets.env" \
+  -f compose.dev.yaml down -v
+rm -f "${DEBATEAI_DEV_CUSTODY_ROOT:-$PWD/.local/dev-auth}/compose-secrets.env"
 pnpm dev:auth:up
 ```
 
-The compose secrets file (`compose-secrets.env` under the custody root, mode 0600)
-is generated by the data-plane command and passed as a second `--env-file`; a bare
-`docker compose up` without it refuses to start, by design.
+Everything in the dev database is discarded by `down -v`; dev users, runs and
+publications are recreated, not migrated. A **fresh clone needs none of this**:
+`pnpm dev:auth:up` generates the file before it starts compose.
+
+## Checks owed on the next `pnpm dev:auth:up` (V-21b)
+
+Two assumptions about the pinned `hatchet-lite` image were reasoned from its
+documentation and have never been observed running. The owner ruled on 2026-09-21
+that they are verified at the next stack start rather than by starting Docker for
+their own sake. Both are cheap, and both have a fail-closed consequence if the
+assumption is wrong. Record the outcome beside this file.
+
+**1. Does the image honour `ADMIN_EMAIL` and `ADMIN_PASSWORD`?** The compose file
+sets both from custody precisely so the image's documented seeded login cannot be
+used; if the names are wrong for this image, the override is silently ignored and
+the seeded admin is still there. The decisive check needs no password: with the
+stack up, open `http://localhost:8888` and try to sign in as `admin@example.com`
+with the password `Admin123!!` from the hatchet-lite documentation.
+
+- Rejected → the assumption holds; the seeded default is gone. Close L7-F3.
+- Accepted → the assumption is **false**: the dashboard has a documented default
+  admin that can mint tenant tokens and trigger paid model runs. Treat it as live,
+  and either find the image's real variable names or disable the seed and create
+  the user once. The generated pair is in `compose-secrets.env` if you need to sign
+  in afterwards.
+
+**2. Does `hatchet-admin token revoke --id` exist?** `pnpm dev:auth:provision-hatchet-token`
+revokes a token it minted but could not attest. If the subcommand does not exist,
+the rotation path leaves a live year-long tenant token behind on every failed
+attestation. Ask the binary, from `dialectical-engine/`:
+
+```sh
+docker compose --env-file .env.compose \
+  --env-file "${DEBATEAI_DEV_CUSTODY_ROOT:-$PWD/.local/dev-auth}/compose-secrets.env" \
+  -f compose.dev.yaml exec -T hatchet-lite ./hatchet-admin --config /config token revoke --help
+```
+
+- Usage text naming `--id` → the assumption holds.
+- `unknown command` or no `--id` flag → the assumption is **false**: revoke any
+  token minted by a failed run through the dashboard, and fix `REVOKE_COMMAND` in
+  `apps/runner/src/dev-hatchet-token.ts` before relying on rotation.

@@ -3,7 +3,7 @@
 // Fail-closed: a custody root inside a cloud-synced folder is refused, so the
 // source tree may stay synced between machines while keys never sync (R4).
 import { realpathSync } from "node:fs";
-import { lstat } from "node:fs/promises";
+import { lstat, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
@@ -39,8 +39,8 @@ const CLOUD_SYNC_SEGMENT_PAIRS = Object.freeze([
 ]);
 
 export class DevCustodyRootError extends TypeError {
-  constructor(code, detail) {
-    super(`${code}: ${detail}`);
+  constructor(code, detail, options) {
+    super(`${code}: ${detail}`, options);
     this.name = "DevCustodyRootError";
     this.code = code;
   }
@@ -121,21 +121,56 @@ export function resolveDevCustodyRoot(repositoryRoot, environment = process.env)
  * One directory of the custody chain: a real directory, not a symlink, owned by
  * this uid, at exactly 0700. Never repaired — narrowing a drifted mode back
  * would hide the exposure event instead of surfacing it (L7-F10).
+ *
+ * V-21(c): this is the ONLY place the rule is spelled. Every dev launcher asks
+ * here and translates the refusal into the typed code it reports, so a change to
+ * the policy cannot reach one command and miss another.
+ *
+ * An environment with no `process.getuid` cannot prove ownership, so it is
+ * refused rather than waved through: an unprovable owner is not a safe one.
  */
 export async function assertDevCustodyDirectory(directory) {
   const path = resolve(directory);
   const metadata = await lstat(path).catch(() => null);
   const uid = typeof process.getuid === "function" ? process.getuid() : null;
   if (metadata === null
+    || uid === null
     || metadata.isSymbolicLink()
     || !metadata.isDirectory()
-    || (uid !== null && metadata.uid !== uid)
+    || metadata.uid !== uid
     || (metadata.mode & 0o777) !== PRIVATE_DIRECTORY_MODE) {
     throw new DevCustodyRootError(
       "DEV_AUTH_CUSTODY_ROOT_INVALID",
       `${path} must be a directory you own with mode 0700; it is not repaired for you.`
     );
   }
+}
+
+/**
+ * The create arm of the same policy, for the commands that build the custody
+ * tree before they read it: create the directory at 0700 when it is absent, then
+ * apply `assertDevCustodyDirectory` unchanged. An existing directory is never
+ * chmod-ed back, so a drifted mode still surfaces (L7-F10). Not recursive: a
+ * missing parent is a refusal, not something to invent.
+ *
+ * The filesystem error is kept as the refusal's `cause`: "you may not write
+ * here" (EACCES) and "the mode drifted" are different faults with different
+ * remedies, and a typed code that discards the errno spells them the same way.
+ */
+export async function ensureDevCustodyDirectory(directory) {
+  const path = resolve(directory);
+  try {
+    await mkdir(path, { mode: PRIVATE_DIRECTORY_MODE });
+  } catch (error) {
+    if (error?.code !== "EEXIST") {
+      throw new DevCustodyRootError(
+        "DEV_AUTH_CUSTODY_ROOT_INVALID",
+        `${path} could not be created as a directory you own with mode 0700.`,
+        { cause: error }
+      );
+    }
+  }
+  await assertDevCustodyDirectory(path);
 }
 
 /**
