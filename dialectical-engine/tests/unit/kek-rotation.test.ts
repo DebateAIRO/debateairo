@@ -498,6 +498,51 @@ describe("V-3 rotation: the support KEK, whose format cannot carry a label", () 
       expect.objectContaining({ code: "SUPPORT_KEK_CUSTODY_INVALID" })
     );
   });
+
+  /**
+   * FIX ROUND 1, Minor 3. The current support KEK was compared against every
+   * protected key path and the previous one was not, so a changeover could hand
+   * this port the user-DEK KEK as its previous support key — the support domain
+   * silently holding a key from another domain for the length of the rotation.
+   * (The path itself cannot be `KEK_PATH`: the basename rule already refuses
+   * anything not named `support-kek.bin`. What was reachable is a file with the
+   * right NAME whose 32 bytes duplicate a protected key.)
+   */
+  it("refuses a previous support KEK whose bytes duplicate a protected key", async () => {
+    const directory = await temporaryDirectory("debateai-rotation-support-protected-");
+    const currentPath = await supportKekPath(directory, "current");
+    const protectedPath = join(directory, "kek.bin");
+    const protectedMaterial = generateDek();
+    await writeFile(protectedPath, protectedMaterial, { mode: 0o600 });
+    await chmod(protectedPath, 0o600);
+    await chmod(directory, 0o700);
+    // Correctly named, correct custody, and the wrong 32 bytes: the user-DEK
+    // KEK copied into the support domain's previous slot.
+    const previousDirectory = join(directory, "previous");
+    await mkdir(previousDirectory, { recursive: true, mode: 0o700 });
+    await chmod(previousDirectory, 0o700);
+    const previousPath = join(previousDirectory, "support-kek.bin");
+    await writeFile(previousPath, protectedMaterial, { mode: 0o600 });
+    await chmod(previousPath, 0o600);
+
+    await expect(createSupportKeyPort({
+      supportKekPath: currentPath,
+      previousSupportKekPath: previousPath,
+      protectedKeyPaths: [protectedPath]
+    })).rejects.toThrowError(
+      expect.objectContaining({ code: "SUPPORT_KEK_CUSTODY_INVALID" })
+    );
+
+    // A genuine changeover — a previous key that is nobody else's — still opens.
+    const honestPrevious = await supportKekPath(directory, "honest-previous");
+    const port = await createSupportKeyPort({
+      supportKekPath: currentPath,
+      previousSupportKekPath: honestPrevious,
+      protectedKeyPaths: [protectedPath]
+    });
+    expect(port.currentKekId()).toMatch(/^[0-9a-f]{16}$/u);
+    await port.close();
+  });
 });
 
 describe("V-3 rotation: records written now carry their kek_id", () => {

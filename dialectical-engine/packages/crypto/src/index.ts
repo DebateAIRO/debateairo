@@ -403,6 +403,15 @@ export function assertPublicationSecretDomains(input: Readonly<{
   corpusKekPath?: string | undefined;
   privateStorePath: string;
   publicationStorePath?: string | undefined;
+  /**
+   * V-3, fix round 1. The PREVIOUS key of each ring a changeover configures.
+   * They are key material this process holds, so they are in the same pairwise
+   * check as everything else: `toKekRing` only refuses a previous key equal to
+   * its OWN current one, which leaves `KEK_PREVIOUS_PATH` aimed at the
+   * blind-index key, the audit salt or the corpus KEK unnoticed — the L2-F8
+   * aliasing this function exists to refuse, one changeover later.
+   */
+  previousKeks?: readonly Readonly<{ handle: KekHandle;path: string }>[];
   additionalSecrets?: readonly Readonly<{
     path: string;
     material: Uint8Array;
@@ -416,6 +425,9 @@ export function assertPublicationSecretDomains(input: Readonly<{
   try {
     materials.push(readKek(input.privateKek));
     if (input.corpusKek !== undefined) materials.push(readKek(input.corpusKek));
+    for (const previous of input.previousKeks ?? []) {
+      materials.push(readKek(previous.handle));
+    }
     for (const secret of input.additionalSecrets ?? []) {
       materials.push(copyKey(secret.material));
     }
@@ -435,6 +447,7 @@ export function assertPublicationSecretDomains(input: Readonly<{
     ...(input.corpusKekPath === undefined ? [] : [canonicalCandidatePath(input.corpusKekPath)]),
     ...(input.publicationStorePath === undefined
       ? [] : [canonicalCandidatePath(input.publicationStorePath)]),
+    ...(input.previousKeks ?? []).map((previous) => canonicalCandidatePath(previous.path)),
     ...(input.additionalSecrets ?? []).map((secret) => canonicalCandidatePath(secret.path)),
     ...(input.additionalStorePaths ?? []).map(canonicalCandidatePath)
   ];
@@ -1750,9 +1763,12 @@ async function republishRecord(
     await fileSystem.rm(temporary, { force: true });
     file = await fileSystem.open(temporary, "wx", modes.file);
     await file.writeFile(payload, "utf8");
+    // A-I3: the group first, while the temporary is still 0600, then the mode,
+    // then the read-back — a re-wrap must not turn a readable record into one
+    // the reader refuses, and it is checked before the rename, so the ORIGINAL
+    // record survives a refusal.
+    await applyCustodyGroupOwnership(file, modes);
     await fileSystem.chmod(temporary, modes.file);
-    // A-I3: a re-wrap must not turn a readable record into one the reader
-    // refuses. Checked before the rename, so the ORIGINAL record survives.
     await assertPublishableUnderCustody(file, directory, modes, fileSystem);
     await file.sync();
     await file.close();
@@ -1924,10 +1940,37 @@ async function custodyWriteModes(
 }
 
 /**
- * V-19, fix wave A-I3. The write half's last step, between `chmod` and the
- * rename: give the temporary the custody GROUP where the writer may, then read
- * the record's own facts back through the acceptance function the READER uses
- * and refuse to publish anything that function would not accept.
+ * V-19, fix wave A-I3. The first half of the write path's custody step: give
+ * the temporary the custody GROUP, BEFORE the mode is widened to 0640.
+ *
+ * The order is the point. The temporary is created 0600 under the unit's
+ * umask, so while it is still owner-only its group may be changed safely;
+ * widening to 0640 first and setting the group second would leave a window in
+ * which the record is group-readable by the WRITER's primary group — not the
+ * custody group — and no byte of a wrapped key may be readable by the wrong
+ * group, however briefly.
+ *
+ * `fchown(fd, -1, gid)` is attempted rather than required: an owner may only
+ * set a group it belongs to, and on many hosts the gid is already right by
+ * inheritance. The read-back below is the authority, not this call's exit.
+ */
+async function applyCustodyGroupOwnership(
+  file: Readonly<{ chown(uid: number, gid: number): Promise<void> }>,
+  modes: CustodyWriteModes
+): Promise<void> {
+  const custodyGid = currentCustodyGid();
+  if (custodyGid === undefined || modes !== GROUP_CUSTODY_MODES) return;
+  try {
+    await file.chown(-1, custodyGid);
+  } catch {
+    // Not permitted, or not needed. The read-back decides.
+  }
+}
+
+/**
+ * The second half, between `chmod` and the rename: read the record's own facts
+ * back through the acceptance function the READER uses, and refuse to publish
+ * anything that function would not accept.
  *
  * Why it is needed. `custodyWriteModes` decides the modes from the store ROOT,
  * but a new file's gid comes from the directory it lands in — the parent's with
@@ -1937,15 +1980,12 @@ async function custodyWriteModes(
  * re-provisioned alone) produced a 0640 record the reader refuses: a
  * registration that "succeeded" whose user can never log in.
  *
- * `fchown(fd, -1, gid)` is attempted rather than required — an owner may only
- * set a group it belongs to, and on many hosts the gid is already right by
- * inheritance — so the READ-BACK is the authority, not the chown's exit.
  * `SECRET_CUSTODY_INVALID` is the reader's own code for "this exists and is not
  * safe to trust", which is exactly what the refusal is saying, one moment
  * earlier and about a record nobody has seen yet.
  */
 async function assertPublishableUnderCustody(
-  file: Readonly<{ chown(uid: number, gid: number): Promise<void>;stat(): Promise<Stats> }>,
+  file: Readonly<{ stat(): Promise<Stats> }>,
   directory: string,
   modes: CustodyWriteModes,
   fileSystem: Pick<UserDekStoreFileSystem, "stat">
@@ -1955,11 +1995,6 @@ async function assertPublishableUnderCustody(
   // umask, and the contract for them is unchanged; the group shape is the one
   // that depends on facts the writer does not control.
   if (custodyGid === undefined || modes !== GROUP_CUSTODY_MODES) return;
-  try {
-    await file.chown(-1, custodyGid);
-  } catch {
-    // Not permitted, or not needed. The read-back below decides.
-  }
   const metadata = await file.stat();
   const parent = await fileSystem.stat(directory);
   if (!custodyAccepts(
@@ -2140,9 +2175,11 @@ export class FileUserDekStore implements ReadableUserDekStore {
       await this.fileSystem.chmod(directory, modes.directory);
       file = await this.fileSystem.open(temporary, "wx", modes.file);
       await file.writeFile(userDekRecordJson(userId, this.keks.current, envelope), "utf8");
+      // A-I3: the custody group while the temporary is still 0600, THEN the
+      // wider mode, then the record's own facts through the reader's own
+      // acceptance function, before the rename publishes it.
+      await applyCustodyGroupOwnership(file, modes);
       await this.fileSystem.chmod(temporary, modes.file);
-      // A-I3: the record's own facts, through the reader's own acceptance
-      // function, before the rename publishes it.
       await assertPublishableUnderCustody(file, directory, modes, this.fileSystem);
       await file.sync();
       await file.close();
@@ -2523,9 +2560,11 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
       await this.fileSystem.chmod(directory, modes.directory);
       file = await this.fileSystem.open(temporary, "wx", modes.file);
       await file.writeFile(JSON.stringify(record), "utf8");
+      // A-I3: the custody group while the temporary is still 0600, THEN the
+      // wider mode, then the record's own facts through the reader's own
+      // acceptance function, before the rename publishes it.
+      await applyCustodyGroupOwnership(file, modes);
       await this.fileSystem.chmod(temporary, modes.file);
-      // A-I3: the record's own facts, through the reader's own acceptance
-      // function, before the rename publishes it.
       await assertPublishableUnderCustody(file, directory, modes, this.fileSystem);
       await file.sync();
       await file.close();
@@ -2990,9 +3029,11 @@ export class FilePublicationKeyStore implements PublicationKeyStore {
       await this.fileSystem.chmod(directory, modes.directory);
       file = await this.fileSystem.open(temporary, "wx", modes.file);
       await file.writeFile(JSON.stringify(record), "utf8");
+      // A-I3: the custody group while the temporary is still 0600, THEN the
+      // wider mode, then the record's own facts through the reader's own
+      // acceptance function, before the rename publishes it.
+      await applyCustodyGroupOwnership(file, modes);
       await this.fileSystem.chmod(temporary, modes.file);
-      // A-I3: the record's own facts, through the reader's own acceptance
-      // function, before the rename publishes it.
       await assertPublishableUnderCustody(file, directory, modes, this.fileSystem);
       await file.sync();
       await file.close();

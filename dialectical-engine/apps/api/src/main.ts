@@ -113,12 +113,15 @@ const boot = installBootCustody();
  * the single key this root has always built.
  *
  * Both handles are held by the boot ledger the moment they exist (DL7-F7), so a
- * stage that rejects mid-boot zeroes the previous key too.
+ * stage that rejects mid-boot zeroes the previous key too — and the LOAD itself
+ * runs under the ledger, because it can refuse between the two: a missing,
+ * short or duplicate previous key file throws with the current key already
+ * held, which is the residual A-I2 closes.
  */
-const userKeks = loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH, (handle) => boot.holdKek(handle));
+const userKeks = boot.runSync("user-dek-kek", () => loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH, (handle) => boot.holdKek(handle)));
 const kek = userKeks.current;
 const corpusKeks = environment.PUBLICATION_ENABLED === "true"
-  ? loadKekRing(environment.CORPUS_KEK_PATH!, environment.CORPUS_KEK_PREVIOUS_PATH, (handle) => boot.holdKek(handle))
+  ? boot.runSync("corpus-kek", () => loadKekRing(environment.CORPUS_KEK_PATH!, environment.CORPUS_KEK_PREVIOUS_PATH, (handle) => boot.holdKek(handle)))
   : undefined;
 const corpusKek = corpusKeks?.current;
 const blindIndexKey = loadSecretKey(environment.BLIND_INDEX_KEY_PATH);
@@ -143,6 +146,14 @@ await boot.run("publication-secret-domains", async () => assertPublicationSecret
   }),
   privateKekPath: environment.KEK_PATH,
   privateStorePath: environment.USER_DEK_STORE_PATH,
+  // V-3 (fix round 1): a changeover's previous keys are this process's key
+  // material too, so they join the same pairwise domain check.
+  previousKeks: [
+    ...(userKeks.previous === undefined
+      ? [] : [{ handle: userKeks.previous, path: environment.KEK_PREVIOUS_PATH! }]),
+    ...(corpusKeks?.previous === undefined
+      ? [] : [{ handle: corpusKeks.previous, path: environment.CORPUS_KEK_PREVIOUS_PATH! }])
+  ],
   additionalSecrets: [
     { path: environment.BLIND_INDEX_KEY_PATH, material: blindIndexKey },
     { path: environment.AUDIT_SOURCE_IP_SALT_PATH, material: sourceIpSalt }
@@ -416,9 +427,9 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   server:serverAskAdmissionPool,legacy:legacyAskAdmissionPool
 }));
 const publicationCipher = environment.PUBLICATION_ENABLED === "true"
-  ? new PublicationCipher(new FilePublicationKeyStore(
+  ? boot.runSync("publication-key-store", () => new PublicationCipher(new FilePublicationKeyStore(
       environment.PUBLICATION_KEY_STORE_PATH!,corpusKeks!
-    ))
+    )))
   : undefined;
 const publications = publicationCipher === undefined
   ? undefined
@@ -434,8 +445,15 @@ if (publications !== undefined) {
   // can accept traffic. Both bounded outboxes continue reconciling while the
   // process is live; an item failure is reported only after later items in the
   // same batch were given a chance to complete.
-  await publications.reconcileKeyProvisionCleanup();
-  await publications.reconcileKeyCleanup();
+  //
+  // DL7-F7 (fix round 1): these two run DURING the boot and were the last
+  // awaits outside the ledger — indented inside this block, which is exactly
+  // what the old line-based scan could not see. A publication pool that refuses
+  // here used to leave every key live and print no `api.boot.failed` line.
+  await boot.run("publication-key-cleanup", async () => {
+    await publications.reconcileKeyProvisionCleanup();
+    await publications.reconcileKeyCleanup();
+  });
   publicationCleanupTimer = setInterval(() => {
     void Promise.all([
       publications.reconcileKeyProvisionCleanup(),

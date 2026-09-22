@@ -718,6 +718,13 @@ class FileSupportKeyPort implements SupportKeyPort {
   }
 }
 
+/** Same file, same inode, or the same 32 bytes under two names. */
+function sameKeyFile(left: KeyFileIdentity, right: KeyFileIdentity): boolean {
+  return left.canonicalPath === right.canonicalPath
+    || left.device === right.device && left.inode === right.inode
+    || timingSafeEqual(left.material, right.material);
+}
+
 export async function createSupportKeyPort(
   input: CreateSupportKeyPortInput
 ): Promise<SupportKeyPort> {
@@ -725,27 +732,28 @@ export async function createSupportKeyPort(
   const support = await readSupportKek(input.supportKekPath);
   let previous: KeyFileIdentity | undefined;
   try {
-    for (const protectedPath of input.protectedKeyPaths ?? []) {
-      const protectedIdentity = await readProtectedKeyIdentity(protectedPath);
-      try {
-        if (support.canonicalPath === protectedIdentity.canonicalPath
-          || support.device === protectedIdentity.device && support.inode === protectedIdentity.inode
-          || timingSafeEqual(support.material, protectedIdentity.material)) {
-          fail("SUPPORT_KEK_CUSTODY_INVALID");
-        }
-      } finally {
-        protectedIdentity.material.fill(0);
-      }
-    }
     if (input.previousSupportKekPath !== undefined) {
       previous = await readSupportKek(input.previousSupportKekPath);
       // A "previous" key that is the current one is not a changeover — it is a
       // misconfiguration that would make a verification pass meaningless, since
       // every row would look already-current whichever key really wrapped it.
-      if (support.canonicalPath === previous.canonicalPath
-        || support.device === previous.device && support.inode === previous.inode
-        || timingSafeEqual(support.material, previous.material)) {
-        fail("SUPPORT_KEK_CUSTODY_INVALID");
+      if (sameKeyFile(support, previous)) fail("SUPPORT_KEK_CUSTODY_INVALID");
+    }
+    // Both keys this port will hold are checked against every protected key
+    // (fix round 1). The previous one used to be exempt, so a changeover could
+    // hand the support domain the user-DEK or corpus KEK as its previous key
+    // and nothing would say so. The basename rule already refuses a path that
+    // is not `support-kek.bin`; what it cannot see is a correctly named file
+    // whose 32 bytes are another domain's key.
+    const held = previous === undefined ? [support] : [support, previous];
+    for (const protectedPath of input.protectedKeyPaths ?? []) {
+      const protectedIdentity = await readProtectedKeyIdentity(protectedPath);
+      try {
+        for (const key of held) {
+          if (sameKeyFile(key, protectedIdentity)) fail("SUPPORT_KEK_CUSTODY_INVALID");
+        }
+      } finally {
+        protectedIdentity.material.fill(0);
       }
     }
     return new FileSupportKeyPort(support.material, previous?.material);

@@ -17,7 +17,10 @@
  * test process already belongs to (`process.getgroups()`) — a test can never
  * create a system group, and must never try.
  */
-import { chmod, chown, link, mkdir, mkdtemp, rm, stat, symlink, writeFile } from "node:fs/promises";
+import {
+  chmod, chown, link, lstat, mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat, symlink,
+  writeFile
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -34,7 +37,8 @@ import {
 } from "../../packages/crypto/src/index.js";
 import type {
   CustodyFileFacts,
-  CustodyParentFacts
+  CustodyParentFacts,
+  UserDekStoreFileSystem
 } from "../../packages/crypto/src/index.js";
 import {
   parseApiEnvironment,
@@ -598,6 +602,62 @@ describe("V-19 custody group: the live loaders on real files", () => {
     // Nothing was published: no half-written record for the reader to refuse.
     await expect(stat(join(root, "users", userId, "dek.v1.json")))
       .rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  /**
+   * FIX ROUND 1, Minor 4. Order matters on the write path: the temporary is
+   * created `0600` under the unit's umask, so while it is still owner-only its
+   * group may be set safely. Doing it the other way round — `chmod 0640` first,
+   * `fchown` second — opens a window in which the record is group-readable by
+   * the WRITER's primary group, which is not the custody group. No byte of a
+   * wrapped key may be group-readable by the wrong group, even briefly.
+   */
+  it.skipIf(NO_GROUP)("sets the custody group before it widens the mode, never after", async () => {
+    const custodyGid = oneCustodyGid();
+    const uid = process.getuid!();
+    const directory = await temporaryDirectory("debateai-custody-order-");
+    const keyPath = join(directory, "kek.bin");
+    await writeFile(keyPath, generateDek(), { mode: 0o600 });
+    await chmod(keyPath, 0o600);
+    await chmod(directory, 0o700);
+    const root = join(directory, "user-deks");
+    await mkdir(root, { mode: 0o750 });
+    await chown(root, uid, custodyGid);
+    await chmod(root, 0o2750);
+
+    const events: string[] = [];
+    const io = {
+      mkdir, lstat, readFile, readdir, rename, rm, stat,
+      async chmod(path: string, mode: number) {
+        if (path.endsWith(".tmp")) events.push(`chmod-${mode.toString(8)}`);
+        await chmod(path, mode);
+      },
+      async open(path: string, flags: string, mode?: number) {
+        const handle = await open(path, flags, mode);
+        if (!path.endsWith(".tmp")) return handle;
+        return new Proxy(handle, {
+          get(target, property, receiver) {
+            if (property === "chown") {
+              return async (owner: number, group: number) => {
+                events.push(`chown-${group}`);
+                await handle.chown(owner, group);
+              };
+            }
+            const value = Reflect.get(target, property, receiver) as unknown;
+            return typeof value === "function" ? (value as () => unknown).bind(target) : value;
+          }
+        });
+      }
+    } as unknown as UserDekStoreFileSystem;
+
+    configureCustodyGroup(String(custodyGid));
+    const store = new FileUserDekStore(root, loadKek(keyPath), io);
+    const userId = "66666666-6666-4666-8666-666666666666";
+    await store.store(userId, generateDek());
+
+    expect(events).toEqual([`chown-${custodyGid}`, "chmod-640"]);
+    // And the record still reads back through the contract it was checked against.
+    expect(await store.load(userId)).toBeInstanceOf(Buffer);
   });
 
   /**
