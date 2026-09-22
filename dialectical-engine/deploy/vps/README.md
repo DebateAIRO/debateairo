@@ -569,7 +569,18 @@ configuration, never an inference from `NODE_ENV`:
 | Set by | `DEBATEAI_DEPLOYMENT_MODE=hosted` in `runner.env` and `api.env` | the setting absent outside production, or `DEBATEAI_DEPLOYMENT_MODE=local` |
 
 The relays are the LOCAL deployment — a supported product path, **not** development-only code.
-What this host does is refuse them, which is a different statement.
+What this host does is refuse them, which is a different statement. Local mode's own
+instructions are `deploy/dev-auth/README.md`; they say plainly that local mode is meant for a
+computer you do not share, and why (V-30(2)).
+
+**The support chat is a provider like any other (V-30(1)).** It reads its own one-entry target,
+`SUPPORT_MODEL_TARGET_JSON` in `api.env`, through the same mode decision and the same
+credential-file contract as the debate targets: hosted refuses a relay target for support with
+the same codes listed below, and the vendor's credential is named by `authorization_file`, never
+inline. Its members are `provider_ref`, `base_url` (`https:`, path ending in `/v1`), `model` and
+`authorization_file` — the API service's own copy of the key file, from step 2 of the procedure
+below. The support model ref published in the support configuration row must equal the
+`provider_ref` written here, or the chat has no model and answers DEGRADED.
 
 `DEBATEAI_DEPLOYMENT_MODE` is read by the strict environment loader of both services, so neither
 can start without answering the question. A production unit that omits it refuses with

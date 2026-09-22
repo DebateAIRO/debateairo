@@ -339,9 +339,12 @@ describe("V-30(2) the local-mode instructions say local mode is for a computer y
     const runbook = await readFile(
       new URL("../../deploy/dev-auth/README.md", import.meta.url), "utf8"
     );
-    expect(runbook).toMatch(/computer you do not share/u);
-    expect(runbook).toMatch(/process list|`ps`/u);
+    // Whitespace-tolerant: a document may be re-wrapped, and a line break is
+    // not a change of meaning.
+    expect(runbook).toMatch(/computer\s+you\s+do\s+not\s+share/u);
+    expect(runbook).toMatch(/process\s+list|`ps`/u);
     expect(runbook).toMatch(/DR-133/u);
-    expect(runbook).toMatch(/support chat/iu);
+    expect(runbook).toMatch(/support\s+chat/iu);
+    expect(runbook).toMatch(/hosted/iu);
   });
 });
