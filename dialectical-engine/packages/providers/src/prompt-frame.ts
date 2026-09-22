@@ -267,18 +267,29 @@ export function buildFramedPrompt(input: {
  * carries a CODE and a machine PATH, inside the fence, and nothing else.
  */
 export function buildFramedRepairPrompt(framed: FramedPrompt, locator: FramedRepairLocator): PromptPacket {
+  return appendFramedRejection(framed.packet, locator);
+}
+
+/**
+ * The same append, for a caller that holds only the PACKET — the public
+ * aggregate transport recovers its frame from the packet it was handed rather
+ * than from a builder it never called. It asserts first, so a transport that
+ * skipped the door cannot reach the append either.
+ */
+export function appendFramedRejection(packet: PromptPacket, locator: FramedRepairLocator): PromptPacket {
   if (!REPAIR_CODE.test(locator.code) || !REPAIR_PATH.test(locator.path)) {
     throw new TypedDomainError(
       "PROMPT_REPAIR_NOT_A_LOCATOR",
       `A repair packet carries a typed code and a machine path only (${locator.code.slice(0, 48)})`
     );
   }
+  const frame = assertFramedPrompt(packet);
   return Object.freeze({
     messages: Object.freeze([
-      ...framed.packet.messages,
+      ...packet.messages,
       Object.freeze({
         role: "user" as const,
-        content: renderMaterialBlock(framed.fence, [
+        content: renderMaterialBlock(frame.fence, [
           { name: "machine_rejection_code", content: locator.code },
           { name: "machine_rejection_path", content: locator.path }
         ])

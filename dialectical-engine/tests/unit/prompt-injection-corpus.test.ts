@@ -14,6 +14,11 @@ import {
   EVALUATOR_PROMPT_CONTRACT
 } from "@debateai/runner";
 import {
+  BLIND_JUDGE_GRADE_PROMPT_CONTRACT,
+  DOMAIN_TAGGER_PROMPT_CONTRACT
+} from "../../packages/evaluator/src/index.js";
+import { CONSUMER_AGGREGATE_PROMPT_CONTRACT } from "../../packages/evaluator/src/consumer.js";
+import {
   SYNTHESIZER_PROMPT_CONTRACT,
   buildEvaluatorRequest,
   buildSynthesisDigest,
@@ -389,6 +394,41 @@ const HAND_OFFS = [
       }))
     }).packet]
   }
+,
+  /**
+   * REVIEW ITEM 2 — the three `packages/evaluator` prompts. They were framed by
+   * RUN1 and then left out of the corpus, which is how the add-on's unconverted
+   * repair builder and the public aggregate transport's missing door both
+   * survived a green suite. A hand-off that is framed but never driven is a
+   * hand-off nobody has measured.
+   */
+  {
+    name: "evaluator:blind-judge-grade (blinded_judge_output — another judge's output)",
+    payloadIn: "blinded_judge_output",
+    render: (attack: string): readonly PromptPacket[] => [buildFramedPrompt({
+      contract: BLIND_JUDGE_GRADE_PROMPT_CONTRACT,
+      material: [{ name: "blinded_judge_output", content: JSON.stringify({ reasons: [attack] }) }]
+    }).packet]
+  },
+  {
+    name: "evaluator:domain-tagger (raw_question — a visitor's text)",
+    payloadIn: "raw_question",
+    render: (attack: string): readonly PromptPacket[] => [buildFramedPrompt({
+      contract: DOMAIN_TAGGER_PROMPT_CONTRACT,
+      material: [
+        { name: "raw_question", content: attack },
+        { name: "known_domains", content: "[]" }
+      ]
+    }).packet]
+  },
+  {
+    name: "evaluator:consumer-aggregate (evaluator_aggregate — anonymous judge samples)",
+    payloadIn: "evaluator_aggregate",
+    render: (attack: string): readonly PromptPacket[] => [buildFramedPrompt({
+      contract: CONSUMER_AGGREGATE_PROMPT_CONTRACT,
+      material: [{ name: "evaluator_aggregate", content: JSON.stringify({ samples: [attack] }) }]
+    }).packet]
+  }
 ] as const;
 
 /* -------------------------------------------------------------- the checks */
@@ -438,8 +478,8 @@ describe("V-11 layer 4 — the injection corpus covers both languages and every 
     // row here is caught by `prompt-surface-guard.test.ts`'s builder count and
     // by the gateway's own refusal; this row keeps the corpus honest about what
     // it claims to have measured.
-    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(11);
-    expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(8);
+    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(14);
+    expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(11);
   });
 });
 

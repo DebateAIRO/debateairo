@@ -15,7 +15,11 @@ import {
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
   buildFramedPrompt,
+  buildFramedRepairPrompt,
+  schemaFailureLocator,
   type CallBound,
+  type FramedPrompt,
+  type PromptPacket,
   type PromptContract,
   type ProviderGateway
 } from "@debateai/providers";
@@ -526,10 +530,11 @@ export async function runEvaluatorJudgeAddon(input: {
   try {
     // V-11 addendum: the blinded sample is another model's output. It is
     // material, it rides the fence, and the grading instruction is code's.
-    const packet = buildFramedPrompt({
+    const framed = buildFramedPrompt({
       contract: BLIND_JUDGE_GRADE_PROMPT_CONTRACT,
       material: [{ name: "blinded_judge_output", content: JSON.stringify(blinded) }]
-    }).packet;
+    });
+    const packet = framed.packet;
     const response = await input.provider.call({
       runId: input.runId,
       subjectItemId: `evaluator:addon-attempt:${attemptId}`,
@@ -544,12 +549,11 @@ export async function runEvaluatorJudgeAddon(input: {
       contractHash: createHash("sha256").update("evaluator-blind-judge-grade/v1").digest("hex"),
       providerRef: input.family.value.providerRef,
       packet,
-      buildRepairPacket: ({ parseError }) => ({
-        messages: [...packet.messages, {
-          role: "user",
-          content: `The response violated the anonymous grading JSON contract (${parseError}). Return corrected strict JSON only.`
-        }]
-      }),
+      // REVIEW ITEM 1: this used to append a bare user turn carrying
+      // `parseError`. The gateway's door refuses that shape and re-throws frame
+      // refusals out of the attempt loop, so the add-on did not merely keep a
+      // leak — it LOST its one repair attempt and recorded ADDON_PROVIDER_FAILED.
+      buildRepairPacket: (rejected) => buildAddonRepairPacket(framed, rejected),
       classifyContent: (content) => {
         const parsed = addonGradeSchema.safeParse((() => {
           try { return JSON.parse(content); } catch { return null; }
@@ -3667,3 +3671,17 @@ export const DOMAIN_TAGGER_PROMPT_CONTRACT: PromptContract = Object.freeze({
   instruction: "Classify the raw question. Never invent an existing domain id.",
   answerForm: "Return strict JSON only: SELECT_EXISTING with domain_id, PROPOSE_NEW with proposed_name, or REFUSED with reason."
 });
+
+
+/**
+ * REVIEW ITEM 1 — the add-on's repair packet, framed. Exported so a test can
+ * drive it: the defect survived because `evaluator-addon.test.ts` never called
+ * `buildRepairPacket`, and a repair builder nothing exercises is a repair
+ * builder nobody knows is broken.
+ */
+export function buildAddonRepairPacket(framed: FramedPrompt, rejected: {
+  readonly parseStatus: string;
+  readonly parseError: string;
+}): PromptPacket {
+  return buildFramedRepairPrompt(framed, schemaFailureLocator(rejected));
+}

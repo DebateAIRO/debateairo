@@ -810,6 +810,7 @@ export class VllmOpenAICompatibleProviderGateway implements ProviderGateway {
 export {
   FRAMED_MATERIAL_FORMAT,
   PROMPT_FRAME_VERSION,
+  appendFramedRejection,
   assertFramedPrompt,
   buildFramedPrompt,
   buildFramedRepairPrompt,
