@@ -291,21 +291,26 @@ export function decideBudgetPressure(input: {
    */
   readonly pendingModelAttempts?: number;
   /**
-   * V-28 (DL4-F2) — THE SECOND REASON A RUN CAN HARD-STOP.
+   * V-28 (DL4-F2) — THE HARD STOP THAT IS NOT ABOUT ATTEMPTS.
    *
-   * The attempt ceiling and the money ceiling are independent bounds on the same
+   * The attempt ceiling and the spend bounds are independent limits on the same
    * run: a cheap topology can exhaust its attempts with money to spare, and one
    * expensive call can spend the money with dozens of attempts untouched. When
-   * the gateway refuses on money this flag says so, and the run takes the SAME
-   * components-only terminal the attempt ceiling has always taken — so the
-   * money stop inherits every guarantee that path carries (the verified
-   * components are served, a served statement is never retracted, DEFECT and
-   * ENVELOPE_EXHAUSTED stay independent) instead of growing a second one.
+   * a spend bound refuses, this flag says so, and the run takes the SAME
+   * components-only terminal the attempt ceiling has always taken — inheriting
+   * every guarantee that path carries (the verified components are served, a
+   * served statement is never retracted, DEFECT and ENVELOPE_EXHAUSTED stay
+   * independent) instead of growing a second one.
+   *
+   * NAMED `forceHardStop`, not `moneyEnvelopeReached`: ruling R2 made an
+   * unbillable vendor take this branch too, so "money" stopped being the truth
+   * about what sets it. The caller decides WHICH bound spoke; this says only
+   * that the answer is no.
    *
    * `consumedModelAttempts` is still reported as it stands: the run did not
    * overspend attempts, and saying it did would be a falsehood on the record.
    */
-  readonly moneyEnvelopeReached?: boolean;
+  readonly forceHardStop?: boolean;
   readonly pendingRows: readonly PendingBudgetRow[];
   readonly verifiedNodeIds: readonly string[];
 }): BudgetPressureDecision {
@@ -332,7 +337,7 @@ export function decideBudgetPressure(input: {
    * character-for-character J28's comparison, and the refusal context supplies
    * the 1 that makes its own question the one being answered.
    */
-  if (input.moneyEnvelopeReached !== true
+  if (input.forceHardStop !== true
     && input.consumedModelAttempts + pendingModelAttempts <= input.basis.maxModelAttempts) {
     return Object.freeze({
       kind: "WITHIN_ENVELOPE",
@@ -465,8 +470,8 @@ export class BudgetRepository {
     readonly basis: CostEnvelopeBasis;
     /** T17B/B1 — see `decideBudgetPressure`: which question the caller is asking. */
     readonly pendingModelAttempts?: number;
-    /** V-28 — see `decideBudgetPressure`: the money ceiling refused the next call. */
-    readonly moneyEnvelopeReached?: boolean;
+    /** V-28 — see `decideBudgetPressure`: a spend bound refused the next call. */
+    readonly forceHardStop?: boolean;
     readonly pendingRows: readonly PendingBudgetRow[];
     readonly verifiedNodeIds: readonly string[];
   }): Promise<BudgetPressureDecision> {
@@ -476,7 +481,7 @@ export class BudgetRepository {
       // Resolved here rather than forwarded as `undefined`: the repo builds under
       // `exactOptionalPropertyTypes`, so an absent caller means 0, explicitly.
       pendingModelAttempts: input.pendingModelAttempts ?? 0,
-      moneyEnvelopeReached: input.moneyEnvelopeReached ?? false,
+      forceHardStop: input.forceHardStop ?? false,
       pendingRows: input.pendingRows,
       verifiedNodeIds: input.verifiedNodeIds
     });

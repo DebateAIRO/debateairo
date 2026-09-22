@@ -789,7 +789,12 @@ export interface OpenAICompatibleGatewayOptions {
  */
 export const PROVIDER_COST_ENVELOPE_REFUSAL_CODES = Object.freeze([
   "RUN_COST_ENVELOPE_MONEY_REACHED",
-  "PROVIDER_USAGE_UNREPORTED"
+  "PROVIDER_USAGE_UNREPORTED",
+  // SMALL (round 3): the gateway's seam cannot raise this today — the daily
+  // envelope is asked when a NEW run is admitted, not per call — but retrying a
+  // day that is spent would be as pointless as retrying a run that is, and the
+  // list is the kernel's, minus the one the gateway never sees.
+  "DAILY_COST_ENVELOPE_REACHED"
 ] as const);
 
 /** L4-F3: a provider body is streamed and abandoned past this many bytes; nothing of it is persisted. */

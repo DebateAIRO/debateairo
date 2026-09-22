@@ -43,7 +43,7 @@ describe("V-28 a money stop is a HARD_STOP even with attempts to spare", () => {
     const decision = decideBudgetPressure({
       basis,
       consumedModelAttempts: 3,
-      moneyEnvelopeReached: true,
+      forceHardStop: true,
       pendingRows: [{ batteryRowId: "Q27", affectedNodeIds: ["node:test:q27"] }],
       verifiedNodeIds: ["node:test:verified"]
     });
@@ -65,7 +65,7 @@ describe("V-28 a money stop is a HARD_STOP even with attempts to spare", () => {
     expect(() => decideBudgetPressure({
       basis,
       consumedModelAttempts: 3,
-      moneyEnvelopeReached: true,
+      forceHardStop: true,
       pendingRows: [],
       verifiedNodeIds: []
     })).toThrowError(
