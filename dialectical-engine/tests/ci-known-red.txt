@@ -19,12 +19,20 @@
 #     cbf1b281. Every entry below appears in it, so none is caused by this branch.
 #
 # What this re-baseline changed (12 entries in, 5 out — the list shrank by 7):
-#   - THE THREE role-token-map ENTRIES WERE RENAMED ON DEV, not fixed: dev's title template
-#     dropped the quotes around the two names, so the listed spellings matched nothing and
-#     the gate reported the same rows as NEW. Two are re-listed below under the exact names
-#     vitest prints today; the third ('DebateMap root hub') is GREEN since dev's 830b1331
-#     and is simply gone. A renamed entry is the quietest way for a list like this to rot:
-#     it neither fails nor goes stale, it just stops meaning anything.
+#   - THE THREE role-token-map ENTRIES WERE RENAMED BY THE TOOL, not fixed and not renamed
+#     by dev. Corrected at INT2, 2026-09-22, because the first account named the wrong
+#     cause and a future re-baseline would have looked in the wrong place:
+#     `git log 7bae9806..cbf1b281 -- tests/architecture/role-token-map.test.ts` is EMPTY and
+#     the template `it.each(expected)("$surface binds its $role role", …)` is byte-identical
+#     at both ends. The rename came from the vitest 4.1.10 -> 5.0.1 upgrade (dev's D78):
+#     vitest 5's `formatAttribute` prints a string value WITHOUT quotes, where 4.x routed it
+#     through `inspect()`, which quoted it. That silently renamed EVERY `$prop`-interpolated
+#     title in the repository — 7 templates in 5 files — and only role-token-map had entries
+#     here, which is why the list is otherwise correct. Two are re-listed below under the
+#     exact names vitest prints today; the third ('DebateMap root hub') is GREEN since dev's
+#     830b1331 and is simply gone. A renamed entry is the quietest way for a list like this
+#     to rot: it neither fails nor goes stale, it just stops meaning anything — and a
+#     TEST-RUNNER upgrade can do it to every templated title at once, without a diff.
 #   - green on the merged tree, deleted: s7-authorization-contract "hardens every immutable
 #     memory scope carrier" (dev's D79 (e)2 — the assertion was VACUOUS LIVE and was
 #     repaired); s8-publication-contract "ships the deliberate controls…" (dev's 84f94f17
