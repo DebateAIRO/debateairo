@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
+import type { PromptPacket } from "@debateai/providers";
 import { readCustodyAuthorizationHeader } from "../../packages/crypto/src/index.js";
 import {
   ApiVendorAdapter,
@@ -13,6 +14,12 @@ import {
   createSupportModelAdapter,
   parseSupportModelTargetJson
 } from "../../apps/api/src/support/model.js";
+import {
+  SUPPORT_ANSWER_CONTRACT_ID,
+  SUPPORT_VISITOR_MESSAGE_FIELD,
+  buildSupportAnswerPrompt
+} from "../../apps/api/src/support/prompt.js";
+import { framedField, readFramedMaterial, wirePacket } from "../support/framed-packet.js";
 
 /**
  * V-30, ruled 2026-09-22 (task 12). The support chat reaches its model by
@@ -88,13 +95,15 @@ const ANSWER = Object.freeze({
   choices: [{ message: { content: "the answer" }, finish_reason: "stop" }]
 });
 
-function ask(): Readonly<{
-  system: string;
-  messages: readonly Readonly<{ role: "user"; content: string }>[];
-  language: "en";
-}> {
+/**
+ * FW-B / B-I1: the support transport takes ONE framed packet and runs the door
+ * on it, so every case here builds its prompt with the shipped support builder.
+ * A fresh packet per call, because the fence and the canary are minted per call.
+ */
+function ask(): Readonly<{ packet: PromptPacket; language: "en" }> {
   return {
-    system: "bounded", messages: [{ role: "user", content: "help" }], language: "en"
+    packet: buildSupportAnswerPrompt({ instruction: "bounded", visitorMessage: "help" }).packet,
+    language: "en"
   };
 }
 
@@ -389,22 +398,33 @@ describe("V-30 local: today's relay path is unchanged", () => {
     const fetchRecord = recordingFetch({
       ...ANSWER, usage: { prompt_tokens: 7, completion_tokens: 3, cost_usd: 0.0001 }
     });
+    const request = ask();
     const completion = await createSupportModelAdapter(
       parseSupportModelTargetJson(RELAY_TARGET, LOCAL),
       {
         readAuthorizationHeader: () => { throw new TypeError("NO_FILE_IS_READ_ON_THE_RELAY_PATH"); },
         fetchImplementation: fetchRecord.implementation
       }
-    ).complete(ask());
+    ).complete(request);
     expect(completion.usage).toEqual({ input_tokens: 7, output_tokens: 3, cost_usd: 0.0001 });
     expect(fetchRecord.calls[0]?.url).toBe("http://127.0.0.1:8794/v1/chat/completions");
     expect((fetchRecord.calls[0]?.init.headers as Record<string, string>).authorization)
       .toBe(RELAY_CREDENTIAL);
-    expect(JSON.parse(String(fetchRecord.calls[0]?.init.body))).toEqual({
-      model: SUPPORT_HERMES_MODEL,
-      stream: false,
-      messages: [{ role: "system", content: "bounded" }, { role: "user", content: "help" }]
-    });
+    const body = String(fetchRecord.calls[0]?.init.body);
+    expect(JSON.parse(body)).toMatchObject({ model: SUPPORT_HERMES_MODEL, stream: false });
+    /**
+     * FW-B / B-I1. The call is the same call; what changed is the PACKET. The
+     * body carries the framed packet the door accepted, verbatim — no turn
+     * appended, none re-labelled — and the visitor's words are inside the fence
+     * in their own field instead of beside the instruction as a bare user turn.
+     */
+    const posted = wirePacket(body);
+    expect(posted.messages).toEqual(request.packet.messages);
+    const material = readFramedMaterial(posted);
+    expect(material.contractId).toBe(SUPPORT_ANSWER_CONTRACT_ID);
+    expect(framedField(material, SUPPORT_VISITOR_MESSAGE_FIELD)).toBe("help");
+    expect(posted.messages[0]!.content).toContain("bounded");
+    expect(posted.messages[0]!.content).not.toContain("help");
   });
 
   /**

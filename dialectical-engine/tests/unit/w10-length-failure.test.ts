@@ -24,6 +24,7 @@ import { DEVELOPMENT_ORGAN_COST_BOUNDS } from "../../apps/runner/src/dev-deploym
 // W10 fix round 1 / F1-F2 class member C: the support relay adapter, whose
 // failure vocabulary is declared in ONE place and sealed by nothing.
 import { RelayAdapter, SupportModelError } from "../../apps/api/src/support/model.js";
+import { buildSupportAnswerPrompt } from "../../apps/api/src/support/prompt.js";
 
 /**
  * W10 (`board/W10-call-budget-truthfulness.md`, audit
@@ -403,9 +404,11 @@ describe("W10 F1/F2 class member C · the support model refuses a truncated comp
   // `language` is REQUIRED on this port and vitest never typechecks
   // (`.hermes/TOOLING-TRAPS.md:4934`), so the first green run said nothing
   // about it; `pnpm run typecheck` did.
+  // FW-B / B-I1: `packet` is required too, and the transport runs the frame
+  // door on it before it posts, so the fixture is built by the shipped support
+  // builder rather than from a system string and a bare turn.
   const ASK = {
-    system: "be brief",
-    messages: [{ role: "user" as const, content: "hello" }],
+    packet: buildSupportAnswerPrompt({ instruction: "be brief", visitorMessage: "hello" }).packet,
     language: "en" as const
   };
 

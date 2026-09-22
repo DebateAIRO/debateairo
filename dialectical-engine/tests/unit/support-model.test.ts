@@ -3,6 +3,17 @@ import {
   RelayAdapter,
   parseSupportModelTargetJson
 } from "../../apps/api/src/support/model.js";
+import { buildSupportAnswerPrompt } from "../../apps/api/src/support/prompt.js";
+
+/**
+ * FW-B / B-I1: the transport takes ONE framed packet now, and the door refuses
+ * anything else, so a transport case builds its packet with the shipped support
+ * builder rather than with a system string and a bare turn.
+ */
+const ASK = Object.freeze({
+  packet: buildSupportAnswerPrompt({ instruction: "bounded",visitorMessage: "help" }).packet,
+  language: "en" as const
+});
 
 function adapter(fetchImplementation: typeof fetch): RelayAdapter {
   return new RelayAdapter({
@@ -47,10 +58,7 @@ describe("support relay response boundary", () => {
       });
     }) as typeof fetch;
     const controller = new AbortController();
-    await adapter(fetchImplementation).complete({
-      system: "bounded",messages: [{ role: "user",content: "help" }],language: "en",
-      signal: controller.signal
-    });
+    await adapter(fetchImplementation).complete({ ...ASK,signal: controller.signal });
     controller.abort();
     expect(seen?.aborted).toBe(true);
   });
@@ -65,9 +73,8 @@ describe("support relay response boundary", () => {
       cancel() { cancelled = true; }
     });
     const fetchImplementation = vi.fn(async () => new Response(body,{ status: 200 })) as typeof fetch;
-    await expect(adapter(fetchImplementation).complete({
-      system: "bounded",messages: [{ role: "user",content: "help" }],language: "en"
-    })).rejects.toMatchObject({ code: "SUPPORT_MODEL_UNAVAILABLE" });
+    await expect(adapter(fetchImplementation).complete(ASK))
+      .rejects.toMatchObject({ code: "SUPPORT_MODEL_UNAVAILABLE" });
     expect(cancelled).toBe(true);
   });
 });

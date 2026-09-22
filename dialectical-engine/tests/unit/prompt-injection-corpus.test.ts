@@ -28,6 +28,15 @@ import {
   type SynthesisDigest,
   type SynthesisLoopControls
 } from "@debateai/serve";
+import type { HelpCorpusEntry } from "../../packages/support-kb/src/index.js";
+import { supportAnswerInstruction } from "../../apps/api/src/support/answer.js";
+import { SUPPORT_SUMMARY_PROMPT } from "../../apps/api/src/support/cases.js";
+import { RelayAdapter } from "../../apps/api/src/support/model.js";
+import {
+  buildSupportAnswerPrompt,
+  buildSupportSummaryPrompt
+} from "../../apps/api/src/support/prompt.js";
+import { wirePacket } from "../support/framed-packet.js";
 
 /**
  * V-11 ADDENDUM, LAYER 4 — THE PERMANENT INJECTION SUITE.
@@ -198,6 +207,30 @@ export const INJECTION_CORPUS: readonly Attack[] = Object.freeze([
 
 const QUESTION = "Should the city fund the tram extension?";
 const CLEAN_STATEMENT = "The extension pays for itself within nine years.";
+
+/**
+ * FW-B / B-I1 + D-I3 — the support chat's fixtures.
+ *
+ * One ratified help entry is enough: what the support rows below vary is the
+ * VISITOR'S text, which is the untrusted half. The entries are the site's own
+ * published help, they are selected by the retrieval step from the visitor's
+ * words and never written by them, and they are the owners' instruction slot.
+ */
+const SUPPORT_HELP_ENTRIES: readonly HelpCorpusEntry[] = Object.freeze([Object.freeze({
+  id: "publish-a-debate",
+  lang: "en" as const,
+  title: "Publish a debate",
+  status: "shipped" as const,
+  sources: Object.freeze(["apps/api/src/index.ts:1"]),
+  verifiedAgainst: "injection-corpus",
+  ratifiedBy: "V" as const,
+  ratifiedOn: "2026-09-04",
+  body: "Owners publish a debate from its page and complete re-authentication."
+})]);
+const SUPPORT_INSTRUCTION = supportAnswerInstruction(SUPPORT_HELP_ENTRIES, "en");
+const SUPPORT_RELAY_ANSWER = JSON.stringify({
+  choices: [{ message: { content: "Open the debate page as its owner." }, finish_reason: "stop" }]
+});
 
 function capturingGateway(sink: PromptPacket[]): ProviderGateway {
   return {
@@ -428,6 +461,65 @@ const HAND_OFFS = [
       contract: CONSUMER_AGGREGATE_PROMPT_CONTRACT,
       material: [{ name: "evaluator_aggregate", content: JSON.stringify({ samples: [attack] }) }]
     }).packet]
+  },
+  /**
+   * FW-B / B-I1 + D-I3 — THE SUPPORT CHAT'S THREE HAND-OFFS.
+   *
+   * These are the only hand-offs in the engine where the attacker is not
+   * another model but a PERSON typing into a public widget, and until this fix
+   * they were the one poster outside the frame: `system` plus a bare `user`
+   * turn, straight to a vendor. Two reviews found it independently (final review
+   * B, Important 1; final review D, Important 3) and both recorded it as a
+   * residual because nothing drove it.
+   *
+   * It is driven now, by the same 14 attacks as every other hand-off.
+   */
+  {
+    name: "support:chat-answer (visitor_message — a visitor's text)",
+    payloadIn: "visitor_message",
+    render: (attack: string): readonly PromptPacket[] => [buildSupportAnswerPrompt({
+      instruction: SUPPORT_INSTRUCTION,
+      visitorMessage: attack
+    }).packet]
+  },
+  {
+    name: "support:case-summary (case_transcript — the visitor's words and the model's)",
+    payloadIn: "case_transcript",
+    render: (attack: string): readonly PromptPacket[] => [buildSupportSummaryPrompt({
+      instruction: SUPPORT_SUMMARY_PROMPT,
+      transcript: `USER> ${attack}\nASSISTANT> I cannot help with that from the help entries.`
+    }).packet]
+  },
+  {
+    /**
+     * The transport row: not a builder's output but the bytes the RELAY
+     * ACTUALLY RECEIVES, read back off the request body. The defect this row
+     * exists for lived in the transport — `complete` re-assembled
+     * `[{role:"system"}, ...messages]` of its own — so a row that stopped at the
+     * builder would have measured the half that was never broken.
+     */
+    name: "support:transport (visitor_message as the relay receives it)",
+    payloadIn: "visitor_message",
+    render: async (attack: string): Promise<readonly PromptPacket[]> => {
+      const posted: PromptPacket[] = [];
+      await new RelayAdapter({
+        baseUrl: "http://127.0.0.1:8794/v1",
+        authorizationHeader: "Bearer injection-corpus",
+        model: "z-ai/glm-5.3-flash",
+        fetchImplementation: async (_url: string | URL | Request, init?: RequestInit) => {
+          posted.push(wirePacket(String(init?.body)) as PromptPacket);
+          return new Response(SUPPORT_RELAY_ANSWER, {
+            status: 200, headers: { "content-type": "application/json" }
+          });
+        }
+      }).complete({
+        packet: buildSupportAnswerPrompt({
+          instruction: SUPPORT_INSTRUCTION, visitorMessage: attack
+        }).packet,
+        language: "en"
+      });
+      return posted;
+    }
   }
 ] as const;
 
@@ -473,13 +565,19 @@ describe("V-11 layer 4 — the injection corpus covers both languages and every 
     expect(INJECTION_CORPUS.filter((attack) => attack.language === "ro").length).toBeGreaterThanOrEqual(5);
   });
 
-  it("covers every hand-off where model-written text enters a prompt", () => {
+  it("covers every hand-off where model-written or visitor-written text enters a prompt", () => {
     // The inventory, stated as a test. A hand-off added to the engine without a
     // row here is caught by `prompt-surface-guard.test.ts`'s builder count and
     // by the gateway's own refusal; this row keeps the corpus honest about what
     // it claims to have measured.
-    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(14);
-    expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(11);
+    //
+    // FW-B: 14 -> 17 and 11 -> 13 distinct fields, with the support chat's three
+    // (the answer, the case summary and the packet as the relay receives it).
+    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(17);
+    expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(13);
+    // Every row's name says which lane it belongs to, so the count above cannot
+    // be satisfied by three more copies of one lane.
+    expect(HAND_OFFS.filter(({ name }) => name.startsWith("support:"))).toHaveLength(3);
   });
 });
 
@@ -527,17 +625,43 @@ for (const row of HAND_OFFS) {
   });
 }
 
+/**
+ * FW-B (final review B, Minor 4) — WHAT THIS ROW ACTUALLY MEASURES.
+ *
+ * The title used to read as "for every hand-off". It is not: only the eight
+ * JUDGE rows drive a gateway, and only a gateway calls `buildRepairPacket`.
+ * The other nine rows render one packet each, so `packets.slice(1)` was empty
+ * for them and the loop asserted nothing at all — nine rows of silent pass.
+ *
+ * The count is asserted now, so the row states its own extent and a render that
+ * quietly stops producing a repair packet turns it red instead of shrinking it.
+ * The uncovered repairs are covered elsewhere, and neither is a gap:
+ *
+ *  - serve and evaluator: `apps/runner/src/index.ts`'s repair is a one-liner
+ *    over `buildFramedRepairPrompt` + `schemaFailureLocator`, both driven
+ *    directly by `prompt-frame.test.ts`, and the gateway re-runs the door on
+ *    every repair packet at runtime (`providers/src/index.ts`);
+ *  - support: the three support hand-offs have NO repair path — one call, one
+ *    answer, no content classifier and no retry — so there is nothing there for
+ *    a repair to echo.
+ */
 describe("V-11 layer 4 — the repair path carries no model text under attack", () => {
   it("never echoes the rejected output or the parse-error message", async () => {
+    let repairPackets = 0;
     for (const row of HAND_OFFS) {
       const packets = await packetsFor(row, INJECTION_CORPUS[0]!.text);
       for (const packet of packets.slice(1)) {
+        repairPackets += 1;
         const joined = packet.messages.map((message) => message.content).join("\n");
         expect(joined).not.toContain("the model's rejected output");
         expect(joined).not.toContain("Expected string, received");
         expect(joined).not.toContain("ignore all previous instructions");
       }
     }
+    // One repair packet per judge row, and the judge rows are the only ones
+    // that produce one. A loop that asserted nothing would leave this at zero.
+    expect(repairPackets).toBe(HAND_OFFS.filter(({ name }) => name.startsWith("judge:")).length);
+    expect(repairPackets).toBe(8);
   });
 });
 
@@ -560,14 +684,25 @@ describe("V-11 layer 5 — the corpus is what the tripwire scan is calibrated ag
 
   it("does NOT claim to catch every attack — the compartment does that, the scan only flags", () => {
     // Stated as a test so nobody reads layer 5 as a filter. Four corpus cases
-    // are deliberately marked `flagged: false` — an encoded payload the scan
-    // does not decode, a forged debate frame that phrases no command, a forged
-    // envelope, and a Romanian fake-system tag. Every one of them is CONTAINED,
-    // by layer 1, which the rows above measured for all eleven hand-offs. The
-    // scan is a flag on a step, never a filter, and this row exists so the
-    // difference cannot be forgotten.
+    // are deliberately marked `flagged: false`, and FW-B (final review B,
+    // Minor 3) corrected which four this comment named: they are
+    // `en-override-forged-debate-frame` (a forged DEBATE frame that phrases no
+    // command), `en-envelope-forgery` (a forged material envelope),
+    // `en-encoded-base64` (a payload the scan does not decode) and
+    // `ro-fence-forgery` (a forged boundary marker with a Romanian
+    // end-of-evidence line). `ro-fake-system` is `flagged: TRUE` and was never
+    // one of them. Every one of the four is CONTAINED by layer 1, which the
+    // rows above measured for all seventeen hand-offs. The scan is a flag on a
+    // step, never a filter, and this row exists so the difference cannot be
+    // forgotten.
     const unflagged = INJECTION_CORPUS.filter((attack) => !attack.flagged);
-    expect(unflagged.length).toBeGreaterThanOrEqual(3);
+    // The four, by name, so the prose above cannot drift from the corpus again.
+    expect(unflagged.map((attack) => attack.id)).toEqual([
+      "en-override-forged-debate-frame",
+      "en-envelope-forgery",
+      "en-encoded-base64",
+      "ro-fence-forgery"
+    ]);
     for (const attack of unflagged) {
       const framed = buildFramedPrompt({
         contract: SYNTHESIZER_PROMPT_CONTRACT,

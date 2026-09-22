@@ -3,6 +3,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import type { HelpCorpusEntry } from "@debateai/support-kb";
 import { redactSupportMessage, type SupportMessageCipherPort } from "./session.js";
 import { SupportModelError, type SupportModelPort, type SupportModelUsage } from "./model.js";
+import { buildSupportAnswerPrompt } from "./prompt.js";
 import { supportTemplate, type SupportLanguage } from "./templates.js";
 import { supportIntentSurface } from "./classify.js";
 import {
@@ -96,6 +97,24 @@ function retrieve(
     .sort((left,right) => right.score - left.score || left.entry.id.localeCompare(right.entry.id))
     .slice(0,MAX_RETRIEVED_ENTRIES)
     .map(({ entry }) => entry));
+}
+
+/**
+ * FW-B / B-I1 — THE OWNERS' INSTRUCTION SLOT for the chat answer, exported so
+ * the injection corpus drives the text the engine really sends rather than a
+ * fixture that resembles it.
+ *
+ * Byte for byte the system text this service has always built: the language
+ * preamble and the retrieved, ratified entries, bounded at
+ * `MAX_SYSTEM_CODE_POINTS`. It is INSTRUCTION only. The visitor's message used
+ * to be a bare `user` turn beside it; it is material now, inside the fence, in
+ * its own named field (`./prompt.ts`).
+ */
+export function supportAnswerInstruction(
+  entries: readonly HelpCorpusEntry[],
+  language: SupportLanguage
+): string {
+  return boundedSystem(entries,language);
 }
 
 function boundedSystem(entries: readonly HelpCorpusEntry[], language: SupportLanguage): string {
@@ -198,11 +217,24 @@ export function createSupportAnswerService(input: Readonly<{
           halfOpenProbe = input.degraded?.isDegraded().degraded === true;
           const attemptSignal = halfOpenProbe
             ? AbortSignal.timeout(HALF_OPEN_PROBE_TIMEOUT_MS) : undefined;
+          /**
+           * FW-B / B-I1 + D-I3 — the visitor's turn goes through the frame.
+           *
+           * Built ONCE, outside `complete`, because the queue may run the
+           * operation again: the fence is minted per CALL, not per attempt, so
+           * a retry re-sends the same bytes (`buildFramedPrompt`, layer 2).
+           * `safeText` is the redacted visitor message — untrusted, and now
+           * inside the fenced `visitor_message` field instead of beside the
+           * instruction as a bare `user` turn.
+           */
+          const framed = buildSupportAnswerPrompt({
+            instruction: boundedSystem(entries,request.language),
+            visitorMessage: safeText
+          });
           const complete = (signal?: AbortSignal) => {
             modelCalled = true;
             return input.modelFor(request.modelRef).complete({
-              system: boundedSystem(entries,request.language),
-              messages: [{ role: "user",content: safeText }],language: request.language,
+              packet: framed.packet,language: request.language,
               ...(signal === undefined ? {} : { signal })
             });
           };

@@ -15,7 +15,9 @@ import {
   SupportCaseError
 } from "../../apps/api/src/support/cases.js";
 import { SupportModelError } from "../../apps/api/src/support/model.js";
+import { SUPPORT_SUMMARY_CONTRACT_ID } from "../../apps/api/src/support/prompt.js";
 import { createSupportCaseService } from "../../apps/api/src/support/session.js";
+import { readFramedMaterial } from "../support/framed-packet.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 let database: TestDatabase;
@@ -469,7 +471,12 @@ describe("SUP-02 cases", () => {
     const summary = Array.from({ length: 40 },(_,index) => `word${index}`).join(" ") + ".";
     const service = createAdvisorySummaryService({
       complete: async (request) => {
-        expect(request.system).toBe(
+        // FW-B / B-I1: the summary directive is the OWNERS' instruction slot of
+        // a framed packet now, and the door's own reader is the only way a test
+        // may open one.
+        const material = readFramedMaterial(request.packet);
+        expect(material.contractId).toBe(SUPPORT_SUMMARY_CONTRACT_ID);
+        expect(request.packet.messages[0]!.content).toContain(
           "Summarize the user's problem in one paragraph of at most 80 words. "
           + "Do not state or guess who the user is, whether they are the account owner, "
           + "or whether their request is legitimate."

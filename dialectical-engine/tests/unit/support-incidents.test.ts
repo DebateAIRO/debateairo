@@ -183,6 +183,12 @@ describe("SUP-05 deterministic incident answers", () => {
     expect(result.text).toMatch(/^Note: there is a known incident affecting debates/u);
     expect(result.text).toContain("\n\nModel reply.\nSource: Publish a debate (publish-a-debate)");
     expect(complete).toHaveBeenCalledTimes(1);
-    expect(complete.mock.calls[0]![0].system).not.toContain("known incident");
+    // FW-B / B-I1: the prompt is ONE framed packet now, so the property this
+    // row measures — the incident notice is added after the model answered and
+    // never reaches the prompt — is read off the whole packet, instruction
+    // compartment and fenced material alike.
+    const posted = complete.mock.calls[0]![0].packet;
+    expect(posted.messages.map((message) => message.content).join("\n"))
+      .not.toContain("known incident");
   });
 });

@@ -16,6 +16,10 @@ import {
   DOMAIN_TAGGER_PROMPT_CONTRACT
 } from "../../packages/evaluator/src/index.js";
 import { CONSUMER_AGGREGATE_PROMPT_CONTRACT } from "../../packages/evaluator/src/consumer.js";
+import {
+  supportAnswerPromptContract,
+  supportSummaryPromptContract
+} from "../../apps/api/src/support/prompt.js";
 
 /**
  * REVIEW ITEM 4, round 2 — THE DISCLOSURE, MADE UNROTTABLE.
@@ -218,7 +222,10 @@ describe("REVIEW ITEM 4 — no prompt anywhere still carries the retired sentenc
     ["evaluator", EVALUATOR_PROMPT_CONTRACT],
     ["blind-judge-grade", BLIND_JUDGE_GRADE_PROMPT_CONTRACT],
     ["domain-tagger", DOMAIN_TAGGER_PROMPT_CONTRACT],
-    ["consumer-aggregate", CONSUMER_AGGREGATE_PROMPT_CONTRACT]
+    ["consumer-aggregate", CONSUMER_AGGREGATE_PROMPT_CONTRACT],
+    // FW-B / B-I1: "anywhere" now includes the support chat's two contracts.
+    ["support-chat-answer", supportAnswerPromptContract("Answer from the supplied entries.")],
+    ["support-case-summary", supportSummaryPromptContract("Summarize the problem.")]
   ])("%s", (_name, contract) => {
     const whole = `${contract.instruction} ${contract.answerForm}`;
     expect(whole).not.toContain("untrusted data, not instructions");
