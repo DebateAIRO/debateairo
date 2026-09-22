@@ -74,6 +74,14 @@ export class SupportModelError extends TypedDomainError {
   constructor(code:
     | "SUPPORT_MODEL_UNAVAILABLE"
     | "SUPPORT_MODEL_PATH_NOT_RATIFIED"
+    // Review finding 4: an API-shaped target with no credential at all. It is
+    // the support chat's OWN extra rule — the debate path permits a target with
+    // no credential — so it gets its own name instead of hiding inside the
+    // not-ratified bucket with rows that are not targets at all.
+    | "SUPPORT_MODEL_CREDENTIAL_ABSENT"
+    // Review finding 3: the configured support model ref names no composed
+    // model. The route layer has always had this name for the condition.
+    | "SUPPORT_RELAY_NOT_COMPOSED"
     | "SUPPORT_DISABLED"
     // W10 (F1/F2 class member C): a completion the relay cut off at the token
     // bound. It is its OWN name, never UNAVAILABLE: the relay was available and
@@ -169,24 +177,40 @@ function ratifiedRelayTarget(
  * must be declared — a support chat with no way to authenticate is a start-up
  * mistake, not a runtime surprise.
  */
+function isApiShaped(baseUrl: unknown): boolean {
+  if (typeof baseUrl !== "string") return false;
+  try {
+    return new URL(baseUrl).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function apiVendorTarget(
   row: Readonly<Record<string,unknown>>,
   source: string
 ): ProviderDiscoveryTarget | undefined {
   if (typeof row.provider_ref !== "string" || row.provider_ref.trim() === "") return undefined;
+  // Review finding 4: a row whose base URL is `https:` is unambiguously meant to
+  // be an API target, so the parser's own typed refusal is the honest answer and
+  // it travels out untouched. A row that is neither shape keeps this module's
+  // `SUPPORT_MODEL_PATH_NOT_RATIFIED`, because for that row the parser's
+  // complaint would be about a shape nobody was aiming at.
+  const apiShaped = isApiShaped(row.base_url);
   let parsed: readonly ProviderDiscoveryTarget[];
   try {
     parsed = parseProviderDiscoveryTargets(`[${source}]`, [
       { providerRef: row.provider_ref, maker: SUPPORT_MODEL_MAKER }
     ]);
-  } catch {
+  } catch (error) {
+    if (apiShaped) throw error;
     return undefined;
   }
   const target = parsed[0];
   if (target === undefined) return undefined;
   if (new URL(target.baseUrl).protocol !== "https:") return undefined;
   if (target.authorizationHeader === undefined && target.authorizationFile === undefined) {
-    return undefined;
+    throw new SupportModelError("SUPPORT_MODEL_CREDENTIAL_ABSENT");
   }
   return target;
 }
@@ -248,7 +272,10 @@ function readUsage(value: unknown): SupportModelUsage | undefined {
   // gateway already reads from vendors (`usageSchema`, @debateai/providers), and
   // the support spend accounting (migration 0054's `cost_usd` column) is the
   // same column either way. A vendor that reports neither still reports tokens.
-  const costUsd = row.cost_usd ?? row.x_cost_usd;
+  // Review finding 6: `??` would stop at a `cost_usd` that is present and
+  // unusable (a string, NaN, a negative), which is exactly when the second name
+  // should be tried.
+  const costUsd = validMetric(row.cost_usd) ? row.cost_usd : row.x_cost_usd;
   const usage: {
     input_tokens?: number;
     output_tokens?: number;
@@ -293,32 +320,62 @@ export type SupportModelAdapterInput = Readonly<{
   model: string;
   timeoutMs?: number;
   fetchImplementation?: typeof fetch;
+  /**
+   * The caller's typed diagnostic sink (`reportSupportDiagnostic` in the API's
+   * composition). A seam, never a `console` call of this module's own: a module
+   * that handles a vendor credential must not be able to write a log line.
+   */
+  reportDiagnostic?: (diagnostic: Readonly<{ code: string }>) => void;
 }>;
 
 /**
  * What a transport accepts, and nothing else about it. The two shipped
  * transports differ ONLY here; everything below — the bounded body, the bounded
  * response, the truncation check, the usage read — is one implementation.
+ *
+ * `reportsCost` says whether a reply from this transport is EXPECTED to carry
+ * the money a call cost. The relay reports it; a vendor API usually does not,
+ * and the absence is announced rather than written to the database as silence
+ * (review finding 2).
  */
 type SupportTransportPolicy = Readonly<{
   acceptsUrl(url: URL): boolean;
   acceptsHeader(value: string): boolean;
+  reportsCost: boolean;
 }>;
 
-/** Today's relay rule, unchanged: cleartext loopback, any port, a bearer. */
+/** The path a chat-completions base URL must carry. */
+const CHAT_COMPLETIONS_PATH = "/v1" as const;
+
+function normalizedPath(url: URL): string {
+  return url.pathname.replace(/\/+$/u,"");
+}
+
+/** Today's relay rule, unchanged: cleartext loopback, any port, the path IS `/v1`. */
 const RELAY_TRANSPORT: SupportTransportPolicy = Object.freeze({
-  acceptsUrl: (url: URL) => url.protocol === "http:" && url.hostname === "127.0.0.1",
-  acceptsHeader: (value: string) => RELAY_BEARER_LINE.test(value)
+  acceptsUrl: (url: URL) => url.protocol === "http:"
+    && url.hostname === "127.0.0.1"
+    && normalizedPath(url) === CHAT_COMPLETIONS_PATH,
+  acceptsHeader: (value: string) => RELAY_BEARER_LINE.test(value),
+  reportsCost: true
 });
 
 /**
  * The paid vendor API: TLS only, and any single printable header line — the
  * scheme word is the vendor's business, and the custody reader has already
  * enforced the same shape on the file's contents.
+ *
+ * Review finding 1: the path ENDS WITH `/v1`, which is what
+ * `normalizedProviderBaseUrl` and the kit's §11 have always required. Demanding
+ * that the path BE `/v1` locked out every vendor whose OpenAI-compatible
+ * endpoint sits under a prefix — `openrouter.ai/api/v1`, `api.groq.com/openai/v1`
+ * — after they had passed the parser and the hosted assertion.
  */
 const API_TRANSPORT: SupportTransportPolicy = Object.freeze({
-  acceptsUrl: (url: URL) => url.protocol === "https:",
-  acceptsHeader: (value: string) => PRINTABLE_HEADER_LINE.test(value) && value === value.trim()
+  acceptsUrl: (url: URL) => url.protocol === "https:"
+    && normalizedPath(url).endsWith(CHAT_COMPLETIONS_PATH),
+  acceptsHeader: (value: string) => PRINTABLE_HEADER_LINE.test(value) && value === value.trim(),
+  reportsCost: false
 });
 
 class SupportChatCompletionsAdapter implements SupportModelPort {
@@ -327,6 +384,8 @@ class SupportChatCompletionsAdapter implements SupportModelPort {
   readonly #model: string;
   readonly #timeoutMs: number;
   readonly #fetch: typeof fetch;
+  readonly #transport: SupportTransportPolicy;
+  readonly #report: ((diagnostic: Readonly<{ code: string }>) => void) | undefined;
 
   constructor(input: SupportModelAdapterInput, transport: SupportTransportPolicy) {
     let url: URL;
@@ -341,7 +400,6 @@ class SupportChatCompletionsAdapter implements SupportModelPort {
       || url.password !== ""
       || url.search !== ""
       || url.hash !== ""
-      || url.pathname.replace(/\/+$/u,"") !== "/v1"
       || !transport.acceptsHeader(input.authorizationHeader)
       || input.model.trim() === ""
       || input.model !== input.model.trim()
@@ -355,6 +413,20 @@ class SupportChatCompletionsAdapter implements SupportModelPort {
     this.#model = input.model;
     this.#timeoutMs = timeoutMs;
     this.#fetch = input.fetchImplementation ?? fetch;
+    this.#transport = transport;
+    this.#report = input.reportDiagnostic;
+  }
+
+  /**
+   * Review finding 2(a). A vendor that answered and reported no money leaves the
+   * support row's `cost_usd` NULL, which is indistinguishable from a call that
+   * cost nothing. Until the cost envelope lands (V-28, task 11) the honest
+   * minimum is to SAY so, once per call, under a typed code, through the
+   * caller's own diagnostic reporter — this module writes no log line itself.
+   */
+  #reportMissingCost(usage: SupportModelUsage | undefined): void {
+    if (this.#transport.reportsCost || usage?.cost_usd !== undefined) return;
+    this.#report?.({ code: "SUPPORT_MODEL_COST_UNREPORTED" });
   }
 
   async complete(input: Parameters<SupportModelPort["complete"]>[0]) {
@@ -399,6 +471,7 @@ class SupportChatCompletionsAdapter implements SupportModelPort {
         || content.trim() === ""
         || [...content].length > MAX_COMPLETION_CODE_POINTS) unavailable();
       const usage = readUsage(decoded.usage);
+      this.#reportMissingCost(usage);
       return Object.freeze({
         text: content.trim(),
         ...(usage === undefined ? {} : { usage })
@@ -445,6 +518,7 @@ export function createSupportModelAdapter(
     readAuthorizationHeader: (path: string) => string;
     timeoutMs?: number;
     fetchImplementation?: typeof fetch;
+    reportDiagnostic?: (diagnostic: Readonly<{ code: string }>) => void;
   }>
 ): SupportModelPort {
   const authorizationHeader = target.authorizationFile === undefined
@@ -459,7 +533,9 @@ export function createSupportModelAdapter(
     model: target.model,
     ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
     ...(options.fetchImplementation === undefined
-      ? {} : { fetchImplementation: options.fetchImplementation })
+      ? {} : { fetchImplementation: options.fetchImplementation }),
+    ...(options.reportDiagnostic === undefined
+      ? {} : { reportDiagnostic: options.reportDiagnostic })
   };
   // The transport follows the target's own protocol, which the parse and the
   // mode decision above have already ruled lawful for this deployment.

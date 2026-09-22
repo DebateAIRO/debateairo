@@ -476,7 +476,8 @@ const supportModels = new Map<string,SupportModelPort>(supportModelTarget === un
   // custody-checked loader the debate targets use — one seam, one contract.
   createSupportModelAdapter(supportModelTarget,{
     readAuthorizationHeader: readCustodyAuthorizationHeader,
-    timeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS
+    timeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS,
+    reportDiagnostic: reportSupportDiagnostic
   })
 ] as const]);
 const supportModelReservations = new SupportModelReservationLedger({
@@ -489,7 +490,10 @@ const supportAdmittedModel = createReservedSupportModelPort({
   configuration: supportConfiguration,
   ledger: supportModelReservations,
   durableCalls: supportRelayCallRecords,
-  modelFor: (modelRef) => supportModels.get(modelRef)
+  modelFor: (modelRef) => supportModels.get(modelRef),
+  // V-30: a configured model ref that names no composed model says so, once,
+  // instead of degrading every visitor's answer with no reason recorded.
+  reportDiagnostic: reportSupportDiagnostic
 });
 const supportCaseSummaries = new PostgresSupportCaseSummaryRepository(supportPool);
 const supportSummaryService = createAdvisorySummaryService({

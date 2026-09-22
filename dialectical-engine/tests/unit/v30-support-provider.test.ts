@@ -155,6 +155,70 @@ describe("V-30 hosted: the support chat reaches a paid API and refuses a relay",
       .toBe(VENDOR_CREDENTIAL);
   });
 
+  /**
+   * Review finding 1. The vendors V is most likely to buy first put their
+   * OpenAI-compatible endpoint UNDER a path prefix: `openrouter.ai/api/v1`,
+   * `api.groq.com/openai/v1`, `api.together.xyz/v1`. The parser and the kit both
+   * say "path ending in /v1"; only the adapter said "path IS /v1", so those
+   * targets passed every rule and then died at module load under the generic
+   * not-ratified code. That is the go-live item V-30 exists to unblock.
+   */
+  it.each([
+    ["https://openrouter.ai/api/v1", "https://openrouter.ai/api/v1/chat/completions"],
+    ["https://api.groq.com/openai/v1", "https://api.groq.com/openai/v1/chat/completions"],
+    ["https://api.together.xyz/v1", "https://api.together.xyz/v1/chat/completions"]
+  ])("reaches a vendor whose endpoint sits under a path prefix (%s)", async (baseUrl, posted) => {
+    const path = credentialFile(VENDOR_CREDENTIAL);
+    const target = parseSupportModelTargetJson(
+      vendorTarget({ authorization_file: path }, { base_url: baseUrl }), HOSTED
+    );
+    expect(target.baseUrl).toBe(baseUrl);
+    const fetchRecord = recordingFetch(ANSWER);
+    await createSupportModelAdapter(target, {
+      readAuthorizationHeader: readCustodyAuthorizationHeader,
+      fetchImplementation: fetchRecord.implementation
+    }).complete(ask());
+    expect(fetchRecord.calls[0]?.url).toBe(posted);
+  });
+
+  /**
+   * Review finding 2(a). Most vendors report tokens and no money at all, and the
+   * support `cost_usd` column then stays NULL with nothing said. Task 11 owns the
+   * money envelope (V-28); until it lands the honest minimum is that the silence
+   * is ANNOUNCED, once per call, under a typed code and through the support
+   * diagnostic reporter — never a bare console line from this module.
+   */
+  it("reports a typed diagnostic when a vendor reply carries no cost, and none when it does", async () => {
+    const path = credentialFile(VENDOR_CREDENTIAL);
+    const target = parseSupportModelTargetJson(
+      vendorTarget({ authorization_file: path }), HOSTED
+    );
+    const seen: string[] = [];
+    const adapterFor = (body: unknown) => createSupportModelAdapter(target, {
+      readAuthorizationHeader: readCustodyAuthorizationHeader,
+      fetchImplementation: recordingFetch(body).implementation,
+      reportDiagnostic: (diagnostic) => { seen.push(diagnostic.code); }
+    });
+    await adapterFor({ ...ANSWER, usage: { prompt_tokens: 12, completion_tokens: 3 } })
+      .complete(ask());
+    expect(seen).toEqual(["SUPPORT_MODEL_COST_UNREPORTED"]);
+    await adapterFor(ANSWER).complete(ask());
+    expect(seen).toEqual(["SUPPORT_MODEL_COST_UNREPORTED", "SUPPORT_MODEL_COST_UNREPORTED"]);
+    seen.length = 0;
+    await adapterFor({ ...ANSWER, usage: { prompt_tokens: 12, cost_usd: 0.002 } }).complete(ask());
+    expect(seen).toEqual([]);
+  });
+
+  it("says nothing about cost on the local relay, which reports its own", async () => {
+    const seen: string[] = [];
+    await createSupportModelAdapter(parseSupportModelTargetJson(RELAY_TARGET, LOCAL), {
+      readAuthorizationHeader: () => { throw new TypeError("NO_FILE_IS_READ_ON_THE_RELAY_PATH"); },
+      fetchImplementation: recordingFetch(ANSWER).implementation,
+      reportDiagnostic: (diagnostic) => { seen.push(diagnostic.code); }
+    }).complete(ask());
+    expect(seen).toEqual([]);
+  });
+
   it("names the provider, never the path or the credential, when the file cannot be used", () => {
     const absentRoot = mkdtempSync(join(tmpdir(), "t12-absent-"));
     roots.push(absentRoot);
@@ -319,17 +383,41 @@ describe("V-30 local: the user's own API key is admitted", () => {
     )).toMatchObject({ authorizationFile: "/etc/debateai/api/providers/acme.header" });
   });
 
-  it("refuses a target that declares both credential forms, and one that declares neither", () => {
-    for (const invalid of [
+  /**
+   * Review finding 4. A row that is unambiguously an API target — its base URL
+   * is `https:` — keeps the refusal the REUSED parser raised. Collapsing those
+   * into one generic code told an operator with a typo in a credential path
+   * exactly the same thing as an operator whose target is not a target at all.
+   * `SUPPORT_MODEL_PATH_NOT_RATIFIED` is kept for a row that is neither lawful
+   * shape, and the support chat's own extra rule gets its own name.
+   */
+  it.each([
+    [
+      "both credential forms",
       vendorTarget({
         authorization_header: VENDOR_CREDENTIAL,
         authorization_file: "/etc/debateai/api/providers/acme.header"
       }),
+      "PROVIDER_DISCOVERY_AUTHORIZATION_CONFLICT"
+    ],
+    [
+      "a credential path that is not absolute",
+      vendorTarget({ authorization_file: "providers/acme.header" }),
+      "PROVIDER_DISCOVERY_AUTHORIZATION_FILE_INVALID"
+    ],
+    [
+      "a member that is not part of a target",
+      vendorTarget({ authorization_header: VENDOR_CREDENTIAL }, { fallback: "vendor:other" }),
+      "PROVIDER_DISCOVERY_TARGETS_INVALID"
+    ],
+    [
+      "no credential at all",
       vendorTarget({}),
-      vendorTarget({ authorization_file: "providers/acme.header" })
-    ]) {
-      expect(() => parseSupportModelTargetJson(invalid, LOCAL))
-        .toThrow("SUPPORT_MODEL_PATH_NOT_RATIFIED");
+      "SUPPORT_MODEL_CREDENTIAL_ABSENT"
+    ]
+  ])("keeps the honest refusal for an API-shaped row with %s", (_name, invalid, code) => {
+    for (const deployment of [LOCAL, HOSTED]) {
+      expect(() => parseSupportModelTargetJson(invalid, deployment)).toThrow(code);
     }
   });
 });
@@ -346,5 +434,12 @@ describe("V-30(2) the local-mode instructions say local mode is for a computer y
     expect(runbook).toMatch(/DR-133/u);
     expect(runbook).toMatch(/support\s+chat/iu);
     expect(runbook).toMatch(/hosted/iu);
+    // Review finding 5: the paragraph points at a hardening list, so the list
+    // has to exist and to name every relay the local mode starts.
+    expect(runbook).toMatch(/local-mode\s+hardening\s+list/iu);
+    for (const tool of ["claude-relay.ts", "model-shim.ts", "grok-relay.ts", "hermes-relay.ts"]) {
+      expect(runbook, tool).toContain(tool);
+    }
+    expect(runbook).toMatch(/no-hang\s+proof/u);
   });
 });

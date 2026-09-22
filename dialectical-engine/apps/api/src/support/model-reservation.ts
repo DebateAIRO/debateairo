@@ -251,6 +251,12 @@ export function createReservedSupportModelPort(input: Readonly<{
     }>): Promise<Readonly<{ kind: "RECORDED" | "DAILY_CAP" }>>;
   }>;
   modelFor(modelRef: string): SupportModelPort | undefined;
+  /**
+   * V-30 review finding 3: the typed diagnostic sink (`reportSupportDiagnostic`
+   * in the API's composition). The ONE condition it reports here is a configured
+   * support model ref that names no composed model.
+   */
+  reportDiagnostic?: (diagnostic: Readonly<{ code: string }>) => void;
   kind?: () => SupportSubmissionKind;
   nonce?: () => string;
   clock?: () => Date;
@@ -274,7 +280,16 @@ export function createReservedSupportModelPort(input: Readonly<{
       const model = input.modelFor(result.modelRef);
       if (model === undefined) {
         result.reservation.releaseBeforePost();
-        throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
+        // V-30 review finding 3. The sealed `supportModelRef` and the composed
+        // model map disagree — a hosted cutover that published one of them and
+        // not the other. Every visitor sees DEGRADED either way; what changes
+        // here is that the refusal carries the name the route layer has always
+        // had for this condition, and the operator gets one line naming the ref
+        // that could not be composed. A ref is configuration, never a secret.
+        input.reportDiagnostic?.({
+          code: `SUPPORT_RELAY_NOT_COMPOSED:${result.modelRef}`
+        });
+        throw new SupportModelError("SUPPORT_RELAY_NOT_COMPOSED");
       }
       let durable: Readonly<{ kind: "RECORDED" | "DAILY_CAP" }>;
       try {
