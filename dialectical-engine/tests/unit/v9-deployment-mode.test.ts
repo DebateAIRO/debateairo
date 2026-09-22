@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { networkInterfaces } from "node:os";
 import { describe, expect, it } from "vitest";
 import {
   DEPLOYMENT_MODES,
@@ -9,7 +10,9 @@ import {
 } from "../../packages/register/src/runtime-environment.js";
 import {
   assertDeploymentProviderTargets,
-  parseProviderDiscoveryTargets
+  isRefusedHostedProviderHost,
+  parseProviderDiscoveryTargets,
+  thisMachineAddressKeys
 } from "../../packages/providers/src/index.js";
 import {
   validApiEnvironmentFixture,
@@ -75,7 +78,35 @@ const TARGET_KINDS = Object.freeze({
   "link-local-ipv6-top-https": { base_url: "https://[febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff]/v1" },
   "ipv4-mapped-link-local-https": { base_url: "https://[::ffff:169.254.1.1]/v1" },
   "ipv4-mapped-this-network-https": { base_url: "https://[::ffff:0.0.0.1]/v1" },
+  // C-I3 (final review, area C): the PRIVATE networks. No paid vendor's public
+  // API can be at one of these, and the hosted operator's own VPS interface,
+  // its Docker bridge and its cloud metadata service all are — so a relay one
+  // hop away on the private side passed the hosted check that exists to refuse
+  // exactly that. RFC 1918, RFC 6598 (CGNAT) and RFC 4193 (ULA).
+  "private-10-https": { base_url: "https://10.0.0.2:8443/v1" },
+  "private-10-top-https": { base_url: "https://10.255.255.254/v1" },
+  "private-172-16-https": { base_url: "https://172.16.0.1/v1" },
+  "private-172-31-https": { base_url: "https://172.31.255.254/v1" },
+  "private-192-168-https": { base_url: "https://192.168.1.10/v1" },
+  "cgnat-https": { base_url: "https://100.64.0.1/v1" },
+  "cgnat-top-https": { base_url: "https://100.127.255.254/v1" },
+  "ula-fc-https": { base_url: "https://[fc00::1]/v1" },
+  "ula-fd-https": { base_url: "https://[fd00::1]/v1" },
+  "ula-top-https": { base_url: "https://[fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]/v1" },
+  "ipv4-mapped-private-10-https": { base_url: "https://[::ffff:10.0.0.2]/v1" },
+  "ipv4-mapped-private-192-168-https": { base_url: "https://[::ffff:192.168.1.10]/v1" },
+  "ipv4-mapped-cgnat-https": { base_url: "https://[::ffff:100.64.0.1]/v1" },
   // Controls just OUTSIDE each new range, which must stay admitted.
+  "vendor-below-private-10-https": { base_url: "https://9.255.255.254/v1" },
+  "vendor-above-private-10-https": { base_url: "https://11.0.0.1/v1" },
+  "vendor-below-private-172-https": { base_url: "https://172.15.255.254/v1" },
+  "vendor-above-private-172-https": { base_url: "https://172.32.0.1/v1" },
+  "vendor-below-private-192-168-https": { base_url: "https://192.167.255.254/v1" },
+  "vendor-above-private-192-168-https": { base_url: "https://192.169.0.1/v1" },
+  "vendor-below-cgnat-https": { base_url: "https://100.63.255.254/v1" },
+  "vendor-above-cgnat-https": { base_url: "https://100.128.0.1/v1" },
+  "vendor-below-ula-https": { base_url: "https://[fbff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]/v1" },
+  "vendor-mapped-public-https": { base_url: "https://[::ffff:9.9.9.9]/v1" },
   "vendor-below-link-local-https": { base_url: "https://169.253.0.1/v1" },
   "vendor-public-resolver-https": { base_url: "https://1.0.0.1/v1" },
   "vendor-below-fe80-https": { base_url: "https://[fe00::1]/v1" },
@@ -159,7 +190,20 @@ const TABLE = Object.freeze([
     "link-local-ipv6-https",
     "link-local-ipv6-top-https",
     "ipv4-mapped-link-local-https",
-    "ipv4-mapped-this-network-https"
+    "ipv4-mapped-this-network-https",
+    "private-10-https",
+    "private-10-top-https",
+    "private-172-16-https",
+    "private-172-31-https",
+    "private-192-168-https",
+    "cgnat-https",
+    "cgnat-top-https",
+    "ula-fc-https",
+    "ula-fd-https",
+    "ula-top-https",
+    "ipv4-mapped-private-10-https",
+    "ipv4-mapped-private-192-168-https",
+    "ipv4-mapped-cgnat-https"
   ] as const).map((kind) => ({
     kind,
     hosted: "PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
@@ -175,7 +219,17 @@ const TABLE = Object.freeze([
     "vendor-below-fe80-https",
     "vendor-above-fe80-https",
     "vendor-localdomain-suffix-https",
-    "vendor-ip6-name-suffix-https"
+    "vendor-ip6-name-suffix-https",
+    "vendor-below-private-10-https",
+    "vendor-above-private-10-https",
+    "vendor-below-private-172-https",
+    "vendor-above-private-172-https",
+    "vendor-below-private-192-168-https",
+    "vendor-above-private-192-168-https",
+    "vendor-below-cgnat-https",
+    "vendor-above-cgnat-https",
+    "vendor-below-ula-https",
+    "vendor-mapped-public-https"
   ] as const).map((kind) => ({
     kind, hosted: null, localProduction: null, localDevelopment: null
   }))
@@ -277,6 +331,62 @@ describe("V-9 mode x provider target (task 10a)", () => {
     expect(JSON.stringify(caught, Object.getOwnPropertyNames(caught ?? {}))).not.toContain(SECRET);
     expect(JSON.stringify(caught, Object.getOwnPropertyNames(caught ?? {})))
       .not.toContain("v9-fixture-token-never-printed");
+  });
+
+  /**
+   * C-I3 — THE HOST'S OWN ADDRESSES, READ ONCE AT START-UP.
+   *
+   * The private ranges above cover the address a relay on the private side of
+   * the VPS would use. They do NOT cover the case the hosted deployment
+   * actually has: a VPS answers on a PUBLIC address of its own, and
+   * `https://<that address>/v1` is the same machine by any reading. No DNS is
+   * involved — the addresses come from `os.networkInterfaces()`, once, at
+   * module load, and the comparison is on the parsed literal exactly as every
+   * other clause here.
+   */
+  it("refuses every literal address this host holds", () => {
+    const addresses = Object.values(networkInterfaces())
+      .flatMap((entries) => entries ?? [])
+      .map((entry) => entry.address);
+    // Loopback alone is enough for the assertion below to be honest, but a
+    // host with no interface at all would make it vacuous.
+    expect(addresses.length).toBeGreaterThan(0);
+    for (const address of addresses) {
+      const bare = address.split("%")[0]!;
+      const host = bare.includes(":") ? `[${bare}]` : bare;
+      const target = parseProviderDiscoveryTargets(
+        JSON.stringify([{ provider_ref: "provider-1", model: "model-1", base_url: `https://${host}/v1` }]),
+        [{ providerRef: "provider-1", maker: "maker-1" }]
+      );
+      expect(() => assertDeploymentProviderTargets(target, { mode: "hosted", nodeEnv: "production" }), host)
+        .toThrowError(new TypeError("PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1"));
+    }
+  });
+
+  /**
+   * ...and the decision is taken against THAT SET, not against a list of ranges
+   * that happens to contain it. 203.0.113.0/24 is TEST-NET-3 (RFC 5737): it is
+   * routable-looking, is in no private range, and is on no interface of this
+   * host — so it is admitted, and refused only when the set holds it.
+   */
+  it("decides the own-address class on the read-once set, in every spelling", () => {
+    expect(isRefusedHostedProviderHost("203.0.113.9")).toBe(false);
+    const held = thisMachineAddressKeys(["203.0.113.9", "2001:db8::5%en0"]);
+    expect(isRefusedHostedProviderHost("203.0.113.9", held)).toBe(true);
+    // The same interface address written as an IPv4-mapped IPv6 literal, in
+    // both the dotted-quad spelling and the one Node normalises it to.
+    expect(isRefusedHostedProviderHost("[::ffff:203.0.113.9]", held)).toBe(true);
+    expect(isRefusedHostedProviderHost(new URL("https://[::ffff:203.0.113.9]/v1").hostname, held))
+      .toBe(true);
+    // A scoped IPv6 interface address: the zone names the interface, not the
+    // address, so the target's unscoped spelling must still match.
+    expect(isRefusedHostedProviderHost("[2001:db8::5]", held)).toBe(true);
+    expect(isRefusedHostedProviderHost("[2001:DB8:0:0:0:0:0:5]", held)).toBe(true);
+    // A neighbour of a held address is not the host.
+    expect(isRefusedHostedProviderHost("203.0.113.10", held)).toBe(false);
+    expect(isRefusedHostedProviderHost("[2001:db8::6]", held)).toBe(false);
+    // A NAME is never resolved (README §11 says so, and the code comment does).
+    expect(isRefusedHostedProviderHost("api.vendor.example", held)).toBe(false);
   });
 
   /**
