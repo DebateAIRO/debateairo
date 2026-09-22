@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import { readCustodyAuthorizationHeader } from "../../packages/crypto/src/index.js";
 import {
+  ApiVendorAdapter,
+  RelayAdapter,
   SUPPORT_HERMES_MODEL,
   SUPPORT_HERMES_PROVIDER_REF,
   createSupportModelAdapter,
@@ -202,6 +204,15 @@ describe("V-30 the hosted credential cannot escape", () => {
     expect(JSON.stringify(adapter!)).not.toContain(VENDOR_CREDENTIAL);
     expect(Object.values(process.env).join(" ")).not.toContain(VENDOR_CREDENTIAL);
     expect(process.argv.join(" ")).not.toContain(VENDOR_CREDENTIAL);
+  });
+
+  it("keeps each transport on its own endpoint shape", () => {
+    expect(() => new ApiVendorAdapter({
+      baseUrl: "http://127.0.0.1:8794/v1", authorizationHeader: RELAY_CREDENTIAL, model: "m"
+    })).toThrowError(expect.objectContaining({ code: "SUPPORT_MODEL_PATH_NOT_RATIFIED" }));
+    expect(() => new RelayAdapter({
+      baseUrl: "https://api.acme.example/v1", authorizationHeader: VENDOR_CREDENTIAL, model: "m"
+    })).toThrowError(expect.objectContaining({ code: "SUPPORT_MODEL_PATH_NOT_RATIFIED" }));
   });
 
   it("never spawns a child and never writes a log line from the model module", async () => {
