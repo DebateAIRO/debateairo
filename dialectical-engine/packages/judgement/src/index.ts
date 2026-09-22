@@ -1,6 +1,13 @@
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
-import { CLAIM_TYPES, REVIEW_OUTCOMES, TypedDomainError, type ReviewOutcome, type WayOfKnowing } from "@debateai/kernel";
+import {
+  argumentLanguageDirective,
+  CLAIM_TYPES,
+  REVIEW_OUTCOMES,
+  TypedDomainError,
+  type ReviewOutcome,
+  type WayOfKnowing
+} from "@debateai/kernel";
 import {
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
@@ -162,6 +169,7 @@ export interface JudgeInput {
   readonly subjectItemId: string;
   readonly callSiteKey: string;
   readonly questionLine: string;
+  readonly argumentLanguageName?: string;
   /**
    * FAIR-01 (DR-140(b)): the text the code-first claim classifier runs on when
    * it differs from the prompt line. One debate has ONE claim frame — the
@@ -201,6 +209,7 @@ export interface JudgeSubjectInput {
   readonly subjectItemId: string;
   readonly callSiteKey: string;
   readonly questionLine: string;
+  readonly argumentLanguageName?: string;
   readonly statement: string;
   readonly authorMaker: string;
   readonly providerRef: string;
@@ -282,6 +291,10 @@ export class Judge {
   "fallacy": { "severity": number [0,1], "fatalFlags": [{ "type": non-empty string, "severity": number [0,1], "description": non-empty string }] }
 }
 Never invent evidence, citations, or sources. Score relevance against the question asked. Use REAL_ATTACK only for a supplied attack; otherwise use PLAUSIBLE_COUNTER and say so. LOOKED_UP requires a resolving locator.${codeClaim.claimType === "unknown" ? " The code classifier returned unknown; include claim_type from the declared closed vocabulary." : " Omit claim_type; the code-first classifier already resolved it."} ${UNTRUSTED_PROMPT_FIELDS_INSTRUCTION}`
+        },
+        {
+          role: "system",
+          content: argumentLanguageDirective(input.argumentLanguageName ?? "the same language as the question")
         },
         {
           role: "user",
@@ -378,6 +391,10 @@ Never invent evidence, citations, or sources. Score relevance against the questi
           content: `Review an existing debate node authored by another participant. Return only one JSON object with exactly this schema and no additional keys:\n{\n  "outcome": "agree" | "dispute" | "cannot-assess",\n  "reasons": [non-empty string, ...],\n  "edge_bearings": [number in [0,1] or null, ...]\n}\nUse cannot-assess when the supplied material does not support an honest judgement. edge_bearings measures how strongly the statement bears on each target listed in edges_sourced_by_this_node, in the SAME ORDER, one entry per edge and exactly ${String(input.edges.length)} entries. Use 0 for no bearing, 1 for a decisive bearing, and null when the supplied material does not support an honest measurement of that edge. Never invent evidence, citations, or sources. ${UNTRUSTED_PROMPT_FIELDS_INSTRUCTION}`
         },
         {
+          role: "system",
+          content: argumentLanguageDirective(input.argumentLanguageName ?? "the same language as the question")
+        },
+        {
           role: "user",
           content: renderUntrustedPromptFields([
             { name: "question_line", content: input.questionLine },
@@ -465,6 +482,10 @@ Never invent evidence, citations, or sources. Score relevance against the questi
         {
           role: "system",
           content: `Assess an existing debate node authored by another participant. Do not restate, rewrite or re-author the statement; assess the statement exactly as supplied. Return only one JSON object with exactly the following schema and no additional keys. Arrays may be empty, but every string must be non-empty:\n{\n  "steelman": { "summary": non-empty string, "fidelity": number [0,1] },\n  "critic": { "summary": non-empty string, "counterargumentStrength": number [0,1], "basis": "REAL_ATTACK" | "PLAUSIBLE_COUNTER" },\n  "evidence": { "quality": number [0,1], "relevance": number [0,1] },\n  "context": { "fit": number [0,1], "ambiguityFlags": non-empty string[] },\n  "fallacy": { "severity": number [0,1], "fatalFlags": [{ "type": non-empty string, "severity": number [0,1], "description": non-empty string }] }\n}\nNever invent evidence, citations, or sources. Score relevance against the question asked. Use REAL_ATTACK only for a supplied attack; otherwise use PLAUSIBLE_COUNTER and say so. ${UNTRUSTED_PROMPT_FIELDS_INSTRUCTION}`
+        },
+        {
+          role: "system",
+          content: argumentLanguageDirective(input.argumentLanguageName ?? "the same language as the question")
         },
         {
           role: "user",

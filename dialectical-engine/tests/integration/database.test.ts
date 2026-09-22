@@ -50,13 +50,19 @@ import {
   type PreservedConditionMarkRecord,
   type ServeGateResult
 } from "@debateai/serve";
-import { AnswerSchema } from "@debateai/contract";
-import type { ServedRootRuleHistory } from "@debateai/kernel";
+import {
+  AnswerSchema,
+  PLAN_TIER_ROSTERS,
+  type AskRequest,
+  type Session
+} from "@debateai/contract";
+import { argumentLanguageDirective, type ServedRootRuleHistory } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
 import {
   buildApi,
   PostgresAskApplication,
-  type AskApplication
+  type AskApplication,
+  type RunCreationSettings
 } from "@debateai/api";
 import { HOME_PAGE_SIZE } from "../../apps/ui/lib/serverApi.js";
 import { projectCanvasCensus } from "../../apps/ui/lib/v3/census.js";
@@ -678,6 +684,77 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await database?.stop();
+});
+
+describe("S-LANG argument language persistence", () => {
+  it("stores Romanian detected from question_line through PostgresAskApplication.submit", async () => {
+    const askerId = `asker:slang:${randomUUID()}`;
+    const panel = PLAN_TIER_ROSTERS.free.map((modelId, index) => Object.freeze({
+      provider_ref: `provider:slang:${String(index + 1)}`,
+      maker: `maker:slang:${String(index + 1)}`,
+      model_id: modelId,
+      probe_evidence_ref: randomUUID(),
+      probed_at: "2026-09-22T00:00:00.000Z"
+    }));
+    const settings: RunCreationSettings = {
+      strangerSampleRate: 0,
+      registerVersion: 1,
+      batteryVersion: "slang-test",
+      settlementWatchHandle: "slang-test",
+      resolveDiscoveredPanel: async () => panel,
+      resolveEnvelopeBasis: async ({ panelSize }) => fixtureStructuralCeiling(12, panelSize, 1),
+      resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
+        effectiveRiskTier,
+        tierSource: tierSource as "ASKER" | "MACHINE_DEFAULT" | "DEPLOYMENT_POLICY",
+        tierProvenanceRef
+      })
+    };
+    const application = new PostgresAskApplication(
+      database.pool,
+      { dispatch: async () => undefined },
+      settings,
+      undefined,
+      database.pool,
+      createTestAskAdmissionPoolFacades(database.pool)
+    );
+    const ask: AskRequest = {
+      question_line: "Ar trebui ca România să investească mai mult în transportul public, deoarece orașele au nevoie de aer mai curat.",
+      risk_tier: "casual",
+      tier_source: "ASKER",
+      tier_provenance_ref: "asker-declaration:slang",
+      composition_budget_tier: "low",
+      depth_params: { depth: 1 },
+      decision_scope: "S-LANG integration test",
+      as_of: "2026-09-22T00:00:00.000Z",
+      steering_presets: [],
+      plan_tier: "free",
+      steering_annotations: []
+    };
+    const session = {
+      asker_id: askerId,
+      session_id: `session:slang:${randomUUID()}`,
+      caller_scope: "ASKER",
+      ownership_provenance: "user_dev_token",
+      provisional_identity_model: true
+    } as unknown as Session;
+
+    const accepted = await application.submit(ask, session, {
+      kind: "legacy",
+      legacyAskerId: askerId
+    });
+    const stored = await database.pool.query<{
+      argument_language_tag: string;
+      argument_language_name: string;
+    }>(
+      `SELECT argument_language_tag,argument_language_name
+       FROM core.run WHERE run_id=$1`,
+      [accepted.run_ref]
+    );
+    expect(stored.rows[0]).toEqual({
+      argument_language_tag: "ro",
+      argument_language_name: "Romanian"
+    });
+  });
 });
 
 describe("BUG-01 content-rejection retry accounting", () => {
@@ -4280,12 +4357,17 @@ describe("apps/runner — legal command lifecycle", () => {
       for (const [index, packet] of attempts.entries()) {
         expect(packet.messages[0]?.role, `attempt ${index}`).toBe("system");
         expect(packet.messages[0]?.content, `attempt ${index}`).toBe(EVALUATOR_CONTRACT_TEXT);
+        expect(packet.messages[1], `attempt ${index}`).toEqual({
+          role: "system",
+          content: argumentLanguageDirective("the same language as the question")
+        });
       }
 
       const messages = evaluatorCalls[0]!.packet.messages;
       const system = messages.filter((message) => message.role === "system");
-      expect(system).toHaveLength(1);
+      expect(system).toHaveLength(2);
       expect(system[0]!.content).toBe(EVALUATOR_CONTRACT_TEXT);
+      expect(system[1]!.content).toBe(argumentLanguageDirective("the same language as the question"));
       // and it leads the packet, so no earlier instruction can displace it
       expect(messages[0]?.role).toBe("system");
       expect(messages[0]?.content).toBe(EVALUATOR_CONTRACT_TEXT);

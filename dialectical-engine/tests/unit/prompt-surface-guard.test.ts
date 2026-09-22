@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { Judge } from "@debateai/judgement";
+import { argumentLanguageDirective } from "@debateai/kernel";
 import {
   ProviderContentUnacceptedError,
   type PromptPacket,
@@ -63,6 +64,7 @@ const WITHHELD = {
 const QUESTION_LINE = "Should the proposal stand?";
 const STATEMENT = "The proposal should stand on its own merits.";
 const TARGET_STATEMENT = "The proposal fails on cost.";
+const ARGUMENT_LANGUAGE_NAME = "Romanian";
 
 /** The foreign-text framing V-BLIND-CONTEXT keeps: authored elsewhere, never by whom. */
 const FOREIGN_TEXT_FRAMING = "authored by another participant";
@@ -97,6 +99,7 @@ const SUBJECT = {
   subjectItemId: WITHHELD.subjectItemId,
   callSiteKey: WITHHELD.callSiteKey,
   questionLine: QUESTION_LINE,
+  argumentLanguageName: ARGUMENT_LANGUAGE_NAME,
   statement: STATEMENT,
   authorMaker: WITHHELD.authorMaker,
   providerRef: WITHHELD.providerRef,
@@ -122,6 +125,7 @@ const BUILDERS = [
         subjectItemId: SUBJECT.subjectItemId,
         callSiteKey: SUBJECT.callSiteKey,
         questionLine: QUESTION_LINE,
+        argumentLanguageName: ARGUMENT_LANGUAGE_NAME,
         providerRef: SUBJECT.providerRef,
         contractHash: SUBJECT.contractHash,
         bound: BOUND
@@ -165,9 +169,9 @@ function contentsOf(captures: readonly Capture[], builder: string): string[] {
 
 describe("V-BLIND-CONTEXT — the judgement prompt surface withholds authorship", () => {
   it("covers every prompt builder in packages/judgement/src", async () => {
-    // A `role: "system"` site is one prompt builder. If someone adds a fourth,
-    // this row fails before any of the withholding rows can report a coverage
-    // it never had.
+    // Every prompt builder has two system sites: its byte-stable JSON contract
+    // first and the argument-language directive second. A new or incomplete
+    // builder makes this count fail before the rows below can claim coverage.
     // F3: RECURSIVE. The package is flat today, and the non-recursive read was
     // therefore correct and blind at the same time — a builder added under any
     // subdirectory escaped the row silently, and the withholding rows below
@@ -180,7 +184,7 @@ describe("V-BLIND-CONTEXT — the judgement prompt surface withholds authorship"
       .map((entry) => readFileSync(`${JUDGEMENT_SRC}/${entry}`, "utf8"))
       .join("\n")
       .split(/\brole: "system"/).length - 1;
-    expect(systemSites).toBe(BUILDERS.length);
+    expect(systemSites).toBe(BUILDERS.length * 2);
 
     // And the instrument must actually have run: one initial packet plus one
     // repair packet per builder, every packet carrying messages.
@@ -210,11 +214,26 @@ describe("V-BLIND-CONTEXT — the judgement prompt surface withholds authorship"
         .filter((capture) => capture.builder === builder && capture.stage === "initial")
         .flatMap((capture) => capture.packet.messages.filter((message) => message.role === "system"))
         .map((message) => message.content);
-      expect(system).toHaveLength(1);
+      expect(system).toHaveLength(2);
       expect(system[0]).toContain(framing);
       // V-S11-GRADER: the same model may review, so the prompt may not assert
       // that the reviewer differs from the author.
       expect(system[0]).not.toMatch(/different maker|another maker/);
+    }
+  );
+
+  it.each(BUILDERS.map(({ name }) => name))(
+    "%s keeps the language directive second in initial and repair packets",
+    async (builder) => {
+      const captures = (await captureAll()).filter((capture) => capture.builder === builder);
+      expect(captures).toHaveLength(2);
+      for (const capture of captures) {
+        expect(capture.packet.messages[0]?.role).toBe("system");
+        expect(capture.packet.messages[1]).toEqual({
+          role: "system",
+          content: argumentLanguageDirective(ARGUMENT_LANGUAGE_NAME)
+        });
+      }
     }
   );
 

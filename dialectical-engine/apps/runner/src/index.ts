@@ -110,7 +110,14 @@ import {
   type VerdictLabelBasis
 } from "@debateai/serve";
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
-import { SERVED_ROOT_SELECTION_RULE, TypedDomainError, type CompositionBudgetTier, type ServedRootRule, type WayOfKnowing } from "@debateai/kernel";
+import {
+  argumentLanguageDirective,
+  SERVED_ROOT_SELECTION_RULE,
+  TypedDomainError,
+  type CompositionBudgetTier,
+  type ServedRootRule,
+  type WayOfKnowing
+} from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
 import { declaredRef, emit, getObsContext, runWithObsContext } from "@debateai/obs-capture";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
@@ -177,6 +184,28 @@ const compositionSchema = z.object({
  */
 export const EVALUATOR_CONTRACT_TEXT =
   "Return only JSON {satisfied,objection,criteria} where criteria is {fairness_to_losers,statement_label_agreement,no_overstatement,restatement,citation_tracing}, each a boolean. Set satisfied true only when every criterion is true. When satisfied is false, objection must state the objection in full; when it is true, objection must be null.";
+
+export function buildSynthesizerPromptPacket(
+  request: SynthesizerRequest,
+  argumentLanguageName: string
+): PromptPacket {
+  return { messages: [
+    { role: "system", content: "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. node_refs must name the node ids of the digest nodes whose facts the segment asserts, so every load-bearing claim traces to a digest node. Preserve the digest and add no facts. When the digest nodes a segment cites rest on reasoning alone, with no measured or looked-up evidence behind them, return at least two segments in order: the first segment states the provisional answer as a hypothesis; the second segment states the research plan that would lift it." },
+    { role: "system", content: argumentLanguageDirective(argumentLanguageName) },
+    { role: "user", content: toSynthesisPromptPayload(request) }
+  ] };
+}
+
+export function buildEvaluatorPromptPacket(
+  request: EvaluatorRequest,
+  argumentLanguageName: string
+): PromptPacket {
+  return { messages: [
+    { role: "system", content: EVALUATOR_CONTRACT_TEXT },
+    { role: "system", content: argumentLanguageDirective(argumentLanguageName) },
+    { role: "user", content: toSynthesisPromptPayload(request) }
+  ] };
+}
 
 // codex r3 B1 part 2: EXPORTED so the schema/prompt agreement check can read the
 // DECLARED criterion keys at runtime rather than scanning this file for them.
@@ -699,6 +728,7 @@ export interface ReviewCatchUpReviewer {
     readonly subjectItemId: string;
     readonly callSiteKey: string;
     readonly questionLine: string;
+    readonly argumentLanguageName?: string;
     readonly statement: string;
     readonly authorMaker: string;
     readonly providerRef: string;
@@ -809,6 +839,7 @@ export async function runReviewCatchUp(input: {
   readonly fromVersion: number;
   readonly workItemId: string;
   readonly questionLine: string;
+  readonly argumentLanguageName?: string;
   readonly invocationId: string;
   readonly pinnedPanel: readonly { readonly maker: string; readonly providerRef: string }[];
   readonly judgeBound: CallBound;
@@ -867,6 +898,7 @@ export async function runReviewCatchUp(input: {
         subjectItemId: input.workItemId,
         callSiteKey,
         questionLine: input.questionLine,
+        argumentLanguageName: input.argumentLanguageName ?? "the same language as the question",
         statement: node.statement,
         authorMaker: node.authorMaker,
         providerRef: reviewer.providerRef,
@@ -2627,6 +2659,7 @@ export class WalkingSkeletonRunner {
               subjectItemId: claimed.workItemId,
               callSiteKey: `${input.callSiteKey}:${member.providerRef}`,
               questionLine: input.questionLine,
+              argumentLanguageName: run.argumentLanguageName,
               statement: input.statement,
               authorMaker: input.authorMaker,
               providerRef: member.providerRef,
@@ -2837,6 +2870,7 @@ export class WalkingSkeletonRunner {
         subjectItemId: claimed.workItemId,
         callSiteKey: "JUDGE",
         questionLine: run.questionLine,
+        argumentLanguageName: run.argumentLanguageName,
         providerRef: primaryMaker.providerRef,
         contractHash: this.settings.judgeContractHash,
         bound: { ...this.settings.judgeBound, maxAttempts }
@@ -3035,6 +3069,7 @@ export class WalkingSkeletonRunner {
           subjectItemId: claimed.workItemId,
           callSiteKey: input.callSiteKey,
           questionLine: input.questionLine,
+          argumentLanguageName: run.argumentLanguageName,
           claimClassificationLine: run.questionLine,
           providerRef: selectedMaker.providerRef,
           contractHash: this.settings.judgeContractHash,
@@ -3224,6 +3259,7 @@ export class WalkingSkeletonRunner {
               subjectItemId: claimed.workItemId,
               callSiteKey,
               questionLine: run.questionLine,
+              argumentLanguageName: run.argumentLanguageName,
               statement: authoredNode.statement,
               authorMaker: authoredNode.maker,
               providerRef: reviewer.providerRef,
@@ -4149,10 +4185,7 @@ export class WalkingSkeletonRunner {
         const synthesizerCallSiteKey = synthesisCallSiteKey({
           role: "SYNTHESIZER", stage: request.stage, round: request.round
         });
-        const packet: PromptPacket = { messages: [
-          { role: "system", content: "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. node_refs must name the node ids of the digest nodes whose facts the segment asserts, so every load-bearing claim traces to a digest node. Preserve the digest and add no facts. When the digest nodes a segment cites rest on reasoning alone, with no measured or looked-up evidence behind them, return at least two segments in order: the first segment states the provisional answer as a hypothesis; the second segment states the research plan that would lift it." },
-          { role: "user", content: toSynthesisPromptPayload(request) }
-        ] };
+        const packet = buildSynthesizerPromptPacket(request, run.argumentLanguageName);
         const response = await callSynthesisRole(role.provider, {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
@@ -4229,10 +4262,7 @@ export class WalkingSkeletonRunner {
       evaluate: async (request: EvaluatorRequest) => {
         const role = resolveSynthesisRoleMaker(request.roleRef, "EVALUATOR");
         const evaluatorCallSiteKey = synthesisCallSiteKey({ role: "EVALUATOR", round: request.round });
-        const packet: PromptPacket = { messages: [
-          { role: "system", content: EVALUATOR_CONTRACT_TEXT },
-          { role: "user", content: toSynthesisPromptPayload(request) }
-        ] };
+        const packet = buildEvaluatorPromptPacket(request, run.argumentLanguageName);
         const response = await callSynthesisRole(role.provider, {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
