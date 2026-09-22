@@ -33,10 +33,15 @@
 #   - the two load-coupled `registration-database` cases ("deep-queue slack", "post-hash RSS
 #     tripwire"): they pass solo; listing them would hide a real regression. Integration
 #     tests, outside this job's directories anyway.
-#   - registration.test.ts "S3c B4 keeps the isolated production RSS curve…": sealed for
-#     node_v22.23.1_darwin_arm64. CI (ubuntu) skips it loudly. On a darwin_arm64 host that
-#     runs another Node (the Mac mini: v26.5.0) its child measurement hits the 60 s budget —
-#     on pristine dev as well. Run the gate under the pinned Node 22.23.1 (.nvmrc); V-25.
+#   - registration.test.ts "S3c B4 keeps the isolated production RSS curve…": V-25 keys the
+#     bound by platform + architecture + Node version, so a host with no published entry —
+#     ubuntu, and any darwin_arm64 host not on node v22.23.1 — SKIPS it loudly, naming its
+#     own runtime. A skip is never a failure, so the case belongs on no list, and the 60 s
+#     child budget that killed it under node 26 is now 240 s (measured 105-110 s per run).
+#     The node v26.8.2 darwin_arm64 measurement was taken (worst curve 255.3 MiB of 14
+#     observations) and is deliberately NOT sealed: the ruled 32 MiB rounding increment
+#     leaves it 0.7 MiB of margin against a 22.6 MiB spread, so its headroom is an open
+#     owner ruling. Until that ruling, this Mac skips rather than gate on noise.
 
 tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > 'DebateCanvas agreed review mark' binds its 'agreed review verdict' role
 #   source: pristine dev@7bae9806, 2026-09-18. UI design-token pin owned by the apps/ui lane.
