@@ -4,6 +4,18 @@
 
 ## Right now — 22 September
 
+### The support-chat test bench is measuring again (22 September, evening)
+
+The support chat has a test bench: 60 scripted visitor questions, run three times against the real support code with a stand-in AI, checking each answer's outcome, language, cited help entries and that no forbidden action was taken. Since the privacy fix earlier today (a visitor's network address is now stored as a keyed code nobody can reverse, instead of a plain hash) the bench had scored **0 of 60 on every run**. The answers were not wrong: the bench itself handed the database a text label where the database's rule for that column only accepts the 64-character keyed code, so every test conversation was refused before it started. The bench now derives the code exactly the way production does. One file changed, committed on the work branch, nothing pushed: [tests/support-eval/run.ts](../../../tests/support-eval/run.ts).
+
+| | Before the fix | After the fix |
+|---|---|---|
+| Questions answered correctly, each of 3 runs | 0 of 60 | 60 of 60 |
+| Speed targets (four of them) | not measurable | all met |
+| Verdict line | FAIL | PENDING |
+
+PENDING is the best result this bench can give on its own, on purpose: it will only say PASS once an independent person has rated the quality of the answers, and until then the command still exits with a failure code. The privacy rule for the column was never touched; the bench had drifted from it.
+
 **A new AI session took over on 21 September**, starting from the handoff note ([HANDOFF-PROMPT.md](HANDOFF-PROMPT.md)). Before doing anything it checked that the state matches the note:
 
 | Checked | Result |

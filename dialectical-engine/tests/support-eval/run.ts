@@ -445,8 +445,11 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
     });
     const support: SupportApplication = Object.freeze({
       configuration: Object.freeze({ current: async () => EVAL_CONFIGURATION }),
-      // DL5-F3: a labelled stand-in; the evaluation harness stores nothing.
-      sourcePseudonym: (value: string) => `eval-pseudonym:${value}`,
+      // DL5-F3: the real keyed derivation, as production wires it, so the harness
+      // stores what production stores: the disposable database enforces the 64-hex
+      // CHECK on support.admission_event.ip_sha256, which a labelled stand-in failed
+      // on every session open (0/60, "execution" on every case).
+      sourcePseudonym: (value: string) => keys!.sourcePseudonym(value),
       sessions: Object.freeze({
         create: sessionRepository.create.bind(sessionRepository),
         read: sessionRepository.read.bind(sessionRepository),
