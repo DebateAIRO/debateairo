@@ -2,9 +2,14 @@
  * Complete, valid process environments for the API and runner compositions.
  * Every value is loopback/dev-safe so a fixture parses in any NODE_ENV; tests
  * override single keys to exercise one refusal at a time (never process.env).
+ *
+ * V-9(c): `DEBATEAI_DEPLOYMENT_MODE` is `local` for the same reason — local is
+ * the loopback-safe deployment, and a fixture that silently claimed `hosted`
+ * would put every other refusal behind the hosted provider rules.
  */
 export function validApiEnvironmentFixture(): Record<string, string> {
   return {
+    DEBATEAI_DEPLOYMENT_MODE: "local",
     KEK_PATH: "/run/secrets/kek",
     SUPPORT_KEK_PATH: "/run/secrets/support-kek",
     BLIND_INDEX_KEY_PATH: "/run/secrets/email-blind-index",
@@ -38,6 +43,7 @@ export function validApiEnvironmentFixture(): Record<string, string> {
 
 export function validRunnerEnvironmentFixture(): Record<string, string> {
   return {
+    DEBATEAI_DEPLOYMENT_MODE: "local",
     KEK_PATH: "/run/secrets/kek",
     DATABASE_URL: "postgresql://runner:pass@127.0.0.1:5432/debateai",
     RUNNER_WORKER_ID: "fixture",

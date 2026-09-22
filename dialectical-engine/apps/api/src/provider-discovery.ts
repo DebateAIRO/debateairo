@@ -3,7 +3,12 @@ import type {
   ProviderProbeRecord
 } from "@debateai/db";
 import { probeTarget, type ProviderDiscoveryTarget } from "@debateai/providers";
-export { assertProductionProviderTargets, parseProviderDiscoveryTargets } from "@debateai/providers";
+export {
+  assertDeploymentProviderTargets,
+  assertHostedProviderTargets,
+  assertProductionProviderTargets,
+  parseProviderDiscoveryTargets
+} from "@debateai/providers";
 
 export type ProviderDiscoveryProbeStore = Readonly<{
   readLatest(providerRefs: readonly string[]): Promise<readonly ProviderProbeRecord[]>;

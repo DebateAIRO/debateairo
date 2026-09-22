@@ -771,7 +771,16 @@ export {
 } from "./algorithm-policy.js";
 
 export {
+  DEPLOYMENT_MODES,
+  assertHostedCostEnvelopesSealed,
   assertProductionFloors,
+  readSealedCostEnvelopeStatus,
+  resolveDeploymentMode,
+  CostEnvelopesNotSealedError,
+  DeploymentModeInvalidError,
+  DeploymentModeUnresolvedError,
+  type DeploymentMode,
+  type SealedCostEnvelopeStatus,
   loadApiEnvironment,
   loadDevelopmentCommandEnvironment,
   loadKeyRotationEnvironment,

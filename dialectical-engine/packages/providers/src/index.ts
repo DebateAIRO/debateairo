@@ -248,6 +248,11 @@ const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "[::1]", "localhost"]);
  * L4-F7: in production a cleartext `http:` base URL may only point at a loopback relay; any
  * other `http:` target would carry the bearer `authorization_header` and every prompt off-box
  * unencrypted. `https:` targets and non-production environments are untouched.
+ *
+ * V-9(c): this is the LOCAL deployment's floor and nothing else. Local mode is a supported
+ * product path — the command-line relays and loopback model servers — so loopback `http:` stays
+ * lawful here, byte-for-byte as before the mode existed. The hosted deployment's own rule is
+ * `assertHostedProviderTargets`, and `assertDeploymentProviderTargets` picks between them.
  */
 export function assertProductionProviderTargets(
   targets: readonly ProviderDiscoveryTarget[],
@@ -260,6 +265,53 @@ export function assertProductionProviderTargets(
       throw new TypeError(`PROVIDER_BASE_URL_TLS_REQUIRED:${target.providerRef}`);
     }
   }
+}
+
+/**
+ * V-9(c) / task 10a — the HOSTED deployment's provider rule.
+ *
+ * The commercial website reaches paid vendor APIs and nothing else:
+ *
+ * - every base URL is `https:` — a cleartext hop would carry the vendor credential and every
+ *   prompt in the clear, and there is no loopback exception here (see below);
+ * - no loopback target — a relay or a local model server on the web server is precisely the
+ *   local-mode path V ruled must not run hosted (V-30(1) says the same for the support chat);
+ * - no credential inline in `PROVIDER_DISCOVERY_TARGETS_JSON`. Hosted credentials live in
+ *   custody-checked FILES (`authorization_file`, task 10b), so a bearer token can never sit in
+ *   an `EnvironmentFile`, in `/proc/<pid>/environ` or in a process listing.
+ *
+ * Every refusal names the provider ref and NOTHING of the credential.
+ */
+export function assertHostedProviderTargets(
+  targets: readonly ProviderDiscoveryTarget[]
+): void {
+  for (const target of targets) {
+    const parsed = new URL(target.baseUrl);
+    if (parsed.protocol !== "https:") {
+      throw new TypeError(`PROVIDER_BASE_URL_TLS_REQUIRED:${target.providerRef}`);
+    }
+    if (LOOPBACK_HOSTS.has(parsed.hostname.toLowerCase())) {
+      throw new TypeError(`PROVIDER_TARGET_LOOPBACK_REFUSED:${target.providerRef}`);
+    }
+    if (target.authorizationHeader !== undefined) {
+      throw new TypeError(`PROVIDER_INLINE_CREDENTIAL_REFUSED:${target.providerRef}`);
+    }
+  }
+}
+
+/**
+ * The ONE decision both shipped composition roots take over their parsed targets. The mode comes
+ * from the register loader (`DEPLOYMENT_MODE`), so it is resolved before the first target is read.
+ */
+export function assertDeploymentProviderTargets(
+  targets: readonly ProviderDiscoveryTarget[],
+  deployment: Readonly<{ mode: "hosted" | "local"; nodeEnv: string | undefined }>
+): void {
+  if (deployment.mode === "hosted") {
+    assertHostedProviderTargets(targets);
+    return;
+  }
+  assertProductionProviderTargets(targets, deployment.nodeEnv);
 }
 
 export interface ProviderAdapterRegistration {

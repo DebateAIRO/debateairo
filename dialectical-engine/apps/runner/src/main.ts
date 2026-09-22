@@ -9,15 +9,21 @@ import {
 } from "@debateai/crypto";
 import { configureContentEncryption, createPool, RunRepository } from "@debateai/db";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
-import { loadRunnerEnvironment } from "@debateai/register";
+import { assertHostedCostEnvelopesSealed, loadRunnerEnvironment } from "@debateai/register";
 import { readDeploymentMakerCapability } from "@debateai/critique";
-import { assertProductionProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets } from "@debateai/providers";
+import { assertDeploymentProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets } from "@debateai/providers";
 import { createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, WalkingSkeletonRunner } from "./index.js";
 import { createRunnerProviderTopology } from "./provider-topology.js";
 import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
 import { reconcileRunnerStartupWork } from "./runner-startup-reconciliation.js";
 
 const environment = loadRunnerEnvironment();
+// V-9(c) / V-28: a hosted deployment spends money on paid vendor APIs, so it may
+// not claim work until the per-run and daily cost envelopes are sealed. The seam
+// is `readSealedCostEnvelopeStatus` in @debateai/register — task 11 publishes the
+// rows behind it; until then hosted refuses here, before anything is opened.
+// Local mode spends nothing this control could bound and is untouched.
+assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE);
 // V-19: this principal owns nothing in the user-DEK store it reads, so without
 // the custody group every load below refuses. Configured before the first open
 // so an unresolvable group is a boot failure, not a mid-run one.
@@ -52,7 +58,9 @@ const providerTargets = parseProviderDiscoveryTargets(
   environment.PROVIDER_DISCOVERY_TARGETS_JSON,
   deploymentMakers.configuredProviders
 );
-assertProductionProviderTargets(providerTargets, environment.NODE_ENV);
+assertDeploymentProviderTargets(providerTargets, {
+  mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
+});
 const hatchet = new Hatchet({
   token: environment.HATCHET_CLIENT_TOKEN, host_port: environment.HATCHET_HOST_PORT,
   api_url: environment.HATCHET_API_URL, tenant_id: environment.HATCHET_TENANT_ID,

@@ -58,7 +58,7 @@ import { installStartupResourceOwner } from "./startup-resource-owner.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 import { RecoveryStartService } from "./recovery.js";
 import {
-  assertProductionProviderTargets,
+  assertDeploymentProviderTargets,
   createProviderDiscoveryResolver,
   parseProviderDiscoveryTargets
 } from "./provider-discovery.js";
@@ -193,7 +193,10 @@ const providerDiscoveryTargets = parseProviderDiscoveryTargets(
   environment.PROVIDER_DISCOVERY_TARGETS_JSON,
   deploymentMakers.configuredProviders
 );
-assertProductionProviderTargets(providerDiscoveryTargets, environment.NODE_ENV);
+// V-9(c): the same mode decision the runner takes, over the same target set.
+assertDeploymentProviderTargets(providerDiscoveryTargets, {
+  mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
+});
 const resolveProviderPanel = createProviderDiscoveryResolver({
   configuredProviders: deploymentMakers.configuredProviders,
   targets: providerDiscoveryTargets,
