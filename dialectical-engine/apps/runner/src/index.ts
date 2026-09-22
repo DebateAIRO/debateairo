@@ -5551,14 +5551,17 @@ export function declareHatchetWalkingSkeletonTask(input: {
             ? { kind: result.kind, answerId: result.answerId }
             : { kind: result.kind };
         } catch (error) {
-          capture?.emit(Object.freeze({
-            code: error instanceof TypedDomainError ? error.code : "OBS_CAPTURE_SELF",
+          // AMENDMENT 2026-09-22, routed at INT2: the envelope carries the
+          // failure's CODE and its bounded diagnostic PATH. The error object
+          // itself — whose message can hold model output — never enters the
+          // second sink.
+          capture?.emit(captureFailureEnvelope({
             error,
-            taxonomy_class: "JOB_FAILURE",
-            capture_point: "job",
+            taxonomyClass: "JOB_FAILURE",
+            capturePoint: "job",
             disposition: "THROWN",
             source: "hatchet",
-            attempt_index: attemptIndex
+            attemptIndex
           }));
           const recorded = await input.failures.recordTerminalFailure({
             runId: dispatch.runId,
@@ -5573,14 +5576,13 @@ export function declareHatchetWalkingSkeletonTask(input: {
               "RUNNER_FAILURE_STATE_NOT_RECORDED",
               dispatch.workItemId
             );
-            capture?.emit(Object.freeze({
-              code: recordingFailure.code,
+            capture?.emit(captureFailureEnvelope({
               error: recordingFailure,
-              taxonomy_class: "JOB_FAILURE",
-              capture_point: "job",
+              taxonomyClass: "JOB_FAILURE",
+              capturePoint: "job",
               disposition: "HANDLED",
               source: "hatchet",
-              attempt_index: attemptIndex
+              attemptIndex
             }));
           }
           // DL4-F1 re-seated inside the restored S06 binding (DEV-SYNC 2026-09-22): the
@@ -5677,11 +5679,10 @@ export function createPostgresProviderGateway(
           })
         });
       } catch (error) {
-        capture?.emit(Object.freeze({
-          code: error instanceof TypedDomainError ? error.code : "OBS_CAPTURE_SELF",
+        capture?.emit(captureFailureEnvelope({
           error,
-          taxonomy_class: "PROVIDER_EXHAUSTED",
-          capture_point: "provider",
+          taxonomyClass: "PROVIDER_EXHAUSTED",
+          capturePoint: "provider",
           disposition: "THROWN",
           source: "first_party"
         }));

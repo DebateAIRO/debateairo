@@ -148,11 +148,17 @@ describe("S06 runner task binding", () => {
 
     expect(order).toEqual(["capture", "terminal"]);
     expect(captured).toHaveLength(1);
+    // pin updated 2026-09-22 (INT2, the V-11 amendment): `@debateai/obs-capture`
+    // is a SECOND sink for error text and carries whatever it is handed as
+    // `payload_ref`. The envelope now carries the failure's CODE and its bounded
+    // diagnostic PATH — never the error object, whose message can hold model
+    // output (apps/runner/src/index.ts, `captureFailureEnvelope`;
+    // tests/unit/runner-hatchet-task-input.test.ts owns that contract).
     expect(captured[0]).toMatchObject({
       kind: "envelope",
       payload_ref: {
         code: "JUDGEMENT_POLICY_UNRESOLVED",
-        error: failure,
+        path: "JUDGEMENT_POLICY_UNRESOLVED",
         taxonomy_class: "JOB_FAILURE",
         capture_point: "job",
         disposition: "THROWN",
@@ -164,6 +170,12 @@ describe("S06 runner task binding", () => {
         work_item_ref: { kind: "work_item", value: workItemId },
       },
     });
+    // `toMatchObject` cannot see what is absent, so the absence is its own pin:
+    // no error object, and no byte of the private message anywhere in what was
+    // emitted.
+    expect((captured[0] as { payload_ref: Record<string, unknown> }).payload_ref)
+      .not.toHaveProperty("error");
+    expect(JSON.stringify(captured[0])).not.toContain("private register diagnostic");
     expect(createSharedRedactor({
       environment: "test",
       build_ref: "UNTRACKED-DEV:s06",
@@ -389,11 +401,15 @@ describe("S06 provider gateway binding", () => {
     expect(observed).toMatchObject({ code: "PROVIDER_CALL_FAILED", attempts: 2 });
     expect(fetchImplementation).toHaveBeenCalledTimes(2);
     expect(captured).toHaveLength(1);
+    // pin updated 2026-09-22 (INT2, the V-11 amendment): code + bounded path,
+    // never the error. Here it also keeps the transport's own `cause` text —
+    // "private provider transport detail" — out of the second sink, which the
+    // raw-error envelope carried straight through.
     expect(captured[0]).toMatchObject({
       kind: "envelope",
       payload_ref: {
         code: "PROVIDER_CALL_FAILED",
-        error: observed,
+        path: "PROVIDER_CALL_FAILED",
         taxonomy_class: "PROVIDER_EXHAUSTED",
         capture_point: "provider",
         disposition: "THROWN",
@@ -404,6 +420,9 @@ describe("S06 provider gateway binding", () => {
         work_item_ref: { kind: "work_item", value: "work:provider-s06" },
       },
     });
+    expect((captured[0] as { payload_ref: Record<string, unknown> }).payload_ref)
+      .not.toHaveProperty("error");
+    expect(JSON.stringify(captured[0])).not.toContain("private provider transport detail");
   });
 });
 
@@ -488,7 +507,13 @@ export async function resolve(specifier, context, nextResolve) {
       "@hatchet-dev/typescript-sdk": "export class Hatchet {}",
       "../../../packages/crypto/src/index.js": "export function loadKek() {}",
       "@debateai/battery": "export class WorkItemRepository {} export function createTerminalActivationEvaluator() {}",
-      "@debateai/register": "export function loadRunnerEnvironment() {}",
+      // INT2: every NAMED import of a stubbed module must exist, because ESM
+      // links the whole graph before any body evaluates — so a stub that falls
+      // behind main.ts fails at LINK time and this case stops measuring the
+      // install-first ordering it exists for. V-28's
+      // \`assertHostedCostEnvelopesSealed\` joined this import line and was
+      // missing here.
+      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {}",
       "./index.js": "export function createPostgresProviderGateway() {} export function declareHatchetWalkingSkeletonTask() {} export class WalkingSkeletonRunner {}",
     };
     if (Object.hasOwn(stubs, specifier)) {

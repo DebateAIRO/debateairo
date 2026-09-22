@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { TypedDomainError } from "@debateai/kernel";
+import { createSharedRedactor } from "@debateai/obs-capture";
 import {
   captureFailureEnvelope,
   declareHatchetWalkingSkeletonTask,
@@ -122,6 +123,51 @@ describe("the 2026-09-22 amendment — an obs-capture envelope never carries the
     });
     expect(envelope.code).toBe("RUN_COST_ENVELOPE_EXHAUSTED");
     expect(JSON.stringify(envelope)).not.toContain("MARKER-7733");
+  });
+
+  /**
+   * INT2 (SYNC2 into integration), 2026-09-22 — the defect the routing exposed.
+   *
+   * The builder and the sink were written apart: `captureFailureEnvelope` was
+   * unit-tested on its own, and the redactor rejects a payload carrying ANY key
+   * outside its input allowlist by minimising the WHOLE envelope to
+   * `OBS_CAPTURE_SELF`. `path` was not in that allowlist, so every routed
+   * capture would have reached the durable record with no code, no capture
+   * point and no attempt index — the amendment would have silently destroyed
+   * exactly the signal the S06 binding exists to record, and every unit test of
+   * the builder would still have been green.
+   *
+   * This row is the joint, measured at full strength: the real builder's
+   * output through the real redactor. `tests/integration/` is in neither
+   * `test:ci-gate` nor `test:s00`, so the S06 case that first caught this does
+   * not gate anything; this one does.
+   */
+  it("survives the shared redactor unminimised, carrying its own code (INT2)", () => {
+    const envelope = captureFailureEnvelope({
+      error: new TypedDomainError("CALL_BUDGET_EXHAUSTED", "MARKER-7733"),
+      taxonomyClass: "PROVIDER_EXHAUSTED",
+      capturePoint: "provider",
+      disposition: "THROWN",
+      source: "first_party",
+      attemptIndex: 2
+    });
+    const redacted = createSharedRedactor({
+      environment: "test",
+      build_ref: "UNTRACKED-DEV:int2",
+      build_dirty: true,
+      runtime: "runner",
+      component: { process: "runner", package: "@debateai/runner" },
+      writer_identity: "int2-test",
+      redaction_policy_version: "g0",
+      allowlist_set_id: "g0-empty-parameters"
+    }).redact({ kind: "envelope", payload_ref: envelope } as never);
+
+    expect(redacted.fallback_minimized).toBe(false);
+    expect(redacted.code).toBe("CALL_BUDGET_EXHAUSTED");
+    expect(redacted.capture_point).toBe("provider");
+    expect(redacted.taxonomy_class).toBe("PROVIDER_EXHAUSTED");
+    expect(redacted.attempt_index).toBe(2);
+    expect(JSON.stringify(redacted)).not.toContain("MARKER-7733");
   });
 });
 

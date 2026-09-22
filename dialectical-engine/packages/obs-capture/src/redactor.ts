@@ -42,6 +42,16 @@ const SOURCE_SET: ReadonlySet<string> = new Set(SOURCES);
 const INPUT_ALLOWLIST: ReadonlySet<string> = new Set([
   "code",
   "error",
+  // The bounded operational diagnostic that replaces `error` at a scrubbed
+  // failure boundary (the 2026-09-22 V-11 amendment; the runner's
+  // `captureFailureEnvelope`). It is drawn from a CLOSED alphabet derived from
+  // the error's class and SQLSTATE, never from its text, and — like every other
+  // key here — it is read for the decision and never copied into the
+  // post-redaction envelope. Added at INT2: without it this list rejected the
+  // whole payload and minimised every routed capture to OBS_CAPTURE_SELF,
+  // destroying the code, capture point and attempt index the S06 binding
+  // exists to record.
+  "path",
   "taxonomy_class",
   "capture_point",
   "disposition",
