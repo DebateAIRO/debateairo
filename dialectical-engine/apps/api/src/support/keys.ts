@@ -272,13 +272,21 @@ function parseContentEnvelope(ciphertext: Uint8Array): Readonly<{
 
 /**
  * V-19 deliberately does NOT reach this loader. The custody group exists for a
- * key store two OS principals must both read; checked 2026-09-22, `SUPPORT_KEK_PATH`
- * has exactly one reader — `apps/api/src/main.ts` — it is absent from the runner's
- * environment shape and from `deploy/vps/env/runner.env.example`, and the material
- * it wraps lives in `support.session_key` / `support.case_key` rows reached through
- * `SUPPORT_DATABASE_URL`, which is likewise API-only. One principal, so the support
- * KEK stays single-owner: 0600 owned by this uid inside a 0700 directory. Widen this
- * only when a second principal genuinely needs it.
+ * key store two OS PRINCIPALS must both read, and this KEK has only one.
+ *
+ * Checked 2026-09-22. `createSupportKeyPort` has three call sites:
+ * `apps/api/src/main.ts` (the API service), `apps/runner/src/support-inbox-cli.ts`
+ * and `apps/runner/src/rotate-kek-cli.ts`. The last two are operator commands,
+ * not a second service: they are run BY the custodian against the same custody
+ * root, so the file is still opened by one uid. `SUPPORT_KEK_PATH` is absent
+ * from the runner service's environment shape and from
+ * `deploy/vps/env/runner.env.example`, so `debateai-runner` cannot be configured
+ * with it at all; the rows it wraps live in `support.session_key` /
+ * `support.case_key`, reached through `SUPPORT_DATABASE_URL` and the
+ * `debateai_support` role, which is likewise not the runner service's.
+ *
+ * So the support KEK stays single-owner: 0600 owned by this uid inside a 0700
+ * directory. Widen it only when a second SERVICE principal genuinely needs it.
  */
 async function readSupportKek(supportKekPath: string): Promise<KeyFileIdentity> {
   if (typeof supportKekPath !== "string") fail("SUPPORT_KEK_PATH_INVALID");

@@ -374,6 +374,36 @@ describe("VPS baseline: runbook and environment templates", () => {
     for (const [key] of env) expect(key).not.toMatch(/^DEBATEAI_DEV_|^EVALUATOR_DEV_MENU/);
   });
 
+  it("units declare the custody group, so it does not depend on a lookup systemd may skip", () => {
+    // Both units set User= AND Group= explicitly, which is exactly the case
+    // where systemd does not consult the group database for the user's other
+    // groups. `usermod -a -G` alone would leave the runner outside the group at
+    // runtime, and every key read would refuse.
+    for (const unit of ["debateai-api", "debateai-runner"]) {
+      expect(read(`deploy/vps/systemd/${unit}.service`), unit)
+        .toMatch(/^SupplementaryGroups=.*\bdebateai-custody\b/m);
+    }
+    // The UI touches no key material and must not be in the group.
+    expect(read("deploy/vps/systemd/debateai-ui.service")).not.toContain("debateai-custody");
+  });
+
+  it("README provisions the tree the runner must traverse, with an explicit mode", () => {
+    const readme = read("deploy/vps/README.md");
+    // The runner has to walk /var/lib/debateai and /var/lib/debateai/api to
+    // reach the store. Today they exist only as a by-product of `install -d` on
+    // the leaf, so nothing pins what they are.
+    expect(readme).toMatch(
+      /install -d -m 0755 -o root -g root \/var\/lib\/debateai \/var\/lib\/debateai\/api/
+    );
+    expect(readme).toContain("| `/var/lib/debateai/api` |");
+  });
+
+  it("README's custody check tests the group, not only the mode", () => {
+    // A 2750 directory whose group is debateai-api passes a mode-only check and
+    // is refused at runtime, which is the worst kind of green.
+    expect(read("deploy/vps/README.md")).toMatch(/! -group debateai-custody -print/);
+  });
+
   it("README provisions the V-19 custody group and no longer leaves the question open", () => {
     const readme = read("deploy/vps/README.md");
     for (const needle of [

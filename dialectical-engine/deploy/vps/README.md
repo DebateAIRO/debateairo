@@ -93,6 +93,7 @@ adduser debateai-api postdrop     # postfix maildrop is setgid; NoNewPrivileges 
 groupadd --system debateai-custody
 usermod -a -G debateai-custody debateai-api
 usermod -a -G debateai-custody debateai-runner
+install -d -m 0755 -o root -g root /var/lib/debateai /var/lib/debateai/api
 install -d -m 0700 -o debateai-api -g debateai-api \
   /var/lib/debateai/api/publication-keys /var/lib/debateai/api/audit-keys
 install -d -m 2750 -o debateai-api -g debateai-custody /var/lib/debateai/api/user-deks
@@ -100,9 +101,19 @@ install -d -m 2750 -o debateai-api -g debateai-custody /var/lib/debateai/api/use
 
 The user-DEK store is the one tree two principals read, so it is the one tree that gets the
 custody group (V-19, below). The other two are written and read by `debateai-api` alone and stay
-`0700`. The setgid bit on the store is load-bearing: without it, a record the API creates takes
-the API's own primary group and the runner is locked out again. Group membership is read at
-process start, so restart both units after `usermod`.
+`0700`.
+
+The two directories above them are created explicitly and left `0755 root:root`. The runner has
+to traverse both to reach the store, they hold nothing secret at their own level, and a tree that
+exists only as a by-product of creating its leaves has a mode nobody chose.
+
+The setgid bit on the store is load-bearing: without it, a record the API creates takes the API's
+own primary group and the runner is locked out again.
+
+Both units also declare `SupplementaryGroups=debateai-custody`. Each sets `User=` and `Group=`
+explicitly, and systemd then does not consult the group database for that user's other groups, so
+`usermod -a -G` alone would leave the process outside the group. Group membership is read at
+process start: restart both units after either change.
 
 ---
 
@@ -121,6 +132,8 @@ process start, so restart both units after `usermod`.
 | `/etc/debateai/hatchet-tls/` | `0755` | `root:root` | `server.crt`, `server.key` (`0640 root:docker`), `ca.crt` |
 | `/etc/debateai/ui-edge.secret` | `0400` | `debateai-ui` | the C2b edge secret (a second `0640 root:caddy` copy for Caddy) |
 | `/etc/debateai/backup.conf` | `0600` | `root:root` | age **public** keys and paths — see `backup.conf.example` |
+| `/var/lib/debateai` | `0755` | `root:root` | the tree below (traversable; nothing secret at this level) |
+| `/var/lib/debateai/api` | `0755` | `root:root` | the tree below (traversable; nothing secret at this level) |
 | `/var/lib/debateai/api/user-deks` | `2750` | `debateai-api:debateai-custody` | user-DEK store — the one tree the runner also reads (V-19) |
 | `/var/lib/debateai/api/publication-keys` | `0700` | `debateai-api` | publication-key store |
 | `/var/lib/debateai/api/audit-keys` | `0700` | `debateai-api` | audit-key store |
@@ -196,6 +209,7 @@ single-owner modes with the same setting on. Check the tree after provisioning:
 
 ```sh
 stat -c '%a %U %G %n' /var/lib/debateai/api/user-deks
+find /var/lib/debateai/api/user-deks ! -group debateai-custody -print
 find /var/lib/debateai/api/user-deks -type d ! -perm 2750 -print -o -type f ! -perm 0640 -print
 ```
 

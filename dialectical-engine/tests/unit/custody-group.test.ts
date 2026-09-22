@@ -73,6 +73,28 @@ function supplementaryGids(): readonly number[] {
   return [...new Set(process.getgroups())].filter((gid) => gid !== primary);
 }
 
+/**
+ * A test process with no supplementary group — a container running as root, for
+ * instance — cannot produce a real 0640-with-a-foreign-gid file, so these cases
+ * cannot run. They must SKIP, never silently pass: an early `return` is a green
+ * tick, so the whole wiring proof would evaporate while the run still printed
+ * the same passing count. `skipIf` puts the absence in the output instead.
+ */
+const GIDS = supplementaryGids();
+const NO_GROUP = GIDS.length === 0;
+const FEWER_THAN_TWO_GROUPS = GIDS.length < 2;
+
+/** Asserts the precondition rather than swallowing it, for the cases that run. */
+function custodyGidPair(): readonly [number, number] {
+  expect(GIDS.length, "this case needs two supplementary groups").toBeGreaterThanOrEqual(2);
+  return [GIDS[0]!, GIDS[1]!];
+}
+
+function oneCustodyGid(): number {
+  expect(GIDS.length, "this case needs a supplementary group").toBeGreaterThanOrEqual(1);
+  return GIDS[0]!;
+}
+
 const goodFile: CustodyFileFacts = Object.freeze({
   isFile: true, nlink: 1, mode: 0o600, uid: CALLER_UID, gid: CUSTODY_GID, size: KEY_BYTES
 });
@@ -115,10 +137,17 @@ const MATRIX: readonly Row[] = Object.freeze([
 
   // --- the setting present: the two accepted shapes -------------------------
   { name: "on: 0600 owned by the caller still loads", group: true, accepted: true },
-  { name: "on: 0640 with the custody gid, owned by another uid", group: true, file: { mode: 0o640, uid: OTHER_UID }, accepted: true },
-  { name: "on: 0640 file inside a 0750 parent, both owned by another uid", group: true, file: { mode: 0o640, uid: OTHER_UID }, parent: { mode: 0o750, uid: OTHER_UID }, accepted: true },
-  { name: "on: 0600 file inside a 0750 custody parent", group: true, parent: { mode: 0o750, uid: OTHER_UID }, accepted: true },
-  { name: "on: 0640 custody file inside a 0700 parent the caller owns", group: true, file: { mode: 0o640, uid: OTHER_UID }, accepted: true },
+  // THE case V-19 exists for: the runner opens a 0640 record inside a 0750
+  // directory, both owned by the API user and both in the custody group.
+  { name: "on: 0640 in a 0750 parent, both owned by the other principal", group: true, file: { mode: 0o640, uid: OTHER_UID }, parent: { mode: 0o750, uid: OTHER_UID }, accepted: true },
+  { name: "on: 0600 file the caller owns inside a 0750 parent the caller owns", group: true, parent: { mode: 0o750 }, accepted: true },
+
+  // --- the setting present: the record and its directory share one owner ----
+  // A directory owned by someone other than the file's owner is a second
+  // principal that can replace the record, which is the thing custody is for.
+  { name: "on: a 0750 custody parent owned by someone other than the file's owner", group: true, parent: { mode: 0o750, uid: OTHER_UID }, accepted: false },
+  { name: "on: a 0640 custody file whose 0700 parent has a different owner", group: true, file: { mode: 0o640, uid: OTHER_UID }, accepted: false },
+  { name: "on: a 0640 custody file whose 0750 custody parent has a different owner", group: true, file: { mode: 0o640, uid: OTHER_UID }, parent: { mode: 0o750 }, accepted: false },
 
   // --- the setting present: every world bit refuses -------------------------
   { name: "on: 0644 (world readable)", group: true, file: { mode: 0o644 }, accepted: false },
@@ -165,15 +194,20 @@ describe("V-19 custody contract: the refusal matrix", () => {
 
   it("skips the size rule for the wrapped-key records, which are JSON not keys", () => {
     const record = { ...goodFile, mode: 0o640, uid: OTHER_UID, size: 1_024 };
+    const parent = { ...goodParent, mode: 0o750, uid: OTHER_UID };
     const contract = { callerUid: CALLER_UID, custodyGid: CUSTODY_GID, expectedSize: undefined };
-    expect(custodyAccepts(record, { ...goodParent, mode: 0o750 }, contract)).toBe(true);
-    expect(custodyAccepts(record, goodParent, { ...contract, expectedSize: KEY_BYTES })).toBe(false);
+    expect(custodyAccepts(record, parent, contract)).toBe(true);
+    expect(custodyAccepts(record, parent, { ...contract, expectedSize: KEY_BYTES })).toBe(false);
   });
 
   it("keeps the uid rule off where the platform has no uid, exactly as today", () => {
     const contract = { callerUid: undefined, custodyGid: undefined, expectedSize: KEY_BYTES };
-    expect(custodyAccepts({ ...goodFile, uid: OTHER_UID }, goodParent, contract)).toBe(true);
-    expect(custodyAccepts({ ...goodFile, mode: 0o640 }, goodParent, contract)).toBe(false);
+    // A platform without uids reports the same uid for everything, so the
+    // record and its directory still agree; what is off is the CALLER rule.
+    const parent = { ...goodParent, uid: OTHER_UID };
+    expect(custodyAccepts({ ...goodFile, uid: OTHER_UID }, parent, contract)).toBe(true);
+    expect(custodyAccepts({ ...goodFile, mode: 0o640, uid: OTHER_UID }, parent, contract))
+      .toBe(false);
   });
 });
 
@@ -259,10 +293,8 @@ describe("V-19 custody group: the deployment opts in through its environment", (
 });
 
 describe("V-19 custody group: the live loaders on real files", () => {
-  it("starts from the single-owner contract until a composition root says otherwise", async () => {
-    const gids = supplementaryGids();
-    if (gids.length === 0) return;
-    const custodyGid = gids[0]!;
+  it.skipIf(NO_GROUP)("starts from the single-owner contract until a composition root says otherwise", async () => {
+    const custodyGid = oneCustodyGid();
     const directory = await temporaryDirectory("debateai-custody-default-");
     const keyPath = join(directory, "kek.bin");
     await writeFile(keyPath, generateDek(), { mode: 0o600 });
@@ -277,10 +309,8 @@ describe("V-19 custody group: the live loaders on real files", () => {
     );
   });
 
-  it("opens a 0640 key file in a 0750 directory only while the group is configured", async () => {
-    const gids = supplementaryGids();
-    if (gids.length === 0) return;
-    const custodyGid = gids[0]!;
+  it.skipIf(NO_GROUP)("opens a 0640 key file in a 0750 directory only while the group is configured", async () => {
+    const custodyGid = oneCustodyGid();
     const directory = await temporaryDirectory("debateai-custody-group-");
     const keyPath = join(directory, "kek.bin");
     await writeFile(keyPath, generateDek(), { mode: 0o600 });
@@ -302,10 +332,8 @@ describe("V-19 custody group: the live loaders on real files", () => {
     );
   });
 
-  it("refuses a 0640 key file whose group is not the configured one", async () => {
-    const gids = supplementaryGids();
-    if (gids.length < 2) return;
-    const [custodyGid, strangerGid] = gids as readonly [number, number];
+  it.skipIf(FEWER_THAN_TWO_GROUPS)("refuses a 0640 key file whose group is not the configured one", async () => {
+    const [custodyGid, strangerGid] = custodyGidPair();
     const directory = await temporaryDirectory("debateai-custody-stranger-");
     const keyPath = join(directory, "kek.bin");
     await writeFile(keyPath, generateDek(), { mode: 0o600 });
@@ -320,10 +348,8 @@ describe("V-19 custody group: the live loaders on real files", () => {
     );
   });
 
-  it("refuses a world bit, a group-write bit, a symlink, a hard link and a short file in group mode", async () => {
-    const gids = supplementaryGids();
-    if (gids.length === 0) return;
-    const custodyGid = gids[0]!;
+  it.skipIf(NO_GROUP)("refuses a world bit, a group-write bit, a symlink, a hard link and a short file in group mode", async () => {
+    const custodyGid = oneCustodyGid();
     const uid = process.getuid!();
     const directory = await temporaryDirectory("debateai-custody-refusals-");
     const keyPath = join(directory, "kek.bin");
@@ -364,10 +390,8 @@ describe("V-19 custody group: the live loaders on real files", () => {
     );
   });
 
-  it("refuses a 0755 directory even when the key file itself is right", async () => {
-    const gids = supplementaryGids();
-    if (gids.length === 0) return;
-    const custodyGid = gids[0]!;
+  it.skipIf(NO_GROUP)("refuses a 0755 directory even when the key file itself is right", async () => {
+    const custodyGid = oneCustodyGid();
     const directory = await temporaryDirectory("debateai-custody-parent-");
     const keyPath = join(directory, "kek.bin");
     await writeFile(keyPath, generateDek(), { mode: 0o600 });
@@ -408,10 +432,8 @@ describe("V-19 custody group: the live loaders on real files", () => {
    * custody group, so the publication-key store (group `debateai-api`) keeps the
    * single-owner modes even while the setting is on.
    */
-  it("writes group-readable records into a store root that carries the custody group", async () => {
-    const gids = supplementaryGids();
-    if (gids.length === 0) return;
-    const custodyGid = gids[0]!;
+  it.skipIf(NO_GROUP)("writes group-readable records into a store root that carries the custody group", async () => {
+    const custodyGid = oneCustodyGid();
     const uid = process.getuid!();
     const directory = await temporaryDirectory("debateai-custody-write-");
     const keyPath = join(directory, "kek.bin");
@@ -448,10 +470,8 @@ describe("V-19 custody group: the live loaders on real files", () => {
     expect(await store.load(userId)).toEqual(dek);
   });
 
-  it("keeps the single-owner modes for a store root that is not in the custody group", async () => {
-    const gids = supplementaryGids();
-    if (gids.length === 0) return;
-    const custodyGid = gids[0]!;
+  it.skipIf(NO_GROUP)("keeps the single-owner modes for a store root that is not in the custody group", async () => {
+    const custodyGid = oneCustodyGid();
     const directory = await temporaryDirectory("debateai-custody-private-");
     const keyPath = join(directory, "kek.bin");
     await writeFile(keyPath, generateDek(), { mode: 0o600 });
@@ -475,10 +495,8 @@ describe("V-19 custody group: the live loaders on real files", () => {
     expect(record.mode & 0o777).toBe(0o600);
   });
 
-  it("lets the second principal read the wrapped user-DEK store, and only in group mode", async () => {
-    const gids = supplementaryGids();
-    if (gids.length === 0) return;
-    const custodyGid = gids[0]!;
+  it.skipIf(NO_GROUP)("lets the second principal read the wrapped user-DEK store, and only in group mode", async () => {
+    const custodyGid = oneCustodyGid();
     const uid = process.getuid!();
     const directory = await temporaryDirectory("debateai-custody-store-");
     const keyPath = join(directory, "kek.bin");
@@ -507,13 +525,50 @@ describe("V-19 custody group: the live loaders on real files", () => {
 
     configureCustodyGroup(undefined);
     await expect(store.load(userId)).rejects.toThrowError(
-      expect.objectContaining({ code: "KEK_UNRESOLVED" })
+      expect.objectContaining({ code: "SECRET_CUSTODY_INVALID" })
     );
 
+    // A custody refusal keeps its OWN code. KEK_UNRESOLVED means "nothing is
+    // provisioned at that path"; a record that exists but is not safe to trust
+    // is a different fault, and on a first deploy it is the likelier one.
     configureCustodyGroup(String(custodyGid));
     await chmod(record, 0o644);
     await expect(store.load(userId)).rejects.toThrowError(
-      expect.objectContaining({ code: "KEK_UNRESOLVED" })
+      expect.objectContaining({ code: "SECRET_CUSTODY_INVALID" })
     );
+  });
+
+  /**
+   * Item 3 of the 6a review. The store follows its root, and a root may only be
+   * read as MORE permissive when it already is: a `chgrp -R` with no `chmod`
+   * must not cause the next write to widen the tree on its own.
+   */
+  it.skipIf(NO_GROUP)("never widens a 0700 root just because its group matches", async () => {
+    const custodyGid = oneCustodyGid();
+    const uid = process.getuid!();
+    const directory = await temporaryDirectory("debateai-custody-no-widen-");
+    const keyPath = join(directory, "kek.bin");
+    await writeFile(keyPath, generateDek(), { mode: 0o600 });
+    await chmod(keyPath, 0o600);
+    await chmod(directory, 0o700);
+    const root = join(directory, "user-deks");
+    await mkdir(root, { mode: 0o700 });
+    // Exactly the half-done repair: the group is right, the mode is not.
+    await chown(root, uid, custodyGid);
+
+    configureCustodyGroup(String(custodyGid));
+    const store = new FileUserDekStore(root, loadKek(keyPath));
+    const userId = "55555555-5555-4555-8555-555555555555";
+    await store.store(userId, generateDek());
+
+    // The root is still 0700 — the write did not add a single permission bit.
+    expect((await stat(root)).mode & 0o777).toBe(0o700);
+    for (const part of [join(root, "users"), join(root, "users", userId)]) {
+      expect((await stat(part)).mode & 0o777, part).toBe(0o700);
+    }
+    expect((await stat(join(root, "users", userId, "dek.v1.json"))).mode & 0o777)
+      .toBe(0o600);
+    // And it still reads back, under the strict contract.
+    expect(await store.load(userId)).toBeInstanceOf(Buffer);
   });
 });

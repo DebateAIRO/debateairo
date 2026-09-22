@@ -643,6 +643,11 @@ export function custodyAccepts(
   if (!file.isFile || file.nlink !== 1) return false;
   if (contract.expectedSize !== undefined && file.size !== contract.expectedSize) return false;
   if (!parent.isDirectory) return false;
+  // One owner for the record and the directory holding it. In the single-owner
+  // contract this is already implied (both must be the caller); in group mode
+  // the FILE's uid is deliberately free, and without this a directory owned by
+  // some other principal — who could therefore replace the record — would pass.
+  if (file.uid !== parent.uid) return false;
   if (!custodyMemberAccepts(file, 0o600, 0o640, contract)) return false;
   return custodyMemberAccepts(parent, 0o700, 0o750, contract);
 }
@@ -1632,9 +1637,11 @@ async function listRecordRefs(
  * O_NOFOLLOW, decisions taken from the opened descriptor, exactly one link,
  * 0600 inside a 0700 directory, both owned by this process.
  *
- * It throws a bare TypeError; every caller already converts an unexpected
- * failure into its own typed `*_UNRESOLVED` code, so the store contracts that
- * the rest of the system asserts on are unchanged.
+ * It throws `CryptoCustodyError("SECRET_CUSTODY_INVALID")`, and every store's
+ * `load` lets that code through rather than collapsing it into its own
+ * `*_UNRESOLVED`. The two mean different things to an operator — "nothing is
+ * provisioned at that path" versus "this exists but is not safe to trust" —
+ * and V-19 makes the second the likelier failure on a first deploy.
  */
 async function readCustodyRecord(
   location: string,
@@ -1666,7 +1673,7 @@ async function readCustodyRecord(
         expectedSize: undefined
       }
     )) {
-      throw new TypeError("SECRET_CUSTODY_INVALID");
+      throw new CryptoCustodyError("SECRET_CUSTODY_INVALID");
     }
     return JSON.parse(await handle.readFile("utf8")) as unknown;
   } finally {
@@ -1708,7 +1715,16 @@ async function custodyWriteModes(
   if (custodyGid === undefined) return OWNER_CUSTODY_MODES;
   try {
     const metadata = await fileSystem.stat(root);
-    if (metadata.isDirectory() && metadata.gid === custodyGid) return GROUP_CUSTODY_MODES;
+    // The gid ALONE is not enough. A store may TIGHTEN a root it writes into
+    // but must never LOOSEN one: after a `chgrp -R` with no matching `chmod` —
+    // a half-done repair — the group matches while the mode is still 0700, and
+    // widening on the gid alone would make the key store group-readable with no
+    // operator action at all. The root must already BE group mode.
+    if (metadata.isDirectory()
+      && metadata.gid === custodyGid
+      && (metadata.mode & 0o777) === (GROUP_CUSTODY_MODES.directory & 0o777)) {
+      return GROUP_CUSTODY_MODES;
+    }
   } catch {
     // No store root yet. The operator provisions the group ON the root, so a
     // tree this process creates out of nothing stays single-owner.
@@ -1931,6 +1947,7 @@ export class FileUserDekStore implements ReadableUserDekStore {
         this.keks, record.kek_id, record.wrapped_dek, userDekAad(userId)
       );
     } catch (error) {
+      if (error instanceof CryptoCustodyError) throw error;
       if (error instanceof KekUnresolvedError || error instanceof CryptoAuthenticationError) throw error;
       throw new KekUnresolvedError();
     }
@@ -2325,6 +2342,7 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
       );
       return await unwrapRunContentKey(this.users, this.resolveUserId, record);
     } catch (error) {
+      if (error instanceof CryptoCustodyError) throw error;
       if (error instanceof RunContentKeyUnresolvedError) throw error;
       throw new RunContentKeyUnresolvedError();
     }
@@ -2350,6 +2368,7 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
         runId
       ).owner_ref;
     } catch (error) {
+      if (error instanceof CryptoCustodyError) throw error;
       if (error instanceof RunContentKeyUnresolvedError) throw error;
       throw new RunContentKeyUnresolvedError();
     }
@@ -2776,6 +2795,7 @@ export class FilePublicationKeyStore implements PublicationKeyStore {
       );
       return unwrapPublicationKey(this.keks, record);
     } catch (error) {
+      if (error instanceof CryptoCustodyError) throw error;
       if (error instanceof PublicationKeyUnresolvedError) throw error;
       throw new PublicationKeyUnresolvedError();
     }
