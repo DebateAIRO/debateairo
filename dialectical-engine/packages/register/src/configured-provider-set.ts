@@ -152,12 +152,14 @@ export function assertHostedConfiguredProviderSetVetted(value: unknown): void {
   if (row.kind !== "CONFIGURED_PROVIDER_SET" || !Array.isArray(providers) || providers.length < 1) {
     throw new TypeError("CONFIGURED_PROVIDER_SET_INVALID");
   }
-  for (const provider of providers) {
-    if (typeof provider !== "object" || provider === null || Array.isArray(provider)
-      || !namedText((provider as Readonly<Record<string, unknown>>).providerRef)) {
-      throw new TypeError("CONFIGURED_PROVIDER_SET_INVALID");
-    }
-  }
+  // Minor 5: the SHAPE question is the builder's own, asked by the same
+  // function — a hand-written hosted row could carry a vetting record on every
+  // vendor and still be a set no reader can use (no `adapterKind`, a duplicate
+  // ref, `requiredDistinctMakers: 0`).
+  assertConfiguredProviderSetShape(
+    row.requiredDistinctMakers,
+    providers as readonly ConfiguredProvider[]
+  );
   const named = providers as readonly VettedConfiguredProvider[];
   // The sealed version-1 shape carries no vetting for ANY vendor, so the first
   // one names the refusal: the operator's next step is the same either way.

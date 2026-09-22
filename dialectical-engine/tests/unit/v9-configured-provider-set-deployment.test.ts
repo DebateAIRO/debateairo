@@ -282,6 +282,50 @@ describe("C-I5 a hosted publication carries the vetted row or none at all", () =
     expect(fixture.events).toEqual([]);
   });
 
+  /**
+   * FIX ROUND 1, Minor 5 — the gate's comment says it checks THE SHAPE the
+   * builder produces, so it must ask the same shape question the builder asks,
+   * not only the vetting one. A hand-written hosted row could carry a vetting
+   * record on every vendor and still be a set the readers cannot use.
+   */
+  it("refuses a hosted row the builder's own shape rule would refuse", async () => {
+    const malformed = [
+      { requiredDistinctMakers: 0, providers: vetted(SEALED_INPUT.providers) },
+      {
+        requiredDistinctMakers: 1,
+        providers: [
+          { ...SEALED_INPUT.providers[0]!, vetting: VETTING },
+          { ...SEALED_INPUT.providers[0]!, vetting: VETTING }
+        ]
+      },
+      {
+        requiredDistinctMakers: 1,
+        providers: [{
+          providerRef: "vendor:acme", maker: "Acme", vetting: VETTING
+        }]
+      }
+    ];
+    for (const value of malformed) {
+      const row = Object.freeze({
+        rowKey: CONFIGURED_PROVIDER_SET_ROW_KEY,
+        value: Object.freeze({
+          kind: "CONFIGURED_PROVIDER_SET",
+          setVersion: CONFIGURED_PROVIDER_SET_DEPLOYMENT_VERSION,
+          ...value
+        }),
+        sourceRef: "fixture-source-ref"
+      }) as ConfiguredProviderSetRow;
+      const input = publicationOf(row, "hosted");
+      const fixture = fakePool(input);
+
+      await expect(
+        createPostgresRegisterPublicationPort(fixture.pool).publishGeneral(input),
+        JSON.stringify(value)
+      ).rejects.toThrowError(new TypeError("CONFIGURED_PROVIDER_SET_INVALID"));
+      expect(fixture.events, JSON.stringify(value)).toEqual([]);
+    }
+  });
+
   it("refuses a hand-written row that names the deployment version but skips a vendor's record", async () => {
     const forged = Object.freeze({
       rowKey: CONFIGURED_PROVIDER_SET_ROW_KEY,
