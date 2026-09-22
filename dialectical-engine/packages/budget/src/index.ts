@@ -7,6 +7,34 @@ import type { Pool } from "pg";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
 import { LedgerRepository } from "@debateai/ledger";
 
+/**
+ * V-28 (DL4-F2): the run-wide bound in MONEY, beside the attempt ceiling this
+ * file has always held. The arithmetic and the two decisions are pure and live
+ * in their own module so the provider gateway can be handed a seam without
+ * `@debateai/providers` taking on the ledger. See ./cost-envelope.ts.
+ */
+export {
+  COST_ENVELOPE_CURRENCY,
+  COST_MICROS_PER_USD,
+  DAILY_COST_ENVELOPE_REACHED,
+  PROJECTED_INPUT_BYTES_PER_TOKEN,
+  PROVIDER_USAGE_UNREPORTED,
+  RUN_COST_ENVELOPE_MONEY_REACHED,
+  chargeMicrosForUsage,
+  costEnvelopeDay,
+  dailyCostEnvelopeReached,
+  decideDailyCostEnvelope,
+  decideRunCostEnvelope,
+  projectedCallCeilingMicros,
+  providerUsageUnreported,
+  readReportedUsage,
+  runCostEnvelopeReached,
+  type DailyCostEnvelopeDecision,
+  type ProviderTargetPrice,
+  type ReportedUsage,
+  type RunCostEnvelopeDecision
+} from "./cost-envelope.js";
+
 export const RATIFIED_BATTERY_ROW_IDS = [
   "Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10",
   "Q11", "Q12", "Q13", "Q14", "Q15", "Q16", "Q17", "Q18", "Q19", "Q20",

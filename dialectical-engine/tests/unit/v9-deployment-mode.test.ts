@@ -321,18 +321,29 @@ describe("V-9 mode x provider target (task 10a)", () => {
   });
 });
 
-describe("V-28 seam: hosted refuses until the cost envelopes are sealed (task 11)", () => {
-  it("reports the envelopes as not sealed until task 11 publishes them", () => {
-    expect(readSealedCostEnvelopeStatus()).toBe("NOT_SEALED");
+/**
+ * TASK 11 FILLED THE SEAM (V-28). The two cases that pinned its placeholder —
+ * "reports NOT_SEALED until task 11 publishes them" and "refuses a hosted
+ * start-up while the seam says NOT_SEALED with no argument" — described a state
+ * that no longer exists and were deleted rather than relaxed: the rows are
+ * published, so the seam reports SEALED.
+ *
+ * What SURVIVES here is the part that is task 10's and must not move: local mode
+ * is untouched, and a hosted boot refuses whenever the seam does not say SEALED.
+ * The envelopes' own behaviour is pinned in `v28-cost-envelope.test.ts`.
+ */
+describe("V-28 seam: hosted refuses unless the cost envelopes are sealed (task 11)", () => {
+  it("reports the envelopes as sealed now that task 11 published the rows", () => {
+    expect(readSealedCostEnvelopeStatus()).toBe("SEALED");
   });
 
-  it("refuses a hosted start-up while the seam says NOT_SEALED", () => {
-    expect(() => assertHostedCostEnvelopesSealed("hosted"))
+  it("refuses a hosted start-up whenever the seam does not say SEALED", () => {
+    expect(() => assertHostedCostEnvelopesSealed("hosted", () => "NOT_SEALED"))
       .toThrowError(expect.objectContaining({ code: "COST_ENVELOPES_NOT_SEALED" }));
   });
 
   it("leaves local mode alone — envelopes are a hosted-spend control", () => {
-    expect(() => assertHostedCostEnvelopesSealed("local")).not.toThrow();
+    expect(() => assertHostedCostEnvelopesSealed("local", () => "NOT_SEALED")).not.toThrow();
   });
 
   it("admits hosted the moment the seam reports SEALED", () => {

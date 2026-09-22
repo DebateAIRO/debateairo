@@ -3,6 +3,10 @@ import {
   parseRegisterVersionText,
   registerVersionToSafeLegacyNumber
 } from "./register-publication.js";
+import {
+  COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
+  costEnvelopePolicyFromValue
+} from "./cost-envelope-policy.js";
 
 function parseEnvironmentSource<T extends z.ZodRawShape>(
   shape: T,
@@ -99,17 +103,37 @@ export function resolveDeploymentMode(
 export type SealedCostEnvelopeStatus = "SEALED" | "NOT_SEALED";
 
 /**
- * TASK 11 SEAM (V-28). The single named function task 11 replaces when it
- * publishes the per-run and daily cost envelopes as sealed register rows.
+ * TASK 11 SEAM (V-28), now FILLED. Task 10 left this as the one named function
+ * a hosted boot asks "are the money ceilings in place?"; task 11 published the
+ * rows, so it answers from them.
  *
- * Until then it reports `NOT_SEALED`, so a hosted start-up refuses: a commercial
- * deployment that can spend money on paid vendor APIs without a ceiling is the
- * risk V-9 asked to be closed in code, and an unsealed envelope is indis-
- * tinguishable from no envelope at all. Local mode is untouched — the relays and
- * loopback model servers spend nothing this control could bound.
+ * It reads the SHIPPED deployment row rather than the database on purpose. This
+ * is the FIRST decision of both start-ups — before a pool exists, before a
+ * credential file is opened — and it is the question "does this build carry
+ * envelopes at all?". The row IN FORCE at the deployment's register version is a
+ * separate, later question, answered by `readCostEnvelopePolicy` where the pool
+ * is; a deployment whose register version never sealed the row refuses there, by
+ * name.
+ *
+ * It still fails CLOSED: the shipped row is parsed through the same validator
+ * every reader uses, and anything that does not parse — a removed row, an edit
+ * that put a float in it, a zero ceiling — is `NOT_SEALED`, because an unsealed
+ * envelope and an absent one must stay indistinguishable to a hosted boot. Local
+ * mode is untouched: the relays and loopback model servers spend nothing this
+ * control could bound.
  */
 export function readSealedCostEnvelopeStatus(): SealedCostEnvelopeStatus {
-  return "NOT_SEALED";
+  try {
+    const policy = costEnvelopePolicyFromValue(
+      COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW.value,
+      COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef
+    );
+    return policy.perRunCeilingMicros > 0 && policy.dailyCeilingMicros > 0
+      ? "SEALED"
+      : "NOT_SEALED";
+  } catch {
+    return "NOT_SEALED";
+  }
 }
 
 export class CostEnvelopesNotSealedError extends TypeError {
@@ -128,6 +152,50 @@ export function assertHostedCostEnvelopesSealed(
 ): void {
   if (mode !== "hosted") return;
   if (readStatus() !== "SEALED") throw new CostEnvelopesNotSealedError();
+}
+
+/**
+ * TASK 11 AMENDMENT (from task 8's review). The support chat's three admission
+ * budgets — `support_reads`, `support_sessions`, `support_model_calls` — are
+ * OPTIONAL members of the `admissionPolicy` row, because DL1-F2 added them in a
+ * superseding version and a host still serving the sealed three-scope row had to
+ * keep booting. The consequence is fail-OPEN: a host pinned to an older
+ * `REGISTER_VERSION` runs unmetered support reads and an unshared model cap, and
+ * says nothing about it.
+ *
+ * In HOSTED mode that is a spend hole of the same family as an unsealed
+ * envelope, so start-up refuses. LOCAL mode keeps today's fail-open behaviour:
+ * there the support chat reaches a relay or a local model and the budgets bound
+ * nothing that costs money.
+ */
+export class SupportAdmissionScopesNotSealedError extends TypeError {
+  readonly code = "SUPPORT_ADMISSION_SCOPES_NOT_SEALED";
+
+  constructor(readonly absentScopes: readonly string[]) {
+    super("SUPPORT_ADMISSION_SCOPES_NOT_SEALED");
+    this.name = "SupportAdmissionScopesNotSealedError";
+  }
+}
+
+/**
+ * The second half of the hosted start-up decision, taken where the admission row
+ * IN FORCE has been read — which is after a pool exists, so it cannot live
+ * inside `assertHostedCostEnvelopesSealed` above (that one runs before the first
+ * connection). The parameter is structural rather than the `AdmissionPolicy`
+ * type so this module keeps no dependency on the policy reader.
+ */
+export function assertHostedSupportAdmissionSealed(
+  mode: DeploymentMode,
+  policy: Readonly<{
+    supportReads: unknown;
+    supportSessions: unknown;
+    supportModelCalls: unknown;
+  }>
+): void {
+  if (mode !== "hosted") return;
+  const absent = (["supportReads", "supportSessions", "supportModelCalls"] as const)
+    .filter((scope) => policy?.[scope] === null || policy?.[scope] === undefined);
+  if (absent.length > 0) throw new SupportAdmissionScopesNotSealedError(Object.freeze(absent));
 }
 
 export function parseMigrationEnvironment(source: EnvironmentSource) {
