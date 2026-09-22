@@ -1,0 +1,21 @@
+{
+  "time.justNow": "az önce",
+  "time.minutes.one": "{count} dakika önce",
+  "time.minutes.other": "{count} dakika önce",
+  "time.hours.one": "{count} saat önce",
+  "time.hours.other": "{count} saat önce",
+  "time.yesterday": "Dün",
+  "time.days.one": "{count} gün önce",
+  "time.days.other": "{count} gün önce",
+  "time.weeks.one": "{count} hafta önce",
+  "time.weeks.other": "{count} hafta önce",
+  "time.status.complete": "Tamamlandı",
+  "time.status.queued": "Kuyrukta",
+  "time.status.claimed": "Üstlenildi",
+  "time.status.running": "Çalışıyor",
+  "time.status.holding": "Sağlayıcı kurtarma beklemesinde",
+  "time.status.settled": "Sonuçlandı",
+  "time.status.generating": "Üretiliyor",
+  "time.status.failed": "Başarısız",
+  "time.status.draft": "Taslak"
+}

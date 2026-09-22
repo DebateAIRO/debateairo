@@ -1,0 +1,21 @@
+{
+  "time.justNow": "точно сега",
+  "time.minutes.one": "{count} преди минута",
+  "time.minutes.other": "{count} преди минути",
+  "time.hours.one": "{count} преди час",
+  "time.hours.other": "{count} преди часове",
+  "time.yesterday": "Вчера",
+  "time.days.one": "{count} преди ден",
+  "time.days.other": "{count} преди дни",
+  "time.weeks.one": "{count} преди седмица",
+  "time.weeks.other": "{count} преди седмици",
+  "time.status.complete": "Завършено",
+  "time.status.queued": "На опашка",
+  "time.status.claimed": "Заявено",
+  "time.status.running": "В ход",
+  "time.status.holding": "Изчаква възстановяване на доставчика",
+  "time.status.settled": "Уредено",
+  "time.status.generating": "Генериране",
+  "time.status.failed": "Неуспешно",
+  "time.status.draft": "Чернова"
+}

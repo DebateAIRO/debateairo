@@ -1,5 +1,6 @@
 import type { Deployment, PlanTier, Session } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 export type RiskTier = "casual" | "standard" | "high-stakes";
 export type CompositionBudgetTier = "low" | "medium" | "high";
@@ -14,21 +15,21 @@ export function dateTimeLocalValue(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-export function deriveSessionAskDefaults(session: Session, now: Date = new Date()) {
+export function deriveSessionAskDefaults(session: Session, now: Date = new Date(), catalog?: MessageCatalog) {
   return Object.freeze({
     decisionScope: DECISION_SCOPE_DEFAULT,
     asOf: dateTimeLocalValue(now),
-    decisionScopeProvenance: "V ruling DR-166",
-    asOfProvenance: "ask time (refreshed when Start is clicked)"
+    decisionScopeProvenance: t(catalog, "newDebate.decisionScopeProvenance"),
+    asOfProvenance: t(catalog, "newDebate.asOfProvenance")
   });
 }
 
-export function deriveRiskTierDefault(deployment: Deployment) {
+export function deriveRiskTierDefault(deployment: Deployment, catalog?: MessageCatalog) {
   const riskRow = deployment.register.rows.find((row) => row.row_key === "riskTier");
   if (riskRow === undefined || !["casual", "standard", "high-stakes"].includes(String(riskRow.value))) {
     throw new TypedDomainError(
       "ASK_RISK_TIER_DEFAULT_UNAVAILABLE",
-      "The deployment has no valid riskTier row; Risk tier awaits input."
+      t(catalog, "newDebate.defaultUnavailable")
     );
   }
   return Object.freeze({
@@ -37,9 +38,13 @@ export function deriveRiskTierDefault(deployment: Deployment) {
   });
 }
 
-export function askDefaultFailureMessage(failure: unknown, fallbackCode: string): string {
+export function askDefaultFailureMessage(
+  failure: unknown,
+  fallbackCode: string,
+  catalog?: MessageCatalog
+): string {
   if (failure instanceof TypedDomainError) return `${failure.code}: ${failure.message}`;
-  return `${fallbackCode}: ${failure instanceof Error ? failure.message : "Default derivation failed"}`;
+  return `${fallbackCode}: ${failure instanceof Error ? failure.message : t(catalog, "newDebate.defaultDerivationFailed")}`;
 }
 
 export type NewDebateAskDefaults = {
@@ -55,10 +60,14 @@ export type NewDebateAskDefaults = {
   readonly riskTierWasEdited?: boolean;
 };
 
-export function buildNewDebateAskConfig(defaults: NewDebateAskDefaults, submitTime: Date): Record<string, unknown> {
+export function buildNewDebateAskConfig(
+  defaults: NewDebateAskDefaults,
+  submitTime: Date,
+  catalog?: MessageCatalog
+): Record<string, unknown> {
   const asOf = defaults.asOfWasEdited ? new Date(defaults.asOf) : submitTime;
   if (Number.isNaN(asOf.valueOf())) {
-    throw new TypedDomainError("ASK_AS_OF_INVALID", "As of must be a valid date and time.");
+    throw new TypedDomainError("ASK_AS_OF_INVALID", t(catalog, "newDebate.invalidAsOf"));
   }
   return {
     plan_tier: defaults.planTier,

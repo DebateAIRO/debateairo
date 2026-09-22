@@ -1,9 +1,11 @@
 import type { CSSProperties, JSX } from "react";
-import { EXCHANGE_CARDS, RESOLUTION } from "./cards";
+import { exchangeCards, resolution } from "./cards";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /* The document's Z-axis cascade: four turns overlapping up the page, each
    rotated and nudged sideways, alternating transform-origin. */
-export function LandingSample(): JSX.Element {
+export function LandingSample({ catalog }: { catalog: MessageCatalog }): JSX.Element {
+  const cards = exchangeCards(catalog);
   return (
     <section
       id="transcripts"
@@ -13,33 +15,33 @@ export function LandingSample(): JSX.Element {
     >
       <div className="lpExchangeHead">
         <div>
-          <p className="lpEyebrow">One round, four turns</p>
+          <p className="lpEyebrow">{t(catalog, "home.oneRound")}</p>
           <h2 id="landing-sample-title" className="lpDisplay lpExchangeTitle">
-            The pressure lands on the joint, not the wording.
+            {t(catalog, "home.sampleTitle")}
           </h2>
         </div>
         <div className="lpResolution">
-          <p className="lpEyebrow lpEyebrowTight">Resolution</p>
-          <p className="lpResolutionClaim">{RESOLUTION}</p>
+          <p className="lpEyebrow lpEyebrowTight">{t(catalog, "home.resolutionLabel")}</p>
+          <p className="lpResolutionClaim">{resolution(catalog)}</p>
           <div className="lpLegend">
             <span>
               <span className="lpSwatch" data-stance="pro" aria-hidden="true" />
-              Pro
+              {t(catalog, "home.pro")}
             </span>
             <span>
               <span className="lpSwatch" data-stance="con" aria-hidden="true" />
-              Con
+              {t(catalog, "home.con")}
             </span>
             <span>
               <span className="lpSwatch" data-stance="reasoning" aria-hidden="true" />
-              Reasoning
+              {t(catalog, "home.reasoning")}
             </span>
           </div>
         </div>
       </div>
 
       <div className="lpCascade">
-        {EXCHANGE_CARDS.map((card, index) => (
+        {cards.map((card, index) => (
           <div
             key={card.turn}
             className="lpCard"
@@ -61,16 +63,16 @@ export function LandingSample(): JSX.Element {
                 data-ai-generated="true"
                 data-bezel="core"
                 data-stance={card.stance}
-                aria-label={`Turn ${card.turn}, ${card.role}`}
+                aria-label={t(catalog, "home.turnLabel", { turn: card.turn, role: card.role })}
               >
                 <span className="lpCardAccent" data-stance={card.stance} aria-hidden="true" />
                 <div className="lpCardHead">
                   <span className="lpChip lpChipStance" data-stance={card.stance}>
                     {card.arrow} {card.role}
                   </span>
-                  <span className="lpChip lpChipBase">BASE {card.base}%</span>
+                  <span className="lpChip lpChipBase">{t(catalog, "home.baseScore", { score: card.base })}</span>
                   <span className="lpChip lpChipStance" data-stance={card.stance}>
-                    FINAL {card.final}%
+                    {t(catalog, "home.finalScore", { score: card.final })}
                   </span>
                   <span className="lpSpacer" />
                   <span className="lpChip lpChipModel" data-model={card.authorKey}>
@@ -84,14 +86,14 @@ export function LandingSample(): JSX.Element {
                     className="lpChip lpChipReview"
                     data-review={card.review === "DISPUTED" ? "dispute" : "agree"}
                   >
-                    REVIEW {card.review} BY:
+                    {t(catalog, "home.reviewBy", { review: card.review })}
                   </span>
                   <span className="lpChip lpChipReviewer">
                     <span className="lpDot lpDotHalo" data-model={card.reviewerKey} aria-hidden="true" />
                     {card.reviewer}
                   </span>
                   <span className="lpSpacer" />
-                  <span className="lpTurn">Turn {card.turn}</span>
+                  <span className="lpTurn">{t(catalog, "home.turn", { turn: card.turn })}</span>
                 </div>
               </article>
             </div>
@@ -100,8 +102,7 @@ export function LandingSample(): JSX.Element {
       </div>
 
       <p className="lpExchangeCoda">
-        The round ends here. Nothing is declared won. You get the transcript, the two marks per turn,
-        and the joint you conceded.
+        {t(catalog, "home.sampleCoda")}
       </p>
     </section>
   );

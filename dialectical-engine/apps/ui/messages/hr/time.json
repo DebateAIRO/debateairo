@@ -1,0 +1,21 @@
+{
+  "time.justNow": "upravo sada",
+  "time.minutes.one": "{count} prije minute",
+  "time.minutes.other": "Prije {count} minuta",
+  "time.hours.one": "{count} prije sat vremena",
+  "time.hours.other": "{count} prije sati",
+  "time.yesterday": "Jučer",
+  "time.days.one": "Prije {count} dan",
+  "time.days.other": "prije {count} dana",
+  "time.weeks.one": "{count} prije tjedan dana",
+  "time.weeks.other": "Prije {count} tjedana",
+  "time.status.complete": "Dovršeno",
+  "time.status.queued": "U redu čekanja",
+  "time.status.claimed": "Traženo",
+  "time.status.running": "U tijeku",
+  "time.status.holding": "Zadržavanje za oporavak davatelja usluga",
+  "time.status.settled": "Zaključeno",
+  "time.status.generating": "Generiranje",
+  "time.status.failed": "neuspješno",
+  "time.status.draft": "Nacrt"
+}

@@ -1,0 +1,21 @@
+{
+  "time.justNow": "tikko",
+  "time.minutes.one": "pirms {count} minūtes",
+  "time.minutes.other": "pirms {count} minūtēm",
+  "time.hours.one": "pirms {count} stundas",
+  "time.hours.other": "pirms {count} stundām",
+  "time.yesterday": "Vakar",
+  "time.days.one": "pirms {count} dienas",
+  "time.days.other": "pirms {count} dienām",
+  "time.weeks.one": "pirms {count} nedēļas",
+  "time.weeks.other": "pirms {count} nedēļām",
+  "time.status.complete": "Pabeigts",
+  "time.status.queued": "Rindā",
+  "time.status.claimed": "Piešķirts",
+  "time.status.running": "Notiek",
+  "time.status.holding": "Apturēts pakalpojumu sniedzēja atkopšanai",
+  "time.status.settled": "Nokārtots",
+  "time.status.generating": "Ģenerē",
+  "time.status.failed": "Neizdevās",
+  "time.status.draft": "Melnraksts"
+}

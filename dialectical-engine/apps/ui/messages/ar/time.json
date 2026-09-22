@@ -1,0 +1,21 @@
+{
+  "time.justNow": "الآن",
+  "time.minutes.one": "قبل {count} دقيقة",
+  "time.minutes.other": "قبل {count} دقائق",
+  "time.hours.one": "قبل {count} ساعة",
+  "time.hours.other": "قبل {count} ساعات",
+  "time.yesterday": "أمس",
+  "time.days.one": "قبل {count} يوم",
+  "time.days.other": "قبل {count} أيام",
+  "time.weeks.one": "قبل {count} أسبوع",
+  "time.weeks.other": "قبل {count} أسابيع",
+  "time.status.complete": "مكتملة",
+  "time.status.queued": "في قائمة الانتظار",
+  "time.status.claimed": "تم استلامها",
+  "time.status.running": "قيد التشغيل",
+  "time.status.holding": "معلّقة لاسترداد المزوّد",
+  "time.status.settled": "تمت تسويتها",
+  "time.status.generating": "قيد التوليد",
+  "time.status.failed": "فشلت",
+  "time.status.draft": "مسودة"
+}

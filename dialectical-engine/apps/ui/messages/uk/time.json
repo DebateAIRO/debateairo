@@ -1,0 +1,21 @@
+{
+  "time.justNow": "щойно",
+  "time.minutes.one": "{count} хвилину тому",
+  "time.minutes.other": "{count} хвилин тому",
+  "time.hours.one": "{count} годину тому",
+  "time.hours.other": "{count} годин тому",
+  "time.yesterday": "Учора",
+  "time.days.one": "{count} день тому",
+  "time.days.other": "{count} днів тому",
+  "time.weeks.one": "{count} тиждень тому",
+  "time.weeks.other": "{count} тижнів тому",
+  "time.status.complete": "Завершено",
+  "time.status.queued": "У черзі",
+  "time.status.claimed": "Призначено",
+  "time.status.running": "Виконується",
+  "time.status.holding": "Призупинено для відновлення постачальника",
+  "time.status.settled": "Узгоджено",
+  "time.status.generating": "Генерується",
+  "time.status.failed": "Помилка",
+  "time.status.draft": "Чернетка"
+}

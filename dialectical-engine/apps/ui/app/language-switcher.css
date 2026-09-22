@@ -1,0 +1,216 @@
+.languageSwitcher {
+  position: relative;
+  flex: 0 0 auto;
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+.languageSwitcherButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--shell);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+}
+
+.languageSwitcherButton:hover,
+.languageSwitcherButton[aria-expanded="true"] {
+  background: var(--surface-sunken);
+  border-color: var(--gold-border);
+}
+
+.languageSwitcherButton:focus-visible,
+.languageSwitcherRow:focus-visible,
+.languageSwitcherSearch input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.languageSwitcherFlag {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.languageSwitcherCode,
+.languageSwitcherRowCode,
+.languageSwitcherTitle,
+.languageSwitcherCount,
+.languageSwitcherGroupHead,
+.languageSwitcherCurrent {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.languageSwitcherCode {
+  font-size: 11px;
+  letter-spacing: .06em;
+}
+
+.languageSwitcherCaret {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.languageSwitcherPanel {
+  position: absolute;
+  inset-block-start: 38px;
+  inset-inline-end: 0;
+  z-index: 90;
+  width: min(470px, calc(100vw - 24px));
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--core);
+  box-shadow: var(--shadow-pop);
+  color: var(--ink);
+}
+
+.languageSwitcherHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.languageSwitcherTitle {
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: .18em;
+}
+
+.languageSwitcherCount {
+  margin-inline-start: auto;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.languageSwitcherCurrent {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--gold-text);
+  font-size: 9.5px;
+}
+
+.languageSwitcherSearch {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 11px 16px;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--shell);
+  color: var(--muted);
+}
+
+.languageSwitcherSearch input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 11.5px var(--font-sans);
+}
+
+.languageSwitcherSearch input::placeholder { color: var(--muted); opacity: 1; }
+
+.languageSwitcherList {
+  max-height: 320px;
+  overflow: auto;
+  padding: 0 10px 14px;
+}
+
+.languageSwitcherGroup { margin-block-start: 12px; }
+
+.languageSwitcherGroupHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px 8px;
+  color: var(--muted);
+  font-size: 8.5px;
+  letter-spacing: .16em;
+}
+
+.languageSwitcherRule { flex: 1; height: 1px; background: var(--line); }
+
+.languageSwitcherGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.languageSwitcherRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: start;
+}
+
+.languageSwitcherRow:hover,
+.languageSwitcherRow[data-highlighted="true"] { background: var(--surface-sunken); }
+
+.languageSwitcherRow[data-current="true"] {
+  border-color: var(--gold-border);
+  background: var(--gold-bg);
+  font-weight: 700;
+}
+
+.languageSwitcherRowCode {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: .06em;
+}
+
+.languageSwitcherRow[data-current="true"] .languageSwitcherRowCode { color: var(--gold-text); }
+
+.languageSwitcherName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.languageSwitcherCheck {
+  width: 7px;
+  height: 7px;
+  transform: rotate(45deg);
+  background: var(--gold);
+  opacity: 0;
+}
+
+.languageSwitcherRow[data-current="true"] .languageSwitcherCheck { opacity: 1; }
+
+@media (max-width: 560px) {
+  .languageSwitcherPanel {
+    position: fixed;
+    inset: 64px 12px auto;
+    width: auto;
+  }
+
+  .languageSwitcherGrid { grid-template-columns: 1fr; }
+}

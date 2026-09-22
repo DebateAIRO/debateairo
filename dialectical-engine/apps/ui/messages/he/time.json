@@ -1,0 +1,21 @@
+{
+  "time.justNow": "זה עתה",
+  "time.minutes.one": "לפני {count} דקה",
+  "time.minutes.other": "לפני {count} דקות",
+  "time.hours.one": "לפני {count} שעה",
+  "time.hours.other": "לפני {count} שעות",
+  "time.yesterday": "אתמול",
+  "time.days.one": "לפני {count} יום",
+  "time.days.other": "לפני {count} ימים",
+  "time.weeks.one": "לפני {count} שבוע",
+  "time.weeks.other": "לפני {count} שבועות",
+  "time.status.complete": "הושלמה",
+  "time.status.queued": "בתור",
+  "time.status.claimed": "נתבעה",
+  "time.status.running": "פועלת",
+  "time.status.holding": "בהמתנה להתאוששות הספק",
+  "time.status.settled": "הוסדרה",
+  "time.status.generating": "בהפקה",
+  "time.status.failed": "נכשלה",
+  "time.status.draft": "טיוטה"
+}

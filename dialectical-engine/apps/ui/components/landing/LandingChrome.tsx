@@ -1,8 +1,12 @@
 import type { JSX } from "react";
 import { ModeToggle } from "@/components/ModeToggle";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t } from "@/lib/i18n/translate";
 
 /* The document's floating glass nav: detached, centred, 34px from the top. */
 export function LandingChrome(): JSX.Element {
+  const { catalog } = useChromeI18n();
   return (
     <header
       data-landing-section="chrome"
@@ -29,15 +33,16 @@ export function LandingChrome(): JSX.Element {
         >
           DebateAI
         </a>
-        <nav aria-label="Landing navigation" className="lpNavLinks">
-          <a href="#method">Method</a>
-          <a href="#transcripts">Transcripts</a>
-          <a href="#pricing">Pricing</a>
+        <nav aria-label={t(catalog, "chrome.landingNavigation")} className="lpNavLinks">
+          <a href="#method">{t(catalog, "chrome.method")}</a>
+          <a href="#transcripts">{t(catalog, "chrome.transcripts")}</a>
+          <a href="#pricing">{t(catalog, "chrome.pricing")}</a>
         </nav>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <LanguageSwitcher />
           <ModeToggle />
           <a className="lpCta lpCtaNav" href="/login?next=%2Fnew">
-            Start a round
+            {t(catalog, "chrome.startRound")}
             <span className="lpArrow" aria-hidden="true">
               →
             </span>

@@ -1,10 +1,11 @@
 import type { JSX } from "react";
 import { AiNotice } from "../AiNotice";
-import { AI_NOTICE } from "@/lib/aiDisclosure";
+import { aiNoticeCopy } from "@/lib/aiDisclosure";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /* The document's closing CTA: centred, with the pro/rule/con motif above it.
    The pricing line carries the id the nav points at. */
-export function LandingPricing(): JSX.Element {
+export function LandingPricing({ catalog }: { catalog: MessageCatalog }): JSX.Element {
   return (
     <section
       id="start"
@@ -18,25 +19,24 @@ export function LandingPricing(): JSX.Element {
         <span className="lpSwatch" data-stance="con" />
       </div>
       <h2 id="landing-pricing-title" className="lpDisplay lpClosingTitle">
-        Your argument is only as strong as its weakest joint.
+        {t(catalog, "home.closingTitle")}
       </h2>
       <p className="lpClosingLede">
-        Take one round. Four turns, about nine minutes, and a transcript that tells you exactly where
-        you stopped answering.
+        {t(catalog, "home.closingLede")}
       </p>
       <div style={{ display: "flex", justifyContent: "center", marginTop: "52px" }}>
         <a className="lpCta lpCtaClosing" href="/login?next=%2Fnew">
-          Start a round
+          {t(catalog, "chrome.startRound")}
           <span className="lpArrow" aria-hidden="true">
             →
           </span>
         </a>
       </div>
       <p id="pricing" className="lpPricing">
-        First [PLACEHOLDER] rounds free, then [PLACEHOLDER] per month. Cancel whenever.
+        {t(catalog, "home.pricingCopy")}
       </p>
       <footer id="ai-transparency" className="lpAiTransparency">
-        <AiNotice variant="block" body={AI_NOTICE.landingBlock} />
+        <AiNotice catalog={catalog} variant="block" body={aiNoticeCopy(catalog).landingBlock} />
       </footer>
     </section>
   );

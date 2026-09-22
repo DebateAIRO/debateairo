@@ -1,0 +1,21 @@
+{
+  "time.justNow": "только что",
+  "time.minutes.one": "{count} минуту назад",
+  "time.minutes.other": "{count} мин. назад",
+  "time.hours.one": "{count} час назад",
+  "time.hours.other": "{count} ч. назад",
+  "time.yesterday": "Вчера",
+  "time.days.one": "{count} день назад",
+  "time.days.other": "{count} дн. назад",
+  "time.weeks.one": "{count} неделю назад",
+  "time.weeks.other": "{count} нед. назад",
+  "time.status.complete": "Завершено",
+  "time.status.queued": "В очереди",
+  "time.status.claimed": "Назначено",
+  "time.status.running": "Выполняется",
+  "time.status.holding": "Ожидание восстановления провайдера",
+  "time.status.settled": "Урегулировано",
+  "time.status.generating": "Создаётся",
+  "time.status.failed": "Ошибка",
+  "time.status.draft": "Черновик"
+}

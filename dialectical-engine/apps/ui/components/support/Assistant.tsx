@@ -11,6 +11,9 @@ import { resolveSupportActions } from "@debateai/support-kb/navigation";
 import { requestPreferences } from "../../lib/consent.js";
 import { BrandMark } from "../TopBar.js";
 import { ModeToggle } from "../ModeToggle.js";
+import { LanguageSwitcher } from "../LanguageSwitcher";
+import { useChromeI18n } from "../../lib/i18n/I18nProvider";
+import { t } from "../../lib/i18n/translate";
 import { AiNotice } from "../AiNotice";
 import { supportPost } from "./http.js";
 
@@ -395,6 +398,7 @@ export function Assistant({
   auxiliaryContent?: ReactNode;
   onClose?: () => void;
 }>) {
+  const { catalog: chromeCatalog } = useChromeI18n();
   const persistent = client === supportAssistantClient;
   const [stored] = useState(() => persistent ? readStoredConversation() : null);
   const [language,setLanguage] = useState<SupportAssistantLanguage>(stored?.language ?? "en");
@@ -731,12 +735,13 @@ export function Assistant({
     <header className="supportHeader" data-support-header>
       <BrandMark />
       <span className="supportHeaderDivider" aria-hidden />
-      <span className="supportHeaderTitle">Help</span>
+      <span className="supportHeaderTitle">{t(chromeCatalog, "chrome.help")}</span>
       <div className="supportHeaderActions">
+        <LanguageSwitcher />
         <ModeToggle compact />
         <span className="supportIdentity">
           <span className="supportIdentityMark" aria-hidden>{identityAvailable ? "A" : "G"}</span>
-          <span>{identityAvailable ? "Signed-in asker" : "Guest session"}</span>
+          <span>{t(chromeCatalog, identityAvailable ? "chrome.signedInAsker" : "chrome.guestSession")}</span>
         </span>
       </div>
     </header>

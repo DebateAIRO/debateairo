@@ -1,0 +1,21 @@
+{
+  "time.justNow": "chiar acum",
+  "time.minutes.one": "acum {count} minut",
+  "time.minutes.other": "acum {count} minute",
+  "time.hours.one": "acum {count} oră",
+  "time.hours.other": "acum {count} ore",
+  "time.yesterday": "Ieri",
+  "time.days.one": "acum {count} zi",
+  "time.days.other": "acum {count} zile",
+  "time.weeks.one": "acum {count} săptămână",
+  "time.weeks.other": "acum {count} săptămâni",
+  "time.status.complete": "Finalizat",
+  "time.status.queued": "În coadă",
+  "time.status.claimed": "Preluat",
+  "time.status.running": "În curs",
+  "time.status.holding": "În așteptarea restabilirii furnizorului",
+  "time.status.settled": "Stabilizat",
+  "time.status.generating": "În generare",
+  "time.status.failed": "Eșuat",
+  "time.status.draft": "Ciornă"
+}

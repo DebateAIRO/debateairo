@@ -1,3 +1,5 @@
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
+
 /* The four-turn exchange the design document puts on the landing page.
    Content, scores, turn order and the cascade geometry (rotation, x-offset,
    negative top margin) are the document's own values. */
@@ -28,7 +30,8 @@ const A_CLAUDE = "Anthropic · Claude · claude-opus-5";
 const A_GPT = "OpenAI · GPT · gpt-5.6-sol";
 const A_GEMINI = "Google · Gemini · gemini-3-ultra";
 
-export const EXCHANGE_CARDS: readonly ExchangeCard[] = [
+export function exchangeCards(catalog?: MessageCatalog): readonly ExchangeCard[] {
+  return [
   {
     role: "REASONING",
     arrow: "◆",
@@ -44,7 +47,7 @@ export const EXCHANGE_CARDS: readonly ExchangeCard[] = [
     reviewer: A_CLAUDE,
     reviewerKey: "claude",
     review: "AGREED",
-    text: "Remote-first companies should generally use location-independent salary bands for engineers performing equivalent work, while allowing transparent adjustments for legally required costs, scarce skills, and role scope."
+    text: t(catalog, "home.card1Text")
   },
   {
     role: "PRO",
@@ -61,7 +64,7 @@ export const EXCHANGE_CARDS: readonly ExchangeCard[] = [
     reviewer: A_GPT,
     reviewerKey: "gpt",
     review: "DISPUTED",
-    text: "Remote-first companies should pay a single global rate for a given role and level, because compensation is owed for the work delivered rather than for the worker’s postal code: two engineers at the same level producing comparable value contribute equally to the firm’s output."
+    text: t(catalog, "home.card2Text")
   },
   {
     role: "CON",
@@ -78,7 +81,7 @@ export const EXCHANGE_CARDS: readonly ExchangeCard[] = [
     reviewer: A_GPT,
     reviewerKey: "gpt",
     review: "AGREED",
-    text: "Remote-first companies should generally set engineering pay against the local labor market an employee can actually access — geo-tiered bands with transparent, published multipliers — because wages are priced against a worker’s realistic alternatives, not against a global abstraction."
+    text: t(catalog, "home.card3Text")
   },
   {
     role: "CON",
@@ -95,36 +98,43 @@ export const EXCHANGE_CARDS: readonly ExchangeCard[] = [
     reviewer: A_GPT,
     reviewerKey: "gpt",
     review: "AGREED",
-    text: "A single global rate anchors to the lowest defensible number: when payroll cannot flex by market, firms quietly lower the level everywhere or slow hiring in expensive markets."
+    text: t(catalog, "home.card4Text")
   }
-];
+  ];
+}
 
-export const METHOD_STEPS = [
+export const EXCHANGE_CARDS = exchangeCards();
+
+export function methodSteps(catalog?: MessageCatalog) {
+  return [
   {
     number: "01",
-    title: "Models argue",
+    title: t(catalog, "home.method1Title"),
     stance: "pro",
-    body: "Five frontier models build the tree — pro, con, and the reasoning that binds them."
+    body: t(catalog, "home.method1Body")
   },
   {
     number: "02",
-    title: "They review each other",
+    title: t(catalog, "home.method2Title"),
     stance: "reasoning",
-    body: "Every claim is cross-reviewed by a rival model: agree or dispute, on the record."
+    body: t(catalog, "home.method2Body")
   },
   {
     number: "03",
-    title: "You challenge",
+    title: t(catalog, "home.method3Title"),
     stance: "con",
-    body: "Flag any sentence; the bench spawns a focused rebuttal where you pointed."
+    body: t(catalog, "home.method3Body")
   },
   {
     number: "04",
-    title: "Verdict with receipts",
+    title: t(catalog, "home.method4Title"),
     stance: "gold",
-    body: "Scores, condition marks, and replay handles — every number traces to its source."
+    body: t(catalog, "home.method4Body")
   }
 ] as const;
+}
 
-export const RESOLUTION =
-  "Should remote-first companies pay engineers the same salary regardless of where they live?";
+export const METHOD_STEPS = methodSteps();
+
+export const resolution = (catalog?: MessageCatalog) => t(catalog, "home.resolution");
+export const RESOLUTION = resolution();

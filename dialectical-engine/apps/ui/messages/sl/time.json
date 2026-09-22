@@ -1,0 +1,21 @@
+{
+  "time.justNow": "pravkar",
+  "time.minutes.one": "pred {count} minuto",
+  "time.minutes.other": "pred {count} min",
+  "time.hours.one": "pred {count} uro",
+  "time.hours.other": "pred {count} h",
+  "time.yesterday": "Včeraj",
+  "time.days.one": "pred {count} dnevom",
+  "time.days.other": "pred {count} dnevi",
+  "time.weeks.one": "pred {count} tednom",
+  "time.weeks.other": "pred {count} tedni",
+  "time.status.complete": "Dokončano",
+  "time.status.queued": "V čakalni vrsti",
+  "time.status.claimed": "Prevzeto",
+  "time.status.running": "V izvajanju",
+  "time.status.holding": "Čakanje na obnovitev ponudnika",
+  "time.status.settled": "Urejeno",
+  "time.status.generating": "Ustvarjanje",
+  "time.status.failed": "Neuspešno",
+  "time.status.draft": "Osnutek"
+}

@@ -1,0 +1,55 @@
+# S2 auth
+components/LoginFlow.tsx
+components/SignUpFlow.tsx
+components/AuthShell.tsx
+app/login/page.tsx
+app/sign-up/page.tsx
+app/verify-email/page.tsx
+app/enroll-mfa/page.tsx
+app/error.tsx
+app/global-error.tsx
+
+# S2 debate chrome and views
+app/debate/**
+components/DebateCanvas.tsx
+components/CanvasViewport.tsx
+components/DebateThread.tsx
+components/DebateSplit.tsx
+components/DebateTree.tsx
+components/DebateMap.tsx
+components/DebateOutline.tsx
+components/ArgumentFocusView.tsx
+components/ReferenceNodeMeta.tsx
+
+# S2 debate drawers and public
+components/NodeDetailDrawer.tsx
+components/VerdictBanner.tsx
+components/SynthesisPanel.tsx
+components/GuideModal.tsx
+components/DebateWorkspaceDrawer.tsx
+components/InvestigationDrawer.tsx
+components/RecommendedInvestigations.tsx
+components/ChallengePopover.tsx
+components/PublicDebateOverview.tsx
+components/PublicAnswerDisclosure.tsx
+components/PublicHonestyDrawer.tsx
+components/PublicationControl.tsx
+app/public/**
+
+# S2 settings, consent, and support
+app/settings/page.tsx
+components/AccountErasureControls.tsx
+components/SessionControls.tsx
+components/LegacyRunClaimControls.tsx
+app/ai-transparency/page.tsx
+app/admin/workers/page.tsx
+components/EvaluatorDevMenu.tsx
+components/consent/**
+components/support/**
+app/help/page.tsx
+
+# Remaining already-ticketed interface surfaces
+components/AnswerHonestyDrawer.tsx
+components/ModelPresentation.tsx
+components/ScoringErrorBoundary.tsx
+components/Toast.tsx

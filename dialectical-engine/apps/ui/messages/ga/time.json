@@ -1,0 +1,21 @@
+{
+  "time.justNow": "díreach anois",
+  "time.minutes.one": "{count} nóiméad ó shin",
+  "time.minutes.other": "{count} nóiméad ó shin",
+  "time.hours.one": "{count} uair an chloig ó shin",
+  "time.hours.other": "{count} uair an chloig ó shin",
+  "time.yesterday": "Inné",
+  "time.days.one": "{count} lá ó shin",
+  "time.days.other": "{count} lá ó shin",
+  "time.weeks.one": "{count} seachtain ó shin",
+  "time.weeks.other": "{count} seachtain ó shin",
+  "time.status.complete": "Críochnaithe",
+  "time.status.queued": "Sa chiú",
+  "time.status.claimed": "Glactha",
+  "time.status.running": "Ar siúl",
+  "time.status.holding": "Téarnamh an tsoláthraí ar feitheamh",
+  "time.status.settled": "Socraithe",
+  "time.status.generating": "Á ghiniúint",
+  "time.status.failed": "Teipthe",
+  "time.status.draft": "Dréacht"
+}

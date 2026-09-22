@@ -70,6 +70,9 @@ import { ChallengePopover } from "@/components/ChallengePopover";
 import { InvestigationDrawer } from "@/components/InvestigationDrawer";
 import { GuideModal } from "@/components/GuideModal";
 import { ModeToggle } from "@/components/ModeToggle";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t } from "@/lib/i18n/translate";
 import { Toast } from "@/components/Toast";
 import {
   PublicationControl,type PrivateDeletionStatus
@@ -389,6 +392,7 @@ export default function DebatePageClient({
    */
   publicHeader?: ReactNode;
 }) {
+  const { catalog: chromeCatalog } = useChromeI18n();
   const [debate, setDebate] = useState<DebateDetail | null>(initialDebate);
   const [answer, setAnswer] = useState<Answer | null>(initialAnswer);
   const [live, setLive] = useState<LiveRunState>(createLiveRunState);
@@ -1140,7 +1144,7 @@ export default function DebatePageClient({
         </div>
         <div className="debateTopControlRow" ref={debateHeaderControlsRef}>
           {publicMode ? (
-            <span className="publicViewPill"><span aria-hidden>🔒</span> Public view · actions locked</span>
+            <span className="publicViewPill"><span aria-hidden>🔒</span> {t(chromeCatalog, "chrome.publicViewLocked")}</span>
           ) : null}
           {/* Scoring diagnostics is a read-only drawer, so the public reader
               keeps it: "actions locked" withholds writes, not evidence. */}
@@ -1149,22 +1153,22 @@ export default function DebatePageClient({
               type="button"
               className="debateScoringPill"
               data-debate-scoring-pill
-              aria-label="Open scoring diagnostics"
+              aria-label={t(chromeCatalog, "chrome.openScoringDiagnostics")}
               onClick={() => setScoringDiagnosticsOpen(true)}
             >
               <span className="debateScoringDot" aria-hidden />
-              Scoring · {scoringByNodeId.size}/{countClaims(debate.tree)}
+              {t(chromeCatalog, "chrome.scoring", { scored: scoringByNodeId.size, total: countClaims(debate.tree) })}
             </button>
           </ScoringErrorBoundary>
           {hasTree ? (
-            <div className="segment" role="group" aria-label="View">
+            <div className="segment" role="group" aria-label={t(chromeCatalog, "chrome.view")}>
               {publicMode && publicOverview ? (
                 <button type="button" aria-pressed={view === "overview"} onClick={() => setView("overview")}>
-                  Overview
+                  {t(chromeCatalog, "chrome.overview")}
                 </button>
               ) : null}
               <button type="button" aria-pressed={view === "thread"} onClick={() => setView("thread")}>
-                Thread
+                {t(chromeCatalog, "chrome.thread")}
               </button>
               <button
                 type="button"
@@ -1174,74 +1178,75 @@ export default function DebatePageClient({
                   setView("split");
                 }}
               >
-                Split
+                {t(chromeCatalog, "chrome.split")}
               </button>
               <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")}>
-                Tree
+                {t(chromeCatalog, "chrome.tree")}
               </button>
               <button type="button" aria-pressed={view === "map"} onClick={() => setView("map")}>
-                Map
+                {t(chromeCatalog, "chrome.map")}
               </button>
             </div>
           ) : null}
+          <LanguageSwitcher />
           <ModeToggle compact />
           <div className="debateUtilityActions" ref={debateHeaderInlineActionsRef}>
-            <Link className="btnGhost debateOverflowAction" href="/" aria-label="Library">
-              <span aria-hidden>←</span><span className="debateActionLabel">Library</span>
+            <Link className="btnGhost debateOverflowAction" href="/" aria-label={t(chromeCatalog, "chrome.library")}>
+              <span aria-hidden>←</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.library")}</span>
             </Link>
             {hasTree && !publicMode ? (
-              <button type="button" className="btn debateOverflowAction" onClick={replayGeneration} title="Replay generation" aria-label="Replay">
-                <span aria-hidden>↻</span><span className="debateActionLabel">Replay</span>
+              <button type="button" className="btn debateOverflowAction" onClick={replayGeneration} title={t(chromeCatalog, "chrome.replayGeneration")} aria-label={t(chromeCatalog, "chrome.replay")}>
+                <span aria-hidden>↻</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.replay")}</span>
               </button>
             ) : null}
             {hasArtifacts && !publicMode ? (
-              <button type="button" className="btn debateOverflowAction" onClick={() => setWorkspaceOpen(true)} aria-label="Workspace">
-                <span aria-hidden>◫</span><span className="debateActionLabel">Workspace</span>
+              <button type="button" className="btn debateOverflowAction" onClick={() => setWorkspaceOpen(true)} aria-label={t(chromeCatalog, "chrome.workspace")}>
+                <span aria-hidden>◫</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.workspace")}</span>
               </button>
             ) : null}
             {honestyAvailable ? (
-              <button type="button" className="btn debateOverflowAction" onClick={() => setHonestyOpen(true)} aria-label="Honesty">
-                <span aria-hidden>◈</span><span className="debateActionLabel">Honesty</span>
+              <button type="button" className="btn debateOverflowAction" onClick={() => setHonestyOpen(true)} aria-label={t(chromeCatalog, "chrome.honesty")}>
+                <span aria-hidden>◈</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.honesty")}</span>
               </button>
             ) : null}
             {answerExport.available ? (
-              <a className="btn debateOverflowAction" href={answerExport.href} download={answerExport.filename} title={answerExport.label} onClick={() => showToast(answerExport.toast)} aria-label="Export">
-                <span aria-hidden>↓</span><span className="debateActionLabel">Export</span>
+              <a className="btn debateOverflowAction" href={answerExport.href} download={answerExport.filename} title={answerExport.label} onClick={() => showToast(answerExport.toast)} aria-label={t(chromeCatalog, "chrome.export")}>
+                <span aria-hidden>↓</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.export")}</span>
               </a>
             ) : null}
-            <button type="button" className="iconBtn debateOverflowAction" aria-label="How it works" onClick={() => setGuideOpen(true)}>?</button>
-            {publicMode ? null : <Link className="iconBtn debateOverflowAction" href="/settings" aria-label="Settings">⚙</Link>}
+            <button type="button" className="iconBtn debateOverflowAction" aria-label={t(chromeCatalog, "chrome.howItWorks")} onClick={() => setGuideOpen(true)}>?</button>
+            {publicMode ? null : <Link className="iconBtn debateOverflowAction" href="/settings" aria-label={t(chromeCatalog, "chrome.settings")}>⚙</Link>}
           </div>
           <details className="debateUtilityOverflow">
-            <summary className="iconBtn" role="button" aria-label="More debate actions" title="More debate actions">
+            <summary className="iconBtn" role="button" aria-label={t(chromeCatalog, "chrome.moreDebateActions")} title={t(chromeCatalog, "chrome.moreDebateActions")}>
               <span aria-hidden>⋯</span>
             </summary>
             <div className="debateOverflowMenu">
-              <Link className="btnGhost debateOverflowAction" href="/" aria-label="Library">
-                <span aria-hidden>←</span><span className="debateActionLabel">Library</span>
+              <Link className="btnGhost debateOverflowAction" href="/" aria-label={t(chromeCatalog, "chrome.library")}>
+                <span aria-hidden>←</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.library")}</span>
               </Link>
               {hasTree && !publicMode ? (
-                <button type="button" className="btn debateOverflowAction" onClick={replayGeneration} title="Replay generation" aria-label="Replay">
-                  <span aria-hidden>↻</span><span className="debateActionLabel">Replay</span>
+                <button type="button" className="btn debateOverflowAction" onClick={replayGeneration} title={t(chromeCatalog, "chrome.replayGeneration")} aria-label={t(chromeCatalog, "chrome.replay")}>
+                  <span aria-hidden>↻</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.replay")}</span>
                 </button>
               ) : null}
               {hasArtifacts && !publicMode ? (
-                <button type="button" className="btn debateOverflowAction" onClick={() => setWorkspaceOpen(true)} aria-label="Workspace">
-                  <span aria-hidden>◫</span><span className="debateActionLabel">Workspace</span>
+                <button type="button" className="btn debateOverflowAction" onClick={() => setWorkspaceOpen(true)} aria-label={t(chromeCatalog, "chrome.workspace")}>
+                  <span aria-hidden>◫</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.workspace")}</span>
                 </button>
               ) : null}
               {honestyAvailable ? (
-                <button type="button" className="btn debateOverflowAction" onClick={() => setHonestyOpen(true)} aria-label="Honesty">
-                  <span aria-hidden>◈</span><span className="debateActionLabel">Honesty</span>
+                <button type="button" className="btn debateOverflowAction" onClick={() => setHonestyOpen(true)} aria-label={t(chromeCatalog, "chrome.honesty")}>
+                  <span aria-hidden>◈</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.honesty")}</span>
                 </button>
               ) : null}
               {answerExport.available ? (
-                <a className="btn debateOverflowAction" href={answerExport.href} download={answerExport.filename} title={answerExport.label} onClick={() => showToast(answerExport.toast)} aria-label="Export">
-                  <span aria-hidden>↓</span><span className="debateActionLabel">Export</span>
+                <a className="btn debateOverflowAction" href={answerExport.href} download={answerExport.filename} title={answerExport.label} onClick={() => showToast(answerExport.toast)} aria-label={t(chromeCatalog, "chrome.export")}>
+                  <span aria-hidden>↓</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.export")}</span>
                 </a>
               ) : null}
-              <button type="button" className="iconBtn debateOverflowAction" aria-label="How it works" onClick={() => setGuideOpen(true)}>?</button>
-              {publicMode ? null : <Link className="iconBtn debateOverflowAction" href="/settings" aria-label="Settings">⚙</Link>}
+              <button type="button" className="iconBtn debateOverflowAction" aria-label={t(chromeCatalog, "chrome.howItWorks")} onClick={() => setGuideOpen(true)}>?</button>
+              {publicMode ? null : <Link className="iconBtn debateOverflowAction" href="/settings" aria-label={t(chromeCatalog, "chrome.settings")}>⚙</Link>}
             </div>
           </details>
         </div>

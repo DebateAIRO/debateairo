@@ -61,7 +61,7 @@ test("auth screens share the reference hierarchy and replace the inline gate", (
 });
 
 test("every public and protected entry point reaches the dedicated auth routes", () => {
-  assert.match(topBar, /href="\/login"/);
+  assert.match(topBar, /href="\/settings"[\s\S]*?t\(catalog, "chrome\.account"\)/);
   assert.match(home, /href="\/login"/);
   assert.match(home, /href="\/sign-up"/);
   assert.match(login, /useState\("\/sign-up"\)/);
@@ -77,9 +77,9 @@ test("the project home confirms a real session before exposing its debate compos
   // rather than by that copy.
   assert.match(home, /let sessionConfirmed = false/);
   assert.match(home, /sessionConfirmed = true/);
-  assert.match(home, /sessionConfirmed \? \([\s\S]*?<LibraryComposer \/>/);
+  assert.match(home, /sessionConfirmed \? \([\s\S]*?<LibraryComposer catalog=\{catalog\} \/>/);
   assert.match(home, /id="start-a-debate"/);
-  assert.doesNotMatch(home, /<LibraryComposer \/>[\s\S]*?\{error \?/);
+  assert.doesNotMatch(home, /<LibraryComposer catalog=\{catalog\} \/>[\s\S]*?\{error \?/);
 });
 
 test("the login route sends an already-authenticated browser back to its debate workspace", () => {
@@ -151,7 +151,7 @@ test("primary and recovery emails occupy distinct autocomplete sections", () => 
 });
 
 test("ordinary top bar exposes a neutral account entry without inventing session state", () => {
-  assert.match(topBar, /href="\/login"[\s\S]*?>\s*Account\s*</);
+  assert.match(topBar, /href="\/settings"[\s\S]*?t\(catalog, "chrome\.account"\)/);
   assert.doesNotMatch(topBar, />\s*Log in\s*</);
   assert.doesNotMatch(topBar, /Signed in|Signed out|authenticated|useSession/);
 });

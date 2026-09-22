@@ -1,0 +1,21 @@
+{
+  "time.justNow": "issa stess",
+  "time.minutes.one": "{count} minuta ilu",
+  "time.minutes.other": "{count} minuti ilu",
+  "time.hours.one": "{count} siegħa ilu",
+  "time.hours.other": "{count} sigħat ilu",
+  "time.yesterday": "Ilbieraħ",
+  "time.days.one": "{count} ġurnata ilu",
+  "time.days.other": "{count} jiem ilu",
+  "time.weeks.one": "{count} ġimgħa ilu",
+  "time.weeks.other": "{count} ġimgħat ilu",
+  "time.status.complete": "Lest",
+  "time.status.queued": "Fil-kju",
+  "time.status.claimed": "Assenjat",
+  "time.status.running": "Għaddej",
+  "time.status.holding": "Miżmum għall-irkupru tal-fornitur",
+  "time.status.settled": "Magħluq",
+  "time.status.generating": "Qed jiġi ġġenerat",
+  "time.status.failed": "Falla",
+  "time.status.draft": "Abbozz"
+}

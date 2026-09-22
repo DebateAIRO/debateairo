@@ -1,0 +1,21 @@
+{
+  "time.justNow": "ką tik",
+  "time.minutes.one": "prieš {count} minutę",
+  "time.minutes.other": "prieš {count} min.",
+  "time.hours.one": "prieš {count} valandą",
+  "time.hours.other": "prieš {count} val.",
+  "time.yesterday": "Vakar",
+  "time.days.one": "prieš {count} dieną",
+  "time.days.other": "prieš {count} d.",
+  "time.weeks.one": "prieš {count} savaitę",
+  "time.weeks.other": "prieš {count} sav.",
+  "time.status.complete": "Baigta",
+  "time.status.queued": "Eilėje",
+  "time.status.claimed": "Priskirta",
+  "time.status.running": "Vykdoma",
+  "time.status.holding": "Sustabdyta tiekėjo atkūrimui",
+  "time.status.settled": "Sutvarkyta",
+  "time.status.generating": "Generuojama",
+  "time.status.failed": "Nepavyko",
+  "time.status.draft": "Juodraštis"
+}

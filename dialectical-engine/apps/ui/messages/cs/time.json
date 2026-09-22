@@ -1,0 +1,21 @@
+{
+  "time.justNow": "právě teď",
+  "time.minutes.one": "Před minutou {count}",
+  "time.minutes.other": "Před {count} minutami",
+  "time.hours.one": "Před hodinou {count}",
+  "time.hours.other": "{count} před hodinami",
+  "time.yesterday": "Včera",
+  "time.days.one": "Před dnem {count}",
+  "time.days.other": "Před {count} dny",
+  "time.weeks.one": "{count} před týdnem",
+  "time.weeks.other": "{count} před týdny",
+  "time.status.complete": "Kompletní",
+  "time.status.queued": "Ve frontě",
+  "time.status.claimed": "Nárokováno",
+  "time.status.running": "Běh",
+  "time.status.holding": "Pozastavení obnovení poskytovatele",
+  "time.status.settled": "Usazeno",
+  "time.status.generating": "Generování",
+  "time.status.failed": "Nepodařilo se",
+  "time.status.draft": "Návrh"
+}

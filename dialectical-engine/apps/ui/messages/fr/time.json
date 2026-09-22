@@ -1,0 +1,21 @@
+{
+  "time.justNow": "à l’instant",
+  "time.minutes.one": "il y a {count} minute",
+  "time.minutes.other": "il y a {count} minutes",
+  "time.hours.one": "il y a {count} heure",
+  "time.hours.other": "il y a {count} heures",
+  "time.yesterday": "Hier",
+  "time.days.one": "il y a {count} jour",
+  "time.days.other": "il y a {count} jours",
+  "time.weeks.one": "il y a {count} semaine",
+  "time.weeks.other": "il y a {count} semaines",
+  "time.status.complete": "Terminé",
+  "time.status.queued": "En file d’attente",
+  "time.status.claimed": "Pris en charge",
+  "time.status.running": "En cours",
+  "time.status.holding": "En attente de rétablissement du fournisseur",
+  "time.status.settled": "Réglé",
+  "time.status.generating": "Génération en cours",
+  "time.status.failed": "Échec",
+  "time.status.draft": "Brouillon"
+}
