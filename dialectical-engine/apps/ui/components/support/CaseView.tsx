@@ -77,11 +77,14 @@ export function CaseView({ language,state,messages,summary = null,onReply }: Rea
   </section>;
 }
 
+/**
+ * DL1-F5c/DL3-F4: the bearer travels in `x-support-case-token`. It used to be a
+ * path segment, which puts the sole capability to read a whole case — and to
+ * reply as the reporter — into every access log and proxy log on the way.
+ */
 export const supportCaseClient = Object.freeze({
   async reply(token: string,text: string): Promise<Response> {
-    return await supportPost(
-      `/api/v1/support/cases/${encodeURIComponent(token)}/messages`,{ text }
-    );
+    return await supportPost("/api/v1/support/case/messages",{ text },undefined,token);
   }
 });
 
@@ -92,7 +95,9 @@ export function CaseLookup() {
   }> | null>(null);
 
   const load = useCallback(async (token: string): Promise<void> => {
-    const response = await fetch(`/api/v1/support/cases/${encodeURIComponent(token)}`);
+    const response = await fetch("/api/v1/support/case",{
+      headers: { "x-support-case-token": token }
+    });
     const body = response.ok ? await response.json() as Record<string,unknown> : null;
     if (body === null) {
       setRecord({ token,language: "en",state: "NOT_FOUND",messages: [],summary: null });

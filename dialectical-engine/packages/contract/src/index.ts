@@ -728,8 +728,9 @@ export const contractInventory = Object.freeze({
     "POST /v1/support/messages/{id}/rating",
     "POST /v1/support/sessions/{id}/escalate",
     "GET /v1/support/cases",
-    "GET /v1/support/cases/{token}",
-    "POST /v1/support/cases/{token}/messages",
+    // DL1-F5c/DL3-F4: the case bearer rides `x-support-case-token`, never a path.
+    "GET /v1/support/case",
+    "POST /v1/support/case/messages",
     "GET /v1/support/status",
     "POST /v1/asks",
     "GET /v1/session",

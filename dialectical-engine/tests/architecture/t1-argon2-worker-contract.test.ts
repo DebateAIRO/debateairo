@@ -474,7 +474,8 @@ describe("T1 database ordering — no KDF after connect/BEGIN", () => {
     const main = readFileSync(join(repoRoot, "apps/api/src/main.ts"), "utf8");
     expect(main.match(/new Argon2WorkerPool\(/g) ?? []).toHaveLength(1);
     const poolAt = main.indexOf("new Argon2WorkerPool(");
-    const readyAt = main.indexOf("await argon2Pool.ready()");
+    // DL7-F7: the handshake is a named boot stage now.
+    const readyAt = main.indexOf('boot.run("argon2-pool", () => argon2Pool.ready())');
     const repositoryAt = main.indexOf("new PostgresIdentityRepository(");
     const listenAt = main.indexOf("api.listen(");
     expect(poolAt).toBeLessThan(readyAt);

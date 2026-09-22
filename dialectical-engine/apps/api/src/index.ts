@@ -66,7 +66,7 @@ import {
   AuthFlowError,
   type RegistrationApplication
 } from "./registration.js";
-import type { AdmissionLimiter, AdmissionScope } from "./admission.js";
+import type { AdmissionDecision, AdmissionLimiter, AdmissionScope } from "./admission.js";
 import type { MfaApplication } from "./mfa.js";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
 import type { PublicationApplication } from "./publications.js";
@@ -76,6 +76,7 @@ import type { RecoveryApplication } from "./recovery.js";
 import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
 import {
   installSupportRoutes,
+  type SupportAdmission,
   type SupportApplication,
   type SupportRoutePath
 } from "./support/index.js";
@@ -1029,15 +1030,22 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "DELETE /v1/debates/{id}", auth: "user", resource: "run-owner", action: "erase-private" },
   { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
-  { route: "POST /v1/support/sessions", auth: "public", session: "optional", resource: "support-session", action: "create" },
+  // DL1-F7: every mutating support route requires the exact first-party Origin,
+  // for anonymous callers too. Without it a page on any site could drive every
+  // one of its visitors' browsers into the support surface — spending the shared
+  // model budget from real visitors' addresses, which defeats the per-IP windows
+  // as well. The reads stay Origin-free: the widget's first paint and a case
+  // link opened from an e-mail are both GETs.
+  { route: "POST /v1/support/sessions", auth: "public", origin: "trusted", session: "optional", resource: "support-session", action: "create" },
   { route: "GET /v1/support/sessions/{id}", auth: "public", session: "optional", resource: "support-session", action: "read" },
-  { route: "POST /v1/support/sessions/{id}/consent", auth: "public", session: "optional", resource: "support-session", action: "consent" },
-  { route: "POST /v1/support/sessions/{id}/messages", auth: "public", session: "optional", resource: "support-message", action: "create" },
-  { route: "POST /v1/support/messages/{id}/rating", auth: "public", session: "optional", resource: "support-message", action: "rate" },
-  { route: "POST /v1/support/sessions/{id}/escalate", auth: "public", session: "optional", resource: "support-case", action: "create" },
+  { route: "POST /v1/support/sessions/{id}/consent", auth: "public", origin: "trusted", session: "optional", resource: "support-session", action: "consent" },
+  { route: "POST /v1/support/sessions/{id}/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "create" },
+  { route: "POST /v1/support/messages/{id}/rating", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "rate" },
+  { route: "POST /v1/support/sessions/{id}/escalate", auth: "public", origin: "trusted", session: "optional", resource: "support-case", action: "create" },
   { route: "GET /v1/support/cases", auth: "user", resource: "support-case", action: "list" },
-  { route: "GET /v1/support/cases/{token}", auth: "public", session: "optional", resource: "support-case", action: "read" },
-  { route: "POST /v1/support/cases/{token}/messages", auth: "public", session: "optional", resource: "support-case", action: "reply" },
+  // DL1-F5c/DL3-F4: the bearer is `x-support-case-token`, never a path segment.
+  { route: "GET /v1/support/case", auth: "public", session: "optional", resource: "support-case", action: "read" },
+  { route: "POST /v1/support/case/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-case", action: "reply" },
   { route: "GET /v1/support/status", auth: "public", session: "optional", resource: "support-status", action: "read" },
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
@@ -1396,18 +1404,19 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     requestId: request.id
   });
   const admissionRefusalAuditedUntil = new Map<string, number>();
+  const ADMISSION_ALLOWED: AdmissionDecision = Object.freeze({ allowed: true as const });
   /**
    * B10: refuses when the sealed admission budget for `key` is spent. The
    * audit is one structured line per route, reason, and window; never one
    * per request, and never carrying an address or owner.
    */
-  const admitOrRefuse = (
-    reply: FastifyReply, scope: AdmissionScope, route: AuthorizationRoute, key: string
-  ): boolean => {
-    if (options.admission === undefined) return true;
+  const chargeAdmission = (
+    scope: AdmissionScope, route: AuthorizationRoute, key: string
+  ): AdmissionDecision => {
+    if (options.admission === undefined) return ADMISSION_ALLOWED;
     const now = options.admissionClock?.() ?? new Date();
     const decision = options.admission.decide(scope, key, now);
-    if (decision.allowed) return true;
+    if (decision.allowed) return decision;
     const auditKey = `${route}:${decision.reason}`;
     if ((admissionRefusalAuditedUntil.get(auditKey) ?? 0) <= now.getTime()) {
       admissionRefusalAuditedUntil.set(auditKey, now.getTime() + decision.windowMs);
@@ -1415,6 +1424,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         event: "api.admission.refused", route, reason: decision.reason, windowMs: decision.windowMs
       })));
     }
+    return decision;
+  };
+  const admitOrRefuse = (
+    reply: FastifyReply, scope: AdmissionScope, route: AuthorizationRoute, key: string
+  ): boolean => {
+    const decision = chargeAdmission(scope, route, key);
+    if (decision.allowed) return true;
     void reply.status(429)
       .header("retry-after", String(Math.max(1, Math.ceil(decision.retryAfterMs / 1_000))))
       .send({ error: "ADMISSION_RATE_LIMITED", message: "ADMISSION_RATE_LIMITED" });
@@ -2207,7 +2223,25 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       ? reply.status(404).send({ error: "MEMORY_LINK_NOT_FOUND" })
       : reply.send(unlinked);
   });
-  installSupportRoutes(api, options.support, (route: SupportRoutePath) => routePolicy(route));
+  /**
+   * DL1-F2. The B10 limiter never reached a support route: every public support
+   * read was unmetered and the heavy `/status` aggregate ran uncached on every
+   * call. The support routes charge the same limiter, through the same typed
+   * refusal, under their own sealed scopes. A deployment whose register version
+   * carries no support budget is unchanged: `admitSupport` admits.
+   */
+  const admitSupport: SupportAdmission = Object.freeze({
+    gate: (reply, scope, route, key) => options.admission?.configured(scope) !== true
+      || admitOrRefuse(reply, scope, route, key),
+    // DL1-F7: decides and audits without answering, so the support routes can
+    // send their own RATE_LIMITED envelope — the one the widget renders — for
+    // a spent model share, exactly as they do for every other window.
+    charge: (scope, route, key) => options.admission?.configured(scope) !== true
+      || chargeAdmission(scope, route, key).allowed
+  });
+  installSupportRoutes(
+    api, options.support, (route: SupportRoutePath) => routePolicy(route), admitSupport
+  );
   return api;
 }
 

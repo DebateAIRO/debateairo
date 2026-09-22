@@ -6,7 +6,7 @@ import type { Pool, PoolClient } from "pg";
 import { EVALUATOR_CONTRACT_TEXT } from "./index.js";
 import { CLAIM_TYPES } from "@debateai/kernel";
 import {
-  ADMISSION_POLICY_REGISTER_ROW,
+  ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW,
   ALGORITHM_REGISTER_ROW_KEYS,
   AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS,
   ENGINE_BAND_ORDER,
@@ -642,7 +642,10 @@ function developmentRows(
     SESSION_POLICY_REGISTER_ROW,
     RECOVERY_POLICY_REGISTER_ROW,
     PRODUCT_ROLE_POLICY_REGISTER_ROW,
-    ADMISSION_POLICY_REGISTER_ROW,
+    // DL1-F2/DL1-F7: the SUPERSEDING admission row, on the same precedent as
+    // V-14's authentication rows above. The sealed three-scope row stays the
+    // historical one; this version adds the three support budgets.
+    ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW,
     ...buildDevelopmentDeploymentRegisterRows(providerPanel),
     ...buildDevelopmentAlgorithmRegisterRows(providerPanel, roleRefs)
   ];

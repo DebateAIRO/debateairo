@@ -30,7 +30,8 @@ import {
   createSupportCaseMaterial,
   createSupportCaseService,
   createSupportMessageCipher,
-  createWrappedSupportSessionKey
+  createWrappedSupportSessionKey,
+  hashSupportCapability
 } from "../../apps/api/src/support/session.js";
 import {
   createSupportKeyPort,
@@ -249,6 +250,41 @@ describe("SUP-01 support routes", () => {
     if (keyRoot !== undefined) await rm(keyRoot,{ recursive: true,force: true });
   }, 120_000);
 
+  /**
+   * DL1-F7: every mutating support route now requires the exact first-party
+   * Origin, for anonymous callers too. A real browser on the help page always
+   * sends it, and a drive-by from another site cannot — so the harness sends it
+   * on mutations, exactly as the browser this suite stands in for would, unless
+   * a case supplies its own Origin to exercise the refusal.
+   */
+  function asBrowser(server: FastifyInstance): FastifyInstance {
+    const inject: FastifyInstance["inject"] = (options?: unknown) => {
+      if (typeof options !== "object" || options === null) {
+        return (server.inject as (value?: unknown) => never)(options);
+      }
+      const request = options as Readonly<{
+        method?: string;url?: string;headers?: Readonly<Record<string,unknown>>;
+      }>;
+      const mutating = typeof request.method === "string"
+        && request.method.toUpperCase() !== "GET" && request.method.toUpperCase() !== "HEAD";
+      const carriesOrigin = Object.keys(request.headers ?? {})
+        .some((name) => name.toLowerCase() === "origin");
+      if (!mutating || carriesOrigin) {
+        return (server.inject as (value?: unknown) => never)(options);
+      }
+      return (server.inject as (value?: unknown) => never)({
+        ...request, headers: { ...request.headers, origin: TEST_APP_ORIGIN }
+      });
+    };
+    return new Proxy(server, {
+      get(target, property, receiver) {
+        if (property === "inject") return inject;
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === "function" ? (value as () => unknown).bind(target) : value;
+      }
+    });
+  }
+
   function api(
     enabled: boolean,
     options: Readonly<{
@@ -263,7 +299,7 @@ describe("SUP-01 support routes", () => {
       reportDiagnostic?: (diagnostic: string) => void;
     }> = {}
   ) {
-    return buildApi({
+    return asBrowser(buildApi({
       application: askApplication(),
       sessions: testSessionApplication([IDENTITY,CASE_OWNER]),
       allowedOrigin: TEST_APP_ORIGIN,
@@ -271,6 +307,8 @@ describe("SUP-01 support routes", () => {
         configuration: options.configurationPort ?? configuration(enabled, options.configuration),
         sessions: options.sessionPort ?? sessions,
         messages: options.messagePort ?? messageCipher,
+        // DL5-F3: the real keyed derivation, so the routes store what production stores.
+        sourcePseudonym: (value: string) => supportKeys.sourcePseudonym(value),
         cases: options.casePort ?? cases,
         caseAccess: options.caseAccessPort ?? caseAccess,
         knowledge,
@@ -279,7 +317,7 @@ describe("SUP-01 support routes", () => {
         ...(options.reportDiagnostic === undefined
           ? {} : { reportDiagnostic: options.reportDiagnostic })
       }
-    });
+    }));
   }
 
   function sessionPort(overrides: Partial<SupportSessionPort>): SupportSessionPort {
@@ -2276,7 +2314,7 @@ describe("SUP-01 support routes", () => {
     expect(body.case).toMatchObject({ state: "NEW",language: "ro" });
     expect(body.text).toBe(
       `Am deschis cazul ${body.case_token} pentru o persoană. Răspuns estimat: în 48 ore. `
-      + `Vezi răspunsurile la /help?case=${body.case_token}. Nu pot promite un rezultat.`
+      + `Vezi răspunsurile la /help#case=${body.case_token}. Nu pot promite un rezultat.`
     );
 
     const stored = (await database.pool.query<{
@@ -2292,7 +2330,10 @@ describe("SUP-01 support routes", () => {
       JOIN support.case_key AS key ON key.case_id=opened.case_id
       WHERE opened.case_id=$1
     `,[body.case.case_id])).rows[0]!;
-    expect(stored.token_sha256).toBe(createHash("sha256").update(body.case_token,"utf8").digest("hex"));
+    // DL2-F4: the stored hash carries the case purpose label, never a bare digest.
+    expect(stored.token_sha256).toBe(hashSupportCapability("support-case",body.case_token));
+    expect(stored.token_sha256)
+      .not.toBe(createHash("sha256").update(body.case_token,"utf8").digest("hex"));
     expect(stored.row_text).not.toContain(body.case_token);
     expect(stored.row_text).not.toContain(question);
     expect(stored.transcript_snapshot_ciphertext.includes(Buffer.from(question,"utf8"))).toBe(false);
@@ -2321,7 +2362,8 @@ describe("SUP-01 support routes", () => {
     }
 
     const viewed = await server.inject({
-      method: "GET",url: `/v1/support/cases/${body.case_token}`
+      method: "GET",url: "/v1/support/case",
+      headers: { "x-support-case-token": body.case_token }
     });
     expect(viewed.statusCode).toBe(200);
     expect(viewed.json()).toMatchObject({
@@ -2329,7 +2371,8 @@ describe("SUP-01 support routes", () => {
       messages: expect.arrayContaining([expect.objectContaining({ role: "user",text: question })])
     });
     const replied = await server.inject({
-      method: "POST",url: `/v1/support/cases/${body.case_token}/messages`,
+      method: "POST",url: "/v1/support/case/messages",
+      headers: { "x-support-case-token": body.case_token },
       payload: { text: "Thank you" }
     });
     expect(replied.statusCode).toBe(200);
@@ -2355,7 +2398,8 @@ describe("SUP-01 support routes", () => {
       kind: "SHREDDED",text: "This conversation was erased at the owner's request."
     });
     const shreddedCase = await server.inject({
-      method: "GET",url: `/v1/support/cases/${body.case_token}`
+      method: "GET",url: "/v1/support/case",
+      headers: { "x-support-case-token": body.case_token }
     });
     expect(shreddedCase.statusCode).toBe(200);
     expect(shreddedCase.json()).toMatchObject({
@@ -2363,7 +2407,8 @@ describe("SUP-01 support routes", () => {
       case: { case_id: body.case.case_id,summary: null },messages: [],next_cursor: null
     });
     const rejectedReply = await server.inject({
-      method: "POST",url: `/v1/support/cases/${body.case_token}/messages`,
+      method: "POST",url: "/v1/support/case/messages",
+      headers: { "x-support-case-token": body.case_token },
       payload: { text: "must not append" }
     });
     expect(rejectedReply.statusCode).toBe(200);
@@ -2384,7 +2429,8 @@ describe("SUP-01 support routes", () => {
 
   /**
    * DL1-F5(b) at the route. The case token travels in the URL path and in the
-   * `/help?case=` link, so it reaches history, shared links and access logs.
+   * link the API mints, so it reached history, shared links and access logs.
+   * DL1-F5c took it out of both: the header below, and the fragment form.
    * When the case carries an owner, holding the token is no longer enough: the
    * caller must present that owner's session, and anyone else gets the same
    * 404 an unknown token gets — never a 403 that would confirm it exists.
@@ -2404,27 +2450,29 @@ describe("SUP-01 support routes", () => {
     expect(escalated.statusCode).toBe(201);
     const caseBody = escalated.json<{ case: { case_id: string };case_token: string }>();
     const anonymousRead = await server.inject({
-      method: "GET",url: `/v1/support/cases/${caseBody.case_token}`
+      method: "GET",url: "/v1/support/case",
+      headers: { "x-support-case-token": caseBody.case_token }
     });
     const anonymousReply = await server.inject({
-      method: "POST",url: `/v1/support/cases/${caseBody.case_token}/messages`,
+      method: "POST",url: "/v1/support/case/messages",
+      headers: { "x-support-case-token": caseBody.case_token },
       payload: { text: "let me in" }
     });
     const foreignRead = await server.inject({
-      method: "GET",url: `/v1/support/cases/${caseBody.case_token}`,
-      headers: testSessionHeaders(IDENTITY)
+      method: "GET",url: "/v1/support/case",
+      headers: { "x-support-case-token": caseBody.case_token,...testSessionHeaders(IDENTITY) }
     });
     const foreignReply = await server.inject({
-      method: "POST",url: `/v1/support/cases/${caseBody.case_token}/messages`,
-      headers: testSessionHeaders(IDENTITY,true),payload: { text: "let me in" }
+      method: "POST",url: "/v1/support/case/messages",
+      headers: { "x-support-case-token": caseBody.case_token,...testSessionHeaders(IDENTITY,true) },payload: { text: "let me in" }
     });
     const ownerRead = await server.inject({
-      method: "GET",url: `/v1/support/cases/${caseBody.case_token}`,
-      headers: testSessionHeaders(CASE_OWNER)
+      method: "GET",url: "/v1/support/case",
+      headers: { "x-support-case-token": caseBody.case_token,...testSessionHeaders(CASE_OWNER) }
     });
     const ownerReply = await server.inject({
-      method: "POST",url: `/v1/support/cases/${caseBody.case_token}/messages`,
-      headers: testSessionHeaders(CASE_OWNER,true),payload: { text: "it is me" }
+      method: "POST",url: "/v1/support/case/messages",
+      headers: { "x-support-case-token": caseBody.case_token,...testSessionHeaders(CASE_OWNER,true) },payload: { text: "it is me" }
     });
     const appended = await database.pool.query<{ count: number }>(
       "SELECT count(*)::int AS count FROM support.case_message WHERE case_id=$1",
@@ -2464,7 +2512,8 @@ describe("SUP-01 support routes", () => {
     expect(escalated.statusCode).toBe(201);
     const caseBody = escalated.json<{ case: { case_id: string };case_token: string }>();
     const fresh = await opening.inject({
-      method: "GET",url: `/v1/support/cases/${caseBody.case_token}`
+      method: "GET",url: "/v1/support/case",
+      headers: { "x-support-case-token": caseBody.case_token }
     });
     await opening.close();
 
@@ -2472,10 +2521,12 @@ describe("SUP-01 support routes", () => {
       clock: () => new Date(CLOCK_BASE_MS + 45 + 30 * 24 * 60 * 60 * 1_000 + 1)
     });
     const expiredRead = await later.inject({
-      method: "GET",url: `/v1/support/cases/${caseBody.case_token}`
+      method: "GET",url: "/v1/support/case",
+      headers: { "x-support-case-token": caseBody.case_token }
     });
     const expiredReply = await later.inject({
-      method: "POST",url: `/v1/support/cases/${caseBody.case_token}/messages`,
+      method: "POST",url: "/v1/support/case/messages",
+      headers: { "x-support-case-token": caseBody.case_token },
       payload: { text: "too late" }
     });
     const appended = await database.pool.query<{ count: number }>(
@@ -2538,7 +2589,8 @@ describe("SUP-01 support routes", () => {
     const secretLike = "keep 123456 eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature sk-live-secret";
     expect(Buffer.byteLength(secretLike,"utf8")).toBeLessThanOrEqual(80);
     const reply = await server.inject({
-      method: "POST",url: `/v1/support/cases/${caseBody.case_token}/messages`,
+      method: "POST",url: "/v1/support/case/messages",
+      headers: { "x-support-case-token": caseBody.case_token },
       payload: { text: secretLike }
     });
     expect(reply.statusCode).toBe(200);
@@ -2574,7 +2626,8 @@ describe("SUP-01 support routes", () => {
     }
 
     const tooManyUtf8Bytes = await server.inject({
-      method: "POST",url: `/v1/support/cases/${caseBody.case_token}/messages`,
+      method: "POST",url: "/v1/support/case/messages",
+      headers: { "x-support-case-token": caseBody.case_token },
       payload: { text: "😀".repeat(21) }
     });
     expect(tooManyUtf8Bytes.statusCode).toBe(413);
@@ -2599,21 +2652,24 @@ describe("SUP-01 support routes", () => {
     });
     const caseToken = escalated.json<{ case_token: string }>().case_token;
     const responses = await Promise.all(["one","two","three"].map((text) => server.inject({
-      method: "POST",url: `/v1/support/cases/${caseToken}/messages`,payload: { text }
+      method: "POST",url: "/v1/support/case/messages",
+      headers: { "x-support-case-token": caseToken },payload: { text }
     })));
     expect(responses.map((response) => response.statusCode).sort()).toEqual([200,200,429]);
     expect(responses.find((response) => response.statusCode === 429)?.json()).toEqual({
       error: "SUPPORT_CASE_MESSAGE_LIMIT"
     });
 
-    const first = await server.inject({ method: "GET",url: `/v1/support/cases/${caseToken}?limit=1` });
+    const first = await server.inject({ method: "GET",url: "/v1/support/case?limit=1",
+      headers: { "x-support-case-token": caseToken } });
     expect(first.statusCode).toBe(200);
     const firstBody = first.json<{ messages: readonly unknown[];next_cursor: string | null }>();
     expect(firstBody.messages).toHaveLength(1);
     expect(firstBody.next_cursor).toEqual(expect.any(String));
     const second = await server.inject({
       method: "GET",
-      url: `/v1/support/cases/${caseToken}?limit=1&cursor=${encodeURIComponent(firstBody.next_cursor!)}`
+      url: `/v1/support/case?limit=1&cursor=${encodeURIComponent(firstBody.next_cursor!)}`,
+      headers: { "x-support-case-token": caseToken }
     });
     expect(second.statusCode).toBe(200);
     expect(second.json<{ messages: readonly unknown[];next_cursor: string | null }>().messages)
@@ -2633,13 +2689,15 @@ describe("SUP-01 support routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
       outcome: "REFUSE_SAFETY",case_token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u),
-      sla_hours: 48,link: expect.stringMatching(/^\/help[?]case=/u),
+      // DL3-F4: the API mints the FRAGMENT form; a query bearer reaches the
+      // address bar, browser history and any future access log.
+      sla_hours: 48,link: expect.stringMatching(/^\/help#case=/u),
       case_acknowledgement: expect.any(String)
     });
     const responseBody = response.json<{ case_token: string;case_acknowledgement: string }>();
     expect(responseBody.case_acknowledgement).toBe(
       `I've opened case ${responseBody.case_token} for a person. Expected reply: within 48 hours. `
-      + `Check replies at /help?case=${responseBody.case_token}. I can't promise an outcome.`
+      + `Check replies at /help#case=${responseBody.case_token}. I can't promise an outcome.`
     );
     const stored = await database.pool.query<{
       case_id: string;
@@ -2696,7 +2754,9 @@ describe("SUP-01 support routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
       outcome: "REFUSE_ZONE",case_token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u),
-      sla_hours: 48,link: expect.stringMatching(/^\/help[?]case=/u),
+      // DL3-F4: the API mints the FRAGMENT form; a query bearer reaches the
+      // address bar, browser history and any future access log.
+      sla_hours: 48,link: expect.stringMatching(/^\/help#case=/u),
       case_acknowledgement: expect.any(String)
     });
     expect(response.json().text).toEqual(supportTemplate("REFUSE_ZONE",language).replace(
@@ -2716,7 +2776,9 @@ describe("SUP-01 support routes", () => {
   it("returns opaque SLA/link receipts for newly opened E3, E6, E7, and E8 cases", async () => {
     const receipt = {
       case_token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u),
-      sla_hours: 48,link: expect.stringMatching(/^\/help[?]case=/u),
+      // DL3-F4: the API mints the FRAGMENT form; a query bearer reaches the
+      // address bar, browser history and any future access log.
+      sla_hours: 48,link: expect.stringMatching(/^\/help#case=/u),
       case_acknowledgement: expect.any(String)
     };
 
@@ -2830,7 +2892,9 @@ describe("SUP-01 support routes", () => {
     expect(ratingReceipts[0]).not.toHaveProperty("case_token");
     expect(ratingReceipts[1]).toMatchObject({
       case_opened: true,case_token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u),
-      sla_hours: 48,link: expect.stringMatching(/^\/help[?]case=/u),
+      // DL3-F4: the API mints the FRAGMENT form; a query bearer reaches the
+      // address bar, browser history and any future access log.
+      sla_hours: 48,link: expect.stringMatching(/^\/help#case=/u),
       case_acknowledgement: expect.any(String)
     });
     await server.close();

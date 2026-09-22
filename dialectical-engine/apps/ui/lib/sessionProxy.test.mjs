@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, rmSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import test, { after } from "node:test";
 import { pathToFileURL } from "node:url";
@@ -257,4 +258,25 @@ test("DL3-F5: x-support-session-token is forwarded only in the API's capability 
     if ("error" in refused) continue; // an unlawful header value the Headers constructor itself rejects
     assert.equal(refused.forwarded.get("x-support-session-token"), null, `unlawful value must not be forwarded: ${JSON.stringify(bad)}`);
   }
+});
+
+test("DL1-F5c: x-support-case-token is forwarded, in the same capability grammar", async () => {
+  // The case bearer travels in a header now, never in the path, so the proxy
+  // has to carry it — and holds it to the API's own 43-character grammar, so a
+  // malformed value never reaches an upstream route at all.
+  const lawful = "c".repeat(43);
+  const good = await forwardedHeadersFor({ "x-support-case-token": lawful });
+  assert.equal(good.forwarded.get("x-support-case-token"), lawful);
+  for (const bad of ["not a token!", "c".repeat(42), "c".repeat(44)]) {
+    const refused = await forwardedHeadersFor({ "x-support-case-token": bad }).catch((error) => ({ error }));
+    if ("error" in refused) continue;
+    assert.equal(refused.forwarded.get("x-support-case-token"), null, `unlawful value must not be forwarded: ${JSON.stringify(bad)}`);
+  }
+});
+
+test("DL1-F5c: the case surfaces put the bearer in the header and never in a path", async () => {
+  const source = await readFile(new URL("../components/support/CaseView.tsx", import.meta.url), "utf8");
+  assert.match(source, /"x-support-case-token"/, "the case read carries the bearer as a header");
+  assert.match(source, /"\/api\/v1\/support\/case\/messages"/, "the reply path names no token");
+  assert.doesNotMatch(source, /support\/cases\/\$\{/, "no path may interpolate the bearer");
 });

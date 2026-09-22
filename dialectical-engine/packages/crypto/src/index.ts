@@ -1574,10 +1574,19 @@ export function generateVerificationToken(): string {
   return randomBytes(32).toString("base64url");
 }
 
-export type TokenKind = "session" | "csrf" | "login-challenge" | "step-up-grant" | "verification";
+/**
+ * DL2-F4: `support-session` and `support-case` join the vocabulary so the two
+ * support capabilities have purpose labels no other subsystem can reuse. The
+ * support module computes their digests itself — SUP-01 forbids support code
+ * from importing this package — and `tests/unit/dl2-f4-support-capability-hash`
+ * pins its bytes to `hashToken`'s, so the two constructions cannot drift.
+ */
+export type TokenKind = "session" | "csrf" | "login-challenge" | "step-up-grant"
+  | "verification" | "support-session" | "support-case";
 
 const TOKEN_KINDS: ReadonlySet<string> = new Set<TokenKind>([
-  "session", "csrf", "login-challenge", "step-up-grant", "verification"
+  "session", "csrf", "login-challenge", "step-up-grant", "verification",
+  "support-session", "support-case"
 ]);
 
 /**

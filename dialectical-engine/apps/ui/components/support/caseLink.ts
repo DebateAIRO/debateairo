@@ -17,8 +17,10 @@
  * to the fragment form, so the query form leaves navigation state, and then
  * consumed exactly like a fragment bearer.
  *
- * The API still takes the token in the path (`/v1/support/cases/<token>`);
- * changing that is a contract decision ruled elsewhere.
+ * DL1-F5c closed the API half too: the bearer travels in `x-support-case-token`
+ * and the acknowledgement sentence mints the fragment form directly. The
+ * retired query form is still read here for one release, for a link a person
+ * saved before the change.
  */
 
 /** The API's grammar for a case capability (`apps/api/src/support/session.ts`). */

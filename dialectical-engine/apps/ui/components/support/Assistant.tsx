@@ -173,9 +173,12 @@ function caseAcknowledgement(body: Readonly<Record<string,unknown>>): SupportCas
   if (typeof body.case_acknowledgement !== "string"
     || typeof body.case_token !== "string" || !/^[A-Za-z0-9_-]{43}$/u.test(body.case_token)
     || typeof body.sla_hours !== "number" || !Number.isSafeInteger(body.sla_hours)
+    // DL1-F5c: the API mints the fragment form and nothing else, so the
+    // tolerance for a query-string bearer from the server is gone. The
+    // browser-side read of a `?case=` link a person saved stays for one
+    // release, in `caseLink.ts`, where it belongs.
     || typeof body.link !== "string"
-    || (body.link !== `/help?case=${body.case_token}`
-      && body.link !== supportCaseLink(body.case_token))) return null;
+    || body.link !== supportCaseLink(body.case_token)) return null;
   return Object.freeze({
     text: body.case_acknowledgement,token: body.case_token,
     slaHours: body.sla_hours,link: supportCaseLink(body.case_token)

@@ -1,5 +1,5 @@
 import {
-  createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual
+  createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual
 } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
@@ -22,7 +22,7 @@ const CONTENT_OVERHEAD_BYTES = VERSION_BYTES + NONCE_BYTES + AUTH_TAG_BYTES;
  * unmodelled call is exactly that shape. A named element is not a candidate.
  */
 const WRAPPED_KEY_VERSION_TAG = 1;
-const CONTENT_ENVELOPE_VERSION_TAG = 1;
+// DL2-F3: the retired content-envelope version 1 has no writer and no reader.
 const SEMANTIC_ENVELOPE_VERSION_TAG = 2;
 const SUPPORT_KEK_FILENAME = "support-kek.bin";
 const PRIVATE_DIRECTORY_MODE = 0o700;
@@ -98,8 +98,16 @@ export interface SupportKeyPort {
   verifyUnderCurrentKek(handle: SupportKeyHandle, wrapped: Uint8Array): Promise<void>;
   /** A non-secret label for the current KEK, for the rotation's own report. */
   currentKekId(): string;
-  seal(handle: SupportKeyHandle, dataKey: Uint8Array, plaintext: Uint8Array): Buffer;
-  open(handle: SupportKeyHandle, dataKey: Uint8Array, ciphertext: Uint8Array): Buffer;
+  /**
+   * DL5-F3. An unlinkable pseudonym for one source value, under a key nobody
+   * outside this host holds. The two append-only support tables that record a
+   * caller's network used to store a bare `sha256` of it: 2^32 digests for the
+   * whole IPv4 space, so every row inverted to an address for anyone who could
+   * read the schema or a backup. Rendered as bare hex, the grammar
+   * `support.abuse_event.ip_sha256` and `support.admission_event.ip_sha256`
+   * CHECK.
+   */
+  sourcePseudonym(value: string): string;
   sealContent(context: SupportContentContext,dataKey: Uint8Array,plaintext: Uint8Array): Buffer;
   openContent(context: SupportContentContext,dataKey: Uint8Array,ciphertext: Uint8Array): Buffer;
   close(): Promise<void>;
@@ -114,6 +122,7 @@ export type SupportKeyErrorCode =
   | "SUPPORT_KEY_OPERATION_FAILED"
   | "SUPPORT_KEY_DESTROYED"
   | "SUPPORT_KEY_PORT_CLOSED"
+  | "SUPPORT_SOURCE_VALUE_INVALID"
   | "SUPPORT_KEK_CUSTODY_INVALID"
   | "SUPPORT_KEK_PATH_INVALID"
   | "SUPPORT_WRAPPED_KEY_INVALID";
@@ -171,7 +180,7 @@ function lengthPrefixed(value: string): Buffer {
   return Buffer.concat([length, bytes]);
 }
 
-function aad(domain: "support" | "support-content", handle: SupportKeyHandle): Buffer {
+function aad(domain: "support", handle: SupportKeyHandle): Buffer {
   assertHandle(handle);
   return Buffer.concat([
     lengthPrefixed("domain"),
@@ -242,6 +251,36 @@ function bytesView(bytes: Uint8Array): Buffer {
   return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }
 
+/**
+ * DL2-F7. Decrypts into an allocation of its own and leaves nothing behind.
+ *
+ * `Buffer.concat` of small pieces answers from Node's shared 8 KiB slab and
+ * copies from two cipher outputs that live in that same slab. Those two copies
+ * were never zeroed, so every unwrapped data key and every decrypted support
+ * message existed in memory the caller could not reach — its own `fill(0)`
+ * erased only the view it was handed. The pieces are zeroed here, on the
+ * authentication-failure path as well, and the result is `allocUnsafeSlow`, so
+ * the caller's buffer owns its bytes and zeroing it is the whole erasure.
+ */
+function decryptSecret(
+  decipher: Readonly<{ update(data: Buffer): Buffer;final(): Buffer }>,
+  encrypted: Buffer
+): Buffer {
+  const pieces: Buffer[] = [];
+  try {
+    pieces.push(decipher.update(encrypted));
+    pieces.push(decipher.final());
+    const plaintext = Buffer.allocUnsafeSlow(
+      pieces.reduce((total,piece) => total + piece.byteLength,0)
+    );
+    let offset = 0;
+    for (const piece of pieces) offset += piece.copy(plaintext,offset);
+    return plaintext;
+  } finally {
+    for (const piece of pieces) piece.fill(0);
+  }
+}
+
 function parseWrappedEnvelope(wrapped: Uint8Array): Readonly<{
   nonce: Buffer;
   encrypted: Buffer;
@@ -260,8 +299,16 @@ function parseWrappedEnvelope(wrapped: Uint8Array): Readonly<{
   };
 }
 
+/**
+ * DL2-F3. The accepted version set is the WRITTEN one: version 2 alone. The
+ * retired version 1 bound only {domain, kind, ref}, so one of its ciphertexts
+ * opened under any semantic context of that handle — a downgrade path that no
+ * shipped writer ever produced (v1 and v2 landed together in `b300ee91`) and
+ * that migration `0054_support_keys_audit.sql` already refuses on every content
+ * column. Reading it was the last thing keeping it alive.
+ */
 function parseContentEnvelope(ciphertext: Uint8Array): Readonly<{
-  version: 1 | 2;
+  version: 2;
   nonce: Buffer;
   encrypted: Buffer;
   tag: Buffer;
@@ -270,9 +317,9 @@ function parseContentEnvelope(ciphertext: Uint8Array): Readonly<{
     fail("SUPPORT_CONTENT_ENVELOPE_INVALID");
   }
   const bytes = bytesView(ciphertext);
-  if (bytes[0] !== 1 && bytes[0] !== 2) fail("SUPPORT_CONTENT_ENVELOPE_INVALID");
+  if (bytes[0] !== SEMANTIC_ENVELOPE_VERSION_TAG) fail("SUPPORT_CONTENT_ENVELOPE_INVALID");
   return {
-    version: bytes[0],
+    version: SEMANTIC_ENVELOPE_VERSION_TAG,
     nonce: bytes.subarray(1, 1 + NONCE_BYTES),
     encrypted: bytes.subarray(1 + NONCE_BYTES, bytes.byteLength - AUTH_TAG_BYTES),
     tag: bytes.subarray(bytes.byteLength - AUTH_TAG_BYTES)
@@ -329,6 +376,10 @@ async function readSupportKek(supportKekPath: string): Promise<KeyFileIdentity> 
 
   let identity: KeyFileIdentity | undefined;
   let failure: SupportKeyError | undefined;
+  // DL2-F7: the bytes read are named OUTSIDE the try. `realpath` runs after the
+  // read, so a rejection there — or any later throw — used to drop 32 live KEK
+  // bytes un-zeroed, because only the record that was never built held them.
+  let material: Buffer | undefined;
   try {
     const metadata = await handle.stat();
     if (!metadata.isFile()
@@ -338,7 +389,7 @@ async function readSupportKek(supportKekPath: string): Promise<KeyFileIdentity> 
       || metadata.size !== KEY_BYTES) {
       fail("SUPPORT_KEK_CUSTODY_INVALID");
     }
-    const material = await handle.readFile();
+    material = await handle.readFile();
     if (material.byteLength !== KEY_BYTES) fail("SUPPORT_KEK_CUSTODY_INVALID");
     identity = Object.freeze({
       canonicalPath: await realpath(resolvedPath),
@@ -357,7 +408,7 @@ async function readSupportKek(supportKekPath: string): Promise<KeyFileIdentity> 
     failure ??= new SupportKeyError("SUPPORT_KEK_CUSTODY_INVALID");
   }
   if (failure !== undefined || identity === undefined) {
-    identity?.material.fill(0);
+    material?.fill(0);
     throw failure ?? new SupportKeyError("SUPPORT_KEK_CUSTODY_INVALID");
   }
   return identity;
@@ -374,6 +425,8 @@ async function readProtectedKeyIdentity(path: string): Promise<KeyFileIdentity> 
   }
   let identity: KeyFileIdentity | undefined;
   let failure: SupportKeyError | undefined;
+  // DL2-F7, as in `readSupportKek`: zeroed whether or not it became the record.
+  let material: Buffer | undefined;
   try {
     const metadata = await handle.stat();
     if (!metadata.isFile()
@@ -381,7 +434,7 @@ async function readProtectedKeyIdentity(path: string): Promise<KeyFileIdentity> 
       || metadata.size !== KEY_BYTES) {
       fail("SUPPORT_KEK_CUSTODY_INVALID");
     }
-    const material = await handle.readFile();
+    material = await handle.readFile();
     if (material.byteLength !== KEY_BYTES) fail("SUPPORT_KEK_CUSTODY_INVALID");
     identity = Object.freeze({
       canonicalPath,
@@ -400,23 +453,51 @@ async function readProtectedKeyIdentity(path: string): Promise<KeyFileIdentity> 
     failure ??= new SupportKeyError("SUPPORT_KEK_CUSTODY_INVALID");
   }
   if (failure !== undefined || identity === undefined) {
-    identity?.material.fill(0);
+    material?.fill(0);
     throw failure ?? new SupportKeyError("SUPPORT_KEK_CUSTODY_INVALID");
   }
   return identity;
 }
 
 const SUPPORT_KEK_ID_DOMAIN = "debateai:kek-id:v1\0";
+/**
+ * DL5-F3. The pseudonym key is DERIVED from the support KEK rather than loaded
+ * from a file of its own.
+ *
+ * The finding proposes a dedicated `SUPPORT_IP_SALT_PATH` under the same
+ * custody rules as `AUDIT_SOURCE_IP_SALT_PATH`. That would need a new required
+ * key in the API's strict environment shape
+ * (`packages/register/src/runtime-environment.ts`), which another task owns —
+ * so this derives a separate MAC key from custody material the support module
+ * already holds, under its own domain label. B13 key-domain separation holds:
+ * the audit salt is untouched and unreachable from here, this key never wraps
+ * or unwraps anything, and the KEK is never itself the MAC key over
+ * caller-supplied bytes. Consequence for the operator, and the reason a
+ * dedicated salt file may still be worth sealing: rotating the support KEK
+ * rotates this pseudonym too, so the per-source windows (all 24 hours or less)
+ * restart once at the changeover.
+ */
+const SUPPORT_SOURCE_PSEUDONYM_DOMAIN = "debateai:support-source-pseudonym:v1\0";
 
 class FileSupportKeyPort implements SupportKeyPort {
   readonly #kek: Buffer;
   readonly #previousKek: Buffer | undefined;
+  readonly #sourceKey: Buffer;
   readonly #closedLeaseKeys = new WeakSet<object>();
   #closed = false;
 
   constructor(kek: Buffer, previousKek?: Buffer) {
     this.#kek = kek;
     this.#previousKek = previousKek;
+    this.#sourceKey = createHmac("sha256", kek)
+      .update(SUPPORT_SOURCE_PSEUDONYM_DOMAIN, "utf8")
+      .digest();
+  }
+
+  sourcePseudonym(value: string): string {
+    this.#assertOpen();
+    if (typeof value !== "string" || value.length === 0) fail("SUPPORT_SOURCE_VALUE_INVALID");
+    return createHmac("sha256", this.#sourceKey).update(value, "utf8").digest("hex");
   }
 
   /**
@@ -447,7 +528,7 @@ class FileSupportKeyPort implements SupportKeyPort {
       });
       decipher.setAAD(aad("support", handle));
       decipher.setAuthTag(envelope.tag);
-      return Buffer.concat([decipher.update(envelope.encrypted), decipher.final()]);
+      return decryptSecret(decipher, envelope.encrypted);
     } catch {
       return undefined;
     }
@@ -576,51 +657,6 @@ class FileSupportKeyPort implements SupportKeyPort {
     }
   }
 
-  seal(
-    handle: SupportKeyHandle,
-    dataKey: Uint8Array,
-    plaintext: Uint8Array
-  ): Buffer {
-    this.#assertOpen();
-    this.#assertDataKey(dataKey);
-    if (!(plaintext instanceof Uint8Array)) fail("SUPPORT_KEY_OPERATION_FAILED");
-    const nonce = randomBytes(NONCE_BYTES);
-    try {
-      const cipher = createCipheriv("aes-256-gcm", dataKey, nonce, {
-        authTagLength: AUTH_TAG_BYTES
-      });
-      cipher.setAAD(aad("support-content", handle));
-      const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-      // Content uses version || 12-byte nonce || variable ciphertext || 16-byte GCM tag.
-      return Buffer.concat([Buffer.from([CONTENT_ENVELOPE_VERSION_TAG]), nonce, encrypted, cipher.getAuthTag()]);
-    } catch (error) {
-      if (error instanceof SupportKeyError) throw error;
-      fail("SUPPORT_KEY_OPERATION_FAILED");
-    }
-  }
-
-  open(
-    handle: SupportKeyHandle,
-    dataKey: Uint8Array,
-    ciphertext: Uint8Array
-  ): Buffer {
-    this.#assertOpen();
-    this.#assertDataKey(dataKey);
-    assertHandle(handle);
-    const envelope = parseContentEnvelope(ciphertext);
-    if (envelope.version !== 1) fail("SUPPORT_CONTENT_ENVELOPE_INVALID");
-    try {
-      const decipher = createDecipheriv("aes-256-gcm", dataKey, envelope.nonce, {
-        authTagLength: AUTH_TAG_BYTES
-      });
-      decipher.setAAD(aad("support-content", handle));
-      decipher.setAuthTag(envelope.tag);
-      return Buffer.concat([decipher.update(envelope.encrypted), decipher.final()]);
-    } catch {
-      fail("SUPPORT_KEY_AUTHENTICATION_FAILED");
-    }
-  }
-
   sealContent(
     context: SupportContentContext,
     dataKey: Uint8Array,
@@ -651,16 +687,15 @@ class FileSupportKeyPort implements SupportKeyPort {
   ): Buffer {
     this.#assertOpen();
     this.#assertDataKey(dataKey);
-    const handle = semanticHandle(context);
+    semanticHandle(context);
     const envelope = parseContentEnvelope(ciphertext);
     try {
       const decipher = createDecipheriv("aes-256-gcm",dataKey,envelope.nonce,{
         authTagLength: AUTH_TAG_BYTES
       });
-      decipher.setAAD(envelope.version === 1
-        ? aad("support-content",handle) : semanticAad(context));
+      decipher.setAAD(semanticAad(context));
       decipher.setAuthTag(envelope.tag);
-      return Buffer.concat([decipher.update(envelope.encrypted),decipher.final()]);
+      return decryptSecret(decipher,envelope.encrypted);
     } catch {
       fail("SUPPORT_KEY_AUTHENTICATION_FAILED");
     }
@@ -671,6 +706,7 @@ class FileSupportKeyPort implements SupportKeyPort {
     this.#closed = true;
     this.#kek.fill(0);
     this.#previousKek?.fill(0);
+    this.#sourceKey.fill(0);
   }
 }
 

@@ -136,7 +136,10 @@ describe("P2-14 sealed product-role catalog", () => {
     expect(devSeed).toContain("PRODUCT_ROLE_POLICY_REGISTER_ROW");
     expect(devSeed).toContain("buildDevelopmentDeploymentRegisterPublicationRows");
     expect(devSeed).toContain("createPostgresRegisterPublicationPort(input.adminPool).publishGeneral");
-    const readIndex = apiMain.indexOf("await readProductRolePolicy(pool, environment.REGISTER_VERSION)");
+    // DL7-F7: the read is a named boot stage now, owned by the custody ledger.
+    const readIndex = apiMain.indexOf(
+      'boot.run("product-role-policy", () => readProductRolePolicy(pool, environment.REGISTER_VERSION))'
+    );
     // pin updated 2026-09-02: the pool now takes options (breaker callback, L2-F9).
     const workerIndex = apiMain.indexOf("new Argon2WorkerPool(");
     expect(readIndex).toBeGreaterThan(-1);

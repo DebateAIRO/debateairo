@@ -104,6 +104,8 @@ function supportApplication(input: Readonly<{
     listSession: async () => []
   };
   return Object.freeze({
+    // DL5-F3: a labelled stand-in; this suite asserts nothing about the value.
+    sourcePseudonym: (value: string) => `test-pseudonym:${value}`,
     configuration: { current: async () => ({
       kind: "AVAILABLE" as const,
       snapshot: {
@@ -189,11 +191,13 @@ describe("SUP-03 consent and anonymous own-context behavior", () => {
     });
     const consent = await server.inject({
       method: "POST",url: `/v1/support/sessions/${SESSION_ID}/consent`,
-      headers: { "x-support-session-token": TOKEN },payload: { on: true }
+      // DL1-F7: a browser on the first-party page sends this.
+      headers: { origin: TEST_APP_ORIGIN,"x-support-session-token": TOKEN },payload: { on: true }
     });
     const question = await server.inject({
       method: "POST",url: `/v1/support/sessions/${SESSION_ID}/messages`,
-      headers: { "x-support-session-token": TOKEN },payload: { text: "Why is my debate stuck?" }
+      // DL1-F7: a browser on the first-party page sends this.
+      headers: { origin: TEST_APP_ORIGIN,"x-support-session-token": TOKEN },payload: { text: "Why is my debate stuck?" }
     });
     await server.close();
 
@@ -289,7 +293,8 @@ describe("SUP-03 consent and anonymous own-context behavior", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
       case_token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u),sla_hours: 48,
-      link: expect.stringMatching(/^\/help[?]case=/u),
+      // DL3-F4: the fragment form, which never reaches a server or a log.
+      link: expect.stringMatching(/^\/help#case=/u),
       case_acknowledgement: expect.stringContaining("I've opened case")
     });
     expect(openOnce).toHaveBeenCalledWith(expect.objectContaining({
@@ -481,7 +486,8 @@ describe("SUP-03 consent and anonymous own-context behavior", () => {
     });
     const response = await server.inject({
       method: "POST",url: `/v1/support/sessions/${SESSION_ID}/messages`,
-      headers: { "x-support-session-token": TOKEN },
+      // DL1-F7: a browser on the first-party page sends this.
+      headers: { origin: TEST_APP_ORIGIN,"x-support-session-token": TOKEN },
       payload: { text }
     });
     await server.close();

@@ -27,6 +27,13 @@ describe("B10 sealed admission-policy register row", () => {
       asks: { key: "owner", limit: 20, windowMs: 3_600_000, capacity: 8_192 },
       publicReads: { key: "source", limit: 120, windowMs: 900_000, capacity: 65_536 },
       recoveryStart: { key: "source", limit: 15, windowMs: 3_600_000, capacity: 65_536 },
+      // DL1-F2 and DL1-F7 added three support budgets as a SUPERSEDING
+      // deployment row. This row is the sealed one and carries none of them, so
+      // all three resolve to null and a host still serving it behaves exactly
+      // as it did.
+      supportReads: null,
+      supportSessions: null,
+      supportModelCalls: null,
       sourceRef: ADMISSION_POLICY_REGISTER_ROW.sourceRef
     });
     expect(Object.isFrozen(policy)).toBe(true);
@@ -84,8 +91,20 @@ describe("B10 sealed admission-policy register row", () => {
     );
     expect(historicalRows).toContain("PRODUCT_ROLE_POLICY_REGISTER_ROW");
     expect(historicalRows).not.toContain("ADMISSION_POLICY_REGISTER_ROW");
-    expect(devSeed).toContain("ADMISSION_POLICY_REGISTER_ROW");
-    const readIndex = apiMain.indexOf("await readAdmissionPolicy(pool, environment.REGISTER_VERSION)");
+    /**
+     * DL1-F2/DL1-F7. What the deployment seed must carry is the SUPERSEDING row
+     * — the sealed three-scope value plus the three support budgets — and it
+     * must carry exactly one `admissionPolicy` row, because publishing both
+     * would make the resolved value a coin toss. The sealed row keeps its own
+     * publisher: the historical set above, which this test already pins.
+     */
+    expect(devSeed).toContain("ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW");
+    expect(devSeed.match(/\bADMISSION_POLICY_(?:DEPLOYMENT_)?REGISTER_ROW\b/gu) ?? [])
+      .toEqual(["ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW", "ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW"]);
+    // DL7-F7: the read is a named boot stage now, owned by the custody ledger.
+    const readIndex = apiMain.indexOf(
+      'boot.run("admission-policy", () => readAdmissionPolicy(pool, environment.REGISTER_VERSION))'
+    );
     const limiterIndex = apiMain.indexOf("new AdmissionLimiter(");
     const composeIndex = apiMain.indexOf("buildApi({");
     expect(readIndex).toBeGreaterThan(-1);

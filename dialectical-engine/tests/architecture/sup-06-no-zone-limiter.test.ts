@@ -39,7 +39,10 @@ describe("SUP-06 remains outside the identity security zone", () => {
     const main = await readFile(resolve(ROOT,"apps/api/src/main.ts"),"utf8");
     expect(main).toContain("PostgresSupportRelayReservationRepository");
     expect(main).toContain(
-      "const supportRelayLeasePool = createPool(environment.SUPPORT_DATABASE_URL,{ max: 18 })"
+      // DL7-F7: the lease pool is held by the boot custody ledger until handover.
+      "const supportRelayLeasePool = boot.hold(\n"
+      + "  createPool(environment.SUPPORT_DATABASE_URL,{ max: 18 })\n"
+      + ")"
     );
     expect(main).toContain(
       "const supportRelayReservations = new PostgresSupportRelayReservationRepository(supportRelayLeasePool)"
