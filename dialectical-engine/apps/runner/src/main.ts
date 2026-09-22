@@ -12,12 +12,10 @@ import { configureContentEncryption, createPool, RunRepository } from "@debateai
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { assertHostedCostEnvelopesSealed, loadRunnerEnvironment } from "@debateai/register";
 import { readDeploymentMakerCapability } from "@debateai/critique";
-import {
-  assertDeploymentProviderTargets,
-  observeProviderTarget,
-  parseProviderDiscoveryTargets,
-  resolveProviderTargetCredentials
-} from "@debateai/providers";
+// ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
+// import line so `probeTarget` — the persisting probe — cannot enter this module under
+// any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
+import { assertDeploymentProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, resolveProviderTargetCredentials } from "@debateai/providers";
 import { createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, WalkingSkeletonRunner } from "./index.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
