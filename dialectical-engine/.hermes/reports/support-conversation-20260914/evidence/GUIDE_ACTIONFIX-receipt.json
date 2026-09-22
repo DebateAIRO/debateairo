@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_ACTIONFIX",
+  "ticket": "t_dbd462b8",
+  "session": "/root/requirements",
+  "baseRevision": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  "productRevision": "b0b91a01cf161d17eef75577cbae94c629b7bc49",
+  "verdict": "AUTHOR_FOCUSED_GREEN_PENDING_COMPOSED_VERIFICATION",
+  "productFiles": [
+    {
+      "laneRelative": "packages/support-kb/src/context.ts",
+      "sha256": "9c3b2909ac5b363dc93ba95ca1201f028b945bac799d81a7dc8f298c948cfdc3",
+      "bytes": 20217
+    },
+    {
+      "laneRelative": "tests/unit/support-answer-context.test.ts",
+      "sha256": "947d8449690648846f189edede3bdcdb7e1a492ce4f41876e4ece199a482b05c",
+      "bytes": 28662
+    },
+    {
+      "laneRelative": "tests/unit/support-context.test.ts",
+      "sha256": "66287c3904b65ebb02ce8684917c9ecfffc0c27202d4edb810e854d7a13b3da0",
+      "bytes": 27801
+    }
+  ],
+  "verification": {
+    "red": {
+      "testFile": "tests/unit/support-context.test.ts",
+      "failed": 38,
+      "passed": 76,
+      "total": 114
+    },
+    "contextGreen": {
+      "exitCode": 0,
+      "testFiles": 1,
+      "passed": 114,
+      "failed": 0
+    },
+    "serviceGreen": {
+      "exitCode": 0,
+      "testFiles": 2,
+      "passed": 149,
+      "failed": 0
+    },
+    "focusedSandbox": {
+      "exitCode": 1,
+      "testFilesPassed": 5,
+      "integrationExecuted": false,
+      "cause": "LOOPBACK_LISTENER_EPERM"
+    },
+    "focusedPermitted": {
+      "exitCode": 0,
+      "testFiles": 6,
+      "passed": 363,
+      "failed": 0
+    },
+    "composedVerification": "PENDING_ACTION_COMPOSE"
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ACTIONFIX.md",
+      "sha256": "ace8feca252c5ebfc050521e4cec21f4de2cdbc9ca5287d17333f68a2031001d",
+      "bytes": 1545
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ACTIONFIX-product-manifest.json",
+      "sha256": "1024978a85e223fdf24a5811fceacceeb96ce9f4c21f2d254b5b98a478987a1b",
+      "bytes": 856
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_ACTIONFIX.md",
+      "sha256": "a7f1e2106ae91a36803ddd56153c761636f244d2cd41db3df7924591371486c2",
+      "bytes": 2096
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ACTIONFIX-context-red.log",
+      "sha256": "b7c69732809b115556c657aae5f6e20d023600be4afe5b044d35dd6d587cfa69",
+      "bytes": 38086
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ACTIONFIX-context-green4.log",
+      "sha256": "612310deba612a9021dbf3a92a290ebc0b70f6b3e165a88de41ecd02ecfb3fdb",
+      "bytes": 20072
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ACTIONFIX-service-green2.log",
+      "sha256": "ed21758d880a5e2e01de15a9df82e78fc3ebb9cad157d9b76bd3f17ba0c6c3b6",
+      "bytes": 26491
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ACTIONFIX-focused-green.log",
+      "sha256": "5d7e7910dc3edd830b8fb20a8fd7991a4ce19b393c8b40db2a00630d249da0b1",
+      "bytes": 60393
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ACTIONFIX-focused-green-escalated.log",
+      "sha256": "6ec5dbc4f50c80cbc3a1a5b4411e4621baf4d63b2e7fb651260623cdf2b78b07",
+      "bytes": 67238
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ACTIONFIX/package-evidence.py",
+      "sha256": "2376e1b6a06d6d8f3dda030beaa74d86319519d7a96cd517b153f87fcd1c5e35",
+      "bytes": 6952
+    }
+  ],
+  "receiptExcludesSelf": true,
+  "leasesReleased": {
+    "heavy": true,
+    "scopedGit": true
+  },
+  "measuredAt": "2026-09-17T15:43:48.774486Z"
+}

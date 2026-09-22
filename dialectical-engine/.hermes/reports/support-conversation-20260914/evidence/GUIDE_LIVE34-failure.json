@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE34",
+  "ticket": "t_8ebcd9a4",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "FAILED_CAPACITY_MODULE_LINK_ZERO_OPERATIONAL_TRAFFIC",
+  "operatorExitStatus": 1,
+  "failedPhase": "capacity",
+  "failedPhaseStatus": 1,
+  "failureCode": "ERR_MODULE_NOT_FOUND",
+  "missingModulePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CONTINUATION_BIND40/phase-contract.mjs",
+  "importerPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CONTINUATION_BIND40/phase-capacity.mjs",
+  "phaseStatuses": {
+    "preflight": 0,
+    "readiness": 0,
+    "capacity": 1,
+    "gate": null,
+    "rowProof": null,
+    "capture": null,
+    "idle": null
+  },
+  "completedAtUtc": {
+    "preflight": "2026-09-21T11:45:35.315Z",
+    "readiness": "2026-09-21T11:45:35.504Z"
+  },
+  "preflight": {
+    "checkedAbsent": 115,
+    "retainedRows": 10,
+    "remainingRows": 21,
+    "syntheticUiMessageAttempts": 1,
+    "createSessionAttempts": 0,
+    "forwardedDynamicRequests": 0
+  },
+  "readiness": {
+    "pid": 9800,
+    "pgid": 9800,
+    "ordinarySystemTlsHelpStatus": 200
+  },
+  "operationalTraffic": {
+    "statusReads": 0,
+    "databaseCapacityQueries": 0,
+    "supportQuestions": 0,
+    "sessionCreations": 0,
+    "modelRequests": 0
+  },
+  "capture": {
+    "attemptedRows": 0,
+    "completedApiReplies": 0,
+    "completedScreenshotRows": 0,
+    "actualReceiptPresent": false,
+    "composed31Present": false
+  },
+  "retryPerformed": false,
+  "runtimeRestarted": false,
+  "qualification": "The capacity module failed during ESM linking before the supported status reader or database capacity query could execute. This is an operator dependency failure, not evidence of quota exhaustion, product behavior, or answer quality."
+}

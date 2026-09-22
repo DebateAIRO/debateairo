@@ -1,0 +1,32 @@
+{
+  "at": "2026-09-14T17:39:03.098214+00:00",
+  "scope": "Author interim claims; final artifact consumption pending",
+  "revision": "e0dcfe77f49655bea774bdfacf988b911be4ff06",
+  "actual": {
+    "requests": 7,
+    "retries": 0,
+    "manuallyUseful": 3,
+    "refused": 4,
+    "apiDomEqual": 7,
+    "refusals": {
+      "full_en_creation": "TEXT_LINK_OR_MARKUP/PATH_OR_ROUTE",
+      "full_en_settings": "TEXT_LINK_OR_MARKUP/PATH_OR_ROUTE",
+      "full_ro_creation": "TEXT_LINK_OR_MARKUP/PATH_OR_ROUTE",
+      "full_ro_settings": "TEXT_CREDENTIAL_OR_SECURITY_ACTION/CREDENTIAL_OPERATION"
+    },
+    "oneFreshValidEventPerRefusalClaim": true,
+    "otherWindowsZeroEvents": true,
+    "englishPointer": "UNVERIFIED: no action",
+    "compactRomanianKeyboard": "canonical guest /login?next=%2Fnew"
+  },
+  "custodyClaim": {
+    "pid": 45639,
+    "pgid": 45639,
+    "ppid": 1,
+    "tlsHelp": 200,
+    "browserExitedIdleSeconds": 10,
+    "freshProfileRemoved": true,
+    "heavyLeaseReleased": true
+  },
+  "limits": "No exact rejected token/text is available; no semantic false-positive claim. Known functional failure retained for final pass2."
+}

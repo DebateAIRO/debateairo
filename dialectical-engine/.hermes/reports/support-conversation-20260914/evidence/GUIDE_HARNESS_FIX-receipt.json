@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX",
+  "ticket": "t_ca041a3c",
+  "revision": "8fb8e407b350f9950cdb27a0f4caaf8e178d7cb6",
+  "verdict": "PASS_BOUNDED_INERT_CONTROLS",
+  "controls": {
+    "declared": 54,
+    "passed": 54,
+    "exitCode": 0
+  },
+  "artifacts": [
+    {
+      "path": "logs/GUIDE_HARNESS_FIX-controls-final.log",
+      "sha256": "17c0ccb812c1144d2cc108cb6173f3eec516c034e6efcdb3426a9537ef9adfc9",
+      "bytes": 2972
+    },
+    {
+      "path": "probes/GUIDE_HARNESS_FIX/README.md",
+      "sha256": "b014135545e2d4f9c7784b4bf62ee87f03739d74cac7efe677b419753d4858c4",
+      "bytes": 6594
+    },
+    {
+      "path": "probes/GUIDE_HARNESS_FIX/capture-public-guide.mjs",
+      "sha256": "d6c19ef4fed9b1617a71d9d86aa29778a38bf76bea115d64a9b55f082c877b5f",
+      "bytes": 16406
+    },
+    {
+      "path": "probes/GUIDE_HARNESS_FIX/controls.mjs",
+      "sha256": "3c97bfbb59bcaa4154f74ea08098aa1f3fed6cbc07ec86b1b60df5a7216d459f",
+      "bytes": 7388
+    },
+    {
+      "path": "probes/GUIDE_HARNESS_FIX/gate-contract.json",
+      "sha256": "b9e1a2c46d6f131d60062bda76ee79a8c5bcd4693222c81b160ba2333ab89230",
+      "bytes": 3660
+    },
+    {
+      "path": "probes/GUIDE_HARNESS_FIX/matrix.mjs",
+      "sha256": "cea34112498143dcf8b1a571e40e5a24d207b5b47ee9b142048506cc773ca1ae",
+      "bytes": 13168
+    },
+    {
+      "path": "probes/GUIDE_HARNESS_FIX/pre-request-verifier.ts",
+      "sha256": "1394da510272fb2773d5da50c37a1eb203d62208225d871f405cdadd1b870c0c",
+      "bytes": 13512
+    },
+    {
+      "path": "probes/GUIDE_HARNESS_FIX/runtime-capacity.mjs",
+      "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87",
+      "bytes": 9935
+    },
+    {
+      "path": "probes/GUIDE_HARNESS_FIX/verify-final-branches.ts",
+      "sha256": "359d82470b5ec47bd8e6fed7689d251ad1ac8129a58cdf14f772c4241cbcdfee",
+      "bytes": 4147
+    },
+    {
+      "path": "probes/GUIDE_HARNESS_FIX/verify-guide-harness.mjs",
+      "sha256": "da70b27127874d6dd01673e4ebeefd0e6daacb449691f6e56c3acabcae995648",
+      "bytes": 24940
+    },
+    {
+      "path": "evidence/GUIDE_HARNESS_FIX.md",
+      "sha256": "bf9385d3ebcceb2fad1ea319beb42d23f8e2ed3f885e8d93a0abea4fc8d318a5",
+      "bytes": 4754
+    },
+    {
+      "path": "agent-reports/GUIDE_HARNESS_FIX.md",
+      "sha256": "43cfc4c9267253e4430ee54db32d79538a7e554521e17a9b27edd397581ae16d",
+      "bytes": 4163
+    }
+  ],
+  "limitations": [
+    "Runtime capacity reader was prepared but not executed.",
+    "README and gate-contract materialization details were clarified after the passing control frame; executable harness files and the retained control log were unchanged.",
+    "No live Support, browser, HTTP, database, model, provider, or lifecycle action occurred.",
+    "This receipt makes no checkpoint-readiness or acceptance claim."
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND15_DIAGNOSTIC",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "completed": true,
+  "verdict": "DIAGNOSIS_INCONCLUSIVE",
+  "browser": {
+    "headless": true,
+    "freshProfile": true,
+    "tlsBypass": false
+  },
+  "traffic": {
+    "actualSupportRequestsForwarded": 0,
+    "guardedAttempts": {
+      "status": 1,
+      "pageCaseListRead": 1,
+      "createSession": 0,
+      "sendMessage": 0,
+      "otherSupport": 0
+    }
+  },
+  "originalChain": [
+    {
+      "step": "PRECONDITION",
+      "modeState": "TERRACOTTA",
+      "transitionState": "IDLE",
+      "cookieVisible": false,
+      "toggleVisible": true,
+      "toggleEnabled": true,
+      "toggleHitTarget": true,
+      "privateHandlerReady": false
+    },
+    {
+      "step": "FIRST_ACTIVATION_DISPATCHED",
+      "modeState": "TERRACOTTA",
+      "transitionState": "IDLE",
+      "cookieVisible": false,
+      "toggleVisible": true,
+      "toggleEnabled": true,
+      "toggleHitTarget": true,
+      "privateHandlerReady": false
+    }
+  ],
+  "firstFailure": {
+    "step": "FIRST_MODE_EXPECTED_STATE",
+    "code": "GUIDE_HARNESS_FULL_MODE_EXPECTED_STATE_TIMEOUT"
+  },
+  "discriminator": {
+    "hypothesis": "COOKIE_REGION_BLOCKS_MODE_TOGGLE_ACTIONABILITY",
+    "action": "NOT_APPLICABLE",
+    "before": {
+      "step": "DISCRIMINATOR_BEFORE",
+      "modeState": "TERRACOTTA",
+      "transitionState": "IDLE",
+      "cookieVisible": true,
+      "toggleVisible": true,
+      "toggleEnabled": true,
+      "toggleHitTarget": true,
+      "privateHandlerReady": true
+    },
+    "after": null,
+    "supported": false
+  }
+}

@@ -1,0 +1,25 @@
+# PACKET GUIDE_HARNESS_BIND12 — repair GH10-R1 without product mutation
+
+Read FIRST this packet then /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md. Resume original Sol /root/preview; retain worker/verification BODY skills. Read assigned ticket/comments before claim; no subdelegation.
+
+## 1. Node
+- seat: GUIDE_HARNESS_BIND12; ticket: t_c804f2f1; model: gpt-5.6-sol; rework rounds: max 3 under owner continuation.
+- cwd: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine; exact clean revision: 152eed4da1cd3e66b74d8301159ba76427552409; inputs: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND12-inputs.json.
+- self-report: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_BIND12.md (new).
+
+## 2. Contract
+- allowed: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND12/ (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_BIND12/ (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL9-manifest.json (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND12.md (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND12- (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_BIND12- (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_BIND12.md (new).
+- forbidden: product, KB, Git, prior harness/evidence edits; runtime/lifecycle/browser/HTTP/DB/Support/model/status/capacity activity; private logs/records; actual GUIDE12 output; owner questions/acceptance.
+- verification: sole heavy only for exact inert syntax, retained controls plus bound-input regression and final row proofs. No product/Git lease. Clean exact primary before/after.
+
+## 3. Work
+Resolve separately reviewed GH10-R1. FINAL8 falsely has empty productFiles despite full changedPaths. Preserve it and all BIND11 evidence unchanged. Produce new cumulative FINAL9 inventory from exact clean current152eed4 bytes, prior complete FINAL7 membership and actual cumulative Git delta. Rehash all present product files, verify expected cumulative members and deleted paths, and include every attested file. Do not merely copy stale hashes. Document why the previous packaging emitted an empty list and the corrected producer invariant. No product implementation or new product commit is authorized.
+
+Copy reviewed BIND11 harness/adapter to BIND12, bind new FINAL9 and unused actual GUIDE_LIVE_GUIDE12 namespace; all semantics, matrix54, prior112 control purposes, exact34 suites, fixed diagnostic projection, API/DOM equality, source/outcome/action/navigation/session/pacing/capacity rules remain unchanged. Add a bounded actual-bound-input control/assertion that invokes the real inventory membership/pre-request static binding against this producer artifact and demonstrates nonempty exact hashes and all attested files present. Preserve negative controls for empty/missing/stale-hash membership; no synthetic nonempty substitute for the actual new inventory. Report exact new control count and explain any proof inventory/count binding change required solely by this added regression. No oracle relaxation or broad generic rewrite.
+
+Demonstrate the old empty inventory rejects and the new complete inventory passes the actual bound path without runtime/capacity/Support traffic. Seal final controls, exact54 composed row proofs, adapter3, ordered-eight digest and all authoritative producer bindings. Exact command documentation must use node --import tsx; adapter argv gatePath,expectedRevision,outputPath. No actual capture/gate freshness claim. Root will route separate original baseline review; existing healthy RUNTIME6 requires no restart for artifact correction. No full suite/typecheck/eval rerun, since product unchanged.
+
+## 4. Handoff
+Self-report question verbatim:
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
+Return SKILLS LOADED, ticket/session/revision/verdict, exact inventory/diff/controls/proof/digest and strict receipt node/ticket/revision/verdict/artifacts absolute/sha256/bytes excluding itself. Release heavy; no self-close/readiness/acceptance. Forgot unresolved/actionless; CP2 gated.

@@ -1,0 +1,44 @@
+START 2026-09-07T05:26:33Z HEAD=4cc0f4b6
+=== CMD-C1 nocolor run 1 2026-09-07T05:26:33Z ===
+script_exit=0 last=S01-C1 verdict=0   summary:      Tests  2 failed | 7 passed (9)   hit-list: 1 (pinned .drawerScrim line: 1)   tsc ran: 1 exit 1, diagnostics outside the pin: 0
+=== CMD-C1 nocolor run 2 2026-09-07T05:26:37Z ===
+script_exit=0 last=S01-C1 verdict=0   summary:      Tests  2 failed | 7 passed (9)   hit-list: 1 (pinned .drawerScrim line: 1)   tsc ran: 1 exit 1, diagnostics outside the pin: 0
+=== CMD-C1 nocolor run 3 2026-09-07T05:26:40Z ===
+script_exit=0 last=S01-C1 verdict=0   summary:      Tests  2 failed | 7 passed (9)   hit-list: 1 (pinned .drawerScrim line: 1)   tsc ran: 1 exit 1, diagnostics outside the pin: 0
+=== CMD-C2 nocolor run 1 2026-09-07T05:26:43Z ===
+script_exit=0 last=S01-C2 verdict=0   summary:      Tests  6 passed (6)  files: Test Files  1 passed (1)   ADR Status:Proposed lines: 1, debateai.consent mentions: 4   tsc ran: 1 exit 1, diagnostics outside the pin: 0
+=== CMD-C2 nocolor run 2 2026-09-07T05:26:46Z ===
+script_exit=0 last=S01-C2 verdict=0   summary:      Tests  6 passed (6)  files: Test Files  1 passed (1)   ADR Status:Proposed lines: 1, debateai.consent mentions: 4   tsc ran: 1 exit 1, diagnostics outside the pin: 0
+=== CMD-C2 nocolor run 3 2026-09-07T05:26:48Z ===
+script_exit=0 last=S01-C2 verdict=0   summary:      Tests  6 passed (6)  files: Test Files  1 passed (1)   ADR Status:Proposed lines: 1, debateai.consent mentions: 4   tsc ran: 1 exit 1, diagnostics outside the pin: 0
+=== CMD-C3 nocolor run 1 2026-09-07T05:26:51Z ===
+script_exit=0 last=S01-C3 verdict=0   summary:      Tests  7 passed (7)  files: Test Files  1 passed (1)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+=== CMD-C3 nocolor run 2 2026-09-07T05:26:55Z ===
+script_exit=0 last=S01-C3 verdict=0   summary:      Tests  7 passed (7)  files: Test Files  1 passed (1)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+=== CMD-C3 nocolor run 3 2026-09-07T05:27:00Z ===
+script_exit=0 last=S01-C3 verdict=0   summary:      Tests  7 passed (7)  files: Test Files  1 passed (1)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+=== CMD-C4 nocolor run 1 2026-09-07T05:27:04Z ===
+script_exit=0 last=S01-C4 verdict=0   summary:      Tests  11 passed (11)  files: Test Files  1 passed (1)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+=== CMD-C4 nocolor run 2 2026-09-07T05:27:09Z ===
+script_exit=0 last=S01-C4 verdict=0   summary:      Tests  11 passed (11)  files: Test Files  1 passed (1)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+=== CMD-C4 nocolor run 3 2026-09-07T05:27:13Z ===
+script_exit=0 last=S01-C4 verdict=0   summary:      Tests  11 passed (11)  files: Test Files  1 passed (1)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+=== CMD-C5 nocolor run 1 2026-09-07T05:27:17Z ===
+script_exit=0 last=S01-C5 verdict=0   summary:      Tests  4 failed | 58 passed (62)  files: Test Files  1 failed | 2 passed (3)   failures: 4 (unpinned: 0)  guarded-green: 2  consent-mount lines: 31 (failing: 0)  hit-list: 1   tsc ran: 1 exit 1, outside the pin: 0
+=== CMD-C5 nocolor run 2 2026-09-07T05:27:24Z ===
+script_exit=0 last=S01-C5 verdict=0   summary:      Tests  4 failed | 58 passed (62)  files: Test Files  1 failed | 2 passed (3)   failures: 4 (unpinned: 0)  guarded-green: 2  consent-mount lines: 31 (failing: 0)  hit-list: 1   tsc ran: 1 exit 1, outside the pin: 0
+=== CMD-C5 nocolor run 3 2026-09-07T05:27:31Z ===
+script_exit=0 last=S01-C5 verdict=0   summary:      Tests  4 failed | 58 passed (62)  files: Test Files  1 failed | 2 passed (3)   failures: 4 (unpinned: 0)  guarded-green: 2  consent-mount lines: 31 (failing: 0)  hit-list: 1   tsc ran: 1 exit 1, outside the pin: 0
+=== CMD-C6 nocolor run 1 2026-09-07T05:27:37Z ===
+script_exit=0 last=S01-C6 verdict=0   summary:      Tests  14 passed (14)  files: Test Files  1 passed (1)   S02-files: ref resolved 0, commits in 4cc0f4b6efcd95214b6e9d2525ff04a40b6d2d69..HEAD touching them: 0, working-tree diff: 'none'   tsc ran: 1 exit 1, outside the pin: 0
+=== CMD-C6 nocolor run 2 2026-09-07T05:27:40Z ===
+script_exit=0 last=S01-C6 verdict=0   summary:      Tests  14 passed (14)  files: Test Files  1 passed (1)   S02-files: ref resolved 0, commits in 4cc0f4b6efcd95214b6e9d2525ff04a40b6d2d69..HEAD touching them: 0, working-tree diff: 'none'   tsc ran: 1 exit 1, outside the pin: 0
+=== CMD-C6 nocolor run 3 2026-09-07T05:27:43Z ===
+script_exit=0 last=S01-C6 verdict=0   summary:      Tests  14 passed (14)  files: Test Files  1 passed (1)   S02-files: ref resolved 0, commits in 4cc0f4b6efcd95214b6e9d2525ff04a40b6d2d69..HEAD touching them: 0, working-tree diff: 'none'   tsc ran: 1 exit 1, outside the pin: 0
+=== CMD-C7 nocolor run 1 2026-09-07T05:27:45Z ===
+script_exit=0 last=S01-C7 verdict=0   summary:      Tests  76 passed (76)  files: Test Files  6 passed (6)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+=== CMD-C7 nocolor run 2 2026-09-07T05:27:52Z ===
+script_exit=0 last=S01-C7 verdict=0   summary:      Tests  76 passed (76)  files: Test Files  6 passed (6)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+=== CMD-C7 nocolor run 3 2026-09-07T05:27:59Z ===
+script_exit=0 last=S01-C7 verdict=0   summary:      Tests  76 passed (76)  files: Test Files  6 passed (6)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+END 2026-09-07T05:28:06Z

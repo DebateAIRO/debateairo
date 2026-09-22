@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_RUNTIME8",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "pid": 82483,
+  "pgid": 82483,
+  "commandMarker": "pnpm dev:auth:up",
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "runtimeLogPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_RUNTIME8-stack.log",
+  "profile": "support-preview",
+  "startedAtUtc": "2026-09-21T06:48:04.699Z",
+  "detached": true
+}

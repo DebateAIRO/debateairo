@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_REVIEW38",
+  "ticket": "t_06b937dc",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_FINAL_FOOTER_CAPTURE_BINDING",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_CAPTURE_REVIEW38.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_CAPTURE_REVIEW38.md",
+      "sha256": "af384eefd0897bfc8f3d1f6846a33642c6eefe897c0649a30a08c4f5531e920b",
+      "bytes": 6273
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_REVIEW38-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_REVIEW38-dispositions.json",
+      "sha256": "a056fa941032213120f2274e682e236209cf9378199f070a5c02b9dfe0c6ca23",
+      "bytes": 2953
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_REVIEW38-visual-inspection.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_REVIEW38-visual-inspection.json",
+      "sha256": "4c897f82068edb4baf11092ade7b838ed540b913860c9c5a0e325114f15785fd",
+      "bytes": 2258
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_REVIEW38-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_REVIEW38-custody.json",
+      "sha256": "2a370a4ff098b6ac890c0f930017e0f0e439f88068ca6ebc78fb92f3b34a8fef",
+      "bytes": 860
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_CAPTURE_REVIEW38.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_CAPTURE_REVIEW38.md",
+      "sha256": "4451eea19c3200e55e232876dfa098d363b2e3bce23c0badc75ee5fbb097830d",
+      "bytes": 2804
+    }
+  ],
+  "manifestSelfExcluded": true,
+  "inputCustody": {
+    "declared": 96,
+    "hashAndSizeMatched": 96,
+    "mismatched": 0
+  }
+}

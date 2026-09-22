@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_RUNTIME_BIND36",
+  "ticket": "t_b048e75f",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_RUNTIME_SCHEMA_BOUND_REVIEW_REQUIRED",
+  "controls": {
+    "passed": 18,
+    "total": 18
+  },
+  "binding": {
+    "commandSha256": "30da55750cd96c3323234f988a07cf2961025db7ebe486176bd79858897e46e4",
+    "operatorScriptSha256": "293c8a65f70871b4be9cce21f13ca7a2aa522b1afc7c8c19a23d9ea91bce678a",
+    "phaseCount": 7,
+    "futurePathsAbsent": 123
+  },
+  "readiness": {
+    "oldRedStatus": 1,
+    "currentStatus": 0,
+    "negativeCases": 6,
+    "idleStatus": 0,
+    "realRuntimeOrHttpCalls": 0
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "limitations": [
+    "INDEPENDENT_REVIEW_REQUIRED",
+    "LIVE30_NOT_RUN",
+    "FORGOT_UNRESOLVED"
+  ]
+}

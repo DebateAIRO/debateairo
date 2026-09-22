@@ -1,0 +1,428 @@
+# Review package — lane /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/consent-s02/dialectical-engine — range 19cc8e77..2127c4ad — generated 2026-09-07 04:27:17
+
+## Commits
+2127c4ad 04:18 test(consent-ui S02-C7/C8): pin focus return for all entries, the tracker resync, the re-entrancy guard; compare the contrast number
+
+## Stat
+ .../tests/render/consent-bar.test.tsx              |  31 ++++-
+ .../tests/render/consent-signup-modal.test.tsx     | 129 +++++++++++++++++++++
+ .../tests/unit/consent-s02-style-contract.test.ts  |  70 +++++++++--
+ 3 files changed, 216 insertions(+), 14 deletions(-)
+
+## Diff (-U10)
+diff --git a/dialectical-engine/tests/render/consent-bar.test.tsx b/dialectical-engine/tests/render/consent-bar.test.tsx
+index d22f15f8..e5f7d987 100644
+--- a/dialectical-engine/tests/render/consent-bar.test.tsx
++++ b/dialectical-engine/tests/render/consent-bar.test.tsx
+@@ -230,23 +230,48 @@ describe("S01-C3 the cookie bar (10a)", () => {
+     // PROPERTY (S01-R09, S01-R25): every one of R09's numbers appears in the
+     // shipped stylesheet as written, the slice's rules live in exactly ONE
+     // delimited block appended after every existing rule, and every colour in
+     // it is a `var(--token)` reference.
+     // jsdom computes NO layout, so this asserts the declared rule TEXT and not
+     // a rendered pixel — the 22px insets, the 7px bezel, the 52x4 gold tab and
+     // the 560px copy column are V's, acceptance steps 1-2 in both modes.
+     const css = globalsSource();
+     expect(css.split(OPEN_MARKER).length - 1, "exactly one S01 block is opened").toBe(1);
+     expect(css.split(CLOSE_MARKER).length - 1, "exactly one S01 block is closed").toBe(1);
+-    expect(css.trimEnd().endsWith(CLOSE_MARKER), "the S01 block is the last block in the file").toBe(
+-      true
+-    );
++
++    // RELAXED BY THE S02-S66 MERGE, and by nothing else (`CODE-S02-C9`, first commit).
++    // This assertion read `css.trimEnd().endsWith(CLOSE_MARKER)` — "the S01 block is the last
++    // block in the file" — which was true while S01's lane was alone and became false the
++    // moment `slice/consent-s01` was merged into `slice/consent-s02`. Both slices append a
++    // delimited block at the end of `globals.css`; the vertical-slice law ACCEPTS that
++    // conflict and fixes the resolution as S01's block first and S02's second
++    // (`slices/S02/PLAN.md` S02-S66 and §"The single-writer rule against S01"). What S01
++    // actually owns — its rules live in ONE block appended after every pre-existing rule, and
++    // nothing of S01's is stranded outside it — is unchanged, and this is that property in the
++    // form that survives the merge: after S01's closing marker there is nothing but whitespace,
++    // or S02's ONE delimited block and then nothing but whitespace. A third block, a stray
++    // rule between the two, or anything at all after S02's closing marker still fails here.
++    const tail = css.slice(css.indexOf(CLOSE_MARKER) + CLOSE_MARKER.length);
++    const S02_OPEN = "/* === consent-ui S02 === */";
++    const S02_CLOSE = "/* === end consent-ui S02 === */";
++    const s02At = tail.indexOf(S02_OPEN);
++    if (s02At === -1) {
++      expect(tail.trim(), "nothing but whitespace follows the S01 block").toBe("");
++    } else {
++      expect(tail.split(S02_OPEN).length - 1, "exactly one S02 block is opened after S01's").toBe(1);
++      expect(tail.split(S02_CLOSE).length - 1, "exactly one S02 block is closed after S01's").toBe(1);
++      expect(tail.slice(0, s02At).trim(), "nothing but whitespace between the two blocks").toBe("");
++      expect(
++        tail.slice(tail.indexOf(S02_CLOSE) + S02_CLOSE.length).trim(),
++        "nothing but whitespace follows S02's closing marker"
++      ).toBe("");
++    }
+ 
+     const block = withoutComments(s01Block());
+     const base = unconditional(block);
+ 
+     expectDeclarations(base, ".consentBar", [
+       "position: fixed",
+       "left: 22px",
+       "right: 22px",
+       "bottom: calc(22px + var(--safe-b))",
+       "z-index: var(--z-consent-bar)"
+diff --git a/dialectical-engine/tests/render/consent-signup-modal.test.tsx b/dialectical-engine/tests/render/consent-signup-modal.test.tsx
+index 85992de2..992ab71c 100644
+--- a/dialectical-engine/tests/render/consent-signup-modal.test.tsx
++++ b/dialectical-engine/tests/render/consent-signup-modal.test.tsx
+@@ -116,20 +116,41 @@ function privacyText(): HTMLElement {
+ function policyControl(): HTMLElement {
+   const control = privacyRow().querySelector<HTMLElement>(".consentPolicyLink");
+   expect(control, "missing the Privacy Policy control").not.toBeNull();
+   return control!;
+ }
+ 
+ function dialog(): HTMLElement | null {
+   return document.querySelector<HTMLElement>('[role="dialog"]');
+ }
+ 
++/**
++ * React's PRIVATE value tracker, READ and never written.
++ *
++ * ACCEPTED REACT-INTERNAL COUPLING (orchestrator ruling 2026-09-07 on
++ * `CODE-REV-S02-C7 r1 N2`, recorded in `slices/S02/DECISIONS.md`). `_valueTracker` is not part
++ * of React's public surface and a React upgrade may rename it — that is the price of the pin
++ * and it was paid deliberately. The alternative on the table was DELETING the resync at
++ * `SignUpFlow.tsx:150-153`; the ruling kept it as declared defence in depth, and
++ * `heartbeat-protocol` §2.2 forbids leaving shipped code both unpinned and unexplained. The
++ * tracker is the ONLY observable this property has: the reviewer measured that removing the
++ * resync changes no DOM value, no button state and no route outcome anywhere in the slice
++ * (mutant M11, `Tests 14 passed (14)`), because `acknowledgePolicy`'s instance assignment
++ * re-syncs the tracker before any later uncheck can be swallowed. The helper degrades to the
++ * string `"NO-TRACKER"` rather than throwing, so a React version that drops the field fails
++ * on an assertion that NAMES the coupling instead of on a `TypeError`.
++ */
++function trackerValue(input: HTMLInputElement): string {
++  const tracker = (input as unknown as { _valueTracker?: { getValue(): string } })._valueTracker;
++  return tracker === undefined ? "NO-TRACKER" : tracker.getValue();
++}
++
+ function scrollRegion(): HTMLElement {
+   const region = document.querySelector<HTMLElement>(".policyBody");
+   expect(region, "missing the policy scroll region").not.toBeNull();
+   return region!;
+ }
+ 
+ /** The single control inside the dialog whose own text is exactly `label`. */
+ function policyButton(label: string): HTMLButtonElement {
+   const open = dialog();
+   expect(open, `expected an open dialog to find ${label} in`).not.toBeNull();
+@@ -205,20 +226,54 @@ async function acknowledgePolicy(): Promise<void> {
+  * THE MIRROR ARM. Ticking `adult-affirmed` makes the privacy mirror the only remaining term
+  * in the button's `disabled`, so a mirror left `true` by an open-or-dismiss route shows up
+  * here as an ENABLED button. Uses the one button idiom, never an assignment.
+  */
+ async function mirrorArm(): Promise<void> {
+   await clickElement(field("adult-affirmed"));
+   expect(field("adult-affirmed").checked, "the mirror arm's own click must land").toBe(true);
+   expect(createAccountButton().disabled, "Create account after the mirror arm").toBe(true);
+ }
+ 
++/**
++ * THE FOCUS-RETURN ARM, for an entry point that is not the check square.
++ *
++ * `SPEC.md` constant (5) quantifies over ALL THREE entry points — *focus return lands on the
++ * input whatever the entry point* — and the mechanism is one line, `input.focus()` at
++ * `SignUpFlow.tsx:134`, which runs before the surface opens so that `modalSemantics`
++ * remembers the input as the element to restore. Until this arm existed the constant was
++ * pinned for the SQUARE only: `S02-S53`/`S02-S54`/`S02-S55`/`S02-S56` all open from the
++ * square, and `S02-S50`/`S02-S51` opened from the text and the control and never dismissed,
++ * so they asserted nothing about focus. Measured by `CODE-REV-S02-C7 r1 N1`: the mutant
++ * `if (event.target === input) input.focus();` — focus only when the click started on the
++ * square — survived the whole file, `R9 | exit=0 | Tests 14 passed (14)`. A keyboard or
++ * screen-reader user who activates the `Privacy Policy` control and then dismisses the policy
++ * lands on `<body>` instead of the box they were filling in, and the mouse path is unaffected,
++ * so nothing shows it without this assertion.
++ *
++ * Placed AFTER each case's existing assertions and after `mirrorArm()`, so no existing
++ * assertion is reordered or weakened; the dismissal is the `×` control, the same route
++ * `S02-S54` uses, and the element `modalSemantics` restores was captured at OPEN, which is
++ * why the intervening `adult-affirmed` click cannot influence it.
++ */
++async function dismissAndExpectFocusReturn(entry: "text" | "control"): Promise<void> {
++  expect(dialog(), `the ${entry} route must still have the policy open`).not.toBeNull();
++
++  await clickElement(policyButton("×"));
++
++  expect(dialog(), `the close control must close the policy opened from the ${entry}`).toBeNull();
++  expect(
++    document.activeElement,
++    `constant (5): focus returns to the privacy input from the ${entry} entry point`
++  ).toBe(field("privacy-accepted"));
++  expect(field("privacy-accepted").checked, "and the dismissal ticks nothing").toBe(false);
++}
++
+ describe("sign-up card ↔ privacy policy modal", () => {
+   beforeEach(() => {
+     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+     metrics = { ...TOP };
+     stubScrollMetrics();
+     container = document.createElement("div");
+     document.body.append(container);
+     root = createRoot(container);
+   });
+ 
+@@ -247,32 +302,106 @@ describe("sign-up card ↔ privacy policy modal", () => {
+   /* S02-S50 — R05, and R17's mirror invariant. The second of the three entry points; each is
+      a separate case because a preventDefault covering only one of them fails exactly one. */
+   it("opens the policy from the row's text, leaving box and mirror false", async () => {
+     await mount();
+ 
+     await clickElement(privacyText());
+ 
+     expect(dialog(), "the policy modal must be open").not.toBeNull();
+     expect(field("privacy-accepted").checked, "the box must stay unticked").toBe(false);
+     await mirrorArm();
++
++    await dismissAndExpectFocusReturn("text");
+   });
+ 
+   /* S02-S51 — R05, R17. The third entry point, and SPEC.md R05 calls this the single most
+      likely implementation slip in the slice. */
+   it("opens the policy from the Privacy Policy control, leaving box and mirror false", async () => {
+     await mount();
+ 
+     await clickElement(policyControl());
+ 
+     expect(dialog(), "the policy modal must be open").not.toBeNull();
+     expect(field("privacy-accepted").checked, "the box must stay unticked").toBe(false);
+     await mirrorArm();
++
++    await dismissAndExpectFocusReturn("control");
++  });
++
++  /* CODE-REV-S02-C7 r1 N2, the tracker resync (`SignUpFlow.tsx:150-153`), pinned directly.
++     Orchestrator ruling 2026-09-07 (`t_c0fd0601`), recorded in `slices/S02/DECISIONS.md`: the
++     `queueMicrotask` block is KEPT as declared defence in depth, and it must therefore stop
++     being both unpinned and unexplained (`heartbeat-protocol` §2.2).
++
++     PROPERTY. After ONE cancelled click on the empty privacy box, React's value tracker for
++     that input agrees with the DOM — both `"false"`. The cancelled click is the whole
++     mechanism: the pre-click activation steps flip `checked` to `true`, React's change
++     extraction records `"true"` in the tracker, and the canceled-activation steps then revert
++     the DOM to `false` AFTER dispatch — leaving tracker `"true"` over DOM `false`, a state in
++     which a later genuine change can go unannounced.
++
++     WHY THE TRACKER AND NOT AN OUTCOME. The reviewer measured that no route in the slice turns
++     that desync into an observable outcome today (mutant M11, the block deleted:
++     `Tests 14 passed (14)`, and all nine of the reviewer's probes still green), because
++     `acknowledgePolicy`'s plain instance assignment re-syncs the tracker before any uncheck
++     could be swallowed. So an outcome-level assertion here would pin nothing; this one is the
++     only one that discriminates. `trackerValue`'s doc-comment states the accepted coupling. */
++  it("re-syncs React's value tracker after a cancelled click on the empty box", async () => {
++    await mount();
++    const input = field("privacy-accepted");
++    expect(trackerValue(input), "React tracks this input's value at all").not.toBe("NO-TRACKER");
++    expect(trackerValue(input), "the tracker starts in step with the empty box").toBe("false");
++
++    await clickElement(input);
++
++    expect(dialog(), "the cancelled click opens the policy").not.toBeNull();
++    expect(input.checked, "and leaves the DOM box empty").toBe(false);
++    expect(
++      trackerValue(input),
++      "the tracker must be back in step with the DOM after the cancelled click"
++    ).toBe("false");
++  });
++
++  /* CODE-REV-S02-C7 r1 N6, the re-entrancy guard (`SignUpFlow.tsx:128`,
++     `if (event.target !== input) input.click();`), pinned with a DISPATCHED event (`t_086c1d78`).
++
++     PROPERTY. One user click on the TICKED privacy box runs the row handler exactly once and
++     leaves the box unticked.
++
++     WHY A DISPATCH AND NOT `.click()`. Every other case in this file reaches the DOM through
++     `HTMLElement.click()`, and the HTML spec's "click in progress" flag — set by the click
++     METHOD — makes the handler's synthesised `input.click()` a no-op, so the guard is
++     unobservable through that path: the reviewer measured mutant R1 (the guard dropped, the
++     `.click()` unconditional) as `Tests 14 passed (14)`. A real user click sets no such flag,
++     and neither does `dispatchEvent(new MouseEvent("click"))`, which is why this is the one
++     idiom that can see it: `HEAD -> handlerRuns=1 dom=false`, `R1 -> handlerRuns=2 dom=TRUE`
++     (probe P4). With the guard gone a user clicking a ticked privacy box in a browser fails to
++     untick it — two toggles instead of one — and no other test in the slice would say so.
++     The `capture: true` listener counts arrivals at the row element itself, which is where the
++     component's own `onClick` lives, so a re-entry is one extra count and nothing else is. */
++  it("runs the row handler once for a dispatched click on the ticked box, and unticks it", async () => {
++    await mount();
++    await acknowledgePolicy();
++    const input = field("privacy-accepted");
++    expect(input.checked, "precondition: the acknowledgement ticked the box").toBe(true);
++
++    let handlerRuns = 0;
++    privacyRow().addEventListener("click", () => { handlerRuns += 1; }, { capture: true });
++
++    await act(async () => {
++      input.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
++    });
++    await settle();
++
++    expect(handlerRuns, "the row handler must run exactly once per user click").toBe(1);
++    expect(input.checked, "a click on the ticked box unticks it").toBe(false);
++    expect(dialog(), "and unticking opens no dialog").toBeNull();
+   });
+ 
+   /* S02-S52 — R06. The checked row unchecks directly, with no modal. The mirror arm is folded
+      in from CODE-REV-S02-C3C4 r1 N1's recovery oracle: the uncheck has to travel the path
+      React listens to, or the mirror stays `true` while the box is empty and `Create account`
+      comes back enabled with nothing ticked. */
+   it("unchecks the checked privacy row directly, with no modal and no stale mirror", async () => {
+     await mount();
+     await acknowledgePolicy();
+ 
+diff --git a/dialectical-engine/tests/unit/consent-s02-style-contract.test.ts b/dialectical-engine/tests/unit/consent-s02-style-contract.test.ts
+index b2a5cc01..617fb674 100644
+--- a/dialectical-engine/tests/unit/consent-s02-style-contract.test.ts
++++ b/dialectical-engine/tests/unit/consent-s02-style-contract.test.ts
+@@ -152,50 +152,85 @@ function composite(fg: string, bg: string, alpha: number): string {
+  * narrated: the round-1 review found `5.61` written in prose beside this arithmetic, where the
+  * arithmetic itself yields `5.54`, and nothing executed the unpinned rungs to catch it
+  * (`CODE-REV-S02-C8-r1` B1).
+  *
+  * The rung is a TIE and the spelling of `1 - alpha` decides it, which is how the wrong figure
+  * survived a three-model table: Terracotta's green channel at .70 is `0.70·38 + (1-0.70)·233`.
+  * `1 - 0.70` is `0.30000000000000004` in IEEE-754, so that sum is 96.5 and `Math.round` gives 97
+  * (ratio 5.5450, printed `5.54`); re-derived by hand as `0.70·38 + 0.30·233` it is
+  * 96.49999999999999, `Math.round` gives 96, and the ratio becomes 5.6077 — `5.61`. The model that
+  * ships is `composite()` above, and these assertions are now the only place either number lives.
++ *
++ * IT RETURNS BOTH THE LABEL AND THE NUMBER, and every filter below compares the NUMBER
++ * (`CODE-REV-S02-C8 r2` N1r2, ADVISORY, class binding; ticket `t_e7801ab7`). The intermediate
++ * form of this helper returned the label alone, so the gate had to re-parse it —
++ * `Number.parseFloat(entry.split(" ")[1]) < 4.5` — which formats to 2 dp FIRST and compares
++ * SECOND. A true ratio in `[4.495, 4.5)` therefore rounds to `"4.50"`, parses to `4.5`, and
++ * escapes a `< 4.5` filter: measured, Chamber at `opacity: .4784` is **4.498360**, a genuine
++ * WCAG AA failure the string form does not list (424 of 200,000 alphas report a wrong failure
++ * SET; the assertion's verdict never flips, which is why the finding is an N and not a B).
++ * A guard that compares a FORMATTED number has silently moved its own threshold, so the
++ * string is for the MESSAGE and the number is for the COMPARISON — the shape this helper had
++ * before the refactor that broke it.
+  */
+-function ratiosAt(alpha: number): string[] {
++function ratiosAt(alpha: number): Array<[string, number]> {
+   return (
+     [
+       ["Terracotta", ":root"],
+       ["Chamber", 'html[data-mode="chamber"]']
+     ] as const
+   ).map(([mode, blockSelector]) => {
+     const ground = tokenValue(blockSelector, "--shell");
+     const face = tokenValue(blockSelector, "--ink");
+     const label = tokenValue(blockSelector, "--bg");
+     const ratio = contrastRatio(composite(label, ground, alpha), composite(face, ground, alpha));
+-    return `${mode} ${ratio.toFixed(2)}`;
++    return [`${mode} ${ratio.toFixed(2)}`, ratio];
+   });
+ }
+ 
++/** The printed rungs of `ratiosAt`, unchanged in text by N1r2's repair. */
++const labelsAt = (alpha: number): string[] => ratiosAt(alpha).map(([label]) => label);
++
++/** The rungs BELOW 4.5:1 at one alpha, selected on the ratio and reported as the label. */
++const failingAt = (alpha: number): string[] =>
++  ratiosAt(alpha)
++    .filter(([, ratio]) => ratio < 4.5)
++    .map(([label]) => label);
++
+ /** The S02 block's inner text, with both markers excluded. Throws if the block is not well formed. */
+ function s02Block(): string {
+   const open = css.indexOf(OPEN_MARKER);
+   const close = css.indexOf(CLOSE_MARKER);
+   if (open === -1 || close === -1 || close < open) {
+     throw new Error(
+       `The S02 block is not delimited in ${globalsPath}: open=${open}, close=${close}`
+     );
+   }
+   return css.slice(open + OPEN_MARKER.length, close);
+ }
+ 
+ describe("S02-C8 consent-ui style contract", () => {
+   it("S02-S59 · appends exactly one delimited S02 block and ends the file with it", () => {
++    // THE ONE THING `stripComments()` MADE INVISIBLE (orchestrator note on `t_4f97ca86`,
++    // 2026-09-07 03:09, from `CODE-S02-C8-REWORK-R1` R1). Every other assertion in this file
++    // reads the block through `stripComments()`, so a comment DUPLICATED inside the S02 block —
++    // the shape `CODE-REV-S02-C8 r1` N2 found as an ORPHANED comment, one commit earlier — is
++    // unreachable by any mutant this suite can build. Comment text is the only documentation a
++    // stylesheet carries, and a paragraph pasted twice is a real defect that nothing else here
++    // can see. The `> 0` arm is a satisfiability arm: an empty comment list would satisfy the
++    // uniqueness assertion vacuously, which is the `TOOLING-TRAPS` "guard that cannot fail" class.
++    const comments = s02Block().match(/\/\*[\s\S]*?\*\//g) ?? [];
++    expect(comments.length, "the S02 block is commented at all").toBeGreaterThan(0);
++    expect(new Set(comments).size, "no comment is duplicated inside the S02 block").toBe(
++      comments.length
++    );
++
+     expect(occurrences(css, OPEN_MARKER)).toBe(1);
+     expect(occurrences(css, CLOSE_MARKER)).toBe(1);
+     expect(css.indexOf(OPEN_MARKER)).toBeLessThan(css.indexOf(CLOSE_MARKER));
+ 
+     const after = css.slice(css.indexOf(CLOSE_MARKER) + CLOSE_MARKER.length);
+     expect(after.trim()).toBe("");
+   });
+ 
+   it("S02-S60 · writes no colour literal and declares no token inside the S02 block", () => {
+     const block = s02Block();
+@@ -340,37 +375,50 @@ describe("S02-C8 consent-ui style contract", () => {
+     expectDecl(".policyPrimary", "background", "var(--ink)");
+     expectDecl(".policyPrimary", "color", "var(--bg)");
+ 
+     // `opacity` composites the whole button — face and label together — over the footer's ground,
+     // which is `--shell` (`.policyFoot`). `tests/support/contrast.ts` takes `#RRGGBB` only, so the
+     // flattening happens here and only the flattened pair reaches the helper.
+     expectDecl(".policyFoot", "background", "var(--shell)");
+ 
+     // The claim the step exists to make: at the alpha the stylesheet DECLARES, neither mode is
+     // below 4.5:1. Read from the block, never transcribed, so moving the declaration moves this.
+-    expect(
+-      ratiosAt(alpha).filter((entry) => Number.parseFloat(entry.split(" ")[1]!) < 4.5)
+-    ).toEqual([]);
++    // The selection is on the RATIO, never on its 2-dp rendering (N1r2; see `ratiosAt`).
++    expect(failingAt(alpha)).toEqual([]);
+ 
+     // And the LADDER the sentence above narrates, executed rung by rung. `.60` is the rung that
+     // fails and is therefore the reason `.65` is pinned; `.70` is the rung whose figure round 1
+     // shipped wrong. A derivation written as prose beside an executable assertion is unexecuted
+     // prose, and this is what that cost.
+-    expect(ratiosAt(0.6)).toEqual(["Terracotta 4.13", "Chamber 6.29"]);
+-    expect(ratiosAt(0.65)).toEqual(["Terracotta 4.79", "Chamber 7.17"]);
+-    expect(ratiosAt(0.7)).toEqual(["Terracotta 5.54", "Chamber 8.09"]);
++    expect(labelsAt(0.6)).toEqual(["Terracotta 4.13", "Chamber 6.29"]);
++    expect(labelsAt(0.65)).toEqual(["Terracotta 4.79", "Chamber 7.17"]);
++    expect(labelsAt(0.7)).toEqual(["Terracotta 5.54", "Chamber 8.09"]);
+ 
+     // `.65` is the SMALLEST 0.05 step that clears 4.5:1 in both modes — the claim the pin rests
+     // on — so the rung below it must fail. Stated as a property, not as a number.
+-    expect(
+-      ratiosAt(0.6).some((entry) => Number.parseFloat(entry.split(" ")[1]!) < 4.5)
+-    ).toBe(true);
++    expect(ratiosAt(0.6).some(([, ratio]) => ratio < 4.5)).toBe(true);
++
++    // THE BLIND WINDOW, executed rather than described (`CODE-REV-S02-C8 r2` N1r2, `t_e7801ab7`).
++    // This is the discriminator between "filter the ratio" and "filter its 2-dp rendering", and
++    // it is the only assertion in this file that can tell them apart: at `alpha = 0.4784`
++    // Chamber's true ratio is 4.498360 — BELOW 4.5, a real AA failure — and it PRINTS as
++    // `"4.50"`. Comparing the printed string lists Terracotta alone; comparing the number lists
++    // both, which is what a reader of a failure message needs. Independently recomputed here
++    // before it was written: Terracotta 2.927853, Chamber 4.498360.
++    expect(labelsAt(0.4784), "the blind window's printed rungs").toEqual([
++      "Terracotta 2.93",
++      "Chamber 4.50"
++    ]);
++    expect(failingAt(0.4784), "a true ratio in [4.495, 4.5) is REPORTED as failing").toEqual([
++      "Terracotta 2.93",
++      "Chamber 4.50"
++    ]);
+   });
+ 
+   it("S02-S65 · no auth-shell ancestor becomes the containing block for the fixed scrim", () => {
+     // The modal is rendered INLINE inside the auth card and relies on `position: fixed` escaping
+     // its ancestors, so none of these seven may declare a property that makes it the containing
+     // block for a fixed descendant. True today; this is what keeps it true. Substring matching
+     // over-includes (`.authCardInner` also matches `.authCard`) and never under-includes, which is
+     // the safe direction for a guard.
+     const shellClasses = [
+       ".appShell",

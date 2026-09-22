@@ -11,7 +11,7 @@ A stranger can mark every step done or not-done with no judgement call. WRONG: "
 
 | Requirement | SPEC sentence (abridged — the SPEC text is authoritative) | PLAN step(s) | Cluster | Acceptance test |
 |---|---|---|---|---|
-| FIX-01-R01 | The `@debateai/obs-capture/runtime` subpath (already declared in `packages/obs-capture/package.json:11`, targe… |  |  |  |
+| FIX-01-R01 | The `@debateai/obs-capture/runtime` subpath (already declared in `packages/obs-capture/package.json:12`, targe… |  |  |  |
 | FIX-01-R02 | When the runtime arms, a real bounded reference queue replaces the installer's drop-everything default; an `em… |  |  |  |
 | FIX-01-R03 | The flusher writes post-redaction envelopes to `obs.occurrence` through the `pg` driver as role `debateai_obs_… |  |  |  |
 | FIX-01-R04 | Spool: only post-redaction envelopes are written, through the installer's pre-opened fd; on the next arm of an… |  |  |  |

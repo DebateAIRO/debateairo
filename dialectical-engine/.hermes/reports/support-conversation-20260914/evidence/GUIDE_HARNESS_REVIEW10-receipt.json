@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW10",
+  "ticket": "t_ef7f6eb6",
+  "runId": 182,
+  "verdict": "REWORK_BOUNDED_FINAL_INVENTORY_BINDING",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "reviewedOn": "2026-09-20T13:27:57.786287Z",
+  "productRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productCheckout": {
+    "headObserved": "152eed4da1cd3e66b74d8301159ba76427552409",
+    "cleanObserved": true
+  },
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "freezeCommit": "5f8191368f72f3b1c37806833f66a32ca9be6361",
+  "finding": {
+    "id": "GH10-R1",
+    "status": "OPEN",
+    "title": "The BIND11 final product inventory is empty",
+    "boundInventory": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL8-manifest.json",
+    "inventoryRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+    "inventoryProductFiles": 0,
+    "consumerEffect": "validateBoundReceiptMembership rejects productFiles.length === 0 before row proof or capture; the pre-request verifier also cannot authenticate the six attested product files from an empty inventory",
+    "proofGap": "run-final-controls validates only the actual manifest revision; the passing membership control uses a synthetic nonempty inventory",
+    "minimumCorrection": "Generate a full current inventory, bind it in a new immutable namespace, and exercise the actual inventory/attestation/suite/proof objects through membership and attested-file hash validation before sealing."
+  },
+  "retainedDispositions": {
+    "suiteBinding": "PASS: 34 unique files; all prior 33 retained; only tests/integration/dev-database-principals.test.ts added; argv complete; maxWorkers=1; no minWorkers",
+    "producerSummary": "PASS AS SEALED INPUT: 34/34 files, 1701 passing tests, 0 failures, 1 TODO",
+    "harnessDelta": "PASS: reviewed FIX9 matrix/verifier/contracts/fixtures retained; only suite count/member and unused GUIDE11 paths changed",
+    "safetyOracles": "PASS RETAINED: all 112 FIX9 control names, 54 rows, API_RECEIVED/parse-null/diagnostic/privacy/source/action/oracle/API-DOM/session/pacing/quota/capacity/no-retry contracts unchanged",
+    "commandsAdapter": "PASS: node --import tsx argv and BIND11 digest pins correct; sealed negative evidence 3/3 with zero importer calls and zero successful rows",
+    "bind10": "PREPARED_NOT_EXECUTED_AWAITING_CORRECTED_PRODUCT; no passing proof",
+    "forgot": "UNRESOLVED_ACTIONLESS"
+  },
+  "controlEvidence": {
+    "indexedInputs": 119,
+    "inputMismatches": 0,
+    "orderedEightDigest": "9b4391fd3e828da6224d9c27600259b2d44be0135c4f5e86c922abc25278303f",
+    "matrixSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+    "preRequestVerifierSha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733",
+    "canonicalControlProofSha256": "c80a6e77554526c37c8017f11072010bfb98331abe7cd9a567465ecd86c1a704",
+    "controls": 112,
+    "passed": 112,
+    "uniqueNames": 112,
+    "sameNamesAsFix9": true,
+    "matrixRows": 54,
+    "adapterNegativePassed": 3,
+    "adapterNegativeTotal": 3,
+    "adapterImporterCalls": 0,
+    "adapterSuccessfulRows": 0,
+    "suiteCurrent": 34,
+    "suitePrior": 33,
+    "suiteAdded": [
+      "tests/integration/dev-database-principals.test.ts"
+    ],
+    "suiteRemoved": [],
+    "futureGuide11PathsCheckedAbsent": 56
+  },
+  "artifacts": [
+    {
+      "role": "report",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW10.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW10.md",
+      "sha256": "5b5534541603785700c2bca347ee1a487abe14c6c7e5c07d68bd53ad6b561e63",
+      "bytes": 4844
+    },
+    {
+      "role": "selfReport",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW10.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW10.md",
+      "sha256": "d19436e25e296431e678c71afb7ff6539c7cf4c3395f34281ae8a3f6e971e288",
+      "bytes": 3347
+    },
+    {
+      "role": "staticCustody",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW10-static-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW10-static-custody.json",
+      "sha256": "ba71ea69fbc47667401037dad0d982339df3887b96319b98f4489892255ff9d2",
+      "bytes": 4413
+    }
+  ],
+  "limits": {
+    "staticOnly": true,
+    "testsRun": false,
+    "heavyLeaseRequested": false,
+    "gitLeaseRequested": false,
+    "gitWrites": false,
+    "runtime": false,
+    "browser": false,
+    "http": false,
+    "database": false,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "readinessClaimed": false,
+    "acceptanceClaimed": false
+  },
+  "selfExclusion": "This receipt excludes itself from artifacts and custody hashes."
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_RECOVER34",
+  "ticket": "t_31c5023f",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "diagnosticStage": "startSupportModelRelay",
+  "status": "PASSED",
+  "outcomeCode": "HERMES_DIAGNOSTIC_READY",
+  "handshakeAttempts": 1,
+  "paidFixedPromptModelAttempts": 1,
+  "supportSessionsCreated": 0,
+  "supportMessagesSent": 0,
+  "timeoutMs": 180000,
+  "preRelayPortFree": true,
+  "postRelayPortFree": true,
+  "failedRuntimeProcessGone": true,
+  "rawStdoutRetained": false,
+  "rawStderrRetained": false,
+  "rawExceptionRetained": false,
+  "credentialOrEnvironmentValuesRetained": false,
+  "startedAtUtc": "2026-09-21T07:55:46.698Z",
+  "completedAtUtc": "2026-09-21T07:56:05.342Z"
+}

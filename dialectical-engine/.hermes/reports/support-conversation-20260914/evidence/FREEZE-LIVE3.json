@@ -1,0 +1,79 @@
+{
+  "at": "2026-09-14T14:57:09.798385+00:00",
+  "ref": "refs/heads/codex/support-conversation-mission",
+  "commit": "95292edad48e479f69a8024a6ade921ef0356b0f",
+  "tree": "3df433f5411736cafd0e53d392dbacddeb2ae235",
+  "parent": "1d6249b1a3eaa853354cad9e8c484f1e5e3acd76",
+  "files": [
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/board-ids.json",
+      "sha256": "669c22978bca31c9cf7c90b1500aee0e4664fe1611dd58ab4229d6b1e2d2e42c"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PROGRESS.md",
+      "sha256": "a97ddc4ca923dd4253949a16df05702c14bcfbcd5028ea48d56623a73b72cbfa"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/LEDGER.md",
+      "sha256": "2dbea1e876351415419849e6aee0979b89532463e21845cb0ac2f295f78845c6"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md",
+      "sha256": "ae06874b32369654e12263161842e7caf19315641b6bcd0506591ceca4762c9c"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/ARCHCHECK.md",
+      "sha256": "663b6d72a61f621214760cf6d496c2e02f6c32a97248968f5d26387854e19113"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/SECDELTA.md",
+      "sha256": "5b3f2ac55291d365fcb5ebd01511ed6ead9cbd8398ccf3f16b870d6e450a735a"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE3.md",
+      "sha256": "3ee68aa6fcfdaf99c3ae6259fcacde6df97d5fb4adcf67dfa3b91a72ed43c2b9"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE3-manifest.json",
+      "sha256": "86442c6e87fb7746548758ed76cac4b3d22726747901111bae34a5b500870b5e"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE3-consumption.json",
+      "sha256": "c63f0b7a430a5beb0632d13939b034adbbb4d1c234c1d465912616aa6cf4c8b8"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE3-stack-receipt.json",
+      "sha256": "837bcf9a5b0b3d17f093966c358438a979a898c6ec8a2b46d2253ab0139fbe9f"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE3-actual-relay-receipt.json",
+      "sha256": "928c5fa840f64fb5125479e0cebbe28322e5a96edef516dcb989a3b40262bc88"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE3-diagnostic-counts.json",
+      "sha256": "6e2905404fbc2188df349fae7c343f6b047e2f5b331d7dbe3e15cd52934fc64c"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/LIVE3.md",
+      "sha256": "63a9ecad5e45f16efe526dc0a8873f5efcbbd47108efda753beb149ff219ce26"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/ASTRA.md",
+      "sha256": "6cad2837e8af0634a14dcf38654f3d05ec13cc9c62afcf2c8cb1a1e0e0a3718d"
+    }
+  ],
+  "source_before": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813",
+    "lane_ref": "43cf9386ea3c9e7c79523ec38debe63271d19292"
+  },
+  "source_after": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813",
+    "lane_ref": "43cf9386ea3c9e7c79523ec38debe63271d19292"
+  },
+  "private_index_removed": true,
+  "tested": "metadata only; no product tests; LIVE3 completed as functional blocker; ARCHCHECK and SECDELTA not yet dispatched"
+}

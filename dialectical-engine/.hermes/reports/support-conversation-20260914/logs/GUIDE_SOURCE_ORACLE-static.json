@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_SOURCE_ORACLE",
+  "reviewedOn": "2026-09-17T18:31:19Z",
+  "verdict": "SCOPED_SOURCE_POLICY_AMENDMENT_REQUIRED",
+  "revision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "harnessSha256": "4768a8b5296ca5838fa6e2588be5cebc537b2613513239e434f0cd60bd7c7c9e",
+  "matrixSha256": "4614aae275462568eed6277c78193d252c441cd47c28bd37021de4d43ba91957",
+  "scope": [
+    {
+      "sequence": 7,
+      "family": "home-library",
+      "mode": "full",
+      "language": "ro",
+      "prompt": "Unde găsesc dezbaterile mele și biblioteca publică?"
+    },
+    {
+      "sequence": 8,
+      "family": "home-library",
+      "mode": "compact",
+      "language": "en",
+      "prompt": "Where do I find my debates and the public debate library?"
+    }
+  ],
+  "sourcePolicy": {
+    "requiredSourceIds": [
+      "app-navigation"
+    ],
+    "allowedSourceIds": [
+      "app-navigation",
+      "browse-public-debates"
+    ],
+    "acceptedDraftOrder": "either",
+    "recoverySourceIds": [
+      "app-navigation"
+    ],
+    "forbiddenForTheseRows": [
+      "getting-started-debate"
+    ]
+  },
+  "sourceFacts": {
+    "app-navigation": {
+      "coverage": "completeCompoundMenuAndPrivateListLimit",
+      "en": {
+        "articleSha256": "a92e96c24c3df6d7a9b3e73a3fafde79321cd7445612588024ea205fb5c6e6db",
+        "modelProjectionSha256": "3f17d7323fcd88f34b6f9f1a4da904b0da28a18a09f6fa7f814e6333f4b83b29",
+        "fallbackSha256": "4264551f61745540e92932ee99a99405152e94edf8b167e0ee19c5463526411d"
+      },
+      "ro": {
+        "articleSha256": "a6f79cd55e0856780bff01ec3134df02a068b41453f44a8847c5c58050af8a23",
+        "modelProjectionSha256": "04001a0ddc6b3f743946fec81d2d3d5caed672f5f14d430eb3af74dc1421e3a3",
+        "fallbackSha256": "e6a00272d90624b8367c54d60b8ecad42ee69ddf8155729b972eb8463a2d1cde"
+      }
+    },
+    "browse-public-debates": {
+      "coverage": "supplementalPublicCatalogHalfOnly",
+      "en": {
+        "articleSha256": "8059a2e46af231765a80f61854752aa5a9ec49e60c95dc715eb3e82a39618fad",
+        "modelProjectionSha256": "c5c6d262a33abda6c4cf76024cfaa5f42c2b51f2e3242ae3ed3d3bf157ba1034",
+        "fallbackSha256": "c5294a4cae6fc88b300ec64634fbbb2531e7eef783bed814f387834804f21bb6"
+      },
+      "ro": {
+        "articleSha256": "0fb2aa501c0980af4afb52520c10e51ca0814266bd2258b1f727fa52d16e0241",
+        "modelProjectionSha256": "87cb63222b2a74f1c75e4d25c28e69e35de0673049d4be055f7de201459e0897",
+        "fallbackSha256": "37bd679ea02946cbdcf7948c7d1345376592335f4e8bde3b2e78adf339e0f40d"
+      }
+    },
+    "getting-started-debate": {
+      "coverage": "unrelatedDebateCreationForm"
+    }
+  },
+  "positiveCases": [
+    {
+      "origin": "MODEL_ACCEPTED_DRAFT",
+      "sourceIds": [
+        "app-navigation"
+      ]
+    },
+    {
+      "origin": "MODEL_ACCEPTED_DRAFT",
+      "sourceIds": [
+        "app-navigation",
+        "browse-public-debates"
+      ]
+    },
+    {
+      "origin": "MODEL_ACCEPTED_DRAFT",
+      "sourceIds": [
+        "browse-public-debates",
+        "app-navigation"
+      ]
+    },
+    {
+      "origin": "REVIEWED_FALLBACK",
+      "sourceIds": [
+        "app-navigation"
+      ]
+    }
+  ],
+  "negativeCases": [
+    {
+      "sourceIds": [
+        "browse-public-debates"
+      ],
+      "reason": "omits complete source for Your debates/private-list limitation"
+    },
+    {
+      "sourceIds": [
+        "getting-started-debate"
+      ],
+      "reason": "creation-form source is unrelated"
+    },
+    {
+      "sourceIds": [
+        "app-navigation",
+        "getting-started-debate"
+      ],
+      "reason": "unrelated admitted context source must not be cited"
+    },
+    {
+      "origin": "REVIEWED_FALLBACK",
+      "sourceIds": [
+        "browse-public-debates"
+      ],
+      "reason": "partial fallback does not answer compound prompt"
+    }
+  ],
+  "uncertainty": "No response bytes for sequence7 survived; this static disposition does not identify the prior runtime predicate or cause.",
+  "activity": {
+    "tests": 0,
+    "probes": 0,
+    "browser": 0,
+    "http": 0,
+    "database": 0,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "gitActions": 0
+  },
+  "adjacentFallbackDisposition": {
+    "sequence7": {
+      "productionContextFirst": "browse-public-debates",
+      "productionRecoveryFallbackSha256": "37bd679ea02946cbdcf7948c7d1345376592335f4e8bde3b2e78adf339e0f40d",
+      "coverageDisposition": "FAILS_COMPOUND_TWO_MENU_CONTRACT_IF_RECOVERY_BRANCH_RUNS",
+      "preRequestVerifierSelected": "app-navigation",
+      "preRequestVerifierFallbackSha256": "e6a00272d90624b8367c54d60b8ecad42ee69ddf8155729b972eb8463a2d1cde",
+      "bindingMismatch": true,
+      "actualLiveBranch": "UNKNOWN_RESPONSE_NOT_PRESERVED"
+    },
+    "sequence8": {
+      "productionContextFirst": "app-navigation",
+      "preRequestVerifierSelected": "app-navigation",
+      "bindingMismatch": false
+    },
+    "minimumFollowOn": "Production recovery and pre-request verifier consume the same declared recoverySourceIds=[app-navigation] policy for rows7/8; add both-language controls including supplemental source ranked first."
+  }
+}

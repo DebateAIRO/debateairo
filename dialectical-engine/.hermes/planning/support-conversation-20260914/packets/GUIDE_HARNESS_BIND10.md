@@ -1,0 +1,25 @@
+# PACKET GUIDE_HARNESS_BIND10 — reviewed harness binding at corrected product
+
+Read FIRST this packet then /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md. Resume original Sol /root/preview; retained worker/verification BODY skills. Read assigned ticket/comments before claim; no subdelegation.
+
+## 1. Node
+- seat: GUIDE_HARNESS_BIND10; ticket: t_f694e6ed; model: gpt-5.6-sol; rework rounds: max 3 under owner continuation.
+- cwd: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine; exact clean revision: 78988fc2e5e24595bd9cd6ec0a3965c6039dc718; inputs: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND10-inputs.json.
+- self-report: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_BIND10.md (new).
+
+## 2. Contract
+- allowed: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND10/ (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_BIND10/ (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND10.md (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND10- (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_BIND10- (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_BIND10.md (new).
+- forbidden: product/KB/Git/prior harness or evidence edits; actual capture/runtime/lifecycle/HTTP/DB/Support/model/status/capacity calls; private logs/records; owner questions/acceptance. No actual GUIDE10 outputs in this node. Do not read or export private ongoing stack log.
+- verification: no heavy initially. Read/copy/bind first; request sole heavy for exact syntax and retained inert controls plus final row proofs. No heavy before root transfer. No product/Git lease. Clean primary before/after, strict sealed receipts.
+
+## 3. Work
+Copy the separately reviewed FIX9 harness and row-proof adapter into allowed new namespace. Bind them to final product 78988fc2e5e24595bd9cd6ec0a3965c6039dc718, author FINAL7/snapshot/required-suite receipts, retained44KB and same reviewed semantics; choose unused actual GUIDE_LIVE_GUIDE10 namespace. Old FIX9 bytes and GUIDE9 partials remain immutable. Inspect all path/revision/receipt/expected-suite bindings; change only those required by this exact product correction and namespace. Preserve all112 control purposes, adapter3, fixed API_RECEIVED stage/field enums/parse-null semantics, strict context/source/branch/API-DOM equality, actual-navigation/session isolation/pacing/capacity checks, matrix54 bytes, expected outcomes and sources. No new generic rewrite or favorable oracle changes.
+
+Only mechanical rebinding is authorized. If the changed product port requires a harness fixture binding adjustment, report exact producer and required change before implementation. Do not retain assertions against a removed production symbol or invent substitute. Build/seal an exact final control proof and ordered-eight digest at new revision; retain111+parse boundary112/112 and all54 row proof. Validate new evidence path absence without writing actual output. Reuse invocation lesson: node --import tsx with actual adapter arguments gatePath,expectedRevision,outputPath; capture takes gatePath. Write the exact fully resolved commands in README, no guessed CLI. Actual later gate will be root's16keys plus fresh2capacity keys; no freshness or runtime assertion in this inert node.
+
+Return exact allowed diff from FIX9, new paths/digest/proof and retained controls. Root will route separate original baseline review then supported owned runtime reload and one actual54 capture under later tickets. No actual GUIDE10 attempt, no quota read and no testability claim here.
+
+## 4. Handoff
+Self-report question verbatim:
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
+Return SKILLS LOADED, ticket/session/revision/verdict, exact binding diff, controls/counts, preserved failures, proof/digest and receipt node/ticket/revision/verdict/artifacts absolute/sha256/bytes excluding itself. Release heavy if held. No self-close, readiness or acceptance. Forgot unresolved/actionless; CP2 gated.

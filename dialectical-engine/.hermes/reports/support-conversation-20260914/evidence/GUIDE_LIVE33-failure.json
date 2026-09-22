@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE33",
+  "ticket": "t_843ad231",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "FAILED_PREFLIGHT_UI_OUTPUT_MODE_ZERO_SUPPORT",
+  "observedAtUtc": "2026-09-21T11:32:20.397773Z",
+  "operatorExit": 1,
+  "phaseStatuses": {
+    "preflight": 1,
+    "readiness": "NOT_RUN",
+    "capacity": "NOT_RUN",
+    "gate": "NOT_RUN",
+    "rowProof": "NOT_RUN",
+    "capture": "NOT_RUN",
+    "idle": "NOT_RUN"
+  },
+  "failureCode": "GUIDE_LIFECYCLE_OWNED_FILE_INVALID",
+  "failureStage": "PREFLIGHT_UI_COMPLETE",
+  "modeMismatch": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTINUATION_UI_PROOF-run-LIVE33.json",
+    "expected": "0600",
+    "actual": "0644"
+  },
+  "uiProof": {
+    "completed": true,
+    "createSessionAttempts": 0,
+    "messageAttempts": 1,
+    "syntheticIntercepted": true,
+    "forwardedDynamicRequests": 0
+  },
+  "counts": {
+    "forwardedSupportRequests": 0,
+    "modelRequests": 0,
+    "statusReads": 0,
+    "databaseQueries": 0,
+    "capacityReads": 0,
+    "sessionsCreated": 0,
+    "actualMessagesSent": 0,
+    "apiReplies": 0,
+    "capturedRows": 0
+  },
+  "outputs": {
+    "prerequisite": true,
+    "stop": true,
+    "uiProof": true,
+    "preflight": false,
+    "capacity": false,
+    "gate": false,
+    "rowProof": false,
+    "capture": false,
+    "actualGuide24": false,
+    "composed31": false
+  },
+  "runtime": {
+    "pid": 9800,
+    "pgid": 9800,
+    "detached": true,
+    "readinessPhaseRun": false
+  }
+}

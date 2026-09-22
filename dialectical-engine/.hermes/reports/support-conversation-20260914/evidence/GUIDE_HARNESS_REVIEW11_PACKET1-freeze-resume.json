@@ -1,0 +1,47 @@
+{
+  "at": "2026-09-20T13:43:33.599834+00:00",
+  "commit": "f1baf9e7420f9a7466e65a32a633839af903c400",
+  "parent": "615092fe669b93ff83d8bd9e2d45a47ef2d3bdc2",
+  "tree": "c7a25493d72b2f2c9959b718829e10fcadf612f8",
+  "records": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/tooling/prepare-inventory-review.py",
+      "sha256": "74fe3f5ba0d782a53d0ee2870379ddaf0685e2b8f81bc9222ca51d2520b72f41",
+      "bytes": 4273
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/GUIDE_HARNESS_REVIEW11.md",
+      "sha256": "26992414c7f1dfba1677a9110ae2783972694f344fa32aa4f32e74d5392abad1",
+      "bytes": 3815
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW11-inputs.json",
+      "sha256": "66d47cb1a994ea222fc808c7f8589fc1036b0e18364b71cb23b0055bcd2eeca5",
+      "bytes": 28014
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW11-freeze-resume.json",
+      "sha256": "d171dea5beb38ef1dd30c836e96a8a272575f2926c8ea60efbf4b27f0bc7229d",
+      "bytes": 30481
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/LEDGER.md",
+      "sha256": "4802de90574a527e6467194504aa9bb8b2568f908712ff7e61762a77b7005392",
+      "bytes": 127745
+    }
+  ],
+  "before": {
+    "head": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19",
+    "productRef": "152eed4da1cd3e66b74d8301159ba76427552409"
+  },
+  "after": {
+    "head": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19",
+    "productRef": "152eed4da1cd3e66b74d8301159ba76427552409"
+  },
+  "privateIndexRemoved": true,
+  "historicalIntakeGap": "unverified; no broader continuity claim"
+}

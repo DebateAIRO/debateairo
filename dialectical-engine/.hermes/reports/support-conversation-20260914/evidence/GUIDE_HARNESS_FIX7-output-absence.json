@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX7",
+  "checkedAfterInertFrame": true,
+  "actualReceipt": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE7-actual-receipt.json",
+    "exists": false
+  },
+  "screenshots": {
+    "pattern": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE7-row-01..54.png",
+    "count": 0,
+    "names": []
+  },
+  "browserProfile": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX7/browser-profile",
+    "exists": false
+  },
+  "result": "PASS"
+}

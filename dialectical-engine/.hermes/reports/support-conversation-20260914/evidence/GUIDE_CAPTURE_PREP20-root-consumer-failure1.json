@@ -1,0 +1,8 @@
+{
+  "at": "2026-09-20T23:21:22.357438+00:00",
+  "consumerExit": 1,
+  "reason": "KeyError preparationBase; flat author receipt omits field, exact value exists in receipt-bound manifest",
+  "dependentBindingExit": 1,
+  "dependentReason": "Missing consumption; aborted before ticket creation",
+  "correction": "Read exact manifest SHA43cb0c... and assert frozen input base equality; do not mutate author receipt."
+}

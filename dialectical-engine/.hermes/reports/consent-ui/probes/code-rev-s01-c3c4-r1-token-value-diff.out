@@ -1,0 +1,31 @@
+MISMATCH --ok-bg
+    light   got='#E6ECE2'                      want='rgba(62,122,78,0.1)'
+    chamber got='#2A2E24'                      want='rgba(134,181,141,0.14)'
+    10b tag pill bg, Essential      (mkCat tagBg)
+MISMATCH --ok-border
+    light   got='#ADC5AF'                      want='rgba(62,122,78,0.4)'
+    chamber got='#4F654F'                      want='rgba(134,181,141,0.5)'
+    10b tag pill border, Essential  (mkCat tagBorder)
+MISMATCH --gold-bg
+    light   got='#F3ECE0'                      want='rgba(168,130,62,0.1)'
+    chamber got='#342A1B'                      want='rgba(200,160,85,0.14)'
+    10b tag pill bg, Model quality
+MISMATCH --gold-border
+    light   got='#D9C8A9'                      want='rgba(168,130,62,0.4)'
+    chamber got='#705A33'                      want='rgba(200,160,85,0.5)'
+    10b tag pill border, Model quality
+ok       --muted-bg       = rgba(110,103,92,.1)          | rgba(156,144,122,.14)
+ok       --muted-border   = rgba(110,103,92,.4)          | rgba(156,144,122,.5)
+ok       --ok-edge        = rgba(62,122,78,.55)          | rgba(134,181,141,.55)
+ok       --ok-soft        = rgba(62,122,78,.28)          | rgba(134,181,141,.35)
+ok       --scrim          = rgba(10,8,6,.42)             | rgba(10,8,6,.42)
+MISMATCH --shadow-thumb
+    light   got='0 1px 4px rgba(0,0,0,.3)'     want='0 1px 3px rgba(0,0,0,.3)'
+    chamber got='0 1px 4px rgba(0,0,0,.3)'     want='0 1px 3px rgba(0,0,0,.3)'
+    10b knob box-shadow (turn-10:121)
+ok       --r-dot          = 50%                          | 50%
+ok       --r-tab          = 0 0 5px 5px                  | 0 0 5px 5px
+ok       --r-panel        = 16px                         | 16px
+ok       --r-pill         = 999px                        | 999px
+
+TOKEN VALUE MISMATCHES vs the design's own formulas: 5

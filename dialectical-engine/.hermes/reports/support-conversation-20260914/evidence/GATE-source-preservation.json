@@ -1,0 +1,9 @@
+{
+  "measuredAt": "2026-09-14T12:56:56.875591+00:00",
+  "sourceHead": "446c685e977104ecf2b0b5ee0519f7123968429f",
+  "sourceStagedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "sourceUnstagedSha256": "606ad70f5e8b852724469816ca922d5685a4117668daeeed1a4d740b8988035e",
+  "matchesOriginalFingerprints": true,
+  "statusEntriesCurrent": 157,
+  "note": "Source HEAD and complete tracked index/working diff byte hashes preserved. Mission-generated administrative files are separate; this check is not a fresh inventory of all unrelated untracked bytes."
+}

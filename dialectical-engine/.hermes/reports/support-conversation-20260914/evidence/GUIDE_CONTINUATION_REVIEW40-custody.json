@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CONTINUATION_REVIEW40",
+  "ticket": "t_b17abb68",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "freeze": "abe278bcc16c011ae3793c28f45fad01fabf4e1a",
+  "authorReceiptSha256": "7a6b277e59ea2e835de2277f75b30f89c51de5afdefadcea2b35d42635de8fdc",
+  "consumptionSha256": "77c379c40ddf58e9538795649ef869fa321b061502863c885441dc39f2e88812",
+  "commandContractSha256": "8b8a25888415c79381aa195d601b2cf2aaf1401ce830abaa5d84a608630bdcea",
+  "operatorSha256": "6bcbb323a3a26efe75cc6626bf4e0574229f948634df21786b4d4309282ebe8e",
+  "compositionContractSha256": "ec7b16bf9f5a64d28358bffd7d4456614cf22888609d615a31909c34c59a76ef",
+  "captureImplementationSha256": "4f6f30a5daa2f60d1087bd9f5210eab0ea3e049c508ba6df1df3e9bb2f9868a6",
+  "screenshotHelperSha256": "10a806c50999a84f3a036375807ef29a29c92ef6368047ec4e14c28af148b3be",
+  "uiProofSha256": "d2661f9902ea1b98a4a8ac2da19669def517ff86efa3ff83e2a35610f816bb96",
+  "retainedArtifactCount": 31,
+  "retainedArtifactMismatches": 0,
+  "futurePathCount": 115,
+  "futurePathsAbsent": 115,
+  "operationalTraffic": 0
+}

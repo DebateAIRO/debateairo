@@ -1,0 +1,19 @@
+# GUIDE_HARNESS_BIND21
+
+Final product `456cafb9e56a737de550570b5736ec52d79ddf48`, KB `7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af`. This append-only successor corrects only the UI private-control field and simultaneous/deferred session semantics.
+
+Run these literal phases in order:
+
+1. `/Users/vladmihaimiron/.local/bin/node /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND21/phase-preflight.mjs /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND21-command-contract.json`
+2. `/Users/vladmihaimiron/.local/bin/node /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND21/phase-readiness.mjs /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND21-command-contract.json`
+3. `/Users/vladmihaimiron/.local/bin/node /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND21/phase-capacity.mjs /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND21-command-contract.json`
+4. `/Users/vladmihaimiron/.local/bin/node /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND21/phase-gate.mjs /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND21-command-contract.json`
+5. `/Users/vladmihaimiron/.local/bin/node /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND21/phase-row-proof.mjs /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND21-command-contract.json`
+6. `/Users/vladmihaimiron/.local/bin/node /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND21/phase-capture.mjs /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND21-command-contract.json`
+7. `/Users/vladmihaimiron/.local/bin/node /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND21/phase-idle.mjs /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND21-command-contract.json`
+
+The fresh capture gate requires five currently free hourly sessions. The two owner sessions are deferred and measured separately after capture. Capture still reserves 37 daily anonymous messages and 33 daily model calls, covering 31+6 messages and 27+6 model calls.
+
+Later owner-capacity invocation: `/Users/vladmihaimiron/.local/bin/node /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND21/owner-capacity.mjs 456cafb9e56a737de550570b5736ec52d79ddf48 7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-owner-capacity.json`. It is not executed here and requires no more than six messages and two sessions.
+
+Runtime7 custody and the private `GUIDE_LIVE20-stack.log` are reused. All operational outputs use fresh LIVE21 / LIVE_GUIDE21 names. Forgot remains unresolved/actionless.

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "phase": "PRETRAFFIC",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "contractSha256": "ff16afdb6f2a5bbc227818df0629c6817213d42595b8fa8814c1670bd2edf659",
+  "checkedAbsent": 143,
+  "present": [],
+  "ui": {
+    "verdict": "PASS_ZERO_SUPPORT_UI_TRANSITIONS",
+    "transitions": 5,
+    "actualSupportRequestsForwarded": 0
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_FIX30",
+  "ticket": "t_ce9f0dca",
+  "nativeSession": "/root/preview",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+  "verdict": "PASS_COMPLETE_FULL_ANSWER_CAPTURE",
+  "usage": "UNAVAILABLE",
+  "productEdits": 0,
+  "gitEdits": 0,
+  "finding": "pane-only expansion left supportDesk overflow clipping active; PNG dimensions did not prove painted completeness",
+  "correction": "expand and restore the actual current-article ancestor chain, viewport and scroll state; prove painted top/footer/source/action influence",
+  "controls": {
+    "screenshotCases": 4,
+    "negativeCases": 12,
+    "supportAttempts": 0,
+    "bindingPassed": 34,
+    "bindingTotal": 34,
+    "successRestoration": true,
+    "exceptionRestoration": true
+  },
+  "visualInspection": {
+    "image": "full-ro-long-complete.png",
+    "sha256": "abdeeab4d41d685bf0571d3e6f770e74ded82065120de02dc12e9a46bdc286b6",
+    "completeAnswer": true,
+    "source": true,
+    "action": true
+  },
+  "retained": {
+    "full58Sha256": "1b5d7b296d5b5981d6391ebba27e8a35e03a0cd20cb671c7cf799494ee999520",
+    "liveNamespace": "LIVE29/GUIDE22",
+    "notBeforeUtc": "2026-09-21T03:21:15.789581Z"
+  },
+  "traffic": {
+    "runtime": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "limitations": [
+    "separate baseline review and operational LIVE29 remain pending",
+    "Forgot password remains unresolved/actionless",
+    "no typecheck claim"
+  ]
+}

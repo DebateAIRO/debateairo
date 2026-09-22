@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_RUNTIME_DIAG",
+  "ticket": "t_adf8b571",
+  "session": "/root/requirements",
+  "revision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "verdict": "INSUFFICIENT_RUNTIME_OBSERVATION_HARNESS_GAP_PROVED",
+  "provedFacts": [
+    "sequence 7 reached safe API projection, visible public reply, fixed diagnostic, and passed API-DOM equality",
+    "one of five compound MODEL result checks failed",
+    "capture asserted before row append and checkpoint"
+  ],
+  "missingEvidence": [
+    "httpStatus",
+    "outcome",
+    "publicResponseText",
+    "sourceIds",
+    "actionIds",
+    "diagnostic",
+    "responseOrigin",
+    "failedPredicate"
+  ],
+  "minimalNextScope": {
+    "kind": "NEW_REVIEWED_HARNESS_NAMESPACE",
+    "productPatchAuthorized": false,
+    "liveRetryAuthorized": false,
+    "requirements": [
+      "pre-assert safe failure checkpoint",
+      "closed predicate-specific errors",
+      "final public response plus public source/action projections only",
+      "fixed diagnostic enums/counts only",
+      "inert privacy and failure-persistence controls"
+    ]
+  },
+  "retainedProtections": [
+    "GUIDE_CORRECTNESS5 finite 28/28",
+    "GUIDE_SECURITY5 finite 18/18",
+    "no raw rejected draft retention",
+    "Forgot unresolved/actionless",
+    "CP2 gated"
+  ],
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME_DIAG.md",
+      "sha256": "52599ce32b883fb48fe0a87e6ec432245b6d3fd35c64535237382e66744be30b",
+      "bytes": 7191
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_RUNTIME_DIAG.md",
+      "sha256": "956878f688a3316dda6460d06f35daa4ebba2db730c0aa46cb9484fefecbf193",
+      "bytes": 2572
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_RUNTIME_DIAG-custody.log",
+      "sha256": "d749341770303295fae4a25efe8259aaea829d6d686ad3c775c835e6ea05e02c",
+      "bytes": 157
+    }
+  ],
+  "productClean": true,
+  "heavyLeaseUsed": false,
+  "gitLeaseUsed": false
+}

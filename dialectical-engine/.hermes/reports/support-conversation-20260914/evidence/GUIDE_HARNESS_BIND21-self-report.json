@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND21",
+  "ticket": "t_cbf4f8f8",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "PASS_CORRECTED_OPERATION_CONTRACT",
+  "model": "gpt-5.6-sol",
+  "session": "01a09f02-346a-7fb0-aa70-0424f1fdd21e",
+  "skills": {
+    "retained": [
+      "superpowers:executing-plans",
+      "superpowers:systematic-debugging",
+      "superpowers:verification-before-completion"
+    ],
+    "reReadThisNode": false
+  },
+  "proofs": {
+    "focusedCorrections": "12/12",
+    "retainedControls": "20/20",
+    "bindingControls": "13/13"
+  },
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "limits": [
+    "Owner capacity invocation prepared but not executed.",
+    "Forgot unresolved/actionless.",
+    "No readiness or acceptance claim."
+  ],
+  "heavyLeaseReleased": true
+}

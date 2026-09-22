@@ -1,0 +1,7 @@
+#!/bin/zsh
+# resume launcher for seat FIX-S03-p3-F1 (Codex Sol) — written 2026-09-16 after the seat's BLOCKED (packet defect: the digest titles' file); started DETACHED from python.
+cd "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/tiers-s03/dialectical-engine" || exit 9
+export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+echo $$ > "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/logs/FIX-S03-p3-F1.pid"
+echo "resume $(date '+%F %T') lane=$(pwd) HEAD=$(git rev-parse --short HEAD) dirty=$(git status --porcelain | wc -l | tr -d ' ')"
+exec caffeinate -s -i codex exec -c model='"gpt-5.6-sol"' -c sandbox_mode='"danger-full-access"' resume 01a0aa32-6b66-70a2-8928-782baa02c056 "UNBLOCKED by the orchestrator — read the two new comments on your ticket first (~/.local/bin/hermes kanban --board debate-tiers show t_85cdfdeb): the RULING amends your allowed list (tests/architecture/register-support-publication.test.ts, its two DIGEST titles only; production-database-principals stays unchanged and is run once as evidence with the §5-1b pair) and the AMENDMENT FROZEN comment names the packet freeze. Then continue exactly where you stopped — your RED→GREEN and mutant logs stand, no re-derivation — through charges 3–6, and post READY on t_85cdfdeb as the packet's handoff section prescribes, opening with SKILLS LOADED. Same laws: nothing on the desktop; never push, merge, mark Done, or touch the main tree, .local/**, the :3000 stack, ports 8790-8796 or the live database." </dev/null

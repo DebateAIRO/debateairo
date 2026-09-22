@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CORRECTNESS9",
+  "ticket": "t_5a730bc3",
+  "session": "/root/plan_review",
+  "baseRevision": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718",
+  "productRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "freezeCommit": "916016c5f5f7f35c95abc1972677251238c94d16",
+  "packetSha256": "fa4910fea129821baa43beef4af1b63a3afd38fe9099284372103784258ff7dc",
+  "authorReceiptSha256": "a8d1f9e53e93c4026f11d297d7f31ff42515a0c1af7a98237342d0d4bcbe3c7c",
+  "authorConsumptionSha256": "21f8e192aab0c9425af642e0509c52821685f62a9c5ecf065dda0eab5dce4604",
+  "verdict": "PASS",
+  "scope": "finite four-file terminal event-lock consumer correction",
+  "commentsReadThrough": 2,
+  "findingDispositions": {
+    "GS8_1_manualHumanRatingDirectCaseBypass": "RESOLVED",
+    "GS8_2_thresholdIncreaseReopening": "RESOLVED",
+    "defaultAndRaisedThresholdRead": "PASS",
+    "raisedThresholdAdmission": "PASS",
+    "directRatingGuard": "PASS",
+    "bothDirectCaseProducers": "PASS",
+    "typedRouteRefusalsAndNoSideEffects": "PASS",
+    "positiveOpenRatingAndCaseControls": "PASS",
+    "thresholdRefusalStorageRestrictedRoleAccountingCooldownStatus": "RETAINED_PASS",
+    "guideCorrectness8UnchangedCaseDisposition": "SUPERSEDED_BY_SECURITY8_AND_CURRENT_EVIDENCE",
+    "principalSourceDerivedCorrection": "RETAINED_PASS_UNCHANGED_BYTES",
+    "unrelatedNavigationPublicKnowledge": "RETAINED_PASS_UNCHANGED_BYTES",
+    "live6FirstException": "UNKNOWN_NOT_ATTRIBUTED"
+  },
+  "verification": {
+    "custody": {
+      "exitCode": 0,
+      "indexedInputsChecked": 67,
+      "indexedInputsMatched": 67,
+      "detachedChangedProductChecked": 4,
+      "detachedChangedProductMatched": 4,
+      "primaryChangedProductChecked": 4,
+      "primaryChangedProductMatched": 4,
+      "changedPathsExpected": 4,
+      "changedPathsMatched": 4
+    },
+    "affectedDatabaseArchitectureFrame": {
+      "exitCode": 0,
+      "testFiles": 5,
+      "testFilesPassed": 5,
+      "passed": 225,
+      "failed": 0,
+      "tsxDisableCache": true,
+      "maxWorkers": 1
+    },
+    "independentTerminalConsumerProbe": {
+      "exitCode": 0,
+      "observations": 4,
+      "passed": 4,
+      "failed": 0,
+      "openPositiveRating": [
+        "yes"
+      ],
+      "defaultReadAfterLock": "LOCKED",
+      "raisedThresholdReadAfterLock": "LOCKED",
+      "raisedThresholdAdmissionAfterLock": "LOCKED",
+      "directHumanRatingAfterLock": null,
+      "ratingCountBeforeAndAfterLockedAttempt": 1
+    },
+    "principalDeclaration": {
+      "entries": 11,
+      "baseSha256": "7d68dd8a2e826ea1da9d8d2fa2555a3458e088710426b8cba3e6cd4f6bb690e8",
+      "finalSha256": "7d68dd8a2e826ea1da9d8d2fa2555a3458e088710426b8cba3e6cd4f6bb690e8",
+      "assertionFileChanged": false
+    },
+    "retainedAuthorEvidence": {
+      "exact34Passed": 1701,
+      "exact34Failed": 0,
+      "exact34Todo": 1,
+      "typecheckExitCode": 1,
+      "typecheckBaselineDiagnostics": 76,
+      "typecheckCurrentDiagnostics": 76,
+      "typecheckByteIdentical": true,
+      "missionAddedDiagnostics": 0,
+      "snapshotEntries": 44,
+      "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+      "initialEvalRetentionClaim": "REJECTED_PRESERVED",
+      "freshStructuralEvalRuns": 3,
+      "freshStructuralEvalPassedPerRun": 60,
+      "freshStructuralEvalApplicablePerRun": 60,
+      "structuralEvalRubric": "PENDING"
+    },
+    "cleanup": {
+      "detachedHeadExact": true,
+      "primaryHeadExact": true,
+      "detachedDirty": 0,
+      "primaryDirty": 0,
+      "temporaryLinksPresent": 0,
+      "heavyLeaseReleased": true
+    }
+  },
+  "preservedFailures": [
+    "GUIDE_SECURITY8 GS8-1 manual/human/direct-case bypass at 78988fc2",
+    "GUIDE_SECURITY8 GS8-2 threshold increase reopening at 78988fc2",
+    "author direct createCaseOnce RED opened from physical OPEN plus immutable LOCK",
+    "author corrected route RED observed read OPEN, rating/manual/message 200/201/200, rating +1 and cases +2",
+    "author first combined RED also contained a preserved test-fixture ReferenceError",
+    "author initial evaluation-retention claim was rejected and preserved before fresh final evaluation"
+  ],
+  "limits": [
+    "no unbounded concurrency audit",
+    "LIVE6 HTTP500 first exception remains unobserved and unattributed",
+    "no full34, typecheck, or structural evaluation rerun by reviewer",
+    "no browser, preview, actual Support, model, status, capacity, or live traffic",
+    "no broad corpus or language audit; full actual54 remains required",
+    "Forgot-password destination remains unresolved and actionless; CP2 remains gated",
+    "no runtime readiness, checkpoint, or owner acceptance claim"
+  ],
+  "skillsLoaded": [
+    "using-superpowers",
+    "heartbeat-protocol",
+    "receiving-code-review",
+    "heartbeat-worker",
+    "test-driven-development",
+    "systematic-debugging",
+    "verification-before-completion"
+  ],
+  "usage": "UNAVAILABLE",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_CORRECTNESS9.md",
+      "sha256": "9c9091d18d25bc08e85eced79fc21b7c71ae9eba67036ed8e33b29378f84b1c6",
+      "bytes": 5926
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_CORRECTNESS9.md",
+      "sha256": "0b15daa8035cbdfe5b87476a99e3aa7897d432e8c69810a433b9688324ff79e3",
+      "bytes": 4633
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CORRECTNESS9/custody.py",
+      "sha256": "2181172eb5d22db45458aaf3a72be289137eb46922509bd49b7f4d6dab548c68",
+      "bytes": 3362
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CORRECTNESS9/terminal-lock-consumers.mts",
+      "sha256": "23a2bef824c9ed09cbb599e3a8d377c584c6547d3efb97fd1bb49c6e64fc2cb9",
+      "bytes": 3715
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS9-input-custody.log",
+      "sha256": "4cabeba5e71ff675f6d31e0b98e29394fbfaf018f6e728e2806a5747ddc8b9ff",
+      "bytes": 1060
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS9-affected-db-tests.log",
+      "sha256": "be4d5783b5b1161f60a3e9032300ccdad342af59a1b4bb2d5a667e879792487b",
+      "bytes": 71535
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS9-terminal-lock-consumers.log",
+      "sha256": "6d01e059ef0118bfa8d9ffb24b7fa9effa2fd4c41a9b7d9054985b3b64afb327",
+      "bytes": 4030
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS9-cleanup-custody.log",
+      "sha256": "4cabeba5e71ff675f6d31e0b98e29394fbfaf018f6e728e2806a5747ddc8b9ff",
+      "bytes": 1060
+    }
+  ],
+  "receiptExcludesSelf": true,
+  "measuredAt": "2026-09-20T13:20:36Z"
+}

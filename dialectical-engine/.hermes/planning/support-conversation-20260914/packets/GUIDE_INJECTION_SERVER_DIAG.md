@@ -1,0 +1,25 @@
+# PACKET GUIDE_INJECTION_SERVER_DIAG — actual HTTP500 refusal-path diagnosis
+
+Read FIRST this packet then /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md. Resume original Sol /root/requirements; assigned ticket/comments before claim. Retain actual BODY worker and systematic-debugging floor; no subdelegation.
+
+## 1. Node
+- seat: GUIDE_INJECTION_SERVER_DIAG; ticket: t_2ddf3990; model: gpt-5.6-sol; rework rounds: max 3 under owner continuation.
+- cwd: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine; exact clean revision: 0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13; inputs: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_SERVER_DIAG-inputs.json.
+- self-report: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_INJECTION_SERVER_DIAG.md (new).
+
+## 2. Contract
+- allowed: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_SERVER_DIAG.md (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_SERVER_DIAG- (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_SERVER_DIAG- (new, bounded static custody); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_INJECTION_SERVER_DIAG.md (new).
+- forbidden: product/KB/harness/Git/predecessor edits; actual browser/runtime/HTTP/status/capacity/DB/Support/model/lifecycle requests; private logs/records, credentials or unprojected response bytes; owner questions/acceptance.
+- verification: read-only static exact-producer diagnosis and sealed fixed observation. No heavy/Git. If a precise offline discriminator or safe closed-code projection is necessary, report its exact command/scope/producer before running; root routes a bounded lease/amendment. Do not perform a broad audit or new live sample.
+
+## 3. Work
+LIVE6 sent15 messages, completed14 and stopped on execution15/canonical43, the same frozen full Romanian injection request. New reviewed FIX9 observation preserved API_RECEIVED with HTTP500, outcome UNKNOWN, body OBJECT/status VALID/outcome UNKNOWN/text INVALID/sources ABSENT/actions ABSENT, failure GUIDE_HARNESS_API_OUTCOME_INVALID. The exact failed body and runtime diagnostic were not persisted. This establishes an actual server error for that request; it does not establish an exception cause. Old LIVE4 lost response stays unknown and is not explained retrospectively.
+
+Trace the exact current deterministic injection route producer and every side effect it invokes before its reply, plus the fixed server error serialization. Reuse your previous injection diagnosis's exact producer/UI trace, but distinguish its now-corrected legacy decoration mismatch from this HTTP500. Inspect supported role/schema/service/error contracts and tests only as implicated by that concrete branch. Consider actual cumulative session context only where code/evidence supports it; do not guess from the 15th position. Identify what can produce this response shape/status and whether current code proves a defect or only a set of candidates. Do not infer raw exception/error strings or inspect real private data. If static evidence is insufficient, name the smallest exact controlled producer/sink or role discriminator needed, with synthetic inputs and no real Support/model traffic. A failure-observation improvement is justified only if required to establish cause, not a speculative rewrite.
+
+Return an evidence-led disposition with exact source locations, what is proved versus unknown, minimum fix surface and affected meaningful validation/review. No product or harness patch in this node. Preserve normal quotas, current model, public-only authority and healthy20420 runtime. Do not read or export the ongoing private GUIDE_LIVE5-stack.log; a later explicitly scoped fixed-code projection would require its producer and safe output schema first. Failed GUIDE9 actual receipt and14screens remain immutable.39rows unattempted,40unfinished including failed canonical43; no complete guide testability, no CP1 acceptance, Forgot unresolved/actionless, CP2 gated.
+
+## 4. Handoff
+Self-report question verbatim:
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
+Return SKILLS LOADED, ticket/session/revision/verdict, exact static facts/unknowns and minimal next step. Receipt node/ticket/revision/verdict/artifacts absolute/sha256/bytes excluding itself. No self-close, readiness or acceptance.

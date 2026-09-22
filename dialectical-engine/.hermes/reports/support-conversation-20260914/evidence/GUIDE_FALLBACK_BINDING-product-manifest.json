@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FALLBACK_BINDING",
+  "ticket": "t_97987e3c",
+  "baseRevision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "finalRevision": "5731eb6faac25f9712f04aea029a021f6eee9352",
+  "productFiles": [
+    {
+      "laneRelative": "apps/api/src/support/answer.ts",
+      "sha256": "8c8c3ab5baa778da342a41ae84c8d81eab7540dc578250fbebbfbbc0fa48e968",
+      "bytes": 22908
+    },
+    {
+      "laneRelative": "packages/support-kb/src/catalog.ts",
+      "sha256": "3f4936b4baeeba5a9bb33ccb88a7a7f9c2432702d756b62a61d7d7ae3827c30c",
+      "bytes": 16980
+    },
+    {
+      "laneRelative": "packages/support-kb/src/context.ts",
+      "sha256": "41a13bb84f21d2eeedda35cc9872948ba278127205235cdefa2eed6edf625603",
+      "bytes": 24874
+    },
+    {
+      "laneRelative": "packages/support-kb/src/index.ts",
+      "sha256": "5f8659e4b7a8920dfcc70389fce3f4ff696817d618dc4f34bee0e6948c457d2e",
+      "bytes": 27563
+    },
+    {
+      "laneRelative": "packages/support-kb/src/recovery.ts",
+      "sha256": "1909e352ac5554b361d79122d6638d337910b26e5eccffc190097489342701c1",
+      "bytes": 6887
+    },
+    {
+      "laneRelative": "tests/architecture/support-catalog-coverage.test.ts",
+      "sha256": "e462c567020fecb68b2efaaf4147439afc6cbb9981ad880f5207979e1023a981",
+      "bytes": 6805
+    },
+    {
+      "laneRelative": "tests/unit/support-answer-context.test.ts",
+      "sha256": "f700f703bd110a6746d551cea59750eedf46f009d8a094c94579a3f2b94edbe3",
+      "bytes": 34324
+    },
+    {
+      "laneRelative": "tests/unit/support-context.test.ts",
+      "sha256": "fbf01f486c211ea8cac2f995c12f3572670a54eeac6373e053045a65fd114e56",
+      "bytes": 33493
+    },
+    {
+      "laneRelative": "tests/unit/support-recovery-components.test.ts",
+      "sha256": "0062ab4fe36f516571a5e738585944132b5ffd502e1fb90d721d39a2f79d1a53",
+      "bytes": 11595
+    }
+  ],
+  "scopeExact": true,
+  "clean": true,
+  "change": "Compound Your/Public debates navigation now uses one declared required, allowed, and recovery source-set policy across retrieval, draft admission, and fallback selection.",
+  "measuredAt": "2026-09-17T18:55:01.055472Z"
+}

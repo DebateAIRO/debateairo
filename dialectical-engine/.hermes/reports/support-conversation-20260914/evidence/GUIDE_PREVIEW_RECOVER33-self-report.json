@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_RECOVER33",
+  "ticket": "t_21dbe7b0",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "BLOCKED_AUTOREVIEW_PAID_STARTUP_HANDSHAKE",
+  "diagnosis": "DEV_AUTH_STACK_SUPPORT_MODEL_FAILED",
+  "runtime9Started": false,
+  "newStartupModelAttempts": 0,
+  "supportAnswerTraffic": 0,
+  "exactBlocker": "AUTO_REVIEW_EXPLICIT_USER_APPROVAL_REQUIRED_FOR_PAID_ZAI_GLM_HANDSHAKE",
+  "nextStep": "Explicit user approval for up to two paid Z.AI/GLM startup handshakes using the exact fixed prompt and existing local credential; then resume the retained diagnostic before any Runtime9 start.",
+  "report": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREVIEW_RECOVER33.md"
+}

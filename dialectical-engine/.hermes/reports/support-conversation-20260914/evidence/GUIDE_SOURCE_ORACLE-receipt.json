@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_SOURCE_ORACLE",
+  "ticket": "t_c138d2f7",
+  "revision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "sourceRevision": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "harnessSha256": "4768a8b5296ca5838fa6e2588be5cebc537b2613513239e434f0cd60bd7c7c9e",
+  "matrixSha256": "4614aae275462568eed6277c78193d252c441cd47c28bd37021de4d43ba91957",
+  "verdict": "SCOPED_SOURCE_POLICY_AMENDMENT_REQUIRED",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "agentPath": "/root/baseline",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-17T18:31:19Z",
+  "inputCustody": {
+    "manifestSha256": "7efc2f7bdd8399aa0bd56387228a8ef03c0cbe81b750ac86b6e91176c148a02d",
+    "indexed": 72,
+    "matched": 72
+  },
+  "canonicalRows": [
+    {
+      "sequence": 7,
+      "mode": "full",
+      "language": "ro",
+      "family": "home-library",
+      "prompt": "Unde găsesc dezbaterile mele și biblioteca publică?"
+    },
+    {
+      "sequence": 8,
+      "mode": "compact",
+      "language": "en",
+      "family": "home-library",
+      "prompt": "Where do I find my debates and the public debate library?"
+    }
+  ],
+  "sourcePolicy": {
+    "requiredSourceIds": [
+      "app-navigation"
+    ],
+    "allowedSourceIds": [
+      "app-navigation",
+      "browse-public-debates"
+    ],
+    "acceptedDraftOrder": "unconstrainedWithinAllowedSet",
+    "recoverySourceIds": [
+      "app-navigation"
+    ],
+    "forbiddenSourceIds": [
+      "getting-started-debate"
+    ]
+  },
+  "canonicalProof": {
+    "appNavigation": {
+      "authority": "MENU-COVERAGE-v2 home-yours and home-public both map to app-navigation; article covers both plus private-list limitation",
+      "en": {
+        "articleSha256": "a92e96c24c3df6d7a9b3e73a3fafde79321cd7445612588024ea205fb5c6e6db",
+        "modelProjectionSha256": "3f17d7323fcd88f34b6f9f1a4da904b0da28a18a09f6fa7f814e6333f4b83b29",
+        "fallbackSha256": "4264551f61745540e92932ee99a99405152e94edf8b167e0ee19c5463526411d"
+      },
+      "ro": {
+        "articleSha256": "a6f79cd55e0856780bff01ec3134df02a068b41453f44a8847c5c58050af8a23",
+        "modelProjectionSha256": "04001a0ddc6b3f743946fec81d2d3d5caed672f5f14d430eb3af74dc1421e3a3",
+        "fallbackSha256": "e6a00272d90624b8367c54d60b8ecad42ee69ddf8155729b972eb8463a2d1cde"
+      }
+    },
+    "browsePublicDebates": {
+      "authority": "supplemental support for public-catalog half only",
+      "en": {
+        "articleSha256": "8059a2e46af231765a80f61854752aa5a9ec49e60c95dc715eb3e82a39618fad",
+        "modelProjectionSha256": "c5c6d262a33abda6c4cf76024cfaa5f42c2b51f2e3242ae3ed3d3bf157ba1034",
+        "fallbackSha256": "c5294a4cae6fc88b300ec64634fbbb2531e7eef783bed814f387834804f21bb6"
+      },
+      "ro": {
+        "articleSha256": "0fb2aa501c0980af4afb52520c10e51ca0814266bd2258b1f727fa52d16e0241",
+        "modelProjectionSha256": "87cb63222b2a74f1c75e4d25c28e69e35de0673049d4be055f7de201459e0897",
+        "fallbackSha256": "37bd679ea02946cbdcf7948c7d1345376592335f4e8bde3b2e78adf339e0f40d"
+      }
+    },
+    "gettingStartedDebate": {
+      "authority": "unrelated creation-form record; broad context admission is not output authority"
+    }
+  },
+  "positiveCases": [
+    {
+      "origin": "MODEL_ACCEPTED_DRAFT",
+      "sourceIds": [
+        "app-navigation"
+      ]
+    },
+    {
+      "origin": "MODEL_ACCEPTED_DRAFT",
+      "sourceIds": [
+        "app-navigation",
+        "browse-public-debates"
+      ]
+    },
+    {
+      "origin": "MODEL_ACCEPTED_DRAFT",
+      "sourceIds": [
+        "browse-public-debates",
+        "app-navigation"
+      ]
+    },
+    {
+      "origin": "REVIEWED_FALLBACK",
+      "sourceIds": [
+        "app-navigation"
+      ]
+    }
+  ],
+  "negativeCases": [
+    {
+      "sourceIds": [
+        "browse-public-debates"
+      ],
+      "reason": "partial public-half only"
+    },
+    {
+      "sourceIds": [
+        "getting-started-debate"
+      ],
+      "reason": "unrelated creation guidance"
+    },
+    {
+      "sourceIds": [
+        "app-navigation",
+        "getting-started-debate"
+      ],
+      "reason": "unrelated admitted source"
+    },
+    {
+      "origin": "REVIEWED_FALLBACK",
+      "sourceIds": [
+        "browse-public-debates"
+      ],
+      "reason": "partial recovery"
+    }
+  ],
+  "adjacentFallbackDisposition": {
+    "sequence7Production": {
+      "contextFirst": "browse-public-debates",
+      "fallbackSha256": "37bd679ea02946cbdcf7948c7d1345376592335f4e8bde3b2e78adf339e0f40d",
+      "contractResult": "FAIL_IF_RECOVERY_BRANCH_RUNS"
+    },
+    "sequence7PreRequestVerifier": {
+      "selectedExpectedEntry": "app-navigation",
+      "fallbackSha256": "e6a00272d90624b8367c54d60b8ecad42ee69ddf8155729b972eb8463a2d1cde",
+      "differsFromProduction": true
+    },
+    "sequence8": {
+      "contextFirst": "app-navigation",
+      "preRequestSelected": "app-navigation",
+      "differsFromProduction": false
+    },
+    "actualLiveRecoveryUse": "UNKNOWN_RESPONSE_NOT_PRESERVED",
+    "minimumFollowOn": "One declared recoverySourceIds=[app-navigation] policy consumed by production and verifier for rows7/8, plus EN/RO controls including supplemental source ranked first."
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_SOURCE_ORACLE.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_SOURCE_ORACLE.md",
+      "sha256": "f31ac5986f588f1cf00525a93a2c039c80db2405d9a63f84b942362c666bd438",
+      "bytes": 7568
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_SOURCE_ORACLE.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_SOURCE_ORACLE.md",
+      "sha256": "b9fa7a114b84123b7c999ed6239023a7b700b64a909e288823701f8513dc4ac9",
+      "bytes": 2809
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SOURCE_ORACLE-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_SOURCE_ORACLE-custody.json",
+      "sha256": "8c84d83abada006ef6df4c00032f92a87db7c20a563d4697a2479663af5b0a3a",
+      "bytes": 32254
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SOURCE_ORACLE-static.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_SOURCE_ORACLE-static.json",
+      "sha256": "8cc167e5002657c4a14bf91265752ae6d922f29396bb2f37c4a10a556b2a4115",
+      "bytes": 5177
+    }
+  ],
+  "limitations": [
+    "Static bounded authority review only; no tests, probes, runtime, browser, HTTP, database, Support/model request, product/matrix edit, Git or private-data action.",
+    "The missing sequence7 response prevents any claim about which LIVE3 predicate failed or whether recovery ran.",
+    "No other matrix row or KB family was reviewed.",
+    "Forgot remains unresolved/actionless; no preview-readiness, checkpoint-completion, owner-ratification or acceptance claim."
+  ]
+}

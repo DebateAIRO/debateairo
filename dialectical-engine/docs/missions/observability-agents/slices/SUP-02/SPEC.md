@@ -38,8 +38,11 @@ product. The assistant transfers observations, never verdicts about who the user
 A case is opened when ANY of these is true; each is decided by deterministic code before
 or after the model call, never by the model's own judgement:
 E1 the user asks for a person (the button, rating `human`, or a phrase from a fixed
-bilingual list) · E2 the message class is `REFUSE_SAFETY` · E3 a second zone-adjacent
-intent in the same session after a `REFUSE_ZONE` · E4 any tool call outside the frozen
+bilingual list) · E2 the message class is `REFUSE_SAFETY`; its fixed coercion list includes
+exactly `I am being told what to type by someone on the phone` and `Cineva la telefon îmi
+spune ce să scriu` (SUP-01-R05), while any co-occurring zone intent takes precedence as
+`REFUSE_ZONE` · E3 a second zone-adjacent intent in the same session after a `REFUSE_ZONE`
+· E4 any tool call outside the frozen
 registry, or any denied tool call (`BOUNDARY_DENY`) — this also inserts a
 `support.abuse_event` row · E5 two consecutive `no` ratings · E6 two `NO_SOURCE` outcomes in
 one session · E7 a `DEGRADED` outcome followed by another user message · E8 a legal or data

@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW26",
+  "ticket": "t_aeee4ff7",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "verdict": "PASS_CAPTURE_PROOF_DEPENDENCY_FINAL_BINDING",
+  "dispositions": [
+    {
+      "id": "GH26-C1",
+      "subject": "row-proof producer status",
+      "disposition": "PASS",
+      "evidence": "Wrapper publishes status0/null-signal/current revision+KB+gate/result hashes only after exact58 validation."
+    },
+    {
+      "id": "GH26-C2",
+      "subject": "independent capture consumption",
+      "disposition": "PASS",
+      "evidence": "Capture rereads status, result and gate and validates freshness, hashes, current custody and exact58 before log-open/spawn."
+    },
+    {
+      "id": "GH26-C3",
+      "subject": "actual inert positive",
+      "disposition": "PASS",
+      "evidence": "Real FIX25 gated58 importer produced SHA 593c9577...; capture consumed that hash and spawned the sentinel exactly once."
+    },
+    {
+      "id": "GH26-C4",
+      "subject": "fail-closed negatives",
+      "disposition": "PASS",
+      "evidence": "Missing, nonzero, stale, malformed and tampered cases reject before capture log/output/child marker."
+    },
+    {
+      "id": "GH26-C5",
+      "subject": "final command self-binding",
+      "disposition": "PASS",
+      "evidence": "All seven argv[2] values bind exact FIX26 contract bytes; only wrapper paths and mechanical node/self paths differ from FIX25."
+    },
+    {
+      "id": "GH26-C6",
+      "subject": "retained namespaces and sources",
+      "disposition": "PASS_RETAINED",
+      "evidence": "LIVE25/GUIDE21 paths remain unused; FIX25 gate/importer/capture child and all product, privacy, screenshot and owner-capacity hashes remain unchanged."
+    },
+    {
+      "id": "GH26-C7",
+      "subject": "private setup",
+      "disposition": "PASS_RETAINED",
+      "evidence": "Prior proven SUPPORT_DATABASE_URL and debateai_dev_support custody remains unchanged; no private values or configuration changes occur."
+    },
+    {
+      "id": "GH26-L1",
+      "subject": "runtime and readiness",
+      "disposition": "NOT_ESTABLISHED",
+      "evidence": "Static review only; current capacity, actual31, owner capacity, live capture, readiness, completion and acceptance remain pending."
+    },
+    {
+      "id": "GH26-L2",
+      "subject": "Forgot and CP2",
+      "disposition": "UNRESOLVED_ACTIONLESS",
+      "evidence": "No destination is inferred and no CP2 authorization follows."
+    }
+  ],
+  "hashes": {
+    "fix26CommandContract": "e64a497a30cf7ed84b5f721e3eab8b743489a33e334917ab124e5ec6a42f7d94",
+    "fix26ControlProof": "8c4b57a770bc26b839f9655e2ef72bba26ab89c6115d1ecc010df194e16b3288",
+    "positiveGated58Result": "593c9577035be42d4907f1a6cac421d61a5ed0ae3c27369c83c183769827c4c3",
+    "rowProofWrapper": "f3368a68a765f6c803057f7dc0a9d6aceacb351df1134449c24b993881256836",
+    "captureWrapper": "cc6b3605f9065b2ccc3d55c4a6a7d880a9b286d794478891b035fa911e64401f",
+    "proofDependency": "8b2884b179e6f54ab1cb060257c7e1b9490ab762c4108e1eb9ee28cea7eb22ac",
+    "gateTemplate": "08afa7f933acaa1fa94575fc3f8e0c997fc187c92bc8e851c54ddf7f7b32d9bc",
+    "captureChild": "464e4361253c583abbd1ae7016d7db5eb861e62cc97d9fcfa1ec5b08f51ae8d9",
+    "rowProofImporter": "b9683fd237fdf53f784f70738c9aab3d006c17f99c516f75d870fff7f63ab689",
+    "ownerCapacityContract": "df5580ba8dd47e354a74aa04b8308d7b626564bd116076b682b1f6d0037d03fc"
+  },
+  "counts": {
+    "focusedPassed": 13,
+    "focusedTotal": 13,
+    "positiveRowsPassed": 58,
+    "positiveRowsTotal": 58,
+    "negativeCasesPassed": 5,
+    "negativeCasesTotal": 5,
+    "phasesSelfBound": 7,
+    "phasesTotal": 7,
+    "manifestVerified": 38,
+    "manifestTotal": 38,
+    "receiptArtifactsVerified": 39,
+    "receiptArtifactsTotal": 39,
+    "inputsVerified": 108,
+    "inputsTotal": 108,
+    "remainingFindings": 0
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_SIGNIN_CLASSIFIER_FIX",
+  "ticket": "t_e69d062f",
+  "baseRevision": "5d6e028ae5defc24e0690219d6128949e73b750d",
+  "revision": "0f4290c290fd38caa0ccfb3b6781fb8c33999a22",
+  "productFiles": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/api/src/support/public-guide-boundary.ts",
+      "sha256": "b2b9dbf4ecc03495c8ba57a999d1376af30461281ca7c7920b23c89af7cadbd1",
+      "bytes": 6002,
+      "laneRelative": "apps/api/src/support/public-guide-boundary.ts"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/api/src/support/classify.ts",
+      "sha256": "4115198050a40bcaa8d3a50dfcbdeca4b8c533e1565aa236830f969f2a213ab7",
+      "bytes": 18608,
+      "laneRelative": "apps/api/src/support/classify.ts"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-public-guide-boundary.test.ts",
+      "sha256": "d6a38b52494419e5382cf4d70e8581c051d12d47736789bff98ec89c6baeff4d",
+      "bytes": 6448,
+      "laneRelative": "tests/unit/support-public-guide-boundary.test.ts"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-classify.test.ts",
+      "sha256": "43d76515ed12429978dfb2afd379fe84e233b0a598cc33eb99f93398e89b8f08",
+      "bytes": 65875,
+      "laneRelative": "tests/unit/support-classify.test.ts"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/integration/support-routes.test.ts",
+      "sha256": "c2cf9895b68b18a5d2dd018d2aee4d0d3b224e1aa48801e30aae85528565998a",
+      "bytes": 146149,
+      "laneRelative": "tests/integration/support-routes.test.ts"
+    }
+  ],
+  "scopeExact": true
+}

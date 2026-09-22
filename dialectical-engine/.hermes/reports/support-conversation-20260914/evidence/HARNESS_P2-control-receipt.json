@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "node": "HARNESS_P2",
+  "scope": "PURE_INERT_EVIDENCE_INTERFACE",
+  "product_revision_inspected": false,
+  "red": {
+    "rc": 1,
+    "actual": "AMBIGUOUS",
+    "expected": "ATTRIBUTED_RECOVERY",
+    "reason": "The unchanged LIVE_P1 consumer treated a grounded response plus one valid rejection event as unmatched."
+  },
+  "green": {
+    "rc": 0,
+    "response_evidence_properties": 9,
+    "transition_and_ambiguity_fixtures": 18,
+    "total_controls": 27,
+    "producer_record_keys": [
+      "attemptId",
+      "code",
+      "predicate",
+      "hasSources",
+      "hasActions",
+      "sourceCount",
+      "actionCount"
+    ],
+    "closed_statuses": [
+      "ACCEPTED_DRAFT",
+      "ATTRIBUTED_REFUSAL",
+      "ATTRIBUTED_RECOVERY",
+      "AMBIGUOUS"
+    ]
+  },
+  "real_model_requests": 0,
+  "http_requests": 0,
+  "browser_or_preview_actions": 0,
+  "runtime_logs_read": 0,
+  "product_reads": 0,
+  "product_writes": 0,
+  "heavy_lease_released_after_green": true,
+  "functional_readiness_claimed": false
+}

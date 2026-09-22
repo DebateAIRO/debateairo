@@ -1,0 +1,8 @@
+===== r1 probe focus-coverage.mjs re-run at 0dc569e9 (COMMON §10.10) =====
+:focus rules in globals.css: 22
+.consentBox          input[type=checkbox]   class-rule=.consentBox:focus-visible   element-rule=.btn:focus-visible, .iconBtn:focus-visible, .modeToggle:focus-visible, .input:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible
+.consentPolicyLink   button                 class-rule=.consentPolicyLink:focus-visible, .policyClose:focus-visible, .policyPill:focus-visible, .policyPrimary:focus-visible   element-rule=NONE
+.policyClose         button                 class-rule=.consentPolicyLink:focus-visible, .policyClose:focus-visible, .policyPill:focus-visible, .policyPrimary:focus-visible   element-rule=NONE
+.policyPill          button                 class-rule=.consentPolicyLink:focus-visible, .policyClose:focus-visible, .policyPill:focus-visible, .policyPrimary:focus-visible   element-rule=NONE
+.policyPrimary       button                 class-rule=.consentPolicyLink:focus-visible, .policyClose:focus-visible, .policyPill:focus-visible, .policyPrimary:focus-visible   element-rule=NONE
+.policyBody          div[tabindex=0]        class-rule=.policyBody:focus-visible   element-rule=NONE

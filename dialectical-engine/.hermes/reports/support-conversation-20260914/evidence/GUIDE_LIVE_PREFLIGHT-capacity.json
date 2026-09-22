@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 1,
+  "checkedAtUtc": "2026-09-17T12:35:58Z",
+  "ticket": "t_f02d880d",
+  "revision": "141f04726e12e40c85fccfb75473cfd684bcf230",
+  "verdict": "STATIC_BLOCKED_PENDING_HARNESS_CORRECTION_AND_RUNTIME_CAPACITY_PROOF",
+  "inspection": {
+    "kind": "IMMUTABLE_GIT_OBJECT_AND_SEALED_INPUTS_ONLY",
+    "runtimeObserved": false,
+    "workingTreeObserved": false,
+    "secretEnvironmentRead": false
+  },
+  "sealedMatrix": {
+    "rows": 54,
+    "languages": { "en": 27, "ro": 27 },
+    "surfaces": { "full": 27, "compact": 27 },
+    "declaredBranches": {
+      "MODEL": 44,
+      "DETERMINISTIC_PRIVATE_REFUSAL": 2,
+      "DETERMINISTIC_RECOVERY": 8
+    },
+    "certainFrozenRevisionCorrection": {
+      "MODEL": 42,
+      "DETERMINISTIC_PRIVATE_REFUSAL": 2,
+      "DETERMINISTIC_INJECTION_REFUSAL": 2,
+      "DETERMINISTIC_RECOVERY": 8
+    },
+    "branchInconsistencies": [
+      {
+        "rows": [43, 44],
+        "kind": "PROMPT_INJECTION",
+        "declared": "MODEL",
+        "frozenClassifier": "REFUSE_INJECTION",
+        "required": "DETERMINISTIC_INJECTION_REFUSAL"
+      },
+      {
+        "families": ["active-sessions"],
+        "rows": 2,
+        "declared": "MODEL",
+        "frozenClassifier": "REFUSE_ZONE_SETTINGS",
+        "required": "REBIND_AT_FINAL_PRODUCT_REVISION"
+      },
+      {
+        "families": ["account-deletion"],
+        "languages": ["ro"],
+        "rows": 1,
+        "declared": "MODEL",
+        "frozenClassifier": "REFUSE_ZONE_SETTINGS",
+        "required": "REBIND_AT_FINAL_PRODUCT_REVISION"
+      },
+      {
+        "recoveryClasses": ["NEGATED_OR_UNRELATED"],
+        "rows": 2,
+        "declared": "MODEL",
+        "frozenClassifier": "REFUSE_ZONE_SETTINGS",
+        "required": "REBIND_AFTER_FINAL_RECOVERY_REVISION"
+      }
+    ]
+  },
+  "committedDefaultsOnly": {
+    "support_limit_anon_msgs_10m": 20,
+    "support_limit_anon_msgs_24h": 100,
+    "support_limit_anon_sessions_1h": 5,
+    "support_limit_session_msgs": 40,
+    "support_limit_msg_chars": 2000,
+    "support_limit_account_msgs_10m": 60,
+    "support_limit_account_msgs_24h": 300,
+    "support_relay_concurrency": 2,
+    "support_queue_depth": 10,
+    "support_daily_call_cap": 500,
+    "support_lock_after_injections": 3,
+    "support_ip_cooldown_minutes": 60,
+    "runtimeOverrideStatus": "UNVERIFIED_EXISTING_PUBLICATION_RETAINS_NUMERIC_VALUES"
+  },
+  "currentCapture": {
+    "sessionCreates": 54,
+    "messageRequests": 54,
+    "providerAttemptForecastAsSealed": 44,
+    "capacityResultAgainstDefaults": "BLOCKED_BY_5_SESSIONS_PER_ROLLING_HOUR"
+  },
+  "minimalFiveSessionPlan": {
+    "sessionCreates": 5,
+    "messageRequests": 54,
+    "supportApiPostRequests": 59,
+    "groups": [
+      { "id": "lifecycle-full-en", "messages": 1 },
+      { "id": "full-ro", "messages": 14 },
+      { "id": "compact-ro", "messages": 13 },
+      { "id": "compact-en", "messages": 14 },
+      { "id": "full-en", "messages": 12 }
+    ],
+    "maxMessagesPerSession": 14,
+    "orderingConstraints": [
+      "PRICING_EN_BEFORE_SWITCH precedes ACCOUNT_RO_AFTER_SWITCH on the same full surface",
+      "navigation rows execute last within their session group",
+      "injection rows execute last within their session group",
+      "each canonical row identity executes exactly once and execution order is recorded separately"
+    ],
+    "historyContract": "SERVER_REQUEST_REMAINS_CURRENT_MESSAGE_ONLY",
+    "credentialOrRecoveryOperations": 0,
+    "retries": 0
+  },
+  "pacing": {
+    "requiredStartSpacingMsGreaterThan": 30000,
+    "recommendedStartSpacingMs": 31000,
+    "maxNewRequestsInAnyRolling10Minutes": 20,
+    "firstToLastStartSpanMs": 1643000,
+    "firstToLastStartSpan": "27m23s",
+    "conservativeTimeoutPlusSpacingEnvelopeMs": 9203000,
+    "conservativeTimeoutPlusSpacingEnvelope": "153m23s plus browser and API overhead"
+  },
+  "conditionalFinalForecast": {
+    "condition": "two injection branches corrected and every branch rebound to the exact final product revision before traffic",
+    "providerAttemptUpperBound": 42,
+    "providerRetries": 0,
+    "exactPromptCodePointsAcrossModelRows": 1693,
+    "maxPromptCodePointsInOneModelRow": 74,
+    "maxSystemCodePointsAcrossModelRows": 1008000,
+    "maxSystemPlusExactPromptCodePoints": 1009693,
+    "maxCompletionCodePointsAcceptedAcrossModelRows": 672000,
+    "maxRelayResponseBytesAcrossModelRows": 11010048,
+    "maxSequentialRelayTimeoutMs": 7560000,
+    "tokenUpperBound": null,
+    "tokenUpperBoundReason": "provider request has no committed token ceiling and no tokenizer is bound",
+    "costUpperBoundUsd": null,
+    "costUpperBoundReason": "provider price and usage accounting are not contractually bound; preview relay usage may be unavailable"
+  },
+  "finalRuntimePreflightRequired": {
+    "configuration": [
+      "registerVersion",
+      "supportRegisterVersion",
+      "supportSnapshotSha256",
+      "supportEnabled",
+      "supportModelRef",
+      "support_limit_anon_msgs_10m",
+      "support_limit_anon_msgs_24h",
+      "support_limit_anon_sessions_1h",
+      "support_limit_session_msgs",
+      "support_limit_msg_chars",
+      "support_relay_concurrency",
+      "support_queue_depth",
+      "support_daily_call_cap",
+      "support_lock_after_injections",
+      "support_ip_cooldown_minutes"
+    ],
+    "consumedCapacityFixedKeys": [
+      "maxAnonSessionEvents1hByIp",
+      "maxAnonMessageEvents10mByIp",
+      "maxAnonMessageEvents24hByIp",
+      "anyIpCooldownActive",
+      "callsToday",
+      "liveRelayWaiters",
+      "relayState",
+      "measuredAtUtc"
+    ],
+    "predicates": [
+      "supportEnabled is true and supportModelRef matches the ratified support-preview binding",
+      "support_limit_anon_sessions_1h - maxAnonSessionEvents1hByIp >= 5",
+      "maxAnonMessageEvents10mByIp equals 0 before the paced run",
+      "support_limit_anon_msgs_24h - maxAnonMessageEvents24hByIp >= 54",
+      "support_limit_session_msgs >= 14",
+      "support_limit_msg_chars >= 84",
+      "support_lock_after_injections >= 2",
+      "anyIpCooldownActive is false",
+      "support_daily_call_cap - callsToday >= finalDerivedModelRows",
+      "support_relay_concurrency >= 1, liveRelayWaiters equals 0, and relayState is AVAILABLE"
+    ],
+    "statusCoverage": {
+      "supportedSupportStatusCliProvides": ["configuration", "callsToday", "openSessions", "kbVersion", "relayState"],
+      "missingFromSupportedStatus": ["rolling per-IP admission counts", "active cooldown boolean", "live durable waiter count"]
+    }
+  },
+  "supportedPreviewProfile": {
+    "name": "support-preview",
+    "publicOrigin": "https://localhost:3100",
+    "publicPort": 3100,
+    "uiPort": 3101,
+    "apiPort": 8890,
+    "supportModelPort": 8894,
+    "postgresPort": 55433,
+    "composeProjectName": "debateai-v3-support-preview"
+  }
+}
+

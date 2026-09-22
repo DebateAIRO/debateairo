@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW20",
+  "ticket": "t_2e34664a",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "freeze": "0a98a3d0d1c6aec8f7136c272444efbc23eabc40",
+  "bindingReceipt": {"sha256":"8ba367a17a6bbd1d486144c19f01dd69e9cb0403dcb93d464def9d4190c194c2"},
+  "bindingConsumption": {"sha256":"de945dc1a3d6e99ac2cd5bbd002f5c554b4391ba76480f72e6dc72a65d5d68ce"},
+  "finalInventory": {"sha256":"b9ffbc1496a321fd963a8a1781f9853b7cb8a4e36f3a971b576b0d45896b6161"},
+  "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+  "commandContract": {"sha256":"91eb9019d5f47b54d20b3eeba914ceb773c81fee1f857498a1149274fdf79704","bytes":9704},
+  "gateTemplate": {"sha256":"f8e6c73651107403c09f9bfd16901b23a477e19f655d3c663aca4293d207a014","bytes":1728},
+  "offline58": {"sha256":"79b065500d0f177016d0e82d83d731bf0bda763f5c86c927e5ab1e31b0273759","bytes":35089},
+  "manifest": {"artifacts":46,"verified":46,"mismatches":0},
+  "indexedInputs": {"inputs":155,"verified":155,"mismatches":0},
+  "packageLogRaceArchives": [
+    ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND20-superseded-manifest-package-log-race.json",
+    ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND20-superseded-receipt-package-log-race.json"
+  ],
+  "reviewMode": "STATIC_READ_ONLY",
+  "traffic": {"runtime":0,"browser":0,"http":0,"support":0,"model":0,"capacity":0,"database":0}
+}

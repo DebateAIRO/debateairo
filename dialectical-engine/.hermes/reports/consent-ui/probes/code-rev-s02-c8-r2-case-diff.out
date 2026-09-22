@@ -1,0 +1,43 @@
+== it() titles at a035f814 ==
+159:"S02-S59 · appends exactly one delimited S02 block and ends the file with it", () => {
+168:"S02-S60 · writes no colour literal and declares no token inside the S02 block", () => {
+183:"S02-S61 · carries the 10c modal geometry, every number derived from the artboard", () => {
+217:"S02-S62 · carries the 8a checkbox-group values, read literally off the artboard", () => {
+264:"S02-S63 · neutralises its own motion under `prefers-reduced-motion: reduce`", () => {
+294:"S02-S64 · the disabled `I have read it` clears 4.5:1 in both modes, computed here", () => {
+336:"S02-S65 · no auth-shell ancestor becomes the containing block for the fixed scrim", () => {
+384:"S02-S65b · `.policyGateHint` is clipped, never `display: none` or `visibility: hidden`", () => {
+
+== it() titles at HEAD ==
+191:"S02-S59 · appends exactly one delimited S02 block and ends the file with it", () => {
+200:"S02-S60 · writes no colour literal and declares no token inside the S02 block", () => {
+215:"S02-S61 · carries the 10c modal geometry, every number derived from the artboard", () => {
+249:"S02-S62 · carries the 8a checkbox-group values, read literally off the artboard", () => {
+296:"S02-S63 · neutralises its own motion under `prefers-reduced-motion: reduce`", () => {
+326:"S02-S64 · the disabled `I have read it` clears 4.5:1 in both modes, computed here", () => {
+369:"S02-S65 · no auth-shell ancestor becomes the containing block for the fixed scrim", () => {
+417:"S02-S65b · `.policyGateHint` is clipped, never `display: none` or `visibility: hidden`", () => {
+442:"S02-S65c · every focusable control the block styles carries a `--focus` ring inside the block", () => {
+
+== assertion (expect / expectDecl) counts, a035f814 vs HEAD, per case ==
+--- a035f814 ---
+     4  S02-S59 · appends exactly one delimited S02 block and ends the file wi
+     2  S02-S60 · writes no colour literal and declares no token inside the S0
+    18  S02-S61 · carries the 10c modal geometry, every number derived from th
+    24  S02-S62 · carries the 8a checkbox-group values, read literally off the
+     3  S02-S63 · neutralises its own motion under `prefers-reduced-motion: re
+     6  S02-S64 · the disabled `I have read it` clears 4.5:1 in both modes, co
+     2  S02-S65 · no auth-shell ancestor becomes the containing block for the 
+     4  S02-S65b · `.policyGateHint` is clipped, never `display: none` or `vis
+--- HEAD ---
+     4  S02-S59 · appends exactly one delimited S02 block and ends the file wi
+     2  S02-S60 · writes no colour literal and declares no token inside the S0
+    18  S02-S61 · carries the 10c modal geometry, every number derived from th
+    24  S02-S62 · carries the 8a checkbox-group values, read literally off the
+     3  S02-S63 · neutralises its own motion under `prefers-reduced-motion: re
+    10  S02-S64 · the disabled `I have read it` clears 4.5:1 in both modes, co
+     2  S02-S65 · no auth-shell ancestor becomes the containing block for the 
+     4  S02-S65b · `.policyGateHint` is clipped, never `display: none` or `vis
+     3  S02-S65c · every focusable control the block styles carries a `--focus
+
+== removed expect/expectDecl lines (a035f814 -> HEAD) ==

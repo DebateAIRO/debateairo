@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "node": "GUIDE_GUARDFIX2",
+  "ticket": "t_4b36bd6a",
+  "revision": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "result": "PASS",
+  "controls": 62,
+  "passed": 62,
+  "harnessSha256": "f8f2935965cd59b893ab02848cd9db17eeb71fa423f5620b61479e6647ae4917",
+  "log": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_GUARDFIX2-harness-controls-final.log",
+    "sha256": "b0a963c4fdc5b96f8fbfb9d53c4d12e4c4d9f93d4bb5223f5ae86e19442fa2b1",
+    "bytes": 3741
+  },
+  "measuredAt": "2026-09-17T14:55:03.716640Z"
+}

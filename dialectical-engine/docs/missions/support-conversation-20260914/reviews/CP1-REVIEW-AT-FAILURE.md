@@ -1,0 +1,11 @@
+# Review the complete evidence, including the known failure
+
+LIVE4 reports one remaining benign-navigation refusal at6e5ab5fc, after six useful actual replies. The exact21-file automated integration is green. All implementation work nodes have completed. Do not create a fifth preparation patch or repeat live requests.
+
+GATE is mechanical evidence packaging, not a content verdict. The prior draft wording that required the live demonstration to pass before final review is superseded for this frozen failed revision. Package the complete failure honestly and dispatch final review pass1 so the separate Sol correctness, security and product-truth sessions can assess all independently actionable CP1 work. A failed acceptance step remains a blocker in the package, and any complete lens verdict must account for it. This changes the internal dependency schedule under the owner's explicit authorization; it does not weaken an acceptance requirement or certify working behavior.
+
+The correctness lens must turn the safely attributed internal-identifier rejection into the concrete architectural decision required by CP1-BOUNDARY-CORRECTION. It must distinguish what is measured from the discarded completion it cannot inspect, compare feasible alternatives, recommend a bounded design and identify whether it changes the response contract or owner-approved behavior. No implementation or extra model call is authorized by this review routing. Root will consume the full review union and architectural recommendation before a next action; another prompt-only tuning cycle is prohibited.
+
+Security and product-truth lenses complete their own current scope using prior preparation plus final changes. Retained prior findings require explicit disposition. The reviews are pass1 of the maximum three final passes; the preceding assessments do not constitute approval or reset the cap. No new preparation cycle substitutes for this final review.
+
+Forgot password remains owner-confirmed, exact destination UNVERIFIED and checkpoint-blocking. Even a lens PASS for independent scope cannot make CP1 ready. The known live failure, missing creation pointer evidence and missing Forgot connection remain visible. CP2/CP3, owner ratification, publication and acceptance remain gated.

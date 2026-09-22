@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PRICING_CLAIM_REVIEW",
+  "ticket": "t_201482d3",
+  "revision": "b103ce27a060c48fcf5613c1bf44be53c7cb2a0c",
+  "baseRevision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "verdict": "REWORK_BOUNDED_FINANCIAL_POLARITY",
+  "dispositions": [
+    {
+      "id": "GPCR-C1",
+      "subject": "server-side enforcement point",
+      "disposition": "PASS",
+      "evidence": "bindSupportDraftAuthority rejects financial capability text before a model draft is returned or stored; this is not prompt-only or an exact-answer exception."
+    },
+    {
+      "id": "GPCR-C2",
+      "subject": "exact observed LIVE28 answer",
+      "disposition": "PASS",
+      "evidence": "The exact unsupported creating-or-paying answer is rejected through productionReviewedCorpus and recovers to reviewed app-navigation guidance."
+    },
+    {
+      "id": "GPCR-C3",
+      "subject": "full44 real route and accounting",
+      "disposition": "PASS",
+      "evidence": "The real route loads the full reviewed corpus, returns HTTP 200 ANSWER_GROUNDED with app-navigation and no action, invokes the model once, and stores model_called=true/input_tokens=7."
+    },
+    {
+      "id": "GPCR-C4",
+      "subject": "supported creation and simple negative limits",
+      "disposition": "PASS",
+      "evidence": "EN/RO creation after sign-in and the tested direct negative checkout/payment limitations remain admitted."
+    },
+    {
+      "id": "GPCR-R1",
+      "subject": "same-clause negation leakage",
+      "disposition": "REWORK",
+      "evidence": "Any negation in the preceding 96 characters licenses a later financial mention. `not checkout because payment happens...` and `nu este checkout deoarece plata are loc...` are accepted even though the later payment claim is positive and unsupported."
+    },
+    {
+      "id": "GPCR-R2",
+      "subject": "modal negative financial limitations",
+      "disposition": "REWORK",
+      "evidence": "`Payment may not be available...` and the Romanian equivalent are rejected because the after-pattern recognizes only selected immediate negative forms."
+    },
+    {
+      "id": "GPCR-C5",
+      "subject": "source/action and safety precedence",
+      "disposition": "PASS_RETAINED",
+      "evidence": "The scoped diff does not change source/action admission or private-data, credential, injection and security controls."
+    },
+    {
+      "id": "GPCR-C6",
+      "subject": "Screenshot30",
+      "disposition": "PASS_RETAINED",
+      "evidence": "The complete full-answer capture and successor-binding disposition from GUIDE_CAPTURE_REVIEW30 is unchanged."
+    },
+    {
+      "id": "GPCR-L1",
+      "subject": "runtime and checkpoint status",
+      "disposition": "NOT_ESTABLISHED",
+      "evidence": "Static review only; revised binding, live31, capacity, readiness, completion and acceptance remain later gates."
+    },
+    {
+      "id": "GPCR-L2",
+      "subject": "Forgot and CP2",
+      "disposition": "UNRESOLVED_ACTIONLESS",
+      "evidence": "No destination is inferred and no CP2 authorization follows."
+    }
+  ],
+  "hashes": {
+    "authorReceipt": "a2ffe74777aa68c9f73527612cfc69b0998fea44a83a8e5c9fd0ce3c0fde95b6",
+    "authorConsumption": "80bb55c93f7b1f7d95620d984a667601e7616d3475fef9a7e1a5d8d0e20cb72b",
+    "responsePolicy": "a5c48c9192837435f46d9249ad0b5d2c4506a18688421204746e1e275336525e",
+    "responsePolicyTests": "b4b30b6d1557a6498debe69b20cfb92715afdc7f53cc68a40e07b2bddd1a185f",
+    "answerContextTests": "4b2af9c1b5bc26cb100fab5ea57014a7e269e3fba6f35a4ba4332a51613507ec",
+    "routeTests": "04ed2fde4372af818367c34f29c5b6e16c5b2532a626f525d27b9ea73ade4da2",
+    "finalAffectedSuiteLog": "58bf18455a537af022fb0474f8ccc11aa2dee8d57c361c48a436519e8ad45d2a",
+    "appNavigationEn": "a92e96c24c3df6d7a9b3e73a3fafde79321cd7445612588024ea205fb5c6e6db",
+    "budgetTierEn": "a49d563ef7bfec75ed179a70adb54c25947aa9cbe4db557698eacc84d1d3c683"
+  },
+  "counts": {
+    "changedProductFiles": 4,
+    "affectedTestFiles": 3,
+    "affectedTestsPassed": 444,
+    "affectedTestsFailed": 0,
+    "reviewedCorpusEntries": 44,
+    "normalizedTypecheckDiagnostics": 76,
+    "ownedPathTypecheckDiagnostics": 0,
+    "indexedInputs": 30,
+    "indexedInputsVerified": 30,
+    "remainingFindings": 2
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

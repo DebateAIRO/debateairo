@@ -1,0 +1,15 @@
+# GUIDE_PREVIEW_RECOVER34
+
+Verdict: **PASS_RECOVERED_BOUND_REVIEW_REQUIRED** at product `0d34f82f4a2188d0ce1db04655b693798ffd2169`. Runtime9 is detached and healthy as PID/PGID 9800. All 12 supported listeners are present, including authoritative support-preview API port 8890, and ordinary system TLS `https://localhost:3100/help` returns HTTP 200. Idle custody passed. The private Runtime9 log remains unread, unhashed and excluded.
+
+The exact production support-model diagnostic ran once after explicit owner approval. It sent the fixed startup handshake to the configured Z.AI/GLM provider, returned `HERMES_DIAGNOSTIC_READY`, immediately stopped its isolated relay, and verified port 8894 free. The one full supported `DEBATEAI_DEV_AUTH_STACK_PROFILE=support-preview pnpm dev:auth:up` start then used the second and final approved startup handshake and reached readiness. Total RECOVER34 startup model attempts: 2. Support-answer/status/capacity/database/capture traffic: 0.
+
+An earlier commentary message incorrectly stated diagnostic times `07:58:30.812Z→07:58:49.752Z`. No such second diagnostic occurred. The authoritative single diagnostic timestamps are `2026-09-21T07:55:46.698Z→2026-09-21T07:56:05.342Z`; the tool returned numeric exit 0 under chunk `007eba`. Runtime9 began separately at `2026-09-21T07:59:03.445Z`. The sealed invocation accounting records this correction and exactly two total approved requests.
+
+The changed binding proof passes 12/12. It retains BIND32's current-product full58 proof and the byte-identical FIX30 screenshot helper, binds all seven literal phases to the RECOVER34 command contract, updates Runtime9 custody and API port 8890, keeps the deferred six-message/two-session owner capacity command, and confirms all 123 LIVE29/actual GUIDE22 future paths remain unique and absent. No seven-phase capture ran here. Independent operator/runtime review is still required before paid31. Forgot remains unresolved; this is not CP1 acceptance or CP2 readiness.
+
+What repeatedly cost tokens: startup collapsed detailed Hermes failures into one outer DEV stage; historical runtime contracts carried stale API metadata; and a hand-entered timestamp update introduced avoidable reconciliation work. Improvements: expose a privacy-safe nested fixed-code projection at the supported lifecycle boundary, generate progress messages from immutable artifacts, and derive runtime port contracts directly from the selected profile. These changes would let one operator prompt diagnose, recover, bind and report without repeated manual reconstruction while keeping secrets and provider output private.
+
+SKILLS LOADED: retained mission BODY/protocol context; no new skill invoked. Native session: original Sol `/root/preview`, ticket `t_31c5023f`.
+
+Self-report prompt retained verbatim: “treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.”

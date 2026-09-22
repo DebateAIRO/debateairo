@@ -29,8 +29,8 @@ absent from every zone route.
 | SUP-04-R01 | "imported and rendered by exactly these files: `apps/ui/app/page.tsx`, `apps/ui/app/new/page.tsx`, `apps/ui/app/debate/[id]/…`, `apps/ui/app/public/debate/[id]/…`" | | |
 | SUP-04-R02 | "not imported by `apps/ui/app/layout.tsx` nor by any file under … zone routes … architecture test lists the four permitted importers" | | |
 | SUP-04-R03 | "share one support session per browser tab … continues the same messages on `/help`" | | |
-| SUP-04-R04 | "collapsed as a button labelled WIDGET_BUTTON … `aria-label` … keyboard … bounding box does not intersect the page's primary control … at 1280×800 and at 390×844" | | |
-| SUP-04-R05 | "Every behaviour of SUP-01 … applies unchanged … pre-selects the current debate … `/public/debate/[id]` no debate context is ever passed" | | |
+| SUP-04-R04 | "collapsed as a button labelled WIDGET_BUTTON … `aria-label` … keyboard … `data-support-widget-panel` / `data-support-primary-control` make non-intersection a Boolean DOM measurement … at 1280×800 and at 390×844" | | |
+| SUP-04-R05 | "Every behaviour of SUP-01 and, where landed, SUP-02/03/05/06 applies unchanged … when SUP-03 is present and consent is on, pre-selects the current debate … `/public/debate/[id]` no debate context is ever passed" | | |
 | SUP-04-R06 | "edits `apps/ui/app/page.tsx` (one import line, one JSX line) … resolved at merge time" | | |
 
 Trace rows: 6. SPEC requirements: 6.

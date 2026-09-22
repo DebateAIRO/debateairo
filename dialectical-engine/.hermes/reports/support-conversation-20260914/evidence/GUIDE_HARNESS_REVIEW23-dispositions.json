@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW23",
+  "ticket": "t_179862b9",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "verdict": "PASS_FINAL_LITERAL_COMMAND_BINDING",
+  "dispositions": [
+    {
+      "id": "GH23-C1",
+      "subject": "seven-phase literal self-binding",
+      "disposition": "PASS",
+      "evidence": "All seven argv[2] values equal the exact absolute FIX23 command-contract path."
+    },
+    {
+      "id": "GH23-C2",
+      "subject": "actual-byte proof hash",
+      "disposition": "PASS",
+      "evidence": "Binding proof reports SHA-256 7502ed0d... for the actual 10164-byte FIX23 contract."
+    },
+    {
+      "id": "GH23-C3",
+      "subject": "shared parser and phase1 owner output",
+      "disposition": "PASS",
+      "evidence": "The real readFinalContract parser consumes FIX23 and the parsed contract exposes GUIDE_LIVE21-owner-capacity.json."
+    },
+    {
+      "id": "GH23-C4",
+      "subject": "corrected capture binding",
+      "disposition": "PASS",
+      "evidence": "Parsed capture child is the reviewed FIX22 producer with SHA-256 cc493ba0...."
+    },
+    {
+      "id": "GH23-C5",
+      "subject": "predecessor fail-closed negative",
+      "disposition": "PASS",
+      "evidence": "The real BIND21 predecessor contract fails self-binding before the callback; operationalActivity is zero."
+    },
+    {
+      "id": "GH23-C6",
+      "subject": "deferred owner command",
+      "disposition": "PASS_RETAINED",
+      "evidence": "FIX22 owner-capacity contract remains unchanged, unexecuted, and bound by SHA-256 df5580ba...."
+    },
+    {
+      "id": "GH23-C7",
+      "subject": "substantive product and operational safeguards",
+      "disposition": "PASS_RETAINED",
+      "evidence": "GUIDE21 provenance, pre-reader reservation, capacity semantics, full58 proof and screenshot successor are unchanged from reviewed inputs."
+    },
+    {
+      "id": "GH23-L1",
+      "subject": "runtime and readiness",
+      "disposition": "NOT_ESTABLISHED",
+      "evidence": "Static review only; actual31, owner capacity, live success, readiness, completion and acceptance remain pending."
+    },
+    {
+      "id": "GH23-L2",
+      "subject": "Forgot and CP2",
+      "disposition": "UNRESOLVED_ACTIONLESS",
+      "evidence": "No destination is inferred and no CP2 authorization follows."
+    }
+  ],
+  "hashes": {
+    "fix23CommandContract": "7502ed0d8bb8618e4ba56c2157efd24a5d9af92258b91ebc90d4ef6c82727c9c",
+    "fix23BindingProof": "4c095066428c90c1954924cc09750e507e98bd042aec3a428a5bb017a219837e",
+    "fix23Verifier": "aaf7bdd7d0849855a1d9790d126c0cf0a056fed789ee836138031e79f81823dd",
+    "ownerCapacityContract": "df5580ba8dd47e354a74aa04b8308d7b626564bd116076b682b1f6d0037d03fc",
+    "captureSource": "cc493ba08d101899ecd3d3bc66dea6ab6bc6507a0597e5b90b29326259996329",
+    "full58": "79b065500d0f177016d0e82d83d731bf0bda763f5c86c927e5ab1e31b0273759",
+    "screenshotSuccessor": "696dc176b7a6e1bbd6f5c8b5714bbf2519c7be7809af5fda8f45ca3f085a0b7c"
+  },
+  "counts": {
+    "bindingPassed": 6,
+    "bindingTotal": 6,
+    "phasesSelfBound": 7,
+    "phasesTotal": 7,
+    "manifestVerified": 21,
+    "manifestTotal": 21,
+    "receiptArtifactsVerified": 22,
+    "receiptArtifactsTotal": 22,
+    "inputsVerified": 50,
+    "inputsTotal": 50,
+    "remainingFindings": 0
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LOCK_HANDOFF_FIX",
+  "ticket": "t_532dbedf",
+  "baseRevision": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718",
+  "finalRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "verdict": "IMPLEMENTED_REVIEW_REQUIRED",
+  "clean": true,
+  "productFiles": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/api/src/support/index.ts",
+      "sha256": "34fabe86db422c417a8e479c6274aaa1e070ad9b2b21515168eebecfcbfe5d29",
+      "bytes": 36957,
+      "laneRelative": "apps/api/src/support/index.ts"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/db/src/support.ts",
+      "sha256": "ca7088f7fbc99c1863f2c44d42db9015076025181a86d1c9662fc6a05a32331a",
+      "bytes": 100535,
+      "laneRelative": "packages/db/src/support.ts"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/integration/support-cases.test.ts",
+      "sha256": "18ca4e4b1a5622b06396259ca2ed973e5cc04c894e6971a1ba6c0da210445dd7",
+      "bytes": 30440,
+      "laneRelative": "tests/integration/support-cases.test.ts"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/integration/support-routes.test.ts",
+      "sha256": "c90576ca3d6f95ff7def08113c2fab02d069488a0d05510a43d8fe64e3303109",
+      "bytes": 144256,
+      "laneRelative": "tests/integration/support-routes.test.ts"
+    }
+  ],
+  "measurements": {
+    "focused": {
+      "passed": 2,
+      "failed": 0
+    },
+    "affected": {
+      "files": 5,
+      "passed": 225,
+      "failed": 0
+    },
+    "final34": {
+      "files": 34,
+      "passed": 1701,
+      "failed": 0,
+      "TODO": 1
+    },
+    "typecheck": {
+      "exitCode": 1,
+      "diagnostics": 76,
+      "byteIdenticalToAcceptedBaseline": true,
+      "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0"
+    },
+    "snapshot": {
+      "entryCount": 44,
+      "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+      "status": "PASS"
+    },
+    "structuralEval": "NOT_REPEATED_DEFINING_BYTES_UNCHANGED"
+  },
+  "preservedFailures": [
+    "initial combined RED had test fixture ReferenceError plus meaningful direct producer OPENED failure",
+    "corrected route RED proved OPEN plus 200/201/200 and side effects",
+    "first snapshot probe was blocked by sandbox tsx IPC EPERM; identical escalated probe passed"
+  ],
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX.md",
+      "sha256": "e408f6ef835b805178650e93732a09c3e993c3238018ea27bc9fc0a830c41f51",
+      "bytes": 1861
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX-product-manifest.json",
+      "sha256": "a817c9a9992e6838a2459a5641a4fe1fa8d613e5c4d611736ef0a60585f93155",
+      "bytes": 1785
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX-required-suites.json",
+      "sha256": "88da3785918ef2657311c4db75b5122d904548f6a9ffbcd7e357614bb15ba7c1",
+      "bytes": 4128
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX-typecheck-comparison.json",
+      "sha256": "d69884d397726fbd18c7f261b8f4ebe201c2abf09054a3194b2c3ebaea46f471",
+      "bytes": 765
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX-snapshot-receipt.json",
+      "sha256": "3d1a19190c51d21866c974bfa0a9e0a756ee248046611365c76a6348df5b4113",
+      "bytes": 49002
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL8-manifest.json",
+      "sha256": "508373f567d2602ef9ff501aa56a9359d9a4e325786d71ae96bfbb8ba0df480c",
+      "bytes": 18430
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX-red.log",
+      "sha256": "2036209169d91650663207816ee76c6063dc2eca6135107d82b9806ee146aece",
+      "bytes": 43948
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX-route-red.log",
+      "sha256": "8dd2fde91676384280f1d02dd383ee82a54d43882fe86068b2e8d6872295140f",
+      "bytes": 33216
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX-route-red2.log",
+      "sha256": "b4eb92ceecf5c89a73a027bc0b2d351748d23a19db7e8f373e0f9a7178ba9d15",
+      "bytes": 36112
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX-green.log",
+      "sha256": "b2bd77a9001e53e98f94a8642943c7af45c8770a8878813642cc3288921a8458",
+      "bytes": 41584
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX-affected.log",
+      "sha256": "41fc0a6724b5c81cbc4e9f0429c8a77cda6e5675b646178a4ee97690d93e5be4",
+      "bytes": 70832
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX-final34.log",
+      "sha256": "d5039088e4eab602c3c117d3ebe7d2d2fd9e88d9257b62d9251d403ac43f7876",
+      "bytes": 627607
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX-typecheck.log",
+      "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+      "bytes": 39611
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LOCK_HANDOFF_FIX-snapshot.log",
+      "sha256": "19f9fb2006075b5b924def2530d9c4d029dc167d7b6a380716b490c4a354a213",
+      "bytes": 461
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_LOCK_HANDOFF_FIX/snapshot.ts",
+      "sha256": "b074bc621e2f238704fbc13061eebedc51cf54a003ba8b8a85487f1466c09816",
+      "bytes": 1655
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_LOCK_HANDOFF_FIX.md",
+      "sha256": "546a8484e6ad2d995826e87849fb3b9f0717e5d8e14fa96388d68782639c713a",
+      "bytes": 2620
+    }
+  ],
+  "receiptExcludesItself": true,
+  "runtimeRequests": 0,
+  "modelRequests": 0,
+  "privateLogsRead": 0,
+  "checkpointAccepted": false,
+  "sealedAt": "2026-09-20T13:08:54.214328Z"
+}

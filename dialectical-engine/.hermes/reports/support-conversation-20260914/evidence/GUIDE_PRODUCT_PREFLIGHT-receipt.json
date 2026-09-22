@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PRODUCT_PREFLIGHT",
+  "ticket": "t_3352e6d5",
+  "run": 211,
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "reviewedOn": "2026-09-20T18:20:24.000627Z",
+  "verdict": "REWORK_RETAINED15_PRODUCT_SCOPE",
+  "counts": {
+    "exactCases": 15,
+    "contentPassOrSafe": 11,
+    "contentRework": 4,
+    "screenshotsCorrespondingVisible": 2,
+    "screenshotsCorrespondingNotVisible": 13,
+    "newSupportRequests": 0,
+    "newModelRequests": 0
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_PRODUCT_PREFLIGHT.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_PRODUCT_PREFLIGHT.md",
+      "sha256": "1af8e21f5a0343a7407fe74cc9365e4212bb59882ebccdda991a0900daa19a88",
+      "bytes": 8860
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PRODUCT_PREFLIGHT-case-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_PRODUCT_PREFLIGHT-case-dispositions.json",
+      "sha256": "c944f4b1e24d62ac3a2798e3a8028210285da2e50ae0528f923c8ed8f3c89296",
+      "bytes": 49804
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PRODUCT_PREFLIGHT-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_PRODUCT_PREFLIGHT-custody.json",
+      "sha256": "6d110ab11301d6b2281e2b7a26a837d78fd6cc9546df6152c26bb1559f1ae017",
+      "bytes": 7406
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PRODUCT_PREFLIGHT.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PRODUCT_PREFLIGHT.md",
+      "sha256": "f400888a975a90dad05908ffc362f297d2f5661ddf5d2988f732fba15af66199",
+      "bytes": 4303
+    }
+  ],
+  "limits": [
+    "No full CP1 or readiness verdict.",
+    "Fresh39 and composite54 not reviewed.",
+    "Forgot destination remains unresolved and actionless.",
+    "Initial source custody, inherited 76 type errors and PENDING eval rubric remain qualified."
+  ]
+}

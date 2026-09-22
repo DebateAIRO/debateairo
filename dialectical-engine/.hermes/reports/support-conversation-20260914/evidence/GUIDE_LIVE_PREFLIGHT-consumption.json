@@ -1,0 +1,47 @@
+{
+  "at": "2026-09-17T12:43:12.526105+00:00",
+  "node": "GUIDE_LIVE_PREFLIGHT",
+  "ticket": "t_f02d880d",
+  "revision": "141f04726e12e40c85fccfb75473cfd684bcf230",
+  "verdict": "STATIC_BLOCKED_PENDING_HARNESS_CORRECTION_AND_RUNTIME_CAPACITY_PROOF",
+  "receipt": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_PREFLIGHT-receipt.json",
+    "sha256": "8108fc880ec97f97b1c8d6252dc98f01ced09644c46d1329e0b499138c22851f"
+  },
+  "artifactsVerified": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_PREFLIGHT.md",
+      "sha256": "39d1ab575bc20cd80bf62f1fa9279ceeebd03b79a5dc33dbfa81af8a98ad52c3",
+      "bytes": 8041
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_PREFLIGHT-capacity.json",
+      "sha256": "48528f3305d443070f13459b079d11d0c0b1c3612ae30d37790dc24f68fb3542",
+      "bytes": 6792
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_LIVE_PREFLIGHT.md",
+      "sha256": "764733624755cea136cec3970c193878d1e78d476c67080328a9b0ef92d5ec99",
+      "bytes": 4823
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE_PREFLIGHT-arithmetic.log",
+      "sha256": "9f99a04a3c7ef3d0e8a65d5ed234c41fa8d34edbb5ecc99165b9ee20b2a224dc",
+      "bytes": 1084
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE_PREFLIGHT-source-bindings.log",
+      "sha256": "01db775487b7ab6881a44914f83ef350ebdb421efc17fc225720ab2817613109",
+      "bytes": 1360
+    }
+  ],
+  "retainedNativeProof": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS-consumption.json",
+    "sha256": "77314db17743e6d66916b5d4f1ab4165313ae0dba9a0c950f927092113e01618"
+  },
+  "runtimeObserved": false,
+  "limits": [
+    "Static preflight consumed; blocking findings require correction and runtime proof.",
+    "No live or checkpoint readiness claim."
+  ]
+}

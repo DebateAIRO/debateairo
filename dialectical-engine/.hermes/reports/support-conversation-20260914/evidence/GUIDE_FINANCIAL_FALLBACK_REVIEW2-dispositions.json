@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FINANCIAL_FALLBACK_REVIEW2",
+  "ticket": "t_163fb85c",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "baseRevision": "c683a0c752553fe2b4e226bc3f70879ce2460b74",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "verdict": "PASS_FINANCIAL_REVIEWED_FALLBACK",
+  "dispositions": [
+    {
+      "id": "GFFR2-C1",
+      "subject": "closed declared-family parity",
+      "disposition": "PASS",
+      "evidence": "New bought, achiz-, factur-, tranzact-, bounded debitare/debitat and taxare/taxat forms complete the frozen parity table."
+    },
+    {
+      "id": "GFFR2-C2",
+      "subject": "nonfinancial near-neighbors",
+      "disposition": "PASS",
+      "evidence": "platform/platformă, taxonomie/taxonomic and flow-rate debit remain directly conversational; debit/tax require the bounded financial suffixes."
+    },
+    {
+      "id": "GFFR2-C3",
+      "subject": "deterministic financial fallback",
+      "disposition": "PASS_RETAINED",
+      "evidence": "Financial draft authority is rejected without polarity interpretation and recovers through reviewed public guidance."
+    },
+    {
+      "id": "GFFR2-C4",
+      "subject": "full44 EN/RO usefulness",
+      "disposition": "PASS",
+      "evidence": "Representative EN payment and RO facturare drafts recover to ANSWER_GROUNDED app-navigation guidance with no action and nonempty reviewed text."
+    },
+    {
+      "id": "GFFR2-C5",
+      "subject": "real POST accounting and persistence",
+      "disposition": "PASS",
+      "evidence": "Romanian tranzacție draft returns HTTP 200 reviewed recovery after one model call and stores model_called=true/input_tokens=5."
+    },
+    {
+      "id": "GFFR2-C6",
+      "subject": "source/action and safety precedence",
+      "disposition": "PASS_RETAINED",
+      "evidence": "No source/action, private-data, credential, injection or security authority changed."
+    },
+    {
+      "id": "GFFR2-C7",
+      "subject": "Screenshot30",
+      "disposition": "PASS_RETAINED",
+      "evidence": "The complete full-answer screenshot and its binding remain unchanged."
+    },
+    {
+      "id": "GFFR2-L1",
+      "subject": "runtime and checkpoint status",
+      "disposition": "NOT_ESTABLISHED",
+      "evidence": "Static review only; BIND32, runtime, actual31, capacity, readiness, completion and acceptance remain later gates."
+    },
+    {
+      "id": "GFFR2-L2",
+      "subject": "Forgot and CP2",
+      "disposition": "UNRESOLVED_ACTIONLESS",
+      "evidence": "No destination is inferred and no CP2 authorization follows."
+    }
+  ],
+  "finiteLexicalParity": {
+    "paymentPayPaid": ["pay", "paid", "plat", "achit"],
+    "purchaseBuyBought": ["purchas", "buy", "bought", "cump", "achiz"],
+    "billing": ["bill", "factur"],
+    "transaction": ["transaction", "tranzact"],
+    "charge": ["charg", "debitare", "debitat", "taxare", "taxat"],
+    "nonfinancialNegatives": ["platform", "platforma", "taxonomie", "taxonomic", "flow-rate debit"]
+  },
+  "hashes": {
+    "decision": "802cd3e4baf9f5571cb976b3009a180a29148ae4c7bf442d12da18281f5edee6",
+    "authorReceipt": "4ae2916588e6b7a8a0740e44902ee4e5b80d6036a5a95891b0cd43c6d3504c90",
+    "authorConsumption": "8e0676e48029cffc667ddd99557909f88f18dee048d1d91c0b4dc3fcee058b1b",
+    "responsePolicy": "32f30a60de319887b4603ee06ed20aefb16f0c64ca2cd8552396ee8959e8370f",
+    "responsePolicyTests": "0ba7f70b57244ef92cac9eb1e593cb8a4ab3b204e6267ccfb1fac7366476b2f2",
+    "answerContextTests": "5c46fecf04faa1f795dd796b4c93bc021ace48005f68638f3188a7dd9e2eaadc",
+    "routeTests": "477b9f4d8d0beb84ff9a351f16f905d68b0eb600394e6a2292f5f9953b8898c6",
+    "finalAffectedSuite": "56f5b8ef9b346e32d8243e244b19dbdfd45755f83113af398ab5d5f26d100abc"
+  },
+  "counts": {
+    "changedProductFiles": 4,
+    "focusedTestsPassed": 262,
+    "focusedTestsFailed": 0,
+    "affectedTestsPassed": 494,
+    "affectedTestsFailed": 0,
+    "reviewedCorpusEntries": 44,
+    "indexedInputs": 27,
+    "indexedInputsVerified": 27,
+    "remainingFindings": 0
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

@@ -1,0 +1,8 @@
+from pathlib import Path
+import json,subprocess
+S=Path('/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine');D=S/'docs/missions/support-conversation-20260914';b=json.loads((D/'board-ids.json').read_text());cli=['/Users/vladmihaimiron/.local/bin/hermes','kanban','--board',b['board']]
+def call(*a):return subprocess.run(cli+list(a),text=True,capture_output=True,check=True).stdout
+raw=json.loads(call('create','[gpt-5.6-sol] Finding: grounded export text exposes unresolved internal action ID','--body','LIVE2 at82f57f1e: validated grounded Romanian export text directs visitor to owner-debate while anonymous trusted context resolves/renders zero actions. Preserve actual receipt; correct available-action producer/visitor-text contract without accepting untrusted run IDs or adding permissions. Assigned to FIX3 and final product/correctness review.','--created-by','Astra','--triage','--idempotency-key',b['board']+'-LIVE2_ACTION_ID','--json'));tid=raw.get('id') or raw.get('task',{}).get('id');assert tid
+state={'ticket':tid,'node':'LIVE2_ACTION_ID','risk_tier':'high','status':'queued','owner':{'agent':'reviewer','session':None},'model':'gpt-5.6-sol','authority_epoch':1,'rework_round':0,'contract':{'allowed':['finding evidence and scoped FIX3 correction'],'forbidden':'all_others','human_review':False},'comments_read_through':0,'human_acceptance':'NOT_APPLICABLE'}
+call('comment',tid,'STATE\n'+json.dumps(state,indent=2),'--author','Astra');b['tickets']['LIVE2_ACTION_ID']=tid;(D/'board-ids.json').write_text(json.dumps(b,indent=2)+'\n');print(tid)
+p=D/'tooling/sync-state.py';x=p.read_text().replace("seats={'FIX2':", "seats={'FIX3':'/root/requirements','LIVE3':'/root/preview','FIX2':");p.write_text(x)

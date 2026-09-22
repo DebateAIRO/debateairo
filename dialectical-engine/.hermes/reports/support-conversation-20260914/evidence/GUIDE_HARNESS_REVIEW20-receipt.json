@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW20",
+  "ticket": "t_2e34664a",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "PASS_FINAL_BINDING",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW20.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW20.md",
+      "sha256": "67744ea25c4456c2df90d0ecd822d37f31472fa81c8f5e9dc9634d3924b47fc2",
+      "bytes": 9762
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW20-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW20-dispositions.json",
+      "sha256": "3107c650e0ed10c098cfeff80d6dabb1175dbd5f16fbc81afe08384d394f3f81",
+      "bytes": 5558
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW20-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW20-custody.json",
+      "sha256": "673dfab9c79e1d2c4bd867bf7b14ff389dd22b5d10f2ffa4268d074304f61be9",
+      "bytes": 1458
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW20.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW20.md",
+      "sha256": "644abbf05a18546ced988fbce5b9cb37741ab6107fcb061230d7ea9f87b1a0f4",
+      "bytes": 2625
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "support": 0,
+    "model": 0,
+    "capacity": 0,
+    "database": 0
+  },
+  "heavyLeaseHeld": false,
+  "limits": [
+    "Static binding review only.",
+    "Runtime7 and seven operational phases remain future work.",
+    "No live quality, readiness, owner testability, acceptance or CP1 completion claim.",
+    "Forgot remains unresolved and actionless."
+  ]
+}

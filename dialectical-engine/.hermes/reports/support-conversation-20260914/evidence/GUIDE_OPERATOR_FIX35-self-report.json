@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_FIX35",
+  "ticket": "t_c7774a62",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_LITERAL_OPERATOR_HASH_FIXED_REVIEW_REQUIRED",
+  "controls": {
+    "passed": 10,
+    "total": 10
+  },
+  "delta": {
+    "oldCommandHash": "6269d1c50fd24574f70f4d4898cd2cf1e2e42174c5f392b9516a558c75575107",
+    "newCommandHash": "f8a5df033841912013df6eda0f13d5811f9e709712e8311f692d7926d9d52030",
+    "newOperatorHash": "41de17e7eb11219ca183a4f156e13225ca6a79446035a5450a0e8d3665c4e153"
+  },
+  "retained": {
+    "commandContract": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREVIEW_RECOVER34-command-contract.json",
+    "sevenPhases": true,
+    "runtime9": true,
+    "futurePathsAbsent": 123
+  },
+  "traffic": {
+    "runtimeActions": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "limitations": [
+    "INDEPENDENT_REVIEW_REQUIRED",
+    "FIXED31_NOT_RUN",
+    "FORGOT_UNRESOLVED"
+  ]
+}

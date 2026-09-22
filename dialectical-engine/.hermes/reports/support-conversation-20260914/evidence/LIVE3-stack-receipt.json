@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "node": "LIVE3",
+  "revision": "43cf9386ea3c9e7c79523ec38debe63271d19292",
+  "previous_supervisor": {
+    "pid": 12958,
+    "process_group": 12958,
+    "parent_pid": 1,
+    "loaded_revision": "82f57f1ebaaf59a9ee0ea81d3084c4d57f7557b0",
+    "normal_tls_help_status": 200,
+    "stopped_cleanly": true
+  },
+  "first_final_launch": {
+    "pid": 37935,
+    "process_group": 37935,
+    "ready": false,
+    "present_after_wait": false,
+    "fixed_stage_category": "DEV_AUTH_STACK_SUPPORT_MODEL_FAILED",
+    "inner_cause": "UNKNOWN",
+    "actual_support_requests": 0
+  },
+  "active_supervisor": {
+    "pid": 40443,
+    "process_group": 40443,
+    "parent_pid": 1,
+    "loaded_revision": "43cf9386ea3c9e7c79523ec38debe63271d19292",
+    "ready_marker": "DEV_AUTH_STACK_READY=https://localhost:3100:RUNNER_REGISTERED",
+    "normal_tls_help_status": 200,
+    "preview_listeners": [3100, 3101, 8890, 8891, 8892, 8893, 8894, 8895, 8896],
+    "preserved_original_listeners": [8790, 8791, 8792, 8793, 8794, 8795, 8796],
+    "present_after_browser_exit_and_ten_second_idle": true,
+    "detached": true,
+    "live_log_mode": "0600"
+  },
+  "browser_profile_removed": true,
+  "tls_bypass_used": false,
+  "original_services_modified": false,
+  "preview_left_active": true
+}

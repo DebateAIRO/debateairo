@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREFLIGHT_LIFECYCLE_REVIEW44",
+  "ticket": "t_ddfc58e9",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_FINAL_PREFLIGHT_LIFECYCLE_BINDING",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "freeze": "a28420a4235dfa95111d17c3d6a1974240f924b9",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_PREFLIGHT_LIFECYCLE_REVIEW44.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_PREFLIGHT_LIFECYCLE_REVIEW44.md",
+      "sha256": "31706b6a5a56b2b79c5ca637f5fad041911245bfdc36998414c063e22d571050",
+      "bytes": 2721
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREFLIGHT_LIFECYCLE_REVIEW44-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_PREFLIGHT_LIFECYCLE_REVIEW44-dispositions.json",
+      "sha256": "fe2b3b5cfded559fe81ed17dc5c2724a255c5944e37493d4ce2bc63235f81b82",
+      "bytes": 1846
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREFLIGHT_LIFECYCLE_REVIEW44-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_PREFLIGHT_LIFECYCLE_REVIEW44-custody.json",
+      "sha256": "b01de8d5e9ac0d06f6c570d5ef6b098515325cdaa464abbae4431d0094ac41fa",
+      "bytes": 995
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PREFLIGHT_LIFECYCLE_REVIEW44.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PREFLIGHT_LIFECYCLE_REVIEW44.md",
+      "sha256": "2f9e09bc3adabff2528a2476c2e9023144882fd3b48444c0e59ccdd81927437a",
+      "bytes": 1387
+    }
+  ]
+}

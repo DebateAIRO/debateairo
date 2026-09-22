@@ -1,0 +1,15 @@
+RECOVERY_DELTA custody follow-up
+observed_at=2026-09-17T07:12:57Z
+supervisor_pid=6142
+supervisor_ppid=1
+supervisor_pgid=6142
+supervisor_stat=Ss
+supervisor_command=node /Users/vladmihaimiron/.local/bin/pnpm dev:auth:up
+port_3100_listener_pid=6162
+port_3100_listener_command=node
+port_3100_listener=127.0.0.1:3100
+ordinary_tls_observed_at=2026-09-17T07:13:13Z
+ordinary_tls_http_code=200
+ordinary_tls_verify_result=0
+action=none
+qualification=The earlier sandboxed curl connection failure did not establish process or listener absence. This escalated read-only observation confirms the detached supervisor, listener, and ordinary-TLS Help response. No restart or runtime change occurred.

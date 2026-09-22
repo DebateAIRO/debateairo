@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_UI_WRITER_FIX45",
+  "ticket": "t_d67f68a5",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_UI_WRITER_BOUND_REVIEW_REQUIRED",
+  "sealedAtUtc": "2026-09-21T11:40:16.618852Z",
+  "proofs": {
+    "actualWriter": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_WRITER_FIX45-actual-writer-control-proof.json",
+      "sha256": "6222cac9bb21fa8d9d8d27b3d12d535e1f166a99d38a092ef9720bc6b3f67134",
+      "bytes": 940
+    },
+    "final": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_WRITER_FIX45-final-control-proof.json",
+      "sha256": "18f24334d7f419fbfe4143abc34e4931aae8e17cdf0d0dd0dacc8a0ef18fd671",
+      "bytes": 730
+    },
+    "permissionTrace": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_WRITER_FIX45-writer-permission-trace.json",
+      "sha256": "18ddd382d01b0610258f0a16835abde9c7315ebc04c5054da334ad45d7ca983f",
+      "bytes": 1975
+    }
+  },
+  "bindings": {
+    "command": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_WRITER_FIX45-command-contract.json",
+      "sha256": "6067a3f0db32f56a6b072fd2826b1e94da7969bc47151bbb9f762b39f2a02c3b",
+      "bytes": 35361
+    },
+    "operator": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_WRITER_FIX45-operator-contract.json",
+      "sha256": "b280d52eb72b0c2c41100bb6f95a46133c5260467b630aee2fb9d6e8478d356e",
+      "bytes": 22413
+    },
+    "delta": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_WRITER_FIX45-delta.json",
+      "sha256": "fd3fed067b6fee946c8c7e3a35cd6fde23a207acccfbaebf9442d17699c754b6",
+      "bytes": 550
+    }
+  },
+  "freshNamespace": "LIVE34",
+  "futureAbsenceCount": 115,
+  "traffic": {
+    "publicLocalAssets": true,
+    "forwardedDynamic": 0,
+    "support": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "model": 0
+  }
+}

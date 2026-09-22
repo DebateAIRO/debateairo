@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE30",
+  "ticket": "t_67ade796",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "FAILED_CAPTURE_SCREENSHOT_FOOTER_UNREACHABLE_NO_RETRY",
+  "operator": {
+    "toolSessionId": 87674,
+    "exitStatus": 1,
+    "stopFirst": true,
+    "retries": 0
+  },
+  "phases": {
+    "preflight": 0,
+    "readiness": 0,
+    "capacity": 0,
+    "gate": 0,
+    "rowProof": 0,
+    "capture": 1,
+    "idle": "NOT_RUN"
+  },
+  "preflight": {
+    "verdict": "PASS_ZERO_SUPPORT_UI_TRANSITIONS",
+    "transitions": 5,
+    "actualSupportRequestsForwarded": 0,
+    "checkedAbsent": 112
+  },
+  "readiness": {
+    "pid": 9800,
+    "pgid": 9800,
+    "ordinarySystemTls": {
+      "url": "https://localhost:3100/help",
+      "customCa": false,
+      "insecure": false,
+      "status": 200
+    }
+  },
+  "capacity": {
+    "measuredAtUtc": "2026-09-21T08:50:31.863Z",
+    "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+    "limits": {
+      "support_limit_anon_msgs_10m": 20,
+      "support_limit_anon_msgs_24h": 100,
+      "support_limit_anon_sessions_1h": 5,
+      "support_limit_session_msgs": 40,
+      "support_limit_msg_chars": 2000,
+      "support_relay_concurrency": 2,
+      "support_queue_depth": 10,
+      "support_daily_call_cap": 500,
+      "support_lock_after_injections": 3,
+      "support_ip_cooldown_minutes": 60
+    },
+    "observed": {
+      "maxAnonSessionEvents1hByIp": 0,
+      "maxAnonMessageEvents10mByIp": 0,
+      "maxAnonMessageEvents24hByIp": 52,
+      "anyIpCooldownActive": false,
+      "callsToday": 1,
+      "liveRelayWaiters": 0,
+      "relayState": "AVAILABLE"
+    }
+  },
+  "rowProof": {
+    "validatedRows": 58,
+    "validation": "PASS",
+    "completedAtUtc": "2026-09-21T08:50:33.056Z"
+  },
+  "capture": {
+    "consumedRowCount": 58,
+    "attemptedRowCount": 5,
+    "completedRowCount": 5,
+    "attemptedRows": [
+      1,
+      2,
+      15,
+      19,
+      23
+    ],
+    "createSessionCount": 2,
+    "sendMessageCount": 5,
+    "forbiddenAnswers": 0,
+    "forbiddenConsent": 0,
+    "sessionCreationTimesUtc": [
+      {
+        "ordinal": 1,
+        "observedAtUtc": "2026-09-21T08:50:35.959Z"
+      },
+      {
+        "ordinal": 2,
+        "observedAtUtc": "2026-09-21T08:51:07.590Z"
+      }
+    ],
+    "modelBranchRows": 5,
+    "providerCallCount": "UNAVAILABLE",
+    "modelCallCeiling": 27
+  },
+  "failure": {
+    "code": "GUIDE_CAPTURE_ORIGINAL_PANE_FOOTER_UNREACHABLE",
+    "stage": "POST_RESPONSE_SCREENSHOT_ORIGINAL_PANE_FOOTER",
+    "canonicalRow": {
+      "sequence": 23,
+      "kind": "GUIDE_FAMILY",
+      "family": "export",
+      "mode": "full",
+      "language": "ro",
+      "branch": "MODEL",
+      "actionPolicy": "NONE",
+      "recoveryClass": null
+    },
+    "api": {
+      "status": 200,
+      "outcome": "ANSWER_GROUNDED",
+      "sources": [
+        {
+          "id": "export-json",
+          "label": "Exportă o dezbatere ca JSON"
+        },
+        {
+          "id": "guide-how-it-works",
+          "label": "Cum citești o dezbatere"
+        }
+      ],
+      "actions": []
+    },
+    "apiDomEquality": {
+      "text": true,
+      "sources": true,
+      "actions": true
+    },
+    "diagnostic": {
+      "status": "ACCEPTED_DRAFT",
+      "category": null,
+      "candidateCount": 0,
+      "validCount": 0,
+      "invalidCount": 0,
+      "duplicateCount": 0,
+      "unmatchedCount": 0
+    },
+    "proof": {
+      "branch": "MODEL"
+    },
+    "classification": "CAPTURE_INSTRUMENTATION_FAILURE_AFTER_ACCEPTED_APP_RESPONSE",
+    "productCause": "NOT_ESTABLISHED"
+  },
+  "artifactsAtFailure": {
+    "completedScreenshotRows": [
+      1,
+      2,
+      15,
+      19
+    ],
+    "failedRow": {
+      "sequence": 23,
+      "provenance": "FRESH_GUIDE22_FIXED31",
+      "responseOrigin": "MODEL_ACCEPTED_DRAFT",
+      "currentArticleIdentitySha256": "UNAVAILABLE_BEFORE_THROW",
+      "sourceLayout": {
+        "apiSourceIds": [
+          "export-json",
+          "guide-how-it-works"
+        ],
+        "visibleSourceLabels": [
+          "Exportă o dezbatere ca JSON",
+          "Cum citești o dezbatere"
+        ],
+        "apiActionIds": [],
+        "visibleActionIds": [],
+        "sourceActionEquality": {
+          "sources": true,
+          "actions": true
+        }
+      },
+      "topPanePng": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE22-row-23-original-pane-top.png",
+        "sha256": "bb3379432c74166b530bc74624efd537b9148d8bfbd099a4eee2c21eebec8cb1",
+        "bytes": 110931,
+        "width": 652,
+        "height": 700
+      },
+      "footerPanePng": "NOT_CREATED",
+      "completeExpandedPng": "NOT_CREATED",
+      "paneRect": "UNAVAILABLE_BEFORE_THROW",
+      "footerRect": "UNAVAILABLE_BEFORE_THROW",
+      "scrollTop": "UNAVAILABLE_BEFORE_THROW",
+      "scrollHeight": "UNAVAILABLE_BEFORE_THROW",
+      "clientHeight": "UNAVAILABLE_BEFORE_THROW",
+      "stylesScrollViewportRestored": "UNAVAILABLE_BEFORE_THROW"
+    }
+  },
+  "futureTiming": {
+    "conservativeFiveSessionNotBeforeUtc": "2026-09-21T09:51:12.590Z",
+    "derivation": "second observed session creation + 1h + 5s; not a future capacity PASS",
+    "ownerWalkthroughCreated": false
+  },
+  "custody": {
+    "idlePhaseRun": false,
+    "postFailureCustody": "NOT_ESTABLISHED",
+    "runtimeRestarted": false,
+    "privateRuntimeLogRead": false
+  },
+  "traffic": {
+    "statusReads": 1,
+    "capacityQueries": 1,
+    "createSession": 2,
+    "sendMessage": 5,
+    "supportRequests": 5,
+    "modelBranchRows": 5,
+    "retries": 0
+  }
+}

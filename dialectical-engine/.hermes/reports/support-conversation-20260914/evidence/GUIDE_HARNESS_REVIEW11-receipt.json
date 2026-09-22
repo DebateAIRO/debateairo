@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW11",
+  "ticket": "t_bca4bdd9",
+  "runId": 185,
+  "verdict": "PASS_BOUNDED_GH10_R1_CORRECTION",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "reviewedOn": "2026-09-20T13:47:15.630931Z",
+  "productRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productCheckout": {
+    "headObserved": "152eed4da1cd3e66b74d8301159ba76427552409",
+    "cleanObserved": true
+  },
+  "freezeCommit": "f1baf9e7420f9a7466e65a32a633839af903c400",
+  "disposition": {
+    "finding": "GH10-R1",
+    "status": "RESOLVED_BOUNDED",
+    "actualProducerArtifact": "GATE_GUIDE_FINAL9-manifest.json",
+    "inventorySha256": "f2397d8f0bd4d083de7a308c8e1aba17e62fa4a359ddce47b4ef752c4b136a3b",
+    "presentRecords": 144,
+    "deletedRecords": 3,
+    "attestedFiles": 6,
+    "immutableInputs": 29,
+    "presentEqualsCumulativeGitDelta": true,
+    "deletedEqualsCumulativeGitDelta": true,
+    "currentFileMismatches": 0,
+    "attestedMismatches": 0,
+    "immutableInputMismatches": 0,
+    "sharedConsumer": "validateGuideStaticBoundInputs is called by both the inert BIND12 frame and future createGuidePreRequestVerifier",
+    "negativeCases": [
+      "retained empty FINAL8 rejects",
+      "missing attested member rejects",
+      "stale attested hash rejects"
+    ],
+    "causeQualification": "FINAL8 visibly has zero product records and Git-root-prefixed changed paths; its emitting implementation is unavailable, so no narrower internal cause is claimed."
+  },
+  "controlEvidence": {
+    "indexedInputs": 97,
+    "inputMismatches": 0,
+    "priorControls": 112,
+    "controls": 116,
+    "passed": 116,
+    "uniqueNames": 116,
+    "retainedPriorNamesAsExactPrefix": true,
+    "addedNames": [
+      "actual FINAL9 product inventory passes the shared pre request static binding",
+      "old empty FINAL8 product inventory is rejected",
+      "missing attested product member is rejected",
+      "stale attested product member hash is rejected"
+    ],
+    "controlProofSha256": "d265543d61405892da8ef1972350158a7342b7743be4b969b9b2d0b9754312da",
+    "orderedEightDigest": "1c46d0d55ed0e8f4f7900682a031ccec2b47e9e831d7357a426975f10e78391a",
+    "matrixSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+    "preRequestVerifierSha256": "d5d6656431f93e3089c9c6751ae767b401d21f23bb90d398fa99a051af0ead39",
+    "matrixRows": 54,
+    "suiteFiles": 34,
+    "adapterNegativePassed": 3,
+    "adapterNegativeTotal": 3,
+    "futureGuide12PathsCheckedAbsent": 56
+  },
+  "retainedDispositions": {
+    "safetyOracles": "PASS RETAINED",
+    "diagnosticProjection": "PASS RETAINED",
+    "sourcesOutcomesActionsNavigation": "PASS RETAINED",
+    "apiDomEquality": "PASS RETAINED",
+    "sessionPacingCapacityNoRetry": "PASS RETAINED",
+    "loaderArgv": "PASS RETAINED",
+    "matrix54": "BYTE IDENTICAL",
+    "forgot": "UNRESOLVED_ACTIONLESS"
+  },
+  "artifacts": [
+    {
+      "role": "report",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW11.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW11.md",
+      "sha256": "6b7f07d33cbe01e474caf0b7388d497a6c7bb36251d9d895bffd243b36ff678f",
+      "bytes": 3808
+    },
+    {
+      "role": "selfReport",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW11.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW11.md",
+      "sha256": "ee8489ba71429b393c0fbbce36b2add69b4b6ea19567efffaef057adb28d84cc",
+      "bytes": 3009
+    },
+    {
+      "role": "staticCustody",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW11-static-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW11-static-custody.json",
+      "sha256": "f5b15c26880fd4b7ffdc502a246424dda39f467cf90ed33b127ea9dfb2d968ca",
+      "bytes": 2456
+    }
+  ],
+  "limits": {
+    "staticOnly": true,
+    "testsRun": false,
+    "technicalReviewRepeated": false,
+    "runtime": false,
+    "browser": false,
+    "http": false,
+    "database": false,
+    "status": false,
+    "capacity": false,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "productWrites": false,
+    "gitWrites": false,
+    "heavyLeaseRequested": false,
+    "gitLeaseRequested": false,
+    "captureClaimed": false,
+    "readinessClaimed": false,
+    "acceptanceClaimed": false
+  },
+  "selfExclusion": "This receipt excludes itself from artifacts and custody hashes."
+}

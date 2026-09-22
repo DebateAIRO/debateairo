@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_REVIEW38",
+  "ticket": "t_06b937dc",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_FINAL_FOOTER_CAPTURE_BINDING",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "dispositions": [
+    {
+      "id": "FIX38-CONTAINED",
+      "result": "PASS",
+      "finding": "Already-contained row23 footer preserves scrollTop 480 with requested delta zero and remains painted and strictly contained."
+    },
+    {
+      "id": "FIX38-FORWARD",
+      "result": "PASS",
+      "finding": "A genuinely below-pane footer advances 104 to 352 by positive overflow plus one pixel and becomes painted within the pane."
+    },
+    {
+      "id": "FIX38-REJECT",
+      "result": "PASS",
+      "finding": "A horizontally clipped footer remains rejected; current target and source mutations reject before capture."
+    },
+    {
+      "id": "FIX38-DIAGNOSTIC",
+      "result": "PASS",
+      "finding": "Failure evidence preserves identity, floating-point geometry, scroll assignment, artifact state and observed exception restoration before rethrow."
+    },
+    {
+      "id": "FIX38-VISUAL",
+      "result": "PASS",
+      "finding": "Saved contained, expanded and forward images visibly paint the intended answer/footer without clipping; impossible control image visibly demonstrates the rejected clipping."
+    },
+    {
+      "id": "FIX38-ATTEMPTS",
+      "result": "PASS_WITH_DISCLOSURE",
+      "finding": "Four fixture/bookkeeping attempts remain immutable and distinct from the final six-control proof."
+    },
+    {
+      "id": "FIX38-BINDING",
+      "result": "PASS",
+      "finding": "All seven argv self-bind the final contract; corrected helper/capture/operator hashes agree; 154 unique future paths are absent."
+    },
+    {
+      "id": "FIX38-OPERATIONS",
+      "result": "UNVERIFIED_FUTURE",
+      "finding": "Actual31, current capacity, Runtime9 postfailure custody and owner availability require the future operational run."
+    }
+  ],
+  "hashes": {
+    "authorReceipt": "11bc46a82fa493b8060e1b51ea4718f43beb14ffb37bd9d7281ed5b90359901a",
+    "browserControlProof": "517bae91db19aa1b51a7bf9710eb1ebc9bae3f75f136c6e8b769436e147a0612",
+    "bindingControlProof": "9f33cf7daf162cd91857505446eb49219de144c054b48126ff7c1ebc7d8cd5d4",
+    "commandContract": "ff16afdb6f2a5bbc227818df0629c6817213d42595b8fa8814c1670bd2edf659",
+    "operatorContract": "677854cec802e1587374fecfa89b8a7aee713d43d6deeabaa4a9b177a1682217",
+    "operatorScript": "6687c835aa82f204838132e14921aeb528f6759c8091bf19ed564def1e84df84",
+    "screenshotHelper": "ae2dd69f15486cdd4cc0e31eb3321227a79b02c340d34d930ece6cea5589f771",
+    "captureImplementation": "e8f317572c8f528fe7410e6fd7c2337508e0ed53a1e987aa1af180df1e28b30c"
+  },
+  "traffic": {"runtime": 0, "browser": 0, "http": 0, "status": 0, "capacity": 0, "database": 0, "support": 0, "model": 0},
+  "heavyLeaseHeld": false
+}

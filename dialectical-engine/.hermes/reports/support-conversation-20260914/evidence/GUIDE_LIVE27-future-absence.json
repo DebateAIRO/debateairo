@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE27",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "checked": 123,
+  "presentCount": 0,
+  "present": [],
+  "verdict": "PASS_ALL_FUTURE_PATHS_REMAIN_ABSENT"
+}

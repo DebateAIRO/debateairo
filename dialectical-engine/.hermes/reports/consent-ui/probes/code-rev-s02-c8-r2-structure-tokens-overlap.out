@@ -1,0 +1,53 @@
+===== r1 css-structure.mjs re-run at 0dc569e9 (with S01 lane for the overlap) =====
+(S01 lane css present)
+== rules parsed in the S02 block: 45 (top-level 44, in at-rules 1)
+
+== S02-S61 duplicate top-level selectors: (none)
+== S02-S63 animated selectors  : [".policyScrim",".policyBezel"]
+== S02-S63 neutralised selectors: [".policyScrim",".policyBezel"]
+== S02-S63 UNCOVERED           : []
+== S02-S63 selectors with `transition:` (not covered by the rule): []
+
+== S01 block: 372 lines, 50 rules, 33 class tokens
+== S02 block: 420 lines, 45 rules, 34 class tokens
+== SHARED class tokens  : []
+== SHARED full selectors: []
+== S01 class tokens: consentActions consentBar consentBarBezel consentBarCore consentBody consentCard consentCardCore consentCardFooter consentCardTitle consentCatDesc consentCatDetail consentCatHead consentCatList consentCatMain consentCatName consentCatRow consentCopy consentEyebrow consentFooterGap consentGhost consentGhostStrong consentKnob consentLede consentLink consentPrimary consentScrim consentSwitch consentTab consentTag consentTag-analytics consentTag-essential consentTag-quality consentTitle
+== SHARED @keyframes names: []
+== S01 @keyframes: (none)   S02 @keyframes: consentPolicyScrimIn,consentPolicyCardIn
+
+===== r1 token-audit.mjs re-run =====
+block lines: 420
+distinct token references in block: 23
+--accent             base=YES s01lane=YES
+--bg                 base=YES s01lane=YES
+--core               base=YES s01lane=YES
+--focus              base=YES s01lane=YES
+--font-display       base=YES s01lane=YES
+--font-mono          base=YES s01lane=YES
+--gold               base=YES s01lane=YES
+--ink                base=YES s01lane=YES
+--line               base=YES s01lane=YES
+--line-strong        base=YES s01lane=YES
+--muted              base=YES s01lane=YES
+--ok-dot             base=YES s01lane=YES
+--ok-edge            base=no  s01lane=YES
+--r-dot              base=YES s01lane=YES
+--r-panel            base=YES s01lane=YES
+--r-pill             base=YES s01lane=YES
+--r-tab              base=YES s01lane=YES
+--scrim              base=no  s01lane=YES
+--shadow-pop         base=YES s01lane=YES
+--shell              base=YES s01lane=YES
+--text-2             base=YES s01lane=YES
+--z-policy-card      base=no  s01lane=YES
+--z-policy-scrim     base=no  s01lane=YES
+
+UNDECLARED-ANYWHERE: (none)
+ARRIVES-FROM-S01: --ok-edge,--scrim,--z-policy-card,--z-policy-scrim
+packet-named token --muted-bg: referenced in block = false
+packet-named token --muted-border: referenced in block = false
+packet-named token --shadow-knob: referenced in block = false
+
+S02-S60 colour literals in block (raw incl. comments): 0 []
+S02-S60 token declarations in block (raw incl. comments): 0 []

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_REVIEW29",
+  "ticket": "t_91c29a7f",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "REWORK_BOUNDED_COMPLETE_FULL_CAPTURE",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_CAPTURE_REVIEW29.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_CAPTURE_REVIEW29.md",
+      "sha256": "0ae9990b025670272c4d42c436c8ad6860b24ad8f867f2a9a75f71db969ca1b6",
+      "bytes": 6200
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_REVIEW29-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_REVIEW29-dispositions.json",
+      "sha256": "87b200becdc3086e3e5992cff6e8ac2d55ed4440c3e4b5dd8f5d69cb5f3280c8",
+      "bytes": 4918
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_REVIEW29-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_REVIEW29-custody.json",
+      "sha256": "60ba4138e9bae21baa644cff01732d3776c0088b5bac5ccd3bbee2d5a5bd394d",
+      "bytes": 2155
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_CAPTURE_REVIEW29.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_CAPTURE_REVIEW29.md",
+      "sha256": "6fe09fd7e69902370b96528291afc6df089476361aefbac12798f57f0bd95ada",
+      "bytes": 3375
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "heavyLeaseHeld": false,
+  "finding": "The sealed full-ro-long complete-expanded PNG is clipped by the full-mode root and does not paint the source/action footer.",
+  "retained": [
+    "Actual LIVE28 source-label versus source-id diagnosis and label-based correction pass.",
+    "Stale/previous/wrong-index guards and contained-short-footer rule pass.",
+    "Unused LIVE29/GUIDE22 literal bindings and planning-only natural availability bound pass."
+  ]
+}

@@ -1,0 +1,6 @@
+at=2026-09-17T07:09:19Z
+target=https://localhost:3100/help
+http_code=000
+result=connection_refused
+action=none
+qualification=Preview was not restarted because RECOVERY_DELTA is read-only and explicitly forbids restart.

@@ -1,0 +1,848 @@
+{
+  "schemaVersion": 2,
+  "status": "planned-public-guide-coverage-corrected",
+  "baselineRevision": "479763da1f586a217f36204cc81138aaa81c6f81",
+  "scope": "meaningful visitor-facing page, menu and control families; cosmetic controls excluded",
+  "navigationModes": [
+    "safe-static-action",
+    "trusted-reference-action",
+    "prose-local-control",
+    "prose-private-context",
+    "prose-prerequisite",
+    "existing-ui-workflow",
+    "unresolved",
+    "excluded"
+  ],
+  "routeDisposition": [
+    {
+      "route": "/",
+      "surface": "landing-and-library",
+      "disposition": "public-guide"
+    },
+    {
+      "route": "/new",
+      "surface": "new-debate",
+      "disposition": "public-guide-with-signed-in-prerequisite"
+    },
+    {
+      "route": "/debate/[id]",
+      "surface": "owner-workspace",
+      "disposition": "prose-only-unless-trusted-owner-reference"
+    },
+    {
+      "route": "/public/debate/[id]",
+      "surface": "published-debate",
+      "disposition": "action-only-with-validated-public-reference"
+    },
+    {
+      "route": "/help",
+      "surface": "support",
+      "disposition": "public-guide-and-separate-human-case-workflow"
+    },
+    {
+      "route": "/login",
+      "surface": "sign-in",
+      "disposition": "public-static-action"
+    },
+    {
+      "route": "/sign-up",
+      "surface": "sign-up",
+      "disposition": "public-static-action"
+    },
+    {
+      "route": "/verify-email",
+      "surface": "email-verification",
+      "disposition": "state-bearing-prose-only"
+    },
+    {
+      "route": "/enroll-mfa",
+      "surface": "mfa-enrollment",
+      "disposition": "state-bearing-prose-only"
+    },
+    {
+      "route": "/settings",
+      "surface": "account-settings",
+      "disposition": "signed-in-static-actions-and-prose"
+    },
+    {
+      "route": "/admin/workers",
+      "surface": "operator-workers",
+      "disposition": "excluded"
+    }
+  ],
+  "articlePlan": [
+    {
+      "articleId": "app-navigation",
+      "files": [
+        "packages/support-kb/content/app-navigation.en.md",
+        "packages/support-kb/content/app-navigation.ro.md"
+      ],
+      "families": [
+        "landing",
+        "global-navigation",
+        "home-library",
+        "help",
+        "theme",
+        "pricing-placeholder"
+      ]
+    },
+    {
+      "articleId": "debate-workspace-menus",
+      "files": [
+        "packages/support-kb/content/debate-workspace-menus.en.md",
+        "packages/support-kb/content/debate-workspace-menus.ro.md"
+      ],
+      "families": [
+        "debate-views",
+        "scoring",
+        "replay",
+        "workspace",
+        "honesty",
+        "export",
+        "guide"
+      ]
+    },
+    {
+      "articleId": "settings-help-menus",
+      "files": [
+        "packages/support-kb/content/settings-help-menus.en.md",
+        "packages/support-kb/content/settings-help-menus.ro.md"
+      ],
+      "families": [
+        "active-sessions",
+        "privacy",
+        "legacy-claim",
+        "account-deletion",
+        "human-case-separation"
+      ]
+    },
+    {
+      "articleId": "support-status-limits",
+      "change": "correct-existing-private-authority-claim",
+      "files": [
+        "packages/support-kb/content/support-status-limits.en.md",
+        "packages/support-kb/content/support-status-limits.ro.md"
+      ],
+      "families": [
+        "public-help-status",
+        "support-availability-limits"
+      ],
+      "forbiddenClaims": [
+        "selected-debate status",
+        "consent-authorized private lookup",
+        "ownership-authorized private lookup",
+        "run state/progress/failure"
+      ]
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "landing",
+      "route": "/",
+      "sourceFiles": [
+        "apps/ui/components/landing/LandingChrome.tsx",
+        "apps/ui/app/page.tsx",
+        "apps/ui/components/ModeToggle.tsx"
+      ],
+      "items": [
+        {
+          "id": "landing-home",
+          "labelEn": "Home",
+          "labelRo": "Acasă",
+          "articleId": "app-navigation",
+          "mode": "safe-static-action",
+          "actionId": "home",
+          "href": "/"
+        },
+        {
+          "id": "landing-method",
+          "labelEn": "Method",
+          "labelRo": "Metodă",
+          "articleId": "app-navigation",
+          "mode": "safe-static-action",
+          "actionId": "method",
+          "href": "/#method"
+        },
+        {
+          "id": "landing-transcripts",
+          "labelEn": "Transcripts",
+          "labelRo": "Transcrieri",
+          "articleId": "app-navigation",
+          "mode": "safe-static-action",
+          "actionId": "sample-transcript",
+          "href": "/#transcripts"
+        },
+        {
+          "id": "landing-pricing",
+          "labelEn": "Pricing",
+          "labelRo": "Prețuri",
+          "articleId": "app-navigation",
+          "mode": "prose-local-control",
+          "actionId": null,
+          "href": null,
+          "constraint": "current placeholder; never describe as checkout"
+        },
+        {
+          "id": "landing-start",
+          "labelEn": "Start a round",
+          "labelRo": "Pornește o rundă",
+          "articleId": "app-navigation",
+          "mode": "safe-static-action",
+          "actionId": "start-debate",
+          "href": null,
+          "constraint": "closed resolver returns /new when signed in and /login?next=%2Fnew when signed out"
+        },
+        {
+          "id": "landing-theme",
+          "labelEn": "Theme",
+          "labelRo": "Temă",
+          "articleId": "app-navigation",
+          "mode": "prose-local-control",
+          "actionId": null,
+          "href": null
+        }
+      ]
+    },
+    {
+      "id": "global-navigation",
+      "route": "all-non-debate-pages",
+      "sourceFiles": [
+        "apps/ui/components/TopBar.tsx",
+        "apps/ui/components/ModeToggle.tsx"
+      ],
+      "items": [
+        {
+          "id": "global-brand",
+          "labelEn": "Dialectical Engine home",
+          "labelRo": "Pagina principală Dialectical Engine",
+          "articleId": "app-navigation",
+          "mode": "safe-static-action",
+          "actionId": "home",
+          "href": "/"
+        },
+        {
+          "id": "global-account",
+          "labelEn": "Account",
+          "labelRo": "Cont",
+          "articleId": "settings-help-menus",
+          "mode": "safe-static-action",
+          "actionId": "settings",
+          "href": "/settings",
+          "constraint": "signed-in Account destination"
+        },
+        {
+          "id": "global-new-debate",
+          "labelEn": "New debate",
+          "labelRo": "Dezbatere nouă",
+          "articleId": "app-navigation",
+          "mode": "safe-static-action",
+          "actionId": "start-debate",
+          "href": "/new"
+        },
+        {
+          "id": "global-identity-chip",
+          "labelEn": "Identity chip",
+          "labelRo": "Indicator de identitate",
+          "articleId": "app-navigation",
+          "mode": "prose-private-context",
+          "actionId": null,
+          "href": null,
+          "constraint": "presentation only; never a Support data source"
+        },
+        {
+          "id": "global-theme",
+          "labelEn": "Theme",
+          "labelRo": "Temă",
+          "articleId": "app-navigation",
+          "mode": "prose-local-control",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "global-settings",
+          "labelEn": "Settings",
+          "labelRo": "Setări",
+          "articleId": "settings-help-menus",
+          "mode": "safe-static-action",
+          "actionId": "settings",
+          "href": "/settings"
+        }
+      ]
+    },
+    {
+      "id": "home-library",
+      "route": "/",
+      "sourceFiles": [
+        "apps/ui/app/page.tsx"
+      ],
+      "items": [
+        {
+          "id": "home-yours",
+          "labelEn": "Your debates",
+          "labelRo": "Dezbaterile tale",
+          "articleId": "app-navigation",
+          "mode": "safe-static-action",
+          "actionId": "your-debates",
+          "href": "/?tab=yours",
+          "constraint": "Support never reads this list"
+        },
+        {
+          "id": "home-public",
+          "labelEn": "Public debates",
+          "labelRo": "Dezbateri publice",
+          "articleId": "app-navigation",
+          "mode": "safe-static-action",
+          "actionId": "public-catalog",
+          "href": "/?tab=public"
+        },
+        {
+          "id": "home-composer",
+          "labelEn": "Start a debate",
+          "labelRo": "Pornește o dezbatere",
+          "articleId": "app-navigation",
+          "mode": "safe-static-action",
+          "actionId": "start-debate",
+          "href": "/new"
+        }
+      ]
+    },
+    {
+      "id": "new-debate",
+      "route": "/new",
+      "sourceFiles": [
+        "apps/ui/app/new/page.tsx"
+      ],
+      "items": [
+        {
+          "id": "new-topic",
+          "labelEn": "Topic",
+          "labelRo": "Subiect",
+          "articleId": "debate-topic-and-description",
+          "mode": "prose-local-control",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "new-plan",
+          "labelEn": "Free or Premium plan",
+          "labelRo": "Plan Gratuit sau Premium",
+          "articleId": "getting-started-debate",
+          "mode": "prose-prerequisite",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "new-risk",
+          "labelEn": "Risk tier",
+          "labelRo": "Nivel de risc",
+          "articleId": "risk-tier-choice",
+          "mode": "prose-local-control",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "new-budget",
+          "labelEn": "Budget tier",
+          "labelRo": "Nivel de buget",
+          "articleId": "budget-tier-choice",
+          "mode": "prose-local-control",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "new-depth",
+          "labelEn": "Depth",
+          "labelRo": "Adâncime",
+          "articleId": "getting-started-debate",
+          "mode": "prose-local-control",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "new-steering",
+          "labelEn": "Steering",
+          "labelRo": "Dirijare",
+          "articleId": "getting-started-debate",
+          "mode": "prose-local-control",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "new-settings",
+          "labelEn": "Settings",
+          "labelRo": "Setări",
+          "articleId": "settings-help-menus",
+          "mode": "safe-static-action",
+          "actionId": "settings",
+          "href": "/settings"
+        },
+        {
+          "id": "new-cancel",
+          "labelEn": "Cancel",
+          "labelRo": "Anulează",
+          "articleId": "app-navigation",
+          "mode": "safe-static-action",
+          "actionId": "home",
+          "href": "/"
+        }
+      ]
+    },
+    {
+      "id": "debate-workspace",
+      "route": "/debate/[id] and /public/debate/[id]",
+      "sourceFiles": [
+        "apps/ui/app/debate/[id]/DebatePageClient.tsx",
+        "apps/ui/components/DebateWorkspaceDrawer.tsx",
+        "apps/ui/components/AnswerHonestyDrawer.tsx",
+        "apps/ui/components/PublicHonestyDrawer.tsx",
+        "apps/ui/components/NodeDetailDrawer.tsx"
+      ],
+      "items": [
+        {
+          "id": "debate-thread",
+          "labelEn": "Thread",
+          "labelRo": "Fir",
+          "articleId": "debate-workspace-menus",
+          "mode": "prose-local-control",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "debate-split",
+          "labelEn": "Split",
+          "labelRo": "Împărțit",
+          "articleId": "debate-workspace-menus",
+          "mode": "prose-local-control",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "debate-tree",
+          "labelEn": "Tree",
+          "labelRo": "Arbore",
+          "articleId": "debate-workspace-menus",
+          "mode": "prose-local-control",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "debate-map",
+          "labelEn": "Map",
+          "labelRo": "Hartă",
+          "articleId": "debate-workspace-menus",
+          "mode": "prose-local-control",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "debate-scoring",
+          "labelEn": "Scoring diagnostics",
+          "labelRo": "Diagnostic de evaluare",
+          "articleId": "debate-workspace-menus",
+          "mode": "prose-local-control",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "debate-library",
+          "labelEn": "Library",
+          "labelRo": "Bibliotecă",
+          "articleId": "app-navigation",
+          "mode": "safe-static-action",
+          "actionId": "home",
+          "href": "/"
+        },
+        {
+          "id": "debate-replay",
+          "labelEn": "Replay",
+          "labelRo": "Repetă generarea",
+          "articleId": "debate-workspace-menus",
+          "mode": "prose-private-context",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "debate-workspace-drawer",
+          "labelEn": "Workspace",
+          "labelRo": "Spațiu de lucru",
+          "articleId": "debate-workspace-menus",
+          "mode": "prose-private-context",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "debate-honesty",
+          "labelEn": "Honesty",
+          "labelRo": "Transparență",
+          "articleId": "debate-workspace-menus",
+          "mode": "prose-private-context",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "debate-export",
+          "labelEn": "Export",
+          "labelRo": "Exportă",
+          "articleId": "export-json",
+          "mode": "prose-private-context",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "debate-how-it-works",
+          "labelEn": "How it works",
+          "labelRo": "Cum funcționează",
+          "articleId": "guide-how-it-works",
+          "mode": "prose-local-control",
+          "actionId": null,
+          "href": null
+        }
+      ]
+    },
+    {
+      "id": "settings",
+      "route": "/settings",
+      "sourceFiles": [
+        "apps/ui/components/SessionControls.tsx",
+        "apps/ui/components/consent/ConsentSettingsPanel.tsx",
+        "apps/ui/components/LegacyRunClaimControls.tsx",
+        "apps/ui/components/AccountErasureControls.tsx"
+      ],
+      "items": [
+        {
+          "id": "settings-sessions",
+          "labelEn": "Active sessions",
+          "labelRo": "Sesiuni active",
+          "articleId": "settings-help-menus",
+          "mode": "safe-static-action",
+          "actionId": "active-sessions",
+          "href": "/settings#active-sessions-heading"
+        },
+        {
+          "id": "settings-privacy",
+          "labelEn": "Privacy",
+          "labelRo": "Confidențialitate",
+          "articleId": "settings-help-menus",
+          "mode": "safe-static-action",
+          "actionId": "privacy-preferences",
+          "href": "/settings#consent-privacy-heading"
+        },
+        {
+          "id": "settings-legacy",
+          "labelEn": "Claim legacy debates",
+          "labelRo": "Revendică dezbaterile vechi",
+          "articleId": "settings-help-menus",
+          "mode": "safe-static-action",
+          "actionId": "claim-legacy",
+          "href": "/settings#legacy-run-claim-heading",
+          "constraint": "Support does not perform the claim"
+        },
+        {
+          "id": "settings-delete",
+          "labelEn": "Delete account",
+          "labelRo": "Șterge contul",
+          "articleId": "settings-help-menus",
+          "mode": "safe-static-action",
+          "actionId": "delete-account",
+          "href": "/settings#account-deletion-heading",
+          "constraint": "Support does not perform deletion"
+        }
+      ]
+    },
+    {
+      "id": "help",
+      "route": "/help",
+      "sourceFiles": [
+        "apps/ui/components/support/Assistant.tsx",
+        "apps/ui/components/support/CaseView.tsx"
+      ],
+      "items": [
+        {
+          "id": "help-free-text",
+          "labelEn": "Support conversation",
+          "labelRo": "Conversație de asistență",
+          "articleId": "app-navigation",
+          "mode": "safe-static-action",
+          "actionId": "help",
+          "href": "/help",
+          "constraint": "verified closed /help action; free text remains the primary interface"
+        },
+        {
+          "id": "help-compact",
+          "labelEn": "Compact Help",
+          "labelRo": "Ajutor compact",
+          "articleId": "app-navigation",
+          "mode": "existing-ui-workflow",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "help-primers",
+          "labelEn": "Topic primers",
+          "labelRo": "Sugestii de subiect",
+          "articleId": "app-navigation",
+          "mode": "prose-local-control",
+          "actionId": null,
+          "href": null,
+          "constraint": "pills only prime or submit free text; they are optional"
+        },
+        {
+          "id": "help-status",
+          "labelEn": "Service status",
+          "labelRo": "Starea serviciului",
+          "articleId": "support-status-limits",
+          "mode": "safe-static-action",
+          "actionId": "support-status",
+          "href": "/help#service-status"
+        },
+        {
+          "id": "help-cookies",
+          "labelEn": "Cookie preferences",
+          "labelRo": "Preferințe cookie",
+          "articleId": "app-navigation",
+          "mode": "existing-ui-workflow",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "help-report",
+          "labelEn": "Report a bug",
+          "labelRo": "Raportează o eroare",
+          "articleId": "support-cases",
+          "mode": "existing-ui-workflow",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "help-email",
+          "labelEn": "Email support",
+          "labelRo": "Asistență prin email",
+          "articleId": "support-cases",
+          "mode": "prose-prerequisite",
+          "actionId": null,
+          "href": null
+        },
+        {
+          "id": "help-human-cases",
+          "labelEn": "Human support cases",
+          "labelRo": "Cazuri de asistență umană",
+          "articleId": "settings-help-menus",
+          "mode": "existing-ui-workflow",
+          "actionId": null,
+          "href": null,
+          "constraint": "case records and tokens never enter the guide model"
+        }
+      ]
+    },
+    {
+      "id": "authentication",
+      "route": "/login, /sign-up, /verify-email, /enroll-mfa",
+      "sourceFiles": [
+        "apps/ui/components/LoginFlow.tsx",
+        "apps/ui/components/SignUpFlow.tsx",
+        "apps/ui/app/verify-email/page.tsx",
+        "apps/ui/app/enroll-mfa/page.tsx"
+      ],
+      "items": [
+        {
+          "id": "auth-sign-in",
+          "labelEn": "Sign in",
+          "labelRo": "Autentificare",
+          "articleId": "account-access",
+          "mode": "safe-static-action",
+          "actionId": "sign-in",
+          "href": "/login"
+        },
+        {
+          "id": "auth-sign-up",
+          "labelEn": "Create account",
+          "labelRo": "Creează un cont",
+          "articleId": "account-access",
+          "mode": "safe-static-action",
+          "actionId": "sign-up",
+          "href": "/sign-up"
+        },
+        {
+          "id": "auth-verify-email",
+          "labelEn": "Verify email",
+          "labelRo": "Verifică emailul",
+          "articleId": "account-access",
+          "mode": "prose-prerequisite",
+          "actionId": null,
+          "href": null,
+          "constraint": "state-bearing link is never guessed"
+        },
+        {
+          "id": "auth-enroll-mfa",
+          "labelEn": "Enroll MFA",
+          "labelRo": "Configurează MFA",
+          "articleId": "account-access",
+          "mode": "prose-prerequisite",
+          "actionId": null,
+          "href": null,
+          "constraint": "state-bearing route is not offered as a generic action"
+        },
+        {
+          "id": "auth-forgot-password",
+          "labelEn": "Forgot password",
+          "labelRo": "Am uitat parola",
+          "articleId": "account-access",
+          "mode": "unresolved",
+          "actionId": "forgot-password",
+          "href": null,
+          "constraint": "checkpoint-blocking until owner verifies the existing destination or opener"
+        }
+      ]
+    },
+    {
+      "id": "operator",
+      "route": "/admin/workers",
+      "sourceFiles": [
+        "apps/ui/app/admin/workers/page.tsx"
+      ],
+      "items": [
+        {
+          "id": "operator-workers",
+          "labelEn": "Workers",
+          "labelRo": "Lucrători",
+          "articleId": "unsupported-capabilities",
+          "mode": "excluded",
+          "actionId": null,
+          "href": null
+        }
+      ]
+    }
+  ],
+  "acceptance": {
+    "includedItemRule": "every item except mode=excluded has reviewed EN/RO guidance and a natural free-text real-corpus test",
+    "actionRule": "only safe-static-action or trusted-reference-action may return an action; every href is server-resolved",
+    "privateRule": "prose-private-context never reads a list, identifier, record, status or content",
+    "forgotRule": "unresolved remains actionless and checkpoint-blocking",
+    "historyRule": "single-turn only in CP1; bounded public-only history remains CP2"
+  },
+  "supersedes": "docs/missions/support-conversation-20260914/slices/CP1/MENU-COVERAGE.json",
+  "counts": {
+    "routes": 11,
+    "surfaces": 9,
+    "items": 52,
+    "included": 51,
+    "excluded": 1
+  },
+  "editorialScope": {
+    "recordCount": 8,
+    "records": [
+      {
+        "id": "app-navigation",
+        "lang": "en",
+        "change": "new"
+      },
+      {
+        "id": "app-navigation",
+        "lang": "ro",
+        "change": "new"
+      },
+      {
+        "id": "debate-workspace-menus",
+        "lang": "en",
+        "change": "new"
+      },
+      {
+        "id": "debate-workspace-menus",
+        "lang": "ro",
+        "change": "new"
+      },
+      {
+        "id": "settings-help-menus",
+        "lang": "en",
+        "change": "new"
+      },
+      {
+        "id": "settings-help-menus",
+        "lang": "ro",
+        "change": "new"
+      },
+      {
+        "id": "support-status-limits",
+        "lang": "en",
+        "change": "corrected"
+      },
+      {
+        "id": "support-status-limits",
+        "lang": "ro",
+        "change": "corrected"
+      }
+    ],
+    "authorProductPaths": [
+      "packages/support-kb/content/app-navigation.en.md",
+      "packages/support-kb/content/app-navigation.ro.md",
+      "packages/support-kb/content/debate-workspace-menus.en.md",
+      "packages/support-kb/content/debate-workspace-menus.ro.md",
+      "packages/support-kb/content/settings-help-menus.en.md",
+      "packages/support-kb/content/settings-help-menus.ro.md",
+      "packages/support-kb/content/support-status-limits.en.md",
+      "packages/support-kb/content/support-status-limits.ro.md",
+      "packages/support-kb/recovery/components.json",
+      "packages/support-kb/src/catalog.ts",
+      "packages/support-kb/src/navigation.ts"
+    ],
+    "attestationProductPaths": [
+      "packages/support-kb/reviews/manifest.json"
+    ]
+  },
+  "languageContract": {
+    "messageBodyKeys": [
+      "text"
+    ],
+    "rejectedMessageBodyKeys": [
+      "language",
+      "run_id",
+      "latest"
+    ],
+    "authority": "support session stored language",
+    "selectorChange": "invalidate active session; next request creates session in selected language",
+    "staleRetry": "one replacement session in current selected language; same redacted text; no loop",
+    "ambiguousControls": [
+      {
+        "text": "Pricing",
+        "sessionLanguage": "en"
+      },
+      {
+        "text": "Account",
+        "sessionLanguage": "ro"
+      }
+    ],
+    "productPaths": [
+      "apps/ui/components/support/Assistant.tsx",
+      "apps/api/src/support/index.ts"
+    ],
+    "testPaths": [
+      "tests/render/sup-01-help.test.tsx",
+      "tests/render/sup-04-widget.test.tsx",
+      "tests/integration/support-routes.test.ts"
+    ]
+  },
+  "verificationGates": {
+    "independent": {
+      "id": "PG-8A",
+      "dependsOn": [
+        "PG-1",
+        "PG-3",
+        "PG-5",
+        "PG-6",
+        "applicable-separate-reviews"
+      ],
+      "forgotAction": "unresolved-and-actionless",
+      "maximumStatus": "WORKING_PREVIEW_VERIFIED_WITH_FORGOT_CONNECTOR_UNRESOLVED"
+    },
+    "readiness": {
+      "id": "PG-8B",
+      "dependsOn": [
+        "owner-verified-forgot-destination",
+        "PG-7",
+        "PG-8A",
+        "separate-final-review"
+      ],
+      "mayDeclare": "READY_FOR_USER_VERIFICATION"
+    }
+  }
+}

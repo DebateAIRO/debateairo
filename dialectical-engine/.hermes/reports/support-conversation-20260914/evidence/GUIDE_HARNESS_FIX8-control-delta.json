@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX8",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "finding": "LEGACY_DETERMINISTIC_DECORATION_OMISSION_REJECTED_BEFORE_SAFE_PROJECTION",
+  "resolvedBy": [
+    "branch-aware absent decoration normalization for three deterministic branches",
+    "strict MODEL decoration presence",
+    "all-branch malformed present-decoration rejection",
+    "API_RECEIVED fixed safe checkpoint",
+    "predicate-specific body/status/outcome/text/sources/actions failure codes"
+  ],
+  "controls": {
+    "previous": 105,
+    "current": 111,
+    "retained": 105,
+    "added": 6
+  },
+  "harnessDelta": [
+    {
+      "path": "README.md",
+      "status": "CHANGED",
+      "sha256": "50e2a31041963d94706f7a7fb225876b805057b2002e34a5940be7c849b305ff",
+      "bytes": 12319,
+      "previousSha256": "098d6e443f0a344b581ce1902c8ff513458397de59c02a500e6c361242ae21fd",
+      "previousBytes": 11228
+    },
+    {
+      "path": "capture-public-guide.mjs",
+      "status": "CHANGED",
+      "sha256": "7e00bcb022cd32770dbe61314d1fc78095201643fa8acfe62682ff8ebda71de1",
+      "bytes": 18423,
+      "previousSha256": "d2ce62e07c570e607a0cfccefe1f17b75e1969686f45ddda73c159ec1650c238",
+      "previousBytes": 18423
+    },
+    {
+      "path": "controls.mjs",
+      "status": "CHANGED",
+      "sha256": "4887cfdf2a22643d3a161ccbfee385f27cc231468a1d2f1c51a501a203b12135",
+      "bytes": 27615,
+      "previousSha256": "f544243fac5405704d0fd98841f8eb84e3732c392ff074530b9cb7de2fc0d711",
+      "previousBytes": 24484
+    },
+    {
+      "path": "gate-contract.json",
+      "status": "UNCHANGED",
+      "sha256": "a06a7ad7b1e328f5432a4ac9403436f87aab15427410c63cec0b55d93b3b8680",
+      "bytes": 4552,
+      "previousSha256": "a06a7ad7b1e328f5432a4ac9403436f87aab15427410c63cec0b55d93b3b8680",
+      "previousBytes": 4552
+    },
+    {
+      "path": "matrix.mjs",
+      "status": "UNCHANGED",
+      "sha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+      "bytes": 14253,
+      "previousSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+      "previousBytes": 14253
+    },
+    {
+      "path": "package-evidence.mjs",
+      "status": "NEW",
+      "sha256": "f947dce3b3b1589c61deb43acf38d5bd9443b273b3ecfd5b42a2784fd48fc8a0",
+      "bytes": 6205
+    },
+    {
+      "path": "pre-request-verifier.ts",
+      "status": "UNCHANGED",
+      "sha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733",
+      "bytes": 16486,
+      "previousSha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733",
+      "previousBytes": 16486
+    },
+    {
+      "path": "run-final-controls.mjs",
+      "status": "NEW",
+      "sha256": "9bc269a8baeb8af46d20d68d18b8f783ad16762af7d4395a13d3a0f93b92a5c1",
+      "bytes": 5305
+    },
+    {
+      "path": "runtime-capacity.mjs",
+      "status": "UNCHANGED",
+      "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87",
+      "bytes": 9935,
+      "previousSha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87",
+      "previousBytes": 9935
+    },
+    {
+      "path": "seal-receipt.mjs",
+      "status": "NEW",
+      "sha256": "51edfe5ed91e4c9f102e6be09812bba40db5ee4d51a2b1b9da0fce4e9a899d49",
+      "bytes": 5181
+    },
+    {
+      "path": "session-lifecycle.mjs",
+      "status": "UNCHANGED",
+      "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b",
+      "bytes": 4254,
+      "previousSha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b",
+      "previousBytes": 4254
+    },
+    {
+      "path": "verify-final-branches.ts",
+      "status": "UNCHANGED",
+      "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a",
+      "bytes": 5131,
+      "previousSha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a",
+      "previousBytes": 5131
+    },
+    {
+      "path": "verify-fix8-red.mjs",
+      "status": "NEW",
+      "sha256": "15703952f80c4fcce7458dd780ac3f63746b0493fe6ee8a4aaea2a783cdb1b92",
+      "bytes": 619
+    },
+    {
+      "path": "verify-guide-harness.mjs",
+      "status": "CHANGED",
+      "sha256": "1161d55dc3c4583ed55769263ba627dfee78f1d07cd82b749f473f7441e32e0f",
+      "bytes": 62790,
+      "previousSha256": "6fc850a0bd6fec915940c3159375056062681cdabf9252570bfe774d30d930af",
+      "previousBytes": 55531
+    }
+  ],
+  "adapterDelta": [
+    {
+      "path": "README.md",
+      "status": "CHANGED",
+      "sha256": "32c51f4251fefdb40394bd4be2a2efdabdec30ae4375803fcb533428201c6c34",
+      "bytes": 2077,
+      "previousSha256": "e87166738ef70a88a95ebd80e3006b32a56cdaf8247cc9fe86ec6ab9b0575b1f",
+      "previousBytes": 2077
+    },
+    {
+      "path": "replay-row-proofs.mjs",
+      "status": "CHANGED",
+      "sha256": "f65f40711faca3a8e6650fea6e8649729df0540cc0cdcdf5c4c549ef8b78c39f",
+      "bytes": 6468,
+      "previousSha256": "da2f18f2aab8285a4b89dd04b66b1125e16a0a4fb99b1d64a8399c0e9281528f",
+      "previousBytes": 6468
+    },
+    {
+      "path": "reviewed-harness-custody.mjs",
+      "status": "CHANGED",
+      "sha256": "b811ebb8c5a00677e333ffc3c4e1879bb9ad4d94351a704b0c28e3cf551fe43e",
+      "bytes": 1417,
+      "previousSha256": "f04495b0b12c8c7eceb927bbfb1410393404446fa21c5ec66f9322847f51a313",
+      "previousBytes": 1417
+    },
+    {
+      "path": "verify-negative-fixture.mjs",
+      "status": "CHANGED",
+      "sha256": "d5ef8af4d319c47e3d0a2569bf9be6766f9491982fd1eaa2d2adfface58a500d",
+      "bytes": 1359,
+      "previousSha256": "872de288bda0596525295d2ca036b00c73314d997eca7921163f09102ae631bc",
+      "previousBytes": 1359
+    }
+  ],
+  "dispositions": {
+    "live4ActualRow43Cause": "UNKNOWN_UNAVAILABLE_NOT_PERSISTED",
+    "productPatch": false,
+    "matrixChanged": false,
+    "sourcePolicyChanged": false,
+    "navigationChanged": false,
+    "actualTraffic": false,
+    "liveRetry": false
+  }
+}

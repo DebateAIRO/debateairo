@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_UI_WRITER_FIX45",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS",
+  "actualWriter": {
+    "script": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_UI_WRITER_FIX45/ui-transition-live-preflight.mjs",
+    "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_WRITER_FIX45-actual-ui-control.json",
+    "mode": "0600",
+    "exclusive": true
+  },
+  "actualLifecycleConsumer": true,
+  "ui": {
+    "completed": true,
+    "createSessionAttempts": 0,
+    "messageAttempts": 1,
+    "forwardedDynamicRequests": 0,
+    "hiddenSupportSetupRequests": 0
+  },
+  "traffic": {
+    "publicLocalAssets": true,
+    "forwardedDynamic": 0,
+    "support": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "model": 0
+  }
+}

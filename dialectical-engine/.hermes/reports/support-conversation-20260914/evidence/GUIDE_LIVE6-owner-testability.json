@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE6",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "result": "CALCULATED_AVAILABLE_AFTER_PARTIAL_CAPTURE_FRESH_RECHECK_REQUIRED",
+  "manualScriptObserved": false,
+  "plannedManualSessions": {
+    "freshSession": 1,
+    "languageChangeSession": 1,
+    "total": 2
+  },
+  "plannedManualMessages": {
+    "en": 1,
+    "ro": 2,
+    "total": 3
+  },
+  "actualCaptureSessionCreationEvidence": [
+    {
+      "groupId": "lifecycle-full-en",
+      "createdAfter": 1,
+      "exactCreationTimeUtc": null,
+      "createdNoLaterThanUtc": "2026-09-20T11:55:02.142Z",
+      "bound": "row-01 screenshot mtime"
+    },
+    {
+      "groupId": "full-ro",
+      "createdAfter": 2,
+      "exactCreationTimeUtc": null,
+      "createdNoLaterThanUtc": "2026-09-20T11:55:39.071Z",
+      "bound": "row-02 screenshot mtime"
+    }
+  ],
+  "capacityMeasurement": {
+    "measuredAtUtc": "2026-09-20T11:54:02.857Z",
+    "sessionLimit1h": 5,
+    "observedMaxSessionEvents1hByIp": 0,
+    "captureSessionsCreated": 2,
+    "calculatedSessionSlotsRemaining": 3,
+    "messageLimit10m": 20,
+    "observedMaxMessageEvents10mByIp": 0,
+    "captureMessagesSent": 15,
+    "calculatedMessageSlotsRemaining": 5,
+    "messageLimit24h": 100,
+    "observedMaxMessageEvents24hByIp": 0
+  },
+  "notBeforeUTC": "2026-09-20T12:02:01.565Z",
+  "naturalExpiryCalculated": false,
+  "freshMeasurementBeforeOwnerHandoffRequired": true,
+  "reason": "The pre-capture measurement was zero, and the partial capture created two sessions and sent fifteen messages. Arithmetic leaves three hourly session slots and five ten-minute message slots, sufficient for the two-session/three-message bounded script. Exact session creation timestamps were not serialized, so screenshot mtimes are only upper bounds and a fresh supported recheck remains required before owner handoff."
+}

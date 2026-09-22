@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE38",
+  "ticket": "t_8d677c9a",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "BLOCKED_AUTOREVIEW_EXPLICIT_LIVE_CAPTURE_APPROVAL_REQUIRED",
+  "traffic": {
+    "operatorLaunches": 0,
+    "phases": 0,
+    "sessionsCreated": 0,
+    "questionsSent": 0,
+    "externalModelRequests": 0,
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "futureAbsence": {
+    "expected": 116,
+    "present": 0
+  },
+  "artifacts": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE38-approval-rejection.json",
+      "sha256": "7b714cdf95103192373d902467a8b6a10a302802f566802af475c9709ae40da5",
+      "bytes": 6685
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE38-approval-rejection.md",
+      "sha256": "aeb55b3e7de26c4170a9ca02f1f32919e62a9a0b7ce9c5c3706982c4c916f675",
+      "bytes": 838
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE38-inputs.json",
+      "sha256": "435846d7b5158d58c49ed08ccd572352679ddd0ed6404c422de4265616c1a99b",
+      "bytes": 58597
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_CWD_BIND50-operator-contract.json",
+      "sha256": "545bf330bb4651cf81bc143755427912d198cc859a4891aa91d0e228cd07116c",
+      "bytes": 22734
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE38-approval-rejection-manifest.json",
+      "sha256": "0ca5219f81354872bf838fa1986d4231f139320dd71af25187af5def1da91e0c",
+      "bytes": 1382
+    }
+  ]
+}

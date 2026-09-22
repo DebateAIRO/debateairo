@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_FIX29_SCREENSHOT_CONTROLS",
+  "result": "PASS_REAL_MESSAGE_SCREENSHOT_TARGET",
+  "sourceProjection": {
+    "old": "visible labels versus API ids",
+    "fixed": "visible labels versus API labels"
+  },
+  "cases": [
+    {
+      "name": "full-en-short-row1",
+      "mode": "full",
+      "language": "en",
+      "completeSha256": "0f2fe8863acbdb7f897f5fa85268da95e332630f7f30923ed6be05a59cc2c206",
+      "completeBytes": 24611,
+      "originalPaneTopReachable": true,
+      "originalPaneFooterReachable": true,
+      "completeAnswerExpandedCapture": true
+    },
+    {
+      "name": "full-ro-long",
+      "mode": "full",
+      "language": "ro",
+      "completeSha256": "488f827b32346fda0bdcb908a4e7dd014eb008b1b5c900b12d8b827ee5a688ee",
+      "completeBytes": 80456,
+      "originalPaneTopReachable": true,
+      "originalPaneFooterReachable": true,
+      "completeAnswerExpandedCapture": true
+    },
+    {
+      "name": "compact-en-long",
+      "mode": "compact",
+      "language": "en",
+      "completeSha256": "f1f9c2254bff202e80dfd0c30c79cccb5a0bf81b792468b22fbd7e5ee2ca9748",
+      "completeBytes": 93258,
+      "originalPaneTopReachable": true,
+      "originalPaneFooterReachable": true,
+      "completeAnswerExpandedCapture": true
+    },
+    {
+      "name": "compact-ro-short",
+      "mode": "compact",
+      "language": "ro",
+      "completeSha256": "5ef597ee825d4ba9984249adc7b7a61f4426bcb8d5307ff8c78943f850609daa",
+      "completeBytes": 23977,
+      "originalPaneTopReachable": true,
+      "originalPaneFooterReachable": true,
+      "completeAnswerExpandedCapture": true
+    }
+  ],
+  "negatives": {
+    "previousArticleRejected": 4,
+    "wrongIndexRejected": 4,
+    "staleProjectionRejected": 4
+  },
+  "supportAttempts": 0
+}

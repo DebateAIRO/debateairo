@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_FIX27",
+  "ticket": "t_c68906dd",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "executed": false,
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "argv": [
+    "/Users/vladmihaimiron/.local/bin/node",
+    "--import",
+    "tsx",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/run-operator.mjs"
+  ],
+  "script": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/run-operator.mjs",
+    "sha256": "464c5ea1e43d34d5ec575458c1c59e36dc27257f70e7be78a3dda983a1e9ac13",
+    "bytes": 10346
+  },
+  "commandContract": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_FIX27-command-contract.json",
+    "sha256": "04512905c4f1b224a5ed1b8249fc0484650ed06ee3519bcec7f90db9ba15bc7a",
+    "bytes": 10166
+  },
+  "phaseOrder": [
+    "preflight",
+    "readiness",
+    "capacity",
+    "gate",
+    "rowProof",
+    "capture",
+    "idle"
+  ],
+  "operatorOwned": {
+    "outputs": {
+      "prerequisite": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE27-prerequisites.json",
+      "stop": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE27-stop.json"
+    },
+    "logs": {
+      "preflight": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_OPERATOR_FIX27-operator-preflight.log",
+      "readiness": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_OPERATOR_FIX27-operator-readiness.log",
+      "capacity": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_OPERATOR_FIX27-operator-capacity.log",
+      "gate": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_OPERATOR_FIX27-operator-gate.log",
+      "rowProof": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_OPERATOR_FIX27-operator-rowProof.log",
+      "capture": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_OPERATOR_FIX27-operator-capture.log",
+      "idle": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_OPERATOR_FIX27-operator-idle.log"
+    }
+  },
+  "wrapperOwned": {
+    "preflight": {
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-preflight.json",
+      "contractLog": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE27-preflight.log"
+    },
+    "readiness": {
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-readiness.json",
+      "contractLog": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE25-readiness.log"
+    },
+    "capacity": {
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-capacity.json",
+      "contractLog": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE25-capacity.log"
+    },
+    "gate": {
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-gate.json",
+      "contractLog": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE25-gate.log"
+    },
+    "rowProof": {
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-row-proof-status.json",
+      "contractLog": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE25-row-proof.log"
+    },
+    "capture": {
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-capture.json",
+      "contractLog": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE25-capture.log"
+    },
+    "idle": {
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-idle.json",
+      "contractLog": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE25-idle.log"
+    }
+  },
+  "environment": {
+    "privateSourceFile": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/.local/dev-auth/api.env",
+    "selectedSourceKey": "SUPPORT_DATABASE_URL",
+    "childEnvironmentKey": "GUIDE_COUNTS_ONLY_DATABASE_URL",
+    "expectedRole": "debateai_dev_support",
+    "valueRecorded": false
+  },
+  "constraints": {
+    "stopFirst": true,
+    "preserveNumericChildStatus": true,
+    "wrapperOwnedPathsAbsentAtInvocation": true,
+    "operatorLogsWrittenAfterChildExit": true,
+    "actualTrafficDuringAuthorControls": {
+      "browser": 0,
+      "http": 0,
+      "status": 0,
+      "database": 0,
+      "support": 0,
+      "model": 0
+    }
+  }
+}

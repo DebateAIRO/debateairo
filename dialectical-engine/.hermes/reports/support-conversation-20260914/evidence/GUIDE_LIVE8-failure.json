@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE8",
+  "ticket": "t_6cf2b039",
+  "session": "/root/preview",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "verdict": "FAIL_PARTIAL_ACTUAL_CAPTURE_PRIMARY_SOURCE_MISSING",
+  "stage": "ACTUAL_CAPTURE_DIAGNOSTIC_PROJECTED",
+  "rowProof": {
+    "verdict": "PASS",
+    "resultCode": "GUIDE_ROW_PROOF_ALL_ROWS_PASS",
+    "rowCount": 54
+  },
+  "failure": {
+    "attemptedOrdinal": 21,
+    "canonicalSequence": 26,
+    "prompt": "Unde pot afla cum funcționează o dezbatere?",
+    "kind": "GUIDE_FAMILY",
+    "family": "guide",
+    "mode": "compact",
+    "language": "ro",
+    "branch": "MODEL",
+    "phase": "DIAGNOSTIC_PROJECTED",
+    "proofBranch": "MODEL",
+    "apiReceived": {
+      "httpStatus": 200,
+      "outcome": "ANSWER_GROUNDED",
+      "fieldStates": {
+        "body": "OBJECT",
+        "status": "VALID",
+        "outcome": "CLOSED",
+        "text": "STRING",
+        "sources": "ARRAY",
+        "actions": "ARRAY"
+      }
+    },
+    "httpStatus": 200,
+    "outcome": "ANSWER_GROUNDED",
+    "responseOrigin": "MODEL_ACCEPTED_DRAFT",
+    "sourceIds": [
+      "app-navigation"
+    ],
+    "actionIds": [],
+    "expectedSourceIds": [
+      "guide-how-it-works",
+      "debate-workspace-menus"
+    ],
+    "rowProofDerivedSourceIds": [
+      "app-navigation",
+      "guide-how-it-works",
+      "debate-workspace-menus"
+    ],
+    "equality": {
+      "text": true,
+      "sources": true,
+      "actions": true
+    },
+    "diagnostic": {
+      "status": "ACCEPTED_DRAFT",
+      "category": null,
+      "candidateCount": 0,
+      "validCount": 0,
+      "invalidCount": 0,
+      "duplicateCount": 0,
+      "unmatchedCount": 0
+    },
+    "failureCode": "GUIDE_HARNESS_EXPECTED_PRIMARY_SOURCE_MISSING"
+  },
+  "completedOutcomeCounts": {
+    "ANSWER_GROUNDED": 16,
+    "REFUSE_ZONE": 3,
+    "REFUSE_INJECTION": 1
+  },
+  "completedOriginCounts": {
+    "REVIEWED_FALLBACK": 3,
+    "MODEL_ACCEPTED_DRAFT": 13,
+    "DETERMINISTIC_PRIVATE_REFUSAL": 1,
+    "DETERMINISTIC_RECOVERY": 2,
+    "DETERMINISTIC_INJECTION_REFUSAL": 1
+  },
+  "traffic": {
+    "browserStarted": true,
+    "sessions": 3,
+    "supportRequests": 21,
+    "forbiddenAnswers": 0,
+    "forbiddenConsent": 0,
+    "modelRequestCeiling": 42,
+    "retryPerformed": false
+  },
+  "ownerTestability": "NOT_PRODUCED_CAPTURE_FAILED",
+  "retryPerformed": false,
+  "productOrOracleCauseInferred": false,
+  "postfailureCustody": {
+    "pid": 77769,
+    "ppid": 1,
+    "pgid": 77769,
+    "previewListeners": [
+      {
+        "pid": 77785,
+        "command": "node",
+        "port": 3100
+      },
+      {
+        "pid": 78396,
+        "command": "node",
+        "port": 3101
+      },
+      {
+        "pid": 19920,
+        "command": "com.docker.backend",
+        "port": 7177
+      },
+      {
+        "pid": 78381,
+        "command": "node",
+        "port": 8890
+      },
+      {
+        "pid": 77785,
+        "command": "node",
+        "port": 8891
+      },
+      {
+        "pid": 77785,
+        "command": "node",
+        "port": 8892
+      },
+      {
+        "pid": 77785,
+        "command": "node",
+        "port": 8893
+      },
+      {
+        "pid": 77785,
+        "command": "node",
+        "port": 8894
+      },
+      {
+        "pid": 77785,
+        "command": "node",
+        "port": 8895
+      },
+      {
+        "pid": 77785,
+        "command": "node",
+        "port": 8896
+      },
+      {
+        "pid": 19920,
+        "command": "com.docker.backend",
+        "port": 8988
+      },
+      {
+        "pid": 19920,
+        "command": "com.docker.backend",
+        "port": 55433
+      }
+    ],
+    "ordinarySystemTls": {
+      "url": "https://localhost:3100/help",
+      "customCa": false,
+      "insecure": false,
+      "status": 200
+    },
+    "unrelatedListenerCount": 9,
+    "unrelatedPreserved": true
+  },
+  "ongoingPrivateLogExcludedFromArtifacts": true,
+  "ongoingPrivateLog": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE7-stack.log"
+}

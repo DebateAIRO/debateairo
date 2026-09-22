@@ -45,7 +45,9 @@ from the widget continues the same messages on `/help`; returning continues in t
 The widget renders collapsed as a button labelled WIDGET_BUTTON (§Copy) at the bottom-right,
 with an `aria-label`, reachable by keyboard (Tab then Enter). Expanded, its bounding box
 does not intersect the page's primary control — the composer on `/`, the submit control on
-`/new`, the publication control on `/debate/[id]` — at 1280×800 and at 390×844.
+`/new`, the publication control on `/debate/[id]` — at 1280×800 and at 390×844. The
+expanded panel has `data-support-widget-panel`; each named primary control has
+`data-support-primary-control`, so the non-intersection is a Boolean DOM measurement.
 
 ### SUP-04-R05 — Same engine, same rules
 Every behaviour of SUP-01 (disclosure, grounding, refusals, limits, rating, minimal case)
@@ -72,11 +74,19 @@ resolved at merge time (V's vertical-slice law), never by serializing the slices
    Click OPEN_FULL_PAGE. Expected: `/help` opens showing the same two messages.
 3. Open `https://localhost:3000/login`, `/sign-up`, `/verify-email`, `/enroll-mfa`.
    Expected: no "Help" button on any of them.
-4. Sign in with the QA identity; open `/settings`. Expected: no "Help" button. Open `/new`.
-   Expected: the button; expanded, it does not cover the submit control (resize the window
-   to 1280×800 and then to 390×844 and check both).
-5. Open one of the QA identity's debates at `/debate/<id>`. Expected: the button; with the
-   SUP-03 consent on, the widget shows the current debate as the selected context.
+4. Sign in with the QA identity; open `/settings`. Expected: no "Help" button. Open `/new`
+   and expand the widget. In browser responsive mode at 1280×800 and then 390×844, paste in
+   DevTools Console: `(() => { const a=document.querySelector('[data-support-widget-panel]')
+   ?.getBoundingClientRect(); const b=document.querySelector('[data-support-primary-control]')
+   ?.getBoundingClientRect(); return !a || !b ? 'MISSING_SELECTOR' : !(a.right<=b.left ||
+   a.left>=b.right || a.bottom<=b.top || a.top>=b.bottom); })()`. Expected: `false` at both
+   sizes; `MISSING_SELECTOR` fails the step.
+5. Terminal in the SUP-04 worktree: `test -f
+   apps/ui/components/support/ConsentToggle.tsx && echo SUP-03_PRESENT || echo
+   SUP-03_ABSENT`. Open one of the QA identity's debates at `/debate/<id>`. Expected in
+   both cases: the Help button. If the command printed `SUP-03_PRESENT`, switch its consent
+   on and expect the current debate as selected context. If it printed `SUP-03_ABSENT`,
+   expect no consent toggle or selected debate; that absence does not fail SUP-04.
 6. Open a published debate at `/public/debate/<public_ref>` in a private window. Expected:
    the button; no debate context is shown or selectable.
 7. Keyboard only: on `/`, press Tab until the "Help" button is focused, press Enter.

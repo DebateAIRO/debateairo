@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PHASE_IMPORT_FIX46",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "proofKind": "ACTUAL_COMPILED_PUBLIC_UI_SYNTHETIC_TRANSPORT",
+  "runtimeIdentity": {
+    "pidMatch": true,
+    "pgidMatch": true,
+    "ppidOne": true,
+    "commandMarkerMatch": true
+  },
+  "publicUiAssetsLoaded": true,
+  "navigationPerformed": true,
+  "destinationHelp": true,
+  "fullRoRestored": true,
+  "priorMessageRestored": true,
+  "sessionIdentityPreserved": true,
+  "capabilityPreserved": true,
+  "languageSelectionPerformed": false,
+  "createSessionAttempts": 0,
+  "messageAttempts": 1,
+  "messageUsedSeededSession": true,
+  "hiddenSupportSetupRequests": 0,
+  "pageCaseListReadAttempts": 2,
+  "interceptedStatusAuthPrivateExternal": {
+    "supportStatus": 2,
+    "authSession": 5,
+    "privateOrOtherApi": 4,
+    "external": 0
+  },
+  "forwardedDynamicRequests": 0,
+  "syntheticReplyRendered": true,
+  "completed": true,
+  "failureCode": null,
+  "seedPresentBeforeOpen": true,
+  "seedPresentAfterOpen": true,
+  "activeLanguageAfterOpen": "RO"
+}

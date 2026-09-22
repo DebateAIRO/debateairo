@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX25",
+  "verdict": "FAIL",
+  "resultCode": "GUIDE_HARNESS_BOUND_RECEIPT_INVALID",
+  "traffic": {
+    "browser": false,
+    "sessions": 0,
+    "supportRequests": 0,
+    "modelRequests": 0
+  },
+  "custody": {
+    "targetRevision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+    "matrixSha256": "9238764acd4067a2c922ff3026187e29d424001994f8dda307ba6bf5847cfa2c",
+    "matrixCount": 58,
+    "verifierSha256": "ec3b11f7103402c1bf31bf4c09cc34f75216c8cfa5d2b117c81bce2345de85d6",
+    "harnessSha256": "4c1d66dcacd4f80517ca098f2d9113e08c9ce1b5f3449956e39c9d1a7a46bdcf",
+    "harnessFiles": [
+      {
+        "path": "capture-public-guide.mjs",
+        "bytes": 26495,
+        "sha256": "8e5401f206a272f650ab2a220c60019ff3a6694f205e9e4d2a2960e55fb595a6"
+      },
+      {
+        "path": "controls.mjs",
+        "bytes": 46919,
+        "sha256": "8f9f5bd24bb0fa75b309949954e324b6ad31894d5a8dc09894b08d0c74dfb115"
+      },
+      {
+        "path": "matrix.mjs",
+        "bytes": 7073,
+        "sha256": "9238764acd4067a2c922ff3026187e29d424001994f8dda307ba6bf5847cfa2c"
+      },
+      {
+        "path": "pre-request-verifier.ts",
+        "bytes": 17382,
+        "sha256": "ec3b11f7103402c1bf31bf4c09cc34f75216c8cfa5d2b117c81bce2345de85d6"
+      },
+      {
+        "path": "runtime-capacity.mjs",
+        "bytes": 10440,
+        "sha256": "81bded5be8cb4044b0b4e4d2277c768a548e7d6dc53f22292dc375ad271ad00c"
+      },
+      {
+        "path": "session-lifecycle.mjs",
+        "bytes": 6928,
+        "sha256": "8da5c67482788fef8ef3a3562add0fe6b3a793c0bfefce388e9c93d282f9c741"
+      }
+    ],
+    "gatePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX25-inert-gate-fixture.json",
+    "gateSha256": "6162e86d6d86443a3d4e6cb5f8ec8fc5719c971d5eb8298e11fa715425a898ca",
+    "productRoot": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "productInventoryPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL13-manifest.json",
+    "productInventorySha256": "b9ffbc1496a321fd963a8a1781f9853b7cb8a4e36f3a971b576b0d45896b6161",
+    "attestationPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND21-snapshot-receipt.json",
+    "attestationSha256": "96f1344aed65e10e3da71fb3eba3274067adac99544617b363aba1e466a4f7da",
+    "requiredSuiteReceiptPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND21-required-suites.json",
+    "requiredSuiteReceiptSha256": "42f6181ff2cccaa75d240adaee25301b9a73d6f2eb3780da486f277f7bbd4679",
+    "controlProofPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX22-control-proof.json",
+    "controlProofSha256": "6a8bdb7193adb0d0ec58b143b1c828d46bcbb1acce8cfc346429082886f80766",
+    "runtimeCapacityPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX25-inert-capacity-fixture.json",
+    "runtimeCapacitySha256": "4df895c4a87b0d0c7ad93a6eaef719241d47331f82b265fccd97bdd7dc701287"
+  },
+  "rows": [],
+  "limitation": "The sealed constructor stops at its first failing proof and exposes per-row prepare(row) only after all 58 proofs derive."
+}

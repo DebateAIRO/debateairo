@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_ACTION_COMPOSE",
+  "ticket": "t_3ffab684",
+  "baseRevision": "b0b91a01cf161d17eef75577cbae94c629b7bc49",
+  "finalRevision": "c8784902f78ed4ba1d637d122e1f32f598415f4e",
+  "productFiles": [
+    {
+      "laneRelative": "tests/unit/support-answer-context.test.ts",
+      "sha256": "2c5ccbfed3cb007594a76ae72adfbd9bc6d0e0a5166661202a38230bab3112d9",
+      "bytes": 28769
+    }
+  ],
+  "scopeExact": true,
+  "clean": true,
+  "change": "Test-only SupportModelPort completion mock typing; assertions and runtime are unchanged.",
+  "measuredAt": "2026-09-17T16:02:13.871701Z"
+}

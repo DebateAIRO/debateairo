@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_SIGNIN_CLASSIFIER_REVIEW",
+  "ticket": "t_fb5b4064",
+  "baseRevision": "5d6e028ae5defc24e0690219d6128949e73b750d",
+  "revision": "0f4290c290fd38caa0ccfb3b6781fb8c33999a22",
+  "reviewedAt": "2026-09-20T23:00:06Z",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "verdict": "PASS_SIGNIN_CLASSIFIER_DELTA",
+  "sourceToOutcome": [
+    {
+      "stage": "public-guide boundary",
+      "disposition": "PASS",
+      "evidence": "EN sign in/login and RO authentication terms are bounded location targets and operations; location syntax is required and affirmative Support/direct-assistant operations disqualify the exception."
+    },
+    {
+      "stage": "ingress classifier",
+      "disposition": "PASS",
+      "evidence": "The existing /login zone rule alone receives publicLocationGuide=true; password/recovery, injection, other zone, and sensitive-intent precedence is unchanged."
+    },
+    {
+      "stage": "real POST route",
+      "disposition": "PASS_2_OF_2",
+      "evidence": "EN and RO POST fixtures traverse ingress, answer service, opaque source/action references, canonical translation and HTTP serialization."
+    },
+    {
+      "stage": "grounded result",
+      "disposition": "PASS",
+      "evidence": "Both POST results are ANSWER_GROUNDED with account-access and canonical sign-in /login."
+    }
+  ],
+  "positiveIngress": [
+    {
+      "language": "en",
+      "text": "Where can I sign in?"
+    },
+    {
+      "language": "en",
+      "text": "Where is the login page?"
+    },
+    {
+      "language": "ro",
+      "text": "Unde mă pot autentifica?"
+    },
+    {
+      "language": "ro",
+      "text": "Unde găsesc pagina de autentificare?"
+    }
+  ],
+  "negativeOperations": [
+    {
+      "language": "en",
+      "text": "Sign in to my account for me.",
+      "outcome": "REFUSE_ZONE",
+      "link": "/login"
+    },
+    {
+      "language": "en",
+      "text": "Where can Support sign in to my account?",
+      "outcome": "REFUSE_ZONE",
+      "link": "/login"
+    },
+    {
+      "language": "en",
+      "text": "Where can you log in to my account for me?",
+      "outcome": "REFUSE_ZONE",
+      "link": "/login"
+    },
+    {
+      "language": "ro",
+      "text": "Unde poate Asistența să se autentifice în contul meu?",
+      "outcome": "REFUSE_ZONE",
+      "link": "/login"
+    },
+    {
+      "language": "ro",
+      "text": "Unde te poți autentifica în contul meu în locul meu?",
+      "outcome": "REFUSE_ZONE",
+      "link": "/login"
+    }
+  ],
+  "retainedControls": {
+    "row58AccountCreation": "PASS_UNCHANGED_CLASSIFIER_AND_REVIEW2_CONTEXT_ACTION",
+    "brandedOverviewENRO": "PASS_UNCHANGED_CLASSIFIER_AND_REVIEW2_PRODUCT_IDENTITY",
+    "credentialDisclosureAndOperations": "PASS_RETAINED",
+    "privateAccountAccess": "PASS_RETAINED",
+    "promptInjection": "PASS_RETAINED",
+    "unrelatedRestrictedTopics": "PASS_RETAINED",
+    "forgotPassword": "PASS_RETAINED_UNRESOLVED_ACTIONLESS",
+    "trustedDebateContext": "PASS_RETAINED"
+  },
+  "productDelta": {
+    "paths": [
+      "apps/api/src/support/classify.ts",
+      "apps/api/src/support/public-guide-boundary.ts",
+      "tests/integration/support-routes.test.ts",
+      "tests/unit/support-classify.test.ts",
+      "tests/unit/support-public-guide-boundary.test.ts"
+    ],
+    "pathCount": 5,
+    "diffCheck": "PASS",
+    "scopeExact": true
+  },
+  "verification": {
+    "frozenInputs": {
+      "matched": 39,
+      "mismatched": 0
+    },
+    "red": {
+      "failed": 8,
+      "passed": 471,
+      "meaning": "new EN/RO ingress cases fail before correction"
+    },
+    "realPost": {
+      "passed": 2,
+      "failed": 0
+    },
+    "finalAffected": {
+      "files": 3,
+      "passed": 648,
+      "failed": 0
+    },
+    "preservedIntermediateFailure": {
+      "failed": 1,
+      "passed": 647,
+      "cause": "ordering-sensitive pre-existing aggregate assertion after new model fixtures; test placement corrected without product-code change"
+    },
+    "typecheck": {
+      "exitCode": 1,
+      "diagnostics": 76,
+      "baselineDiagnostics": 76,
+      "normalizedDiagnosticLinesEqual": true,
+      "ownedPathDiagnostics": 0,
+      "rawByteIdentical": false
+    },
+    "finalInventory": {
+      "changedPaths": 145,
+      "uniqueChangedPaths": 145,
+      "productFiles": 145,
+      "deletedPaths": 3,
+      "nonempty": true
+    }
+  },
+  "corpus": {
+    "unchanged": true,
+    "entryCount": 44,
+    "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+    "factualAuditRepeated": false
+  },
+  "retainedReview2": {
+    "codeMetadata": "PASS_UNCHANGED",
+    "focused31Plan": "PASS_UNCHANGED"
+  },
+  "limits": [
+    "No complete offline58 producer replay claim.",
+    "No live model/browser/runtime/capacity/readiness/acceptance claim.",
+    "Forgot remains unresolved/actionless."
+  ]
+}

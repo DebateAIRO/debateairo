@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_ACTIONFIX",
+  "ticket": "t_dbd462b8",
+  "baseRevision": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  "finalRevision": "b0b91a01cf161d17eef75577cbae94c629b7bc49",
+  "productFiles": [
+    {
+      "laneRelative": "packages/support-kb/src/context.ts",
+      "sha256": "9c3b2909ac5b363dc93ba95ca1201f028b945bac799d81a7dc8f298c948cfdc3",
+      "bytes": 20217
+    },
+    {
+      "laneRelative": "tests/unit/support-answer-context.test.ts",
+      "sha256": "947d8449690648846f189edede3bdcdb7e1a492ce4f41876e4ece199a482b05c",
+      "bytes": 28662
+    },
+    {
+      "laneRelative": "tests/unit/support-context.test.ts",
+      "sha256": "66287c3904b65ebb02ce8684917c9ecfffc0c27202d4edb810e854d7a13b3da0",
+      "bytes": 27801
+    }
+  ],
+  "scopeExact": true,
+  "clean": true,
+  "measuredAt": "2026-09-17T15:43:48.774486Z"
+}

@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW26",
+  "ticket": "t_aeee4ff7",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "freeze": "ffe8fbbefbf3a99e1674aa498024246e434a9f17",
+  "fix26Receipt": {
+    "sha256": "e87f3084ee66b5342ad33b63fc67281cee3c14f8b160f9d653f758a2c32ef3c9"
+  },
+  "fix26Consumption": {
+    "sha256": "53a5808a8ad48c463b9dd909de5f25e605a01a5920fc788800aa94ab0ed86be6"
+  },
+  "manifest": {
+    "artifacts": 38,
+    "verified": 38,
+    "mismatches": 0
+  },
+  "receiptArtifacts": {
+    "artifacts": 39,
+    "verified": 39,
+    "mismatches": 0
+  },
+  "indexedInputs": {
+    "inputs": 108,
+    "verified": 108,
+    "mismatches": 0
+  },
+  "actualCommandContract": {
+    "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX26-command-contract.json",
+    "sha256": "e64a497a30cf7ed84b5f721e3eab8b743489a33e334917ab124e5ec6a42f7d94",
+    "bytes": 10158,
+    "selfBoundPhases": 7
+  },
+  "dependencyProof": {
+    "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX26-control-proof.json",
+    "sha256": "8c4b57a770bc26b839f9655e2ef72bba26ab89c6115d1ecc010df194e16b3288",
+    "positiveResultSha256": "593c9577035be42d4907f1a6cac421d61a5ed0ae3c27369c83c183769827c4c3",
+    "controlsPassed": 13,
+    "negativeCasesPassed": 5
+  },
+  "operationalPaths": {
+    "checkedAbsent": 20,
+    "present": 0,
+    "actualNamespace": "GUIDE_LIVE_GUIDE21",
+    "provenance": "FRESH_GUIDE21_FIXED31"
+  },
+  "ownerContract": {
+    "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX22-owner-capacity-contract.json",
+    "sha256": "df5580ba8dd47e354a74aa04b8308d7b626564bd116076b682b1f6d0037d03fc",
+    "bytes": 1591
+  },
+  "reviewMode": "STATIC_READ_ONLY",
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

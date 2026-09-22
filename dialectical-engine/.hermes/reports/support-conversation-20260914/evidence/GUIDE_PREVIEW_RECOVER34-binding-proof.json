@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_RECOVER34",
+  "ticket": "t_31c5023f",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_CHANGED_BINDING_CONTROLS",
+  "controls": 12,
+  "passed": 12,
+  "names": [
+    "diagnostic has one exact successful handshake and cleanup",
+    "Runtime9 custody uses exact11 keys and reviewed product",
+    "authoritative support-preview API port is8890",
+    "runtime custody and gate hashes bind exact bytes",
+    "seven phases self-bind exact final command contract",
+    "capture uses RECOVER34 successor and unchanged screenshot helper",
+    "operator hashes exact current script and command",
+    "123 future paths remain unique and absent",
+    "exact31 five-session bilingual capture plan retained",
+    "current product full58 retained without rerun",
+    "owner capacity remains deferred6messages2sessions",
+    "private runtime log binds Runtime9 and remains outside artifacts"
+  ],
+  "retained": {
+    "full58Path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-PREVIEW_BIND32.json",
+    "full58Sha256": "67cfc10ca5e079022e8a6c609e95cf2bdf333a077a0fd0c6017587e49b718617",
+    "screenshotHelperSha256": "824e780a1817c198a6ca6ebc6215948241ecccbb5611617a033e650799ac4b29"
+  },
+  "runtime": {
+    "node": "GUIDE_RUNTIME9",
+    "pid": 9800,
+    "apiPort": 8890,
+    "tls": 200
+  },
+  "traffic": {
+    "approvedStartupHandshakeAttempts": 2,
+    "supportAnswerRequests": 0,
+    "statusReads": 0,
+    "capacityReads": 0,
+    "databaseQueries": 0,
+    "actualCaptureRows": 0
+  }
+}

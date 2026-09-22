@@ -1,0 +1,51 @@
+{
+  "at": "2026-09-17T07:09:19Z",
+  "node": "RECOVERY_DELTA",
+  "ticket": "t_33197c7c",
+  "session": "/root/preview",
+  "productRevision": "475c5a7e7eb8f48a3f5a81379f37b49fdd014ce9",
+  "productDirtyCount": 0,
+  "sourceRevision": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+  "heavyLease": "NOT_REQUESTED_OR_HELD",
+  "gitLease": "NOT_REQUESTED_OR_HELD",
+  "result": {
+    "recoveryDestination": "UNRESOLVED",
+    "recoveryCause": "CATALOG_DESTINATION_ABSENT",
+    "explicitForgotBehavior": "DETERMINISTIC_REFUSE_ZONE_WITH_EMPTY_ACTIONS",
+    "genericRecoveryLinkBehavior": "GENERIC_SECURITY_REFUSAL_CAN_POINT_TO_SETTINGS",
+    "productIdentityCause": "CANONICAL_IDENTITY_ARTICLE_AND_ALIAS_ABSENT",
+    "productIdentityLanguageSplit": "EN_CAN_SELECT_IRRELEVANT_ENGINE_TOKEN_DOCUMENTS_RO_SELECTS_ZERO",
+    "historicalConversationObserved": false,
+    "previewLiveness": "CONNECTION_REFUSED_HTTP_000"
+  },
+  "artifacts": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/RECOVERY_DELTA-cua.json",
+      "sha256": "3816effa9fde20d15a42121f6c57512188b5070d0f469fee1aead31434f99a08",
+      "bytes": 418
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/RECOVERY_DELTA-liveness.txt",
+      "sha256": "195b85d9a83142cbabc76cd88df23a8ea620ca482bda76bb678e2bb91343012c",
+      "bytes": 219
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/RECOVERY_DELTA.md",
+      "sha256": "3d7d8a0efc063b4337b4ad373d007bc47416b0168d083c2ef10fcee45c330ba5",
+      "bytes": 5044
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/RECOVERY_DELTA.md",
+      "sha256": "0c90f75bbd91114943a04fea3ef01616ceb62b18d798d09e82d61df3377f0199",
+      "bytes": 4373
+    }
+  ],
+  "limitations": [
+    "The actual prior Help prompt and rendered response were not observable; only the exact saved owner feedback wording is quoted.",
+    "The author-confirmed product identity language split is referenced without duplicating its synthetic diagnostics.",
+    "No new recovery destination or opener was found, and no route was guessed.",
+    "No browser input, Support request, model request, recovery submission, runtime restart, product edit or Git edit occurred.",
+    "No checkpoint verdict."
+  ],
+  "usage": "UNAVAILABLE"
+}

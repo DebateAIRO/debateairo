@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_FIX29",
+  "result": "PLANNING_ONLY_NOT_CAPACITY_PASS",
+  "basis": {
+    "kind": "root_consumption_upper_bound",
+    "live28CompletedAttemptUpperBoundUtc": "2026-09-21T02:21:10.789581Z",
+    "sessionCreationTimestampRecorded": false
+  },
+  "windowSeconds": 3600,
+  "marginSeconds": 5,
+  "fiveSessionNotBeforeUtc": "2026-09-21T03:21:15.789581Z",
+  "qualification": "The timestamp is a conservative planning bound, not a measured capacity result or an exact session creation time.",
+  "successorCaptureTiming": {
+    "recordsFirstTwoSessionCreationObservations": true,
+    "recordsIdentifiers": false,
+    "recordsCapabilities": false
+  },
+  "deferredOwnerCapacity": {
+    "sessions": 2,
+    "messages": 6,
+    "requiresSeparateNaturalAvailability": true,
+    "measuredNow": false
+  }
+}

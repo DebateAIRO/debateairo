@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW13",
+  "ticket": "t_e49fe2f9",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "inputCustody": {
+    "count": 94,
+    "mismatches": []
+  },
+  "productCheckout": {
+    "head": "152eed4da1cd3e66b74d8301159ba76427552409",
+    "clean": true
+  },
+  "proof": {
+    "previous": 120,
+    "current": 127,
+    "passed": 127,
+    "uniqueNames": 127,
+    "retainedPrefixExact": true,
+    "addedExact": true,
+    "harnessSha256": "ba72808c15fe611c1999e440c206cb41d637d064884dde856a82ee7865f6f0d6",
+    "recomputedHarnessSha256": "ba72808c15fe611c1999e440c206cb41d637d064884dde856a82ee7865f6f0d6"
+  },
+  "retainedExactFiles": {
+    "gate-contract.json": true,
+    "matrix.mjs": true,
+    "pre-request-verifier.ts": true,
+    "runtime-capacity.mjs": true,
+    "session-lifecycle.mjs": true,
+    "verify-final-branches.ts": true,
+    "verify-fix9-red.mjs": true
+  },
+  "producerSources": {
+    "apps/ui/components/support/Assistant.tsx": {
+      "sha256": "5921ced41c60a047a4c4e390f2e6154b99944c4ad0620433f130d58d590062b3",
+      "bytes": 35138
+    },
+    "apps/ui/components/ModeToggle.tsx": {
+      "sha256": "ddcb31e0c25fbc2e7c52e14b414a7edc522b29884f61f4f41d7870f8a590669b",
+      "bytes": 1422
+    },
+    "apps/ui/components/support/CaseView.tsx": {
+      "sha256": "bd23bed0caeefb09346580bad4d91320e7e96594285562235558294ac1dfffd2",
+      "bytes": 6268
+    },
+    "apps/ui/app/help/page.tsx": {
+      "sha256": "4950ea4b0a41d031c616a94dd3c6e15ced53516e1d2168dd958166d63711d742",
+      "bytes": 390
+    }
+  },
+  "staticChecks": {
+    "sharedFullHelperCapture": true,
+    "sharedFullHelperProbe": true,
+    "compactHelperRetained": true,
+    "sameLocaleHarnessNoClick": true,
+    "helperLanguageOnlyOnMismatch": true,
+    "modeToggleTwice": true,
+    "modeRestored": true,
+    "actualSameLocaleNoOp": true,
+    "actualDifferentLocaleResetsSession": true,
+    "actualModeDoesNotTouchSupportState": true,
+    "caseListExactProducer": true,
+    "classifierExactCasesGet": true,
+    "classifierUnknownSupportBlocked": true,
+    "probeUsesSharedClassifier": true,
+    "probeAbortOnly": true,
+    "probeSeparateCaseCounter": true,
+    "probeRejectsCreateSendUnknown": true,
+    "fiveTransitions": true,
+    "compactViewportTwice": true,
+    "freshProfile": true,
+    "fixedFailureAndNonzeroExit": true,
+    "directNoTee": true,
+    "fiveSessionCapturePlan": true
+  },
+  "stateSemantics": {
+    "sameLocale": "actual chooseLanguage returns before mutation; harness setLanguage also returns before click",
+    "differentLocale": "actual chooseLanguage resets session and retains transcript messages; harness activates only when desired differs",
+    "modeHandshake": "public ModeToggle changes document/localStorage mode only and is toggled back; no Support state access",
+    "capturePlan": "five groups retained; language activation occurs at planned group boundaries; same-locale remount does not activate language"
+  },
+  "routeSemantics": {
+    "pageCaseListRead": "exact GET /api/v1/support/cases only, source OwnCaseLookup on Help",
+    "status": "exact GET status",
+    "createSession": "exact POST sessions",
+    "sendMessage": "exact POST session token messages",
+    "otherSupport": "method mismatch, token read, and unknown /api/v1/support/*",
+    "blockedBeforeRuntime": true,
+    "syntheticResponses": false
+  },
+  "preparedProbe": {
+    "script": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND14/probe-zero-request-ui.mjs",
+      "sha256": "6fec8d16353b31116d95540012139f21b200e9cb697ec1f733b2ffad05573b4d",
+      "bytes": 12436
+    },
+    "argv": [
+      "node",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND14/probe-zero-request-ui.mjs",
+      "152eed4da1cd3e66b74d8301159ba76427552409",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE2-run-LIVE8.json"
+    ],
+    "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "logPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_UI_TRANSITION_PROBE2-LIVE8.log",
+    "transitions": [
+      "fresh full/en",
+      "same-session full/ro",
+      "storage-reset compact/ro",
+      "route-remount full/en",
+      "storage-reset compact/en"
+    ],
+    "executed": false
+  },
+  "outputAbsence": {
+    "checked": 57,
+    "present": []
+  },
+  "limits": {
+    "staticOnly": true,
+    "testsRun": false,
+    "probeRun": false,
+    "browser": false,
+    "runtime": false,
+    "traffic": false,
+    "live7Cause": "UNPROVED",
+    "productDefectInferred": false,
+    "heavyLease": false,
+    "gitWrites": false
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "measuredAt": "2026-09-14T16:19:28.476074+00:00",
+  "sourceHead": "446c685e977104ecf2b0b5ee0519f7123968429f",
+  "sourceStagedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "sourceUnstagedSha256": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813",
+  "headAndIndexMatchOriginal": true,
+  "worktreeMatchesLatestFreeze": true,
+  "worktreeMatchesOriginal": false,
+  "originalUnstagedSha256": "606ad70f5e8b852724469816ca922d5685a4117668daeeed1a4d740b8988035e",
+  "lastOriginalMatch": "FREEZE-LIVE2.json 2026-09-14T14:04:30Z",
+  "firstCurrentHash": "FREEZE-FIX3.json 2026-09-14T14:30:38Z",
+  "note": "Historical source working-diff drift detected during current mechanical assembly; current hash matches every freeze since FIX3, and HEAD/index match original. Cause and changed original bytes are UNVERIFIED; no restoration or source mutation attempted. Source preservation from intake must not be claimed. Exact isolated product bytes remain clean99/99."
+}

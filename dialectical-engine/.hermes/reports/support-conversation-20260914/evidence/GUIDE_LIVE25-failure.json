@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE25",
+  "ticket": "t_419471a7",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "STOPPED_ZERO_PHASE_ORCHESTRATION_LOADER",
+  "invocation": [
+    "/Users/vladmihaimiron/.local/bin/node",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_LIVE25/run-seven-phases.mjs"
+  ],
+  "failure": {
+    "stage": "BEFORE_PHASE1",
+    "exitCode": 1,
+    "code": "ERR_MODULE_NOT_FOUND",
+    "importingPublicSource": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/runner/src/dev-api-environment.ts",
+    "missingPublicModule": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/runner/src/dev-database-principals.js",
+    "cause": "The thin orchestration was invoked with plain Node, so its TypeScript source import followed the authored .js specifier without the supported tsx loader."
+  },
+  "phaseStatuses": {
+    "preflight": "NOT_RUN",
+    "readiness": "NOT_RUN",
+    "capacity": "NOT_RUN",
+    "gate": "NOT_RUN",
+    "rowProof": "NOT_RUN",
+    "capture": "NOT_RUN",
+    "idle": "NOT_RUN"
+  },
+  "actualCapture": {
+    "attemptedRequests": 0,
+    "completedRequests": 0,
+    "newSessions": 0,
+    "modelCalls": 0,
+    "sessionCreationTimestamps": []
+  },
+  "traffic": {
+    "browser": 0,
+    "http": 0,
+    "supportStatus": 0,
+    "capacityDatabaseQueries": 0,
+    "support": 0,
+    "model": 0
+  },
+  "outputCustody": {
+    "checkedPaths": 112,
+    "presentPaths": 0,
+    "allLIVE25AndGUIDE21OperationalOutputsRemainAbsent": true
+  },
+  "runtime": {
+    "pid": 12272,
+    "pgid": 12272,
+    "commandMarker": "pnpm dev:auth:up",
+    "postFailureProcess": "PASS",
+    "ordinarySystemTlsHelpStatus": 200,
+    "leftDetached": true
+  },
+  "successorLoaderContract": {
+    "invocationPrefix": [
+      "/Users/vladmihaimiron/.local/bin/node",
+      "--import",
+      "tsx"
+    ],
+    "narrowWitnesses": [
+      "apps/runner/src/dev-api-process.ts#readPrivateEnvironment+parseExactEnvironment",
+      "apps/runner/src/dev-api-environment.ts#DEVELOPMENT_API_ENVIRONMENT_KEYS",
+      "apps/runner/src/dev-auth-stack-profile.ts#SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE",
+      "apps/runner/src/dev-database-principals.ts#SUPPORT_DATABASE_URL+debateai_dev_support"
+    ],
+    "selectedSourceKey": "SUPPORT_DATABASE_URL",
+    "childEnvironmentKey": "GUIDE_COUNTS_ONLY_DATABASE_URL",
+    "privateValueRecorded": false
+  },
+  "limits": [
+    "No same-node retry was performed.",
+    "No reviewed phase was invoked.",
+    "No capacity frame was measured or consumed.",
+    "Forgot remains unresolved/actionless."
+  ]
+}

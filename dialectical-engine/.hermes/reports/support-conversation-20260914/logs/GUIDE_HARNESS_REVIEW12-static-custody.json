@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW12",
+  "ticket": "t_ff1f66fa",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "inputCustody": {
+    "count": 139,
+    "mismatches": []
+  },
+  "productCheckout": {
+    "head": "152eed4da1cd3e66b74d8301159ba76427552409",
+    "clean": true
+  },
+  "proof": {
+    "previous": 116,
+    "current": 120,
+    "passed": 120,
+    "uniqueNames": 120,
+    "retainedPrefixExact": true,
+    "addedExact": true,
+    "harnessSha256": "4a73ade641ff12f9772aed1d858bf3694224b256d43babed528fa85120a58646",
+    "recomputedHarnessSha256": "4a73ade641ff12f9772aed1d858bf3694224b256d43babed528fa85120a58646"
+  },
+  "retainedExactFiles": {
+    "gate-contract.json": true,
+    "matrix.mjs": true,
+    "pre-request-verifier.ts": true,
+    "runtime-capacity.mjs": true,
+    "session-lifecycle.mjs": true,
+    "verify-final-branches.ts": true,
+    "verify-fix9-red.mjs": true
+  },
+  "retainedControlsTailExact": true,
+  "probeContract": {
+    "scriptPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND13/probe-zero-request-ui.mjs",
+    "scriptSha256": "def6e1b8a7bda541a999a7bfa457d6f8637a802d2ac6013dab9af61bea8153c4",
+    "argv": [
+      "node",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND13/probe-zero-request-ui.mjs",
+      "152eed4da1cd3e66b74d8301159ba76427552409",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE-run-LIVE8.json"
+    ],
+    "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "logPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_UI_TRANSITION_PROBE-LIVE8.log",
+    "transitions": [
+      "fresh full/en",
+      "same-session full/ro",
+      "storage-reset compact/ro",
+      "route-remount full/en",
+      "storage-reset compact/en"
+    ],
+    "executed": false,
+    "checks": {
+      "sharedHelperCapture": true,
+      "sharedHelperProbe": true,
+      "reactHandlerHydrationCapture": true,
+      "reactHandlerHydrationProbe": true,
+      "singleActivationExpressionCapture": true,
+      "singleActivationExpressionProbe": true,
+      "guardAborts": true,
+      "guardNeverFulfills": true,
+      "childFailureNonzero": true,
+      "directRedirection": true,
+      "noTeeInProbeCommand": true,
+      "compactViewportTwice": true,
+      "storageResetTwice": true,
+      "fixedErrorCodeFilter": true,
+      "noSyntheticResponses": true,
+      "statusAttemptsSeparate": true,
+      "sessionsMessagesMustStayZero": true,
+      "noBlindDelayInUiTransition": true,
+      "retainedDiagnosticSettlingDelaysOutsideUiTransition": true
+    },
+    "transitionDelayQualification": "No waitForTimeout occurs in openGuideSupportSurface, waitForHydratedClickHandler, or the prepared probe. Capture retains pre-existing bounded diagnostic-log settling delays after responses; they do not substitute for UI hydration or transition predicates."
+  },
+  "outputAbsence": {
+    "checked": 57,
+    "present": []
+  },
+  "disposition": {
+    "live7Cause": "UNKNOWN",
+    "productDefectInferred": false,
+    "blockedSupportAttemptsSeparateFromForwarded": true,
+    "syntheticResponses": false
+  },
+  "limits": {
+    "staticOnly": true,
+    "testsRun": false,
+    "probeRun": false,
+    "browser": false,
+    "runtime": false,
+    "traffic": false,
+    "heavyLease": false,
+    "gitWrites": false
+  }
+}

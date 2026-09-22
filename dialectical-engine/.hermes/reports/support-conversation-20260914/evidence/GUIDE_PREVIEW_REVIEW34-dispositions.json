@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_REVIEW34",
+  "ticket": "t_9ac4ece7",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "verdict": "REWORK_FINAL_OPERATOR_EMBEDDED_CONTRACT_HASH",
+  "dispositions": [
+    {
+      "id": "GPR34-R1",
+      "subject": "literal final operator command-contract hash",
+      "disposition": "REWORK",
+      "evidence": "run-operator.mjs embeds predecessor SHA 6269d1c5… but reads RECOVER34 command-contract SHA f8a5df03…; its non-inert guard rejects before preflight."
+    },
+    {
+      "id": "GPR34-P1",
+      "subject": "startup request accounting",
+      "disposition": "PASS",
+      "evidence": "Exactly one approved diagnostic and one full supported startup handshake; diagnostic 07:55:46.698Z–07:56:05.342Z, runtime start 07:59:03.445Z, no additional retry."
+    },
+    {
+      "id": "GPR34-P2",
+      "subject": "withdrawn timestamp",
+      "disposition": "PASS_QUALIFIED",
+      "evidence": "07:58:30.812Z–07:58:49.752Z is explicitly withdrawn and not treated as a second diagnostic."
+    },
+    {
+      "id": "GPR34-P3",
+      "subject": "Runtime9 custody",
+      "disposition": "PASS",
+      "evidence": "Detached PID/PGID9800, exact0d34 revision, 12 expected listeners, API8890, system TLS Help200 and unchanged unrelated listeners."
+    },
+    {
+      "id": "GPR34-P4",
+      "subject": "private-log handling",
+      "disposition": "PASS",
+      "evidence": "Closed Runtime8 source-allowlisted extraction retained fixed code only after custody/closed-file checks; Runtime9 private log remains unread and unhashed."
+    },
+    {
+      "id": "GPR34-P5",
+      "subject": "retained full58 and current product binding",
+      "disposition": "PASS_RETAINED",
+      "evidence": "BIND32 proof passes58 at revision0d34, FINAL18 and KB7ef with zero browser/session/Support/model traffic."
+    },
+    {
+      "id": "GPR34-P6",
+      "subject": "literal seven phase argv",
+      "disposition": "PASS_EXCEPT_R1",
+      "evidence": "All seven argv arrays point at the RECOVER34 contract and TS children use node --import tsx; execution is blocked solely by the stale embedded source hash."
+    },
+    {
+      "id": "GPR34-P7",
+      "subject": "future output custody",
+      "disposition": "PASS",
+      "evidence": "123 paths are unique and absent, including rowProof.result, owner-testability, owner capacity and 93 GUIDE22 screenshots."
+    },
+    {
+      "id": "GPR34-P8",
+      "subject": "capture and owner session accounting",
+      "disposition": "PASS_RETAINED",
+      "evidence": "Fixed31 uses five capture sessions; owner capacity remains deferred and separate at six messages/two sessions with reservation-before-read."
+    },
+    {
+      "id": "GPR34-P9",
+      "subject": "screenshot safeguards",
+      "disposition": "PASS_RETAINED",
+      "evidence": "FIX30 helper remains byte-identical SHA824e780a…; no repeated visual audit."
+    },
+    {
+      "id": "GPR34-L1",
+      "subject": "actual operator and readiness",
+      "disposition": "NOT_ESTABLISHED",
+      "evidence": "The planned operator has not run; static binding and runtime health do not prove current capacity, actual31 quality or completion."
+    },
+    {
+      "id": "GPR34-L2",
+      "subject": "Forgot and checkpoint",
+      "disposition": "UNRESOLVED_ACTIONLESS",
+      "evidence": "No destination is inferred; CP1 is not accepted and CP2 remains gated."
+    }
+  ],
+  "hashes": {
+    "actualCommandContract": "f8a5df033841912013df6eda0f13d5811f9e709712e8311f692d7926d9d52030",
+    "staleEmbeddedCommandContract": "6269d1c50fd24574f70f4d4898cd2cf1e2e42174c5f392b9516a558c75575107",
+    "operatorScript": "84793f9357933a8e6fbc87a87425698600a57287ca82c2eb4da05e5b94b50ca9",
+    "operatorContract": "8fc078cdcfc0d94eb285240e1ff116b13b3a4e28c156807b06ace5ccb926cfc2",
+    "bindingProof": "20c74966c18a63c8bf5650596cfc2100293c83ffb4d89ec3511aa4cca8b09a4a",
+    "full58": "67cfc10ca5e079022e8a6c609e95cf2bdf333a077a0fd0c6017587e49b718617",
+    "final18Manifest": "8e57b2dfcd1ece63058be87d62cad23d6ecda69a6e3bbba8ad42c421eaf303ff",
+    "screenshotHelper": "824e780a1817c198a6ca6ebc6215948241ecccbb5611617a033e650799ac4b29",
+    "invocationAccounting": "e7394f0d3c0150dc4ccec808c19fe064ea85a2eef259d4cbf65475cad9cb2466",
+    "runtimeCustody": "e31c050e25add67fa0b2a92cad5cdccd81727f8074aca39b9bd3304b52940ab7"
+  },
+  "counts": {
+    "indexedInputsMatched": 93,
+    "indexedInputsTotal": 93,
+    "bindingControlsPassed": 12,
+    "bindingControlsTotal": 12,
+    "full58RowsPassed": 58,
+    "full58RowsTotal": 58,
+    "phaseCount": 7,
+    "captureRows": 31,
+    "captureSessions": 5,
+    "ownerMessages": 6,
+    "ownerSessions": 2,
+    "futurePathsAbsent": 123,
+    "futurePathsTotal": 123,
+    "approvedStartupModelRequests": 2,
+    "supportAnswerRequests": 0,
+    "remainingFindings": 1
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

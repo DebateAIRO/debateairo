@@ -1,0 +1,1039 @@
+{
+  "at": "2026-09-17T19:18:18.531738+00:00",
+  "ref": "refs/heads/codex/support-conversation-mission",
+  "commit": "04727d3b5f02be4ce9310410dd5fe113300b7fd1",
+  "tree": "3ef1c25ed09d89177c33861b6d32dc62fd614a31",
+  "parent": "554e776a293840bb1ec50b5a028d0c129fd79cb2",
+  "files": [
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/board-ids.json",
+      "sha256": "bba28f7697b225ff745f1e629d9cdc1c1c5d9459585d9e11356d89d9aa8cf48d"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/agents.json",
+      "sha256": "8f9e9e9b81208553efca28a0acbcb14e7ca96d6836fb412955827017107e5789"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/LEDGER.md",
+      "sha256": "986e03306c29b877268e154d63a19021fd6925e31bad5f5b87a2f51d3b64c7c1"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/INSTRUCTIONS.md",
+      "sha256": "c99c4c266e63b683f1da1fb46048b38e8e9aa00ac2f01816832c27460b8bdeeb"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/OWNER-PUBLIC-GUIDE-20260917.md",
+      "sha256": "bc80328fa3ecddb954ff4b7872fe2c460e8c3af37cbb8619807b3371f1175f63"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/SPEC-v5.md",
+      "sha256": "4dc2a6ecb17b29eb25f4b523eae9ed7d99c45c6d48aad356987d1e0868fbe327"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/MENU-COVERAGE-v2.json",
+      "sha256": "32793ff1c7dc9c4a133c52de845f906092f1e7d71e8858b8d907a17abbc03c52"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL5-manifest.json",
+      "sha256": "b38209d524d6d552c2b8aefef3e23958dbdae8151a3cf4258a946af819937ab6"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SECURITY6-receipt.json",
+      "sha256": "d5643e7a76bdd951779477270bd9d2a59a6e03756ba74f611c7562ed6611935e"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SECURITY6-consumption.json",
+      "sha256": "00d62cdb30d85038ec57e35ff9fb13b188a4b112de781a20fc27cb39f9b4681f"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_SECURITY6.md",
+      "sha256": "1d392c73692f838178764ecb5e33a54aa6b578093e16aedd47e37f9dea4f0d82"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_SECURITY6.md",
+      "sha256": "2e5e332d73bad988c17d39bea67349a29c0f6077d57b120f6f412f3df4889fd2"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY6-custody-pre.log",
+      "sha256": "fe9729b20bfaccfc5dcab223621c14f8881b0cfc8965048856b43b51e58704d7"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY6-dependency-custody.log",
+      "sha256": "458dfa36de807007e2fa5ddcb727ab689508749091a2593914efcd9e89c77438"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY6-context18.log",
+      "sha256": "6b10dc7350e01327c99ac72f8594927c194adadbf99dbc8adf859be9fa23f19e"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY6-policy18.log",
+      "sha256": "8d74c9b2f9be3aac7dbe7a32970172d1c3ff5c3d8fbf7f97721ba301b07e25a7"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY6-focused.log",
+      "sha256": "8064a39ae3de455605f5b026a513104564b780844b03cdb1fa9b093b8286b66a"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY6-custody-post.log",
+      "sha256": "3e4a7dbdb973cd339e41b06391492c9ad63de81bd130aadad2c2c42dd38c8a71"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY6/COMMANDS.txt",
+      "sha256": "ac6b37bcad9360d3dead1ab909164a92b25dad9374db8b5d1f35cf5898bb6666"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY6/matrix18.json",
+      "sha256": "ae7ff3ce8754a15e0ad2d7b33c45a9e70ce738263c9d8577288551b7add0d0ad"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY6/matrix-policy.json",
+      "sha256": "789f058af86d3a3302c40e6c3c35dd86f559431c6d7f487fb6afcf6c3be12f9d"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY6/run-context18.mts",
+      "sha256": "a1b945acd2e46bf9a4f703af4ecb66fbe9a727313f9965379d24a6d84a1b55bf"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY6/run-policy-safety.mts",
+      "sha256": "d4d5d2f04604f5d68721be4308989e03c7dcdd3a16ecd94c7299fd07ab6b6077"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY6/run-custody.mjs",
+      "sha256": "784daf34d4af216550beee9c1fceff8da04340f54a2d6076154010b2bbd3e13c"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY6/run-dependency-custody.mjs",
+      "sha256": "2c6bf4248357cf969e670d15bb8e1c518820d7ceb685f33b9ee970eadf0aa5f3"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_SECURITY6/package-receipt.mjs",
+      "sha256": "2738de0b3c722302de1cf6b078c6bb174bd4d237437e5ce0a61b19ac25e6b71a"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CORRECTNESS6-receipt.json",
+      "sha256": "d88fead9ef13523f5e835674be8eb3bec0013b26ad1b7a615543c23e5cceb6a7"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CORRECTNESS6-consumption.json",
+      "sha256": "a5314a464f63f60d9ad7f4abaaba5c14b3e44bfd1f3de04ae2ef1f3f5b446c54"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_CORRECTNESS6.md",
+      "sha256": "1b39098a16d3dc63b4f4a87084ce08013410c70bf69dba39313b12ba9a662ad0"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_CORRECTNESS6.md",
+      "sha256": "28b957307fe054dafee2522c027cb063e597f837fff030b8e3a022eb4d61275e"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CORRECTNESS6/custody.py",
+      "sha256": "8ae2d0946e763e1a112413b54fe56421d3bb6ca165cd00025d1823b245a6f71d"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CORRECTNESS6/cleanup-custody.py",
+      "sha256": "12f6b0b2f32008b3f3215fee1f9e518f9e521080e3ac154d4a25db398b5a6ed9"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CORRECTNESS6/navigation-admission.mts",
+      "sha256": "24a66dd53aba3ccba23119310ee6ce3576469b8b604de9b74f561f343e13bfb7"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CORRECTNESS6/source-fallback.mts",
+      "sha256": "6cac6f37362d0de8c4378791157bdc05fc162cd45d61fa5fd10eba5187ec42be"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS6-input-custody.log",
+      "sha256": "0d9f13dea1a6b7ab2777931166938f3ea7c0ba52952dbfe6de79cb8238969f99"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS6-authored-tests.log",
+      "sha256": "0cd18b5bbb85951c9283db6381be39be5757ff220aeecaf2076007f6b24653c9"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS6-navigation-admission.log",
+      "sha256": "5216e26abb477698f141bf0674f562da930d4cb3c4daa799fd14c3271285b261"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS6-source-fallback.log",
+      "sha256": "4713587df59a6b2cdbf52354a32e1604778ae5a3f1d4e074a27696654de23d11"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS6-cleanup-custody.log",
+      "sha256": "443d48071f8f3505717fe55f0cd74a9b3f34a16b71e925037781c330e2a58818"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FALLBACK_BINDING-receipt.json",
+      "sha256": "465dcd5f4c7fb2f80c4651d29ed6e6aa8fba0b6db6f571fedb174d661516e729"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FALLBACK_BINDING-consumption.json",
+      "sha256": "2fb1406d943a8f5f467d88565a48d4598f9bc74faa01b52a50c5289a0c29ed2f"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FALLBACK_BINDING.md",
+      "sha256": "7e5e984f20ad79cf023f7a2d0845ceca3fe97e6fb88c24fc17d702f6dfa134a8"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FALLBACK_BINDING-snapshot-receipt.json",
+      "sha256": "c2f9949a077c745334e664f441c953cf29d4c10284bfda4a29b0a82a9d33540e"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FALLBACK_BINDING-required-suites.json",
+      "sha256": "3f7cbf39dcca305625f75d0c1ebbb011f9440151d6b87755573f4f74d3b88a02"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FALLBACK_BINDING-typecheck-comparison.json",
+      "sha256": "0fdbf5d3b9f37107c2758d90cc808c96b1910e73ed3cd3455dc304a3511cf35c"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FALLBACK_BINDING-eval-summary.json",
+      "sha256": "b6bd47d6053efdb48c8c54d2487b4d73d90e82cddb106e340c8a1c99e48a8b50"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FALLBACK_BINDING-product-manifest.json",
+      "sha256": "18c3063c5d56458b788fb6473ed1471e3253b3ce773da6430ad16ed15528c7f1"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_FALLBACK_BINDING.md",
+      "sha256": "9e9bd71653bd14b12ee048188a59249250f9e043b22e14f57c86f02c5b18967d"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_FALLBACK_BINDING-red.log",
+      "sha256": "6fc241b19a6b8ae2b28e76f6cbb34e2ffc977fec8195bd90f8774fa28c3b4c94"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_FALLBACK_BINDING-focused-green-final.log",
+      "sha256": "9135d511d0c9b0eb8aeecdb1f284de30cbeacd002e9e4de8517da21802bd7788"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_FALLBACK_BINDING-answer-typing-green.log",
+      "sha256": "a6627bf5ea066ac0e833d53730b016441678e20b385869f496015ba92271165d"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_FALLBACK_BINDING-catalog-typing-green.log",
+      "sha256": "4d6d0dcd1a6873953b35450cf7cf4fb3bec84ee91f8cd77842a0b6032e4b1b9b"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_FALLBACK_BINDING-suite-final.log",
+      "sha256": "fec274c15da77b44169cbcce29956572f30e3ad58945d02f29afd9255300ce59"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_FALLBACK_BINDING-suite-final2.log",
+      "sha256": "33ad10c70ea32e4d4c130825e0bff39cdb0bde73d7cdbdd3ae23cd819bc9cc36"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_FALLBACK_BINDING-typecheck-final.log",
+      "sha256": "546fdb6600cb32f0d6f12bfb9a02acbae910520346b410309ac190a13a46b59c"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_FALLBACK_BINDING-typecheck-final2.log",
+      "sha256": "943a586a210c585f4a6e9b1bab83774b5f236ab6d9302e280aa096c5e33d8dd4"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_FALLBACK_BINDING-typecheck-final3.log",
+      "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_FALLBACK_BINDING-eval.log",
+      "sha256": "293ad6a5c080d0205fb24a936d1428bc408d99157bb43749ed66914b4460c542"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_FALLBACK_BINDING-eval-escalated.log",
+      "sha256": "95b16e6a777c01a2d411678781d754164593ecf6e566a008eb535812565bbdb1"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_FALLBACK_BINDING-snapshot-final.log",
+      "sha256": "f2ddc7d02175e6dae584be18555b7d60eab92b956a15c9f1202a57b9b0ad23b3"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_FALLBACK_BINDING/capture-snapshot.mts",
+      "sha256": "bacedfa61b4b7c5095256bfb3b675ae7a22437b497458da0ff3fd076a6fd8c3c"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_FALLBACK_BINDING/package-evidence.py",
+      "sha256": "8b6804cf58929d2e68adc4618dfa7f525ea394ff588f7033ff4e5e2cf5b7e0e2"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_COMPOUND_ALIAS-inputs.json",
+      "sha256": "7b9519dc36cccdd3c992a97936ad935177f1e6ea91cd9c9d02cf85115b7c4e13"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/GUIDE_COMPOUND_ALIAS.md",
+      "sha256": "ae190f36fe2a2a14375cca644f9d1624815caee47c8884046ddb8a484efde56b"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW5-receipt.json",
+      "sha256": "15a93cd65b8fa9e972093e4c048cd7ea5cd5cfb6693f670384d067126558de89"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW5-consumption.json",
+      "sha256": "7b4e3c096c138ed89b458e72a311b44fe7b2995115c4db756b46c62e0a4587de"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW5.md",
+      "sha256": "c0250bf717ed5398cd9d8eba31e797fa859f1b7f4fcb92142507659d990ec24c"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW5.md",
+      "sha256": "9f90403e778d277b0aad5c0f49a8687c451cfbd3f31a76f821fcf647088343da"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW5-static-custody.json",
+      "sha256": "2678446ffe5b31b2aeda05ffeaeb2d91ecca03120302e4324c0f984010f789c0"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX5-receipt.json",
+      "sha256": "5d4ff3f9657a2cfea9f7486aff74a6a08c013f445a29276eaebb6bbe3de1593f"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX5-consumption.json",
+      "sha256": "b75679ce4002d42157135947b049f5e7dbcc3676e6d1b10af7ba2d8dba18d453"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX5/README.md",
+      "sha256": "8ead01a1eb2592c418d897563685ca0c95c27d817d3b61c13fe414e16f08cd78"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX5/capture-public-guide.mjs",
+      "sha256": "7dda1673a32da20e43b6ed8879d24f57036d76f8b1ae4a59ca86aef581c8ddda"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX5/controls.mjs",
+      "sha256": "5f7402ca88dfceaf414fbd1862b4321f40bddd33e37a4e3a1200ffc59c7a8c75"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX5/gate-contract.json",
+      "sha256": "a06a7ad7b1e328f5432a4ac9403436f87aab15427410c63cec0b55d93b3b8680"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX5/matrix.mjs",
+      "sha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX5/pre-request-verifier.ts",
+      "sha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX5/runtime-capacity.mjs",
+      "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX5/session-lifecycle.mjs",
+      "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX5/verify-final-branches.ts",
+      "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX5/verify-guide-harness.mjs",
+      "sha256": "6ed6d7bfe77023caa6fa1fbde287c9c474361664ed8a164706527b3422a6da26"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_FIX5/README.md",
+      "sha256": "d2629080d09427aa653fa991993d2304281ba0f82a3427029768e2d777361f30"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_FIX5/replay-row-proofs.mjs",
+      "sha256": "becafc56c1b83df24ac4cce577d4b2c6164c24a15ecdfb71bd0fc8928966c5fd"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_FIX5/reviewed-harness-custody.mjs",
+      "sha256": "3d612d8e61fd67ccef1ee88b5304f452ef8ec25d62405340dbc24f752c9c7768"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_FIX5/verify-negative-fixture.mjs",
+      "sha256": "3ea43c427feb988cdc2f916cf43f8dc2765665ba05b65e66db5cc04dad5c87b6"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_FIX5-controls-interim-f3.log",
+      "sha256": "e57e208a0ba9d37bab76bbca57d9cb5788828936fcbfd0a89097ef6a007689d5"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_FIX5-controls-final.log",
+      "sha256": "b16854342b505125ef61e24381dec2ddec1520eb97c1ec97763faf158d7cc01d"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX5-control-proof.interim-f3.json",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX5-control-proof.json",
+      "sha256": "c5719c864c94868c83095841402af050f5cca45fb98eaf9a3d1657dd1900256d"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX5-control-delta.json",
+      "sha256": "863a65fd1c090d551d1235bd74c4d52bf4dbab91748218dd532fd47835aa3689"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX5-delta.json",
+      "sha256": "80ab72b37ff111c452a424165ff7ae3e7e7613ce218f290427d2b34dfe8a162b"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX5-custody.json",
+      "sha256": "5dfe24305bcc850ce52f65983c50b8c15331ca79f0eb38d821411c2c252daf41"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX5-output-absence.json",
+      "sha256": "60f69e5cc8e321830f236d3d2abb95a2c022a09552ca380c50eaf1de2a0e9338"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX5.md",
+      "sha256": "97f6009a9da75142bcf8132a7602db3071a81d9bbac85822a5e2be1bafdc232c"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_FIX5.md",
+      "sha256": "840674cae9e831af5c8485a49cecdaaf3047f1053cb5ec7cdc6b0c4750329df4"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SOURCE_ORACLE-receipt.json",
+      "sha256": "c36647a0b4ec736e75028f4b13229b3173eeab31e392221633b92f295b8b9dd5"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SOURCE_ORACLE-consumption.json",
+      "sha256": "c8391fb188569bb34eaaed49eece2286b87e275e9805dae6036dabf422f81fdb"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_SOURCE_ORACLE.md",
+      "sha256": "f31ac5986f588f1cf00525a93a2c039c80db2405d9a63f84b942362c666bd438"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_SOURCE_ORACLE.md",
+      "sha256": "b9fa7a114b84123b7c999ed6239023a7b700b64a909e288823701f8513dc4ac9"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SOURCE_ORACLE-custody.json",
+      "sha256": "8c84d83abada006ef6df4c00032f92a87db7c20a563d4697a2479663af5b0a3a"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SOURCE_ORACLE-static.json",
+      "sha256": "8cc167e5002657c4a14bf91265752ae6d922f29396bb2f37c4a10a556b2a4115"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME_DIAG-receipt.json",
+      "sha256": "2d9456afdc88fe11b4bdb9c763116390973c7b3b845d4c8ccfea38da13651588"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME_DIAG-consumption.json",
+      "sha256": "8b98b4b3a82379e6bb6c956bae85668a33bacc8e77213aeb71a96634e95ddf64"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME_DIAG.md",
+      "sha256": "52599ce32b883fb48fe0a87e6ec432245b6d3fd35c64535237382e66744be30b"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_RUNTIME_DIAG.md",
+      "sha256": "956878f688a3316dda6460d06f35daa4ebba2db730c0aa46cb9484fefecbf193"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_RUNTIME_DIAG-custody.log",
+      "sha256": "d749341770303295fae4a25efe8259aaea829d6d686ad3c775c835e6ea05e02c"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX6-inputs.json",
+      "sha256": "24137fc561a280bf4f0892187c8015ca6208fe67ed816bc8c2f35e3bea161f90"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/GUIDE_HARNESS_FIX6.md",
+      "sha256": "679f5adbdedcf735d47814920f5f6995bc436fdb571a7dbe12652ce23f444b78"
+    }
+  ],
+  "source_before": {
+    "head": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "indexFullDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktreeFullDiffSha256": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19",
+    "trackedDirtyPaths": [
+      {
+        "path": "dialectical-engine/.claude/skills/heartbeat-orchestrator/SKILL.md",
+        "kind": "file",
+        "sha256": "69592fbe13c09dd6522a4c99689ee2f9de27447ed964439d9d114ebdf1812a52"
+      },
+      {
+        "path": "dialectical-engine/.claude/skills/heartbeat-orchestrator/scripts/skills-check.sh",
+        "kind": "file",
+        "sha256": "14f39c250b4f4af232636c2862f685c8c4332df551e87e79fe8f8d685cb053fa"
+      },
+      {
+        "path": "dialectical-engine/.hermes/planning/observability-agents/packets/COMMON.md",
+        "kind": "file",
+        "sha256": "ac5d0140d8a7816820962d2beda39ba8a6bdc165a8975d476fb2972f992a391c"
+      },
+      {
+        "path": "dialectical-engine/.hermes/planning/observability-agents/packets/REQ-FIX.md",
+        "kind": "file",
+        "sha256": "5504a091878b890ff7c0bca78d1f865b5b380ddd0bc1982ae37f438be0069fb8"
+      },
+      {
+        "path": "dialectical-engine/.hermes/planning/observability-agents/packets/REQ-OBS.md",
+        "kind": "file",
+        "sha256": "a8eb27b3478d48c1c9f56c0d374f44dd71bb95787250f208805e97c6646ef214"
+      },
+      {
+        "path": "dialectical-engine/.hermes/planning/observability-agents/packets/REQ-REV-FIX.md",
+        "kind": "file",
+        "sha256": "98704f2d1ad39714e113b507a6eb70efe4cefd61a64a9573d55a12b6a1d65492"
+      },
+      {
+        "path": "dialectical-engine/.hermes/planning/observability-agents/packets/REQ-REV-OBS.md",
+        "kind": "file",
+        "sha256": "eaaf67ed3afedca9f56980e7e4e86b3742b9c5f88f545d1f2324c038e2b3d84b"
+      },
+      {
+        "path": "dialectical-engine/.hermes/planning/observability-agents/packets/REQ-REV-SUP.md",
+        "kind": "file",
+        "sha256": "a74ce1389ea5cc17c8497517bc918d0ad75742648ab05188417e2cf6a80dda87"
+      },
+      {
+        "path": "dialectical-engine/.hermes/planning/observability-agents/packets/REQ-SUP.md",
+        "kind": "file",
+        "sha256": "c8311ca6719d72f86fb91179cdeb2fafc84bc57c6fc3db21d705fa231a6e5ffb"
+      },
+      {
+        "path": "dialectical-engine/.hermes/planning/observability-agents/packets/REQ-SYNTH.md",
+        "kind": "file",
+        "sha256": "10b24869749d06abe3c00180a4bd769ee91e073817bcc4ca830b8a50ee2da6a4"
+      },
+      {
+        "path": "dialectical-engine/.hermes/reports/consent-ui/LEDGER.md",
+        "kind": "file",
+        "sha256": "13b505e3e1226b48830f90349455ea9f337bde618668a12f6f987e7c063f84f7"
+      },
+      {
+        "path": "dialectical-engine/.hermes/reports/observability-agents/LEDGER.md",
+        "kind": "file",
+        "sha256": "9abb98a7d0ca027d6591ac1ef4c6fc94ef01f2f29c9dd019e4aef9805dd61949"
+      },
+      {
+        "path": "dialectical-engine/apps/api/src/index.ts",
+        "kind": "file",
+        "sha256": "09fb43043584e1d5a13bbd29a804e161ebbbe4c955381c48b6c6b6e6c494dbee"
+      },
+      {
+        "path": "dialectical-engine/apps/ui/components/NodeDetailDrawer.tsx",
+        "kind": "file",
+        "sha256": "9b6aa62928589ee904ab9f1c089746745516b3ab6cee312ecd4318c92a0747c6"
+      },
+      {
+        "path": "dialectical-engine/apps/ui/lib/v3/adapter.ts",
+        "kind": "file",
+        "sha256": "39151432de933de782e77b94a130427ac49760c2c78e0a3fa97c9f2f1cf72966"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/TYPECHECK-BASELINE.md",
+        "kind": "file",
+        "sha256": "034cbb6c4b35e78404a0d12770e6b263fc0df5804d9e64bd01512d0a0f7017ec"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/V-DECISIONS-PACKET.md",
+        "kind": "file",
+        "sha256": "295bb546c227a8cf6817038f352e1925163c64907c885ec853c440e893a07e2c"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/requirements/fixagent.md",
+        "kind": "file",
+        "sha256": "718d5dd14c7bb8d647e72ef416dd89609e4efffb2b2757e0c9111ff7eb136e09"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/requirements/observationagent-compass-block.md",
+        "kind": "file",
+        "sha256": "4eb688e996301d6105f8c38b4ffd2d7bfdccb71ed1c347a63afcb9800956dd71"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/requirements/observationagent.md",
+        "kind": "file",
+        "sha256": "00e332fc845fdafbf707fa0f8bcca7d5372e0f71046ea81f69d2bccb8d67a0a2"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/requirements/supportagent.md",
+        "kind": "file",
+        "sha256": "40b8cf11918edb1f9239cc176118400bd5273a662ecdcedf700abde504397490"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-01/PLAN.md",
+        "kind": "file",
+        "sha256": "f1fa8278015e6059e0bd3be3cb7d0b5615de5aa8006b4ca8b49f22b230712713"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-01/SPEC.md",
+        "kind": "file",
+        "sha256": "261e40e57d87876b9fff0dbb7c0557af59627974a2f416faf61a8b5e2892240f"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-02/SPEC.md",
+        "kind": "file",
+        "sha256": "d6399a1eecea043fb8145742c4a55f3e58d15e5338c4b3e6c89e63d515ab2b3c"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-03/SPEC.md",
+        "kind": "file",
+        "sha256": "eec276c31adf2a73cb13b1816a60678b0bbfc26d7eabbd0aa7fd2baea2ca72e9"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-04/SPEC.md",
+        "kind": "file",
+        "sha256": "105b37803b50d4963f4b17517618dc57b720a667d848eb091af954f7d04c0ab2"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-05/SPEC.md",
+        "kind": "file",
+        "sha256": "23488cfa805690fc42fc1793882d9bbd0365ef7e2173e8a58865010a3cf31d04"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-06/SPEC.md",
+        "kind": "file",
+        "sha256": "c0ecca11044aa8d0da28a652373be7f1811faf841e23047815de11eba6b319d1"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-07/DECISIONS.md",
+        "kind": "file",
+        "sha256": "eb24748300914ade881419000839a5bf24e6a3336ef81912ff5cde1eaf652e1e"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-07/SPEC.md",
+        "kind": "file",
+        "sha256": "1fbdc1283aa68d4fc32b82d631a092aee88929fe653d9a0bd0986c73a5ad3c1b"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-09/SPEC.md",
+        "kind": "file",
+        "sha256": "bde2797ff51576985cc7b6dbf20beb26cf995046c08a6025f8dad2aeba69f78d"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-12/SPEC.md",
+        "kind": "file",
+        "sha256": "9782671f53a1209631f01ce54b57f98686bdb79e996dbf019205ad4cf0df494e"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-13/SPEC.md",
+        "kind": "file",
+        "sha256": "01c1dd7dfa232eaf2162e00205bd75fc3f4cbc58dbe01b82523016ad12324174"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-14/SPEC.md",
+        "kind": "file",
+        "sha256": "32294cd27b657a6e683cec1817748d3735d231c825b9212d0bfebdbeb6f52644"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-15/SPEC.md",
+        "kind": "file",
+        "sha256": "2a69d052f594832e77acf4fcc7927cb08cd2a7dc9ca7a6b304b87e7608113d33"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/OBS-01/DECISIONS.md",
+        "kind": "file",
+        "sha256": "9bef0532374697f718a99596ed05ed19ebc9cec7216ad6711d525f7db079d70b"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/OBS-01/PLAN.md",
+        "kind": "file",
+        "sha256": "0298ac52e78d1d6f77516079125d640f637d9adcdb792339e6a3d344415710a0"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/OBS-01/SPEC.md",
+        "kind": "file",
+        "sha256": "26cc65b5d9f04d4dc2c93c197eeb1706d7a1c998ccfb3d1b8bbe3c068e0c40da"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/OBS-02/DECISIONS.md",
+        "kind": "file",
+        "sha256": "e42c996f8f72094701c68587746f81632af1049cd7336e96ac010d0c81a15361"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/OBS-02/PLAN.md",
+        "kind": "file",
+        "sha256": "533774e1fb829f94be7ed016c4ef5b7ecbabe710886592930dc2497b6d47c2f4"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/OBS-02/SPEC.md",
+        "kind": "file",
+        "sha256": "1cbd610eee0c1e044ccc751c59deb0cc750e70e255f136b45b29ef3b3772213b"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/SUP-01/PLAN.md",
+        "kind": "file",
+        "sha256": "d71bfccc291e5a78f46558a58c755fc106811e78cce1d313728d3af5a2029921"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/SUP-01/SPEC.md",
+        "kind": "file",
+        "sha256": "369a6dd8910e888e94b02dc880ddbe3305c45345bd8ed6c983371691096f8b07"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/SUP-02/PLAN.md",
+        "kind": "file",
+        "sha256": "0b88b0cb61a4fb1de399892fd149fc520e6dd376cca9ad5569fa9bec58aa35c0"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/SUP-02/SPEC.md",
+        "kind": "file",
+        "sha256": "b99fef527dd23b23bd711cd145f51a52ee209cc1bece0224e7d5fb7c97e0527c"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/SUP-03/SPEC.md",
+        "kind": "file",
+        "sha256": "104393ed7db0850fee45fcde6c8deb77e523bd7cfa92e174f2849807f1d05a07"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/SUP-04/PLAN.md",
+        "kind": "file",
+        "sha256": "ed1463844ef685a771616aca60d1337b85a5cb11446fe7f8e8f165702004ce17"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/SUP-04/SPEC.md",
+        "kind": "file",
+        "sha256": "9872e16dad43afc9dab48a64d506f26bd035467c8f34890caa6780324df123cd"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/SUP-06/PLAN.md",
+        "kind": "file",
+        "sha256": "ef0b78d8c0096208f4a120c0780310f6a0760a390902cc303954a40a0cea9c4d"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/SUP-06/SPEC.md",
+        "kind": "file",
+        "sha256": "49cfb1d5327072f57f84bd31cfff0a4df3b8554ad0778aa07896cb1f363dcf7d"
+      },
+      {
+        "path": "dialectical-engine/tests/architecture/dev-database-principals.test.ts",
+        "kind": "file",
+        "sha256": "b024de41b0f2ba289040e9a66b550f1f31177fe38e9ca3c667a420ae96617ec7"
+      },
+      {
+        "path": "dialectical-engine/tests/integration/dev-api-environment.test.ts",
+        "kind": "file",
+        "sha256": "bfab7d8cd289a521dac5c0b67c26efc74a6b78c287a1cf28257c75d87dfc2dce"
+      },
+      {
+        "path": "dialectical-engine/tests/integration/dev-api-process.test.ts",
+        "kind": "file",
+        "sha256": "09b8fd6eb1c8f9c88ec0be9df49f5ae42d5dd223fd133120e9180504c5dcd398"
+      },
+      {
+        "path": "dialectical-engine/tests/integration/dev-database-principals.test.ts",
+        "kind": "file",
+        "sha256": "3e73802ef33212ac0acb953c71a705ddb8d42ab9737b049f4a7e3fa535a3c9e8"
+      },
+      {
+        "path": "dialectical-engine/tests/integration/dev-ui-process.test.ts",
+        "kind": "file",
+        "sha256": "999888473bd9bc4525fe21552ab8e0cbddc2633773ec0b068a6c5dd1dfe650b5"
+      },
+      {
+        "path": "dialectical-engine/tests/unit/evaluator-profiles.test.ts",
+        "kind": "file",
+        "sha256": "786d4ed842d237ae6060dd26716ea16112b1575227cb8e658477c29d97517a1e"
+      },
+      {
+        "path": "dialectical-engine/tests/unit/v2ui-data-layer.test.ts",
+        "kind": "file",
+        "sha256": "4193cca4eeac410f5c0d918c1ae8095a1d43fe1f539da2e2d097a1e27e1366e4"
+      },
+      {
+        "path": "ui_designs/DebateAI Design Document.html",
+        "kind": "file",
+        "sha256": "f3d948d135499b8c3c651a1bf6c33e7b82bfb7a4bb5f6353decd9d1ae353f989"
+      }
+    ],
+    "productRef": "5731eb6faac25f9712f04aea029a021f6eee9352"
+  },
+  "source_after": {
+    "head": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "indexFullDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktreeFullDiffSha256": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19",
+    "trackedDirtyPaths": [
+      {
+        "path": "dialectical-engine/.claude/skills/heartbeat-orchestrator/SKILL.md",
+        "kind": "file",
+        "sha256": "69592fbe13c09dd6522a4c99689ee2f9de27447ed964439d9d114ebdf1812a52"
+      },
+      {
+        "path": "dialectical-engine/.claude/skills/heartbeat-orchestrator/scripts/skills-check.sh",
+        "kind": "file",
+        "sha256": "14f39c250b4f4af232636c2862f685c8c4332df551e87e79fe8f8d685cb053fa"
+      },
+      {
+        "path": "dialectical-engine/.hermes/planning/observability-agents/packets/COMMON.md",
+        "kind": "file",
+        "sha256": "ac5d0140d8a7816820962d2beda39ba8a6bdc165a8975d476fb2972f992a391c"
+      },
+      {
+        "path": "dialectical-engine/.hermes/planning/observability-agents/packets/REQ-FIX.md",
+        "kind": "file",
+        "sha256": "5504a091878b890ff7c0bca78d1f865b5b380ddd0bc1982ae37f438be0069fb8"
+      },
+      {
+        "path": "dialectical-engine/.hermes/planning/observability-agents/packets/REQ-OBS.md",
+        "kind": "file",
+        "sha256": "a8eb27b3478d48c1c9f56c0d374f44dd71bb95787250f208805e97c6646ef214"
+      },
+      {
+        "path": "dialectical-engine/.hermes/planning/observability-agents/packets/REQ-REV-FIX.md",
+        "kind": "file",
+        "sha256": "98704f2d1ad39714e113b507a6eb70efe4cefd61a64a9573d55a12b6a1d65492"
+      },
+      {
+        "path": "dialectical-engine/.hermes/planning/observability-agents/packets/REQ-REV-OBS.md",
+        "kind": "file",
+        "sha256": "eaaf67ed3afedca9f56980e7e4e86b3742b9c5f88f545d1f2324c038e2b3d84b"
+      },
+      {
+        "path": "dialectical-engine/.hermes/planning/observability-agents/packets/REQ-REV-SUP.md",
+        "kind": "file",
+        "sha256": "a74ce1389ea5cc17c8497517bc918d0ad75742648ab05188417e2cf6a80dda87"
+      },
+      {
+        "path": "dialectical-engine/.hermes/planning/observability-agents/packets/REQ-SUP.md",
+        "kind": "file",
+        "sha256": "c8311ca6719d72f86fb91179cdeb2fafc84bc57c6fc3db21d705fa231a6e5ffb"
+      },
+      {
+        "path": "dialectical-engine/.hermes/planning/observability-agents/packets/REQ-SYNTH.md",
+        "kind": "file",
+        "sha256": "10b24869749d06abe3c00180a4bd769ee91e073817bcc4ca830b8a50ee2da6a4"
+      },
+      {
+        "path": "dialectical-engine/.hermes/reports/consent-ui/LEDGER.md",
+        "kind": "file",
+        "sha256": "13b505e3e1226b48830f90349455ea9f337bde618668a12f6f987e7c063f84f7"
+      },
+      {
+        "path": "dialectical-engine/.hermes/reports/observability-agents/LEDGER.md",
+        "kind": "file",
+        "sha256": "9abb98a7d0ca027d6591ac1ef4c6fc94ef01f2f29c9dd019e4aef9805dd61949"
+      },
+      {
+        "path": "dialectical-engine/apps/api/src/index.ts",
+        "kind": "file",
+        "sha256": "09fb43043584e1d5a13bbd29a804e161ebbbe4c955381c48b6c6b6e6c494dbee"
+      },
+      {
+        "path": "dialectical-engine/apps/ui/components/NodeDetailDrawer.tsx",
+        "kind": "file",
+        "sha256": "9b6aa62928589ee904ab9f1c089746745516b3ab6cee312ecd4318c92a0747c6"
+      },
+      {
+        "path": "dialectical-engine/apps/ui/lib/v3/adapter.ts",
+        "kind": "file",
+        "sha256": "39151432de933de782e77b94a130427ac49760c2c78e0a3fa97c9f2f1cf72966"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/TYPECHECK-BASELINE.md",
+        "kind": "file",
+        "sha256": "034cbb6c4b35e78404a0d12770e6b263fc0df5804d9e64bd01512d0a0f7017ec"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/V-DECISIONS-PACKET.md",
+        "kind": "file",
+        "sha256": "295bb546c227a8cf6817038f352e1925163c64907c885ec853c440e893a07e2c"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/requirements/fixagent.md",
+        "kind": "file",
+        "sha256": "718d5dd14c7bb8d647e72ef416dd89609e4efffb2b2757e0c9111ff7eb136e09"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/requirements/observationagent-compass-block.md",
+        "kind": "file",
+        "sha256": "4eb688e996301d6105f8c38b4ffd2d7bfdccb71ed1c347a63afcb9800956dd71"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/requirements/observationagent.md",
+        "kind": "file",
+        "sha256": "00e332fc845fdafbf707fa0f8bcca7d5372e0f71046ea81f69d2bccb8d67a0a2"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/requirements/supportagent.md",
+        "kind": "file",
+        "sha256": "40b8cf11918edb1f9239cc176118400bd5273a662ecdcedf700abde504397490"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-01/PLAN.md",
+        "kind": "file",
+        "sha256": "f1fa8278015e6059e0bd3be3cb7d0b5615de5aa8006b4ca8b49f22b230712713"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-01/SPEC.md",
+        "kind": "file",
+        "sha256": "261e40e57d87876b9fff0dbb7c0557af59627974a2f416faf61a8b5e2892240f"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-02/SPEC.md",
+        "kind": "file",
+        "sha256": "d6399a1eecea043fb8145742c4a55f3e58d15e5338c4b3e6c89e63d515ab2b3c"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-03/SPEC.md",
+        "kind": "file",
+        "sha256": "eec276c31adf2a73cb13b1816a60678b0bbfc26d7eabbd0aa7fd2baea2ca72e9"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-04/SPEC.md",
+        "kind": "file",
+        "sha256": "105b37803b50d4963f4b17517618dc57b720a667d848eb091af954f7d04c0ab2"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-05/SPEC.md",
+        "kind": "file",
+        "sha256": "23488cfa805690fc42fc1793882d9bbd0365ef7e2173e8a58865010a3cf31d04"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-06/SPEC.md",
+        "kind": "file",
+        "sha256": "c0ecca11044aa8d0da28a652373be7f1811faf841e23047815de11eba6b319d1"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-07/DECISIONS.md",
+        "kind": "file",
+        "sha256": "eb24748300914ade881419000839a5bf24e6a3336ef81912ff5cde1eaf652e1e"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-07/SPEC.md",
+        "kind": "file",
+        "sha256": "1fbdc1283aa68d4fc32b82d631a092aee88929fe653d9a0bd0986c73a5ad3c1b"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-09/SPEC.md",
+        "kind": "file",
+        "sha256": "bde2797ff51576985cc7b6dbf20beb26cf995046c08a6025f8dad2aeba69f78d"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-12/SPEC.md",
+        "kind": "file",
+        "sha256": "9782671f53a1209631f01ce54b57f98686bdb79e996dbf019205ad4cf0df494e"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-13/SPEC.md",
+        "kind": "file",
+        "sha256": "01c1dd7dfa232eaf2162e00205bd75fc3f4cbc58dbe01b82523016ad12324174"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-14/SPEC.md",
+        "kind": "file",
+        "sha256": "32294cd27b657a6e683cec1817748d3735d231c825b9212d0bfebdbeb6f52644"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/FIX-15/SPEC.md",
+        "kind": "file",
+        "sha256": "2a69d052f594832e77acf4fcc7927cb08cd2a7dc9ca7a6b304b87e7608113d33"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/OBS-01/DECISIONS.md",
+        "kind": "file",
+        "sha256": "9bef0532374697f718a99596ed05ed19ebc9cec7216ad6711d525f7db079d70b"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/OBS-01/PLAN.md",
+        "kind": "file",
+        "sha256": "0298ac52e78d1d6f77516079125d640f637d9adcdb792339e6a3d344415710a0"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/OBS-01/SPEC.md",
+        "kind": "file",
+        "sha256": "26cc65b5d9f04d4dc2c93c197eeb1706d7a1c998ccfb3d1b8bbe3c068e0c40da"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/OBS-02/DECISIONS.md",
+        "kind": "file",
+        "sha256": "e42c996f8f72094701c68587746f81632af1049cd7336e96ac010d0c81a15361"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/OBS-02/PLAN.md",
+        "kind": "file",
+        "sha256": "533774e1fb829f94be7ed016c4ef5b7ecbabe710886592930dc2497b6d47c2f4"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/OBS-02/SPEC.md",
+        "kind": "file",
+        "sha256": "1cbd610eee0c1e044ccc751c59deb0cc750e70e255f136b45b29ef3b3772213b"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/SUP-01/PLAN.md",
+        "kind": "file",
+        "sha256": "d71bfccc291e5a78f46558a58c755fc106811e78cce1d313728d3af5a2029921"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/SUP-01/SPEC.md",
+        "kind": "file",
+        "sha256": "369a6dd8910e888e94b02dc880ddbe3305c45345bd8ed6c983371691096f8b07"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/SUP-02/PLAN.md",
+        "kind": "file",
+        "sha256": "0b88b0cb61a4fb1de399892fd149fc520e6dd376cca9ad5569fa9bec58aa35c0"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/SUP-02/SPEC.md",
+        "kind": "file",
+        "sha256": "b99fef527dd23b23bd711cd145f51a52ee209cc1bece0224e7d5fb7c97e0527c"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/SUP-03/SPEC.md",
+        "kind": "file",
+        "sha256": "104393ed7db0850fee45fcde6c8deb77e523bd7cfa92e174f2849807f1d05a07"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/SUP-04/PLAN.md",
+        "kind": "file",
+        "sha256": "ed1463844ef685a771616aca60d1337b85a5cb11446fe7f8e8f165702004ce17"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/SUP-04/SPEC.md",
+        "kind": "file",
+        "sha256": "9872e16dad43afc9dab48a64d506f26bd035467c8f34890caa6780324df123cd"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/SUP-06/PLAN.md",
+        "kind": "file",
+        "sha256": "ef0b78d8c0096208f4a120c0780310f6a0760a390902cc303954a40a0cea9c4d"
+      },
+      {
+        "path": "dialectical-engine/docs/missions/observability-agents/slices/SUP-06/SPEC.md",
+        "kind": "file",
+        "sha256": "49cfb1d5327072f57f84bd31cfff0a4df3b8554ad0778aa07896cb1f363dcf7d"
+      },
+      {
+        "path": "dialectical-engine/tests/architecture/dev-database-principals.test.ts",
+        "kind": "file",
+        "sha256": "b024de41b0f2ba289040e9a66b550f1f31177fe38e9ca3c667a420ae96617ec7"
+      },
+      {
+        "path": "dialectical-engine/tests/integration/dev-api-environment.test.ts",
+        "kind": "file",
+        "sha256": "bfab7d8cd289a521dac5c0b67c26efc74a6b78c287a1cf28257c75d87dfc2dce"
+      },
+      {
+        "path": "dialectical-engine/tests/integration/dev-api-process.test.ts",
+        "kind": "file",
+        "sha256": "09b8fd6eb1c8f9c88ec0be9df49f5ae42d5dd223fd133120e9180504c5dcd398"
+      },
+      {
+        "path": "dialectical-engine/tests/integration/dev-database-principals.test.ts",
+        "kind": "file",
+        "sha256": "3e73802ef33212ac0acb953c71a705ddb8d42ab9737b049f4a7e3fa535a3c9e8"
+      },
+      {
+        "path": "dialectical-engine/tests/integration/dev-ui-process.test.ts",
+        "kind": "file",
+        "sha256": "999888473bd9bc4525fe21552ab8e0cbddc2633773ec0b068a6c5dd1dfe650b5"
+      },
+      {
+        "path": "dialectical-engine/tests/unit/evaluator-profiles.test.ts",
+        "kind": "file",
+        "sha256": "786d4ed842d237ae6060dd26716ea16112b1575227cb8e658477c29d97517a1e"
+      },
+      {
+        "path": "dialectical-engine/tests/unit/v2ui-data-layer.test.ts",
+        "kind": "file",
+        "sha256": "4193cca4eeac410f5c0d918c1ae8095a1d43fe1f539da2e2d097a1e27e1366e4"
+      },
+      {
+        "path": "ui_designs/DebateAI Design Document.html",
+        "kind": "file",
+        "sha256": "f3d948d135499b8c3c651a1bf6c33e7b82bfb7a4bb5f6353decd9d1ae353f989"
+      }
+    ],
+    "productRef": "5731eb6faac25f9712f04aea029a021f6eee9352"
+  },
+  "private_index_removed": true,
+  "scope": "Exact current-state before/after source and product-reference preservation for this administrative operation. Does not reconstruct missing intake source evidence. Product bytes independently checked by handoff inventory."
+}

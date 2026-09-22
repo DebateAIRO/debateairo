@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "reviewedRevision": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  "adapter": {
+    "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF/replay-row-proofs.mjs",
+    "sha256": "0ef7c5168af426c9c87572fc52110b5a0ad40ac0bf35a7638e80c9cb294039d7",
+    "bytes": 5333,
+    "status": "PREPARED_NOT_EXECUTED"
+  },
+  "sealedImports": {
+    "matrixSha256": "cea34112498143dcf8b1a571e40e5a24d207b5b47ee9b142048506cc773ca1ae",
+    "verifierSha256": "a123d265d2070d9ef5929dd30bb752b826412e42b5091c68e4806b276b37a402",
+    "expectedHarnessSha256": "f8f2935965cd59b893ab02848cd9db17eeb71fa423f5620b61479e6647ae4917",
+    "expectedHarnessComparisonPresent": false
+  },
+  "finding": {
+    "id": "GRP-R1",
+    "severity": "blocking",
+    "disposition": "REWORK",
+    "evidence": [
+      "line 9 defines EXPECTED_HARNESS_SHA256",
+      "line 81 copies EXPECTED_HARNESS_SHA256 into output custody",
+      "no condition compares current or constructor-returned harnessSha256 to EXPECTED_HARNESS_SHA256",
+      "lines 65-67 bind only matrix and pre-request-verifier bytes",
+      "the constructor binds current eight-file digest to the gate proof, which is not equivalent to binding the reviewed f8f digest"
+    ],
+    "minimumFix": [
+      "before importing FIX2 modules, read and hash all eight executable harness files against the reviewed ordered manifest/digest",
+      "use dynamic imports only after the reviewed digest passes",
+      "after constructor success, require verifier.controlProof.harnessSha256 equals the reviewed digest before projecting rows",
+      "emit actual verified digest in custody instead of an unchecked constant"
+    ]
+  },
+  "passingBoundaries": {
+    "browserCaptureImport": false,
+    "playwrightImport": false,
+    "capacityReaderInvocation": false,
+    "httpOrDatabaseInvocation": false,
+    "modelClientInvocation": false,
+    "failureRows": "empty",
+    "failureCode": "uppercase GUIDE_* only",
+    "successRows": 54,
+    "outputCreation": "exclusive mode 0600",
+    "freshCapacityRequiredByConstructor": true,
+    "sameGateRequiredForLaterCapture": true
+  }
+}

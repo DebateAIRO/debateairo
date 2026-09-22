@@ -1,0 +1,30 @@
+{
+  "at": "2026-09-17T05:43:56.925877+00:00",
+  "revision": "ee06cd875956b76548ffb04d9dff29e4af8bbb74",
+  "workspaces": [
+    {
+      "lens": 1,
+      "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-correctness/dialectical-engine",
+      "revision": "ee06cd875956b76548ffb04d9dff29e4af8bbb74",
+      "clean": true
+    },
+    {
+      "lens": 2,
+      "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-security/dialectical-engine",
+      "revision": "ee06cd875956b76548ffb04d9dff29e4af8bbb74",
+      "clean": true
+    },
+    {
+      "lens": 3,
+      "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-product/dialectical-engine",
+      "revision": "ee06cd875956b76548ffb04d9dff29e4af8bbb74",
+      "clean": true
+    }
+  ],
+  "sourceBeforeAfter": {
+    "head": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "working": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19"
+  },
+  "preserved": true
+}

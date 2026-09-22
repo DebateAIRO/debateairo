@@ -1,0 +1,38 @@
+{
+  "at": "2026-09-16T20:41:46.769293+00:00",
+  "blocker": "Owner input required: existing Forgot destination and explicit decision for focused security correction/review beyond final pass3 cap.",
+  "firstObservedTurn": "Final review consumption, decision freeze743c5151 and one asynchronous V-2 question; substantive progress completed before reaching the owner gate.",
+  "consecutiveGoalTurnsWithSamePendingBlocker": 3,
+  "previousGoalTurnClassification": "no progress; same pending owner input",
+  "currentGoalTurnClassification": "no progress; third resumed authoritative check unchanged",
+  "authoritativeState": {
+    "DEST": "blocked; latest native comment1789385150",
+    "V_P3_DECISION": "blocked; latest native comment1789542385",
+    "CP1": "todo behind blocked owner parents",
+    "productRevision": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
+    "productClean": true,
+    "allThreeReviewerSessions": "completed"
+  },
+  "approval": "No answer received; the automatic goal continuation is not an approval.",
+  "action": "Third resumed blocked threshold met. Mark goal blocked; no new questions or unauthorized work.",
+  "latestGateReadback": [
+    {
+      "ticket": "t_979fe293",
+      "status": "blocked",
+      "latestCommentAt": 1789385150
+    },
+    {
+      "ticket": "t_c5d11148",
+      "status": "blocked",
+      "latestCommentAt": 1789542385
+    }
+  ],
+  "priorBlockedAudits": [
+    {
+      "consecutiveGoalTurns": 3,
+      "endedAt": "2026-09-16T07:08:44.503461+00:00",
+      "result": "goal marked blocked"
+    }
+  ],
+  "resumedGoalUpdatedAt": 1789591189
+}

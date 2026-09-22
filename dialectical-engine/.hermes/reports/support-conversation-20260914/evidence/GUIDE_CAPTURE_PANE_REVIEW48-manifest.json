@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_PANE_REVIEW48",
+  "ticket": "t_75f5344e",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_FINAL_COMPACT_PANE_CONTINUATION_BINDING",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "freeze": "8ab0c2ad1cbeb983d5aa26a4f437ab4db5094bdc",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_CAPTURE_PANE_REVIEW48.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_CAPTURE_PANE_REVIEW48.md",
+      "sha256": "80ea23e092787ab2f317d22ebe2e15d3d670456da7edb6bd8119412e6dc57824",
+      "bytes": 5290
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_PANE_REVIEW48-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_PANE_REVIEW48-dispositions.json",
+      "sha256": "5227e6a20657d49166e4eb727c3917aacd1c0c3b032876dbda89906ea5a0333d",
+      "bytes": 3088
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_PANE_REVIEW48-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_PANE_REVIEW48-custody.json",
+      "sha256": "fa35dd42f96201d4975a4f314b32f31546d0e9823d2a885b2628df6794033d2d",
+      "bytes": 1903
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_CAPTURE_PANE_REVIEW48.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_CAPTURE_PANE_REVIEW48.md",
+      "sha256": "d630240ab338be7b090f0f6230500cffe385670b35013232f8476fd1111a3fe9",
+      "bytes": 1743
+    }
+  ]
+}

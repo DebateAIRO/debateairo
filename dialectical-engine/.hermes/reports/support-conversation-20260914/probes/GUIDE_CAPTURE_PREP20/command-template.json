@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_PREP20",
+  "revision": null,
+  "preparationBase": "0f4290c290fd38caa0ccfb3b6781fb8c33999a22",
+  "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "evidenceRoot": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence",
+  "baseUrl": "https://localhost:3100",
+  "runtimeCustodyPath": "__FINAL_RUNTIME_CUSTODY_PATH__",
+  "gateTemplatePath": "__FINAL_GATE_TEMPLATE_PATH__",
+  "gateTemplateSha256": "__FINAL_GATE_TEMPLATE_SHA256__",
+  "actualReceipt": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE18-actual-receipt.json",
+  "browserProfile": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_PREP20/browser-profile",
+  "actualSequences": [1, 2, 15, 19, 23, 27, 31, 35, 39, 47, 43, 10, 18, 26, 34, 56, 58, 54, 5, 13, 21, 25, 29, 37, 45, 53, 8, 12, 42, 55, 57],
+  "plan": {
+    "requests": 31,
+    "modelCallCeiling": 27,
+    "sessions": 5,
+    "english": 14,
+    "romanian": 17,
+    "reservedOwnerMessages": 6,
+    "reservedOwnerSessions": 2
+  },
+  "phases": {
+    "preflight": {
+      "argv": ["/Users/vladmihaimiron/.local/bin/node", "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_PREP20/phase-preflight.mjs", "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE20-command-contract.json"],
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE20-preflight.json",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE20-preflight.log"
+    },
+    "readiness": {
+      "argv": ["/Users/vladmihaimiron/.local/bin/node", "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_PREP20/phase-readiness.mjs", "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE20-command-contract.json"],
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE20-readiness.json",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE20-readiness.log"
+    },
+    "capacity": {
+      "argv": ["/Users/vladmihaimiron/.local/bin/node", "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_PREP20/phase-capacity.mjs", "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE20-command-contract.json"],
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE20-runtime-capacity.json",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE20-capacity.log"
+    },
+    "gate": {
+      "argv": ["/Users/vladmihaimiron/.local/bin/node", "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_PREP20/phase-gate.mjs", "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE20-command-contract.json"],
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE20-gate.json",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE20-gate.log"
+    },
+    "rowProof": {
+      "argv": ["/Users/vladmihaimiron/.local/bin/node", "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_PREP20/phase-row-proof.mjs", "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE20-command-contract.json"],
+      "childArgv": ["/Users/vladmihaimiron/.local/bin/node", "--import", "tsx", "__FINAL_ROW_PROOF_SCRIPT__", "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE20-gate.json", "__FINAL_REVISION__", "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-LIVE20.json"],
+      "result": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-LIVE20.json",
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE20-row-proof-status.json",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ROW_PROOF-LIVE20.log"
+    },
+    "capture": {
+      "argv": ["/Users/vladmihaimiron/.local/bin/node", "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_PREP20/phase-capture.mjs", "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE20-command-contract.json"],
+      "childArgv": ["/Users/vladmihaimiron/.local/bin/node", "--import", "tsx", "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_PREP20/capture-public-guide.mjs", "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE20-gate.json"],
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE20-capture-status.json",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE20-capture.log"
+    },
+    "idle": {
+      "argv": ["/Users/vladmihaimiron/.local/bin/node", "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_PREP20/phase-idle.mjs", "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE20-command-contract.json"],
+      "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE20-idle-custody.json",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE20-idle.log"
+    }
+  }
+}

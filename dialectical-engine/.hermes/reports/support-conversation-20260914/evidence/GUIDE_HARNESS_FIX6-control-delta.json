@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX6",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "harnessSha256": "6444862b9d465565a5416cec763a92216a04eb042bafe833dab43135c00debd2",
+  "matrixChanged": false,
+  "canonicalRows": 54,
+  "retainedControlPurposes": 91,
+  "finalControlCount": 100,
+  "allPriorControlNamesRetained": true,
+  "missingPriorControlNames": [],
+  "addedControlNames": [
+    "staged consumer retains canonical attempt when API projection is invalid",
+    "staged consumer preserves safe API after missing assistant DOM",
+    "staged consumer preserves safe API after session version failure",
+    "staged consumer preserves safe API after rendered reply read failure",
+    "staged consumer rejects malformed DOM without inventing equality",
+    "staged consumer preserves DOM equality after diagnostic consumer failure",
+    "staged consumer preserves DOM equality when diagnostic shape is invalid",
+    "staged consumer checkpoints complete safe stages before assertion failure",
+    "staged consumer strips private and raw extras at every persisted phase"
+  ],
+  "stages": [
+    "ATTEMPTED",
+    "API_PROJECTED",
+    "DOM_PROJECTED",
+    "DIAGNOSTIC_PROJECTED"
+  ],
+  "phaseFailureCodes": [
+    "GUIDE_HARNESS_API_PROJECTION_INVALID",
+    "GUIDE_HARNESS_SESSION_VERSION_INVALID",
+    "GUIDE_HARNESS_ASSISTANT_DOM_MISSING",
+    "GUIDE_HARNESS_DOM_READ_FAILED",
+    "GUIDE_HARNESS_DOM_PROJECTION_INVALID",
+    "GUIDE_HARNESS_DIAGNOSTIC_CAPTURE_FAILED",
+    "GUIDE_HARNESS_DIAGNOSTIC_INVALID"
+  ],
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "lifecycle": 0,
+    "http": 0,
+    "database": 0,
+    "supportRequests": 0,
+    "modelRequests": 0
+  }
+}

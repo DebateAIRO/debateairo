@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_INJECTION_FIX",
+  "ticket": "t_9a52015c",
+  "revision": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718",
+  "command": [
+    "pnpm",
+    "run",
+    "typecheck"
+  ],
+  "exitCode": 1,
+  "diagnostics": 76,
+  "baselineDiagnostics": 76,
+  "byteIdenticalToBaseline": true,
+  "baseline": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_COMPOUND_ALIAS-typecheck-final.log",
+    "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "bytes": 39611
+  },
+  "final": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_FIX-typecheck-final2.log",
+    "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "bytes": 39611
+  },
+  "preservedIntroducedFailure": {
+    "diagnostics": 81,
+    "newDiagnostics": 5,
+    "code": "TS7006",
+    "path": "tests/integration/support-routes.test.ts",
+    "remedy": "explicit parameter types only; assertions and runtime behavior unchanged",
+    "log": {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_FIX-typecheck-final.log",
+      "sha256": "0736152cfe419ab0e08b5eb3b14de941a1e2a238c32bdd65f84b4b8e2673f4e4",
+      "bytes": 40178
+    }
+  }
+}

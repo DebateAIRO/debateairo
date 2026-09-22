@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_UI_WRITER_FIX45",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "contractPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_WRITER_FIX45-control-contract.json",
+  "contractSha256": "72bcabcb8441f6e087cf5ba7add8a184ae28ff53b6267ccf71ae606a7b24fb71",
+  "invocationNonce": "GUIDE_UI_WRITER_FIX45_CONTROL_V1",
+  "futureOutputsCheckedAbsent": 3,
+  "controlFixture": true
+}

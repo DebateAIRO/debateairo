@@ -1,0 +1,52 @@
+== SignUpFlow.tsx focusable controls, with their className (context) ==
+--- :127 ---
+            <input
+              type="email"
+--- :141 ---
+            <button
+              type="button"
+              className="authVerifyEmail"
+--- :156 ---
+          <input
+            type="email"
+--- :175 ---
+          <input
+            type="password"
+--- :205 ---
+            <input
+              className="consentBox"
+              type="checkbox"
+--- :216 ---
+            <input
+              className="consentBox"
+              type="checkbox"
+--- :234 ---
+              <button type="button" className="consentPolicyLink">Privacy Policy</button>
+        <button
+--- :240 ---
+        <button
+          className="authPrimary"
+          type="submit"
+--- :248 ---
+        <p className="authPanelFooter">Already have one? <Link href={loginHref}>Log in</Link></p>
+          <p className="authFinePrint" role="status" aria-live="polite">
+
+== PrivacyPolicyModal.tsx focusable controls, with className ==
+--- :180 ---
+            <button
+              type="button"
+              className="policyClose"
+--- :195 ---
+          <div className="policyBody" tabIndex={0} aria-label="Privacy Policy text" ref={bodyRef}>
+            <div className="policyJumps">
+                <button
+--- :198 ---
+                <button
+                  type="button"
+                  className="policyPill"
+--- :259 ---
+                <button
+                  type="button"
+                  className="policyPrimary"
+--- :271 ---
+              <button type="button" className="policyPrimary" onClick={onClose}>

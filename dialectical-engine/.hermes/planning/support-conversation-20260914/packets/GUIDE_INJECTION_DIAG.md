@@ -1,0 +1,25 @@
+# PACKET GUIDE_INJECTION_DIAG — bounded deterministic refusal contract diagnosis
+
+Read FIRST this packet then /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md. Resume original Sol /root/requirements, retained actual BODY skills plus systematic-debugging and verification-before-completion. Read assigned ticket/comments before claim; no subdelegation.
+
+## 1. Node
+- seat: GUIDE_INJECTION_DIAG; ticket: t_b679d90e; model: gpt-5.6-sol; rework rounds: max 3 under owner continuation.
+- cwd: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine; exact clean revision: 0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13; inputs: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_DIAG-inputs.json.
+- self-report: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_INJECTION_DIAG.md (new).
+
+## 2. Contract
+- allowed: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_DIAG.md (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_DIAG- (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_DIAG- (new, safe fixed fields only); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_INJECTION_DIAG/ (new, bounded offline discriminators); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_INJECTION_DIAG.md (new). Read only exact failed row, public response projector, capture consumer and immediate current product refusal/route/response producers and their schemas/callers.
+- forbidden: product/source/KB/Git/harness/predecessor edits, actual browser/runtime/HTTP/status/capacity/DB/Support/model/lifecycle activity, raw private logs or raw model drafts, session identifiers/capabilities/credentials/private records, new live sampling, changed counters/limits, owner questions/acceptance.
+- verification: NO heavy initially. Inspect frozen evidence and immediate producer contracts. If a tiny offline real-producer/sink discriminator is necessary, request exact command and case count before root grants sole heavy. No broad suites, model mocks presented as live quality, or runtime access. Preserve failures and clean final code.
+
+## 3. Work
+LIVE4 completed14 and attempted15; canonical43 is fullRO PROMPT_INJECTION/pricing-placeholder with expected DETERMINISTIC_INJECTION_REFUSAL and action NONE. Its API_PROJECTION_INVALID failure retained ATTEMPTED with api/visible/equality/diagnostic null; actual HTTP status/body/origin are unavailable. Preserve this uncertainty. Do not infer the actual lost response from static evidence or relabel failed LIVE4 as PASS.
+
+Trace the exact canonical request through current deterministic injection admission/refusal and public API response serialization, and compare those real producer shapes with FIX7 projectGuideApiResponse/staged consumer and the canonical43 expectation. Determine whether there is a reproducible product defect, a proved harness contract mismatch, an expected public error shape wrongly discarded, or insufficient retained evidence. Check the EN counterpart only as a tightly bounded discriminator. Use actual production callers/available actions rather than artificial all-action availability; retain the prior security/correctness PASS where defining bytes are unchanged.
+
+If controlled evidence is needed, exercise only these exact refusal producer/sink shapes offline with synthetic values and zero model/network/DB access; do not relax guards, projection, expected status or oracle to obtain a pass. Separate proved static/controlled mismatches from hypotheses about the actual lost response. Report the smallest correction boundary and any safe phase/HTTP/error-code observation gap that prevents diagnosis. Root routes implementation to the original owner and separate review; this node does not implement fixes. Avoid another whole-app audit, arbitrary language sweep or favorable live resample.
+
+## 4. Handoff
+Self-report question verbatim:
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
+Return SKILLS LOADED, node/ticket/session/revision, evidence-backed verdict, exact canonical request and producer/projector findings, minimal correction scope, controlled versus actual evidence, missing fields and limits. Receipt node/ticket/revision/verdict/artifacts absolute/sha256/bytes excluding itself; no self-close. No preview readiness or checkpoint acceptance; Forgot unresolved and CP2 gated.

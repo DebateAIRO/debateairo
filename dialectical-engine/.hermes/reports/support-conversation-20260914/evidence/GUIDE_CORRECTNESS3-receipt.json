@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CORRECTNESS3",
+  "ticket": "t_fa1d8e82",
+  "session": "/root/plan_review",
+  "baseRevision": "2ccb57fa061f74a81c8f2ef42bd33c768f00d4e0",
+  "productRevision": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  "sourceHead": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+  "freezeCommit": "563b8e002a83837071cea7bffbdcc36d45b0ac27",
+  "freezeReceiptSha256": "f93fc886bd02f723b7e93deedd35ffb802748a7dea8e30080bc4feacbfed6970",
+  "verdict": "PASS",
+  "scope": "finite seven-path guard correction",
+  "commentsReadThrough": 4,
+  "findingDispositions": {
+    "B1": "RESOLVED",
+    "B2": "RESOLVED",
+    "newSameClassFinding": null
+  },
+  "verification": {
+    "custody": {
+      "exitCode": 0,
+      "indexedInputsChecked": 58,
+      "indexedInputsMatched": 58,
+      "detachedProductChecked": 143,
+      "detachedProductMatched": 143,
+      "primaryProductChecked": 143,
+      "primaryProductMatched": 143,
+      "changedPathsExpected": 7,
+      "changedPathsMatched": 7
+    },
+    "changedFrame": {
+      "exitCode": 0,
+      "testFiles": 4,
+      "passed": 764,
+      "failed": 0,
+      "sandboxAttempt": {
+        "exitCode": 1,
+        "passed": 602,
+        "skipped": 162,
+        "failure": "listen EPERM 127.0.0.1",
+        "productFailureInferred": false
+      }
+    },
+    "guardDiscriminator": {
+      "exitCode": 0,
+      "rows": 20,
+      "comparisons": 44,
+      "passed": 44,
+      "failed": 0,
+      "probeByteIdenticalToPrior": true
+    },
+    "retainedAuthorEvidence": {
+      "exact33Passed": 1589,
+      "exact33Failed": 0,
+      "exact33Todo": 1,
+      "typecheckExitCode": 1,
+      "typecheckBaselineDiagnostics": 76,
+      "typecheckCurrentDiagnostics": 76,
+      "typecheckByteIdentical": true,
+      "missionAddedDiagnostics": 0,
+      "structuralEvalRuns": 3,
+      "structuralEvalPassedPerRun": 60,
+      "structuralEvalRubric": "PENDING",
+      "structuralEvalExitCode": 1,
+      "frozenHarnessPassed": 62,
+      "frozenHarnessTotal": 62
+    },
+    "cleanup": {
+      "detachedHeadExact": true,
+      "primaryHeadExact": true,
+      "detachedDirty": 0,
+      "primaryDirty": 0,
+      "temporaryLinksPresent": 0,
+      "heavyLeaseReleased": true
+    }
+  },
+  "limits": [
+    "no full33 or typecheck rerun",
+    "no harness or structural quality rubric rerun",
+    "no real HTTP, model, provider, browser, DOM, or preview traffic",
+    "Forgot-password destination remains unresolved and actionless",
+    "no checkpoint, readiness, owner-acceptance, or general language-completeness claim"
+  ],
+  "skillsLoaded": [
+    "using-superpowers",
+    "heartbeat-protocol",
+    "receiving-code-review",
+    "heartbeat-worker",
+    "test-driven-development",
+    "systematic-debugging",
+    "verification-before-completion"
+  ],
+  "usage": "UNAVAILABLE",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_CORRECTNESS3.md",
+      "sha256": "77a53e05a01f0edfbf63eb151abc0e3a23c3231f55a78c19340b347eefd9e1b1",
+      "bytes": 5973
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_CORRECTNESS3.md",
+      "sha256": "b403063e1e35cf871e60f32961edd2e9c8540fee8bfbe3c12e03d5609bb68411",
+      "bytes": 4219
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CORRECTNESS3/custody.py",
+      "sha256": "95f4cd4d5e29075b748ea7510be0659612cdca0df813515f3654512da6f8d0b6",
+      "bytes": 3602
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CORRECTNESS3/cleanup-custody.py",
+      "sha256": "12f6b0b2f32008b3f3215fee1f9e518f9e521080e3ac154d4a25db398b5a6ed9",
+      "bytes": 995
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CORRECTNESS3/guard-discriminator.mts",
+      "sha256": "4d846ad65679dd59020bdc03ca3626849f6ff4b79bdc00ed1998e39ebe135142",
+      "bytes": 5153
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS3-input-custody.log",
+      "sha256": "1ecf07b104b599cac910190ec56a214705fafef0ca7088d3279af76296a59072",
+      "bytes": 404
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS3-input-custody-attempt2.log",
+      "sha256": "b3c3b612c225a426c210293b3e613bab848ff0bff1263264e942b6c63292b3f8",
+      "bytes": 1397
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS3-changed-frame.log",
+      "sha256": "7a78e5f11e0ac0599f136634fd164b6001e059a2e8ffc273404691d30dd64b57",
+      "bytes": 135370
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS3-changed-frame-attempt2.log",
+      "sha256": "2c51e97db4f0fcff0e4541dec7cbd8d359510fcfaedcf6a3c27b711dc682d1de",
+      "bytes": 141835
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS3-guard-discriminator.log",
+      "sha256": "f69f8898f909cc4d47e33b6836d7afa8461edce560188599023f4b2747d929fd",
+      "bytes": 7286
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS3-dependency-custody.log",
+      "sha256": "b91b1c8592abf7ec34b3891f37d51031058ddc30d0261578b44776ab937a53e9",
+      "bytes": 291
+    }
+  ],
+  "receiptExcludesSelf": true,
+  "measuredAt": "2026-09-17T15:05:00Z"
+}

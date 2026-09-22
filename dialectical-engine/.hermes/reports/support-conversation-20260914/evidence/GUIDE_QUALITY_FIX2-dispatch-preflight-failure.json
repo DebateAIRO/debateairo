@@ -1,0 +1,6 @@
+{
+  "at": "2026-09-20T19:07:36.247669+00:00",
+  "phase": "packet check before freeze/dispatch",
+  "error": "Slash-delimited credentials/private-data/injection prose was parsed as a nonexistent absolute path",
+  "productRuntimeTraffic": 0
+}

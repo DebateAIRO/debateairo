@@ -1,0 +1,15 @@
+{
+  "node": "GUIDE_COMPOUND_ALIAS",
+  "base": "5731eb6faac25f9712f04aea029a021f6eee9352",
+  "writePaths": [
+    "packages/support-kb/src/catalog.ts",
+    "packages/support-kb/src/context.ts",
+    "packages/support-kb/src/index.ts",
+    "tests/unit/support-context.test.ts",
+    "tests/unit/support-answer-context.test.ts",
+    "tests/unit/support-public-guide-boundary.test.ts",
+    "tests/architecture/support-catalog-coverage.test.ts"
+  ],
+  "at": "2026-09-17T19:18:29.524479+00:00",
+  "scope": "Frozen pre-dispatch base and allowed product scope, no future active-work fingerprint."
+}

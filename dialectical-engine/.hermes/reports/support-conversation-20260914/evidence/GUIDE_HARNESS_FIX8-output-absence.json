@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX8",
+  "checked": 56,
+  "present": [],
+  "futureReceipt": "GUIDE_LIVE_GUIDE8-actual-receipt.json",
+  "futureScreenshots": 54,
+  "browserProfile": "ABSENT",
+  "captureExecuted": false
+}

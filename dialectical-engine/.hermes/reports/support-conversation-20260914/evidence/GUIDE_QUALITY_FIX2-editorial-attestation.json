@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_QUALITY_FIX2",
+  "revision": "5d6e028ae5defc24e0690219d6128949e73b750d",
+  "records": [
+    {
+      "id": "debate-workspace-menus",
+      "lang": "en",
+      "articleSha256": "e3f92be13a7d880e259c331e2c5dc3881abd9693e1846b90fcddafeda151170d",
+      "modelProjectionSha256": "d4da3f54b348b1c78dad80b67cbe1db12d196f396e6385c2dc0d2fd0ef5d0f34",
+      "fallbackSha256": "28525e3135cc7b623a00f52d7f9aa520579959f4238bb51117866ad3ba89bcce",
+      "reviewedBy": "SOL",
+      "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+      "reviewedOn": "2026-09-20",
+      "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_QUALITY_REVIEW.md",
+      "ratifiedBy": "",
+      "ratifiedOn": ""
+    },
+    {
+      "id": "debate-workspace-menus",
+      "lang": "ro",
+      "articleSha256": "eb2b85327509e4e9e0e4b29009af11b109e225f70e784b09f447d17ed7aa162a",
+      "modelProjectionSha256": "095fe2fae248ca61c4b7e99100ab4bc4343d0ab7e525576bf747baa79d6816c8",
+      "fallbackSha256": "5e558ff25dda284435df41eca3e9de5f6b1f940f95cb0b8a3126801bba415e97",
+      "reviewedBy": "SOL",
+      "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+      "reviewedOn": "2026-09-20",
+      "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_QUALITY_REVIEW.md",
+      "ratifiedBy": "",
+      "ratifiedOn": ""
+    },
+    {
+      "id": "support-cases",
+      "lang": "en",
+      "articleSha256": "300f6b63a1798ee15ba335538bdc9eb0e1c5dca11c770ce11f5e11edee9cee9e",
+      "modelProjectionSha256": "04ff511b177c062b1fa66397db84ac7295b75319e2c27fc870aaff171c43ae76",
+      "fallbackSha256": "df37d0f11029ff345c6f303c425bdeb36435ab0a51e0dbddf22ffd0877ca49a1",
+      "reviewedBy": "SOL",
+      "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+      "reviewedOn": "2026-09-20",
+      "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-wording-supplement.json",
+      "ratifiedBy": "",
+      "ratifiedOn": ""
+    },
+    {
+      "id": "support-cases",
+      "lang": "ro",
+      "articleSha256": "4073ca95886bd56063c9f6ff49b959e3affa5c5a0a9000b6ecf6ff2171535977",
+      "modelProjectionSha256": "23df826d8a8701abb080a371df942b978885224bb612140c54221f2806615c2a",
+      "fallbackSha256": "62bbe76506089edca69ffca3d820f7ebd9610f831cf6a3b007efe00125cb971f",
+      "reviewedBy": "SOL",
+      "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+      "reviewedOn": "2026-09-20",
+      "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-wording-supplement.json",
+      "ratifiedBy": "",
+      "ratifiedOn": ""
+    }
+  ],
+  "unchangedOtherRecords": 40,
+  "ownerRatificationAdded": false,
+  "componentFileSha256": "aa94ff0592d41b399f38eb9be034b5e77ec2d350677e52b1e39852196245f9d9",
+  "reviewManifestSha256": "4c8e09f18207ab3cd24ac5fa89fa5846c6821469d2eeffcbef1cce43a5a10bc6"
+}

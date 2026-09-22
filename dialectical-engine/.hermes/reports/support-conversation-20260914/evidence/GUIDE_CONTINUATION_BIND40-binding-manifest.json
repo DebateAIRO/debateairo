@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CONTINUATION_BIND40",
+  "ticket": "t_2cf4e326",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+  "verdict": "PASS_CONTINUATION21_BOUND_REVIEW_REQUIRED",
+  "sealedAtUtc": "2026-09-21T10:47:09.219850Z",
+  "retainedSequences": [
+    1,
+    2,
+    15,
+    19,
+    23,
+    27,
+    31,
+    35,
+    39,
+    47
+  ],
+  "remainingSequences": [
+    10,
+    18,
+    26,
+    34,
+    56,
+    58,
+    54,
+    43,
+    5,
+    13,
+    21,
+    25,
+    29,
+    37,
+    45,
+    53,
+    8,
+    12,
+    42,
+    55,
+    57
+  ],
+  "composedCount": 31,
+  "budgets": {
+    "captureSessions": 3,
+    "captureMessages": 21,
+    "modelCallCeiling": 18,
+    "reservedOwnerMessages": 6,
+    "reservedOwnerModelCalls": 6,
+    "deferredOwnerSessions": 2,
+    "requiredSessionHeadroom1h": 3,
+    "requiredMessageHeadroom24h": 27,
+    "requiredDailyCallHeadroom": 24
+  },
+  "commandContract": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTINUATION_BIND40-command-contract.json",
+    "sha256": "8b8a25888415c79381aa195d601b2cf2aaf1401ce830abaa5d84a608630bdcea",
+    "bytes": 31942
+  },
+  "operatorContract": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTINUATION_BIND40-operator-contract.json",
+    "sha256": "a8083a9f7f22958ebcfbe88d0b44c9126dd1bb4c1968a6beaac1821dd5bfbd97",
+    "bytes": 22485
+  },
+  "compositionContract": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTINUATION_BIND40-composition-contract.json",
+    "sha256": "ec7b16bf9f5a64d28358bffd7d4456614cf22888609d615a31909c34c59a76ef",
+    "bytes": 10875
+  },
+  "gateTemplate": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTINUATION_BIND40-gate-template.json",
+    "sha256": "893f81832eed903f49d4ddc6ccb3a74a4fcb16179eabb38ba6067693ae27e128",
+    "bytes": 1746
+  },
+  "coreControlProof": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTINUATION_BIND40-core-control-proof-final.json",
+    "sha256": "bae21bbcba611c0912561291c3aefaaed5a0c3734d85c7541de7767ed3ec7556",
+    "bytes": 759
+  },
+  "finalControlProof": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTINUATION_BIND40-final-control-proof.json",
+    "sha256": "b7bfc41e8ee74cea6b62659d5859e5846f1e3068cf1b5c8a3ddc0e44862f3528",
+    "bytes": 891
+  },
+  "uiProof": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTINUATION_BIND40-ui-proof-final4.json",
+    "sha256": "d2661f9902ea1b98a4a8ac2da19669def517ff86efa3ff83e2a35610f816bb96",
+    "bytes": 1075
+  },
+  "ownerCapacityOutput": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-owner-capacity.json",
+  "ownerWalkthroughOutput": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-owner-testability.json",
+  "composedManifestOutput": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE32-composed31-manifest.json",
+  "futureAbsenceCount": 115,
+  "traffic": {
+    "publicLocalAssets": true,
+    "syntheticSupportAttempts": 1,
+    "forwardedDynamicRequests": 0,
+    "support": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "model": 0
+  },
+  "limits": {
+    "operatorExecuted": false,
+    "runtimeReadinessDeferred": true,
+    "capacityDeferred": true,
+    "forgotDestination": "UNRESOLVED"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE28",
+  "ticket": "t_0874e640",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "STOPPED_CAPTURE_SCREENSHOT_TARGET_MISMATCH",
+  "skillsLoaded": [
+    "retained mission BODY/floor instructions; no new skill read in this operational node"
+  ],
+  "phaseStatuses": {
+    "preflight": 0,
+    "readiness": 0,
+    "capacity": 0,
+    "gate": 0,
+    "rowProof": 0,
+    "capture": 1,
+    "idle": "NOT_STARTED"
+  },
+  "attemptedRows": 1,
+  "completedRows": 1,
+  "sessionsCreated": 1,
+  "messagesSent": 1,
+  "firstSessionCreatedAtUtc": null,
+  "heavyLeaseReleased": true,
+  "limitations": [
+    "Screenshot target mismatch stopped capture after one accepted public response",
+    "Idle custody not run because stop-first applied",
+    "Exact session creation timestamp not recorded",
+    "Owner walkthrough not created",
+    "Forgot password remains unresolved/actionless"
+  ]
+}

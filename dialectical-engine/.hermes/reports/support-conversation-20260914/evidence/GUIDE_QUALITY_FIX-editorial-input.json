@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "baseRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productRevision": "6cbe0e7ad18b20eca35876f4a91478cfbba82307",
+  "records": [
+    {
+      "id": "debate-workspace-menus",
+      "lang": "en",
+      "modelProjection": "When a debate has a tree, Thread shows a sequence, Split compares branches, Tree shows hierarchy, and Map shows relationships. Scoring appears only when available. Its public diagnostics can show availability, load and refresh status; provider and model with checked or generated timestamps; cache or staleness; current, scored, skipped and truncated claim counts and score-aware filters; unresolved holes and fatal flags; and recommended investigations. A category or value can be absent when scoring data is unavailable. Support can explain these public categories but cannot read a visitor's debate or its scoring values. Replay, Workspace, Honesty, Export, and How it works act on the debate already open; public debates expose a smaller read-only set.",
+      "fallback": "Scoring diagnostics can show availability, load and refresh status; provider and model timestamps; cache or staleness; claim counts and filters; unresolved holes, fatal flags, and recommended investigations when scoring data is available. Support can explain these categories but cannot read a visitor's debate or scoring values.",
+      "article": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/content/debate-workspace-menus.en.md",
+      "articleSha256": "e3f92be13a7d880e259c331e2c5dc3881abd9693e1846b90fcddafeda151170d",
+      "articleBytes": 2027,
+      "modelProjectionSha256": "d4da3f54b348b1c78dad80b67cbe1db12d196f396e6385c2dc0d2fd0ef5d0f34",
+      "fallbackSha256": "28525e3135cc7b623a00f52d7f9aa520579959f4238bb51117866ad3ba89bcce",
+      "reviewedBy": "",
+      "reviewerSession": "",
+      "reviewedOn": "",
+      "evidence": "",
+      "ratifiedBy": "",
+      "ratifiedOn": ""
+    },
+    {
+      "id": "debate-workspace-menus",
+      "lang": "ro",
+      "modelProjection": "Când dezbaterea are un arbore, Thread arată o succesiune, Split compară ramurile, Tree arată ierarhia, iar Map arată relațiile. Evaluarea apare numai când este disponibilă. Diagnosticul public poate arăta disponibilitatea, starea încărcării și a reîmprospătării; furnizorul și modelul cu momentele verificării sau generării; cache sau învechire; numărul afirmațiilor curente, evaluate, omise și trunchiate și filtrele bazate pe scor; golurile nerezolvate și marcajele fatale; și investigațiile recomandate. O categorie sau o valoare poate lipsi când datele de evaluare nu sunt disponibile. Asistența poate explica aceste categorii publice, dar nu poate citi dezbaterea sau valorile ei. Replay, Workspace, Honesty, Export și How it works acționează asupra dezbaterii deja deschise; dezbaterile publice oferă un set mai mic, numai pentru citire.",
+      "fallback": "Diagnosticul de evaluare poate arăta disponibilitatea, starea încărcării și a reîmprospătării; furnizorul și modelul; cache sau învechire; numărul afirmațiilor și filtrele; golurile nerezolvate, marcajele fatale și investigațiile recomandate când datele sunt disponibile. Asistența poate explica aceste categorii, dar nu poate citi dezbaterea sau valorile ei.",
+      "article": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/content/debate-workspace-menus.ro.md",
+      "articleSha256": "eb2b85327509e4e9e0e4b29009af11b109e225f70e784b09f447d17ed7aa162a",
+      "articleBytes": 2289,
+      "modelProjectionSha256": "095fe2fae248ca61c4b7e99100ab4bc4343d0ab7e525576bf747baa79d6816c8",
+      "fallbackSha256": "5e558ff25dda284435df41eca3e9de5f6b1f940f95cb0b8a3126801bba415e97",
+      "reviewedBy": "",
+      "reviewerSession": "",
+      "reviewedOn": "",
+      "evidence": "",
+      "ratifiedBy": "",
+      "ratifiedOn": ""
+    },
+    {
+      "id": "support-cases",
+      "lang": "en",
+      "modelProjection": "Talk to a human or Escalate to a human creates an asynchronous Support case, not a telephone call. Email support is a separate mail workflow and does not create this API case or receive its receipt, response target, or private case link. The server receipt gives a response target of forty-eight hours, while another panel currently says one working day on weekdays. Rely on the receipt until the wording is aligned. Keep it private because it controls case access. Support does not verify inbox delivery.",
+      "fallback": "Choose Talk to a human or Escalate to a human to create an asynchronous case; it is not a telephone call. Email support is a separate mail workflow and does not create that case or receive its receipt, response target, or private link. Rely on the server receipt's forty-eight-hour target while another panel still says one working day on weekdays, and keep the receipt private.",
+      "article": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/content/support-cases.en.md",
+      "articleSha256": "300f6b63a1798ee15ba335538bdc9eb0e1c5dca11c770ce11f5e11edee9cee9e",
+      "articleBytes": 844,
+      "modelProjectionSha256": "151e25db30e1cf75b5e6a3f0b6efb1137ad005b3e0fa6514ed23eb14bcbbb546",
+      "fallbackSha256": "df37d0f11029ff345c6f303c425bdeb36435ab0a51e0dbddf22ffd0877ca49a1",
+      "reviewedBy": "",
+      "reviewerSession": "",
+      "reviewedOn": "",
+      "evidence": "",
+      "ratifiedBy": "",
+      "ratifiedOn": ""
+    },
+    {
+      "id": "support-cases",
+      "lang": "ro",
+      "modelProjection": "Talk to a human sau Escalate to a human creează un caz asincron de Asistență, nu un apel telefonic. Emailul de asistență este un flux separat de mail și nu creează acest caz API și nu primește confirmarea, termenul de răspuns sau legătura privată. Confirmarea serverului oferă un termen țintă de patruzeci și opt de ore, iar alt panou spune în prezent o zi lucrătoare în zilele lucrătoare. Bazează-te pe confirmare până la alinierea textelor. Păstreaz-o privată deoarece controlează accesul la caz. Asistența nu verifică livrarea în inbox.",
+      "fallback": "Alege Talk to a human sau Escalate to a human pentru a crea un caz asincron; nu este un apel telefonic. Emailul de asistență este un flux separat și nu creează acel caz și nu primește confirmarea, termenul sau legătura privată. Bazează-te pe termenul de patruzeci și opt de ore din confirmarea serverului cât timp alt panou spune o zi lucrătoare și păstrează confirmarea privată.",
+      "article": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/content/support-cases.ro.md",
+      "articleSha256": "4073ca95886bd56063c9f6ff49b959e3affa5c5a0a9000b6ecf6ff2171535977",
+      "articleBytes": 975,
+      "modelProjectionSha256": "195b0d8634d1a110e239ee8a89d6a4df0d88c8425ad2d97a5a5e94485d6da57a",
+      "fallbackSha256": "62bbe76506089edca69ffca3d820f7ebd9610f831cf6a3b007efe00125cb971f",
+      "reviewedBy": "",
+      "reviewerSession": "",
+      "reviewedOn": "",
+      "evidence": "",
+      "ratifiedBy": "",
+      "ratifiedOn": ""
+    }
+  ],
+  "attestationWritePaths": [
+    "packages/support-kb/recovery/components.json",
+    "packages/support-kb/reviews/manifest.json"
+  ]
+}

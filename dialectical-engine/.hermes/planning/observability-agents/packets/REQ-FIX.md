@@ -3,9 +3,9 @@
 Read FIRST, in full: `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/observability-agents/packets/COMMON.md`, then `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/observability-agents/00-intake-H0.md`.
 
 ## 1. Ticket state
-- **board:** `observability-agents` · **ticket:** `t_80ef9dec` · **seat:** REQ-FIX · **role:** requirements (`heartbeat-requirements`) · **model:** Fable 5.1 (Claude subagent)
-- **session:** record your agent id/session in your CLAIM comment · **comment cursor at dispatch:** 0
-- **review route:** REQ-REV-FIX (Fable 5.1, blind) — dispatched by the orchestrator, not you · **rework rounds: max 3** (round 4 → V DECISIONS PACKET)
+- **board:** `observability-agents` · **ticket:** `t_80ef9dec` · **seat:** REQ-FIX · **role:** requirements (`heartbeat-requirements`) · **model for new/rework dispatch:** GPT-5.6-sol
+- **session:** record your agent id/session in your CLAIM comment · **recorded initial cursor:** 0; on any new/rework dispatch read every comment currently present on `t_80ef9dec` and record the exact count read
+- **review route:** REQ-REV-FIX (Grok 4.6, blind) — dispatched by the orchestrator, not you · **rework rounds: max 3** (round 4 → V DECISIONS PACKET)
 - **allowed (exhaustive):**
   - `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/observability-agents/requirements/fixagent.md`
   - `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/observability-agents/requirements/fixagent-compass-block.md`
@@ -19,10 +19,18 @@ Read FIRST, in full: `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-eng
 1. V's verbatim goal and the contradiction check — `00-intake-H0.md` (above). Contradictions C1, C3, C4, C7 bind you.
 2. Predecessor's measure of done — `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-21-observability-loop/planning/DEFINITION-OF-DONE.md` (D1–D12).
 3. Predecessor's slice list and file contracts — `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-21-observability-loop/planning/VerticalSlices.md` §1 (S01–S30), §4 merge order. Large; read §0, §1, §4 fully, skim the rest.
-4. Ratified requirements — `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-21-observability-loop/research/SYNTHESIS-requirements.md` (88 KB — read the verdict summary, the ranked recommendations and the contested-decisions table; skim the rest) and V's rulings on it in `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-21-observability-loop/research/POST-SYNTHESIS-RULINGS.md` (read fully) plus the intake `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-21-observability-loop/00-intake-H0.md`.
-5. Today's demo output — `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/observability-agents/logs/d12-demo-2026-09-01.log` (every SKIPPED stage names what is missing by file path and ticket).
+4. Ratified requirements — `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-21-observability-loop/research/SYNTHESIS-requirements.md`: read §1, §4 **in full** (the normative OBS-R001…OBS-R144 rows required by Q1), §5, and the ranked recommendations; skim §§2–3 and §6. Read V's rulings in `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-21-observability-loop/research/POST-SYNTHESIS-RULINGS.md` in full, plus the predecessor intake `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-21-observability-loop/00-intake-H0.md`.
+5. Demo output — `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/observability-agents/logs/d12-demo-2026-09-01.log`. Verify the file before using its counts. If it is absent or unreadable, use H0 only as the historical record, mark the demo counts `UNVERIFIED`, and continue; absence alone is not a blocker.
 6. What exists on `dev` — `packages/obs-capture/**` (read the module headers), `migrations/0034_obs_foundation.sql`, `packages/kernel/src/index.ts` (the `TypedDomainError` that discards `cause`).
-7. Predecessor board `observability-loop`: `t_4deda7ab` (RP-0), `t_3a04cc06` (S05b seam obligations O-1..O-4 — binding on any runtime wiring), `t_9f4e5bfb` (S07), `t_40c2cc1b` (D12), `t_d821f99e` (audit:source collision). Read the comments; they are the live record, the columns are stale.
+7. Predecessor board `observability-loop`: read comments on `t_4deda7ab` (RP-0), `t_3a04cc06` (S05b seam obligations O-1..O-4 — binding on runtime wiring), `t_9f4e5bfb` (S07), `t_40c2cc1b` (D12), and `t_d821f99e` (`audit:source` collision). The columns may be stale. Do not use `list` to reconstruct slice ids: the complete on-disk board-readback map is `docs/missions/2026-08-21-observability-loop/planning/H6-selfaudit.md` §1:
+   - S01 `t_1fde033d` · S02 `t_8e040ec2` · S03a `t_489ecbcc` · S03b `t_9b5ca941`
+   - S04 `t_d1e18a14` · S05 `t_6e99d607` · S06 `t_5504afe0` · S07 `t_9f4e5bfb`
+   - S08 `t_c1651ebb` · S09 `t_3c54fdeb` · S10 `t_6c5e1a6e` · S11 `t_7efcd635`
+   - S12 `t_a0ce760a` · S13 `t_1ca8851f` · S14 `t_89061516` · S15 `t_a85ad2d8`
+   - S16 `t_aab2d3d2` · S17 `t_f6593842` · S18 `t_220330f5` · S18b `t_49e079f4`
+   - S19 `t_f4439c53` · S20 `t_2a85cd89` · S21 `t_0cd47a46` · S22 `t_37f2f56f`
+   - S23 `t_5aca48c6` · S24 `t_27975928` · S25 `t_af6161bf` · S26 `t_286bde80`
+   - S27 `t_d55caea1` · S28 `t_28c5c2e2` · S29 `t_8cf81861` · S30 `t_af2a1c41`
 8. If `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/observability-agents/requirements/fixagent-state-audit.md` exists when you reach a section, you may cite it. **Do not wait for it.**
 
 ## 3. The work — numbered charges
@@ -47,6 +55,7 @@ Read FIRST, in full: `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-eng
 ## Q7 Contested decisions for V         (table)
 ## Ranked recommendations               (top 10; VERDICT / CONFIDENCE / STRONGEST COUNTER each)
 ## UNVERIFIED / gaps
+## Handoff
 ```
 
 ## 5. Handoff

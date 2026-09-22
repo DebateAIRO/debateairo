@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_REVIEW30",
+  "ticket": "t_d7d0b386",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "freeze": "70bd79f497537384cddd51c049b48d3c18b09cb8",
+  "fix30Receipt": {
+    "sha256": "eb7851ecdc7cf1f880750dabc85ff48a451fcb839123d4e1cac21e44de237850",
+    "bytes": 12549
+  },
+  "fix30Consumption": {
+    "sha256": "3d8f126a0936b3f8b7cd8f6d3e86589b5cb7652cb269c632184320e802abffa0",
+    "bytes": 47459
+  },
+  "manifest": {
+    "artifacts": 39,
+    "verified": 39,
+    "mismatches": 0
+  },
+  "receiptArtifacts": {
+    "artifacts": 40,
+    "verified": 40,
+    "mismatches": 0
+  },
+  "indexedInputs": {
+    "inputs": 160,
+    "verified": 160,
+    "mismatches": 0
+  },
+  "screenshotCorrection": {
+    "helperSha256": "824e780a1817c198a6ca6ebc6215948241ecccbb5611617a033e650799ac4b29",
+    "imagePath": ".hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_FIX30/control-fixtures/full-ro-long-complete.png",
+    "imageSha256": "abdeeab4d41d685bf0571d3e6f770e74ded82065120de02dc12e9a46bdc286b6",
+    "imageBytes": 137087,
+    "imageWidth": 760,
+    "imageHeight": 562,
+    "paintedTopFooterSourceAction": true,
+    "restorationSuccessAndException": true
+  },
+  "successor": {
+    "commandContractSha256": "e6b6ef591e8574e65af4b3eca2351f58ac67ed0940774a80bcd1aa997c168f0d",
+    "operatorContractSha256": "006190e7f386db5a5698f54b77809676b2fa2a98ef02d11df709f752c235799e",
+    "phases": 7,
+    "futurePaths": 123,
+    "futureScreenshotPaths": 93,
+    "actualNamespace": "GUIDE_LIVE_GUIDE22",
+    "unused": true
+  },
+  "pricingAuthority": {
+    "appNavigationSha256": "a92e96c24c3df6d7a9b3e73a3fafde79321cd7445612588024ea205fb5c6e6db",
+    "gettingStartedSha256": "a438b7c7a91342dee7c5edb2efe48e586be2cc33d9a2eafabaadad2882f6f9e8",
+    "budgetTierSha256": "a49d563ef7bfec75ed179a70adb54c25947aa9cbe4db557698eacc84d1d3c683",
+    "paymentInCreatorSupported": false
+  },
+  "reviewMode": "STATIC_READ_ONLY_WITH_EXISTING_IMAGE_INSPECTION",
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

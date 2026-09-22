@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE4",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "verdict": "CALCULATED_FULL_MESSAGE_CAPACITY_AFTER_NATURAL_EXPIRY",
+  "freshPostCaptureMeasurement": false,
+  "manual": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE4-manual.md",
+    "requiredSessions": 2,
+    "messageCountsByLanguage": {
+      "en": 3,
+      "ro": 2,
+      "total": 5
+    },
+    "steps": [
+      "Fresh full-mode English session: ask product identity, a menu question, and one free-text guide question.",
+      "Fresh compact-mode Romanian session: change the language, ask one Romanian menu question, and ask about account recovery limitations without submitting a recovery operation."
+    ]
+  },
+  "observedBeforeCapture": {
+    "measuredAtUtc": "2026-09-17T20:01:52.511Z",
+    "limits": {
+      "support_limit_anon_msgs_10m": 20,
+      "support_limit_anon_msgs_24h": 100,
+      "support_limit_anon_sessions_1h": 5,
+      "support_limit_session_msgs": 40,
+      "support_limit_msg_chars": 2000,
+      "support_relay_concurrency": 2,
+      "support_queue_depth": 10,
+      "support_daily_call_cap": 500,
+      "support_lock_after_injections": 3,
+      "support_ip_cooldown_minutes": 60
+    },
+    "counts": {
+      "maxAnonSessionEvents1hByIp": 0,
+      "maxAnonMessageEvents10mByIp": 0,
+      "maxAnonMessageEvents24hByIp": 13,
+      "anyIpCooldownActive": false,
+      "callsToday": 12,
+      "liveRelayWaiters": 0,
+      "relayState": "AVAILABLE"
+    }
+  },
+  "observedDuringCapture": {
+    "createdSessions": 2,
+    "sentMessages": 15,
+    "requestStarts": [
+      {
+        "sequence": 1,
+        "estimatedRequestStartUtc": "2026-09-17T20:02:31.190Z",
+        "basis": "capture log birth time plus sealed monotonic request offset"
+      },
+      {
+        "sequence": 2,
+        "estimatedRequestStartUtc": "2026-09-17T20:03:02.194Z",
+        "basis": "capture log birth time plus sealed monotonic request offset"
+      },
+      {
+        "sequence": 7,
+        "estimatedRequestStartUtc": "2026-09-17T20:03:33.197Z",
+        "basis": "capture log birth time plus sealed monotonic request offset"
+      },
+      {
+        "sequence": 11,
+        "estimatedRequestStartUtc": "2026-09-17T20:04:04.200Z",
+        "basis": "capture log birth time plus sealed monotonic request offset"
+      },
+      {
+        "sequence": 15,
+        "estimatedRequestStartUtc": "2026-09-17T20:04:35.200Z",
+        "basis": "capture log birth time plus sealed monotonic request offset"
+      },
+      {
+        "sequence": 19,
+        "estimatedRequestStartUtc": "2026-09-17T20:05:06.203Z",
+        "basis": "capture log birth time plus sealed monotonic request offset"
+      },
+      {
+        "sequence": 23,
+        "estimatedRequestStartUtc": "2026-09-17T20:05:37.205Z",
+        "basis": "capture log birth time plus sealed monotonic request offset"
+      },
+      {
+        "sequence": 27,
+        "estimatedRequestStartUtc": "2026-09-17T20:06:08.209Z",
+        "basis": "capture log birth time plus sealed monotonic request offset"
+      },
+      {
+        "sequence": 31,
+        "estimatedRequestStartUtc": "2026-09-17T20:06:39.211Z",
+        "basis": "capture log birth time plus sealed monotonic request offset"
+      },
+      {
+        "sequence": 35,
+        "estimatedRequestStartUtc": "2026-09-17T20:07:10.215Z",
+        "basis": "capture log birth time plus sealed monotonic request offset"
+      },
+      {
+        "sequence": 39,
+        "estimatedRequestStartUtc": "2026-09-17T20:07:41.220Z",
+        "basis": "capture log birth time plus sealed monotonic request offset"
+      },
+      {
+        "sequence": 41,
+        "estimatedRequestStartUtc": "2026-09-17T20:08:12.220Z",
+        "basis": "capture log birth time plus sealed monotonic request offset"
+      },
+      {
+        "sequence": 47,
+        "estimatedRequestStartUtc": "2026-09-17T20:08:43.223Z",
+        "basis": "capture log birth time plus sealed monotonic request offset"
+      },
+      {
+        "sequence": 51,
+        "estimatedRequestStartUtc": "2026-09-17T20:09:14.224Z",
+        "basis": "capture log birth time plus sealed monotonic request offset"
+      },
+      {
+        "sequence": 43,
+        "estimatedRequestStartUtc": "2026-09-17T20:09:45.225Z",
+        "basis": "capture log birth time plus sealed monotonic request offset"
+      }
+    ],
+    "sessionCreationBounds": [
+      {
+        "groupIndex": 0,
+        "groupId": "lifecycle-full-en",
+        "firstSequence": 1,
+        "estimatedSessionCreationNoLaterThanUtc": "2026-09-17T20:02:31.190Z",
+        "evidence": "session creation completed before its first request; wall time is conservatively derived from capture log birth plus monotonic offset"
+      },
+      {
+        "groupIndex": 1,
+        "groupId": "full-ro",
+        "firstSequence": 2,
+        "estimatedSessionCreationNoLaterThanUtc": "2026-09-17T20:03:02.194Z",
+        "evidence": "session creation completed before its first request; wall time is conservatively derived from capture log birth plus monotonic offset"
+      }
+    ]
+  },
+  "arithmetic": {
+    "sessionsRemainingNow": 3,
+    "messagesRemainingInMeasuredTenMinuteWindow": 5,
+    "manualSessionsRequired": 2,
+    "manualMessagesRequired": 5
+  },
+  "conservativeNotBeforeUtc": "2026-09-17T20:19:46.673Z",
+  "basis": "The two-session allowance is arithmetically sufficient immediately, but the five-message walkthrough would consume every remaining ten-minute message slot. The conservative time waits ten minutes after the partial capture receipt was sealed; it is a calculation, not a fresh capacity read.",
+  "limits": [
+    "No post-wait capacity request was made.",
+    "Session creation wall times are conservative bounds derived from immutable local capture timing because the fixed receipt does not serialize absolute creation timestamps.",
+    "Forgot remains unresolved and actionless; no recovery submission is part of the manual."
+  ]
+}

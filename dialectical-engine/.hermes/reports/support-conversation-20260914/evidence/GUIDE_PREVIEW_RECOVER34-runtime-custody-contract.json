@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_RECOVER34",
+  "producerNode": "GUIDE_RUNTIME9",
+  "outputPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREVIEW_RECOVER34-runtime-custody.json",
+  "privateRuntimeLogPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_RUNTIME9-stack.log",
+  "exactKeys": [
+    "schemaVersion",
+    "node",
+    "revision",
+    "pid",
+    "pgid",
+    "commandMarker",
+    "runtimeLogPath",
+    "ports",
+    "startedAtUtc",
+    "detached",
+    "ordinarySystemTls"
+  ],
+  "required": {
+    "schemaVersion": 1,
+    "node": "GUIDE_RUNTIME9",
+    "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+    "commandMarker": "pnpm dev:auth:up",
+    "runtimeLogPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_RUNTIME9-stack.log",
+    "ports": {
+      "ui": 3100,
+      "api": 8890,
+      "postgres": 55433,
+      "hatchetGrpc": 7177,
+      "hatchetApi": 8988,
+      "providerStart": 8891,
+      "providerEnd": 8896,
+      "supportModel": 8894
+    },
+    "detached": true,
+    "ordinarySystemTls": {
+      "path": "/help",
+      "customCa": false,
+      "insecure": false,
+      "status": 200
+    }
+  },
+  "dynamic": {
+    "pid": "positive safe integer equal to pgid",
+    "pgid": "positive safe integer equal to pid",
+    "startedAtUtc": "finite ISO-8601 timestamp"
+  },
+  "limitation": "API KB confirmation remains deferred to the later single fresh status/capacity frame; no Support, status, capacity, or application DB request occurred."
+}

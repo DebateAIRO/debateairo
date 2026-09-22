@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PRICING_CLAIM_REVIEW2",
+  "ticket": "t_dfa4697e",
+  "revision": "130adf47da2e889005e73c3adb7ebb49fd50b529",
+  "baseRevision": "b103ce27a060c48fcf5613c1bf44be53c7cb2a0c",
+  "verdict": "REWORK_BOUNDED_FINANCIAL_POLARITY_ORDER",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_PRICING_CLAIM_REVIEW2.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_PRICING_CLAIM_REVIEW2.md",
+      "sha256": "0e36fa37ee162c9a5da81ebc13f2c6b260dce202669d6fc6583c089ecffac9ee",
+      "bytes": 4964
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_REVIEW2-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_REVIEW2-dispositions.json",
+      "sha256": "a3de50743ebdceb1462908a8b558f5bd257bfe29b57eb7592d52c9524ecc3299",
+      "bytes": 3860
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_REVIEW2-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_REVIEW2-custody.json",
+      "sha256": "8a7155b1740dc3e5691f88059f81f3d6a5a9129963de7df72e812600d58c58b8",
+      "bytes": 1395
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PRICING_CLAIM_REVIEW2.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PRICING_CLAIM_REVIEW2.md",
+      "sha256": "53d62e5265f185ed471081a5858737dda3fb5654150e65d4da469bb80d41550a",
+      "bytes": 3187
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "heavyLeaseHeld": false,
+  "finding": "The no-intervening-financial-token rule still lets a negation belonging to an earlier financial predicate license a later positive financial predicate, and common direct postfix negatives were removed.",
+  "retained": [
+    "Forward-order causal/comma/coordination defects are closed.",
+    "Exact LIVE28, full44 service and real POST recovery/accounting evidence remains valid.",
+    "Screenshot30 complete full-answer capture remains PASS."
+  ],
+  "minimumBoundary": "Remove arbitrary preceding-window authority; admit only tightly anchored negative constructions governing the current financial mention and otherwise use reviewed fallback."
+}

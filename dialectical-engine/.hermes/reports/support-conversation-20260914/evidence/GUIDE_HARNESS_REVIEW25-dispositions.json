@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW25",
+  "ticket": "t_3962b425",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "verdict": "REWORK_BOUNDED_CAPTURE_PROOF_DEPENDENCY",
+  "dispositions": [
+    {
+      "id": "GH25-C1",
+      "subject": "exact canonical54 plus owner4 identity",
+      "disposition": "PASS",
+      "evidence": "Importer requires byte-exact canonical54 and owner4 concatenation and enforces the four owner source/action contracts."
+    },
+    {
+      "id": "GH25-C2",
+      "subject": "membership negatives",
+      "disposition": "PASS",
+      "evidence": "Missing, extra, duplicate and mutated-owner-action inputs reject; exact byte comparisons also reject reorder and mutation."
+    },
+    {
+      "id": "GH25-C3",
+      "subject": "actual shared gated CLI",
+      "disposition": "PASS",
+      "evidence": "Real phase-row-proof wrapper returned status zero with 58 PASS rows under a declared non-operational fixture."
+    },
+    {
+      "id": "GH25-C4",
+      "subject": "preserved RED evidence",
+      "disposition": "PASS",
+      "evidence": "Stale54 mismatch and invalid extra-key FIX22 control-proof attempts remain preserved with their distinct fixed errors."
+    },
+    {
+      "id": "GH25-C5",
+      "subject": "control proof schema and provenance",
+      "disposition": "PASS",
+      "evidence": "Final control proof has exactly eight accepted keys, current revision/KB/harness custody, and GUIDE21 rather than GUIDE18 labels."
+    },
+    {
+      "id": "GH25-C6",
+      "subject": "fresh command self-binding",
+      "disposition": "PASS",
+      "evidence": "All seven argv[2] values point to the actual FIX25 contract and the proof hashes those exact bytes."
+    },
+    {
+      "id": "GH25-C7",
+      "subject": "fresh LIVE25 paths and unused actual namespace",
+      "disposition": "PASS",
+      "evidence": "Capacity, gate, row proof, statuses, logs and profile are fresh LIVE25; actual response/screens remain unused GUIDE21."
+    },
+    {
+      "id": "GH25-C8",
+      "subject": "private setup and retained safeguards",
+      "disposition": "PASS_RETAINED",
+      "evidence": "SUPPORT_DATABASE_URL/debateai_dev_support custody, Runtime7, privacy, fixed31, screenshot, pacing and owner-capacity contracts remain unchanged."
+    },
+    {
+      "id": "GH25-R1",
+      "subject": "capture dependency on fresh row proof",
+      "disposition": "REWORK",
+      "evidence": "Neither phase-capture nor the FIX25 child reads or validates the bound LIVE25 row-proof status/result before spawn; wrapper must validate status0/current revision and hash/check exact58 PASS current gate/KB/custody before spawning."
+    },
+    {
+      "id": "GH25-L1",
+      "subject": "runtime and readiness",
+      "disposition": "NOT_ESTABLISHED",
+      "evidence": "Static review only; actual31, current capacity, owner capacity, live success, readiness, completion and acceptance remain pending."
+    },
+    {
+      "id": "GH25-L2",
+      "subject": "Forgot and CP2",
+      "disposition": "UNRESOLVED_ACTIONLESS",
+      "evidence": "No destination is inferred and no CP2 authorization follows."
+    }
+  ],
+  "hashes": {
+    "fix25CommandContract": "f9c73d53a70f3474d41c6fd094e7a5b0fdd632919e8df35c72df6ab9c4b5ff0e",
+    "realGated58Proof": "104b78a1e92c1f42b9bad338633d7a470dec753c288259c3de39b86f74f00d44",
+    "bindingProof": "7adc16fc53bad300470a6ed2c2142f8fe4dd6904e692a0a5c7c63e33bbf0316b",
+    "controlProof": "3381211714ac74e503b9c63afc6645caedbadb3b3259e28b86404c431a085510",
+    "gateTemplate": "08afa7f933acaa1fa94575fc3f8e0c997fc187c92bc8e851c54ddf7f7b32d9bc",
+    "captureChild": "464e4361253c583abbd1ae7016d7db5eb861e62cc97d9fcfa1ec5b08f51ae8d9",
+    "sharedPhaseCapture": "65ba6605f04dbbbacd12c4b8a1316d113866471a7f108e7a9bad59824e43d053",
+    "ownerCapacityContract": "df5580ba8dd47e354a74aa04b8308d7b626564bd116076b682b1f6d0037d03fc"
+  },
+  "counts": {
+    "focusedPassed": 8,
+    "focusedTotal": 8,
+    "realGatedRowsPassed": 58,
+    "realGatedRowsTotal": 58,
+    "phasesSelfBound": 7,
+    "phasesTotal": 7,
+    "manifestVerified": 45,
+    "manifestTotal": 45,
+    "receiptArtifactsVerified": 46,
+    "receiptArtifactsTotal": 46,
+    "inputsVerified": 117,
+    "inputsTotal": 117,
+    "remainingFindings": 1
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

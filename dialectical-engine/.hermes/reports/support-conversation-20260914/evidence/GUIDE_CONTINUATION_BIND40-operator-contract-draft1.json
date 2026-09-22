@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CONTINUATION_BIND40",
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "argv": [
+    "/Users/vladmihaimiron/.local/bin/node",
+    "--import",
+    "tsx",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CONTINUATION_BIND40/run-operator.mjs"
+  ],
+  "sandboxPermissions": "require_escalated",
+  "toolCapturedOutput": true,
+  "redirection": false,
+  "script": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CONTINUATION_BIND40/run-operator.mjs",
+    "sha256": "77236e209767b3dc735bd1d779e50c45724f7a9ddf85fbf951fb97c315267b4a",
+    "bytes": 10188
+  },
+  "commandContract": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTINUATION_BIND40-command-contract.json",
+    "sha256": "4e6e9f2b1a7a448f21d036c21d599f7329404b887c725e59ee2fdd7fd0c82b98"
+  }
+}

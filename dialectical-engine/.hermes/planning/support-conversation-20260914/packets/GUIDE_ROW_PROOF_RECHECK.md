@@ -1,0 +1,24 @@
+# PACKET GUIDE_ROW_PROOF_RECHECK — separate row-proof adapter review
+
+Read FIRST this packet, then /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md. Resume original Sol /root/baseline; assigned ticket/comments before claim. Retain same-session BODY skills and prior bounded harness-review evidence. No subdelegation.
+
+## 1. Node
+- seat: GUIDE_ROW_PROOF_RECHECK; ticket: t_c43abca2; model: gpt-5.6-sol; rework rounds: max 3 under owner continuation.
+- cwd: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-product/dialectical-engine; clean detached immutable reference: b0b91a01cf161d17eef75577cbae94c629b7bc49. Active primary author may advance independently; no current primary-byte claim.
+- inputs: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/INSTRUCTIONS.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/OWNER-PUBLIC-GUIDE-20260917.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF_RECHECK-inputs.json and indexed sealed adapter/preparation/failure/harness artifacts. Read exact wrapper and immediate sealed exports only, no product re-audit or active author outputs.
+- self-report: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_ROW_PROOF_RECHECK.md (new).
+
+## 2. Contract
+- allowed: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_ROW_PROOF_RECHECK.md (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF_RECHECK-receipt.json (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_ROW_PROOF_RECHECK.md (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ROW_PROOF_RECHECK- (new, static custody and optional syntax-only checks without import/execution).
+- forbidden: all product/source/Git/harness/adapter/matrix edits; semantic probe/tests, browser/profile/session, HTTP/DB/model/runtime/capacity traffic; peer active output reads; owner questions/readiness/acceptance.
+- verification: read-only bounded static review, no heavy/Git lease. Verify indexed hashes and detached reference; do not confuse preparation with a successful execution.
+
+## 3. Work
+Resolve exact GRP-R1 against the corrected isolated adapter and its bounded inert copied-controls negative. Require full reviewed8 digest validation before any dynamic imports, constructor proof equality, and actual computed custody value. Read negative evidence; no new execution needed. Review the isolated adapter's exact matrix/count/hash and target product/evidence bindings, dependency chain, failure propagation and guaranteed exit before browser/session/model creation. It must reuse the sealed proof logic without cloning/weaking expectations or changing the f8f executable harness. Verify that it cannot fabricate suite/snapshot/capacity attestations, silently replace timestamps or claim live readiness from stale data. Fresh actual final-gate prerequisites are intentional: ACTION_COMPOSE provides final exact tests/snapshot/inert62, then LIVE2 supplies one genuinely fresh supported capacity measurement and runs adapter before capture using that same gate within120s. No extra capacity read or request is performed by the adapter.
+
+Constructor short-circuit on the first proof failure is permitted; do not require per-row continuation by weakening sealed code. Full54 per-row success metadata is legitimate only after constructor success at the final clean revision. Check that diagnostic output is fixed/public and excludes capabilities, raw private logs and rejected drafts. State exact preparation-only limits and any blocking flaw. Product navigation correction and test-only typing composition are outside this review. Do not claim all54 proof until valid-gate LIVE2 execution.
+
+## 4. Handoff
+Self-report question verbatim:
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
+Return SKILLS LOADED, node/ticket/session/revision, PASS or REWORK for the bounded prepared adapter with explicit fresh-gate execution prerequisite, exact findings/bindings/custody/limits. Receipt must include node/ticket/revision/verdict/artifacts absolute/sha256/bytes excluding itself. No self-close or readiness.

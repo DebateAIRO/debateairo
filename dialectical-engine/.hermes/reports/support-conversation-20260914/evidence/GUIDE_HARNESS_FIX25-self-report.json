@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX25",
+  "ticket": "t_e4c9f4e1",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "PASS_REAL_GATED58_CONTRACT",
+  "skillsLoaded": [
+    "retained BODY skills and mission floors"
+  ],
+  "realGatedProof": {
+    "staleImporterStatus": 1,
+    "staleImporterCode": "GUIDE_ROW_PROOF_MATRIX_COUNT_MISMATCH",
+    "firstCorrectedStatus": 1,
+    "firstCorrectedCode": "GUIDE_HARNESS_BOUND_RECEIPT_INVALID",
+    "finalStatus": 0,
+    "canonicalRows": 54,
+    "ownerRows": 4,
+    "totalRows": 58,
+    "supportRequests": 0,
+    "modelRequests": 0
+  },
+  "finding": "Unbound proof and gate materialization did not execute the actual constructor chain; copied row counts and an exact-key control-proof mismatch survived until the real gated child.",
+  "upgrade": "Generate counts, identity digests, gate, self-bound commands, namespace ledger and one real inert-gate receipt from one declarative mission input before any operational read.",
+  "limits": [
+    "No runtime availability claim.",
+    "No operational traffic.",
+    "LIVE24 capacity is expired and not reusable.",
+    "Forgot remains unresolved/actionless.",
+    "No CP1 readiness or acceptance claim."
+  ]
+}

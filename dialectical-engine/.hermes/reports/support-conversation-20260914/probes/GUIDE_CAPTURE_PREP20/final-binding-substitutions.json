@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_PREP20",
+  "revision": null,
+  "requiredSubstitutions": [
+    "__FINAL_REVISION__",
+    "__FINAL_PRODUCT_INVENTORY_PATH__",
+    "__FINAL_PRODUCT_INVENTORY_SHA256__",
+    "__FINAL_ATTESTATION_PATH__",
+    "__FINAL_ATTESTATION_SHA256__",
+    "__FINAL_SUITE_RECEIPT_PATH__",
+    "__FINAL_SUITE_RECEIPT_SHA256__",
+    "__FINAL_CONTROL_PROOF_PATH__",
+    "__FINAL_CONTROL_PROOF_SHA256__",
+    "__FINAL_PRIVATE_RUNTIME_LOG_PATH__",
+    "__FINAL_RUNTIME_CUSTODY_PATH__",
+    "__FINAL_GATE_TEMPLATE_PATH__",
+    "__FINAL_GATE_TEMPLATE_SHA256__",
+    "__FINAL_ROW_PROOF_SCRIPT__"
+  ],
+  "finalFilesToMaterialize": [
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE20-command-contract.json",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE20-gate-template.json"
+  ],
+  "bindingRequirements": [
+    "Corrected product revision is sealed clean and separately reviewed.",
+    "Full58 offline row proof passes on that exact revision and KB.",
+    "Finite composed controls execute on that exact revision and publish a new control proof.",
+    "Product inventory, attestation, final34 suite receipt, and all referenced hashes are verified mechanically.",
+    "Supported owned preview is reloaded at that exact revision so startup-loaded KB is current.",
+    "The later capacity phase confirms public status kb_version in the same one-read frame used by the gate.",
+    "GUIDE_COUNTS_ONLY_DATABASE_URL is supplied through private supported custody and is never persisted in evidence."
+  ]
+}

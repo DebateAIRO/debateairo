@@ -1,0 +1,227 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX5",
+  "from": "GUIDE_HARNESS_FIX4",
+  "revision": "5731eb6faac25f9712f04aea029a021f6eee9352",
+  "rows": {
+    "count": 54,
+    "changedCanonicalRows": [
+      7,
+      8
+    ],
+    "unchangedCanonicalRows": 52,
+    "policy": {
+      "requiredSourceIds": [
+        "app-navigation"
+      ],
+      "allowedSourceIds": [
+        "app-navigation",
+        "browse-public-debates"
+      ],
+      "recoverySourceIds": [
+        "app-navigation"
+      ],
+      "acceptedSourceOrder": "irrelevant"
+    }
+  },
+  "harnessFiles": [
+    {
+      "path": "README.md",
+      "old": {
+        "path": "README.md",
+        "bytes": 9013,
+        "sha256": "24141106d1ea88f024d3d15491c0bd6ca7b2c87af5557c2d57f8ea46811bfde4"
+      },
+      "new": {
+        "path": "README.md",
+        "bytes": 10567,
+        "sha256": "8ead01a1eb2592c418d897563685ca0c95c27d817d3b61c13fe414e16f08cd78"
+      },
+      "changed": true
+    },
+    {
+      "path": "capture-public-guide.mjs",
+      "old": {
+        "path": "capture-public-guide.mjs",
+        "bytes": 18385,
+        "sha256": "819d25257c473802235e69307ee75103e68d96a32e860226ddf4bc93d692f3ba"
+      },
+      "new": {
+        "path": "capture-public-guide.mjs",
+        "bytes": 18852,
+        "sha256": "7dda1673a32da20e43b6ed8879d24f57036d76f8b1ae4a59ca86aef581c8ddda"
+      },
+      "changed": true
+    },
+    {
+      "path": "controls.mjs",
+      "old": {
+        "path": "controls.mjs",
+        "bytes": 10181,
+        "sha256": "73ac41bd6ad88c9f50289af72684b9038915db1a54b613dbf9dcde55ceec0837"
+      },
+      "new": {
+        "path": "controls.mjs",
+        "bytes": 17405,
+        "sha256": "5f7402ca88dfceaf414fbd1862b4321f40bddd33e37a4e3a1200ffc59c7a8c75"
+      },
+      "changed": true
+    },
+    {
+      "path": "gate-contract.json",
+      "old": {
+        "path": "gate-contract.json",
+        "bytes": 4552,
+        "sha256": "a06a7ad7b1e328f5432a4ac9403436f87aab15427410c63cec0b55d93b3b8680"
+      },
+      "new": {
+        "path": "gate-contract.json",
+        "bytes": 4552,
+        "sha256": "a06a7ad7b1e328f5432a4ac9403436f87aab15427410c63cec0b55d93b3b8680"
+      },
+      "changed": false
+    },
+    {
+      "path": "matrix.mjs",
+      "old": {
+        "path": "matrix.mjs",
+        "bytes": 13383,
+        "sha256": "4614aae275462568eed6277c78193d252c441cd47c28bd37021de4d43ba91957"
+      },
+      "new": {
+        "path": "matrix.mjs",
+        "bytes": 14253,
+        "sha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c"
+      },
+      "changed": true
+    },
+    {
+      "path": "pre-request-verifier.ts",
+      "old": {
+        "path": "pre-request-verifier.ts",
+        "bytes": 13715,
+        "sha256": "a123d265d2070d9ef5929dd30bb752b826412e42b5091c68e4806b276b37a402"
+      },
+      "new": {
+        "path": "pre-request-verifier.ts",
+        "bytes": 16486,
+        "sha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733"
+      },
+      "changed": true
+    },
+    {
+      "path": "runtime-capacity.mjs",
+      "old": {
+        "path": "runtime-capacity.mjs",
+        "bytes": 9935,
+        "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87"
+      },
+      "new": {
+        "path": "runtime-capacity.mjs",
+        "bytes": 9935,
+        "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87"
+      },
+      "changed": false
+    },
+    {
+      "path": "session-lifecycle.mjs",
+      "old": {
+        "path": "session-lifecycle.mjs",
+        "bytes": 4254,
+        "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b"
+      },
+      "new": {
+        "path": "session-lifecycle.mjs",
+        "bytes": 4254,
+        "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b"
+      },
+      "changed": false
+    },
+    {
+      "path": "verify-final-branches.ts",
+      "old": {
+        "path": "verify-final-branches.ts",
+        "bytes": 5131,
+        "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a"
+      },
+      "new": {
+        "path": "verify-final-branches.ts",
+        "bytes": 5131,
+        "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a"
+      },
+      "changed": false
+    },
+    {
+      "path": "verify-guide-harness.mjs",
+      "old": {
+        "path": "verify-guide-harness.mjs",
+        "bytes": 34583,
+        "sha256": "ca2c99671036db5160b376ef4176b309b4d41a2b87c6209f44f5570f7e9a2571"
+      },
+      "new": {
+        "path": "verify-guide-harness.mjs",
+        "bytes": 45723,
+        "sha256": "6ed6d7bfe77023caa6fa1fbde287c9c474361664ed8a164706527b3422a6da26"
+      },
+      "changed": true
+    }
+  ],
+  "adapterFiles": [
+    {
+      "path": "README.md",
+      "old": {
+        "path": "README.md",
+        "bytes": 1916,
+        "sha256": "9d41f547db48a743bc7f41d1e5e2bab2e30b1f1ffb436d175868681a59258966"
+      },
+      "new": {
+        "path": "README.md",
+        "bytes": 2062,
+        "sha256": "d2629080d09427aa653fa991993d2304281ba0f82a3427029768e2d777361f30"
+      },
+      "changed": true
+    },
+    {
+      "path": "replay-row-proofs.mjs",
+      "old": {
+        "path": "replay-row-proofs.mjs",
+        "bytes": 6121,
+        "sha256": "8f1c0930bc6e92c2bad6ee2a9e515f2bc478101968c5f6bc898303ce18ee9627"
+      },
+      "new": {
+        "path": "replay-row-proofs.mjs",
+        "bytes": 6468,
+        "sha256": "becafc56c1b83df24ac4cce577d4b2c6164c24a15ecdfb71bd0fc8928966c5fd"
+      },
+      "changed": true
+    },
+    {
+      "path": "reviewed-harness-custody.mjs",
+      "old": {
+        "path": "reviewed-harness-custody.mjs",
+        "bytes": 1417,
+        "sha256": "8cc9f1d8617127f3090797071424caee3406db3052ac11dde19fe1da33ab6d28"
+      },
+      "new": {
+        "path": "reviewed-harness-custody.mjs",
+        "bytes": 1417,
+        "sha256": "3d612d8e61fd67ccef1ee88b5304f452ef8ec25d62405340dbc24f752c9c7768"
+      },
+      "changed": true
+    },
+    {
+      "path": "verify-negative-fixture.mjs",
+      "old": {
+        "path": "verify-negative-fixture.mjs",
+        "bytes": 1359,
+        "sha256": "08272f8d0efe221409570a309d142d3bc0d56c346dd1ba53c33ed417a1133530"
+      },
+      "new": {
+        "path": "verify-negative-fixture.mjs",
+        "bytes": 1359,
+        "sha256": "3ea43c427feb988cdc2f916cf43f8dc2765665ba05b65e66db5cc04dad5c87b6"
+      },
+      "changed": true
+    }
+  ]
+}

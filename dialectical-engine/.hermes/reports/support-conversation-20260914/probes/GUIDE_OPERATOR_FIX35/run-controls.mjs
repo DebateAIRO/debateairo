@@ -1,0 +1,35 @@
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { access,mkdtemp,readFile,rm,writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+const R="/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914",E=`${R}/evidence`,P=`${R}/probes`,node="/Users/vladmihaimiron/.local/bin/node";
+const finalHash="f8a5df033841912013df6eda0f13d5811f9e709712e8311f692d7926d9d52030",staleHash="6269d1c50fd24574f70f4d4898cd2cf1e2e42174c5f392b9516a558c75575107";
+const sha=b=>createHash("sha256").update(b).digest("hex"),absent=async p=>{try{await access(p);return false}catch{return true}};
+const scriptPath=`${P}/GUIDE_OPERATOR_FIX35/run-operator.mjs`,oldPath=`${P}/GUIDE_PREVIEW_RECOVER34/run-operator.mjs`,contractPath=`${E}/GUIDE_PREVIEW_RECOVER34-command-contract.json`,metadataPath=`${E}/GUIDE_OPERATOR_FIX35-operator-contract.json`;
+const script=await readFile(scriptPath,"utf8"),old=await readFile(oldPath,"utf8"),contractBytes=await readFile(contractPath),contract=JSON.parse(contractBytes),metadata=JSON.parse(await readFile(metadataPath,"utf8"));
+const names=[];const check=(name,fn)=>{fn();names.push(name)};
+check("sealed RECOVER34 command bytes have final hash",()=>assert.equal(sha(contractBytes),finalHash));
+check("new operator differs from old by only embedded hash",()=>assert.equal(script,old.replace(staleHash,finalHash)));
+check("new operator embeds final hash once and no stale hash",()=>{assert.equal(script.split(finalHash).length-1,1);assert.equal(script.includes(staleHash),false)});
+check("operator metadata hashes actual script and retained command",()=>{assert.equal(metadata.script.sha256,sha(Buffer.from(script)));assert.equal(metadata.commandContract.sha256,finalHash);assert.equal(metadata.commandContract.path,contractPath)});
+check("all seven phases retain RECOVER34 self paths",()=>{assert.deepEqual(Object.keys(contract.phases),["preflight","readiness","capacity","gate","rowProof","capture","idle"]);for(const phase of Object.values(contract.phases))assert.equal(phase.argv[2],contractPath)});
+check("Runtime9 and future namespaces remain retained",()=>{assert.equal(contract.runtimeCustodyPath,`${E}/GUIDE_PREVIEW_RECOVER34-runtime-custody.json`);assert.equal(contract.actualReceipt,`${E}/GUIDE_LIVE_GUIDE22-actual-receipt.json`);assert.equal(metadata.futureAbsence.count,123);assert.equal(new Set(metadata.futureAbsence.paths).size,123)});
+assert.equal((await Promise.all(metadata.futureAbsence.paths.map(absent))).every(Boolean),true);names.push("all123 future paths remain absent");
+const insertion="\nthrow new Error(\"GUIDE_OPERATOR_FIX35_FIRST_PHASE_INTERCEPT\");\n";
+const boundary="\nif (inert) {",index=script.lastIndexOf(boundary);assert.ok(index>0);const oldIndex=old.lastIndexOf(boundary);assert.ok(oldIndex>0);
+const dir=await mkdtemp(join(tmpdir(),"guide-operator-fix35-"));const goodFixture=join(dir,"good.mjs"),staleFixture=join(dir,"stale.mjs");
+try{
+  await writeFile(goodFixture,script.slice(0,index)+insertion+script.slice(index),{mode:0o600});
+  await writeFile(staleFixture,old.slice(0,oldIndex)+insertion+old.slice(oldIndex),{mode:0o600});
+  const run=p=>spawnSync(node,["--import","tsx",p],{cwd:"/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",encoding:"utf8",env:{PATH:process.env.PATH,HOME:process.env.HOME,TMPDIR:process.env.TMPDIR}});
+  const stale=run(staleFixture),good=run(goodFixture);
+  check("stale literal rejects before first-phase intercept",()=>{assert.notEqual(stale.status,0);assert.equal(stale.stderr.includes("GUIDE_OPERATOR_FIX35_FIRST_PHASE_INTERCEPT"),false);assert.equal(stale.stdout.length,0)});
+  check("matching literal reaches controlled first-phase intercept",()=>{assert.notEqual(good.status,0);assert.equal(good.stderr.includes("GUIDE_OPERATOR_FIX35_FIRST_PHASE_INTERCEPT"),true);assert.equal(good.stdout.length,0)});
+  const stillAbsent=(await Promise.all(metadata.futureAbsence.paths.map(absent))).every(Boolean);
+  check("guard fixtures create no contract outputs",()=>assert.equal(stillAbsent,true));
+  const proof={schemaVersion:1,node:"GUIDE_OPERATOR_FIX35",ticket:"t_c7774a62",revision:contract.revision,verdict:"PASS_LITERAL_OPERATOR_HASH_FIXED_REVIEW_REQUIRED",controls:names.length,passed:names.length,names,realNonInertGuard:{staleFixtureExitStatus:stale.status,staleReachedFirstPhase:false,matchingFixtureExitStatus:good.status,matchingReachedFirstPhaseBoundary:true,operationalChildSpawned:false,privateEnvironmentRead:false},hashes:{retainedCommandContract:finalHash,oldOperator:sha(Buffer.from(old)),newOperator:sha(Buffer.from(script)),runtimeCustodyContract:sha(await readFile(contract.runtimeCustodyContractPath))},traffic:{runtimeActions:0,browser:0,http:0,status:0,capacity:0,database:0,support:0,model:0},futurePaths:{count:123,allAbsent:true}};
+  await writeFile(`${E}/GUIDE_OPERATOR_FIX35-control-proof.json`,`${JSON.stringify(proof,null,2)}\n`,{flag:"wx",mode:0o600});
+  console.log(JSON.stringify({passed:proof.passed,controls:proof.controls,staleStatus:stale.status,matchingStatus:good.status,futureAbsent:123}));
+}finally{await rm(dir,{recursive:true,force:true})}

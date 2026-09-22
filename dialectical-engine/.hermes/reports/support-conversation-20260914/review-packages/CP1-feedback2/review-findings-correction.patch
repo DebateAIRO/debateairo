@@ -1,0 +1,443 @@
+diff --git a/dialectical-engine/apps/api/src/support/security-guidance.ts b/dialectical-engine/apps/api/src/support/security-guidance.ts
+index b01e454c912e0cc62aa777160459c77bc0fcab21..3befcd9b2b14b1048a725ccacf5cff7be2a2389c 100644
+--- a/dialectical-engine/apps/api/src/support/security-guidance.ts
++++ b/dialectical-engine/apps/api/src/support/security-guidance.ts
+@@ -8,13 +8,33 @@ export type SupportSecurityNavigation = Readonly<{
+ 
+ const FORGOT_PASSWORD_RO = /(?:\bam\s+uitat\s+parol(?:a|ă)\b|\bnu(?:-mi)?\s+(?:mai\s+)?amintesc\s+parol(?:a|ă)\b)/u;
+ const FORGOT_PASSWORD_EN = /(?:\bforgot(?:ten)?\s+(?:my\s+)?password\b|\b(?:can(?:not|'t)|do\s+not|don't)\s+remember\s+(?:my\s+)?password\b)/u;
+-const RECOVERY_NAVIGATION_EN = /(?:(?:password\s+(?:recovery|reset)|(?:recovery|reset)\s+(?:my\s+)?password).{0,40}\b(?:link|page|option|button|screen|opener)\b|\b(?:link|page|option|button|screen|opener)\b.{0,40}(?:password\s+(?:recovery|reset)|(?:recovery|reset)\s+(?:my\s+)?password))/u;
+-const RECOVERY_NAVIGATION_RO = /(?:(?:recuperarea|resetarea|recuperare(?:a)?|resetare(?:a)?)\s+(?:a\s+)?parol(?:ei|a|ă).{0,40}\b(?:link(?:ul)?|pagin(?:a|ă)|opțiun(?:ea|e)|optiun(?:ea|e)|buton(?:ul)?|ecran(?:ul)?|deschidere)\b|\b(?:link(?:ul)?|pagin(?:a|ă)|opțiun(?:ea|e)|optiun(?:ea|e)|buton(?:ul)?|ecran(?:ul)?|deschidere)\b.{0,40}(?:recuperarea|resetarea|recuperare(?:a)?|resetare(?:a)?)\s+(?:a\s+)?parol(?:ei|a|ă))/u;
++const RECOVERY_SUBJECT_EN = /(?:\bpassword\b.{0,32}\b(?:recovery|reset)\b|\b(?:recover\w*|recovery|reset)\b.{0,32}\bpassword\b)/u;
++const RECOVERY_NAVIGATION_NOUN_EN = /\b(?:link|page|option|button|screen|opener)\b/u;
++const RECOVERY_SUBJECT_RO = /(?:(?:recuper\p{L}*|reset\p{L}*).{0,32}(?<!\p{L})parol\p{L}*|(?<!\p{L})parol\p{L}*.{0,32}(?:recuper\p{L}*|reset\p{L}*))/u;
++const RECOVERY_NAVIGATION_NOUN_RO = /(?<!\p{L})(?:link\p{L}*|pagin\p{L}*|opțiun\p{L}*|optiun\p{L}*|buton\p{L}*|ecran\p{L}*|deschidere)(?!\p{L})/u;
++const RECOVERY_OPERATION_EN = /(?:(?:\bvalidate|\bverify|\bcheck|\bsubmit|\bexecute|\bperform|\bapply|\bchange|\breplace|\bset)\w*.{0,56}\b(?:reset\s+token|password\s+reset|reset)\b|\b(?:reset\s+token|password\s+reset|reset)\b.{0,56}(?:\bvalidate|\bverify|\bcheck|\bsubmit|\bexecute|\bperform|\bapply|\bchange|\breplace|\bset)\w*)/u;
++const RECOVERY_OPERATION_RO = /(?:(?:valid\p{L}*|verific\p{L}*|trimit\p{L}*|execut\p{L}*|efectu\p{L}*|schimb\p{L}*|înlocu\p{L}*|inlocu\p{L}*).{0,56}(?:token\p{L}*|reset\p{L}*)|(?:token\p{L}*|reset\p{L}*).{0,56}(?:valid\p{L}*|verific\p{L}*|trimit\p{L}*|execut\p{L}*|efectu\p{L}*|schimb\p{L}*|înlocu\p{L}*|inlocu\p{L}*))/u;
+ 
+ function normalized(value: string): string {
+   return value.normalize("NFKC").toLocaleLowerCase("en-US");
+ }
+ 
++function normalizedViews(values: readonly string[]): readonly string[] {
++  return Object.freeze(Array.from(new Set(values.flatMap((value) => {
++    const plain = value.toLocaleLowerCase("en-US");
++    const decoded = plain.replace(/%([0-7][0-9a-f])/giu,(_match,hex: string) =>
++      String.fromCharCode(Number.parseInt(hex,16)));
++    return decoded === plain ? [plain] : [plain,decoded];
++  }))));
++}
++
++function recoveryNavigation(value: string,language: SupportLanguage): boolean {
++  if (language === "ro") {
++    return RECOVERY_SUBJECT_RO.test(value) && RECOVERY_NAVIGATION_NOUN_RO.test(value);
++  }
++  return RECOVERY_SUBJECT_EN.test(value) && RECOVERY_NAVIGATION_NOUN_EN.test(value);
++}
++
+ export function classifySecurityNavigation(text: string): SupportSecurityNavigation | null {
+   return classifySecurityNavigationViews([normalized(text)]);
+ }
+@@ -22,10 +42,14 @@ export function classifySecurityNavigation(text: string): SupportSecurityNavigat
+ export function classifySecurityNavigationViews(
+   values: readonly string[]
+ ): SupportSecurityNavigation | null {
+-  if (values.some((value) => FORGOT_PASSWORD_RO.test(value) || RECOVERY_NAVIGATION_RO.test(value))) {
++  const views = normalizedViews(values);
++  if (views.some((value) => RECOVERY_OPERATION_EN.test(value) || RECOVERY_OPERATION_RO.test(value))) {
++    return null;
++  }
++  if (views.some((value) => FORGOT_PASSWORD_RO.test(value) || recoveryNavigation(value,"ro"))) {
+     return Object.freeze({ kind: "FORGOT_PASSWORD",language: "ro",actionId: "forgot-password" });
+   }
+-  if (values.some((value) => FORGOT_PASSWORD_EN.test(value) || RECOVERY_NAVIGATION_EN.test(value))) {
++  if (views.some((value) => FORGOT_PASSWORD_EN.test(value) || recoveryNavigation(value,"en"))) {
+     return Object.freeze({ kind: "FORGOT_PASSWORD",language: "en",actionId: "forgot-password" });
+   }
+   return null;
+diff --git a/dialectical-engine/packages/support-kb/src/context.ts b/dialectical-engine/packages/support-kb/src/context.ts
+index 2fc7ea3db7deb5479e08df7a2e2e131342027c90..c878a23936cef87ce49f152d814e8b8343680f5c 100644
+--- a/dialectical-engine/packages/support-kb/src/context.ts
++++ b/dialectical-engine/packages/support-kb/src/context.ts
+@@ -40,13 +40,19 @@ const STOP_WORDS = new Set([
+ 
+ const PRODUCT_ALIAS_SOURCE = String.raw`\b(?:dialectical(?:[\s-]*engine)|debate\s*airo)\b`;
+ const PRODUCT_OVERVIEW_WORDS = new Set([
+-  "about","agent","answer","cannot","cant","describe","does","explain","feature","features",
++  "about","agent","answer","cannot","cant","define","describe","does","explain","feature","features",
+   "identity","mean","meaning","overview","product","purpose","question","questions","support",
+   "tell","use","used","what","why",
+   "asistent","asistentul","capabilitati","despre","explica","face","folosit","folosita",
+   "identitate","intrebare","intrebari","poate","prezentare","produs","raspund","raspunde",
+   "scop","spune"
+ ]);
++const GENERIC_BRANDED_WORDS = new Set([
++  ...PRODUCT_OVERVIEW_WORDS,
++  "allow","allows","assist","assistance","help","helps","offer","offers","provide","provides",
++  "service","services","tool","tools",
++  "ajuta","ajutor","asistenta","ofera","serviciu","servicii"
++]);
+ 
+ function normalizedText(value: string): string {
+   return value.normalize("NFKD").replace(/\p{M}/gu,"").toLocaleLowerCase("en");
+@@ -63,6 +69,9 @@ function normalizeWords(value: string): Set<string> {
+ function productQuery(value: string): Readonly<{
+   branded: boolean;
+   identityOverview: boolean;
++  normalized: string;
++  preferredArticleId: string | null;
++  substantiveWords: Set<string>;
+   words: Set<string>;
+ }> {
+   const normalized = normalizedText(value);
+@@ -70,10 +79,16 @@ function productQuery(value: string): Readonly<{
+   const withoutBrand = branded
+     ? normalized.replace(new RegExp(PRODUCT_ALIAS_SOURCE,"gu")," ") : normalized;
+   const words = normalizeWords(withoutBrand);
++  const substantiveWords = new Set([...words].filter((word) => !GENERIC_BRANDED_WORDS.has(word)));
+   const identityOverview = branded && (
+     words.size === 0 || [...words].every((word) => PRODUCT_OVERVIEW_WORDS.has(word))
+   );
+-  return Object.freeze({ branded,identityOverview,words });
++  const preferredArticleId = /\b(?:publish|publishing)\b/u.test(normalized)
++    || /\bcum\s+public\p{L}*\b/u.test(normalized)
++    ? "publish-a-debate" : null;
++  return Object.freeze({
++    branded,identityOverview,normalized,preferredArticleId,substantiveWords,words
++  });
+ }
+ 
+ function overlapScore(query: Set<string>, value: string): number {
+@@ -155,24 +170,36 @@ export function buildSupportKnowledgeContext(input: Readonly<{
+   const eligibleEntries = input.entries.filter(({ lang,modelProjection }) =>
+     lang === input.language && modelProjection !== undefined
+   );
+-  const matchedCapabilities = (product.identityOverview
++  const identityEntryScore = Math.max(0,...eligibleEntries
++    .filter(({ id }) => id === "product-identity")
++    .map((entry) => overlapScore(product.substantiveWords,`${entry.title}\n${entry.modelProjection}`)));
++  const identityFactQuestion = product.branded
++    && /(?:^|\s)(?:what|why|is|este|define|defineste|definește|describe|descrie|explain|explica|explică)\b/u.test(product.normalized)
++    && identityEntryScore >= Math.max(1,product.substantiveWords.size - 1);
++  const identityRequest = product.identityOverview || identityFactQuestion;
++  const scoringWords = product.branded ? product.substantiveWords : queryWords;
++  const matchedCapabilities = (identityRequest
+     ? input.capabilities.filter(({ id }) => id === "product-identity").map((item) => ({ item,score:1 }))
+     : input.capabilities
+     .map((item) => ({
+       item,
+       catalogScore: overlapScore(
+-        queryWords,
++        scoringWords,
+         `${item.labels[input.language]} ${item.searchTerms[input.language].join(" ")}`,
+       ),
++      articleScore: Math.max(0,...eligibleEntries
++        .filter(({ id }) => item.articleIds.includes(id))
++        .map((entry) => overlapScore(scoringWords,entry.title) * 100
++          + overlapScore(scoringWords,entry.modelProjection ?? "") * 10)),
+     }))
+-    .filter(({ catalogScore }) => catalogScore > 0)
+-    .map(({ item,catalogScore }) => ({
++    .filter(({ catalogScore,articleScore }) => catalogScore > 0
++      && (!product.branded || articleScore > 0))
++    .map(({ item,catalogScore,articleScore }) => ({
+       item,
+       score: product.branded
+-        ? Math.max(0,...eligibleEntries
+-          .filter(({ id }) => item.articleIds.includes(id))
+-          .map((entry) => overlapScore(queryWords,entry.title) * 100
+-            + overlapScore(queryWords,entry.body) * 10)) * 1_000 + catalogScore
++        ? articleScore * 1_000 + catalogScore
++          + (product.preferredArticleId !== null
++            && item.articleIds.includes(product.preferredArticleId) ? 1_000_000 : 0)
+         : catalogScore,
+     }))
+     .sort((left, right) => right.score - left.score || left.item.id.localeCompare(right.item.id, "en")));
+@@ -208,8 +235,10 @@ export function buildSupportKnowledgeContext(input: Readonly<{
+     .map((entry) => ({
+       entry,
+       score: (capabilityArticleScore.get(entry.id) ?? 0)
++        + (entry.id === product.preferredArticleId ? 1_000_000_000 : 0)
+         + (product.branded
+-          ? overlapScore(queryWords,entry.title) * 100 + overlapScore(queryWords,entry.body) * 10
++          ? overlapScore(scoringWords,entry.title) * 100
++            + overlapScore(scoringWords,entry.modelProjection ?? "") * 10
+           : overlapScore(queryWords, `${entry.title}\n${entry.body}`)),
+     }))
+     .filter(({ entry,score }) => score > 0
+diff --git a/dialectical-engine/tests/integration/support-routes.test.ts b/dialectical-engine/tests/integration/support-routes.test.ts
+index c7bfa1e64df5762147d4a804455a11dc1d3b5271..36cd9eeaa2fa78becfd25870ee32e685ce1be430 100644
+--- a/dialectical-engine/tests/integration/support-routes.test.ts
++++ b/dialectical-engine/tests/integration/support-routes.test.ts
+@@ -1943,8 +1943,12 @@ describe("SUP-01 support routes", () => {
+     ["Am uitat parola","ro"],
+     ["Give me the password recovery link","en"],
+     ["Where is the password reset page?","en"],
++    ["Where can I find the link to recover my password?","en"],
++    ["Show the p%61ssword recovery link.","en"],
+     ["Vreau linkul de recuperare a parolei","ro"],
+-    ["Unde este pagina pentru resetarea parolei?","ro"]
++    ["Unde este pagina pentru resetarea parolei?","ro"],
++    ["Unde găsesc linkul pentru a-mi recupera parola?","ro"],
++    ["Arată pagina pentru recuperarea p%61rolei.","ro"]
+   ] as const)("returns canonical deterministic unresolved Forgot password guidance without a model: %s", async (
+     requestText,language
+   ) => {
+@@ -1973,6 +1977,26 @@ describe("SUP-01 support routes", () => {
+     await server.close();
+   });
+ 
++  it.each([
++    ["Where is the page to validate my password reset token?","en"],
++    ["Unde este pagina pentru validarea tokenului de resetare a parolei?","ro"]
++  ] as const)("keeps reset-token operations in the fixed security refusal: %s", async (
++    requestText,language
++  ) => {
++    const respond = vi.fn<SupportAnswerPort["respond"]>();
++    const server = api(true,{ answerPort:Object.freeze({ respond }) });
++    const opened = await openSession(server,language === "en" ? "203.0.113.215" : "203.0.113.216");
++    const response = await sendMessage(
++      server,opened.body,requestText,language === "en" ? "203.0.113.215" : "203.0.113.216"
++    );
++    expect(response.statusCode).toBe(200);
++    expect(response.json()).toMatchObject({
++      outcome:"REFUSE_ZONE",text:supportTemplate("REFUSE_ZONE",language).replace("{link}","/settings")
++    });
++    expect(respond).not.toHaveBeenCalled();
++    await server.close();
++  });
++
+   it.each([
+     ["encoded link","Open https%3A%2F%2Finvalid.example/reset"],
+     ["internal identifier","Select start-debate to continue."]
+diff --git a/dialectical-engine/tests/unit/support-answer-context.test.ts b/dialectical-engine/tests/unit/support-answer-context.test.ts
+index b4efa0b0ab07a5f3678c1b21d80f37ba66f44c86..937d8f1edf7d550bd5bb69e5d2ff7cd693f227b2 100644
+--- a/dialectical-engine/tests/unit/support-answer-context.test.ts
++++ b/dialectical-engine/tests/unit/support-answer-context.test.ts
+@@ -1,8 +1,10 @@
++import { readFileSync } from "node:fs";
++import { resolve } from "node:path";
+ import { describe,expect,it,vi } from "vitest";
+ 
+ import { createSupportAnswerService } from "../../apps/api/src/support/answer.js";
+ import {
+-  createHelpCorpusSnapshotLookup,type HelpCorpusEntry,type LoadedHelpCorpus
++  createHelpCorpusSnapshotLookup,loadHelpCorpus,type HelpCorpusEntry,type LoadedHelpCorpus
+ } from "../../packages/support-kb/src/index.js";
+ import type { SupportMessageCipherPort } from "../../apps/api/src/support/session.js";
+ import { createSupportModelReferenceFactory } from "../../apps/api/src/support/model-references.js";
+@@ -25,6 +27,15 @@ function corpus(entries: readonly HelpCorpusEntry[],kbVersion: string): LoadedHe
+   return Object.freeze({ entries: Object.freeze([...entries]),kbVersion }) as LoadedHelpCorpus;
+ }
+ 
++function admittedCorpus(): LoadedHelpCorpus {
++  const root = resolve(process.cwd(),"packages/support-kb");
++  return loadHelpCorpus(resolve(root,"content"),{
++    reviewManifest: JSON.parse(readFileSync(resolve(root,"reviews/manifest.json"),"utf8")) as unknown,
++    recoveryComponents: readFileSync(resolve(root,"recovery/components.json")),
++    requireReviewedRecovery: true
++  });
++}
++
+ const messages = Object.freeze({
+   write: vi.fn(async (input) => Object.freeze({ ...input,redacted: false })),
+   writeAndTransit: vi.fn(async (input,transit) => {
+@@ -120,6 +131,50 @@ describe("CP1 composed answer context", () => {
+     expect(complete).not.toHaveBeenCalled();
+   });
+ 
++  it("grounds a reviewed identity-fact paraphrase through the actual service on the admitted corpus", async () => {
++    const snapshot = admittedCorpus();
++    const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
++      kind:"answer",text:"Dialectical Engine is a reasoning instrument.",
++      sourceIds:[SOURCE_REFERENCE],actionIds:[]
++    }) }));
++    const service = createSupportAnswerService({
++      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
++      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
++      clock:(() => { let at=Date.parse("2026-09-17T12:45:00.000Z");return () => new Date(++at); })()
++    });
++
++    const result = await service.respond({
++      ...request(snapshot),text:"Is Dialectical Engine a reasoning instrument?"
++    });
++
++    expect(complete).toHaveBeenCalledOnce();
++    expect(result).toMatchObject({
++      outcome:"ANSWER_GROUNDED",sources:[{ id:"product-identity" }],actions:[]
++    });
++  });
++
++  it.each([
++    "Does Dialectical Engine support investment advice?",
++    "Can DebateAIRO help diagnose medical conditions?"
++  ])("keeps an unsupported branded claim out of the actual service on the admitted corpus: %s", async (
++    text
++  ) => {
++    const snapshot = admittedCorpus();
++    const complete = vi.fn(async () => Object.freeze({ text: JSON.stringify({
++      kind:"answer",text:"Unsupported synthetic claim.",sourceIds:[SOURCE_REFERENCE],actionIds:[]
++    }) }));
++    const service = createSupportAnswerService({
++      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
++      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
++      clock:(() => { let at=Date.parse("2026-09-17T12:30:00.000Z");return () => new Date(++at); })()
++    });
++
++    const result = await service.respond({ ...request(snapshot),text });
++
++    expect(result).toMatchObject({ outcome:"NO_SOURCE",sources:[],actions:[] });
++    expect(complete).not.toHaveBeenCalled();
++  });
++
+   it.each(["not-json",JSON.stringify({ kind: "tool",text: "ignored",sourceIds: [],actionIds: [] })])(
+     "recovers every rejected ordinary knowledge envelope from the pinned top source: %s",
+     async (completionText) => {
+diff --git a/dialectical-engine/tests/unit/support-classify.test.ts b/dialectical-engine/tests/unit/support-classify.test.ts
+index 079c0537c5697259891759c73e9dee690328fa6d..91af99503bbc70b974682e37421432b046be9772 100644
+--- a/dialectical-engine/tests/unit/support-classify.test.ts
++++ b/dialectical-engine/tests/unit/support-classify.test.ts
+@@ -573,8 +573,13 @@ describe("SUP-01 deterministic support classifier", () => {
+     ["Am uitat parola and I need a replacement password","ro"],
+     ["Give me the password recovery link","en"],
+     ["Where is the password reset page?","en"],
++    ["Where can I find the link to recover my password?","en"],
++    ["Can you show me the recovery page for my password?","en"],
++    ["Show the p%61ssword recovery link.","en"],
+     ["Vreau linkul de recuperare a parolei","ro"],
+-    ["Unde este pagina pentru resetarea parolei?","ro"]
++    ["Unde este pagina pentru resetarea parolei?","ro"],
++    ["Unde găsesc linkul pentru a-mi recupera parola?","ro"],
++    ["Arată pagina pentru recuperarea p%61rolei.","ro"]
+   ] as const)("classifies deterministic Forgot password before generic rules: %s", (message,language) => {
+     expect(classifySupportMessage(message)).toEqual({
+       outcome: "REFUSE_ZONE",language,link: null,
+@@ -601,6 +606,19 @@ describe("SUP-01 deterministic support classifier", () => {
+     });
+   });
+ 
++  it.each([
++    "Can the password reset page validate my reset token?",
++    "Use the password reset button to submit a reset for me",
++    "Where is the page to validate my password reset token?",
++    "Poate pagina de resetare a parolei să valideze tokenul meu de resetare?",
++    "Unde este pagina pentru validarea tokenului de resetare a parolei?"
++  ])("keeps reset execution and token validation out of navigation: %s", (message) => {
++    expect(classifySupportMessage(message)).toMatchObject({
++      outcome:"REFUSE_ZONE",link:"/settings"
++    });
++    expect(classifySupportMessage(message)).not.toHaveProperty("securityNavigation");
++  });
++
+   it.each([
+     ["coercion-en", "I am being told what to type by someone on the phone", "en"],
+     ["coercion-ro", "Cineva la telefon îmi spune ce să scriu", "ro"],
+diff --git a/dialectical-engine/tests/unit/support-context.test.ts b/dialectical-engine/tests/unit/support-context.test.ts
+index 678cf51ca3a945f153c0196f1d09bda86ded3ee2..4ed027b9c3f666a75e935827fb435827444c3811 100644
+--- a/dialectical-engine/tests/unit/support-context.test.ts
++++ b/dialectical-engine/tests/unit/support-context.test.ts
+@@ -1,8 +1,10 @@
++import { readFileSync } from "node:fs";
++import { resolve } from "node:path";
+ import { describe, expect, it } from "vitest";
+ 
+ import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
+ import { buildSupportKnowledgeContext as buildContext } from "../../packages/support-kb/src/context.js";
+-import type { HelpCorpusEntry } from "../../packages/support-kb/src/index.js";
++import { loadHelpCorpus,type HelpCorpusEntry } from "../../packages/support-kb/src/index.js";
+ 
+ type ContextInput = Parameters<typeof buildContext>[0];
+ function buildSupportKnowledgeContext(
+@@ -36,6 +38,15 @@ function entry(
+   });
+ }
+ 
++function admittedCorpus() {
++  const root = resolve(process.cwd(),"packages/support-kb");
++  return loadHelpCorpus(resolve(root,"content"),{
++    reviewManifest: JSON.parse(readFileSync(resolve(root,"reviews/manifest.json"),"utf8")) as unknown,
++    recoveryComponents: readFileSync(resolve(root,"recovery/components.json")),
++    requireReviewedRecovery: true
++  });
++}
++
+ describe("Support knowledge context", () => {
+   const entries = [
+     entry("creation", "en", "Create a debate", "Open the new debate page and choose the plan controls."),
+@@ -343,4 +354,43 @@ describe("Support knowledge context", () => {
+     expect(result.sourceIds).toEqual([]);
+     expect(result.requestedActionIds).toEqual([]);
+   });
++
++  it.each([
++    ["en" as const,"Is Dialectical Engine a reasoning instrument?","product-identity"],
++    ["en" as const,"Is DebateAIRO an AI debate tool?","product-identity"],
++    ["ro" as const,"Este Dialectical Engine un instrument de raționament?","product-identity"],
++    ["en" as const,"What does Dialectical Engine Support status show?","support-status-limits"],
++    ["en" as const,"How do I view a public debate in DebateAIRO?","view-public-debate"],
++    ["ro" as const,"Cum public o dezbatere în DebateAIRO?","publish-a-debate"],
++    ["ro" as const,"Cum public o dezbatere în Debate AIRO?","publish-a-debate"]
++  ])("selects the intended reviewed article from the admitted corpus for %s: %s", (
++    language,query,expected
++  ) => {
++    const snapshot = admittedCorpus();
++    const result = buildSupportKnowledgeContext({
++      entries:snapshot.entries,capabilities:SUPPORT_CAPABILITIES,
++      availableActionIds:SUPPORT_ACTION_IDS,language,query,historyText:"",maxCodePoints:24_000
++    });
++    expect(snapshot).toMatchObject({ entries:expect.arrayContaining([
++      expect.objectContaining({ id:"product-identity",lang:language })
++    ]) });
++    expect(result.sourceIds[0]).toBe(expected);
++    if (expected === "product-identity") expect(result.sourceIds).not.toContain("support-status-limits");
++    if (expected === "publish-a-debate") expect(result.sourceIds).not.toContain("view-public-debate");
++    if (expected === "product-identity") expect(result.requestedActionIds).toEqual([]);
++  });
++
++  it.each([
++    "Does Dialectical Engine support investment advice?",
++    "Can DebateAIRO help diagnose medical conditions?",
++    "Can Dialectical-Engine support insider trading questions?"
++  ])("does not treat generic help wording as reviewed authority in the admitted corpus: %s", (query) => {
++    const snapshot = admittedCorpus();
++    const result = buildSupportKnowledgeContext({
++      entries:snapshot.entries,capabilities:SUPPORT_CAPABILITIES,
++      availableActionIds:SUPPORT_ACTION_IDS,language:"en",query,historyText:"",maxCodePoints:24_000
++    });
++    expect(result.sourceIds).toEqual([]);
++    expect(result.requestedActionIds).toEqual([]);
++  });
+ });
+diff --git a/dialectical-engine/tests/unit/support-security-guidance.test.ts b/dialectical-engine/tests/unit/support-security-guidance.test.ts
+index 89a77c3f8185f344220cd406c350d640aca2cb57..36db35825bf9fa1d662818a361927c8170b90f6f 100644
+--- a/dialectical-engine/tests/unit/support-security-guidance.test.ts
++++ b/dialectical-engine/tests/unit/support-security-guidance.test.ts
+@@ -13,8 +13,13 @@ describe("CP1 deterministic Forgot password guidance", () => {
+     ["Am uitat parola and I need a replacement password", "ro"],
+     ["Give me the password recovery link", "en"],
+     ["Where is the password reset page?", "en"],
++    ["Where can I find the link to recover my password?", "en"],
++    ["Can you show me the recovery page for my password?", "en"],
++    ["Show the p%61ssword recovery link.", "en"],
+     ["Vreau linkul de recuperare a parolei", "ro"],
+-    ["Unde este pagina pentru resetarea parolei?", "ro"]
++    ["Unde este pagina pentru resetarea parolei?", "ro"],
++    ["Unde găsesc linkul pentru a-mi recupera parola?", "ro"],
++    ["Arată pagina pentru recuperarea p%61rolei.", "ro"]
+   ] as const)("recognizes %s before generic security routing", (text,language) => {
+     expect(classifySecurityNavigation(text)).toEqual({
+       kind: "FORGOT_PASSWORD",language,actionId: "forgot-password"
+@@ -28,7 +33,12 @@ describe("CP1 deterministic Forgot password guidance", () => {
+     "Authentication codes remain private.",
+     "How do I change my password?",
+     "Reset my password now",
+-    "Validate my password reset token"
++    "Validate my password reset token",
++    "Can the password reset page validate my reset token?",
++    "Use the password reset button to submit a reset for me",
++    "Where is the page to validate my password reset token?",
++    "Poate pagina de resetare a parolei să valideze tokenul meu de resetare?",
++    "Unde este pagina pentru validarea tokenului de resetare a parolei?"
+   ])("keeps saved-MFA and ordinary password requests distinct: %s", (text) => {
+     expect(classifySecurityNavigation(text)).toBeNull();
+   });

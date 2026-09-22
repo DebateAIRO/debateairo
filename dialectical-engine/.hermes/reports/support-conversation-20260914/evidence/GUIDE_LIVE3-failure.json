@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE3",
+  "ticket": "t_eaf4b3eb",
+  "revision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "verdict": "FAILED_CAPTURE_MODEL_RESULT_INVALID",
+  "pretraffic": {
+    "rowProof": "GUIDE_ROW_PROOF_ALL_ROWS_PASS",
+    "rows": 54,
+    "harnessSha256": "4768a8b5296ca5838fa6e2588be5cebc537b2613513239e434f0cd60bd7c7c9e"
+  },
+  "capture": {
+    "attempts": 1,
+    "retried": false,
+    "completed": false,
+    "completedRows": [
+      {
+        "sequence": 1,
+        "family": "pricing-placeholder",
+        "mode": "full",
+        "language": "en",
+        "prompt": "Pricing",
+        "branch": "MODEL",
+        "httpStatus": 200,
+        "outcome": "ANSWER_GROUNDED",
+        "sourceIds": [
+          "app-navigation"
+        ],
+        "actionIds": [],
+        "diagnostic": {
+          "status": "ACCEPTED_DRAFT",
+          "candidateCount": 0,
+          "validCount": 0,
+          "invalidCount": 0,
+          "duplicateCount": 0,
+          "unmatchedCount": 0
+        },
+        "origin": "MODEL_ACCEPTED_DRAFT",
+        "apiDomEqual": true
+      },
+      {
+        "sequence": 2,
+        "family": "global-navigation",
+        "mode": "full",
+        "language": "ro",
+        "prompt": "Account",
+        "branch": "MODEL",
+        "httpStatus": 200,
+        "outcome": "ANSWER_GROUNDED",
+        "sourceIds": [
+          "settings-help-menus"
+        ],
+        "actionIds": [],
+        "diagnostic": {
+          "status": "ACCEPTED_DRAFT",
+          "candidateCount": 0,
+          "validCount": 0,
+          "invalidCount": 0,
+          "duplicateCount": 0,
+          "unmatchedCount": 0
+        },
+        "origin": "MODEL_ACCEPTED_DRAFT",
+        "apiDomEqual": true
+      }
+    ],
+    "failed": {
+      "executionIndex": 3,
+      "sequence": 7,
+      "family": "home-library",
+      "mode": "full",
+      "language": "ro",
+      "prompt": "Unde găsesc dezbaterile mele și biblioteca publică?",
+      "branch": "MODEL",
+      "actionPolicy": "ALLOW_CLOSED",
+      "errorCode": "GUIDE_HARNESS_MODEL_RESULT_INVALID",
+      "apiDomEquality": "PASSED_BEFORE_MODEL_VALIDATION",
+      "httpStatus": "UNAVAILABLE_NOT_PERSISTED",
+      "outcome": "UNAVAILABLE_NOT_PERSISTED",
+      "sourceIds": "UNAVAILABLE_NOT_PERSISTED",
+      "actionIds": "UNAVAILABLE_NOT_PERSISTED",
+      "diagnostic": "UNAVAILABLE_NOT_PERSISTED",
+      "responseOrigin": "UNAVAILABLE_NOT_PERSISTED",
+      "causeLimit": "The fixed error proves one compound MODEL result predicate failed after API-DOM equality; it does not identify status, outcome, source membership or product/model root cause."
+    },
+    "networkCounts": {
+      "createSession": 2,
+      "sendMessage": 3,
+      "forbiddenAnswers": 0,
+      "forbiddenConsent": 0
+    },
+    "consoleErrorCount": 5,
+    "consoleErrorCategories": {
+      "HTTP_401": 5,
+      "HTTP_404": 0,
+      "JS_OR_HYDRATION": 0,
+      "OTHER": 0
+    },
+    "navigations": [],
+    "sessionReplacementEvidence": [
+      {
+        "sequence": 2,
+        "before": 1,
+        "after": 2,
+        "selectedLanguage": "ro"
+      }
+    ],
+    "groupSessionEvidence": [
+      {
+        "groupIndex": 0,
+        "groupId": "lifecycle-full-en",
+        "transition": "FRESH_PROFILE",
+        "createdBefore": 0,
+        "createdAfter": 1,
+        "sessionIdentitySha256": "be74af64ad6d3f25d52fbbe00f49206e04d1a4c7ce62ea83edcdc02905abe447",
+        "firstSequence": 1
+      },
+      {
+        "groupIndex": 1,
+        "groupId": "full-ro",
+        "transition": "LANGUAGE_SELECTOR_RESET",
+        "createdBefore": 1,
+        "createdAfter": 2,
+        "sessionIdentitySha256": "4a639cdd4763debab703ea253f4e24f2bdc31a015a7efe799446e93c7f21f7dc",
+        "firstSequence": 2
+      }
+    ],
+    "screenshots": [
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE2-row-01.png",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE2-row-02.png"
+    ]
+  },
+  "trafficAfterFailure": {
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "retries": 0
+  },
+  "preview": {
+    "pid": 65268,
+    "postFailureCustodyPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE3-post-failure-custody.json",
+    "leftRunning": true
+  },
+  "limits": [
+    "Only two completed row responses were persisted.",
+    "The third final public API response was not persisted by the sealed harness and is unavailable without forbidden new traffic or private-log reconstruction.",
+    "No model-vs-fallback attribution is claimed for sequence 7."
+  ]
+}

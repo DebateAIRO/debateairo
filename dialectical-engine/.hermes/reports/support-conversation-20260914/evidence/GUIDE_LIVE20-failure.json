@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE20",
+  "ticket": "t_0e1ba873",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "STOPPED_PRETRAFFIC_WRAPPER_CONTRACT_MISMATCH",
+  "observedAtUtc": "2026-09-21T00:15:10.707992Z",
+  "phaseStatuses": {
+    "preflightChild": "PASS_ZERO_SUPPORT_UI_TRANSITIONS",
+    "preflightWrapper": "FAIL",
+    "readiness": "NOT_RUN",
+    "capacity": "NOT_RUN",
+    "gate": "NOT_RUN",
+    "rowProof": "NOT_RUN",
+    "capture": "NOT_RUN",
+    "idle": "NOT_RUN"
+  },
+  "failure": {
+    "code": "GUIDE_LIVE20_PRIVATE_CONTROL_SHAPE_MISMATCH",
+    "wrapperSource": "phase-preflight.mjs:41",
+    "expectedByWrapper": "privateControls[*].result === PASS",
+    "observedReviewedProducerShape": "privateControls[*].passed === true",
+    "count": 5,
+    "allObservedPassed": true,
+    "preflightOutputWritten": false
+  },
+  "ui": {
+    "completed": true,
+    "verdict": "PASS_ZERO_SUPPORT_UI_TRANSITIONS",
+    "transitions": 5,
+    "actualSupportRequestsForwarded": 0,
+    "guardedAttempts": {
+      "status": 3,
+      "pageCaseListRead": 3,
+      "createSession": 0,
+      "sendMessage": 0,
+      "otherSupport": 0
+    }
+  },
+  "traffic": {
+    "supportRequestsForwarded": 0,
+    "supportSessions": 0,
+    "supportMessages": 0,
+    "capacityReads": 0,
+    "databaseReads": 0,
+    "modelCalls": 0
+  },
+  "separateStaticBlockerReportedByRoot": "BIND20 requires simultaneous session headroom 7 although runtime configured session limit is known as 5; not measured or executed by this node.",
+  "runtime": "Healthy detached Runtime7 PID/PGID12272 left untouched.",
+  "limits": [
+    "No retry or later phase execution.",
+    "No product or harness edit.",
+    "Forgot remains unresolved/actionless."
+  ]
+}

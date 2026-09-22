@@ -1,0 +1,116 @@
+{
+  "at": "2026-09-17T08:07:35.322231+00:00",
+  "node": "FEEDBACK_REV2",
+  "ticket": "t_bce33c23",
+  "revision": "1b23c0b732679fdb665a19e03104b800f9d2ef38",
+  "verdict": "REWORK",
+  "scope": "Separate owner-feedback correction review: identity, branded feature grounding, recovery intent and admitted manifest. Retains unaffected prior evidence.",
+  "receipt": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FEEDBACK_REV2-receipt.json",
+    "sha256": "8325d313d7b6c2df8331216aa40a03213a59a50285e57ab25345cd0f5c44e414"
+  },
+  "report": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/FEEDBACK_REV2.md",
+    "sha256": "1340a72d1ae157730d0f189a3af01a727e95fbb3c7afeda786ae2c813afcc38e"
+  },
+  "artifactsVerified": [
+    {
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/FEEDBACK_REV2.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/FEEDBACK_REV2.md",
+      "sha256": "1340a72d1ae157730d0f189a3af01a727e95fbb3c7afeda786ae2c813afcc38e",
+      "bytes": 6022
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/FEEDBACK_REV2.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FEEDBACK_REV2.md",
+      "sha256": "4b7eff93e990f09b09f53faa21aa184ac522e892613dac1c6fb0a4fe35358fd1",
+      "bytes": 4114
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/FEEDBACK_REV2/feedback-boundary-control.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/FEEDBACK_REV2/feedback-boundary-control.ts",
+      "sha256": "76c7f29556821f174dcc5724673a3b66bc81af4ccf95a99a787de8486e5f2c6a",
+      "bytes": 14224
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/FEEDBACK_REV2/run-feedback-boundary-control.mjs",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/FEEDBACK_REV2/run-feedback-boundary-control.mjs",
+      "sha256": "be22fcdc3f594f805c13d446c20b5e55d29fef5998a5ceee3cceb3a6a2f78d1b",
+      "bytes": 2187
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/FEEDBACK_REV2/verify-inputs.mjs",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/FEEDBACK_REV2/verify-inputs.mjs",
+      "sha256": "51b3ec0cac41885422f4215b0cc2e3869b36a3a064a7ea5a5aa5ffee9c1b1b3a",
+      "bytes": 1363
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/FEEDBACK_REV2-input-verification.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FEEDBACK_REV2-input-verification.log",
+      "sha256": "281af3eb919e2926cd8f29458fc75e9f71750435a885e0b88050faf880e6f37e",
+      "bytes": 180
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/FEEDBACK_REV2-feedback-boundary.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FEEDBACK_REV2-feedback-boundary.log",
+      "sha256": "88dab1e11bbc60d7f4cc04f5d74273386b2dac7faadcf87c9b0af36e8c4ad462",
+      "bytes": 14753
+    }
+  ],
+  "gate": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_FEEDBACK-manifest.json",
+    "sha256": "bd4a3b3bfd50f9573daa0c542c4b66cb2c29413fcd31f86a1ad95590d721bac7",
+    "inputsVerified": 36,
+    "productFilesVerified": 110
+  },
+  "primaryAndDetachedClean": true,
+  "nativeSession": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-10-55-01a09ef8-1b81-7cb1-9a2d-015a5e8346b6.jsonl",
+  "nativeSkillBodyProof": {
+    "using-superpowers": {
+      "nativeTimestamp": "2026-09-14T08:11:03.754Z",
+      "nativeCallId": "call_VBjDrNnrSOLGJDtmEajsopFL",
+      "bodyPhrase": "This is not negotiable. You cannot rationalize your way out of this.",
+      "outputBodySha256": "4dbbba2a1985e33c85a6d33115f1ed446a727bc8d850625458c13c637e4d18d1"
+    },
+    "heartbeat-protocol": {
+      "nativeTimestamp": "2026-09-14T08:11:14.507Z",
+      "nativeCallId": "call_FoN70ApTfriCiXcgiZYSaJ5R",
+      "bodyPhrase": "One role per node: a seat that reviews does not code, and no seat reviews its own work",
+      "outputBodySha256": "3b8189c5dbacbde20d47f8fdae7badb9d8bb2ed6b48a11595a58414e9f10b4c9"
+    },
+    "heartbeat-reviewer": {
+      "nativeTimestamp": "2026-09-14T11:44:20.404Z",
+      "nativeCallId": "call_Qr6PU1jFaauSxnaR9A4yQKSf",
+      "bodyPhrase": "is a finding against the orchestrator's packet, not against the worker who obeyed it",
+      "outputBodySha256": "85fa08e485944eff2a886006d675d88f3976b6ef18f1a55e3b80c46834aa6c5b"
+    },
+    "verification-before-completion": {
+      "nativeTimestamp": "2026-09-14T11:44:20.404Z",
+      "nativeCallId": "call_Qr6PU1jFaauSxnaR9A4yQKSf",
+      "bodyPhrase": "NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE",
+      "outputBodySha256": "85fa08e485944eff2a886006d675d88f3976b6ef18f1a55e3b80c46834aa6c5b"
+    },
+    "systematic-debugging": {
+      "nativeTimestamp": "2026-09-14T14:58:31.519Z",
+      "nativeCallId": "call_13lBsWHdnt4ZggzWyLllSKIO",
+      "bodyPhrase": "Violating the letter of this process is violating the spirit of debugging.",
+      "outputBodySha256": "1ec86b9b8d276fe89dfa0a1f3921bef6f280b856b457365b519754756983d269"
+    },
+    "test-driven-development": {
+      "nativeTimestamp": "2026-09-16T06:36:11.814Z",
+      "nativeCallId": "call_hFCzkMryCVspIvARW8IOxVNH",
+      "bodyPhrase": "If you didn't watch the test fail, you don't know if it tests the right thing.",
+      "outputBodySha256": "d6b09db975f5e719c2789e63a5125dfc88e3f2a30d02e02d873bdcff57a4fd05"
+    }
+  },
+  "retainedSkillProof": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/REV2-p5-consumption.json",
+    "sha256": "f1f333cc441fe67188d1c3ef8f1169f69658a4086d356aaf32b0efc511d71278",
+    "method": "Same separate native reviewer; retained actual BODY reads, not a new-read claim."
+  },
+  "limits": [
+    "Reviewer owns substantive verdict; root verifies custody and recorded evidence.",
+    "Finite synthetic probe, no current preview or arbitrary-prose guarantee.",
+    "Forgot destination unresolved; user alone accepts checkpoint."
+  ]
+}

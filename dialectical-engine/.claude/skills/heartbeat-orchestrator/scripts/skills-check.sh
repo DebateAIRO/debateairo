@@ -16,6 +16,8 @@ phrase(){ case "$1" in
   brainstorming) echo "the ceremony scales with the task";;
   writing-plans) echo "split only where a reviewer could meaningfully";;
   receiving-code-review) echo "RESPOND: Technical acknowledgment or reasoned pushback";;
+  executing-plans) echo "Tell your human partner that Superpowers works";;
+  using-git-worktrees) echo 'If `GIT_DIR != GIT_COMMON` (and not a submodule)';;
   heartbeat-protocol) echo "One role per node: a seat that reviews does not code, and no seat reviews its own work";;
   heartbeat-worker) echo "Check the packet against reality and stop if it is wrong";;
   heartbeat-reviewer) echo "is a finding against the orchestrator's packet, not against the worker who obeyed it";;

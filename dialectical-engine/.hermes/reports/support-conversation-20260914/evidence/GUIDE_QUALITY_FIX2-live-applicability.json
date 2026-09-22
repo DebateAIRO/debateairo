@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "revision": "5d6e028ae5defc24e0690219d6128949e73b750d",
+  "freshRequiredRows": [
+    2,
+    15,
+    19,
+    23,
+    27,
+    31,
+    35,
+    39
+  ],
+  "reason": "model projections, authority binder, and product overview/account retrieval changed",
+  "currentStaticCarryRows": [
+    1,
+    7,
+    11,
+    41,
+    43,
+    47,
+    51
+  ],
+  "screenshotRows": 15,
+  "screenshotStatus": "REQUIRES_CURRENT_VISUAL_PROOF",
+  "captureContract": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_FIX18/screenshot-evidence.mjs",
+  "runtimeStatus": "NOT_RELOADED; running API may retain old startup-loaded corpus",
+  "actualSupportRequests": 0
+}

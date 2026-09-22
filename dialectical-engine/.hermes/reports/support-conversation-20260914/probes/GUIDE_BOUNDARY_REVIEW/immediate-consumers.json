@@ -1,0 +1,24 @@
+{
+  "revision": "cd4f6d62c64d0abe8df9061ac5869930425beb5e",
+  "objects": [
+    {
+      "path": "apps/api/src/support/answer.ts",
+      "sha256": "16e1eb66a8f72a0bed59c00ab879bcddd54e191de5046baec8610d859ec77c76",
+      "bytes": 22479,
+      "reason": "message-to-model and model-to-storage trust-boundary consumer"
+    },
+    {
+      "path": "packages/support-kb/src/context.ts",
+      "sha256": "05e004ec5365dbb6d11e89d9204ae7f801203d498cf8127a39818ead5e56c05d",
+      "bytes": 12763,
+      "reason": "public-corpus model context builder"
+    },
+    {
+      "path": "packages/support-kb/src/navigation.ts",
+      "sha256": "26e8840761f92bbfea308f7b3c596962d406e6009c4201defbf1afef2eee3879",
+      "bytes": 3412,
+      "reason": "canonical first-party action sink"
+    }
+  ],
+  "method": "git show <revision>:dialectical-engine/<path>; SHA-256 and byte count over exact blob bytes"
+}

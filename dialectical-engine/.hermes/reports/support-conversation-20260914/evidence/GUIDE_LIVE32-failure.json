@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE32",
+  "ticket": "t_b3d74c9a",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "FAILED_PREFLIGHT_SELF_COLLISION_ZERO_TRAFFIC",
+  "observedAtUtc": "2026-09-21T11:17:17.682163Z",
+  "operatorExit": 1,
+  "phaseStatuses": {
+    "preflight": 1,
+    "readiness": "NOT_RUN",
+    "capacity": "NOT_RUN",
+    "gate": "NOT_RUN",
+    "rowProof": "NOT_RUN",
+    "capture": "NOT_RUN",
+    "idle": "NOT_RUN"
+  },
+  "failureCode": "GUIDE_CONTINUATION_FUTURE_PRESENT",
+  "collisionPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE32-prerequisites.json",
+  "cause": "operator writes its prerequisite before preflight; preflight treats every futureAbsence entry including that prerequisite as forbidden",
+  "counts": {
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "statusReads": 0,
+    "databaseQueries": 0,
+    "capacityReads": 0,
+    "sessionsCreated": 0,
+    "messagesSent": 0,
+    "apiReplies": 0,
+    "capturedRows": 0
+  },
+  "outputs": {
+    "prerequisite": true,
+    "stop": true,
+    "uiProof": false,
+    "preflight": false,
+    "capacity": false,
+    "gate": false,
+    "rowProof": false,
+    "capture": false,
+    "actualGuide24": false,
+    "composed31": false
+  },
+  "runtime": {
+    "pid": 9800,
+    "pgid": 9800,
+    "detached": true,
+    "readinessPhaseRun": false
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_FIX27",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "contractPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_FIX27-command-contract.json",
+  "contractSha256": "04512905c4f1b224a5ed1b8249fc0484650ed06ee3519bcec7f90db9ba15bc7a",
+  "runtime": {
+    "pid": 12272,
+    "pgid": 12272,
+    "commandMarker": "pnpm dev:auth:up",
+    "runtimeLogPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE20-stack.log",
+    "detached": true
+  },
+  "connection": {
+    "selectedSourceKey": "SUPPORT_DATABASE_URL",
+    "childEnvironmentKey": "GUIDE_COUNTS_ONLY_DATABASE_URL",
+    "principalRole": "debateai_dev_support",
+    "present": true,
+    "acceptedShape": true,
+    "valueRecorded": false
+  },
+  "futureOutputsCheckedAbsent": 123
+}

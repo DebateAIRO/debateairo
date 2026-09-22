@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX25",
+  "result": "PASS",
+  "contractPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX25-command-contract.json",
+  "contractSha256": "f9c73d53a70f3474d41c6fd094e7a5b0fdd632919e8df35c72df6ab9c4b5ff0e",
+  "actualByteParserProof": true,
+  "phaseCount": 7,
+  "selfBoundPhaseCount": 7,
+  "gateTemplateSha256": "08afa7f933acaa1fa94575fc3f8e0c997fc187c92bc8e851c54ddf7f7b32d9bc",
+  "controlProofSha256": "3381211714ac74e503b9c63afc6645caedbadb3b3259e28b86404c431a085510",
+  "controls": 28,
+  "staleGatedFailure": "GUIDE_ROW_PROOF_MATRIX_COUNT_MISMATCH",
+  "necessaryGateReferenceFailure": "GUIDE_HARNESS_BOUND_RECEIPT_INVALID",
+  "finalGatedRows": 58,
+  "canonicalRows": 54,
+  "ownerRows": 4,
+  "focusedNegativeCases": [
+    "missing",
+    "extra",
+    "duplicate",
+    "mutated-owner-action"
+  ],
+  "traffic": {
+    "browser": false,
+    "sessions": 0,
+    "supportRequests": 0,
+    "modelRequests": 0
+  },
+  "freshOperationalOutputsCheckedAbsent": 20,
+  "actualNamespace": "GUIDE_LIVE_GUIDE21",
+  "provenance": "FRESH_GUIDE21_FIXED31",
+  "runtimeCustody": "GUIDE_RUNTIME7",
+  "ownerCapacityContractSha256": "df5580ba8dd47e354a74aa04b8308d7b626564bd116076b682b1f6d0037d03fc",
+  "retainedScreenshotSha256": "696dc176b7a6e1bbd6f5c8b5714bbf2519c7be7809af5fda8f45ca3f085a0b7c",
+  "captureSha256": "464e4361253c583abbd1ae7016d7db5eb861e62cc97d9fcfa1ec5b08f51ae8d9"
+}

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE24",
+  "ticket": "t_140e22fa",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "STOPPED_ROW_PROOF_MATRIX_COUNT",
+  "model": "gpt-5.6-sol",
+  "session": "01a09f02-346a-7fb0-aa70-0424f1fdd21e",
+  "skills": {
+    "retained": [
+      "superpowers:executing-plans",
+      "superpowers:systematic-debugging",
+      "superpowers:verification-before-completion"
+    ],
+    "reReadThisNode": false
+  },
+  "retained": {
+    "preflight": "PASS_BY_HASH",
+    "readiness": "PASS_BY_HASH",
+    "live23Failure": "PRESERVED"
+  },
+  "phases": {
+    "capacity": "PASS",
+    "gate": "PASS",
+    "rowProof": "FAILED_MATRIX_COUNT",
+    "capture": "NOT_RUN",
+    "idle": "NOT_RUN"
+  },
+  "actual": {
+    "attempted": 0,
+    "completed": 0,
+    "sessions": 0,
+    "modelCalls": 0
+  },
+  "trafficThisNode": {
+    "ordinaryTls": 1,
+    "status": 1,
+    "databaseQueries": 1,
+    "capacityResults": 1,
+    "support": 0,
+    "model": 0
+  },
+  "cumulativeReaderTraffic": {
+    "statusReads": 2,
+    "databaseQueryAttempts": 2,
+    "capacityResults": 1
+  },
+  "heavyLeaseReleased": true,
+  "limits": [
+    "Fresh capacity frame consumed and not reusable.",
+    "No retry or capture.",
+    "Deferred owner capacity remains unexecuted.",
+    "Forgot unresolved/actionless.",
+    "No readiness or acceptance claim."
+  ]
+}

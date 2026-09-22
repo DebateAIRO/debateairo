@@ -1,0 +1,15 @@
+== rules parsed in the S02 block: 44 (top-level 43, in at-rules 1)
+
+== S02-S61 duplicate top-level selectors: (none)
+== S02-S63 animated selectors  : [".policyScrim",".policyBezel"]
+== S02-S63 neutralised selectors: [".policyScrim",".policyBezel"]
+== S02-S63 UNCOVERED           : []
+== S02-S63 selectors with `transition:` (not covered by the rule): []
+
+== S01 block: 372 lines, 50 rules, 33 class tokens
+== S02 block: 404 lines, 44 rules, 34 class tokens
+== SHARED class tokens  : []
+== SHARED full selectors: []
+== S01 class tokens: consentActions consentBar consentBarBezel consentBarCore consentBody consentCard consentCardCore consentCardFooter consentCardTitle consentCatDesc consentCatDetail consentCatHead consentCatList consentCatMain consentCatName consentCatRow consentCopy consentEyebrow consentFooterGap consentGhost consentGhostStrong consentKnob consentLede consentLink consentPrimary consentScrim consentSwitch consentTab consentTag consentTag-analytics consentTag-essential consentTag-quality consentTitle
+== SHARED @keyframes names: []
+== S01 @keyframes: (none)   S02 @keyframes: consentPolicyScrimIn,consentPolicyCardIn

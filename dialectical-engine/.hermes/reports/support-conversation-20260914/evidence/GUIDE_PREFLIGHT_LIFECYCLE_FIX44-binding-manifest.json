@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREFLIGHT_LIFECYCLE_FIX44",
+  "ticket": "t_3ecfe52b",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_PREFLIGHT_LIFECYCLE_BOUND_REVIEW_REQUIRED",
+  "sealedAtUtc": "2026-09-21T11:25:57.903772Z",
+  "finding": "LIVE32_PREFLIGHT_SELF_COLLISION",
+  "proofs": {
+    "lifecycle": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREFLIGHT_LIFECYCLE_FIX44-lifecycle-control-proof.json",
+      "sha256": "af95b8ddcfb1bfc86b69604628b5be07e266127f3e336df9ce06ce22bd2cf46e",
+      "bytes": 682
+    },
+    "final": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREFLIGHT_LIFECYCLE_FIX44-final-control-proof.json",
+      "sha256": "ca59acfa21a74b73e2f2877f893f9b3792ff6320ffb206665f84d344aa5df8b1",
+      "bytes": 684
+    }
+  },
+  "bindings": {
+    "command": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREFLIGHT_LIFECYCLE_FIX44-command-contract.json",
+      "sha256": "477979eaea246301f6b4ee0e4ced54d2b7d63ab3af5c3755deaa4e09bc7c43ac",
+      "bytes": 35398
+    },
+    "operator": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREFLIGHT_LIFECYCLE_FIX44-operator-contract.json",
+      "sha256": "f7ada306a31f9bbc940a0f4bc5b03c69f4437d507a64c6a0d7ef707cca028e7f",
+      "bytes": 22593
+    },
+    "delta": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREFLIGHT_LIFECYCLE_FIX44-delta.json",
+      "sha256": "1e1902d96501eef5b04736a09b5f3d0733ec53d97564c86c962ae20582034a28",
+      "bytes": 930
+    }
+  },
+  "futureAbsenceCount": 115,
+  "freshNamespace": "LIVE33",
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

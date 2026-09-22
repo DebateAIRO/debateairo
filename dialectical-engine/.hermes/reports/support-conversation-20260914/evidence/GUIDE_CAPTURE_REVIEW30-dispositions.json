@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_REVIEW30",
+  "ticket": "t_d7d0b386",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "verdict": "REWORK_BOUNDED_ROW1_PAYMENT_CLAIM",
+  "screenshotVerdict": "PASS_COMPLETE_FULL_ANSWER_CAPTURE_FINAL_BINDING",
+  "dispositions": [
+    {
+      "id": "GCR30-C1",
+      "subject": "actual ancestor expansion",
+      "disposition": "PASS",
+      "evidence": "Helper expands and restores the selected article chain through supportDesk, including full-grid rows, pane and viewport."
+    },
+    {
+      "id": "GCR30-C2",
+      "subject": "complete full-RO painted evidence",
+      "disposition": "PASS",
+      "evidence": "abdeeab4… 760x562 visibly includes target top, complete long answer, footer, source and action with no clipped blank remainder."
+    },
+    {
+      "id": "GCR30-C3",
+      "subject": "discriminating old RED and paint proof",
+      "disposition": "PASS",
+      "evidence": "Old clipped image ignores footer/source/action paint mutation; corrected image hash changes independently for top, footer, source and action."
+    },
+    {
+      "id": "GCR30-C4",
+      "subject": "state restoration",
+      "disposition": "PASS",
+      "evidence": "Exact ancestor inline styles, ancestor/page scroll and viewport restore on success and forced screenshot exception."
+    },
+    {
+      "id": "GCR30-C5",
+      "subject": "retained target and pane safeguards",
+      "disposition": "PASS_RETAINED",
+      "evidence": "Label-to-label identity, assistant index/count, previous/wrong/stale negatives, separate pane top/footer and bounded contained-short rule remain unchanged."
+    },
+    {
+      "id": "GCR30-C6",
+      "subject": "final literal successor binding",
+      "disposition": "PASS",
+      "evidence": "34/34 binding controls; seven exact self paths; fixed31, 93 GUIDE22 screenshots and 123 unique unused future paths retained."
+    },
+    {
+      "id": "GCR30-P1",
+      "subject": "Pricing creation location",
+      "disposition": "SUPPORTED",
+      "evidence": "app-navigation says Start a round/New debate open the debate creator after sign-in."
+    },
+    {
+      "id": "GCR30-R1",
+      "subject": "Pricing payment location",
+      "disposition": "REWORK_UNSUPPORTED_CLAIM",
+      "evidence": "No reviewed app-navigation or creator source says payment happens in the creator; Pricing is explicitly not checkout and budget-tier guidance disclaims proof of payment/checkout."
+    },
+    {
+      "id": "GCR30-L1",
+      "subject": "runtime and readiness",
+      "disposition": "NOT_ESTABLISHED",
+      "evidence": "Static review only; LIVE29/GUIDE22 are unused and current capacity, fresh31, readiness, completion and acceptance remain unproved."
+    },
+    {
+      "id": "GCR30-L2",
+      "subject": "Forgot and CP2",
+      "disposition": "UNRESOLVED_ACTIONLESS",
+      "evidence": "No destination is inferred and no CP2 authorization follows."
+    }
+  ],
+  "hashes": {
+    "screenshotHelper": "824e780a1817c198a6ca6ebc6215948241ecccbb5611617a033e650799ac4b29",
+    "captureScript": "b4ad70890747e38a6a8cf882c3a503896047c45701f9315d34e6ad890be3d598",
+    "operatorScript": "cebb0cb10ff6279d5de3ab18441d98714e37155c4d2ca9fc33ba5b054fc2251e",
+    "commandContract": "e6b6ef591e8574e65af4b3eca2351f58ac67ed0940774a80bcd1aa997c168f0d",
+    "operatorContract": "006190e7f386db5a5698f54b77809676b2fa2a98ef02d11df709f752c235799e",
+    "screenshotControlProof": "ccef4ab584af7695afdfade6d4004a02238c77bd7b84033e39e1ff4c75d11264",
+    "visualInspection": "9a8902fc6b61b1ca6bfe4ef7d26a3bdb5d995ef70606c1085b0ea449ac84cbe2",
+    "bindingProof": "1d2a53f0385233de98f425088c3915f4ea8057c82886289d479dcd5f04059559",
+    "correctedFullLongComplete": "abdeeab4d41d685bf0571d3e6f770e74ded82065120de02dc12e9a46bdc286b6",
+    "appNavigationArticle": "a92e96c24c3df6d7a9b3e73a3fafde79321cd7445612588024ea205fb5c6e6db",
+    "gettingStartedArticle": "a438b7c7a91342dee7c5edb2efe48e586be2cc33d9a2eafabaadad2882f6f9e8",
+    "budgetTierArticle": "a49d563ef7bfec75ed179a70adb54c25947aa9cbe4db557698eacc84d1d3c683",
+    "fix30Receipt": "eb7851ecdc7cf1f880750dabc85ff48a451fcb839123d4e1cac21e44de237850",
+    "fix30Consumption": "3d8f126a0936b3f8b7cd8f6d3e86589b5cb7652cb269c632184320e802abffa0"
+  },
+  "counts": {
+    "fixtureCases": 4,
+    "targetNegatives": 12,
+    "paintMutations": 4,
+    "bindingPassed": 34,
+    "bindingTotal": 34,
+    "commandPhases": 7,
+    "fixedPlanRows": 31,
+    "futureScreenshotPaths": 93,
+    "futurePaths": 123,
+    "manifestVerified": 39,
+    "manifestTotal": 39,
+    "receiptArtifactsVerified": 40,
+    "receiptArtifactsTotal": 40,
+    "inputsVerified": 160,
+    "inputsTotal": 160,
+    "remainingScreenshotFindings": 0,
+    "remainingProductFindings": 1
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

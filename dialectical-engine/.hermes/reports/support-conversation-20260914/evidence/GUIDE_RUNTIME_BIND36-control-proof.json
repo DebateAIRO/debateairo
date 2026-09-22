@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_RUNTIME_BIND36",
+  "ticket": "t_b048e75f",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_RUNTIME_SCHEMA_BOUND_REVIEW_REQUIRED",
+  "controls": 18,
+  "passed": 18,
+  "names": [
+    "old readiness RED rejects current Runtime9 custody before operational I/O",
+    "corrected readiness accepts authenticated Runtime9 fixture",
+    "predecessor identity rejects before operational I/O",
+    "wrong API port rejects before operational I/O",
+    "invalid custody schema hash rejects before operational I/O",
+    "missing custody key rejects before operational I/O",
+    "extra custody key rejects before operational I/O",
+    "invalid PID rejects before operational I/O",
+    "real idle consumes corrected readiness output shape",
+    "final seven-phase runtime dependency inventory has no predecessor marker",
+    "final readiness command selects corrected source",
+    "all seven argv self-bind final command",
+    "fresh LIVE30 paths retain actualGUIDE22 and owner contract",
+    "exact31 plan retained",
+    "screenshot helper remains byte-identical",
+    "123 fresh future paths unique and absent",
+    "stale final operator hash rejects before first-phase boundary",
+    "actual final operator hash reaches controlled first-phase boundary"
+  ],
+  "readinessControlledIo": {
+    "oldRedStatus": 1,
+    "currentStatus": 0,
+    "negativeCases": 6,
+    "idleStatus": 0,
+    "realRuntimeOrHttpCalls": 0
+  },
+  "operatorGuard": {
+    "staleStatus": 1,
+    "matchingStatus": 1,
+    "matchingReachedBoundary": true
+  },
+  "hashes": {
+    "commandContract": "30da55750cd96c3323234f988a07cf2961025db7ebe486176bd79858897e46e4",
+    "operatorScript": "293c8a65f70871b4be9cce21f13ca7a2aa522b1afc7c8c19a23d9ea91bce678a",
+    "runtimeCustodyContract": "9094ce7d0c9543914bf61cd2d0a28a1965c338771acac0b70f04a9d6d00a25eb",
+    "screenshotHelper": "824e780a1817c198a6ca6ebc6215948241ecccbb5611617a033e650799ac4b29"
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "futurePaths": {
+    "count": 123,
+    "allAbsent": true
+  }
+}

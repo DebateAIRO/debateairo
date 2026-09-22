@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE37",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "ZERO_TRAFFIC_STATIC_CONTRACT_COMPATIBILITY_SCOPE",
+  "failure": {
+    "phase": "preflight",
+    "status": 1,
+    "code": "GUIDE_CONTINUATION_COMPOSITION_CONTRACT_INVALID",
+    "actualEntrypoint": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_UI_WRITER_FIX45/phase-preflight.mjs",
+    "predecessorValidator": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_UI_WRITER_FIX45/composition.mjs",
+    "oldAssumptions": {
+      "compositionSchemaVersion": 1,
+      "retainedRows": 10,
+      "remainingRows": 21
+    },
+    "requiredAssumptions": {
+      "compositionSchemaVersion": 2,
+      "retainedRows": 11,
+      "remainingRows": 20,
+      "actualSegments": 3,
+      "sessionTimes": 6
+    }
+  },
+  "changedContractConsumers": [
+    {
+      "phase": "preflight",
+      "status": "BROKEN",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_UI_WRITER_FIX45/phase-preflight.mjs",
+      "anchors": [7, 13, 19],
+      "reason": "Imports predecessor schema1 validator and serializes retained10/remaining21."
+    },
+    {
+      "phase": "capacity",
+      "status": "BOUND_OFFLINE_PASS",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_PANE_FIX48/phase-capacity.mjs",
+      "reason": "Uses FIX48 runtime-capacity requirements 3 sessions, 26 messages, 23 daily calls."
+    },
+    {
+      "phase": "rowProof",
+      "status": "BOUND_OFFLINE_PASS",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_PANE_FIX48/replay-row-proofs.mjs",
+      "reason": "Uses canonical58 matrix and FIX48 verifier with actual remaining20 model count17."
+    },
+    {
+      "phase": "capture",
+      "status": "BOUND_OFFLINE_PASS",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_PANE_FIX48/capture-public-guide.mjs",
+      "anchors": [19, 28, 29, 489, 500],
+      "reason": "Uses remaining20 matrix and FIX48 schema2 composer; writes LIVE37 composed31 only after exact20 completion."
+    },
+    {
+      "phase": "composition",
+      "status": "BOUND_OFFLINE_PASS",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_PANE_FIX48/composition.mjs",
+      "anchors": [6, 20, 27],
+      "reason": "Requires retained11 plus remaining20, three segments, six times, and distinct non-actual replay evidence."
+    }
+  ],
+  "unchangedGenericPhases": [
+    "readiness",
+    "gate",
+    "idle",
+    "rowProof wrapper",
+    "capture wrapper"
+  ],
+  "nextBoundedProof": "Execute the real corrected preflight entrypoint against the final FIX48 command/composition contract through the UI-child boundary with all dynamic requests intercepted; assert schema2, retained11, remaining20, and preserve exact lifecycle ownership.",
+  "traffic": {
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

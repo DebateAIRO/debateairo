@@ -1,0 +1,11 @@
+# GUIDE_CAPTURE_ACTIVATION_FIX47
+
+Verdict: `PASS_CAPTURE_ACTIVATION_BOUND_REVIEW_REQUIRED`.
+
+The LIVE35 zero-request failure was caused by capture ordering: compact activation ran while the visible cookie-consent surface still owned the interaction boundary, and consent was settled only after READY. Product code was unchanged.
+
+The successor capture imports `runGuideCaptureOpenMode`. For compact mode it now navigates and hydrates, records the existing precondition, settles visible consent through the exposed **Essential only** control immediately inside the activation callback, and then clicks the compact toggle. Full mode, locale selection, same-session Help navigation, screenshot/restoration, readiness, and private-control assertions retain their prior behavior.
+
+The real compiled public UI control executed that same shared function three times with all Support/status/auth/private/external requests intercepted before navigation. The legacy order reproduced `GUIDE_HARNESS_COMPACT_STATE_TRANSITION_ABSENT`; the corrected visible-cookie and already-settled cases both reached READY/composer. The already-settled case proves `cookieRegionVisible=HIDDEN` at its `BEFORE_INTERACTION` observation after using the exposed consent control during hydration. No actual Support request or dynamic request was forwarded. The first corrected draft attempted settlement before navigation and failed; it was superseded by the source-conclusive activation-callback placement. A first qualification mislabeled a remounted visible banner as already settled; that artifact and receipt are retained with `superseded-prequalification` names, and the corrected qualification was rerun with the hidden entry-state assertion.
+
+The final LIVE36 contract uses the fresh actual `GUIDE_LIVE_GUIDE25` namespace and `GUIDE_LIVE36-composed31-manifest.json`, retains the unused `GUIDE_LIVE21-owner-capacity.json` and `GUIDE_LIVE25-owner-testability.json` paths, binds seven phase self paths, and records a 32-file reachable closure including the shared activation helper. All 115 operational future paths remained absent. No live capture, status/capacity/DB read, Support/model request, startup, restart, product test, or Git operation occurred.

@@ -1,0 +1,25 @@
+# PACKET GUIDE_HARNESS_FIX9 — response-read parse classification
+
+Read FIRST this packet then /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md. Resume original Sol /root/preview, retained actual BODY skills plus receiving-code-review/systematic-debugging/verification-before-completion. Read assigned ticket/comments before claim; no subdelegation.
+
+## 1. Node
+- seat: GUIDE_HARNESS_FIX9; ticket: t_6fce3fbf; model: gpt-5.6-sol; rework rounds: max 3 under owner continuation.
+- cwd: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine; exact clean product: 0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13; inputs: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX9-inputs.json.
+- self-report: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_FIX9.md (new).
+
+## 2. Contract
+- allowed: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX9/ (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_FIX9/ (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX9.md (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX9- (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_FIX9- (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_FIX9.md (new).
+- forbidden: product/source/KB/Git/index changes, predecessor mutation, matrix/source-policy/navigation changes, runtime/browser/HTTP/status/capacity/DB/Support/model/lifecycle work, private records or raw model drafts, limit/counter changes, owner questions/acceptance.
+- verification: sole heavy on dispatch; one bounded final inert/adapter-negative/syntax frame. No product suite or extra live sample. Preserve failures; release before packaging.
+
+## 3. Work
+Fix only the exact sealed GUIDE_HARNESS_REVIEW8 response-read parse classification finding. Copy FIX8 and ROW_PROOF_FIX8 into FIX9 namespaces. Preserve JSON parse failure as a non-object sentinel before the shared staged consumer, so it records fixed body INVALID and GUIDE_HARNESS_API_BODY_INVALID rather than replacing the failed parse with an empty object and misclassifying it as outcome invalid. Add an inert control exercising the actual response-read boundary, including throwing JSON parse and legitimate parsed body behavior. Do not merely test the downstream projector with a handcrafted null if actual capture still substitutes an object. Preserve safe API_RECEIVED checkpoint and numeric status without retaining raw response or exception data.
+
+Reproduce RED before the minimal correction, then one affected final inert/adapter-negative/syntax frame. All111 prior control purposes remain. Retain branch-aware deterministic omission normalization, strict MODEL/present-malformed arrays, privacy, diagnostic schemas, staged accounting and closed predicate codes. Do not rerun settled product suites or add wider schema redesign. All54 matrix bytes, pre-request verifier, source policy, session/pacing/navigation behavior and existing producer contracts remain FIX8-identical. Preserve full ordered-eight digest and adapter pre-import/constructor integrity; bind schema2 proof to exact final0b9320ea and unchanged44KB. New proof uses GUIDE_HARNESS_FIX9-control-proof.json; new future actual outputs GUIDE_LIVE_GUIDE9-actual-receipt.json and GUIDE_LIVE_GUIDE9-row-01..54.png, with absent FIX9 browser-profile. Old GUIDE7 partial failures and inert predecessor outputs remain immutable.
+
+This is harness-only and inert. No lifecycle, HTTP, status, capacity, DB, browser, Support or model request. Separately restored runtime from RUNTIME5 must remain untouched. Return exact delta, named control retention/additions, RED/GREEN and full digests. A separate bounded reviewer follows; the original lost LIVE3/LIVE4 causes stay unknown.
+
+## 4. Handoff
+Self-report question verbatim:
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
+Return SKILLS LOADED, ticket/session/revision/verdict, resolved exact finding, retained dispositions, receipt/artifact absolute paths/sha256/bytes excluding receipt itself. No self-close or CP1 readiness/acceptance. Forgot unresolved/actionless and CP2 gated.

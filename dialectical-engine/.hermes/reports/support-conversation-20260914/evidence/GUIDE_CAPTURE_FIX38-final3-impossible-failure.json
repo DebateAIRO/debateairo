@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "sequence": 23,
+  "failureCode": "GUIDE_CAPTURE_ORIGINAL_PANE_FOOTER_UNREACHABLE",
+  "phase": "ORIGINAL_PANE_SCREENSHOT",
+  "identity": {
+    "sequence": 23,
+    "promptSha256": "aa12d7a055f9a9b38e1cd869469eef20967ede8f875f8d9de9ff19e5ec7ac0f6",
+    "mode": "full",
+    "language": "ro",
+    "apiTextSha256": "09578cfee38f29591f0e3668a3fc12488fde9f791de71a7dfc170b2bfd01a082",
+    "sources": [
+      "export-json",
+      "guide-how-it-works"
+    ],
+    "actions": [],
+    "targetAssistantIndex": 0
+  },
+  "geometry": {
+    "before": {
+      "target": {
+        "top": 267.5185241699219,
+        "left": 413,
+        "right": 884.109375,
+        "bottom": 434.2528991699219,
+        "x": 413,
+        "y": 267.5185241699219,
+        "width": 471.109375,
+        "height": 166.734375
+      },
+      "pane": {
+        "top": 154,
+        "left": 389,
+        "right": 1041,
+        "bottom": 897,
+        "x": 389,
+        "y": 154,
+        "width": 652,
+        "height": 743
+      },
+      "footer": {
+        "top": 159.51852416992188,
+        "left": 843,
+        "right": 1143,
+        "bottom": 207.29977416992188,
+        "x": 843,
+        "y": 159.51852416992188,
+        "width": 300,
+        "height": 47.78125
+      },
+      "footerPainted": true,
+      "paneScrollTop": 0,
+      "paneScrollHeight": 743,
+      "paneClientHeight": 743
+    },
+    "top": {
+      "target": {
+        "top": 267.5185241699219,
+        "left": 413,
+        "right": 884.109375,
+        "bottom": 434.2528991699219,
+        "x": 413,
+        "y": 267.5185241699219,
+        "width": 471.109375,
+        "height": 166.734375
+      },
+      "pane": {
+        "top": 154,
+        "left": 389,
+        "right": 1041,
+        "bottom": 897,
+        "x": 389,
+        "y": 154,
+        "width": 652,
+        "height": 743
+      },
+      "top": {
+        "top": 267.5185241699219,
+        "left": 413,
+        "right": 884.109375,
+        "bottom": 434.2528991699219,
+        "x": 413,
+        "y": 267.5185241699219,
+        "width": 471.109375,
+        "height": 166.734375
+      },
+      "footer": {
+        "top": 159.51852416992188,
+        "left": 843,
+        "right": 1143,
+        "bottom": 207.29977416992188,
+        "x": 843,
+        "y": 159.51852416992188,
+        "width": 300,
+        "height": 47.78125
+      },
+      "footerPainted": true,
+      "paneScrollTop": 0,
+      "paneScrollHeight": 743,
+      "paneClientHeight": 743
+    },
+    "preFooter": {
+      "target": {
+        "top": 261.8125,
+        "left": 413,
+        "right": 884.109375,
+        "bottom": 428.546875,
+        "x": 413,
+        "y": 261.8125,
+        "width": 471.109375,
+        "height": 166.734375
+      },
+      "pane": {
+        "top": 154,
+        "left": 389,
+        "right": 1041,
+        "bottom": 897,
+        "x": 389,
+        "y": 154,
+        "width": 652,
+        "height": 743
+      },
+      "footer": {
+        "top": 153.8125,
+        "left": 843,
+        "right": 1143,
+        "bottom": 201.59375,
+        "x": 843,
+        "y": 153.8125,
+        "width": 300,
+        "height": 47.78125
+      },
+      "footerPainted": true,
+      "paneScrollTop": 0,
+      "paneScrollHeight": 743,
+      "paneClientHeight": 743
+    },
+    "postFooter": {
+      "target": {
+        "top": 261.8125,
+        "left": 413,
+        "right": 884.109375,
+        "bottom": 428.546875,
+        "x": 413,
+        "y": 261.8125,
+        "width": 471.109375,
+        "height": 166.734375
+      },
+      "pane": {
+        "top": 154,
+        "left": 389,
+        "right": 1041,
+        "bottom": 897,
+        "x": 389,
+        "y": 154,
+        "width": 652,
+        "height": 743
+      },
+      "footer": {
+        "top": 153.8125,
+        "left": 843,
+        "right": 1143,
+        "bottom": 201.59375,
+        "x": 843,
+        "y": 153.8125,
+        "width": 300,
+        "height": 47.78125
+      },
+      "footerPainted": true,
+      "paneScrollTop": 0,
+      "paneScrollHeight": 743,
+      "paneClientHeight": 743
+    }
+  },
+  "scrollAssignment": {
+    "action": "UNREACHABLE_NO_FORWARD_SCROLL",
+    "alreadyContained": false,
+    "priorScrollTop": 0,
+    "requestedDelta": 0,
+    "requestedScrollTop": 0,
+    "assignedScrollTop": 0,
+    "maximumScrollTop": 0,
+    "belowOverflow": 0,
+    "aboveOverflow": 0.1875
+  },
+  "restoration": {
+    "paneScrollTopRestored": true,
+    "viewportRestored": true,
+    "observedPaneScrollTop": 0,
+    "observedViewport": {
+      "width": 1440,
+      "height": 1000
+    }
+  },
+  "artifacts": {
+    "topPaneScreenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_FIX38-final3-impossible-original-pane-top.png",
+    "footerPaneScreenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_FIX38-final3-impossible-original-pane-footer.png",
+    "screenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_FIX38-final3-impossible-complete-expanded.png",
+    "topPaneCreated": true,
+    "footerPaneCreated": false,
+    "completeExpandedCreated": false
+  }
+}

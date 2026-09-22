@@ -1,0 +1,279 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_ACTIVATION_FIX47",
+  "cases": [
+    {
+      "name": "legacy-visible-cookie",
+      "ordering": "LEGACY_COOKIE_AFTER_READY",
+      "preSettle": false,
+      "stages": [],
+      "observations": [
+        {
+          "surface": "compact",
+          "language": "en",
+          "phase": "BEFORE_INTERACTION",
+          "hydrationReady": "READY",
+          "toggleCount": 1,
+          "toggleVisible": "VISIBLE",
+          "widgetState": "COLLAPSED",
+          "ariaExpanded": "FALSE",
+          "panelCount": 0,
+          "panelVisible": "HIDDEN",
+          "compactRootCount": 0,
+          "compactRootVisible": "HIDDEN",
+          "composerCount": 0,
+          "composerVisible": "HIDDEN",
+          "urlClass": "BASE",
+          "cookieRegionVisible": "VISIBLE",
+          "consoleErrorCategories": {
+            "HTTP_401": 0,
+            "HTTP_404": 0,
+            "JS_OR_HYDRATION": 0,
+            "OTHER": 0
+          },
+          "fullReadiness": null
+        },
+        {
+          "surface": "compact",
+          "language": "en",
+          "phase": "FAILED",
+          "hydrationReady": "READY",
+          "toggleCount": 1,
+          "toggleVisible": "VISIBLE",
+          "widgetState": "COLLAPSED",
+          "ariaExpanded": "FALSE",
+          "panelCount": 0,
+          "panelVisible": "HIDDEN",
+          "compactRootCount": 0,
+          "compactRootVisible": "HIDDEN",
+          "composerCount": 0,
+          "composerVisible": "HIDDEN",
+          "urlClass": "BASE",
+          "cookieRegionVisible": "VISIBLE",
+          "consoleErrorCategories": {
+            "HTTP_401": 0,
+            "HTTP_404": 0,
+            "JS_OR_HYDRATION": 0,
+            "OTHER": 0
+          },
+          "fullReadiness": null
+        }
+      ],
+      "failureCode": "GUIDE_HARNESS_COMPACT_STATE_TRANSITION_ABSENT",
+      "ready": false
+    },
+    {
+      "name": "corrected-visible-cookie",
+      "ordering": "COOKIE_BEFORE_COMPACT_ACTIVATION",
+      "preSettle": false,
+      "stages": [
+        {
+          "stage": "COOKIE_SETTLING",
+          "state": "ENTERED"
+        },
+        {
+          "stage": "COOKIE_SETTLING",
+          "state": "PASSED"
+        },
+        {
+          "stage": "LOCALE_SELECTION",
+          "state": "ENTERED"
+        },
+        {
+          "stage": "LOCALE_SELECTION",
+          "state": "PASSED"
+        }
+      ],
+      "observations": [
+        {
+          "surface": "compact",
+          "language": "en",
+          "phase": "BEFORE_INTERACTION",
+          "hydrationReady": "READY",
+          "toggleCount": 1,
+          "toggleVisible": "VISIBLE",
+          "widgetState": "COLLAPSED",
+          "ariaExpanded": "FALSE",
+          "panelCount": 0,
+          "panelVisible": "HIDDEN",
+          "compactRootCount": 0,
+          "compactRootVisible": "HIDDEN",
+          "composerCount": 0,
+          "composerVisible": "HIDDEN",
+          "urlClass": "BASE",
+          "cookieRegionVisible": "VISIBLE",
+          "consoleErrorCategories": {
+            "HTTP_401": 0,
+            "HTTP_404": 0,
+            "JS_OR_HYDRATION": 0,
+            "OTHER": 0
+          },
+          "fullReadiness": null
+        },
+        {
+          "surface": "compact",
+          "language": "en",
+          "phase": "AFTER_INTERACTION",
+          "hydrationReady": "READY",
+          "toggleCount": 1,
+          "toggleVisible": "VISIBLE",
+          "widgetState": "EXPANDED",
+          "ariaExpanded": "TRUE",
+          "panelCount": 1,
+          "panelVisible": "VISIBLE",
+          "compactRootCount": 1,
+          "compactRootVisible": "VISIBLE",
+          "composerCount": 1,
+          "composerVisible": "VISIBLE",
+          "urlClass": "BASE",
+          "cookieRegionVisible": "HIDDEN",
+          "consoleErrorCategories": {
+            "HTTP_401": 0,
+            "HTTP_404": 0,
+            "JS_OR_HYDRATION": 0,
+            "OTHER": 0
+          },
+          "fullReadiness": null
+        },
+        {
+          "surface": "compact",
+          "language": "en",
+          "phase": "READY",
+          "hydrationReady": "READY",
+          "toggleCount": 1,
+          "toggleVisible": "VISIBLE",
+          "widgetState": "EXPANDED",
+          "ariaExpanded": "TRUE",
+          "panelCount": 1,
+          "panelVisible": "VISIBLE",
+          "compactRootCount": 1,
+          "compactRootVisible": "VISIBLE",
+          "composerCount": 1,
+          "composerVisible": "VISIBLE",
+          "urlClass": "BASE",
+          "cookieRegionVisible": "HIDDEN",
+          "consoleErrorCategories": {
+            "HTTP_401": 0,
+            "HTTP_404": 0,
+            "JS_OR_HYDRATION": 0,
+            "OTHER": 0
+          },
+          "fullReadiness": null
+        }
+      ],
+      "failureCode": null,
+      "ready": true
+    },
+    {
+      "name": "corrected-already-settled",
+      "ordering": "COOKIE_BEFORE_COMPACT_ACTIVATION",
+      "preSettle": true,
+      "stages": [
+        {
+          "stage": "COOKIE_SETTLING",
+          "state": "ENTERED"
+        },
+        {
+          "stage": "COOKIE_SETTLING",
+          "state": "PASSED"
+        },
+        {
+          "stage": "LOCALE_SELECTION",
+          "state": "ENTERED"
+        },
+        {
+          "stage": "LOCALE_SELECTION",
+          "state": "PASSED"
+        }
+      ],
+      "observations": [
+        {
+          "surface": "compact",
+          "language": "en",
+          "phase": "BEFORE_INTERACTION",
+          "hydrationReady": "READY",
+          "toggleCount": 1,
+          "toggleVisible": "VISIBLE",
+          "widgetState": "COLLAPSED",
+          "ariaExpanded": "FALSE",
+          "panelCount": 0,
+          "panelVisible": "HIDDEN",
+          "compactRootCount": 0,
+          "compactRootVisible": "HIDDEN",
+          "composerCount": 0,
+          "composerVisible": "HIDDEN",
+          "urlClass": "BASE",
+          "cookieRegionVisible": "HIDDEN",
+          "consoleErrorCategories": {
+            "HTTP_401": 0,
+            "HTTP_404": 0,
+            "JS_OR_HYDRATION": 0,
+            "OTHER": 0
+          },
+          "fullReadiness": null
+        },
+        {
+          "surface": "compact",
+          "language": "en",
+          "phase": "AFTER_INTERACTION",
+          "hydrationReady": "READY",
+          "toggleCount": 1,
+          "toggleVisible": "VISIBLE",
+          "widgetState": "EXPANDED",
+          "ariaExpanded": "TRUE",
+          "panelCount": 1,
+          "panelVisible": "VISIBLE",
+          "compactRootCount": 1,
+          "compactRootVisible": "VISIBLE",
+          "composerCount": 1,
+          "composerVisible": "VISIBLE",
+          "urlClass": "BASE",
+          "cookieRegionVisible": "HIDDEN",
+          "consoleErrorCategories": {
+            "HTTP_401": 0,
+            "HTTP_404": 0,
+            "JS_OR_HYDRATION": 0,
+            "OTHER": 0
+          },
+          "fullReadiness": null
+        },
+        {
+          "surface": "compact",
+          "language": "en",
+          "phase": "READY",
+          "hydrationReady": "READY",
+          "toggleCount": 1,
+          "toggleVisible": "VISIBLE",
+          "widgetState": "EXPANDED",
+          "ariaExpanded": "TRUE",
+          "panelCount": 1,
+          "panelVisible": "VISIBLE",
+          "compactRootCount": 1,
+          "compactRootVisible": "VISIBLE",
+          "composerCount": 1,
+          "composerVisible": "VISIBLE",
+          "urlClass": "BASE",
+          "cookieRegionVisible": "HIDDEN",
+          "consoleErrorCategories": {
+            "HTTP_401": 0,
+            "HTTP_404": 0,
+            "JS_OR_HYDRATION": 0,
+            "OTHER": 0
+          },
+          "fullReadiness": null
+        }
+      ],
+      "failureCode": null,
+      "ready": true
+    }
+  ],
+  "network": {
+    "support": 0,
+    "status": 0,
+    "auth": 4,
+    "privateOrOtherApi": 0,
+    "external": 0,
+    "forwardedDynamic": 0
+  },
+  "actualSupportRequests": 0
+}

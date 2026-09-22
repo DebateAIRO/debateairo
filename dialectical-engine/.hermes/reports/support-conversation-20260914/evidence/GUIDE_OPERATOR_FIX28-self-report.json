@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_FIX28",
+  "ticket": "t_7c6e8882",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "PASS_OPERATOR_COMPLETE_ABSENCE_SET",
+  "skillsLoaded": [
+    "retained mission BODY/floor instructions; no new skill read in this bounded node"
+  ],
+  "focusedControls": {
+    "passed": 20,
+    "total": 20
+  },
+  "bindingControls": {
+    "passed": 30,
+    "total": 30
+  },
+  "futureAbsence": {
+    "count": 123,
+    "uniqueCount": 123
+  },
+  "retainedCommandContractSha256": "04512905c4f1b224a5ed1b8249fc0484650ed06ee3519bcec7f90db9ba15bc7a",
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "limitations": [
+    "operational phases not executed",
+    "preview readiness and acceptance not claimed",
+    "Forgot password remains unresolved/actionless"
+  ],
+  "heavyLeaseReleased": true
+}

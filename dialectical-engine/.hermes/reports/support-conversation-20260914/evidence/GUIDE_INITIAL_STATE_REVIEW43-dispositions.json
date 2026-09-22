@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_INITIAL_STATE_REVIEW43",
+  "ticket": "t_6ef0c57d",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_FINAL_INITIAL_STATE_BINDING",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "dispositions": [
+    {
+      "id": "GIR43-D1",
+      "scope": "GCR42-R1 shared actual initial state",
+      "verdict": "PASS",
+      "basis": "Actual capture and all completion controls consume createCaptureCompletionState(); clean sentinel is null without a fixture-only patch."
+    },
+    {
+      "id": "GIR43-D2",
+      "scope": "completion predicate and call ordering",
+      "verdict": "PASS",
+      "basis": "Non-null failure and exact-three timestamps validate before completed=true and checkpoint; actual call precedes composition."
+    },
+    {
+      "id": "GIR43-D3",
+      "scope": "positive and negative controls",
+      "verdict": "PASS",
+      "basis": "Valid three-session state writes one checkpoint; missing, extra, malformed, unordered, and failure states remain incomplete with zero checkpoints."
+    },
+    {
+      "id": "GIR43-D4",
+      "scope": "directly affected final binding",
+      "verdict": "PASS",
+      "basis": "Seven argv, command/operator hashes, corrected capture child and 115 unique absent future paths are bound."
+    },
+    {
+      "id": "GIR43-D5",
+      "scope": "unchanged REVIEW42/41/40 dispositions",
+      "verdict": "RETAIN_PASS",
+      "basis": "Unchanged bytes and contracts remain outside this bounded recheck."
+    }
+  ],
+  "limits": [
+    "No actual remaining21 execution or fresh-capacity claim.",
+    "No owner-availability, composed31-quality, Forgot, CP1 acceptance, or CP2 claim."
+  ]
+}

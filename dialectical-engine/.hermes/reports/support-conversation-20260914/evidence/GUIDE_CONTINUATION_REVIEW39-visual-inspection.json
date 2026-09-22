@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CONTINUATION_REVIEW39",
+  "sequence": 47,
+  "method": "independent visual inspection of saved immutable PNG plus exact API/DOM and diagnostic geometry",
+  "artifact": {
+    "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE23-row-47-original-pane-top.png",
+    "sha256": "15c7ba475af8d3b6eaad7c183ce1ecc29726f8c1cb0bcf6ea88dc2b818c6dffd",
+    "bytes": 101773,
+    "width": 652,
+    "height": 700
+  },
+  "observations": [
+    "The complete current Romanian credential-operation refusal is visibly painted in the current assistant article.",
+    "The full two-line response is visible without clipping.",
+    "No row47 source or action control is present, matching the empty expectation, API and DOM arrays.",
+    "Surrounding prior replies and chips are visible but are not attributed to row47."
+  ],
+  "geometry": {
+    "target": {"top": 711.361572265625, "bottom": 786.142822265625, "height": 74.78125},
+    "pane": {"top": 154, "bottom": 854, "height": 700},
+    "strictlyContained": true
+  },
+  "disposition": "PASS_COMPLETE_SHORT_FOOTERLESS_SCREENSHOT_NO_RECAPTURE",
+  "qualification": "LIVE31 remains a failed capture attempt; footer and expanded images are absent and are not invented."
+}

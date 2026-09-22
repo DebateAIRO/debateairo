@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX25",
+  "fixtureOnly": true,
+  "operationalUseForbidden": true,
+  "runtimeAvailabilityClaimed": false,
+  "copiedCapacitySource": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-capacity.json",
+  "substitutions": [
+    "measuredAtUtc"
+  ],
+  "capacityPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX25-inert-capacity-fixture.json",
+  "capacitySha256": "4df895c4a87b0d0c7ad93a6eaef719241d47331f82b265fccd97bdd7dc701287",
+  "gatePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX25-inert-gate-fixture.json",
+  "gateSha256": "6162e86d6d86443a3d4e6cb5f8ec8fc5719c971d5eb8298e11fa715425a898ca"
+}

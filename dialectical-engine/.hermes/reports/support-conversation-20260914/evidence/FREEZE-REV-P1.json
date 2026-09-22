@@ -1,0 +1,99 @@
+{
+  "at": "2026-09-14T16:53:27.556857+00:00",
+  "ref": "refs/heads/codex/support-conversation-mission",
+  "commit": "0aa00488d326ba7054eeaa9b32e86e56ae0a14d9",
+  "tree": "087eb1f9ce993a627e56c836358c5d0845d6d4f7",
+  "parent": "de7138ffddff8109003d8b4617c509cae5fd8dd2",
+  "files": [
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/board-ids.json",
+      "sha256": "4e43ed40894b4b05104741da654b4cc7fdfaccafef82054c8129f4e46b8475eb"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PROGRESS.md",
+      "sha256": "6a406daa16ce867b59ebe2264d862e12874221c0a5251c0e665e08191533a723"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/tooling/sync-state.py",
+      "sha256": "0c6f40d2ce2bde2e206b59406a6ed3f19fc741ee1496059a4fcc552861d9f104"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV-CP1-p1-UNION.md",
+      "sha256": "b3ddf9b92daf517c851472842feffb6a543056d86e96e70808d64e84de070349"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/CP1-R14-ALIASES.md",
+      "sha256": "6110e1b51b8aea6ca671409b74dc4421ee336a8d7e872edd29e2c55e9a8da5e9"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/LEDGER.md",
+      "sha256": "966f9c351d28d31a198cf9653c0bfee6cf76811fee9b547f313c55569d8fe8d8"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/ASTRA.md",
+      "sha256": "a87c10cff6c64a376bd956da3dc88e758b661d431fc4a40402ad2f86b0db2992"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md",
+      "sha256": "34a1d2f4ae0567ff80411b7b665a19309587113f36bf23cd4fe584ab4c14a683"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/FIX_P1.md",
+      "sha256": "ce9f44d59e18fc47aaf21c3b2deb26226cc8c9af298bdc39e4e6a1383c37507a"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV1-p1.md",
+      "sha256": "e9f3e31c1f1fbae4b32209ea34152675b964a047e913f6ae8f91ab2a1bae4e0f"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV2-p1.md",
+      "sha256": "d8973d38dd7cdd5014197c2e70316023ff95d1a700939a84cd8ed3b7615021f5"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV3-p1.md",
+      "sha256": "52ca1fe4c456b2b5cf534ad86a551a2252a1dcb076fb32451126f6f13d70970e"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/REV1.md",
+      "sha256": "9a50ba831ac56948718ad88902db80ea82b2b38e6534061d8bb66131741fc2a9"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/REV2.md",
+      "sha256": "54ece4138c77a624f640ccfa72b09d742b316a6c84e7bfbb76981ea1f4b35bf5"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/REV3.md",
+      "sha256": "228dc61b6073f1dd27ea6dd822d95b63d60cf0b1edd6229fd86100972f3323f6"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/REV1-p1-consumption.json",
+      "sha256": "4c45a3e3bb11c071a197b770f37ebf05f58d7bd4146351b7a1b9ad709bc711a6"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/REV2-p1-consumption.json",
+      "sha256": "99a957b3e82d7c449844b00981a321f36a9ef6e7be89780269212a0ba8a6b88f"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/REV3-p1-consumption.json",
+      "sha256": "91ee61a9cc667fe8f03928a977845e82867b8fc0b4142e1aeb3db6263682e6c9"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/REV2/final-boundary-probe.ts",
+      "sha256": "4ca2fc17eaedf992cd1f6ad7bde0e50f1f3992654acaf33e0ad065f06069cbb2"
+    }
+  ],
+  "source_before": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813",
+    "lane_ref": "6e5ab5fc41acebbff4264efc7d481df3db8dce44"
+  },
+  "source_after": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813",
+    "lane_ref": "6e5ab5fc41acebbff4264efc7d481df3db8dce44"
+  },
+  "private_index_removed": true,
+  "tested": "completed final pass1 evidence and explicit internal R14 amendment; no product tests or source writes; source diff representation limitation disclosed; FIX_P1 not yet dispatched"
+}

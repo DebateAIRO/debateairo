@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LOCK_HANDOFF_FIX",
+  "ticket": "t_532dbedf",
+  "baseRevision": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718",
+  "finalRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productFiles": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/api/src/support/index.ts",
+      "sha256": "34fabe86db422c417a8e479c6274aaa1e070ad9b2b21515168eebecfcbfe5d29",
+      "bytes": 36957,
+      "laneRelative": "apps/api/src/support/index.ts"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/db/src/support.ts",
+      "sha256": "ca7088f7fbc99c1863f2c44d42db9015076025181a86d1c9662fc6a05a32331a",
+      "bytes": 100535,
+      "laneRelative": "packages/db/src/support.ts"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/integration/support-cases.test.ts",
+      "sha256": "18ca4e4b1a5622b06396259ca2ed973e5cc04c894e6971a1ba6c0da210445dd7",
+      "bytes": 30440,
+      "laneRelative": "tests/integration/support-cases.test.ts"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/integration/support-routes.test.ts",
+      "sha256": "c90576ca3d6f95ff7def08113c2fab02d069488a0d05510a43d8fe64e3303109",
+      "bytes": 144256,
+      "laneRelative": "tests/integration/support-routes.test.ts"
+    }
+  ],
+  "deletedProductPaths": [],
+  "commit": {
+    "subject": "fix(support): keep immutable locks terminal",
+    "scopeCount": 4
+  },
+  "clean": true
+}

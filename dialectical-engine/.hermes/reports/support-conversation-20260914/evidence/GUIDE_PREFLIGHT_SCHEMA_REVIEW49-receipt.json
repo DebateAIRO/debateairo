@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREFLIGHT_SCHEMA_REVIEW49",
+  "ticket": "t_3b4cc8fd",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_FINAL_PREFLIGHT_SCHEMA_BINDING",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "freeze": "fa4371ed38dbcc861f543e8012fecd745194b272",
+  "resolvedFailure": "LIVE37_SCHEMA1_PREFLIGHT_REJECTED_SCHEMA2_COMPOSITION",
+  "authorReceiptSha256": "b14edd9998d8b512bdb1dc19ae2bf29dddb8ed200b092516b14eb460e21a8ab1",
+  "authorConsumptionSha256": "ed281e6203c1215ade234c4072a7c8c3cbf0cb29fb665b1c147b615f79b2d2b9",
+  "reviewedSources": {
+    "phasePreflightSha256": "7abc75044287384ee7c79d89cb2e79b68d236696f7166985dfcc5e84f0461245",
+    "preflightSchemaSha256": "7bf70664ec655cc18bf7f365b5359f6c123a8c0049b5457f4d1893b6d08df889",
+    "compositionContractSha256": "7e39c79b7dabd06a03f067be81b582709641a55c1ecabafe3209a6dfee5d7cf3",
+    "compatibilityMapSha256": "e1a78218c33c5be8790ce00a5b7824710b00784bb0e8d60b229ff611014b8e8d",
+    "moduleClosureSha256": "b1c36e08c3b91c41002b425ffbd406b132552cce2bbd5a7d31b5a6c960278cf8",
+    "commandContractSha256": "1be2c74d25dbf4fd45f72fb1360f06836547e868b7b19993e17a0f949fcbd7e6",
+    "operatorScriptSha256": "466ef588b04c6f45a13c607baab099a4fef9919150601791ba4a1ad0c8178f47"
+  },
+  "controls": {
+    "affectedControls": "15/15",
+    "schemaVersion": 2,
+    "retainedRows": 11,
+    "remainingRows": 20,
+    "unionRows": 31,
+    "phaseCompatibility": "7/7",
+    "moduleClosureCount": 34,
+    "futurePathsAbsent": 116,
+    "actualRequestsSent": 0,
+    "operationalTraffic": 0
+  },
+  "scope": {
+    "heavyCommands": 0,
+    "newTestsExecuted": 0,
+    "newRuntimeActions": 0,
+    "newBrowserActions": 0,
+    "newHttpRequests": 0,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "productWrites": 0,
+    "gitWrites": 0
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_PREFLIGHT_SCHEMA_REVIEW49.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_PREFLIGHT_SCHEMA_REVIEW49.md",
+      "sha256": "2c4f66ae9dcadf63eaee7edabf51fe0965d860572b184c6935956db22bd8968e",
+      "bytes": 3627
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREFLIGHT_SCHEMA_REVIEW49-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_PREFLIGHT_SCHEMA_REVIEW49-dispositions.json",
+      "sha256": "0dc4978ef29bd059caf12520a4cb5fdc9ea669cca275aa2d865087d6f00c57a0",
+      "bytes": 2696
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREFLIGHT_SCHEMA_REVIEW49-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_PREFLIGHT_SCHEMA_REVIEW49-custody.json",
+      "sha256": "195ffebc07e1024fcf7a1f1cf54ad924469d9a1844ad17e8e3f7342bfe9df430",
+      "bytes": 1551
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PREFLIGHT_SCHEMA_REVIEW49.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PREFLIGHT_SCHEMA_REVIEW49.md",
+      "sha256": "9f5c257942899487a3f19f7473482c7ded84cf5d126d3bf8cc952d6d9ba583b5",
+      "bytes": 1704
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREFLIGHT_SCHEMA_REVIEW49-manifest.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_PREFLIGHT_SCHEMA_REVIEW49-manifest.json",
+      "sha256": "e66dc7ff3ea5f29d12718ddde53562d8bc896ef2b4e815acb51d0d6cb86ccfb2",
+      "bytes": 2118
+    }
+  ],
+  "receiptSelfExcluded": true
+}

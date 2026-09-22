@@ -1,0 +1,140 @@
+{
+  "revision": "8cdb75d75055ccb41b6325da23bf233b24e2614b",
+  "base": "130adf47da2e889005e73c3adb7ebb49fd50b529",
+  "inputs": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/INSTRUCTIONS.md",
+      "sha256": "c99c4c266e63b683f1da1fb46048b38e8e9aa00ac2f01816832c27460b8bdeeb",
+      "bytes": 2069
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/OWNER-PUBLIC-GUIDE-20260917.md",
+      "sha256": "bc80328fa3ecddb954ff4b7872fe2c460e8c3af37cbb8619807b3371f1175f63",
+      "bytes": 1478
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/OWNER-RESUME-20260917.md",
+      "sha256": "6b5caf665f520a7b5313c4564e5c6021ab06a727b54ef5d1e6f1f5f5cd4990fa",
+      "bytes": 1308
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/decisions/GUIDE-CP1-FOCUSED-LIVE-VERIFICATION-20260920.md",
+      "sha256": "136fceec0f7e80bef17c64e0cf089c617080ca3b58994b79895ed5f6a26411b7",
+      "bytes": 7521
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL16-manifest.json",
+      "sha256": "3021c43e9d036469397e9bcf6f85bd519d8f59590ca98fd2cc44857e9005f329",
+      "bytes": 71276
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_FIX3-receipt.json",
+      "sha256": "372c0c2913e924cea2d7086568866b3f91f2a6f391e6e1e902e2ed03277bae0a",
+      "bytes": 5728
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_FIX3-consumption.json",
+      "sha256": "326aa7c2129e5078fd434174961865eebe7162c3c7ef550eb916e0b5733e6401",
+      "bytes": 13483
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_FIX3.md",
+      "sha256": "b0dd1688167d32fc02fae58b59cd72cf996d8d80a6610f06dc7a5824dcc18e65",
+      "bytes": 1541
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_FIX3-product-manifest.json",
+      "sha256": "88afdd24736f28011d070497408e09feab0bd087a25c28731f22a926275022f3",
+      "bytes": 983
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_FIX3-required-suites.json",
+      "sha256": "3e9c504a0dc8a6596adc47034384b3593149ba77f133243af1543fdb4e8be921",
+      "bytes": 818
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PRICING_CLAIM_FIX3.md",
+      "sha256": "3f5eddd76f306498866ccae678fe452e66e2620b7d422313c2de08dfa8926576",
+      "bytes": 1751
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_PRICING_CLAIM_FIX3-red.log",
+      "sha256": "45de0cc49ce9d186dba222e2985b23b85d00dd0fa60d945106c18e3fe122c36e",
+      "bytes": 52849
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_PRICING_CLAIM_FIX3-policy-green.log",
+      "sha256": "f204bfe8c9cbcb1f171cb021fa2693861bff4b7019a6ee9810b6432c71e0c0a7",
+      "bytes": 44774
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_PRICING_CLAIM_FIX3-affected-final.log",
+      "sha256": "97007dfbf71c70e330c5ea1684619f24f88b03964a1a53460f9c92248f18ce3a",
+      "bytes": 93233
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_REVIEW2-receipt.json",
+      "sha256": "d4a299d65316879cd282850369a09333d8f87ab12649ceb9d3d93cea85cef46a",
+      "bytes": 2968
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_REVIEW2-consumption.json",
+      "sha256": "9bcaad5770673d71de7dd97092ddae0222313e02538adc3157b743a00778c0e7",
+      "bytes": 10498
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_PRICING_CLAIM_REVIEW2.md",
+      "sha256": "0e36fa37ee162c9a5da81ebc13f2c6b260dce202669d6fc6583c089ecffac9ee",
+      "bytes": 4964
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_REVIEW2-dispositions.json",
+      "sha256": "a3de50743ebdceb1462908a8b558f5bd257bfe29b57eb7592d52c9524ecc3299",
+      "bytes": 3860
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_REVIEW2-custody.json",
+      "sha256": "8a7155b1740dc3e5691f88059f81f3d6a5a9129963de7df72e812600d58c58b8",
+      "bytes": 1395
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PRICING_CLAIM_REVIEW2.md",
+      "sha256": "53d62e5265f185ed471081a5858737dda3fb5654150e65d4da469bb80d41550a",
+      "bytes": 3187
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_REVIEW30-receipt.json",
+      "sha256": "181d9158928279429f753397d591fc37ebe8b59994ff33dc6a5c4096f8a0aff9",
+      "bytes": 2657
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_REVIEW30-consumption.json",
+      "sha256": "91b41aef050e5aa490be3889e82b945fd7569a4ba7cf93c2bb3f8c2774e69177",
+      "bytes": 49176
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_CAPTURE_REVIEW30.md",
+      "sha256": "7ce4fc8e0eafd315c9cf9fb21627585be87e01f395b2add0733ba87e74af6d1b",
+      "bytes": 7146
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_REVIEW30-dispositions.json",
+      "sha256": "1f75e53a763d74f075c1a2bfec2792cd20cc423eb82cf49679f94e62c8159f98",
+      "bytes": 4994
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_REVIEW30-custody.json",
+      "sha256": "6ecfba0460726cd0476525787727951bdfcfce442419cb3f22cda09f41e37111",
+      "bytes": 2149
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_CAPTURE_REVIEW30.md",
+      "sha256": "4e70cf935dc279f1577b99959f25c135de3033693d06b06f415d7047845736a8",
+      "bytes": 3377
+    }
+  ],
+  "changedPaths": [
+    "dialectical-engine/apps/api/src/support/response-policy.ts",
+    "dialectical-engine/tests/unit/support-response-policy.test.ts"
+  ]
+}

@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_ORACLE_REVIEW17",
+  "ticket": "t_dc69946d",
+  "runId": 207,
+  "verdict": "PASS_JUSTIFIED_BOUNDED_ORACLE_CORRECTION",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "reviewedOn": "2026-09-20T17:32:55.865263Z",
+  "productRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productClean": true,
+  "freezeCommit": "2eccc9edaebcacf09147a516f69ea5c44960088e",
+  "observed": {
+    "canonicalSequence": 26,
+    "promptSha256": "fbb9c3f02ab160df01113bb5669ea0ac0df63e212ff5cd5c957c0a90af13d01a",
+    "answerSha256": "9f85e8c55ecdf9fa1244e0d76a5c8f89acaa98251b8b8702cd095d6756bbe738",
+    "sourceIds": [
+      "app-navigation"
+    ],
+    "actionIds": [],
+    "apiDomEqual": true,
+    "draftDiagnostic": "ACCEPTED_DRAFT",
+    "retrospectiveLive8Success": false
+  },
+  "preliminaryCorrection": {
+    "initialInference": "generic help control was the named debate How it works control and mislocated",
+    "status": "RETRACTED_AFTER_EXACT_PRODUCER_REVIEW",
+    "reason": "library page renders SupportWidget and menu inventory binds help-compact to app-navigation; answer does not name the local guide"
+  },
+  "answerQuality": {
+    "membershipAloneSufficient": false,
+    "separateClauseReview": true,
+    "useful": true,
+    "supported": true,
+    "landingMethodTranscript": "PASS",
+    "libraryCompactHelp": "PASS",
+    "homeOrSampleNavigation": "PASS",
+    "remoteOperationClaimed": false
+  },
+  "broadOracle": {
+    "sequences": [
+      25,
+      26
+    ],
+    "allowedPrimarySourceIds": [
+      "app-navigation",
+      "guide-how-it-works",
+      "debate-workspace-menus"
+    ],
+    "proofMembershipRequired": true,
+    "bothLanguages": true
+  },
+  "localControlBoundary": {
+    "questions": {
+      "en": "In an already open debate, what does the How it works control explain?",
+      "ro": "Într-o dezbatere deja deschisă, ce explică controlul Cum funcționează?"
+    },
+    "allowedPrimarySourceIds": [
+      "guide-how-it-works",
+      "debate-workspace-menus"
+    ],
+    "appNavigationOnly": "REJECT",
+    "compactHelpDistinct": true
+  },
+  "requiredRegressions": [
+    "broad EN and RO accept app-navigation only when proof-context present",
+    "broad EN and RO retain guide-how-it-works and debate-workspace-menus",
+    "accurate broad positive names or explains Method/Transcripts or library Compact Help",
+    "empty or generic non-answer fails despite valid source",
+    "explicit already-open-debate local-control EN and RO reject app-navigation only",
+    "Compact Help and named debate How it works conflation fails",
+    "unrelated absent empty duplicate and proof-external sources fail",
+    "unchanged API DOM attribution language action privacy injection credential session pacing traffic and 42-model ceiling"
+  ],
+  "scope": {
+    "kind": "APPEND_ONLY_HARNESS_ORACLE",
+    "productChangesJustified": false,
+    "kbChangesJustified": false,
+    "rows": 54,
+    "rowOrderUnchanged": true,
+    "modelCeiling": 42,
+    "actualTrafficPreserved": true,
+    "failureArtifactsPreserved": true,
+    "freshCompleteActualRunRequired": true
+  },
+  "custody": {
+    "reviewInputs": 131,
+    "reviewInputMismatches": 0,
+    "diagnosisArtifacts": 7,
+    "diagnosisArtifactMismatches": 0
+  },
+  "artifacts": [
+    {
+      "role": "report",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_ORACLE_REVIEW17.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_ORACLE_REVIEW17.md",
+      "sha256": "af74906502a685f795b9bd22b6437941870217caa96a26d495ac206cac53abba",
+      "bytes": 6825
+    },
+    {
+      "role": "selfReport",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_ORACLE_REVIEW17.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_ORACLE_REVIEW17.md",
+      "sha256": "ce2444772b5b125d67a03cf349007879e522812d1570aeea94e7869820bbd1dd",
+      "bytes": 3665
+    },
+    {
+      "role": "semanticDisposition",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ORACLE_REVIEW17-semantic-disposition.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_ORACLE_REVIEW17-semantic-disposition.json",
+      "sha256": "17cc155c404b2b0587e36c8630bfe7913f3aaadc269cfcbbbdce719b15782172",
+      "bytes": 5512
+    },
+    {
+      "role": "staticCustody",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ORACLE_REVIEW17-static-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_ORACLE_REVIEW17-static-custody.json",
+      "sha256": "2f5dd0497935efb67887b2c2b7c62245a1642341de664f8945a916bc3c912a3d",
+      "bytes": 4288
+    }
+  ],
+  "limits": {
+    "staticReview": true,
+    "browser": false,
+    "runtime": false,
+    "http": false,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "capacity": false,
+    "database": false,
+    "privateData": false,
+    "productWrites": false,
+    "kbWrites": false,
+    "harnessWrites": false,
+    "gitWrites": false,
+    "testabilityClaimed": false,
+    "readinessClaimed": false,
+    "acceptanceClaimed": false,
+    "cp1": "INCOMPLETE",
+    "cp2": "GATED",
+    "forgot": "UNRESOLVED_ACTIONLESS"
+  },
+  "selfExclusion": "This receipt excludes itself from artifacts and custody hashes."
+}

@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "revision": "606b2eabea1dc9212159e53c193cf69655424e77",
+  "idle_started_at": "2026-09-15T17:52:59.069Z",
+  "idle_completed_at": "2026-09-15T17:53:09.072Z",
+  "idle_seconds": 10,
+  "supervisor": {
+    "pid": 86341,
+    "ppid": 1,
+    "pgid": 86341,
+    "state": "Ss"
+  },
+  "expected_supervisor": {
+    "pid": 86341,
+    "ppid": 1,
+    "pgid": 86341
+  },
+  "head": "606b2eabea1dc9212159e53c193cf69655424e77",
+  "product_status_clean": true,
+  "ordinary_system_tls": {
+    "url": "https://localhost:3100/help",
+    "custom_ca": false,
+    "insecure": false,
+    "status": 200
+  },
+  "preview_listeners": {
+    "3100": 1,
+    "3101": 1,
+    "8890": 1,
+    "8891": 1,
+    "8892": 1,
+    "8893": 1,
+    "8894": 1,
+    "8895": 1,
+    "8896": 1
+  },
+  "original_listeners": {
+    "8790": 1,
+    "8791": 1,
+    "8792": 1,
+    "8793": 1,
+    "8794": 1,
+    "8795": 1,
+    "8796": 1
+  },
+  "browser_profile_present": false
+}

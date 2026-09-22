@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FINANCIAL_FALLBACK_REVIEW",
+  "ticket": "t_37700807",
+  "revision": "c683a0c752553fe2b4e226bc3f70879ce2460b74",
+  "baseRevision": "8cdb75d75055ccb41b6325da23bf233b24e2614b",
+  "verdict": "REWORK_BOUNDED_ROMANIAN_FINANCIAL_EQUIVALENTS",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_FINANCIAL_FALLBACK_REVIEW.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_FINANCIAL_FALLBACK_REVIEW.md",
+      "sha256": "b92be10dbec51206db578523596bac531e98409051a1a3c6d57821f0170279b0",
+      "bytes": 4810
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FINANCIAL_FALLBACK_REVIEW-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_FINANCIAL_FALLBACK_REVIEW-dispositions.json",
+      "sha256": "99609779f39c58fd53365888b971e3af27346206e40df6d7c0171a6f5b29644f",
+      "bytes": 4368
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FINANCIAL_FALLBACK_REVIEW-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_FINANCIAL_FALLBACK_REVIEW-custody.json",
+      "sha256": "1345cf20f017aa81fa3412435b3f18e08941cb4d18b7616f80ad556676b1225a",
+      "bytes": 1591
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_FINANCIAL_FALLBACK_REVIEW.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_FINANCIAL_FALLBACK_REVIEW.md",
+      "sha256": "baded4de98563a3df5ea1da503e295aaea24fbf0c704eb3d793b3c38b4a8b63d",
+      "bytes": 2712
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "heavyLeaseHeld": false,
+  "finding": "The deterministic family omits English bought and finite Romanian counterparts for purchase, billing, transaction, and charge.",
+  "finiteLexicalParity": {
+    "paymentPayPaid": ["plat", "achit"],
+    "purchaseBuyBought": ["buy", "bought", "cump", "achizit"],
+    "billing": ["factur"],
+    "transaction": ["tranzact"],
+    "charge": ["debitare", "debitat", "taxare", "taxat"],
+    "nonfinancialNegatives": ["platform/platforma", "taxonomie/taxonomic", "flow-rate debit"]
+  },
+  "retained": [
+    "Financial polarity interpretation is removed and matched drafts use reviewed fallback.",
+    "Full44 EN/RO and real POST prove useful reviewed guidance and correct accounting.",
+    "Screenshot30 complete full-answer capture remains PASS."
+  ]
+}

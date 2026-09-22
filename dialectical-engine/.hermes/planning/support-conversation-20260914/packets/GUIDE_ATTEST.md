@@ -1,0 +1,26 @@
+# PACKET GUIDE_ATTEST — scoped public guide author work
+
+Read FIRST this packet then /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md. Resume original Sol /root/requirements; read ticket/comments before claim. Retain actual same-session BODY skills and applicable library. No subdelegation.
+
+## 1. Node
+- seat: GUIDE_ATTEST; ticket: t_c6f60eaf; model: gpt-5.6-sol; rework rounds: max 3 under owner continuation override.
+- cwd: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine; branch: codex/support-conversation-cp1; base: af02290219c734d2ad2fe7df878356fec9043b15.
+- inputs: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/INSTRUCTIONS.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/OWNER-RESUME-20260917.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/OWNER-PUBLIC-GUIDE-20260917.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/SPEC-v5.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PLAN-PUBLIC-GUIDE-v2.md:219-241 PG-5 only; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ATTEST-start.json and exact indexed files. /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ATTEST-scope-amendment1.json is the exact scope amendment. Read allowed product paths and their immediate callers only; do not repeat full audit.
+- self-report: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_ATTEST.md (new)
+
+## 2. Contract
+- allowed: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/reviews/manifest.json; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-recovery-attestation.test.ts; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-kb.test.ts; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ATTEST.md (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ATTEST-receipt.json (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_ATTEST.md (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ATTEST- (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ATTEST/ (new).
+- forbidden: original dirty source, other product/Git paths, runtime-model changes, private records, credential operations, owner ratification, guessed Forgot destination, actual model/browser/HTTP traffic, push/deploy or acceptance.
+- verification: sole heavy/scoped Git lease. Capture exact-base focused START, meaningful RED, GREEN and exact final revision/KB custody with /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-orchestrator/scripts/run-capture.sh. Use --maxWorkers=1 only. No duplicate broad suite or typecheck; final composition handles the union.
+
+## 3. Work
+Execute PG-5 only. Bind the exact separately reviewed changed records, actual reviewer native child identity, date and report. Preserve all unchanged review bindings and blank owner fields. Capture strict-load RED before attestation and the planned focused GREEN; record exact admitted count/digest and kbVersion. No content or catalog editing, no owner ratification.
+
+Amendment1: correct only the two existing pre-attestation transition assertions in the added support-kb test file to reflect the actual separately admitted corpus; retain all loader security/integrity assertions. Preserve the failed41/2 frame, then rerun only the affected planned three-file frame.
+
+Commit only allowed product files after the scoped frame passes. Required out-of-scope dependency: report before edit, retain all failures. Release heavy when commands end and scoped Git only after clean committed handoff.
+
+## 4. Handoff
+Self-report question verbatim:
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
+Return SKILLS LOADED, node/ticket/session/base/final revision, exact changed paths, START/RED/GREEN, exact admitted corpus digest/count/kbVersion, limits and comments cursor. Receipt node/ticket/base/productRevision/productFiles/artifacts absolute/sha256/bytes excluding itself. No self-close, self-review or acceptance; usage UNAVAILABLE unless measured.

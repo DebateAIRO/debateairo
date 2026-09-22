@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_RUNTIME7",
+  "observedAtUtc": "2026-09-21T00:12:15.367Z",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "pid": 12272,
+  "ppid": 1,
+  "pgid": 12272,
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "commandMarker": "pnpm dev:auth:up",
+  "livePorts": [
+    3100,
+    3101,
+    55433,
+    7177,
+    8988,
+    8890,
+    8891,
+    8892,
+    8893,
+    8894,
+    8895,
+    8896
+  ],
+  "ordinarySystemTls": {
+    "url": "https://localhost:3100/help",
+    "customCa": false,
+    "insecure": false,
+    "status": 200
+  },
+  "runtimeLogPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE20-stack.log",
+  "privateRuntimeLogRead": false
+}

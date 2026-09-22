@@ -1,0 +1,42 @@
+{
+  "at": "2026-09-20T11:51:09.713023+00:00",
+  "commit": "a682980b9e1d7a3ed5fed5bcdaecf696465686a2",
+  "parent": "2f4ec377246fde07c0a500b0951500e60c955797",
+  "tree": "fcb250468aa86b0fe1f80aad2926754568af8c8b",
+  "records": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/GUIDE_LIVE6.md",
+      "sha256": "8f3a4a7efe5500eb4f51a88d41127cf568ba812725a8de972c393e8114fd5f27",
+      "bytes": 12914
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE6-inputs.json",
+      "sha256": "f5095875e7ebd183c29c26878afe4045c7d2a6e3f92c8c7e2337a78b4e2a91f1",
+      "bytes": 66631
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE6-gate-template.json",
+      "sha256": "ca57120920aefad1f7e62bcd59c6b7cbb989fc287b98bc51841c6d52b804899b",
+      "bytes": 1724
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/board-ids.json",
+      "sha256": "e0a35a18b96ee8b4dd957b90ed4ea426579725149f5a4ccfcebc70fcee6e3999",
+      "bytes": 24712
+    }
+  ],
+  "before": {
+    "head": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19",
+    "productRef": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13"
+  },
+  "after": {
+    "head": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19",
+    "productRef": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13"
+  },
+  "privateIndexRemoved": true,
+  "historicalIntakeGap": "unverified; no broader continuity claim"
+}

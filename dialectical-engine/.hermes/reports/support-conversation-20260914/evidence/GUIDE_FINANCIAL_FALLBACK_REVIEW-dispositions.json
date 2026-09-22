@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FINANCIAL_FALLBACK_REVIEW",
+  "ticket": "t_37700807",
+  "revision": "c683a0c752553fe2b4e226bc3f70879ce2460b74",
+  "baseRevision": "8cdb75d75055ccb41b6325da23bf233b24e2614b",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "verdict": "REWORK_BOUNDED_ROMANIAN_FINANCIAL_EQUIVALENTS",
+  "dispositions": [
+    {
+      "id": "GFFR-C1",
+      "subject": "deterministic financial fallback",
+      "disposition": "PASS",
+      "evidence": "Matched financial capability drafts are rejected without positive/negative polarity interpretation and recover through reviewed source guidance."
+    },
+    {
+      "id": "GFFR-C2",
+      "subject": "useful full44 EN/RO recovery",
+      "disposition": "PASS",
+      "evidence": "Full-corpus service tests return ANSWER_GROUNDED with app-navigation, no action and nonempty reviewed guidance for EN and RO financial drafts."
+    },
+    {
+      "id": "GFFR-C3",
+      "subject": "real POST accounting and persistence",
+      "disposition": "PASS",
+      "evidence": "Real POST returns HTTP 200 reviewed recovery after one model call and persists model_called=true with the reported input-token count."
+    },
+    {
+      "id": "GFFR-C4",
+      "subject": "ordinary product and creation prose",
+      "disposition": "PASS",
+      "evidence": "platform/platformă, Pricing navigation and EN/RO creation-only prose remain directly conversational."
+    },
+    {
+      "id": "GFFR-R1",
+      "subject": "ordinary Romanian financial equivalents",
+      "disposition": "REWORK",
+      "evidence": "Current finite gaps are buy→bought; purchase/buy→Romanian achiziț-; billing→factur-; transaction→tranzacț-; and charge→financial debitare/debitat/taxare/taxat. Existing plat-/achit- and cump- cover payment and part of purchase."
+    },
+    {
+      "id": "GFFR-C5",
+      "subject": "source/action and safety precedence",
+      "disposition": "PASS_RETAINED",
+      "evidence": "The scoped change does not alter source/action admission or private-data, credential, injection and security controls."
+    },
+    {
+      "id": "GFFR-C6",
+      "subject": "Screenshot30",
+      "disposition": "PASS_RETAINED",
+      "evidence": "The complete full-answer screenshot and its binding remain unchanged."
+    },
+    {
+      "id": "GFFR-L1",
+      "subject": "runtime and checkpoint status",
+      "disposition": "NOT_ESTABLISHED",
+      "evidence": "Static review only; final binding, runtime, actual31, capacity, readiness, completion and acceptance remain later gates."
+    },
+    {
+      "id": "GFFR-L2",
+      "subject": "Forgot and CP2",
+      "disposition": "UNRESOLVED_ACTIONLESS",
+      "evidence": "No destination is inferred and no CP2 authorization follows."
+    }
+  ],
+  "hashes": {
+    "decision": "802cd3e4baf9f5571cb976b3009a180a29148ae4c7bf442d12da18281f5edee6",
+    "authorReceipt": "6839ec8867ce1cc51bed8990e71003a0e3669566b1958aaf0a5b4e97f22d2dea",
+    "authorConsumption": "c82bde5635ba01b2a31f3cae286b9296a36e111ddad18d1e7b16d490a38c02a4",
+    "responsePolicy": "d899d38d03acf61c05185cd9b0545123a117653fe488050b327abb1d5d4c7f9a",
+    "responsePolicyTests": "8dd683ab31daefc1d71dd6dce32ca87e307698b8fde0b571ff10377f87e05a56",
+    "answerContextTests": "2d392ae83555c2de6f755b72de45b24da249d91d30cccd0e4349bbf6a2dfc50b",
+    "routeTests": "0eefb4bbe181b7d24a5f4e76437e1c015080e1f0a9cf973b8cbc43cdaff94e9f",
+    "finalAffectedSuite": "fca262c6eb4d7d9d8819d60c59dfbff62c04ec8971f6f63fa2ce845319ee90e0"
+  },
+  "counts": {
+    "changedProductFiles": 4,
+    "focusedTestsPassed": 248,
+    "focusedTestsFailed": 0,
+    "affectedTestsPassed": 480,
+    "affectedTestsFailed": 0,
+    "reviewedCorpusEntries": 44,
+    "indexedInputs": 27,
+    "indexedInputsVerified": 27,
+    "remainingFindings": 1
+  },
+  "finiteLexicalParity": {
+    "paymentPayPaid": ["plat", "achit"],
+    "purchaseBuyBought": ["buy", "bought", "cump", "achizit"],
+    "billing": ["factur"],
+    "transaction": ["tranzact"],
+    "charge": ["debitare", "debitat", "taxare", "taxat"],
+    "requiredNonfinancialNegatives": ["platform", "platforma", "taxonomie", "taxonomic", "debitul apei", "network throughput debit"]
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

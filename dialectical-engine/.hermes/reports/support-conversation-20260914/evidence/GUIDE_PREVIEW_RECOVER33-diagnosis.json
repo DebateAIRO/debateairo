@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_RECOVER33",
+  "ticket": "t_21dbe7b0",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "validation": {
+    "exactClosedPath": true,
+    "failedProcessGone": true,
+    "regularFile": true,
+    "ownUid": true,
+    "mode0600": true,
+    "nlink1": true,
+    "boundedSize": true,
+    "noOpenWriter": true,
+    "rawPrinted": false,
+    "rawHashed": false,
+    "rawCopied": false
+  },
+  "allowlist": {
+    "sourceDerived": true,
+    "sourcePaths": [
+      "apps/runner/src/dev-auth-stack-cli.ts",
+      "apps/runner/src/dev-auth-stack.ts",
+      "apps/runner/src/dev-auth-stack-profile.ts",
+      "apps/runner/src/dev-auth-data-plane.ts",
+      "apps/runner/src/dev-hatchet-token.ts",
+      "apps/runner/src/dev-api-environment.ts",
+      "apps/runner/src/dev-api-process.ts",
+      "apps/runner/src/dev-ui-process.ts",
+      "apps/runner/src/dev-runner-process.ts",
+      "apps/runner/src/dev-cli-provider-panel.ts",
+      "apps/runner/src/dev-support-model.ts"
+    ],
+    "tokenCount": 101,
+    "generatedFiniteCodes": [
+      "DEV_AUTH_STACK_API_EXITED",
+      "DEV_AUTH_STACK_UI_EXITED",
+      "DEV_AUTH_STACK_RUNNER_EXITED"
+    ]
+  },
+  "matchedChains": [
+    "DEV_AUTH_STACK_SUPPORT_MODEL_FAILED"
+  ],
+  "matchedChainCount": 1,
+  "rawRetention": "DISCARDED_IN_MEMORY",
+  "verdict": "FIXED_CODE_AVAILABLE"
+}

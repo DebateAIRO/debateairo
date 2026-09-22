@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_COMPLETION_FIX42",
+  "ticket": "t_d492c89a",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_COMPLETION_BOUND_REVIEW_REQUIRED",
+  "sealedAtUtc": "2026-09-21T11:05:11.133331Z",
+  "finding": "GSTR41-R1",
+  "proofs": {
+    "completion": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_COMPLETION_FIX42-completion-control-proof.json",
+      "sha256": "6f8fc9eef445a5a786ad2056da0976efd17e7cd80c5b5757069805ba3d9dab26",
+      "bytes": 719
+    },
+    "final": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_COMPLETION_FIX42-final-control-proof.json",
+      "sha256": "02edbd31bfac625afd665a6f803601ac2e23a35760882bdfe6e7367322305c19",
+      "bytes": 683
+    }
+  },
+  "bindings": {
+    "command": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_COMPLETION_FIX42-command-contract.json",
+      "sha256": "2fb449ede1f9fdb76ce8f951625feff6dff57f4505cb707866e11c506a167a45",
+      "bytes": 32812
+    },
+    "operator": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_COMPLETION_FIX42-operator-contract.json",
+      "sha256": "2508af0d8ef464d92e36b0a4e4a101dde79b04270d50c65166b4d915e206fb6a",
+      "bytes": 22431
+    },
+    "delta": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_COMPLETION_FIX42-delta.json",
+      "sha256": "0664dfc9f3bdb9f7042fb6f2afbf33cc43226da268802db7fb42c4b1845a2cc9",
+      "bytes": 1535
+    }
+  },
+  "futureAbsenceCount": 115,
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

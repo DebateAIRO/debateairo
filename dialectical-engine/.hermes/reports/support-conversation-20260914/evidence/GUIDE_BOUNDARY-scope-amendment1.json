@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-17T10:08:12.111849+00:00",
+  "node": "GUIDE_BOUNDARY",
+  "base": "163f15c59bcfb1bf2cb0979f8b0e7d414ebd0703",
+  "addedProductPaths": [
+    "apps/ui/app/debate/[id]/DebatePageGate.tsx"
+  ],
+  "source": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/ui/app/debate/[id]/DebatePageGate.tsx",
+    "line": 40,
+    "text": "<SupportWidget context={{ runId: id }} />",
+    "sha256": "956f7a083af3ce362d643b98e50dedf2e7e5d686c9a529a39986236c20a4b52f"
+  },
+  "reason": "Author identified live caller omitted from approved write list; removal is necessary to eliminate private-context API rather than retain ignored capability."
+}

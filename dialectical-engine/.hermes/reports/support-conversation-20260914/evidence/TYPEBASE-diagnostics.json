@@ -1,0 +1,665 @@
+{
+  "schema_version": 1,
+  "mission": "support-conversation-20260914",
+  "node": "TYPEBASE",
+  "ticket": "t_cc2dfcbd",
+  "session": {
+    "agent": "/root/baseline",
+    "codex_thread_id": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "codex_session_id": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "normalization": {
+    "rule": "Only the two absolute diagnostic checkout prefixes in diagnostic messages were replaced with <CHECKOUT>; filenames, line, column, code, and remaining message text were unchanged.",
+    "prefixes": [
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-typebase/dialectical-engine",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine"
+    ]
+  },
+  "baseline": {
+    "commit": "b7ca2c413bf3242ce18e29a397dc9a3aa9228893",
+    "command": "pnpm run typecheck",
+    "rc": 1,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/TYPEBASE-typecheck.log",
+    "log_sha256": "d609e418b93fd3502df37c385b951374b4363c07becfc72783bc19ac9702d70c",
+    "diagnostic_count": 76,
+    "counts_by_code": {
+      "TS18046": 2,
+      "TS2307": 4,
+      "TS2322": 3,
+      "TS2339": 23,
+      "TS2345": 1,
+      "TS2353": 4,
+      "TS2694": 3,
+      "TS2741": 34,
+      "TS7006": 2
+    },
+    "counts_by_file": {
+      "apps/api/src/index.ts": 1,
+      "tests/acceptance/obs-agent-03-fixture.ts": 1,
+      "tests/acceptance/obs-agent-04-fixture.ts": 2,
+      "tests/acceptance/obs-agent-06-fixture.ts": 1,
+      "tests/architecture/obs-agent-06-copy.test.ts": 1,
+      "tests/architecture/register-support-publication.test.ts": 15,
+      "tests/architecture/sup-04-mounts.test.ts": 9,
+      "tests/integration/obs-agent-01-delivery.test.ts": 2,
+      "tests/integration/obs-agent-03-fixture.test.ts": 1,
+      "tests/integration/obs-agent-04-gap-drill.test.ts": 1,
+      "tests/integration/obs-agent-04-not-wired.test.ts": 4,
+      "tests/integration/obs-agent-05-connection-drill.test.ts": 1,
+      "tests/integration/obs-agent-05-docker.test.ts": 1,
+      "tests/integration/obs-agent-06-status.test.ts": 3,
+      "tests/integration/obs-agent-06-views.test.ts": 1,
+      "tests/unit/dev-cli-provider-panel.test.ts": 3,
+      "tests/unit/dev-evaluator-process.test.ts": 1,
+      "tests/unit/evaluator-profiles.test.ts": 4,
+      "tests/unit/obs-agent-01-discovery.test.ts": 8,
+      "tests/unit/obs-agent-01-status-projections.test.ts": 1,
+      "tests/unit/obs-agent-05-lifecycle.test.ts": 5,
+      "tests/unit/obs-agent-05-postgres.test.ts": 2,
+      "tests/unit/s14-ui.test.ts": 8
+    },
+    "tuples": [
+      {
+        "file": "apps/api/src/index.ts",
+        "line": 64,
+        "column": 44,
+        "code": "TS2307",
+        "message": "Cannot find module '../../../packages/evaluator/src/rankings.js' or its corresponding type declarations."
+      },
+      {
+        "file": "tests/acceptance/obs-agent-03-fixture.ts",
+        "line": 370,
+        "column": 27,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type 'Readonly<{ now: Date; timeoutMs: 2000; database: Readonly<{ withClient<T>(operation: (client: Readonly<{ query<R extends QueryResultRow = any, I = any[]>(queryTextOrConfig: string | QueryConfig<I>, values?: QueryConfigValues<I> | undefined): Promise<...>; }>) => Promise<...>): Promise<...>; }>; ... 4 more ...; thres...' but required in type 'Readonly<{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(operation: (client: Readonly<{ query<R extends QueryResultRow = any, I = any[]>(queryTextOrConfig: string | QueryConfig<I>, values?: QueryConfigValues<I> | undefined): Promise<...>; }>) => Promise<...>): Promise<...>; }>; ... 6 more ...; thr...'."
+      },
+      {
+        "file": "tests/acceptance/obs-agent-04-fixture.ts",
+        "line": 207,
+        "column": 23,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ modules: Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: ModuleLifecycle; targetFragmentBasename?: string; router?: SignalRouterFactory; probe(ctx: ProbeContext): Promise<readonly ProbeObservation[]>; samples(observations: readonly ProbeObservation[], ctx: Sample...' but required in type 'Readonly<{ modules: readonly Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: Readonly<{ legacyCorrelationKey(signal: { seq: number; signal_id: string; state: \"CLEARED\" | \"OPEN\"; ... 13 more ...; recorded_at: string; }): string | null; restore(openSignals: readonly ...'."
+      },
+      {
+        "file": "tests/acceptance/obs-agent-04-fixture.ts",
+        "line": 278,
+        "column": 44,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ modules: Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: ModuleLifecycle; targetFragmentBasename?: string; router?: SignalRouterFactory; probe(ctx: ProbeContext): Promise<readonly ProbeObservation[]>; samples(observations: readonly ProbeObservation[], ctx: Sample...' but required in type 'Readonly<{ modules: readonly Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: Readonly<{ legacyCorrelationKey(signal: { seq: number; signal_id: string; state: \"CLEARED\" | \"OPEN\"; ... 13 more ...; recorded_at: string; }): string | null; restore(openSignals: readonly ...'."
+      },
+      {
+        "file": "tests/acceptance/obs-agent-06-fixture.ts",
+        "line": 179,
+        "column": 21,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ modules: Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: ModuleLifecycle; targetFragmentBasename?: string; router?: SignalRouterFactory; probe(ctx: ProbeContext): Promise<readonly ProbeObservation[]>; samples(observations: readonly ProbeObservation[], ctx: Sample...' but required in type 'Readonly<{ modules: readonly Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: Readonly<{ legacyCorrelationKey(signal: { seq: number; signal_id: string; state: \"CLEARED\" | \"OPEN\"; ... 13 more ...; recorded_at: string; }): string | null; restore(openSignals: readonly ...'."
+      },
+      {
+        "file": "tests/architecture/obs-agent-06-copy.test.ts",
+        "line": 11,
+        "column": 45,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(): Promise<T>; }>; stateDir: string; targets: never[]; targetFragment: null; configuration: {}; thresholds: {}; }' but required in type 'Readonly<{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(operation: (client: Readonly<{ query<R extends QueryResultRow = any, I = any[]>(queryTextOrConfig: string | QueryConfig<I>, values?: QueryConfigValues<I> | undefined): Promise<...>; }>) => Promise<...>): Promise<...>; }>; ... 6 more ...; thr...'."
+      },
+      {
+        "file": "tests/architecture/register-support-publication.test.ts",
+        "line": 64,
+        "column": 30,
+        "code": "TS2694",
+        "message": "Namespace '\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\"' has no exported member 'Expression'."
+      },
+      {
+        "file": "tests/architecture/register-support-publication.test.ts",
+        "line": 65,
+        "column": 10,
+        "code": "TS2339",
+        "message": "Property 'isStringLiteral' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/register-support-publication.test.ts",
+        "line": 65,
+        "column": 38,
+        "code": "TS2339",
+        "message": "Property 'isNoSubstitutionTemplateLiteral' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/register-support-publication.test.ts",
+        "line": 66,
+        "column": 10,
+        "code": "TS2339",
+        "message": "Property 'isParenthesizedExpression' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/register-support-publication.test.ts",
+        "line": 67,
+        "column": 10,
+        "code": "TS2339",
+        "message": "Property 'isBinaryExpression' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/register-support-publication.test.ts",
+        "line": 67,
+        "column": 69,
+        "code": "TS2339",
+        "message": "Property 'SyntaxKind' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/register-support-publication.test.ts",
+        "line": 72,
+        "column": 10,
+        "code": "TS2339",
+        "message": "Property 'isTemplateExpression' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/register-support-publication.test.ts",
+        "line": 81,
+        "column": 10,
+        "code": "TS2339",
+        "message": "Property 'isTaggedTemplateExpression' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/register-support-publication.test.ts",
+        "line": 88,
+        "column": 10,
+        "code": "TS2339",
+        "message": "Property 'ScriptKind' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/register-support-publication.test.ts",
+        "line": 88,
+        "column": 29,
+        "code": "TS2339",
+        "message": "Property 'ScriptKind' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/register-support-publication.test.ts",
+        "line": 89,
+        "column": 19,
+        "code": "TS2339",
+        "message": "Property 'createSourceFile' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/register-support-publication.test.ts",
+        "line": 89,
+        "column": 53,
+        "code": "TS2339",
+        "message": "Property 'ScriptTarget' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/register-support-publication.test.ts",
+        "line": 91,
+        "column": 27,
+        "code": "TS2694",
+        "message": "Namespace '\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\"' has no exported member 'Node'."
+      },
+      {
+        "file": "tests/architecture/register-support-publication.test.ts",
+        "line": 92,
+        "column": 12,
+        "code": "TS2339",
+        "message": "Property 'isExpression' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/register-support-publication.test.ts",
+        "line": 99,
+        "column": 8,
+        "code": "TS2339",
+        "message": "Property 'forEachChild' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/sup-04-mounts.test.ts",
+        "line": 16,
+        "column": 19,
+        "code": "TS2339",
+        "message": "Property 'createSourceFile' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/sup-04-mounts.test.ts",
+        "line": 17,
+        "column": 20,
+        "code": "TS2339",
+        "message": "Property 'ScriptTarget' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/sup-04-mounts.test.ts",
+        "line": 18,
+        "column": 35,
+        "code": "TS2339",
+        "message": "Property 'ScriptKind' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/sup-04-mounts.test.ts",
+        "line": 18,
+        "column": 55,
+        "code": "TS2339",
+        "message": "Property 'ScriptKind' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/sup-04-mounts.test.ts",
+        "line": 21,
+        "column": 27,
+        "code": "TS2694",
+        "message": "Namespace '\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\"' has no exported member 'Node'."
+      },
+      {
+        "file": "tests/architecture/sup-04-mounts.test.ts",
+        "line": 22,
+        "column": 13,
+        "code": "TS2339",
+        "message": "Property 'isImportDeclaration' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/sup-04-mounts.test.ts",
+        "line": 22,
+        "column": 45,
+        "code": "TS2339",
+        "message": "Property 'isExportDeclaration' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/sup-04-mounts.test.ts",
+        "line": 24,
+        "column": 13,
+        "code": "TS2339",
+        "message": "Property 'isStringLiteral' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/architecture/sup-04-mounts.test.ts",
+        "line": 25,
+        "column": 8,
+        "code": "TS2339",
+        "message": "Property 'forEachChild' does not exist on type 'typeof import(\"<CHECKOUT>/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/version\")'."
+      },
+      {
+        "file": "tests/integration/obs-agent-01-delivery.test.ts",
+        "line": 433,
+        "column": 81,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ stateDir: string; delivery: DeliveryCoordinator; osascript: OsaScriptDeliveryExecutor; moduleName: string; targetFragment: Readonly<{ basename: \"OBS-07.json\"; targets: readonly never[]; configuration: Readonly<...>; }>; configuration: Readonly<...>; thresholds: Readonly<...>; thresholdVersion: number; }' but required in type 'Readonly<{ stateDir: string; repoRoot: string; delivery: DeliveryCoordinator; osascript: OsaScriptDeliveryExecutor; moduleName: string; targetFragment: Readonly<...>; configuration: ModuleConfigurationObject; thresholds: ModuleConfigurationObject; thresholdVersion: number; deliveryResults?: readonly { ...; }[]; }>'."
+      },
+      {
+        "file": "tests/integration/obs-agent-01-delivery.test.ts",
+        "line": 492,
+        "column": 27,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ modules: readonly Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: ModuleLifecycle; targetFragmentBasename?: string; router?: SignalRouterFactory; probe(ctx: ProbeContext): Promise<readonly ProbeObservation[]>; samples(observations: readonly ProbeObservation[], ct...' but required in type 'Readonly<{ modules: readonly Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: Readonly<{ legacyCorrelationKey(signal: { seq: number; signal_id: string; state: \"CLEARED\" | \"OPEN\"; ... 13 more ...; recorded_at: string; }): string | null; restore(openSignals: readonly ...'."
+      },
+      {
+        "file": "tests/integration/obs-agent-03-fixture.test.ts",
+        "line": 145,
+        "column": 7,
+        "code": "TS2322",
+        "message": "Type '(now: Date) => { now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(operation: (client: ObservationQueryClient) => Promise<T>): Promise<T>; }>; stateDir: string; targets: never[]; targetFragment: null; configuration: {}; thresholds: { claim_grace_s: number; ready_age_s: number; no_progress_s: number; h...' is not assignable to type '(now: Date) => Readonly<{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(operation: (client: Readonly<{ query<R extends QueryResultRow = any, I = any[]>(queryTextOrConfig: string | QueryConfig<I>, values?: QueryConfigValues<...> | undefined): Promise<...>; }>) => Promise<...>): Promise<...>; }>; .....'."
+      },
+      {
+        "file": "tests/integration/obs-agent-04-gap-drill.test.ts",
+        "line": 52,
+        "column": 44,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ modules: Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: ModuleLifecycle; targetFragmentBasename?: string; router?: SignalRouterFactory; probe(ctx: ProbeContext): Promise<readonly ProbeObservation[]>; samples(observations: readonly ProbeObservation[], ctx: Sample...' but required in type 'Readonly<{ modules: readonly Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: Readonly<{ legacyCorrelationKey(signal: { seq: number; signal_id: string; state: \"CLEARED\" | \"OPEN\"; ... 13 more ...; recorded_at: string; }): string | null; restore(openSignals: readonly ...'."
+      },
+      {
+        "file": "tests/integration/obs-agent-04-not-wired.test.ts",
+        "line": 93,
+        "column": 40,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(): Promise<T>; }>; stateDir: string; targets: never[]; targetFragment: null; configuration: {}; thresholds: { detector_interval_ms: number; blind_window_s: number; gap_window_s: number; gap_severe_lost_count: number; expected_runtimes: string[]; }; }' but required in type 'Readonly<{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(operation: (client: Readonly<{ query<R extends QueryResultRow = any, I = any[]>(queryTextOrConfig: string | QueryConfig<I>, values?: QueryConfigValues<I> | undefined): Promise<...>; }>) => Promise<...>): Promise<...>; }>; ... 6 more ...; thr...'."
+      },
+      {
+        "file": "tests/integration/obs-agent-04-not-wired.test.ts",
+        "line": 110,
+        "column": 43,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(): Promise<T>; }>; stateDir: string; targets: never[]; targetFragment: null; configuration: {}; thresholds: { detector_interval_ms: number; blind_window_s: number; gap_window_s: number; gap_severe_lost_count: number; expected_runtimes: string[]; }; }' but required in type 'Readonly<{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(operation: (client: Readonly<{ query<R extends QueryResultRow = any, I = any[]>(queryTextOrConfig: string | QueryConfig<I>, values?: QueryConfigValues<I> | undefined): Promise<...>; }>) => Promise<...>): Promise<...>; }>; ... 6 more ...; thr...'."
+      },
+      {
+        "file": "tests/integration/obs-agent-04-not-wired.test.ts",
+        "line": 116,
+        "column": 40,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(): Promise<T>; }>; stateDir: string; targets: never[]; targetFragment: null; configuration: {}; thresholds: { detector_interval_ms: number; blind_window_s: number; gap_window_s: number; gap_severe_lost_count: number; expected_runtimes: string[]; }; }' but required in type 'Readonly<{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(operation: (client: Readonly<{ query<R extends QueryResultRow = any, I = any[]>(queryTextOrConfig: string | QueryConfig<I>, values?: QueryConfigValues<I> | undefined): Promise<...>; }>) => Promise<...>): Promise<...>; }>; ... 6 more ...; thr...'."
+      },
+      {
+        "file": "tests/integration/obs-agent-04-not-wired.test.ts",
+        "line": 190,
+        "column": 43,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(): Promise<T>; }>; stateDir: string; targets: never[]; targetFragment: null; configuration: {}; thresholds: { detector_interval_ms: number; blind_window_s: number; gap_window_s: number; gap_severe_lost_count: number; expected_runtimes: string[]; }; }' but required in type 'Readonly<{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(operation: (client: Readonly<{ query<R extends QueryResultRow = any, I = any[]>(queryTextOrConfig: string | QueryConfig<I>, values?: QueryConfigValues<I> | undefined): Promise<...>; }>) => Promise<...>): Promise<...>; }>; ... 6 more ...; thr...'."
+      },
+      {
+        "file": "tests/integration/obs-agent-05-connection-drill.test.ts",
+        "line": 40,
+        "column": 23,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ modules: Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: ModuleLifecycle; targetFragmentBasename?: string; router?: SignalRouterFactory; probe(ctx: ProbeContext): Promise<readonly ProbeObservation[]>; samples(observations: readonly ProbeObservation[], ctx: Sample...' but required in type 'Readonly<{ modules: readonly Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: Readonly<{ legacyCorrelationKey(signal: { seq: number; signal_id: string; state: \"CLEARED\" | \"OPEN\"; ... 13 more ...; recorded_at: string; }): string | null; restore(openSignals: readonly ...'."
+      },
+      {
+        "file": "tests/integration/obs-agent-05-docker.test.ts",
+        "line": 46,
+        "column": 45,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(): Promise<T>; }>; stateDir: string; targets: never[]; targetFragment: null; configuration: {}; thresholds: {}; }' but required in type 'Readonly<{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(operation: (client: Readonly<{ query<R extends QueryResultRow = any, I = any[]>(queryTextOrConfig: string | QueryConfig<I>, values?: QueryConfigValues<I> | undefined): Promise<...>; }>) => Promise<...>): Promise<...>; }>; ... 6 more ...; thr...'."
+      },
+      {
+        "file": "tests/integration/obs-agent-06-status.test.ts",
+        "line": 45,
+        "column": 44,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(): Promise<T>; }>; stateDir: string; targets: readonly unknown[]; targetFragment: null; configuration: Readonly<{}>; thresholds: ModuleConfigurationObject; }' but required in type 'Readonly<{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(operation: (client: Readonly<{ query<R extends QueryResultRow = any, I = any[]>(queryTextOrConfig: string | QueryConfig<I>, values?: QueryConfigValues<I> | undefined): Promise<...>; }>) => Promise<...>): Promise<...>; }>; ... 6 more ...; thr...'."
+      },
+      {
+        "file": "tests/integration/obs-agent-06-status.test.ts",
+        "line": 196,
+        "column": 24,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type 'Readonly<{ now: Date; timeoutMs: 2000; database: Readonly<{ withClient<T>(): Promise<T>; }>; stateDir: \"/tmp/obs-06-status-fixture\"; targets: readonly never[]; targetFragment: null; configuration: Readonly<...>; thresholds: Readonly<...>; }>' but required in type 'Readonly<{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(operation: (client: Readonly<{ query<R extends QueryResultRow = any, I = any[]>(queryTextOrConfig: string | QueryConfig<I>, values?: QueryConfigValues<I> | undefined): Promise<...>; }>) => Promise<...>): Promise<...>; }>; ... 6 more ...; thr...'."
+      },
+      {
+        "file": "tests/integration/obs-agent-06-status.test.ts",
+        "line": 203,
+        "column": 39,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ timeoutMs: 2000; database: Readonly<{ withClient<T>(): Promise<T>; }>; stateDir: \"/tmp/obs-06-status-fixture\"; targets: readonly never[]; targetFragment: null; configuration: Readonly<{}>; thresholds: Readonly<...>; now: Date; }' but required in type 'Readonly<{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(operation: (client: Readonly<{ query<R extends QueryResultRow = any, I = any[]>(queryTextOrConfig: string | QueryConfig<I>, values?: QueryConfigValues<I> | undefined): Promise<...>; }>) => Promise<...>): Promise<...>; }>; ... 6 more ...; thr...'."
+      },
+      {
+        "file": "tests/integration/obs-agent-06-views.test.ts",
+        "line": 94,
+        "column": 42,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(operation: (client: ObservationQueryClient) => Promise<T>): Promise<T>; }>; stateDir: string; targets: readonly never[]; targetFragment: null; configuration: Readonly<...>; thresholds: Readonly<...>; }' but required in type 'Readonly<{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(operation: (client: Readonly<{ query<R extends QueryResultRow = any, I = any[]>(queryTextOrConfig: string | QueryConfig<I>, values?: QueryConfigValues<I> | undefined): Promise<...>; }>) => Promise<...>): Promise<...>; }>; ... 6 more ...; thr...'."
+      },
+      {
+        "file": "tests/unit/dev-cli-provider-panel.test.ts",
+        "line": 151,
+        "column": 7,
+        "code": "TS2322",
+        "message": "Type 'string' is not assignable to type 'RegisterVersionText'."
+      },
+      {
+        "file": "tests/unit/dev-cli-provider-panel.test.ts",
+        "line": 153,
+        "column": 9,
+        "code": "TS2322",
+        "message": "Type '(input: GeneralRegisterPublication) => Promise<Readonly<{ registerVersion: \"9\"; baseRegisterVersion: RegisterVersionText; publicationId: string; ... 4 more ...; recordedAt: Date; }>>' is not assignable to type '(input: GeneralRegisterPublication) => Promise<Readonly<{ registerVersion: RegisterVersionText; baseRegisterVersion: RegisterVersionText; ... 5 more ...; recordedAt: Date; }>>'."
+      },
+      {
+        "file": "tests/unit/dev-cli-provider-panel.test.ts",
+        "line": 176,
+        "column": 43,
+        "code": "TS2345",
+        "message": "Argument of type 'string' is not assignable to parameter of type 'RegisterVersionText'."
+      },
+      {
+        "file": "tests/unit/dev-evaluator-process.test.ts",
+        "line": 6,
+        "column": 8,
+        "code": "TS2307",
+        "message": "Cannot find module '../../apps/runner/src/dev-evaluator-process.js' or its corresponding type declarations."
+      },
+      {
+        "file": "tests/unit/evaluator-profiles.test.ts",
+        "line": 32,
+        "column": 5,
+        "code": "TS2353",
+        "message": "Object literal may only specify known properties, and 'posterior' does not exist in type 'EvaluatorProfileObservation'."
+      },
+      {
+        "file": "tests/unit/evaluator-profiles.test.ts",
+        "line": 91,
+        "column": 76,
+        "code": "TS2353",
+        "message": "Object literal may only specify known properties, and 'posterior' does not exist in type 'Partial<EvaluatorProfileObservation> & Pick<EvaluatorProfileObservation, \"observationId\" | \"runId\">'."
+      },
+      {
+        "file": "tests/unit/evaluator-profiles.test.ts",
+        "line": 153,
+        "column": 47,
+        "code": "TS2353",
+        "message": "Object literal may only specify known properties, and 'posterior' does not exist in type 'Partial<EvaluatorProfileObservation> & Pick<EvaluatorProfileObservation, \"observationId\" | \"runId\">'."
+      },
+      {
+        "file": "tests/unit/evaluator-profiles.test.ts",
+        "line": 181,
+        "column": 47,
+        "code": "TS2353",
+        "message": "Object literal may only specify known properties, and 'posterior' does not exist in type 'Partial<EvaluatorProfileObservation> & Pick<EvaluatorProfileObservation, \"observationId\" | \"runId\">'."
+      },
+      {
+        "file": "tests/unit/obs-agent-01-discovery.test.ts",
+        "line": 157,
+        "column": 79,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ stateDir: string; delivery: never; osascript: () => Promise<{ deliveredAt: Date; externalRef: null; }>; moduleName: string; targetFragment: Readonly<{ basename: \"OBS-07.json\"; targets: readonly never[]; configuration: Readonly<...>; }>; configuration: Readonly<...>; thresholds: Readonly<...>; thresholdVersion: num...' but required in type 'Readonly<{ stateDir: string; repoRoot: string; delivery: DeliveryCoordinator; osascript: OsaScriptDeliveryExecutor; moduleName: string; targetFragment: Readonly<...>; configuration: ModuleConfigurationObject; thresholds: ModuleConfigurationObject; thresholdVersion: number; deliveryResults?: readonly { ...; }[]; }>'."
+      },
+      {
+        "file": "tests/unit/obs-agent-01-discovery.test.ts",
+        "line": 246,
+        "column": 78,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ stateDir: string; delivery: never; osascript: () => Promise<{ deliveredAt: Date; externalRef: null; }>; moduleName: string; targetFragment: Readonly<{ basename: \"OBS-07.json\"; targets: readonly never[]; configuration: Readonly<...>; }>; configuration: Readonly<...>; thresholds: Readonly<...>; thresholdVersion: num...' but required in type 'Readonly<{ stateDir: string; repoRoot: string; delivery: DeliveryCoordinator; osascript: OsaScriptDeliveryExecutor; moduleName: string; targetFragment: Readonly<...>; configuration: ModuleConfigurationObject; thresholds: ModuleConfigurationObject; thresholdVersion: number; deliveryResults?: readonly { ...; }[]; }>'."
+      },
+      {
+        "file": "tests/unit/obs-agent-01-discovery.test.ts",
+        "line": 255,
+        "column": 71,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ stateDir: string; delivery: never; osascript: () => Promise<{ deliveredAt: Date; externalRef: null; }>; moduleName: string; targetFragment: Readonly<{ basename: \"OBS-07.json\"; targets: readonly never[]; configuration: Readonly<...>; }>; configuration: Readonly<...>; thresholds: Readonly<...>; thresholdVersion: num...' but required in type 'Readonly<{ stateDir: string; repoRoot: string; delivery: DeliveryCoordinator; osascript: OsaScriptDeliveryExecutor; moduleName: string; targetFragment: Readonly<...>; configuration: ModuleConfigurationObject; thresholds: ModuleConfigurationObject; thresholdVersion: number; deliveryResults?: readonly { ...; }[]; }>'."
+      },
+      {
+        "file": "tests/unit/obs-agent-01-discovery.test.ts",
+        "line": 557,
+        "column": 79,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ modules: { name: string; cadence: { intervalMs: number; timeoutMs: number; }; targetFragmentBasename: string; probe(ctx: Parameters<import(\"../../apps/observation-agent/src/core/types.js\").Module[\"probe\"]>[0]): Promise<...>; samples(): never[]; signals(_observations: readonly unknown[], ctx: Parameters<import(\"../...' but required in type 'Readonly<{ modules: readonly Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: Readonly<{ legacyCorrelationKey(signal: { seq: number; signal_id: string; state: \"CLEARED\" | \"OPEN\"; ... 13 more ...; recorded_at: string; }): string | null; restore(openSignals: readonly ...'."
+      },
+      {
+        "file": "tests/unit/obs-agent-01-discovery.test.ts",
+        "line": 611,
+        "column": 44,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ modules: { name: string; cadence: { intervalMs: number; timeoutMs: number; }; probe(): Promise<readonly [{ readonly component: \"dev_stack\"; readonly ok: false; readonly class: \"INFRA_DOWN\"; readonly probe: \"expected_set\"; readonly lastStatus: \"NOT_RUNNING\"; readonly management: \"module\"; readonly statusState: \"NOT...' but required in type 'Readonly<{ modules: readonly Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: Readonly<{ legacyCorrelationKey(signal: { seq: number; signal_id: string; state: \"CLEARED\" | \"OPEN\"; ... 13 more ...; recorded_at: string; }): string | null; restore(openSignals: readonly ...'."
+      },
+      {
+        "file": "tests/unit/obs-agent-01-discovery.test.ts",
+        "line": 763,
+        "column": 32,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ now: Date; timeoutMs: 2000; database: Readonly<{ withClient<T>(): Promise<T>; }>; stateDir: \"/tmp/observation-state\"; targets: readonly []; thresholdVersion: 1; modules: never; }' but required in type 'Readonly<{ modules: readonly Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: Readonly<{ legacyCorrelationKey(signal: { seq: number; signal_id: string; state: \"CLEARED\" | \"OPEN\"; ... 13 more ...; recorded_at: string; }): string | null; restore(openSignals: readonly ...'."
+      },
+      {
+        "file": "tests/unit/obs-agent-01-discovery.test.ts",
+        "line": 769,
+        "column": 32,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ now: Date; timeoutMs: 2000; database: Readonly<{ withClient<T>(): Promise<T>; }>; stateDir: \"/tmp/observation-state\"; targets: readonly []; thresholdVersion: 1; modules: { cadence: { intervalMs: number; timeoutMs: number; }; probe(): Promise<...>; signals(): never[]; name: string; samples(): { ...; }[]; }[]; }' but required in type 'Readonly<{ modules: readonly Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: Readonly<{ legacyCorrelationKey(signal: { seq: number; signal_id: string; state: \"CLEARED\" | \"OPEN\"; ... 13 more ...; recorded_at: string; }): string | null; restore(openSignals: readonly ...'."
+      },
+      {
+        "file": "tests/unit/obs-agent-01-discovery.test.ts",
+        "line": 775,
+        "column": 32,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ now: Date; timeoutMs: 2000; database: Readonly<{ withClient<T>(): Promise<T>; }>; stateDir: \"/tmp/observation-state\"; targets: readonly []; thresholdVersion: 1; modules: never; }' but required in type 'Readonly<{ modules: readonly Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: Readonly<{ legacyCorrelationKey(signal: { seq: number; signal_id: string; state: \"CLEARED\" | \"OPEN\"; ... 13 more ...; recorded_at: string; }): string | null; restore(openSignals: readonly ...'."
+      },
+      {
+        "file": "tests/unit/obs-agent-01-status-projections.test.ts",
+        "line": 141,
+        "column": 21,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ modules: { name: string; cadence: { intervalMs: number; timeoutMs: number; }; probe(): Promise<never>; samples(): never[]; signals(): never[]; }[]; now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(): Promise<T>; }>; stateDir: string; targets: never[]; thresholdVersion: number; }' but required in type 'Readonly<{ modules: readonly Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: Readonly<{ legacyCorrelationKey(signal: { seq: number; signal_id: string; state: \"CLEARED\" | \"OPEN\"; ... 13 more ...; recorded_at: string; }): string | null; restore(openSignals: readonly ...'."
+      },
+      {
+        "file": "tests/unit/obs-agent-05-lifecycle.test.ts",
+        "line": 75,
+        "column": 23,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ modules: Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: ModuleLifecycle; targetFragmentBasename?: string; router?: SignalRouterFactory; probe(ctx: ProbeContext): Promise<readonly ProbeObservation[]>; samples(observations: readonly ProbeObservation[], ctx: Sample...' but required in type 'Readonly<{ modules: readonly Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: Readonly<{ legacyCorrelationKey(signal: { seq: number; signal_id: string; state: \"CLEARED\" | \"OPEN\"; ... 13 more ...; recorded_at: string; }): string | null; restore(openSignals: readonly ...'."
+      },
+      {
+        "file": "tests/unit/obs-agent-05-lifecycle.test.ts",
+        "line": 78,
+        "column": 23,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ modules: Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: ModuleLifecycle; targetFragmentBasename?: string; router?: SignalRouterFactory; probe(ctx: ProbeContext): Promise<readonly ProbeObservation[]>; samples(observations: readonly ProbeObservation[], ctx: Sample...' but required in type 'Readonly<{ modules: readonly Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: Readonly<{ legacyCorrelationKey(signal: { seq: number; signal_id: string; state: \"CLEARED\" | \"OPEN\"; ... 13 more ...; recorded_at: string; }): string | null; restore(openSignals: readonly ...'."
+      },
+      {
+        "file": "tests/unit/obs-agent-05-lifecycle.test.ts",
+        "line": 80,
+        "column": 23,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ modules: Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: ModuleLifecycle; targetFragmentBasename?: string; router?: SignalRouterFactory; probe(ctx: ProbeContext): Promise<readonly ProbeObservation[]>; samples(observations: readonly ProbeObservation[], ctx: Sample...' but required in type 'Readonly<{ modules: readonly Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: Readonly<{ legacyCorrelationKey(signal: { seq: number; signal_id: string; state: \"CLEARED\" | \"OPEN\"; ... 13 more ...; recorded_at: string; }): string | null; restore(openSignals: readonly ...'."
+      },
+      {
+        "file": "tests/unit/obs-agent-05-lifecycle.test.ts",
+        "line": 82,
+        "column": 23,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ modules: Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: ModuleLifecycle; targetFragmentBasename?: string; router?: SignalRouterFactory; probe(ctx: ProbeContext): Promise<readonly ProbeObservation[]>; samples(observations: readonly ProbeObservation[], ctx: Sample...' but required in type 'Readonly<{ modules: readonly Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: Readonly<{ legacyCorrelationKey(signal: { seq: number; signal_id: string; state: \"CLEARED\" | \"OPEN\"; ... 13 more ...; recorded_at: string; }): string | null; restore(openSignals: readonly ...'."
+      },
+      {
+        "file": "tests/unit/obs-agent-05-lifecycle.test.ts",
+        "line": 84,
+        "column": 23,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ modules: Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: ModuleLifecycle; targetFragmentBasename?: string; router?: SignalRouterFactory; probe(ctx: ProbeContext): Promise<readonly ProbeObservation[]>; samples(observations: readonly ProbeObservation[], ctx: Sample...' but required in type 'Readonly<{ modules: readonly Readonly<{ name: string; cadence: Readonly<{ intervalMs: number; timeoutMs: number; }>; lifecycle?: Readonly<{ legacyCorrelationKey(signal: { seq: number; signal_id: string; state: \"CLEARED\" | \"OPEN\"; ... 13 more ...; recorded_at: string; }): string | null; restore(openSignals: readonly ...'."
+      },
+      {
+        "file": "tests/unit/obs-agent-05-postgres.test.ts",
+        "line": 45,
+        "column": 43,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ readonly now: Date; readonly timeoutMs: 2000; readonly database: Readonly<{ withClient<T>(): Promise<T>; }>; readonly stateDir: \"/tmp/obs-05-fixture\"; readonly targets: readonly []; readonly targetFragment: null; readonly configuration: {}; readonly thresholds: Readonly<...>; }' but required in type 'Readonly<{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(operation: (client: Readonly<{ query<R extends QueryResultRow = any, I = any[]>(queryTextOrConfig: string | QueryConfig<I>, values?: QueryConfigValues<I> | undefined): Promise<...>; }>) => Promise<...>): Promise<...>; }>; ... 6 more ...; thr...'."
+      },
+      {
+        "file": "tests/unit/obs-agent-05-postgres.test.ts",
+        "line": 66,
+        "column": 24,
+        "code": "TS2741",
+        "message": "Property 'repoRoot' is missing in type '{ readonly now: Date; readonly timeoutMs: 2000; readonly database: Readonly<{ withClient<T>(): Promise<T>; }>; readonly stateDir: \"/tmp/obs-05-fixture\"; readonly targets: readonly []; readonly targetFragment: null; readonly configuration: {}; readonly thresholds: Readonly<...>; }' but required in type 'Readonly<{ now: Date; timeoutMs: number; database: Readonly<{ withClient<T>(operation: (client: Readonly<{ query<R extends QueryResultRow = any, I = any[]>(queryTextOrConfig: string | QueryConfig<I>, values?: QueryConfigValues<I> | undefined): Promise<...>; }>) => Promise<...>): Promise<...>; }>; ... 6 more ...; thr...'."
+      },
+      {
+        "file": "tests/unit/s14-ui.test.ts",
+        "line": 19,
+        "column": 8,
+        "code": "TS2307",
+        "message": "Cannot find module '../../web/lib/v3Presentation.js' or its corresponding type declarations."
+      },
+      {
+        "file": "tests/unit/s14-ui.test.ts",
+        "line": 122,
+        "column": 38,
+        "code": "TS18046",
+        "message": "'label' is of type 'unknown'."
+      },
+      {
+        "file": "tests/unit/s14-ui.test.ts",
+        "line": 128,
+        "column": 71,
+        "code": "TS18046",
+        "message": "'label' is of type 'unknown'."
+      },
+      {
+        "file": "tests/unit/s14-ui.test.ts",
+        "line": 199,
+        "column": 18,
+        "code": "TS2339",
+        "message": "Property 'nodes' does not exist on type '{ event_id: string; event_type: \"graph.cycle_refused\" | \"graph.edge_added\" | \"honesty.abstention_typed\" | \"honesty.budget_skip_marked\" | \"honesty.fallback_labeled\" | \"honesty.investigation_gap_opened\" | ... 22 more ... | \"serve.recompose_or_defect\"; run_ref: string; subject_ref?: string | ... 1 more ... | undefined;...'."
+      },
+      {
+        "file": "tests/unit/s14-ui.test.ts",
+        "line": 200,
+        "column": 18,
+        "code": "TS2339",
+        "message": "Property 'placeholderEdges' does not exist on type '{ event_id: string; event_type: \"graph.cycle_refused\" | \"graph.edge_added\" | \"honesty.abstention_typed\" | \"honesty.budget_skip_marked\" | \"honesty.fallback_labeled\" | \"honesty.investigation_gap_opened\" | ... 22 more ... | \"serve.recompose_or_defect\"; run_ref: string; subject_ref?: string | ... 1 more ... | undefined;...'."
+      },
+      {
+        "file": "tests/unit/s14-ui.test.ts",
+        "line": 230,
+        "column": 58,
+        "code": "TS2307",
+        "message": "Cannot find module '../../web/lib/api.js' or its corresponding type declarations."
+      },
+      {
+        "file": "tests/unit/s14-ui.test.ts",
+        "line": 232,
+        "column": 55,
+        "code": "TS7006",
+        "message": "Parameter 'input' implicitly has an 'any' type."
+      },
+      {
+        "file": "tests/unit/s14-ui.test.ts",
+        "line": 232,
+        "column": 62,
+        "code": "TS7006",
+        "message": "Parameter 'init' implicitly has an 'any' type."
+      }
+    ]
+  },
+  "preview_final": {
+    "provided_log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-typecheck-final.log",
+    "provided_log_sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "diagnostic_count": 76,
+    "counts_by_code": {
+      "TS18046": 2,
+      "TS2307": 4,
+      "TS2322": 3,
+      "TS2339": 23,
+      "TS2345": 1,
+      "TS2353": 4,
+      "TS2694": 3,
+      "TS2741": 34,
+      "TS7006": 2
+    },
+    "attribution": {
+      "observed_in_baseline_exact": 73,
+      "unmatched_due_to_moved_lines": 3,
+      "introduced_count": 0,
+      "baseline_only_after_matching": 0,
+      "moved": [
+        {
+          "preview": {
+            "file": "tests/unit/dev-cli-provider-panel.test.ts",
+            "line": 171,
+            "column": 7,
+            "code": "TS2322",
+            "message": "Type 'string' is not assignable to type 'RegisterVersionText'."
+          },
+          "baseline_location": {
+            "line": 151,
+            "column": 7
+          }
+        },
+        {
+          "preview": {
+            "file": "tests/unit/dev-cli-provider-panel.test.ts",
+            "line": 173,
+            "column": 9,
+            "code": "TS2322",
+            "message": "Type '(input: GeneralRegisterPublication) => Promise<Readonly<{ registerVersion: \"9\"; baseRegisterVersion: RegisterVersionText; publicationId: string; ... 4 more ...; recordedAt: Date; }>>' is not assignable to type '(input: GeneralRegisterPublication) => Promise<Readonly<{ registerVersion: RegisterVersionText; baseRegisterVersion: RegisterVersionText; ... 5 more ...; recordedAt: Date; }>>'."
+          },
+          "baseline_location": {
+            "line": 153,
+            "column": 9
+          }
+        },
+        {
+          "preview": {
+            "file": "tests/unit/dev-cli-provider-panel.test.ts",
+            "line": 196,
+            "column": 43,
+            "code": "TS2345",
+            "message": "Argument of type 'string' is not assignable to parameter of type 'RegisterVersionText'."
+          },
+          "baseline_location": {
+            "line": 176,
+            "column": 43
+          }
+        }
+      ],
+      "introduced_tuples": [],
+      "baseline_only_tuples": []
+    }
+  },
+  "notes": [
+    "A diagnostic tuple is the first TypeScript diagnostic line: file, line, column, code, message. Continuation text remains verbatim in the immutable logs.",
+    "Filename-only matching was not used. Exact matches include normalized message text; moved matches require the same file, code, and normalized message with a different line or column."
+  ]
+}

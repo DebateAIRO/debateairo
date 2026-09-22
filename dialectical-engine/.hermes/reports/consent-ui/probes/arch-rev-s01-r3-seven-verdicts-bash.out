@@ -1,0 +1,17 @@
+SHELL=/bin/bash  grep=grep (BSD grep, GNU compatible) 2.6.0-FreeBSD
+porcelain BEFORE: 0
+===== BLOCK 1 =====
+S01-C1 verdict=0   summary:      Tests  2 failed | 6 passed (8)   hit-list: 1 (pinned .drawerScrim line: 1)   tsc ran: 1 exit 1, diagnostics outside the pin: 0
+===== BLOCK 2 =====
+S01-C2 verdict=1   summary:  files:   ADR Status:Proposed lines: 0, debateai.consent mentions: 0   tsc ran: 1 exit 1, diagnostics outside the pin: 0
+===== BLOCK 3 =====
+S01-C3 verdict=1   summary:  files:   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 0   tsc ran: 1 exit 1, outside the pin: 0
+===== BLOCK 4 =====
+S01-C4 verdict=1   summary:  files:   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 0   tsc ran: 1 exit 1, outside the pin: 0
+===== BLOCK 5 =====
+S01-C5 verdict=1   summary:      Tests  4 failed | 27 passed (31)  files: Test Files  1 failed | 1 passed (2)   failures: 4 (unpinned: 0)  guarded-green: 2  consent-mount lines: 0 (failing: 0)  hit-list: 1   tsc ran: 1 exit 1, outside the pin: 0
+===== BLOCK 6 =====
+S01-C6 verdict=1   summary:  files:   S02-files: ref resolved 0, commits in 2b670d3059c60d7262cf655bd5d402c88100dff3..HEAD touching them: 0, working-tree diff: 'none'   tsc ran: 1 exit 1, outside the pin: 0
+===== BLOCK 7 =====
+S01-C7 verdict=1   summary:  files:   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 0   tsc ran: 1 exit 1, outside the pin: 0
+porcelain AFTER: 0

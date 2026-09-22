@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "node": "ATTEST",
+  "status": "READY_FOR_PEER_REVIEW",
+  "inputRevision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+  "commit": "252f8faf46d987e1df89778eff0439ea140994d0",
+  "reviewerArtifactSha256": "02b1396b131ddf437dc361679ecbad6587d1fafda3a2a17b889ec370492f5fab",
+  "runtimeManifestSha256": "02b1396b131ddf437dc361679ecbad6587d1fafda3a2a17b889ec370492f5fab",
+  "testFileSha256": "a4c5cb99e887a8139d2c795cad53c97055308b421296ae71b741c6f9060af165",
+  "catalogCanonicalSha256": "24784328a4bb8d4e5205b3036dd369268180df792243db1c296a0a7ed2a0f9fe",
+  "articles": { "checked": 24, "mismatches": 0 },
+  "loaded": {
+    "kbVersion": "b6f48a593b500f108e0eed11e0ceccfe8654e684fcdf0bb8284c1ded179867ca",
+    "shippedCount": 18,
+    "ignoredCount": 0,
+    "previewReviewedCount": 12,
+    "ownerRatifiedCount": 6,
+    "reviewRecords": 24
+  },
+  "suite": { "filesPassed": 4, "testsPassed": 52 },
+  "ownerAcceptance": false
+}

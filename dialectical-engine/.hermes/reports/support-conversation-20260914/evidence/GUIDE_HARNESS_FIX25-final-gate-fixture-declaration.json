@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX25",
+  "fixtureOnly": true,
+  "operationalUseForbidden": true,
+  "runtimeAvailabilityClaimed": false,
+  "finalGateTemplatePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX25-gate-template.json",
+  "finalGateTemplateSha256": "08afa7f933acaa1fa94575fc3f8e0c997fc187c92bc8e851c54ddf7f7b32d9bc",
+  "substitutions": [
+    "runtimeCapacityPath",
+    "runtimeCapacitySha256"
+  ],
+  "capacityPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX25-final-gate-capacity-fixture.json",
+  "capacitySha256": "495b97622a1cffa7999f9ff886713a3e98983d0fd4cb832e38eaa9f09527468b",
+  "gatePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX25-final-gate-fixture.json",
+  "gateSha256": "2873dabbe64fde02a89d6518e1c9c14e07e05389aef3de4d548284d9f9135fe6"
+}

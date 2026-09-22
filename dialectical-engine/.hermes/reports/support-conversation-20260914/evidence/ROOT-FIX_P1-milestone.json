@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-14T17:03:07.403497+00:00",
+  "node": "FIX_P1",
+  "status": "author milestone, not final consumption",
+  "designSha256Reported": "36b96175191bb89d08a0380a65ba92499fe858886d67d482cf59f41aa8ae7227",
+  "redLogSha256Reported": "77b7180e33ed59a46e39776c160da55e1a1acf20c51fd199350090374413f8b4",
+  "reportedFrame": {
+    "files": 7,
+    "filesFailed": 6,
+    "filesPassed": 1,
+    "testsFailed": 26,
+    "testsPassed": 160
+  },
+  "limitations": "Author message only; new-module load failures isolated to2suites, other production tests expose existing classes. Final exact artifacts not yet consumed. No live traffic."
+}

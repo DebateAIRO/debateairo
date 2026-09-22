@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE22",
+  "ticket": "t_198ae0a9",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "STOPPED_PRIVATE_ENVIRONMENT_VALIDATION",
+  "recordedAtUtc": "2026-09-21T00:51:37.647934Z",
+  "retained": {
+    "preflightSha256": "dfce83ea1e186372e9d16c0989e3117d262968c8c724d23540ad46572324df58",
+    "readinessSha256": "03fb0a8c0fef2d92496c6a2a7a0f263d15a2746752ce8b54cadaf4a8198c7a7f"
+  },
+  "preCapacityChecks": {
+    "contractSha256": "7502ed0d8bb8618e4ba56c2157efd24a5d9af92258b91ebc90d4ef6c82727c9c",
+    "futureOutputsAbsent": true,
+    "runtimePid": 12272,
+    "runtimePgid": 12272,
+    "commandMarkerMatched": true,
+    "ordinaryTlsStatus": 200
+  },
+  "privateEnvironment": {
+    "source": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/.local/dev-auth/api.env",
+    "loader": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/runner/src/dev-api-process.ts#loadDevelopmentApiProcessEnvironment",
+    "privateReader": "readPrivateEnvironment",
+    "sourceResolved": true,
+    "loaderResult": "REJECTED",
+    "code": "DEV_API_PROCESS_ENVIRONMENT_INVALID",
+    "causeCode": "DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID",
+    "valueDisplayed": false,
+    "valuePersisted": false,
+    "childEnvironmentProjected": false,
+    "lowerLevelReader": "apps/runner/src/dev-api-process.ts#readPrivateEnvironment",
+    "orderedParser": "apps/runner/src/dev-api-process.ts#parseExactEnvironment",
+    "orderedKeySource": "apps/runner/src/dev-api-environment.ts#DEVELOPMENT_API_ENVIRONMENT_KEYS"
+  },
+  "phaseStatuses": {
+    "preflight": "RETAINED_PASS",
+    "readiness": "RETAINED_PASS",
+    "capacity": "NOT_INVOKED",
+    "gate": "NOT_RUN",
+    "rowProof": "NOT_RUN",
+    "capture": "NOT_RUN",
+    "idle": "NOT_RUN"
+  },
+  "actualCapture": {
+    "attemptedRequests": 0,
+    "completedRequests": 0,
+    "newSessions": 0,
+    "modelCalls": 0
+  },
+  "traffic": {
+    "preCapacityOrdinaryTlsReads": 1,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "outputAbsence": {
+    "prerequisite": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE22-prerequisites.json",
+      "absent": true
+    },
+    "stop": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE22-stop.json",
+      "absent": true
+    },
+    "capacityDirectLog": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE22-phase3-direct.log",
+      "absent": true
+    },
+    "capacity": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-capacity.json",
+      "absent": true
+    },
+    "gate": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-gate.json",
+      "absent": true
+    },
+    "rowProof": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-row-proof-status.json",
+      "absent": true
+    },
+    "rowProofResult": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-LIVE21.json",
+      "absent": true
+    },
+    "capture": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-capture.json",
+      "absent": true
+    },
+    "idle": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-idle.json",
+      "absent": true
+    },
+    "actualReceipt": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE21-actual-receipt.json",
+      "absent": true
+    }
+  },
+  "runtime": {
+    "pid": 12272,
+    "pgid": 12272,
+    "leftUntouched": true,
+    "postFailureLiveness": "NOT_RECHECKED",
+    "lastProvedBy": "LIVE22_PRECAPACITY_OWNERSHIP_TLS_CHECK"
+  },
+  "limits": [
+    "No retry or alternate loader used.",
+    "No phase3 command was invoked.",
+    "Deferred owner-capacity command not executed.",
+    "Forgot remains unresolved/actionless."
+  ]
+}

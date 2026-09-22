@@ -1,0 +1,14 @@
+{
+  "node": "GUIDE_TYPEFIX",
+  "ticket": "t_a8d71466",
+  "base": "8fb8e407b350f9950cdb27a0f4caaf8e178d7cb6",
+  "writePaths": [
+    "apps/api/src/support/recovery-intent.ts",
+    "tests/architecture/sup-03-projection.test.ts",
+    "tests/architecture/support-catalog-coverage.test.ts",
+    "tests/integration/support-routes.test.ts",
+    "tests/unit/support-context.test.ts",
+    "tests/unit/support-recovery-intent.test.ts"
+  ],
+  "finding": "Composed typecheck95 diagnostics vs76 baseline:19 added across exact six paths; current33 tests1496+1TODO and structural60/60 are historical at8fb, not a clean type gate."
+}

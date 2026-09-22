@@ -1,0 +1,323 @@
+# Review package — lane /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/consent-s02-css/dialectical-engine — range a035f814..0dc569e9 — generated 2026-09-07 03:07:02
+
+## Commits
+0dc569e9 02:58 fix(consent-ui S02-C8): correct the .70 contrast figure, focus rings for the four bare controls, drop the orphaned comment
+
+## Stat
+ dialectical-engine/apps/ui/app/globals.css         |  32 +++--
+ .../tests/unit/consent-s02-style-contract.test.ts  | 139 +++++++++++++++++----
+ 2 files changed, 139 insertions(+), 32 deletions(-)
+
+## Diff (-U10)
+diff --git a/dialectical-engine/apps/ui/app/globals.css b/dialectical-engine/apps/ui/app/globals.css
+index cc94b04e..85596e16 100644
+--- a/dialectical-engine/apps/ui/app/globals.css
++++ b/dialectical-engine/apps/ui/app/globals.css
+@@ -7565,23 +7565,26 @@ a:focus-visible {
+   background: var(--ink);
+   color: var(--bg);
+   font: inherit;
+   font-size: 12px;
+   font-weight: 700;
+   cursor: pointer;
+ }
+ 
+ /* `.65` is MEASURED, not chosen: stepping alpha by 0.05 over the label and the face composited
+    on the footer's `--shell` ground gives .60 -> Terracotta 4.13 (fails 4.5:1), .65 -> 4.79 /
+-   7.17, .70 -> 5.61 / 8.09. It is the smallest step clearing 4.5:1 in BOTH modes, i.e. the most
+-   dimmed value that a reader can still read. The arithmetic is executed, not asserted, in
+-   `tests/unit/consent-s02-style-contract.test.ts` (S02-S64). */
++   7.17, .70 -> 5.54 / 8.09. It is the smallest step clearing 4.5:1 in BOTH modes, i.e. the most
++   dimmed value that a reader can still read. Every rung above is now ASSERTED, not just narrated,
++   in `tests/unit/consent-s02-style-contract.test.ts` (S02-S64) — the first version of this
++   comment said 5.61 at .70, which is what `Math.round` returns only if `1 - .70` is re-spelled
++   as the literal `.30`; the rung is a tie and the two spellings fall on opposite sides of it
++   (CODE-REV-S02-C8-r1 B1). */
+ .policyPrimary:disabled {
+   opacity: .65;
+   cursor: not-allowed;
+ }
+ 
+ /* The reason the button is disabled reaches assistive technology through `aria-describedby`
+    and must NOT reach it as visible footer text. `display: none` and `visibility: hidden` both
+    remove the element from the accessibility tree and take R15's description with it, so this is
+    the repo's own `.srOnly` treatment (`globals.css:684-694`), copied declaration for
+    declaration: clipped to 1x1 and off the flow, still rendered, still announced. */
+@@ -7590,25 +7593,38 @@ a:focus-visible {
+   width: 1px;
+   height: 1px;
+   padding: 0;
+   margin: -1px;
+   overflow: hidden;
+   clip: rect(0, 0, 0, 0);
+   white-space: nowrap;
+   border: 0;
+ }
+ 
+-/* The reason the button is disabled reaches assistive technology through `aria-describedby`
+-   and must NOT reach it as visible footer text. `display: none` and `visibility: hidden` both
+-   remove the element from the accessibility tree and take R15's description with it, so this is
+-   the repo's own `.srOnly` treatment (`globals.css:684-694`), copied declaration for
+-   declaration: clipped to 1x1 and off the flow, still rendered, still announced. */
++/* --- Focus rings for the controls the repo's shared rule cannot reach --------------------- */
++
++/* The repo's shared ring (`globals.css:488-495`) is keyed on `.btn, .iconBtn, .modeToggle,
++   .input, input, textarea, select, a` — a class list plus four element names. Every control
++   here is a BARE `<button>`, so it matches none of them and falls through to the browser's own
++   ring, which is chrome-coloured: the one paint on either S02 surface that would NOT follow the
++   Terracotta/Chamber toggle. `SPEC.md:612` maps focus rings to `--focus`, `:637` requires them
++   on every control in both modes, so the treatment is added HERE rather than by widening
++   `:488-495`, which is above this block's opening marker and outside S02's single-writer
++   contract. `.consentBox` and `.policyBody` carry their own rules above; the four grouped here
++   are the rest of the block's focusable inventory (CODE-REV-S02-C8-r1 N1). */
++.consentPolicyLink:focus-visible,
++.policyClose:focus-visible,
++.policyPill:focus-visible,
++.policyPrimary:focus-visible {
++  outline: 2px solid var(--focus);
++  outline-offset: 2px;
++}
+ 
+ /* --- Motion, and switching it off (S02-S63, R24) -------------------------------------- */
+ 
+ @keyframes consentPolicyScrimIn {
+   from { opacity: 0; }
+   to { opacity: 1; }
+ }
+ 
+ @keyframes consentPolicyCardIn {
+   from { opacity: 0; transform: translateY(8px) scale(.985); }
+diff --git a/dialectical-engine/tests/unit/consent-s02-style-contract.test.ts b/dialectical-engine/tests/unit/consent-s02-style-contract.test.ts
+index 4851b48b..b2a5cc01 100644
+--- a/dialectical-engine/tests/unit/consent-s02-style-contract.test.ts
++++ b/dialectical-engine/tests/unit/consent-s02-style-contract.test.ts
+@@ -41,22 +41,25 @@ function stripComments(text: string): string {
+ 
+ /**
+  * A brace-walking rule reader. It is deliberately NOT a substring scan: `.hermes/TOOLING-TRAPS.md`
+  * records a CSS guard that collected `/bottom:\s*([^;]+);/` and went red the day a neighbouring
+  * cluster added a perfectly correct `border-bottom:` to the same block — a filter that can match
+  * for the wrong reason is not evidence. Every assertion below therefore names a SELECTOR and a
+  * PROPERTY, both compared after trimming, never a substring of the stylesheet.
+  *
+  * `@media` and `@supports` bodies are recursed into so their inner rules are seen with the
+  * at-rule recorded; `@keyframes` is kept whole, because its `from`/`to` steps are not rules whose
+- * selector any assertion here names. Measured in this file: the only at-rules present are
+- * `@keyframes` (7) and `@media` (18).
++ * selector any assertion here names. The only at-rules `globals.css` contains are `@keyframes`
++ * and `@media`; the counts are deliberately NOT written here, because this block's own two
++ * `@keyframes` and one `@media` move them and a count maintained by hand goes stale the round
++ * after it is written (`CODE-REV-S02-C8-r1` B1c, COMMON §10.28 — a count over a file belongs in
++ * the handoff that measured it, not in the file it counts).
+  */
+ function parseRules(text: string, at: string | null = null): Rule[] {
+   const rules: Rule[] = [];
+   let start = 0;
+   let preludeEnd = -1;
+   let depth = 0;
+   for (let i = 0; i < text.length; i += 1) {
+     const char = text[i];
+     if (char === "{") {
+       if (depth === 0) preludeEnd = i;
+@@ -136,20 +139,49 @@ function tokenValue(blockSelector: string, name: string): string {
+ function composite(fg: string, bg: string, alpha: number): string {
+   const channels = (hex: string): number[] =>
+     [1, 3, 5].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16));
+   const front = channels(fg);
+   const back = channels(bg);
+   return `#${front
+     .map((value, index) => Math.round(alpha * value + (1 - alpha) * back[index]!).toString(16).padStart(2, "0"))
+     .join("")}`;
+ }
+ 
++/**
++ * The disabled button's label-on-face ratio at one alpha, in both modes, as the two strings the
++ * assertion below prints. Extracted so the whole measured LADDER can be executed and not merely
++ * narrated: the round-1 review found `5.61` written in prose beside this arithmetic, where the
++ * arithmetic itself yields `5.54`, and nothing executed the unpinned rungs to catch it
++ * (`CODE-REV-S02-C8-r1` B1).
++ *
++ * The rung is a TIE and the spelling of `1 - alpha` decides it, which is how the wrong figure
++ * survived a three-model table: Terracotta's green channel at .70 is `0.70·38 + (1-0.70)·233`.
++ * `1 - 0.70` is `0.30000000000000004` in IEEE-754, so that sum is 96.5 and `Math.round` gives 97
++ * (ratio 5.5450, printed `5.54`); re-derived by hand as `0.70·38 + 0.30·233` it is
++ * 96.49999999999999, `Math.round` gives 96, and the ratio becomes 5.6077 — `5.61`. The model that
++ * ships is `composite()` above, and these assertions are now the only place either number lives.
++ */
++function ratiosAt(alpha: number): string[] {
++  return (
++    [
++      ["Terracotta", ":root"],
++      ["Chamber", 'html[data-mode="chamber"]']
++    ] as const
++  ).map(([mode, blockSelector]) => {
++    const ground = tokenValue(blockSelector, "--shell");
++    const face = tokenValue(blockSelector, "--ink");
++    const label = tokenValue(blockSelector, "--bg");
++    const ratio = contrastRatio(composite(label, ground, alpha), composite(face, ground, alpha));
++    return `${mode} ${ratio.toFixed(2)}`;
++  });
++}
++
+ /** The S02 block's inner text, with both markers excluded. Throws if the block is not well formed. */
+ function s02Block(): string {
+   const open = css.indexOf(OPEN_MARKER);
+   const close = css.indexOf(CLOSE_MARKER);
+   if (open === -1 || close === -1 || close < open) {
+     throw new Error(
+       `The S02 block is not delimited in ${globalsPath}: open=${open}, close=${close}`
+     );
+   }
+   return css.slice(open + OPEN_MARKER.length, close);
+@@ -286,58 +318,59 @@ describe("S02-C8 consent-ui style contract", () => {
+           /prefers-reduced-motion:\s*reduce/.test(rule.at) &&
+           declarations(rule.body).some((decl) => decl.prop === "animation" && decl.value === "none")
+       )
+       .flatMap((rule) => rule.selector.split(",").map((part) => part.trim()));
+ 
+     expect(animated.filter((selector) => !neutralised.includes(selector))).toEqual([]);
+   });
+ 
+   it("S02-S64 · the disabled `I have read it` clears 4.5:1 in both modes, computed here", () => {
+     // The pinned value, and its derivation is a MEASUREMENT rather than a convention: stepping
+-    // alpha by 0.05 over the composite below gives `.60` -> Terracotta 4.13 (fails 4.5), `.65` ->
+-    // 4.79 / 7.17, `.70` -> 5.61 / 8.09. `.65` is the smallest 0.05 step clearing 4.5:1 in BOTH
+-    // modes, i.e. the most dimmed — the most legibly disabled — value that still passes.
++    // alpha by 0.05 over the composite below gives `.60` -> Terracotta 4.13 (fails 4.5) / Chamber
++    // 6.29, `.65` -> 4.79 / 7.17, `.70` -> 5.54 / 8.09. `.65` is the smallest 0.05 step clearing
++    // 4.5:1 in BOTH modes, i.e. the most dimmed — the most legibly disabled — value that still
++    // passes. Every one of those six numbers is ASSERTED at the end of this case, not narrated:
++    // the round-1 review found `5.61` in this sentence, where the arithmetic gives 5.54, because
++    // the only rung anything executed was the pinned one (`CODE-REV-S02-C8-r1` B1).
+     expectDecl(".policyPrimary:disabled", "opacity", ".65");
+     const alpha = Number.parseFloat(declsOf(".policyPrimary:disabled").get("opacity")!);
+     expect(Number.isFinite(alpha)).toBe(true);
+ 
+     // The composite is only about the right colours while the button is painted from these two
+     // tokens, so the model is pinned beside the number it depends on.
+     expectDecl(".policyPrimary", "background", "var(--ink)");
+     expectDecl(".policyPrimary", "color", "var(--bg)");
+ 
+     // `opacity` composites the whole button — face and label together — over the footer's ground,
+     // which is `--shell` (`.policyFoot`). `tests/support/contrast.ts` takes `#RRGGBB` only, so the
+     // flattening happens here and only the flattened pair reaches the helper.
+     expectDecl(".policyFoot", "background", "var(--shell)");
+ 
+-    const measured: Array<[string, number]> = [];
+-    for (const [mode, blockSelector] of [
+-      ["Terracotta", ":root"],
+-      ["Chamber", 'html[data-mode="chamber"]']
+-    ] as const) {
+-      const ground = tokenValue(blockSelector, "--shell");
+-      const face = tokenValue(blockSelector, "--ink");
+-      const label = tokenValue(blockSelector, "--bg");
+-
+-      const ratio = contrastRatio(
+-        composite(label, ground, alpha),
+-        composite(face, ground, alpha)
+-      );
+-      measured.push([mode, ratio]);
+-    }
+-
++    // The claim the step exists to make: at the alpha the stylesheet DECLARES, neither mode is
++    // below 4.5:1. Read from the block, never transcribed, so moving the declaration moves this.
+     expect(
+-      measured
+-        .filter(([, ratio]) => ratio < 4.5)
+-        .map(([mode, ratio]) => `${mode} ${ratio.toFixed(2)}`)
++      ratiosAt(alpha).filter((entry) => Number.parseFloat(entry.split(" ")[1]!) < 4.5)
+     ).toEqual([]);
++
++    // And the LADDER the sentence above narrates, executed rung by rung. `.60` is the rung that
++    // fails and is therefore the reason `.65` is pinned; `.70` is the rung whose figure round 1
++    // shipped wrong. A derivation written as prose beside an executable assertion is unexecuted
++    // prose, and this is what that cost.
++    expect(ratiosAt(0.6)).toEqual(["Terracotta 4.13", "Chamber 6.29"]);
++    expect(ratiosAt(0.65)).toEqual(["Terracotta 4.79", "Chamber 7.17"]);
++    expect(ratiosAt(0.7)).toEqual(["Terracotta 5.54", "Chamber 8.09"]);
++
++    // `.65` is the SMALLEST 0.05 step that clears 4.5:1 in both modes — the claim the pin rests
++    // on — so the rung below it must fail. Stated as a property, not as a number.
++    expect(
++      ratiosAt(0.6).some((entry) => Number.parseFloat(entry.split(" ")[1]!) < 4.5)
++    ).toBe(true);
+   });
+ 
+   it("S02-S65 · no auth-shell ancestor becomes the containing block for the fixed scrim", () => {
+     // The modal is rendered INLINE inside the auth card and relies on `position: fixed` escaping
+     // its ancestors, so none of these seven may declare a property that makes it the containing
+     // block for a fixed descendant. True today; this is what keeps it true. Substring matching
+     // over-includes (`.authCardInner` also matches `.authCard`) and never under-includes, which is
+     // the safe direction for a guard.
+     const shellClasses = [
+       ".appShell",
+@@ -398,11 +431,69 @@ describe("S02-C8 consent-ui style contract", () => {
+     // Compared as a SET, sorted by property: none of these nine declarations interacts with
+     // another, so a different order is the same treatment and must not be called a defect.
+     const sorted = (map: Map<string, string>): string[] =>
+       [...map].map(([prop, value]) => `${prop}: ${value}`).sort();
+     expect(srOnly.size).toBeGreaterThan(0);
+     expect(sorted(hint)).toEqual(sorted(srOnly));
+ 
+     expect(hint.get("display")).toBeUndefined();
+     expect(hint.get("visibility")).toBeUndefined();
+   });
++
++  it("S02-S65c · every focusable control the block styles carries a `--focus` ring inside the block", () => {
++    // `CODE-REV-S02-C8-r1` N1. `SPEC.md:612` maps focus rings to `--focus` and `:637` requires
++    // them "visible on every control, in both modes". The repo's shared ring (`globals.css:488-495`)
++    // is keyed on `.btn, .iconBtn, .modeToggle, .input, input, textarea, select, a` — a class list
++    // plus four element names. A BARE `<button>` is in none of those, so four of this block's six
++    // focusable controls fell through to the UA ring: the one paint on either S02 surface that does
++    // not follow the mode toggle, which is what falsifies R23 for them. The ring has to be added
++    // INSIDE this block — `:488-495` is above the opening marker and outside C8's contract.
++    //
++    // The block's focusable inventory, TRANSCRIBED (`grep -n` over the two surfaces it styles):
++    //   .consentBox         <input type="checkbox">   SignUpFlow.tsx:206, :217            2 nodes
++    //   .consentPolicyLink  <button type="button">    SignUpFlow.tsx:234                  1 node
++    //   .policyClose        <button>                  PrivacyPolicyModal.tsx:180          1 node
++    //   .policyBody         <div tabIndex={0}>        PrivacyPolicyModal.tsx:195          1 node
++    //   .policyPill         <button type="button">    PrivacyPolicyModal.tsx:198          8 nodes
++    //   .policyPrimary      <button>                  PrivacyPolicyModal.tsx:259, :271    2 nodes
++    // Every other class the block styles is non-interactive. This list is a CONSTANT and not a
++    // derivation: the JSX cannot be scanned with `<(button|input)\b[^>]*>` because these two
++    // components carry arrow functions in their props and `=>` ends the `[^>]*` run mid-tag.
++    // A SEVENTH control added to either surface is therefore caught by review, not by this case —
++    // which is why the assertion runs in BOTH directions, so the inventory cannot drift silently.
++    const focusable = [
++      ".consentBox",
++      ".consentPolicyLink",
++      ".policyClose",
++      ".policyBody",
++      ".policyPill",
++      ".policyPrimary"
++    ];
++
++    const base = blockRules().filter((rule) => rule.at === null);
++    const parts = (rule: Rule): string[] => rule.selector.split(",").map((piece) => piece.trim());
++
++    // Satisfiability, and staleness in the other direction: every name above still names something
++    // this block styles. A guard whose scan matches nothing passes for the wrong reason, and a
++    // renamed control would otherwise leave a ring pinned to a selector nothing renders.
++    const styled = new Set(base.flatMap(parts));
++    expect(focusable.filter((name) => !styled.has(name))).toEqual([]);
++
++    // The controls this block paints a `--focus` ring for. `outline-offset` is deliberately NOT
++    // pinned: `.policyBody` insets its ring (`-2px`) because it is a scroll region, and the clause
++    // this case exists to hold is the TOKEN clause of `SPEC.md:612`, not a geometry.
++    const ringed = new Set(
++      base
++        .filter((rule) =>
++          declarations(rule.body).some(
++            (decl) => decl.prop === "outline" && decl.value.includes("var(--focus)")
++          )
++        )
++        .flatMap(parts)
++        .filter((selector) => selector.endsWith(":focus-visible"))
++        .map((selector) => selector.slice(0, -":focus-visible".length))
++    );
++
++    expect(focusable.filter((name) => !ringed.has(name))).toEqual([]);
++    expect([...ringed].filter((name) => !focusable.includes(name))).toEqual([]);
++  });
+ });

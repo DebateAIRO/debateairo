@@ -1,0 +1,7 @@
+# Historical source working-diff drift discovered at final packaging
+
+The source HEAD446c685e and empty staged index still match intake. The full tracked working-diff hash is now dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813, matching the before/after checks of every administrative freeze from FIX3 through FIX4. It differs from intake606ad70f5e8b852724469816ca922d5685a4117668daeeed1a4d740b8988035e. The last recorded original match is FREEZE-LIVE2 at14:04:30Z; the first recorded current hash is FREEZE-FIX3 at14:30:38Z.
+
+Earlier before/after freeze claims remain true for those operations, but cannot establish full source preservation since intake. Root caught the false equivalence while asserting the original hash during GATE assembly; the assertion failed and prevented GATE creation. No source file, index or branch has been restored or changed in response. The isolated product remains clean at6e5ab5fc with99/99changed paths matching the consumed inventory.
+
+REV3 reuses the baseline investigator session to perform a bounded provenance check from retained receipts and file hashes if possible. Do not repeat the product audit, read unrelated raw private logs, inspect actual credentials, or alter unrelated user work. If the original full bytes were not captured, state that limitation and keep the cause UNVERIFIED. Do not infer our own or another agent's authorship from timestamps alone. Independent product review may continue, while source preservation cannot be called proved from intake until reconciled.

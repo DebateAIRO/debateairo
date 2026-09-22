@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_FIX35",
+  "ticket": "t_c7774a62",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_LITERAL_OPERATOR_HASH_FIXED_REVIEW_REQUIRED",
+  "controls": 10,
+  "passed": 10,
+  "names": [
+    "sealed RECOVER34 command bytes have final hash",
+    "new operator differs from old by only embedded hash",
+    "new operator embeds final hash once and no stale hash",
+    "operator metadata hashes actual script and retained command",
+    "all seven phases retain RECOVER34 self paths",
+    "Runtime9 and future namespaces remain retained",
+    "all123 future paths remain absent",
+    "stale literal rejects before first-phase intercept",
+    "matching literal reaches controlled first-phase intercept",
+    "guard fixtures create no contract outputs"
+  ],
+  "realNonInertGuard": {
+    "staleFixtureExitStatus": 1,
+    "staleReachedFirstPhase": false,
+    "matchingFixtureExitStatus": 1,
+    "matchingReachedFirstPhaseBoundary": true,
+    "operationalChildSpawned": false,
+    "privateEnvironmentRead": false
+  },
+  "hashes": {
+    "retainedCommandContract": "f8a5df033841912013df6eda0f13d5811f9e709712e8311f692d7926d9d52030",
+    "oldOperator": "84793f9357933a8e6fbc87a87425698600a57287ca82c2eb4da05e5b94b50ca9",
+    "newOperator": "41de17e7eb11219ca183a4f156e13225ca6a79446035a5450a0e8d3665c4e153",
+    "runtimeCustodyContract": "9094ce7d0c9543914bf61cd2d0a28a1965c338771acac0b70f04a9d6d00a25eb"
+  },
+  "traffic": {
+    "runtimeActions": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "futurePaths": {
+    "count": 123,
+    "allAbsent": true
+  }
+}

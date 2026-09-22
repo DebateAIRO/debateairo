@@ -1,0 +1,11 @@
+{
+  "at": "2026-09-17T07:09:19Z",
+  "target": "https://localhost:3100/help",
+  "entryPoint": "cua.getBrowser({ url })",
+  "result": "NO_BROWSER_AVAILABLE",
+  "browserSurfaceCount": 0,
+  "conversationObserved": false,
+  "userInputChanged": false,
+  "messageSent": false,
+  "qualification": "The owner feedback file supplies the quoted product name, but the prior Help prompt and rendered answer were not observable."
+}

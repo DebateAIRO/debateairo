@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX26",
+  "ticket": "t_45088d73",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "result": "PASS",
+  "verdict": "PASS_CAPTURE_PROOF_DEPENDENCY",
+  "actualByteContractSha256": "e64a497a30cf7ed84b5f721e3eab8b743489a33e334917ab124e5ec6a42f7d94",
+  "phaseCount": 7,
+  "selfBoundPhaseCount": 7,
+  "producer": {
+    "status": 0,
+    "validation": "PASS",
+    "resultPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-GUIDE_HARNESS_FIX26-POSITIVE.json",
+    "resultSha256": "593c9577035be42d4907f1a6cac421d61a5ed0ae3c27369c83c183769827c4c3",
+    "gatePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX26-inert-gate.json",
+    "gateSha256": "04c023c4c79e717e6ca46e7ca1408bef9db40960968cbb0b30915a2a1a6c6a3d",
+    "validatedRows": 58
+  },
+  "consumer": {
+    "status": 0,
+    "consumedRowProofSha256": "593c9577035be42d4907f1a6cac421d61a5ed0ae3c27369c83c183769827c4c3",
+    "consumedGateSha256": "04c023c4c79e717e6ca46e7ca1408bef9db40960968cbb0b30915a2a1a6c6a3d",
+    "consumedRowCount": 58,
+    "sentinelChildCalls": 1
+  },
+  "negativeCases": [
+    {
+      "name": "missing",
+      "result": "PASS",
+      "errorCode": "GUIDE_CAPTURE_ROW_PROOF_EVIDENCE_MISSING",
+      "childCalls": 0,
+      "browserCalls": 0
+    },
+    {
+      "name": "nonzero",
+      "result": "PASS",
+      "errorCode": "GUIDE_CAPTURE_ROW_PROOF_STATUS_INVALID",
+      "childCalls": 0,
+      "browserCalls": 0
+    },
+    {
+      "name": "stale",
+      "result": "PASS",
+      "errorCode": "GUIDE_CAPTURE_ROW_PROOF_STATUS_INVALID",
+      "childCalls": 0,
+      "browserCalls": 0
+    },
+    {
+      "name": "malformed",
+      "result": "PASS",
+      "errorCode": "GUIDE_CAPTURE_ROW_PROOF_RESULT_INVALID",
+      "childCalls": 0,
+      "browserCalls": 0
+    },
+    {
+      "name": "tampered",
+      "result": "PASS",
+      "errorCode": "GUIDE_CAPTURE_ROW_PROOF_HASH_MISMATCH",
+      "childCalls": 0,
+      "browserCalls": 0
+    }
+  ],
+  "beforeSpawn": true,
+  "freshnessMaxAgeMs": 120000,
+  "futureSkewMs": 5000,
+  "operationalOutputsCheckedAbsent": 20,
+  "retained": {
+    "gateTemplatePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX25-gate-template.json",
+    "ownerCapacityContractSha256": "df5580ba8dd47e354a74aa04b8308d7b626564bd116076b682b1f6d0037d03fc",
+    "actualNamespace": "GUIDE_LIVE_GUIDE21",
+    "provenance": "FRESH_GUIDE21_FIXED31"
+  },
+  "traffic": {
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

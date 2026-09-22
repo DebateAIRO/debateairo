@@ -1,0 +1,138 @@
+{
+  "schema": "GUIDE_SECURITY8_RECEIPT_V1",
+  "node": "GUIDE_SECURITY8",
+  "ticket": "t_a923e6ed",
+  "session": "/root/forgot_destination",
+  "model": "gpt-5.6-sol",
+  "revision": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718",
+  "base": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "verdict": "REWORK",
+  "scope": "exact nine-path immutable lock/restricted-role correction and source-derived cardinality assertions",
+  "usage": "UNAVAILABLE",
+  "findings": [
+    {
+      "id": "GS8-1",
+      "title": "Event-locked sessions can still open a human case",
+      "status": "CONFIRMED_STATIC_BLOCKING",
+      "productionPaths": [
+        "apps/api/src/support/index.ts",
+        "packages/db/src/support.ts"
+      ],
+      "regressionPaths": [
+        "tests/integration/support-routes.test.ts",
+        "tests/integration/support-cases.test.ts"
+      ],
+      "surfaces": [
+        "manual escalation",
+        "human rating",
+        "createCaseOnce",
+        "createCase"
+      ],
+      "capabilityOrDataDisclosureProven": false
+    },
+    {
+      "id": "GS8-2",
+      "title": "A later injection-threshold increase reopens an immutable lock",
+      "status": "CONFIRMED_STATIC_BLOCKING",
+      "productionPaths": [
+        "packages/db/src/support.ts",
+        "apps/api/src/support/index.ts"
+      ],
+      "regressionPaths": [
+        "tests/integration/support-routes.test.ts"
+      ],
+      "surfaces": [
+        "read",
+        "admitMessage",
+        "rateMessage",
+        "manual escalation",
+        "case creation"
+      ],
+      "retainedStatusControl": "tests/integration/support-metrics.test.ts",
+      "modelReachabilityAfterConfigIncrease": "source-path possible; not executed"
+    }
+  ],
+  "staticChecks": {
+    "indexedInputsMatched": 55,
+    "indexedInputsTotal": 55,
+    "deltaPathsMatched": 9,
+    "selectedDefiningObjectsMatched": 7,
+    "declaredPrincipalCountBase": 11,
+    "declaredPrincipalCountFinal": 11,
+    "privilegeDeltaLines": 0,
+    "detachedCleanExact": true,
+    "heavyLeaseAcquired": false,
+    "testsExecutedIndependently": 0,
+    "runtimeOrDatabaseTraffic": false
+  },
+  "retainedDispositions": {
+    "immutableInjectionAndLockCreation": "UNCHANGED",
+    "serializedAdmission": "UNCHANGED",
+    "encryptedRefusalStorage": "AUTHOR_GREEN_RETAINED",
+    "hashedAbuseEvents": "AUTHOR_GREEN_RETAINED",
+    "noModelInjectionRefusal": "AUTHOR_GREEN_RETAINED",
+    "ipCooldown": "UNCHANGED_EVENT_CONSUMER",
+    "statusExcludesEventLocked": "CONFIRMED_STATIC",
+    "migrationTree": "UNCHANGED",
+    "principalDeclaration": "UNCHANGED_11",
+    "privilegeExpansion": "NONE_IN_DELTA",
+    "publicPrivacyModelSourceActionBoundaries": "RETAINED_ON_EXACT_UNCHANGED_OBJECTS"
+  },
+  "authorEvidence": {
+    "restrictedRoleRed": {
+      "exitCode": 1,
+      "httpStatus": 500,
+      "firstExceptionObserved": false,
+      "logSha256": "5d7992d707cb73e6f41273c371a515b67e08e8f873870d4bf4d78da74515e420"
+    },
+    "restrictedRoleGreen": {
+      "exitCode": 0,
+      "passed": 1,
+      "skipped": 162,
+      "logSha256": "92095f9cc992e0a19a7ccf679090d717cf56c36a86ea7f29a1155bda93000bf8"
+    },
+    "fullSuite": {
+      "filesPassed": 34,
+      "testsPassed": 1699,
+      "todo": 1,
+      "logSha256": "6e45e00f21b888851df9b8284af6516c7a484c5d846b9b0833ef4555f207af5b"
+    },
+    "preservedFailures": [
+      "actual restricted-role HTTP 500 RED with first exception unobserved",
+      "five stale literal-count test failures after 186 passes",
+      "one remaining stale password-cardinality assertion after 15 passes"
+    ]
+  },
+  "limits": {
+    "modelCalled": false,
+    "browserUsed": false,
+    "liveApiCalled": false,
+    "databaseProbeRepeated": false,
+    "privateRecordsUsed": false,
+    "accountOrRecoveryActionExecuted": false,
+    "runtimeLogsRead": false,
+    "live6FirstExceptionAttributed": false,
+    "actual54Completed": false,
+    "forgotDestinationKnown": false,
+    "checkpointAccepted": false
+  },
+  "receiptExcludesItself": true,
+  "artifacts": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_SECURITY8.md",
+      "sha256": "311c979d81e45614c0bf2798f4a869cb422e8e6b69b4b92f08489ed07340eb9b",
+      "bytes": 8929
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_SECURITY8.md",
+      "sha256": "f6bdc40f4b43b26bc4600c0a4e0c8d5c5db9212cd32e55cedf9e313e1cacd08f",
+      "bytes": 2973
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY8-static.log",
+      "sha256": "46d1e40c29b5148aca2dbfa05b3df94293e163b2dc1ccc24029e4e8ae4ac4c62",
+      "bytes": 3913
+    }
+  ],
+  "sealedAt": "2026-09-20T12:53:29.016543+00:00"
+}

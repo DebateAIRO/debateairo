@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND19",
+  "ticket": "t_7286ccaf",
+  "revision": "0f4290c290fd38caa0ccfb3b6781fb8c33999a22",
+  "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+  "verdict": "REWORK_PRODUCT_ACCOUNT_ACCESS_RETRIEVAL",
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "failedRow": {
+    "sequence": 58,
+    "kind": "OWNER_REGRESSION",
+    "family": "account-access",
+    "surface": "compact",
+    "language": "ro",
+    "prompt": "Unde îmi pot crea un cont?",
+    "expectedBranch": "MODEL",
+    "expectedSourceIds": ["account-access"],
+    "requiredActionId": "sign-up",
+    "observedBoundary": "PUBLIC_GUIDE",
+    "observedClassifierOutcome": null,
+    "observedSourceIds": ["settings-help-menus", "app-navigation", "support-cases"],
+    "observedRequestedActionIds": ["sign-up"],
+    "observedSourcePolicyId": null,
+    "failureCode": "GUIDE_HARNESS_EXPECTED_SOURCE_MISSING"
+  },
+  "existingTestGap": {
+    "path": "tests/unit/support-answer-context.test.ts",
+    "lines": "229-252",
+    "finding": "The matching row filters the drafted corpus to the expected article before ranking, so it does not exercise full-corpus competition."
+  },
+  "smallestProductScope": [
+    "packages/support-kb/src/context.ts",
+    "tests/unit/support-answer-context.test.ts"
+  ],
+  "reusablePreparation": {
+    "matrixRows": 58,
+    "actualRows": 31,
+    "ownerRows": [55, 56, 57, 58],
+    "row57PassedBeforeRow58Failure": true,
+    "finalCaptureBindingCompleted": false,
+    "offline58Pass": false
+  },
+  "attempts": [
+    {
+      "name": "offline58-attempt1",
+      "result": "HARNESS_COPY_DEPENDENCY_MISSING",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_BIND19-offline58.log"
+    },
+    {
+      "name": "offline58-attempt2",
+      "result": "ROW_58_EXPECTED_SOURCE_MISSING",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_BIND19-offline58-attempt2.log"
+    },
+    {
+      "name": "row58-fixed-field-diagnostic",
+      "result": "PRODUCT_RETRIEVAL_DIVERGENCE_CONFIRMED",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_BIND19-row58-diagnostic.log"
+    }
+  ],
+  "postInputPrerequisites": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SIGNIN_CLASSIFIER_REVIEW-receipt.json",
+      "sha256": "0f3698db508eeed75eb00dad277abfbd56d60c0b7a82cd27695f37ebf7a9cf40"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SIGNIN_CLASSIFIER_REVIEW-consumption.json",
+      "sha256": "18161143b8f6bc7db552f35a40483ae697b0912ff56a821ab8fe9d4b77bcb7db"
+    }
+  ],
+  "limitations": [
+    "No full58 PASS was produced.",
+    "No final finite-control PASS or seven-phase operational binding was claimed.",
+    "No runtime readiness, live quality, capacity, owner acceptance, or CP1 readiness was evaluated.",
+    "Forgot password remains unresolved and actionless."
+  ]
+}

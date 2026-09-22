@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_RUNTIME_REVIEW36",
+  "ticket": "t_a0bea7dc",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "REWORK_RUNTIME_PROCESS_IDENTITY_GUARD",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_RUNTIME_REVIEW36.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_RUNTIME_REVIEW36.md",
+      "sha256": "d0070fca09f24e564b99da30718b62a299b40340fbbfc44ee04ffb9467da2fe8",
+      "bytes": 4455
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME_REVIEW36-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME_REVIEW36-dispositions.json",
+      "sha256": "bf94babe722423fcbc2909d956fab57f37905505a38f44db11c6bc5ceea0230b",
+      "bytes": 4647
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME_REVIEW36-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME_REVIEW36-custody.json",
+      "sha256": "862a2c50ea44253f927c72104af0039d7929e618929d75a8ddcea391131e5922",
+      "bytes": 1638
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_RUNTIME_REVIEW36.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_RUNTIME_REVIEW36.md",
+      "sha256": "46d4c2bcccd33f5a54bccb6c24e85e4839dbc39571885786a475179d22288e93",
+      "bytes": 2761
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "heavyLeaseHeld": false,
+  "finding": "Readiness and idle accept any ps text containing the command marker; controlled PID/PGID123/123 passes against authenticated custody9800/9800, so exact detached process identity is unproved.",
+  "retained": [
+    "Authenticated Runtime9 schema and early schema negatives.",
+    "Final seven-phase source inventory, self-bound operator and 123 absent future paths.",
+    "Product0d34/full58/FINAL18/KB7ef, Runtime9/two startup requests and FIX30 evidence."
+  ],
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

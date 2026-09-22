@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PROCESS_BIND37",
+  "ticket": "t_ebade6b9",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_PROCESS_IDENTITY_BOUND_REVIEW_REQUIRED",
+  "controls": {
+    "passed": 28,
+    "total": 28
+  },
+  "processIdentity": {
+    "actualFixture": {
+      "pid": 9800,
+      "ppid": 1,
+      "pgid": 9800,
+      "commandMarker": "pnpm dev:auth:up"
+    },
+    "oldFalseAcceptanceStatus": 0,
+    "readinessStatus": 0,
+    "idleStatus": 0,
+    "readinessNegativeCases": 6,
+    "idleNegativeCases": 6
+  },
+  "binding": {
+    "commandSha256": "a569348814688b64eab8368ef383bc77b7ec80605c08290489024fe8ca926f1f",
+    "operatorScriptSha256": "4bbf33ade77da4270c7c61c92742ef02dbc32743f94cec44356af1d34440f0e7",
+    "validatorSha256": "754aaef056f9dfa207a1ac1d0213761b2f8ebd40fc5c3bb9c0bc8373247e6d42",
+    "phaseCount": 7,
+    "futurePathsAbsent": 123
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "limitations": [
+    "INDEPENDENT_REVIEW_REQUIRED",
+    "LIVE30_NOT_RUN",
+    "FORGOT_UNRESOLVED"
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "schema": "support-rev3-p3-receipt-v1",
+  "node": "REV3_P3",
+  "ticket": "t_689d8959",
+  "runId": 62,
+  "pass": 3,
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewerAgent": "/root/baseline",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-16",
+  "productRevision": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
+  "runtimeEvidenceRevision": "606b2eabea1dc9212159e53c193cf69655424e77",
+  "sourceAdministrativeHead": "446c685e977104ecf2b0b5ee0519f7123968429f",
+  "contractFreeze": "bc0e85fc6013e0067cdb178a4bf7cc0526bdd72c",
+  "basePackage": "ac55729b",
+  "verdict": "BLOCKED",
+  "technicalProductTruthDisposition": "PASS",
+  "blockingDependency": {
+    "ticket": "t_979fe293",
+    "criterion": "CP1-A05",
+    "reason": "The exact existing Forgot-password URL or reviewed UI opener remains unknown."
+  },
+  "checks": {
+    "indexedInputsMatched": 79,
+    "indexedInputsExpected": 79,
+    "productPathsMatched": 108,
+    "productPathsExpected": 108,
+    "finalCorrectionPaths": 24,
+    "actualRowsGrounded": 7,
+    "actualRowsExpected": 7,
+    "apiDomExact": 7,
+    "acceptedDrafts": 6,
+    "exactReviewedRecoveries": 1,
+    "englishPointerCanonicalDestination": true,
+    "compactRomanianKeyboardCanonicalDestination": true,
+    "syntheticRenderTestFilesPassed": 1,
+    "syntheticRenderTestsPassed": 6,
+    "syntheticRenderTestsSkipped": 48,
+    "syntheticRenderExitCode": 0,
+    "productCleanAfter": true,
+    "primaryDependencyLaneCleanAfter": true,
+    "dependencySymlinksRemoved": true
+  },
+  "dependencyLane": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "revision": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
+    "resolvedFileHashes": {
+      "apps/ui/components/support/Assistant.tsx": "80a26625bd72da1e683d0fcb54efe75692417525780ec3ffcb838a883e31c5d9",
+      "packages/support-kb/src/navigation.ts": "d55c80d91d7e0d737787220539b26dc10ebf8f497d09a58e86e0160c81469cfe",
+      "packages/support-kb/src/catalog.ts": "be0c28d2629fa01cba3351e31f6f4864391fcc091b33d978e52551471bc41e36"
+    }
+  },
+  "heavyLease": {
+    "acquired": true,
+    "released": true,
+    "runs": 1,
+    "scope": "One named synthetic Support render selection; no browser, HTTP, Support, preview, service, or model traffic."
+  },
+  "sourceCustody": {
+    "startHead": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "startCachedDefaultDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "startWorkingDefaultDiffSha256": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813",
+    "endCachedFullIndexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "endWorkingFullIndexDiffSha256": "9ebe3aaa073a1bd28323ddfee587070b7380a46ba13a5d3557c79dfadf8ceabf",
+    "endTrackedDirtyPathCount": 81,
+    "qualification": "The shared source worktree changed concurrently during this read-only review. No cause or actor is inferred; this node made no tracked source, product, Git, index, or ref change. Historical SOURCE_CUSTODY remains bounded by the retained provenance artifacts."
+  },
+  "artifacts": [
+    {
+      "kind": "verdict",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/REV3-p3.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV3-p3.md",
+      "sha256": "7b6e674de759c14bab7869550b864a8ef75927822201f4a8f4fba0bf446de4b5",
+      "bytes": 10489
+    },
+    {
+      "kind": "selfReport",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/REV3_P3.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/REV3_P3.md",
+      "sha256": "4780c2b8265010885a768f14b64a2de2c45e68e708cdd89f661c7b567608a48f",
+      "bytes": 6706
+    },
+    {
+      "kind": "capturedLog",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/REV3_P3-synthetic-render.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/REV3_P3-synthetic-render.log",
+      "sha256": "45493a3bbba624ec8be0bbcab38e10b20a29424af153336f814b1ca94d11f3dc",
+      "bytes": 7512
+    }
+  ],
+  "limits": [
+    "The actual model/UI/API sample is immutable evidence at runtime revision 606b2eab; no new real request was issued.",
+    "The later review revision changes only a test fixture and is not presented as a new runtime sample.",
+    "The 15 HTTP 401 origins and harmlessness remain unverified.",
+    "Actual signed-in ownership/private authorization was not exercised.",
+    "The historical source byte state, cause, actor, exact change time, and intake untracked inventory remain unverified.",
+    "Actual model-token usage is unavailable."
+  ]
+}

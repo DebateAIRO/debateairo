@@ -1,0 +1,20 @@
+(node:99443) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:99446) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-grok-10c/dialectical-engine
+
+(node:99454) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ .review-scratch/GROK-REV-S02-10C-r1/design-fidelity.probe.test.tsx > S02-10C design fidelity — own jsdom document + real globals.css > consent mode: strings, 8 pills, 11 sections, end marker last, no Download PDF, ARIA 176ms
+ ✓ .review-scratch/GROK-REV-S02-10C-r1/design-fidelity.probe.test.tsx > S02-10C design fidelity — own jsdom document + real globals.css > read mode: Close only, no I have read it, no gate, onAcknowledge never fires 41ms
+ ✓ .review-scratch/GROK-REV-S02-10C-r1/design-fidelity.probe.test.tsx > S02-10C design fidelity — own jsdom document + real globals.css > sign-up 8a copy and two real checkboxes, no banned substrings in the card 38ms
+ ✓ .review-scratch/GROK-REV-S02-10C-r1/design-fidelity.probe.test.tsx > S02-10C design fidelity — own jsdom document + real globals.css > token map on both modes — getComputedStyle of the REAL stylesheet 103ms
+ ✓ .review-scratch/GROK-REV-S02-10C-r1/design-fidelity.probe.test.tsx > S02-10C design fidelity — own jsdom document + real globals.css > checkbox group tokens and 17px square from the stylesheet (layout still unverified) 54ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  08:27:19
+   Duration  1.28s (transform 102ms, setup 0ms, import 225ms, tests 412ms, environment 542ms)
+

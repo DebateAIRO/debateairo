@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CONTINUATION_FEASIBILITY48",
+  "ticket": "t_e85f7666",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "FEASIBLE_WITH_DISTINCT_REPLAY_EVIDENCE",
+  "execution": {
+    "heavy": false,
+    "browser": false,
+    "http": false,
+    "support": false,
+    "model": false,
+    "capacity": false,
+    "database": false,
+    "productWrites": false,
+    "gitWrites": false
+  },
+  "inputs": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTINUATION_FEASIBILITY48-inputs.json",
+      "sha256": "3bfe16d0ca4f9daabdff371e1664acc2b0e91424c46aa099b4210713f1efa617",
+      "bytes": 13005
+    }
+  ],
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CONTINUATION_FEASIBILITY48-static-trace.log",
+      "sha256": "36ce2e83a10a07b510fd60cafabdf7b394fbd27c99de4d30096442540f00aeb3",
+      "bytes": 2022
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTINUATION_FEASIBILITY48-disposition.json",
+      "sha256": "0471dc29cbfae20784dc86de87384c3855716c8d87378286ccc78d480d387a5c",
+      "bytes": 5060
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_CONTINUATION_FEASIBILITY48.md",
+      "sha256": "320d4731e77b5f87cf56f9061bdcd1943827bec641badb9de8b8f41da68030e8",
+      "bytes": 4841
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_CONTINUATION_FEASIBILITY48.md",
+      "sha256": "7ea5654392a8cfe14a011c7d976216b9f333ebd9f2097d72a3dc658780799fe8",
+      "bytes": 1613
+    }
+  ],
+  "usage": "UNAVAILABLE",
+  "checkpointAccepted": false
+}

@@ -1,0 +1,197 @@
+{
+  "at": "2026-09-14T16:19:28.476074+00:00",
+  "node": "LIVE4",
+  "manifest_sha256": "6ba7fba830d0306cbfcc0f5acd7be3f56412578d297710f45f734abacc098ae5",
+  "revision": "6e5ab5fc41acebbff4264efc7d481df3db8dce44",
+  "product_status_clean": true,
+  "verified_references": [
+    {
+      "path": "agent-reports/LIVE4.md",
+      "sha256": "712653fb243ee8c310d9e5317307417fc2a0a726b6bc572dafe198654ae99b57"
+    },
+    {
+      "path": "agent-reports/LIVE4-superseded.md",
+      "sha256": "8ad78e06fd5b631d942bb88ac1ac6ca5d321113e9a33f64bd47fd9eefb19e29a"
+    },
+    {
+      "path": "evidence/LIVE4.md",
+      "sha256": "d207069a6e3af843025c6b32934d5a0606fa730cc2563029d3ec046e86c7ab08"
+    },
+    {
+      "path": "evidence/LIVE4-required-suites.json",
+      "sha256": "d90fa96499bb825c9add0a4df40d0c05d25fed758a5f826c811850961c4dfa7e"
+    },
+    {
+      "path": "evidence/LIVE4-actual-relay-receipt.json",
+      "sha256": "d0b121350586d3b1b7835a48f7fbf2f20dbbb611fb140065451678333e66f41b"
+    },
+    {
+      "path": "evidence/LIVE4-diagnostic-projection-receipt.json",
+      "sha256": "71accbb829995b787e4aaa6a3bb66a52eeea0ee0c5c373dcc5197e36d6998377"
+    },
+    {
+      "path": "evidence/LIVE4-stack-custody.json",
+      "sha256": "55490fcf8e63e5bacb8f8dfdaa961039a5b49b6ddee4311269244502b2704307"
+    },
+    {
+      "path": "evidence/LIVE4-stack-custody-r2.json",
+      "sha256": "058fde8602b11474da377f7d0973715ae8aac1bab2c525380452c01c2cceb1f6"
+    },
+    {
+      "path": "evidence/LIVE4-stack-receipt.json",
+      "sha256": "464a12159c7ec2e2ed3dfc3494b751796511c1985f9f256e550793d3f839895c"
+    },
+    {
+      "path": "evidence/LIVE4-full-en.png",
+      "sha256": "36b0e983bfdb7d12c5ad6500d5f54a5a33a99446b86c294065f2619caeeefe97"
+    },
+    {
+      "path": "evidence/LIVE4-full-ro.png",
+      "sha256": "c71f6c5611874f8c4cd4646751fca5e7dd6289f21cb3760589693077eff88880"
+    },
+    {
+      "path": "evidence/LIVE4-compact-ro.png",
+      "sha256": "2bf64f9174362b669d0d872bfa8c6dc8143bd4235c702287d589dfe29af75e33"
+    },
+    {
+      "path": "evidence/LIVE4-superseded.md",
+      "sha256": "a6d1f2a9e308c93cb28129d28397e304f13c395fe6e493dcc9a5b4386e18d333"
+    },
+    {
+      "path": "evidence/LIVE4-superseded-manifest.json",
+      "sha256": "9b839263ecdb38513ea215ef27b0950f89ff084e6d57cac6309127fa58b171d8"
+    },
+    {
+      "path": "evidence/LIVE4-superseded-actual-relay-receipt.json",
+      "sha256": "2dc216d117389a10ba8b2f52301709d7642702417e41b34fd0a6c59c080ab37a"
+    },
+    {
+      "path": "evidence/LIVE4-superseded-map.json",
+      "sha256": "5accc8854f9e47abbe9eb17261c8c3955195272aa807a2f2be3fda286eecd96d"
+    },
+    {
+      "path": "logs/LIVE4-integrated-suite.log",
+      "sha256": "c9d6647503f86955cb5f615427b2f548ff8a2273168777bf5c93436bb2fd9f5f"
+    },
+    {
+      "path": "logs/LIVE4-diagnostic-consumer-control.log",
+      "sha256": "e0c405db5fa61e650364f967ddd0c5b86482c199f5d8493c0d43a678769f351a"
+    },
+    {
+      "path": "logs/LIVE4-strict-seven-consumer-control.log",
+      "sha256": "6dedeeb8f52f326e7fc58ffb1afc6e8df526fbf62d060f8df7503cdbdce160d6"
+    },
+    {
+      "path": "logs/LIVE4-retrospective-projection.log",
+      "sha256": "b009738feb7b9cbd825b2a49d7f12541fab216ff8eef54d9c0c8cceab8443a4e"
+    },
+    {
+      "path": "logs/LIVE4-stack-preflight.log",
+      "sha256": "412f898d7bdccf0845a6079345a1fb5d0866a8a4ea61be05554ef2fa90c70b74"
+    },
+    {
+      "path": "logs/LIVE4-stack-reload-stop.log",
+      "sha256": "94c1ea602672120860357cb81f93c6e53740331873943f11ce9aec836c87ae8e"
+    },
+    {
+      "path": "logs/LIVE4-launch-detached.log",
+      "sha256": "abab1da886d2eb1851b326d2e758b190b45228a9756a781d1c9d05528264e216"
+    },
+    {
+      "path": "logs/LIVE4-stack-ready.log",
+      "sha256": "51b522dfeafb5ba7745aff2ea7009d21a7da6e95e5e6b2420dd37c3ad4ec6354"
+    },
+    {
+      "path": "logs/LIVE4-stack-ready-diagnosis.log",
+      "sha256": "c02bd2f6100291b555a5ca39446ff8b072187ffd5264b27f92869e348b50eb22"
+    },
+    {
+      "path": "logs/LIVE4-stack-detached.log",
+      "sha256": "de98b2cfafdb83af147c4e13a14f539133089391589ef5c5a760b4091e582b0b"
+    },
+    {
+      "path": "logs/LIVE4-launch-detached-r2.log",
+      "sha256": "4c6ec3f78b5a34e952121223e1a3e7ed42ecd78d9fadf8d7f9954deac749e6a8"
+    },
+    {
+      "path": "logs/LIVE4-stack-ready-r2.log",
+      "sha256": "29e9fd13d1c5837020f1c0f1f9b37f76228474996b939082d8a291a023cb39f2"
+    },
+    {
+      "path": "logs/LIVE4-actual-relay-browser.log",
+      "sha256": "a138de9228dd6054b87cb7bd1a8d89cfde77facac251dd4be021e57980f740c4"
+    },
+    {
+      "path": "logs/LIVE4-stack-postflight.log",
+      "sha256": "9066ab96ebb727993957e7d79d7051b8e9c89c7db941b442e0f63d1a107e6d72"
+    },
+    {
+      "path": "logs/LIVE4-superseded-diagnostic-consumer-control.log",
+      "sha256": "e0c405db5fa61e650364f967ddd0c5b86482c199f5d8493c0d43a678769f351a"
+    },
+    {
+      "path": "logs/LIVE4-superseded-manifest-verification.log",
+      "sha256": "3cce4283f594b42f5fa2b0430f5ebfcc5aa7f2dafe8cd5ace9d169397ff400cd"
+    },
+    {
+      "path": "probes/LIVE4/start-preview-detached.mjs",
+      "sha256": "f1acf8b20e449912a048fea5154721327f639fe6d006681ef678c61b985001a5"
+    },
+    {
+      "path": "probes/LIVE4/start-preview-detached-r2.mjs",
+      "sha256": "a5201579a344d364036512627e81aa0b220dff30a5d4f1220eabca63b6414144"
+    },
+    {
+      "path": "probes/LIVE4/capture-actual-relay.mjs",
+      "sha256": "b37ea4be53b07aedc6d1583c1abf7cf91f076cf496132d68c1c421ff40994f76"
+    },
+    {
+      "path": "probes/LIVE4/console-classifier.mjs",
+      "sha256": "9ebf232a8c37c587013ce28404186230ddb3925b5e96a79131b64e31d9d9a33f"
+    },
+    {
+      "path": "probes/LIVE4/diagnostic-consumer.mjs",
+      "sha256": "312f4ef7f8c00f105e2cd5fd85093f763ee5804010b04c6caf21fa683a4a651a"
+    },
+    {
+      "path": "probes/LIVE4/verify-diagnostic-consumer.mjs",
+      "sha256": "a5e8d5113924ea194f103476d30d47e444a10c7af7c2342d6d186973c7fcd79a"
+    },
+    {
+      "path": "probes/LIVE4/project-retrospective-receipt.mjs",
+      "sha256": "44f759c1d105de79e1813d864623b2ec5776d03e3135a3dd5edc5af635c9fb48"
+    },
+    {
+      "path": "probes/LIVE4/build-manifest.mjs",
+      "sha256": "975817eb306567c167c53dbbf375af3f02e828636c2c78525ae4b0b40f39eef0"
+    },
+    {
+      "path": "probes/LIVE4/verify-manifest.mjs",
+      "sha256": "2fca9c074380e04e6c64098f234800ee31c856a7b7cd6fa8069f710d48f6237e"
+    },
+    {
+      "path": "probes/LIVE4/superseded-diagnostic-consumer.mjs",
+      "sha256": "a69d32c3b3af555feaa4f1e15748325bff45fe89f1d26c772a1999aa4821c582"
+    },
+    {
+      "path": "probes/LIVE4/superseded-verify-diagnostic-consumer.mjs",
+      "sha256": "70b723b1c3d6ee70d9fd7c59dc7460f68ac26f4d53b1163d62b12e5ed0a05f4d"
+    },
+    {
+      "path": "probes/LIVE4/superseded-build-manifest.mjs",
+      "sha256": "96ba628520121a16d366b6c5326ca791fa7d0fba93b7b21db6143eaa0b8627de"
+    },
+    {
+      "path": "probes/LIVE4/superseded-verify-manifest.mjs",
+      "sha256": "318ec5069afc6b41f6a6a959b10f5a4e1cc86acb9ba460dab13bd338043db0ca"
+    }
+  ],
+  "skills": {
+    "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-21-56-01a09f02-346a-7fb0-aa70-0424f1fdd21e.jsonl",
+    "rc": 0,
+    "output": "ok   using-superpowers (4)\nok   heartbeat-protocol (6)\nok   heartbeat-worker (7)\nok   test-driven-development (5)\nok   verification-before-completion (5)\nok   systematic-debugging (4)\nSKILLS LOADED verified: 6 / 6\n"
+  },
+  "result": "FUNCTIONAL_BLOCKER",
+  "root_scope": "Mechanical exact-reference/full99path byte/commit verification; test/content/custody conclusions are Sol worker evidence. No raw private logs printed or live requests.",
+  "current_preview_custody": "Worker receipt records PID91461 PPID1 normal TLS200 after browser exit and10s idle; not a fresh independent runtime measurement by root."
+}

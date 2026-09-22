@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND18",
+  "ticket": "t_62cbe3cc",
+  "revision": "5d6e028ae5defc24e0690219d6128949e73b750d",
+  "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+  "verdict": "REWORK_PRODUCT_SIGNIN_CLASSIFIER",
+  "failedRow": {
+    "sequence": 57,
+    "kind": "OWNER_REGRESSION",
+    "surface": "compact",
+    "language": "en",
+    "prompt": "Where can I sign in?",
+    "expected": {
+      "boundary": "PUBLIC_GUIDE",
+      "branch": "MODEL",
+      "sourceId": "account-access",
+      "actionId": "sign-in"
+    },
+    "observed": {
+      "boundary": "PUBLIC_GUIDE",
+      "classificationOutcome": "REFUSE_ZONE",
+      "link": "/login",
+      "sources": [],
+      "actions": []
+    }
+  },
+  "cause": {
+    "publicGuideBoundary": "apps/api/src/support/public-guide-boundary.ts:75",
+    "classifier": "apps/api/src/support/classify.ts:367",
+    "responseBranch": "apps/api/src/support/index.ts:441",
+    "summary": "The public account-location exemption recognizes bounded account settings such as sessions and deletion but not the exact sign-in location question. The zone classifier therefore returns REFUSE_ZONE before reviewed account-access context and canonical action binding can run."
+  },
+  "smallestProductRegressionScope": {
+    "source": [
+      "apps/api/src/support/public-guide-boundary.ts",
+      "apps/api/src/support/classify.ts"
+    ],
+    "tests": [
+      "tests/unit/support-public-guide-boundary.test.ts",
+      "tests/unit/support-classify.test.ts",
+      "tests/integration/support-routes.test.ts"
+    ],
+    "existingPositiveContextEvidence": "tests/unit/support-answer-context.test.ts:238",
+    "mustPreserve": [
+      "credential-operation refusals",
+      "Forgot-password unresolved/actionless behavior",
+      "private-record refusal",
+      "unrelated zone rules",
+      "Romanian account-creation row 58"
+    ]
+  },
+  "proof": {
+    "attempt1": "failed without row attribution at GUIDE_HARNESS_PUBLIC_NAVIGATION_REFUSED",
+    "attempt2": "failed at row 57 with GUIDE_HARNESS_PUBLIC_NAVIGATION_REFUSED",
+    "rowsCompletedBeforeFailure": 56,
+    "full58Pass": false,
+    "controlPass": false
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PHASE_IMPORT_REVIEW46",
+  "ticket": "t_c14694e8",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "freeze": "5106191475bc3a2de818b55aa7f097155d4a6fd0",
+  "authorReceiptSha256": "1a8242ef00128422ecdd00be8be2044c378afe6d388d02ab549950b9e2923fd7",
+  "authorConsumptionSha256": "d4d8c4fca3ec8c4f4ec6ef8830a40eb95e853dc2077d7fed65f117d484ee4b1e",
+  "commandContractSha256": "2257cae89fbe2592ddbb0d1ba6533931cb9c6fe1824465240ead8b9586af2e26",
+  "moduleClosureSha256": "2b50440b9474c79e91c832481a7644356c26dddf9733c3ca1c52148b88201e66",
+  "controlProofSha256": "8e1e75f5c3ee9473773d229253ce9d2b91aeb34a7e359eec4ba7e6886f8504ea",
+  "moduleClosureProofSha256": "ae59dfbc86c613f32956c091d6537360b8ae248d03c4a1af5c83417c29794458",
+  "rowProofSha256": "864800e34e41723b74784d86fdeafcc40b6759b75d8c5289c6841b21ab7a8166",
+  "operatorSha256": "bb351d17ab1d5a6c43a11deb31eed9f009674b0e534f8b64df0c1da33e22c127",
+  "futurePathsAbsent": 115
+}

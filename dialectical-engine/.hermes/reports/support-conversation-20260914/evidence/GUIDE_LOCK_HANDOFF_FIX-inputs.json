@@ -1,0 +1,336 @@
+{
+  "revision": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718",
+  "inputs": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/INSTRUCTIONS.md",
+      "sha256": "c99c4c266e63b683f1da1fb46048b38e8e9aa00ac2f01816832c27460b8bdeeb",
+      "bytes": 2069
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/OWNER-PUBLIC-GUIDE-20260917.md",
+      "sha256": "bc80328fa3ecddb954ff4b7872fe2c460e8c3af37cbb8619807b3371f1175f63",
+      "bytes": 1478
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/OWNER-RESUME-20260917.md",
+      "sha256": "6b5caf665f520a7b5313c4564e5c6021ab06a727b54ef5d1e6f1f5f5cd4990fa",
+      "bytes": 1308
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/SPEC-v5.md",
+      "sha256": "4dc2a6ecb17b29eb25f4b523eae9ed7d99c45c6d48aad356987d1e0868fbe327",
+      "bytes": 7794
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL7-manifest.json",
+      "sha256": "37672a6e6f9b64acaf6e6052e79f1a34b8ab8587c8671bfb82ae408d1c89bb83",
+      "bytes": 67867
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_FIX-receipt.json",
+      "sha256": "ed7142a9b289a48fdde0ef8dcb4484557129351e2d15d6edca8a4a6d1481d2e6",
+      "bytes": 11851
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_FIX-consumption.json",
+      "sha256": "30672307739916b478c8f60609d200e645f9c66f85fb37cfc6134df4c3fa4444",
+      "bytes": 20190
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_FIX.md",
+      "sha256": "c774af69ffb89ab50fe522afdf9793bc354f306cccb501e8eea3bf2cc54538c7",
+      "bytes": 4599
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_FIX-custody.json",
+      "sha256": "e4cb008f26c0dcfc12cdd92a898cf6180d9f4b84ab738b87f9398abb99c1713c",
+      "bytes": 1073
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_FIX-snapshot-receipt.json",
+      "sha256": "eb1351d78661cbfa1bb62e4b1d6b2438848c5bd049aab9d3f570ae204ccc5ebb",
+      "bytes": 48925
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_FIX-required-suites.json",
+      "sha256": "7ef0a703d31974988bef81645c162bfb36e8e0893ade9977532174f8f5e28099",
+      "bytes": 4584
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_FIX-typecheck-comparison.json",
+      "sha256": "229f166efa9d95e9f731cfad6de77e4e472f52a35e1ae3730b5d3c8a7f16f081",
+      "bytes": 1443
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_FIX-eval-summary.json",
+      "sha256": "62d390f9cc51619deac07fa97f1e7b0e995afecf6cc54653de846538d323a678",
+      "bytes": 1377
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_INJECTION_FIX-product-manifest.json",
+      "sha256": "d377e9ec2e8dde204c9c7b30b0676a797cbb1ad9c9870f91b093cd8b685e4e47",
+      "bytes": 3687
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_FIX-restricted-role-red.log",
+      "sha256": "5d7992d707cb73e6f41273c371a515b67e08e8f873870d4bf4d78da74515e420",
+      "bytes": 26788
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_FIX-restricted-role-red-escalated.log",
+      "sha256": "2bfb15ea120c7fbf28d2a71f3781cb0a2c284086aaad52e08f5344a21a5fbbcd",
+      "bytes": 34272
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_FIX-restricted-role-green.log",
+      "sha256": "92095f9cc992e0a19a7ccf679090d717cf56c36a86ea7f29a1155bda93000bf8",
+      "bytes": 32127
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_FIX-four-file-green.log",
+      "sha256": "09aa2a5486eaad8b707a999fd6902878b3294d3fca3aa383fb06146a6ddfc05c",
+      "bytes": 63159
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_FIX-principal-count-green.log",
+      "sha256": "58f3ef92d7507af800fe95a9b8dd19a58051b3ad4bdced57d9f31e00f47769d0",
+      "bytes": 13346
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_FIX-principal-cardinality-green.log",
+      "sha256": "9efbaad6fbf460cc7919b3bd02a6288039b6545fbda85cb468095656b46c402c",
+      "bytes": 10157
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_FIX-suite-final.log",
+      "sha256": "a8541fe333b3059e48bb1a34d410471eb094705d7c0dc01ec178d3538c4d2cfc",
+      "bytes": 627770
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_FIX-suite-final2.log",
+      "sha256": "6e45e00f21b888851df9b8284af6516c7a484c5d846b9b0833ef4555f207af5b",
+      "bytes": 627065
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_FIX-typecheck-final.log",
+      "sha256": "0736152cfe419ab0e08b5eb3b14de941a1e2a238c32bdd65f84b4b8e2673f4e4",
+      "bytes": 40178
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_FIX-typecheck-final2.log",
+      "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+      "bytes": 39611
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_FIX-eval.log",
+      "sha256": "34b07b3eeb5093d55a5fe00aa40d072099ae8ece5fc8702739e90300a41c7bc0",
+      "bytes": 4715
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_FIX-snapshot-final.log",
+      "sha256": "558b0815fd1d07a6a81a17e1f06c0614da9aed9fe1e00d88f203e1581996bb5f",
+      "bytes": 1200
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_INJECTION_FIX-snapshot-final-escalated.log",
+      "sha256": "cd30a0ee19b7d26a46351318c49d2dd47495f4ac26326a8624d93da3e8877b14",
+      "bytes": 461
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_INJECTION_FIX/capture-snapshot.mts",
+      "sha256": "628f25a5b6f3affc2e56c2869abd4621ba2f54547158a1bbc243d998bd63ae66",
+      "bytes": 1862
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_INJECTION_FIX/package-evidence.py",
+      "sha256": "30c98bb1a2e43ad09c89eba126b9aa673628e416fd162a9c15d0700a40a1ee7c",
+      "bytes": 6402
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_INJECTION_FIX.md",
+      "sha256": "dafb923440d496a9039d92ef1bab7627f4c7410703fba0d0f517836d58144f90",
+      "bytes": 2456
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CORRECTNESS8-receipt.json",
+      "sha256": "f8d9d36a78f015a72aa1d6aaddba463c1f28c1d17bea97deddcfe2bd5d79e0f4",
+      "bytes": 5612
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CORRECTNESS8-consumption.json",
+      "sha256": "e103c412e00862f22c7dfe421f7f3fc40a374ce30cdb6d98737a12f8f4c0a61b",
+      "bytes": 17854
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_CORRECTNESS8.md",
+      "sha256": "748a911217ab0a1aaf4447df92ea035c369ed5a9127f309af53367e5db7e0041",
+      "bytes": 5879
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_CORRECTNESS8.md",
+      "sha256": "97e4d75b4bdfbd680d610fa8758114eeaabbdc44ce5b6a5d6191aa0f162c7b6d",
+      "bytes": 4371
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CORRECTNESS8/custody.py",
+      "sha256": "3db6659bbaed1fc186a285e66c0da1f6197fd3cc4b3380a81fc1b695e9377451",
+      "bytes": 3293
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS8-input-custody.log",
+      "sha256": "9fa5f012f4cc17783d8c3949de564c3aabb47f19c0619ab8678cebd8886b9aa7",
+      "bytes": 1477
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS8-affected-db-tests.log",
+      "sha256": "e26e5093089568d92f91f114ad937bae90f217371037dac6c67cf488b6f2021e",
+      "bytes": 59189
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CORRECTNESS8-cleanup-custody.log",
+      "sha256": "9fa5f012f4cc17783d8c3949de564c3aabb47f19c0619ab8678cebd8886b9aa7",
+      "bytes": 1477
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SECURITY8-receipt.json",
+      "sha256": "c828c491de8419e634cfea3f7ca4569e04b2ee2616f7d5bb8e9aedb2faa3b562",
+      "bytes": 4857
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SECURITY8-consumption.json",
+      "sha256": "7eaea27eb3a1f2248d63020e4788b02dd62f8eb32ebbc023bf702a2dae0a1832",
+      "bytes": 17413
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_SECURITY8.md",
+      "sha256": "311c979d81e45614c0bf2798f4a869cb422e8e6b69b4b92f08489ed07340eb9b",
+      "bytes": 8929
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_SECURITY8.md",
+      "sha256": "f6bdc40f4b43b26bc4600c0a4e0c8d5c5db9212cd32e55cedf9e313e1cacd08f",
+      "bytes": 2973
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY8-static.log",
+      "sha256": "46d1e40c29b5148aca2dbfa05b3df94293e163b2dc1ccc24029e4e8ae4ac4c62",
+      "bytes": 3913
+    }
+  ],
+  "writePaths": [
+    "packages/db/src/support.ts",
+    "apps/api/src/support/index.ts",
+    "tests/integration/support-routes.test.ts",
+    "tests/integration/support-cases.test.ts"
+  ],
+  "writePathsAtBase": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/db/src/support.ts",
+      "sha256": "1b1d23c8fa0f7396616e2f0760f8bdce4360407e33477bdb41fc7d5215e739a1",
+      "bytes": 99487
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/api/src/support/index.ts",
+      "sha256": "04429c6af9ed947a8964f43aef25614b7bd02d9629a2db3c15e367fbf0e6a61b",
+      "bytes": 36801
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/integration/support-routes.test.ts",
+      "sha256": "240b4e7c2b21b458c2b18ac64eef0e463fa8d7427c8ae3229fe238d63cc11842",
+      "bytes": 141262
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/integration/support-cases.test.ts",
+      "sha256": "75185830441a1fb2f467f4fe3b68c63ed4d29b7c69f96ed0e2dd6b5cb02b2632",
+      "bytes": 29045
+    }
+  ],
+  "argv": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/unit/support-kb.test.ts",
+    "tests/unit/support-context.test.ts",
+    "tests/unit/support-navigation.test.ts",
+    "tests/architecture/support-catalog-coverage.test.ts",
+    "tests/unit/support-response-policy.test.ts",
+    "tests/unit/support-classify.test.ts",
+    "tests/unit/support-security-guidance.test.ts",
+    "tests/unit/support-model.test.ts",
+    "tests/unit/support-escalation.test.ts",
+    "tests/integration/support-routes.test.ts",
+    "tests/integration/support-metrics.test.ts",
+    "tests/integration/support-degraded.test.ts",
+    "tests/integration/support-relay-reservations.test.ts",
+    "tests/render/sup-01-help.test.tsx",
+    "tests/integration/support-config-convergence.test.ts",
+    "tests/integration/support-own-context.test.ts",
+    "tests/integration/support-shred.test.ts",
+    "tests/unit/support-answer-context.test.ts",
+    "tests/unit/support-redaction.test.ts",
+    "tests/integration/support-cases.test.ts",
+    "tests/unit/support-credentials.test.ts",
+    "tests/unit/support-model-references.test.ts",
+    "tests/unit/support-text-views.test.ts",
+    "tests/unit/support-recovery-components.test.ts",
+    "tests/unit/support-recovery-attestation.test.ts",
+    "tests/render/sup-03-consent.test.tsx",
+    "tests/render/sup-04-widget.test.tsx",
+    "tests/render/support-topbar.test.tsx",
+    "tests/unit/support-public-guide-boundary.test.ts",
+    "tests/unit/support-recovery-intent.test.ts",
+    "tests/unit/s7-authorization.test.ts",
+    "tests/architecture/sup-01-boundary.test.ts",
+    "tests/architecture/sup-03-projection.test.ts",
+    "tests/integration/dev-database-principals.test.ts",
+    "--maxWorkers=1"
+  ],
+  "files": [
+    "tests/unit/support-kb.test.ts",
+    "tests/unit/support-context.test.ts",
+    "tests/unit/support-navigation.test.ts",
+    "tests/architecture/support-catalog-coverage.test.ts",
+    "tests/unit/support-response-policy.test.ts",
+    "tests/unit/support-classify.test.ts",
+    "tests/unit/support-security-guidance.test.ts",
+    "tests/unit/support-model.test.ts",
+    "tests/unit/support-escalation.test.ts",
+    "tests/integration/support-routes.test.ts",
+    "tests/integration/support-metrics.test.ts",
+    "tests/integration/support-degraded.test.ts",
+    "tests/integration/support-relay-reservations.test.ts",
+    "tests/render/sup-01-help.test.tsx",
+    "tests/integration/support-config-convergence.test.ts",
+    "tests/integration/support-own-context.test.ts",
+    "tests/integration/support-shred.test.ts",
+    "tests/unit/support-answer-context.test.ts",
+    "tests/unit/support-redaction.test.ts",
+    "tests/integration/support-cases.test.ts",
+    "tests/unit/support-credentials.test.ts",
+    "tests/unit/support-model-references.test.ts",
+    "tests/unit/support-text-views.test.ts",
+    "tests/unit/support-recovery-components.test.ts",
+    "tests/unit/support-recovery-attestation.test.ts",
+    "tests/render/sup-03-consent.test.tsx",
+    "tests/render/sup-04-widget.test.tsx",
+    "tests/render/support-topbar.test.tsx",
+    "tests/unit/support-public-guide-boundary.test.ts",
+    "tests/unit/support-recovery-intent.test.ts",
+    "tests/unit/s7-authorization.test.ts",
+    "tests/architecture/sup-01-boundary.test.ts",
+    "tests/architecture/sup-03-projection.test.ts",
+    "tests/integration/dev-database-principals.test.ts"
+  ],
+  "sourceCustody": {
+    "head": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19",
+    "productRef": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718"
+  },
+  "findings": [
+    "GS8-1",
+    "GS8-2"
+  ],
+  "union": "REWORK; correctness8 counted tests do not override the concrete security counterexamples"
+}

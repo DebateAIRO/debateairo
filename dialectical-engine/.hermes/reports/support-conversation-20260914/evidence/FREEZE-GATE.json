@@ -1,0 +1,95 @@
+{
+  "at": "2026-09-14T16:21:25.976000+00:00",
+  "ref": "refs/heads/codex/support-conversation-mission",
+  "commit": "de7138ffddff8109003d8b4617c509cae5fd8dd2",
+  "tree": "8d6ed8325b7b0098f80b0bc4b87903a6e3077102",
+  "parent": "096638486c4f2eab450055c4b1d25ecd58a1ca54",
+  "files": [
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/board-ids.json",
+      "sha256": "3da90b34ce234c197581ec5b1ed1da40ab517e17aac2d8085be1536e4a7ca7f7"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PROGRESS.md",
+      "sha256": "7c46b024774baa03761a684be361be3be9ec0d40e291a7f7d825b7fd7be13c7a"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/CP1-REVIEW-AT-FAILURE.md",
+      "sha256": "4d07c4edc2c4a85f30990c853f723816ada34911ffed4210935ea51c51ef2789"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/CP1-SOURCE-DRIFT.md",
+      "sha256": "f092e0898c0b23a2e9ef38098741e365c79e5ac6520ce6562f745d8f8b61304f"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/LEDGER.md",
+      "sha256": "aa8d9593e2e312d77b8b416eabf09f4be9e84ea2032b03fa53fcb69115d73b63"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md",
+      "sha256": "f23098a6487039c1d880c12a45b8b7474d9f1d98966a3c6f06844b9db2ceb994"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REVIEW-COMMON.md",
+      "sha256": "92396b21adaf2736d228580b86bac741f2647af09b3abd530a7a0928a719fbaa"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REV1.md",
+      "sha256": "a920525e4a302736c8c6fdf3ee5f89f975aa491906985a9693f06ee9f7fe40aa"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REV2.md",
+      "sha256": "3177d4f0abef1be1a212b5bba1e101fa1d24ec4a4613e39586ec6681f51a4701"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REV3.md",
+      "sha256": "82eb18096de85a86e5d079b3c7f2919863440cc8bca6bd608a893ce9bd305021"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/LIVE4.md",
+      "sha256": "712653fb243ee8c310d9e5317307417fc2a0a726b6bc572dafe198654ae99b57"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/review-packages/CP1-p1/README.md",
+      "sha256": "38837da549f154039e30a50091036f285e1d4de3b8d92e9d86fc5902ab089cf4"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE4.md",
+      "sha256": "d207069a6e3af843025c6b32934d5a0606fa730cc2563029d3ec046e86c7ab08"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE4-manifest.json",
+      "sha256": "6ba7fba830d0306cbfcc0f5acd7be3f56412578d297710f45f734abacc098ae5"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE4-consumption.json",
+      "sha256": "dbf5c7bd12dc20dbb96dda8b604c66906454541d5d24ea90bd8032a734b882c5"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE.md",
+      "sha256": "1e62bf0669c5bbbfc533e4b2cfca5f0013dd3b60f17054ab8f3b4b66e00ca4a9"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE-manifest.json",
+      "sha256": "ab6221c1e5e1a4fa3050854005a646242bbc7472522d2745077eea77a2da48f0"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE-final-source-preservation.json",
+      "sha256": "a14d15751c670b441b6e845bc38bcc6ebab522eec98768242fa2e0df80ab22d0"
+    }
+  ],
+  "source_before": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813",
+    "lane_ref": "6e5ab5fc41acebbff4264efc7d481df3db8dce44"
+  },
+  "source_after": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813",
+    "lane_ref": "6e5ab5fc41acebbff4264efc7d481df3db8dce44"
+  },
+  "private_index_removed": true,
+  "tested": "metadata only; known LIVE4 failure consumed; final review pass1 contract; original source drift disclosed; no product mutation"
+}

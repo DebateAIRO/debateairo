@@ -1,0 +1,176 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_FIX27",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "contract": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_FIX27-command-contract.json",
+  "rules": {
+    "operatorMayOpenContractOwnedPath": false,
+    "operatorLogWriteTime": "AFTER_CHILD_EXIT",
+    "phaseOutputWriteMode": "EXCLUSIVE",
+    "stopFirst": true
+  },
+  "phases": {
+    "preflight": {
+      "output": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-preflight.json",
+        "owner": "PHASE_WRAPPER",
+        "writeMode": "EXCLUSIVE"
+      },
+      "contractLog": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE27-preflight.log",
+        "owner": "CONTRACT_RESERVED_ABSENCE_PATH",
+        "operatorMayOpen": false
+      },
+      "operatorLog": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_OPERATOR_FIX27-operator-preflight.log",
+        "owner": "THIN_OPERATOR",
+        "writeTime": "AFTER_CHILD_EXIT",
+        "writeMode": "EXCLUSIVE"
+      }
+    },
+    "readiness": {
+      "output": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-readiness.json",
+        "owner": "PHASE_WRAPPER",
+        "writeMode": "EXCLUSIVE"
+      },
+      "contractLog": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE25-readiness.log",
+        "owner": "CONTRACT_RESERVED_ABSENCE_PATH",
+        "operatorMayOpen": false
+      },
+      "operatorLog": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_OPERATOR_FIX27-operator-readiness.log",
+        "owner": "THIN_OPERATOR",
+        "writeTime": "AFTER_CHILD_EXIT",
+        "writeMode": "EXCLUSIVE"
+      }
+    },
+    "capacity": {
+      "output": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-capacity.json",
+        "owner": "PHASE_WRAPPER",
+        "writeMode": "EXCLUSIVE"
+      },
+      "contractLog": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE25-capacity.log",
+        "owner": "CONTRACT_RESERVED_ABSENCE_PATH",
+        "operatorMayOpen": false
+      },
+      "operatorLog": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_OPERATOR_FIX27-operator-capacity.log",
+        "owner": "THIN_OPERATOR",
+        "writeTime": "AFTER_CHILD_EXIT",
+        "writeMode": "EXCLUSIVE"
+      }
+    },
+    "gate": {
+      "output": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-gate.json",
+        "owner": "PHASE_WRAPPER",
+        "writeMode": "EXCLUSIVE"
+      },
+      "contractLog": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE25-gate.log",
+        "owner": "CONTRACT_RESERVED_ABSENCE_PATH",
+        "operatorMayOpen": false
+      },
+      "operatorLog": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_OPERATOR_FIX27-operator-gate.log",
+        "owner": "THIN_OPERATOR",
+        "writeTime": "AFTER_CHILD_EXIT",
+        "writeMode": "EXCLUSIVE"
+      }
+    },
+    "rowProof": {
+      "output": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-row-proof-status.json",
+        "owner": "PHASE_WRAPPER",
+        "writeMode": "EXCLUSIVE"
+      },
+      "contractLog": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE25-row-proof.log",
+        "owner": "PHASE_WRAPPER_CHILD_STDIO",
+        "operatorMayOpen": false
+      },
+      "operatorLog": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_OPERATOR_FIX27-operator-rowProof.log",
+        "owner": "THIN_OPERATOR",
+        "writeTime": "AFTER_CHILD_EXIT",
+        "writeMode": "EXCLUSIVE"
+      }
+    },
+    "capture": {
+      "output": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-capture.json",
+        "owner": "PHASE_WRAPPER",
+        "writeMode": "EXCLUSIVE"
+      },
+      "contractLog": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE25-capture.log",
+        "owner": "PHASE_WRAPPER_CHILD_STDIO",
+        "operatorMayOpen": false
+      },
+      "operatorLog": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_OPERATOR_FIX27-operator-capture.log",
+        "owner": "THIN_OPERATOR",
+        "writeTime": "AFTER_CHILD_EXIT",
+        "writeMode": "EXCLUSIVE"
+      }
+    },
+    "idle": {
+      "output": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-idle.json",
+        "owner": "PHASE_WRAPPER",
+        "writeMode": "EXCLUSIVE"
+      },
+      "contractLog": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE25-idle.log",
+        "owner": "CONTRACT_RESERVED_ABSENCE_PATH",
+        "operatorMayOpen": false
+      },
+      "operatorLog": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_OPERATOR_FIX27-operator-idle.log",
+        "owner": "THIN_OPERATOR",
+        "writeTime": "AFTER_CHILD_EXIT",
+        "writeMode": "EXCLUSIVE"
+      }
+    }
+  },
+  "nested": {
+    "preflightUiOutput": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE-run-LIVE25.json",
+      "owner": "PREFLIGHT_UI_CHILD"
+    },
+    "preflightUiLog": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_UI_TRANSITION_PROBE-LIVE25.log",
+      "owner": "PREFLIGHT_WRAPPER_CHILD_STDIO"
+    },
+    "rowProofResult": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-LIVE25.json",
+      "owner": "ROW_PROOF_CHILD"
+    },
+    "actualReceipt": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE21-actual-receipt.json",
+      "owner": "CAPTURE_CHILD"
+    },
+    "browserProfile": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX25/browser-profile",
+      "owner": "CAPTURE_CHILD"
+    },
+    "actualScreenshots": {
+      "owner": "CAPTURE_CHILD",
+      "stem": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE21-row-<sequence>"
+    },
+    "prerequisite": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE27-prerequisites.json",
+      "owner": "THIN_OPERATOR"
+    },
+    "stop": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE27-stop.json",
+      "owner": "THIN_OPERATOR",
+      "condition": "FIRST_NONZERO_PHASE_ONLY"
+    }
+  },
+  "uniqueConcretePaths": 29
+}

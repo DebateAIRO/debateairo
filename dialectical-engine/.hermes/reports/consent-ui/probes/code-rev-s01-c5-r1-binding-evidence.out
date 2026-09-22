@@ -1,0 +1,25 @@
+=== A. CMD-C5 on the SHIPPED code (control) ===
+  CMD-C5 verdict=0  summary:      Tests  4 failed | 38 passed (42)  files: Test Files  1 failed | 2 passed (3)  unpinned-failures:0  consent-mount failing:0
+
+=== B. CMD-C5 with the DISMISSAL keyed on presence, not validity (RM2) ===
+  CMD-C5 verdict=0  summary:      Tests  4 failed | 38 passed (42)  files: Test Files  1 failed | 2 passed (3)  unpinned-failures:0  consent-mount failing:0
+
+=== C. CMD-C5 with the MOUNT keyed on presence, not validity (RM3) ===
+  CMD-C5 verdict=0  summary:      Tests  4 failed | 38 passed (42)  files: Test Files  1 failed | 2 passed (3)  unpinned-failures:0  consent-mount failing:0
+
+=== D. THE N7 COMPILE PIN — apps/ui tsc with the save-choices overload LOOSENED ===
+--- D0 shipped (control) ---
+APPSUI_TSC_EXIT=0
+APPSUI_TSC_EXIT=0
+--- D1 the save-choices overload made toggles-OPTIONAL (the regression the pin exists to see) ---
+lib/consent.ts(218,3): error TS2578: Unused '@ts-expect-error' directive.
+APPSUI_TSC_EXIT=1
+--- D2 BOTH overloads deleted (the author's own M15 mutant) ---
+lib/consent.ts(213,3): error TS2578: Unused '@ts-expect-error' directive.
+APPSUI_TSC_EXIT=1
+--- D3 does the ROOT typecheck see it? (COMMON §10.30's whole premise) ---
+root diagnostics outside the pin: 0
+
+=== E. restore proof ===
+       0
+       0

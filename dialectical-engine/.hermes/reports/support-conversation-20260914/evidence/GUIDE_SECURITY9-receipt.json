@@ -1,0 +1,127 @@
+{
+  "schema": "GUIDE_SECURITY9_RECEIPT_V1",
+  "node": "GUIDE_SECURITY9",
+  "ticket": "t_68bbd016",
+  "session": "/root/forgot_destination",
+  "model": "gpt-5.6-sol",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "base": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718",
+  "verdict": "PASS",
+  "usage": "UNAVAILABLE",
+  "scope": "finite member-by-member GS8-1/GS8-2 terminal immutable-lock correction",
+  "dispositions": {
+    "GS8_1": "RESOLVED",
+    "GS8_2": "RESOLVED",
+    "newFindings": 0,
+    "readWithThreshold": "PASS",
+    "defaultRead": "PASS",
+    "admitMessage": "PASS",
+    "rateMessageDirect": "PASS",
+    "createCaseOnce": "PASS",
+    "createCase": "PASS",
+    "manualEscalation": "PASS",
+    "humanRating": "PASS",
+    "thresholdIncrease": "PASS",
+    "thresholdRefusalStored": "PASS",
+    "status": "RETAINED_PASS",
+    "ipCooldown": "RETAINED_PASS"
+  },
+  "staticChecks": {
+    "indexedInputsMatched": 67,
+    "indexedInputsTotal": 67,
+    "deltaPathsMatched": 4,
+    "authorProductFilesMatched": 4,
+    "selectedUnchangedObjectsMatched": 13,
+    "declaredPrincipalCountBase": 11,
+    "declaredPrincipalCountFinal": 11,
+    "privilegeOrStateUpdateDeltaLines": 0,
+    "detachedCleanExact": true,
+    "heavyLeaseAcquired": false,
+    "testsExecutedIndependently": 0,
+    "runtimeOrDatabaseTraffic": false
+  },
+  "authorEvidence": {
+    "redDirect": "createCaseOnce opened from physical OPEN plus immutable LOCK",
+    "redRoute": {
+      "read": "OPEN",
+      "statuses": [
+        200,
+        201,
+        200
+      ],
+      "ratingsDelta": 1,
+      "casesDelta": 2
+    },
+    "preservedNonSecurityFailure": "initial combined RED test fixture ReferenceError",
+    "focused": {
+      "passed": 2,
+      "failed": 0
+    },
+    "affected": {
+      "files": 5,
+      "passed": 225,
+      "failed": 0
+    },
+    "final34": {
+      "files": 34,
+      "passed": 1701,
+      "failed": 0,
+      "TODO": 1
+    },
+    "structuralEval": {
+      "runs": [
+        "60/60",
+        "60/60",
+        "60/60"
+      ],
+      "rubric": "PENDING"
+    },
+    "greenLogSha256": "b2bd77a9001e53e98f94a8642943c7af45c8770a8878813642cc3288921a8458",
+    "affectedLogSha256": "41fc0a6724b5c81cbc4e9f0429c8a77cda6e5675b646178a4ee97690d93e5be4",
+    "final34LogSha256": "d5039088e4eab602c3c117d3ebe7d2d2fd9e88d9257b62d9251d403ac43f7876"
+  },
+  "retainedBoundaries": {
+    "migrationOrPrivilegeExpansion": false,
+    "physicalStateUpdate": false,
+    "serializedConcurrentAdmission": true,
+    "encryptedThresholdRefusalStorage": true,
+    "hashedAbuseEvidence": true,
+    "noModelInjectionRefusal": true,
+    "ordinaryOpenFeedbackAndHandoff": true,
+    "publicPrivacySourceActionObjectsUnchanged": true,
+    "principalDeclarationUnchanged": true
+  },
+  "limits": {
+    "modelCalledByReviewer": false,
+    "browserUsed": false,
+    "liveApiCalled": false,
+    "databaseProbeRepeated": false,
+    "privateRecordsUsed": false,
+    "accountOrRecoveryActionExecuted": false,
+    "privateRuntimeLogsRead": false,
+    "live6FirstExceptionAttributed": false,
+    "actual54Completed": false,
+    "arbitraryFutureCallersProven": false,
+    "forgotDestinationKnown": false,
+    "checkpointAccepted": false
+  },
+  "receiptExcludesItself": true,
+  "artifacts": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_SECURITY9.md",
+      "sha256": "ebbc87cbe5e9e1e25e6168d95078a9938861c4d2fb046e449e1e808777ecf86d",
+      "bytes": 5856
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_SECURITY9.md",
+      "sha256": "d16c155a1a99d17c7c4f1284327ef88971555c350ee000c04255eb9a98a2a94f",
+      "bytes": 2485
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SECURITY9-static.log",
+      "sha256": "02a7e7cc41c1dff7de42547e934067b92f97db8d23530768a21cf6315cc2c915",
+      "bytes": 4937
+    }
+  ],
+  "sealedAt": "2026-09-20T13:18:47.006277+00:00"
+}

@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_FIX27",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "PASS_FINAL_BINDING",
+  "checks": {
+    "total": 35,
+    "passed": 35,
+    "allSevenSelfBound": true,
+    "exactContractDelta": {
+      "node": true,
+      "sevenArgv2": true,
+      "preflightLogOnly": true
+    },
+    "publicOperatorInvocationExact": true,
+    "operatorScriptDigestVerified": true,
+    "commandContractDigestVerified": true,
+    "ownerMapUniqueConcretePaths": 29,
+    "futurePathsCheckedAbsent": 123,
+    "futureOwnerTestabilityAbsent": true,
+    "syntaxFiles": 6,
+    "operationalTraffic": {
+      "browser": 0,
+      "http": 0,
+      "status": 0,
+      "database": 0,
+      "support": 0,
+      "model": 0
+    }
+  },
+  "records": {
+    "baseContract": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX26-command-contract.json",
+      "sha256": "e64a497a30cf7ed84b5f721e3eab8b743489a33e334917ab124e5ec6a42f7d94",
+      "bytes": 10158
+    },
+    "finalContract": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_FIX27-command-contract.json",
+      "sha256": "04512905c4f1b224a5ed1b8249fc0484650ed06ee3519bcec7f90db9ba15bc7a",
+      "bytes": 10166
+    },
+    "operatorContract": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_FIX27-operator-contract.json",
+      "sha256": "d0f8c0962d22cf50ae47ecd7bf22f7fed49bb6df6c38718de297cfec350b7d39",
+      "bytes": 6066
+    },
+    "ownerMap": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_FIX27-owner-map.json",
+      "sha256": "cfca760a1ad8f47dfc85367ae758d2eb216ad891b99012288acdb871cca8300b",
+      "bytes": 8496
+    },
+    "controlProof": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_FIX27-control-proof.json",
+      "sha256": "38c8900ba71114df07a3d6144c9c22bb378f3f1cb1acb5c663111737bcf3bce6",
+      "bytes": 5728
+    },
+    "syntax": [
+      {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/run-operator.mjs",
+        "sha256": "464c5ea1e43d34d5ec575458c1c59e36dc27257f70e7be78a3dda983a1e9ac13",
+        "bytes": 10346
+      },
+      {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/sentinel-ui-preflight.mjs",
+        "sha256": "e43c6217a780a793314208ef52c3f7811e882babf09eebfde0d149fa13953c3f",
+        "bytes": 936
+      },
+      {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/run-focused-controls.mjs",
+        "sha256": "099c23c0f5dd7ce00d7e998b6012b6ccf2828960e95ad7b01e746b1d969be1fd",
+        "bytes": 7518
+      },
+      {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/build-command-contract.mjs",
+        "sha256": "b28cb7065b981d47d6ad9ae122ca0beed38ba97125f773027d761a264d9a7455",
+        "bytes": 851
+      },
+      {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/build-public-contracts.mjs",
+        "sha256": "27d020984cdb905732710cd49bcea32e6903e646c199a3f611e44939c8950f20",
+        "bytes": 5247
+      },
+      {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX27/verify-final-binding.mjs",
+        "sha256": "5f91691c38c8ca560c5feeeca665df9e5e631efb5f7c83980b1587d884fe63b2",
+        "bytes": 5857
+      }
+    ]
+  }
+}

@@ -1,0 +1,288 @@
+{
+  "schema_version": 1,
+  "base_url": "https://localhost:3100",
+  "browser": {
+    "driver": "playwright@1.61.1",
+    "executablePath": "/Users/vladmihaimiron/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell",
+    "headless": true,
+    "tls_bypass": false
+  },
+  "synthetic_api": true,
+  "observations": [
+    {
+      "mode": "full",
+      "language": "en",
+      "url": "https://localhost:3100/help",
+      "sourceLabel": "Sources",
+      "sourceItems": [
+        "Start a debate",
+        "Choose your plan"
+      ],
+      "actionLabel": "Actions",
+      "actionCount": 1,
+      "actionHref": "/login?next=%2Fnew",
+      "actionBox": {
+        "x": 800.828125,
+        "y": 441.265625,
+        "width": 62.28125,
+        "height": 11
+      },
+      "shellStyle": {
+        "display": "block",
+        "fontFamily": "\"Plus Jakarta Sans\", \"Plus Jakarta Sans Fallback\", \"Plus Jakarta Sans\", ui-sans-serif, system-ui, sans-serif",
+        "color": "rgb(85, 81, 71)",
+        "backgroundColor": "rgb(253, 251, 246)"
+      },
+      "textVisible": true,
+      "screenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UI-full-en.png"
+    },
+    {
+      "mode": "full",
+      "language": "ro",
+      "url": "https://localhost:3100/help",
+      "sourceLabel": "Surse",
+      "sourceItems": [
+        "Începe o dezbatere",
+        "Alege planul"
+      ],
+      "actionLabel": "Acțiuni",
+      "actionCount": 1,
+      "actionHref": "/login?next=%2Fnew",
+      "actionBox": {
+        "x": 769.40625,
+        "y": 459.65625,
+        "width": 93.703125,
+        "height": 11
+      },
+      "shellStyle": {
+        "display": "block",
+        "fontFamily": "\"Plus Jakarta Sans\", \"Plus Jakarta Sans Fallback\", \"Plus Jakarta Sans\", ui-sans-serif, system-ui, sans-serif",
+        "color": "rgb(85, 81, 71)",
+        "backgroundColor": "rgb(253, 251, 246)"
+      },
+      "textVisible": true,
+      "screenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UI-full-ro.png"
+    },
+    {
+      "mode": "compact",
+      "language": "en",
+      "url": "https://localhost:3100/",
+      "sourceLabel": "Sources",
+      "sourceItems": [
+        "Start a debate",
+        "Choose your plan"
+      ],
+      "actionLabel": "Actions",
+      "actionCount": 1,
+      "actionHref": "/login?next=%2Fnew",
+      "actionBox": {
+        "x": 246.109375,
+        "y": 595.140625,
+        "width": 62.28125,
+        "height": 11
+      },
+      "shellStyle": {
+        "display": "block",
+        "fontFamily": "\"Plus Jakarta Sans\", \"Plus Jakarta Sans Fallback\", \"Plus Jakarta Sans\", ui-sans-serif, system-ui, sans-serif",
+        "color": "rgb(85, 81, 71)",
+        "backgroundColor": "rgb(253, 251, 246)"
+      },
+      "textVisible": true,
+      "screenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UI-compact-en.png"
+    },
+    {
+      "mode": "compact",
+      "language": "ro",
+      "url": "https://localhost:3100/",
+      "sourceLabel": "Surse",
+      "sourceItems": [
+        "Începe o dezbatere",
+        "Alege planul"
+      ],
+      "actionLabel": "Acțiuni",
+      "actionCount": 1,
+      "actionHref": "/login?next=%2Fnew",
+      "actionBox": {
+        "x": 222.53125,
+        "y": 631.921875,
+        "width": 47,
+        "height": 29.390625
+      },
+      "shellStyle": {
+        "display": "block",
+        "fontFamily": "\"Plus Jakarta Sans\", \"Plus Jakarta Sans Fallback\", \"Plus Jakarta Sans\", ui-sans-serif, system-ui, sans-serif",
+        "color": "rgb(85, 81, 71)",
+        "backgroundColor": "rgb(253, 251, 246)"
+      },
+      "textVisible": true,
+      "screenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UI-compact-ro.png"
+    }
+  ],
+  "action_activation": {
+    "input": "keyboard-enter",
+    "focusedName": "Start a debate",
+    "destination": "https://localhost:3100/login?next=%2Fnew"
+  },
+  "stale_session": {
+    "synthetic": true,
+    "calls": [
+      {
+        "step": "message",
+        "session": "A",
+        "redacted": true
+      },
+      {
+        "step": "create",
+        "session": "B"
+      },
+      {
+        "step": "message",
+        "session": "B",
+        "redacted": true
+      }
+    ],
+    "oneVisibleUserTurn": true,
+    "storedSessionB": true,
+    "removedSessionA": true
+  },
+  "api_calls": [
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/support/status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions/browser-4/messages",
+      "language": "en"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/support/status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions/browser-9/messages",
+      "language": "ro"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/support/status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/support/status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions/stale-a/messages",
+      "language": "en"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions/stale-b/messages",
+      "language": "en"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions/browser-22/messages",
+      "language": "en"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions/browser-27/messages",
+      "language": "ro"
+    }
+  ],
+  "console_errors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 409 (Conflict)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ]
+}

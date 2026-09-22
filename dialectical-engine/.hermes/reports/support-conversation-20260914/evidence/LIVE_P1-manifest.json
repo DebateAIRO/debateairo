@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "node": "LIVE_P1",
+  "revision": "e0dcfe77f49655bea774bdfacf988b911be4ff06",
+  "immutable_sha256": {
+    "agent-reports/LIVE_P1.md": "5931993ecccb90d8fcc55b79ab9b208644dcb3b890f09b657682e914009aea74",
+    "evidence/LIVE_P1.md": "9ea008867e15118f8d481aee0fcaf0d63da30726dff43a7659ab4150e92b6f23",
+    "evidence/LIVE_P1-actual-relay-receipt.json": "b2cc1d4c31ab873f9119b8c580adc4ae69bdb5276dbc5837480f0bec01cd64f4",
+    "evidence/LIVE_P1-compact-ro.png": "30f6dce5a4cba513ff083ce0cddb8dce9a2b6f4e77185244c260544b5134fed2",
+    "evidence/LIVE_P1-full-en.png": "8cac78ec02e26fc487bce4e0c746d7b2ed84e1f02c10b916183e9f15b1d91d6a",
+    "evidence/LIVE_P1-full-ro.png": "251b1e5f8119fb65cb78db611cb8e27b16b541e0bc38af222e3c0d0b96f883e6",
+    "evidence/LIVE_P1-required-suites-draft.json": "f25c8fd9adb2b14c48cb3884dcb5dc2f03f438aa7d70784553dd8118dcde4210",
+    "evidence/LIVE_P1-required-suites.json": "18144cbc0e8365a7e8d1f7d78ac0251d3ce0def2418951d6ef9c9589083c5a96",
+    "evidence/LIVE_P1-stack-custody.json": "8f8eda80b5f2c4e01e424fdcede3dbef25fd132f4a1cedf652fa1275fc69ecaf",
+    "evidence/LIVE_P1-stack-receipt.json": "5346de0c3ffbbe63ef7f00000dc30e03f0bc2a2065df83e76e41ba8e636fe5cc",
+    "logs/LIVE_P1-actual-relay-browser.log": "64ada14841dc508fd5cbc397593d7d3d4148c3584f90160047c89fa0987de9a1",
+    "logs/LIVE_P1-integrated-suite.log": "5670ab80c3bf48249c85099495f086bb0aa81fd53479c6f68a70a3a677060ec2",
+    "logs/LIVE_P1-launch-detached.log": "965e1657324e894d7b530f7c83aa4f4b7a7112d6bfd17f0f68a639bc59000678",
+    "logs/LIVE_P1-stack-postflight.log": "7488902b72e08ebaa3f4b3f30c987fe0a030368bfd18a46bbfe7209c599d1fea",
+    "logs/LIVE_P1-stack-preflight.log": "c8476a984e832c9910efd45419f148ad76f615150c2975007ea55c0c70d11f1b",
+    "logs/LIVE_P1-stack-ready.log": "de89e230c35be8872b663328adc027a16956ef95a1d42a1149662849293100a2",
+    "logs/LIVE_P1-stack-reload-stop.log": "a1fae03bf8c65d83bea5cab1f2b67cfdf55f7c6498123ebee9a73d5d8004a31f",
+    "logs/LIVE_P1-strict-seven-consumer-control-final.log": "fb8fc45838fc8f7dcccb00cf54a5abe600c69176c3ec1d9a1cd70206e9404a38",
+    "logs/LIVE_P1-strict-seven-consumer-control.log": "6dedeeb8f52f326e7fc58ffb1afc6e8df526fbf62d060f8df7503cdbdce160d6",
+    "probes/LIVE_P1/capture-actual-relay.mjs": "7670423c23733536ce14c870e6be9fbd4c07ea70fe26cd23c226a79def1dca13",
+    "probes/LIVE_P1/console-classifier.mjs": "9ebf232a8c37c587013ce28404186230ddb3925b5e96a79131b64e31d9d9a33f",
+    "probes/LIVE_P1/diagnostic-consumer.mjs": "6b53275c0e621e1925c300b0024674c942f72782b31c1ecadde29c9a04c9295f",
+    "probes/LIVE_P1/generate-manifest.mjs": "a44f817d0ef314b39cee561373f2ab61f4324a475a23174040db22469545f267",
+    "probes/LIVE_P1/start-preview-detached.mjs": "14662c67e145af6bb697b2fad370a3edc32b76992e6d6575c5274a4d1c02faeb",
+    "probes/LIVE_P1/verify-diagnostic-consumer.mjs": "84d9cd01085e9e7ab30857cefa207018a06b21c9040eb7c44822b7e4541f9a04",
+    "probes/LIVE_P1/verify-manifest.mjs": "70c7decbde1639e2c0d7b81a3322ca9646b6b4ce7750ddfbc7dd50e41c513ad9"
+  },
+  "exclusions": {
+    "logs/LIVE_P1-stack-detached.log": "Active mode-0600 runtime log may grow while the supported preview remains active."
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX25",
+  "fixtureOnly": true,
+  "operationalUseForbidden": true,
+  "runtimeAvailabilityClaimed": false,
+  "supersedesFailedFixtureForGreenOnly": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX25-inert-gate-fixture.json",
+  "reason": "prior fixture exposed the FIX22 control proof's extra node key; use the exact eight-key reviewed BIND21 proof",
+  "substitutions": [
+    "measuredAtUtc",
+    "controlProofPath",
+    "controlProofSha256"
+  ],
+  "capacityPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX25-inert-capacity-fixture-attempt2.json",
+  "capacitySha256": "66fe7397cc4572c977cd9fe63183422d56414f6f63412a75013c90d59b5cab2f",
+  "gatePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX25-inert-gate-fixture-attempt2.json",
+  "gateSha256": "f346ba8dd28f43e3ea016a9f9a3fb4f16972a3fb5f0732681f4882c142d6c2f2"
+}

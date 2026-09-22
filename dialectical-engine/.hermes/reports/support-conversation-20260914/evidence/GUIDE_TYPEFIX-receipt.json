@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_TYPEFIX",
+  "ticket": "t_a8d71466",
+  "session": "/root/requirements",
+  "baseRevision": "8fb8e407b350f9950cdb27a0f4caaf8e178d7cb6",
+  "productRevision": "c34c64d4e643e404cefe96dfaf167536ae364a94",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "verdict": "AUTHOR_VERIFIED_PENDING_SEPARATE_REVIEW",
+  "productFiles": [
+    {
+      "laneRelative": "apps/api/src/support/recovery-intent.ts",
+      "sha256": "c3cda8dcd5764c84e8b56dffb99f883eb92b1a1a42eb3aaa514b7133e1e624ab",
+      "bytes": 7835
+    },
+    {
+      "laneRelative": "tests/architecture/sup-03-projection.test.ts",
+      "sha256": "4b64677b9f1032a95d6af199173611eba2edb701d91bbcd0875ac604dc41ee79",
+      "bytes": 1420
+    },
+    {
+      "laneRelative": "tests/architecture/support-catalog-coverage.test.ts",
+      "sha256": "0914c392280d4e5c31a8ebc2dfa2a38bf3c87594b114cf9df38906a4608207c1",
+      "bytes": 5415
+    },
+    {
+      "laneRelative": "tests/integration/support-routes.test.ts",
+      "sha256": "b721bf759c6353bee83388cec8f41a201ed9df81fb4cf8623a8f77b070c19fe4",
+      "bytes": 133738
+    },
+    {
+      "laneRelative": "tests/unit/support-context.test.ts",
+      "sha256": "c15afc15ec276d9735c2f1cc8001ef5b09279e3dcda01e9139f1b96d252f2cd2",
+      "bytes": 24265
+    },
+    {
+      "laneRelative": "tests/unit/support-recovery-intent.test.ts",
+      "sha256": "d24e84b37747d21a300df9c2bf772a17c4b67c1532ab7e922aa5f5cc1249ecaf",
+      "bytes": 5904
+    }
+  ],
+  "verification": {
+    "exact33": {
+      "exitCode": 0,
+      "testFiles": 33,
+      "passed": 1496,
+      "failed": 0,
+      "todo": 1
+    },
+    "typecheck": {
+      "exitCode": 1,
+      "exitMeaning": "ATTRIBUTED_BASELINE_ONLY",
+      "baselineDiagnostics": 76,
+      "currentDiagnostics": 76,
+      "missionAddedDiagnostics": 0,
+      "byteIdentical": true
+    },
+    "supportEval": {
+      "exitCode": 1,
+      "exitMeaning": "PENDING_INDEPENDENT_QUALITY_RUBRIC",
+      "runs": 3,
+      "passedPerRun": 60,
+      "failedPerRun": 0,
+      "rubric": "PENDING"
+    },
+    "snapshot": {
+      "entryCount": 44,
+      "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+      "ownerRecoveryFieldsBlank": true
+    }
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_TYPEFIX.md",
+      "sha256": "447908b45a6812d14fb997d80ca7a3b8bf234f2a8eab16c0774f44709461bba0",
+      "bytes": 1428
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_TYPEFIX-snapshot-receipt.json",
+      "sha256": "81c2432f04edfcfc5c3afb6589530a8b08dccdc077242a9f733245d0a807802f",
+      "bytes": 48184
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_TYPEFIX-required-suites.json",
+      "sha256": "ad4c7eb39c02318e92d7e47e6cb9e4145b7120d00511b33e3639bd5ca85e6978",
+      "bytes": 4047
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_TYPEFIX-typecheck-comparison.json",
+      "sha256": "b7bcbcb4b4f5cafd64481511d1c1e9699f4ff95bfdd50457c2bb409c91f39d3b",
+      "bytes": 1006
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_TYPEFIX-eval-summary.json",
+      "sha256": "4be0f19b1e110e2b774e27e0cf8eec20eec64713eb8a70970d2ef687640f34cd",
+      "bytes": 1354
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_TYPEFIX-product-manifest.json",
+      "sha256": "5abeecf2266146876ae733230970043183658991ad52d331c729173460442819",
+      "bytes": 1421
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_TYPEFIX.md",
+      "sha256": "2e6370cc43f237cd2486d77d912cd1a0c093e630e1d9ed706e68724b2a90e6e3",
+      "bytes": 2339
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_TYPEFIX-suite.log",
+      "sha256": "18552287589fe3ea0c682a94fca3a000eadaaabd6b6eee0953a5b9d0c27a662e",
+      "bytes": 580336
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_TYPEFIX-typecheck.log",
+      "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+      "bytes": 39611
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_TYPEFIX-eval.log",
+      "sha256": "2e99d26b0f6047bda14c05edd7f9a13461f52203c08efc290775f37a609a6abb",
+      "bytes": 4734
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_TYPEFIX/build-preflight.mts",
+      "sha256": "73d295d6db2525016c14777ee5eacb69d525439cf716ca61b91b63361e765078",
+      "bytes": 6726
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_TYPEFIX/input-verification.json",
+      "sha256": "b4235bcd2503a61779535c27ff2a193448b7a89c96a5b921a1d7f14dc9346c90",
+      "bytes": 8477
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_TYPEFIX/package-evidence.mjs",
+      "sha256": "bd3f629997cf4a7c44dc41bcc61c0b8128a6339316dd2bb17b30184652d928d2",
+      "bytes": 11803
+    }
+  ],
+  "receiptExcludesSelf": true,
+  "leasesReleased": {
+    "heavy": true,
+    "git": true
+  },
+  "measuredAt": "2026-09-17T13:28:06.456Z"
+}

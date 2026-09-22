@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_REVIEW29",
+  "ticket": "t_91c29a7f",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "freeze": "568ee46b3c2fa4de0900e8cdf9c142515b937cea",
+  "fix29Receipt": {
+    "sha256": "ebbd092e04d289df6be75abf71430c7135d5277b97f5e664089cce2f65d35bb2",
+    "bytes": 9635
+  },
+  "fix29Consumption": {
+    "sha256": "e040626248ad29e954bf2aaa4eceb33c2807e7bbb2d3c5a16886491a7b1aea3a",
+    "bytes": 53870
+  },
+  "manifest": {
+    "artifacts": 30,
+    "verified": 30,
+    "mismatches": 0
+  },
+  "receiptArtifacts": {
+    "artifacts": 31,
+    "verified": 31,
+    "mismatches": 0
+  },
+  "indexedInputs": {
+    "inputs": 182,
+    "verified": 182,
+    "mismatches": 0
+  },
+  "source": {
+    "assistantPath": ".worktrees/support-conversation-cp1/dialectical-engine/apps/ui/components/support/Assistant.tsx",
+    "assistantSha256": "08973898240182a2c04894b1987ffab92e593d70bb9eb9808484f2c76c8e710d"
+  },
+  "successor": {
+    "screenshotHelperSha256": "45eaed8c244c215a97fe7b0af5902568ea01a54351f20b6408b9e53c0ad7976f",
+    "commandContractSha256": "6d1d5a7d80190c67ef29516532708fcda61bb8384bfc30c08b0c620fccc21433",
+    "operatorContractSha256": "b8e1069f138f844be820b3169df0037bd7b4931d722d78953503501db33ac956",
+    "phases": 7,
+    "futurePaths": 123,
+    "futureScreenshotPaths": 93
+  },
+  "finding": {
+    "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_FIX29/control-fixtures/full-ro-long-complete.png",
+    "sha256": "488f827b32346fda0bdcb908a4e7dd014eb008b1b5c900b12d8b827ee5a688ee",
+    "bytes": 80456,
+    "width": 779,
+    "height": 416,
+    "observed": "Paint clips at full root; blank lower region; source and action absent from claimed complete image."
+  },
+  "naturalAvailability": {
+    "sha256": "8b0e6e55c7179f31b121f76b943104f3cc16791ca02f86ed66eead78fdf43a72",
+    "notBeforeUtc": "2026-09-21T03:21:15.789581Z",
+    "planningOnly": true
+  },
+  "reviewMode": "STATIC_READ_ONLY_WITH_EXISTING_IMAGE_INSPECTION",
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

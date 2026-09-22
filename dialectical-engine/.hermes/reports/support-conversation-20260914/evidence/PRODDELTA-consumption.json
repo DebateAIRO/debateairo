@@ -1,0 +1,56 @@
+{
+  "at": "2026-09-14T15:35:31.702653+00:00",
+  "revision": "43cf9386ea3c9e7c79523ec38debe63271d19292",
+  "report_receipt_hashes": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/PRODDELTA.md",
+      "sha256": "242391af13738cd48b6f96874a3d27f406a869234e13d1f6dea7d9664098aeeb"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/PRODDELTA.md",
+      "sha256": "ea75e0895d4dc4fc9dc9641fbf8722c0d16dba6131c1c0caa1737e560c54a8b3"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UIFIX1-manifest.json",
+      "sha256": "d23f942f037c17c94997dea356339a6d2332b01d061b887ee57dbb2751e947ec"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UIFIX1-consumption.json",
+      "sha256": "3f1e28907bebc20389fd52deb6bef9ee216ee50f839cd7bef0051265e64740f0"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UIFIX1-browser-receipt.json",
+      "sha256": "8f3220bef01ccf42a9f2bb718d3ed65b69403e96b4082b31441277c8d57079dc"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE3-manifest.json",
+      "sha256": "86442c6e87fb7746548758ed76cac4b3d22726747901111bae34a5b500870b5e"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE3-consumption.json",
+      "sha256": "c63f0b7a430a5beb0632d13939b034adbbb4d1c234c1d465912616aa6cf4c8b8"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE3-actual-relay-receipt.json",
+      "sha256": "928c5fa840f64fb5125479e0cebbe28322e5a96edef516dcb989a3b40262bc88"
+    }
+  ],
+  "frozen_code_hashes": [
+    {
+      "path": "apps/ui/components/support/Assistant.tsx",
+      "sha256": "80a26625bd72da1e683d0fcb54efe75692417525780ec3ffcb838a883e31c5d9"
+    },
+    {
+      "path": "tests/render/sup-01-help.test.tsx",
+      "sha256": "8c9612bfbe09371ca31ade8b11140998127be20552a8ea89c62b101d6ab56c7d"
+    }
+  ],
+  "result": "PRODUCT_DELTA_CONSUMED; finalREV3 pending",
+  "scope": "Separate Sol reviewer inspected seven saved screenshots; resolved prior shortcut and synthetic signed-in rendering scopes. No new distinct class; LIVE3 remains failed. Root verified new receipt hashes and frozen committed UI bytes; moving FIX4 product not inspected.",
+  "accuracy_amendment": "Prior literal invalidhrefs /settings#privacy and /settings#cookies verified by reviewer against frozen diff. Console classifier establishes category/count only, not exact origin or expected/harmless status.",
+  "prior_artifact_hashes_superseded": [
+    "2ed0fdfd45bb40a02481d19cc812df78f42966352f25a1fcbf9b9b4a4ad8f377",
+    "d2c2468093bc3b52840cbcee7356fec81b4249d0b951598e56e639e17c5d9ff7"
+  ],
+  "pending": "FIX4/LIVE4/GATE/finalreviews and exact Forgot destination"
+}

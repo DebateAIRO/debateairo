@@ -1,0 +1,411 @@
+# Review package — lane /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/consent-s02/dialectical-engine — range 4ef2f7d3..4cc0f4b6 — generated 2026-09-07 07:38:20
+
+## Commits
+4cc0f4b6 07:29 fix(consent-ui CROSS-03 rework 1): the containment tiebreak is STRICT — a surface sharing its container with the incumbent keeps open order (CODE-REV-CROSS-03 r1 B1; ADR three pinning cases, N1; N2)
+
+## Stat
+ .../apps/ui/components/consent/CookieConsent.tsx   |   5 +-
+ .../apps/ui/components/consent/modalSemantics.ts   |  31 +++-
+ .../ADR-0022-shared-modal-semantics.md             |  47 +++++++
+ .../tests/render/consent-modal-semantics.test.tsx  | 156 ++++++++++++++++++++-
+ 4 files changed, 230 insertions(+), 9 deletions(-)
+
+## Diff (-U10)
+diff --git a/dialectical-engine/apps/ui/components/consent/CookieConsent.tsx b/dialectical-engine/apps/ui/components/consent/CookieConsent.tsx
+index 692881c7..5eefad11 100644
+--- a/dialectical-engine/apps/ui/components/consent/CookieConsent.tsx
++++ b/dialectical-engine/apps/ui/components/consent/CookieConsent.tsx
+@@ -187,21 +187,24 @@ export function CookieConsent() {
+ 
+   if (surface === undefined || surface === "silent") return null;
+ 
+   if (surface === "card") {
+     /**
+      * **THE ARRANGEMENT BELOW IS A RECORDED CONSTRAINT, NOT THE MECHANISM.**
+      * The policy modal is the card's LATER SIBLING because V-20 recorded that
+      * shape, and `S01-S40` pins it — but nothing about which surface answers
+      * the dismiss key now depends on it. The shared helper resolves two
+      * UNRELATED open surfaces by the order they OPENED in, and applies
+-     * containment only where one surface is nested inside the other; it makes
++     * containment only where one surface's container is a STRICT DESCENDANT of
++     * the other's — two surfaces holding the SAME container node are not nested
++     * either way, so open order decides between them too (the strictness is the
++     * correction CODE-REV-CROSS-03 r1 B1 measured); it makes
+      * no `compareDocumentPosition` call and has no `FOLLOWING` arm (V-20 (b′),
+      * `modalSemantics.ts` `topmostSurface()`; ADR-0022's two 2026-09-07
+      * addenda). Swap these two and the policy still answers, because it is
+      * still the one opened last.
+      *
+      * The sentences this replaces said the opposite — "DOM ORDER IS
+      * LOAD-BEARING … topmost by DOCUMENT POSITION — `CONTAINED_BY ||
+      * FOLLOWING` — and not by the order they opened in", citing ticket
+      * `t_457c9898`. Every clause of that was false from `c334136d` onward
+      * (CODE-REV-CROSS-02 r1 N5, measured); the FOLLOWING arm it described is
+diff --git a/dialectical-engine/apps/ui/components/consent/modalSemantics.ts b/dialectical-engine/apps/ui/components/consent/modalSemantics.ts
+index 322844d0..3981cf35 100644
+--- a/dialectical-engine/apps/ui/components/consent/modalSemantics.ts
++++ b/dialectical-engine/apps/ui/components/consent/modalSemantics.ts
+@@ -141,24 +141,32 @@ function trapTab(entry: StackEntry, event: KeyboardEvent): void {
+  *
+  * Two passes, in this order:
+  *
+  * 1. **The incumbent, by open order.** Walk back from the last registered entry and take the
+  *    first whose container is `null` or still connected. An entry whose container is `null` — a
+  *    surface that renders no container of its own — still receives `Escape`. An entry whose
+  *    container has LEFT the document is skipped, because it is no longer on screen at all, and
+  *    the walk continues to the entry below it; that is the one guard this function keeps from the
+  *    document-order version it replaces.
+  * 2. **The containment tiebreak** (V-20 (b′)). Keep scanning DOWNWARDS from the incumbent. A
+- *    lower entry replaces the incumbent when, and only when, its container is inside the
+- *    incumbent's — `Node.contains`. Because each replacement is strictly deeper, one pass reaches
+- *    the innermost open surface: anything nested in the new incumbent was nested in the old one
+- *    too, so nothing already scanned can be missed.
++ *    lower entry replaces the incumbent when, and only when, its container is a STRICT
++ *    DESCENDANT of the incumbent's — `topContainer.contains(container)` AND the two are not the
++ *    SAME node. The identity term is load-bearing, not defensive: `Node.contains` is REFLEXIVE
++ *    (`n.contains(n)` is `true`), so without it two surfaces registered against ONE container
++ *    node rank by the reverse of open order — with two sharers the earlier-opened one takes the
++ *    key, and with three the walk reassigns `topContainer` to the same node twice and reaches
++ *    the EARLIEST-registered of the group (CODE-REV-CROSS-03 r1 B1, measured; probe
++ *    `.hermes/reports/consent-ui/probes/code-rev-cross-03-r1-reflexive-contains.probe.test.tsx`).
++ *    With the identity term, every replacement IS strictly deeper, so one pass reaches the
++ *    innermost open surface: anything nested in the new incumbent was nested in the old one too,
++ *    so nothing already scanned can be missed, and the depth strictly decreasing is what makes
++ *    the single pass sufficient rather than merely terminating.
+  *
+  * **There is no `FOLLOWING` arm and no document-order comparison between UNRELATED surfaces.**
+  * That comparison is what produced CODE-REV-S02-C9 r1 B1: `app/layout.tsx` mounts
+  * `<CookieConsent />` after `{children}`, so on `/sign-up` the cookie card is later in the
+  * document than the sign-up policy while the policy is the one opened last and painted on top,
+  * and one `Escape` closed the card underneath it. Containment cannot mix unrelated surfaces up;
+  * document order can, and did.
+  *
+  * Registration order IS open order for every surface a visitor can reach, because they open one
+  * at a time — each from a control of the surface below it. The one shape where the two part
+@@ -177,27 +185,36 @@ function topmostSurface(): StackEntry | undefined {
+   for (; index >= 0; index -= 1) {
+     const entry = surfaceStack[index]!;
+     const container = entry.read().containerRef.current;
+     if (container === null || container.isConnected) {
+       top = entry;
+       topContainer = container;
+       break;
+     }
+   }
+   if (top === undefined) return undefined;
+-  // A `null` incumbent renders no node, so nothing can be nested inside it and open order
+-  // decides alone.
++  // A `null` incumbent renders no node, so nothing can be a strict descendant of it and open
++  // order decides alone.
+   for (index -= 1; topContainer !== null && index >= 0; index -= 1) {
+     const entry = surfaceStack[index]!;
+     const container = entry.read().containerRef.current;
++    // `!container.isConnected` is UNREACHABLE here and is kept as a stated invariant, not as a
++    // live branch: this pass runs only while `topContainer !== null`, pass 1 chose a `null` or
++    // CONNECTED container, and every node a connected element `contains()` is itself connected —
++    // so a disconnected `container` already fails the next line. No fixture can distinguish it
++    // (CODE-REV-CROSS-03 r1 N2: removing it survives the whole suite); do not spend a round
++    // trying to pin it. `container === null` is a real branch — a surface that renders no
++    // container of its own — and is skipped because nothing can be nested inside nothing.
+     if (container === null || !container.isConnected) continue;
+-    if (!topContainer.contains(container)) continue;
++    // STRICT descendant: `Node.contains` is reflexive, so the identity term is what stops two
++    // surfaces that SHARE one container node from inverting open order (CODE-REV-CROSS-03 r1 B1).
++    if (container === topContainer || !topContainer.contains(container)) continue;
+     top = entry;
+     topContainer = container;
+   }
+   return top;
+ }
+ 
+ function handleDocumentKeydown(event: KeyboardEvent): void {
+   const top = topmostSurface();
+   if (top === undefined) return;
+   if (event.key === "Escape") {
+diff --git a/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md b/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md
+index 262d528d..808ef942 100644
+--- a/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md
++++ b/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md
+@@ -201,20 +201,67 @@ opener captured at open did not survive the opening commit". That names the CAUS
+ tests the STATE: `modalSemantics.ts`'s cleanup evaluates `opener.isConnected` **at close**, so
+ the named control also serves an opener that was on the page at open and left the document while
+ the surface was open — a strictly broader rule than the sentence, and one the case
+ `returns focus to the named control when the captured opener has since left the page` already
+ pinned. Read that clause as: **when the captured opener is not a usable element at close —
+ because the opening commit removed it, or because it left the document while the surface was
+ open.** The addendum's decision and its precedence sentence (surviving-capture-first, not
+ named-control-first) are unaffected. The same clause is corrected in place in the
+ `ModalSurface` member's JSDoc and in `CookiePreferencesCard`'s prop doc.
+ 
++### Addendum 2026-09-07 — correction to the (b′) addendum: the tiebreak is STRICT, and it is pinned by THREE cases (CODE-REV-CROSS-03 r1 B1 and N1)
++
++Nothing above this heading is edited; this addendum supersedes two of its statements and leaves
++the decision itself standing.
++
++**1. The relation is STRICT DESCENDANT, and bare `Node.contains` is not the rule.** The (b′)
++addendum above says pass 2 "replaces the incumbent by any connected entry whose container the
++incumbent's container `contains` (`Node.contains`)", and its closing argument offers "one
++`Node.contains` call" as the mechanism. `Node.contains` is **reflexive** — `n.contains(n)` is
++`true` — while the ruled word is *descendant*, which is strict, so the shipped predicate was
++descendant-**or-self**. Measured consequence, not argued (CODE-REV-CROSS-03 r1 B1, probe
++`.hermes/reports/consent-ui/probes/code-rev-cross-03-r1-reflexive-contains.probe.test.tsx`,
++three runs, registration order asserted): two surfaces registered against the SAME container
++node hand `Escape` to the one opened **first**; three sharers hand it to the **earliest**
++registered, because pass 2 keeps matching against that same node and reassigning `topContainer`
++to it. That is a full inversion of open order — `CODE-REV-S02-C9` r1 **B1**'s harm in a third
++shape.
++
++**Read the rule as:** a lower entry replaces the incumbent when, and only when, its container is
++a **strict descendant** of the incumbent's — `topContainer.contains(container)` **and**
++`container !== topContainer`. Anyone implementing from this ADR (`A11Y-OVERLAYS`, `t_8962842f`)
++writes both terms, or picks a primitive that is already strict
++(`compareDocumentPosition(container) & DOCUMENT_POSITION_CONTAINED_BY`, which is what
++`CODE-REV-CROSS-02` r1 N2 actually measured). The (b′) addendum's *"each replacement is strictly
++deeper"* argument for a single pass is FALSE for the reflexive predicate and TRUE for this one;
++it is the identity term that earns it. The decision, the absence of a `FOLLOWING` arm, the
++`null`-container branch, the detached-entry skip and the exported surface are all unchanged, and
++the probe goes `2 failed | 4 passed (6)` → `6 passed (6)` under the correction with the consent
++SET unmoved.
++
++**2. THREE cases pin the tiebreak, not four.** The (b′) addendum says *"Pinned by four cases in
++`tests/render/consent-modal-semantics.test.tsx`"* and names them. The mutant that removes the
++tiebreak reds **three**: `delivers one Escape to the nested INNER surface of a pair mounted in ONE
++commit`, `delivers one Escape to exactly one of three surfaces, and it is the innermost`, and
++`traps Tab in the same surface Escape reaches, for the same nested pair`. The fourth —
++`delivers one Escape to a nested inner surface that opened in a LATER commit` — stays **green with
++the tiebreak removed**, correctly: there the inner surface is already the last registered, so
++plain open order reaches it, and the test file's own comment says as much. It is a valuable case
++about open order; it is not evidence for the tiebreak. Do not delete one of the three believing
++four cover it (CODE-REV-CROSS-03 r1 N1).
++
++**3. Two further cases pin the STRICTNESS**, added with this correction and red at `4ef2f7d3`:
++`delivers one Escape to the LAST-OPENED of two surfaces that SHARE one container node` and its
++three-surface twin. `Tab` is deliberately not asserted in either: surfaces sharing one container
++give the focus trap an identical candidate list whichever entry is chosen, so no mutant of the
++tiebreak can move it.
++
+ ## Options considered
+ 
+ - **A React context provider owning the stack.** Rejected: it would force slice S01's
+   preferences card and slice S02's policy modal into one React tree, and they are mounted from
+   different components in different slices.
+ - **A per-surface `keydown` listener with a "topmost" flag.** Rejected: a surface cannot know
+   it is topmost without a shared registry, which is the module this ADR introduces.
+ - **Retrofitting the seven existing overlays now.** Rejected as out of scope for this mission;
+   it is ticket `A11Y-OVERLAYS` (`t_8962842f`).
+ 
+diff --git a/dialectical-engine/tests/render/consent-modal-semantics.test.tsx b/dialectical-engine/tests/render/consent-modal-semantics.test.tsx
+index 3fda10ef..e9243a5c 100644
+--- a/dialectical-engine/tests/render/consent-modal-semantics.test.tsx
++++ b/dialectical-engine/tests/render/consent-modal-semantics.test.tsx
+@@ -1,13 +1,13 @@
+ // @vitest-environment jsdom
+ 
+-import { act, useRef, type ReactNode, type RefObject } from "react";
++import { act, useEffect, useRef, type ReactNode, type RefObject } from "react";
+ import { createRoot, type Root } from "react-dom/client";
+ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+ import {
+   backdropCloseHandler,
+   openSurfaceCount,
+   prefersReducedMotion,
+   useModalSurface
+ } from "../../apps/ui/components/consent/modalSemantics.js";
+ 
+ let root: Root | null = null;
+@@ -75,20 +75,58 @@ function TestSurface({
+           ref={claim(label)}
+         >
+           {label}
+         </button>
+       ))}
+       {children}
+     </div>
+   );
+ }
+ 
++/**
++ * A surface whose container ref is supplied by the CALLER, so two or more of them can be
++ * pointed at the SAME node. `TestSurface` cannot express that shape: it owns its container ref
++ * and renders its own container `<div>`, so two of them are always two distinct nodes.
++ *
++ * `registrations` is a push-on-mount log. It sits AFTER `useModalSurface`, so within one
++ * component the stack registration runs first and the log entry second; across siblings React
++ * runs each component's effects in tree order. The log is therefore the REGISTRATION order,
++ * measured rather than assumed.
++ */
++function SharedContainerSurface({
++  containerRef,
++  name,
++  onClose,
++  registrations
++}: {
++  containerRef: RefObject<HTMLElement | null>;
++  name: string;
++  onClose: () => void;
++  registrations?: string[];
++}): ReactNode {
++  const initialFocusRef = useRef<HTMLElement | null>(null);
++  useModalSurface(true, { containerRef, initialFocusRef, onClose });
++  useEffect(() => {
++    registrations?.push(name);
++  }, [name, registrations]);
++  return (
++    <button
++      type="button"
++      ref={(node) => {
++        initialFocusRef.current = node;
++      }}
++    >
++      {`close-${name}`}
++    </button>
++  );
++}
++
+ function labelled(label: string): HTMLButtonElement {
+   const button = [...document.querySelectorAll("button")].find(
+     (candidate) => candidate.textContent?.trim() === label
+   );
+   expect(button, `missing rendered button ${label}`).toBeDefined();
+   return button as HTMLButtonElement;
+ }
+ 
+ async function render(element: ReactNode): Promise<void> {
+   await act(async () => {
+@@ -249,20 +287,136 @@ describe("consent modal semantics helper", () => {
+     );
+     expect(openSurfaceCount()).toBe(3);
+ 
+     await act(async () => {
+       pressEscape();
+     });
+ 
+     expect(closed).toEqual(["c"]);
+   });
+ 
++  it("delivers one Escape to the LAST-OPENED of two surfaces that SHARE one container node", async () => {
++    // PROPERTY (V-20 (b′), and the word is STRICT): the containment tiebreak fires only when a
++    // lower entry's container is a STRICT DESCENDANT of the incumbent's. A node is not a
++    // descendant of itself, so two surfaces registered against the SAME container node are not
++    // nested — neither is inside the other — nothing overrides open order, and the surface
++    // opened LAST answers Escape.
++    //
++    // Why this needs its own case: `Node.contains` is REFLEXIVE (`n.contains(n)` is `true`), so a
++    // tiebreak written `topContainer.contains(container)` alone ALSO fires when the two are the
++    // same node. The incumbent is then replaced by the entry below it and one Escape closes the
++    // surface the visitor opened FIRST, leaving focus trapped in the one that refused the key —
++    // CODE-REV-S02-C9 r1 B1's harm in a third shape, measured as CODE-REV-CROSS-03 r1 B1 (probe
++    // `.hermes/reports/consent-ui/probes/code-rev-cross-03-r1-reflexive-contains.probe.test.tsx`,
++    // case P3: `firstClose=1 secondClose=0`). The identity term in `topmostSurface()`'s pass 2 is
++    // what this case pins; removing it turns this case red.
++    const order: string[] = [];
++    const firstClose = vi.fn();
++    const secondClose = vi.fn();
++
++    function SharedPair(): ReactNode {
++      const sharedRef = useRef<HTMLElement | null>(null);
++      return (
++        <div
++          data-shared="host"
++          ref={(node) => {
++            sharedRef.current = node;
++          }}
++        >
++          <SharedContainerSurface
++            containerRef={sharedRef}
++            name="first"
++            onClose={firstClose}
++            registrations={order}
++          />
++          <SharedContainerSurface
++            containerRef={sharedRef}
++            name="second"
++            onClose={secondClose}
++            registrations={order}
++          />
++        </div>
++      );
++    }
++
++    await render(<SharedPair />);
++    expect(openSurfaceCount()).toBe(2);
++
++    // Both premises MEASURED, never assumed: there is exactly ONE container node and it holds
++    // both surfaces' controls, and `first` registered before `second`. Without these the case
++    // could pass because the two surfaces turned out to be unrelated siblings.
++    const hosts = [...document.querySelectorAll<HTMLElement>('[data-shared="host"]')];
++    expect(hosts.length, "the two surfaces share ONE container node").toBe(1);
++    expect(hosts[0]!.contains(labelled("close-first"))).toBe(true);
++    expect(hosts[0]!.contains(labelled("close-second"))).toBe(true);
++    expect(order, "registration (open) order").toEqual(["first", "second"]);
++
++    await act(async () => {
++      pressEscape();
++    });
++
++    expect(secondClose, "the surface opened LAST answers Escape").toHaveBeenCalledTimes(1);
++    expect(firstClose, "the surface opened first does not").toHaveBeenCalledTimes(0);
++
++    // `Tab` is deliberately NOT asserted here and the omission is the point: both entries hold
++    // the SAME container, so `trapTab` builds the identical candidate list whichever entry
++    // `topmostSurface()` returned. No mutant of the tiebreak can move it, so an assertion on it
++    // would pin nothing (`heartbeat-worker` §2). The reviewer's own probe says the same in its
++    // P5 comment. The case that DOES pin "Tab reads the entry Escape reaches" is the nested pair
++    // below, where the two containers differ.
++  });
++
++  it("delivers one Escape to the LAST-OPENED of three surfaces that SHARE one container node", async () => {
++    // The same property one step deeper, and it is not a duplicate of the pair above: under the
++    // reflexive predicate the walk does not stop after one step. Pass 2 keeps matching
++    // `topContainer.contains(container)` against the very same node, reassigns `topContainer` to
++    // it, and walks past BOTH lower entries — so Escape reaches the EARLIEST-registered surface,
++    // the bottom of the group rather than the one below the top (probe P4: `closed=["a"]` where
++    // the rule requires `["c"]`).
++    //
++    // It is also the ONLY case here that reds a fix which guards identity on the first pass-2
++    // iteration alone: with two sharers pass 2 runs exactly once, so such a fix is green against
++    // the pair above and wrong against this one.
++    const closed: string[] = [];
++    const record = (name: string) => () => {
++      closed.push(name);
++    };
++
++    function SharedThree(): ReactNode {
++      const sharedRef = useRef<HTMLElement | null>(null);
++      return (
++        <div
++          data-shared="host"
++          ref={(node) => {
++            sharedRef.current = node;
++          }}
++        >
++          <SharedContainerSurface containerRef={sharedRef} name="a" onClose={record("a")} />
++          <SharedContainerSurface containerRef={sharedRef} name="b" onClose={record("b")} />
++          <SharedContainerSurface containerRef={sharedRef} name="c" onClose={record("c")} />
++        </div>
++      );
++    }
++
++    await render(<SharedThree />);
++    expect(openSurfaceCount()).toBe(3);
++
++    const hosts = [...document.querySelectorAll<HTMLElement>('[data-shared="host"]')];
++    expect(hosts.length, "the three surfaces share ONE container node").toBe(1);
++
++    await act(async () => {
++      pressEscape();
++    });
++
++    expect(closed, "exactly one onClose runs, and it is the last-opened surface").toEqual(["c"]);
++  });
++
+   it("delivers one Escape by OPEN order when two surfaces opened out of DOM order", async () => {
+     // THE discriminating case, and the mechanism V-20 (b) ruled on: `first-dom` is rendered
+     // BEFORE `second-dom` in the document but OPENS after it, so registration order is
+     // [second-dom, first-dom] while document order puts `second-dom` last. Ranking by document
+     // position gives the key to `second-dom`; ranking by open order gives it to `first-dom`,
+     // which is the surface the visitor just opened and — because it opened from a control of the
+     // one below it, under its own scrim — the one they are looking at.
+     //
+     // This is the abstract form of CODE-REV-S02-C9 r1 B1: on `/sign-up` the cookie card is later
+     // in the document (`layout.tsx` mounts `<CookieConsent />` after `{children}`) while the

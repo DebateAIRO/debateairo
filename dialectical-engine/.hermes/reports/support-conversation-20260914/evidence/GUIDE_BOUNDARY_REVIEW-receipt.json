@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_BOUNDARY_REVIEW",
+  "ticket": "t_38dbae5b",
+  "session": "/root/forgot_destination",
+  "model": "gpt-5.6-sol",
+  "reviewedRevision": "cd4f6d62c64d0abe8df9061ac5869930425beb5e",
+  "oldDetachedRevision": "479763da1f586a217f36204cc81138aaa81c6f81",
+  "verdict": "PASS_FINITE_STATIC",
+  "commentsReadThrough": 1789645603,
+  "objectCustody": {
+    "indexed": 32,
+    "present": 29,
+    "deleted": 3,
+    "mismatches": 0,
+    "immediateConsumers": 3
+  },
+  "independentExecution": {
+    "staticGitObjectReads": true,
+    "tests": false,
+    "build": false,
+    "database": false,
+    "http": false,
+    "model": false,
+    "browser": false,
+    "preview": false
+  },
+  "authorEvidence": {
+    "focused": {
+      "files": 10,
+      "passed": 269,
+      "todo": 1,
+      "failed": 0,
+      "rc": 0
+    },
+    "supportEval": {
+      "runs": 3,
+      "passedPerRun": 50,
+      "totalPerRun": 60,
+      "classEPassed": 6,
+      "classETotal": 6,
+      "classAFailures": 10,
+      "classAAttribution": "UNATTRIBUTED_NO_COMPARABLE_BASELINE"
+    },
+    "attestation": {
+      "files": 3,
+      "passed": 43,
+      "failed": 0,
+      "corpusProbePassed": true
+    }
+  },
+  "skillsLoaded": [
+    "superpowers:using-superpowers",
+    "heartbeat-protocol",
+    "heartbeat-reviewer",
+    "superpowers:verification-before-completion",
+    "superpowers:systematic-debugging",
+    "superpowers:test-driven-development",
+    "codex-security:attack-path-analysis"
+  ],
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_BOUNDARY_REVIEW.md",
+      "sha256": "50e21edb58ab771798199f82edea34e38df651d72da94dde0de7e5158e1c2948",
+      "bytes": 8913
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_BOUNDARY_REVIEW.md",
+      "sha256": "d1d22e3763fbe976db82274a493f6d65ade92ba571df9a91737e8fe86a0a19f8",
+      "bytes": 3637
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_BOUNDARY_REVIEW-object-custody.log",
+      "sha256": "6fc78976c733549815d5255b8d3797bd0906806d2e024fa45b0b6815ba3e817e",
+      "bytes": 11873
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_BOUNDARY_REVIEW/verify-immutable-objects.mjs",
+      "sha256": "d62e4d40908762b2689a19dea65adede373b5e6c90f44083ba9cc7dfbd13a9cd",
+      "bytes": 1695
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_BOUNDARY_REVIEW/immediate-consumers.json",
+      "sha256": "6b817e6e4a7f15329d8f191e20514a26a5cc44b8a3edea6473b40b93e1ff2307",
+      "bytes": 884
+    }
+  ],
+  "limits": [
+    "Finite static public/private boundary review only; no full-application or final composed security claim.",
+    "Author test evidence was consumed but not independently rerun.",
+    "Runtime credentials, database grants, HTTP, relay/model, browser/preview, and concurrent retrieval correction were not verified.",
+    "Forgot-password destination remains unresolved and separate."
+  ]
+}

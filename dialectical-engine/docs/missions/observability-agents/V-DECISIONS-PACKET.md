@@ -61,3 +61,36 @@ Rows only V can rule. Each row is self-contained: what the thing IS, why it exis
 **Example.** A FixAgent coder adds a capture call, runs the type check, sees 8 errors, and spends an hour hunting a bug it never introduced.
 **Options.** (a) coders start now; every packet states the exact baseline (8 errors, that one file) and each seat asserts *no new errors* rather than *zero errors* · (b) the UI mission fixes its test first and the coders wait · (c) I ask the UI mission to fix it while the coders start under (a).
 **Recommendation:** (c), with (a) as the working rule regardless — the delta assertion is the honest one even on a green repo, and it is what protects a seat from inheriting someone else's red.
+
+---
+
+# Rows added 2026-09-02 by the WAR PLAN (`WAR-PLAN-2026-09-02.md` §12) — V-9..V-15
+Context in one line: you ordered a FixAgent that branches from `dev` on the remote, fixes, proves the fix on its own mock database and alerts through a file in the app. Seven decisions below are yours alone; the plan (under Grok review, ticket `t_d9a33421`) explains each at length. Reply with the row id and a letter.
+
+## V-9 · Push authorization for the FixAgent (F-14 → remote form)
+
+What it is: today's law says nobody pushes without you; FIX-13 froze a LOCAL branch for that reason. You ordered a branch "on the remote as well". Example: incident `7f3a…` is traced to `apps/scheduler/src/jobs/archive.ts:archiveExpired`; the agent pushes `origin/fixagent/7f3a…` (one commit) and opens a draft PR into `dev`; it cannot push `dev` or `main` because the ruleset refuses the bot identity there — and Op 0.4 PROVES that refusal before any push code exists — the drill records a refused push to the decoy AND a refused push to `dev` itself (a harmless V-authored docs commit), an allowed push to `fixagent/probe`, and its deletion. Options: (a) the FixAgent's bot identity pushes `refs/heads/fixagent/*` ONLY, GitHub rulesets forbid it `dev` and `main`, it opens a DRAFT PR into `dev`, you merge · (b) keep the local form. **Recommendation (a)** — it is what you ordered, and the ruleset makes the scope mechanical rather than promised.
+
+## V-10 · PR #8 before the campaign?
+
+What it is: `security/2026-09-01-hardening` (130 commits, 184 files) is open against `dev` and conflicts on one file, `apps/ui/scripts/node-test-manifest.json` (a test manifest — both sides added entries). Its own CI jobs (`verify`, `secrets`, `codeql`) pass; two EXTERNAL checks are red: GitHub's "CodeQL" status (failed in 4 s — a setup-level failure, not a finding) and the Cloudflare Workers build for `dezbatere`. Example: if the FixAgent's first branch is cut today and PR #8 lands next week, that branch rebases across 13k lines, and FIX-03/04 bind into entry points that PR #8 rewrote. Options: (a) merge now, resolving the manifest conflict, accepting the two red external checks as not-ours-to-gate · (b) park PR #8 until both external checks are green; FixAgent slices branch knowing a rebase is coming · (c) merge only the `deploy/` + CI parts now. **Recommendation (a)** — residual: the two external checks stay red until their owners fix them; note it in the merge commit.
+
+## V-11 · Does the agent wait for your approval before coding, or is your merge the only gate?
+
+Your 09-01 words ("in charge of everything") froze approve-first (FIX-12 waits for `obsctl approve` before FIX-13 codes); your 09-02 words describe an agent that fixes and then alerts. Example: a scheduler job throws at 03:00. Under (a) you wake to a draft PR with RED→GREEN evidence and an alert block; under (b) you wake to a proposal and nothing coded until you type `obsctl approve`. Options: (a) code-first on the branch — the PR is the approval object; nothing lands without you · (b) approve-first as frozen. **What (a) costs that (b) does not, named:** a Codex session is spent per incident BEFORE you have seen a proposal (bounded by `callsPerDay`, `maxConcurrent` and wall-clock register rows that count diagnosis AND coding together, seeds yours; and the coding worker inherits FIX-12-R07: no usage data → no next spawn until you re-arm); a flapping fingerprint could burn the day's cap while you sleep (one active mutation per fingerprint; the cap is a hard stop, not a retry); a live bot token exists — so the rulesets and the decoy-ref refusal drill (Op 0.4) MUST exist before the first push, or the first coding bug is a push; a kill mid-push can leave a PR-less `origin/fixagent/*` ref (the daemon deletes it — App. A R08′); draft PRs accumulate in your inbox faster than you scope them. **Recommendation (a)** with those five bounds — it is faster, a branch plus a Foundry touches nothing, and V-1 (nothing LANDS unapproved) still holds.
+
+## V-12 · Foundry mechanism
+
+What it is: the agent needs a database it may break. SQLite or an in-memory emulator cannot be it: the schema carries 171 stored functions, 77 triggers, pgcrypto and 143 `SECURITY DEFINER` clauses, and the tests assert on them (§7.1 Option 0). Two real-Postgres mechanisms remain. Example: `pnpm mock:up` in a fresh worktree boots a private PostgreSQL 18 on a kernel-chosen port; each test clones a migrated template in ~50 ms (measured on an empty template). Options: (a) embedded-postgres per worktree + template clone (honours DR-121; zero new deps) · (b) Docker `postgres:18` per worktree (reverses DR-121; two tests red) · (c) (a) now, Docker later for a Linux CI runner. **Recommendation (a) now, (c) when CI runs DB tests.**
+
+## V-13 · How does the ObservationAgent hand a suspected code defect to the FixAgent?
+
+The two frozen requirement sets disagree (FixAgent F-1: it inserts `detector` rows into `obs.occurrence`; ObservationAgent D1: it NEVER writes a product table and exposes a view). Options: (a) F-1 · (b) D1's view, FixAgent polls · (c) FixAgent consumes thrown errors only in THIS campaign; decide at Op 5. **Recommendation (c) now, (b) at Op 5** — G12 says the ObservationAgent writes no product table.
+
+## V-14 · Alert file location and format
+
+What it is: the file the daemon appends to when a fix is proven, written into ONE configured checkout: `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine`, which is `<git-root>/dialectical-engine` where the git root `/Users/vladmihaimiron/Documents/DebateAIRO` is the first row of `git worktree list` (the daemon checks both facts before it starts), file `.fixagent/ALERTS.md`. Options: (a) `.fixagent/ALERTS.md` + JSON twin, gitignored in that checkout, PR body as the durable copy · (b) a committed `docs/fixagent/<hash>.md` inside the fix branch · (c) both. **Recommendation (a).**
+
+## V-15 · First fault to hunt
+
+Options: (a) FIX-01's scheduler job (one terminal command, nothing else running) · (b) FIX-03's runner job (closer to real pain; needs the stack up). **Recommendation (a)** for W1..W7; (b) opens Op 4.

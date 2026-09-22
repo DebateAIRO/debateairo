@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW10",
+  "ticket": "t_ef7f6eb6",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "freezeCommit": "5f8191368f72f3b1c37806833f66a32ca9be6361",
+  "inputCustody": {
+    "count": 119,
+    "mismatches": []
+  },
+  "productCheckout": {
+    "headObserved": "152eed4da1cd3e66b74d8301159ba76427552409",
+    "cleanObserved": true
+  },
+  "orderedEight": {
+    "harnessSha256": "9b4391fd3e828da6224d9c27600259b2d44be0135c4f5e86c922abc25278303f",
+    "matchesAuthor": true,
+    "files": [
+      {
+        "path": "capture-public-guide.mjs",
+        "bytes": 18426,
+        "sha256": "acb9671453cc0c7d6bec7e168b1ba712d5af8d0aac88f2d38a0c62822432c495"
+      },
+      {
+        "path": "controls.mjs",
+        "bytes": 27827,
+        "sha256": "ec6af64b04e2ba31fed9025ca93394d059bd4e34f939400b64a5e1d9ae362272"
+      },
+      {
+        "path": "matrix.mjs",
+        "bytes": 14253,
+        "sha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c"
+      },
+      {
+        "path": "pre-request-verifier.ts",
+        "bytes": 16486,
+        "sha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733"
+      },
+      {
+        "path": "runtime-capacity.mjs",
+        "bytes": 9935,
+        "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87"
+      },
+      {
+        "path": "session-lifecycle.mjs",
+        "bytes": 4254,
+        "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b"
+      },
+      {
+        "path": "verify-final-branches.ts",
+        "bytes": 5131,
+        "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a"
+      },
+      {
+        "path": "verify-guide-harness.mjs",
+        "bytes": 64194,
+        "sha256": "ca70884b46182820274eed32207db169b0f99360713aead850568a5f2df70d4f"
+      }
+    ]
+  },
+  "controlProof": {
+    "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+    "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+    "controls": 112,
+    "passed": 112,
+    "uniqueNames": 112,
+    "sameNamesAsFix9": true
+  },
+  "suiteBinding": {
+    "currentCount": 34,
+    "uniqueCount": 34,
+    "priorCount": 33,
+    "added": [
+      "tests/integration/dev-database-principals.test.ts"
+    ],
+    "removed": [],
+    "argvCoversAll": true,
+    "minWorkersPresent": false,
+    "maxWorkers1Present": true
+  },
+  "actualBoundInputs": {
+    "inventoryPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL8-manifest.json",
+    "inventoryRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+    "inventoryProductFiles": 0,
+    "attestationFinalCommit": "152eed4da1cd3e66b74d8301159ba76427552409",
+    "attestationEntryCount": 44,
+    "attestationKbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278"
+  },
+  "finding": {
+    "id": "GH10-R1",
+    "status": "OPEN",
+    "description": "bound FINAL8 manifest has an empty productFiles array",
+    "consumerRejection": "validateBoundReceiptMembership requires productFiles.length > 0 before row-proof or capture",
+    "wrapperGap": "run-final-controls checks only inventory revision while synthetic receipt control uses a nonempty fixture",
+    "minimalCorrection": "regenerate full final inventory, bind it in a new namespace, and exercise the actual bound inventory through membership and attested-file hash checks"
+  },
+  "retained": {
+    "matrixSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+    "preRequestVerifierSha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733",
+    "futureOutputAbsence": {
+      "schemaVersion": 1,
+      "node": "GUIDE_HARNESS_BIND11",
+      "checked": 56,
+      "present": [],
+      "futureReceipt": "GUIDE_LIVE_GUIDE11-actual-receipt.json",
+      "futureScreenshots": 54,
+      "browserProfile": "ABSENT",
+      "captureExecuted": false
+    }
+  },
+  "execution": {
+    "staticOnly": true,
+    "tests": false,
+    "probes": false,
+    "browser": false,
+    "runtime": false,
+    "capacity": false,
+    "http": false,
+    "database": false,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "gitWrites": false,
+    "heavyLease": false
+  }
+}

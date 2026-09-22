@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREFLIGHT_LIFECYCLE_FIX44",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "finding": "LIVE32_PREFLIGHT_SELF_COLLISION",
+  "commandContractSha256": "477979eaea246301f6b4ee0e4ced54d2b7d63ab3af5c3755deaa4e09bc7c43ac",
+  "operatorSha256": "67bf5a085fd80b5738c0033b89a04b8688925dd458fdb499f8227a226b673ec2",
+  "changed": [
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_LIFECYCLE_FIX44/artifact-lifecycle.mjs",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_LIFECYCLE_FIX44/phase-preflight.mjs",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_LIFECYCLE_FIX44/run-operator.mjs"
+  ],
+  "freshNamespace": "LIVE33"
+}

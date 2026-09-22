@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE8",
+  "ticket": "t_6cf2b039",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "evidenceClass": "APPROVED_PUBLIC_QUESTION_AND_ACCEPTED_VISIBLE_ANSWER",
+  "canonicalRow": {
+    "sequence": 26,
+    "prompt": "Unde pot afla cum funcționează o dezbatere?",
+    "kind": "GUIDE_FAMILY",
+    "family": "guide",
+    "mode": "compact",
+    "language": "ro",
+    "branch": "MODEL"
+  },
+  "api": {
+    "status": 200,
+    "outcome": "ANSWER_GROUNDED",
+    "text": "Informațiile despre cum funcționează o dezbatere se găsesc pe pagina de prezentare, care include o secțiune dedicată metodei, plus un exemplu de dezbatere însoțit de transcrierea completă, astfel încât să poți vedea structura și desfășurarea unei dezbateri în practică. De asemenea, în biblioteca de dezbateri există un control de ajutor care explică funcționarea. Dacă vrei să explorezi direct, poți porni navigarea către pagina principală sau către exemplul de dezbatere.",
+    "sources": [
+      {
+        "id": "app-navigation",
+        "label": "Navighează în Dialectical Engine"
+      }
+    ],
+    "actions": []
+  },
+  "visible": {
+    "text": "Informațiile despre cum funcționează o dezbatere se găsesc pe pagina de prezentare, care include o secțiune dedicată metodei, plus un exemplu de dezbatere însoțit de transcrierea completă, astfel încât să poți vedea structura și desfășurarea unei dezbateri în practică. De asemenea, în biblioteca de dezbateri există un control de ajutor care explică funcționarea. Dacă vrei să explorezi direct, poți porni navigarea către pagina principală sau către exemplul de dezbatere.",
+    "sources": [
+      "Navighează în Dialectical Engine"
+    ],
+    "actions": []
+  },
+  "equality": {
+    "text": true,
+    "sources": true,
+    "actions": true
+  },
+  "diagnostic": {
+    "status": "ACCEPTED_DRAFT",
+    "category": null,
+    "candidateCount": 0,
+    "validCount": 0,
+    "invalidCount": 0,
+    "duplicateCount": 0,
+    "unmatchedCount": 0
+  },
+  "failureCode": "GUIDE_HARNESS_EXPECTED_PRIMARY_SOURCE_MISSING",
+  "limits": [
+    "This artifact contains only the approved public canonical question, accepted API answer, visible answer, public source/action metadata, and fixed safe diagnostics already present in the sealed actual record.",
+    "No rejected draft, private record, headers, credentials, raw runtime log, or underlying exception is included."
+  ]
+}

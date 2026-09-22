@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_ACCOUNT_RANKING_REVIEW",
+  "ticket": "t_b3a78084",
+  "baseRevision": "0f4290c290fd38caa0ccfb3b6781fb8c33999a22",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "reviewedAt": "2026-09-20T23:17:35Z",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "verdict": "PASS_FULL_CORPUS_RANKING_DELTA",
+  "ranking": {
+    "disposition": "PASS_NARROW_CANONICAL_ACTION_PHRASE_MATCH",
+    "cause": "Action scoring admitted Romanian crea→Creează sign-up while exact guide/source phrase scoring did not, so account-access lost the full44 three-source competition.",
+    "correction": "Contiguous canonical action-label matching permits only the existing crea/creează equivalence.",
+    "proseOnlyLabels": "UNCHANGED_EXACT_PHRASE_MATCH",
+    "notPresent": [
+      "prompt literal",
+      "forced article ID",
+      "broad authentication exemption",
+      "generic inflection matcher",
+      "source-cap relaxation"
+    ]
+  },
+  "rejectedImplementation": {
+    "disposition": "REJECTED_AND_PRESERVED",
+    "description": "General ordered inflection matching widened public-debate and publishing authority.",
+    "observedRegressions": 5
+  },
+  "fullCorpusProof": {
+    "entryCount": 44,
+    "filteredToExpectedRecord": false,
+    "normalLanguageEligibility": true,
+    "normalSourceCap": 3,
+    "ownerQuestions": [
+      {
+        "language": "en",
+        "prompt": "Where can I sign in?",
+        "sourceId": "account-access",
+        "actionIds": [
+          "sign-in"
+        ]
+      },
+      {
+        "language": "ro",
+        "prompt": "Unde îmi pot crea un cont?",
+        "sourceId": "account-access",
+        "actionIds": [
+          "sign-up"
+        ]
+      },
+      {
+        "language": "en",
+        "prompt": "What is Dialectical-Engine, and what can I do in this app?",
+        "sourceId": "product-identity",
+        "actionIds": []
+      },
+      {
+        "language": "ro",
+        "prompt": "Ce este Dialectical-Engine și ce pot face în această aplicație?",
+        "sourceId": "product-identity",
+        "actionIds": []
+      }
+    ],
+    "answerServiceCanonicalCases": "PASS_WITH_ALL44",
+    "row58RealPost": {
+      "disposition": "PASS",
+      "ingress": "PUBLIC_GUIDE",
+      "sourceId": "account-access",
+      "actionId": "sign-up",
+      "href": "/sign-up",
+      "opaqueReferences": true
+    }
+  },
+  "retainedBoundaries": {
+    "ordinaryAccountSettingsSessionsCaseQueries": "PASS_RETAINED_AFFECTED_FRAME",
+    "unsupportedBrandedTopics": "PASS_RETAINED",
+    "privacyAndEmptyHistory": "PASS_RETAINED",
+    "promptInjectionAndCredentialOperations": "PASS_RETAINED",
+    "trustedDebateReferences": "PASS_RETAINED",
+    "closedCanonicalActions": "PASS_RETAINED",
+    "forgotPassword": "PASS_RETAINED_UNRESOLVED_ACTIONLESS"
+  },
+  "productDelta": {
+    "paths": [
+      "packages/support-kb/src/context.ts",
+      "tests/integration/support-routes.test.ts",
+      "tests/unit/support-answer-context.test.ts",
+      "tests/unit/support-context.test.ts"
+    ],
+    "pathCount": 4,
+    "scopeExact": true,
+    "diffCheck": "PASS"
+  },
+  "verification": {
+    "frozenInputs": {
+      "matched": 45,
+      "mismatched": 0
+    },
+    "red": {
+      "failed": 3,
+      "passed": 12,
+      "property": "full44 context, answer-service, and real POST row58"
+    },
+    "rejectedBroadMatcher": {
+      "failed": 5,
+      "passed": 376
+    },
+    "finalAffected": {
+      "files": 3,
+      "passed": 381,
+      "failed": 0
+    },
+    "typecheck": {
+      "exitCode": 1,
+      "diagnostics": 76,
+      "baselineDiagnostics": 76,
+      "normalizedDiagnosticLinesEqual": true,
+      "ownedPathDiagnostics": 0,
+      "rawByteIdentical": false
+    },
+    "finalInventory": {
+      "changedPaths": 145,
+      "uniqueChangedPaths": 145,
+      "productFiles": 145,
+      "deletedPaths": 3,
+      "nonempty": true
+    }
+  },
+  "corpus": {
+    "unchanged": true,
+    "entryCount": 44,
+    "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+    "factualAuditRepeated": false
+  },
+  "retainedPriorVerdicts": {
+    "classifierDelta": "PASS_UNCHANGED",
+    "review2CodeMetadata": "PASS_UNCHANGED",
+    "focused31Plan": "PASS_UNCHANGED"
+  },
+  "limits": [
+    "Full58 producer replay remains separate.",
+    "No live model/browser/runtime/capacity/readiness/acceptance claim.",
+    "Forgot remains unresolved/actionless."
+  ]
+}

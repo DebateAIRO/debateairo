@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_BIND32",
+  "ticket": "t_f068fcad",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "observedAtUtc": "2026-09-21T06:50:00.547055Z",
+  "verdict": "FAIL_RUNTIME8_SUPERVISOR_EXITED_REVIEW_REQUIRED",
+  "failure": {
+    "stage": "SUPPORTED_RUNTIME8_READINESS",
+    "code": "GUIDE_PREVIEW_BIND32_SUPERVISOR_EXITED",
+    "pid": 82483,
+    "pgid": 82483,
+    "startedAtUtc": "2026-09-21T06:48:04.699Z",
+    "supervisorPresent": false
+  },
+  "listeners": {
+    "ownedTransientExpected": [
+      3100,
+      3101,
+      8890,
+      8891,
+      8892,
+      8893,
+      8894,
+      8895,
+      8896
+    ],
+    "ownedTransientPresent": [],
+    "preservedDataPlane": [
+      {
+        "pid": 19920,
+        "command": "com.docker.backend",
+        "port": 7177
+      },
+      {
+        "pid": 19920,
+        "command": "com.docker.backend",
+        "port": 8988
+      },
+      {
+        "pid": 19920,
+        "command": "com.docker.backend",
+        "port": 55433
+      }
+    ],
+    "unrelatedObserved": [
+      {
+        "pid": 1142,
+        "command": "rapportd",
+        "port": 51966
+      },
+      {
+        "pid": 1205,
+        "command": "ControlCenter",
+        "port": 7000
+      },
+      {
+        "pid": 1205,
+        "command": "ControlCenter",
+        "port": 5000
+      },
+      {
+        "pid": 1682,
+        "command": "node",
+        "port": 9797
+      },
+      {
+        "pid": 1698,
+        "command": "Ollama",
+        "port": 49251
+      },
+      {
+        "pid": 1719,
+        "command": "ollama",
+        "port": 11434
+      }
+    ]
+  },
+  "ordinarySystemTls": {
+    "attempted": false,
+    "reason": "all required owned ports did not become ready"
+  },
+  "apiKbVersionConfirmation": "NOT_ATTEMPTED",
+  "runtimeCustodyProduced": false,
+  "retryCount": 0,
+  "traffic": {
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "privateRuntimeLog": {
+    "read": false,
+    "hashed": false,
+    "exported": false,
+    "includedInManifest": false
+  },
+  "limitation": "The private ongoing log was intentionally not inspected. This evidence proves supervisor exit and listener state, not the underlying exit cause."
+}

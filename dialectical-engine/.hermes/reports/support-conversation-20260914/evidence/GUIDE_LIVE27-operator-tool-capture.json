@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE27",
+  "ticket": "t_0d922a12",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "observedAtUtc": "2026-09-21T02:13:40.202835+00:00",
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "argv": [
+    "/Users/vladmihaimiron/.local/bin/node",
+    "--import",
+    "tsx",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX28/run-operator.mjs"
+  ],
+  "toolExitCode": 1,
+  "toolWallTimeSeconds": 0.040716083,
+  "stdout": "",
+  "stderr": "node:internal/modules/run_main:123\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: GUIDE_OPERATOR_FIX27_RUNTIME_PROCESS_MISSING\n\nnull !== 0\n\n    at file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX28/run-operator.mjs:158:10\n",
+  "safeCapture": true,
+  "privateValuesRecorded": false
+}

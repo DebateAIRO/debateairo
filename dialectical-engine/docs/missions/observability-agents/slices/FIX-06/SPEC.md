@@ -27,12 +27,12 @@ Client fault: `CAUGHT(boundary | onerror | unhandledrejection)` → `ENUMERATED`
 
 ## 5. Acceptance — V runs this personally (dev stack up; FIX-01, FIX-04 merged)
 1. Open `https://localhost:3000` in a browser, signed in; open the browser devtools Network panel.
-2. Cause a real client fault in unmodified product code — the ARCH seat names the site with `path:line` evidence in PLAN.md (candidate, UNVERIFIED by REQ-FIX: a debate page whose run is erased while the page is open); V performs it → the error boundary renders; one `POST /v1/obs/client-report` appears in the Network panel with status `202`/`204`.
+2. In the browser devtools Console paste `setTimeout(() => { throw new Error("FIX06_V_DRILL"); }, 0)` → the running, unmodified product's `window.onerror` seam receives a real client exception; one `POST /v1/obs/client-report` appears in the Network panel with status `202`/`204` (the planted text is deliberately untrusted and must not appear in step 3 or the stored row).
 3. Inspect that request's body in devtools → only the enumerated keys, no `message`, no stack text, no URL text.
 4. `docker exec debateai-v3-postgres-1 psql -U debateai -d debateai -At -c "SELECT runtime, capture_point, source, code, build_ref FROM obs.occurrence WHERE source='ui_client' ORDER BY occ_seq DESC LIMIT 1"` → `ui-client|client|ui_client|<enumerated code>|<server build ref>`.
 5. `curl -sk https://localhost:3000/v1/obs/client-report -X POST -H 'content-type: application/json' -d '{"code":"NOT_A_MEMBER","component":"x","route_template":"/y","kind":"z"}' -w '\n%{http_code}\n'` → `400`; the occurrence count is unchanged.
 6. `for i in $(seq 1 200); do curl -sk -o /dev/null https://localhost:3000/v1/obs/client-report -X POST -H 'content-type: application/json' -d '<a valid body from step 3>'; done` → later requests return `429`; `SELECT gap_class, lost_count FROM obs.capture_gap ORDER BY opened_at DESC LIMIT 1` → a client-drop class with `lost_count ≥ 1`.
-7. `git diff <base>..<tip> -- apps/api/src/index.ts | grep -c 'options.registration !== undefined'` → `0`.
+7. `pnpm exec vitest run tests/integration/fix06-*.test.ts --reporter=verbose` → the case that compares the captured pre-change mount region with the implemented file prints `zone-route-mount: byte-identical` and passes; no SHA placeholder or zone-file read is required.
 V vetoes Done only after steps 1–7 match.
 
 ## 6. Out of scope

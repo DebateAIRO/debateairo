@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE21",
+  "ticket": "t_cfe2b979",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "STOPPED_PRECAPACITY_CUSTODY_MISSING",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-inputs.json",
+      "sha256": "3f51a2f393fd9fcf53b0f21e38c7b77f4004f3048973bde80a177e4be64db29a",
+      "bytes": 25591
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW23-consumption.json",
+      "sha256": "a9ce81e8883fe8406007e19a4be67954e17e3d336ad9a6ac4703407d24df01b6",
+      "bytes": 16456
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX23-command-contract.json",
+      "sha256": "7502ed0d8bb8618e4ba56c2157efd24a5d9af92258b91ebc90d4ef6c82727c9c",
+      "bytes": 10164
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME7-stack-custody.json",
+      "sha256": "c126f521a332caae7c840e8391032f1b6f0b76e61146ba1e1120ca6851e89709",
+      "bytes": 592
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-preflight.json",
+      "sha256": "dfce83ea1e186372e9d16c0989e3117d262968c8c724d23540ad46572324df58",
+      "bytes": 365
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-readiness.json",
+      "sha256": "03fb0a8c0fef2d92496c6a2a7a0f263d15a2746752ce8b54cadaf4a8198c7a7f",
+      "bytes": 435
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE-run-LIVE21.json",
+      "sha256": "18335d8e7bfebcb4464c6e77f351fd0b74753d258dd225ffb45e46fc959a3c27",
+      "bytes": 17100
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_UI_TRANSITION_PROBE-LIVE21.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-failure.json",
+      "sha256": "da8e4479d7a835eb0b14a4c745ec578eb8232d7ee7ae49b9d70458e5a88abb5b",
+      "bytes": 3935
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE21-capacity-failure.log",
+      "sha256": "f43d475f9d9cf9ec78b9288abf91697eaa7adaa7c492cb75546d096fd26a8915",
+      "bytes": 180
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/runner/src/dev-api-process.ts",
+      "sha256": "826f2d6dc4d4e374c678a16447cb597162bb3a2c85b07f338a93577abbad5f45",
+      "bytes": 15481
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-self-report.json",
+      "sha256": "ad570025291ffd026865f28dbf82ce3f22493560bf99cc450533f298cddceaba",
+      "bytes": 1278
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21.md",
+      "sha256": "1fa98ea060982eedde52a0ec203203e78d4e3bcbb266c7e1c46981e1ba588de8",
+      "bytes": 2926
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_LIVE21.md",
+      "sha256": "1fa98ea060982eedde52a0ec203203e78d4e3bcbb266c7e1c46981e1ba588de8",
+      "bytes": 2926
+    }
+  ]
+}

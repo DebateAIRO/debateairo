@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FOOTER_DIAG38",
+  "method": "saved screenshots plus static markup and CSS inspection",
+  "row23": {
+    "sequence": 23,
+    "prompt": "Cum pot exporta o dezbatere?",
+    "mode": "full",
+    "language": "ro",
+    "image": {
+      "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE22-row-23-original-pane-top.png",
+      "sha256": "bb3379432c74166b530bc74624efd537b9148d8bfbd099a4eee2c21eebec8cb1",
+      "bytes": 110931,
+      "width": 652,
+      "height": 700
+    },
+    "visibleObservations": [
+      "The current Romanian export response is visible.",
+      "The exact source chips 'Exportă o dezbatere ca JSON' and 'Cum citești o dezbatere' are fully visible inside the pane.",
+      "No action link is shown, matching the saved API and DOM actions arrays.",
+      "There is visible pane space below the source chips."
+    ],
+    "identityBinding": {
+      "apiDomTextEqual": true,
+      "apiDomSourcesEqual": true,
+      "apiDomActionsEqual": true,
+      "sourceIds": ["export-json", "guide-how-it-works"],
+      "sourceLabels": ["Exportă o dezbatere ca JSON", "Cum citești o dezbatere"],
+      "actions": []
+    },
+    "disposition": "CURRENT_ARTICLE_FOOTER_VISIBLE_BEFORE_HELPER_FOOTER_SCROLL"
+  },
+  "priorGeometry": [
+    {"sequence": 2, "topScrollTop": 87, "footerScrollTop": 0, "direction": "backward"},
+    {"sequence": 15, "topScrollTop": 382, "footerScrollTop": 264, "direction": "backward"},
+    {"sequence": 19, "topScrollTop": 713, "footerScrollTop": 595, "direction": "backward", "footerBottom": 854, "paneBottom": 854}
+  ],
+  "limitations": [
+    "No row23 post-scroll screenshot exists.",
+    "No row23 historical target, pane or footer rectangles were serialized.",
+    "No row23 historical scrollTop, scrollHeight, clientHeight, assigned delta or realized scroll position was serialized.",
+    "No post-finally restoration observation was serialized."
+  ]
+}

@@ -40,7 +40,9 @@ Rows and defaults: `support_limit_anon_msgs_10m` 20 · `support_limit_anon_msgs_
 `support_queue_depth` 10 · `support_daily_call_cap` 500 · `support_lock_after_injections`
 3 · `support_ip_cooldown_minutes` 60. `pnpm support:limits set <row> <value>` changes one
 row and takes effect within 5 s without an API restart; `pnpm support:status` prints every
-row with its current value.
+row with its current value. Despite its name, `support:limits set` accepts every mutable
+register row whose name begins `support_`, including `support_model_ref` from SUP-01-R08
+and retention rows from SUP-07; it rejects every row outside that prefix.
 
 ### SUP-06-R02 — Per-account limits
 When the support session is bound to an `identity_owner_ref`, the account limits apply in
@@ -98,7 +100,8 @@ counts when the relay reports them, and the sum of reported cost in USD — prin
    `RATE_LIMIT`. Then `pnpm support:limits set support_limit_anon_msgs_10m 20`.
 3. `pnpm support:limits set support_relay_concurrency 1` and `… support_queue_depth 1`.
    Open two private windows on `/help`; send a question in both within one second.
-   Expected: one answers; the other shows QUEUED with `number 1` for a few seconds and then
+   Expected: one answers; if the other is still waiting, it shows QUEUED with `number 1`
+   after 3.0 s and no later than 3.5 s from enqueue, then keeps the notice visible until it
    answers. Open a third window and send a question while the first two are in flight.
    Expected: DEGRADED immediately. Restore both rows to defaults.
 4. `pnpm support:limits set support_daily_call_cap 1`. Send one question (answered), then a

@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "revision": "606b2eabea1dc9212159e53c193cf69655424e77",
+  "pid": 86341,
+  "process_group": 86341,
+  "command": [
+    "pnpm",
+    "dev:auth:up"
+  ],
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "profile": "support-preview",
+  "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/LIVE_P2-stack-detached.log",
+  "detached": true,
+  "started_at": "2026-09-15T17:36:37.028Z"
+}

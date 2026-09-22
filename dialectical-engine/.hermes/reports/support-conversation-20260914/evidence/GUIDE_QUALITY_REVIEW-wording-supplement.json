@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_QUALITY_REVIEW_WORDING_SUPPLEMENT",
+  "parentNode": "GUIDE_QUALITY_REVIEW",
+  "ticket": "t_62335359",
+  "revision": "6cbe0e7ad18b20eca35876f4a91478cfbba82307",
+  "reviewedAt": "2026-09-20T19:04:27Z",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "verdict": "PASS_EXACT_WORDING_SUPPLEMENT",
+  "originalApprovedEvidence": {
+    "knowledgeDispositions": {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-knowledge-dispositions.json",
+      "sha256": "9ac6bdc6c4ceea6c61fdc559f94d13412d4f7d01825317860ed9df2ab5e50383",
+      "bytes": 25648
+    },
+    "editorialInput": {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_FIX-editorial-input.json",
+      "sha256": "6def288a428c0a2aaaa8c74c401662f563ea0038d673581dae62d66d06e77998",
+      "bytes": 7538
+    },
+    "originalReviewReceipt": {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-receipt.json",
+      "sha256": "244854af9cf1dba39c8930bc6e8ea5ba6c8589b4c9049beb767d84e4348a4541",
+      "bytes": 3385
+    }
+  },
+  "substitutions": [
+    {
+      "id": "support-cases",
+      "lang": "en",
+      "disposition": "PASS_EXACT_PLAIN_LANGUAGE_SUBSTITUTION",
+      "substitution": {
+        "from": "this API case",
+        "to": "the case in this app",
+        "occurrences": 1
+      },
+      "originalApprovedRecordHashes": {
+        "articleSha256": "300f6b63a1798ee15ba335538bdc9eb0e1c5dca11c770ce11f5e11edee9cee9e",
+        "articleBytes": 844,
+        "modelProjectionSha256": "151e25db30e1cf75b5e6a3f0b6efb1137ad005b3e0fa6514ed23eb14bcbbb546",
+        "modelProjectionBytes": 505,
+        "fallbackSha256": "df37d0f11029ff345c6f303c425bdeb36435ab0a51e0dbddf22ffd0877ca49a1",
+        "fallbackBytes": 378
+      },
+      "resultingModelProjection": "Talk to a human or Escalate to a human creates an asynchronous Support case, not a telephone call. Email support is a separate mail workflow and does not create the case in this app or receive its receipt, response target, or private case link. The server receipt gives a response target of forty-eight hours, while another panel currently says one working day on weekdays. Rely on the receipt until the wording is aligned. Keep it private because it controls case access. Support does not verify inbox delivery.",
+      "resultingModelProjectionSha256": "04ff511b177c062b1fa66397db84ac7295b75319e2c27fc870aaff171c43ae76",
+      "resultingModelProjectionBytes": 512,
+      "articleUnchanged": true,
+      "fallbackUnchanged": true,
+      "reviewFinding": "“The case in this app” preserves the exact distinction from the separate email workflow in plain user language; all case-creation, receipt, response-target, private-link and inbox-delivery facts remain unchanged.",
+      "review": {
+        "reviewedBy": "SOL",
+        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+        "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+        "reviewedOn": "2026-09-20",
+        "reviewedAt": "2026-09-20T19:04:27Z"
+      }
+    },
+    {
+      "id": "support-cases",
+      "lang": "ro",
+      "disposition": "PASS_EXACT_PLAIN_LANGUAGE_SUBSTITUTION",
+      "substitution": {
+        "from": "acest caz API",
+        "to": "cazul din această aplicație",
+        "occurrences": 1
+      },
+      "originalApprovedRecordHashes": {
+        "articleSha256": "4073ca95886bd56063c9f6ff49b959e3affa5c5a0a9000b6ecf6ff2171535977",
+        "articleBytes": 975,
+        "modelProjectionSha256": "195b0d8634d1a110e239ee8a89d6a4df0d88c8425ad2d97a5a5e94485d6da57a",
+        "modelProjectionBytes": 568,
+        "fallbackSha256": "62bbe76506089edca69ffca3d820f7ebd9610f831cf6a3b007efe00125cb971f",
+        "fallbackBytes": 395
+      },
+      "resultingModelProjection": "Talk to a human sau Escalate to a human creează un caz asincron de Asistență, nu un apel telefonic. Emailul de asistență este un flux separat de mail și nu creează cazul din această aplicație și nu primește confirmarea, termenul de răspuns sau legătura privată. Confirmarea serverului oferă un termen țintă de patruzeci și opt de ore, iar alt panou spune în prezent o zi lucrătoare în zilele lucrătoare. Bazează-te pe confirmare până la alinierea textelor. Păstreaz-o privată deoarece controlează accesul la caz. Asistența nu verifică livrarea în inbox.",
+      "resultingModelProjectionSha256": "23df826d8a8701abb080a371df942b978885224bb612140c54221f2806615c2a",
+      "resultingModelProjectionBytes": 584,
+      "articleUnchanged": true,
+      "fallbackUnchanged": true,
+      "reviewFinding": "„Cazul din această aplicație” păstrează în limbaj clar distincția exactă față de fluxul separat de email; toate faptele despre creare, confirmare, termen, legătura privată și livrarea în inbox rămân neschimbate.",
+      "review": {
+        "reviewedBy": "SOL",
+        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+        "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+        "reviewedOn": "2026-09-20",
+        "reviewedAt": "2026-09-20T19:04:27Z"
+      }
+    }
+  ],
+  "mechanicalUse": {
+    "authorized": true,
+    "scope": "Replace only the one exact phrase in each listed support-cases model projection before component/review attestation.",
+    "articleBytesRemainExact": true,
+    "fallbackBytesRemainExact": true,
+    "ownerRatification": false
+  },
+  "limits": [
+    "No product, article, fallback, metadata or prior evidence bytes were changed.",
+    "This supplement does not resolve the sealed runtime code REWORK.",
+    "Any other projection edit requires independent exact-byte review."
+  ]
+}

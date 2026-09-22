@@ -1,0 +1,327 @@
+{
+  "schema_version": 1,
+  "revision": "43cf9386ea3c9e7c79523ec38debe63271d19292",
+  "base_url": "https://localhost:3100",
+  "browser": {
+    "driver": "playwright@1.61.1",
+    "executablePath": "/Users/vladmihaimiron/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell",
+    "headless": true,
+    "tls_bypass": false,
+    "fresh_profile": true
+  },
+  "support_api": "actual",
+  "relay": "actual unchanged support-preview relay",
+  "identity": "actual anonymous visitor",
+  "synthetic_support_overrides": false,
+  "credential_or_recovery_operations": 0,
+  "prompts": [
+    {
+      "sequence": 1,
+      "mode": "full",
+      "language": "en",
+      "topic": "creation",
+      "input": "How do I create a debate?",
+      "api": {
+        "status": 200,
+        "outcome": "REFUSE_SAFETY",
+        "text": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+        "sources": [],
+        "actions": [],
+        "error": null
+      },
+      "visible": {
+        "text": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+        "sources": [],
+        "actions": []
+      },
+      "api_dom_text_equal": true,
+      "api_dom_source_labels_equal": true,
+      "api_dom_actions_equal": true,
+      "grounded_success": false
+    },
+    {
+      "sequence": 2,
+      "mode": "full",
+      "language": "en",
+      "topic": "settings",
+      "input": "What can I change in Settings?",
+      "api": {
+        "status": 200,
+        "outcome": "REFUSE_SAFETY",
+        "text": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+        "sources": [],
+        "actions": [],
+        "error": null
+      },
+      "visible": {
+        "text": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+        "sources": [],
+        "actions": []
+      },
+      "api_dom_text_equal": true,
+      "api_dom_source_labels_equal": true,
+      "api_dom_actions_equal": true,
+      "grounded_success": false
+    },
+    {
+      "sequence": 3,
+      "mode": "full",
+      "language": "en",
+      "topic": "export",
+      "input": "How does JSON export work?",
+      "api": {
+        "status": 200,
+        "outcome": "ANSWER_GROUNDED",
+        "text": "JSON export is conditional. For a debate you own, the Export option appears only after a served answer and a readable execution-ledger digest are available. When you export, the download is a JSON file containing the answer, the ledger digest, and the current honesty records. For a published debate, you can export its published JSON snapshot instead. Note the limitations: the product does not offer Markdown export here, you cannot export an unfinished owner answer, and a public download never includes private owner data.",
+        "sources": [
+          {
+            "id": "export-json",
+            "label": "Export a debate as JSON"
+          }
+        ],
+        "actions": [],
+        "error": null
+      },
+      "visible": {
+        "text": "JSON export is conditional. For a debate you own, the Export option appears only after a served answer and a readable execution-ledger digest are available. When you export, the download is a JSON file containing the answer, the ledger digest, and the current honesty records. For a published debate, you can export its published JSON snapshot instead. Note the limitations: the product does not offer Markdown export here, you cannot export an unfinished owner answer, and a public download never includes private owner data.",
+        "sources": [
+          "Export a debate as JSON"
+        ],
+        "actions": []
+      },
+      "api_dom_text_equal": true,
+      "api_dom_source_labels_equal": true,
+      "api_dom_actions_equal": true,
+      "grounded_success": true
+    },
+    {
+      "sequence": 4,
+      "mode": "full",
+      "language": "ro",
+      "topic": "creation",
+      "input": "Cum creez o dezbatere?",
+      "api": {
+        "status": 200,
+        "outcome": "ANSWER_GROUNDED",
+        "text": "Ca să creezi o dezbatere, autentifică-te mai întâi, apoi deschide formularul complet al dezbaterilor. În câmpul de subiect scrie întrebarea sau afirmația pe care vrei să o examinezi — textul trebuie să aibă mai mult de șase caractere. Cu planul Free, controalele vizibile de risc, buget, adâncime și îndrumare rămân fixe, iar câmpurile de îndrumare sunt goale și dezactivate. Cu planul Premium poți ajusta nivelul de risc (Casual, Standard sau High stakes) și poți adăuga îndrumări, câte o selecție pe linie, plus adnotări libere. După aceea selectează Start run pentru a trimite rularea; selecția efectivă se înregistrează la trimitere și nu mai poate fi schimbată. Reține că Asistența nu pornește dezbaterea în locul tău — dacă pornirea directă nu este disponibilă, poți folosi compozitorul din pagina principală pentru a transfera subiectul în formular.",
+        "sources": [
+          {
+            "id": "debate-topic-and-description",
+            "label": "Scrie subiectul și îndrumările dezbaterii"
+          },
+          {
+            "id": "getting-started-debate",
+            "label": "Pornește o dezbatere"
+          },
+          {
+            "id": "risk-tier-choice",
+            "label": "Alege nivelul de risc"
+          }
+        ],
+        "actions": [
+          {
+            "id": "start-debate",
+            "label": "Pornește o dezbatere",
+            "href": "/login?next=%2Fnew"
+          }
+        ],
+        "error": null
+      },
+      "visible": {
+        "text": "Ca să creezi o dezbatere, autentifică-te mai întâi, apoi deschide formularul complet al dezbaterilor. În câmpul de subiect scrie întrebarea sau afirmația pe care vrei să o examinezi — textul trebuie să aibă mai mult de șase caractere. Cu planul Free, controalele vizibile de risc, buget, adâncime și îndrumare rămân fixe, iar câmpurile de îndrumare sunt goale și dezactivate. Cu planul Premium poți ajusta nivelul de risc (Casual, Standard sau High stakes) și poți adăuga îndrumări, câte o selecție pe linie, plus adnotări libere. După aceea selectează Start run pentru a trimite rularea; selecția efectivă se înregistrează la trimitere și nu mai poate fi schimbată. Reține că Asistența nu pornește dezbaterea în locul tău — dacă pornirea directă nu este disponibilă, poți folosi compozitorul din pagina principală pentru a transfera subiectul în formular.",
+        "sources": [
+          "Scrie subiectul și îndrumările dezbaterii",
+          "Pornește o dezbatere",
+          "Alege nivelul de risc"
+        ],
+        "actions": [
+          {
+            "label": "Pornește o dezbatere",
+            "href": "/login?next=%2Fnew"
+          }
+        ]
+      },
+      "api_dom_text_equal": true,
+      "api_dom_source_labels_equal": true,
+      "api_dom_actions_equal": true,
+      "grounded_success": true
+    },
+    {
+      "sequence": 5,
+      "mode": "full",
+      "language": "ro",
+      "topic": "settings",
+      "input": "Ce pot schimba în Setări?",
+      "api": {
+        "status": 200,
+        "outcome": "REFUSE_SAFETY",
+        "text": "Aici e nevoie de o persoană, nu de un asistent. Alege „Vorbește cu o persoană” și o persoană îți va citi mesajul.",
+        "sources": [],
+        "actions": [],
+        "error": null
+      },
+      "visible": {
+        "text": "Aici e nevoie de o persoană, nu de un asistent. Alege „Vorbește cu o persoană” și o persoană îți va citi mesajul.",
+        "sources": [],
+        "actions": []
+      },
+      "api_dom_text_equal": true,
+      "api_dom_source_labels_equal": true,
+      "api_dom_actions_equal": true,
+      "grounded_success": false
+    },
+    {
+      "sequence": 6,
+      "mode": "full",
+      "language": "ro",
+      "topic": "export",
+      "input": "Cum funcționează exportul JSON?",
+      "api": {
+        "status": 200,
+        "outcome": "ANSWER_GROUNDED",
+        "text": "Exportul JSON funcționează astfel: pentru o dezbatere care îți aparține, opțiunea de export apare numai după ce există un răspuns servit și după ce rezumatul registrului de execuție poate fi citit. Descărcarea JSON conține răspunsul, rezumatul registrului și înregistrările curente de onestitate. O dezbatere publică își poate exporta copia JSON publicată. Limitări: produsul nu oferă export Markdown, nu permite exportul unui răspuns neterminat al proprietarului și nu include datele private ale proprietarului într-o descărcare publică.",
+        "sources": [
+          {
+            "id": "export-json",
+            "label": "Exportă o dezbatere ca JSON"
+          }
+        ],
+        "actions": [],
+        "error": null
+      },
+      "visible": {
+        "text": "Exportul JSON funcționează astfel: pentru o dezbatere care îți aparține, opțiunea de export apare numai după ce există un răspuns servit și după ce rezumatul registrului de execuție poate fi citit. Descărcarea JSON conține răspunsul, rezumatul registrului și înregistrările curente de onestitate. O dezbatere publică își poate exporta copia JSON publicată. Limitări: produsul nu oferă export Markdown, nu permite exportul unui răspuns neterminat al proprietarului și nu include datele private ale proprietarului într-o descărcare publică.",
+        "sources": [
+          "Exportă o dezbatere ca JSON"
+        ],
+        "actions": []
+      },
+      "api_dom_text_equal": true,
+      "api_dom_source_labels_equal": true,
+      "api_dom_actions_equal": true,
+      "grounded_success": true
+    },
+    {
+      "sequence": 7,
+      "mode": "compact",
+      "language": "ro",
+      "topic": "creation-repeat",
+      "input": "Cum creez o dezbatere?",
+      "api": {
+        "status": 200,
+        "outcome": "ANSWER_GROUNDED",
+        "text": "Autentifică-te, apoi deschide formularul complet de dezbatere (acțiunea start-debate te duce acolo). Scrie în câmpul Topic întrebarea sau afirmația pe care vrei să o examinezi — formularul cere mai mult de șase caractere. Planul Free păstrează valori fixe pentru controalele de risc, buget, adâncime și îndrumare: nivelul de risc rămâne Standard, iar câmpurile de îndrumare sunt goale și dezactivate. Cu planul Premium poți ajusta controalele de risc, buget, adâncime și îndrumare, poți alege nivelul de risc Casual, Standard sau High stakes și poți adăuga câte o selecție de îndrumare pe linie plus adnotări libere. Nu există un câmp separat pentru descriere în formularul curent. După configurare, selectează Start run; odată trimisă, rularea înregistrează selecția efectivă și nu mai poate fi schimbată. Compozitorul din pagina principală poate transfera subiectul către formular dacă pornirea directă nu este disponibilă, iar Asistența nu pornește dezbaterea în locul tău.",
+        "sources": [
+          {
+            "id": "debate-topic-and-description",
+            "label": "Scrie subiectul și îndrumările dezbaterii"
+          },
+          {
+            "id": "getting-started-debate",
+            "label": "Pornește o dezbatere"
+          },
+          {
+            "id": "risk-tier-choice",
+            "label": "Alege nivelul de risc"
+          }
+        ],
+        "actions": [
+          {
+            "id": "start-debate",
+            "label": "Pornește o dezbatere",
+            "href": "/login?next=%2Fnew"
+          }
+        ],
+        "error": null
+      },
+      "visible": {
+        "text": "Autentifică-te, apoi deschide formularul complet de dezbatere (acțiunea start-debate te duce acolo). Scrie în câmpul Topic întrebarea sau afirmația pe care vrei să o examinezi — formularul cere mai mult de șase caractere. Planul Free păstrează valori fixe pentru controalele de risc, buget, adâncime și îndrumare: nivelul de risc rămâne Standard, iar câmpurile de îndrumare sunt goale și dezactivate. Cu planul Premium poți ajusta controalele de risc, buget, adâncime și îndrumare, poți alege nivelul de risc Casual, Standard sau High stakes și poți adăuga câte o selecție de îndrumare pe linie plus adnotări libere. Nu există un câmp separat pentru descriere în formularul curent. După configurare, selectează Start run; odată trimisă, rularea înregistrează selecția efectivă și nu mai poate fi schimbată. Compozitorul din pagina principală poate transfera subiectul către formular dacă pornirea directă nu este disponibilă, iar Asistența nu pornește dezbaterea în locul tău.",
+        "sources": [
+          "Scrie subiectul și îndrumările dezbaterii",
+          "Pornește o dezbatere",
+          "Alege nivelul de risc"
+        ],
+        "actions": [
+          {
+            "label": "Pornește o dezbatere",
+            "href": "/login?next=%2Fnew"
+          }
+        ]
+      },
+      "api_dom_text_equal": true,
+      "api_dom_source_labels_equal": true,
+      "api_dom_actions_equal": true,
+      "grounded_success": true
+    }
+  ],
+  "navigations": [
+    {
+      "input": "pointer",
+      "performed": false,
+      "reason": "NO_RENDERED_ACTION"
+    },
+    {
+      "input": "keyboard-enter",
+      "performed": true,
+      "label": "Pornește o dezbatere",
+      "href": "/login?next=%2Fnew",
+      "focused_label": "Pornește o dezbatere",
+      "destination": "https://localhost:3100/login?next=%2Fnew"
+    }
+  ],
+  "network": [
+    {
+      "operation": "support_status",
+      "status": 200
+    },
+    {
+      "operation": "create_session",
+      "status": 201
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    },
+    {
+      "operation": "create_session",
+      "status": 201
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    }
+  ],
+  "console_error_count": 11,
+  "console_error_categories": {
+    "HTTP_401": 11,
+    "HTTP_404": 0,
+    "JS_OR_HYDRATION": 0,
+    "OTHER": 0
+  },
+  "screenshots": [
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE3-full-en.png",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE3-full-ro.png",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE3-compact-ro.png"
+  ],
+  "completed": true
+}

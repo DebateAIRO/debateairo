@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "stoppedAt": "2026-09-17T19:59:40.388Z",
+  "pid": 65268,
+  "processGroup": 65268,
+  "signal": "SIGTERM",
+  "scope": "VERIFIED_OWNED_PROCESS_GROUP",
+  "supervisorExited": true,
+  "transientRemaining": [],
+  "reusableDataPlane": [
+    55433,
+    7177,
+    8988
+  ],
+  "originalListenersPreserved": [
+    3001,
+    55432,
+    7077,
+    8888,
+    8790,
+    8793,
+    8794,
+    8795,
+    8796
+  ]
+}

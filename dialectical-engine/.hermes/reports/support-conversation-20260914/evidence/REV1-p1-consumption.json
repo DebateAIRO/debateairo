@@ -1,0 +1,33 @@
+{
+  "at": "2026-09-14T16:46:05.344561+00:00",
+  "review": "REV1-p1",
+  "session": "/root/plan_review",
+  "revision": "6e5ab5fc41acebbff4264efc7d481df3db8dce44",
+  "report": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV1-p1.md",
+    "sha256": "e9f3e31c1f1fbae4b32209ea34152675b964a047e913f6ae8f91ab2a1bae4e0f"
+  },
+  "selfReport": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/REV1.md",
+    "sha256": "9a50ba831ac56948718ad88902db80ea82b2b38e6534061d8bb66131741fc2a9"
+  },
+  "gateManifestSha256": "ab6221c1e5e1a4fa3050854005a646242bbc7472522d2745077eea77a2da48f0",
+  "gateInputHashesReverified": 114,
+  "productFilesReverified": 99,
+  "skills": {
+    "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-38-35-01a09f11-6f5f-74b2-9bba-1442a15308ef.jsonl",
+    "floor": [
+      "using-superpowers",
+      "heartbeat-protocol",
+      "heartbeat-reviewer",
+      "verification-before-completion"
+    ],
+    "rc": 0,
+    "output": "ok   using-superpowers (2)\nok   heartbeat-protocol (4)\nok   heartbeat-reviewer (2)\nok   verification-before-completion (2)\nSKILLS LOADED verified: 4 / 4\n"
+  },
+  "scope": "Mechanical immutable-input/report/hash/current-byte verification; reviewer content verdict is independent Sol evidence, not root content judgment. Probe hashes consumed separately if present.",
+  "supersededReportSha256": "2c234b2fa5b91d8da0c2df63c317e81ce1279b84a665f885be99beda20305501",
+  "supersededSelfReportSha256": "7e9a6ef25592d607c9a64f4a834cd1e635782fac3df74b90758ca185b274651f",
+  "amendment": "Qualified sourceHEAD-only vs cleanproduct and corrected reviewer-transcribed wrong58fbaa7d fullhash; verdict unchanged. Unrelated Linear read stalled16:31:34..16:42, rootinterrupted, no externalresultreceived/used.",
+  "additionalSkillBodyProof": "ok   systematic-debugging (2)\nSKILLS LOADED verified: 1 / 1\n"
+}

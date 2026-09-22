@@ -1,0 +1,134 @@
+{
+  "at": "2026-09-16T06:29:51.538576+00:00",
+  "node": "FIX_P2_DEGRADED",
+  "ticket": "t_7f51fcb1",
+  "state": "AUTHOR TEST-ONLY CORRECTION CONSUMED; SEPARATE REV1_P3 DISPOSITION PENDING",
+  "baseRevision": "606b2eabea1dc9212159e53c193cf69655424e77",
+  "productCommit": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
+  "runtimeEvidenceRevision": "606b2eabea1dc9212159e53c193cf69655424e77",
+  "clean": true,
+  "immutableReferences": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX_P2_DEGRADED.md",
+      "sha256": "5a0920105a45fd7c8ed04a566d3bd592a4ee5f949ae805481caa365ef87294da",
+      "bytes": 4772
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FIX_P2_DEGRADED.md",
+      "sha256": "5c077ed9d4f9ef104c4ba59ce5f206197c984de30a958fd1b6bb8401845e8cc1",
+      "bytes": 3952
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P2_DEGRADED-target-red.log",
+      "sha256": "80345a8adc78d11a7b0265e45d6fa96f4e9868896cc7afcf90209e184f07def3",
+      "bytes": 2690
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P2_DEGRADED-file-green.log",
+      "sha256": "b013fde167ba1b1f3b95195d839e77007bc0c6f0420dda23d6b7df9e2fcec6d1",
+      "bytes": 1584
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P2_DEGRADED-scope-proof.log",
+      "sha256": "b3120d1b59d9c559ac6cdccd6f727b8c45598bbbf4f46c4de20166df412ebb35",
+      "bytes": 1011
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FIX_P2_DEGRADED-final-custody.log",
+      "sha256": "107a26a018f4ff6b6fcbde8a096b2c8255f2fd6055f2e7bc938b7ec7e954f655",
+      "bytes": 1052
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX_P2_DEGRADED-receipt.json",
+      "sha256": "20d2ad8152b1b06c0717b00815283d4094cc2eb9f6d3da57859c3058a5b7b7f6",
+      "bytes": 5461
+    }
+  ],
+  "productBinding": {
+    "laneRelative": "tests/integration/support-degraded.test.ts",
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/integration/support-degraded.test.ts",
+    "sha256": "0559fdf2dceeadac10b7d544094ff02e0b84067102fb2e8787c24bce200d0df6",
+    "bytes": 10834,
+    "kind": "productTest"
+  },
+  "summary": {
+    "targetedRed": {
+      "revision": "606b2eabea1dc9212159e53c193cf69655424e77",
+      "exitCode": 1,
+      "failed": 1,
+      "skipped": 7,
+      "observed": "NO_SOURCE before model transport"
+    },
+    "affectedFileGreen": {
+      "committedBytes": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
+      "exitCode": 0,
+      "passed": 8,
+      "failed": 0,
+      "testFiles": 1
+    },
+    "onlyChangedFile": "tests/integration/support-degraded.test.ts",
+    "onlySemanticChange": "Safe modelProjection added to shared ENTRY fixture",
+    "fallbackAbsent": true,
+    "allExistingAssertionsByteUnchanged": true,
+    "allOtherTrackedGitPathsUnchanged": true,
+    "newLiveSample": false,
+    "whole25SuiteRerun": false,
+    "limit": "The original exact25 run at606b remains 977 passed,1 failed,1 Forgot TODO. This final focused8/8 evidence is separate, not a new whole-suite PASS."
+  },
+  "nativeSkillBodyProof": {
+    "using-superpowers": {
+      "file": "/Users/vladmihaimiron/.codex/plugins/cache/openai-curated-remote/superpowers/6.3.0/skills/using-superpowers/SKILL.md",
+      "sha256": "30f2ab78e20ddc27ee7158ae8d4a2abe161c360981c7cc3548070913142d3dc3",
+      "bodyPhrase": "This is not negotiable. You cannot rationalize your way out of this.",
+      "nativeToolOutputOccurrences": 1
+    },
+    "heartbeat-protocol": {
+      "file": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-protocol/SKILL.md",
+      "sha256": "9f5c803cbdfb92a98bb749601b96d5fa1f2bdcba3805e7cff5be200fd98f3bb3",
+      "bodyPhrase": "One role per node: a seat that reviews does not code, and no seat reviews its own work",
+      "nativeToolOutputOccurrences": 3
+    },
+    "heartbeat-worker": {
+      "file": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md",
+      "sha256": "2cc1cb1676e582648002989f75259127421a223bbea1e47814f52366a9ca94c1",
+      "bodyPhrase": "Check the packet against reality and stop if it is wrong",
+      "nativeToolOutputOccurrences": 4
+    },
+    "test-driven-development": {
+      "file": "/Users/vladmihaimiron/.codex/plugins/cache/openai-curated-remote/superpowers/6.3.0/skills/test-driven-development/SKILL.md",
+      "sha256": "bf1b8216e523851a411e91d429a7c1c2a173e79d88957bc78e348218d50edd54",
+      "bodyPhrase": "If you didn't watch the test fail, you don't know if it tests the right thing.",
+      "nativeToolOutputOccurrences": 2
+    },
+    "verification-before-completion": {
+      "file": "/Users/vladmihaimiron/.codex/plugins/cache/openai-curated-remote/superpowers/6.3.0/skills/verification-before-completion/SKILL.md",
+      "sha256": "2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3",
+      "bodyPhrase": "NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE",
+      "nativeToolOutputOccurrences": 1
+    },
+    "systematic-debugging": {
+      "file": "/Users/vladmihaimiron/.codex/plugins/cache/openai-curated-remote/superpowers/6.3.0/skills/systematic-debugging/SKILL.md",
+      "sha256": "808fc5717aa88ad65efff312b11c186294d3e6ee301afb584e2f86599b137787",
+      "bodyPhrase": "Violating the letter of this process is violating the spirit of debugging.",
+      "nativeToolOutputOccurrences": 2
+    }
+  },
+  "skillProofContinuity": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/ATTEST_P2-consumption.json",
+    "sha256": "fcab1dd7da70b48dc00b1ec7dcea3ead4607a3ed24e13ecfb6c05dc654a54ad0",
+    "sameNativeAuthorSession": "01a09ef7-fa46-7b73-bc98-70f84abd06cc",
+    "scope": "Retained actual same-session BODY reads, current hashes checked; no fresh-read claim."
+  },
+  "checks": {
+    "artifacts": 7,
+    "immutableReferences": 7,
+    "singleParent": "606b2eabea1dc9212159e53c193cf69655424e77",
+    "oneFileExactByteTransformation": true,
+    "allNonTestTrackedPathsUnchanged": true
+  },
+  "limits": [
+    "Root verified custody, exact one-file transformation and captured evidence; root did not execute product or issue the separate review verdict.",
+    "LIVE_P2 remains measured at606b. No runtime, content or configuration changes, reload or new actual model sample.",
+    "Forgot destination and owner acceptance remain unresolved; no readiness or checkpoint advancement."
+  ]
+}

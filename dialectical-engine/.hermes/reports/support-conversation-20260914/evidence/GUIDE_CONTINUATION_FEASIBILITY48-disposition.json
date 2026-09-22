@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CONTINUATION_FEASIBILITY48",
+  "ticket": "t_e85f7666",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+  "verdict": "FEASIBLE_WITH_DISTINCT_REPLAY_EVIDENCE",
+  "staticOnly": true,
+  "execution": {
+    "browser": false,
+    "http": false,
+    "support": false,
+    "model": false,
+    "capacity": false,
+    "database": false,
+    "productWrites": false,
+    "gitWrites": false
+  },
+  "live36": {
+    "actualSequence": 10,
+    "actualResponseAccepted": true,
+    "apiDomTextEqual": true,
+    "apiDomSourcesEqual": true,
+    "apiDomActionsEqual": true,
+    "actualStartImagePresent": true,
+    "actualEndImagePresent": false,
+    "actualExpandedImagePresent": false,
+    "attemptVerdictRetained": "FAILED_CAPTURE_ROW10_NO_RETRY",
+    "failureCode": "GUIDE_CAPTURE_ORIGINAL_PANE_FOOTER_UNREACHABLE",
+    "controllerFinding": "selected non-scrolling .supportAssistantCompact instead of parent .supportWidgetPanel"
+  },
+  "layeredAcceptanceConditions": [
+    "retain exact actual LIVE36 response, equality, partial image, geometry failure, timestamp, and failed provenance",
+    "separately seal and independently review the corrected parent-scroll helper before relying on it",
+    "replay only the exact hash-bound public row10 projection through the real compiled React UI",
+    "intercept or abort all Support/status/auth/private/external dynamic requests; forward zero and make zero Support/model calls",
+    "bind prompt/text/source/action hashes and target assistant ordinal to the actual receipt",
+    "prove start, parent-panel footer containment and viewport paint, end image, expanded image, and restoration at 390x844",
+    "label every replay artifact SYNTHETIC_RESPONSE_REPLAY_THROUGH_REAL_COMPILED_UI and never actual LIVE36",
+    "require independent final review; an expanded screenshot alone or unsealed author controls are insufficient"
+  ],
+  "remaining": {
+    "requests": 20,
+    "modelBranches": 17,
+    "newSessions": 3,
+    "pacingSeconds": 31,
+    "ownerReservedMessages": 6,
+    "ownerReservedModelCalls": 6,
+    "gateAccept": {
+      "sessions": 3,
+      "messages": 26,
+      "modelCalls": 23
+    },
+    "gateReject": {
+      "sessions": 2,
+      "messages": 25,
+      "modelCalls": 22
+    }
+  },
+  "groups": [
+    {
+      "id": "compact-ro-to-full-ro",
+      "sequences": [
+        18,
+        26,
+        34,
+        56,
+        58,
+        54,
+        43
+      ],
+      "transition": "compact RO row54 keyboard /help -> full RO row43",
+      "sessions": 1
+    },
+    {
+      "id": "full-en",
+      "sequences": [
+        5,
+        13,
+        21,
+        25,
+        29,
+        37,
+        45,
+        53
+      ],
+      "sessions": 1
+    },
+    {
+      "id": "compact-en",
+      "sequences": [
+        8,
+        12,
+        42,
+        55,
+        57
+      ],
+      "sessions": 1
+    }
+  ],
+  "composition": {
+    "actualReplyCount": 31,
+    "segments": [
+      {
+        "id": "LIVE31",
+        "count": 10,
+        "sequences": [
+          1,
+          2,
+          15,
+          19,
+          23,
+          27,
+          31,
+          35,
+          39,
+          47
+        ]
+      },
+      {
+        "id": "LIVE36",
+        "count": 1,
+        "sequences": [
+          10
+        ]
+      },
+      {
+        "id": "successor",
+        "count": 20,
+        "sequences": [
+          18,
+          26,
+          34,
+          56,
+          58,
+          54,
+          43,
+          5,
+          13,
+          21,
+          25,
+          29,
+          37,
+          45,
+          53,
+          8,
+          12,
+          42,
+          55,
+          57
+        ]
+      }
+    ],
+    "sessionTimestampCount": 6,
+    "knownTimesUtc": [
+      "09:52:36.856Z",
+      "09:53:08.483Z",
+      "12:41:51.789Z"
+    ],
+    "futureTimes": "three identifier-free ordinal/timestamp records",
+    "row47RecaptureRequired": false,
+    "row10ResendAllowed": false
+  },
+  "sourceAnchors": [
+    "apps/ui/components/support/SupportWidget.tsx:96-106 mounts Assistant inside .supportWidgetPanel and exposes /help",
+    "apps/ui/app/globals.css:275-288 makes .supportWidgetPanel max-height:70vh; overflow:auto",
+    "apps/ui/app/globals.css:1160-1167 leaves .supportAssistantCompact as a grid content root",
+    ".hermes/reports/support-conversation-20260914/probes/GUIDE_CONTINUATION_BIND40/screenshot-evidence-successor.mjs:227-285 selects compact paneSelector=root and enforces identity/paint checks",
+    "GUIDE_LIVE_GUIDE25-row-10-screenshot-failure.json records inner root maxScrollTop=0, footer present, footer not painted",
+    "GUIDE_LIVE_GUIDE25-actual-receipt.json records actual API/DOM equality, timestamp, and failure provenance"
+  ],
+  "limits": [
+    "Replay evidence is not actual LIVE36 evidence.",
+    "No replay control was executed or certified by this node.",
+    "No continuous31, live54/58, readiness, CP1 acceptance, or CP2 claim is made.",
+    "Forgot remains unresolved and actionless."
+  ]
+}

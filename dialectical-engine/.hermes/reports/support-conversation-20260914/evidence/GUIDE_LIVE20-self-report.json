@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE20",
+  "ticket": "t_0e1ba873",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "STOPPED_PRETRAFFIC_WRAPPER_CONTRACT_MISMATCH",
+  "model": "gpt-5.6-sol",
+  "session": "01a09f02-346a-7fb0-aa70-0424f1fdd21e",
+  "skills": {
+    "retained": [
+      "superpowers:executing-plans",
+      "superpowers:systematic-debugging",
+      "superpowers:verification-before-completion"
+    ],
+    "reReadThisNode": false
+  },
+  "phaseStatuses": {
+    "preflightChild": "PASS_ZERO_SUPPORT_UI_TRANSITIONS",
+    "preflightWrapper": "FAIL",
+    "readiness": "NOT_RUN",
+    "capacity": "NOT_RUN",
+    "gate": "NOT_RUN",
+    "rowProof": "NOT_RUN",
+    "capture": "NOT_RUN",
+    "idle": "NOT_RUN"
+  },
+  "traffic": {
+    "supportRequestsForwarded": 0,
+    "supportSessions": 0,
+    "supportMessages": 0,
+    "capacityReads": 0,
+    "databaseReads": 0,
+    "modelCalls": 0
+  },
+  "heavyLeaseReleased": true
+}

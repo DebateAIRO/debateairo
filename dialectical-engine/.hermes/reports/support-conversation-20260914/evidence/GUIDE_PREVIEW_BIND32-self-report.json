@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_BIND32",
+  "ticket": "t_f068fcad",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "FAIL_RUNTIME8_SUPERVISOR_EXITED_REVIEW_REQUIRED",
+  "nativeSession": "01a09f02-346a-7fb0-aa70-0424f1fdd21e",
+  "skillsLoaded": "Retained mission BODY skill context; no new skill invoked in this resumed node.",
+  "questionVerbatim": "treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.",
+  "answer": "The binding layer is now reusable and passed the current 58-row constructor, but lifecycle launch remains a separate brittle boundary. The repeated token cost comes from serially rebuilding contracts and only then learning that the detached supervisor cannot stay up. The one-prompt path should generate and validate the binding, run a zero-traffic supervisor preflight that proves the exact startup environment, then atomically reload and emit custody. It should return one fixed failure enum plus safe process/listener facts when startup exits, while preserving private logs for a separately scoped diagnosis.",
+  "limits": [
+    "No Runtime8 custody or ordinary TLS proof exists.",
+    "The supervisor exit cause is unknown because the private log was not read.",
+    "No status, capacity, DB, Support, model, or actual31 action occurred.",
+    "Forgot remains unresolved."
+  ]
+}

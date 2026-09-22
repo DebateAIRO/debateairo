@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-21T00:10:46.840Z",
+  "oldRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "finalRevision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "head": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "statusClean": true,
+  "supervisor": {
+    "pid": 77769,
+    "ppid": 1,
+    "pgid": 77769,
+    "state": "Ss",
+    "elapsed": "10:43:42",
+    "command": "pnpm dev:auth:up",
+    "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine"
+  },
+  "groupMembers": [
+    {
+      "pid": 77769,
+      "ppid": 1,
+      "pgid": 77769,
+      "command": "node /Users/vladmihaimiron/.local/bin/pnpm dev:auth:up"
+    },
+    {
+      "pid": 77779,
+      "ppid": 77769,
+      "pgid": 77769,
+      "command": "node /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.bin/../tsx/dist/cli.mjs apps/runner/src/dev-auth-stack-cli.ts"
+    },
+    {
+      "pid": 77785,
+      "ppid": 77779,
+      "pgid": 77769,
+      "command": "/Users/vladmihaimiron/.hermes/node/bin/node --require /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/tsx@4.23.11/node_modules/tsx/dist/preflight.cjs --import file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/tsx@4.23.11/node_modules/tsx/dist/loader.mjs apps/runner/src/dev-auth-stack-cli.ts"
+    },
+    {
+      "pid": 78380,
+      "ppid": 77785,
+      "pgid": 77769,
+      "command": "/Users/vladmihaimiron/.hermes/node/bin/node /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/tsx/dist/cli.mjs apps/api/src/main.ts"
+    },
+    {
+      "pid": 78381,
+      "ppid": 78380,
+      "pgid": 77769,
+      "command": "/Users/vladmihaimiron/.hermes/node/bin/node --require /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/tsx@4.23.11/node_modules/tsx/dist/preflight.cjs --import file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/tsx@4.23.11/node_modules/tsx/dist/loader.mjs apps/api/src/main.ts"
+    },
+    {
+      "pid": 78382,
+      "ppid": 78381,
+      "pgid": 77769,
+      "command": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/@esbuild+darwin-arm64@0.28.1/node_modules/@esbuild/darwin-arm64/bin/esbuild --service=0.28.1 --ping"
+    },
+    {
+      "pid": 78392,
+      "ppid": 77785,
+      "pgid": 77769,
+      "command": "/Users/vladmihaimiron/.hermes/node/bin/node /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/tsx/dist/cli.mjs apps/runner/src/main.ts"
+    },
+    {
+      "pid": 78393,
+      "ppid": 78392,
+      "pgid": 77769,
+      "command": "/Users/vladmihaimiron/.hermes/node/bin/node --require /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/tsx@4.23.11/node_modules/tsx/dist/preflight.cjs --import file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/node_modules/.pnpm/tsx@4.23.11/node_modules/tsx/dist/loader.mjs apps/runner/src/main.ts"
+    },
+    {
+      "pid": 78396,
+      "ppid": 77785,
+      "pgid": 77769,
+      "command": "/Users/vladmihaimiron/.hermes/node/bin/node server.mjs --dev"
+    }
+  ],
+  "previewListeners": [
+    {
+      "pid": 19920,
+      "command": "com.docker.backend",
+      "port": 7177
+    },
+    {
+      "pid": 19920,
+      "command": "com.docker.backend",
+      "port": 8988
+    },
+    {
+      "pid": 19920,
+      "command": "com.docker.backend",
+      "port": 55433
+    },
+    {
+      "pid": 77785,
+      "command": "node",
+      "port": 8891
+    },
+    {
+      "pid": 77785,
+      "command": "node",
+      "port": 8896
+    },
+    {
+      "pid": 77785,
+      "command": "node",
+      "port": 8895
+    },
+    {
+      "pid": 77785,
+      "command": "node",
+      "port": 8893
+    },
+    {
+      "pid": 77785,
+      "command": "node",
+      "port": 8894
+    },
+    {
+      "pid": 77785,
+      "command": "node",
+      "port": 8892
+    },
+    {
+      "pid": 77785,
+      "command": "node",
+      "port": 3100
+    },
+    {
+      "pid": 78381,
+      "command": "node",
+      "port": 8890
+    },
+    {
+      "pid": 78396,
+      "command": "node",
+      "port": 3101
+    }
+  ],
+  "unrelatedListeners": [
+    {
+      "pid": 1205,
+      "command": "ControlCenter",
+      "port": 7000
+    },
+    {
+      "pid": 1205,
+      "command": "ControlCenter",
+      "port": 7000
+    },
+    {
+      "pid": 1205,
+      "command": "ControlCenter",
+      "port": 5000
+    },
+    {
+      "pid": 1205,
+      "command": "ControlCenter",
+      "port": 5000
+    },
+    {
+      "pid": 1682,
+      "command": "node",
+      "port": 9797
+    },
+    {
+      "pid": 1698,
+      "command": "Ollama",
+      "port": 49251
+    },
+    {
+      "pid": 1719,
+      "command": "ollama",
+      "port": 11434
+    }
+  ],
+  "oldPrivateLogRetainedWithoutRead": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE7-stack.log"
+}

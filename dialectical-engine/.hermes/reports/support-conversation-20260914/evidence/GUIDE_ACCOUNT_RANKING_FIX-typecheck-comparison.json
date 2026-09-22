@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "command": "pnpm run typecheck",
+  "exitCode": 1,
+  "currentRaw": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ACCOUNT_RANKING_FIX-typecheck.log",
+    "sha256": "cd3c50acd2c3f2f4cf00cecdf2c64df9cb8f34590591e0e64452d3e2c1bb5bb3",
+    "bytes": 39710
+  },
+  "baselineRaw": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-typecheck-final2.log",
+    "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "bytes": 39611
+  },
+  "currentDiagnostics": 76,
+  "baselineDiagnostics": 76,
+  "normalizedDiagnosticLinesEqual": true,
+  "normalizedDiagnosticLinesSha256": "7d9816c9fde8d1f83d2828485402016bfd02d53b1ad1c3f0f95f0d3567a14f4a",
+  "ownedPathDiagnostics": 0,
+  "rawLogsByteIdentical": false
+}

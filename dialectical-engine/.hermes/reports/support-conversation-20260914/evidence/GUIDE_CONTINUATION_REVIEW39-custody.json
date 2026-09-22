@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CONTINUATION_REVIEW39",
+  "ticket": "t_ae5c12e5",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "sourceHead": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+  "freeze": "884eef218c48a90005b05bc4e8da8fb3c5bb00f0",
+  "inputs": {"declared": 180, "hashAndSizeMatched": 180, "mismatched": 0},
+  "productCheckout": {"head": "0d34f82f4a2188d0ce1db04655b693798ffd2169", "clean": true},
+  "live31": {"verdict": "FAILED_CAPTURE_ROW47_NO_RETRY", "completedReplies": 10, "fullyCapturedRows": 9, "partialScreenshotRows": 1, "createdSessions": 2, "sendMessages": 10},
+  "traffic": {"runtime": 0, "browser": 0, "http": 0, "process": 0, "status": 0, "capacity": 0, "database": 0, "support": 0, "model": 0},
+  "heavyLeaseHeld": false,
+  "mutations": "new GUIDE_CONTINUATION_REVIEW39 report/evidence/self/manifest/receipt files only"
+}

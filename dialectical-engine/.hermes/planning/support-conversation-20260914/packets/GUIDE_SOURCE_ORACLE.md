@@ -1,0 +1,24 @@
+# PACKET GUIDE_SOURCE_ORACLE — bounded evidence-backed continuation
+
+Read FIRST this packet then /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md. Resume original Sol /root/baseline; assigned ticket/comments before claim. Retain actual BODY skills and systematic-debugging/receiving-code-review/verification-before-completion; no subdelegation.
+
+## 1. Node
+- seat: GUIDE_SOURCE_ORACLE; ticket: t_c138d2f7; model: gpt-5.6-sol; rework rounds: max 3 under owner continuation.
+- cwd: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-product/dialectical-engine; exact clean product: f3be0af81f1691db6c23494f9e286bb6b10f13bf.
+- inputs: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SOURCE_ORACLE-inputs.json and indexed sealed failure, diagnosis, reviewed FIX4 and governing public-guide contract; immediate named consumers read-only.
+- self-report: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_SOURCE_ORACLE.md (new).
+
+## 2. Contract
+- allowed: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_SOURCE_ORACLE.md (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SOURCE_ORACLE-receipt.json (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_SOURCE_ORACLE.md (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SOURCE_ORACLE- (new, static custody only).
+- forbidden: product/source/KB/Git/index edits; sealed predecessor mutation; actual browser/runtime/capacity/status/HTTP/DB/Support/model/provider/lifecycle activity; limits/counter changes; private records/credentials/raw rejected drafts; owner questions or acceptance.
+- verification: Static bounded contract review, no heavy/Git lease, tests, probes or execution. No valid-gate actual54 or live-quality claim.
+
+## 3. Work
+Review the STATIC soundness of canonical home-library primary-source expectation, initially sequence7 and its direct English counterpart only. GUIDE_RUNTIME_DIAG reports expected first source app-navigation while the exact admitted product proof orders browse-public-debates, app-navigation, getting-started-debate and production reviewed recovery uses the first admitted entry. Compare owner public-navigation requirements, specification grounding/relevance rules, already reviewed public KB facts, matrix contract and immediate source validation/recovery consumers. Determine whether both relevant public records legitimately support this menu request and whether a unique first-source app-navigation requirement is mandated, justified, incomplete or unsupported. Cite exact authority/content; do not allow arbitrary unrelated admitted sources merely because they are selectable.
+
+This is separate authority review, NOT a claim about the lost actual response or a conclusion that the prior failure was caused by source order. Actual third response remains unavailable; no runtime cause may be inferred and no product or matrix change may be made here. Author FIX5 concurrently fixes safe failure persistence only and must preserve matrix until an explicit scoped amendment. Return exact minimal source expectation disposition and counterpart identities if justified, with safe positive/negative source cases. If the frozen contract intentionally requires unique app-navigation first, retain it and state evidence needed to diagnose a different result. If only observation is justified, say so; do not manufacture a rework finding to obtain green. Do not broaden to all54 or re-audit the corpus; report a concrete adjacent pattern separately if discovered. No tests/runtime/private logs/new model samples. Retain prior validated navigation/recovery/privacy/capacity protections and keep existing failed capture immutable.
+
+## 4. Handoff
+Self-report question verbatim:
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
+Return SKILLS LOADED, ticket/session/revision/verdict, precise proved scope and uncertainty, measurements/custody and limits. Receipt node/ticket/revision/verdict/artifacts absolute/sha256/bytes excluding itself; author includes kbVersion/harnessSha256 and canonical proof. No self-close/readiness; Forgot unresolved and CP2 gated.

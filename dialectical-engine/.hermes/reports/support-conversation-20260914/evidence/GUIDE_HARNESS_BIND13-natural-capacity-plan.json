@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND13",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "basis": "SEALED_LIVE7_ONLY_NO_NEW_CAPACITY_READ",
+  "limit": {
+    "anonymousSessionsPerIpPerHour": 5
+  },
+  "preCaptureMeasurement": {
+    "measuredAtUtc": "2026-09-20T13:54:43.254Z",
+    "observedMaxAnonSessionEvents1hByIp": 0
+  },
+  "live7CreatedSessions": 2,
+  "creationTimeEvidence": [
+    {
+      "group": "lifecycle-full-en",
+      "exactCreationTimeUtc": null,
+      "createdNoLaterThanUtc": "2026-09-20T13:55:36.313Z",
+      "bound": "row-01 screenshot mtime"
+    },
+    {
+      "group": "full-ro",
+      "exactCreationTimeUtc": null,
+      "createdNoLaterThanUtc": "2026-09-20T13:56:12.337Z",
+      "bound": "row-02 screenshot mtime"
+    }
+  ],
+  "fiveFreeSlotsCalculatedNotBeforeUtc": "2026-09-20T14:56:12.337Z",
+  "availabilityKind": "CONSERVATIVE_NATURAL_EXPIRY_CALCULATION",
+  "futureMeasuredCapacityStillRequired": true,
+  "limitation": "Exact create-session timestamps were not serialized; screenshot mtimes are the smallest sealed upper bounds after each completed group's first response. This calculation is not a current capacity measurement and does not account for later external use."
+}

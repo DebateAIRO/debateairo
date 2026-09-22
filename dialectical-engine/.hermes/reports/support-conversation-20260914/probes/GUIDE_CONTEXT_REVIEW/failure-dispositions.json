@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "revision": "9bf56f95711d19e6405fff5db06c4ad3d606bd68",
+  "testFile": "tests/unit/support-answer-context.test.ts",
+  "testFileSha256": "4c35a9f1185cf60829157217a5d045086c579a66b08bed454a4696f05e07805e",
+  "contextFile": "packages/support-kb/src/context.ts",
+  "contextFileSha256": "d918ee72d6257b37a1e0ea5b796273f9a4bdd4dc493d0559e9621861371c7977",
+  "answerFile": "apps/api/src/support/answer.ts",
+  "answerFileSha256": "16e1eb66a8f72a0bed59c00ab879bcddd54e191de5046baec8610d859ec77c76",
+  "sharedFixture": {
+    "requestText": "crosscap alpha beta gamma",
+    "directWordCount": 4,
+    "matchedWordsPerAffectedEntry": 2,
+    "projectionCoverage": 0.5,
+    "meaningful": false,
+    "capabilityFallback": false,
+    "observedServiceBranch": "NO_SOURCE_BEFORE_MODEL"
+  },
+  "proposedFixture": {
+    "requestText": "crosscap",
+    "directWordCount": 1,
+    "matchedWordsPerAffectedEntry": 1,
+    "projectionCoverage": 1,
+    "meaningfulRule": "directWords.size === 1 && projectionScore === 1",
+    "expectedEffect": "Each affected synthetic entry satisfies the existing relevance precondition without changing production selector code or assertions.",
+    "status": "STATIC_INFERENCE_NOT_EXECUTED"
+  },
+  "failures": [
+    {
+      "number": 1,
+      "name": "keeps matching whole reviewed sections above 12,000 and below the 24,000 system cap",
+      "intendedProperty": "Whole selected sections and the output contract remain within the 24,000-code-point cap.",
+      "observed": "The model was not called and the captured system text remained empty.",
+      "disposition": "FIXTURE_PRECONDITION"
+    },
+    {
+      "number": 2,
+      "name": "uses the exact immutable snapshot object already resolved by the route",
+      "intendedProperty": "The request snapshot wins over the service's stale lookup snapshot.",
+      "observed": "NO_SOURCE was returned before either snapshot marker entered model context.",
+      "disposition": "FIXTURE_PRECONDITION"
+    },
+    {
+      "number": 3,
+      "name": "reports only the closed diagnostic shape for a rejected completion",
+      "intendedProperty": "A rejected completion emits the closed diagnostic schema without hostile bytes.",
+      "observed": "NO_SOURCE prevented completion and diagnostic production.",
+      "disposition": "FIXTURE_PRECONDITION"
+    },
+    {
+      "number": 4,
+      "name": "rejects an internal identifier before canonical assistant storage",
+      "intendedProperty": "Internal identifiers are rejected before the canonical sink and recover through reviewed fallback.",
+      "observed": "NO_SOURCE prevented the hostile completion from reaching the response-policy boundary.",
+      "disposition": "FIXTURE_PRECONDITION"
+    },
+    {
+      "number": 5,
+      "name": "rejects a request alias in narrative text before canonical assistant storage",
+      "intendedProperty": "Opaque request aliases cannot appear in stored visitor prose.",
+      "observed": "NO_SOURCE prevented the hostile completion from reaching the response-policy boundary.",
+      "disposition": "FIXTURE_PRECONDITION"
+    },
+    {
+      "number": 6,
+      "name": "rejects a source reference issued for a prior request",
+      "intendedProperty": "A source reference is valid only for the request that issued it.",
+      "observed": "NO_SOURCE prevented current-request reference validation.",
+      "disposition": "FIXTURE_PRECONDITION"
+    },
+    {
+      "number": 7,
+      "name": "keeps a rejected transformed completion out of assistant storage and return: Support does not request passwords, plus it could receive them.",
+      "intendedProperty": "Credential-operation contradiction is rejected and only reviewed fallback reaches return and storage.",
+      "observed": "The completion spy was called zero times because selection returned no source.",
+      "disposition": "FIXTURE_PRECONDITION"
+    },
+    {
+      "number": 8,
+      "name": "keeps a rejected transformed completion out of assistant storage and return: Support does not request passwords, in addition it accepts them.",
+      "intendedProperty": "Credential-operation contradiction is rejected and only reviewed fallback reaches return and storage.",
+      "observed": "The completion spy was called zero times because selection returned no source.",
+      "disposition": "FIXTURE_PRECONDITION"
+    },
+    {
+      "number": 9,
+      "name": "keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere parole, plus le poate primi.",
+      "intendedProperty": "Romanian credential-operation contradiction is rejected and only reviewed fallback reaches return and storage.",
+      "observed": "The completion spy was called zero times because selection returned no source.",
+      "disposition": "FIXTURE_PRECONDITION"
+    },
+    {
+      "number": 10,
+      "name": "keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere parole, în plus le poate primi.",
+      "intendedProperty": "Romanian credential-operation contradiction is rejected and only reviewed fallback reaches return and storage.",
+      "observed": "The completion spy was called zero times because selection returned no source.",
+      "disposition": "FIXTURE_PRECONDITION"
+    },
+    {
+      "number": 11,
+      "name": "keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere coduri de autentificare; de asemenea le poate valida.",
+      "intendedProperty": "Romanian authentication-code validation prose is rejected and only reviewed fallback reaches return and storage.",
+      "observed": "The completion spy was called zero times because selection returned no source.",
+      "disposition": "FIXTURE_PRECONDITION"
+    },
+    {
+      "number": 12,
+      "name": "keeps a rejected transformed completion out of assistant storage and return: Asistența nu cere coduri de securitate; în plus le poate verifica.",
+      "intendedProperty": "Romanian security-code verification prose is rejected and only reviewed fallback reaches return and storage.",
+      "observed": "The completion spy was called zero times because selection returned no source.",
+      "disposition": "FIXTURE_PRECONDITION"
+    },
+    {
+      "number": 13,
+      "name": "keeps a rejected transformed completion out of assistant storage and return: Network=%5C%5Cserver%5Cshare to continue.",
+      "intendedProperty": "Encoded backslash paths are rejected and only reviewed fallback reaches return and storage.",
+      "observed": "The completion spy was called zero times because selection returned no source.",
+      "disposition": "FIXTURE_PRECONDITION"
+    },
+    {
+      "number": 14,
+      "name": "assigns distinct opaque identities to separate rejected model attempts",
+      "intendedProperty": "Each rejected attempt receives a distinct opaque UUID diagnostic identity.",
+      "observed": "Both calls returned NO_SOURCE, producing zero of two expected diagnostics.",
+      "disposition": "FIXTURE_PRECONDITION"
+    }
+  ]
+}

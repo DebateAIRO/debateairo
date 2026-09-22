@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX9",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "finding": "JSON_PARSE_FAILURE_COLLAPSED_TO_OBJECT",
+  "resolvedBy": [
+    "actual response-read helper retains rejected JSON parsing as null",
+    "staged consumer records body INVALID with GUIDE_HARNESS_API_BODY_INVALID",
+    "numeric status is retained without response bytes or exception data",
+    "legitimate parsed public bodies remain unchanged"
+  ],
+  "controls": {
+    "previous": 111,
+    "current": 112,
+    "retained": 111,
+    "added": 1
+  },
+  "harnessDelta": [
+    {
+      "path": "README.md",
+      "status": "CHANGED",
+      "sha256": "fa35c193f8bfc96515d5c5f3464960b8109656941d42c67fdc79ce6c1141a64a",
+      "bytes": 12821,
+      "previousSha256": "50e2a31041963d94706f7a7fb225876b805057b2002e34a5940be7c849b305ff",
+      "previousBytes": 12319
+    },
+    {
+      "path": "capture-public-guide.mjs",
+      "status": "CHANGED",
+      "sha256": "e962db1875e6595eb2db67d51f2245c9a4928cee04c0c498cd2455460c0a48ce",
+      "bytes": 18422,
+      "previousSha256": "7e00bcb022cd32770dbe61314d1fc78095201643fa8acfe62682ff8ebda71de1",
+      "previousBytes": 18423
+    },
+    {
+      "path": "controls.mjs",
+      "status": "CHANGED",
+      "sha256": "5b04015e7a0eb380471b0cc6be4453acceee9ba03b2b2994b300ba350aeccc93",
+      "bytes": 27827,
+      "previousSha256": "4887cfdf2a22643d3a161ccbfee385f27cc231468a1d2f1c51a501a203b12135",
+      "previousBytes": 27615
+    },
+    {
+      "path": "gate-contract.json",
+      "status": "UNCHANGED",
+      "sha256": "a06a7ad7b1e328f5432a4ac9403436f87aab15427410c63cec0b55d93b3b8680",
+      "bytes": 4552,
+      "previousSha256": "a06a7ad7b1e328f5432a4ac9403436f87aab15427410c63cec0b55d93b3b8680",
+      "previousBytes": 4552
+    },
+    {
+      "path": "matrix.mjs",
+      "status": "UNCHANGED",
+      "sha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+      "bytes": 14253,
+      "previousSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+      "previousBytes": 14253
+    },
+    {
+      "path": "package-evidence.mjs",
+      "status": "CHANGED",
+      "sha256": "db775b6cd1df93451ffb5d874e62da02ce2a1c3a93b825ffa286e9888b0a3cf7",
+      "bytes": 6150,
+      "previousSha256": "f947dce3b3b1589c61deb43acf38d5bd9443b273b3ecfd5b42a2784fd48fc8a0",
+      "previousBytes": 6205
+    },
+    {
+      "path": "pre-request-verifier.ts",
+      "status": "UNCHANGED",
+      "sha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733",
+      "bytes": 16486,
+      "previousSha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733",
+      "previousBytes": 16486
+    },
+    {
+      "path": "run-final-controls.mjs",
+      "status": "CHANGED",
+      "sha256": "b8d65ba3added2642c086f56428689990a2057944300caacc61a48400bad6ee6",
+      "bytes": 5305,
+      "previousSha256": "9bc269a8baeb8af46d20d68d18b8f783ad16762af7d4395a13d3a0f93b92a5c1",
+      "previousBytes": 5305
+    },
+    {
+      "path": "runtime-capacity.mjs",
+      "status": "UNCHANGED",
+      "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87",
+      "bytes": 9935,
+      "previousSha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87",
+      "previousBytes": 9935
+    },
+    {
+      "path": "seal-receipt.mjs",
+      "status": "CHANGED",
+      "sha256": "2b57a98c5960af74a96f2f380e8d390864d77a5a4b31bffc96a38ef524213988",
+      "bytes": 4646,
+      "previousSha256": "51edfe5ed91e4c9f102e6be09812bba40db5ee4d51a2b1b9da0fce4e9a899d49",
+      "previousBytes": 5181
+    },
+    {
+      "path": "session-lifecycle.mjs",
+      "status": "UNCHANGED",
+      "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b",
+      "bytes": 4254,
+      "previousSha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b",
+      "previousBytes": 4254
+    },
+    {
+      "path": "verify-final-branches.ts",
+      "status": "UNCHANGED",
+      "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a",
+      "bytes": 5131,
+      "previousSha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a",
+      "previousBytes": 5131
+    },
+    {
+      "path": "verify-fix9-red.mjs",
+      "status": "NEW",
+      "sha256": "09f194ae1f401a4bbe8c0ebaa1e461e6201e93c13c22b6b8babc8129da7fc977",
+      "bytes": 1641
+    },
+    {
+      "path": "verify-guide-harness.mjs",
+      "status": "CHANGED",
+      "sha256": "5df50203619f569c08e4170485a0c566b917882c5b654d6a6282f7cdbc921a4d",
+      "bytes": 64135,
+      "previousSha256": "1161d55dc3c4583ed55769263ba627dfee78f1d07cd82b749f473f7441e32e0f",
+      "previousBytes": 62790
+    }
+  ],
+  "adapterDelta": [
+    {
+      "path": "README.md",
+      "status": "CHANGED",
+      "sha256": "e88d9df1d5dcaa9f39189a2c8515570c7c2be153f0e1fb9f790c4058e331d22b",
+      "bytes": 2077,
+      "previousSha256": "32c51f4251fefdb40394bd4be2a2efdabdec30ae4375803fcb533428201c6c34",
+      "previousBytes": 2077
+    },
+    {
+      "path": "replay-row-proofs.mjs",
+      "status": "CHANGED",
+      "sha256": "e4fd081b1b9ae136eae661169a8685254205fc36d0a6483889dc3b3413549305",
+      "bytes": 6468,
+      "previousSha256": "f65f40711faca3a8e6650fea6e8649729df0540cc0cdcdf5c4c549ef8b78c39f",
+      "previousBytes": 6468
+    },
+    {
+      "path": "reviewed-harness-custody.mjs",
+      "status": "CHANGED",
+      "sha256": "278641711328909ae2700dd54c37a68dc17ca95155e96b5d79ab933f774e3807",
+      "bytes": 1417,
+      "previousSha256": "b811ebb8c5a00677e333ffc3c4e1879bb9ad4d94351a704b0c28e3cf551fe43e",
+      "previousBytes": 1417
+    },
+    {
+      "path": "verify-negative-fixture.mjs",
+      "status": "CHANGED",
+      "sha256": "321acd8b10abdf38d84b6193e70eee05f1a35aa37b1ce9435a4d855e477d26c2",
+      "bytes": 1359,
+      "previousSha256": "d5ef8af4d319c47e3d0a2569bf9be6766f9491982fd1eaa2d2adfface58a500d",
+      "previousBytes": 1359
+    }
+  ],
+  "dispositions": {
+    "live4ActualRow43Cause": "UNKNOWN_UNAVAILABLE_NOT_PERSISTED",
+    "productPatch": false,
+    "matrixChanged": false,
+    "sourcePolicyChanged": false,
+    "navigationChanged": false,
+    "actualTraffic": false,
+    "liveRetry": false
+  }
+}

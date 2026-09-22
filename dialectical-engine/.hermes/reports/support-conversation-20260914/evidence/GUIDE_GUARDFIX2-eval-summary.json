@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_GUARDFIX2",
+  "ticket": "t_4b36bd6a",
+  "revision": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  "command": [
+    "pnpm",
+    "run",
+    "support:eval"
+  ],
+  "exitCode": 1,
+  "exitMeaning": "PENDING_INDEPENDENT_QUALITY_RUBRIC",
+  "mode": "deterministic-structural",
+  "runs": [
+    {
+      "run": 1,
+      "passed": 60,
+      "applicable": 60
+    },
+    {
+      "run": 2,
+      "passed": 60,
+      "applicable": 60
+    },
+    {
+      "run": 3,
+      "passed": 60,
+      "applicable": 60
+    }
+  ],
+  "classes": {
+    "A": {
+      "passed": 20,
+      "applicable": 20
+    },
+    "B": {
+      "passed": 6,
+      "applicable": 6
+    },
+    "C": {
+      "passed": 10,
+      "applicable": 10
+    },
+    "D": {
+      "passed": 12,
+      "applicable": 12
+    },
+    "E": {
+      "passed": 6,
+      "applicable": 6
+    },
+    "F": {
+      "passed": 3,
+      "applicable": 3
+    },
+    "G": {
+      "passed": 3,
+      "applicable": 3
+    }
+  },
+  "realFirstToken": "NOT_APPLICABLE",
+  "rubric": "PENDING",
+  "log": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_GUARDFIX2-eval.log",
+    "sha256": "063e814c6ae397cb6ccd1384221e78fb806665504713dafdc71cc60442803617",
+    "bytes": 4715
+  },
+  "measuredAt": "2026-09-17T14:55:03.716640Z"
+}

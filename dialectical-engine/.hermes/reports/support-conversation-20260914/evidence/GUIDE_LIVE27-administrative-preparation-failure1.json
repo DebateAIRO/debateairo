@@ -1,0 +1,8 @@
+{
+  "at": "2026-09-21T02:11:15.740283+00:00",
+  "stage": "root preparation before ticket/freeze/dispatch",
+  "failure": "retained command contract expected as flat new manifest artifact, but is preserved through sealed input index and public operator contract",
+  "productRevision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "operationalTraffic": 0,
+  "correction": "Verify the manifest-bound input index and public operator commandContract record, retaining exact hashes; do not change implementation or review verdict."
+}

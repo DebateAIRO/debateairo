@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND15",
+  "checked": 57,
+  "present": [],
+  "futureCaptureNamespace": "GUIDE_LIVE_GUIDE15",
+  "futureScreenshots": 54,
+  "futureReceipt": "GUIDE_LIVE_GUIDE15-actual-receipt.json",
+  "futureUiProbe": "GUIDE_UI_TRANSITION_PROBE-run-LIVE8-PROBE4.json",
+  "futureUiProbeLog": "GUIDE_UI_TRANSITION_PROBE4-LIVE8.log",
+  "browserProfile": "ABSENT"
+}

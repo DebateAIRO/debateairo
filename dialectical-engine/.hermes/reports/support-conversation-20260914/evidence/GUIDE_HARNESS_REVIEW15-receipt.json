@@ -1,0 +1,194 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW15",
+  "ticket": "t_27166180",
+  "runId": 197,
+  "verdict": "PASS_BOUNDED_HYDRATION_GATE",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "reviewedOn": "2026-09-20T15:58:19.160845Z",
+  "productRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productClean": true,
+  "freezeCommit": "352f6df621e301edc6d2c8098dfc1e51cbd129fc",
+  "observedCause": {
+    "class": "HARNESS_PRE_HYDRATION_INTERACTION",
+    "establishedFor": "PROBE3_FIRST_FULL_EN_MODE_HANDSHAKE",
+    "before": {
+      "modeState": "TERRACOTTA",
+      "transitionState": "IDLE",
+      "toggleVisible": true,
+      "toggleEnabled": true,
+      "toggleHitTarget": true,
+      "privateHandlerReady": false
+    },
+    "afterReturnedClick": {
+      "modeState": "TERRACOTTA",
+      "transitionState": "IDLE",
+      "privateHandlerReady": false
+    },
+    "firstFailure": {
+      "step": "FIRST_MODE_EXPECTED_STATE",
+      "code": "GUIDE_HARNESS_FULL_MODE_EXPECTED_STATE_TIMEOUT"
+    },
+    "laterHandlerReady": true,
+    "cookieObstructionSupported": false,
+    "discriminatorActionUsed": false,
+    "repeatedFavorableSample": false,
+    "productDefectInferred": false,
+    "historicalLive7CauseClaimed": false
+  },
+  "correction": {
+    "sharedConsumers": [
+      "capture-public-guide.mjs",
+      "probe-zero-request-ui.mjs"
+    ],
+    "firstClickPrecondition": "exact mode toggle has hydrated React click handler",
+    "restorePrecondition": "expected aria-pressed state and producer transition idle",
+    "activeProducerClicksIgnored": true,
+    "publicModeTransitionStillRequired": true,
+    "forcedClick": false,
+    "retries": 0,
+    "timeoutExtended": false,
+    "sameLocaleSupportStatePreserved": true,
+    "captureSessionGroups": 5,
+    "captureSessionPlanUnchanged": true,
+    "compactOneClickRetained": true
+  },
+  "failureAttribution": {
+    "handlerPreconditionFailure": "GUIDE_HARNESS_FULL_HYDRATION_TIMEOUT",
+    "postHydrationCodes": [
+      "GUIDE_HARNESS_FULL_MODE_ACTIVATION_FAILED",
+      "GUIDE_HARNESS_FULL_MODE_EXPECTED_STATE_TIMEOUT",
+      "GUIDE_HARNESS_FULL_MODE_RESTORE_ACTIVATION_FAILED",
+      "GUIDE_HARNESS_FULL_MODE_RESTORE_STATE_TIMEOUT",
+      "GUIDE_HARNESS_FULL_LANGUAGE_ACTIVATION_FAILED",
+      "GUIDE_HARNESS_FULL_LANGUAGE_EXPECTED_STATE_TIMEOUT",
+      "GUIDE_HARNESS_FULL_FINAL_VERIFICATION_FAILED"
+    ]
+  },
+  "controlEvidence": {
+    "priorControls": 127,
+    "controls": 130,
+    "passed": 130,
+    "retainedPriorNamesAsExactPrefix": true,
+    "addedNames": [
+      "full readiness reports the exact failed interaction phase",
+      "full adapters gate the first click on hydration and each restore on transition idle",
+      "documented PROBE4 argv passes the extracted guard and stale forms reject"
+    ],
+    "orderedEightSha256": "b6162d665b60a1a35d882e41fa5b0da3259e9cb86bae32ca5d5056d320ad99d4",
+    "matrixRows": 54,
+    "matrixSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+    "preRequestVerifierSha256": "d5d6656431f93e3089c9c6751ae767b401d21f23bb90d398fa99a051af0ead39",
+    "suiteFiles": 34,
+    "adapterNegativePassed": 3,
+    "adapterNegativeTotal": 3,
+    "adapterImporterCalls": 0,
+    "adapterSuccessfulRows": 0,
+    "failedBookkeepingFrames": 3,
+    "finalControlFramePassed": true
+  },
+  "producerEvidence": {
+    "modeTransitionSha256": "5b433d669da6e13d49489aa3bf040c0e4fc895b96cec64bbd673540dbbd1ee3b",
+    "modeToggleSha256": "ddcb31e0c25fbc2e7c52e14b414a7edc522b29884f61f4f41d7870f8a590669b"
+  },
+  "preparedProbe4": {
+    "argv": [
+      "node",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND15/probe-zero-request-ui.mjs",
+      "152eed4da1cd3e66b74d8301159ba76427552409",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE-run-LIVE8-PROBE4.json"
+    ],
+    "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "outputPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE-run-LIVE8-PROBE4.json",
+    "logPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_UI_TRANSITION_PROBE4-LIVE8.log",
+    "childStatusPreservedBy": "direct stdout/stderr redirection without tee",
+    "scriptSha256": "d6ce905b822bf5913a4ca4fe8aeaa2cdb9abbf8f1b979995c5c4e6730475a412",
+    "pinnedExecutablePresent": true,
+    "outputAbsent": true,
+    "logAbsent": true,
+    "argumentGuardPassed": 5,
+    "argumentGuardTotal": 5,
+    "rejected": [
+      "old PROBE2 basename",
+      "wrong root",
+      "extra argument",
+      "malformed revision"
+    ],
+    "executed": false
+  },
+  "retainedDispositions": {
+    "final9Binding": "PASS RETAINED",
+    "suite34": "PASS RETAINED",
+    "matrix54": "BYTE IDENTICAL",
+    "sourceOutcomeActionApiDom": "PASS RETAINED",
+    "privacyCredential": "PASS RETAINED",
+    "sessionPacingCapacityNavigation": "PASS RETAINED",
+    "exactCaseListBlocking": "PASS RETAINED",
+    "syntheticSupportResponses": 0,
+    "forgot": "UNRESOLVED_ACTIONLESS"
+  },
+  "custody": {
+    "reviewInputs": 106,
+    "reviewInputMismatches": 0,
+    "authorInputs": 82,
+    "authorArtifacts": 39,
+    "futureOutputsCheckedAbsent": 57
+  },
+  "artifacts": [
+    {
+      "role": "report",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW15.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW15.md",
+      "sha256": "0654240704aff6698eeba6353e94788b2b0e8f166b4bf8dd40cce9501d51ed4f",
+      "bytes": 7116
+    },
+    {
+      "role": "selfReport",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW15.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW15.md",
+      "sha256": "61c6e0ec5de391e1918670813c086317e2ebd3881eb80520ea57415af3e4cbfa",
+      "bytes": 3744
+    },
+    {
+      "role": "argumentCheck",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW15-argument-check.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW15-argument-check.json",
+      "sha256": "ad90c2cd0be71fdb6ce91afc9f311c8ec70e1dcf868941bb57bfcd8a35e6b7c6",
+      "bytes": 3425
+    },
+    {
+      "role": "staticCustody",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW15-static-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW15-static-custody.json",
+      "sha256": "425583813000762a110034270d4e3cb89571bfef2df4fb00c8487a98060d8dc1",
+      "bytes": 2892
+    }
+  ],
+  "limits": {
+    "staticReview": true,
+    "inertArgumentChecks": 5,
+    "diagnosticWasAuthorInput": true,
+    "probe4Run": false,
+    "browser": false,
+    "runtime": false,
+    "http": false,
+    "database": false,
+    "status": false,
+    "capacity": false,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "productWrites": false,
+    "gitWrites": false,
+    "harnessWrites": false,
+    "testabilityClaimed": false,
+    "readinessClaimed": false,
+    "acceptanceClaimed": false,
+    "cp1": "INCOMPLETE",
+    "cp2": "GATED"
+  },
+  "selfExclusion": "This receipt excludes itself from artifacts and custody hashes."
+}

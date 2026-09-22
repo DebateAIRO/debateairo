@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_REVIEW28",
+  "ticket": "t_2ff58f09",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "freeze": "e1fd6f6d882e463b98d3cffab9f61009f50fa1bc",
+  "fix28Receipt": {
+    "sha256": "132cc735100d73dd3a556cd17a8d26d81a91b91091c1e1478d263fa90cee9c16",
+    "bytes": 8088
+  },
+  "fix28Consumption": {
+    "sha256": "ff9d09d6cad4a22f0d438c03bb40c782142604e880743498fa7495173624a58f",
+    "bytes": 38724
+  },
+  "manifest": {
+    "artifacts": 25,
+    "verified": 25,
+    "mismatches": 0
+  },
+  "receiptArtifacts": {
+    "artifacts": 26,
+    "verified": 26,
+    "mismatches": 0
+  },
+  "indexedInputs": {
+    "inputs": 130,
+    "verified": 130,
+    "mismatches": 0
+  },
+  "commandContract": {
+    "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_FIX27-command-contract.json",
+    "sha256": "04512905c4f1b224a5ed1b8249fc0484650ed06ee3519bcec7f90db9ba15bc7a",
+    "bytes": 10166,
+    "selfBoundPhases": 7
+  },
+  "operatorContract": {
+    "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_FIX28-operator-contract.json",
+    "sha256": "37ed60d1022dfeb97ec4ecb2939eaeac7ddcf515aec5d71c164857237dc3f186",
+    "bytes": 25044
+  },
+  "operator": {
+    "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_OPERATOR_FIX28/run-operator.mjs",
+    "sha256": "82eb5e1aa7c24c42d457e02ccd0c313d97c848bcab2ba4ef74e852377676c292",
+    "bytes": 10675,
+    "invocationTimeAbsencePaths": 123,
+    "sealedRequiredAbsencePaths": 123,
+    "uniquePaths": 123,
+    "addedByFix28": [
+      ".hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-LIVE25.json",
+      ".hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE25-owner-testability.json"
+    ]
+  },
+  "proofs": {
+    "focused": {
+      "sha256": "92fba67ea676305d614357bb2709d938816293b9cc242a34b380e934ff082f58",
+      "bytes": 5298,
+      "passed": 20,
+      "total": 20
+    },
+    "binding": {
+      "sha256": "edd73a5c05849a728a6862ff9eb385eb924c3981ebb741764a243b255f37b6d5",
+      "bytes": 3553,
+      "passed": 30,
+      "total": 30
+    }
+  },
+  "reviewMode": "STATIC_READ_ONLY",
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

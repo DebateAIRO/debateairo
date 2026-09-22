@@ -1,0 +1,63 @@
+{
+  "base": "163f15c59bcfb1bf2cb0979f8b0e7d414ebd0703",
+  "clean": true,
+  "knowledgeReceipt": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/IDENTITY_ATTEST-receipt.json",
+    "sha256": "770359de45910567acfc980fa959424c659f629dc97db514726b7fadd01d70d8"
+  },
+  "kbFiles": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/recovery/components.json",
+      "sha256": "8934293e862387fd3e6e83527780640e8497bdc50704854e43eb1d2db24fcae6",
+      "bytes": 31857
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/reviews/manifest.json",
+      "sha256": "8e0057f4091d5cae733ddafd92527d1f02144834a78a8724c37cc99672ca3951",
+      "bytes": 38174
+    }
+  ],
+  "writePaths": [
+    "apps/ui/components/support/Assistant.tsx",
+    "apps/ui/components/support/SupportWidget.tsx",
+    "apps/ui/components/support/DebatePicker.tsx",
+    "apps/ui/components/support/ConsentToggle.tsx",
+    "apps/api/src/support/index.ts",
+    "apps/api/src/support/public-guide-boundary.ts",
+    "apps/api/src/support/own-context.ts",
+    "apps/api/src/support/session.ts",
+    "apps/api/src/support/tools.ts",
+    "apps/api/src/support/templates.ts",
+    "apps/api/src/main.ts",
+    "apps/api/src/index.ts",
+    "packages/db/src/support.ts",
+    "packages/db/src/index.ts",
+    "packages/contract/src/index.ts",
+    "tests/render/sup-01-help.test.tsx",
+    "tests/render/sup-03-consent.test.tsx",
+    "tests/render/sup-04-widget.test.tsx",
+    "tests/unit/support-public-guide-boundary.test.ts",
+    "tests/integration/support-own-context.test.ts",
+    "tests/integration/support-routes.test.ts",
+    "tests/architecture/sup-01-boundary.test.ts",
+    "tests/architecture/sup-03-projection.test.ts",
+    "tests/unit/s7-authorization.test.ts",
+    "tests/integration/support-shred.test.ts",
+    "tests/support-eval/run.ts",
+    "tests/support-eval/cases/sup-e-01.json",
+    "tests/support-eval/cases/sup-e-02.json",
+    "tests/support-eval/cases/sup-e-03.json",
+    "tests/support-eval/cases/sup-e-04.json",
+    "tests/support-eval/cases/sup-e-05.json",
+    "tests/support-eval/cases/sup-e-06.json"
+  ],
+  "newFiles": [
+    "apps/api/src/support/public-guide-boundary.ts",
+    "tests/unit/support-public-guide-boundary.test.ts"
+  ],
+  "planSection": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PLAN-PUBLIC-GUIDE-v2.md",
+    "start": 50,
+    "end": 137
+  }
+}

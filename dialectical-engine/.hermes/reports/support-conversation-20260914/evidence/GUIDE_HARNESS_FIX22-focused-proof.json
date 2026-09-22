@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX22",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "result": "PASS",
+  "controls": 14,
+  "passed": 14,
+  "names": [
+    "fresh row provenance is GUIDE21",
+    "control proof labels are GUIDE21",
+    "binding proof labels are GUIDE21",
+    "existing owner output rejects before readers",
+    "collision preserves existing bytes",
+    "failed read preserves fixed finite artifact",
+    "owner output is bound into preflight absence set",
+    "actual owner output remains absent",
+    "actual owner output remains absent",
+    "capture child uses FIX22 corrected source",
+    "preflight phase uses FIX22 absence consumer",
+    "LIVE21 namespaces remain unchanged",
+    "Runtime7 custody and LIVE20 private log retained",
+    "screenshot successor retained by hash"
+  ],
+  "retained": {
+    "full58Sha256": "79b065500d0f177016d0e82d83d731bf0bda763f5c86c927e5ab1e31b0273759",
+    "screenshotSha256": "696dc176b7a6e1bbd6f5c8b5714bbf2519c7be7809af5fda8f45ca3f085a0b7c"
+  },
+  "traffic": {
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

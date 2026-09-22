@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "revision": "c683a0c752553fe2b4e226bc3f70879ce2460b74",
+  "command": "pnpm exec vitest run tests/unit/support-response-policy.test.ts tests/unit/support-answer-context.test.ts tests/integration/support-routes.test.ts --maxWorkers=1",
+  "files": [
+    "tests/unit/support-response-policy.test.ts",
+    "tests/unit/support-answer-context.test.ts",
+    "tests/integration/support-routes.test.ts"
+  ],
+  "result": {
+    "filesPassed": 3,
+    "testsPassed": 480,
+    "failed": 0,
+    "exitCode": 0
+  },
+  "log": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_FINANCIAL_FALLBACK_FIX-affected-final.log",
+    "sha256": "fca262c6eb4d7d9d8819d60c59dfbff62c04ec8971f6f63fa2ce845319ee90e0",
+    "bytes": 96453
+  }
+}

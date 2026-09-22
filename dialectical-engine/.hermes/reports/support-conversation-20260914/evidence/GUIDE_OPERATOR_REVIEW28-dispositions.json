@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_REVIEW28",
+  "ticket": "t_2ff58f09",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "verdict": "PASS_OPERATOR_COMPLETE_ABSENCE_SET_FINAL_BINDING",
+  "dispositions": [
+    {
+      "id": "GO28-C1",
+      "subject": "row-proof result absence",
+      "disposition": "PASS",
+      "evidence": "The real operator includes contract.phases.rowProof.result, and a pre-existing result rejects before preflight wrapper or sentinel execution."
+    },
+    {
+      "id": "GO28-C2",
+      "subject": "owner-testability absence",
+      "disposition": "PASS",
+      "evidence": "The real operator includes GUIDE_LIVE25-owner-testability.json, and a pre-existing output rejects before preflight wrapper or sentinel execution."
+    },
+    {
+      "id": "GO28-C3",
+      "subject": "complete invocation-time absence set",
+      "disposition": "PASS",
+      "evidence": "Operator and public contract bind 123 distinct future paths; addedByFix28 is exactly the two REVIEW27 omissions."
+    },
+    {
+      "id": "GO28-C4",
+      "subject": "focused controls",
+      "disposition": "PASS",
+      "evidence": "20/20: all 18 FIX27 controls retained plus two discriminating preexistence negatives."
+    },
+    {
+      "id": "GO28-C5",
+      "subject": "final reusable operator contract",
+      "disposition": "PASS",
+      "evidence": "Exact node --import tsx argv binds FIX28 operator SHA 82eb5e1a and unchanged FIX27 command SHA 04512905."
+    },
+    {
+      "id": "GO28-C6",
+      "subject": "binding controls",
+      "disposition": "PASS",
+      "evidence": "30/30 controls bind cwd, argv, seven phase self paths, exact delta, syntax, hashes and 123 unique absent paths."
+    },
+    {
+      "id": "GO28-C7",
+      "subject": "retained operator behavior and namespaces",
+      "disposition": "PASS_RETAINED",
+      "evidence": "FIX27 loader, phase order, distinct log ownership, numeric failure, stop-first behavior and every runtime/output namespace remain unchanged."
+    },
+    {
+      "id": "GO28-C8",
+      "subject": "future LIVE27 launch composition",
+      "disposition": "PASS_WITH_LAUNCH_CONDITION",
+      "evidence": "Invoke the sealed argv directly with tool-captured stdout/stderr; do not pre-open or redirect into operator-owned artifacts."
+    },
+    {
+      "id": "GO28-L1",
+      "subject": "runtime and readiness",
+      "disposition": "NOT_ESTABLISHED",
+      "evidence": "Static review only; current capacity, actual31, owner capacity, live capture, readiness, completion and acceptance remain pending."
+    },
+    {
+      "id": "GO28-L2",
+      "subject": "Forgot and CP2",
+      "disposition": "UNRESOLVED_ACTIONLESS",
+      "evidence": "No destination is inferred and no CP2 authorization follows."
+    }
+  ],
+  "hashes": {
+    "finalCommandContract": "04512905c4f1b224a5ed1b8249fc0484650ed06ee3519bcec7f90db9ba15bc7a",
+    "operatorContract": "37ed60d1022dfeb97ec4ecb2939eaeac7ddcf515aec5d71c164857237dc3f186",
+    "controlProof": "92fba67ea676305d614357bb2709d938816293b9cc242a34b380e934ff082f58",
+    "bindingProof": "edd73a5c05849a728a6862ff9eb385eb924c3981ebb741764a243b255f37b6d5",
+    "operatorScript": "82eb5e1aa7c24c42d457e02ccd0c313d97c848bcab2ba4ef74e852377676c292",
+    "fix28Receipt": "132cc735100d73dd3a556cd17a8d26d81a91b91091c1e1478d263fa90cee9c16",
+    "fix28Consumption": "ff9d09d6cad4a22f0d438c03bb40c782142604e880743498fa7495173624a58f"
+  },
+  "counts": {
+    "focusedPassed": 20,
+    "focusedTotal": 20,
+    "bindingPassed": 30,
+    "bindingTotal": 30,
+    "phasesSelfBound": 7,
+    "phasesTotal": 7,
+    "operatorRuntimeAbsencePaths": 123,
+    "sealedRequiredAbsencePaths": 123,
+    "manifestVerified": 25,
+    "manifestTotal": 25,
+    "receiptArtifactsVerified": 26,
+    "receiptArtifactsTotal": 26,
+    "inputsVerified": 130,
+    "inputsTotal": 130,
+    "remainingFindings": 0
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

@@ -1,0 +1,79 @@
+[
+  {
+    "key": "PROCESS_BASE_ARGV",
+    "title": "BASE packet omitted executable baseline frame",
+    "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/BASE.md",
+    "reference": "BASE.md Finding 1",
+    "body": "Future BASE packets must embed exact argv, expected suite frame, cwd, locale and log paths. Current mission recovered the 6-file command and captured it; nonblocking process residue."
+  },
+  {
+    "key": "PROCESS_DEPS",
+    "title": "Dependency-clone recipe was underspecified",
+    "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/BASE.md",
+    "reference": "BASE.md Finding 2",
+    "body": "Future lane preparation should freeze APFS copy recipe and bounded workspace list plus symlink resolution proof. Current mission has isolated dependencies and 1108/1108 verified symlinks."
+  },
+  {
+    "key": "PROCESS_SANDBOX",
+    "title": "Known tsx IPC and board-lock sandbox boundaries cause retries",
+    "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/BASE.md",
+    "reference": "BASE.md Finding 3; REQ.md Dead ends",
+    "body": "Document ordinary escalation for captured tsx IPC and Hermes initialization locks on this host; never patch product behavior for execution policy. Current retries succeeded and logs retained."
+  },
+  {
+    "key": "PROCESS_ROLES",
+    "title": "Baseline and investigation role contracts are missing",
+    "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/BASE.md",
+    "reference": "BASE.md Finding 4; PREVIEW.md packet defect",
+    "body": "Define bounded baseline/investigation floors in future protocol work. Current packets name explicit skills and scope. No generic protocol changes in this feature mission."
+  },
+  {
+    "key": "PROCESS_STATE",
+    "title": "Hermes has no replace-comment API for canonical STATE",
+    "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/ASTRA.md",
+    "reference": "ASTRA.md Board tooling",
+    "body": "Provide atomic canonical-state update API in future tooling work. Current scoped CAS helper preserves one STATE and before/after journal without changing status/dependencies."
+  },
+  {
+    "key": "PROCESS_READ_FLOOR",
+    "title": "Legacy wrappers and broad reads inflate context",
+    "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/ASTRA.md",
+    "reference": "ASTRA.md Cause of intake overhead",
+    "body": "Direct future packets to current v4 roles and named ranges; keep archival spine for concrete disputes. Current COMMON applies this route; measure unavailable token totals honestly."
+  },
+  {
+    "key": "PROCESS_DESTINATION",
+    "title": "External navigation intent needs explicit target identity",
+    "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FIND.md",
+    "reference": "FIND.md What should improve 1 and Packet clarity",
+    "body": "Represent existing external destinations by origin/path-or-opener/audience and target identity. Product dependency is already DEST t_979fe293, owner question pending; this process residue does not invent target."
+  },
+  {
+    "key": "PROCESS_RUNTIME_RECEIPT",
+    "title": "Runtime route inventory should be durable",
+    "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FIND.md",
+    "reference": "FIND.md What should improve 4",
+    "body": "Future read-only runtime inspections should persist route/control inventory automatically. Current FIND receipt records three inspected surfaces without credential submission."
+  },
+  {
+    "key": "PROCESS_FREEZE_PACKET",
+    "title": "FREEZE packet enumeration and evidence markers were indirect",
+    "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FREEZE.md",
+    "reference": "FREEZE.md Findings",
+    "body": "Future freeze packet should enumerate each exact input and every exclusion/receipt path with new markers. Current 24-file freeze independently verified hashes and exclusions."
+  },
+  {
+    "key": "PROCESS_SHELL_NAMES",
+    "title": "zsh special variable caused discarded verification attempt",
+    "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FREEZE.md",
+    "reference": "FREEZE.md Content verification",
+    "body": "Use task-specific file_path names instead of zsh path. Faulty verifier was read-only; corrected run proved 24/24. Current protocol already prohibits common system variables."
+  },
+  {
+    "key": "PROCESS_PACKET_RESULT",
+    "title": "Packet checker misread slash prose and dispatch receipt preceded result inspection",
+    "evidence": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/ASTRA.md",
+    "reference": "ASTRA.md living record",
+    "body": "Checker interpreted /private-status/human prose as missing path. Root corrected prose and board premature PASS statement, reran successfully before actual dispatch. Future orchestration must branch on exit_code before recording PASS."
+  }
+]

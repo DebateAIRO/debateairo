@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "productRoot": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "finalCommit": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productInventoryPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_GUIDE_FINAL9-manifest.json",
+  "productInventorySha256": "f2397d8f0bd4d083de7a308c8e1aba17e62fa4a359ddce47b4ef752c4b136a3b",
+  "attestationPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX-snapshot-receipt.json",
+  "attestationSha256": "3d1a19190c51d21866c974bfa0a9e0a756ee248046611365c76a6348df5b4113",
+  "expectedSnapshotVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "expectedEntryCount": 44,
+  "requiredSuiteReceiptPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX-required-suites.json",
+  "requiredSuiteReceiptSha256": "88da3785918ef2657311c4db75b5122d904548f6a9ffbcd7e357614bb15ba7c1",
+  "controlProofPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND16-control-proof.json",
+  "controlProofSha256": "ab588f4ca9cac7825036fe443d06cc0ce728c1d7efeca7d14fea66686a20d2d1",
+  "runtimeLogPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE7-stack.log",
+  "baseUrl": "https://localhost:3100",
+  "forgotConnector": {
+    "status": "UNRESOLVED_ACTIONLESS"
+  },
+  "runtimeCapacityPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE8-runtime-capacity.json",
+  "runtimeCapacitySha256": "fe1f153259f6ae176482213c2a345785d637cde7bb3f24825427224187ac5db7"
+}

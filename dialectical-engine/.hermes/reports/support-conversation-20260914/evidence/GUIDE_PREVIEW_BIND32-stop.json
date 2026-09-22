@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "stoppedAt": "2026-09-21T06:47:52.024Z",
+  "pid": 12272,
+  "processGroup": 12272,
+  "signal": "SIGTERM",
+  "scope": "VERIFIED_OWNED_PROCESS_GROUP",
+  "supervisorExited": true,
+  "transientRemaining": [],
+  "reusableDataPlane": [
+    {
+      "pid": 19920,
+      "command": "com.docker.backend",
+      "port": 7177
+    },
+    {
+      "pid": 19920,
+      "command": "com.docker.backend",
+      "port": 8988
+    },
+    {
+      "pid": 19920,
+      "command": "com.docker.backend",
+      "port": 55433
+    }
+  ],
+  "unrelatedListenersPreserved": [
+    {
+      "pid": 1142,
+      "command": "rapportd",
+      "port": 51966
+    },
+    {
+      "pid": 1142,
+      "command": "rapportd",
+      "port": 51966
+    },
+    {
+      "pid": 1205,
+      "command": "ControlCenter",
+      "port": 7000
+    },
+    {
+      "pid": 1205,
+      "command": "ControlCenter",
+      "port": 7000
+    },
+    {
+      "pid": 1205,
+      "command": "ControlCenter",
+      "port": 5000
+    },
+    {
+      "pid": 1205,
+      "command": "ControlCenter",
+      "port": 5000
+    },
+    {
+      "pid": 1682,
+      "command": "node",
+      "port": 9797
+    },
+    {
+      "pid": 1698,
+      "command": "Ollama",
+      "port": 49251
+    },
+    {
+      "pid": 1719,
+      "command": "ollama",
+      "port": 11434
+    }
+  ]
+}

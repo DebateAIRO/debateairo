@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_ROW_PROOF",
+  "ticket": "t_23ec7294",
+  "session": "/root/preview",
+  "immutableReference": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  "verdict": "PREPARED_NOT_EXECUTED",
+  "traffic": {
+    "adapterExecutions": 0,
+    "runtimeReads": 0,
+    "httpRequests": 0,
+    "databaseReads": 0,
+    "browserStarts": 0,
+    "sessionsCreated": 0,
+    "supportRequests": 0,
+    "modelRequests": 0
+  },
+  "bindings": {
+    "matrixCount": 54,
+    "matrixSha256": "cea34112498143dcf8b1a571e40e5a24d207b5b47ee9b142048506cc773ca1ae",
+    "verifierSha256": "a123d265d2070d9ef5929dd30bb752b826412e42b5091c68e4806b276b37a402",
+    "harnessSha256": "f8f2935965cd59b893ab02848cd9db17eeb71fa423f5620b61479e6647ae4917",
+    "perRowSuccessCode": "GUIDE_ROW_PROOF_PASS",
+    "allRowsSuccessCode": "GUIDE_ROW_PROOF_ALL_ROWS_PASS",
+    "failureProjection": "SAFE_FIXED_FIRST_CONSTRUCTOR_CODE_WITH_EMPTY_ROWS"
+  },
+  "futureExecutionPrerequisites": {
+    "newExactRevisionGate": true,
+    "exactProductInventory": true,
+    "exactSnapshotAttestation": true,
+    "successfulExact33SuiteReceipt": true,
+    "schema2HarnessControlProof": true,
+    "cleanProductCustody": true,
+    "reviewed44EntryCorpus": true,
+    "freshCountsOnlyCapacity": true,
+    "capacityMaxAgeMs": 120000,
+    "sameGateRequiredForCapture": true,
+    "staleGateSuccessAllowed": false,
+    "clockOverrideAllowed": false
+  },
+  "noTrafficBoundary": "The adapter imports the sealed matrix and verifier only; it does not import capture-public-guide.mjs, Playwright, browser profiles, session lifecycle, HTTP/DB readers, or model clients.",
+  "boardTransport": {
+    "workerReadResult": "BLOCKED",
+    "code": "EPERM_INIT_LOCK",
+    "rootPersistedClaim": true
+  },
+  "skillsLoaded": [
+    "superpowers:using-superpowers",
+    "repository heartbeat-protocol",
+    "repository heartbeat-worker",
+    "superpowers:receiving-code-review",
+    "superpowers:systematic-debugging",
+    "superpowers:test-driven-development",
+    "superpowers:verification-before-completion"
+  ],
+  "artifacts": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF/replay-row-proofs.mjs",
+      "sha256": "0ef7c5168af426c9c87572fc52110b5a0ad40ac0bf35a7638e80c9cb294039d7",
+      "bytes": 5333
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF/README.md",
+      "sha256": "8b6fb6d04c9b87882ecc713845b1ae91e4c3dc31d62f845d1a9c69c79cf5b843",
+      "bytes": 3753
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF.md",
+      "sha256": "f989379885cab928210a486e507a379b7f43b35dccc877d35067564d807120ca",
+      "bytes": 3519
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_ROW_PROOF.md",
+      "sha256": "5e26590596a53ec3c74f7b0d2415a99cedcd9fd5263db2acc69c6d7fe5875359",
+      "bytes": 2566
+    }
+  ],
+  "receiptExcludesItself": true,
+  "usage": "UNAVAILABLE"
+}

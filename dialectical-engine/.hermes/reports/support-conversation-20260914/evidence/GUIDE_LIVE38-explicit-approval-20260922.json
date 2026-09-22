@@ -1,0 +1,26 @@
+{
+  "at": "2026-09-22T07:49:49.716070+00:00",
+  "node": "GUIDE_LIVE38",
+  "ticket": "t_8d677c9a",
+  "userMessage": "Approved",
+  "authority": "Latest direct user response to the bounded final LIVE38 approval request",
+  "approvedScope": "I explicitly approve one execution of the sealed GUIDE_LIVE38 operator from the reviewed product worktree. It may send exactly the listed 20 public Support prompts across three sessions, including up to 17 paid external model requests to the configured Z.AI/GLM model z-ai/glm-5.3-flash, and create the reviewed local evidence/screenshots. No retries, resampling, startup, account recovery, credential exposure, or additional prompts are authorized.",
+  "priorRejection": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE38-approval-rejection.json",
+    "sha256": "7b714cdf95103192373d902467a8b6a10a302802f566802af475c9709ae40da5",
+    "bytes": 6685
+  },
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "operatorMetadata": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_CWD_BIND50-operator-contract.json",
+    "sha256": "545bf330bb4651cf81bc143755427912d198cc859a4891aa91d0e228cd07116c",
+    "bytes": 22734
+  },
+  "commandContract": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREFLIGHT_SCHEMA_FIX49-command-contract.json",
+    "sha256": "1be2c74d25dbf4fd45f72fb1360f06836547e868b7b19993e17a0f949fcbd7e6",
+    "bytes": 48358
+  },
+  "startupAuthorized": false,
+  "retryAuthorized": false
+}

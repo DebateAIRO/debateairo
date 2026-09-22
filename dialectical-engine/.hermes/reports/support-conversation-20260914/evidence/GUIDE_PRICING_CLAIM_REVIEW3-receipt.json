@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PRICING_CLAIM_REVIEW3",
+  "ticket": "t_39dbe68c",
+  "revision": "8cdb75d75055ccb41b6325da23bf233b24e2614b",
+  "baseRevision": "130adf47da2e889005e73c3adb7ebb49fd50b529",
+  "verdict": "REWORK_BOUNDED_FINANCIAL_SUFFIX_CONSTRUCTION",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_PRICING_CLAIM_REVIEW3.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_PRICING_CLAIM_REVIEW3.md",
+      "sha256": "a3dd87ca1c07bb1766205ee9e6c2bc952388feadbf5bd454c0168cc4fb26db8d",
+      "bytes": 4567
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_REVIEW3-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_REVIEW3-dispositions.json",
+      "sha256": "8e1203d413db18451a671976413e12859fd921a58b8716c1ea241b58f583d567",
+      "bytes": 3970
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_REVIEW3-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_PRICING_CLAIM_REVIEW3-custody.json",
+      "sha256": "b09769ca6352dda547937b8a54fc079e2ec650b078ffe2c24977aa40173b3b89",
+      "bytes": 1395
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PRICING_CLAIM_REVIEW3.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PRICING_CLAIM_REVIEW3.md",
+      "sha256": "6fbc4faf3cd7c3fe6b2d6d8ebbd6af144b863ae3cecd930b62b030a495810bfb",
+      "bytes": 2757
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "heavyLeaseHeld": false,
+  "finding": "Bare after-subject negation operators admit positive not-only/not-merely/nu-este-doar financial capability constructions.",
+  "deterministicFallback": {
+    "supported": true,
+    "contractObstacleFound": false,
+    "evidence": "Existing full44 service and real POST tests prove rejected financial drafts return useful reviewed app-navigation guidance with no action and correct accounting."
+  },
+  "retained": [
+    "Both mixed-predicate orderings and required direct/modal negatives are covered.",
+    "Exact LIVE28, full44 service and real POST recovery/accounting evidence remains valid.",
+    "Screenshot30 complete full-answer capture remains PASS."
+  ]
+}

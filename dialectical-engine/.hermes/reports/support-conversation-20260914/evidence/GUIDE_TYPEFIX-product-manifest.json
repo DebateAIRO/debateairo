@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_TYPEFIX",
+  "ticket": "t_a8d71466",
+  "baseRevision": "8fb8e407b350f9950cdb27a0f4caaf8e178d7cb6",
+  "finalRevision": "c34c64d4e643e404cefe96dfaf167536ae364a94",
+  "productFiles": [
+    {
+      "laneRelative": "apps/api/src/support/recovery-intent.ts",
+      "sha256": "c3cda8dcd5764c84e8b56dffb99f883eb92b1a1a42eb3aaa514b7133e1e624ab",
+      "bytes": 7835
+    },
+    {
+      "laneRelative": "tests/architecture/sup-03-projection.test.ts",
+      "sha256": "4b64677b9f1032a95d6af199173611eba2edb701d91bbcd0875ac604dc41ee79",
+      "bytes": 1420
+    },
+    {
+      "laneRelative": "tests/architecture/support-catalog-coverage.test.ts",
+      "sha256": "0914c392280d4e5c31a8ebc2dfa2a38bf3c87594b114cf9df38906a4608207c1",
+      "bytes": 5415
+    },
+    {
+      "laneRelative": "tests/integration/support-routes.test.ts",
+      "sha256": "b721bf759c6353bee83388cec8f41a201ed9df81fb4cf8623a8f77b070c19fe4",
+      "bytes": 133738
+    },
+    {
+      "laneRelative": "tests/unit/support-context.test.ts",
+      "sha256": "c15afc15ec276d9735c2f1cc8001ef5b09279e3dcda01e9139f1b96d252f2cd2",
+      "bytes": 24265
+    },
+    {
+      "laneRelative": "tests/unit/support-recovery-intent.test.ts",
+      "sha256": "d24e84b37747d21a300df9c2bf772a17c4b67c1532ab7e922aa5f5cc1249ecaf",
+      "bytes": 5904
+    }
+  ],
+  "scopeExact": true,
+  "clean": true,
+  "measuredAt": "2026-09-17T13:28:06.456Z"
+}

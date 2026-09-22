@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_QUALITY_REVIEW",
+  "ticket": "t_62335359",
+  "revision": "6cbe0e7ad18b20eca35876f4a91478cfbba82307",
+  "reviewedOn": "2026-09-20T18:58:31Z",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "verdict": "PASS_STATIC_CUSTODY",
+  "inputManifest": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-inputs.json",
+    "sha256": "e12366cf47ea43d471172d2f194ed1716e4a9984a18cd78be5063448f36b1722",
+    "bytes": 19148
+  },
+  "inputCount": 65,
+  "exactMatches": 65,
+  "mismatches": 0,
+  "productCheckout": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "head": "6cbe0e7ad18b20eca35876f4a91478cfbba82307",
+    "porcelainEntries": 0
+  },
+  "authorReceipt": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_FIX-receipt.json",
+    "sha256": "e109ad67195cd0944517908e8850530aea010bfdab0e8a0664fdfbb92f90b54b",
+    "bytes": 9336
+  },
+  "authorConsumption": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_FIX-consumption.json",
+    "sha256": "62d72d0712a973078aaba54f177c341a9d35aaa198d4baca8df33614a86504a4",
+    "bytes": 46132
+  },
+  "existingMetadata": {
+    "components": {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/recovery/components.json",
+      "sha256": "0c06363ee4409efe96807786ad96ed73e46659481f61c56e957eeb340fff3b94",
+      "bytes": 39738
+    },
+    "reviewManifest": {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/reviews/manifest.json",
+      "sha256": "6df66c5c9cdecde4a6eb2f38c6da2659310581b55f3bec130451040aa4c66849",
+      "bytes": 45127
+    }
+  },
+  "limits": [
+    "Read-only static review; no new test or execution.",
+    "Existing metadata intentionally binds prior bytes; mechanical attestation remains pending."
+  ]
+}

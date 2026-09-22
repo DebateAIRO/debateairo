@@ -1,0 +1,51 @@
+{
+  "at": "2026-09-17T07:15:01.552028+00:00",
+  "node": "RECOVERY_DELTA",
+  "ticket": "t_33197c7c",
+  "revision": "475c5a7e7eb8f48a3f5a81379f37b49fdd014ce9",
+  "verdict": "DIAGNOSTIC_EVIDENCE_CONSUMED",
+  "immutableReferences": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/RECOVERY_DELTA-cua.json",
+      "sha256": "3816effa9fde20d15a42121f6c57512188b5070d0f469fee1aead31434f99a08",
+      "bytes": 418
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/RECOVERY_DELTA-liveness.txt",
+      "sha256": "195b85d9a83142cbabc76cd88df23a8ea620ca482bda76bb678e2bb91343012c",
+      "bytes": 219
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/RECOVERY_DELTA.md",
+      "sha256": "3d7d8a0efc063b4337b4ad373d007bc47416b0168d083c2ef10fcee45c330ba5",
+      "bytes": 5044
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/RECOVERY_DELTA.md",
+      "sha256": "0c90f75bbd91114943a04fea3ef01616ceb62b18d798d09e82d61df3377f0199",
+      "bytes": 4373
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/RECOVERY_DELTA-custody.txt",
+      "sha256": "ed5ca52270c3c1b3b3e09505c3b50e69b7654209460981170e53f2145649f3b9",
+      "bytes": 685
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/RECOVERY_DELTA-receipt.json",
+      "sha256": "5c806a672474f713d5648a9b0b36d6b524e35e20d2e6d2449ae1a59fa8c028af",
+      "bytes": 2566
+    }
+  ],
+  "primaryClean": true,
+  "retainedNativeSkillBodyProof": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIND_CURRENT-consumption.json",
+    "sha256": "be7a4e24bc4e0bbee94bdf68dbc36135a29453003251392dd6f3ad6665b58e99",
+    "method": "Same existing native Sol session, previously verified actual tool-output BODY reads; no new-read claim."
+  },
+  "qualifications": [
+    "Root verifies hashes/custody; Sol owns diagnostic findings.",
+    "No real model prompt was made during diagnostics.",
+    "Recovery destination remains unverified.",
+    "RECOVERY_DELTA sandbox connection refusal is superseded by separate approved process/listener/TLS200 check, not a confirmed outage."
+  ]
+}

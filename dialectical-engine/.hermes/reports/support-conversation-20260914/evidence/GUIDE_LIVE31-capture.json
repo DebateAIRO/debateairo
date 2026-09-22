@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 2,
+  "phase": "CAPTURE",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "status": 1,
+  "consumedRowProofPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-LIVE31.json",
+  "consumedRowProofSha256": "c6848ff3d302f7f77912c7876f0ce9ad337330268b2e39ad99baaa09413f7966",
+  "consumedGatePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE31-gate.json",
+  "consumedGateSha256": "67238998eb7e0308edfab7b6f61586541dbeb9323472d4759a23145fb0485b57",
+  "consumedRowCount": 58
+}

@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "node": "GUIDE_INJECTION_SERVER_DIAG",
+  "ticket": "t_2ddf3990",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "verdict": "PROVED_REACHABLE_PRODUCT_DEFECT_LIVE6_FIRST_EXCEPTION_UNOBSERVED",
+  "sealedObservation": {
+    "attempted": 15,
+    "completed": 14,
+    "failedCanonicalRow": 43,
+    "httpStatus": 500,
+    "failure": "GUIDE_HARNESS_API_OUTCOME_INVALID",
+    "unattempted": 39,
+    "unfinishedIncludingFailure": 40,
+    "exactBodyAvailable": false,
+    "diagnosticAvailable": false
+  },
+  "guaranteedDefect": {
+    "routeCalls": [
+      "apps/api/src/support/index.ts:459-465",
+      "apps/api/src/support/index.ts:584-590"
+    ],
+    "forbiddenWrite": "packages/db/src/support.ts:468-482",
+    "roleContract": [
+      "migrations/0050_support_foundation.sql:80-84",
+      "migrations/0054_support_keys_audit.sql:822-852",
+      "migrations/0054_support_keys_audit.sql:874-885",
+      "packages/db/src/support.ts:2228-2280",
+      "packages/db/src/support.ts:2310-2366",
+      "apps/api/src/main.ts:368-385",
+      "apps/api/src/main.ts:576-583"
+    ],
+    "statementPrivilegeRequiredWhenPredicateFalse": true,
+    "firstLive6ExceptionKnown": false
+  },
+  "preservedContracts": [
+    "immutable INJECTION and LOCK events",
+    "serialized admission and threshold refusal",
+    "encrypted user and assistant refusal storage",
+    "hashed-only abuse accounting",
+    "IP cooldown from LOCK events",
+    "no model transit",
+    "restricted support role with no session.state update",
+    "human-case separation"
+  ],
+  "sessionStateConsumers": [
+    {
+      "location": "packages/db/src/support.ts:284-304",
+      "disposition": "retain event-derived public read"
+    },
+    {
+      "location": "packages/db/src/support.ts:306-417",
+      "disposition": "retain immutable-count admission lock"
+    },
+    {
+      "location": "packages/db/src/support.ts:468-482",
+      "disposition": "remove forbidden mutable finalizer"
+    },
+    {
+      "location": "packages/db/src/support.ts:559-595",
+      "disposition": "retain physical lifecycle guard so threshold refusal messages store"
+    },
+    {
+      "location": "packages/db/src/support.ts:674-688",
+      "disposition": "retain case parent lifecycle guard unchanged"
+    },
+    {
+      "location": "packages/db/src/support.ts:766-783",
+      "disposition": "retain case parent lifecycle guard unchanged"
+    },
+    {
+      "location": "packages/db/src/support.ts:2000",
+      "disposition": "derive openSessions by excluding immutable LOCK events"
+    }
+  ],
+  "minimumWritePaths": [
+    "apps/api/src/support/index.ts",
+    "apps/api/src/support/session.ts",
+    "apps/api/src/main.ts",
+    "packages/db/src/support.ts",
+    "tests/support-eval/run.ts",
+    "tests/integration/support-routes.test.ts",
+    "tests/integration/support-metrics.test.ts",
+    "tests/integration/dev-database-principals.test.ts",
+    "tests/architecture/sup-01-boundary.test.ts"
+  ],
+  "regressionCommand": "TSX_DISABLE_CACHE=1 pnpm exec vitest run tests/architecture/sup-01-boundary.test.ts tests/integration/dev-database-principals.test.ts tests/integration/support-routes.test.ts tests/integration/support-metrics.test.ts --maxWorkers=1",
+  "forbiddenRemedies": [
+    "GRANT UPDATE(state)",
+    "SECURITY DEFINER or other privilege bypass",
+    "model or classifier change",
+    "raw runtime log inspection",
+    "live retry"
+  ]
+}

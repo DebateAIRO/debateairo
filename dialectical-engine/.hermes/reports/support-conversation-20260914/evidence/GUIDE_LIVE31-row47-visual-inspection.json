@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE31",
+  "sequence": 47,
+  "verdict": "PASS_PARTIAL_IMAGE_VISUAL_INSPECTION",
+  "artifact": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE23-row-47-original-pane-top.png",
+  "observed": "The complete Romanian recovery refusal body is visibly painted in the original pane. The reply contains no source or action footer; surrounding prior content and chips are visible but are not attributed to row47.",
+  "qualification": "Top-pane partial evidence only; footer and expanded images are absent."
+}

@@ -1,0 +1,10 @@
+{
+  "at": "2026-09-21T14:22:35.421140+00:00",
+  "blocker": "Explicit consent required by automatic approval review for exact paid LIVE38 capture",
+  "consecutiveGoalTurns": 2,
+  "previousTurnClassification": "progress: verified zero-launch rejection recorded and exact bounded approval requested",
+  "currentTurnClassification": "no progress: same approval absent; current clean product and missing operational outputs revalidated",
+  "safeDependentActionAvailable": false,
+  "goalStatus": "active",
+  "next": "Await explicit approval; do not execute or route around rejection. Mark goal blocked if same condition recurs on next consecutive goal turn and no independent meaningful work becomes available."
+}

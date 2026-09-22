@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW2",
+  "ticket": "t_3edc6ad2",
+  "revision": "c34c64d4e643e404cefe96dfaf167536ae364a94",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "harnessSha256": "f8f2935965cd59b893ab02848cd9db17eeb71fa423f5620b61479e6647ae4917",
+  "sourceRevision": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+  "verdict": "PASS_BOUNDED_C34_CORRECTIONS_REBIND_REQUIRED",
+  "reviewMode": "immutableGitObjects",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "agentPath": "/root/baseline",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-17T13:51:09Z",
+  "localCheckoutHead": "af02290219c734d2ad2fe7df878356fec9043b15",
+  "findingDispositions": [
+    {
+      "id": "GH-R1",
+      "disposition": "PASS",
+      "summary": "Shared reset and lifecycle checks now realize five distinct sessions and fail stale persistence or replacement at the first affected response."
+    },
+    {
+      "id": "GH-R2",
+      "disposition": "PASS",
+      "summary": "Exact schema-2 proof binds successful result to product revision, KB version, and recomputed ordered eight-file harness digest."
+    }
+  ],
+  "reviewedCode": [
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX2/capture-public-guide.mjs",
+      "sha256": "33d46c07dba0f3deab6d2cb76494cfef534e135ea7145a284dbd70f471d4479f",
+      "bytes": 18107
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX2/controls.mjs",
+      "sha256": "530c5e8e850b611945719a3563424c595c9a608fcb5a707e818f5da03284e8a3",
+      "bytes": 8812
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX2/matrix.mjs",
+      "sha256": "cea34112498143dcf8b1a571e40e5a24d207b5b47ee9b142048506cc773ca1ae",
+      "bytes": 13168
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX2/pre-request-verifier.ts",
+      "sha256": "a123d265d2070d9ef5929dd30bb752b826412e42b5091c68e4806b276b37a402",
+      "bytes": 13715
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX2/runtime-capacity.mjs",
+      "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87",
+      "bytes": 9935
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX2/session-lifecycle.mjs",
+      "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b",
+      "bytes": 4254
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX2/verify-final-branches.ts",
+      "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a",
+      "bytes": 5131
+    },
+    {
+      "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX2/verify-guide-harness.mjs",
+      "sha256": "c0f5ffb26b4d0bddc48c5ed7850ea23ff779e8026ba68f8680d997582272d320",
+      "bytes": 29210
+    }
+  ],
+  "assistantConsumer": {
+    "gitRevision": "c34c64d4e643e404cefe96dfaf167536ae364a94",
+    "path": "dialectical-engine/apps/ui/components/support/Assistant.tsx",
+    "sha256": "5921ced41c60a047a4c4e390f2e6154b99944c4ad0620433f130d58d590062b3",
+    "bytes": 35138
+  },
+  "historicalControlProof": {
+    "revision": "c34c64d4e643e404cefe96dfaf167536ae364a94",
+    "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+    "harnessSha256": "f8f2935965cd59b893ab02848cd9db17eeb71fa423f5620b61479e6647ae4917",
+    "sha256": "a604c80cf9e8f359f6801ca8b55473e9f228a451b834fe3053227b730c97febc",
+    "bytes": 3741,
+    "controls": 62,
+    "passed": 62,
+    "bindingDisposition": "historicalC34Only"
+  },
+  "requiredFutureRebind": {
+    "productRevision": "eventualCleanGuardCorrectedRevision",
+    "kbVersion": "corpusVersionAtThatRevision",
+    "harnessSha256": "f8f2935965cd59b893ab02848cd9db17eeb71fa423f5620b61479e6647ae4917",
+    "proofAction": "rerunFrozenFIX2FrameAndBindNewProofPathAndSha256BeforeLive"
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW2.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW2.md",
+      "sha256": "455a5901264be3cf051d2f4202b9e91d8728ed6d390e16c89578b16f1375fbf4",
+      "bytes": 8868
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW2.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW2.md",
+      "sha256": "f8b002f2d4f7f03e5b7d80f33403c14c40f04027d617c644f9b8ae8ffdcd773b",
+      "bytes": 3401
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW2-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW2-custody.json",
+      "sha256": "ce2df054b388bb96fbee6bcbaa6b5c0f5d1b85ff40fa82edbc3a5b1a7cc125ac",
+      "bytes": 11071
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW2-harness-manifest.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW2-harness-manifest.json",
+      "sha256": "3e23a123e7d76bd84a8059452d25e1b47efb94ce05bae6d058cb7be478d46162",
+      "bytes": 1497
+    }
+  ],
+  "limitations": [
+    "No browser, HTTP, database, Support, model, preview or runtime-capacity action occurred.",
+    "The 62/62 proof applies only to c34 and cannot evidence a later product revision.",
+    "Runtime capacity remains unobserved and is not reserved across the paced run.",
+    "Final LIVE custody must hash and seal the actual receipt and screenshot bytes.",
+    "This receipt makes no product-readiness, checkpoint-completion or owner-acceptance claim."
+  ]
+}

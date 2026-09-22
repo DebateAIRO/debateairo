@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_REVIEW38",
+  "method": "independent visual inspection of saved immutable PNG evidence",
+  "observations": [
+    {
+      "artifact": "GUIDE_CAPTURE_FIX38-final4-corrected-row23-original-pane-top.png",
+      "sha256": "5670eeb3620d266f567528bd93664c79cb12b784ca74888fb22835f3eda2faab",
+      "result": "PASS",
+      "observed": "Current Romanian export response and both source labels are completely painted in the original pane."
+    },
+    {
+      "artifact": "GUIDE_CAPTURE_FIX38-final4-corrected-row23-original-pane-footer.png",
+      "sha256": "5670eeb3620d266f567528bd93664c79cb12b784ca74888fb22835f3eda2faab",
+      "result": "PASS",
+      "observed": "Image is byte-identical to top capture, consistent with the required contained-footer no-scroll behavior."
+    },
+    {
+      "artifact": "GUIDE_CAPTURE_FIX38-final4-corrected-row23-complete-expanded.png",
+      "sha256": "98be10758b61359acc04124ab0b968f447b80ac448e705f7d48a364093c51d3d",
+      "result": "PASS",
+      "observed": "Complete current response and both source labels are visible without clipping."
+    },
+    {
+      "artifact": "GUIDE_CAPTURE_FIX38-final4-forward-original-pane-footer.png",
+      "sha256": "8b26b7058f9a540ecb1ee5f1cb587272a2d8529f592410c6d108d03f728a4986",
+      "result": "PASS",
+      "observed": "Long fixture's final lines and both source labels are painted within the pane after forward reveal."
+    },
+    {
+      "artifact": "GUIDE_CAPTURE_FIX38-final4-old-row23-original-pane-footer.png",
+      "sha256": "b3945b1ad28390a4835b20addd2015e9f69cb7ad2e968494c9d36c8e34cf850c",
+      "result": "RED_PRESERVED",
+      "observed": "Old helper moved the contained footer backward to a lower, boundary-tight view."
+    },
+    {
+      "artifact": "GUIDE_CAPTURE_FIX38-final4-impossible-original-pane-top.png",
+      "sha256": "f8697ee57c329a5886b9bc5d15ad4fd47fe6491d97cc1805a06fb322ada90239",
+      "result": "NEGATIVE_PRESERVED",
+      "observed": "Fixture footer is visibly displaced outside the pane to the upper-right and correctly receives no footer/expanded success image."
+    }
+  ],
+  "qualification": "Offline inert production-structure/CSS fixture evidence; it does not prove a fresh live Support answer."
+}

@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW13",
+  "ticket": "t_e49fe2f9",
+  "runId": 192,
+  "verdict": "PASS_BOUNDED_FULL_READINESS_AND_ROUTE_GUARD",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "reviewedOn": "2026-09-20T15:14:44.968438Z",
+  "productRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productClean": true,
+  "freezeCommit": "496335c2bd042ee3a2df6ae7ab39ded4e2db6a92",
+  "fullReadiness": {
+    "sharedHelper": "proveGuideFullReadiness",
+    "usedBy": [
+      "capture-public-guide.mjs",
+      "probe-zero-request-ui.mjs"
+    ],
+    "publicPreconditions": [
+      "expected /help route",
+      "exactly two visible language controls",
+      "exactly one active desired locale",
+      "exactly one visible composer",
+      "exactly one visible display-mode toggle"
+    ],
+    "interaction": "public display-mode toggle then restore",
+    "sameLocaleLanguageActivations": 0,
+    "differentLocaleLanguageActivations": 1,
+    "sameLocaleFixture": {
+      "session": "nonempty-session",
+      "messages": 7,
+      "locale": "EN",
+      "exactStatePreserved": true
+    },
+    "captureSessions": 5,
+    "captureSessionPlanUnchanged": true,
+    "compactHydrationBeforeOneClickRetained": true,
+    "retries": 0,
+    "publicCapabilitiesSavedOrRestored": false
+  },
+  "trafficClassifier": {
+    "pageCaseListRead": "exact GET /api/v1/support/cases",
+    "pageCaseListReadIsSupportApi": true,
+    "pageCaseListReadIsPublicData": false,
+    "pageCaseListReadAbortedBeforeTransmission": true,
+    "statusSeparate": true,
+    "createSessionSeparate": true,
+    "sendMessageSeparate": true,
+    "methodTokenUnknownSupportPathsFailClosed": true,
+    "syntheticSupportResponses": 0,
+    "blockedAttemptsDistinctFromForwardedRequests": true,
+    "historicalOtherSupport3Attributed": false,
+    "historical401OriginsQualified": true
+  },
+  "controlEvidence": {
+    "indexedInputs": 94,
+    "inputMismatches": 0,
+    "priorControls": 120,
+    "controls": 127,
+    "passed": 127,
+    "uniqueNames": 127,
+    "retainedPriorNamesAsExactPrefix": true,
+    "addedNames": [
+      "full readiness projection is fixed and surface specific",
+      "full readiness classifier distinguishes public preconditions",
+      "full readiness preserves nonempty Support state on same locale remount",
+      "full readiness changes locale once only at the planned session boundary",
+      "full capture call sites retain the exact five session boundary plan",
+      "failed full interaction checkpoints its closed predicate",
+      "blocked Support classifier isolates only the automatic case list read"
+    ],
+    "controlProofSha256": "0a00372ab55a75debc4548a6510a8de46d68f72b20970b3fe0ee33d5d74293e0",
+    "orderedEightDigest": "ba72808c15fe611c1999e440c206cb41d637d064884dde856a82ee7865f6f0d6",
+    "matrixSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+    "preRequestVerifierSha256": "d5d6656431f93e3089c9c6751ae767b401d21f23bb90d398fa99a051af0ead39",
+    "scopeClarificationSha256": "8ec1a8e89fd5ad8793d348093c8edb5b93cdeb32ebe9ba66839aba69299ce407",
+    "bind14ReceiptSha256": "9b139bec717e46ae0f3e845443ae18d16db41e540beb15624d6108360680fbab",
+    "matrixRows": 54,
+    "suiteFiles": 34,
+    "productFiles": 144,
+    "adapterNegativePassed": 3,
+    "adapterNegativeTotal": 3,
+    "futureOutputsCheckedAbsent": 57
+  },
+  "productSource": {
+    "assistantSha256": "5921ced41c60a047a4c4e390f2e6154b99944c4ad0620433f130d58d590062b3",
+    "modeToggleSha256": "ddcb31e0c25fbc2e7c52e14b414a7edc522b29884f61f4f41d7870f8a590669b",
+    "caseViewSha256": "bd23bed0caeefb09346580bad4d91320e7e96594285562235558294ac1dfffd2",
+    "helpPageSha256": "4950ea4b0a41d031c616a94dd3c6e15ced53516e1d2168dd958166d63711d742"
+  },
+  "preparedProbe": {
+    "executable": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND14/probe-zero-request-ui.mjs",
+    "sha256": "6fec8d16353b31116d95540012139f21b200e9cb697ec1f733b2ffad05573b4d",
+    "argv": [
+      "node",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND14/probe-zero-request-ui.mjs",
+      "152eed4da1cd3e66b74d8301159ba76427552409",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE2-run-LIVE8.json"
+    ],
+    "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "logPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_UI_TRANSITION_PROBE2-LIVE8.log",
+    "prerequisites": [
+      "independently verified exact-revision owned preview",
+      "ordinary system TLS https://localhost:3100",
+      "pinned installed Playwright Chromium",
+      "absent output path"
+    ],
+    "transitions": [
+      "fresh full/en",
+      "same-session full/ro",
+      "storage-reset compact/ro",
+      "route-remount full/en",
+      "storage-reset compact/en"
+    ],
+    "compactViewport": "390x844",
+    "freshProfile": true,
+    "executed": false,
+    "supportGuard": "abort only; never fulfill or substitute a response",
+    "blockedStatusAttemptsReportedSeparately": true,
+    "blockedPageCaseListAttemptsReportedSeparately": true,
+    "requiredActualForwardedSupportRequests": 0,
+    "requiredCreateSessionAttempts": 0,
+    "requiredSendMessageAttempts": 0,
+    "requiredOtherSupportAttempts": 0,
+    "childStatus": "process.exitCode=1 on failure; direct stdout/stderr redirection without tee"
+  },
+  "retainedDispositions": {
+    "final9Binding": "PASS RETAINED",
+    "suite34": "PASS RETAINED",
+    "matrix54": "BYTE IDENTICAL",
+    "safetyPrivacyCredentialOracles": "PASS RETAINED",
+    "sourceOutcomeActionApiDom": "PASS RETAINED",
+    "sessionPacingCapacityNavigationNoRetry": "PASS RETAINED",
+    "live7Cause": "UNKNOWN",
+    "productDefectInferred": false,
+    "forgot": "UNRESOLVED_ACTIONLESS"
+  },
+  "artifacts": [
+    {
+      "role": "report",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW13.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW13.md",
+      "sha256": "d96f05f97e74b9bbb51cc4fa8eaddbfef66e8b55a5d5500a084ecefae80e7853",
+      "bytes": 7742
+    },
+    {
+      "role": "selfReport",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW13.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW13.md",
+      "sha256": "cb8d16b24788e7c18b4cf442402abe24de6a3024b9cfc5966673ca3e1b9ad2d6",
+      "bytes": 3903
+    },
+    {
+      "role": "staticCustody",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW13-static-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW13-static-custody.json",
+      "sha256": "6dab8327ee899e7aa771539bb622a7f29fd4ad1fe83b1c86875b3885e68544b3",
+      "bytes": 5024
+    }
+  ],
+  "limits": {
+    "staticOnly": true,
+    "testsRun": false,
+    "probeRun": false,
+    "browser": false,
+    "runtime": false,
+    "http": false,
+    "database": false,
+    "status": false,
+    "capacity": false,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "syntheticResponses": 0,
+    "productWrites": false,
+    "gitWrites": false,
+    "heavyLeaseRequested": false,
+    "gitLeaseRequested": false,
+    "actual54Claimed": false,
+    "captureClaimed": false,
+    "readinessClaimed": false,
+    "acceptanceClaimed": false
+  },
+  "selfExclusion": "This receipt excludes itself from artifacts and custody hashes."
+}

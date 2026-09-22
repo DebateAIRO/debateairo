@@ -1,0 +1,166 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW16",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productHead": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productClean": true,
+  "indexedInputs": 124,
+  "inputMismatches": [],
+  "authorInputs": 86,
+  "authorInputMismatches": [],
+  "authorArtifacts": 35,
+  "authorArtifactMismatches": [],
+  "historicalBoundary": {
+    "probe5ExactException": "UNAVAILABLE",
+    "compactReadyPersisted": true,
+    "privateControlAssertionEntry": "UNPROVED",
+    "retrospectiveRuntimeCauseClaimed": false
+  },
+  "producer": {
+    "assistant": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/ui/components/support/Assistant.tsx",
+      "sha256": "5921ced41c60a047a4c4e390f2e6154b99944c4ad0620433f130d58d590062b3",
+      "bytes": 35138
+    },
+    "fullRootPresent": true,
+    "compactRootPresent": true,
+    "sharedLanguageControlsPresent": true,
+    "fullSelector": ".supportDesk .supportLanguage button",
+    "compactSelector": ".supportAssistantCompact .supportLanguage button"
+  },
+  "sharedSelector": {
+    "controls": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/controls.mjs",
+      "sha256": "d9f8b49d05d828ed8963fdfd8529a289a0cd9fb03ba22991d09efe1807ac56bf",
+      "bytes": 45053
+    },
+    "capture": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/capture-public-guide.mjs",
+      "sha256": "b226654e61ac3efc9d66f0773c45dbaa8f5663a51254167ba80eaa84b6f8af81",
+      "bytes": 25764
+    },
+    "probe": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/probe-zero-request-ui.mjs",
+      "sha256": "666a54b1d9cd547951e609e79dd06ab88eb517bcc21f48a76ae385a921f053d6",
+      "bytes": 13837
+    },
+    "exportsSelectors": true,
+    "exportsSelection": true,
+    "captureImportsAndCalls": true,
+    "probeImportsAndCalls": true,
+    "surfaceRootsBound": true,
+    "exactTwoControlsRequired": true,
+    "exactOneActiveRequired": true,
+    "sameLocaleNoClick": true,
+    "changedLocaleSingleClick": true,
+    "postClickWait": true,
+    "postClickActiveVerification": true
+  },
+  "stages": {
+    "names": [
+      "COOKIE_SETTLING",
+      "LOCALE_SELECTION",
+      "PRIVATE_CONTROL_CHECK",
+      "TRANSITION_COMPLETION"
+    ],
+    "captureHasAll": true,
+    "probeHasAll": true,
+    "fixedCodeMapping": true,
+    "rawDomPersisted": false
+  },
+  "retained": {
+    "priorControls": 130,
+    "controls": 136,
+    "passed": 136,
+    "priorNamesExactPrefix": true,
+    "addedNames": [
+      "actual product binds language controls under full and compact roots",
+      "old full-only selector misses compact while the shared selector reaches it",
+      "shared selector covers the exact five transition locale branches",
+      "shared selector rejects absent duplicate and wrong-locale controls",
+      "post-ready failure stages remain closed and surface specific",
+      "both actual adapters use the shared selector and fixed post-ready stages"
+    ],
+    "matrix": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/matrix.mjs",
+      "sha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+      "bytes": 14253
+    },
+    "preRequestVerifier": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/pre-request-verifier.ts",
+      "sha256": "d5d6656431f93e3089c9c6751ae767b401d21f23bb90d398fa99a051af0ead39",
+      "bytes": 16751
+    },
+    "orderedEightManifest": [
+      {
+        "path": "capture-public-guide.mjs",
+        "bytes": 25764,
+        "sha256": "b226654e61ac3efc9d66f0773c45dbaa8f5663a51254167ba80eaa84b6f8af81"
+      },
+      {
+        "path": "controls.mjs",
+        "bytes": 45053,
+        "sha256": "d9f8b49d05d828ed8963fdfd8529a289a0cd9fb03ba22991d09efe1807ac56bf"
+      },
+      {
+        "path": "matrix.mjs",
+        "bytes": 14253,
+        "sha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c"
+      },
+      {
+        "path": "pre-request-verifier.ts",
+        "bytes": 16751,
+        "sha256": "d5d6656431f93e3089c9c6751ae767b401d21f23bb90d398fa99a051af0ead39"
+      },
+      {
+        "path": "runtime-capacity.mjs",
+        "bytes": 9935,
+        "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87"
+      },
+      {
+        "path": "session-lifecycle.mjs",
+        "bytes": 4254,
+        "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b"
+      },
+      {
+        "path": "verify-final-branches.ts",
+        "bytes": 5131,
+        "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a"
+      },
+      {
+        "path": "verify-guide-harness.mjs",
+        "bytes": 85891,
+        "sha256": "57a82dc5a4f1c7220eb4e812268ee5b032cfba23ddb450a75f1a5bd1493dad89"
+      }
+    ],
+    "orderedEightComputedSha256": "fa91eede37beb7ac5f51366a9d4c7e89d62dc72c1033810d868bd5d2bf0c354c",
+    "orderedEightDeclaredSha256": "fa91eede37beb7ac5f51366a9d4c7e89d62dc72c1033810d868bd5d2bf0c354c",
+    "orderedEightMatches": true,
+    "adapterNegative": {
+      "total": 3,
+      "passed": 3,
+      "importerCalls": 0,
+      "successfulRows": 0
+    },
+    "checkpointRegression": {
+      "originalStatus": 1,
+      "fixedStatus": 0,
+      "initialExclusive": true,
+      "updates": true,
+      "failurePersistence": true
+    }
+  },
+  "futureOutputs": {
+    "checked": 58,
+    "present": []
+  },
+  "pinnedExecutablePresent": true,
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "database": 0,
+    "supportRequests": 0,
+    "modelRequests": 0
+  }
+}

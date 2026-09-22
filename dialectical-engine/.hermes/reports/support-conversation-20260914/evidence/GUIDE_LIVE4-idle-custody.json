@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-17T20:10:44.146Z",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "pid": 60670,
+  "ppid": 1,
+  "pgid": 60670,
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "command": "pnpm dev:auth:up",
+  "previewListeners": [
+    3100,
+    3101,
+    55433,
+    7177,
+    8988,
+    8890,
+    8891,
+    8892,
+    8893,
+    8894,
+    8895,
+    8896
+  ],
+  "originalListenersPreserved": [
+    3001,
+    55432,
+    7077,
+    8888,
+    8790,
+    8793,
+    8794,
+    8795,
+    8796
+  ],
+  "ordinarySystemTls": {
+    "url": "https://localhost:3100/help",
+    "customCa": false,
+    "insecure": false,
+    "status": 200
+  }
+}

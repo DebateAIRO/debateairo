@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FINANCIAL_FALLBACK_REVIEW2",
+  "ticket": "t_163fb85c",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "baseRevision": "c683a0c752553fe2b4e226bc3f70879ce2460b74",
+  "verdict": "PASS_FINANCIAL_REVIEWED_FALLBACK",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_FINANCIAL_FALLBACK_REVIEW2.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_FINANCIAL_FALLBACK_REVIEW2.md",
+      "sha256": "4165880a977c013e46bee95a2283683486d0bbd68177c3c9361b9143bfbfb720",
+      "bytes": 4113
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FINANCIAL_FALLBACK_REVIEW2-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_FINANCIAL_FALLBACK_REVIEW2-dispositions.json",
+      "sha256": "51260562a561f4c2cfbb84e59067da64519638b9fe1e35022bd36b5cece70377",
+      "bytes": 4221
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FINANCIAL_FALLBACK_REVIEW2-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_FINANCIAL_FALLBACK_REVIEW2-custody.json",
+      "sha256": "1cf08bfa2ced51390a6363c640400881d25faf223018f29df95e866b2b6483e8",
+      "bytes": 1599
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_FINANCIAL_FALLBACK_REVIEW2.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_FINANCIAL_FALLBACK_REVIEW2.md",
+      "sha256": "a60d71621f29484572d1241874d8e9dce72d6e4df113fcb0cafe0447727e9fb8",
+      "bytes": 2223
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "heavyLeaseHeld": false,
+  "finiteLexicalParity": {
+    "paymentPayPaid": ["pay", "paid", "plat", "achit"],
+    "purchaseBuyBought": ["purchas", "buy", "bought", "cump", "achiz"],
+    "billing": ["bill", "factur"],
+    "transaction": ["transaction", "tranzact"],
+    "charge": ["charg", "debitare", "debitat", "taxare", "taxat"],
+    "nonfinancialNegatives": ["platform/platforma", "taxonomie/taxonomic", "flow-rate debit"]
+  },
+  "retained": [
+    "Deterministic reviewed fallback remains the governing architecture.",
+    "Full44 EN/RO and real POST prove useful guidance, source/action shape and accounting.",
+    "Screenshot30 complete full-answer capture remains PASS."
+  ],
+  "remainingFindings": 0
+}

@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PROBE_CHECKPOINT_REVIEW",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "sourceDelta": {
+    "original": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND15/probe-zero-request-ui.mjs",
+      "sha256": "d6ce905b822bf5913a4ca4fe8aeaa2cdb9abbf8f1b979995c5c4e6730475a412",
+      "bytes": 12251
+    },
+    "fixed": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PROBE_CHECKPOINT_FIX/probe-zero-request-ui.mjs",
+      "sha256": "67dd1695af2f03f55d2bfbed1fafedabf2b8ec2bd57d3348eb23feb80cb4d8f2",
+      "bytes": 12389
+    },
+    "patchSha256": "cf85b16ab7d1818d901f91fc3397ac02352308ab09c3763e17cae904aa6ad73b",
+    "onlyChanges": [
+      "relocate unchanged BIND15 controls import",
+      "import production checkpoint writer",
+      "restore EVIDENCE_ROOT binding",
+      "replace inline closure with explicit-dependency writer"
+    ]
+  },
+  "resolvedDependencies": {
+    "consoleClassifier": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P3/console-classifier.mjs",
+      "present": true
+    },
+    "bind15Controls": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND15/controls.mjs",
+      "present": true
+    },
+    "checkpointWriter": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PROBE_CHECKPOINT_FIX/checkpoint-writer.mjs",
+      "present": true
+    },
+    "playwright": {
+      "path": "/Users/vladmihaimiron/.npm/_npx/e41f203b7505f1fb/node_modules/playwright/index.mjs",
+      "present": true
+    },
+    "chromiumExecutable": {
+      "path": "/Users/vladmihaimiron/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell",
+      "present": true
+    }
+  },
+  "checkpointBindings": {
+    "mkdirImported": true,
+    "writeFileImported": true,
+    "evidenceRootDefined": true,
+    "outputPathValidatedBeforeWriter": true,
+    "resultDefinedBeforeWriter": true,
+    "writerHasNoUnboundEvidenceRoot": true,
+    "writerDependenciesExplicit": true
+  },
+  "checkpointSemantics": {
+    "initialExclusiveWx": true,
+    "initialMode0600": true,
+    "subsequentUpdate": true,
+    "createdAfterSuccessfulWrite": true,
+    "fixedJsonSerialization": true
+  },
+  "cleanupDependencies": {
+    "rmImported": true,
+    "profileBound": true,
+    "contextBound": true,
+    "contextCloseInFinally": true,
+    "profileRemoveInFinally": true,
+    "behaviorUnchangedFromBind15": true
+  },
+  "argumentGuard": {
+    "passed": 5,
+    "total": 5,
+    "cases": [
+      {
+        "name": "exact",
+        "expected": true,
+        "actual": true,
+        "pass": true
+      },
+      {
+        "name": "old",
+        "expected": false,
+        "actual": false,
+        "pass": true
+      },
+      {
+        "name": "root",
+        "expected": false,
+        "actual": false,
+        "pass": true
+      },
+      {
+        "name": "extra",
+        "expected": false,
+        "actual": false,
+        "pass": true
+      },
+      {
+        "name": "revision",
+        "expected": false,
+        "actual": false,
+        "pass": true
+      }
+    ]
+  },
+  "future": {
+    "output": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE-run-LIVE8-PROBE5.json",
+    "outputAbsent": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_UI_TRANSITION_PROBE5-LIVE8.log",
+    "logAbsent": true
+  },
+  "supplementalContract": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PROBE_CHECKPOINT_FIX/probe-contract.json",
+    "sha256": "a6000967793737e33a3dabe3361e578defb0af7f1df51a985275607d6cc6b638",
+    "bytes": 1639
+  },
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "database": 0
+  }
+}

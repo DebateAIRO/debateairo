@@ -1,0 +1,17 @@
+{
+  "node": "GUIDE_ACTIONFIX",
+  "ticket": "t_dbd462b8",
+  "base": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  "writePaths": [
+    "packages/support-kb/src/context.ts",
+    "packages/support-kb/src/catalog.ts",
+    "packages/support-kb/src/navigation.ts",
+    "tests/unit/support-context.test.ts",
+    "tests/unit/support-answer-context.test.ts",
+    "tests/unit/support-navigation.test.ts",
+    "tests/unit/support-kb.test.ts",
+    "tests/architecture/support-catalog-coverage.test.ts",
+    "tests/integration/support-routes.test.ts"
+  ],
+  "finding": "Pricing prose-only placeholder incorrectly admits help, support-status and home through shared app-navigation article evidence."
+}

@@ -3,9 +3,9 @@
 Read FIRST, in full: `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/observability-agents/packets/COMMON.md`, then `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/observability-agents/00-intake-H0.md`.
 
 ## 1. Ticket state
-- **board:** `observability-agents` · **ticket:** `t_3af6affd` · **seat:** REQ-OBS · **role:** requirements (`heartbeat-requirements`) · **model:** Fable 5.1 (Claude subagent)
-- **session:** record your agent id/session in your CLAIM comment · **comment cursor at dispatch:** 0
-- **review route:** REQ-REV-OBS (Fable 5.1, blind) — not yours to dispatch · **rework rounds: max 3**
+- **board:** `observability-agents` · **ticket:** `t_3af6affd` · **seat:** REQ-OBS · **role:** requirements (`heartbeat-requirements`) · **model for new/rework dispatch:** GPT-5.6-sol
+- **session:** record your agent id/session in your CLAIM comment · **recorded initial cursor:** 0; on any new/rework dispatch read every comment currently present on `t_3af6affd` and record the exact count read
+- **review route:** REQ-REV-OBS (Grok 4.6, blind) — not yours to dispatch · **rework rounds: max 3**
 - **allowed (exhaustive):**
   - `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/observability-agents/requirements/observationagent.md`
   - `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/observability-agents/requirements/observationagent-compass-block.md`
@@ -17,7 +17,7 @@ Read FIRST, in full: `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-eng
 
 ## 2. Upstream artifacts (absolute paths)
 1. `00-intake-H0.md` — V's verbatim goal; C3 and C4 bind you. "the fastest when it comes to observability" is a LATENCY requirement — quantify it.
-2. How the product runs, and what already reports health: `apps/runner/src/dev-auth-stack.ts` (the https dev stack on :3000 and every process it starts), `apps/runner/src/main.ts`, `apps/api/src/main.ts`, `apps/api/src/graceful-shutdown.ts` (Hatchet usage, shutdown), `apps/scheduler/src/cli.ts` and its three jobs (`liveness-sweep`, `settlement-watch`, `replay-self-test`), `packages/liveness/src/index.ts` (product staleness — decide reuse vs boundary), `packages/obs-capture/src/health.ts` and `src/zone/counter.ts` (capture health and blind counters), `migrations/0034_obs_foundation.sql` (the `obs.*` store the FixAgent uses — decide whether metrics share it or get their own schema, with the standalone rule C3 in view).
+2. How the product runs, and what already reports health: `apps/runner/src/dev-auth-stack.ts` (the https dev stack on :3000 and every process it starts), `apps/runner/src/main.ts`, `apps/api/src/main.ts`, `apps/api/src/graceful-shutdown.ts` (Hatchet usage, shutdown), `apps/scheduler/src/cli.ts:3-20` (the 24-line dispatcher) **and** `apps/scheduler/src/index.ts:18-119` (implementations of `replay-self-test`, `liveness-sweep`, and `settlement-watch`), `packages/liveness/src/index.ts` (product staleness — decide reuse vs boundary), `packages/obs-capture/src/health.ts` and `src/zone/counter.ts` (capture health and blind counters), `migrations/0034_obs_foundation.sql` (the `obs.*` store the FixAgent uses — decide whether metrics share it or get their own schema, with the standalone rule C3 in view).
 3. Env-var law: `packages/register/src/runtime-environment.ts` is the ONLY file allowed to read `process.env` (rule at `tools/orphan-audit/src/index.ts:455`); the predecessor collided with it (row V-6 in `docs/missions/observability-agents/V-DECISIONS-PACKET.md`). Your requirements must not assume unvalidated env config.
 4. Infrastructure inventory — establish it yourself with evidence: `find . -maxdepth 3 -name 'compose*' -not -path '*/node_modules/*'`, `deploy/**`, `docker ps` (postgres on 127.0.0.1:55432, hatchet-lite 7077/8888 at intake), Hatchet's own admin/metrics surface (cite vendor docs by URL or mark UNVERIFIED — never invent a Hatchet API), the target deployment in `docs/missions/2026-08-21-docker-hatchet/architecture/Plan.md` (Compose on Hetzner behind Cloudflare — read its summary, not all of it), launchd usage (`launchctl list | grep -iE 'debate|dialect|obs'`, the predecessor's S14/S21 KeepAlive witness design in `docs/missions/2026-08-21-observability-loop/planning/VerticalSlices.md` §1 — S14, S18, S21, S22, S23).
 5. Standing law in COMMON §3: DR-179 means NO hosted SaaS observability (no Datadog/Grafana Cloud keys) — local-first; DR-188 means retention is V-gated; privacy means metrics carry no private content.
@@ -47,6 +47,8 @@ Read FIRST, in full: `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-eng
 ## Q8 Contested decisions for V    (table)
 ## Ranked recommendations          (top 10; VERDICT / CONFIDENCE / STRONGEST COUNTER)
 ## UNVERIFIED / gaps
+## Findings                        (every packet/product contradiction with path:line and disposition)
+## Handoff
 ```
 
 ## 5. Handoff

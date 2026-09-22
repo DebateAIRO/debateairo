@@ -1,0 +1,153 @@
+{
+  "at": "2026-09-16T06:56:58.582355+00:00",
+  "node": "REV1_P3",
+  "ticket": "t_88683868",
+  "verdict": "PASS",
+  "revision": "5cbfc6d483aae0f56eabfdee00a6829e09e76c3d",
+  "state": "SEPARATE REVIEW EVIDENCE CONSUMED; ROOT FINDING DISPOSITIONS PENDING",
+  "receipt": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/REV1_P3-receipt.json",
+    "sha256": "ce8a2eff787650f7ef1a6dcc5a5b21935decffd50d1d6044122da62cb223ff21"
+  },
+  "report": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV1-p3.md",
+    "sha256": "568d560fc7dd340064a53be3e4a4e0560b457c3033878fe680dc84f2db7a9b62"
+  },
+  "selfReport": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/REV1_P3.md",
+    "sha256": "b166f702745d0892a91621e61379de78689526af3dca89aeac342406e63620c4"
+  },
+  "immutableReferences": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV1-p3.md",
+      "sha256": "568d560fc7dd340064a53be3e4a4e0560b457c3033878fe680dc84f2db7a9b62",
+      "bytes": 12585
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/REV1_P3.md",
+      "sha256": "b166f702745d0892a91621e61379de78689526af3dca89aeac342406e63620c4",
+      "bytes": 10343
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/REV1_P3/degraded_projection_control.ts",
+      "sha256": "e80cc2ae5bf68678e234279aa117176c9ef92f9c76b801df5436e97f60ffafe1",
+      "bytes": 4379
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/REV1_P3/recovery_contract_control.ts",
+      "sha256": "e3652941e36271d26552f960942a564d0a63424b22e01e60e53bafcc438eec33",
+      "bytes": 11202
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/REV1_P3-degraded-final.log",
+      "sha256": "32a729ab2c6abc4872be3cd0bc51adb375ce88fb1effeead5c63e4912297a855",
+      "bytes": 1245
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/REV1_P3-degraded-final-attempt2.log",
+      "sha256": "9736548ed97ddc1ef2cf2c02e94990bc11a0f95fe847e2db1eebbe0ba78f1d43",
+      "bytes": 1586
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/REV1_P3-degraded-projection-control.log",
+      "sha256": "9e6b696f52196ddf6016fffa7098f1e8d84cd7a70135b16ad28d3bbfcd119331",
+      "bytes": 1200
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/REV1_P3-degraded-projection-control-attempt2.log",
+      "sha256": "40381615c7ade1902a2c6c6c3e01c9f6dd418fd140fed0b699c56e28906f4ea0",
+      "bytes": 371
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/REV1_P3-recovery-contract-control.log",
+      "sha256": "329f7a841adf9474921ddaaeaf039ec1d5c43d3cb91bd61d2316d893e4d4390a",
+      "bytes": 580
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/REV1_P3-receipt.json",
+      "sha256": "ce8a2eff787650f7ef1a6dcc5a5b21935decffd50d1d6044122da62cb223ff21",
+      "bytes": 5888
+    }
+  ],
+  "gateManifest": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_P3-manifest.json",
+    "sha256": "83c3d7e6e961464eb2baf2096b9ad4df5d24054c55ec81622de0732c6e8d5aa4",
+    "inputsReverified": 180
+  },
+  "lensIndex": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/review-packages/CP1-p3/REV1-inputs.json",
+    "sha256": "a34b426724024acfd5c60385cbf73bfe938dabf31c649597f2cf83c059c890bb",
+    "inputsReverified": 74
+  },
+  "productFilesReverified": 108,
+  "detachedCwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-correctness/dialectical-engine",
+  "primaryAndDetachedClean": true,
+  "nativeSession": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-38-35-01a09f11-6f5f-74b2-9bba-1442a15308ef.jsonl",
+  "nativeSkillBodyProof": {
+    "using-superpowers": {
+      "file": "/Users/vladmihaimiron/.codex/plugins/cache/openai-curated-remote/superpowers/6.3.0/skills/using-superpowers/SKILL.md",
+      "sha256": "30f2ab78e20ddc27ee7158ae8d4a2abe161c360981c7cc3548070913142d3dc3",
+      "bodyPhrase": "This is not negotiable. You cannot rationalize your way out of this.",
+      "nativeTimestamp": "2026-09-14T08:39:04.284Z",
+      "nativeCallId": "call_m1mcy5OFsrYNan6dWKlcoQHz",
+      "outputBodySha256": "f17fbc266faf570bd44db24514c6ed144068e9792f936cb36d374a3f59da296a",
+      "method": "Actual native tool output BODY only, not invocation arguments; retained same-session read, no fresh-read claim."
+    },
+    "heartbeat-protocol": {
+      "file": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-protocol/SKILL.md",
+      "sha256": "9f5c803cbdfb92a98bb749601b96d5fa1f2bdcba3805e7cff5be200fd98f3bb3",
+      "bodyPhrase": "One role per node: a seat that reviews does not code, and no seat reviews its own work",
+      "nativeTimestamp": "2026-09-14T08:39:04.284Z",
+      "nativeCallId": "call_m1mcy5OFsrYNan6dWKlcoQHz",
+      "outputBodySha256": "f17fbc266faf570bd44db24514c6ed144068e9792f936cb36d374a3f59da296a",
+      "method": "Actual native tool output BODY only, not invocation arguments; retained same-session read, no fresh-read claim."
+    },
+    "heartbeat-reviewer": {
+      "file": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-reviewer/SKILL.md",
+      "sha256": "5b49f9faaf743bfe18d2dfbc5f20560fd3c3edd7a57d55ce1903b021b11b722b",
+      "bodyPhrase": "is a finding against the orchestrator's packet, not against the worker who obeyed it",
+      "nativeTimestamp": "2026-09-14T08:39:04.284Z",
+      "nativeCallId": "call_m1mcy5OFsrYNan6dWKlcoQHz",
+      "outputBodySha256": "f17fbc266faf570bd44db24514c6ed144068e9792f936cb36d374a3f59da296a",
+      "method": "Actual native tool output BODY only, not invocation arguments; retained same-session read, no fresh-read claim."
+    },
+    "verification-before-completion": {
+      "file": "/Users/vladmihaimiron/.codex/plugins/cache/openai-curated-remote/superpowers/6.3.0/skills/verification-before-completion/SKILL.md",
+      "sha256": "2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3",
+      "bodyPhrase": "NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE",
+      "nativeTimestamp": "2026-09-14T08:39:04.284Z",
+      "nativeCallId": "call_m1mcy5OFsrYNan6dWKlcoQHz",
+      "outputBodySha256": "f17fbc266faf570bd44db24514c6ed144068e9792f936cb36d374a3f59da296a",
+      "method": "Actual native tool output BODY only, not invocation arguments; retained same-session read, no fresh-read claim."
+    },
+    "systematic-debugging": {
+      "file": "/Users/vladmihaimiron/.codex/plugins/cache/openai-curated-remote/superpowers/6.3.0/skills/systematic-debugging/SKILL.md",
+      "sha256": "808fc5717aa88ad65efff312b11c186294d3e6ee301afb584e2f86599b137787",
+      "bodyPhrase": "Violating the letter of this process is violating the spirit of debugging.",
+      "nativeTimestamp": "2026-09-14T14:58:09.351Z",
+      "nativeCallId": "call_jryjQKIz5eKrofyOjFmfnXpd",
+      "outputBodySha256": "682c3794161612c51546b2a58bd1b1eb3859afca8c55893cbc48c880b0886787",
+      "method": "Actual native tool output BODY only, not invocation arguments; retained same-session read, no fresh-read claim."
+    },
+    "test-driven-development": {
+      "file": "/Users/vladmihaimiron/.codex/plugins/cache/openai-curated-remote/superpowers/6.3.0/skills/test-driven-development/SKILL.md",
+      "sha256": "bf1b8216e523851a411e91d429a7c1c2a173e79d88957bc78e348218d50edd54",
+      "bodyPhrase": "If you didn't watch the test fail, you don't know if it tests the right thing.",
+      "nativeTimestamp": "2026-09-16T06:36:00.387Z",
+      "nativeCallId": "call_6X1NeNdRq5eHjJMJfg66Ujeb",
+      "outputBodySha256": "a01a8f9c6c6595593da2f82de113b4f1d950ad8bbbc82b4bfd20ae46c6802bf2",
+      "method": "Actual native tool output BODY only, not invocation arguments; retained same-session read, no fresh-read claim."
+    }
+  },
+  "limits": [
+    "Root verified custody, exact indexed/current bytes and captured evidence; reviewer owns substantive verdict.",
+    "Separate native Sol session, not independent model-family review.",
+    "LIVE_P2 stays measured at606b, whose runtime/config/content equals final5cbf; final commit changes one test only.",
+    "No owner acceptance or checkpoint readiness; Forgot destination remains unresolved."
+  ],
+  "qualifications": [
+    "Correctness PASS is limited to the named architecture/fixture scope. The separate final security REWORK governs current screening failures and cannot be overridden by broad prose about output-boundary correctness.",
+    "The self-report's final wording placing owner ratification/checkpoint advancement with root means administrative recording only. The user alone grants acceptance; all new owner-ratification fields remain blank.",
+    "A transient apps/runner/node_modules dependency symlink exceeded the explicit packet allowlist, was disclosed and removed. Primary and detached tracked bytes are verified clean; this process residue is tracked separately without claiming the action had prior scope authorization."
+  ]
+}

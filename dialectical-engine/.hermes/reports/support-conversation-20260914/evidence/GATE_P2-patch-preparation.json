@@ -1,0 +1,22 @@
+{
+  "at": "2026-09-14T17:33:57.070867+00:00",
+  "status": "PATCH PREPARATION ONLY; live evidence and final GATE_P2 packaging pending",
+  "patches": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/review-packages/CP1-p2/CP1-pass1-correction-e0dcfe77.patch",
+      "base": "6e5ab5fc41acebbff4264efc7d481df3db8dce44",
+      "revision": "e0dcfe77f49655bea774bdfacf988b911be4ff06",
+      "sha256": "e408f9a3b14204f5459f106ab74f28637774ae60bf85c6fa2259f8c92361cb9b",
+      "fileCount": 16
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/review-packages/CP1-p2/CP1-e0dcfe77.patch",
+      "base": "b7ca2c413bf3242ce18e29a397dc9a3aa9228893",
+      "revision": "e0dcfe77f49655bea774bdfacf988b911be4ff06",
+      "sha256": "c50d4f3bf8ec8f02f95f2237ba411860acd90be3bf772b16b1dc03c42409335e",
+      "fileCount": 103
+    }
+  ],
+  "productClean": true,
+  "noProductMutation": true
+}

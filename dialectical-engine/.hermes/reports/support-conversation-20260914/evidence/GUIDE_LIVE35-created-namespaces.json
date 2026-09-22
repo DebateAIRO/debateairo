@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE35",
+  "created": {
+    "phaseEvidence": "GUIDE_LIVE35-* through capture; idle and composed31 absent",
+    "phaseLogs": "GUIDE_PHASE_IMPORT_FIX46-operator-* through capture plus GUIDE_LIVE35 row-proof/capture logs",
+    "uiProof": "GUIDE_CONTINUATION_UI_PROOF-run-LIVE35.json and GUIDE_CONTINUATION_UI_PROOF-LIVE35.log",
+    "logicalProof": "GUIDE_ROW_PROOF-run-LIVE35.json",
+    "actualCapture": "GUIDE_LIVE_GUIDE24-actual-receipt.json only",
+    "browserProfile": "absent after failure cleanup",
+    "screenshots": 0
+  },
+  "stillAbsent": [
+    "GUIDE_LIVE35-idle.json",
+    "GUIDE_LIVE35-composed31-manifest.json",
+    "GUIDE_LIVE21-owner-capacity.json",
+    "GUIDE_LIVE25-owner-testability.json",
+    "all GUIDE_LIVE_GUIDE24 screenshot paths"
+  ],
+  "successorRequirement": "Use fresh phase, UI proof, logical proof, actual receipt, profile, screenshot, and composed-manifest namespaces; do not overwrite any LIVE35 or GUIDE24 artifact."
+}

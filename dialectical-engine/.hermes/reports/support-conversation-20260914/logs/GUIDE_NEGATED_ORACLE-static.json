@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_NEGATED_ORACLE",
+  "ticket": "t_2aeea03b",
+  "reviewedOn": "2026-09-17T17:32:47Z",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "revision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "sourceHead": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+  "verdict": "REWORK_MATRIX_ORACLE",
+  "expectationDisposition": "MATRIX_WRONG_PRODUCT_HELP_ACTION_CORRECT",
+  "rows": [
+    {
+      "sequence": 53,
+      "mode": "full",
+      "language": "en",
+      "prompt": "I am not asking to reset a password. Where is Help?",
+      "retained": {
+        "branch": "MODEL",
+        "expectedSourceIds": [
+          "app-navigation"
+        ],
+        "recoveryClass": "NEGATED_OR_UNRELATED"
+      },
+      "current": {
+        "actionPolicy": "NONE",
+        "navigation": null
+      },
+      "required": {
+        "actionPolicy": "REQUIRE_CLOSED",
+        "navigation": {
+          "kind": "pointer",
+          "actionId": "help"
+        }
+      }
+    },
+    {
+      "sequence": 54,
+      "mode": "compact",
+      "language": "ro",
+      "prompt": "Nu cer resetarea parolei. Unde găsesc Ajutor?",
+      "retained": {
+        "branch": "MODEL",
+        "expectedSourceIds": [
+          "app-navigation"
+        ],
+        "recoveryClass": "NEGATED_OR_UNRELATED"
+      },
+      "current": {
+        "actionPolicy": "NONE",
+        "navigation": null
+      },
+      "required": {
+        "actionPolicy": "REQUIRE_CLOSED",
+        "navigation": {
+          "kind": "keyboard",
+          "actionId": "help"
+        }
+      }
+    }
+  ],
+  "authority": [
+    {
+      "path": "docs/missions/support-conversation-20260914/OWNER-PUBLIC-GUIDE-20260917.md",
+      "lines": "3-9",
+      "effect": "public free-text menu guidance with no private/account operation"
+    },
+    {
+      "path": "docs/missions/support-conversation-20260914/slices/CP1/SPEC-v5.md",
+      "lines": "49,53,59,67,75,79",
+      "effect": "Forgot actionless; help is verified safe-static /help action"
+    },
+    {
+      "path": "docs/missions/support-conversation-20260914/slices/CP1/PLAN-PUBLIC-GUIDE-v2.md",
+      "lines": "264-282,298-299",
+      "effect": "clause-aware recovery semantics; unresolved recovery navigation actionless"
+    }
+  ],
+  "productBindings": [
+    {
+      "laneRelative": "packages/support-kb/src/catalog.ts",
+      "sha256": "7d9977b75820a33ac632a54eb65836032321965ee7a4c9311b8a3eacfcc6b527",
+      "bytes": 16135
+    },
+    {
+      "laneRelative": "packages/support-kb/src/context.ts",
+      "sha256": "c6526ee8b613e5b2c491974b16936078191796ebfb9f346ab45c37f1485861ad",
+      "bytes": 23579
+    },
+    {
+      "laneRelative": "packages/support-kb/src/navigation.ts",
+      "sha256": "26e8840761f92bbfea308f7b3c596962d406e6009c4201defbf1afef2eee3879",
+      "bytes": 3412
+    },
+    {
+      "laneRelative": "apps/api/src/support/recovery-intent.ts",
+      "sha256": "983cd60c3eb48b051153087453b74991d7a39c97825cc2c2a24cf2e1aa702ace",
+      "bytes": 8586
+    },
+    {
+      "laneRelative": "apps/api/src/support/classify.ts",
+      "sha256": "dd358b8bb471a5a7cbdf38a080b2782a4115ef10b46d59662af5d5ec53a18baf",
+      "bytes": 18577
+    },
+    {
+      "laneRelative": "packages/support-kb/content/app-navigation.en.md",
+      "sha256": "a92e96c24c3df6d7a9b3e73a3fafde79321cd7445612588024ea205fb5c6e6db",
+      "bytes": 1489
+    },
+    {
+      "laneRelative": "packages/support-kb/content/app-navigation.ro.md",
+      "sha256": "a6f79cd55e0856780bff01ec3134df02a068b41453f44a8847c5c58050af8a23",
+      "bytes": 1697
+    },
+    {
+      "laneRelative": "packages/support-kb/recovery/components.json",
+      "sha256": "0c06363ee4409efe96807786ad96ed73e46659481f61c56e957eeb340fff3b94",
+      "bytes": 39738
+    }
+  ],
+  "liveFailure": {
+    "resultCode": "GUIDE_HARNESS_PROSE_ONLY_ACTION_PROOF_MISMATCH",
+    "aggregateFirstFailureOnly": true,
+    "rowsExposed": 0,
+    "traffic": {
+      "browser": false,
+      "sessions": 0,
+      "supportRequests": 0,
+      "modelRequests": 0
+    }
+  },
+  "retained": {
+    "otherRows": 52,
+    "actualRecoveryRowsActionless": true,
+    "modelCallBudget": true,
+    "sessionGroups": 5,
+    "spacingMs": 31000,
+    "capacityAndPretrafficGates": true,
+    "forgotConnector": "UNRESOLVED_ACTIONLESS",
+    "productChangeRequired": false
+  },
+  "verification": {
+    "indexedInputs": 92,
+    "indexedInputsMatched": 92
+  },
+  "execution": {
+    "tests": 0,
+    "probes": 0,
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "database": 0,
+    "modelRequests": 0
+  },
+  "limits": [
+    "Static contract review only.",
+    "No all54, capture, readiness, checkpoint or acceptance claim."
+  ]
+}

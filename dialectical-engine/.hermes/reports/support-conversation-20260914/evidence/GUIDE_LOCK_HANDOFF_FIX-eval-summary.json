@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LOCK_HANDOFF_FIX",
+  "ticket": "t_532dbedf",
+  "measuredRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "command": [
+    "pnpm",
+    "run",
+    "support:eval"
+  ],
+  "exitCode": 1,
+  "exitMeaning": "PENDING_INDEPENDENT_QUALITY_RUBRIC",
+  "mode": "deterministic-structural",
+  "runs": [
+    {
+      "run": 1,
+      "passed": 60,
+      "applicable": 60
+    },
+    {
+      "run": 2,
+      "passed": 60,
+      "applicable": 60
+    },
+    {
+      "run": 3,
+      "passed": 60,
+      "applicable": 60
+    }
+  ],
+  "classes": {
+    "A": {
+      "passed": 20,
+      "applicable": 20
+    },
+    "B": {
+      "passed": 6,
+      "applicable": 6
+    },
+    "C": {
+      "passed": 10,
+      "applicable": 10
+    },
+    "D": {
+      "passed": 12,
+      "applicable": 12
+    },
+    "E": {
+      "passed": 6,
+      "applicable": 6
+    },
+    "F": {
+      "passed": 3,
+      "applicable": 3
+    },
+    "G": {
+      "passed": 3,
+      "applicable": 3
+    }
+  },
+  "realFirstToken": "NOT_APPLICABLE",
+  "rubric": "PENDING",
+  "log": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LOCK_HANDOFF_FIX-eval.log",
+    "sha256": "81def0d526c8e0eda743050c643c240ec3d1eba1cff657a2f93ac39febc740c8",
+    "bytes": 4734
+  },
+  "measuredAt": "2026-09-20T13:12:03.102997Z",
+  "reasonRunRequired": "tests/support-eval/run.ts imports buildApi/support route composition and Postgres support repositories; changed producer bytes invalidated retained-only provenance"
+}

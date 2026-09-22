@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_REVIEW29",
+  "ticket": "t_91c29a7f",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "verdict": "REWORK_BOUNDED_COMPLETE_FULL_CAPTURE",
+  "dispositions": [
+    {
+      "id": "GCR29-C1",
+      "subject": "LIVE28 screenshot target cause",
+      "disposition": "PASS",
+      "evidence": "LIVE28 API carried id app-navigation plus label Navigate Dialectical Engine; the public UI rendered the label while the old helper compared it with the id."
+    },
+    {
+      "id": "GCR29-C2",
+      "subject": "source-label target correction",
+      "disposition": "PASS",
+      "evidence": "Successor compares visible source labels to API labels and retains assistant-count, target-index, role, text, action and projection equality."
+    },
+    {
+      "id": "GCR29-C3",
+      "subject": "stale/current target controls",
+      "disposition": "PASS",
+      "evidence": "Four previous-article, four wrong-index and four stale-projection negatives reject; actual row1 reproduces the old mismatch and passes the successor."
+    },
+    {
+      "id": "GCR29-C4",
+      "subject": "contained short footer",
+      "disposition": "PASS",
+      "evidence": "Equal scroll is accepted only when the top-view footer is already fully contained; long overflow still requires forward scroll."
+    },
+    {
+      "id": "GCR29-C5",
+      "subject": "separate original-pane top/footer evidence",
+      "disposition": "PASS",
+      "evidence": "Full-long top and footer pane images separately show the requested edges; the footer image visibly includes source and Help action."
+    },
+    {
+      "id": "GCR29-R1",
+      "subject": "full-mode long complete-expanded screenshot",
+      "disposition": "REWORK",
+      "evidence": "full-ro-long-complete.png SHA 488f827b… is clipped at the full root and leaves its lower locator area blank; it contains neither source label nor action although proof claims complete/source-action capture."
+    },
+    {
+      "id": "GCR29-C6",
+      "subject": "fresh successor binding",
+      "disposition": "PASS_RETAINED",
+      "evidence": "Seven phases self-bind command SHA 6d1d5a7d; LIVE29/GUIDE22 namespaces, fixed31, 93 screenshots and 123 unique future paths are mechanically bound and unused."
+    },
+    {
+      "id": "GCR29-C7",
+      "subject": "natural availability bound",
+      "disposition": "PASS_PLANNING_ONLY",
+      "evidence": "03:21:15.789581Z equals LIVE28 consumption upper bound plus one hour and five seconds; it is not an exact creation time or capacity PASS."
+    },
+    {
+      "id": "GCR29-L1",
+      "subject": "runtime and readiness",
+      "disposition": "NOT_ESTABLISHED",
+      "evidence": "Static review only; no LIVE29 run, fresh31 sample, capacity measurement, readiness, completion or acceptance is established."
+    },
+    {
+      "id": "GCR29-L2",
+      "subject": "Forgot and CP2",
+      "disposition": "UNRESOLVED_ACTIONLESS",
+      "evidence": "No destination is inferred and no CP2 authorization follows."
+    }
+  ],
+  "hashes": {
+    "assistantSource": "08973898240182a2c04894b1987ffab92e593d70bb9eb9808484f2c76c8e710d",
+    "oldScreenshotHelper": "696dc176b7a6e1bbd6f5c8b5714bbf2519c7be7809af5fda8f45ca3f085a0b7c",
+    "successorScreenshotHelper": "45eaed8c244c215a97fe7b0af5902568ea01a54351f20b6408b9e53c0ad7976f",
+    "captureScript": "b4ad70890747e38a6a8cf882c3a503896047c45701f9315d34e6ad890be3d598",
+    "commandContract": "6d1d5a7d80190c67ef29516532708fcda61bb8384bfc30c08b0c620fccc21433",
+    "operatorContract": "b8e1069f138f844be820b3169df0037bd7b4931d722d78953503501db33ac956",
+    "screenshotControlProof": "e294da0dd379cc5609d7cf710988d212d96528be21af4657586ecf30f8ad14e2",
+    "bindingProof": "13d44cebd479483b021b22ec9332358207b25d4c844a30ff9f5ee2e7dcf6adbc",
+    "clippedFullLongComplete": "488f827b32346fda0bdcb908a4e7dd014eb008b1b5c900b12d8b827ee5a688ee",
+    "fullLongTop": "e10f4db34e191e179311df740afbc89fccd5c03dde51e4f2bc94ec5bad0e02ee",
+    "fullLongFooter": "41979c7a82056c83e1c3c139a52cb2f30be3b64fffb3626aba15a1837a58d2f2",
+    "fix29Receipt": "ebbd092e04d289df6be75abf71430c7135d5277b97f5e664089cce2f65d35bb2",
+    "fix29Consumption": "e040626248ad29e954bf2aaa4eceb33c2807e7bbb2d3c5a16886491a7b1aea3a"
+  },
+  "counts": {
+    "fixtureCases": 4,
+    "targetNegatives": 12,
+    "bindingPassed": 25,
+    "bindingTotal": 25,
+    "commandPhases": 7,
+    "fixedPlanRows": 31,
+    "futureScreenshotPaths": 93,
+    "futurePaths": 123,
+    "manifestVerified": 30,
+    "manifestTotal": 30,
+    "receiptArtifactsVerified": 31,
+    "receiptArtifactsTotal": 31,
+    "inputsVerified": 182,
+    "inputsTotal": 182,
+    "remainingFindings": 1
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "base": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "writePaths": [
+    "packages/support-kb/src/catalog.ts",
+    "packages/support-kb/src/context.ts",
+    "packages/support-kb/src/index.ts",
+    "packages/support-kb/src/recovery.ts",
+    "apps/api/src/support/answer.ts",
+    "tests/unit/support-context.test.ts",
+    "tests/unit/support-answer-context.test.ts",
+    "tests/unit/support-recovery-components.test.ts",
+    "tests/unit/support-public-guide-boundary.test.ts",
+    "tests/architecture/support-catalog-coverage.test.ts"
+  ],
+  "authority": "Exact scope derived from frozen dispatch inputs; not a new worktree fingerprint during active author work.",
+  "dispatchFreeze": "b9fd50d97d2d8fcb514e30094d6867f1e0861739"
+}

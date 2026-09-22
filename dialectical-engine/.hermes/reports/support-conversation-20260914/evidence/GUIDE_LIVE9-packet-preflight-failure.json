@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-20T18:12:08.864979+00:00",
+  "operation": "root operational packet preflight",
+  "exitCode": 1,
+  "observedCheckerOutput": "DEFECT path does not resolve (line 36): /private/recovery",
+  "cause": "Slash-separated prose parsed as an absolute path; no runtime or capacity activity",
+  "rejectedPacket": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE9-packet-rejected.md",
+    "sha256": "53b511cba37632759bfa7345b6165ba58136025c9ad8ecf96db414f33e22d28e",
+    "bytes": 11113
+  },
+  "correction": "Use ordinary comma-separated prose; no command or product change"
+}

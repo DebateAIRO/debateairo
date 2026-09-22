@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CONTINUATION_REVIEW40",
+  "ticket": "t_b17abb68",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+  "verdict": "REWORK_BOUNDED_SESSION_TIMESTAMP_COMPOSITION",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "finding": {
+    "id": "GCR40-R1",
+    "severity": "BLOCKING_OPERATIONAL_COMPOSITION",
+    "producer": {"path":".hermes/reports/support-conversation-20260914/probes/GUIDE_CONTINUATION_BIND40/capture-public-guide.mjs","lines":"119-121","behavior":"records session timestamps only while length < 2"},
+    "consumer": {"path":".hermes/reports/support-conversation-20260914/probes/GUIDE_CONTINUATION_BIND40/composition.mjs","lines":"27-31","behavior":"requires exactly 3 remaining timestamps, then exactly 5 composed timestamps"},
+    "impact": "A successful 21-request, three-session capture deterministically fails final composition because its receipt contains at most two new session timestamps.",
+    "minimumCorrection": [
+      "Record exactly three successful create-session timestamps and reject a fourth.",
+      "Require exactly three timestamp records before marking the remaining segment complete.",
+      "Exercise a real producer-shaped three-timestamp receipt through createComposedManifest.",
+      "Reject two, four, malformed-ordinal and out-of-order timestamp inputs.",
+      "Rebind only affected source and contract hashes."
+    ]
+  },
+  "retainedPass": [
+    "retained10 hashes and FAILED_CAPTURE_ROW47_NO_RETRY provenance",
+    "fixed remaining21 and composed31 unique membership",
+    "compiled UI keyboard Help transition with same synthetic session/capability",
+    "zero createSession and one intercepted same-session message in UI proof",
+    "narrow row54 compact to row43 full exception with other mode/language assertions strict",
+    "three groups, 21 messages, 18 model ceiling and 31-second pacing",
+    "capacity guard 3 session slots, 27 messages and 24 calls including owner reserve",
+    "seven literal final-contract argv bindings and operator digest guard",
+    "FIX39 helper selected by exact digest",
+    "115 unique future paths absent",
+    "prior process/schema/product/footerless-helper dispositions"
+  ],
+  "unverified": ["corrected producer-to-composer timestamp path","actual remaining21","composed31 quality","current operational gate","owner availability","Forgot destination","CP1/CP2 completion"],
+  "traffic": {"runtime":0,"browser":0,"http":0,"process":0,"status":0,"capacity":0,"database":0,"support":0,"model":0},
+  "heavyLeaseHeld": false
+}

@@ -1,0 +1,36 @@
+== gate-hint comment, HEAD (0dc569e9) ==
+7586:/* The reason the button is disabled reaches assistive technology through `aria-describedby`
+== gate-hint comment, a035f814 ==
+7583:/* The reason the button is disabled reaches assistive technology through `aria-describedby`
+7600:/* The reason the button is disabled reaches assistive technology through `aria-describedby`
+
+== context at HEAD 7586-7592 ==
+/* The reason the button is disabled reaches assistive technology through `aria-describedby`
+   and must NOT reach it as visible footer text. `display: none` and `visibility: hidden` both
+   remove the element from the accessibility tree and take R15's description with it, so this is
+   the repo's own `.srOnly` treatment (`globals.css:684-694`), copied declaration for
+   declaration: clipped to 1x1 and off the flow, still rendered, still announced. */
+.policyGateHint {
+  position: absolute;
+
+== the four-selector focus rule, exact file lines at HEAD ==
+7614:.consentPolicyLink:focus-visible,
+7615:.policyClose:focus-visible,
+7616:.policyPill:focus-visible,
+7617:.policyPrimary:focus-visible {
+
+== .70 figure: any '5.61' left anywhere in the two files? ==
+apps/ui/app/globals.css:7578:   comment said 5.61 at .70, which is what `Math.round` returns only if `1 - .70` is re-spelled
+tests/unit/consent-s02-style-contract.test.ts:152: * narrated: the round-1 review found `5.61` written in prose beside this arithmetic, where the
+tests/unit/consent-s02-style-contract.test.ts:160: * 96.49999999999999, `Math.round` gives 96, and the ratio becomes 5.6077 — `5.61`. The model that
+tests/unit/consent-s02-style-contract.test.ts:332:    // the round-1 review found `5.61` in this sentence, where the arithmetic gives 5.54, because
+tests/unit/consent-s02-style-contract.test.ts:3
+apps/ui/app/globals.css:1
+
+== '5.54' occurrences ==
+tests/unit/consent-s02-style-contract.test.ts:153: * arithmetic itself yields `5.54`, and nothing executed the unpinned rungs to catch it
+tests/unit/consent-s02-style-contract.test.ts:159: * (ratio 5.5450, printed `5.54`); re-derived by hand as `0.70·38 + 0.30·233` it is
+tests/unit/consent-s02-style-contract.test.ts:329:    // 6.29, `.65` -> 4.79 / 7.17, `.70` -> 5.54 / 8.09. `.65` is the smallest 0.05 step clearing
+tests/unit/consent-s02-style-contract.test.ts:332:    // the round-1 review found `5.61` in this sentence, where the arithmetic gives 5.54, because
+tests/unit/consent-s02-style-contract.test.ts:360:    expect(ratiosAt(0.7)).toEqual(["Terracotta 5.54", "Chamber 8.09"]);
+apps/ui/app/globals.css:7575:   7.17, .70 -> 5.54 / 8.09. It is the smallest step clearing 4.5:1 in BOTH modes, i.e. the most

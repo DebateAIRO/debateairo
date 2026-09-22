@@ -1,0 +1,19 @@
+== marker counts at HEAD (exact strings) ==
+open  '/* === consent-ui S02 === */'      : 1
+close '/* === end consent-ui S02 === */'  : 1
+
+== nothing after the closing marker (line 7643 is last) ==
+total lines:     7643   sed -n '7644,$p' bytes:        0
+trailing non-whitespace after close: []
+
+=========== PREFIX ABOVE THE OPENING MARKER — three cuts, at HEAD and at a035f814 and at 511d30b6 ===========
+head -n 7222 : HEAD=164623 (290e01c7f8409de8)  a035f814=164623 (290e01c7f8409de8)  511d30b6=164623 (290e01c7f8409de8)
+head -n 7223 : HEAD=164624 (42a3cb387145f0e9)  a035f814=164624 (42a3cb387145f0e9)  511d30b6=164623 (290e01c7f8409de8)
+
+== diff -q of the whole prefix (lines 1..7223, i.e. everything strictly above the marker at :7224) ==
+PREFIX HEAD == a035f814 : IDENTICAL
+Files /private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/009d21d4-3595-46d3-b2b0-d763ebe8900d/scratchpad/CODE-REV-S02-C8-r2/prefix-head.txt and /private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/009d21d4-3595-46d3-b2b0-d763ebe8900d/scratchpad/CODE-REV-S02-C8-r2/prefix-511d.txt differ
+
+== git diff -U0 a035f814..HEAD hunk headers on globals.css ==
+
+== git diff -U0 511d30b6..HEAD hunk headers on globals.css ==

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_FIX38",
+  "ticket": "t_368d9d59",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_FINAL_CAPTURE_BINDING_CONTROLS",
+  "controls": 10,
+  "passed": 10,
+  "names": [
+    "all seven literal argv self-bind the final contract",
+    "fresh LIVE31 phase and GUIDE23 actual namespaces are exact",
+    "capture uses corrected helper through the local successor",
+    "readiness idle and process identity remain byte-bound to PROCESS_BIND37",
+    "fixed31 plan remains exact and unique",
+    "preflight binds all potential GUIDE23 screenshots and failure artifacts",
+    "operator metadata binds the actual finalized files",
+    "all future outputs are unique and absent",
+    "stale embedded command hash rejects before controlled first-phase boundary",
+    "actual embedded command hash reaches controlled first-phase boundary"
+  ],
+  "operatorGuard": {
+    "staleStatus": 1,
+    "matchingStatus": 1,
+    "matchingReachedBoundary": true
+  },
+  "hashes": {
+    "commandContract": "ff16afdb6f2a5bbc227818df0629c6817213d42595b8fa8814c1670bd2edf659",
+    "operatorScript": "6687c835aa82f204838132e14921aeb528f6759c8091bf19ed564def1e84df84",
+    "operatorContract": "677854cec802e1587374fecfa89b8a7aee713d43d6deeabaa4a9b177a1682217",
+    "screenshotHelper": "ae2dd69f15486cdd4cc0e31eb3321227a79b02c340d34d930ece6cea5589f771",
+    "captureImplementation": "e8f317572c8f528fe7410e6fd7c2337508e0ed53a1e987aa1af180df1e28b30c"
+  },
+  "futurePaths": {
+    "count": 154,
+    "allAbsent": true
+  },
+  "traffic": {
+    "runtime": 0,
+    "browserApp": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

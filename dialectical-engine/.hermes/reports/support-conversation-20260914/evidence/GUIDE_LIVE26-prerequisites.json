@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE26",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "contractSha256": "e64a497a30cf7ed84b5f721e3eab8b743489a33e334917ab124e5ec6a42f7d94",
+  "runtime": {
+    "pid": 12272,
+    "pgid": 12272,
+    "commandMarker": "pnpm dev:auth:up",
+    "runtimeLogPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE20-stack.log",
+    "detached": true
+  },
+  "connection": {
+    "source": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/.local/dev-auth/api.env",
+    "loader": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/runner/src/dev-api-process.ts#readPrivateEnvironment+parseExactEnvironment",
+    "keySource": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/runner/src/dev-api-environment.ts#DEVELOPMENT_API_ENVIRONMENT_KEYS",
+    "selectedSourceKey": "SUPPORT_DATABASE_URL",
+    "childEnvironmentKey": "GUIDE_COUNTS_ONLY_DATABASE_URL",
+    "principalRole": "debateai_dev_support",
+    "present": true,
+    "acceptedShape": true,
+    "valueRecorded": false
+  },
+  "futureOutputsCheckedAbsent": 114
+}

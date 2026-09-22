@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PRICING_CLAIM_FIX2",
+  "ticket": "t_aa6f2971",
+  "baseRevision": "b103ce27a060c48fcf5613c1bf44be53c7cb2a0c",
+  "revision": "130adf47da2e889005e73c3adb7ebb49fd50b529",
+  "productFiles": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/api/src/support/response-policy.ts",
+      "sha256": "2850c6b7dc5d59e09eae4083cd202d90bbe87d2fdd1b0baf460fb4f6e9d159b8",
+      "bytes": 18299,
+      "laneRelative": "apps/api/src/support/response-policy.ts"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-response-policy.test.ts",
+      "sha256": "2ff215bcd6f02e391bb0a3abfea5571e5f4602f0b55bb712336c3f3a035e8e62",
+      "bytes": 27484,
+      "laneRelative": "tests/unit/support-response-policy.test.ts"
+    }
+  ],
+  "scopeExact": true
+}

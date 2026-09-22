@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FOOTERLESS_FIX39",
+  "result": "VISUAL_QA_FIXTURE_FAILURE",
+  "reason": "The synthetic pane height override used !important, preventing the helper inline expansion from releasing the ancestor height. Original-pane body start/end controls passed, but the separately labeled expanded PNG visibly painted only the first section. No product issue was inferred.",
+  "affectedArtifact": "GUIDE_FOOTERLESS_FIX39-final-full-en-long-complete-expanded.png",
+  "operationalTraffic": 0
+}

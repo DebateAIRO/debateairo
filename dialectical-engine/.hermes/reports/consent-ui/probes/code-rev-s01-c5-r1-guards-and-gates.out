@@ -1,0 +1,26 @@
+shell=/bin/bash  grep=grep (BSD grep, GNU compatible) 2.6.0-FreeBSD  locale=C
+
+=== S01-S45 guard class over apps/ui/components/consent/ (FIXED strings, -F) ===
+  addEventListener   total hits: 0
+  Escape             total hits: 0
+  .focus()           total hits: 0
+  document.          total hits: 0
+  <script            total hits: 0
+  createPortal       total hits: 0
+  localStorage       total hits: 0
+  sessionStorage     total hits: 0
+  gtag               total hits: 0
+  analytics.         total hits: 0
+
+=== colour literals in every file this slice added under apps/ui (C7's class, pre-flight) ===
+  0 hits
+
+=== the S01 delimited CSS block: colour literals outside var(--token) ===
+  0 hits
+
+=== standing gates ===
+  auth-flow-integration       Tests 17 passed (17)
+  s5-session-controls.test.tsx                    Tests 2 passed (2)
+  s9-legacy-claim-controls.test.tsx               Tests 3 passed (3)
+  s10-erasure-ui.test.ts                          Tests 3 passed (3)
+  evaluator-dev-menu-ui.test.ts                   Tests 2 passed (2)

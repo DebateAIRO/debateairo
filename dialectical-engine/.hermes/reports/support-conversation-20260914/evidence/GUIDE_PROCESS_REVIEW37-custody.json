@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PROCESS_REVIEW37",
+  "ticket": "t_043df858",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "reviewedOn": "2026-09-21",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "productCheckout": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "head": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+    "porcelain": "",
+    "clean": true
+  },
+  "indexedInputs": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PROCESS_REVIEW37-inputs.json",
+    "matched": 86,
+    "total": 86,
+    "mismatches": 0
+  },
+  "processIdentity": {
+    "positive": { "pid": 9800, "ppid": 1, "pgid": 9800, "readinessAccepted": true, "idleAccepted": true },
+    "oldMismatchedAcceptanceReproduced": true,
+    "readinessNegatives": 6,
+    "idleNegatives": 6,
+    "failuresBeforeTls": true,
+    "failuresBeforeSuccessWrite": true,
+    "helperAuthenticatedBeforeImport": true
+  },
+  "finalBinding": {
+    "commandSha256": "a569348814688b64eab8368ef383bc77b7ec80605c08290489024fe8ca926f1f",
+    "embeddedOperatorSha256": "a569348814688b64eab8368ef383bc77b7ec80605c08290489024fe8ca926f1f",
+    "operatorScriptSha256": "4bbf33ade77da4270c7c61c92742ef02dbc32743f94cec44356af1d34440f0e7",
+    "hashGuardMatches": true
+  },
+  "futureAbsence": {
+    "declared": 123,
+    "unique": 123,
+    "absent": 123,
+    "present": 0
+  },
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

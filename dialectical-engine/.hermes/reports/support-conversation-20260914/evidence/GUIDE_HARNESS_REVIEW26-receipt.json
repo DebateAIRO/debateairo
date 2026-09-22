@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW26",
+  "ticket": "t_aeee4ff7",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "PASS_CAPTURE_PROOF_DEPENDENCY_FINAL_BINDING",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW26.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW26.md",
+      "sha256": "fca4dd5417e86ce6e5973b9efb57093145d6f874774384c548d8705c66365c3d",
+      "bytes": 4691
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW26-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW26-dispositions.json",
+      "sha256": "faf63aac71e5dc2fa096d468d1fdeb2110f6f31d03151a71e4fea00083b3ac87",
+      "bytes": 4116
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW26-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW26-custody.json",
+      "sha256": "9dd2cd38f2e7d71f92b388d9e1b5a981bf26fd49c9f497e087445f86a3e9e6b3",
+      "bytes": 1917
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW26.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW26.md",
+      "sha256": "b9ca8bbf0aa8019bcbbae5d67f93edf4a2d535d4b679f876fb6c87d037d1d91f",
+      "bytes": 2705
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "heavyLeaseHeld": false,
+  "finding": "FIX26 producer and capture wrappers enforce fresh hashed gated58 proof consumption before capture spawn.",
+  "retained": [
+    "FIX25 exact54+owner4 and real gated58 dispositions remain retained.",
+    "All seven FIX26 phases self-bind exact final contract bytes.",
+    "LIVE25/GUIDE21 namespaces and all product/privacy/owner-capacity sources remain unchanged and unused."
+  ]
+}

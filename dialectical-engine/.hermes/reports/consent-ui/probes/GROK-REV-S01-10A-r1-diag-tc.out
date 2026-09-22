@@ -1,0 +1,12 @@
+(node:73538) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[2m$ tsc --noEmit[22m
+tests/unit/s14-ui.test.ts(19,8): error TS2307: Cannot find module '../../web/lib/v3Presentation.js' or its corresponding type declarations.
+tests/unit/s14-ui.test.ts(122,38): error TS18046: 'label' is of type 'unknown'.
+tests/unit/s14-ui.test.ts(128,71): error TS18046: 'label' is of type 'unknown'.
+tests/unit/s14-ui.test.ts(199,18): error TS2339: Property 'nodes' does not exist on type '{ event_id: string; event_type: "graph.cycle_refused" | "graph.edge_added" | "honesty.abstention_typed" | "honesty.budget_skip_marked" | "honesty.fallback_labeled" | "honesty.investigation_gap_opened" | ... 22 more ... | "serve.recompose_or_defect"; run_ref: string; subject_ref?: string | ... 1 more ... | undefined;...'.
+tests/unit/s14-ui.test.ts(200,18): error TS2339: Property 'placeholderEdges' does not exist on type '{ event_id: string; event_type: "graph.cycle_refused" | "graph.edge_added" | "honesty.abstention_typed" | "honesty.budget_skip_marked" | "honesty.fallback_labeled" | "honesty.investigation_gap_opened" | ... 22 more ... | "serve.recompose_or_defect"; run_ref: string; subject_ref?: string | ... 1 more ... | undefined;...'.
+tests/unit/s14-ui.test.ts(230,58): error TS2307: Cannot find module '../../web/lib/api.js' or its corresponding type declarations.
+tests/unit/s14-ui.test.ts(232,55): error TS7006: Parameter 'input' implicitly has an 'any' type.
+tests/unit/s14-ui.test.ts(232,62): error TS7006: Parameter 'init' implicitly has an 'any' type.
+[41m[31m[[39m[49m[41m[30mELIFECYCLE[39m[49m[41m[31m][39m[49m [31mCommand failed with exit code 1.[39m

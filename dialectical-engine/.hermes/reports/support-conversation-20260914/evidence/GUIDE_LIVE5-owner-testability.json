@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE5",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "result": "UNAVAILABLE_PRETRAFFIC_OPERATOR_INVOCATION_FAILURE",
+  "manualScriptObserved": false,
+  "plannedManualSessions": {
+    "freshSession": 1,
+    "languageChangeSession": 1
+  },
+  "actualCaptureSessionCreationTimes": [],
+  "capacityMeasurement": {
+    "measuredAtUtc": "2026-09-20T11:46:23.077Z",
+    "sessionLimit1h": 5,
+    "observedMaxSessionEvents1hByIp": 0,
+    "messageLimit10m": 20,
+    "observedMaxMessageEvents10mByIp": 0,
+    "messageLimit24h": 100,
+    "observedMaxMessageEvents24hByIp": 0
+  },
+  "notBeforeUTC": null,
+  "naturalExpiryCalculated": false,
+  "freshMeasurementBeforeOwnerHandoffRequired": true,
+  "reason": "The five-session capture never started, so no capture session timestamps or observed manual rows exist. Capacity cannot be relabeled as post-capture owner availability."
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "node": "LIVE4",
+  "status": "SUPERSEDED_NONCONFORMING",
+  "reason": "The original diagnostic consumer serialized twelve producer fields; the packet permits exactly seven.",
+  "conforming": false,
+  "preserved": {
+    "agent-reports/LIVE4-superseded.md": "8ad78e06fd5b631d942bb88ac1ac6ca5d321113e9a33f64bd47fd9eefb19e29a",
+    "evidence/LIVE4-superseded.md": "a6d1f2a9e308c93cb28129d28397e304f13c395fe6e493dcc9a5b4386e18d333",
+    "evidence/LIVE4-superseded-manifest.json": "9b839263ecdb38513ea215ef27b0950f89ff084e6d57cac6309127fa58b171d8",
+    "evidence/LIVE4-superseded-actual-relay-receipt.json": "2dc216d117389a10ba8b2f52301709d7642702417e41b34fd0a6c59c080ab37a",
+    "logs/LIVE4-superseded-diagnostic-consumer-control.log": "e0c405db5fa61e650364f967ddd0c5b86482c199f5d8493c0d43a678769f351a",
+    "logs/LIVE4-superseded-manifest-verification.log": "3cce4283f594b42f5fa2b0430f5ebfcc5aa7f2dafe8cd5ace9d169397ff400cd"
+  },
+  "new_support_requests": 0,
+  "product_or_git_edits": 0
+}

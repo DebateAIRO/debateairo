@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "revision": "0f4290c290fd38caa0ccfb3b6781fb8c33999a22",
+  "command": "pnpm exec vitest run tests/unit/support-public-guide-boundary.test.ts tests/unit/support-classify.test.ts tests/integration/support-routes.test.ts --maxWorkers=1",
+  "files": [
+    "tests/unit/support-public-guide-boundary.test.ts",
+    "tests/unit/support-classify.test.ts",
+    "tests/integration/support-routes.test.ts"
+  ],
+  "result": {
+    "filesPassed": 3,
+    "testsPassed": 648,
+    "failed": 0,
+    "exitCode": 0
+  },
+  "log": {
+    "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_SIGNIN_CLASSIFIER_FIX-final-affected2.log",
+    "sha256": "24a14a2b4c73a122b422dfde0888b977753b41cba5d986c05ca06f9a78e7cf1c",
+    "bytes": 118922
+  }
+}

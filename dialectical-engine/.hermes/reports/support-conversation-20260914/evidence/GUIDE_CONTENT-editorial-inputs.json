@@ -1,0 +1,326 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CONTENT",
+  "ticket": "t_690be938",
+  "baseRevision": "714c7aa9f649b3e1bff4c517cb69b7245f68d9a3",
+  "productRevision": "5a8d10099178e2913f5e58b4f5e73f1eda13c30a",
+  "admission": "NONE; separate editorial review and manifest attestation are required",
+  "ownerRatification": "blank for every record",
+  "componentFile": {
+    "laneRelative": "packages/support-kb/recovery/components.json",
+    "sha256": "92088c3fa31dd3f01a43228b3e53eb009d8509f9a89312fb828eaf506e8bb7b3",
+    "bytes": 38776,
+    "totalRecords": 44
+  },
+  "priorManifest": {
+    "laneRelative": "packages/support-kb/reviews/manifest.json",
+    "sha256": "8e0057f4091d5cae733ddafd92527d1f02144834a78a8724c37cc99672ca3951",
+    "status": "STALE_BY_DESIGN"
+  },
+  "changedRecordCount": 8,
+  "unchangedRecordCount": 36,
+  "records": [
+    {
+      "id": "app-navigation",
+      "lang": "en",
+      "change": "new",
+      "status": "UNADMITTED_PENDING_SEPARATE_EDITORIAL",
+      "ownerRatification": {
+        "ratifiedBy": "",
+        "ratifiedOn": ""
+      },
+      "article": {
+        "laneRelative": "packages/support-kb/content/app-navigation.en.md",
+        "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/content/app-navigation.en.md",
+        "sha256": "0530c272ad7309caa39be93583a5c2b4d09eb995ec77a784b0f2fe3e39e06a09",
+        "bytes": 1366
+      },
+      "body": {
+        "sha256": "378bc3a0c18f1a48ec573972df17ea845f106bae1e72a8b1f515812b448c1d55",
+        "bytes": 1041,
+        "contract": "exact UTF-8 bytes after front-matter closing delimiter, including terminal newline"
+      },
+      "modelProjection": {
+        "sha256": "32a43ca48cf97847c44bc394d0fe1d9836eefc80fa79669560a4e3065b648564",
+        "bytes": 598
+      },
+      "fallback": {
+        "sha256": "4264551f61745540e92932ee99a99405152e94edf8b167e0ee19c5463526411d",
+        "bytes": 341
+      },
+      "producerSourceEvidence": {
+        "verifiedAgainst": "714c7aa9",
+        "sources": [
+          "apps/ui/components/landing/LandingChrome.tsx:33",
+          "apps/ui/components/TopBar.tsx:75",
+          "apps/ui/app/page.tsx:90",
+          "apps/ui/components/support/Assistant.tsx:728"
+        ]
+      }
+    },
+    {
+      "id": "app-navigation",
+      "lang": "ro",
+      "change": "new",
+      "status": "UNADMITTED_PENDING_SEPARATE_EDITORIAL",
+      "ownerRatification": {
+        "ratifiedBy": "",
+        "ratifiedOn": ""
+      },
+      "article": {
+        "laneRelative": "packages/support-kb/content/app-navigation.ro.md",
+        "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/content/app-navigation.ro.md",
+        "sha256": "af6e9b4926c71a27c0672fd3433a6ef5986b64fb4ed8c3736b9e90616d03204d",
+        "bytes": 1545
+      },
+      "body": {
+        "sha256": "8e1a69776cace332c0e09dfa60db17df1521f97349032a15fb2c1321f2bd1231",
+        "bytes": 1213,
+        "contract": "exact UTF-8 bytes after front-matter closing delimiter, including terminal newline"
+      },
+      "modelProjection": {
+        "sha256": "41f0fa900c297a531f6cb0f8ddb18e3a1f95812234476f5d309daebf6efe2636",
+        "bytes": 651
+      },
+      "fallback": {
+        "sha256": "e6a00272d90624b8367c54d60b8ecad42ee69ddf8155729b972eb8463a2d1cde",
+        "bytes": 384
+      },
+      "producerSourceEvidence": {
+        "verifiedAgainst": "714c7aa9",
+        "sources": [
+          "apps/ui/components/landing/LandingChrome.tsx:33",
+          "apps/ui/components/TopBar.tsx:75",
+          "apps/ui/app/page.tsx:90",
+          "apps/ui/components/support/Assistant.tsx:728"
+        ]
+      }
+    },
+    {
+      "id": "debate-workspace-menus",
+      "lang": "en",
+      "change": "new",
+      "status": "UNADMITTED_PENDING_SEPARATE_EDITORIAL",
+      "ownerRatification": {
+        "ratifiedBy": "",
+        "ratifiedOn": ""
+      },
+      "article": {
+        "laneRelative": "packages/support-kb/content/debate-workspace-menus.en.md",
+        "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/content/debate-workspace-menus.en.md",
+        "sha256": "dd5673e995acba7c108c52ff31080880206bdf0d51b2ca9f0113b0828e7be607",
+        "bytes": 1280
+      },
+      "body": {
+        "sha256": "51f5b6a42043f37a0c15f53edc63e128fa78b82a9dffb9f7292249c7a660746a",
+        "bytes": 954,
+        "contract": "exact UTF-8 bytes after front-matter closing delimiter, including terminal newline"
+      },
+      "modelProjection": {
+        "sha256": "7577c504c4b671b0027e49b37f64f0d2a456df9412a9349e58a98e631f8494bf",
+        "bytes": 529
+      },
+      "fallback": {
+        "sha256": "4028dd08b5d16d4ab54fba253595f758273d5d8dc9f8d6784ccf9b5c47d70618",
+        "bytes": 274
+      },
+      "producerSourceEvidence": {
+        "verifiedAgainst": "714c7aa9",
+        "sources": [
+          "apps/ui/app/debate/[id]/DebatePageClient.tsx:1131",
+          "apps/ui/components/DebateWorkspaceDrawer.tsx:24",
+          "apps/ui/components/AnswerHonestyDrawer.tsx:64"
+        ]
+      }
+    },
+    {
+      "id": "debate-workspace-menus",
+      "lang": "ro",
+      "change": "new",
+      "status": "UNADMITTED_PENDING_SEPARATE_EDITORIAL",
+      "ownerRatification": {
+        "ratifiedBy": "",
+        "ratifiedOn": ""
+      },
+      "article": {
+        "laneRelative": "packages/support-kb/content/debate-workspace-menus.ro.md",
+        "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/content/debate-workspace-menus.ro.md",
+        "sha256": "3cd8b0cdabe438779873f8f940cdff4bb2039ff55742f9400f8805320c8cbc39",
+        "bytes": 1445
+      },
+      "body": {
+        "sha256": "1e2080d9a727f2b2cfe6c3cc591ce632edd98db91f569a9c9f1eeb9ddced8841",
+        "bytes": 1105,
+        "contract": "exact UTF-8 bytes after front-matter closing delimiter, including terminal newline"
+      },
+      "modelProjection": {
+        "sha256": "e24fe21a32ba3cadd4539cc77afe806630b38b67dce8e33815665017cc3b03ef",
+        "bytes": 603
+      },
+      "fallback": {
+        "sha256": "7d0c57c3f8bb32eee70788195fe3d9971cbcb7ee4548249ea9a600207ac9ac0f",
+        "bytes": 324
+      },
+      "producerSourceEvidence": {
+        "verifiedAgainst": "714c7aa9",
+        "sources": [
+          "apps/ui/app/debate/[id]/DebatePageClient.tsx:1131",
+          "apps/ui/components/DebateWorkspaceDrawer.tsx:24",
+          "apps/ui/components/AnswerHonestyDrawer.tsx:64"
+        ]
+      }
+    },
+    {
+      "id": "settings-help-menus",
+      "lang": "en",
+      "change": "new",
+      "status": "UNADMITTED_PENDING_SEPARATE_EDITORIAL",
+      "ownerRatification": {
+        "ratifiedBy": "",
+        "ratifiedOn": ""
+      },
+      "article": {
+        "laneRelative": "packages/support-kb/content/settings-help-menus.en.md",
+        "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/content/settings-help-menus.en.md",
+        "sha256": "13ad6a9d637a972f1231ad9c07f3fd6c935d1a0d7438205a824244b5e125792e",
+        "bytes": 1680
+      },
+      "body": {
+        "sha256": "f9110ccae4333369c34bde0463548059adb789616841f184dcb708f8390eca0a",
+        "bytes": 1218,
+        "contract": "exact UTF-8 bytes after front-matter closing delimiter, including terminal newline"
+      },
+      "modelProjection": {
+        "sha256": "71d67c56465c915120cb18eb8e98a2522f9c41e0b4b7d82e486445a79695c169",
+        "bytes": 595
+      },
+      "fallback": {
+        "sha256": "d05abced279aa1b901165ce7bc701c23be75603123a47d1d58d8514c99908c2d",
+        "bytes": 372
+      },
+      "producerSourceEvidence": {
+        "verifiedAgainst": "714c7aa9",
+        "sources": [
+          "apps/ui/components/TopBar.tsx:82",
+          "apps/ui/components/SessionControls.tsx:165",
+          "apps/ui/components/consent/ConsentSettingsPanel.tsx:35",
+          "apps/ui/components/LegacyRunClaimControls.tsx:43",
+          "apps/ui/components/AccountErasureControls.tsx:93",
+          "apps/ui/components/support/Assistant.tsx:796"
+        ]
+      }
+    },
+    {
+      "id": "settings-help-menus",
+      "lang": "ro",
+      "change": "new",
+      "status": "UNADMITTED_PENDING_SEPARATE_EDITORIAL",
+      "ownerRatification": {
+        "ratifiedBy": "",
+        "ratifiedOn": ""
+      },
+      "article": {
+        "laneRelative": "packages/support-kb/content/settings-help-menus.ro.md",
+        "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/content/settings-help-menus.ro.md",
+        "sha256": "eca1fff36e680fc23768b9728aca8f52f7f0737357dfd458d084f5c173267146",
+        "bytes": 1859
+      },
+      "body": {
+        "sha256": "479afedbc1eb4525da7d6c6b819b45576ed3e18114efe55da15fd99a63ef7560",
+        "bytes": 1386,
+        "contract": "exact UTF-8 bytes after front-matter closing delimiter, including terminal newline"
+      },
+      "modelProjection": {
+        "sha256": "3fb9c82c7ddd17279147ff756dfa7dd6a70df5dafb9d30590f2b2e0b6cd55b4f",
+        "bytes": 635
+      },
+      "fallback": {
+        "sha256": "a671ff9eae38069e118a6c1adc88e610168918b4d2da2319f12945335677bea7",
+        "bytes": 386
+      },
+      "producerSourceEvidence": {
+        "verifiedAgainst": "714c7aa9",
+        "sources": [
+          "apps/ui/components/TopBar.tsx:82",
+          "apps/ui/components/SessionControls.tsx:165",
+          "apps/ui/components/consent/ConsentSettingsPanel.tsx:35",
+          "apps/ui/components/LegacyRunClaimControls.tsx:43",
+          "apps/ui/components/AccountErasureControls.tsx:93",
+          "apps/ui/components/support/Assistant.tsx:796"
+        ]
+      }
+    },
+    {
+      "id": "support-status-limits",
+      "lang": "en",
+      "change": "corrected",
+      "status": "UNADMITTED_PENDING_SEPARATE_EDITORIAL",
+      "ownerRatification": {
+        "ratifiedBy": "",
+        "ratifiedOn": ""
+      },
+      "article": {
+        "laneRelative": "packages/support-kb/content/support-status-limits.en.md",
+        "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/content/support-status-limits.en.md",
+        "sha256": "f5344e3c0e5f0bec3bb3b5b10dff77b12a85d90233a6d7a7cf8a31f38cc7bfe7",
+        "bytes": 898
+      },
+      "body": {
+        "sha256": "22afc752389590aa454e6d0015ce80b1eee1dc21f0fa79eafeaed5a97fd8bad9",
+        "bytes": 636,
+        "contract": "exact UTF-8 bytes after front-matter closing delimiter, including terminal newline"
+      },
+      "modelProjection": {
+        "sha256": "932f33969c279c6e7db4dc9d0d47fee7eb535b0d1cb593f9b9e9ccc743913385",
+        "bytes": 486
+      },
+      "fallback": {
+        "sha256": "3aafc3b34626b517e8827a8ff0ab9fa6deadf978dee235bd6d78936f37354375",
+        "bytes": 272
+      },
+      "producerSourceEvidence": {
+        "verifiedAgainst": "714c7aa9",
+        "sources": [
+          "apps/ui/components/support/Assistant.tsx:706",
+          "apps/ui/components/support/Assistant.tsx:748"
+        ]
+      }
+    },
+    {
+      "id": "support-status-limits",
+      "lang": "ro",
+      "change": "corrected",
+      "status": "UNADMITTED_PENDING_SEPARATE_EDITORIAL",
+      "ownerRatification": {
+        "ratifiedBy": "",
+        "ratifiedOn": ""
+      },
+      "article": {
+        "laneRelative": "packages/support-kb/content/support-status-limits.ro.md",
+        "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/content/support-status-limits.ro.md",
+        "sha256": "0ba2909d0b6bf0dbb731e6c19ceff73cd99babbfed69949aec3b28d57f732bfa",
+        "bytes": 981
+      },
+      "body": {
+        "sha256": "48662f4fb25887ded7d01b3ba5a003188ee088670b7be39792cb152711079cde",
+        "bytes": 715,
+        "contract": "exact UTF-8 bytes after front-matter closing delimiter, including terminal newline"
+      },
+      "modelProjection": {
+        "sha256": "05ede1015a5f66f5a5e2e564d061353d433c3af82ea2871bf9489764a27915f0",
+        "bytes": 537
+      },
+      "fallback": {
+        "sha256": "b14e495dcccbcf8d01c1e6213e28ee4c738ee405c6ea8eb4cc572d79f7a73b5e",
+        "bytes": 309
+      },
+      "producerSourceEvidence": {
+        "verifiedAgainst": "714c7aa9",
+        "sources": [
+          "apps/ui/components/support/Assistant.tsx:706",
+          "apps/ui/components/support/Assistant.tsx:748"
+        ]
+      }
+    }
+  ]
+}

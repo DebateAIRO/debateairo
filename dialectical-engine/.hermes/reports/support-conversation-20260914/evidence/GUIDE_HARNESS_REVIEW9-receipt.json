@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW9",
+  "ticket": "t_6ffde39b",
+  "runId": 170,
+  "reviewerAgentPath": "/root/baseline",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-20T11:42:06Z",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "productRevision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "freezeCommit": "714f0b82ad442564620dcebb6c240b6ad0c494f9",
+  "verdict": "PASS_BOUNDED_PARSE_CLASSIFICATION",
+  "findingDisposition": {
+    "id": "GH8-R1",
+    "status": "RESOLVED",
+    "captureBoundary": "capture-public-guide.mjs imports and calls readGuidePublicResponse",
+    "helper": "controls.mjs:260-265",
+    "control": "verify-guide-harness.mjs:684-708",
+    "parseFailure": {
+      "body": null,
+      "status": 502,
+      "phases": [
+        "API_RECEIVED",
+        "API_RECEIVED"
+      ],
+      "bodyState": "INVALID",
+      "statusState": "VALID",
+      "outcome": "UNKNOWN",
+      "failureCode": "GUIDE_HARNESS_API_BODY_INVALID"
+    },
+    "privacy": {
+      "rawBodyRetained": false,
+      "parseExceptionRetained": false,
+      "headersRetained": false,
+      "cookiesRetained": false,
+      "identifiersRetained": false
+    },
+    "validParsedBodyPassThrough": true
+  },
+  "retainedDispositions": [
+    {
+      "area": "111 FIX8 purpose names retained",
+      "verdict": "PASS"
+    },
+    {
+      "area": "legacy deterministic and strict MODEL/malformed decoration compatibility",
+      "verdict": "PASS"
+    },
+    {
+      "area": "safe staged checkpoints, privacy and attempted/completed accounting",
+      "verdict": "PASS"
+    },
+    {
+      "area": "diagnostic schemas and closed result predicates",
+      "verdict": "PASS"
+    },
+    {
+      "area": "matrix, source policy, navigation and pre-request verifier",
+      "verdict": "PASS"
+    },
+    {
+      "area": "five sessions, 31-second pacing, 42-model ceiling, 120-second freshness and no retry",
+      "verdict": "PASS"
+    },
+    {
+      "area": "ordered-eight final revision/KB/digest and copied adapter custody",
+      "verdict": "PASS"
+    },
+    {
+      "area": "GUIDE9 output namespace absence and GUIDE7 isolation",
+      "verdict": "PASS"
+    }
+  ],
+  "controlEvidence": {
+    "harnessSha256": "acc2c2cdf503f185ce8a43fcc6b262d144314708085a80e79ac262d99fed6fbc",
+    "matrixSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+    "verifierSha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733",
+    "canonicalProofSha256": "763466402b1525862a8688e6141d9217a65484ead1a78de6a591907a8ca8e7e6",
+    "retainedPurposes": 111,
+    "addedPurposes": 1,
+    "controls": 112,
+    "passed": 112,
+    "uniqueNames": 112,
+    "adapterNegativeControls": 3,
+    "adapterNegativePassed": 3,
+    "adapterImporterCalls": 0,
+    "adapterSuccessfulRows": 0,
+    "syntaxFiles": 10,
+    "inputCount": 99,
+    "inputMismatches": 0
+  },
+  "privacyAndFailureCustody": {
+    "lastSafePhase": "API_RECEIVED",
+    "failureCode": "GUIDE_HARNESS_API_BODY_INVALID",
+    "actualLive3Cause": "UNKNOWN_UNAVAILABLE_NOT_PERSISTED",
+    "actualLive4Cause": "UNKNOWN_UNAVAILABLE_NOT_PERSISTED",
+    "futureOutputsChecked": 56,
+    "futureOutputsPresent": []
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW9.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW9.md",
+      "sha256": "67bb0ade3a7fb8b4c7eaab122cc138e6e559de3ce9866e919444e13483f69d58",
+      "bytes": 3765
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW9.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW9.md",
+      "sha256": "3558c39b3e1d64352164b49ece169cd6988b470a28d3d9368c8363db812806cb",
+      "bytes": 3128
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW9-static-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW9-static-custody.json",
+      "sha256": "86fafd973f2726562c45b79765f37fd16c50b1af0d4ae1871baf8a5423de1b08",
+      "bytes": 3805
+    }
+  ],
+  "limits": [
+    "narrow static GH8-R1 re-review only; sealed author 112/112 and 3/3 were not rerun",
+    "no test/probe/browser/runtime/status/capacity/HTTP/DB/Support/model/lifecycle/product/KB/Git mutation",
+    "historical live failure responses and causes remain unknown and are not relabeled",
+    "PASS permits preparation of one reviewed capture only; no traffic, model-quality, readiness, acceptance, checkpoint, or CP2 claim",
+    "Forgot remains unresolved/actionless"
+  ],
+  "leases": {
+    "heavy": "not_requested",
+    "git": "not_requested"
+  },
+  "receiptExcludesItself": true
+}

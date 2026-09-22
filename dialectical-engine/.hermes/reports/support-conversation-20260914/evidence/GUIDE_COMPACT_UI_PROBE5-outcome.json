@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_COMPACT_UI_PROBE5",
+  "ticket": "t_ea7d37a8",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "verdict": "REWORK_COMPACT_RO_POST_READY_UNCLASSIFIED",
+  "childExitStatus": 1,
+  "failure": {
+    "code": "GUIDE_UI_PROBE_UNCLASSIFIED_FAILURE",
+    "phase": "UNAVAILABLE",
+    "surface": "UNKNOWN",
+    "language": "UNKNOWN"
+  },
+  "completedTransitions": [
+    { "surface": "full", "language": "en", "result": "PASS" },
+    { "surface": "full", "language": "ro", "result": "PASS" }
+  ],
+  "boundedLastObservation": {
+    "surface": "compact",
+    "language": "ro",
+    "phase": "READY",
+    "hydrationReady": "READY",
+    "widgetState": "EXPANDED",
+    "ariaExpanded": "TRUE",
+    "panelCount": 1,
+    "panelVisible": "VISIBLE",
+    "compactRootCount": 1,
+    "compactRootVisible": "VISIBLE",
+    "composerCount": 1,
+    "composerVisible": "VISIBLE",
+    "urlClass": "BASE"
+  },
+  "postOpenPrivateControls": {
+    "fullEn": "PASS",
+    "fullRo": "PASS",
+    "compactRo": "NOT_ESTABLISHED_AS_ENTERED"
+  },
+  "sourceBoundFailureWindow": {
+    "readyCheckpointPersisted": true,
+    "nextOperation": "SELECT_LANGUAGE",
+    "privateControlAssertionEntry": "UNPROVED",
+    "selectorScope": "FULL_DESK_ONLY",
+    "compactRootScope": "COMPACT_ASSISTANT",
+    "exactLostException": "UNAVAILABLE"
+  },
+  "traffic": {
+    "actualSupportRequestsForwarded": 0,
+    "guardedAttempts": {
+      "status": 1,
+      "pageCaseListRead": 1,
+      "createSession": 0,
+      "sendMessage": 0,
+      "otherSupport": 0
+    }
+  },
+  "consoleErrorCategories": {
+    "HTTP_401": 3,
+    "HTTP_404": 0,
+    "JS_OR_HYDRATION": 0,
+    "OTHER": 2
+  },
+  "runtimeAfterFailure": {
+    "pid": 77769,
+    "ppid": 1,
+    "pgid": 77769,
+    "ordinaryTlsHelpStatus": 200,
+    "unrelatedListenersPreserved": true
+  },
+  "limits": [
+    "The retained fixed projection bounds failure after compact Romanian READY and before its completed transition/private-control record.",
+    "Source ordering places selectLanguage after READY and before return to the caller's private-control assertion; assertion entry is not established.",
+    "The probe language selector is scoped to the full desk while the compact root is separate, but the lost exception prevents asserting exact causation.",
+    "It does not retain the underlying exception or compact private-control counts.",
+    "No product defect or exact cause is inferred.",
+    "The one-shot was not retried."
+  ]
+}

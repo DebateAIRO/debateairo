@@ -1,0 +1,702 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND16_UI_PROBE",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "completed": true,
+  "verdict": "PASS_ZERO_SUPPORT_UI_TRANSITIONS",
+  "baseUrlClass": "LOCAL_ORDINARY_TLS",
+  "browser": {
+    "driver": "playwright@1.61.1",
+    "headless": true,
+    "tlsBypass": false,
+    "freshProfile": true
+  },
+  "traffic": {
+    "actualSupportRequestsForwarded": 0,
+    "guardedAttempts": {
+      "status": 3,
+      "pageCaseListRead": 3,
+      "createSession": 0,
+      "sendMessage": 0,
+      "otherSupport": 0
+    }
+  },
+  "transitionSequence": [
+    "fresh full/en",
+    "same-session full/ro",
+    "storage-reset compact/ro",
+    "route-remount full/en",
+    "storage-reset compact/en"
+  ],
+  "observations": [
+    {
+      "surface": "full",
+      "language": "en",
+      "phase": "BEFORE_INTERACTION",
+      "hydrationReady": "READY",
+      "toggleCount": 0,
+      "toggleVisible": "NOT_APPLICABLE",
+      "widgetState": "NOT_APPLICABLE",
+      "ariaExpanded": "NOT_APPLICABLE",
+      "panelCount": 0,
+      "panelVisible": "NOT_APPLICABLE",
+      "compactRootCount": 0,
+      "compactRootVisible": "NOT_APPLICABLE",
+      "composerCount": 1,
+      "composerVisible": "VISIBLE",
+      "urlClass": "HELP",
+      "cookieRegionVisible": "VISIBLE",
+      "consoleErrorCategories": {
+        "HTTP_401": 1,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 2
+      },
+      "fullReadiness": {
+        "languageControlCount": 2,
+        "visibleLanguageControlCount": 2,
+        "activeLanguage": "EN",
+        "composerCount": 1,
+        "composerVisible": "VISIBLE",
+        "modeToggleCount": 1,
+        "modeToggleVisible": "VISIBLE",
+        "modeState": "TERRACOTTA",
+        "urlClass": "HELP"
+      }
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "phase": "READY",
+      "hydrationReady": "READY",
+      "toggleCount": 0,
+      "toggleVisible": "NOT_APPLICABLE",
+      "widgetState": "NOT_APPLICABLE",
+      "ariaExpanded": "NOT_APPLICABLE",
+      "panelCount": 0,
+      "panelVisible": "NOT_APPLICABLE",
+      "compactRootCount": 0,
+      "compactRootVisible": "NOT_APPLICABLE",
+      "composerCount": 1,
+      "composerVisible": "VISIBLE",
+      "urlClass": "HELP",
+      "cookieRegionVisible": "VISIBLE",
+      "consoleErrorCategories": {
+        "HTTP_401": 1,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 2
+      },
+      "fullReadiness": {
+        "languageControlCount": 2,
+        "visibleLanguageControlCount": 2,
+        "activeLanguage": "EN",
+        "composerCount": 1,
+        "composerVisible": "VISIBLE",
+        "modeToggleCount": 1,
+        "modeToggleVisible": "VISIBLE",
+        "modeState": "TERRACOTTA",
+        "urlClass": "HELP"
+      }
+    },
+    {
+      "surface": "full",
+      "language": "ro",
+      "phase": "BEFORE_INTERACTION",
+      "hydrationReady": "READY",
+      "toggleCount": 0,
+      "toggleVisible": "NOT_APPLICABLE",
+      "widgetState": "NOT_APPLICABLE",
+      "ariaExpanded": "NOT_APPLICABLE",
+      "panelCount": 0,
+      "panelVisible": "NOT_APPLICABLE",
+      "compactRootCount": 0,
+      "compactRootVisible": "NOT_APPLICABLE",
+      "composerCount": 1,
+      "composerVisible": "VISIBLE",
+      "urlClass": "HELP",
+      "cookieRegionVisible": "UNKNOWN",
+      "consoleErrorCategories": {
+        "HTTP_401": 1,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 2
+      },
+      "fullReadiness": {
+        "languageControlCount": 2,
+        "visibleLanguageControlCount": 2,
+        "activeLanguage": "RO",
+        "composerCount": 1,
+        "composerVisible": "VISIBLE",
+        "modeToggleCount": 1,
+        "modeToggleVisible": "VISIBLE",
+        "modeState": "TERRACOTTA",
+        "urlClass": "HELP"
+      }
+    },
+    {
+      "surface": "full",
+      "language": "ro",
+      "phase": "READY",
+      "hydrationReady": "READY",
+      "toggleCount": 0,
+      "toggleVisible": "NOT_APPLICABLE",
+      "widgetState": "NOT_APPLICABLE",
+      "ariaExpanded": "NOT_APPLICABLE",
+      "panelCount": 0,
+      "panelVisible": "NOT_APPLICABLE",
+      "compactRootCount": 0,
+      "compactRootVisible": "NOT_APPLICABLE",
+      "composerCount": 1,
+      "composerVisible": "VISIBLE",
+      "urlClass": "HELP",
+      "cookieRegionVisible": "UNKNOWN",
+      "consoleErrorCategories": {
+        "HTTP_401": 1,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 2
+      },
+      "fullReadiness": {
+        "languageControlCount": 2,
+        "visibleLanguageControlCount": 2,
+        "activeLanguage": "RO",
+        "composerCount": 1,
+        "composerVisible": "VISIBLE",
+        "modeToggleCount": 1,
+        "modeToggleVisible": "VISIBLE",
+        "modeState": "TERRACOTTA",
+        "urlClass": "HELP"
+      }
+    },
+    {
+      "surface": "compact",
+      "language": "ro",
+      "phase": "BEFORE_INTERACTION",
+      "hydrationReady": "READY",
+      "toggleCount": 1,
+      "toggleVisible": "VISIBLE",
+      "widgetState": "COLLAPSED",
+      "ariaExpanded": "FALSE",
+      "panelCount": 0,
+      "panelVisible": "UNKNOWN",
+      "compactRootCount": 0,
+      "compactRootVisible": "UNKNOWN",
+      "composerCount": 0,
+      "composerVisible": "UNKNOWN",
+      "urlClass": "BASE",
+      "cookieRegionVisible": "UNKNOWN",
+      "consoleErrorCategories": {
+        "HTTP_401": 1,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 2
+      },
+      "fullReadiness": null
+    },
+    {
+      "surface": "compact",
+      "language": "ro",
+      "phase": "AFTER_INTERACTION",
+      "hydrationReady": "READY",
+      "toggleCount": 1,
+      "toggleVisible": "VISIBLE",
+      "widgetState": "EXPANDED",
+      "ariaExpanded": "TRUE",
+      "panelCount": 1,
+      "panelVisible": "VISIBLE",
+      "compactRootCount": 1,
+      "compactRootVisible": "VISIBLE",
+      "composerCount": 1,
+      "composerVisible": "VISIBLE",
+      "urlClass": "BASE",
+      "cookieRegionVisible": "UNKNOWN",
+      "consoleErrorCategories": {
+        "HTTP_401": 1,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 2
+      },
+      "fullReadiness": null
+    },
+    {
+      "surface": "compact",
+      "language": "ro",
+      "phase": "READY",
+      "hydrationReady": "READY",
+      "toggleCount": 1,
+      "toggleVisible": "VISIBLE",
+      "widgetState": "EXPANDED",
+      "ariaExpanded": "TRUE",
+      "panelCount": 1,
+      "panelVisible": "VISIBLE",
+      "compactRootCount": 1,
+      "compactRootVisible": "VISIBLE",
+      "composerCount": 1,
+      "composerVisible": "VISIBLE",
+      "urlClass": "BASE",
+      "cookieRegionVisible": "UNKNOWN",
+      "consoleErrorCategories": {
+        "HTTP_401": 1,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 2
+      },
+      "fullReadiness": null
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "phase": "BEFORE_INTERACTION",
+      "hydrationReady": "READY",
+      "toggleCount": 0,
+      "toggleVisible": "NOT_APPLICABLE",
+      "widgetState": "NOT_APPLICABLE",
+      "ariaExpanded": "NOT_APPLICABLE",
+      "panelCount": 0,
+      "panelVisible": "NOT_APPLICABLE",
+      "compactRootCount": 0,
+      "compactRootVisible": "NOT_APPLICABLE",
+      "composerCount": 1,
+      "composerVisible": "VISIBLE",
+      "urlClass": "HELP",
+      "cookieRegionVisible": "UNKNOWN",
+      "consoleErrorCategories": {
+        "HTTP_401": 5,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 6
+      },
+      "fullReadiness": {
+        "languageControlCount": 2,
+        "visibleLanguageControlCount": 2,
+        "activeLanguage": "EN",
+        "composerCount": 1,
+        "composerVisible": "VISIBLE",
+        "modeToggleCount": 1,
+        "modeToggleVisible": "VISIBLE",
+        "modeState": "TERRACOTTA",
+        "urlClass": "HELP"
+      }
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "phase": "READY",
+      "hydrationReady": "READY",
+      "toggleCount": 0,
+      "toggleVisible": "NOT_APPLICABLE",
+      "widgetState": "NOT_APPLICABLE",
+      "ariaExpanded": "NOT_APPLICABLE",
+      "panelCount": 0,
+      "panelVisible": "NOT_APPLICABLE",
+      "compactRootCount": 0,
+      "compactRootVisible": "NOT_APPLICABLE",
+      "composerCount": 1,
+      "composerVisible": "VISIBLE",
+      "urlClass": "HELP",
+      "cookieRegionVisible": "UNKNOWN",
+      "consoleErrorCategories": {
+        "HTTP_401": 5,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 6
+      },
+      "fullReadiness": {
+        "languageControlCount": 2,
+        "visibleLanguageControlCount": 2,
+        "activeLanguage": "EN",
+        "composerCount": 1,
+        "composerVisible": "VISIBLE",
+        "modeToggleCount": 1,
+        "modeToggleVisible": "VISIBLE",
+        "modeState": "TERRACOTTA",
+        "urlClass": "HELP"
+      }
+    },
+    {
+      "surface": "compact",
+      "language": "en",
+      "phase": "BEFORE_INTERACTION",
+      "hydrationReady": "READY",
+      "toggleCount": 1,
+      "toggleVisible": "VISIBLE",
+      "widgetState": "COLLAPSED",
+      "ariaExpanded": "FALSE",
+      "panelCount": 0,
+      "panelVisible": "UNKNOWN",
+      "compactRootCount": 0,
+      "compactRootVisible": "UNKNOWN",
+      "composerCount": 0,
+      "composerVisible": "UNKNOWN",
+      "urlClass": "BASE",
+      "cookieRegionVisible": "UNKNOWN",
+      "consoleErrorCategories": {
+        "HTTP_401": 5,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 6
+      },
+      "fullReadiness": null
+    },
+    {
+      "surface": "compact",
+      "language": "en",
+      "phase": "AFTER_INTERACTION",
+      "hydrationReady": "READY",
+      "toggleCount": 1,
+      "toggleVisible": "VISIBLE",
+      "widgetState": "EXPANDED",
+      "ariaExpanded": "TRUE",
+      "panelCount": 1,
+      "panelVisible": "VISIBLE",
+      "compactRootCount": 1,
+      "compactRootVisible": "VISIBLE",
+      "composerCount": 1,
+      "composerVisible": "VISIBLE",
+      "urlClass": "BASE",
+      "cookieRegionVisible": "UNKNOWN",
+      "consoleErrorCategories": {
+        "HTTP_401": 5,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 6
+      },
+      "fullReadiness": null
+    },
+    {
+      "surface": "compact",
+      "language": "en",
+      "phase": "READY",
+      "hydrationReady": "READY",
+      "toggleCount": 1,
+      "toggleVisible": "VISIBLE",
+      "widgetState": "EXPANDED",
+      "ariaExpanded": "TRUE",
+      "panelCount": 1,
+      "panelVisible": "VISIBLE",
+      "compactRootCount": 1,
+      "compactRootVisible": "VISIBLE",
+      "composerCount": 1,
+      "composerVisible": "VISIBLE",
+      "urlClass": "BASE",
+      "cookieRegionVisible": "UNKNOWN",
+      "consoleErrorCategories": {
+        "HTTP_401": 5,
+        "HTTP_404": 0,
+        "JS_OR_HYDRATION": 0,
+        "OTHER": 6
+      },
+      "fullReadiness": null
+    }
+  ],
+  "transitions": [
+    {
+      "surface": "full",
+      "language": "en",
+      "result": "PASS",
+      "readyPhase": "READY"
+    },
+    {
+      "surface": "full",
+      "language": "ro",
+      "result": "PASS",
+      "readyPhase": "READY"
+    },
+    {
+      "surface": "compact",
+      "language": "ro",
+      "result": "PASS",
+      "readyPhase": "READY"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "result": "PASS",
+      "readyPhase": "READY"
+    },
+    {
+      "surface": "compact",
+      "language": "en",
+      "result": "PASS",
+      "readyPhase": "READY"
+    }
+  ],
+  "failure": null,
+  "postReadyStages": [
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "COOKIE_SETTLING",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "COOKIE_SETTLING",
+      "state": "PASSED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "LOCALE_SELECTION",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "LOCALE_SELECTION",
+      "state": "PASSED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "PRIVATE_CONTROL_CHECK",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "PRIVATE_CONTROL_CHECK",
+      "state": "PASSED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "TRANSITION_COMPLETION",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "TRANSITION_COMPLETION",
+      "state": "PASSED"
+    },
+    {
+      "surface": "full",
+      "language": "ro",
+      "stage": "COOKIE_SETTLING",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "full",
+      "language": "ro",
+      "stage": "COOKIE_SETTLING",
+      "state": "PASSED"
+    },
+    {
+      "surface": "full",
+      "language": "ro",
+      "stage": "LOCALE_SELECTION",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "full",
+      "language": "ro",
+      "stage": "LOCALE_SELECTION",
+      "state": "PASSED"
+    },
+    {
+      "surface": "full",
+      "language": "ro",
+      "stage": "PRIVATE_CONTROL_CHECK",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "full",
+      "language": "ro",
+      "stage": "PRIVATE_CONTROL_CHECK",
+      "state": "PASSED"
+    },
+    {
+      "surface": "full",
+      "language": "ro",
+      "stage": "TRANSITION_COMPLETION",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "full",
+      "language": "ro",
+      "stage": "TRANSITION_COMPLETION",
+      "state": "PASSED"
+    },
+    {
+      "surface": "compact",
+      "language": "ro",
+      "stage": "COOKIE_SETTLING",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "compact",
+      "language": "ro",
+      "stage": "COOKIE_SETTLING",
+      "state": "PASSED"
+    },
+    {
+      "surface": "compact",
+      "language": "ro",
+      "stage": "LOCALE_SELECTION",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "compact",
+      "language": "ro",
+      "stage": "LOCALE_SELECTION",
+      "state": "PASSED"
+    },
+    {
+      "surface": "compact",
+      "language": "ro",
+      "stage": "PRIVATE_CONTROL_CHECK",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "compact",
+      "language": "ro",
+      "stage": "PRIVATE_CONTROL_CHECK",
+      "state": "PASSED"
+    },
+    {
+      "surface": "compact",
+      "language": "ro",
+      "stage": "TRANSITION_COMPLETION",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "compact",
+      "language": "ro",
+      "stage": "TRANSITION_COMPLETION",
+      "state": "PASSED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "COOKIE_SETTLING",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "COOKIE_SETTLING",
+      "state": "PASSED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "LOCALE_SELECTION",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "LOCALE_SELECTION",
+      "state": "PASSED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "PRIVATE_CONTROL_CHECK",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "PRIVATE_CONTROL_CHECK",
+      "state": "PASSED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "TRANSITION_COMPLETION",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "full",
+      "language": "en",
+      "stage": "TRANSITION_COMPLETION",
+      "state": "PASSED"
+    },
+    {
+      "surface": "compact",
+      "language": "en",
+      "stage": "COOKIE_SETTLING",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "compact",
+      "language": "en",
+      "stage": "COOKIE_SETTLING",
+      "state": "PASSED"
+    },
+    {
+      "surface": "compact",
+      "language": "en",
+      "stage": "LOCALE_SELECTION",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "compact",
+      "language": "en",
+      "stage": "LOCALE_SELECTION",
+      "state": "PASSED"
+    },
+    {
+      "surface": "compact",
+      "language": "en",
+      "stage": "PRIVATE_CONTROL_CHECK",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "compact",
+      "language": "en",
+      "stage": "PRIVATE_CONTROL_CHECK",
+      "state": "PASSED"
+    },
+    {
+      "surface": "compact",
+      "language": "en",
+      "stage": "TRANSITION_COMPLETION",
+      "state": "ENTERED"
+    },
+    {
+      "surface": "compact",
+      "language": "en",
+      "stage": "TRANSITION_COMPLETION",
+      "state": "PASSED"
+    }
+  ],
+  "currentPostReadyStage": {
+    "surface": "compact",
+    "language": "en",
+    "stage": "TRANSITION_COMPLETION",
+    "state": "PASSED"
+  },
+  "consoleErrorCategories": {
+    "HTTP_401": 7,
+    "HTTP_404": 0,
+    "JS_OR_HYDRATION": 0,
+    "OTHER": 6
+  },
+  "privateControls": [
+    {
+      "surface": "full",
+      "passed": true
+    },
+    {
+      "surface": "full",
+      "passed": true
+    },
+    {
+      "surface": "compact",
+      "passed": true
+    },
+    {
+      "surface": "full",
+      "passed": true
+    },
+    {
+      "surface": "compact",
+      "passed": true
+    }
+  ]
+}

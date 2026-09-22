@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_BIND31",
+  "ticket": "t_36863bc5",
+  "revision": "b103ce27a060c48fcf5613c1bf44be53c7cb2a0c",
+  "verdict": "PREPARED_NOT_EXECUTED_PRODUCT_REWORK",
+  "nativeSession": "01a09f02-346a-7fb0-aa70-0424f1fdd21e",
+  "skillsLoaded": "Retained mission BODY skill context; no new skill invoked in this resumed node.",
+  "questionVerbatim": "treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.",
+  "answer": "This node stopped at the product-review boundary. It preserved a reusable mechanical successor contract and all 123 unused outputs. The most important efficiency improvement is to require the independently reviewed product revision before building or executing product-bound preview contracts, then keep the next node to a hash substitution, one offline proof, and one supported reload. The repeated cost here was serial rebinding against a revision that was still under semantic review; the reusable FIX30 contract prevented broader rework.",
+  "limitations": [
+    "No successor executable contract was sealed.",
+    "No full58 proof ran.",
+    "No runtime lifecycle or readiness check ran.",
+    "The product defect attribution is from root baseline review, not reproduced here."
+  ]
+}

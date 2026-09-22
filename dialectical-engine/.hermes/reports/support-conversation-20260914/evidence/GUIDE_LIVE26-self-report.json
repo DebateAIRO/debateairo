@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE26",
+  "ticket": "t_0fbb505d",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "STOPPED_PHASE1_OPERATOR_LOG_COLLISION",
+  "skillsLoaded": ["retained BODY skills and mission floors"],
+  "loaderPrerequisiteStatus": 0,
+  "phaseStatuses": ["FAILED_BEFORE_UI_CHILD", "NOT_RUN", "NOT_RUN", "NOT_RUN", "NOT_RUN", "NOT_RUN", "NOT_RUN"],
+  "createdOperationalPaths": ["logs/GUIDE_LIVE25-preflight.log"],
+  "absentOperationalPathCount": 111,
+  "actualCounts": {"attempted": 0, "completed": 0, "sessions": 0, "modelCalls": 0},
+  "runtime": {"pid": 12272, "pgid": 12272, "ordinaryTlsHelpStatus": 200, "detached": true},
+  "finding": "The operator treated a wrapper-owned future log as its stdout destination, violating the wrapper's own absence precondition.",
+  "upgrade": "Generate ownership metadata for every output path and reject an operator plan that opens a child-owned path before the child validates absence.",
+  "limits": ["No retry", "No capacity read", "No actual traffic", "Forgot unresolved/actionless"]
+}

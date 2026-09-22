@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_UI_WRITER_FIX45",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "finding": "LIVE33_UI_OUTPUT_MODE",
+  "commandContractSha256": "6067a3f0db32f56a6b072fd2826b1e94da7969bc47151bbb9f762b39f2a02c3b",
+  "operatorSha256": "af7e1d91ac8d7a22f580a7b96bdf1569d44782c9b138b6dc0f92d46aeebbb787",
+  "uiWriterSha256": "e75e3f040c8f9a64ce5e54f0dd8ff03c84177ea79bf27dfdb163bff9e57659ad",
+  "privateWriterSha256": "df8efe4054581308f4915438b332e337bc7a2098f2e6c8e91eba6b85c2a6e9fb",
+  "freshNamespace": "LIVE34"
+}

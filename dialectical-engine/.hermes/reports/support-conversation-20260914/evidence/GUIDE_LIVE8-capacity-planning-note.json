@@ -1,0 +1,83 @@
+{
+  "at": "2026-09-20T17:23:43.938408+00:00",
+  "authority": "administrative planning from sealed aggregate evidence only; no fresh availability claim",
+  "frames": [
+    {
+      "node": "GUIDE_LIVE6",
+      "receipt": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE6-receipt.json",
+        "sha256": "07e139fa51af5afd66a28fb974a198ace17d7365c2554b10656372d8c0adcf91",
+        "bytes": 16275
+      },
+      "consumption": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE6-consumption.json",
+        "sha256": "8a3f9e3d6ea9137f79978c675c5115b5c29a60afa28146f6d288b90fe8d546fb",
+        "bytes": 80114
+      },
+      "consumedAt": "2026-09-20T12:09:55.869309+00:00",
+      "capacity": {
+        "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE6-runtime-capacity.json",
+        "sha256": "aa741c242bc66696b34a7ade0b7e9682d4f6aa9ea57946608a035e8a4bb36211",
+        "bytes": 1188
+      },
+      "measuredAtUtc": "2026-09-20T11:54:02.857Z",
+      "dailyLimit": 100,
+      "maximumDailyEvents": 0
+    },
+    {
+      "node": "GUIDE_LIVE7",
+      "receipt": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE7-receipt.json",
+        "sha256": "77ade4a41d2899964e587e86b3be58fd6c97d5f63ffbb430d32a60d28d8d1cf3",
+        "bytes": 14440
+      },
+      "consumption": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE7-consumption.json",
+        "sha256": "f8868e2f7b3e78e306decb68da4771b269968cdb79b29f1282cad8a3620b169d",
+        "bytes": 56712
+      },
+      "consumedAt": "2026-09-20T14:07:47.111762+00:00",
+      "capacity": {
+        "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE7-runtime-capacity.json",
+        "sha256": "94465f98ce1b4ac7c68b1cf70ecac76b894dfe2198288fd4fdc13bb3a977769a",
+        "bytes": 1190
+      },
+      "measuredAtUtc": "2026-09-20T13:54:43.254Z",
+      "dailyLimit": 100,
+      "maximumDailyEvents": 15
+    },
+    {
+      "node": "GUIDE_LIVE8",
+      "receipt": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE8-receipt.json",
+        "sha256": "c83366391969de5ec01b50707317895b46e27c6c014a7c636d723ef19cbe3d2b",
+        "bytes": 21287
+      },
+      "consumption": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE8-consumption.json",
+        "sha256": "2ff4087a38b4ba206eb5117fdd8f5009c40af1fa8ca23f990df91ceb44a8a08d",
+        "bytes": 65628
+      },
+      "consumedAt": "2026-09-20T17:17:20.550341+00:00",
+      "capacity": {
+        "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE8-runtime-capacity.json",
+        "sha256": "fe1f153259f6ae176482213c2a345785d637cde7bb3f24825427224187ac5db7",
+        "bytes": 1190
+      },
+      "measuredAtUtc": "2026-09-20T16:52:47.181Z",
+      "dailyLimit": 100,
+      "maximumDailyEvents": 30
+    }
+  ],
+  "candidateFreshCheckUtc": "2026-09-21T12:10:00Z",
+  "candidateBasis": "LIVE6 was consumed at12:09:55UTC onSep20 after15 attempted sends. Its traffic will be older than24h by the candidate check. This may recover sufficient capacity earlier than complete LIVE8 expiry; accounting is not a substitute for a fresh supported measurement and does not identify IPs.",
+  "fallbackConservativeCheckUtc": "2026-09-21T17:18:00Z",
+  "fallbackBasis": "After LIVE8 consumedAt+24h; conditional on no intervening traffic.",
+  "rules": [
+    "No new traffic for scheduling",
+    "No quota changes or resets",
+    "No full54 until fresh complete gate passes",
+    "No recombination of partials",
+    "Exact current revision and runtime must be revalidated"
+  ]
+}

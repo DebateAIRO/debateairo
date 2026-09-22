@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PRICING_CLAIM_REVIEW2",
+  "ticket": "t_dfa4697e",
+  "revision": "130adf47da2e889005e73c3adb7ebb49fd50b529",
+  "baseRevision": "b103ce27a060c48fcf5613c1bf44be53c7cb2a0c",
+  "freeze": "dad31eb8971c537453bd5cfc94822f71193edc58",
+  "authorReceipt": {
+    "sha256": "9ec55a4253b5da6644fea495642a942a564ef93f8be4c3be614e79b8afdfa787",
+    "bytes": 6973
+  },
+  "authorConsumption": {
+    "sha256": "e3274a9c3c01264142427b41319ae3ccee36bd6aa71850d668d1193b9939d153",
+    "bytes": 14625
+  },
+  "product": {
+    "clean": true,
+    "changedPaths": 2,
+    "responsePolicySha256": "2850c6b7dc5d59e09eae4083cd202d90bbe87d2fdd1b0baf460fb4f6e9d159b8",
+    "responsePolicyTestsSha256": "2ff215bcd6f02e391bb0a3abfea5571e5f4602f0b55bb712336c3f3a035e8e62"
+  },
+  "authorVerification": {
+    "focusedPassed": 231,
+    "focusedFailed": 0,
+    "affectedPassed": 460,
+    "affectedFailed": 0,
+    "affectedFiles": 3,
+    "finalLogSha256": "00efad600c96751819d17d01e4d9fe81b7a5b9cc770e7e5e9ee6e588eaad4364",
+    "typecheckRepeated": false,
+    "inheritedNormalizedDiagnostics": 76
+  },
+  "indexedInputs": {
+    "inputs": 29,
+    "verified": 29,
+    "mismatches": 0
+  },
+  "reviewMode": "STATIC_READ_ONLY_DELTA_REVIEW",
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

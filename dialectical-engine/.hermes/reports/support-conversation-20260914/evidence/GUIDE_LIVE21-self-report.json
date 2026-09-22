@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE21",
+  "ticket": "t_cfe2b979",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "STOPPED_PRECAPACITY_CUSTODY_MISSING",
+  "model": "gpt-5.6-sol",
+  "session": "01a09f02-346a-7fb0-aa70-0424f1fdd21e",
+  "skills": {
+    "retained": [
+      "superpowers:executing-plans",
+      "superpowers:systematic-debugging",
+      "superpowers:verification-before-completion"
+    ],
+    "reReadThisNode": false
+  },
+  "phases": {
+    "preflight": "PASS",
+    "readiness": "PASS",
+    "capacity": "FAILED_BEFORE_READ",
+    "gate": "NOT_RUN",
+    "rowProof": "NOT_RUN",
+    "capture": "NOT_RUN",
+    "idle": "NOT_RUN"
+  },
+  "actual": {
+    "attempted": 0,
+    "completed": 0,
+    "sessions": 0,
+    "modelCalls": 0
+  },
+  "traffic": {
+    "uiPreflightSupportForwarded": 0,
+    "capacityStatusReads": 0,
+    "capacityDatabaseReads": 0,
+    "support": 0,
+    "model": 0
+  },
+  "runtime": {
+    "pid": 12272,
+    "pgid": 12272,
+    "leftUntouched": true,
+    "postFailureLiveness": "NOT_RECHECKED"
+  },
+  "heavyLeaseReleased": true,
+  "limits": [
+    "No capacity frame was measured or retried.",
+    "Deferred owner capacity remains unexecuted.",
+    "Forgot unresolved/actionless.",
+    "No readiness or acceptance claim."
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-17T08:34:31Z",
+  "node": "FEEDBACK2_REV2",
+  "ticket": "t_7ced3540",
+  "session": "/root/forgot_destination",
+  "model": "gpt-5.6-sol",
+  "revision": "9e87fe5859b44fbd62dd485e03045e5bcde96bed",
+  "previousRevision": "1b23c0b732679fdb665a19e03104b800f9d2ef38",
+  "freeze": "b89d0bf11e01f39dbd7b53cc84ddaa05bde92055",
+  "verdict": "REWORK",
+  "usage": "UNAVAILABLE",
+  "artifacts": [
+    {
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/FEEDBACK2_REV2.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/FEEDBACK2_REV2.md",
+      "sha256": "1b8cd51883f01b9da02a1f32bcf16fa072301158d6954115aa9605b784901834",
+      "bytes": 6141
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/FEEDBACK2_REV2.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FEEDBACK2_REV2.md",
+      "sha256": "5ba1dc911b12b7cc5ab08881913ba1f632bd8e653daef65ec2550d29796a1584",
+      "bytes": 4107
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/FEEDBACK2_REV2/feedback2-boundary-control.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/FEEDBACK2_REV2/feedback2-boundary-control.ts",
+      "sha256": "ff4179b5fd4328ebe5fc570fbdd9087a29c5e4dd999a6ea480f923798291ba39",
+      "bytes": 16054
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/FEEDBACK2_REV2/run-feedback2-boundary-control.mjs",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/FEEDBACK2_REV2/run-feedback2-boundary-control.mjs",
+      "sha256": "8c57609dbdbb360c6ea4edfe97ce7140e9d23b173d6980cd6df2d6444dec1053",
+      "bytes": 2189
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/FEEDBACK2_REV2/verify-inputs.mjs",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/FEEDBACK2_REV2/verify-inputs.mjs",
+      "sha256": "a30e4238d14230085cbc996f3fb3c67ee0b5fbedb4725dc928799f663562d76a",
+      "bytes": 2029
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/FEEDBACK2_REV2-input-verification.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FEEDBACK2_REV2-input-verification.log",
+      "sha256": "8221f55b9c4ffa818defa23b4d859b49f8d008dec5bd83ea8f890ea5e74c4cd1",
+      "bytes": 482
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/FEEDBACK2_REV2-feedback2-boundary.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FEEDBACK2_REV2-feedback2-boundary.log",
+      "sha256": "162bca7b1038c6be5d90201604bf4ecf10ac3301b17461afa97d5fe17ce45556",
+      "bytes": 20847
+    }
+  ],
+  "limits": [
+    "Bounded union-family recheck only; no final-25 rerun or broad audit.",
+    "The original unsupported-authority sink is fixed for seven context and two actual in-memory service members; no complete semantic-authority claim is made.",
+    "Recovery findings establish four operation-word suppression members and one Romanian recovery-code member, not general negation or natural-language completeness.",
+    "The Romanian recovery-code case emitted no URL/action and performed no credential validation or reset.",
+    "No real HTTP, database, browser, preview, provider, model, authentication, reset, or account traffic.",
+    "Forgot-password destination remains unresolved and was not searched, guessed, or waived.",
+    "User alone accepts CP1; this receipt is not checkpoint acceptance."
+  ]
+}

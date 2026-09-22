@@ -1,0 +1,45 @@
+{
+  "revision": "141f04726e12e40c85fccfb75473cfd684bcf230",
+  "inputs": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS-receipt.json",
+      "sha256": "76b99ec9047e71300d2762250860d81b0b112dfda728723af3deebaf398c244e",
+      "bytes": 6269
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS-consumption.json",
+      "sha256": "77314db17743e6d66916b5d4f1ab4165313ae0dba9a0c950f927092113e01618",
+      "bytes": 8543
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS/README.md",
+      "sha256": "f55e2091d63049c1bc1fb89a8f1da18aa28c471d8f7149dfb7dc02792404bcb6",
+      "bytes": 2843
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS/matrix.mjs",
+      "sha256": "b767c81d76427c2e924870a4a2eaeb99893c737862c0a85b11339bab6214563f",
+      "bytes": 9347
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS/capture-public-guide.mjs",
+      "sha256": "5e040eedb2530457189382501f81a9e5a5d81044cd5ca4a4c8912ba425dde413",
+      "bytes": 14287
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_EVAL_RECHECK-consumption.json",
+      "sha256": "96d3773ad19e0dd760bd62030b772c70aa1660a065fe04db2fbfa5d132f611ad",
+      "bytes": 16030
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/SPEC-v5.md",
+      "sha256": "4dc2a6ecb17b29eb25f4b523eae9ed7d99c45c6d48aad356987d1e0868fbe327",
+      "bytes": 7794
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PLAN-PUBLIC-GUIDE-v2.md",
+      "sha256": "2cb58e6136888f8802cdf4c5982aa9c0505e958f5cb3ae2dcdb49a6de40265fe",
+      "bytes": 35888
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_RUNTIME7",
+  "ticket": "t_bb4c9a2b",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "PASS_OWNED_RUNTIME_READY",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME7.md",
+      "sha256": "90bf9ca7abd70299c25411d30620c0b4e20d1a9a61aa2d7d9613ba4be8763297",
+      "bytes": 2590
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME7-self-report.json",
+      "sha256": "1325f74c9245af08508ca3de9baa7a43fc4fcf879b8c1ed158b475b3ed2a1f6b",
+      "bytes": 1038
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME7-manifest.json",
+      "sha256": "37b5e3460754adeba9a8ec4affdfce48bc37a1dbe7c9840addedea5be19e2072",
+      "bytes": 6328
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME7-stack-custody.json",
+      "sha256": "c126f521a332caae7c840e8391032f1b6f0b76e61146ba1e1120ca6851e89709",
+      "bytes": 592
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME7-readiness.json",
+      "sha256": "26040d98e793ba27bbf0356667f91866c335877773732a826b2856df1fafd629",
+      "bytes": 2195
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME7-idle-custody.json",
+      "sha256": "20f91663305c26b031f2ff342cf55467c18f84a75ca8521ae7428396b696dc8d",
+      "bytes": 843
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME7-actual-outputs-absence.json",
+      "sha256": "1fc720cce172df594df0bd437bb7de3013ff6ca077892b05aa5bcfd6cb340f63",
+      "bytes": 480
+    }
+  ],
+  "privateOngoingLogExcluded": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE20-stack.log",
+  "heavyLeaseReleased": true
+}

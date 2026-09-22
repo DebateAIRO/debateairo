@@ -1,0 +1,10 @@
+# LIVE attempt 4 — pnpm dev:auth:up from .worktrees/all at b97985a8 (integration/all after the RULING 4 merge) against V's dev database on 127.0.0.1:55432 with the custody copy; launched 2026-09-16 17:34:55 (pid 38597); before: receipt v9 / 32 rows, api.env REGISTER_VERSION=9 (12:53); after: receipt v10 / 33 rows, api.env REGISTER_VERSION=10 written 17:35:29; the stack then failed at the RUNNER stage and stopped every owned stage (no listeners).
+$ tsx apps/runner/src/dev-auth-stack-cli.ts
+DEV_PROVIDER_SLOT_UNAVAILABLE class (a) tier=free model=gpt-5.6-luna
+DEV_PROVIDER_SLOT_UNAVAILABLE class (a) tier=free model=glm-5.3-flash
+(node:39455) [HATCHET_V0_REMOVED] DeprecationWarning: The v0 SDK, including the step module, has been deprecated and was removed in v1.14.0. Please migrate to the v1 SDK: https://docs.hatchet.run/home/v1-sdk-improvements
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:39455) [HATCHET_V0_REMOVED] DeprecationWarning: The v0 SDK, including the workflow module, has been deprecated and was removed in v1.14.0. Please migrate to the v1 SDK: https://docs.hatchet.run/home/v1-sdk-improvements
+ConcurrencyLimitStrategy and StickyStrategy have been moved to @hatchet-dev/typescript-sdk/v1.
+DEV_AUTH_STACK_RUNNER_FAILED:DEV_RUNNER_PROCESS_READINESS_INVALID
+[ELIFECYCLE] Command failed with exit code 1.

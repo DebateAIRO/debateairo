@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_RECOMPOSE",
+  "ticket": "t_81f12de2",
+  "session": "/root/requirements",
+  "revision": "8fb8e407b350f9950cdb27a0f4caaf8e178d7cb6",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "verdict": "BLOCKED_BY_TYPECHECK_DELTA",
+  "productUnchanged": true,
+  "measurements": {
+    "exact33": {
+      "exitCode": 0,
+      "passed": 1496,
+      "failed": 0,
+      "todo": 1,
+      "testFiles": 33
+    },
+    "typecheck": {
+      "exitCode": 1,
+      "baselineDiagnostics": 76,
+      "currentDiagnostics": 95,
+      "added": 19,
+      "removed": 0,
+      "correctionPaths": 6
+    },
+    "supportEval": {
+      "exitCode": 1,
+      "exitMeaning": "PENDING",
+      "runs": 3,
+      "passedPerRun": 60,
+      "failedPerRun": 0,
+      "rubric": "PENDING"
+    }
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RECOMPOSE.md",
+      "sha256": "f4e71fb2fc8a92c8629d8f702b03dd31d6f8a3c5c65852ba50ef92c7f6dd0360",
+      "bytes": 2834
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RECOMPOSE-snapshot-receipt.json",
+      "sha256": "65fd3b05d82f6b8f7975e117f6c2f4690889d824272164bcf821d2fd9ded9c5a",
+      "bytes": 48186
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RECOMPOSE-required-suites.json",
+      "sha256": "6d3b889b26a54ed7cefbaab9607b6574cff50f9cc91974927c97579b8aec7c3f",
+      "bytes": 4006
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RECOMPOSE-typecheck-delta.json",
+      "sha256": "a032fcd53e7dbe58eff171ef9a4e7008a30276dd680c7aa9c049888d862aa700",
+      "bytes": 10848
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RECOMPOSE-eval-cases.json",
+      "sha256": "05c693eb31b1283b1694924cafc9a6190d0fd0f557b37fa9246d9b132b3aa1a4",
+      "bytes": 27734
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_RECOMPOSE.md",
+      "sha256": "f5a6e0254bd0a0b06c0fb49f19b992c7dbd128b4125ed8e16bd54a630b7ba8ef",
+      "bytes": 2821
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_RECOMPOSE-suite.log",
+      "sha256": "9891f22409e6725f8a548f35e8fccd11dbaa977058a5718d02419eea61e1eb71",
+      "bytes": 580323
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_RECOMPOSE-typecheck.log",
+      "sha256": "5f413ae6ec942172332b439012402866970d76ec821f6a839593ee50225cb255",
+      "bytes": 44478
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_RECOMPOSE-eval.log",
+      "sha256": "697f65b96b9839177c3c0c8bcb3b6b1499a1b996874d05a991f297ae2bb1df12",
+      "bytes": 4791
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_RECOMPOSE/build-preflight.mts",
+      "sha256": "612534d12a41fe1d2755f3b69ca827a75f502e50a94a0c1d6ea41e8e70f89bb8",
+      "bytes": 6664
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_RECOMPOSE/input-verification.json",
+      "sha256": "2992a12b3790816d0004430b153cfa3028c0794366a5cceb26f0b58dd7600159",
+      "bytes": 12431
+    }
+  ],
+  "receiptExcludesSelf": true
+}

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PHASE_IMPORT_REVIEW46",
+  "ticket": "t_c14694e8",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_FINAL_PHASE_IMPORT_BINDING",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "dispositions": [
+    {
+      "id": "GPIR46-D1",
+      "scope": "phase-contract helper compatibility",
+      "verdict": "PASS",
+      "basis": "Capacity/gate local helper is byte-identical to reviewed BIND21 helper and preserves final contract/absolute command validation."
+    },
+    {
+      "id": "GPIR46-D2",
+      "scope": "ten-root executable import closure",
+      "verdict": "PASS",
+      "basis": "Independently reconstructed 31-file local closure matches all hashes; seven phases and three children reach intended real pre-I/O boundaries."
+    },
+    {
+      "id": "GPIR46-D3",
+      "scope": "discriminating missing dependency",
+      "verdict": "PASS",
+      "basis": "Original missing predecessor still rejects ERR_MODULE_NOT_FOUND before I/O."
+    },
+    {
+      "id": "GPIR46-D4",
+      "scope": "corrected row child and composition pointer",
+      "verdict": "PASS",
+      "basis": "Actual corrected child produces ordered58 PASS with18 actual-model rows; final capture and contract select repaired LIVE35 composition contract."
+    },
+    {
+      "id": "GPIR46-D5",
+      "scope": "final LIVE35 binding",
+      "verdict": "PASS",
+      "basis": "Seven argv, final contract/operator hashes, GUIDE24/owner retention and115 absent future paths match."
+    },
+    {
+      "id": "GPIR46-D6",
+      "scope": "REVIEW45 and ancestor dispositions",
+      "verdict": "RETAIN_PASS",
+      "basis": "Unchanged package/product and prior evidence remain outside this bounded review."
+    }
+  ],
+  "limits": [
+    "Load-boundary and row-proof controls are offline; no live answers or capacity claim.",
+    "No all31 quality, owner availability, Forgot, CP1 acceptance, or CP2 claim."
+  ]
+}

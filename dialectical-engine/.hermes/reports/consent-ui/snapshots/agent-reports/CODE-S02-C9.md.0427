@@ -1,0 +1,216 @@
+# CODE-S02-C9 — self-report (mission `consent-ui`, slice S02, cluster C9)
+
+> treat it like a murder case. I want to get a nice report on what can be done
+> better. What we must upgrade. what repeatedly costed us tokens. how we can
+> make the coding more efficient. How can we turn this into a one prompt machine
+> even better.
+
+Seat CODE-S02-C9 · worker · Opus 5 · 2026-09-07 · lane
+`.worktrees/consent-s02/dialectical-engine`, branch `slice/consent-s02`.
+HEAD at CLAIM `19cc8e772dc3f8441aaadd6ed7c0bc1fb32070d8`, porcelain 0 entries.
+HEAD at handoff `2127c4add7b98d8f3a88d1bfcf847f315b8746ef`, porcelain 0 entries.
+Wall clock ≈ 75 minutes, of which roughly 40 was vitest.
+
+---
+
+## 1. What was actually delivered
+
+**One commit, `2127c4ad`, three test files, zero product bytes.**
+`git diff --name-only 19cc8e77 HEAD` = exactly `tests/render/consent-bar.test.tsx`,
+`tests/render/consent-signup-modal.test.tsx`, `tests/unit/consent-s02-style-contract.test.ts`.
+`git diff --quiet 19cc8e77 HEAD -- apps/ui/components/SignUpFlow.tsx` and the same for
+`apps/ui/app/globals.css` both exit 0 after nine mutants were applied to them and restored.
+
+Four review findings discharged (`t_31623705`, `t_c0fd0601`, `t_086c1d78`, `t_e7801ab7`) plus the
+duplicate-comment note on `t_4f97ca86` and the S01-C3 end-of-file relaxation the merge forced.
+
+S02-S66 recorded, not performed. S02-S67/S68 measured in both shells. S02-S69 is
+`UNVERIFIED — dev stack not serving this branch`, with the process evidence in §5.
+
+---
+
+## 2. The cause, not the symptom — what this cluster was really cleaning up
+
+**Every one of the four findings is the same defect class wearing four costumes: an assertion that
+observes a WEAKER thing than the property it was written for.**
+
+| Finding | The property | What was actually asserted | Cost of the gap |
+|---|---|---|---|
+| N1 (`t_31623705`) | focus returns to the input from **all three** entry points | focus after the **square** route, four times over | mutant R9 green 14/14 |
+| N2 (`t_c0fd0601`) | the value **tracker** is re-synced | the **DOM** value the same line writes | mutant M11 green 14/14 |
+| N6 (`t_086c1d78`) | one **user** click runs the handler once | one `.click()`-**method** call, which the platform de-duplicates for you | mutant R1 green 14/14 |
+| N1r2 (`t_e7801ab7`) | the **ratio** is below 4.5 | the ratio's **2-dp rendering** parsed back | 424/200,000 alphas misreported |
+
+Three of the four are "the test drove the system through an idiom that is not the user's idiom".
+`.click()` sets the HTML spec's click-in-progress flag; a real click does not. `field(x).checked = y`
+announces nothing to React; a real click does. The `toFixed(2)` string is what a human reads; the
+float is what the threshold means.
+
+**UPGRADE 1 — put the idiom's BLIND SPOT in the plan, next to the idiom.** `SPEC.md` R17's hook
+already does the hard half: it names ONE test idiom (`field(name).click()` inside `act`) and lists
+the forms measured not to work. Two rounds of review were spent getting that right and it worked —
+no seat re-derived it. What it does not carry is the other half: **what that idiom cannot see.**
+`.click()` cannot observe anything that depends on the click-in-progress flag, and nothing said so
+until a reviewer spent a probe finding it. A plan that names a mandatory idiom owes a
+"blind to:" line beside it, and every constant whose wording quantifies over N routes owes a
+"pinned for:" line naming which routes a case actually exercises. Both are one line; both would
+have removed a whole review round each.
+
+**UPGRADE 2 — the refutation duty needs a MATRIX, not a list.** `heartbeat-worker` §2 asks for
+"one neighbouring mutant it should NOT catch" per assertion. Run as a **matrix** — every mutant
+against every new pin — it costs the same three runs and produces strictly more:
+
+```
+             new pin: focus-return   tracker   re-entrancy
+mutant R9  :          RED (x2)       green     green
+mutant M11 :          green          RED       green
+mutant R1  :          green          green     RED
+```
+
+The off-diagonal IS the neighbouring-mutant evidence, and the diagonal being the only RED is the
+proof that no pin is over-broad. Three runs, one table, nothing left to argue about. **This should
+be in the worker contract as the default shape of §2, not as an option I happened to pick.**
+
+---
+
+## 3. What repeatedly cost tokens
+
+**3.1 The zsh word-splitting trap, live, on my first multi-file run — COMMON §10.40 exists and I
+still paid it.** `FILES=$(find …); pnpm exec vitest run $FILES` collapsed 14 paths into ONE filter
+and printed `No test files found, exiting with code 1`. Cost: one run, ~2 min.
+The rule is written; what is missing is that **every multi-file command in a packet should be
+delivered as a `.sh` the seat runs, not as a shell line the seat retypes.** The packet already
+mandates a `/bin/bash` arm for §10.16 — make the bash arm the PRIMARY artefact and the inline arm
+the second opinion, and this class dies. I now do every multi-file run through a `.sh` and never
+inline first.
+
+**3.2 The promoted probe-runner's alias list.** Appended to `TOOLING-TRAPS.md` (2026-09-07 04:25).
+`:2306` gives the right remedy for running a promoted probe — a scratchpad `--config` whose
+`include` names the probe — but the template's `resolve.alias` only covers the probe's own relative
+specifiers plus `react`. `SignUpFlow.tsx` imports `@/components/AuthShell`, so the run died at
+transform time and printed `Tests  no tests`, which reads exactly like the `include` problem
+`:2306` is about. **Nearly got wrong:** I almost went back to `include`. The tell that saved it was
+the frame naming a PRODUCT file (`Failed to resolve import "@/…" from apps/ui/components/SignUpFlow.tsx`)
+— a resolve error inside a product file is a runner-config defect, `No test files found` is a filter
+defect. Classify by cause first (COMMON §10.17) and this is a 30-second fix. Cost: ~2 min.
+
+**3.3 "The sixteen consent files" was not a resolvable name.** The tree has **14** files matching
+`consent-*`, totalling 159 tests. The packet's pinned figure `1 failed | 178 passed (179)` only
+reproduces when `tests/render/auth-flow-integration.test.tsx` (18) and
+`tests/unit/v2ui-node-runner.test.ts` (2) are added — 16 files, 179 tests. I reconciled it by
+arithmetic in about three minutes; a seat that trusted the name would have reported 159 and been
+"wrong" against a correct pin. **UPGRADE 3: a packet never names a FILE SET in prose. It gives the
+list, or the command that produces it.** This is COMMON §10.10's corollary ("every COUNT carries its
+counting rule and the command that produced it") applied to sets — the same rule, one level up, and
+it is not currently stated for sets.
+
+**3.4 Reading budget.** Getting to the first edit took the packet (30 lines), COMMON (143),
+INSTRUCTIONS (99), BASELINE (45), four PLAN slices (~450), two review sections (~250), five ticket
+bodies and one 8-comment thread. That is right — every one of them changed what I did — but the
+**ordering** was luck. The single highest-value read was the packet's third "Orchestrator addition"
+(the MEASURED TRUTH after the merges): it told me `run_c9`'s two arms cannot pass, which stopped me
+from debugging a correct command for however long that would have taken. **UPGRADE 4: a packet's
+"what is already known to be broken, and what you do instead" block belongs at the TOP, above the
+reading list, beside CLAIM.** Right now it is the last section of the file.
+
+---
+
+## 4. Dead ends, named so nobody re-derives them
+
+- **Do not try to make `run_c9`'s merge arms pass.** `--scrim` is mode-independent and declared in
+  `:root` only, so `grep -c -- '--scrim:'` is **1**, and it is 1 *correctly* (S01 DECISIONS, C1).
+  `grep -c -- '=== consent-ui S02 ==='` is **1** because the end marker reads
+  `=== end consent-ui S02 ===` and the needle requires `=== ` immediately before `consent-ui`.
+  Both arms are wrong in the PLAN, both are ticketed (`t_4f97ca86`, 04:03), and the command is not
+  a coding seat's to edit. Run it as written, paste the RED, evaluate the PROPERTY.
+- **Do not assert a verdict flip for `t_e7801ab7`.** Over an exhaustive 200,000-alpha sweep the
+  reviewer measured **zero** alphas where the assertion's pass/fail flips; only the reported failure
+  SET differs, on a 2.1e-3-wide band. A mutant that tries to flip the verdict cannot exist. The
+  discriminator is a direct assertion on the reported set at `alpha = 0.4784` (Chamber true
+  4.498360, printed `"4.50"`), which I recomputed independently before writing it.
+- **Do not rename the S01-C3 case.** Its title still says "at the end of globals.css" while the
+  assertion is now "last except for S02's block". Renaming moves a name BASELINE.md and several
+  verdicts gate on. Filed as a non-blocking finding instead.
+- **`mirrorArm()` before the dismissal, not after.** `modalSemantics` captures the element to
+  restore at OPEN, so an intervening `adult-affirmed` click cannot influence focus return — which
+  is what lets the two new focus arms be purely ADDITIVE to `S02-S50`/`S02-S51` instead of
+  reordering their existing assertions.
+
+---
+
+## 5. S02-S69, and why `UNVERIFIED` is the honest answer
+
+A dev stack IS up: `lsof -nP -iTCP:3000 -sTCP:LISTEN` shows `node` pid 5436, and
+`curl -sk https://localhost:3000/sign-up` returns HTTP 200. It is **not serving this branch**:
+
+- `lsof -a -p 5436 -d cwd` → `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine`
+  (the MAIN tree), not `.worktrees/consent-s02/dialectical-engine`.
+- The served HTML contains `consentGroup` **0** times and `privacy-accepted` **0** times
+  (`adult-affirmed` 1, which is the pre-mission row).
+- The lane has no `apps/ui/.next` at all.
+
+So the answer is the literal `UNVERIFIED — dev stack not serving this branch`. I did **not** run
+step 1's `rm -rf apps/ui/.next`: the lane has no `.next`, so it would print `GONE` while proving
+nothing, and step 2 — the restart — is not this seat's to perform. **Running the first command of a
+three-command sequence you cannot finish, and reporting its output, is how a green-looking record
+gets built out of nothing.**
+
+**UPGRADE 5, and it is the one that would change the mission's shape.** S02-S69 has been
+unrunnable by design for every coding seat in this slice, because pointing the dev stack is V's and
+no seat may do it. The acceptance therefore resolves to `UNVERIFIED` every single time, which makes
+it a ritual rather than a gate. Two lawful fixes: (a) the ORCHESTRATOR points the `dev-stack`
+launch config at the lane once, before the C9 dispatch, and the packet says so — then S02-S69 is a
+real three-command gate; or (b) S02-S69 becomes explicitly an ORCHESTRATOR step and leaves the
+coding packet. Leaving it in a seat's charge list, with a pre-written `UNVERIFIED` escape, costs a
+paragraph of every handoff and proves nothing.
+
+---
+
+## 6. Toward the one-prompt machine — ranked by measured value
+
+1. **Ship the "blind to:" line with every mandated idiom, and the "pinned for:" line with every
+   universally-quantified constant** (§2). Three of this cluster's four findings die at authoring
+   time. Highest value per character in this whole report.
+2. **Make the mutant MATRIX the default shape of `heartbeat-worker` §2** (§2). Same cost, strictly
+   more evidence, and it makes "this pin is over-broad" mechanically checkable by a reviewer.
+3. **Packets give file LISTS or the command that produces them, never a prose name for a set**
+   (§3.3).
+4. **Move each packet's "known-broken, do this instead" block above the reading list** (§3.4). This
+   packet had one and it was the single most valuable paragraph in it — at the bottom.
+5. **Deliver every multi-file command as a `.sh`, and make the bash arm primary** (§3.1). §10.16
+   already forces the script to exist; stop making the seat type the inline form first.
+6. **Fix S02-S69's ownership** (§5).
+7. **The promoted probe-runner template should start from the lane's own `vitest.config.ts` alias
+   array** (§3.2) — now in `TOOLING-TRAPS.md`.
+
+---
+
+## 7. Where THIS packet was unclear, exactly
+
+- **§2 constant (1) says "sixteen consent files" and the tree has fourteen matching that name.**
+  Resolved by arithmetic against the pinned 179 (§3.3). One line of file list would have removed it.
+- **The duplicate-comment assertion is ordered "as the FIRST line of that suite's next lawful
+  edit".** "First line" is ambiguous between *do it first* and *place it first*. I satisfied both:
+  it is the first assertion of the suite's first `it()` (`S02-S59`, the block-well-formedness case,
+  which is where a structural property about the block belongs), and it was the first edit I made
+  to that file. Say which one is meant.
+- **The packet's §2 gate list ends "C9 itself writes NO product file and normally no commit — if
+  S02-S66's record needs no file, say so"**, immediately after mandating one commit with a fixed
+  message. It reads as a contradiction until you notice the first clause is about the C7/C8
+  follow-up and the second about C9's own steps. Two sentences, not one.
+- **Not a defect, and worth keeping:** the packet's three "Orchestrator addition" blocks were
+  correct in every measurable claim I checked — `4ddc350c`, `19cc8e77`, `e8bf0658`, `--scrim:`=1,
+  markers=1, `1 failed | 178 passed (179)`, t9's nine tests, typecheck 8 in `s14-ui`, apps/ui exit
+  0. Nine constants, nine reproductions. That is what a packet should feel like.
+
+## 8. Findings I am handing up (also on `t_d36df457`)
+
+1. `PLAN.md:1413-1416` — both `run_c9` merge arms are unsatisfiable as written. Already ticketed
+   (`t_4f97ca86`, 04:03). Not mine to edit.
+2. `tests/render/consent-bar.test.tsx:229` — the case title still says "at the end of globals.css"
+   after the assertion was relaxed. Non-blocking; a rename moves a gated name.
+3. `PLAN.md:1296-1301` (S02-S67) still says "all eight S02 test files … `Test Files 9 passed (9)`"
+   while the cluster row and the chain rule say **10**. Docs residue, line-count-preserving.
+4. `docs/missions/consent-ui/BASELINE.md` has no pin for the sixteen-file set or for
+   `consent-signup-modal.test.tsx`, both of which C9 reports. Worth a baseline addendum now that
+   the figure is 181.

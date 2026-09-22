@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND14",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productClean": true,
+  "harnessSha256": "ba72808c15fe611c1999e440c206cb41d637d064884dde856a82ee7865f6f0d6",
+  "orderedFiles": [
+    {
+      "path": "capture-public-guide.mjs",
+      "bytes": 23923,
+      "sha256": "52f313bcb7a1eb5fa7047084fadd0dde184482a81575d223eaa3f2f521568b56"
+    },
+    {
+      "path": "controls.mjs",
+      "bytes": 41120,
+      "sha256": "325a2b22d4870fa56b862e36c02f94d0efb2fe5dbdb978109207c296194b18c4"
+    },
+    {
+      "path": "matrix.mjs",
+      "bytes": 14253,
+      "sha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c"
+    },
+    {
+      "path": "pre-request-verifier.ts",
+      "bytes": 16751,
+      "sha256": "d5d6656431f93e3089c9c6751ae767b401d21f23bb90d398fa99a051af0ead39"
+    },
+    {
+      "path": "runtime-capacity.mjs",
+      "bytes": 9935,
+      "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87"
+    },
+    {
+      "path": "session-lifecycle.mjs",
+      "bytes": 4254,
+      "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b"
+    },
+    {
+      "path": "verify-final-branches.ts",
+      "bytes": 5131,
+      "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a"
+    },
+    {
+      "path": "verify-guide-harness.mjs",
+      "bytes": 76385,
+      "sha256": "bcf47454b4d744caf96b3ad7558f4121bb4bc1e8d81d410cf180ba153b4c9201"
+    }
+  ],
+  "matrixSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+  "preRequestVerifierSha256": "d5d6656431f93e3089c9c6751ae767b401d21f23bb90d398fa99a051af0ead39",
+  "controlProof": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND14-control-proof.json",
+    "sha256": "0a00372ab55a75debc4548a6510a8de46d68f72b20970b3fe0ee33d5d74293e0",
+    "controls": 127,
+    "passed": 127
+  },
+  "retainedControlPurposes": 120,
+  "addedControlPurposes": 7,
+  "matrixRows": 54,
+  "suiteFiles": 34,
+  "productFiles": 144,
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "database": 0,
+    "status": 0,
+    "capacity": 0,
+    "supportRequests": 0,
+    "modelRequests": 0
+  }
+}

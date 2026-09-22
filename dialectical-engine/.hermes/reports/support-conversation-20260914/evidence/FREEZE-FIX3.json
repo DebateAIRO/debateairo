@@ -1,0 +1,71 @@
+{
+  "at": "2026-09-14T14:30:38.369285+00:00",
+  "ref": "refs/heads/codex/support-conversation-mission",
+  "commit": "1d6249b1a3eaa853354cad9e8c484f1e5e3acd76",
+  "tree": "5a2fad042a99142af353d0b160154cbd52545f1b",
+  "parent": "be2201d4278c2d14ee8d559369536048ad45c555",
+  "files": [
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/board-ids.json",
+      "sha256": "5641d5659b28550c4b5def7779f7e4827fe22775e2cc98e78b8f0feaec2d279d"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PROGRESS.md",
+      "sha256": "d6885edc0e412c797c344a25e00375f1ec305861c323b8e55f257dcb73179efd"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/LEDGER.md",
+      "sha256": "c2a2b156424a9d30c40e59b6526fd0e682fa92c5342161b7c390ce7d08ff672a"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md",
+      "sha256": "36476b7ccce1b1c92cb2d113c4d14f727529cdeb7c1e29eb0a5c97705c318031"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/LIVE3.md",
+      "sha256": "e3d5df04680ffab202540722296f98f50f6283902b856f3664d41436d4fd899f"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX3.md",
+      "sha256": "de39311cf0e53b9a91a3f2c00c9d43d90f4a77720572a759d795c7a05359f6df"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX3-manifest.json",
+      "sha256": "98355d3ffaab10b4a2eab15c4728c7567c5d5c9458ed6726a24c8afed4643057"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX3-consumption.json",
+      "sha256": "9f0510b3aab2f19d08140b23b860dc69dad8b8b9b6222f610cc9d395d212a37a"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX3-stack-custody.json",
+      "sha256": "f372be2481ddd1eec7e7632b6bf0778bb601ddc75282710b100d2ea8831e2731"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE-pre-LIVE3-inventory.json",
+      "sha256": "4d0b92219766d0106cfcfca65ff882b0fc8d0523bdfa20d1fb2245a4e7709e40"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE3-required-suites.json",
+      "sha256": "499adb3c737645de7947d10fdb23c58aaeb3b5a9c79af9c50ffea621f357050a"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FIX3.md",
+      "sha256": "de302d374d6c1c44ca4026ca653563255c0badeb9aac5ff158d4dca858dab4ff"
+    }
+  ],
+  "source_before": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813",
+    "lane_ref": "43cf9386ea3c9e7c79523ec38debe63271d19292"
+  },
+  "source_after": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813",
+    "lane_ref": "43cf9386ea3c9e7c79523ec38debe63271d19292"
+  },
+  "private_index_removed": true,
+  "tested": "metadata only; no product tests; FIX3 completed; LIVE3 not yet dispatched"
+}

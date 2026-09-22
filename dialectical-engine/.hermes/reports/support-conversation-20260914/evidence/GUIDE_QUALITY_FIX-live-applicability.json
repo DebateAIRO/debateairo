@@ -1,0 +1,60 @@
+{
+  "revision": "6cbe0e7ad18b20eca35876f4a91478cfbba82307",
+  "historicalReceipt": "GUIDE_LIVE_GUIDE16-actual-receipt.json",
+  "intentionallyInvalidatedRows": [
+    2,
+    15,
+    35,
+    39
+  ],
+  "projectionChangedRows": [
+    19,
+    23
+  ],
+  "unchangedModelInputRows": [
+    1,
+    7,
+    11,
+    27,
+    31
+  ],
+  "unchangedDeterministicRows": [
+    41,
+    43,
+    47,
+    51
+  ],
+  "behaviorRerunRequired": [
+    2,
+    15,
+    19,
+    23,
+    27,
+    31,
+    35,
+    39
+  ],
+  "screenshotRerunRequired": [
+    1,
+    2,
+    7,
+    11,
+    15,
+    19,
+    23,
+    27,
+    31,
+    35,
+    39,
+    41,
+    43,
+    47,
+    51
+  ],
+  "notes": [
+    "Rows 19 and 23 include debate-workspace-menus, whose proposed model projection changes.",
+    "Rows 27 and 31 retain exact settings-help-menus input, but the central answer authority binder now executes for their drafts.",
+    "Rows 1, 7, and 11 retain exact source/projection inputs; row 1 and 7 were reviewed fallbacks.",
+    "Deterministic refusal/recovery rows bypass the model-answer binder, but their screenshots must be recaptured after the pane-follow change."
+  ]
+}

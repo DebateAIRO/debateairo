@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW12",
+  "ticket": "t_ff1f66fa",
+  "runId": 189,
+  "verdict": "PASS_BOUNDED_COMPACT_PRECONDITION_AND_PROBE_CONTRACT",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "reviewedOn": "2026-09-20T14:38:57.303790Z",
+  "productRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "productClean": true,
+  "freezeCommit": "1f68a2eae641e4bce894bb51d99d09a75abaf74c",
+  "transitionGuard": {
+    "sharedHelper": "openGuideSupportSurface",
+    "usedBy": [
+      "capture-public-guide.mjs",
+      "probe-zero-request-ui.mjs"
+    ],
+    "hydration": "visible current-page target with attached React onClick producer property before compact interaction",
+    "compactInteractions": 1,
+    "beforeCheckpoint": true,
+    "afterCheckpoint": true,
+    "readyCheckpoint": true,
+    "readyRequires": [
+      "widget EXPANDED",
+      "aria-expanded TRUE",
+      "one visible panel",
+      "one visible compact root",
+      "one visible composer"
+    ],
+    "blindTransitionDelay": false,
+    "retries": 0,
+    "fixedSafeProjection": true,
+    "unknownPreserved": true,
+    "rawExceptionContentExposed": false
+  },
+  "controlEvidence": {
+    "indexedInputs": 139,
+    "inputMismatches": 0,
+    "priorControls": 116,
+    "controls": 120,
+    "passed": 120,
+    "uniqueNames": 120,
+    "retainedPriorNamesAsExactPrefix": true,
+    "addedNames": [
+      "compact transition projection rejects malformed or extra state",
+      "compact precondition requires hydration before the single support click",
+      "opening helper hydrates and checkpoints before one compact interaction",
+      "failed compact transition checkpoints a closed discriminator"
+    ],
+    "controlProofSha256": "f41543d8f83a2d75f5cab4a93a908939f271e13bc9c2b6a7c444e380ea7288db",
+    "orderedEightDigest": "4a73ade641ff12f9772aed1d858bf3694224b256d43babed528fa85120a58646",
+    "matrixSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+    "preRequestVerifierSha256": "d5d6656431f93e3089c9c6751ae767b401d21f23bb90d398fa99a051af0ead39",
+    "matrixRows": 54,
+    "suiteFiles": 34,
+    "productFiles": 144,
+    "adapterNegativePassed": 3,
+    "adapterNegativeTotal": 3,
+    "futureOutputsCheckedAbsent": 57
+  },
+  "preparedProbe": {
+    "executable": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND13/probe-zero-request-ui.mjs",
+    "sha256": "def6e1b8a7bda541a999a7bfa457d6f8637a802d2ac6013dab9af61bea8153c4",
+    "argv": [
+      "node",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND13/probe-zero-request-ui.mjs",
+      "152eed4da1cd3e66b74d8301159ba76427552409",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE-run-LIVE8.json"
+    ],
+    "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "logPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_UI_TRANSITION_PROBE-LIVE8.log",
+    "prerequisites": [
+      "independently verified exact-revision owned preview",
+      "ordinary system TLS https://localhost:3100",
+      "pinned installed Playwright Chromium",
+      "absent output path"
+    ],
+    "transitions": [
+      "fresh full/en",
+      "same-session full/ro",
+      "storage-reset compact/ro",
+      "route-remount full/en",
+      "storage-reset compact/en"
+    ],
+    "compactViewport": "390x844",
+    "freshProfile": true,
+    "executed": false,
+    "supportGuard": "abort only; never fulfill or substitute a response",
+    "blockedStatusAttemptsReportedSeparately": true,
+    "requiredActualForwardedSupportRequests": 0,
+    "requiredCreateSessionAttempts": 0,
+    "requiredSendMessageAttempts": 0,
+    "requiredOtherSupportAttempts": 0,
+    "childStatus": "process.exitCode=1 on failure; direct stdout/stderr redirection without tee"
+  },
+  "retainedDispositions": {
+    "final9Binding": "PASS RETAINED",
+    "suite34": "PASS RETAINED",
+    "matrix54": "BYTE IDENTICAL",
+    "safetyPrivacyCredentialOracles": "PASS RETAINED",
+    "sourceOutcomeActionApiDom": "PASS RETAINED",
+    "sessionPacingCapacityNavigationNoRetry": "PASS RETAINED",
+    "live7Cause": "UNKNOWN",
+    "productDefectInferred": false,
+    "forgot": "UNRESOLVED_ACTIONLESS"
+  },
+  "artifacts": [
+    {
+      "role": "report",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW12.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW12.md",
+      "sha256": "2abe21549bd9de3087b186fa8d4c7918f1237d26c7b64031cc94452fadb0050a",
+      "bytes": 5531
+    },
+    {
+      "role": "selfReport",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW12.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW12.md",
+      "sha256": "572e9a403a05310d7da89b40ddb8b092f23d371836243f151fb1657ba7e6d0fc",
+      "bytes": 3312
+    },
+    {
+      "role": "staticCustody",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW12-static-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW12-static-custody.json",
+      "sha256": "85fc472d94ae9b10b18bff7efa43d5312932a0d69adcc0bc8298998174fd8570",
+      "bytes": 3743
+    }
+  ],
+  "limits": {
+    "staticOnly": true,
+    "testsRun": false,
+    "probeRun": false,
+    "browser": false,
+    "runtime": false,
+    "http": false,
+    "database": false,
+    "status": false,
+    "capacity": false,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "syntheticResponses": 0,
+    "productWrites": false,
+    "gitWrites": false,
+    "heavyLeaseRequested": false,
+    "gitLeaseRequested": false,
+    "actual54Claimed": false,
+    "captureClaimed": false,
+    "readinessClaimed": false,
+    "acceptanceClaimed": false
+  },
+  "selfExclusion": "This receipt excludes itself from artifacts and custody hashes."
+}

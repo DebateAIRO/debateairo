@@ -1,0 +1,27 @@
+# PACKET GUIDE_HARNESS_REVIEW13 — exact full-view readiness and no-traffic probe correction review
+
+Read FIRST this packet then /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md. Resume original Sol /root/baseline; retained reviewer BODY skills. Read assigned ticket/comments before claim; no subdelegation.
+
+## 1. Node
+- seat: GUIDE_HARNESS_REVIEW13; ticket: t_e49fe2f9; model: gpt-5.6-sol; rework rounds: max 3 under owner continuation.
+- cwd: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine; exact clean revision: 152eed4da1cd3e66b74d8301159ba76427552409; inputs: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW13-inputs.json.
+- self-report: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW13.md (new).
+
+## 2. Contract
+- allowed: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW13.md (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_REVIEW13-receipt.json (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW13- (new); /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW13.md (new).
+- forbidden: product/KB/Git/harness/prior evidence mutation; heavy commands, actual runtime/browser/HTTP/DB/Support/model/status/capacity traffic; private records/logs; peer technical reports; owner questions/acceptance.
+- verification: static finite review with exact sealed hash checks only; no broad test repeat.
+
+## 3. Work
+Review the exact BIND13→BIND14 source and probe contract against the sealed failed no-traffic preflight. Three transitions passed, route-remount fullEN failed the EN language-button own React onClick predicate with a visible composer; compactEN never ran. Check author diagnosis against actual current product controls and intended transition state. Accept only a proved harness predicate/setup correction, not a speculative product claim or deletion of readiness safeguards. Review any new fixed full-readiness subpredicates and meaningful regression discrimination. Preserve the prior compact hydration-before-one-click contract and fixed observations. Public readiness interactions must not silently reset an existing session/transcript or increase the exact five-session capture plan. Verify actual setLocale semantics and every capture call site; a validated empty-state precondition must reject a nonempty conversation before interacting, with a meaningful negative regression. Do not accept an empty-fixture-only assumption or saving/restoring capabilities.
+
+Resolve the observed blocked otherSupport3 accounting: the scope clarification permits exact GET /api/v1/support/cases to be counted as known blocked pageCaseListRead from the OwnCaseLookup source. It is a Support API operation, not public data. Verify the source and method/token/unknown-path negatives preserve blocking of every Support runtime request before transmission; the old aggregate alone cannot attribute its three historical requests. No broad tolerance of unknown requests or synthetic Support responses. Keep blocked browser attempts distinct from forwarded requests and created sessions/messages; unknown HTTP401/console origins remain qualified unless established. Probe must still exercise all five transitions, actual browser behavior and composer usability in both languages/modes, with zero Support runtime requests and fresh isolated public state.
+
+Retain all120 prior control purposes plus justified discriminators, unchanged product/FINAL9 and exact34 suites, matrix54/row proof, adapter CLI/negatives, source/outcome/action/API-DOM oracles, privacy/credential restrictions, session/pacing/capacity/navigation guards and numeric child failure status. Recompute exact ordered-eight digest and verify producer/helper imports are covered by the sealed binding. New actual GUIDE14 and UI_PROBE2 outputs remain absent. Require the same corrected helper in capture and probe, and verify exact future UI_PROBE2 argv and no-traffic prerequisites. No actual probe execution in this review.
+
+Return finite PASS/REWORK with exact retained/new dispositions and limitations. Historical LIVE7 cause remains unproved unless new evidence specifically establishes it; passing inert controls alone cannot establish real UI or model quality. No product changes or broad technical re-review needed if bytes unchanged. Forgot unresolved/actionless; no CP1 readiness/acceptance or CP2.
+
+## 4. Handoff
+Self-report question verbatim:
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
+Return SKILLS LOADED, ticket/session/revision/verdict, findings/checks/probe contract/limits and strict receipt node/ticket/revision/verdict/artifacts absolute/sha256/bytes excluding itself. No self-close/readiness/acceptance.

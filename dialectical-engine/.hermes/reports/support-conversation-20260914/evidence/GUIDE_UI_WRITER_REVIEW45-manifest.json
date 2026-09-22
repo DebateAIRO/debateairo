@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_UI_WRITER_REVIEW45",
+  "ticket": "t_14d061d4",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_FINAL_UI_WRITER_BINDING",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "freeze": "bc86dbdfd6151c3439ee1c317ebc63d488269841",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_UI_WRITER_REVIEW45.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_UI_WRITER_REVIEW45.md",
+      "sha256": "5aa12af2ba2c708b96868dabca715991d43cf7e08642d1e37dbf26760046c3bf",
+      "bytes": 2614
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_WRITER_REVIEW45-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_WRITER_REVIEW45-dispositions.json",
+      "sha256": "3fe58f420b976d2214ec96e4b7de8132d59fd5d0947169af975fa1b2c4d18579",
+      "bytes": 1762
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_WRITER_REVIEW45-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_WRITER_REVIEW45-custody.json",
+      "sha256": "7867fa9bf07ef1610af779605e8c8ed4b1096bd02e4ec4bd7295f6e5b067cdcd",
+      "bytes": 1064
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_UI_WRITER_REVIEW45.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_UI_WRITER_REVIEW45.md",
+      "sha256": "bb3eb4a22171ccd884c69502d079844e71f279b06a8bfa70b8042511981cfd4b",
+      "bytes": 1344
+    }
+  ]
+}

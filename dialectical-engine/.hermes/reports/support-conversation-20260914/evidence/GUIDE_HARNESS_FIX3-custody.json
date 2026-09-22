@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_FIX3",
+  "ticket": "t_51f2f2f4",
+  "revision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "harness": {
+    "sha256": "77b47d705133486ad4d7f520b117c191524cebaaf4131431df512c470177e314",
+    "files": [
+      {
+        "path": "capture-public-guide.mjs",
+        "bytes": 18107,
+        "sha256": "421b9c450540a663e5f33420ce91fa28ea5b54aa065a829e10321f48cc9c03db"
+      },
+      {
+        "path": "controls.mjs",
+        "bytes": 8812,
+        "sha256": "530c5e8e850b611945719a3563424c595c9a608fcb5a707e818f5da03284e8a3"
+      },
+      {
+        "path": "matrix.mjs",
+        "bytes": 13383,
+        "sha256": "4614aae275462568eed6277c78193d252c441cd47c28bd37021de4d43ba91957"
+      },
+      {
+        "path": "pre-request-verifier.ts",
+        "bytes": 13715,
+        "sha256": "a123d265d2070d9ef5929dd30bb752b826412e42b5091c68e4806b276b37a402"
+      },
+      {
+        "path": "runtime-capacity.mjs",
+        "bytes": 9935,
+        "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87"
+      },
+      {
+        "path": "session-lifecycle.mjs",
+        "bytes": 4254,
+        "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b"
+      },
+      {
+        "path": "verify-final-branches.ts",
+        "bytes": 5131,
+        "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a"
+      },
+      {
+        "path": "verify-guide-harness.mjs",
+        "bytes": 31914,
+        "sha256": "cf736c307ec2db932957eaa445a52127974f217970c73acdcaeb8870dc10e94b"
+      }
+    ]
+  },
+  "adapter": {
+    "sha256": "b0d68ed0a8a27b3b9c67ba96b70a64e6051387d5a46bf75e886f75ea0643ad58",
+    "files": [
+      {
+        "path": "README.md",
+        "bytes": 1920,
+        "sha256": "04d0300cba7e6a2bfdd968b63db9043754b8d8eb95c9254b6a8e3433bd107e0d"
+      },
+      {
+        "path": "replay-row-proofs.mjs",
+        "bytes": 6121,
+        "sha256": "2ee693b8736b3b0a16798b96d811044ed93aeb0b11f88307d5d33bad139758a5"
+      },
+      {
+        "path": "reviewed-harness-custody.mjs",
+        "bytes": 1417,
+        "sha256": "1a63bf8699447bf09eb2b8a7d469300d8d5be56fa74ae7266baf404939eaa604"
+      },
+      {
+        "path": "verify-negative-fixture.mjs",
+        "bytes": 1359,
+        "sha256": "a0f45f9725041382fedf6cbb99f175387f92a3bbde38b4610ad4aff23603748e"
+      }
+    ]
+  },
+  "controls": {
+    "schemaVersion": 2,
+    "result": "PASS",
+    "passed": 65,
+    "total": 65,
+    "proofPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_FIX3-control-proof.json"
+  },
+  "negative": {
+    "result": "PASS",
+    "passed": 3,
+    "total": 3,
+    "importerCalls": 0,
+    "successfulRows": 0,
+    "traffic": {
+      "browser": false,
+      "sessions": 0,
+      "supportRequests": 0,
+      "modelRequests": 0
+    }
+  },
+  "fixedCaptureOutputs": {
+    "receiptAbsent": true,
+    "screenshotsCreated": 0,
+    "profileAbsent": true
+  },
+  "runtimeTraffic": {
+    "browser": false,
+    "http": false,
+    "database": false,
+    "support": false,
+    "model": false,
+    "lifecycle": false
+  }
+}

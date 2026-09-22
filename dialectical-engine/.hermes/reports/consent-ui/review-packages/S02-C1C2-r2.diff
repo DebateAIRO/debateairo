@@ -1,0 +1,378 @@
+# Review package — lane /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/consent-s02/dialectical-engine — range 91877847..06ab1da4 — generated 2026-09-06 23:36:58
+
+## Commits
+06ab1da4 23:31 fix(consent-ui S02-C1): topmost surface by DOM containment; stopPropagation pin; focusable filter
+
+## Stat
+ .../apps/ui/components/consent/modalSemantics.ts   |  59 +++++++-
+ .../ADR-0022-shared-modal-semantics.md             |  15 +-
+ .../tests/render/consent-modal-semantics.test.tsx  | 157 ++++++++++++++++++++-
+ 3 files changed, 217 insertions(+), 14 deletions(-)
+
+## Diff (-U10)
+diff --git a/dialectical-engine/apps/ui/components/consent/modalSemantics.ts b/dialectical-engine/apps/ui/components/consent/modalSemantics.ts
+index 008fdc66..3a543ea7 100644
+--- a/dialectical-engine/apps/ui/components/consent/modalSemantics.ts
++++ b/dialectical-engine/apps/ui/components/consent/modalSemantics.ts
+@@ -28,51 +28,96 @@ type StackEntry = Readonly<{ read: () => ModalSurface }>;
+ 
+ /** The Esc stack: LIFO, module-level, shared by every surface in the app. */
+ const surfaceStack: StackEntry[] = [];
+ 
+ /** Exactly one `document` keydown listener exists while the stack is non-empty. */
+ let listenerAttached = false;
+ 
+ const FOCUSABLE_SELECTOR =
+   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+ 
++/**
++ * `FOCUSABLE_SELECTOR` is an ATTRIBUTE match, and focusability is not an attribute. Two members
++ * of that gap are filtered here: `tabindex="-1"` on any element (the selector's
++ * `:not([tabindex="-1"])` guard sits on its `[tabindex]` arm ALONE, so `button`, `input`,
++ * `select`, `textarea` and `a[href]` re-admit it), and `input[type=hidden]`. The visibility
++ * member (`display:none` / `visibility:hidden` / `[hidden]` / `inert`) is NOT filtered by
++ * attribute: jsdom's `focus()` lands on all of those, so no test here can discriminate it —
++ * `trapTab` covers it instead by advancing past any candidate `focus()` did not land on, which
++ * is what a real browser reports. Positive-`tabindex` ORDERING stays out of scope.
++ */
++function isFocusCandidate(element: HTMLElement): boolean {
++  if (element.getAttribute("tabindex") === "-1") return false;
++  return !(element.nodeName === "INPUT" && (element as HTMLInputElement).type === "hidden");
++}
++
+ /**
+  * Queried at the moment `Tab` is pressed and never cached: the set changes while a surface is
+  * open (the policy modal's `I have read it` is `disabled` until the scroll gate latches).
+  */
+ function focusableWithin(container: HTMLElement | null): HTMLElement[] {
+   if (container === null) return [];
+-  return [...container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)];
++  return [...container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)].filter(isFocusCandidate);
+ }
+ 
+ function focusElement(element: HTMLElement | null): void {
+   if (element === null) return;
+   if (typeof element.focus !== "function") return;
+   element.focus();
+ }
+ 
+ function trapTab(entry: StackEntry, event: KeyboardEvent): void {
+   const focusable = focusableWithin(entry.read().containerRef.current);
+   if (focusable.length === 0) return;
+   const active = document.activeElement as HTMLElement | null;
+   const index = active === null ? -1 : focusable.indexOf(active);
+   const step = event.shiftKey ? -1 : 1;
+-  const next =
+-    index === -1
+-      ? focusable[event.shiftKey ? focusable.length - 1 : 0]!
+-      : focusable[(index + step + focusable.length) % focusable.length]!;
++  // Focus outside the surface enters at the first (or, going backwards, the last) candidate.
++  let cursor = index === -1 ? (event.shiftKey ? focusable.length : -1) : index;
+   event.preventDefault();
+-  focusElement(next);
++  // Advance past any candidate `focus()` refused, so a control the selector matched but the
++  // platform will not focus (a hidden or invisible one) cannot turn Tab into a dead key.
++  for (let attempt = 0; attempt < focusable.length; attempt += 1) {
++    cursor = (cursor + step + focusable.length) % focusable.length;
++    const next = focusable[cursor]!;
++    focusElement(next);
++    if (document.activeElement === next) return;
++  }
++}
++
++/**
++ * The topmost surface — derived from the DOM, never from the order the surfaces registered in.
++ * Registration happens in `React.useEffect`, which runs CHILD-FIRST within one commit, so for a
++ * nested pair mounted together the LAST registered entry is the surface UNDERNEATH. Document
++ * position is the property itself: a surface contained by another is drawn over it, and among
++ * unrelated surfaces the later one in document order is on top. Entries whose container is not
++ * in the DOM yet cannot be compared and leave the incumbent standing, so a surface that renders
++ * no container still receives `Escape`.
++ */
++function topmostSurface(): StackEntry | undefined {
++  if (surfaceStack.length === 0) return undefined;
++  let top = surfaceStack[surfaceStack.length - 1]!;
++  for (const candidate of surfaceStack) {
++    const held = top.read().containerRef.current;
++    const other = candidate.read().containerRef.current;
++    if (held === null || other === null || held === other) continue;
++    const relation = held.compareDocumentPosition(other);
++    const above =
++      (relation & Node.DOCUMENT_POSITION_CONTAINED_BY) !== 0 ||
++      (relation & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
++    if (above) top = candidate;
++  }
++  return top;
+ }
+ 
+ function handleDocumentKeydown(event: KeyboardEvent): void {
+-  const top = surfaceStack[surfaceStack.length - 1];
++  const top = topmostSurface();
+   if (top === undefined) return;
+   if (event.key === "Escape") {
+     event.preventDefault();
+     event.stopPropagation();
+     top.read().onClose();
+     return;
+   }
+   if (event.key === "Tab") {
+     trapTab(top, event);
+   }
+diff --git a/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md b/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md
+index 9b2fa070..fb1aaf6f 100644
+--- a/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md
++++ b/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md
+@@ -48,25 +48,30 @@ before either surface is built.
+ 
+ **One module owns modal semantics for this repository:
+ `apps/ui/components/consent/modalSemantics.ts`.** Slice S02 writes it; slice S01 consumes it
+ **unchanged**; no second implementation is added.
+ 
+ It owns exactly six things: the **focus trap**, **initial focus**, **focus return**,
+ **backdrop close**, **`prefers-reduced-motion`**, and the **Esc stack**.
+ 
+ **The Esc-stack rule, which is law for every future overlay in this repo, not only for these
+ two:** *the topmost open surface consumes `Escape`, and no other surface acts on the same
+-event.* Its shape: a module-level LIFO array of open surfaces plus **exactly one** `document`
+-`keydown` listener, installed when the array becomes non-empty and removed when it empties. On
+-`Escape` only the last entry's `onClose` is invoked, and the handler calls `preventDefault()`
+-and `stopPropagation()`. `Tab` is handled on the topmost entry only. A per-surface listener is
+-rejected: a listener cannot know whether its own surface is topmost.
++event.* Its shape: a module-level registry array of open surfaces plus **exactly one**
++`document` `keydown` listener, installed when the array becomes non-empty and removed when it
++empties. **Topmost is derived from the DOM, never from the order the surfaces registered in:
++on `Escape` the module invokes the `onClose` of the one open surface that no other open surface
++contains and that comes last in document order (`compareDocumentPosition`)** — registration
++happens in a `React.useEffect`, which React runs child-first within a commit, so for a nested
++pair mounted together the last-registered entry is the surface *underneath* (measured:
++`CODE-REV-S02-C1C2` r1 B1). The handler calls `preventDefault()` and `stopPropagation()`.
++`Tab` is handled on that same topmost entry only. A per-surface listener is rejected: a
++listener cannot know whether its own surface is topmost.
+ 
+ **The focusable set is queried inside the surface at the moment `Tab` is pressed and is never
+ cached at open**, because the set changes while the surface is open (the policy modal's
+ `I have read it` button is `disabled` until the scroll gate latches). The selector is:
+ 
+ ```
+ a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])
+ ```
+ 
+ **`prefers-reduced-motion` is read through a guard**, because jsdom 30.0.1 in this repo has no
+diff --git a/dialectical-engine/tests/render/consent-modal-semantics.test.tsx b/dialectical-engine/tests/render/consent-modal-semantics.test.tsx
+index 66f4c360..60aca7da 100644
+--- a/dialectical-engine/tests/render/consent-modal-semantics.test.tsx
++++ b/dialectical-engine/tests/render/consent-modal-semantics.test.tsx
+@@ -138,20 +138,111 @@ describe("consent modal semantics helper", () => {
+     );
+ 
+     await act(async () => {
+       pressEscape();
+     });
+ 
+     expect(innerClose).toHaveBeenCalledTimes(1);
+     expect(outerClose).toHaveBeenCalledTimes(0);
+   });
+ 
++  it("delivers one Escape to the nested inner surface, not to the outer one it mounted with", async () => {
++    // The two surfaces mount in ONE commit, the inner as a React CHILD of the outer. React runs
++    // effects child-first, so registration order is [inner, outer] and "the last registered
++    // entry" names the surface UNDERNEATH. Topmost is a DOM property, not an effect-order one.
++    const outerClose = vi.fn();
++    const innerClose = vi.fn();
++
++    await render(
++      <TestSurface open name="outer" onClose={outerClose}>
++        <TestSurface open name="inner" onClose={innerClose} />
++      </TestSurface>
++    );
++    expect(openSurfaceCount()).toBe(2);
++
++    await act(async () => {
++      pressEscape();
++    });
++
++    expect(innerClose).toHaveBeenCalledTimes(1);
++    expect(outerClose).toHaveBeenCalledTimes(0);
++  });
++
++  it("delivers one Escape to the innermost of three nested surfaces", async () => {
++    const closed: string[] = [];
++    const record = (name: string) => () => {
++      closed.push(name);
++    };
++
++    await render(
++      <TestSurface open name="a" onClose={record("a")}>
++        <TestSurface open name="b" onClose={record("b")}>
++          <TestSurface open name="c" onClose={record("c")} />
++        </TestSurface>
++      </TestSurface>
++    );
++    expect(openSurfaceCount()).toBe(3);
++
++    await act(async () => {
++      pressEscape();
++    });
++
++    expect(closed).toEqual(["c"]);
++  });
++
++  it("delivers one Escape by document position when two surfaces opened out of DOM order", async () => {
++    // Same class as the nested pair: the surface that registered LAST is not the topmost one.
++    // Here `later` is rendered BEFORE `earlier` in the DOM but opens after it, so registration
++    // order is [earlier, later] while document order — which is what the visitor sees stacked —
++    // puts `earlier` on top. This is the arm of the rule that containment alone cannot decide.
++    const firstDomClose = vi.fn();
++    const secondDomClose = vi.fn();
++
++    function Harness({ firstDomOpen }: { firstDomOpen: boolean }): ReactNode {
++      return (
++        <>
++          <TestSurface open={firstDomOpen} name="first-dom" onClose={firstDomClose} />
++          <TestSurface open name="second-dom" onClose={secondDomClose} />
++        </>
++      );
++    }
++
++    await render(<Harness firstDomOpen={false} />);
++    expect(openSurfaceCount()).toBe(1);
++    await render(<Harness firstDomOpen />);
++    expect(openSurfaceCount()).toBe(2);
++
++    await act(async () => {
++      pressEscape();
++    });
++
++    expect(secondDomClose).toHaveBeenCalledTimes(1);
++    expect(firstDomClose).toHaveBeenCalledTimes(0);
++  });
++
++  it("traps Tab inside the nested inner surface, not inside the outer one", async () => {
++    // The Tab trap reads the same "topmost" the Escape branch reads, so the nested pair must be
++    // asserted for Tab too: focus sitting in the outer surface is pulled into the inner one.
++    await render(
++      <TestSurface open name="outer" onClose={vi.fn()} buttons={["outer-2"]}>
++        <TestSurface open name="inner" onClose={vi.fn()} />
++      </TestSurface>
++    );
++
++    await act(async () => {
++      labelled("close-outer").focus();
++      pressTab();
++    });
++
++    expect(document.activeElement).toBe(labelled("close-inner"));
++  });
++
+   it("moves initial focus to the element the caller names, not the first one", async () => {
+     await render(
+       <TestSurface
+         open
+         name="only"
+         onClose={vi.fn()}
+         buttons={["second", "third"]}
+         initialFocus="third"
+       />
+     );
+@@ -231,37 +322,99 @@ describe("consent modal semantics helper", () => {
+     expect(labelled("third").disabled).toBe(false);
+ 
+     await act(async () => {
+       labelled("second").focus();
+       pressTab();
+     });
+ 
+     expect(document.activeElement).toBe(labelled("third"));
+   });
+ 
++  it("skips a control that tabindex=-1 has removed from the tab order", async () => {
++    // The pinned selector's `:not([tabindex="-1"])` guard sits on the `[tabindex]` arm only, so
++    // `button:not([disabled])` re-admits a button carrying tabindex="-1". jsdom's focus() DOES
++    // land on such a button, so without the filter the trap parks focus where Tab cannot reach.
++    await render(
++      <TestSurface open name="only" onClose={vi.fn()}>
++        <button type="button" tabIndex={-1}>
++          untabbable
++        </button>
++        <button type="button">last</button>
++      </TestSurface>
++    );
++
++    await act(async () => {
++      labelled("close-only").focus();
++      pressTab();
++    });
++
++    expect(document.activeElement).toBe(labelled("last"));
++  });
++
++  it("skips a hidden input, so Tab inside the surface is never a no-op", async () => {
++    // `input:not([disabled])` matches `<input type="hidden">`. focus() is a no-op on it in jsdom
++    // and in every real browser, so an unfiltered cycle preventDefaults Tab and moves nothing.
++    await render(
++      <TestSurface open name="only" onClose={vi.fn()}>
++        <input type="hidden" name="csrf" />
++        <button type="button">last</button>
++      </TestSurface>
++    );
++
++    await act(async () => {
++      labelled("close-only").focus();
++      pressTab();
++    });
++
++    expect(document.activeElement).toBe(labelled("last"));
++  });
++
++  it("keeps Escape from reaching a window listener while a surface is open", async () => {
++    const onWindow = vi.fn();
++    window.addEventListener("keydown", onWindow);
++    const onClose = vi.fn();
++
++    // Control: with nothing open the same listener DOES see the key, so a run in which the
++    // event never reached the document at all cannot pass this case vacuously.
++    expect(openSurfaceCount()).toBe(0);
++    pressEscape();
++    expect(onWindow).toHaveBeenCalledTimes(1);
++
++    await render(<TestSurface open name="only" onClose={onClose} />);
++    await act(async () => {
++      pressEscape();
++    });
++    window.removeEventListener("keydown", onWindow);
++
++    expect(onClose).toHaveBeenCalledTimes(1);
++    expect(onWindow).toHaveBeenCalledTimes(1);
++  });
++
+   it("closes on a backdrop click only when the click landed on the backdrop", () => {
+     const scrim = document.createElement("div");
+     const child = document.createElement("div");
+     scrim.append(child);
+     document.body.append(scrim);
+     const onClose = vi.fn();
+ 
+     const handler = backdropCloseHandler(scrim, onClose);
+     handler({ target: scrim });
+     handler({ target: child });
+ 
+     expect(onClose).toHaveBeenCalledTimes(1);
+   });
+ 
+   it("reports no reduced-motion preference when matchMedia does not exist", () => {
+-    // Measured environment fact (jsdom 30.0.1 in this repo): the property is absent.
+-    expect(typeof window.matchMedia).toBe("undefined");
++    // The absent branch is DRIVEN here, never inherited from the environment: jsdom 30.0.1 in
++    // this repo happens to have no `window.matchMedia`, but that is an environment fact, and a
++    // jsdom upgrade that implements it must not read as a modal-semantics regression.
++    vi.stubGlobal("matchMedia", undefined);
+     expect(prefersReducedMotion()).toBe(false);
+ 
+     const queries: string[] = [];
+     vi.stubGlobal("matchMedia", (query: string) => {
+       queries.push(query);
+       return { matches: true } as MediaQueryList;
+     });
+ 
+     expect(prefersReducedMotion()).toBe(true);
+     expect(queries).toEqual(["(prefers-reduced-motion: reduce)"]);

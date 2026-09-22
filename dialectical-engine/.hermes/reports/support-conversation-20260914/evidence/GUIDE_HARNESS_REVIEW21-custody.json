@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW21",
+  "ticket": "t_ba4349a2",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "freeze": "cd7022a5d5d05ccf32dc7478bf1dc7c69290a064",
+  "bindingReceipt": {"sha256":"87178003a28ab357d9e0ed314894faf7c8c72d9126be94b906b90d558bea50b7"},
+  "manifest": {"artifacts":47,"verified":47,"mismatches":0},
+  "indexedInputs": {"inputs":96,"verified":96,"mismatches":0},
+  "actualUiFixture": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE-run-LIVE20.json",
+  "immutableLimitFixture": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE8-runtime-capacity.json",
+  "correctionProof": {"path":".hermes/reports/support-conversation-20260914/evidence/GUIDE_HARNESS_BIND21-two-corrections-proof.json","controls":12,"passed":12},
+  "commandContract": {"sha256":"571bb52477c1ff0826b364109ef61666b69e00e0bde8aba1ae926bebb8ffef98","bytes":9704},
+  "screenshotSuccessorSha256": "696dc176b7a6e1bbd6f5c8b5714bbf2519c7be7809af5fda8f45ca3f085a0b7c",
+  "reviewMode": "STATIC_READ_ONLY",
+  "traffic": {"runtime":0,"browser":0,"http":0,"status":0,"capacity":0,"database":0,"support":0,"model":0}
+}

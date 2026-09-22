@@ -1,0 +1,68 @@
+=== HEAD 4cc0f4b6 ===
+=== ADR arms (S02-S72) ===
+EXISTS
+Status Proposed count: 1
+useModalSurface: 1
+backdropCloseHandler: 1
+prefersReducedMotion: 1
+openSurfaceCount: 2
+=== CLUSTER COMMANDS ×3 ===
+----- PASS 1 -----
+S02-C1 | vt=0 guard=0 VERDICT=0 |       Tests  28 passed (28) |  Test Files  1 passed (1)
+S02-C2 | vt=0 guard=0 VERDICT=0 |       Tests  6 passed (6) |  Test Files  1 passed (1)
+S02-C3 | vt=0 guard=0 VERDICT=0 |       Tests  28 passed (28) |  Test Files  3 passed (3)
+S02-C4 | vt=0 guard=0 VERDICT=0 |       Tests  32 passed (32) |  Test Files  4 passed (4)
+S02-C5 | vt=0 guard=0 VERDICT=0 |       Tests  8 passed (8) |  Test Files  1 passed (1)
+S02-C6 | vt=0 guard=0 VERDICT=0 |       Tests  22 passed (22) |  Test Files  2 passed (2)
+S02-C7 | vt=0 guard=0 VERDICT=0 |       Tests  48 passed (48) |  Test Files  5 passed (5)
+S02-C8 | vt=0 guard=0 VERDICT=0 |       Tests  10 passed (10) |  Test Files  1 passed (1)
+S02-C9 | vt=0 guard=0 VERDICT=0 |       Tests  114 passed (114) |  Test Files  10 passed (10)
+S02-C9 | mergeArms: --scrim:=1 (expect 2)  S02markers=1 (expect 2)
+S02-C9-run_c9-exit=1
+----- PASS 2 -----
+S02-C1 | vt=0 guard=0 VERDICT=0 |       Tests  28 passed (28) |  Test Files  1 passed (1)
+S02-C2 | vt=0 guard=0 VERDICT=0 |       Tests  6 passed (6) |  Test Files  1 passed (1)
+S02-C3 | vt=0 guard=0 VERDICT=0 |       Tests  28 passed (28) |  Test Files  3 passed (3)
+S02-C4 | vt=0 guard=0 VERDICT=0 |       Tests  32 passed (32) |  Test Files  4 passed (4)
+S02-C5 | vt=0 guard=0 VERDICT=0 |       Tests  8 passed (8) |  Test Files  1 passed (1)
+S02-C6 | vt=0 guard=0 VERDICT=0 |       Tests  22 passed (22) |  Test Files  2 passed (2)
+S02-C7 | vt=0 guard=0 VERDICT=0 |       Tests  48 passed (48) |  Test Files  5 passed (5)
+S02-C8 | vt=0 guard=0 VERDICT=0 |       Tests  10 passed (10) |  Test Files  1 passed (1)
+S02-C9 | vt=0 guard=0 VERDICT=0 |       Tests  114 passed (114) |  Test Files  10 passed (10)
+S02-C9 | mergeArms: --scrim:=1 (expect 2)  S02markers=1 (expect 2)
+S02-C9-run_c9-exit=1
+----- PASS 3 -----
+S02-C1 | vt=0 guard=0 VERDICT=0 |       Tests  28 passed (28) |  Test Files  1 passed (1)
+S02-C2 | vt=0 guard=0 VERDICT=0 |       Tests  6 passed (6) |  Test Files  1 passed (1)
+S02-C3 | vt=0 guard=0 VERDICT=0 |       Tests  28 passed (28) |  Test Files  3 passed (3)
+S02-C4 | vt=0 guard=0 VERDICT=0 |       Tests  32 passed (32) |  Test Files  4 passed (4)
+S02-C5 | vt=0 guard=0 VERDICT=0 |       Tests  8 passed (8) |  Test Files  1 passed (1)
+S02-C6 | vt=0 guard=0 VERDICT=0 |       Tests  22 passed (22) |  Test Files  2 passed (2)
+S02-C7 | vt=0 guard=0 VERDICT=0 |       Tests  48 passed (48) |  Test Files  5 passed (5)
+S02-C8 | vt=0 guard=0 VERDICT=0 |       Tests  10 passed (10) |  Test Files  1 passed (1)
+S02-C9 | vt=0 guard=0 VERDICT=0 |       Tests  114 passed (114) |  Test Files  10 passed (10)
+S02-C9 | mergeArms: --scrim:=1 (expect 2)  S02markers=1 (expect 2)
+S02-C9-run_c9-exit=1
+=== STANDING GATES ===
+G1 generate:contract exit=0
+G1 typecheck exit=1
+G1 tsc_runs=0 outside_pin=0 pin_count=8 (report, never assert)
+G2 exit=1 fail_named_lines=2
+ FAIL  tests/unit/t9-mode-tokens.test.ts > T9-C3 mode control and document guard > renders one accessible toggle that reads the document mode, flips it, and persists it
+ FAIL  tests/unit/t9-mode-tokens.test.ts > T9-C3 mode control and document guard > leaves no mode-inert colour literal in the four Wave-0 product files
+G2 hit_list_count=1
++   "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-grok-10c/dialectical-engine/apps/ui/app/globals.css:6116:background: color-mix(in srgb, #0a0806 32%, transparent);",
+      Tests  2 failed | 7 passed (9)
+G3 | vt=0 guard=0 VERDICT=0 |       Tests  2 passed (2) |  Test Files  1 passed (1)
+=== apps/ui tsc (COMMON §10.30) ===
+(node:95670) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+apps/ui tsc exit=0
+=== 17-file SET (BASELINE.md command) ×3 ===
+----- SET pass 1 -----
+SET pass=1 exit=0 |       Tests  197 passed (197) |  Test Files  17 passed (17)
+----- SET pass 2 -----
+SET pass=2 exit=0 |       Tests  197 passed (197) |  Test Files  17 passed (17)
+----- SET pass 3 -----
+SET pass=3 exit=0 |       Tests  197 passed (197) |  Test Files  17 passed (17)
+=== DONE ===

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREFLIGHT_LIFECYCLE_FIX44",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS",
+  "controls": 6,
+  "passed": 6,
+  "names": [
+    "actual operator to actual preflight accepts exact owned stage files",
+    "stale prerequisite rejected by initial guard",
+    "other preexisting future output rejected",
+    "unexpected future artifact at preflight rejected",
+    "forged wrong-binding prerequisite rejected by actual preflight",
+    "proof serialized"
+  ],
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

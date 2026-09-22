@@ -1,0 +1,24 @@
+{
+  "at": "2026-09-20T19:06:32.607168+00:00",
+  "node": "GUIDE_QUALITY_REVIEW_WORDING_SUPPLEMENT",
+  "revision": "6cbe0e7ad18b20eca35876f4a91478cfbba82307",
+  "verdict": "PASS_EXACT_WORDING_SUPPLEMENT",
+  "receipt": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-wording-supplement-receipt.json",
+    "sha256": "1be0fdc33a7caa7b4c0c2abf70e57d06b25eef1aa56c8f53fd81936e5e3f1e51",
+    "bytes": 2136
+  },
+  "artifactsVerified": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-wording-supplement.json",
+      "sha256": "7ede542145876d02a540f26cecddc68dc7b66fdf957c203060c10cb01bf88aee",
+      "bytes": 6047
+    }
+  ],
+  "originalReviewConsumption": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-consumption.json",
+    "sha256": "0e2f1532039f3aad317da38173388c1af70c7a18ddfa842d789c66646fd929d5",
+    "bytes": 20652
+  },
+  "authority": "Mechanical consumption of original independent reviewer exact two-projection wording approval; article/fallback hashes retained; original code REWORK remains; no owner ratification"
+}

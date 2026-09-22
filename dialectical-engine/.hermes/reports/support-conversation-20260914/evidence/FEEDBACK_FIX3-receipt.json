@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "node": "FEEDBACK_FIX3",
+  "ticket": "t_29466553",
+  "session": "/root/requirements",
+  "sourceRevision": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+  "baseRevision": "9e87fe5859b44fbd62dd485e03045e5bcde96bed",
+  "finalRevision": "479763da1f586a217f36204cc81138aaa81c6f81",
+  "status": "READY_FOR_SEPARATE_RECHECK_AND_LIVE_VERIFICATION",
+  "productFiles": [
+    {
+      "laneRelative": "apps/api/src/support/security-guidance.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/api/src/support/security-guidance.ts",
+      "sha256": "3a8ac4fadd3da6255b7ab0051234468920906864a84aae6f0bddfd49aebb8b5c",
+      "bytes": 4866
+    },
+    {
+      "laneRelative": "packages/support-kb/src/context.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/src/context.ts",
+      "sha256": "05e004ec5365dbb6d11e89d9204ae7f801203d498cf8127a39818ead5e56c05d",
+      "bytes": 12763
+    },
+    {
+      "laneRelative": "tests/integration/support-routes.test.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/integration/support-routes.test.ts",
+      "sha256": "dc505f81ec9bcc9c1452e3f26cb7c7de5c10184b861d822e9ff4ba9ccf602d9d",
+      "bytes": 124719
+    },
+    {
+      "laneRelative": "tests/unit/support-answer-context.test.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-answer-context.test.ts",
+      "sha256": "6c2f26439c5265441c41df334329131884ee4fbd669ce304a7538e1845249251",
+      "bytes": 24373
+    },
+    {
+      "laneRelative": "tests/unit/support-classify.test.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-classify.test.ts",
+      "sha256": "0b84d26df4421b4e6f1311496c4239d860b7b2af146e5a4600d03b928b06300e",
+      "bytes": 60456
+    },
+    {
+      "laneRelative": "tests/unit/support-context.test.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-context.test.ts",
+      "sha256": "010c6c726547cd599bacae4f68bbb8a899e73b7b4deb8adfb7d12b870ed0ed3f",
+      "bytes": 17963
+    },
+    {
+      "laneRelative": "tests/unit/support-security-guidance.test.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-security-guidance.test.ts",
+      "sha256": "2ce60f51fb8bcec238e794f2455015e66fb446acdca5781bd190bf1c40a91ad9",
+      "bytes": 3155
+    }
+  ],
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FEEDBACK_FIX3.md",
+      "sha256": "36c7d314638086410c49918729f64239cdbbfc8995aa06caa0ee0f8a416e2cd2",
+      "bytes": 2764
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FEEDBACK_FIX3-snapshot-receipt.json",
+      "sha256": "c6de07d1e9f8ff1733f4ea41d4319f89f27c4b7e2808cc0b43befcca5cbe26a9",
+      "bytes": 45700
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FEEDBACK_FIX3.md",
+      "sha256": "d98238943185544dbb6922e6b05ce7592a2754b8200c3ae1d24f236d12eca25f",
+      "bytes": 2933
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FEEDBACK_FIX3-red.log",
+      "sha256": "2ad704592fad4ae5a998c16d2b7c246604ef3a75849102632ced45cd5c37dc90",
+      "bytes": 122966
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FEEDBACK_FIX3-unit-green.log",
+      "sha256": "aa07782450da49d02a7295326c8edc03da35cbf8c72dbb972341ac732f09a06c",
+      "bytes": 80940
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FEEDBACK_FIX3-routes-green.log",
+      "sha256": "57cd0e964480ce85e75f6cf5a824009e5e56567d87d3c89ad264a4e04e32bd8f",
+      "bytes": 2169
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FEEDBACK_FIX3-routes-green2.log",
+      "sha256": "39d94d5c9a0eee44659c3af5fbf4a2ce845e751b1a125f7ecab5ff9febd79c14",
+      "bytes": 26018
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FEEDBACK_FIX3-final-affected.log",
+      "sha256": "20589b90b3d0fe1fb5c77c2a9d50b366a9b81ee6f6d1848365d389a3a2e62b9f",
+      "bytes": 106656
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/FEEDBACK_FIX3-typecheck-final.log",
+      "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+      "bytes": 39611
+    }
+  ],
+  "verification": {
+    "red": {
+      "files": 5,
+      "passed": 589,
+      "failed": 23
+    },
+    "finalAffected": {
+      "files": 5,
+      "passed": 612,
+      "failed": 0,
+      "logSha256": "20589b90b3d0fe1fb5c77c2a9d50b366a9b81ee6f6d1848365d389a3a2e62b9f"
+    },
+    "typecheck": {
+      "rc": 1,
+      "diagnostics": 76,
+      "byteIdenticalToAttributedBaseline": true,
+      "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0"
+    }
+  },
+  "retainedSnapshot": {
+    "kbVersion": "23f8131ced441159be735d779ff4d863c9b0b77cf79a7eb513df49e7711f9f3e",
+    "entryCount": 38,
+    "contentOrManifestChanged": false,
+    "ownerRatificationAdded": false
+  },
+  "leases": {
+    "heavy": "RELEASED_AFTER_VERIFICATION",
+    "scopedGit": "RELEASED_AFTER_COMMIT"
+  },
+  "limits": [
+    "Separate rechecks and supported live capture remain required.",
+    "Forgot-password destination remains unresolved.",
+    "New conversational-guide scope belongs to a separate assessment.",
+    "No checkpoint acceptance is claimed."
+  ]
+}

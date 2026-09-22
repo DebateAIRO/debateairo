@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE",
+  "revision": "91d17ae2a2748f3d48e14d9e56fdb8a2d8ee7c69",
+  "verdict": "BLOCKED_PRETRAFFIC_ACTION_PROOF_ZERO_REQUESTS",
+  "ongoingPrivateRuntimeLogExcluded": ".hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE-stack.log",
+  "files": [
+    { "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE.md", "sha256": "a74003e804e931d95aba23407c0d31af310649f8334a6a40309e0053981566e1", "bytes": 4701 },
+    { "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE-manual.md", "sha256": "5dfd4b0c7dd982aea972438379c574681f56b7c360d7d3f54004fd4bfd5db608", "bytes": 1135 },
+    { "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE-failure-receipt.json", "sha256": "2662bd9f5549f35e2af00f0345ee7f8179c8b934f173dbc2bc5ad199c1baf882", "bytes": 3635 },
+    { "path": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_LIVE.md", "sha256": "ddfb94b5b0d652a27a2a1798173b82e2da3c6b0d7067c72f260c95552c3e4f61", "bytes": 3532 },
+    { "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE-gate-template.json", "sha256": "0d08e53827a0de1d154e7630880f3c3bf44b6cf811daecaaac38f1e83f3ca35d" },
+    { "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE-gate.json", "sha256": "dd6e8e27db4481578db963e881a72beeb6f68fade8b5dce8ed918db7ac76250f" },
+    { "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE-runtime-capacity.json", "sha256": "f21441771305bbb094e0b19e466dd1d98ceccac1e0b5d88f83fcb9dfdf0c85da" },
+    { "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE-pre-reload.json", "sha256": "16a1b49131df48be2fd23ebf5ddb268793e6c0256217afcf7e3d9eb854ee2a11" },
+    { "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE-stack-custody.json", "sha256": "7486c339bc7eef701b3a1b3316e4888f56cef7a307d2e36189d2fc36f04f2054" },
+    { "path": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE-readiness.json", "sha256": "9b37fb4cfd4ced2bb16c6f39b1e9b66f8d3b961571100ff8aff7effea85d021e" },
+    { "path": ".hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE-stop.log", "sha256": "14d12836fa1aed96caaa28590ae1b774e07a601cbd3b7722a0df01e568e6f87a" },
+    { "path": ".hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE-stop-r2.log", "sha256": "2ef89e96a441a99217d04c4be56fdd6d732dca9ffe9f8b2dea63e1984af4b18a" },
+    { "path": ".hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE-launch.log", "sha256": "a6d4d92b6320d094cfa92329ebed251a3797b9b1c210859909921dbcca0cd3d0" },
+    { "path": ".hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE-readiness.log", "sha256": "9b37fb4cfd4ced2bb16c6f39b1e9b66f8d3b961571100ff8aff7effea85d021e" },
+    { "path": ".hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE-capacity.log", "sha256": "8cf5cd0bab3b4f66710aa1433cfe2bbde73228341900ebd7bcd821fa6469053d" },
+    { "path": ".hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE-gate.log", "sha256": "250634c3ad4741d9928e49ce06cf5e3a114097abe5d1ab83c7434822884f6b1c" },
+    { "path": ".hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE-capture.log", "sha256": "dffeb5fe8f0705c74228cd5bcd88a972414c94f817ef3726caa5b70b6cfd8f04" },
+    { "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_LIVE/materialize-final-gate.mjs", "sha256": "350babb499dff4302edfd3a02cc2368e5696b104626564e53609f7a298490500" },
+    { "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_LIVE/materialize-runtime-capacity.mjs", "sha256": "47888ae10d57660a4e293de8e585e85db2e236f0f76316bf8e2ab589a6d30496" },
+    { "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_LIVE/record-pre-reload.mjs", "sha256": "34a334fcf19a57c8207e8b48ed5b5a254b9e61852ea29d8af067eea71f1154ff" },
+    { "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_LIVE/start-preview-detached.mjs", "sha256": "658e4faf596a66aa82baebdef645991b33c52a9fd5d8939ef03cb5fea5cd4739" },
+    { "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_LIVE/stop-owned-preview-r2.mjs", "sha256": "57f418266d1eb2f743511ad6eb79c06d2ce21a697d1ca2585e1b24f2db6f6f0c" },
+    { "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_LIVE/stop-owned-preview.mjs", "sha256": "987353009c629f1ec1ad52958d2b5ae6a2b57c2572425d90fde861cf02eeb112" },
+    { "path": ".hermes/reports/support-conversation-20260914/probes/GUIDE_LIVE/verify-ready.mjs", "sha256": "74f054fae624a9100574dda758c608335249a85a1fe1e3159fda8ae23d872f31" }
+  ]
+}

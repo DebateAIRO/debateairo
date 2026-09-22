@@ -1,0 +1,563 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_FOOTERLESS_FIX39",
+  "ticket": "t_37ac3d2f",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_FOOTERLESS_HELPER_CONTROLS",
+  "controls": 9,
+  "passed": 9,
+  "records": [
+    {
+      "name": "old FIX38 helper rejects exact saved footerless row47",
+      "passed": true,
+      "code": "GUIDE_CAPTURE_SCROLL_EDGE_MISSING"
+    },
+    {
+      "name": "full ro short footerless body start/end",
+      "passed": true,
+      "sequence": 47,
+      "endScroll": {
+        "action": "PRESERVED_ALREADY_CONTAINED",
+        "alreadyContained": true,
+        "priorScrollTop": 0,
+        "requestedDelta": 0,
+        "requestedScrollTop": 0,
+        "assignedScrollTop": 0,
+        "maximumScrollTop": 0,
+        "belowOverflow": 0,
+        "aboveOverflow": 0
+      },
+      "images": {
+        "start": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-final-full-ro-short-original-pane-start.png",
+          "sha256": "398fcda02994d0fc326b6cc4382c1600b9b433922edfd0614efa5a7c6121ebbf",
+          "bytes": 18713,
+          "width": 652,
+          "height": 380
+        },
+        "end": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-final-full-ro-short-original-pane-end.png",
+          "sha256": "398fcda02994d0fc326b6cc4382c1600b9b433922edfd0614efa5a7c6121ebbf",
+          "bytes": 18713,
+          "width": 652,
+          "height": 380
+        },
+        "complete": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-final-full-ro-short-complete-expanded.png",
+          "sha256": "bed4b049547d17e49d4ae095f1f16f39bfe1bef9c3990325ed3eeb700fa0be80",
+          "bytes": 7591,
+          "width": 472,
+          "height": 76,
+          "expansion": {
+            "ancestorCount": 5,
+            "ancestorClasses": [
+              "supportConversation",
+              "supportChatScroll",
+              "supportAgent",
+              "supportDeskBody",
+              "supportDesk"
+            ],
+            "viewportBefore": {
+              "width": 1440,
+              "height": 1000
+            },
+            "viewportExpandedHeight": 1000,
+            "stylesScrollViewportRestored": true
+          }
+        }
+      },
+      "restoration": {
+        "paneScrollTopRestored": true,
+        "viewportRestored": true,
+        "observedPaneScrollTop": 0,
+        "observedViewport": {
+          "width": 1440,
+          "height": 1000
+        }
+      }
+    },
+    {
+      "name": "compact ro short footerless body start/end",
+      "passed": true,
+      "sequence": 147,
+      "endScroll": {
+        "action": "PRESERVED_ALREADY_CONTAINED",
+        "alreadyContained": true,
+        "priorScrollTop": 0,
+        "requestedDelta": 0,
+        "requestedScrollTop": 0,
+        "assignedScrollTop": 0,
+        "maximumScrollTop": 0,
+        "belowOverflow": 0,
+        "aboveOverflow": 0
+      },
+      "images": {
+        "start": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-final-compact-ro-short-original-pane-start.png",
+          "sha256": "88a249cb00672299c4a8d4a52535296381dbadce804aa8a0d2b24cc298f17036",
+          "bytes": 15430,
+          "width": 1408,
+          "height": 380
+        },
+        "end": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-final-compact-ro-short-original-pane-end.png",
+          "sha256": "88a249cb00672299c4a8d4a52535296381dbadce804aa8a0d2b24cc298f17036",
+          "bytes": 15430,
+          "width": 1408,
+          "height": 380
+        },
+        "complete": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-final-compact-ro-short-complete-expanded.png",
+          "sha256": "bf9f547aa9f91d154f910bbde6c5dd4f57c520a35471f2b6ea82255d08efd9fb",
+          "bytes": 7251,
+          "width": 632,
+          "height": 58,
+          "expansion": {
+            "ancestorCount": 2,
+            "ancestorClasses": [
+              "supportConversation",
+              "supportAssistantCompact"
+            ],
+            "viewportBefore": {
+              "width": 1440,
+              "height": 1000
+            },
+            "viewportExpandedHeight": 1000,
+            "stylesScrollViewportRestored": true
+          }
+        }
+      },
+      "restoration": {
+        "paneScrollTopRestored": true,
+        "viewportRestored": true,
+        "observedPaneScrollTop": 0,
+        "observedViewport": {
+          "width": 1440,
+          "height": 1000
+        }
+      }
+    },
+    {
+      "name": "full en short footerless body start/end",
+      "passed": true,
+      "sequence": 148,
+      "endScroll": {
+        "action": "PRESERVED_ALREADY_CONTAINED",
+        "alreadyContained": true,
+        "priorScrollTop": 0,
+        "requestedDelta": 0,
+        "requestedScrollTop": 0,
+        "assignedScrollTop": 0,
+        "maximumScrollTop": 0,
+        "belowOverflow": 0,
+        "aboveOverflow": 0
+      },
+      "images": {
+        "start": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-final-full-en-short-original-pane-start.png",
+          "sha256": "a56822a45ae950927e1273991f0ba718a449a7b4ee2d43f49bf19c5caa093443",
+          "bytes": 18129,
+          "width": 652,
+          "height": 380
+        },
+        "end": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-final-full-en-short-original-pane-end.png",
+          "sha256": "a56822a45ae950927e1273991f0ba718a449a7b4ee2d43f49bf19c5caa093443",
+          "bytes": 18129,
+          "width": 652,
+          "height": 380
+        },
+        "complete": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-final-full-en-short-complete-expanded.png",
+          "sha256": "fed0f6062764c80eb32a8607ad61f15084b6d3abcd5118ef21a4840ca01f73fd",
+          "bytes": 6994,
+          "width": 472,
+          "height": 76,
+          "expansion": {
+            "ancestorCount": 5,
+            "ancestorClasses": [
+              "supportConversation",
+              "supportChatScroll",
+              "supportAgent",
+              "supportDeskBody",
+              "supportDesk"
+            ],
+            "viewportBefore": {
+              "width": 1440,
+              "height": 1000
+            },
+            "viewportExpandedHeight": 1000,
+            "stylesScrollViewportRestored": true
+          }
+        }
+      },
+      "restoration": {
+        "paneScrollTopRestored": true,
+        "viewportRestored": true,
+        "observedPaneScrollTop": 0,
+        "observedViewport": {
+          "width": 1440,
+          "height": 1000
+        }
+      }
+    },
+    {
+      "name": "compact en short footerless body start/end",
+      "passed": true,
+      "sequence": 149,
+      "endScroll": {
+        "action": "PRESERVED_ALREADY_CONTAINED",
+        "alreadyContained": true,
+        "priorScrollTop": 0,
+        "requestedDelta": 0,
+        "requestedScrollTop": 0,
+        "assignedScrollTop": 0,
+        "maximumScrollTop": 0,
+        "belowOverflow": 0,
+        "aboveOverflow": 0
+      },
+      "images": {
+        "start": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-final-compact-en-short-original-pane-start.png",
+          "sha256": "02b10217e69663f4e6ff485aa59b7d0402d06b33a60addc6dba0fde9c97232b8",
+          "bytes": 14869,
+          "width": 1408,
+          "height": 380
+        },
+        "end": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-final-compact-en-short-original-pane-end.png",
+          "sha256": "02b10217e69663f4e6ff485aa59b7d0402d06b33a60addc6dba0fde9c97232b8",
+          "bytes": 14869,
+          "width": 1408,
+          "height": 380
+        },
+        "complete": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-final-compact-en-short-complete-expanded.png",
+          "sha256": "a05c181e087bb42399202e44ad0a284bdfe59016b95a0cefe891234b1c679016",
+          "bytes": 6670,
+          "width": 556,
+          "height": 58,
+          "expansion": {
+            "ancestorCount": 2,
+            "ancestorClasses": [
+              "supportConversation",
+              "supportAssistantCompact"
+            ],
+            "viewportBefore": {
+              "width": 1440,
+              "height": 1000
+            },
+            "viewportExpandedHeight": 1000,
+            "stylesScrollViewportRestored": true
+          }
+        }
+      },
+      "restoration": {
+        "paneScrollTopRestored": true,
+        "viewportRestored": true,
+        "observedPaneScrollTop": 0,
+        "observedViewport": {
+          "width": 1440,
+          "height": 1000
+        }
+      }
+    },
+    {
+      "name": "long footerless reply proves painted body start and body end",
+      "passed": true,
+      "endScroll": {
+        "action": "SCROLLED_FORWARD",
+        "alreadyContained": false,
+        "priorScrollTop": 114,
+        "requestedDelta": 835,
+        "requestedScrollTop": 949,
+        "assignedScrollTop": 949,
+        "maximumScrollTop": 993,
+        "belowOverflow": 833.859375,
+        "aboveOverflow": 0
+      },
+      "views": {
+        "start": {
+          "target": {
+            "x": 413,
+            "y": 154,
+            "width": 367,
+            "height": 1141
+          },
+          "pane": {
+            "x": 389,
+            "y": 154,
+            "width": 652,
+            "height": 280
+          },
+          "bodyStart": {
+            "x": 434,
+            "y": 175,
+            "width": 6,
+            "height": 14
+          },
+          "bodyStartPainted": true,
+          "paneScrollTop": 114
+        },
+        "end": {
+          "target": {
+            "x": 413,
+            "y": -687,
+            "width": 367,
+            "height": 1141
+          },
+          "pane": {
+            "x": 389,
+            "y": 154,
+            "width": 652,
+            "height": 280
+          },
+          "bodyEnd": {
+            "x": 757,
+            "y": 419,
+            "width": 3,
+            "height": 14
+          },
+          "bodyEndPainted": true,
+          "footer": null,
+          "footerPainted": false,
+          "paneScrollTop": 949
+        }
+      },
+      "images": {
+        "start": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-final-full-en-long-original-pane-start.png",
+          "sha256": "1c6cbcd125ea1e6efaf7de86406d2034436412b8cc589bdf6b2287360c20436f",
+          "bytes": 55997,
+          "width": 652,
+          "height": 280
+        },
+        "end": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-final-full-en-long-original-pane-end.png",
+          "sha256": "8b405431a8bbfd1a8ee73462bde46e313418eaddea3760e2e5b367defb83e529",
+          "bytes": 59294,
+          "width": 652,
+          "height": 280
+        },
+        "complete": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-final-full-en-long-complete-expanded.png",
+          "sha256": "e97039fe3bef231d927211f8a4568a388937fe566d5eb652a26ee62619396d86",
+          "bytes": 18485,
+          "width": 368,
+          "height": 1143,
+          "expansion": {
+            "ancestorCount": 5,
+            "ancestorClasses": [
+              "supportConversation",
+              "supportChatScroll",
+              "supportAgent",
+              "supportDeskBody",
+              "supportDesk"
+            ],
+            "viewportBefore": {
+              "width": 1440,
+              "height": 1000
+            },
+            "viewportExpandedHeight": 1302,
+            "stylesScrollViewportRestored": true
+          }
+        }
+      },
+      "restoration": {
+        "paneScrollTopRestored": true,
+        "viewportRestored": true,
+        "observedPaneScrollTop": 993,
+        "observedViewport": {
+          "width": 1440,
+          "height": 1000
+        }
+      }
+    },
+    {
+      "name": "missing expected source footer rejects with diagnostic and restoration",
+      "passed": true,
+      "diagnostic": {
+        "schemaVersion": 1,
+        "sequence": 151,
+        "failureCode": "GUIDE_CAPTURE_EXPECTED_FOOTER_MISSING",
+        "phase": "ORIGINAL_PANE_SCREENSHOT",
+        "identity": {
+          "sequence": 151,
+          "promptSha256": "1cc1ceae56047be2271226f1769bf4483f9d05729c4e50824e869909a292cf92",
+          "mode": "full",
+          "language": "ro",
+          "apiTextSha256": "ff763149a9baa582f7246711e4962b78d8f61ee83d2b90ea0f56d0262c298961",
+          "sources": [
+            "app-navigation"
+          ],
+          "actions": [],
+          "targetAssistantIndex": 0
+        },
+        "endEvidenceKind": "SOURCE_ACTION_FOOTER",
+        "geometry": {
+          "before": {
+            "target": {
+              "top": 267.7010803222656,
+              "left": 413,
+              "right": 579.875,
+              "bottom": 324.0917053222656,
+              "x": 413,
+              "y": 267.7010803222656,
+              "width": 166.875,
+              "height": 56.390625
+            },
+            "pane": {
+              "top": 154,
+              "left": 389,
+              "right": 1041,
+              "bottom": 534,
+              "x": 389,
+              "y": 154,
+              "width": 652,
+              "height": 380
+            },
+            "footer": null,
+            "footerPainted": false,
+            "paneScrollTop": 0,
+            "paneScrollHeight": 380,
+            "paneClientHeight": 380
+          },
+          "top": {
+            "target": {
+              "top": 267.7010803222656,
+              "left": 413,
+              "right": 579.875,
+              "bottom": 324.0917053222656,
+              "x": 413,
+              "y": 267.7010803222656,
+              "width": 166.875,
+              "height": 56.390625
+            },
+            "pane": {
+              "top": 154,
+              "left": 389,
+              "right": 1041,
+              "bottom": 534,
+              "x": 389,
+              "y": 154,
+              "width": 652,
+              "height": 380
+            },
+            "top": {
+              "top": 267.7010803222656,
+              "left": 413,
+              "right": 579.875,
+              "bottom": 324.0917053222656,
+              "x": 413,
+              "y": 267.7010803222656,
+              "width": 166.875,
+              "height": 56.390625
+            },
+            "footer": null,
+            "footerPainted": false,
+            "paneScrollTop": 0,
+            "paneScrollHeight": 380,
+            "paneClientHeight": 380
+          },
+          "preEnd": {
+            "target": {
+              "top": 261.8125,
+              "left": 413,
+              "right": 579.875,
+              "bottom": 318.203125,
+              "x": 413,
+              "y": 261.8125,
+              "width": 166.875,
+              "height": 56.390625
+            },
+            "pane": {
+              "top": 154,
+              "left": 389,
+              "right": 1041,
+              "bottom": 534,
+              "x": 389,
+              "y": 154,
+              "width": 652,
+              "height": 380
+            },
+            "bodyEnd": {
+              "top": 282.8125,
+              "left": 555.984375,
+              "right": 558.875,
+              "bottom": 296.8125,
+              "x": 555.984375,
+              "y": 282.8125,
+              "width": 2.890625,
+              "height": 14
+            },
+            "bodyEndPainted": true,
+            "footer": null,
+            "footerPainted": false,
+            "paneScrollTop": 0,
+            "paneScrollHeight": 380,
+            "paneClientHeight": 380
+          },
+          "postEnd": null
+        },
+        "scrollAssignment": null,
+        "restoration": {
+          "paneScrollTopRestored": true,
+          "viewportRestored": true,
+          "observedPaneScrollTop": 0,
+          "observedViewport": {
+            "width": 1440,
+            "height": 1000
+          }
+        },
+        "artifacts": {
+          "topPaneScreenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-final-expected-footer-missing-original-pane-start.png",
+          "footerPaneScreenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-final-expected-footer-missing-original-pane-end.png",
+          "screenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_FOOTERLESS_FIX39-final-expected-footer-missing-complete-expanded.png",
+          "topPaneCreated": true,
+          "endPaneCreated": false,
+          "completeExpandedCreated": false
+        }
+      }
+    },
+    {
+      "name": "previous target remains rejected before capture",
+      "passed": true,
+      "code": "GUIDE_CAPTURE_SCREENSHOT_TARGET_MISMATCH"
+    },
+    {
+      "name": "call contract rejects mismatched validated source projection",
+      "passed": true,
+      "code": "GUIDE_CAPTURE_VALIDATED_SOURCE_LAYOUT_MISMATCH\n\nfalse !== true\n"
+    }
+  ],
+  "traffic": {
+    "forwardedSupport": 0,
+    "externalRequests": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "sourceCustody": {
+    "assistant": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/ui/components/support/Assistant.tsx",
+      "sha256": "08973898240182a2c04894b1987ffab92e593d70bb9eb9808484f2c76c8e710d",
+      "bytes": 35959
+    },
+    "css": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/ui/app/globals.css",
+      "sha256": "4a63c4227acdc5edd4f8358a7ebe7378a03a3334be05e8ae83f0e0a5c430fe5b",
+      "bytes": 209761
+    },
+    "actualRow47Receipt": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE23-actual-receipt.json",
+      "sha256": "f0dde45933a40f1836014cc1c187258e8b233228973f1410cbb144eaf8b83951"
+    }
+  },
+  "retainedFix38Proof": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_FIX38-browser-control-proof.json",
+    "sha256": "517bae91db19aa1b51a7bf9710eb1ebc9bae3f75f136c6e8b769436e147a0612"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "node": "GUIDE_OPERATOR_CWD_OBSERVATION50",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "operatorMetadata": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREFLIGHT_SCHEMA_FIX49-operator-contract.json",
+  "operatorMetadataSha256": "63379645c09e162cc780f15cc069ef212cb644b54ea26a30baa1ecb6f36eb0d0",
+  "observedCwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine",
+  "requiredCwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "argv": [
+    "/Users/vladmihaimiron/.local/bin/node",
+    "--import",
+    "tsx",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_SCHEMA_FIX49/run-operator.mjs"
+  ],
+  "dispatchStoppedBeforeTicketAndExecution": true,
+  "operationalTraffic": 0,
+  "changeScope": "New operator metadata successor only: cwd=L, same sealed FIX49 source/contract/argv."
+}

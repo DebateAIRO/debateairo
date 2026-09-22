@@ -1,0 +1,106 @@
+{
+  "at": "2026-09-17T06:55:04.003491+00:00",
+  "node": "REV3_P4",
+  "ticket": "t_bcd8b6b5",
+  "revision": "475c5a7e7eb8f48a3f5a81379f37b49fdd014ce9",
+  "verdict": "BLOCKED",
+  "scope": "Separate product and demonstration review of current actual capture; retaining unchanged UI checks.",
+  "receipt": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/REV3_P4-receipt.json",
+    "sha256": "0c369a087b43e069581204c265ff449336fc19320ffc11ea416e7a1b0a080d37"
+  },
+  "report": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV3-p4.md",
+    "sha256": "c27375efffc628ff973cf75dbe39a991acd1d9d4f80d40fbe97d76be13f90d4b"
+  },
+  "artifactsVerified": [
+    {
+      "kind": "verdict",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/REV3-p4.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV3-p4.md",
+      "sha256": "c27375efffc628ff973cf75dbe39a991acd1d9d4f80d40fbe97d76be13f90d4b",
+      "bytes": 7001
+    },
+    {
+      "kind": "selfReport",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/REV3_P4.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/REV3_P4.md",
+      "sha256": "9de07d17487d3de2f9973fe58d71d3a178a16e3e8510937fd65070a4a1476778",
+      "bytes": 5318
+    }
+  ],
+  "gate": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_P5-manifest.json",
+    "sha256": "4abdf0b3f9a1af6b66796165ded25207cd84f75f7625504beee4e04afc23350b",
+    "inputsVerified": 25,
+    "productFilesVerified": 108
+  },
+  "primaryAndDetachedClean": true,
+  "nativeSession": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-10-40-01a09ef7-e096-7c31-9b35-806840028cf0.jsonl",
+  "nativeSkillBodyProof": {
+    "using-superpowers": {
+      "file": "/Users/vladmihaimiron/.codex/plugins/cache/openai-curated-remote/superpowers/6.3.0/skills/using-superpowers/SKILL.md",
+      "sha256": "30f2ab78e20ddc27ee7158ae8d4a2abe161c360981c7cc3548070913142d3dc3",
+      "bodyPhrase": "This is not negotiable. You cannot rationalize your way out of this.",
+      "nativeTimestamp": "2026-09-14T08:10:49.960Z",
+      "nativeCallId": "call_xumdvGo98yh65kpWmsOpYdCK",
+      "outputBodySha256": "2b66a1dd7e0196727088eeed4276ce08e4acb40bb62d3234d431397f11cd37e6",
+      "method": "Actual native tool output BODY only, not invocation arguments; retained same-session read, no fresh-read claim."
+    },
+    "heartbeat-protocol": {
+      "file": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-protocol/SKILL.md",
+      "sha256": "9f5c803cbdfb92a98bb749601b96d5fa1f2bdcba3805e7cff5be200fd98f3bb3",
+      "bodyPhrase": "One role per node: a seat that reviews does not code, and no seat reviews its own work",
+      "nativeTimestamp": "2026-09-14T08:11:10.417Z",
+      "nativeCallId": "call_bpvwrTvdJ91it1XPn7rAzITW",
+      "outputBodySha256": "4d34caea58ee45869b184f3b58ada24e454d4dba3a8d58807a7373f68d4efdb9",
+      "method": "Actual native tool output BODY only, not invocation arguments; retained same-session read, no fresh-read claim."
+    },
+    "verification-before-completion": {
+      "file": "/Users/vladmihaimiron/.codex/plugins/cache/openai-curated-remote/superpowers/6.3.0/skills/verification-before-completion/SKILL.md",
+      "sha256": "2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3",
+      "bodyPhrase": "NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE",
+      "nativeTimestamp": "2026-09-14T08:11:28.955Z",
+      "nativeCallId": "call_s5V1wdpIhcfjYw7OlnJdFFiy",
+      "outputBodySha256": "83e47c6a3723ee1afdc3d6d204593e80962d56ce697ff0cd1ca9bca9caf52fdb",
+      "method": "Actual native tool output BODY only, not invocation arguments; retained same-session read, no fresh-read claim."
+    },
+    "test-driven-development": {
+      "file": "/Users/vladmihaimiron/.codex/plugins/cache/openai-curated-remote/superpowers/6.3.0/skills/test-driven-development/SKILL.md",
+      "sha256": "bf1b8216e523851a411e91d429a7c1c2a173e79d88957bc78e348218d50edd54",
+      "bodyPhrase": "If you didn't watch the test fail, you don't know if it tests the right thing.",
+      "nativeTimestamp": "2026-09-14T08:11:28.955Z",
+      "nativeCallId": "call_s5V1wdpIhcfjYw7OlnJdFFiy",
+      "outputBodySha256": "83e47c6a3723ee1afdc3d6d204593e80962d56ce697ff0cd1ca9bca9caf52fdb",
+      "method": "Actual native tool output BODY only, not invocation arguments; retained same-session read, no fresh-read claim."
+    },
+    "systematic-debugging": {
+      "file": "/Users/vladmihaimiron/.codex/plugins/cache/openai-curated-remote/superpowers/6.3.0/skills/systematic-debugging/SKILL.md",
+      "sha256": "808fc5717aa88ad65efff312b11c186294d3e6ee301afb584e2f86599b137787",
+      "bodyPhrase": "Violating the letter of this process is violating the spirit of debugging.",
+      "nativeTimestamp": "2026-09-14T08:17:17.038Z",
+      "nativeCallId": "call_FNy25vzkPEYZNfEJGoSN8w2K",
+      "outputBodySha256": "bd2fa9e9ffd14fdcc7d01816659dd3417b18d686a0cbe6e78929543997759fc3",
+      "method": "Actual native tool output BODY only, not invocation arguments; retained same-session read, no fresh-read claim."
+    },
+    "heartbeat-reviewer": {
+      "file": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-reviewer/SKILL.md",
+      "sha256": "5b49f9faaf743bfe18d2dfbc5f20560fd3c3edd7a57d55ce1903b021b11b722b",
+      "bodyPhrase": "is a finding against the orchestrator's packet, not against the worker who obeyed it",
+      "nativeTimestamp": "2026-09-14T12:19:54.675Z",
+      "nativeCallId": "call_DKfsZEJoLIFwwXQLHbu3RWCm",
+      "outputBodySha256": "554af2989271f80dfbcf159001ea01867b74b3db644ac058ba2c3d2bfd52ef93",
+      "method": "Actual native tool output BODY only, not invocation arguments; retained same-session read, no fresh-read claim."
+    }
+  },
+  "retainedSkillProof": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/REV3-p3-consumption.json",
+    "sha256": "2ad7d202154bdfcfabf05f4241fb1c0c9d7d3a0f6441d3cc8f8868a3df54bf8f",
+    "method": "Same separate native reviewer; retained actual BODY reads, not a new-read claim."
+  },
+  "limits": [
+    "Reviewer owns substantive verdict; root verifies custody and recorded evidence.",
+    "Finite actual runtime capture inspected by separate reviewer; no additional model sampling or arbitrary-prose guarantee.",
+    "Forgot destination unresolved; user alone accepts checkpoint."
+  ]
+}

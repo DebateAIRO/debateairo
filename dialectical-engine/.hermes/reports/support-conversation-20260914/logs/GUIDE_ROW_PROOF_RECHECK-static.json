@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_ROW_PROOF_RECHECK",
+  "ticket": "t_c43abca2",
+  "reviewedOn": "2026-09-17T16:00:28Z",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "revision": "b0b91a01cf161d17eef75577cbae94c629b7bc49",
+  "verdict": "PASS",
+  "adapterState": "PREPARED_NOT_EXECUTED",
+  "grpR1": {
+    "status": "RESOLVED",
+    "reviewedHarnessSha256": "f8f2935965cd59b893ab02848cd9db17eeb71fa423f5620b61479e6647ae4917",
+    "computedHarnessSha256": "f8f2935965cd59b893ab02848cd9db17eeb71fa423f5620b61479e6647ae4917",
+    "fullEightFilesCheckedBeforeDynamicImporter": true,
+    "dynamicFix2Imports": 2,
+    "staticFix2Imports": 0,
+    "constructorProofEqualityBeforeProjection": true,
+    "outputUsesComputedCustody": true
+  },
+  "harnessManifest": [
+    {
+      "path": "capture-public-guide.mjs",
+      "bytes": 18107,
+      "sha256": "33d46c07dba0f3deab6d2cb76494cfef534e135ea7145a284dbd70f471d4479f"
+    },
+    {
+      "path": "controls.mjs",
+      "bytes": 8812,
+      "sha256": "530c5e8e850b611945719a3563424c595c9a608fcb5a707e818f5da03284e8a3"
+    },
+    {
+      "path": "matrix.mjs",
+      "bytes": 13168,
+      "sha256": "cea34112498143dcf8b1a571e40e5a24d207b5b47ee9b142048506cc773ca1ae"
+    },
+    {
+      "path": "pre-request-verifier.ts",
+      "bytes": 13715,
+      "sha256": "a123d265d2070d9ef5929dd30bb752b826412e42b5091c68e4806b276b37a402"
+    },
+    {
+      "path": "runtime-capacity.mjs",
+      "bytes": 9935,
+      "sha256": "54dce2b0e70f8d7bbeedc8c3e9104cc4fcd76f4daab018ef34c09f0422ea5b87"
+    },
+    {
+      "path": "session-lifecycle.mjs",
+      "bytes": 4254,
+      "sha256": "dfdfb781913dd75928389c66e78d1b84ce89cd3a5f1658bda7f5105546aae25b"
+    },
+    {
+      "path": "verify-final-branches.ts",
+      "bytes": 5131,
+      "sha256": "eee25a0bfb2ee1620707fee8883a933a1f5b22a5c510c14a4055df7c8468bb4a"
+    },
+    {
+      "path": "verify-guide-harness.mjs",
+      "bytes": 29210,
+      "sha256": "c0f5ffb26b4d0bddc48c5ed7850ea23ff779e8026ba68f8680d997582272d320"
+    }
+  ],
+  "syntaxOnly": {
+    "files": [
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_FIX/reviewed-harness-custody.mjs",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_FIX/replay-row-proofs.mjs",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_FIX/verify-negative-fixture.mjs"
+    ],
+    "passed": 3,
+    "exitCode": 0
+  },
+  "sealedNegative": {
+    "schemaVersion": 1,
+    "result": "PASS",
+    "controls": 3,
+    "passed": 3,
+    "names": [
+      "changed previously unpinned controls source is rejected",
+      "rejection occurs before dynamic importer",
+      "real reviewed harness remains untouched"
+    ],
+    "importerCalls": 0,
+    "successfulRows": 0,
+    "traffic": {
+      "browser": false,
+      "sessions": 0,
+      "supportRequests": 0,
+      "modelRequests": 0
+    }
+  },
+  "inputs": {
+    "count": 75,
+    "matched": 75,
+    "mismatches": []
+  },
+  "execution": {
+    "validGateAdapterRuns": 0,
+    "negativeRunsByReviewer": 0,
+    "constructorRuns": 0,
+    "semanticProbes": 0,
+    "tests": 0,
+    "browserStarts": 0,
+    "sessions": 0,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "capacityReads": 0,
+    "httpRequests": 0,
+    "databaseReads": 0
+  },
+  "limits": [
+    "Static preparation and previously sealed inert copied-source negative only.",
+    "No all54, product, runtime, readiness, checkpoint or acceptance claim."
+  ]
+}

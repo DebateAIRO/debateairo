@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "sequence": 10,
+  "failureCode": "GUIDE_CAPTURE_ORIGINAL_PANE_TOP_UNREACHABLE",
+  "phase": "ORIGINAL_PANE_SCREENSHOT",
+  "identity": {
+    "sequence": 10,
+    "promptSha256": "b09961d11c5756b4b5f3b3e74512313eb70b6d9c738f3103fa92e5a10aaa2c81",
+    "mode": "compact",
+    "language": "ro",
+    "apiTextSha256": "a5d14b4985aa771cf298f50ef5eeb28ef07828513a53e55509719f4b287345a8",
+    "sources": [
+      "app-navigation",
+      "settings-help-menus"
+    ],
+    "actions": [
+      "help"
+    ],
+    "targetAssistantIndex": 0
+  },
+  "endEvidenceKind": "SOURCE_ACTION_FOOTER",
+  "geometry": {
+    "before": {
+      "target": {
+        "top": 210.67669677734375,
+        "left": 38.160400390625,
+        "right": 329.79022216796875,
+        "bottom": 580.8133544921875,
+        "x": 38.160400390625,
+        "y": 210.67669677734375,
+        "width": 291.62982177734375,
+        "height": 370.13665771484375
+      },
+      "pane": {
+        "top": 90.47738647460938,
+        "left": 38.160400390625,
+        "right": 355.159423828125,
+        "bottom": 785.1665954589844,
+        "x": 38.160400390625,
+        "y": 90.47738647460938,
+        "width": 316.9990234375,
+        "height": 694.689208984375
+      },
+      "footer": {
+        "top": 496.440185546875,
+        "left": 58.96345901489258,
+        "right": 308.98715591430664,
+        "bottom": 561.9915161132812,
+        "x": 58.96345901489258,
+        "y": 496.440185546875,
+        "width": 250.02369689941406,
+        "height": 65.55133056640625
+      },
+      "footerPainted": true,
+      "paneScrollTop": 0,
+      "paneScrollHeight": 701,
+      "paneClientHeight": 701
+    },
+    "top": {
+      "target": {
+        "top": 210.67669677734375,
+        "left": 38.160400390625,
+        "right": 329.79022216796875,
+        "bottom": 580.8133544921875,
+        "x": 38.160400390625,
+        "y": 210.67669677734375,
+        "width": 291.62982177734375,
+        "height": 370.13665771484375
+      },
+      "pane": {
+        "top": 90.47738647460938,
+        "left": 38.160400390625,
+        "right": 355.159423828125,
+        "bottom": 785.1665954589844,
+        "x": 38.160400390625,
+        "y": 90.47738647460938,
+        "width": 316.9990234375,
+        "height": 694.689208984375
+      },
+      "top": {
+        "top": 210.67669677734375,
+        "left": 38.160400390625,
+        "right": 329.79022216796875,
+        "bottom": 580.8133544921875,
+        "x": 38.160400390625,
+        "y": 210.67669677734375,
+        "width": 291.62982177734375,
+        "height": 370.13665771484375
+      },
+      "footer": {
+        "top": 496.440185546875,
+        "left": 58.96345901489258,
+        "right": 308.98715591430664,
+        "bottom": 561.9915161132812,
+        "x": 58.96345901489258,
+        "y": 496.440185546875,
+        "width": 250.02369689941406,
+        "height": 65.55133056640625
+      },
+      "footerPainted": true,
+      "paneScrollTop": 0,
+      "paneScrollHeight": 701,
+      "paneClientHeight": 701
+    },
+    "preEnd": null,
+    "postEnd": null
+  },
+  "scrollAssignment": null,
+  "restoration": {
+    "paneScrollTopRestored": true,
+    "viewportRestored": true,
+    "observedPaneScrollTop": 0,
+    "observedViewport": {
+      "width": 390,
+      "height": 844
+    }
+  },
+  "artifacts": {
+    "topPaneScreenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_PANE_FIX48-row10-original-selector-compiled-synthetic-replay-start.png",
+    "footerPaneScreenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_PANE_FIX48-row10-original-selector-compiled-synthetic-replay-end.png",
+    "screenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_PANE_FIX48-row10-original-selector-compiled-synthetic-replay-complete.png",
+    "topPaneCreated": false,
+    "endPaneCreated": false,
+    "completeExpandedCreated": false
+  }
+}

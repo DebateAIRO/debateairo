@@ -1,0 +1,29 @@
+# PACKET EDITORIAL DRAFT — exact-byte bilingual knowledge review · mission support-conversation-20260914
+
+NOT DISPATCHABLE until KB commit/digests and final manifest contract are stamped.
+Read FIRST this packet, then /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md in full, then named inputs. Derived from reviewer template; independent editorial review is required before preview eligibility. Owner ratification remains separate.
+Skills: using-superpowers; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-protocol/SKILL.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-reviewer/SKILL.md; verification-before-completion.
+
+## 1. Node
+- seat: EDITORIAL · node: CP1 exact-byte editorial review · pass: 1 of 3 · rework rounds: max 3 · model: gpt-5.6-sol · separate reviewer session from /root/requirements
+- ticket: t_48916645 · slice t_e584e488 · authority_epoch: 1 · read current comments before claim
+- cwd: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine · commit/digests: PENDING KB HANDOFF
+- inputs: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/INSTRUCTIONS.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/SPEC-v2.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/KB.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/KB-manifest.json; exact committed catalog/content files named by KB manifest; read-only current product files that each claim names; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/PLANREV-p2.md
+- output: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-p1.md and /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/EDITORIAL-attestation.json (new)
+- self-report: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/EDITORIAL.md (new)
+
+## 2. Contract
+- allowed: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-p1.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/EDITORIAL-attestation.json; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/EDITORIAL.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/EDITORIAL (new)
+- forbidden: all product/content/catalog files, manifests consumed by runtime, other reviews or mission files, git writes, account/reset/credential operations. No subdelegation.
+- verification: before and after hashes of every reviewed article/catalog byte, compare KB receipt, complete EN/RO pair inventory, visitor-text/internal-path lint evidence. Read actual UI/API composition to verify supported behavior and limits; no whole-repo audit or heavy suite absent a concrete concern and lease.
+
+## 3. Work
+Review exact bilingual content and capability/action catalog for factual accuracy, prerequisites, unsupported promises, EN/RO semantic parity, valid existing routes/fragments, ownership/private-status limits, security guidance, and accurate review/ratification metadata. The owner-confirmed Forgot password destination remains unresolved; reviewed wording must preserve that fact without a guessed destination, replacement, saved-MFA/Settings substitute, credential handling or default escalation.
+Do not equate a source API method/type with an exposed user capability. Current main does not wire evaluatorRankings; inspect actual live composition rather than treating its optional DTO as shipped UI. Do not allow internal source paths, reviewer identities or evidence locators into visitor-visible content. UI feature truth must match current intended product baseline rather than old audit limitations.
+On PASS, emit actual reviewer/session identity, date, exact per-article and catalog SHA256 values and durable review-evidence locator in the precise KB manifest contract. Attest only bytes you read and checked; never a future edit. Owner-ratification remains blank. The author will separately integrate your attestation; you must not mutate product manifest or content. On REWORK, emit no approval record for failed bytes; identify each correction with exact file/line and consequence so the same author fixes it. A resulting byte change requires new attestation of those bytes.
+This is content/editorial review, not whole-bundle runtime security or UI acceptance. Mark runtime/owner-destination evidence unverified. Preserve same-session rework for corrected content; no full re-review of unchanged facts absent concern.
+
+## 4. Handoff
+Write self-report first. Its question, verbatim:
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
+Return PASS/REWORK with SKILLS LOADED actual reads, ticket/session, reviewed commit/digests, inventory and claim verification, findings or attestation hash, limitations, self-report/cursor. Actual token usage UNAVAILABLE unless exposed. No self-Done or owner ratification.

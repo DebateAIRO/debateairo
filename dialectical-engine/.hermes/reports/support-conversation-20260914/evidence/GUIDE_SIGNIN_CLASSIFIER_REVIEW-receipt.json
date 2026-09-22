@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_SIGNIN_CLASSIFIER_REVIEW",
+  "ticket": "t_fb5b4064",
+  "revision": "0f4290c290fd38caa0ccfb3b6781fb8c33999a22",
+  "baseRevision": "5d6e028ae5defc24e0690219d6128949e73b750d",
+  "reviewedAt": "2026-09-20T23:00:06Z",
+  "reviewer": {
+    "agentPath": "/root/baseline",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a"
+  },
+  "verdict": "PASS_SIGNIN_CLASSIFIER_DELTA",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_SIGNIN_CLASSIFIER_REVIEW.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_SIGNIN_CLASSIFIER_REVIEW.md",
+      "sha256": "ee78b86f0330b942feee54c8dcdee9085f51a1a38fe29d370948dc84bf63fbe6",
+      "bytes": 4424
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SIGNIN_CLASSIFIER_REVIEW-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_SIGNIN_CLASSIFIER_REVIEW-dispositions.json",
+      "sha256": "67e141071e5f4e28999cccaa01c140d989db42fca573cc4b0b9acb921814f2bf",
+      "bytes": 4960
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_SIGNIN_CLASSIFIER_REVIEW-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_SIGNIN_CLASSIFIER_REVIEW-custody.json",
+      "sha256": "d50e8d0832a01d0f72626990a4bd0abaf4689af2ab4db9e4e42235bdff4c32ab",
+      "bytes": 1131
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_SIGNIN_CLASSIFIER_REVIEW.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_SIGNIN_CLASSIFIER_REVIEW.md",
+      "sha256": "8bbe7bc70a11cc883380f2bd369be0b0f2392ddc2c1566b05f0c0ce5fd06b4db",
+      "bytes": 2224
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "limits": [
+    "Complete58 producer replay remains a separate preview gate.",
+    "No live model, browser, runtime KB, capacity, readiness, CP1 completion, or owner acceptance claim.",
+    "Forgot remains unresolved/actionless."
+  ]
+}

@@ -1,0 +1,21 @@
+import { chromium } from "/Users/vladmihaimiron/.npm/_npx/e41f203b7505f1fb/node_modules/playwright/index.mjs";
+
+const executablePath = "/Users/vladmihaimiron/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell";
+const profile = "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/UI/debug-profile";
+const context = await chromium.launchPersistentContext(profile,{ executablePath,headless: true });
+const page = context.pages()[0] ?? await context.newPage();
+const failed = [];
+const errors = [];
+page.on("requestfailed",request => failed.push({ url: new URL(request.url()).pathname,error: request.failure()?.errorText ?? "unknown" }));
+page.on("response",response => { if (response.status() >= 400) errors.push({ url: new URL(response.url()).pathname,status: response.status() }); });
+await page.goto("https://localhost:3100/help",{ waitUntil: "domcontentloaded" });
+await page.locator('.supportComposer input[name="support-message"]').waitFor();
+await page.waitForTimeout(3000);
+const buttons = page.locator('.supportLanguage button');
+const before = await buttons.evaluateAll(nodes => nodes.map(node => ({ text: node.textContent?.trim(),pressed: node.getAttribute("aria-pressed") })));
+await buttons.filter({ hasText: /^RO$/ }).first().click();
+await page.waitForTimeout(1000);
+const after = await buttons.evaluateAll(nodes => nodes.map(node => ({ text: node.textContent?.trim(),pressed: node.getAttribute("aria-pressed") })));
+const scripts = await page.locator("script[src]").evaluateAll(nodes => nodes.map(node => new URL(node.src).pathname));
+process.stdout.write(JSON.stringify({ url: page.url(),before,after,scripts,failed,errors },null,2) + "\n");
+await context.close();

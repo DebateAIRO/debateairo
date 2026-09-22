@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "b7ca2c413bf3242ce18e29a397dc9a3aa9228893",
+  "current_commit_before_ui": "58fbaa7d5535dad89b479b98776cf2b8e88b978e",
+  "current_log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/UI-root-typecheck.log",
+  "baseline_diagnostic_count": 76,
+  "current_diagnostic_count": 76,
+  "observed_in_baseline_exact": 73,
+  "observed_in_baseline_at_moved_line": 3,
+  "introduced_count": 0,
+  "baseline_only_count": 0,
+  "introduced": [],
+  "baseline_only": []
+}

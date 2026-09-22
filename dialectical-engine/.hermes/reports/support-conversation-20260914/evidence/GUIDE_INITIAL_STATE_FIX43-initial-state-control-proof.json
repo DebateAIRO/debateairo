@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_INITIAL_STATE_FIX43",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS",
+  "controls": 9,
+  "passed": 9,
+  "names": [
+    "production initializer exact clean shape",
+    "valid passes",
+    "missing rejects",
+    "extra rejects",
+    "malformed rejects",
+    "unordered rejects",
+    "failure rejects",
+    "actual capture shares initializer before completion predicate",
+    "proof serialized"
+  ],
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

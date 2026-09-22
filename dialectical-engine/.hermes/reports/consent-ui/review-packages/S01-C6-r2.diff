@@ -1,0 +1,219 @@
+# Review package — lane /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/consent-s01/dialectical-engine — range ab449cba..97859c58 — generated 2026-09-07 02:43:36
+
+## Commits
+97859c58 02:36 fix(consent-ui S01-C6): reset the policy flag on every card open; pin the close-under-policy routes
+
+## Stat
+ .../apps/ui/components/consent/CookieConsent.tsx   | 29 +++++--
+ .../tests/render/consent-policy-link.test.tsx      | 89 ++++++++++++++++++++--
+ 2 files changed, 103 insertions(+), 15 deletions(-)
+
+## Diff (-U10)
+diff --git a/dialectical-engine/apps/ui/components/consent/CookieConsent.tsx b/dialectical-engine/apps/ui/components/consent/CookieConsent.tsx
+index e7954f7a..57b4c8c8 100644
+--- a/dialectical-engine/apps/ui/components/consent/CookieConsent.tsx
++++ b/dialectical-engine/apps/ui/components/consent/CookieConsent.tsx
+@@ -70,28 +70,36 @@ export function CookieConsent() {
+    * picked (CODE-REV-S01-C3C4 r1 **N6**, measured).
+    */
+   const [opens, setOpens] = useState(0);
+ 
+   /**
+    * Whether the read-only policy modal is open OVER the card (S01-R20). It is
+    * this component's state rather than the card's for one reason: the modal
+    * element has to be a LATER SIBLING of the card, and a child cannot render its
+    * own sibling.
+    *
+-   * **Nothing resets it when the card closes, and that is deliberate.** Every
+-   * exit the policy has — its footer `Close`, its `×`, its backdrop and the
+-   * shared helper's key arm — is the one `onClose` below, so the flag is already
+-   * false before any route that could close the CARD becomes reachable: while the
+-   * policy is open it is the topmost surface, it owns the keystroke, and its
+-   * scrim covers every control of the card. A defensive reset in `openCard` was
+-   * written first and then deleted, because no mutant of it is observable: it is
+-   * a line no test can pin (`heartbeat-worker` §2).
++   * **It is PER-OPEN state, and `openCard` resets it.** The flag has to be false
++   * at the start of every open, and closing the POLICY is not the only way it
++   * gets there: the CARD can be closed while the policy still stands over it —
++   * by the card's own backdrop, and by `Save choices` — and both routes unmount
++   * the card and the policy element together while this component stays mounted,
++   * stranding the flag at `true`. The next open would then render the policy over
++   * a card the visitor opened fresh (CODE-REV-S01-C6 r1 **B1**, measured; both
++   * routes are pinned in `tests/render/consent-policy-link.test.tsx`).
++   *
++   * An earlier version of this comment argued the reset was unreachable because
++   * the policy's scrim "covers every control of the card". That is a CSS claim,
++   * and the rule it names does not exist in this lane: `globals.css` carries no
++   * `.policy*` rule at all, and the `--z-policy-*` tokens S01-C1 declared for
++   * S02's stylesheet are unconsumed — while the card's own scrim is
++   * `position: fixed; inset: 0`. **A component whose correctness depends on an
++   * unwritten stylesheet in another lane is not verifiable by this slice's gate.**
+    */
+   const [policyOpen, setPolicyOpen] = useState(false);
+ 
+   /**
+    * The control that asked for the card, kept so the shared modal helper can
+    * return focus to it on close (S01-R18). This component never moves focus
+    * itself: focus trap, initial focus, focus return, backdrop close and the Esc
+    * stack are all `apps/ui/components/consent/modalSemantics.ts`'s, which S02
+    * owns and cluster C6 wires in (SPEC §Out of scope bans a second one).
+    *
+@@ -103,22 +111,27 @@ export function CookieConsent() {
+ 
+   useEffect(() => {
+     setSurface(readConsent() === null ? "bar" : "silent");
+   }, []);
+ 
+   /**
+    * Opening the card, from either control. `initial` is recomputed from STORAGE
+    * at every open — not from the last open, and never from where the request
+    * came from — so the two entry points are indistinguishable to the card
+    * (S01-R17, S01-R21, B1's class).
++   *
++   * Every piece of per-open state is set here, and `policyOpen` is the first of
++   * them precisely because it is the only one whose previous value can survive a
++   * close (see its declaration above).
+    */
+   const openCard = useCallback((opener: HTMLElement | null): void => {
++    setPolicyOpen(false);
+     openerRef.current = opener;
+     setInitial(togglesFor(readConsent()));
+     setOpens((count) => count + 1);
+     setSurface("card");
+   }, []);
+ 
+   /**
+    * The Settings → Privacy button holds no reference to this component — R07
+    * mounts the surface as a SIBLING placed after `{children}`, and a sibling
+    * cannot provide context to `{children}` — so the request arrives through the
+diff --git a/dialectical-engine/tests/render/consent-policy-link.test.tsx b/dialectical-engine/tests/render/consent-policy-link.test.tsx
+index 859c8a97..b9dbb8df 100644
+--- a/dialectical-engine/tests/render/consent-policy-link.test.tsx
++++ b/dialectical-engine/tests/render/consent-policy-link.test.tsx
+@@ -390,44 +390,119 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
+   });
+ 
+   it("does not bring the policy back with a reopened card", () => {
+     // PROPERTY (S01-R20 read across two opens): the policy is a surface the
+     // visitor asked for, not a state of the card, so a card opened afresh opens
+     // without it. The flag lives one level up, in the machine, and outlives the
+     // card's unmount — this is the case that walks the whole loop and shows it is
+     // nonetheless clean, because every exit the policy has runs through the one
+     // `onClose` that clears it.
+     //
+-    // **Declared, per `heartbeat-worker` §2: this case does not pin a mutant of
+-    // its own.** The mutant it catches — `onClose={(): void => {}}` on the modal —
+-    // is the one the S01-S39 case above already catches, and the defensive
+-    // `setPolicyOpen(false)` in `openCard` that this case was written for turned
+-    // out to be unobservable (the suite stays 11/11 with it removed), so that line
+-    // was deleted rather than shipped unpinned. What is left here is a regression
+-    // net over the two-open LOOP, which no other case walks.
++    // **This is the CONTROL for the two cases below it**, and it is the clean
++    // path: the policy is closed by its own route FIRST, so the reset in
++    // `openCard` is not what makes this case green and it stays green with that
++    // line removed. It was originally declared here as pinning no mutant of its
++    // own, on the premise that the reset was unobservable; CODE-REV-S01-C6 r1
++    // **B1** measured the premise false — the mutant needs a case that closes the
++    // CARD while the policy is open, which is what the two cases below drive.
+     mountSettings();
+     activate(labelled("Cookie preferences"));
+     activate(labelled("Privacy notice"));
+     expect(policy(), "the policy is open").not.toBeNull();
+ 
+     press("Escape");
+     press("Escape");
+     expect(policy(), "both surfaces closed, one keystroke each").toBeNull();
+     expect(card(), "the card too").toBeNull();
+ 
+     activate(labelled("Cookie preferences"));
+ 
+     expect(card(), "the card is open again").not.toBeNull();
+     expect(policy(), "and the policy did not come back with it").toBeNull();
+     expect(dialogs().length, "one dialog, not two").toBe(1);
+   });
+ 
++  it("opens a CLEAN card after the card was closed by its scrim under an open policy", () => {
++    // PROPERTY (S01-R20 read across two opens; CODE-REV-S01-C6 r1 **B1**):
++    // `policyOpen` is PER-OPEN state of the card surface, so every open starts
++    // with no policy over it — WHATEVER closed the previous card, not only the
++    // routes that run the policy's own `onClose`.
++    //
++    // The route is reachable TODAY. The card's scrim is `position: fixed;
++    // inset: 0` (`globals.css:7384-7393`) and the policy's scrim has no rule in
++    // this lane at all — a line-scan of `globals.css` for
++    // `^\s*\.policy[A-Za-z]*\s*[,{]` returns `[]`, and the `--z-policy-*` tokens
++    // S01-C1 declared for that stylesheet are unconsumed — so a pointer click
++    // lands on the CARD's backdrop while the policy stands over it. The card and
++    // the policy element unmount together; the flag lives one level up, in this
++    // still-mounted component, and outlives both.
++    mountBar();
++    activate(labelled("Choose what to store"));
++    activate(labelled("Privacy notice"));
++    expect(policy(), "the policy is open over the card").not.toBeNull();
++    expect(dialogs().length, "two dialogs while the visitor has both open").toBe(2);
++
++    const scrim = document.querySelector<HTMLElement>(".consentScrim")!;
++    act(() => scrim.dispatchEvent(new MouseEvent("click", { bubbles: true })));
++
++    expect(card(), "the CARD is dismissed from under the open policy").toBeNull();
++    expect(policy(), "and the policy element unmounts with it").toBeNull();
++    expect(bar(), "the bar returns, because nothing valid is stored").not.toBeNull();
++    expect(raw(), "a backdrop dismissal writes nothing").toBeNull();
++
++    activate(labelled("Choose what to store"));
++
++    expect(card(), "the card is open again").not.toBeNull();
++    expect(policy(), "and it is CLEAN — no policy the visitor did not ask for").toBeNull();
++    expect(dialogs().length, "exactly one dialog on a freshly opened card").toBe(1);
++    expect(openSurfaceCount(), "and exactly one surface on the stack").toBe(1);
++  });
++
++  it("opens a CLEAN card after the card was settled by Save choices under an open policy", () => {
++    // PROPERTY: the same per-open property through the OTHER exit class. The case
++    // above leaves by a DISMISSAL (writes nothing, re-reads storage); this one
++    // leaves by a SETTLE (writes a decision and goes Silent), from the Settings
++    // entry, where the opener survives the card. Two exits, two routes to the same
++    // stranded flag — a reset written into `dismiss` instead of `openCard` fixes
++    // the case above and leaves this one red, which is why both are here.
++    //
++    // `Save choices` sits behind the open policy in paint order and is in the
++    // document and enabled; nothing in this lane's stylesheet covers it.
++    const stored = JSON.stringify({
++      v: 1,
++      essential: true,
++      quality: true,
++      analytics: false,
++      decidedAt: "2026-02-02T00:00:00.000Z"
++    });
++    localStorage.setItem(CONSENT_KEY, stored);
++    mountSettings();
++    activate(labelled("Cookie preferences"));
++    activate(labelled("Privacy notice"));
++    expect(policy(), "the policy is open over the card").not.toBeNull();
++
++    // Clicked WITHOUT focusing it, unlike `activate`: the point of the case is
++    // that this control settles the card from behind the policy.
++    act(() => labelled("Save choices").click());
++
++    expect(card(), "the card settled and closed").toBeNull();
++    expect(policy(), "and the policy element unmounts with it").toBeNull();
++    expect(raw(), "the settle wrote a decision").not.toBeNull();
++
++    activate(labelled("Cookie preferences"));
++
++    expect(card(), "reopened from Settings").not.toBeNull();
++    expect(policy(), "CLEAN — the settle route left no policy behind either").toBeNull();
++    expect(dialogs().length, "one dialog, not two").toBe(1);
++    expect(openSurfaceCount(), "and one surface on the stack").toBe(1);
++  });
++
+   it("closes the card on a backdrop click through the shared helper, and not on a click inside it", () => {
+     // PROPERTY (S01-R14/R18, S01-S41): the backdrop route is
+     // `backdropCloseHandler(scrim, onClose)` — it closes only when the click landed
+     // ON the scrim, never on a descendant. The negative half is what separates a
+     // real backdrop from a click-anywhere dismissal that would eat every control.
+     mountBar();
+     activate(labelled("Choose what to store"));
+     const scrim = document.querySelector<HTMLElement>(".consentScrim")!;
+ 
+     act(() => card()!.dispatchEvent(new MouseEvent("click", { bubbles: true })));

@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW7",
+  "ticket": "t_421d66b7",
+  "runId": 163,
+  "reviewerAgentPath": "/root/baseline",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-17T19:52:39Z",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "productRevision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "freezeCommit": "c73e867e20d5cd924de27ef52080f4dd5ade84e8",
+  "verdict": "PASS_BOUNDED_DIAGNOSTIC_SHAPE",
+  "findingDisposition": {
+    "id": "GH6-R1",
+    "status": "RESOLVED",
+    "evidence": [
+      "status-dependent validator rejects partial attributed shapes before DIAGNOSTIC_PROJECTED",
+      "assertGuideObservation revalidates projected diagnostics",
+      "malformed attributed diagnostics preserve DOM_PROJECTED with GUIDE_HARNESS_DIAGNOSTIC_INVALID",
+      "known attributed recovery/refusal and legitimate NOT_APPLICABLE positive shapes pass"
+    ]
+  },
+  "diagnosticSchemas": {
+    "ACCEPTED_DRAFT": {
+      "category": null,
+      "candidateCount": 0,
+      "validCount": 0,
+      "invalidCount": 0,
+      "duplicateCount": 0,
+      "unmatchedCount": 0
+    },
+    "ATTRIBUTED_RECOVERY": {
+      "category": "KNOWN_ALLOWLISTED",
+      "candidateCount": 1,
+      "validCount": 1,
+      "invalidCount": 0,
+      "duplicateCount": 0,
+      "unmatchedCount": 0
+    },
+    "ATTRIBUTED_REFUSAL": {
+      "category": "KNOWN_ALLOWLISTED",
+      "candidateCount": 1,
+      "validCount": 1,
+      "invalidCount": 0,
+      "duplicateCount": 0,
+      "unmatchedCount": 0
+    },
+    "AMBIGUOUS": {
+      "category": null,
+      "counts": "complete nonnegative",
+      "invariant": "candidateCount=validCount+invalidCount"
+    },
+    "NOT_APPLICABLE": {
+      "category": null,
+      "candidateCount": "retained nonnegative",
+      "validCount": null,
+      "invalidCount": null,
+      "duplicateCount": null,
+      "unmatchedCount": null
+    }
+  },
+  "retainedDispositions": [
+    {
+      "area": "earliest safe API and canonical attempt checkpoint",
+      "verdict": "PASS"
+    },
+    {
+      "area": "phase-specific failure persistence and honest attempted/completed accounting",
+      "verdict": "PASS"
+    },
+    {
+      "area": "public-only privacy allowlist",
+      "verdict": "PASS"
+    },
+    {
+      "area": "54-row FIX5-exact matrix",
+      "verdict": "PASS"
+    },
+    {
+      "area": "rows7/8 production source policy and selector binding at final revision",
+      "verdict": "PASS"
+    },
+    {
+      "area": "ordered-eight/final revision/KB and copied adapter custody",
+      "verdict": "PASS"
+    },
+    {
+      "area": "GUIDE7 output namespace isolation and absence",
+      "verdict": "PASS"
+    }
+  ],
+  "controlEvidence": {
+    "harnessSha256": "66a56435d7e0c664a12429498b5929b8f308f6217951700c506361d18554e30a",
+    "matrixSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+    "verifierSha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733",
+    "canonicalProofSha256": "235f4e8a60005e17b9ecc0f816a3b06dc3d0148bb42bde830d65df5744857063",
+    "retainedPurposes": 100,
+    "addedControls": 5,
+    "controls": 105,
+    "passed": 105,
+    "uniqueNames": 105,
+    "adapterNegativeControls": 3,
+    "adapterNegativePassed": 3,
+    "adapterImporterCalls": 0,
+    "adapterSuccessfulRows": 0,
+    "inputCount": 124,
+    "inputMismatches": 0
+  },
+  "privacyAndFailureCustody": {
+    "malformedDiagnosticLastSafePhase": "DOM_PROJECTED",
+    "malformedDiagnosticCode": "GUIDE_HARNESS_DIAGNOSTIC_INVALID",
+    "excluded": [
+      "unknown/raw diagnostic predicate",
+      "malformed count values",
+      "raw or rejected model drafts",
+      "private/extra fields",
+      "headers",
+      "cookies",
+      "session identities",
+      "capabilities",
+      "credentials",
+      "attempt IDs",
+      "raw runtime bytes",
+      "raw thrown details"
+    ]
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW7.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW7.md",
+      "sha256": "9ca3a6a94770f902442512879ceeb93232b00c2146d5d0862d0605c96a5762a7",
+      "bytes": 4697
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW7.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW7.md",
+      "sha256": "3e7e953f5fb825cb97caf9de116e831ef742a8799c6a0c1fe0914994d29d57bb",
+      "bytes": 2660
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW7-static-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW7-static-custody.json",
+      "sha256": "ccbbfea4e4fb25a003fe81e418a71bd61f2676e16be0f62f7759d08ec07e3e0d",
+      "bytes": 4640
+    }
+  ],
+  "limits": [
+    "static changed-consumer review only; retained author 105/105 and 3/3 were not rerun",
+    "no harness/test/probe/browser/runtime/status/capacity/HTTP/DB/Support/model/lifecycle/product/KB/Git action",
+    "sealed LIVE3 predicate, response origin, and cause remain unknown",
+    "PASS authorizes preparation of one fresh reviewed capture only; no resampling, readiness, acceptance, checkpoint, or CP2 claim",
+    "Forgot remains unresolved/actionless"
+  ],
+  "leases": {
+    "heavy": "not_requested",
+    "git": "not_requested"
+  }
+}

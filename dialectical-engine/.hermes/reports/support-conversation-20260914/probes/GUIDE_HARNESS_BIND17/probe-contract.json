@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND16",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "script": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/probe-zero-request-ui.mjs",
+    "sha256": "666a54b1d9cd547951e609e79dd06ab88eb517bcc21f48a76ae385a921f053d6",
+    "bytes": 13837
+  },
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "argv": [
+    "node",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND16/probe-zero-request-ui.mjs",
+    "152eed4da1cd3e66b74d8301159ba76427552409",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE-run-LIVE8-PROBE6.json"
+  ],
+  "outputPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE-run-LIVE8-PROBE6.json",
+  "logPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_UI_TRANSITION_PROBE6-LIVE8.log",
+  "childStatusPreservedBy": "direct stdout/stderr redirection without tee",
+  "argumentGuardControls": {
+    "acceptedExactFutureArgv": true,
+    "rejectedStaleProbeBasename": true,
+    "rejectedWrongRoot": true,
+    "rejectedExtraArgument": true,
+    "rejectedMalformedRevision": true
+  },
+  "executed": false
+}

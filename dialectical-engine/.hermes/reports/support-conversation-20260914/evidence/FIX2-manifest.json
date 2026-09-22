@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "node": "FIX2",
+  "status": "READY_FOR_PEER_REVIEW",
+  "ticket": "t_5bea68d5",
+  "finding": "t_8596ccbc",
+  "session": "/root/requirements",
+  "inputRevision": "085fff68f8b22743978d1efafd7ad9fd204e5a6f",
+  "commit": "82f57f1ebaaf59a9ee0ea81d3084c4d57f7557b0",
+  "files": {
+    "apps/api/src/main.ts": "3021e5f445cfbcdc097ee2d86f50849b624cae82d7176040343354909becdd21",
+    "apps/api/src/support/answer.ts": "831e90511a2e47e4970ce68e57e808d6ffc707be947df97cc842a96a2082bf1d",
+    "apps/api/src/support/response-policy.ts": "500b0cc577d422d10dad260637ffedf685f734b4a3ab7a47952614a1a5f94687",
+    "packages/support-kb/src/context.ts": "7328bfbd84eb685b97f006e30b60c4715383e97b08678db0586130939c978d36",
+    "tests/unit/support-answer-context.test.ts": "8d9921c0202bf6600729c77e837c7d12e2c0babf3ebe3f02f60b0ea9538d4c28",
+    "tests/unit/support-context.test.ts": "ca1e55eaef0cff18e0336e3fde5e7d749f2880ca24f83191ccd53038a00ca07c",
+    "tests/unit/support-response-policy.test.ts": "7420fca9ad04ff9eff1a4d63cf862132e7393bf1d1508fa66688650585a592de"
+  },
+  "evidence": {
+    "report": "5825a75ccbc11e3c0562219642709d075a73df7dec36455f199dc16fc5b0b9c4",
+    "stackCustody": "6c15845f2500e76ac4298f285d5bf8abf2ad1d7ff8064b183906bd848023b0ef",
+    "actualDiagnostic": "c21bd085c881c87cab0b29e155cd91647a314f91b46604531bbdff486267b2ef",
+    "authorReport": "996eff4ed551b74d74f6f568a00d808127a07b664e4961c127dc02cc55a31482"
+  },
+  "probes": {
+    "contextContract": "79548193faf322794d12feb0e8338ea6b3306109de0ebb8c42ee84ca345d7932",
+    "actualOne": "8900877d77add447acc7495539062f11190ceef11f194a48a2e41d9dd640fc5d"
+  },
+  "logs": {
+    "contextSandboxEnvironmental": "d2f8c08fb760db1f1f98c41bca736de2ec363770ea01257553cad287321067cb",
+    "contextBeforeCorrection": "4555628bce731f81eaf1d9a322c195ebee051bbfbe3fb454b61e8ded03a2d045",
+    "diagnosticRed": "a07cee32798a5c7bd52b81cad241a1d39bbc219b4d29070b7bf9c845371466b3",
+    "diagnosticIntermediate": "922205cd575d9d534cd46e2ff50078d4d1ad401449d3d75f060d9d49a43c339e",
+    "diagnosticGreen": "40dcef8e3e1519bfc5be389b52f96c18a2fb097d3c528ccb3ed34d7af4ce0563",
+    "reporterRed": "f31bca045166dc0d4f43f995bdb5b6a8f7f23b3bd04df68ade1659b2de273f00",
+    "reporterGreen": "205b08a6da7f890f1d311788b04d996fd9d3a60a56e7d1ef2bf71ed768114d3e",
+    "actualOne": "f3bfd573e7fc02842ebd80cbab4834c692bdb40d8c4c113b5553546f50489049",
+    "producerRed": "44cd79e361ab8fed3f704a3f4e3c38de326aa2cd32d023655fa24c82ca71b06c",
+    "producerGreen": "8506030ff57579de4e036ed6d6dfc941ed974df729fb5d883bd291d64462545f",
+    "actionContractRed": "29b2c15b42131a55a0a0e1390b7258e7d20c0f2ba4fdba54cff78420292d4e49",
+    "actionContractGreen": "9cf186194aa9950187cec37a157174c7dc0fe61c5e25d1942d2c85d3d7c3cf7a",
+    "focusedIntermediate": "433979f666488dedb579eb469dfaca101385e82745c9cbae4826b42c3b8034cf",
+    "focusedGreen": "751253ff2287d6218a42db809c02952c159e43a04a3ac7f17e2ce276741ab532",
+    "contextCorrected": "6654aeb3cfd6648d624b64cafc190d7dd67e06f0d5b66f4e7cfc1366860949fc",
+    "typecheckIntroducedFailure": "31a869c451dbdc099596fc39e2ccb1779959cd116ea898e66cddc3b8f86e6e0b",
+    "typecheckFinal": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "mutantCapabilitySelection": "0188dafa1549de82c0289cc64d5385464c78260721b107a5760fc4bb46a9f2c5",
+    "mutantOutputContract": "c6cc91636fee4f0d5530f6c8623e063e6f82430e89b3b9d1ce6bee39f3cb2362",
+    "mutantDiagnosticReporter": "b0322bef56773121083f35bfa1b6e927441b2216e6aeae5cef71c1948978612f",
+    "mutantsRestored": "07df7f19ae8406a60b73fb1389fff02a2a0116307a404015ae080041d298d27b"
+  },
+  "tests": {
+    "diagnosticRed": { "filesFailed": 1, "testsFailed": 2, "testsPassed": 32 },
+    "diagnosticGreen": { "filesPassed": 1, "testsPassed": 34 },
+    "reporterRed": { "filesFailed": 1, "testsFailed": 1, "testsPassed": 2 },
+    "reporterGreen": { "filesPassed": 1, "testsPassed": 3 },
+    "producerRed": { "filesFailed": 2, "testsFailed": 21, "testsPassed": 10 },
+    "producerGreen": { "filesPassed": 3, "testsPassed": 65 },
+    "actionContractRed": { "filesFailed": 1, "testsFailed": 2, "testsSkipped": 28 },
+    "actionContractGreen": { "filesPassed": 1, "testsPassed": 2, "testsSkipped": 28 },
+    "focusedGreen": { "filesPassed": 4, "testsPassed": 101 }
+  },
+  "mutations": {
+    "capabilitySelection": { "filesFailed": 1, "testsFailed": 20, "testsPassed": 4, "testsSkipped": 6 },
+    "outputContract": { "filesFailed": 2, "testsFailed": 2, "testsSkipped": 31 },
+    "diagnosticReporter": { "filesFailed": 1, "testsFailed": 1, "testsSkipped": 2 },
+    "restored": { "filesPassed": 2, "testsPassed": 27, "testsSkipped": 6 }
+  },
+  "actualDiagnostic": {
+    "requestCount": 1,
+    "httpStatus": 200,
+    "outcome": "ANSWER_GROUNDED",
+    "diagnosticCode": "ACCEPTED",
+    "sourceCount": 1,
+    "actionCount": 0,
+    "originalSixRejectionPredicate": "UNKNOWN",
+    "retryCount": 0
+  },
+  "typecheck": {
+    "repositoryPassed": false,
+    "inheritedDiagnostics": 76,
+    "introducedDiagnostics": 0,
+    "byteIdenticalToAttributedBaseline": true
+  },
+  "live2ReloadRequired": true,
+  "ownerAcceptance": false,
+  "actualUsage": "UNAVAILABLE"
+}

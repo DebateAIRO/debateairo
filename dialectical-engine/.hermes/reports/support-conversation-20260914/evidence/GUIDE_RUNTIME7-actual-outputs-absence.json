@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_RUNTIME7",
+  "observedAtUtc": "2026-09-21T00:12:26.029094Z",
+  "checked": 18,
+  "present": [],
+  "result": "PASS",
+  "exclusions": [
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_RUNTIME7-stack-custody.json",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE20-stack.log"
+  ]
+}

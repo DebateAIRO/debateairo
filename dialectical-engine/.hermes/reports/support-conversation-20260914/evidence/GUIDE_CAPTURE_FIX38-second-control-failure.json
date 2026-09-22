@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_FIX38",
+  "attempt": 2,
+  "verdict": "FIXTURE_REWORK_REQUIRED",
+  "completedBeforeFailure": [
+    "old helper reproduced backward movement or footer failure",
+    "corrected four-turn row23 preserved already-contained footer"
+  ],
+  "failure": {
+    "control": "genuinely below-pane footer scrolls forward into painted containment",
+    "expected": "reach footer branch",
+    "actual": "GUIDE_CAPTURE_ORIGINAL_PANE_TOP_UNREACHABLE",
+    "cause": "synthetic constrained pane caused fractional top-edge alignment before the footer discriminator"
+  },
+  "productIssueRevealed": false,
+  "guardDisposition": "top-edge guard retained unchanged",
+  "operationalTraffic": 0,
+  "disposition": "exercise the exported footer primitive against the same production DOM after positioning the top safely inside; do not loosen top containment"
+}

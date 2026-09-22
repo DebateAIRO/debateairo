@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_REVIEW6",
+  "ticket": "t_70110160",
+  "runId": 161,
+  "reviewerAgentPath": "/root/baseline",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThreadId": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-17T19:38:28Z",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "productRevision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "kbVersion": "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278",
+  "freezeCommit": "d451bf55a1097d3a471f79efd9d9d3cdfb6ee827",
+  "verdict": "REWORK_BOUNDED_DIAGNOSTIC_SHAPE",
+  "finding": {
+    "id": "GH6-R1",
+    "title": "Partially malformed attributed diagnostic can become successful attribution",
+    "blockingFutureLive": true,
+    "locations": [
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX6/controls.mjs:248",
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX6/controls.mjs:330",
+      ".hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_FIX6/verify-guide-harness.mjs:693"
+    ],
+    "concreteInput": {
+      "status": "ATTRIBUTED_RECOVERY",
+      "candidateCount": 1,
+      "record": "missing",
+      "fixedCounts": "missing"
+    },
+    "currentWrongOutcome": "DIAGNOSTIC_PROJECTED with null category/counts can be returned as REVIEWED_FALLBACK when other model predicates pass",
+    "minimalCorrection": [
+      "enforce status-dependent diagnostic producer schemas before DIAGNOSTIC_PROJECTED",
+      "require recognized predicate/category and every required non-negative fixed count for attributed statuses",
+      "retain preceding DOM_PROJECTED checkpoint and GUIDE_HARNESS_DIAGNOSTIC_INVALID on malformed diagnostic",
+      "add actual staged-consumer negatives for missing record, unknown predicate, and missing/non-integer counts",
+      "recompute ordered-eight proof and adapter pins without product, KB, matrix, source-policy, or live changes"
+    ]
+  },
+  "retainedDispositions": [
+    {
+      "area": "earliest safe API and canonical attempt checkpoint",
+      "verdict": "PASS"
+    },
+    {
+      "area": "session, DOM, diagnostic-throw, and assertion phase persistence",
+      "verdict": "PASS"
+    },
+    {
+      "area": "attempted versus completed row accounting",
+      "verdict": "PASS"
+    },
+    {
+      "area": "public-only privacy allowlist",
+      "verdict": "PASS"
+    },
+    {
+      "area": "54-row FIX5-exact matrix",
+      "verdict": "PASS"
+    },
+    {
+      "area": "rows7/8 production source policy and selector binding at final revision",
+      "verdict": "PASS"
+    },
+    {
+      "area": "ordered-eight/final revision/KB and copied adapter custody",
+      "verdict": "PASS"
+    },
+    {
+      "area": "GUIDE6 output namespace isolation and absence",
+      "verdict": "PASS"
+    }
+  ],
+  "controlEvidence": {
+    "harnessSha256": "6444862b9d465565a5416cec763a92216a04eb042bafe833dab43135c00debd2",
+    "matrixSha256": "4e3250313f415b71cea228cc5f3559cf9a2375cb5ca70916ecfbaac32c1a5a2c",
+    "verifierSha256": "c74a64f7dcbd6b17ffb0b6c2f4a281a4af0ee89d925e2ae509fdc3bffcc89733",
+    "canonicalProofSha256": "c7aa6b60b0b9170d00023bd859003b956d57178f6be72e3e3da2752a3fdf849a",
+    "retainedPurposes": 91,
+    "addedControls": 9,
+    "controls": 100,
+    "passed": 100,
+    "uniqueNames": 100,
+    "adapterNegativeControls": 3,
+    "adapterNegativePassed": 3,
+    "adapterImporterCalls": 0,
+    "adapterSuccessfulRows": 0,
+    "inputCount": 125,
+    "inputMismatches": 0
+  },
+  "privacyAndFailureCustody": {
+    "admitted": [
+      "canonical row identity",
+      "proof branch",
+      "public HTTP status/outcome/text/sources/actions",
+      "rendered public fields",
+      "completed equality booleans",
+      "validated fixed diagnostic fields",
+      "closed phase or predicate code"
+    ],
+    "excluded": [
+      "raw or rejected model drafts",
+      "private/extra fields",
+      "headers",
+      "cookies",
+      "session identities",
+      "capabilities",
+      "credentials",
+      "attempt IDs",
+      "raw runtime bytes",
+      "raw thrown details"
+    ],
+    "remainingGap": "Attributed diagnostic category and fixed count schema is not strictly validated before successful attribution."
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW6.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_HARNESS_REVIEW6.md",
+      "sha256": "b515d7f8c7ece79af0e4952d955017d7570b36a9380470cd50ef380be2bbe9db",
+      "bytes": 5897
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW6.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_HARNESS_REVIEW6.md",
+      "sha256": "e056f2952bafba2a821e5983a4c4011c5a7fdfbc56e0d4429bd17399511b70c3",
+      "bytes": 2924
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW6-static-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_HARNESS_REVIEW6-static-custody.json",
+      "sha256": "c84983885bf4a4cbe13acfba1acdd4f8c985aefe00098e233959bf7999584b8a",
+      "bytes": 4074
+    }
+  ],
+  "limits": [
+    "static review only; retained author 100/100 and 3/3 were not rerun",
+    "no harness/test/probe/browser/runtime/HTTP/DB/Support/model/capacity/lifecycle/product/KB/Git action",
+    "sealed LIVE3 predicate, response origin, and cause remain unknown",
+    "Forgot remains unresolved/actionless; no readiness, acceptance, checkpoint, or CP2 claim"
+  ],
+  "leases": {
+    "heavy": "not_requested",
+    "git": "not_requested"
+  }
+}

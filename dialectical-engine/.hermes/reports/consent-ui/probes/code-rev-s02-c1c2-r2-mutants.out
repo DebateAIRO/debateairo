@@ -1,0 +1,100 @@
+pristine sha256[:24] = ec45551bee291031b18e989a   (7483 bytes)
+cluster command: pnpm exec vitest run tests/render/consent-modal-semantics.test.tsx
+
+KILLED  | M1  FIFO (surfaceStack[0])
+    exit=1   Tests  1 failed | 16 passed (17)
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > delivers one Escape to the topmost open surface only
+    restored: byte-identical to pristine = True · porcelain for module = []
+KILLED  | M2  stack never pops
+    exit=1   Tests  6 failed | 11 passed (17)
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > delivers one Escape to the nested inner surface, not to the outer one it mounted with
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > delivers one Escape to the innermost of three nested surfaces
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > delivers one Escape by document position when two surfaces opened out of DOM order
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > keeps Escape from reaching a window listener while a surface is open
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > hands Escape back to the outer surface once the inner one closes
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > keeps exactly one document-level keydown listener across all surfaces
+    restored: byte-identical to pristine = True · porcelain for module = []
+KILLED  | M3b focusable set cached AT OPEN
+    exit=1   Tests  2 failed | 15 passed (17)
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > traps Tab inside the nested inner surface, not inside the outer one
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > recomputes the focusable set on every Tab instead of caching it at open
+    restored: byte-identical to pristine = True · porcelain for module = []
+KILLED  | M4  focus not returned
+    exit=1   Tests  1 failed | 16 passed (17)
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > returns focus to the element that was focused when the surface opened
+    restored: byte-identical to pristine = True · porcelain for module = []
+KILLED  | M5  matchMedia unguarded
+    exit=1   Tests  1 failed | 16 passed (17)
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > reports no reduced-motion preference when matchMedia does not exist
+    restored: byte-identical to pristine = True · porcelain for module = []
+KILLED  | M6  Escape to EVERY surface
+    exit=1   Tests  4 failed | 13 passed (17)
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > delivers one Escape to the topmost open surface only
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > delivers one Escape to the nested inner surface, not to the outer one it mounted with
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > delivers one Escape to the innermost of three nested surfaces
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > delivers one Escape by document position when two surfaces opened out of DOM order
+    restored: byte-identical to pristine = True · porcelain for module = []
+KILLED  | M7  Tab preventDefault removed
+    exit=1   Tests  1 failed | 16 passed (17)
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > wraps Tab from the last focusable back to the first
+    restored: byte-identical to pristine = True · porcelain for module = []
+KILLED  | M8  initial focus not applied
+    exit=1   Tests  2 failed | 15 passed (17)
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > moves initial focus to the element the caller names, not the first one
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > returns focus to the element that was focused when the surface opened
+    restored: byte-identical to pristine = True · porcelain for module = []
+KILLED  | M9  second document keydown listener
+    exit=1   Tests  6 failed | 11 passed (17)
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > wraps Tab from the last focusable back to the first
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > wraps Shift+Tab from the first focusable back to the last
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > recomputes the focusable set on every Tab instead of caching it at open
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > skips a control that tabindex=-1 has removed from the tab order
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > skips a hidden input, so Tab inside the surface is never a no-op
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > keeps exactly one document-level keydown listener across all surfaces
+    restored: byte-identical to pristine = True · porcelain for module = []
+KILLED  | M10 stopPropagation removed
+    exit=1   Tests  1 failed | 16 passed (17)
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > keeps Escape from reaching a window listener while a surface is open
+    restored: byte-identical to pristine = True · porcelain for module = []
+KILLED  | MB1a round-1 impl restored (last registered)
+    exit=1   Tests  4 failed | 13 passed (17)
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > delivers one Escape to the nested inner surface, not to the outer one it mounted with
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > delivers one Escape to the innermost of three nested surfaces
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > delivers one Escape by document position when two surfaces opened out of DOM order
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > traps Tab inside the nested inner surface, not inside the outer one
+    restored: byte-identical to pristine = True · porcelain for module = []
+KILLED  | MB1b containment arm ONLY (drop FOLLOWING)
+    exit=1   Tests  1 failed | 16 passed (17)
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > delivers one Escape by document position when two surfaces opened out of DOM order
+    restored: byte-identical to pristine = True · porcelain for module = []
+SURVIVED | MB1c FOLLOWING arm ONLY (drop CONTAINED_BY)
+    exit=0   Tests  17 passed (17)
+    restored: byte-identical to pristine = True · porcelain for module = []
+KILLED  | MB1d topmost = first in document order (invert)
+    exit=1   Tests  5 failed | 12 passed (17)
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > delivers one Escape to the topmost open surface only
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > delivers one Escape to the nested inner surface, not to the outer one it mounted with
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > delivers one Escape to the innermost of three nested surfaces
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > delivers one Escape by document position when two surfaces opened out of DOM order
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > traps Tab inside the nested inner surface, not inside the outer one
+    restored: byte-identical to pristine = True · porcelain for module = []
+KILLED  | MN1a no tabindex=-1 filter
+    exit=1   Tests  1 failed | 16 passed (17)
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > skips a control that tabindex=-1 has removed from the tab order
+    restored: byte-identical to pristine = True · porcelain for module = []
+SURVIVED | MN1b no hidden-input filter
+    exit=0   Tests  17 passed (17)
+    restored: byte-identical to pristine = True · porcelain for module = []
+SURVIVED | MN1c no advance loop
+    exit=0   Tests  17 passed (17)
+    restored: byte-identical to pristine = True · porcelain for module = []
+KILLED  | MN1d neither hidden filter nor advance
+    exit=1   Tests  1 failed | 16 passed (17)
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > skips a hidden input, so Tab inside the surface is never a no-op
+    restored: byte-identical to pristine = True · porcelain for module = []
+KILLED  | MN1e whole isFocusCandidate filter removed
+    exit=1   Tests  1 failed | 16 passed (17)
+    FAIL  tests/render/consent-modal-semantics.test.tsx > consent modal semantics helper > skips a control that tabindex=-1 has removed from the tab order
+    restored: byte-identical to pristine = True · porcelain for module = []
+
+KILLED 16 / 19

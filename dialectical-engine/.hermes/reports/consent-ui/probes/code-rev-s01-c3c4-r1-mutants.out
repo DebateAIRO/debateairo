@@ -1,0 +1,84 @@
+===== MUTANT A-essential-operable =====
+apply A-essential-operable -> apps/ui/components/consent/CookiePreferencesCard.tsx
+  author consent-card: PASS
+  REVIEWER probe    : PASS
+  reverted; tracked-dirty entries: 0
+===== MUTANT B-second-bottom =====
+apply B-second-bottom -> apps/ui/app/globals.css
+  author consent-bar: FAIL
+  reverted; tracked-dirty entries: 0
+===== MUTANT C-ts7053 =====
+apply C-ts7053 -> apps/ui/components/consent/CookiePreferencesCard.tsx
+  apps/ui tsc      : FAIL
+  reverted; tracked-dirty entries: 0
+===== MUTANT D-ignore-initial =====
+apply D-ignore-initial -> apps/ui/components/consent/CookiePreferencesCard.tsx
+  author consent-card: FAIL
+  REVIEWER probe    : FAIL
+  reverted; tracked-dirty entries: 0
+===== MUTANT E-paraphrase-title =====
+apply E-paraphrase-title -> apps/ui/components/consent/CookieBar.tsx
+  author consent-bar: FAIL
+  REVIEWER probe    : FAIL
+  reverted; tracked-dirty entries: 0
+===== MUTANT F-button-order =====
+apply F-button-order -> apps/ui/components/consent/CookieBar.tsx
+  author consent-bar: FAIL
+  REVIEWER probe    : FAIL
+  reverted; tracked-dirty entries: 0
+===== MUTANT F2-button-order-tail =====
+apply F2-button-order-tail -> apps/ui/components/consent/CookieBar.tsx
+  author consent-bar: FAIL
+  REVIEWER probe    : FAIL
+  reverted; tracked-dirty entries: 0
+===== MUTANT G-close-glyph =====
+apply G-close-glyph -> apps/ui/components/consent/CookieBar.tsx
+  author consent-bar: FAIL
+  REVIEWER probe    : FAIL
+  reverted; tracked-dirty entries: 0
+===== MUTANT H-inline-category =====
+apply H-inline-category -> apps/ui/components/consent/CookiePreferencesCard.tsx
+  author consent-card: FAIL
+  REVIEWER probe    : FAIL
+  reverted; tracked-dirty entries: 0
+===== MUTANT I-save-swapped =====
+apply I-save-swapped -> apps/ui/components/consent/CookiePreferencesCard.tsx
+  author consent-card: FAIL
+  REVIEWER probe    : PASS
+  reverted; tracked-dirty entries: 0
+===== MUTANT J-no-labelledby =====
+apply J-no-labelledby -> apps/ui/components/consent/CookiePreferencesCard.tsx
+  author consent-card: FAIL
+  REVIEWER probe    : FAIL
+  reverted; tracked-dirty entries: 0
+===== MUTANT N-space-not-handled =====
+apply N-space-not-handled -> apps/ui/components/consent/CookiePreferencesCard.tsx
+  author consent-card: FAIL
+  REVIEWER probe    : FAIL
+  reverted; tracked-dirty entries: 0
+===== MUTANT K-colour-literal =====
+apply K-colour-literal -> apps/ui/app/globals.css
+  author consent-bar: FAIL
+  author consent-card: FAIL
+  CMD hit/block terms: FAIL(hits=2 blocks=1)
+  reverted; tracked-dirty entries: 0
+===== MUTANT L-second-block =====
+apply L-second-block -> apps/ui/app/globals.css
+  author consent-bar: FAIL
+  author consent-card: FAIL
+  CMD hit/block terms: FAIL(hits=1 blocks=2)
+  reverted; tracked-dirty entries: 0
+===== MUTANT M-no-media-query =====
+apply M-no-media-query -> apps/ui/app/globals.css
+  author consent-bar: FAIL
+  reverted; tracked-dirty entries: 0
+===== MUTANT A2-lock-both-points =====
+apply A2-lock-both-points -> apps/ui/components/consent/CookiePreferencesCard.tsx
+  author consent-card: PASS
+  REVIEWER probe    : PASS
+  reverted; tracked-dirty entries: 0
+===== MUTANT A3-drop-flip-guard-only =====
+apply A3-drop-flip-guard-only -> apps/ui/components/consent/CookiePreferencesCard.tsx
+  author consent-card: PASS
+  REVIEWER probe    : PASS
+  reverted; tracked-dirty entries: 0

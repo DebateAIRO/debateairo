@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREVIEW_BIND32",
+  "ticket": "t_f068fcad",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "FAIL_RUNTIME8_SUPERVISOR_EXITED_REVIEW_REQUIRED",
+  "capturedAtUtc": "2026-09-21T06:50:00.547055Z",
+  "binding": {
+    "verdict": "PASS_BOUND_OFFLINE_REVIEW_REQUIRED",
+    "controls": 17,
+    "passed": 17,
+    "firstVerifierAttempt": "FAIL_ASSERTION_PATTERN_ONLY",
+    "full58Rows": 58,
+    "full58Passed": 58,
+    "futurePathsAbsent": 123,
+    "screenshotHelperSha256": "824e780a1817c198a6ca6ebc6215948241ecccbb5611617a033e650799ac4b29"
+  },
+  "lifecycle": {
+    "runtime7OwnershipValidated": true,
+    "runtime7Stopped": true,
+    "unrelatedServicesPreserved": true,
+    "dataPlanePreserved": true,
+    "runtime8StartPid": 82483,
+    "runtime8StartedAtUtc": "2026-09-21T06:48:04.699Z",
+    "runtime8Ready": false,
+    "failureCode": "GUIDE_PREVIEW_BIND32_SUPERVISOR_EXITED",
+    "retryCount": 0
+  },
+  "traffic": {
+    "offlineProofBrowser": 0,
+    "tls": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "nextAction": "Bounded supported-lifecycle diagnosis using non-private public process/lifecycle evidence or separately authorized private-log custody review; do not rerun the actual31 operator until Runtime8 is healthy and independently reviewed."
+}

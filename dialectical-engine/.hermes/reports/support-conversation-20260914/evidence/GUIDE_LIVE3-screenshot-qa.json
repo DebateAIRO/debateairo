@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE3",
+  "reviewedBy": "/root/preview",
+  "items": [
+    {
+      "sequence": 1,
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE2-row-01.png",
+      "language": "en",
+      "surface": "full",
+      "observed": "Dialectical Engine Help shell, English welcome, Pricing prompt and completed answer are visibly rendered; menu, status, shortcuts and composer are present without visible overlap.",
+      "sha256": "dfafb5d5dcb0a33676d74b824834f811b152e1de81a0d25c284d2c6467813186",
+      "bytes": 166550,
+      "width": 1440,
+      "height": 1000,
+      "visualReview": "PASS"
+    },
+    {
+      "sequence": 2,
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE2-row-02.png",
+      "language": "ro",
+      "surface": "full",
+      "observed": "Romanian selection and welcome, retained Pricing conversation, Account prompt and completed Romanian answer are visibly rendered; menu, status, shortcuts and composer remain usable without visible overlap.",
+      "sha256": "dd41caff17495bae587f4797a52861474e18cd29c212c05a589c2ea5e407d9de",
+      "bytes": 208726,
+      "width": 1440,
+      "height": 1000,
+      "visualReview": "PASS"
+    }
+  ],
+  "limitations": [
+    "Only the two completed rows produced screenshots.",
+    "No screenshot or visual claim exists for failed sequence 7 or remaining rows."
+  ]
+}

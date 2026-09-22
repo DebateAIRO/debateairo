@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE35",
+  "ticket": "t_313ee057",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "FAILED_CAPTURE_COMPACT_COOKIE_ORDER_ZERO_ANSWERS",
+  "operatorExitStatus": 1,
+  "phaseStatuses": {
+    "preflight": 0,
+    "readiness": 0,
+    "capacity": 0,
+    "gate": 0,
+    "rowProof": 0,
+    "capture": 1,
+    "idle": null
+  },
+  "completedAtUtc": {
+    "preflight": "2026-09-21T12:14:44.265Z",
+    "readiness": "2026-09-21T12:14:44.511Z",
+    "capacity": "2026-09-21T12:14:45.264Z",
+    "gate": "2026-09-21T12:14:45.306Z",
+    "rowProof": "2026-09-21T12:14:45.846Z"
+  },
+  "freshCapacity": {
+    "measuredAtUtc": "2026-09-21T12:14:44.571Z",
+    "maxAnonSessionEvents1hByIp": 0,
+    "maxAnonMessageEvents10mByIp": 0,
+    "maxAnonMessageEvents24hByIp": 52,
+    "callsToday": 15,
+    "liveRelayWaiters": 0,
+    "relayState": "AVAILABLE"
+  },
+  "logicalProof": {
+    "validatedRows": 58,
+    "resultSha256": "bce4a67e683d0a47641d649b06f75a921ae9cb1bbb3875ebf3086d92a67fffca",
+    "gateSha256": "9f71aae3dc7ad43aa97874cf41bde89abef9b5b9c246491193b0b96f9ea5ff9a"
+  },
+  "capture": {
+    "failureCode": "GUIDE_HARNESS_COMPACT_STATE_TRANSITION_ABSENT",
+    "failedSurface": "compact",
+    "failedLanguage": "ro",
+    "attemptedRows": 0,
+    "completedApiReplies": 0,
+    "completedScreenshotRows": 0,
+    "createSessionRequests": 0,
+    "sendMessageRequests": 0,
+    "sessionCreationTimesUtc": [],
+    "screenshots": [],
+    "before": {
+      "hydrationReady": "READY",
+      "toggleVisible": "VISIBLE",
+      "widgetState": "COLLAPSED",
+      "ariaExpanded": "FALSE",
+      "cookieRegionVisible": "VISIBLE"
+    },
+    "afterActivation": {
+      "hydrationReady": "READY",
+      "toggleVisible": "VISIBLE",
+      "widgetState": "COLLAPSED",
+      "ariaExpanded": "FALSE",
+      "cookieRegionVisible": "VISIBLE"
+    }
+  },
+  "boundedDiagnosis": {
+    "kind": "CAPTURE_CONTROLLER_INTERACTION_ORDER",
+    "captureSource": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PHASE_IMPORT_FIX46/capture-public-guide.mjs",
+    "sharedControlSource": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CONTINUATION_BIND40/controls.mjs",
+    "cause": "The real compact openMode path activates the widget before settleCookieConsent; the visible cookie region remains present and the widget stays collapsed. The passing zero-Support UI preflight settles cookie consent before activating the same widget.",
+    "nextAffectedCheck": "A compiled-public-UI control can invoke the real openMode ordering with all Support APIs intercepted: the retained order must reproduce the transition failure and cookie-before-activation must reach READY with zero forwarded Support traffic."
+  },
+  "runtime": {
+    "pid": 9800,
+    "pgid": 9800,
+    "ordinarySystemTlsHelpStatus": 200,
+    "restarted": false,
+    "idlePhaseRun": false
+  },
+  "retryPerformed": false,
+  "qualification": "The failure preceded the first Support session and question. It is not evidence about answer quality, product Support behavior, quota exhaustion, or model behavior."
+}

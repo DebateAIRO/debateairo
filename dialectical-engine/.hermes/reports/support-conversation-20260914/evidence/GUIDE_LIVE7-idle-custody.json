@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-20T14:04:21.088Z",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "pid": 77769,
+  "ppid": 1,
+  "pgid": 77769,
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "command": "pnpm dev:auth:up",
+  "previewListenersPreserved": 12,
+  "unrelatedListenersPreserved": 9,
+  "ordinarySystemTls": {
+    "url": "https://localhost:3100/help",
+    "customCa": false,
+    "insecure": false,
+    "status": 200
+  },
+  "ongoingPrivateLog": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_LIVE7-stack.log"
+}

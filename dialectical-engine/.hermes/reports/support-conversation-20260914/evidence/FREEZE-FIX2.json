@@ -1,0 +1,83 @@
+{
+  "at": "2026-09-14T13:49:57.021843+00:00",
+  "ref": "refs/heads/codex/support-conversation-mission",
+  "commit": "bc52996f968f6a9251e937c3a714f86eb47f4163",
+  "tree": "6ebb0d8617cb0ccad50f1e575dda1dceea868b4f",
+  "parent": "6241d226b59050eb62aaa911b7b6708d5cba021f",
+  "files": [
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/board-ids.json",
+      "sha256": "9cbd7e69fa5adec4e32886fbad7562f787159e77913e07a90e266d71f8615cb3"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PROGRESS.md",
+      "sha256": "004829362df87434f8b71a37d78b6066e513dae3183717286a790a950d13f543"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/LEDGER.md",
+      "sha256": "dbd3b5259def05576cf626fb3d49d91a604d8d9d72ee94b1b0db041a2129d11a"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/ASTRA.md",
+      "sha256": "9d101f25808d2b469656e1616e09ef0d6245460aa8c43fac323096209d8ca44f"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md",
+      "sha256": "fe7c9feaf7a3bcee927c45ac5bea3fcaf89f8d981df8dbe9b5b8dae8d5c33402"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/FIX2.md",
+      "sha256": "f89aa396ef1160cf7debcc52c97039b347c34a811d15f8818b6f14c1c1936b89"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/LIVE2.md",
+      "sha256": "0d41936424cdf5b7aa522fc77e4201561d51bfb9234364e0f05f5209ea58e774"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX2.md",
+      "sha256": "5825a75ccbc11e3c0562219642709d075a73df7dec36455f199dc16fc5b0b9c4"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX2-manifest.json",
+      "sha256": "4162dc4e32c8e2d7690d8e74015fb91c8a82d84f1b0bf9e336f23e6f643c3a60"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX2-stack-custody.json",
+      "sha256": "6c15845f2500e76ac4298f285d5bf8abf2ad1d7ff8064b183906bd848023b0ef"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX2-consumption.json",
+      "sha256": "4b080a958070f45eee18d49d407d95903252469081b06cf11ae4f2bd947e37cf"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE-pre-LIVE2-inventory.json",
+      "sha256": "bf9013e340b388d9ee086782caa8c049668af6f8c8ba1401c41a34880c2c3781"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE2-required-suites.json",
+      "sha256": "e72fa9afb890b6b518bc92bf100a510082f77d250e8c137d407d99945c0b3e60"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FIX2.md",
+      "sha256": "996eff4ed551b74d74f6f568a00d808127a07b664e4961c127dc02cc55a31482"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/review-packages/CP1-p1/CP1-82f57f1e-diff.json",
+      "sha256": "9640c1014c54024d155a1b55edc56e8f9011efd898e67d79eb1f238dd5695101"
+    }
+  ],
+  "source_before": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "606ad70f5e8b852724469816ca922d5685a4117668daeeed1a4d740b8988035e",
+    "lane_ref": "82f57f1ebaaf59a9ee0ea81d3084c4d57f7557b0"
+  },
+  "source_after": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "606ad70f5e8b852724469816ca922d5685a4117668daeeed1a4d740b8988035e",
+    "lane_ref": "82f57f1ebaaf59a9ee0ea81d3084c4d57f7557b0"
+  },
+  "private_index_removed": true,
+  "tested": "metadata only; no product tests; no running LIVE2 output included"
+}

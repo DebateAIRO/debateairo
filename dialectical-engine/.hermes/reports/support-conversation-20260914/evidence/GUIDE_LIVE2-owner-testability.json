@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE2",
+  "revision": "f3be0af81f1691db6c23494f9e286bb6b10f13bf",
+  "verdict": "NOT_CALCULATED_CAPTURE_NOT_RUN",
+  "reason": "The exact-product row-proof gate failed before browser or Support traffic.",
+  "captureSessionsCreated": 0,
+  "captureMessagesSent": 0,
+  "manualScript": null,
+  "requiredManualSessions": null,
+  "requiredMessagesByLanguage": null,
+  "conservativeNotBeforeUtc": null,
+  "freshPostWaitMeasurement": false,
+  "preCaptureCapacity": {
+    "measuredAtUtc": "2026-09-17T17:13:45.031Z",
+    "anonymousSessionLimit1h": 5,
+    "observedMaxAnonymousSessionEvents1hByIp": 0,
+    "anonymousMessageLimit10m": 20,
+    "observedMaxAnonymousMessageEvents10mByIp": 0,
+    "anonymousMessageLimit24h": 100,
+    "observedMaxAnonymousMessageEvents24hByIp": 10
+  },
+  "limitation": "No owner testability claim is possible without the frozen capture and observed manual rows."
+}

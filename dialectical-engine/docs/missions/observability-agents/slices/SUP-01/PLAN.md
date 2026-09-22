@@ -38,14 +38,14 @@ and every release is gated by the independent evaluation set.
 | SUP-01-R02 | "The first assistant message of every session is the DISCLOSURE text" | | |
 | SUP-01-R03 | "Every reply of class `ANSWER_GROUNDED` ends with a `Source:` line … `NO_SOURCE` text and no product claim" | | |
 | SUP-01-R04 | "The corpus lives at `packages/support-kb/content/<id>.<lang>.md` … serves only entries with `status: shipped` and `ratified_by: V` … `kb_version`" | | |
-| SUP-01-R05 | "A deterministic pre-model classifier routes any message whose intent is … to the `REFUSE_ZONE` text … No model call is made" | | |
+| SUP-01-R05 | "A deterministic pre-model classifier routes any message whose intent is … to the `REFUSE_ZONE` text … exact coercion phrases produce `REFUSE_SAFETY` … an R05 zone intent takes precedence … No model call is made" | | |
 | SUP-01-R06 | "routes the message to `REFUSE_INJECTION` and inserts one `support.abuse_event` row … After 3 … `LOCKED`" | | |
 | SUP-01-R07 | "exactly three tools … Postgres role `debateai_support` holding SELECT/INSERT on `support.*` only … No support code imports from … No support route path begins with …" | | |
 | SUP-01-R08 | "through the existing loopback relay contract … register rows `support_enabled` … `pnpm support:switch off\|on` … within 5 s … `pnpm support:status`" | | |
 | SUP-01-R09 | "`received_at`, `first_token_at`, `completed_at` … first token ≤ 3 s at p50 and ≤ 8 s at p95 … printed as a number" | | |
 | SUP-01-R10 | "classified `ro` or `en` … `RO \| EN` override … stored per message … every corpus entry exists in both languages" | | |
 | SUP-01-R11 | "20 messages / 10 minutes, 100 messages / 24 hours, 5 new sessions / hour … 40 messages, 2 000 characters … HTTP 429" | | |
-| SUP-01-R12 | "Schema `support` … per-session data key wrapped by a support KEK … never the raw relay response … `[REDACTED_SECRET_LIKE]`" | | |
+| SUP-01-R12 | "Schema `support` … `support.session.identity_owner_ref` is nullable and copied only from the authenticated identity session … per-session data key wrapped by a support KEK … never the raw relay response … `[REDACTED_SECRET_LIKE]`" | | |
 | SUP-01-R13 | "Assistant text renders as plain text. The only anchors are `link_first_party` routes on the same origin" | | |
 | SUP-01-R14 | "N = 60 … `pnpm support:eval --runs 3` prints `applicable/total` … structural assertions 48/48 on every run … ≥ 46/48 with 0 rubric failures in classes C and D" | | |
 | SUP-01-R15 | "the UI shows the RATING prompt … `rating` … Deflection rate = … `pnpm support:status` prints it" | | |

@@ -1,0 +1,32 @@
+########## PACKET REVIEW — constants of CODE-S02-C8-REWORK-R1.md checked at a035f814 ##########
+-- globals.css:7575 at a035f814 (claimed: the .70 comment figure) --
+   7.17, .70 -> 5.61 / 8.09. It is the smallest step clearing 4.5:1 in BOTH modes, i.e. the most
+-- test:297 at a035f814 (claimed: the .70 figure) --
+    // 4.79 / 7.17, `.70` -> 5.61 / 8.09. `.65` is the smallest 0.05 step clearing 4.5:1 in BOTH
+-- test:51-52 at a035f814 (claimed: the at-rule counts) --
+ * selector any assertion here names. Measured in this file: the only at-rules present are
+ * `@keyframes` (7) and `@media` (18).
+-- globals.css:7600-7604 at a035f814 (claimed: the orphaned comment) --
+/* The reason the button is disabled reaches assistive technology through `aria-describedby`
+   and must NOT reach it as visible footer text. `display: none` and `visibility: hidden` both
+   remove the element from the accessibility tree and take R15's description with it, so this is
+   the repo's own `.srOnly` treatment (`globals.css:684-694`), copied declaration for
+   declaration: clipped to 1x1 and off the flow, still rendered, still announced. */
+-- the four selectors' rule lines at a035f814 (claimed 7304/7409/7448/7560) --
+7304: .consentPolicyLink {
+7409: .policyClose {
+7448: .policyPill {
+7560: .policyPrimary {
+
+########## MY OWN r2 PACKET's constants ##########
+-- 'the rule at block :7614-7617' — FILE lines at HEAD --
+.consentPolicyLink:focus-visible,
+.policyClose:focus-visible,
+.policyPill:focus-visible,
+.policyPrimary:focus-visible {
+-- BLOCK-relative line of .consentPolicyLink:focus-visible --
+391:.consentPolicyLink:focus-visible,
+-- review package line count (packet claims 323) --
+     323
+-- how many RULES did the fix add? (packet says 'four :focus-visible rules') --
+1

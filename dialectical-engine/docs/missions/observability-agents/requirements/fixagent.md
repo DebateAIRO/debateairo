@@ -1,13 +1,13 @@
 # FixAgent — requirements (observability-agents)
 
-Seat REQ-FIX (Fable 5.1) · ticket `t_80ef9dec` · 2026-09-01/02 · tree `dev @ 8d38185c` (+111 `ui-overhaul` dirty entries, untouched) · binding overlays: intake C1/C3/C4/C7, V rulings R-E1..R-E6, Batch 3–9, DoD D1–D12. Per-slice files: `docs/missions/observability-agents/slices/FIX-01 … FIX-16/{SPEC,PLAN,PROGRESS,DECISIONS}.md`.
+Seat REQ-FIX (Fable 5.1) · ticket `t_80ef9dec` · 2026-09-01/02 · authoring snapshot `dev @ 4f764037` (the packet's older SHA and `+111` dirty count are not repeated as measured state) · binding overlays: intake C1/C3/C4/C7, V rulings R-E1..R-E6, Batch 3–9, DoD D1–D12. Per-slice files: `docs/missions/observability-agents/slices/FIX-01 … FIX-16/{SPEC,PLAN,PROGRESS,DECISIONS}.md`.
 
 ## Verdict summary
-1. The predecessor's ratified set STANDS almost whole: of 144 `OBS-R` rows, **129 STAND, 13 CHANGE, 2 are REMOVED** (both already struck by V rulings) — the FixAgent is the predecessor's listener loop with the model's hands tied until V unties them.
+1. The predecessor's ratified set STANDS almost whole: of 144 `OBS-R` rows, **128 STAND, 14 CHANGE, 2 are REMOVED** (both already struck by V rulings) — the FixAgent is the predecessor's listener loop with the model's hands tied until V unties them.
 2. Under C1 every phase-1 action is approval-first: trace → **file a ticket carrying the root** → propose → **wait**; nothing merges. The QUICK auto-merge arm becomes a policy-bundle switch `quick_arm`, born **OFF** in FIX-09, with seven V-checkable preconditions frozen in FIX-14 before V may flip it.
 3. Under C4 the FixAgent consumes ONLY error-shaped input: `obs.occurrence` rows (first-party, later Hatchet run failures) and detector signals that name a code defect; stalls, blind periods and infrastructure health move to the ObservationAgent (Q2 table, diffable against REQ-OBS).
-4. **Measured state corrects the intake:** `obs` schema, 15 tables and 5 roles are LIVE on the dev Postgres; `apps/runner/src/main.ts:1` already imports the installer (S06 PARTIAL, not absent); `apps/api/src/index.ts:490` already stops echoing messages on 500s; S13 build repoint is already true; ROW-GIT is resolved (3,566 tracked files, 0 phantom deletions). Still absent: `packages/obs-capture/src/runtime/**`, every emit call, `tools/obs-listener/**`.
-5. **16 slices.** FIX-01 is the smallest complete proof: `pnpm job:liveness-sweep` against a database that does not exist, with a planted password, and one `docker exec … psql` query shows the row and proves the password never landed. Nine slices are parallel-safe on day one; two are V-gated by design (FIX-14 QUICK, FIX-15 Hatchet); one is held by a cross-mission collision (FIX-06 browser client vs `ui-overhaul`).
+4. **Measured state corrects the intake:** `obs` schema, 15 tables and 5 roles are LIVE on the dev Postgres; `apps/runner/src/main.ts:1` already imports the installer (S06 PARTIAL, not absent); at the authoring snapshot `apps/api/src/index.ts:490` substitutes the fixed error code for internal prose on 500s but still returns a `message` key, so OBS-R053 remains partial until FIX-04 removes that key and adds `correlation_id`; S13 build repoint is already true; ROW-GIT is resolved (3,566 tracked files, 0 phantom deletions), but that does not make runtime `build_ref` real. The runtime and emit absences in the original measurement are historical snapshot facts, not current slice status; `tools/obs-listener/**` remains a later slice.
+5. **16 slices.** FIX-01 is the smallest complete proof: `pnpm job:liveness-sweep` against a database that does not exist, with a planted password, and one bounded query shows ordered `STARTED, FAILED` lifecycle rows while proving the password never landed. Nine slices are parallel-safe on day one; two are V-gated by design (FIX-14 QUICK, FIX-15 Hatchet); one is held by a cross-mission collision (FIX-06 browser client vs `ui-overhaul`).
 6. Three custodian acts shape slices without blocking FIX-01: RP-0 (blocks FIX-05's Done), `audit:source` V-6 (recorded, never gating), stage-16 D6 (a suspected demo-rule defect; FIX-16 exempts the manifest by construction).
 7. `psql` is not on this Mac's PATH — every V acceptance step uses `docker exec debateai-v3-postgres-1 psql …`; this is written into every SPEC.
 
@@ -20,7 +20,7 @@ Legend: **STANDS** (unchanged; slice that lands it) · **CHANGES** (C1 approval-
 | OBS-R002 thrown AND "does not work" both covered | CHANGES (C4) | thrown → FixAgent (FIX-01..06); "does not work" → ObservationAgent |
 | OBS-R003 `packages/liveness` stays the staleness owner | CHANGES (owner) | boundary is REQ-OBS's to state; FixAgent never reads it |
 | OBS-R004 independent detectors (deadline breach, READY age, heartbeat, …) | CHANGES (owner) | ObservationAgent; the FixAgent consumes their typed signal (Q2 row 2) |
-| OBS-R005 every job persists scheduled/started/succeeded-failed-noop with input count | STANDS | producer side stays in capture — FIX-01-R06 |
+| OBS-R005 every job persists scheduled/started/succeeded-failed-noop with input count | CHANGES | FIX-01 C5 owns execution receipts only: STARTED then exactly one terminal row with the authoritative input count; `scheduled(next_due)` stays OPEN for a later V/ops-owned scheduling-host decision |
 | OBS-R006 stall detection ships; reaper out of scope | CHANGES (owner) | detection → ObservationAgent; reaper stays out (§K row 15) |
 | OBS-R007 closed taxonomy + severity + component | STANDS | 0034 CHECK constraints live; registry landed |
 | OBS-R008 severity reuses `CONDITION_MARKS` band | STANDS | pinned Pg0-a ladder `INFO<DEGRADED<SEVERE<FATAL` |
@@ -301,9 +301,24 @@ Collected, not asked. Rows V-1, V-3, V-5, V-6 already exist on `V-DECISIONS-PACK
 - U-F2 Ticket ids for S27, S18b, S23, S24 — not present in the D12 log or the packet; the orchestrator/AUDIT-STATE resolve them before FIX-12/15 tickets are minted.
 - U-F3 Whether `debateai_obs_writer` holds UPDATE on `obs.component_health` (FIX-07 heartbeat upsert) — the 0034 grant block was not read line-by-line; ARCH confirms or specifies append-only.
 - U-F4 How the tracer reaches chain codes given the listener role is denied `occurrence_detail` — ARCH mechanism (linked occurrences vs a listener-readable projection).
-- U-F5 The exact real client-side fault V can cause in unmodified `apps/ui` code (FIX-06 §5 step 2) — ARCH names the site with `path:line`.
+- U-F5 RESOLVED by reviewer-authorized follow-up: FIX-06 §5 step 2 is the deterministic browser-console `setTimeout(() => { throw new Error("FIX06_V_DRILL"); }, 0)` drill; ARCH does not need to select or modify an `apps/ui` source site.
 - U-F6 The 0-byte dead-pid spool file rule (S05b carry-forward) — ARCH states it in FIX-01 PLAN.
 - U-F7 The obs-lane-3 worktree's uncommitted S06 work vs `e8d99d33` — AUDIT-STATE charge E; this seat found the checkpoint commit merged (`1c9578a2`) and no emit call in `apps/runner/src/index.ts`.
 - U-F8 `pnpm audit:source` current `blocking` array length — not run by this seat (AUDIT-STATE charge C runs it); the ticket `t_d821f99e` says 4 rows on 2026-08-27 in lane 2.
 - U-F9 Whether `sendmail` is configured on this Mac — FIX-12 makes it optional.
 - U-F10 `fixagent-state-audit.md` did not exist when this file was written; nothing here waited for it (packet §2 item 8).
+
+## Handoff
+SKILLS LOADED: using-superpowers, heartbeat-protocol, heartbeat-requirements, brainstorming, receiving-code-review, verification-before-completion
+
+READY FOR PEER REVIEW
+
+Slice table: Q3 defines FIX-01 through FIX-16, their absorbed predecessor work, D-criteria, seams, one-line V acceptance, file-overlap exclusions, gate, and dispatch posture.
+
+SPEC → PLAN-scaffold trace counts (requirements / rows): FIX-01 15/15 · FIX-02 8/8 · FIX-03 12/12 · FIX-04 10/10 · FIX-05 7/7 · FIX-06 8/8 · FIX-07 7/7 · FIX-08 11/11 · FIX-09 13/13 · FIX-10 8/8 · FIX-11 10/10 · FIX-12 11/11 · FIX-13 11/11 · FIX-14 8/8 · FIX-15 7/7 · FIX-16 7/7 · total 153/153.
+
+Contradictions found after round-1 rework: **0**. The one reviewer-proven collision is resolved by the canonical order `NEW → RESEARCHING(trace) → TICKETED → RESEARCHING(worker) → PROPOSED → APPROVED → FIXING → FIXED_UNVALIDATED`; `PR_PRESENTED` is an action while the incident remains `FIXING`, matching the live 0034 incident-state vocabulary without claiming a migration.
+
+Packet defects found: (1) COMMON §0 roster conflicts with the later H0 FINAL roster; (2) REQ-FIX's reviewer-house label is stale; (3) Q1 required SYNTHESIS §4 in full but the packet asked only for selected sections plus a skim; (4) the granted predecessor-board map omits S27/S18b/S23/S24 ids. These are controller-owned and do not alter this artifact set.
+
+comments read through: 3

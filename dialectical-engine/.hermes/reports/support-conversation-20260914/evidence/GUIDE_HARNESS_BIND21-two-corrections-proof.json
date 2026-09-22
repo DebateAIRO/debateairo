@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND21",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "result": "PASS",
+  "controls": 12,
+  "passed": 12,
+  "names": [
+    "old consumer rejects actual passed-field producer shape",
+    "corrected consumer accepts immutable LIVE20 producer output",
+    "passed false rejects",
+    "missing private controls rejects",
+    "forwarded Support traffic rejects",
+    "old simultaneous seven-session gate rejects measured limit five",
+    "corrected capture gate accepts five free sessions",
+    "one used session rejects capture gate",
+    "insufficient daily message reserve rejects",
+    "insufficient daily model reserve rejects",
+    "stale measurement rejects",
+    "KB mismatch rejects"
+  ],
+  "fixtures": {
+    "ui": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE-run-LIVE20.json",
+    "capacity": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE8-runtime-capacity.json",
+    "substitutions": [
+      "measuredAtUtc",
+      "finalCommit",
+      "kbVersion"
+    ],
+    "preservedLimit5": 5
+  },
+  "traffic": {
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

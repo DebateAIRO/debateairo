@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_FIX30_SCREENSHOT_CONTROLS",
+  "result": "PASS_COMPLETE_FULL_ANSWER_CAPTURE",
+  "cases": [
+    {
+      "name": "full-en-short-row1",
+      "mode": "full",
+      "language": "en",
+      "completeSha256": "ec9f31d2b4024a5f4484809ed77b7e016351547b315f80bb7c2ca8a9d0955f2d",
+      "completeBytes": 25408,
+      "completeWidth": 760,
+      "completeHeight": 210,
+      "ancestorCount": 5,
+      "stylesScrollViewportRestored": true
+    },
+    {
+      "name": "full-ro-long",
+      "mode": "full",
+      "language": "ro",
+      "completeSha256": "abdeeab4d41d685bf0571d3e6f770e74ded82065120de02dc12e9a46bdc286b6",
+      "completeBytes": 137087,
+      "completeWidth": 760,
+      "completeHeight": 562,
+      "ancestorCount": 5,
+      "stylesScrollViewportRestored": true
+    },
+    {
+      "name": "compact-en-long",
+      "mode": "compact",
+      "language": "en",
+      "completeSha256": "5d53177136fde235b295d9712bec483eb57316ecda619edbe6c2ce971aa0462e",
+      "completeBytes": 117001,
+      "completeWidth": 340,
+      "completeHeight": 948,
+      "ancestorCount": 2,
+      "stylesScrollViewportRestored": true
+    },
+    {
+      "name": "compact-ro-short",
+      "mode": "compact",
+      "language": "ro",
+      "completeSha256": "35e8ce24963699cc9466b7598f86f1bc0060cc69daec7ee51cd9f780534cfc32",
+      "completeBytes": 21921,
+      "completeWidth": 340,
+      "completeHeight": 268,
+      "ancestorCount": 2,
+      "stylesScrollViewportRestored": true
+    }
+  ],
+  "oldClippedDiscriminator": {
+    "footerSourceActionMutationChangedOldPng": false,
+    "oldBehaviorRejected": true
+  },
+  "paintedEvidence": {
+    "topMutationChangedPng": true,
+    "footerMutationChangedPng": true,
+    "sourceMutationChangedPng": true,
+    "actionMutationChangedPng": true
+  },
+  "restoration": {
+    "successPath": true,
+    "exceptionPath": true,
+    "styles": true,
+    "scroll": true,
+    "viewport": true
+  },
+  "negatives": {
+    "previousArticleRejected": 4,
+    "wrongIndexRejected": 4,
+    "staleProjectionRejected": 4
+  },
+  "supportAttempts": 0
+}

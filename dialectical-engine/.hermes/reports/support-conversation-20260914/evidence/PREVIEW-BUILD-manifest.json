@@ -1,0 +1,482 @@
+{
+  "schema_version": 1,
+  "mission": "support-conversation-20260914",
+  "node": "PREVIEW-BUILD",
+  "ticket": "t_984d15e6",
+  "prerequisite_tickets": [
+    "t_1997183c",
+    "t_db9a4abf",
+    "t_6612154e"
+  ],
+  "measured_base": "b7ca2c413bf3242ce18e29a397dc9a3aa9228893",
+  "branch": "codex/support-conversation-cp1",
+  "commits": [
+    {
+      "revision": "1d84592c0d639dfebaea4ac3aa9cb0711555e251",
+      "subject": "support preview model target ratifier",
+      "tree": "7d647c6c537110edd600c24e9d1f0794281435d0"
+    },
+    {
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "subject": "support preview isolated local stack",
+      "tree": "5adc9497684609735759872f435d1bcc86ffa78c"
+    }
+  ],
+  "files": [
+    {
+      "path": "dialectical-engine/acceptance/hermes-relay.test.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 4463,
+      "sha256": "b1445541d46c78c67ee87cfa35bd8e932bee877a3c191cad1bc4f196deca9cc0"
+    },
+    {
+      "path": "dialectical-engine/acceptance/hermes-relay.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 6467,
+      "sha256": "2e0355acd88d3aa696e6155437f51c51fc9e60fd641529f7b1945791108235c4"
+    },
+    {
+      "path": "dialectical-engine/apps/api/src/support/model.ts",
+      "revision": "1d84592c0d639dfebaea4ac3aa9cb0711555e251",
+      "bytes": 8272,
+      "sha256": "ec3dcfd9e53f725e939a7f6d62f8a5f71094cab007e11f8261ce12104219b565"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-api-environment.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 21193,
+      "sha256": "ef3694270c582d8cfd8cc3767b950db9a28d66be0a3019f27467d622bd594ee5"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-api-process.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 15481,
+      "sha256": "826f2d6dc4d4e374c678a16447cb597162bb3a2c85b07f338a93577abbad5f45"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-auth-data-plane.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 15047,
+      "sha256": "456abfdb1f57473b4a1be8b2ef7e9d7f2cb4dd6098ec5f42053b1b310ff88c0d"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-auth-stack-cli.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 2083,
+      "sha256": "b33869aa58c4a038cff1194a53e7a33873e24ca37f9ac94cd547993f252aed97"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-auth-stack-profile.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 1820,
+      "sha256": "e997aa81f9505d1b9148d0e9bf414694df7674e07892891a7443b96142fbe4fb"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-auth-stack.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 10822,
+      "sha256": "ed93e423bc880f4084c15b401d5d443ac33239ad0d9efb478294c7ec204b93a4"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-cli-provider-panel.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 6466,
+      "sha256": "a6434cfc1a9576d99092968d92a08891b3698634ea83a42caa3a3a7600e8f597"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-hatchet-token.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 15010,
+      "sha256": "104d54d7edc943ff69d36b4d7556901ba40108e23ef3a386a4983d808c2e960b"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-provider-panel.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 7520,
+      "sha256": "bae8dde83f20228ee06b3136e35ff59c9f3447341078c5d1473a14b6e11577ff"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-runner-process.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 9159,
+      "sha256": "1b989e168ce51bd093248106e52e6cf60780596f8ea0a0a356c7809acfa0242d"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-support-model.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 2612,
+      "sha256": "d6677e3e2966f98733a80ea479c189301e7e17682cade45b7355259e2d7b6721"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/dev-ui-process.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 8232,
+      "sha256": "5b672dd3868436ba719ba262b94e4ac03b7dbd230518b5d7b48110812b60c5e0"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/main.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 6687,
+      "sha256": "ee10aa430acb397315702ffe8278baffe8477900b321bc2a21432a8f44c38602"
+    },
+    {
+      "path": "dialectical-engine/apps/runner/src/support-config-cli-credentials.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 10598,
+      "sha256": "46743738dea907e75a95ea8f964c09264bf3dc98930e5170412e42ee7f7be0b9"
+    },
+    {
+      "path": "dialectical-engine/compose.dev.yaml",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 2135,
+      "sha256": "d73757e40b4acf2ad0a258ad2b0019f455265aebd9080766d1cb18aa53a24beb"
+    },
+    {
+      "path": "dialectical-engine/deploy/dev-auth/README.md",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 3348,
+      "sha256": "ba9853200786d7a763a401b3dd1014b827945922ce2da4f66de2d2ef0de393eb"
+    },
+    {
+      "path": "dialectical-engine/deploy/dev-auth/tls-front-door.d.mts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 1531,
+      "sha256": "35034f63b84831c66b0102ae3766348dac0e1bab3140807ae3e81817d5171055"
+    },
+    {
+      "path": "dialectical-engine/deploy/dev-auth/tls-front-door.mjs",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 13288,
+      "sha256": "24f931e18bb49cde5e99efe091cd31bd7edb9459a18d101036f919cfd33315b9"
+    },
+    {
+      "path": "dialectical-engine/deploy/dev-auth/validate-compose-postgres.mjs",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 2041,
+      "sha256": "00212b07d9e4478f872d7a3cfaa62b4dcf6cf72dc4c8b14181e38d85ccd61a32"
+    },
+    {
+      "path": "dialectical-engine/packages/register/src/register-publication.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 37400,
+      "sha256": "fed2a2474f597c8acfe83476b1948cafbf794724dcf58568f5ddccf942d170ed"
+    },
+    {
+      "path": "dialectical-engine/packages/register/src/runtime-environment.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 11539,
+      "sha256": "2299123f4b2e5b831fde81340ad1f7ce2002c18f0735b88d9d3fac49df4796fa"
+    },
+    {
+      "path": "dialectical-engine/tests/architecture/dev-compose-postgres.test.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 2730,
+      "sha256": "9f6d59b76d23b025e6b2dc264fe4905d642f2f43412de16c8521b7058c2231c6"
+    },
+    {
+      "path": "dialectical-engine/tests/architecture/dev-local-auth-topology-spec.test.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 12178,
+      "sha256": "132f89079be33fc6d648299efb7978c2850492c5d1b8aa5bd796149ecffe0ac9"
+    },
+    {
+      "path": "dialectical-engine/tests/integration/dev-api-process.test.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 16027,
+      "sha256": "8e21cc0897bc6a8363939705cbe12887600adfff46abceaf3244b0a958a6022d"
+    },
+    {
+      "path": "dialectical-engine/tests/integration/dev-hatchet-token.test.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 8409,
+      "sha256": "e64666bd4d062176479eee132c852e55fe6ce6e06ee1a97def57f98988f71960"
+    },
+    {
+      "path": "dialectical-engine/tests/integration/dev-provider-panel.test.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 3345,
+      "sha256": "1a2ad3c78216b9a5b6c2708effa05ec1d656be14b9b4444a324a0b727061ed7d"
+    },
+    {
+      "path": "dialectical-engine/tests/integration/dev-tls-readiness.test.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 5495,
+      "sha256": "f4ed6c0364295b73d68a88f3caec67d18f03efed57aa2a31d32c368e0041ce0f"
+    },
+    {
+      "path": "dialectical-engine/tests/integration/dev-ui-process.test.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 7542,
+      "sha256": "3bbfc8eb730ae504564ce1f632a39e0a9f5d14bfec8b44ad1d0a68b77ea5c022"
+    },
+    {
+      "path": "dialectical-engine/tests/integration/register-support-publication.test.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 78273,
+      "sha256": "c2e43404cfa431d7a278b945d8b7cfec4db800cebda727d946965586b5a92c1a"
+    },
+    {
+      "path": "dialectical-engine/tests/integration/support-config-principals.test.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 31644,
+      "sha256": "714b46cd4bdb9ca1bd6d6d120d767411bc39a2ccdb7dc97101702f8b91f27b1a"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/dev-auth-data-plane.test.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 6789,
+      "sha256": "ad607d786630968b50cc7e3b4a70a2c415e897210f85fdc56904ed1cfecc9343"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/dev-auth-stack-profile.test.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 2576,
+      "sha256": "ec4e59fe4e4b5b1920df3d349be8061add654f4f9ed5b79a5f07d0b6a3c10b18"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/dev-auth-stack.test.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 12412,
+      "sha256": "004986a43939fc9b9f38f4ff57db473af7d6cdc9f0f0f24a40e27525d4e4b97f"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/dev-cli-provider-panel.test.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 10563,
+      "sha256": "9c6b9e1e9c739464cf82476ce276d89a12d5c81cfb09fafd79a6f90c37e45a97"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/register-publication.test.ts",
+      "revision": "fa362c5e87abe0e6068cb8f43822d718697258f5",
+      "bytes": 39046,
+      "sha256": "e4e3d5dc597da75a8744555a5107ea8ab3e1a1de12af951426327793e1a2fcda"
+    },
+    {
+      "path": "dialectical-engine/tests/unit/support-model.test.ts",
+      "revision": "1d84592c0d639dfebaea4ac3aa9cb0711555e251",
+      "bytes": 4002,
+      "sha256": "a598dede7eec3528055930f1d71dfd4f485920622a5a5dba206286fc55407358"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/PREVIEW-BUILD.md",
+      "bytes": 13920,
+      "sha256": "0c254b2f723d3b51fe9a5d8a06e153526a1ea0351c36e817ec2f7873c2036807"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/PREVIEW-BUILD.md",
+      "bytes": 9380,
+      "sha256": "67cdec1c6b4eae01abed46d303d3464ff07c24b154e8a32569b81e13156ff315"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/RUNTIME_BASE.md",
+      "bytes": 2401,
+      "sha256": "701ed1ba45b008ebe8fec26989ba6b71e2a247cdc0e2f35681a60af858d62b33"
+    }
+  ],
+  "verification": [
+    {
+      "name": "PREVIEW-profile-red-r2.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-profile-red-r2.log",
+      "bytes": 2424,
+      "sha256": "c7404c3ef0799ffce7a0ea97497b3ab1029e869a640b22530ee076e1b20426a9"
+    },
+    {
+      "name": "PREVIEW-init-red.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-init-red.log",
+      "bytes": 15326,
+      "sha256": "696ce74ee310147ec7267001994b6d1870a4477e3fbfc2eb80dd1142b0c64e12"
+    },
+    {
+      "name": "PREVIEW-init-writer-red.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-init-writer-red.log",
+      "bytes": 18246,
+      "sha256": "9c84cd4d705fb87ab5df7153669ef0064c1de08fb1e5237e46c2e4ef3ce0bd07"
+    },
+    {
+      "name": "PREVIEW-model-ratifier-red.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-model-ratifier-red.log",
+      "bytes": 1820,
+      "sha256": "4c9e120fb2f1807abec5ca2585fda2b92fc022dda77503a7ba22f2d5c6de6e37"
+    },
+    {
+      "name": "PREVIEW-final-focused-green-r2.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-final-focused-green-r2.log",
+      "bytes": 23411,
+      "sha256": "59fda607e6a8cd74899b19e294fed0411dae7a4d40b280bda3bd69898e625931"
+    },
+    {
+      "name": "PREVIEW-final-real-boundaries-green.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-final-real-boundaries-green.log",
+      "bytes": 35438,
+      "sha256": "dabf56df0a7e32a8e43f4e64d4989e918256715e7545df386df95d3ce8268dce"
+    },
+    {
+      "name": "PREVIEW-model-ratifier-green-r2.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-model-ratifier-green-r2.log",
+      "bytes": 4865,
+      "sha256": "99b01e26a7d6d5bb87f090bf19c7a54f571e08774daff9f472c228f1bba2efe2"
+    },
+    {
+      "name": "PREVIEW-runner-readiness-green.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-runner-readiness-green.log",
+      "bytes": 1419,
+      "sha256": "86a7e9a9895641cbd4f307578f43e89319b33c66fba35fb75a8e55bedf7c014b"
+    },
+    {
+      "name": "PREVIEW-compose-validator.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-compose-validator.log",
+      "bytes": 51,
+      "sha256": "0b92fb8f88a4454e03dbf65cd38fc32998bda9aec17ee01ce0e23fff66a904da"
+    },
+    {
+      "name": "PREVIEW-compose-config-default-r2.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-compose-config-default-r2.log",
+      "bytes": 2414,
+      "sha256": "28e33a284490afb85dd11a744f7b2a4ac51d7011ebffceef1efeefd929ae97ba"
+    },
+    {
+      "name": "PREVIEW-compose-config-support-preview.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-compose-config-support-preview.log",
+      "bytes": 2462,
+      "sha256": "9f07a70e6d657b53fed9a021ef676a0371091db29a318901dae2793c107db4df"
+    },
+    {
+      "name": "PREVIEW-stack-live-r6.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-stack-live-r6.log",
+      "bytes": 770,
+      "sha256": "b81ca6090e33b5f346ddfa4131af1a0a774a286eddf59043a7377ea166617e84"
+    },
+    {
+      "name": "PREVIEW-https-readiness.json",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-https-readiness.json",
+      "bytes": 260,
+      "sha256": "65d10c9dc24fa62c3c31542f06c71680f1c0c4d69c223cb06fb6d9479caf3c7a"
+    },
+    {
+      "name": "PREVIEW-live-listeners.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-live-listeners.log",
+      "bytes": 1282,
+      "sha256": "9c35ba9fd5ff370d48c18219ba470caff6c613a111c4c016ffc1bfbc8600af6f"
+    },
+    {
+      "name": "PREVIEW-compose-ownership.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-compose-ownership.log",
+      "bytes": 340,
+      "sha256": "13878958be0d3b2af3defaf8f362aaa5ccf56923fb595485960eeae6a03b5eb4"
+    },
+    {
+      "name": "PREVIEW-container-footprint.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-container-footprint.log",
+      "bytes": 192,
+      "sha256": "1ac7e18a3be13aa685c997ca7a0c2985c1b41049955ffbc505095c341174e973"
+    },
+    {
+      "name": "PREVIEW-host-footprint.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-host-footprint.log",
+      "bytes": 2511,
+      "sha256": "65a8d0447ff4af25477136fe0c3be23324374ca6171e30a715a92145823fcbf2"
+    },
+    {
+      "name": "PREVIEW-stack-live-r7.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-stack-live-r7.log",
+      "bytes": 1290,
+      "sha256": "af5072e998670c200c6814cd41100aee6750bc15eccd6a5bb96816fb02c79685"
+    },
+    {
+      "name": "PREVIEW-stack-live-r7-escalated.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-stack-live-r7-escalated.log",
+      "bytes": 722,
+      "sha256": "fdc29292d0adc22f04117d7ef506f197d3f3c9d47c17f5b89934ec85d5826590"
+    },
+    {
+      "name": "PREVIEW-system-trust.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-system-trust.log",
+      "bytes": 104,
+      "sha256": "b4e884e454c0f6044e7c7b25c71915861cd8a65559fa6ab30b5852ffa746801c"
+    },
+    {
+      "name": "PREVIEW-system-trust-escalated.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-system-trust-escalated.log",
+      "bytes": 14,
+      "sha256": "337d55ead282fa65d01beaa6c7363aa151c0688815524bfca6856797ac1937dd"
+    },
+    {
+      "name": "PREVIEW-supervisor-sigterm.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-supervisor-sigterm.log",
+      "bytes": 98,
+      "sha256": "9ee91e8a99e6a90bdfd5fd4bbd51a476c692612337bb948a698d48cf72197ecb"
+    },
+    {
+      "name": "PREVIEW-supervisor-sigterm-escalated.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-supervisor-sigterm-escalated.log",
+      "bytes": 43,
+      "sha256": "9f419b2b9bb96237f4fc87c9a1ac773222834218d3461b79556d92035862654e"
+    },
+    {
+      "name": "PREVIEW-direct-cleanup.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-direct-cleanup.log",
+      "bytes": 215,
+      "sha256": "34cf7ca29ff368eeafcec8cf51aac854b8ef7a6dfe95a647370701d67dcfbab2"
+    },
+    {
+      "name": "PREVIEW-direct-cleanup-escalated.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-direct-cleanup-escalated.log",
+      "bytes": 363,
+      "sha256": "df0023ba3be6420b8da6133c1c94094ce3ea0caae22d01ac3681530d756cd8ec"
+    },
+    {
+      "name": "PREVIEW-typecheck-final.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-typecheck-final.log",
+      "bytes": 39611,
+      "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0"
+    },
+    {
+      "name": "PREVIEW-baseline-failures-b7ca2c41.log",
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/PREVIEW-baseline-failures-b7ca2c41.log",
+      "bytes": 10529,
+      "sha256": "c3bf10f806fdeeab6f237ff93a055e9370460d45dac418efb17c11a4adc4665a"
+    }
+  ],
+  "live_profile": {
+    "selector": "support-preview",
+    "public_origin": "https://localhost:3100",
+    "loopback_ports": [
+      3100,
+      3101,
+      8890,
+      8891,
+      8895,
+      8892,
+      8896,
+      8893,
+      8894,
+      55433,
+      7177,
+      8988
+    ],
+    "compose_project": "debateai-v3-support-preview",
+    "postgres_volume": "debateai-v3-support-preview_postgres-data",
+    "ready": true,
+    "ordinary_system_curl_http_status": 200,
+    "browser_trust": "UNVERIFIED_MAC_LOCKED_NO_BROWSER_SURFACE",
+    "direct_sigterm_parent_rc": 0,
+    "listeners_after_stop": 0
+  },
+  "typecheck": {
+    "rc": 1,
+    "preview_owned_production_source_diagnostics": 0,
+    "full_baseline_attribution": "UNAVAILABLE",
+    "full_pass_claimed": false
+  },
+  "exclusions": [
+    "secrets and credential values",
+    ".local generated state",
+    "global CA trust",
+    "production deployment",
+    "existing services and data",
+    "NAV and Support content work"
+  ],
+  "actual_model_token_usage": "UNAVAILABLE"
+}

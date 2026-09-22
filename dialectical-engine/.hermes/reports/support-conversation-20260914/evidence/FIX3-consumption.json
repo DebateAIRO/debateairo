@@ -1,0 +1,70 @@
+{
+  "at": "2026-09-14T14:29:44.553964+00:00",
+  "revision": "43cf9386ea3c9e7c79523ec38debe63271d19292",
+  "handoffHashes": {
+    "evidence/FIX3.md": "de39311cf0e53b9a91a3f2c00c9d43d90f4a77720572a759d795c7a05359f6df",
+    "evidence/FIX3-manifest.json": "98355d3ffaab10b4a2eab15c4728c7567c5d5c9458ed6726a24c8afed4643057",
+    "evidence/FIX3-stack-custody.json": "f372be2481ddd1eec7e7632b6bf0778bb601ddc75282710b100d2ea8831e2731",
+    "agent-reports/FIX3.md": "de302d374d6c1c44ca4026ca653563255c0badeb9aac5ff158d4dca858dab4ff"
+  },
+  "resolvedManifestReferences": {
+    "logs.contractRed": [
+      "logs/FIX3-contract-red.log"
+    ],
+    "logs.contractGreen": [
+      "logs/FIX3-contract-green1.log"
+    ],
+    "logs.affectedGreenBeforeFinalPolicyTightening": [
+      "logs/FIX3-focused-green.log"
+    ],
+    "logs.modelPreserved": [
+      "logs/FIX3-model-preserved.log"
+    ],
+    "logs.mutantActionAvailability": [
+      "logs/FIX3-mutant-action-availability.log"
+    ],
+    "logs.mutantPolicyBroad": [
+      "logs/FIX3-mutant-policy-broad.log"
+    ],
+    "logs.mutantsRestored": [
+      "logs/FIX3-mutants-restored.log"
+    ],
+    "logs.policyIntermediate": [
+      "logs/FIX3-policy-final.log"
+    ],
+    "logs.policyFinal": [
+      "logs/FIX3-policy-final2.log"
+    ],
+    "logs.typecheckBeforeFinalPolicyTightening": [
+      "logs/FIX3-typecheck-final.log",
+      "logs/FIX3-typecheck-final3.log",
+      "logs/FIX3-typecheck-final2.log"
+    ],
+    "logs.typecheckIntermediate": [
+      "logs/FIX3-typecheck-final.log",
+      "logs/FIX3-typecheck-final3.log",
+      "logs/FIX3-typecheck-final2.log"
+    ],
+    "logs.typecheckFinal": [
+      "logs/FIX3-typecheck-final.log",
+      "logs/FIX3-typecheck-final3.log",
+      "logs/FIX3-typecheck-final2.log"
+    ],
+    "evidence.report": [
+      "evidence/FIX3.md"
+    ],
+    "evidence.stackCustody": [
+      "evidence/FIX3-stack-custody.json"
+    ],
+    "evidence.authorReport": [
+      "agent-reports/FIX3.md"
+    ]
+  },
+  "manifestReferencesVerified": 15,
+  "currentPolicyFrame": "49/49",
+  "earlierAffectedFrame": "184/184 before final policy tightening; exact final integration is LIVE3",
+  "typecheckFinal3ExactAttributedMatch": true,
+  "nativeSchemaEnforcement": false,
+  "runtimeStillAt": "82f57f1ebaaf59a9ee0ea81d3084c4d57f7557b0",
+  "ownerAcceptance": "PENDING"
+}

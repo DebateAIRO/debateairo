@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE23",
+  "ticket": "t_8688d7d5",
+  "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+  "verdict": "STOPPED_COUNTS_PRINCIPAL_PERMISSION",
+  "recordedAtUtc": "2026-09-21T00:57:18.236160Z",
+  "retained": {
+    "preflightSha256": "dfce83ea1e186372e9d16c0989e3117d262968c8c724d23540ad46572324df58",
+    "readinessSha256": "03fb0a8c0fef2d92496c6a2a7a0f263d15a2746752ce8b54cadaf4a8198c7a7f",
+    "live21FailureSha256": "da8e4479d7a835eb0b14a4c745ec578eb8232d7ee7ae49b9d70458e5a88abb5b",
+    "live22FailureSha256": "6334368b5eac927c7a06cef44448eea97aea5a05a6d6de185a598e69e425a5cb"
+  },
+  "prerequisites": {
+    "result": "PASS",
+    "futureOutputsAbsent": 109,
+    "runtimePid": 12272,
+    "runtimePgid": 12272,
+    "commandMarkerMatched": true,
+    "ordinaryTlsStatus": 200,
+    "privateCustody": "PASS",
+    "exactOrderedKeys": "PASS",
+    "databaseConnectionShape": "PASS",
+    "childEnvironmentPresence": "PASS",
+    "valueRecorded": false
+  },
+  "capacity": {
+    "status": "FAILED",
+    "exitCode": 1,
+    "stage": "COUNTS_ONLY_QUERY",
+    "databaseErrorCode": "42501",
+    "databaseErrorClass": "SCHEMA_PERMISSION_DENIED",
+    "capacityOutputWritten": false
+  },
+  "phaseStatuses": {
+    "preflight": "RETAINED_PASS",
+    "readiness": "RETAINED_PASS",
+    "capacity": "FAILED_AFTER_STATUS_BEFORE_RESULT",
+    "gate": "NOT_RUN",
+    "rowProof": "NOT_RUN",
+    "capture": "NOT_RUN",
+    "idle": "NOT_RUN"
+  },
+  "actualCapture": {
+    "attemptedRequests": 0,
+    "completedRequests": 0,
+    "newSessions": 0,
+    "modelCalls": 0
+  },
+  "traffic": {
+    "preCapacityOrdinaryTlsReads": 1,
+    "capacityStatusReads": 1,
+    "capacityDatabaseConnections": 1,
+    "capacityDatabaseQueryAttempts": 1,
+    "capacityResults": 0,
+    "support": 0,
+    "model": 0
+  },
+  "outputAbsence": {
+    "capacity": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-capacity.json",
+      "absent": true
+    },
+    "gate": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-gate.json",
+      "absent": true
+    },
+    "rowProof": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-row-proof-status.json",
+      "absent": true
+    },
+    "rowProofResult": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF-run-LIVE21.json",
+      "absent": true
+    },
+    "capture": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-capture.json",
+      "absent": true
+    },
+    "idle": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE21-idle.json",
+      "absent": true
+    },
+    "actualReceipt": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE21-actual-receipt.json",
+      "absent": true
+    }
+  },
+  "runtime": {
+    "pid": 12272,
+    "pgid": 12272,
+    "leftUntouched": true,
+    "postFailureLiveness": "NOT_RECHECKED",
+    "lastProvedBy": "GUIDE_LIVE23-prerequisites.json"
+  },
+  "limits": [
+    "No retry or alternate database principal used.",
+    "No gate, row proof, capture, or idle command was invoked.",
+    "Deferred owner-capacity command not executed.",
+    "Forgot remains unresolved/actionless."
+  ],
+  "publicSupportConnection": {
+    "environmentKey": "SUPPORT_DATABASE_URL",
+    "apiComposition": "apps/api/src/main.ts#supportPool+supportRelayLeasePool",
+    "developmentPrincipal": "apps/runner/src/dev-database-principals.ts#debateai_dev_support",
+    "environmentAssembly": "apps/runner/src/dev-api-environment.ts#DEVELOPMENT_API_ENVIRONMENT_KEYS",
+    "credentialReader": "apps/runner/src/support-status-cli-credentials.ts#SUPPORT_KEY",
+    "valueRead": false,
+    "valueRecorded": false,
+    "queryRetried": false
+  }
+}

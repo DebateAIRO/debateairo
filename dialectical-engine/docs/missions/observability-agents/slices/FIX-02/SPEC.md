@@ -16,7 +16,7 @@ Seam obligations: none of O-1..O-4 (no sink code). Batch-3 row 6 binds (no free 
 - **FIX-02-R04** Walking `.cause` from the outermost product error reaches the original pg error object (identity, not text) through two real wrap levels at real call sites — proven by a test that throws a distinguishable inner error and asserts `outer.cause.cause === inner`.
 - **FIX-02-R05** Async joins in the touched regions preserve every rejection, not only the first (`AggregateError` or equivalent carrying all causes).
 - **FIX-02-R06** The stored record carries the chain: after a wrapped fault is captured through FIX-01's pipeline, `obs.occurrence.cause_relation` is non-null on the wrapper's row and `obs.occurrence_detail.cause_chain_codes` (human-only channel) lists the wrapper's registry code followed by the cause's code — codes only, never message text.
-- **FIX-02-R07** Zero behaviour change for callers that do not pass a cause: the repo-wide `pnpm typecheck` diagnostic count in `packages/kernel/**` and `packages/db/**` is unchanged from the base.
+- **FIX-02-R07** Zero behaviour change for callers that do not pass a cause: repo-wide `pnpm typecheck` exits 0, including every existing two-argument caller in `packages/kernel/**` and `packages/db/**`.
 - **FIX-02-R08** A green test suite is a worker milestone only; Done is V's veto after running §5.
 
 ## 3. States
@@ -32,7 +32,7 @@ Stored: wrapper row with `cause_relation = 'WRAPS'` (vocabulary from the registr
 3. `docker exec debateai-v3-postgres-1 psql -U debateai -d debateai -At -c "SELECT o.code, o.cause_relation, d.cause_chain_codes FROM obs.occurrence o JOIN obs.occurrence_detail d ON d.occurrence_id = o.occurrence_id ORDER BY o.occ_seq DESC LIMIT 1"` → the wrapper's code first, then at least one further code from the pg layer in `cause_chain_codes` (a JSON array of ≥ 2 codes); `cause_relation` non-null.
 4. `docker exec debateai-v3-postgres-1 psql -U debateai -d debateai -At -c "SELECT count(*) FROM (SELECT d::text t FROM obs.occurrence_detail d) s WHERE t LIKE '%no_such_database%' OR t LIKE '%PLANTED-SECRET-7731%'"` → `0` (codes, not text).
 5. `grep -c 'console.error' packages/db/src/index.ts` → `0` in the `createPool` region (V opens the file at the `pool.on("error")` line and sees the capture channel call instead).
-6. `pnpm typecheck; echo "exit=$?"` → the same exit code and the same count of diagnostics under `packages/kernel/**` and `packages/db/**` as the slice's recorded base (the handoff states both numbers).
+6. `pnpm typecheck; echo "exit=$?"` → `exit=0`, with no diagnostic under `packages/kernel/**` or `packages/db/**`.
 V vetoes Done only after steps 1–6 match.
 
 ## 6. Out of scope

@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-17T05:52:28Z",
+  "node": "REV2_P4",
+  "ticket": "t_9040a66d",
+  "session": "/root/forgot_destination",
+  "model": "gpt-5.6-sol",
+  "pass": 4,
+  "maximumPasses": null,
+  "revision": "ee06cd875956b76548ffb04d9dff29e4af8bbb74",
+  "verdict": "PASS",
+  "usage": "UNAVAILABLE",
+  "artifacts": [
+    {
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/REV2-p4.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV2-p4.md",
+      "sha256": "1f2bd4b78130cba26fa1b856257b9ca82f4d448980231f7fac093b22d85111ba",
+      "bytes": 8620
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/REV2_P4.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/REV2_P4.md",
+      "sha256": "64c08d07e73cff0cc2e6e999335f1fdccaa2a40c8ca719786893c138d07b5a29",
+      "bytes": 3480
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/REV2_P4/final-security-boundary-probe.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/REV2_P4/final-security-boundary-probe.ts",
+      "sha256": "23acbb535ceb627be35ee2db7fa61b32c3a1ed2f6fe9e3bb08b7c3f3701f3c97",
+      "bytes": 24355
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/REV2_P4/run-final-security-probe.mjs",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/REV2_P4/run-final-security-probe.mjs",
+      "sha256": "475ca88f9080067abdd4e46fe9d537ed04fa1de7321af683a0b6b13a6925f83e",
+      "bytes": 2185
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/REV2_P4/verify-inputs.mjs",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/REV2_P4/verify-inputs.mjs",
+      "sha256": "b68ec4e7b1f52c9784b685982c2523ed1080768374dca33a15b3e3927d2b973c",
+      "bytes": 1405
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/REV2_P4-final-security-boundary.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/REV2_P4-final-security-boundary.log",
+      "sha256": "0b8a3485bb36c35e535bda72d25aabd3c98b0e619eda25196c6da6ae0b6cdb51",
+      "bytes": 38633
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/REV2_P4-input-verification.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/REV2_P4-input-verification.log",
+      "sha256": "0cceabc3f5f37bf07b67cf0ae9eaf556e8e2209e0a7b9448ad0ff771c5a80f2b",
+      "bytes": 199
+    }
+  ],
+  "limits": [
+    "Named pass-4 technical security lens only; root remains the finding closer and checkpoint acceptor.",
+    "No real HTTP, database, browser, preview, provider, relay, auth/reset, or account traffic.",
+    "No formal arbitrary-language or arbitrary-encoding completeness claim.",
+    "No current-preview behavior claim at this revision.",
+    "Forgot-password destination remains unresolved and was not searched, guessed, or waived."
+  ]
+}

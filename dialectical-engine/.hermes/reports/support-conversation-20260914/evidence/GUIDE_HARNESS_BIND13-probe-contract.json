@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND13",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "script": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND13/probe-zero-request-ui.mjs",
+    "sha256": "def6e1b8a7bda541a999a7bfa457d6f8637a802d2ac6013dab9af61bea8153c4",
+    "bytes": 10172
+  },
+  "outputPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE-run-LIVE8.json",
+  "argv": [
+    "node",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_HARNESS_BIND13/probe-zero-request-ui.mjs",
+    "152eed4da1cd3e66b74d8301159ba76427552409",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_TRANSITION_PROBE-run-LIVE8.json"
+  ],
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "logPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_UI_TRANSITION_PROBE-LIVE8.log",
+  "childStatusPreservedBy": "direct stdout/stderr redirection without tee",
+  "prerequisites": [
+    "exact revision owned preview independently verified",
+    "ordinary system TLS for https://localhost:3100",
+    "pinned installed Playwright Chromium exists",
+    "output path absent"
+  ],
+  "transitions": [
+    "fresh full/en",
+    "same-session full/ro",
+    "storage-reset compact/ro",
+    "route-remount full/en",
+    "storage-reset compact/en"
+  ],
+  "noTrafficGuard": {
+    "behavior": "abort before runtime; never fulfill or substitute a response",
+    "routes": [
+      "support status",
+      "support session create",
+      "support message send",
+      "other support"
+    ],
+    "requiredActualForwardedSupportRequests": 0,
+    "requiredCreateSessionAttempts": 0,
+    "requiredSendMessageAttempts": 0,
+    "requiredOtherSupportAttempts": 0,
+    "blockedStatusAttemptsReportedSeparately": true
+  },
+  "outputFields": "fixed transition enums/counts only",
+  "executed": false
+}

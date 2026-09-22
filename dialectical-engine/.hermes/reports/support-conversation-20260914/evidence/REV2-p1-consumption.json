@@ -1,0 +1,48 @@
+{
+  "at": "2026-09-14T16:34:58.244065+00:00",
+  "review": "REV2-p1",
+  "session": "/root/forgot_destination",
+  "revision": "6e5ab5fc41acebbff4264efc7d481df3db8dce44",
+  "report": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV2-p1.md",
+    "sha256": "d8973d38dd7cdd5014197c2e70316023ff95d1a700939a84cd8ed3b7615021f5"
+  },
+  "selfReport": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/REV2.md",
+    "sha256": "54ece4138c77a624f640ccfa72b09d742b316a6c84e7bfbb76981ea1f4b35bf5"
+  },
+  "gateManifestSha256": "ab6221c1e5e1a4fa3050854005a646242bbc7472522d2745077eea77a2da48f0",
+  "gateInputHashesReverified": 114,
+  "productFilesReverified": 99,
+  "skills": {
+    "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-10-55-01a09ef8-1b81-7cb1-9a2d-015a5e8346b6.jsonl",
+    "floor": [
+      "using-superpowers",
+      "heartbeat-protocol",
+      "heartbeat-reviewer",
+      "verification-before-completion"
+    ],
+    "rc": 0,
+    "output": "ok   using-superpowers (5)\nok   heartbeat-protocol (9)\nok   heartbeat-reviewer (7)\nok   verification-before-completion (3)\nSKILLS LOADED verified: 4 / 4\n"
+  },
+  "scope": "Mechanical immutable-input/report/hash/current-byte verification; reviewer content verdict is independent Sol evidence, not root content judgment. Probe hashes consumed separately if present.",
+  "independentProbeReferences": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/REV2/final-boundary-probe.ts",
+      "sha256": "4ca2fc17eaedf992cd1f6ad7bde0e50f1f3992654acaf33e0ad065f06069cbb2"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/REV2-final-boundary-probe.log",
+      "sha256": "9ffc1b192d32245d5f1221dc5033c7f3d69e20176efc4b17d0782db1f4e5b88d"
+    }
+  ],
+  "additionalSkillBodyProof": {
+    "security-diff-scan": {
+      "file": "/Users/vladmihaimiron/.codex/plugins/cache/openai-curated-remote/codex-security/0.1.24/skills/security-diff-scan/SKILL.md",
+      "bodyPhrase": "Review every changed source file, including deleted files. Follow changed behavior into supporting code without expanding into an unrelated repository audit.",
+      "transcriptOccurrences": 5,
+      "scope": "Read/method only; formal Codex Security workflow not claimed"
+    },
+    "systematic-debugging": "ok   systematic-debugging (3)\nSKILLS LOADED verified: 1 / 1\n"
+  }
+}

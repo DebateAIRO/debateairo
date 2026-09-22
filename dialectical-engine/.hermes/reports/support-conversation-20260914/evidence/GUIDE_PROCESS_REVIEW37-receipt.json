@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PROCESS_REVIEW37",
+  "ticket": "t_043df858",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_FINAL_PROCESS_RUNTIME_OPERATOR_BINDING",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_PROCESS_REVIEW37.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_PROCESS_REVIEW37.md",
+      "sha256": "374da631ff1ba2b7210bb190b22c1327a0fc83ae82bf998da83113a766f37fb9",
+      "bytes": 3125
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PROCESS_REVIEW37-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_PROCESS_REVIEW37-dispositions.json",
+      "sha256": "1a13af3072b2def8d74eeb652ba467c1f673d81266b0c26ecf75fe185a8a6da1",
+      "bytes": 4404
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PROCESS_REVIEW37-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_PROCESS_REVIEW37-custody.json",
+      "sha256": "b741498ada5f352aeb1b51a159399d9c3d865e9e7bd5c97a9374b597105713e7",
+      "bytes": 1688
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PROCESS_REVIEW37.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_PROCESS_REVIEW37.md",
+      "sha256": "02378cf7ba9441e4747e041111e335539e2388c0cf0bf359588afbdfeab00edd",
+      "bytes": 2257
+    }
+  ],
+  "receiptSelfExcluded": true,
+  "heavyLeaseHeld": false,
+  "finding": null,
+  "retained": [
+    "Authenticated Runtime9 schema/Git/TLS and exact process identity.",
+    "Final seven-phase self-binding and 123 absent future paths.",
+    "Product0d34/full58/FINAL18/KB7ef, startup accounting and FIX30 evidence."
+  ],
+  "traffic": {
+    "runtime": 0,
+    "browser": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  }
+}

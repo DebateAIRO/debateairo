@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_HARNESS_BIND15",
+  "revision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "retainedControlPurposes": 127,
+  "addedControlPurposes": 3,
+  "controls": 130,
+  "passed": 130,
+  "added": [
+    "full readiness reports the exact failed interaction phase",
+    "full adapters gate the first click on hydration and each restore on transition idle",
+    "documented PROBE4 argv passes the extracted guard and stale forms reject"
+  ],
+  "change": {
+    "firstClick": "wait for the exact full mode toggle React click handler before public interaction",
+    "restoreClick": "wait for expected aria state and document transition idle before another click",
+    "failureCodes": [
+      "GUIDE_HARNESS_FULL_MODE_ACTIVATION_FAILED",
+      "GUIDE_HARNESS_FULL_MODE_EXPECTED_STATE_TIMEOUT",
+      "GUIDE_HARNESS_FULL_MODE_RESTORE_ACTIVATION_FAILED",
+      "GUIDE_HARNESS_FULL_MODE_RESTORE_STATE_TIMEOUT",
+      "GUIDE_HARNESS_FULL_LANGUAGE_ACTIVATION_FAILED",
+      "GUIDE_HARNESS_FULL_LANGUAGE_EXPECTED_STATE_TIMEOUT",
+      "GUIDE_HARNESS_FULL_FINAL_VERIFICATION_FAILED"
+    ],
+    "sharedConsumers": [
+      "capture-public-guide.mjs",
+      "probe-zero-request-ui.mjs"
+    ]
+  },
+  "orderedEightSha256": "b6162d665b60a1a35d882e41fa5b0da3259e9cb86bae32ca5d5056d320ad99d4",
+  "matrixRows": 54,
+  "adapterNegative": {
+    "controls": 3,
+    "passed": 3,
+    "importerCalls": 0,
+    "successfulRows": 0
+  }
+}

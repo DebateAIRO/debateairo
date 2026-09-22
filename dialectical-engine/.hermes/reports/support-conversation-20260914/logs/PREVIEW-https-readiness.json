@@ -1,0 +1,11 @@
+{
+  "tls_verification": "worktree-local CA via curl --cacert",
+  "home_status": 200,
+  "home_content_type": true,
+  "home_contains_login": true,
+  "session_status": 401,
+  "session_content_type": true,
+  "session_body": {
+    "error": "SESSION_REQUIRED"
+  }
+}

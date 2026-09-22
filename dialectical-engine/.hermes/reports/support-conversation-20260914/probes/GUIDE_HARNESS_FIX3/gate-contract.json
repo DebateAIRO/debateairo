@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "gateExactKeys": [
+    "schemaVersion",
+    "productRoot",
+    "finalCommit",
+    "productInventoryPath",
+    "productInventorySha256",
+    "attestationPath",
+    "attestationSha256",
+    "expectedSnapshotVersion",
+    "expectedEntryCount",
+    "requiredSuiteReceiptPath",
+    "requiredSuiteReceiptSha256",
+    "controlProofPath",
+    "controlProofSha256",
+    "runtimeCapacityPath",
+    "runtimeCapacitySha256",
+    "runtimeLogPath",
+    "baseUrl",
+    "forgotConnector"
+  ],
+  "fixedGateValues": {
+    "schemaVersion": 1,
+    "productRoot": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "baseUrl": "https://localhost:3100",
+    "forgotConnector": {
+      "status": "UNRESOLVED_ACTIONLESS"
+    }
+  },
+  "runtimeCapacityExactKeys": [
+    "schemaVersion",
+    "measuredAtUtc",
+    "finalCommit",
+    "kbVersion",
+    "supportRegisterVersion",
+    "supportSchemaVersion",
+    "supportSnapshotSha256",
+    "fullSnapshotSha256",
+    "supportEnabled",
+    "supportModelRef",
+    "limits",
+    "observed"
+  ],
+  "runtimeLimitExactKeys": [
+    "support_limit_anon_msgs_10m",
+    "support_limit_anon_msgs_24h",
+    "support_limit_anon_sessions_1h",
+    "support_limit_session_msgs",
+    "support_limit_msg_chars",
+    "support_relay_concurrency",
+    "support_queue_depth",
+    "support_daily_call_cap",
+    "support_lock_after_injections",
+    "support_ip_cooldown_minutes"
+  ],
+  "runtimeObservedExactKeys": [
+    "maxAnonSessionEvents1hByIp",
+    "maxAnonMessageEvents10mByIp",
+    "maxAnonMessageEvents24hByIp",
+    "anyIpCooldownActive",
+    "callsToday",
+    "liveRelayWaiters",
+    "relayState"
+  ],
+  "runtimeCapacityMaterialization": {
+    "when": "AFTER_SUPPORTED_STACK_READINESS_IMMEDIATELY_BEFORE_CAPTURE",
+    "staticGateState": "NEW_TEMPLATE_WITH_RUNTIME_CAPACITY_BINDINGS_OMITTED",
+    "allowedOneTimeFinalGateAdditions": [
+      "runtimeCapacityPath",
+      "runtimeCapacitySha256"
+    ],
+    "supportedStatusCommand": "GET /v1/support/status",
+    "countsOnlyCommand": "readCountsOnly(GUIDE_COUNTS_ONLY_SQL, [measuredAt, supportIpCooldownMinutes])",
+    "supportedStatusReads": 1,
+    "countsOnlyReads": 1,
+    "maxAgeMsAtValidation": 120000,
+    "maxFutureClockSkewMs": 5000,
+    "sealedGateMutationAllowed": false,
+    "limitMutationAllowed": false
+  },
+  "runtimeCapacityFixedFieldEqualities": [
+    {
+      "capacityField": "finalCommit",
+      "gateField": "finalCommit"
+    },
+    {
+      "capacityField": "kbVersion",
+      "gateDerivedField": "expectedSnapshotVersion"
+    },
+    {
+      "capacityField": "supportEnabled",
+      "literal": true
+    },
+    {
+      "capacityField": "supportModelRef",
+      "literal": "development:hermes-glm-5.3-flash"
+    }
+  ],
+  "controlProofExactKeys": [
+    "schemaVersion",
+    "result",
+    "revision",
+    "kbVersion",
+    "harnessSha256",
+    "controls",
+    "passed",
+    "names"
+  ],
+  "controlProofFixedValues": {
+    "schemaVersion": 2,
+    "result": "PASS"
+  },
+  "controlProofEqualities": [
+    {
+      "proofField": "revision",
+      "gateField": "finalCommit"
+    },
+    {
+      "proofField": "kbVersion",
+      "gateField": "expectedSnapshotVersion"
+    },
+    {
+      "proofField": "harnessSha256",
+      "derivedFrom": "GUIDE_HARNESS_EXECUTABLE_FILES"
+    }
+  ],
+  "sessionLifecycle": {
+    "storageKey": "debateai.support.conversation.v1",
+    "groups": 5,
+    "firstResponseCreateIncrement": 1,
+    "distinctSessionIdentityRequired": true,
+    "sameLanguageBoundary": "STORAGE_RESET_BEFORE_REMOUNT",
+    "languageBoundary": "LANGUAGE_SELECTOR_RESET",
+    "failureTiming": "FIRST_GROUP_RESPONSE"
+  },
+  "schedule": {
+    "canonicalRows": 54,
+    "sessionGroups": 5,
+    "sessionMessageCounts": [1, 14, 13, 12, 14],
+    "requestStartSpacingMs": 31000,
+    "modelRowCeiling": 42,
+    "retries": 0
+  },
+  "requiredFinalSourceBindings": [
+    "apps/api/src/main.ts",
+    "apps/api/src/support/classify.ts",
+    "apps/api/src/support/index.ts",
+    "apps/api/src/support/limits.ts",
+    "apps/api/src/support/model-reservation.ts",
+    "apps/api/src/support/public-guide-boundary.ts",
+    "apps/api/src/support/queue.ts",
+    "apps/api/src/support/recovery-intent.ts",
+    "apps/api/src/support/security-guidance.ts",
+    "packages/db/src/support.ts",
+    "packages/support-kb/recovery/components.json",
+    "packages/support-kb/reviews/manifest.json",
+    "packages/support-kb/src/catalog.ts",
+    "packages/support-kb/src/context.ts",
+    "packages/support-kb/src/index.ts"
+  ]
+}

@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE6",
+  "revision": "0b9320eae5a0ad8c9fcc9648ed85ebef1b289c13",
+  "result": "PASS_PARTIAL_14",
+  "screenshotCount": 14,
+  "screenshots": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE9-row-01.png",
+      "sha256": "cd78e9bbd8d299e76178d9f054fb5312b740a94b449d21140f9c822ecce6d602",
+      "bytes": 166432,
+      "pngSignatureValid": true,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE9-row-02.png",
+      "sha256": "7f134bc50721e12a196121253cad56714994a69e1b3fdb755270071cd3c05183",
+      "bytes": 207261,
+      "pngSignatureValid": true,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE9-row-07.png",
+      "sha256": "ec748dfcfbfdb0adcaea736ad7f0b11a5bda9ccdebcd07e6a3b66c6311550deb",
+      "bytes": 202129,
+      "pngSignatureValid": true,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE9-row-11.png",
+      "sha256": "ec748dfcfbfdb0adcaea736ad7f0b11a5bda9ccdebcd07e6a3b66c6311550deb",
+      "bytes": 202129,
+      "pngSignatureValid": true,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE9-row-15.png",
+      "sha256": "ec748dfcfbfdb0adcaea736ad7f0b11a5bda9ccdebcd07e6a3b66c6311550deb",
+      "bytes": 202129,
+      "pngSignatureValid": true,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE9-row-19.png",
+      "sha256": "ec748dfcfbfdb0adcaea736ad7f0b11a5bda9ccdebcd07e6a3b66c6311550deb",
+      "bytes": 202129,
+      "pngSignatureValid": true,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE9-row-23.png",
+      "sha256": "ec748dfcfbfdb0adcaea736ad7f0b11a5bda9ccdebcd07e6a3b66c6311550deb",
+      "bytes": 202129,
+      "pngSignatureValid": true,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE9-row-27.png",
+      "sha256": "ec748dfcfbfdb0adcaea736ad7f0b11a5bda9ccdebcd07e6a3b66c6311550deb",
+      "bytes": 202129,
+      "pngSignatureValid": true,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE9-row-31.png",
+      "sha256": "ec748dfcfbfdb0adcaea736ad7f0b11a5bda9ccdebcd07e6a3b66c6311550deb",
+      "bytes": 202129,
+      "pngSignatureValid": true,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE9-row-35.png",
+      "sha256": "ec748dfcfbfdb0adcaea736ad7f0b11a5bda9ccdebcd07e6a3b66c6311550deb",
+      "bytes": 202129,
+      "pngSignatureValid": true,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE9-row-39.png",
+      "sha256": "ec748dfcfbfdb0adcaea736ad7f0b11a5bda9ccdebcd07e6a3b66c6311550deb",
+      "bytes": 202129,
+      "pngSignatureValid": true,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE9-row-41.png",
+      "sha256": "43629d3bad814e4021e27cc49a07296a1c206336fe5dfd117b029599f5fab695",
+      "bytes": 202190,
+      "pngSignatureValid": true,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE9-row-47.png",
+      "sha256": "43629d3bad814e4021e27cc49a07296a1c206336fe5dfd117b029599f5fab695",
+      "bytes": 202190,
+      "pngSignatureValid": true,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE_GUIDE9-row-51.png",
+      "sha256": "43629d3bad814e4021e27cc49a07296a1c206336fe5dfd117b029599f5fab695",
+      "bytes": 202190,
+      "pngSignatureValid": true,
+      "width": 1440,
+      "height": 1000
+    }
+  ]
+}

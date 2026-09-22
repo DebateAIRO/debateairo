@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_ROW_PROOF_FIX",
+  "ticket": "t_b9bd6336",
+  "session": "/root/preview",
+  "immutableReference": "b0b91a01cf161d17eef75577cbae94c629b7bc49",
+  "verdict": "PREPARED_NOT_EXECUTED_VALID_GATE",
+  "findingDisposition": {
+    "id": "GRP-R1",
+    "status": "CORRECTED_PENDING_SEPARATE_REVIEW",
+    "reviewedHarnessSha256": "f8f2935965cd59b893ab02848cd9db17eeb71fa423f5620b61479e6647ae4917",
+    "preImportFullEightDigestRequired": true,
+    "dynamicFix2ImportOnlyAfterDigest": true,
+    "constructorProofDigestRequiredBeforeProjection": true,
+    "custodyUsesActualComputedDigest": true
+  },
+  "staticVerification": {
+    "syntaxFiles": 3,
+    "syntaxPassed": 3
+  },
+  "inertNegative": {
+    "executions": 1,
+    "exitCode": 0,
+    "controls": 3,
+    "passed": 3,
+    "changedCopiedFile": "controls.mjs",
+    "importerCalls": 0,
+    "successfulRows": 0,
+    "temporaryFixtureRemoved": true,
+    "realHarnessModified": false,
+    "traffic": {
+      "browser": false,
+      "sessions": 0,
+      "supportRequests": 0,
+      "modelRequests": 0
+    }
+  },
+  "validGateExecution": {
+    "adapterExecutions": 0,
+    "all54Claim": false,
+    "runtimeReads": 0,
+    "capacityReads": 0,
+    "httpRequests": 0,
+    "databaseReads": 0,
+    "browserStarts": 0,
+    "sessionsCreated": 0,
+    "supportRequests": 0,
+    "modelRequests": 0
+  },
+  "futureExecution": {
+    "newExactComposedGateRequired": true,
+    "freshCountsOnlyCapacityRequired": true,
+    "sameGateForAdapterAndCapture": true,
+    "capacityMaxAgeMs": 120000,
+    "staleGateSuccessAllowed": false
+  },
+  "skillsLoaded": [
+    "superpowers:using-superpowers",
+    "repository heartbeat-protocol",
+    "repository heartbeat-worker",
+    "superpowers:receiving-code-review",
+    "superpowers:systematic-debugging",
+    "superpowers:test-driven-development",
+    "superpowers:verification-before-completion"
+  ],
+  "artifacts": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_FIX/reviewed-harness-custody.mjs",
+      "sha256": "35c3fe3494078c38cca13eda624dd559c3d539dcb58cc981e0c229408fcbc805",
+      "bytes": 1417
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_FIX/replay-row-proofs.mjs",
+      "sha256": "8e16bab1607c978a63fbf15c1cdb9fa2c0c83fc6edb56176c99b9291be8c6b80",
+      "bytes": 6119
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_FIX/verify-negative-fixture.mjs",
+      "sha256": "7acfa22c93d2adfbf4ec2f18de12d3394feac836c10d1b347dc58e974214b154",
+      "bytes": 1358
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_ROW_PROOF_FIX/README.md",
+      "sha256": "4af97dc18fae9e38bba410d52ac264e6d7bf64724fb7a63889633743457a181c",
+      "bytes": 1879
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_ROW_PROOF_FIX-negative.log",
+      "sha256": "b16854342b505125ef61e24381dec2ddec1520eb97c1ec97763faf158d7cc01d",
+      "bytes": 329
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_ROW_PROOF_FIX.md",
+      "sha256": "c6ba0ae19318b9ec96a97d36bdc67ea892444af3376b80e9b9c3b8cad8fbfad6",
+      "bytes": 3582
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_ROW_PROOF_FIX.md",
+      "sha256": "bf988481b5609f1c87bf70b65d728215eb7934b9a9ac8a8ad37195988d334bd3",
+      "bytes": 2512
+    }
+  ],
+  "receiptExcludesItself": true,
+  "heavyLeaseReleased": true,
+  "usage": "UNAVAILABLE"
+}

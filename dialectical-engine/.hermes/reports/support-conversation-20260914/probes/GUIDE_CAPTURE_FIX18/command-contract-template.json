@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "baseRevision": "152eed4da1cd3e66b74d8301159ba76427552409",
+  "finalRevision": null,
+  "actualNamespace": null,
+  "helpers": [
+    { "phase": "preflight", "script": null, "cwd": null, "argv": null, "argumentTypes": null, "output": null, "log": null },
+    { "phase": "readiness", "script": null, "cwd": null, "argv": null, "argumentTypes": null, "output": null, "log": null },
+    { "phase": "capacity", "script": null, "cwd": null, "argv": null, "argumentTypes": null, "output": null, "log": null },
+    { "phase": "gate", "script": null, "cwd": null, "argv": null, "argumentTypes": null, "output": null, "log": null },
+    { "phase": "rowProof", "script": null, "cwd": null, "argv": null, "argumentTypes": null, "output": null, "log": null },
+    { "phase": "capture", "script": null, "cwd": null, "argv": null, "argumentTypes": null, "output": null, "log": null },
+    { "phase": "idle", "script": null, "cwd": null, "argv": null, "argumentTypes": null, "output": null, "log": null }
+  ]
+}

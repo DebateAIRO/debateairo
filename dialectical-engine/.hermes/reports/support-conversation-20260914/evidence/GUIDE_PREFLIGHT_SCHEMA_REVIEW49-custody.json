@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREFLIGHT_SCHEMA_REVIEW49",
+  "ticket": "t_3b4cc8fd",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "freeze": "fa4371ed38dbcc861f543e8012fecd745194b272",
+  "authorReceiptSha256": "b14edd9998d8b512bdb1dc19ae2bf29dddb8ed200b092516b14eb460e21a8ab1",
+  "authorReceiptBytes": 12680,
+  "authorConsumptionSha256": "ed281e6203c1215ade234c4072a7c8c3cbf0cb29fb665b1c147b615f79b2d2b9",
+  "phasePreflightSha256": "7abc75044287384ee7c79d89cb2e79b68d236696f7166985dfcc5e84f0461245",
+  "preflightSchemaSha256": "7bf70664ec655cc18bf7f365b5359f6c123a8c0049b5457f4d1893b6d08df889",
+  "compositionImplementationSha256": "10417b9c197b6de5d48c00f53d51970cf848c0a0363689ad28c3e2dc890a0b22",
+  "compositionContractSha256": "7e39c79b7dabd06a03f067be81b582709641a55c1ecabafe3209a6dfee5d7cf3",
+  "compatibilityMapSha256": "e1a78218c33c5be8790ce00a5b7824710b00784bb0e8d60b229ff611014b8e8d",
+  "controlProofSha256": "b8af3b868a4ab54a092db4c21d9effa2189cf73fbafafeb683737d8f3fc24590",
+  "moduleClosureSha256": "b1c36e08c3b91c41002b425ffbd406b132552cce2bbd5a7d31b5a6c960278cf8",
+  "moduleClosureCount": 34,
+  "commandContractSha256": "1be2c74d25dbf4fd45f72fb1360f06836547e868b7b19993e17a0f949fcbd7e6",
+  "operatorScriptSha256": "466ef588b04c6f45a13c607baab099a4fef9919150601791ba4a1ad0c8178f47",
+  "operatorContractSha256": "63379645c09e162cc780f15cc069ef212cb644b54ea26a30baa1ecb6f36eb0d0",
+  "initialNoLoaderFailureLogSha256": "e37bbcd81140e7772a91963cbba268dadba40372956d5af1786cec182bb15729",
+  "futurePathsAbsent": 116
+}

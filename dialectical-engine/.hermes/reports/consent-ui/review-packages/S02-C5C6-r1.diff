@@ -1,0 +1,1181 @@
+# Review package — lane /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/consent-s02-modal/dialectical-engine — range 68f3ea33..3d207a48 — generated 2026-09-07 00:43:26
+
+## Commits
+3d207a48 00:37 feat(consent-ui S02-C6): policy modal scroll gate, acknowledgement and focus
+da1e1fa6 00:27 feat(consent-ui S02-C5): privacy policy modal
+279d9577 00:18 fix(consent-ui S02-C1): fieldset-disabled pin, containment wording, isConnected guard
+
+## Stat
+ .../ui/components/consent/PrivacyPolicyModal.tsx   | 280 ++++++++++++++
+ .../apps/ui/components/consent/modalSemantics.ts   |  24 +-
+ .../tests/render/consent-modal-semantics.test.tsx  |  93 +++++
+ .../render/consent-policy-modal-behaviour.test.tsx | 406 +++++++++++++++++++++
+ .../render/consent-policy-modal-render.test.tsx    | 244 +++++++++++++
+ 5 files changed, 1044 insertions(+), 3 deletions(-)
+
+## Diff (-U10)
+diff --git a/dialectical-engine/apps/ui/components/consent/PrivacyPolicyModal.tsx b/dialectical-engine/apps/ui/components/consent/PrivacyPolicyModal.tsx
+new file mode 100644
+index 00000000..a7845276
+--- /dev/null
++++ b/dialectical-engine/apps/ui/components/consent/PrivacyPolicyModal.tsx
+@@ -0,0 +1,280 @@
++"use client";
++
++import * as React from "react";
++
++import { POLICY_JUMP, POLICY_SECTIONS } from "../../lib/privacyPolicy";
++import { backdropCloseHandler, prefersReducedMotion, useModalSurface } from "./modalSemantics";
++
++/**
++ * The privacy policy modal (design 10c). Standalone and prop-driven: it owns no consent state,
++ * reads and writes no storage, and holds no policy prose of its own — every string it shows
++ * comes from `apps/ui/lib/privacyPolicy.ts`. Its modal semantics come from the ONE shared
++ * helper `./modalSemantics`.
++ *
++ * The prop type is a cross-slice contract: `slices/S02/SPEC.md` R14 and `slices/S01/SPEC.md`
++ * R20 state it byte-identically and neither slice may change it alone.
++ */
++export type PrivacyPolicyModalProps = {
++  open: boolean;
++  mode: "read" | "consent";
++  onClose: () => void;
++  onAcknowledge?: () => void;
++};
++
++/**
++ * S02-S33's four-member closure, pinned WHERE A TYPECHECKER CAN SEE IT. Measured 2026-09-07:
++ * `tsc --noEmit --listFiles` counts this file 1 in the `apps/ui` project and 0 in the root one,
++ * and counts `tests/render/consent-policy-modal-render.test.tsx` **0 in BOTH** — so the two
++ * type-level pins the plan places in that test file are inert, and the plan's sentence "a wrong
++ * prop set produces a 9th diagnostic" cannot come true (`.hermes/TOOLING-TRAPS.md:1485-1499` is
++ * the standing measurement of the same gap). Reported as a finding; pinned here as well so the
++ * property has a gate that actually runs — `cd apps/ui && npx tsc --noEmit -p tsconfig.json`
++ * fails on a renamed member, a removed one, a fifth one (optional or not), and on
++ * `onAcknowledge` made required.
++ */
++type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
++type Expect<T extends true> = T;
++type _PropShapeIsExact = Expect<
++  Exact<
++    PrivacyPolicyModalProps,
++    { open: boolean; mode: "read" | "consent"; onClose: () => void; onAcknowledge?: () => void }
++  >
++>;
++type _PropKeysAreExact = Expect<
++  Exact<keyof PrivacyPolicyModalProps, "open" | "mode" | "onClose" | "onAcknowledge">
++>;
++
++/**
++ * Fixed, not generated. Only one policy modal is ever open (the Esc stack in `modalSemantics`
++ * is what makes that observable), and a fixed id is queryable with `querySelector` — a
++ * `React.useId()` value contains `:` characters, which are legal in `getElementById` and not in
++ * a CSS id selector.
++ */
++const TITLE_ID = "policy-modal-title";
++const GATE_HINT_ID = "policy-modal-gate-hint";
++
++/**
++ * The per-section accent reaches the DOM as a TOKEN REFERENCE, never as a colour: the number and
++ * the bullet dots read `var(--accent)` from CSS, and `--accent` is set here to `var(--ok-dot)`,
++ * `var(--gold)`, … So the accent follows the mode toggle with nothing wired, and no colour
++ * literal enters this file (COMMON §7's design-system law).
++ */
++const ACCENT_PROPERTY = "--accent";
++
++/**
++ * The header copy, `slices/S02/SPEC.md` §Copy, transcribed as DECODED characters (U+00B7 MIDDLE
++ * DOT twice in the eyebrow, U+2014 EM DASH once in the lede). Written as string expressions
++ * rather than as JSX text so no whitespace folding can alter a `textContent` comparison.
++ * `privacyPolicy.ts` holds the pills and the sections; the header, the end marker and the
++ * footer contact line are the modal's own chrome and live here.
++ */
++const EYEBROW = "PRIVACY POLICY · v2.1 · EFFECTIVE 12 AUG 2026";
++const TITLE = "What we store, and why";
++const LEDE =
++  "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Eleven sections — scroll to the end.";
++const END_MARKER = "END OF POLICY · GDPR (EU) 2016/679 · v2.1";
++const GATE_HINT = "Scroll to the end of the policy to continue.";
++
++/**
++ * The scroll-to-end criterion's slack, in pixels (`SPEC.md` R15). DERIVED, not conventional: the
++ * body text is 11.5px at `line-height: 1.65` ≈ 19px per line, so 8px is under half a line — the
++ * end marker cannot count as reached while a line of policy is still hidden — while still
++ * absorbing the sub-pixel and browser-zoom rounding that exact equality does not.
++ */
++const SCROLL_SLACK = 8;
++
++export function PrivacyPolicyModal({
++  open,
++  mode,
++  onClose,
++  onAcknowledge
++}: PrivacyPolicyModalProps): React.ReactElement | null {
++  const scrimRef = React.useRef<HTMLDivElement | null>(null);
++  const dialogRef = React.useRef<HTMLElement | null>(null);
++  const closeRef = React.useRef<HTMLElement | null>(null);
++  const bodyRef = React.useRef<HTMLDivElement | null>(null);
++  const [reachedEnd, setReachedEnd] = React.useState(false);
++
++  // Focus trap, initial focus on the close control, focus return on close, backdrop close and
++  // the Esc STACK — all of it from the ONE shared helper. This component installs no keydown
++  // listener of its own, which is what the listener-count arm of S02-S46 pins.
++  useModalSurface(open, { containerRef: dialogRef, initialFocusRef: closeRef, onClose });
++
++  React.useEffect(() => {
++    // `mode="read"` applies no scroll-to-end gate at all (R14), so the listeners are not even
++    // attached there.
++    if (!open || mode !== "consent") return undefined;
++    const region = bodyRef.current;
++    if (region === null) return undefined;
++    const evaluate = (): void => {
++      // The latch lives in the updater: once true it is never recomputed to false, so scrolling
++      // back up to re-read a section cannot take the button away again.
++      setReachedEnd(
++        (latched) =>
++          latched || region.scrollTop + region.clientHeight >= region.scrollHeight - SCROLL_SLACK
++      );
++    };
++    evaluate();
++    region.addEventListener("scroll", evaluate);
++    // On `resize` too, and on `window`: a taller viewport can show the end of the policy without
++    // the reader scrolling at all, and a criterion bound only to `scroll` would leave the button
++    // disabled with the end marker in plain sight.
++    window.addEventListener("resize", evaluate);
++    return () => {
++      region.removeEventListener("scroll", evaluate);
++      window.removeEventListener("resize", evaluate);
++    };
++  }, [open, mode]);
++
++  if (!open) return null;
++
++  const gateOpen = reachedEnd;
++
++  const acknowledge = (): void => {
++    // The ONLY route that ticks the box, and it exists only in `mode="consent"`. `×`, Esc and
++    // the backdrop reach `onClose` and nothing else, so no dismissal can consent on the
++    // reader's behalf. Acknowledge first, then close, so the consumer sees the acknowledgement
++    // before the surface goes away.
++    onAcknowledge?.();
++    onClose();
++  };
++
++  const jumpTo = (target: string): void => {
++    const section = dialogRef.current?.querySelector<HTMLElement>(`[id="${target}"]`) ?? null;
++    // Guarded on both hops: jsdom 30.0.1 has no `Element.prototype.scrollIntoView` at all, so an
++    // unguarded call throws a TypeError naming a DOM API and the failure reads as an environment
++    // bug rather than as this component's. A reader who asked for no animation gets none.
++    section?.scrollIntoView?.({
++      block: "start",
++      behavior: prefersReducedMotion() ? "auto" : "smooth"
++    });
++  };
++
++  return (
++    <div
++      className="policyScrim"
++      ref={scrimRef}
++      // Resolved at CLICK time, never at render time: `scrimRef.current` is still null during
++      // the first render, and a handler built then would close on nothing.
++      onClick={(event) => backdropCloseHandler(scrimRef.current, onClose)(event)}
++    >
++      <div
++        className="policyBezel"
++        role="dialog"
++        aria-modal="true"
++        aria-labelledby={TITLE_ID}
++        ref={(node) => {
++          dialogRef.current = node;
++        }}
++      >
++        <div className="policyCore">
++          <span className="policyTab" aria-hidden="true" />
++          <div className="policyHead">
++            <div className="policyHeadText">
++              <div className="policyEyebrow">{EYEBROW}</div>
++              <div id={TITLE_ID} className="policyTitle">
++                {TITLE}
++              </div>
++              <div className="policyLede">{LEDE}</div>
++            </div>
++            <button
++              type="button"
++              className="policyClose"
++              aria-label="Close"
++              onClick={onClose}
++              ref={(node) => {
++                closeRef.current = node;
++              }}
++            >
++              {"×"}
++            </button>
++          </div>
++          {/* `tabindex="0"` plus a name of its own: paging this region is the ONLY way a
++              keyboard-only reader can satisfy the scroll gate, and the name says what is inside
++              it rather than repeating the dialog's title. */}
++          <div className="policyBody" tabIndex={0} aria-label="Privacy Policy text" ref={bodyRef}>
++            <div className="policyJumps">
++              {POLICY_JUMP.map((jump) => (
++                <button
++                  key={jump.target}
++                  type="button"
++                  className="policyPill"
++                  data-jump={jump.target}
++                  onClick={() => jumpTo(jump.target)}
++                >
++                  {jump.label}
++                </button>
++              ))}
++            </div>
++            {POLICY_SECTIONS.map((section) => (
++              <div key={section.no} id={`policy-section-${section.no}`} className="policySection">
++                <div className="policySectionHead">
++                  <span
++                    className="policyNo"
++                    data-accent={section.accent}
++                    style={{ [ACCENT_PROPERTY]: `var(${section.accent})` } as React.CSSProperties}
++                  >
++                    {section.no}
++                  </span>
++                  <span className="policySectionTitle">{section.title}</span>
++                </div>
++                <p className="policyText">{section.body}</p>
++                {section.items.length > 0 ? (
++                  <div className="policyItems">
++                    {section.items.map((item) => (
++                      <div key={item} className="policyItem">
++                        <span
++                          className="policyDot"
++                          aria-hidden="true"
++                          style={
++                            { [ACCENT_PROPERTY]: `var(${section.accent})` } as React.CSSProperties
++                          }
++                        />
++                        <span className="policyItemText">{item}</span>
++                      </div>
++                    ))}
++                  </div>
++                ) : null}
++              </div>
++            ))}
++            <div className="policyEnd">{END_MARKER}</div>
++          </div>
++          <div className="policyFoot">
++            <span className="policyContact">
++              {"Questions: "}
++              <span className="policyMail">{"privacy@dezbatere.ro"}</span>
++            </span>
++            <span className="policyFootSpacer" />
++            {mode === "consent" ? (
++              <>
++                {/* The reason the button is disabled, as an accessible DESCRIPTION and not as a
++                    `title` — the SPEC forbids a tooltip, which is invisible to a keyboard user
++                    and to a screen reader alike. `.policyGateHint` is the class C8 styles with
++                    the repo's visually-hidden treatment. */}
++                {!gateOpen ? (
++                  <span id={GATE_HINT_ID} className="policyGateHint">
++                    {GATE_HINT}
++                  </span>
++                ) : null}
++                <button
++                  type="button"
++                  className="policyPrimary"
++                  disabled={!gateOpen}
++                  aria-disabled={!gateOpen ? "true" : undefined}
++                  aria-describedby={!gateOpen ? GATE_HINT_ID : undefined}
++                  onClick={acknowledge}
++                >
++                  {"I have read it"}
++                </button>
++              </>
++            ) : (
++              <button type="button" className="policyPrimary" onClick={onClose}>
++                {"Close"}
++              </button>
++            )}
++          </div>
++        </div>
++      </div>
++    </div>
++  );
++}
+diff --git a/dialectical-engine/apps/ui/components/consent/modalSemantics.ts b/dialectical-engine/apps/ui/components/consent/modalSemantics.ts
+index 3a543ea7..fa5d00e1 100644
+--- a/dialectical-engine/apps/ui/components/consent/modalSemantics.ts
++++ b/dialectical-engine/apps/ui/components/consent/modalSemantics.ts
+@@ -19,21 +19,29 @@ export type ModalSurface = Readonly<{
+   initialFocusRef: React.RefObject<HTMLElement | null>;
+   onClose: () => void;
+ }>;
+ 
+ /**
+  * One entry per OPEN surface. `read()` returns the caller's current surface object, so a
+  * re-rendered consumer's fresh `onClose` is the one that runs.
+  */
+ type StackEntry = Readonly<{ read: () => ModalSurface }>;
+ 
+-/** The Esc stack: LIFO, module-level, shared by every surface in the app. */
++/**
++ * The Esc stack: a module-level REGISTRY of open surfaces, shared by every surface in the app.
++ * It is not a LIFO — removal is `lastIndexOf` + `splice`, and the entry that receives `Escape`
++ * is never "the last one registered". Which surface is topmost is decided by `topmostSurface()`
++ * from DOM containment: a surface contained by another is drawn over it and wins, and among
++ * unrelated siblings the one later in document order wins — which in this product tracks the
++ * order they opened in, because the stacking is the `--z-consent-bar` < `--z-consent-card` <
++ * `--z-policy-*` ladder. The most recently registered entry is only where that search starts.
++ */
+ const surfaceStack: StackEntry[] = [];
+ 
+ /** Exactly one `document` keydown listener exists while the stack is non-empty. */
+ let listenerAttached = false;
+ 
+ const FOCUSABLE_SELECTOR =
+   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+ 
+ /**
+  * `FOCUSABLE_SELECTOR` is an ATTRIBUTE match, and focusability is not an attribute. Two members
+@@ -83,30 +91,40 @@ function trapTab(entry: StackEntry, event: KeyboardEvent): void {
+     if (document.activeElement === next) return;
+   }
+ }
+ 
+ /**
+  * The topmost surface — derived from the DOM, never from the order the surfaces registered in.
+  * Registration happens in `React.useEffect`, which runs CHILD-FIRST within one commit, so for a
+  * nested pair mounted together the LAST registered entry is the surface UNDERNEATH. Document
+  * position is the property itself: a surface contained by another is drawn over it, and among
+  * unrelated surfaces the later one in document order is on top. Entries whose container is not
+- * in the DOM yet cannot be compared and leave the incumbent standing, so a surface that renders
+- * no container still receives `Escape`.
++ * in the DOM yet (`null`) cannot be compared and leave the incumbent standing, so a surface that
++ * renders no container still receives `Escape`; an entry whose container has LEFT the document
++ * is a different case and is skipped outright, because it is no longer on screen at all.
+  */
+ function topmostSurface(): StackEntry | undefined {
+   if (surfaceStack.length === 0) return undefined;
+   let top = surfaceStack[surfaceStack.length - 1]!;
+   for (const candidate of surfaceStack) {
+     const held = top.read().containerRef.current;
+     const other = candidate.read().containerRef.current;
+     if (held === null || other === null || held === other) continue;
++    // A container that has left the document cannot be compared for stacking: jsdom answers
++    // DISCONNECTED|FOLLOWING|IMPLEMENTATION_SPECIFIC in BOTH directions, so a detached node
++    // reads as "above" whichever way it is asked and the entry iterated last would win. A
++    // detached candidate therefore never wins, and a detached incumbent never stands.
++    if (!other.isConnected) continue;
++    if (!held.isConnected) {
++      top = candidate;
++      continue;
++    }
+     const relation = held.compareDocumentPosition(other);
+     const above =
+       (relation & Node.DOCUMENT_POSITION_CONTAINED_BY) !== 0 ||
+       (relation & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+     if (above) top = candidate;
+   }
+   return top;
+ }
+ 
+ function handleDocumentKeydown(event: KeyboardEvent): void {
+diff --git a/dialectical-engine/tests/render/consent-modal-semantics.test.tsx b/dialectical-engine/tests/render/consent-modal-semantics.test.tsx
+index 60aca7da..3dfbee17 100644
+--- a/dialectical-engine/tests/render/consent-modal-semantics.test.tsx
++++ b/dialectical-engine/tests/render/consent-modal-semantics.test.tsx
+@@ -212,20 +212,87 @@ describe("consent modal semantics helper", () => {
+     expect(openSurfaceCount()).toBe(2);
+ 
+     await act(async () => {
+       pressEscape();
+     });
+ 
+     expect(secondDomClose).toHaveBeenCalledTimes(1);
+     expect(firstDomClose).toHaveBeenCalledTimes(0);
+   });
+ 
++  it("never lets a surface whose container has detached consume Escape", async () => {
++    // `topmostSurface()` compares containers by document position, and jsdom answers a
++    // comparison involving a DETACHED node with DISCONNECTED|FOLLOWING|IMPLEMENTATION_SPECIFIC
++    // in BOTH directions (measured, 37 each way) — so "above" is true whichever node is asked,
++    // and the surface iterated LAST simply wins. The detaching surface therefore mounts SECOND
++    // here, which is the arrangement that lets it capture the key; mounted first it would lose
++    // to the same coincidence and the case would pass against a module that has no guard.
++    // The reachable shape is React 19's cleanup-returning callback ref: it does NOT null the
++    // ref on detach, so a surface that stays registered while it stops rendering its container
++    // holds a stale detached node. The precondition is asserted, not assumed, so the case
++    // cannot pass through the `null` branch that already skips such an entry.
++    const staleClose = vi.fn();
++    const liveClose = vi.fn();
++    const captured: { ref: { current: HTMLElement | null } | null } = { ref: null };
++
++    function DetachingSurface({ mounted }: { mounted: boolean }): ReactNode {
++      const containerRef = useRef<HTMLElement | null>(null);
++      const initialFocusRef = useRef<HTMLElement | null>(null);
++      captured.ref = containerRef;
++      useModalSurface(true, { containerRef, initialFocusRef, onClose: staleClose });
++      if (!mounted) return null;
++      return (
++        <div
++          data-surface="stale"
++          ref={(node) => {
++            containerRef.current = node;
++            return () => {};
++          }}
++        >
++          <button
++            type="button"
++            ref={(node) => {
++              initialFocusRef.current = node;
++            }}
++          >
++            close-stale
++          </button>
++        </div>
++      );
++    }
++
++    function Harness({ mounted }: { mounted: boolean }): ReactNode {
++      return (
++        <>
++          <TestSurface open name="live" onClose={liveClose} />
++          <DetachingSurface mounted={mounted} />
++        </>
++      );
++    }
++
++    await render(<Harness mounted />);
++    expect(openSurfaceCount()).toBe(2);
++    await render(<Harness mounted={false} />);
++    expect(openSurfaceCount()).toBe(2);
++
++    const stale = captured.ref!.current;
++    expect(stale, "the stale surface must still hold its container ref").not.toBeNull();
++    expect(stale!.isConnected).toBe(false);
++
++    await act(async () => {
++      pressEscape();
++    });
++
++    expect(liveClose).toHaveBeenCalledTimes(1);
++    expect(staleClose).toHaveBeenCalledTimes(0);
++  });
++
+   it("traps Tab inside the nested inner surface, not inside the outer one", async () => {
+     // The Tab trap reads the same "topmost" the Escape branch reads, so the nested pair must be
+     // asserted for Tab too: focus sitting in the outer surface is pulled into the inner one.
+     await render(
+       <TestSurface open name="outer" onClose={vi.fn()} buttons={["outer-2"]}>
+         <TestSurface open name="inner" onClose={vi.fn()} />
+       </TestSurface>
+     );
+ 
+     await act(async () => {
+@@ -343,20 +410,46 @@ describe("consent modal semantics helper", () => {
+     );
+ 
+     await act(async () => {
+       labelled("close-only").focus();
+       pressTab();
+     });
+ 
+     expect(document.activeElement).toBe(labelled("last"));
+   });
+ 
++  it("advances past a control inside a disabled fieldset, so Tab is not a dead key", async () => {
++    // `button:not([disabled])` MATCHES this button — the `disabled` attribute is on the
++    // fieldset, not on the button — so the attribute filter keeps it, while `focus()` refuses
++    // it in jsdom exactly as a real browser does (HTML: a descendant of a disabled fieldset is
++    // itself disabled). It is the SECOND unfocusable shape this environment can discriminate,
++    // and it is the one that pins the advance loop: without that loop, the trap preventDefaults
++    // Tab, calls focus() on a control the platform refuses, and Tab becomes a dead key.
++    await render(
++      <TestSurface open name="only" onClose={vi.fn()}>
++        <fieldset disabled>
++          <button type="button">locked</button>
++        </fieldset>
++        <button type="button">next-real</button>
++      </TestSurface>
++    );
++
++    expect(labelled("locked").matches('button:not([disabled])')).toBe(true);
++
++    await act(async () => {
++      labelled("close-only").focus();
++      pressTab();
++    });
++
++    expect(document.activeElement).toBe(labelled("next-real"));
++  });
++
+   it("skips a hidden input, so Tab inside the surface is never a no-op", async () => {
+     // `input:not([disabled])` matches `<input type="hidden">`. focus() is a no-op on it in jsdom
+     // and in every real browser, so an unfiltered cycle preventDefaults Tab and moves nothing.
+     await render(
+       <TestSurface open name="only" onClose={vi.fn()}>
+         <input type="hidden" name="csrf" />
+         <button type="button">last</button>
+       </TestSurface>
+     );
+ 
+diff --git a/dialectical-engine/tests/render/consent-policy-modal-behaviour.test.tsx b/dialectical-engine/tests/render/consent-policy-modal-behaviour.test.tsx
+new file mode 100644
+index 00000000..07b70b44
+--- /dev/null
++++ b/dialectical-engine/tests/render/consent-policy-modal-behaviour.test.tsx
+@@ -0,0 +1,406 @@
++// @vitest-environment jsdom
++
++import { act, type ReactNode } from "react";
++import { createRoot, type Root } from "react-dom/client";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { PrivacyPolicyModal } from "../../apps/ui/components/consent/PrivacyPolicyModal.js";
++import { POLICY_JUMP } from "../../apps/ui/lib/privacyPolicy.js";
++
++let root: Root | null = null;
++let container: HTMLDivElement | null = null;
++
++const METRIC_KEYS = ["scrollTop", "clientHeight", "scrollHeight"] as const;
++type MetricKey = (typeof METRIC_KEYS)[number];
++
++/**
++ * The scroll metrics of the policy scroll region, driven by the test.
++ *
++ * jsdom's own `scrollTop` / `clientHeight` / `scrollHeight` are all `0`, and `0 + 0 >= 0 - 8` is
++ * TRUE — so a modal mounted with jsdom's defaults latches its gate at mount and no later
++ * `scroll` event can ever close it again. The metrics therefore have to be in place BEFORE the
++ * mount evaluation runs, which rules out `Object.defineProperty(element, …)`: the element does
++ * not exist until React has rendered it. Shadowing the three accessors on `HTMLElement.prototype`
++ * (jsdom defines them on `Element.prototype`, so these are new own properties and `delete`
++ * restores the originals exactly) puts them in place before the first render, and reading them
++ * from a mutable object means a single definition serves every case, including the latch case
++ * that has to scroll back up.
++ */
++let metrics: Record<MetricKey, number> = { scrollTop: 0, clientHeight: 200, scrollHeight: 500 };
++
++function stubScrollMetrics(): void {
++  for (const key of METRIC_KEYS) {
++    Object.defineProperty(HTMLElement.prototype, key, {
++      configurable: true,
++      get(this: HTMLElement): number {
++        return this.classList.contains("policyBody") ? metrics[key] : 0;
++      }
++    });
++  }
++}
++
++function restoreScrollMetrics(): void {
++  for (const key of METRIC_KEYS) {
++    delete (HTMLElement.prototype as unknown as Record<string, unknown>)[key];
++  }
++}
++
++async function settle(): Promise<void> {
++  await act(async () => {
++    await Promise.resolve();
++    await Promise.resolve();
++  });
++}
++
++async function render(element: ReactNode): Promise<void> {
++  await act(async () => {
++    root!.render(element);
++  });
++  await settle();
++}
++
++function dialog(): HTMLElement {
++  return document.querySelector('[role="dialog"]') as HTMLElement;
++}
++
++function scrollRegion(): HTMLElement {
++  return document.querySelector(".policyBody") as HTMLElement;
++}
++
++/** The single control whose own text is exactly `label`. */
++function control(label: string): HTMLButtonElement {
++  const found = [...dialog().querySelectorAll<HTMLButtonElement>("button")].filter(
++    (button) => button.textContent === label
++  );
++  expect(found.length, `expected exactly one control labelled ${label}`).toBe(1);
++  return found[0]!;
++}
++
++function acknowledgeButton(): HTMLButtonElement {
++  return control("I have read it");
++}
++
++/**
++ * jsdom 30.0.1 has no `Element.prototype.scrollIntoView` at all — the property does not exist —
++ * so the component calls it optionally and this supplies one stub per section. Stubbing per
++ * element turns "scrolling cannot be tested in jsdom" into a real assertion about WHICH target
++ * the handler resolved and with what arguments.
++ */
++function stubScrollIntoView(): Map<string, ReturnType<typeof vi.fn>> {
++  const stubs = new Map<string, ReturnType<typeof vi.fn>>();
++  for (const section of dialog().querySelectorAll<HTMLElement>('[id^="policy-section-"]')) {
++    const stub = vi.fn();
++    (section as unknown as { scrollIntoView: unknown }).scrollIntoView = stub;
++    stubs.set(section.id, stub);
++  }
++  expect(stubs.size).toBe(11);
++  return stubs;
++}
++
++async function dispatchOn(target: EventTarget, type: string): Promise<void> {
++  await act(async () => {
++    target.dispatchEvent(new Event(type, { bubbles: false }));
++  });
++}
++
++describe("privacy policy modal — behaviour", () => {
++  beforeEach(() => {
++    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
++    metrics = { scrollTop: 0, clientHeight: 200, scrollHeight: 500 };
++    stubScrollMetrics();
++    container = document.createElement("div");
++    document.body.append(container);
++    root = createRoot(container);
++  });
++
++  afterEach(async () => {
++    if (root !== null) await act(async () => root!.unmount());
++    root = null;
++    container?.remove();
++    container = null;
++    document.body.innerHTML = "";
++    restoreScrollMetrics();
++    vi.unstubAllGlobals();
++    vi.restoreAllMocks();
++  });
++
++  // S02-S40 — the boundary: `scrollHeight - 9` is not reached, `scrollHeight - 8` is. The two
++  // cases are the 291/292 pair: 291 + 200 = 491 < 492, and 292 + 200 = 492 >= 500 - 8. Together
++  // they discriminate `>=` from `>`, and both from any other slack.
++  it("keeps the acknowledgement disabled one pixel short of the end", async () => {
++    metrics = { scrollTop: 291, clientHeight: 200, scrollHeight: 500 };
++    await render(
++      <PrivacyPolicyModal open mode="consent" onClose={vi.fn()} onAcknowledge={vi.fn()} />
++    );
++
++    await dispatchOn(scrollRegion(), "scroll");
++
++    expect(acknowledgeButton().disabled).toBe(true);
++  });
++
++  it("opens the gate at exactly scrollHeight - 8", async () => {
++    metrics = { scrollTop: 291, clientHeight: 200, scrollHeight: 500 };
++    await render(
++      <PrivacyPolicyModal open mode="consent" onClose={vi.fn()} onAcknowledge={vi.fn()} />
++    );
++    expect(acknowledgeButton().disabled).toBe(true);
++
++    metrics.scrollTop = 292;
++    await dispatchOn(scrollRegion(), "scroll");
++
++    expect(acknowledgeButton().disabled).toBe(false);
++  });
++
++  // S02-S41 — the gate latches: scrolling back to the top leaves it enabled.
++  it("keeps the gate open after the reader scrolls back to the top", async () => {
++    metrics = { scrollTop: 291, clientHeight: 200, scrollHeight: 500 };
++    await render(
++      <PrivacyPolicyModal open mode="consent" onClose={vi.fn()} onAcknowledge={vi.fn()} />
++    );
++    metrics.scrollTop = 292;
++    await dispatchOn(scrollRegion(), "scroll");
++    expect(acknowledgeButton().disabled).toBe(false);
++
++    metrics.scrollTop = 0;
++    await dispatchOn(scrollRegion(), "scroll");
++
++    expect(acknowledgeButton().disabled).toBe(false);
++  });
++
++  // S02-S42 — a policy short enough to need no scrolling enables the button at mount.
++  it("enables the acknowledgement at mount when the policy needs no scrolling", async () => {
++    metrics = { scrollTop: 0, clientHeight: 200, scrollHeight: 200 };
++
++    await render(
++      <PrivacyPolicyModal open mode="consent" onClose={vi.fn()} onAcknowledge={vi.fn()} />
++    );
++
++    // No event of any kind is dispatched: the criterion is evaluated once at mount and no
++    // special case is written for a short policy.
++    expect(acknowledgeButton().disabled).toBe(false);
++  });
++
++  // S02-S43 — the criterion is re-evaluated on `resize`.
++  it("re-evaluates the criterion on a window resize, with no scroll event", async () => {
++    metrics = { scrollTop: 291, clientHeight: 200, scrollHeight: 500 };
++    await render(
++      <PrivacyPolicyModal open mode="consent" onClose={vi.fn()} onAcknowledge={vi.fn()} />
++    );
++    expect(acknowledgeButton().disabled).toBe(true);
++
++    // A wider window shows more of the policy at once: the same scrollTop now reaches the end.
++    metrics.clientHeight = 300;
++    await dispatchOn(window, "resize");
++
++    expect(acknowledgeButton().disabled).toBe(false);
++  });
++
++  // S02-S44 — while disabled the button is announced as disabled and says why; no tooltip.
++  it("announces the disabled acknowledgement and describes why, without a tooltip", async () => {
++    metrics = { scrollTop: 0, clientHeight: 200, scrollHeight: 500 };
++    await render(
++      <PrivacyPolicyModal open mode="consent" onClose={vi.fn()} onAcknowledge={vi.fn()} />
++    );
++
++    const button = acknowledgeButton();
++    expect(button.disabled).toBe(true);
++    expect(button.getAttribute("aria-disabled")).toBe("true");
++    expect(button.hasAttribute("title")).toBe(false);
++
++    const describedBy = button.getAttribute("aria-describedby");
++    expect(describedBy).not.toBeNull();
++    const description = document.getElementById(describedBy!);
++    expect(description, `aria-describedby="${describedBy}" resolves to nothing`).not.toBeNull();
++    expect(description!.textContent).toBe("Scroll to the end of the policy to continue.");
++  });
++
++  // S02-S45 — the scroll region is keyboard-reachable and named.
++  it("makes the scroll region focusable and gives it its own accessible name", async () => {
++    await render(<PrivacyPolicyModal open mode="consent" onClose={vi.fn()} />);
++
++    const region = scrollRegion();
++    // A keyboard-only reader can only satisfy the scroll gate by focusing this region and
++    // paging it, and the name says what is INSIDE it — the dialog's own name is already its
++    // title, `What we store, and why`.
++    expect(region.getAttribute("tabindex")).toBe("0");
++    expect(region.getAttribute("aria-label")).toBe("Privacy Policy text");
++  });
++
++  // S02-S46 — the modal takes its focus behaviour from the helper, and only from it.
++  it("takes initial focus, the Tab cycle, focus return and its one listener from the helper", async () => {
++    // A short policy, so the acknowledgement is enabled and is therefore the LAST focusable.
++    metrics = { scrollTop: 0, clientHeight: 200, scrollHeight: 200 };
++    const added = vi.spyOn(document, "addEventListener");
++    const keydownRegistrations = (): number =>
++      added.mock.calls.filter((call) => call[0] === "keydown").length;
++
++    function Harness({ open }: { open: boolean }): ReactNode {
++      return (
++        <>
++          <button type="button" id="opener">
++            open the policy
++          </button>
++          <PrivacyPolicyModal open={open} mode="consent" onClose={vi.fn()} onAcknowledge={vi.fn()} />
++        </>
++      );
++    }
++
++    await render(<Harness open={false} />);
++    const opener = document.querySelector<HTMLButtonElement>("#opener")!;
++    await act(async () => {
++      opener.focus();
++    });
++    expect(document.activeElement).toBe(opener);
++
++    await render(<Harness open />);
++    const close = dialog().querySelector<HTMLButtonElement>(".policyClose")!;
++    expect(document.activeElement).toBe(close);
++
++    // Exactly ONE document-level keydown listener exists for this surface: the helper's. A modal
++    // that installed its own Esc handler as well would register a second.
++    expect(keydownRegistrations()).toBe(1);
++
++    const last = acknowledgeButton();
++    expect(last.disabled).toBe(false);
++    await act(async () => {
++      last.focus();
++      document.dispatchEvent(
++        new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true })
++      );
++    });
++    expect(document.activeElement).toBe(close);
++
++    await render(<Harness open={false} />);
++    expect(document.activeElement).toBe(opener);
++  });
++
++  // S02-S47 — `I have read it` acknowledges; `×`, Esc and backdrop only close. Four cases: the
++  // box can be ticked by the acknowledgement path and by nothing else.
++  it("acknowledges and then closes when I have read it is clicked", async () => {
++    metrics = { scrollTop: 0, clientHeight: 200, scrollHeight: 200 };
++    const calls: string[] = [];
++    const onClose = vi.fn(() => calls.push("close"));
++    const onAcknowledge = vi.fn(() => calls.push("acknowledge"));
++
++    await render(
++      <PrivacyPolicyModal open mode="consent" onClose={onClose} onAcknowledge={onAcknowledge} />
++    );
++    expect(acknowledgeButton().disabled).toBe(false);
++
++    await act(async () => {
++      acknowledgeButton().click();
++    });
++
++    expect(onAcknowledge).toHaveBeenCalledTimes(1);
++    expect(onClose).toHaveBeenCalledTimes(1);
++    expect(calls).toEqual(["acknowledge", "close"]);
++  });
++
++  it("closes without acknowledging when the × is clicked", async () => {
++    metrics = { scrollTop: 0, clientHeight: 200, scrollHeight: 200 };
++    const onClose = vi.fn();
++    const onAcknowledge = vi.fn();
++
++    await render(
++      <PrivacyPolicyModal open mode="consent" onClose={onClose} onAcknowledge={onAcknowledge} />
++    );
++    await act(async () => {
++      dialog().querySelector<HTMLButtonElement>(".policyClose")!.click();
++    });
++
++    expect(onClose).toHaveBeenCalledTimes(1);
++    expect(onAcknowledge).toHaveBeenCalledTimes(0);
++  });
++
++  it("closes without acknowledging when Escape is pressed", async () => {
++    metrics = { scrollTop: 0, clientHeight: 200, scrollHeight: 200 };
++    const onClose = vi.fn();
++    const onAcknowledge = vi.fn();
++
++    await render(
++      <PrivacyPolicyModal open mode="consent" onClose={onClose} onAcknowledge={onAcknowledge} />
++    );
++    await act(async () => {
++      document.dispatchEvent(
++        new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })
++      );
++    });
++
++    expect(onClose).toHaveBeenCalledTimes(1);
++    expect(onAcknowledge).toHaveBeenCalledTimes(0);
++  });
++
++  it("closes without acknowledging when the backdrop itself is clicked", async () => {
++    metrics = { scrollTop: 0, clientHeight: 200, scrollHeight: 200 };
++    const onClose = vi.fn();
++    const onAcknowledge = vi.fn();
++
++    await render(
++      <PrivacyPolicyModal open mode="consent" onClose={onClose} onAcknowledge={onAcknowledge} />
++    );
++    const scrim = document.querySelector<HTMLElement>(".policyScrim")!;
++
++    // A click that lands on the CARD must not close: the backdrop route is the scrim itself.
++    await act(async () => {
++      dialog().click();
++    });
++    expect(onClose).toHaveBeenCalledTimes(0);
++
++    await act(async () => {
++      scrim.click();
++    });
++
++    expect(onClose).toHaveBeenCalledTimes(1);
++    expect(onAcknowledge).toHaveBeenCalledTimes(0);
++  });
++
++  // S02-S48 — a pill click resolves its target and asks it to scroll, honouring reduced motion.
++  // `Element.prototype.scrollIntoView` does not exist in jsdom 30.0.1, so the component calls it
++  // optionally and the test supplies the stub. This asserts the CALL — which target was resolved
++  // and with what arguments — and never that anything scrolled; the scroll is V's step 12.
++  it("asks exactly the mapped section to scroll, smoothly, and asks no other section", async () => {
++    await render(<PrivacyPolicyModal open mode="consent" onClose={vi.fn()} />);
++
++    // FIRST, with NO stub in place: a pill click must not throw. This is the arm that pins the
++    // `?.` guard — every other assertion in this case installs a stub, and an UNGUARDED
++    // `section.scrollIntoView(…)` passes them all while throwing a TypeError in any consumer
++    // that has not stubbed it (C7's wiring tests, for one).
++    await act(async () => {
++      dialog().querySelector<HTMLButtonElement>('button[data-jump="policy-section-01"]')!.click();
++    });
++
++    const stubs = stubScrollIntoView();
++
++    await act(async () => {
++      for (const pill of [...dialog().querySelectorAll<HTMLButtonElement>("button[data-jump]")]) {
++        pill.click();
++      }
++    });
++
++    const targets = new Set(POLICY_JUMP.map((jump) => jump.target));
++    for (const [id, stub] of stubs) {
++      expect(stub.mock.calls.length, `${id} was asked to scroll the wrong number of times`).toBe(
++        targets.has(id) ? 1 : 0
++      );
++      for (const call of stub.mock.calls) {
++        expect(call[0]).toEqual({ block: "start", behavior: "smooth" });
++      }
++    }
++    // The three sections with no pill (02, 09, 10) are the zero half of that assertion.
++    expect(stubs.size - targets.size).toBe(3);
++  });
++
++  it("asks for no animation when the reader has asked for reduced motion", async () => {
++    vi.stubGlobal("matchMedia", (query: string) => ({ matches: true, media: query }));
++    await render(<PrivacyPolicyModal open mode="consent" onClose={vi.fn()} />);
++    const stubs = stubScrollIntoView();
++
++    await act(async () => {
++      dialog().querySelector<HTMLButtonElement>('button[data-jump="policy-section-05"]')!.click();
++    });
++
++    expect(stubs.get("policy-section-05")!.mock.calls[0]![0]).toEqual({
++      block: "start",
++      behavior: "auto"
++    });
++  });
++});
+diff --git a/dialectical-engine/tests/render/consent-policy-modal-render.test.tsx b/dialectical-engine/tests/render/consent-policy-modal-render.test.tsx
+new file mode 100644
+index 00000000..845346df
+--- /dev/null
++++ b/dialectical-engine/tests/render/consent-policy-modal-render.test.tsx
+@@ -0,0 +1,244 @@
++// @vitest-environment jsdom
++
++import { act, type ReactNode } from "react";
++import { createRoot, type Root } from "react-dom/client";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import {
++  PrivacyPolicyModal,
++  type PrivacyPolicyModalProps
++} from "../../apps/ui/components/consent/PrivacyPolicyModal.js";
++import { POLICY_JUMP, POLICY_SECTIONS } from "../../apps/ui/lib/privacyPolicy.js";
++
++let root: Root | null = null;
++let container: HTMLDivElement | null = null;
++
++async function settle(): Promise<void> {
++  await act(async () => {
++    await Promise.resolve();
++    await Promise.resolve();
++  });
++}
++
++async function render(element: ReactNode): Promise<void> {
++  await act(async () => {
++    root!.render(element);
++  });
++  await settle();
++}
++
++/** Every element inside the dialog whose own text is exactly `label`. */
++function textControls(dialog: HTMLElement, label: string): HTMLElement[] {
++  return [...dialog.querySelectorAll<HTMLElement>("*")].filter(
++    (element) => element.textContent === label
++  );
++}
++
++describe("privacy policy modal — rendered", () => {
++  beforeEach(() => {
++    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
++    container = document.createElement("div");
++    document.body.append(container);
++    root = createRoot(container);
++  });
++
++  afterEach(async () => {
++    if (root !== null) await act(async () => root!.unmount());
++    root = null;
++    container?.remove();
++    container = null;
++    document.body.innerHTML = "";
++    vi.unstubAllGlobals();
++    vi.restoreAllMocks();
++  });
++
++  // S02-S33 — the prop type has exactly four members and `open: false` renders nothing.
++  it("renders nothing at all when open is false", async () => {
++    await render(
++      <PrivacyPolicyModal open={false} mode="consent" onClose={vi.fn()} onAcknowledge={vi.fn()} />
++    );
++
++    expect(container!.childNodes.length).toBe(0);
++  });
++
++  // S02-S34 — scrim, bezel, core, gold tab, and the three dialog ARIA attributes.
++  it("announces itself as one dialog whose name resolves to its own title", async () => {
++    await render(<PrivacyPolicyModal open mode="consent" onClose={vi.fn()} />);
++
++    const scrims = document.querySelectorAll(".policyScrim");
++    expect(scrims.length).toBe(1);
++    const dialogs = scrims[0]!.querySelectorAll('[role="dialog"]');
++    expect(dialogs.length).toBe(1);
++    const dialog = dialogs[0] as HTMLElement;
++
++    expect(dialog.getAttribute("aria-modal")).toBe("true");
++    const labelledBy = dialog.getAttribute("aria-labelledby");
++    expect(labelledBy).not.toBeNull();
++    const title = document.getElementById(labelledBy!);
++    expect(title, `aria-labelledby="${labelledBy}" resolves to nothing`).not.toBeNull();
++    expect(title!.textContent).toBe("What we store, and why");
++
++    expect(dialog.querySelectorAll(".policyCore .policyTab").length).toBe(1);
++  });
++
++  // S02-S35 — header copy is byte-exact and `×` is labelled.
++  it("shows the header copy byte-exact and labels the close control", async () => {
++    await render(<PrivacyPolicyModal open mode="consent" onClose={vi.fn()} />);
++    const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
++
++    expect(dialog.querySelector(".policyEyebrow")!.textContent).toBe(
++      "PRIVACY POLICY · v2.1 · EFFECTIVE 12 AUG 2026"
++    );
++    expect(dialog.querySelector(".policyTitle")!.textContent).toBe("What we store, and why");
++    expect(dialog.querySelector(".policyLede")!.textContent).toBe(
++      "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Eleven sections — scroll to the end."
++    );
++
++    const closers = [...dialog.querySelectorAll("*")].filter(
++      (element) => element.getAttribute("aria-label") === "Close"
++    );
++    expect(closers.length).toBe(1);
++    expect(closers[0]!.textContent).toBe("×");
++  });
++
++  // S02-S36 — eight pills render in order and every `data-jump` resolves inside the modal.
++  it("renders the eight jump pills in the design's order, each resolving to one section", async () => {
++    await render(<PrivacyPolicyModal open mode="consent" onClose={vi.fn()} />);
++    const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
++
++    const pills = [...dialog.querySelectorAll<HTMLButtonElement>("button[data-jump]")];
++    expect(pills.length).toBe(8);
++    expect(pills.map((pill) => pill.textContent)).toEqual(POLICY_JUMP.map((jump) => jump.label));
++
++    for (const pill of pills) {
++      expect(pill.getAttribute("type")).toBe("button");
++      const target = pill.dataset.jump!;
++      const resolved = [...dialog.querySelectorAll("*")].filter(
++        (element) => element.id === target
++      );
++      expect(resolved.length, `data-jump="${target}" resolves to ${resolved.length} elements`).toBe(
++        1
++      );
++    }
++  });
++
++  // S02-S37 — eleven sections with number, title, body, bullets and their accent.
++  it("renders the eleven sections in order, with their bullets and their accent tokens", async () => {
++    await render(<PrivacyPolicyModal open mode="consent" onClose={vi.fn()} />);
++    const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
++
++    const sections = [...dialog.querySelectorAll<HTMLElement>('[id^="policy-section-"]')];
++    expect(sections.length).toBe(11);
++    expect(sections.map((section) => section.id)).toEqual([
++      "policy-section-01",
++      "policy-section-02",
++      "policy-section-03",
++      "policy-section-04",
++      "policy-section-05",
++      "policy-section-06",
++      "policy-section-07",
++      "policy-section-08",
++      "policy-section-09",
++      "policy-section-10",
++      "policy-section-11"
++    ]);
++
++    expect(sections.map((section) => section.querySelector(".policySectionTitle")!.textContent)).toEqual(
++      POLICY_SECTIONS.map((section) => section.title)
++    );
++    expect(sections.map((section) => section.querySelector(".policyNo")!.textContent)).toEqual(
++      POLICY_SECTIONS.map((section) => section.no)
++    );
++    expect(sections.map((section) => section.querySelector(".policyText")!.textContent)).toEqual(
++      POLICY_SECTIONS.map((section) => section.body)
++    );
++
++    // The expected bullet total is DERIVED from the data (3 + 4 + 5), and the data's own total is
++    // then pinned at the SPEC's number, so neither a dropped bullet nor a dropped list passes.
++    const expectedBullets = POLICY_SECTIONS.reduce((total, section) => total + section.items.length, 0);
++    expect(expectedBullets).toBe(12);
++    expect(dialog.querySelectorAll(".policyItem").length).toBe(expectedBullets);
++
++    for (const [index, section] of sections.entries()) {
++      const number = section.querySelector<HTMLElement>(".policyNo")!;
++      const token = POLICY_SECTIONS[index]!.accent;
++      expect(number.dataset.accent).toBe(token);
++      expect(number.style.getPropertyValue("--accent")).toBe(`var(${token})`);
++    }
++  });
++
++  // S02-S38 — footer contact line, end marker last in the scroll region, and NO `Download PDF`.
++  it("ends the scroll region with the end marker, keeps the contact line, and offers no PDF", async () => {
++    await render(<PrivacyPolicyModal open mode="consent" onClose={vi.fn()} />);
++    const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
++
++    const contacts = [...dialog.querySelectorAll("*")].filter(
++      (element) => element.textContent === "Questions: privacy@dezbatere.ro"
++    );
++    expect(contacts.length).toBeGreaterThanOrEqual(1);
++
++    const scrollRegion = dialog.querySelector(".policyBody")!;
++    const last = scrollRegion.lastElementChild!;
++    expect(last.textContent).toBe("END OF POLICY · GDPR (EU) 2016/679 · v2.1");
++
++    // The honesty rule: this repository generates no policy PDF, so no control claims one.
++    const pdf = [...dialog.querySelectorAll("*")].filter(
++      (element) => element.textContent?.trim() === "Download PDF"
++    );
++    expect(pdf.length).toBe(0);
++  });
++
++  // S02-S39 — `mode="read"` and `mode="consent"` differ in exactly the specified way.
++  it("offers Close and no acknowledgement in read mode", async () => {
++    const onAcknowledge = vi.fn();
++    await render(
++      <PrivacyPolicyModal open mode="read" onClose={vi.fn()} onAcknowledge={onAcknowledge} />
++    );
++    const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
++
++    expect(textControls(dialog, "I have read it").length).toBe(0);
++    expect(textControls(dialog, "Close").length).toBe(1);
++    expect(
++      [...dialog.querySelectorAll("*")].filter(
++        (element) => element.textContent === "Questions: privacy@dezbatere.ro"
++      ).length
++    ).toBeGreaterThanOrEqual(1);
++
++    const footerControls = [
++      ...dialog.querySelectorAll<HTMLElement>(".policyFoot button, .policyFoot [role='button']")
++    ];
++    expect(footerControls.length).toBeGreaterThanOrEqual(1);
++    await act(async () => {
++      for (const control of footerControls) control.click();
++    });
++
++    expect(onAcknowledge).toHaveBeenCalledTimes(0);
++  });
++
++  it("offers the acknowledgement and no Close control in consent mode", async () => {
++    await render(<PrivacyPolicyModal open mode="consent" onClose={vi.fn()} />);
++    const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
++
++    expect(textControls(dialog, "I have read it").length).toBe(1);
++    expect(textControls(dialog, "Close").length).toBe(0);
++  });
++});
++
++// S02-S33, the two type-level pins. `onAcknowledge` is OPTIONAL, so this assignment compiles:
++const optionalAcknowledge: PrivacyPolicyModalProps = {
++  open: true,
++  mode: "read",
++  onClose: () => {}
++};
++
++// ...and the type is CLOSED, so a fifth member does not. The `@ts-expect-error` itself becomes
++// an error if the assignment ever starts compiling, which is what pins the closure.
++const fifthMember: PrivacyPolicyModalProps = {
++  open: true,
++  mode: "read",
++  onClose: () => {},
++  // @ts-expect-error - the prop type is closed: exactly four members, no fifth
++  downloadPdf: () => {}
++};
++
++void optionalAcknowledge;
++void fifthMember;

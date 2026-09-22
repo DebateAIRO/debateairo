@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_GAP",
+  "ticket": "t_2c5f0117",
+  "reviewer": "/root/baseline",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-17",
+  "stableProductRevision": "479763da1f586a217f36204cc81138aaa81c6f81",
+  "sourceRevision": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+  "verdict": "GAPS_CONFIRMED_IMPLEMENTATION_NEEDED",
+  "checkpointVerdict": false,
+  "heavyLease": "NOT_REQUESTED_OR_HELD",
+  "gitLease": "NOT_REQUESTED_OR_HELD",
+  "receiptSelfExcluded": true,
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_GAP.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_GAP.md",
+      "sha256": "16615571383048577c5da8b9247eddf24c9e557066c16f7e948ea4f89e8376a1",
+      "bytes": 12792
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_GAP.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_GAP.md",
+      "sha256": "7488878c331d22a4598658abbb6083eeebca95af74a779efd1f8d0ba51bc10f9",
+      "bytes": 4499
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_GAP-stable-files.sha256",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/GUIDE_GAP-stable-files.sha256",
+      "sha256": "f9f5e1402caeebfd31a70557a95cb504b485d5a4743d24cced2e81c40f9f0b02",
+      "bytes": 2154
+    }
+  ],
+  "limits": [
+    "No private user/account/content data was read.",
+    "No active FEEDBACK_FIX3 author output was consumed or judged.",
+    "No product/source/Git/index edit, test, build, install, service, browser, HTTP, model, auth or reset traffic occurred.",
+    "The unresolved Forgot destination was not investigated or guessed.",
+    "This is a requirements gap assessment, not a CP1 verdict or acceptance."
+  ],
+  "usage": "UNAVAILABLE"
+}

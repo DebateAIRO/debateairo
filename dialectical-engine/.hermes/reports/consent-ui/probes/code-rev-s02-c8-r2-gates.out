@@ -1,0 +1,47 @@
+##### GATES (AT-0dc569e9) — /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-s02-c8-r2/dialectical-engine — HEAD 0dc569e9
+G1 typecheck exit=1 diagnostics=8 outside-pin=0
+G1 diag: tests/unit/s14-ui.test.ts(19,8): error TS2307: Cannot find module '../../web/lib/v3Presentation.js' or its corresponding type declarations.
+G1 diag: tests/unit/s14-ui.test.ts(122,38): error TS18046: 'label' is of type 'unknown'.
+G1 diag: tests/unit/s14-ui.test.ts(128,71): error TS18046: 'label' is of type 'unknown'.
+G1 diag: tests/unit/s14-ui.test.ts(199,18): error TS2339: Property 'nodes' does not exist on type '{ event_id: string; event_type: "graph.cycle_refused" | "graph.edge_added" | "honesty.abstention_typed" | "honesty.budget_skip_marked" | "honesty.fallback_labeled" | "honesty.investigation_gap_opened" | ... 22 more ... | "serve.recompose_or_defect"; run_ref: string; subject_ref?: string | ... 1 more ... | undefined;...'.
+G1 diag: tests/unit/s14-ui.test.ts(200,18): error TS2339: Property 'placeholderEdges' does not exist on type '{ event_id: string; event_type: "graph.cycle_refused" | "graph.edge_added" | "honesty.abstention_typed" | "honesty.budget_skip_marked" | "honesty.fallback_labeled" | "honesty.investigation_gap_opened" | ... 22 more ... | "serve.recompose_or_defect"; run_ref: string; subject_ref?: string | ... 1 more ... | undefined;...'.
+G1 diag: tests/unit/s14-ui.test.ts(230,58): error TS2307: Cannot find module '../../web/lib/api.js' or its corresponding type declarations.
+G1 diag: tests/unit/s14-ui.test.ts(232,55): error TS7006: Parameter 'input' implicitly has an 'any' type.
+G1 diag: tests/unit/s14-ui.test.ts(232,62): error TS7006: Parameter 'init' implicitly has an 'any' type.
+G2 t9 exit=1
+G2  Test Files  1 failed (1)
+G2       Tests  2 failed | 6 passed (8)
+G2 hit-list elements:
+G2   +   "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-s02-c8-r2/dialectical-engine/apps/ui/app/globals.css:6096:background: color-mix(in srgb, #0a0806 32%, transparent);",
+G2 hit-list count: 1
+G2 failing test names:
+G2    × tests/unit/t9-mode-tokens.test.ts > T9-C3 mode control and document guard > renders one accessible toggle that reads the document mode, flips it, and persists it 34ms
+G2    × tests/unit/t9-mode-tokens.test.ts > T9-C3 mode control and document guard > leaves no mode-inert colour literal in the four Wave-0 product files 5ms
+G2    FAIL  tests/unit/t9-mode-tokens.test.ts > T9-C3 mode control and document guard > renders one accessible toggle that reads the document mode, flips it, and persists it
+G2    FAIL  tests/unit/t9-mode-tokens.test.ts > T9-C3 mode control and document guard > leaves no mode-inert colour literal in the four Wave-0 product files
+G3 tests/unit/pda-s03-keyboard-accessibility.test.ts        Tests  2 failed | 3 passed (5)
+G3   tests/unit/pda-s03-keyboard-accessibility.test.ts ::  × tests/unit/pda-s03-keyboard-accessibility.test.ts > public debate navigation keyboard accessibility > computes a grouped control treatment and a non-colour-only current state for tab=yours 129ms
+G3   tests/unit/pda-s03-keyboard-accessibility.test.ts ::  × tests/unit/pda-s03-keyboard-accessibility.test.ts > public debate navigation keyboard accessibility > computes a grouped control treatment and a non-colour-only current state for tab=public 53ms
+G3   tests/unit/pda-s03-keyboard-accessibility.test.ts ::  FAIL  tests/unit/pda-s03-keyboard-accessibility.test.ts > public debate navigation keyboard accessibility > computes a grouped control treatment and a non-colour-only current state for tab=yours
+G3   tests/unit/pda-s03-keyboard-accessibility.test.ts ::  FAIL  tests/unit/pda-s03-keyboard-accessibility.test.ts > public debate navigation keyboard accessibility > computes a grouped control treatment and a non-colour-only current state for tab=public
+G3 tests/unit/v2ui-pages.test.ts        Tests  5 failed | 36 passed (41)
+G3   tests/unit/v2ui-pages.test.ts ::  × tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps > kills MUT-A: deleting the V3ScoreBadges JSX render site 4ms
+G3   tests/unit/v2ui-pages.test.ts ::  × tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps > kills MUT-C: deleting the maker meta line from the contentful node header 0ms
+G3   tests/unit/v2ui-pages.test.ts ::  × tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps > uses DR-160 content-aware overflow instead of a fixed collapse breakpoint 3ms
+G3   tests/unit/v2ui-pages.test.ts ::  × tests/unit/v2ui-pages.test.ts > UI-02d — every non-canvas maker surface preserves its recorded maker prop > pins tree, thread, outline, split, map, and drawer at all eight call sites 9ms
+G3   tests/unit/v2ui-pages.test.ts ::  × tests/unit/v2ui-pages.test.ts > XREV-01 — node review uses the existing V2 card and drawer vocabulary > shows typed review outcome and reviewer house on cards, including honest absence 2ms
+G3   tests/unit/v2ui-pages.test.ts ::  FAIL  tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps > kills MUT-A: deleting the V3ScoreBadges JSX render site
+G3   tests/unit/v2ui-pages.test.ts ::  FAIL  tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps > kills MUT-C: deleting the maker meta line from the contentful node header
+G3   tests/unit/v2ui-pages.test.ts ::  FAIL  tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps > uses DR-160 content-aware overflow instead of a fixed collapse breakpoint
+G3   tests/unit/v2ui-pages.test.ts ::  FAIL  tests/unit/v2ui-pages.test.ts > UI-02d — every non-canvas maker surface preserves its recorded maker prop > pins tree, thread, outline, split, map, and drawer at all eight call sites
+G3   tests/unit/v2ui-pages.test.ts ::  FAIL  tests/unit/v2ui-pages.test.ts > XREV-01 — node review uses the existing V2 card and drawer vocabulary > shows typed review outcome and reviewer house on cards, including honest absence
+G3 tests/architecture/role-token-map.test.ts        Tests  3 failed | 46 passed (49)
+G3   tests/architecture/role-token-map.test.ts ::  × tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > 'DebateMap root hub' binds its 'reasoning accent' role 2ms
+G3   tests/architecture/role-token-map.test.ts ::  × tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > 'DebateCanvas agreed review mark' binds its 'agreed review verdict' role 0ms
+G3   tests/architecture/role-token-map.test.ts ::  × tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > 'DebateCanvas disputed review mark' binds its 'disputed review verdict' role 0ms
+G3   tests/architecture/role-token-map.test.ts ::  FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > 'DebateMap root hub' binds its 'reasoning accent' role
+G3   tests/architecture/role-token-map.test.ts ::  FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > 'DebateCanvas agreed review mark' binds its 'agreed review verdict' role
+G3   tests/architecture/role-token-map.test.ts ::  FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > 'DebateCanvas disputed review mark' binds its 'disputed review verdict' role
+G4 tests/render/auth-flow-integration.test.tsx        Tests  18 passed (18)
+G4 tests/unit/v2ui-node-runner.test.ts        Tests  2 passed (2)
+##### END GATES (AT-0dc569e9)

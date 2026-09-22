@@ -1,0 +1,9 @@
+{
+  "stage": "administrative freeze path allowlist",
+  "error": "one referenced public product loader source lies outside mission roots",
+  "outside": [
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/apps/runner/src/dev-api-process.ts"
+  ],
+  "result": "No freeze/dispatch occurred; existing ready ticket and input index retained. Source remains bound by exact clean product revision and input hash, never staged into mission-only freeze.",
+  "privateSourceContentsRead": false
+}
