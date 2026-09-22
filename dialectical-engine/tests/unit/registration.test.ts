@@ -361,6 +361,47 @@ describe("S3 ruled authentication policy", () => {
     }
   });
 
+  it("S3c B4 refuses a runtime measurement that does not derive from its own curve (V-25)", () => {
+    // The refinements above are fail-closed CONTROLS, so each one is shown to
+    // bite. A measurement filed under the wrong runtime, or a ceiling somebody
+    // typed rather than derived, would otherwise parse member by member and
+    // then hand a host a bound that was never measured for it.
+    const sealedEntry = RSS_MEASUREMENT_VERSIONS!.by_runtime["node_v22.23.1_darwin_arm64"]!;
+    const republished = (versions: unknown) => AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS
+      .map((row) => row.rowKey !== "rateLimitPolicy" ? row : {
+        ...row,
+        value: {
+          ...row.value,
+          sketch_design: {
+            ...(row.value as { sketch_design: Readonly<Record<string, unknown>> }).sketch_design,
+            isolated_limiter_resident_measurement_versions: versions
+          }
+        }
+      });
+    const wrap = (by_runtime: Record<string, unknown>) =>
+      ({ measurement_rounding_increment_mib: 32, by_runtime });
+
+    // The control: unmodified, the deployment set resolves.
+    expect(() => authPolicyFromRegisterRows(AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS)).not.toThrow();
+
+    for (const [label, versions] of [
+      ["a key that is not a runtime", wrap({ whatever: sealedEntry })],
+      ["a measurement under another runtime's key",
+        wrap({ "node_v26.8.2_darwin_arm64": sealedEntry })],
+      ["a ceiling that is not the curve rounded up",
+        wrap({ "node_v22.23.1_darwin_arm64": { ...sealedEntry, isolated_measurement_ceiling_mib: 1_024 } })],
+      ["a 100 % figure that disagrees with its own curve",
+        wrap({ "node_v22.23.1_darwin_arm64": { ...sealedEntry, measured_100_percent_rss_mib: 1 } })],
+      ["a worst point that disagrees with the curve",
+        wrap({ "node_v22.23.1_darwin_arm64": { ...sealedEntry, max_measured_curve_rss_mib: 300, isolated_measurement_ceiling_mib: 320 } })],
+      ["an unknown extra member",
+        wrap({ "node_v22.23.1_darwin_arm64": { ...sealedEntry, sneaked: 1 } })]
+    ] as const) {
+      expect(() => authPolicyFromRegisterRows(republished(versions)), label)
+        .toThrowError(expect.objectContaining({ code: "AUTH_POLICY_INVALID" }));
+    }
+  });
+
   it.skipIf(RSS_MEASUREMENT === undefined)(
     "S3c B4 keeps the isolated production RSS curve below the published measured bound", async () => {
     const rateLimitRow = AUTH_POLICY_REGISTER_ROWS.find((row) => row.rowKey === "rateLimitPolicy")!;
