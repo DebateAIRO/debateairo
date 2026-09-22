@@ -2328,10 +2328,19 @@ export async function evaluateAskAdmission(
    * Panel discovery probes every configured vendor, and a probe is itself a
    * request to a paid gateway. Taking the money decision after it would spend
    * money to find out that no money may be spent, so the day's ceiling is the
-   * first question this function asks. The refusal travels as the typed
-   * `DAILY_COST_ENVELOPE_REACHED` the guard raised.
+   * first question this function asks.
+   *
+   * It is marked as an ask REFUSAL, like every other decision taken at this
+   * stage: the boundary answers 422 with the typed code for an `AskRefusal` and
+   * 500 INTERNAL_ERROR for anything else, so an unwrapped budget-reached ask
+   * would read to the caller — and in the operator's logs — as the engine having
+   * broken, when in fact it worked exactly as ruled.
    */
-  await settings.assertDailyCostEnvelope?.();
+  try {
+    await settings.assertDailyCostEnvelope?.();
+  } catch (error) {
+    markAskRefusal(error);
+  }
   const risk = settings.resolveRisk(ask.risk_tier, ask.tier_source, ask.tier_provenance_ref);
   const discoveredPanel = await settings.resolveDiscoveredPanel();
   const makers = Object.freeze([...new Set(discoveredPanel.map((member) => member.maker))]);

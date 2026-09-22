@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { evaluateAskAdmission, type RunCreationSettings } from "../../apps/api/src/index.js";
+import { AskRefusal, evaluateAskAdmission, type RunCreationSettings } from "../../apps/api/src/index.js";
+import { TypedDomainError } from "@debateai/kernel";
 
 /**
  * V-28 — THE CONTROLS ARE WIRED INTO BOTH SHIPPED ROOTS.
@@ -61,17 +62,19 @@ describe("V-28 a new ask passes the daily envelope before anything is resolved",
 
   it("refuses the ask, and never discovers a panel, once the day is spent", async () => {
     let panelDiscovered = false;
-    await expect(evaluateAskAdmission(settingsWith({
+    const refusal = await evaluateAskAdmission(settingsWith({
       assertDailyCostEnvelope: async () => {
-        throw Object.assign(new Error("DAILY_COST_ENVELOPE_REACHED"), {
-          code: "DAILY_COST_ENVELOPE_REACHED"
-        });
+        throw new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", "spent");
       },
       resolveDiscoveredPanel: async () => { panelDiscovered = true; return []; }
-    }), ASK)).rejects.toThrowError(
-      expect.objectContaining({ code: "DAILY_COST_ENVELOPE_REACHED" })
-    );
+    }), ASK).then(() => null, (error: unknown) => error);
 
+    // A REFUSAL, not a fault. The ask surface answers 422 with the typed code
+    // for an `AskRefusal` and 500 INTERNAL_ERROR for anything else, so a
+    // budget-reached ask that arrived here unwrapped would read to the caller —
+    // and to the operator's logs — as the engine having broken.
+    expect(refusal).toBeInstanceOf(AskRefusal);
+    expect(refusal).toMatchObject({ code: "DAILY_COST_ENVELOPE_REACHED" });
     expect(panelDiscovered).toBe(false);
   });
 
