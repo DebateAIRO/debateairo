@@ -9,6 +9,7 @@ export {
   type ChainedAgentActionResult,
 } from "./agent-action-gateway.js";
 export {
+  CHAIN_SIGNER_PROFILES,
   prepareChainedWriterSigner,
   type ChainedSignerCommitCheck,
   type ChainedSignerReadiness,

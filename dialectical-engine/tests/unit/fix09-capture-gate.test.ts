@@ -3,11 +3,7 @@ import { describe, expect, it } from "vitest";
 
 // The authority requires this executable to remain a single checked-in .mjs file.
 // @ts-expect-error TypeScript does not synthesize declarations for that boundary.
-import {
-  assertChildArgv,
-  parseGateManifest,
-  validateVitestReport,
-} from "../../tools/fix09-capture-gate.mjs";
+import { assertChildArgv, parseGateManifest, validateVitestReport } from "../../tools/fix09-capture-gate.mjs";
 
 type GateRule = Readonly<{
   child_argv: readonly string[];
