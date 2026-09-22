@@ -135,12 +135,14 @@ export const RUNNER_COMPOSITION_SEGMENT_CAP = ENGINE_COMPOSITION_SEGMENT_CAP;
 export const RUNNER_FIXED_ORGANS_PER_COMPOSITION = ENGINE_FIXED_ORGANS_PER_COMPOSITION;
 export const RUNNER_MAX_RECOMPOSE = ENGINE_MAX_RECOMPOSE;
 
+const machineIdentifierSchema = z.string().trim().regex(/^[A-Za-z0-9][A-Za-z0-9:._-]*$/u);
+
 const compositionSchema = z.object({
   segments: z.array(z.object({
-    segment_id: z.string().trim().min(1),
+    segment_id: machineIdentifierSchema,
     text: z.string().trim().min(1),
-    node_refs: z.array(z.string().trim().min(1)),
-    served_number_refs: z.array(z.string().trim().min(1))
+    node_refs: z.array(machineIdentifierSchema),
+    served_number_refs: z.array(machineIdentifierSchema)
   }).strict()).min(1).max(RUNNER_COMPOSITION_SEGMENT_CAP, "Composer output exceeds the engine segment cap")
 }).strict();
 // T9 retired the CONFORMANCE and post-compose-R9 organ schemas with the gates
@@ -223,7 +225,18 @@ export const evaluatorVerdictSchema = z.object({
     restatement: z.boolean(),
     citation_tracing: z.boolean()
   }).strict()
-}).strict();
+}).strict().superRefine((verdict, context) => {
+  const allCriteriaPass = Object.values(verdict.criteria).every((value) => value);
+  if (verdict.satisfied !== allCriteriaPass) {
+    context.addIssue({ code: "custom", message: "satisfied must agree with every criterion" });
+  }
+  if (verdict.satisfied && verdict.objection !== null) {
+    context.addIssue({ code: "custom", path: ["objection"], message: "a satisfied verdict requires the JSON null literal" });
+  }
+  if (!verdict.satisfied && (verdict.objection ?? "").trim().length === 0) {
+    context.addIssue({ code: "custom", path: ["objection"], message: "an unsatisfied verdict requires objection text" });
+  }
+});
 
 /**
  * FAIR-01 (DR-140(b)): the SECOND real maker's leg. When configured, the
@@ -4206,6 +4219,7 @@ export class WalkingSkeletonRunner {
           // judge, answering about ONE node, had 180.
           bound: this.settings.synthesisRolePolicy.synthesizerBound,
           contractHash: this.settings.composerContractHash,
+          argumentLanguageName: run.argumentLanguageName,
           providerRef: role.providerRef,
           packet,
           classifyContent: (content) => classifyStructuredContent(content, compositionSchema),
@@ -4276,6 +4290,7 @@ export class WalkingSkeletonRunner {
           // W10/3: the EVALUATOR's own sealed bound, formerly CONFORMANCE's.
           bound: this.settings.synthesisRolePolicy.evaluatorBound,
           contractHash: this.settings.conformanceContractHash,
+          argumentLanguageName: run.argumentLanguageName,
           providerRef: role.providerRef,
           packet,
           classifyContent: (content) => classifyStructuredContent(content, evaluatorVerdictSchema),

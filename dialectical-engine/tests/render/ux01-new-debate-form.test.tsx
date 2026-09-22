@@ -7,6 +7,9 @@ import {
   buildNewDebateAskConfig,
   deriveSessionAskDefaults
 } from "../../apps/ui/app/new/defaults.js";
+import NewDebatePage from "../../apps/ui/app/new/NewDebatePageClient.js";
+import homeCatalog from "../../apps/ui/messages/en/home.json" with { type: "json" };
+import newDebateCatalog from "../../apps/ui/messages/en/newDebate.json" with { type: "json" };
 
 process.env.TZ = "UTC";
 
@@ -136,15 +139,17 @@ function collectElements(node: ReactNode, predicate: (element: ReactElement) => 
 }
 
 async function renderRealNewDebatePageState(): Promise<{ html: string; tree: ReactNode }> {
-  const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
   let html = "";
   for (let pass = 0; pass < 4; pass += 1) {
     hooks.beginRender();
-    html = renderToStaticMarkup(<NewDebatePage />);
+    html = renderToStaticMarkup(<NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} />);
     await hooks.flushEffects();
   }
   hooks.beginRender();
-  return { html, tree: evaluateElementTree(<NewDebatePage />) };
+  return {
+    html,
+    tree: evaluateElementTree(<NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} />)
+  };
 }
 
 /* Risk tier is a segmented pill group: the asker's choice arrives as a click
@@ -162,8 +167,9 @@ async function submitRenderedPage(): Promise<Record<string, unknown>> {
   const initial = await renderRealNewDebatePageState();
   chooseRiskTier(initial.tree, "standard");
   hooks.beginRender();
-  const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
-  const rendered = { tree: evaluateElementTree(<NewDebatePage />) };
+  const rendered = {
+    tree: evaluateElementTree(<NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} />)
+  };
   const form = findElement(rendered.tree, (element) => element.type === "form");
   expect(form).not.toBeNull();
   await (form!.props as { onSubmit: (event: { preventDefault: () => void }) => Promise<void> })
@@ -206,8 +212,9 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
     const initial = await renderRealNewDebatePageState();
     chooseRiskTier(initial.tree, "casual");
     hooks.beginRender();
-    const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
-    const editedTree = evaluateElementTree(<NewDebatePage />);
+    const editedTree = evaluateElementTree(
+      <NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} />
+    );
     const form = findElement(editedTree, (element) => element.type === "form");
     expect(form).not.toBeNull();
     await (form!.props as { onSubmit: (event: { preventDefault: () => void }) => Promise<void> })
@@ -267,8 +274,9 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
     expect(optionsButton).not.toBeNull();
     (optionsButton!.props as { onClick: () => void }).onClick();
     hooks.beginRender();
-    const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
-    const openHtml = renderToStaticMarkup(<NewDebatePage />);
+    const openHtml = renderToStaticMarkup(
+      <NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} />
+    );
     expect(openHtml).toContain('aria-controls="additionalRunOptions"');
     expect(openHtml).toContain('id="additionalRunOptions"');
   });
@@ -280,8 +288,9 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
     pageMocks.contractClientHasPlanTierReader = false;
     try {
       hooks.beginRender();
-      const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
-      const tree = evaluateElementTree(<NewDebatePage />);
+      const tree = evaluateElementTree(
+        <NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} />
+      );
       const steering = collectElements(tree, (element) =>
         ["steeringPresets", "steeringAnnotations"].includes(
           String((element.props as { id?: string }).id ?? "")
@@ -314,8 +323,9 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
     (premium!.props as { onClick: () => void }).onClick();
 
     hooks.beginRender();
-    const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
-    const premiumTree = evaluateElementTree(<NewDebatePage />);
+    const premiumTree = evaluateElementTree(
+      <NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} />
+    );
     const steering = collectElements(premiumTree, (element) =>
       ["steeringPresets", "steeringAnnotations"].includes(
         String((element.props as { id?: string }).id ?? "")
@@ -331,7 +341,10 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
       (field.props as { onChange: (event: unknown) => void }).onChange({ target: node, currentTarget: node });
     });
     hooks.beginRender();
-    const form = findElement(evaluateElementTree(<NewDebatePage />), (element) => element.type === "form");
+    const form = findElement(
+      evaluateElementTree(<NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} />),
+      (element) => element.type === "form"
+    );
     // V-12: the rendered Premium screen still has its real submit boundary.
     expect(form).not.toBeNull();
     await (form!.props as { onSubmit: (event: { preventDefault: () => void }) => Promise<void> })

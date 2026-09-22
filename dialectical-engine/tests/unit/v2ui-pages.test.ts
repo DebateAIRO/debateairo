@@ -47,7 +47,7 @@ const USER_ASK_FIELDS = [
 const MACHINE_ASK_FIELDS = ["decisionScope", "asOf"] as const;
 
 describe("v2-ui /new collects every value the V3 ask requires", () => {
-  const newPage = source("app/new/page.tsx");
+  const newPage = source("app/new/NewDebatePageClient.tsx");
   const defaults = source("app/new/defaults.tsx");
 
   it.each(USER_ASK_FIELDS)("binds a control the asker can actually fill for $config", (field) => {

@@ -1364,6 +1364,13 @@ export class RunRepository {
             "[RUN_PLAN_TIER_DROPPED] core.create_encrypted_run does not accept planTier; run created without plan tier"
           );
         }
+        if (created.rows[0]?.created === true
+          && created.rows[0].argument_language_supported === false
+          && argumentLanguageTag !== "und") {
+          console.warn(
+            "[RUN_ARGUMENT_LANGUAGE_DROPPED] core.create_encrypted_run does not accept argument language; run created with the fallback directive"
+          );
+        }
         if (created.rows[0]?.created !== true) {
           commitAttempted = false;
           throw new TypedDomainError(
@@ -1689,10 +1696,12 @@ export class RunRepository {
     const contentCiphertextProjection = encryptionSchemaApplied
       ? ", content_encryption_version, content_ciphertext"
       : "";
+    const argumentLanguageApplied = await argumentLanguageColumnsAreApplied(this.pool);
+    const argumentLanguageProjection = argumentLanguageApplied ? ", argument_language_name" : "";
     const result = await this.pool.query<{
       run_id: string;
       question_line: string;
-      argument_language_name: string;
+      argument_language_name?: string;
       content_encryption_version?: number | null;
       content_ciphertext?: CryptoEnvelope | null;
       agent_count: number;
@@ -1702,7 +1711,7 @@ export class RunRepository {
       stranger_sample_rate: number;
       envelope_basis: Readonly<Record<string, unknown>>;
     }>(
-      `SELECT run_id, question_line${contentCiphertextProjection}, argument_language_name,
+      `SELECT run_id, question_line${contentCiphertextProjection}${argumentLanguageProjection},
               agent_count, discovered_panel, depth_params,
               composition_budget_tier, stranger_sample_rate, envelope_basis
        FROM core.run WHERE run_id = $1`,
@@ -1723,7 +1732,7 @@ export class RunRepository {
     return {
       runId: row.run_id,
       questionLine: content.questionLine,
-      argumentLanguageName: row.argument_language_name,
+      argumentLanguageName: row.argument_language_name ?? "the same language as the question",
       agentCount: Number(row.agent_count),
       discoveredPanel: Object.freeze(row.discovered_panel.map((member) => Object.freeze({ ...member }))),
       depthParams: Object.freeze({ ...row.depth_params }),

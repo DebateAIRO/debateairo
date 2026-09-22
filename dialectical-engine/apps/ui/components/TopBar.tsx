@@ -94,7 +94,7 @@ export function TopBar() {
         <Link className="btn btnDark" href="/new">
           + {t(catalog, "chrome.newDebate")}
         </Link>
-        <span className="roleChip" title={t(catalog, "chrome.asker")}>{t(catalog, "chrome.asker")}</span>
+        <span className="roleChip" title={t(catalog, "chrome.askerRolePlaceholder")}>{t(catalog, "chrome.asker")}</span>
         <LanguageSwitcher />
         <ModeToggle />
         <Link className="iconBtn" href="/settings" aria-label={t(catalog, "chrome.settings")} title={t(catalog, "chrome.settings")}>

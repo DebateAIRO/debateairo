@@ -83,8 +83,13 @@ export async function resolveClaimType(input: { readonly text: string; readonly 
 }
 
 const fatalFlagSchema = z.object({
-  type: z.string().trim().min(1), severity: z.number().min(0).max(1), description: z.string().trim().min(1)
+  type: z.string().trim().regex(/^[A-Za-z][A-Za-z0-9_-]*$/u),
+  severity: z.number().min(0).max(1), description: z.string().trim().min(1)
 }).strict();
+
+function canonicalFatalType(value: string): string {
+  return value.trim().toLocaleUpperCase("en-US");
+}
 
 export const judgeAssessmentSchema = z.object({
   steelman: z.object({ summary: z.string().trim().min(1), fidelity: z.number().min(0).max(1) }).strict(),
@@ -193,9 +198,12 @@ export function reduceAssessment(input: { readonly claimType: ClaimType; readonl
   }
   tau = Math.max(0, Math.min(1, tau));
   const appliedCaps: { what: "tau"; toWhat: number; why: string; byWhat: string }[] = [];
+  const fatalTypes = new Set(
+    input.assessment.fallacy.fatalFlags.map((flag) => canonicalFatalType(flag.type))
+  );
   for (const cap of composition.caps) {
     assertUnitInterval(cap.to, `cap ${cap.whenFatalType}`);
-    if (!input.assessment.fallacy.fatalFlags.some((flag) => flag.type === cap.whenFatalType) || tau <= cap.to) continue;
+    if (!fatalTypes.has(canonicalFatalType(cap.whenFatalType)) || tau <= cap.to) continue;
     tau = cap.to;
     appliedCaps.push(Object.freeze({ what: "tau", toWhat: cap.to, why: cap.why, byWhat: cap.by }));
   }

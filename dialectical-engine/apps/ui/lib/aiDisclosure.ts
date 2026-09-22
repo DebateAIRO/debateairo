@@ -1,4 +1,4 @@
-import { t, type MessageCatalog } from "./i18n/translate";
+import { t, type MessageCatalog } from "./i18n/translate.js";
 
 /** Disclosure copy from the design document's shared AI Notice component. */
 export function aiNoticeCopy(catalog?: MessageCatalog) {

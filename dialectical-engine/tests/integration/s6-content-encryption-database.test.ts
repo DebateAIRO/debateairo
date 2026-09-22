@@ -778,6 +778,74 @@ afterAll(async () => {
 });
 
 describe("S6 content encryption on disposable PostgreSQL", () => {
+  it("persists and reads the detected argument language on the encrypted run path", async () => {
+    const repository = new RunRepository(database.pool);
+    const questionLine = "Ar trebui ca România să investească mai mult în transportul public?";
+    const runId = await repository.startRun({
+      ...serverRunInput(questionLine),
+      argumentLanguageTag: "ro",
+      argumentLanguageName: "Romanian"
+    });
+    expect((await database.pool.query<{
+      argument_language_tag: string;
+      argument_language_name: string;
+    }>(
+      `SELECT argument_language_tag,argument_language_name
+       FROM core.run WHERE run_id=$1`,
+      [runId]
+    )).rows[0]).toEqual({
+      argument_language_tag: "ro",
+      argument_language_name: "Romanian"
+    });
+    await expect(repository.readFrozenHead(runId)).resolves.toMatchObject({
+      runId,
+      questionLine,
+      argumentLanguageName: "Romanian"
+    });
+  });
+
+  it("reads a frozen run head before migration 0072 is applied", async () => {
+    const pre0072 = await startTestDatabase();
+    try {
+      const directory = new URL("../../migrations/", import.meta.url);
+      const names = (await readdir(directory))
+        .filter((name) => /^\d+.*\.sql$/.test(name) && name < "0072_argument_language.sql")
+        .sort();
+      for (const name of names) {
+        await pre0072.pool.query(await readFile(new URL(name, directory), "utf8"));
+      }
+      const questionLine = `S-LANG pre-0072 compatibility ${randomUUID()}`;
+      const repository = new RunRepository(pre0072.pool);
+      const runId = await repository.startRun({
+        questionLine,
+        askContract: { audience: "pre-0072-legacy" },
+        principal: { kind: "legacy", legacyAskerId: `legacy-pre0072-${randomUUID()}` },
+        sessionId: randomUUID(),
+        callerScope: "ASKER",
+        asOf: new Date("2026-09-22T00:00:00.000Z"),
+        askerRiskTier: "casual",
+        effectiveRiskTier: "casual",
+        tierSource: "ASKER",
+        tierProvenanceRef: "s-lang:pre-0072",
+        compositionBudgetTier: "low",
+        depthParams: { depth: 1 },
+        discoveredPanel: fixtureDiscoveredPanel(1),
+        strangerSampleRate: 1,
+        envelopeBasis: { source: "s-lang:pre-0072" },
+        registerVersion: 1,
+        batteryVersion: "s-lang:pre-0072",
+        batteryRows: []
+      });
+      await expect(repository.readFrozenHead(runId)).resolves.toMatchObject({
+        runId,
+        questionLine,
+        argumentLanguageName: "the same language as the question"
+      });
+    } finally {
+      await pre0072.stop();
+    }
+  }, 120_000);
+
   it("applies the complete fresh migration set and replays 0040 safely", async () => {
     const directory=new URL("../../migrations/",import.meta.url);
     const migration=await readFile(new URL("0040_account_erasure.sql",directory),"utf8");

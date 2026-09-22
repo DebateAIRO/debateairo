@@ -1,4 +1,4 @@
-import { formatDate, t, tPlural, type MessageCatalog } from "./i18n/translate";
+import { formatDate, t, tPlural, type MessageCatalog } from "./i18n/translate.js";
 
 export function relativeTime(
   input: string | null | undefined,

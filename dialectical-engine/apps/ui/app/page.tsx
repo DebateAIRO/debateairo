@@ -105,7 +105,7 @@ export default async function HomePage({
 
         <div className="libAiDisclosure"><AiNotice catalog={catalog} /></div>
 
-        <div className="libTabs sectionHead" aria-label={t(catalog, "chrome.library")}>
+        <div className="libTabs sectionHead" aria-label={t(catalog, "chrome.debateLibrary")}>
           <Link
             aria-current={tab === "yours" ? "page" : undefined}
             href="/?tab=yours"

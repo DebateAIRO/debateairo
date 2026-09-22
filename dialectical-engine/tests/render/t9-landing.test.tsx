@@ -129,7 +129,7 @@ describe("T9-C1 route split & chrome", () => {
     // PROPERTY: the cookie read is followed by the landing branch before any
     // library work, AuthGate stays off `/`, and LandingPage remains server-rendered.
     const pageSource = readFileSync(resolve(process.cwd(), "apps/ui/app/page.tsx"), "utf8");
-    const cookieReadIndex = pageSource.indexOf("const token = (await cookies()).get(USER_TOKEN_COOKIE)?.value ?? null;");
+    const cookieReadIndex = pageSource.indexOf("const token = cookieStore.get(USER_TOKEN_COOKIE)?.value ?? null;");
     // b300ee91 (feat(support): add guarded SupportAgent experience) mounted the
     // support dock on the anonymous landing route, so the branch returns a
     // fragment rather than the bare landing. The PROPERTY above is untouched by
@@ -138,7 +138,7 @@ describe("T9-C1 route split & chrome", () => {
     // nothing looser: an arbitrary body here would let real work sneak in front
     // of the landing and the ordering assertions below would stop meaning it.
     const landingBranch =
-      /if\s*\(\s*token\s*===\s*null\s*\)\s*(?:\{\s*)?return\s*(?:<LandingPage\s*\/>|<>\s*<LandingPage\s*\/>\s*<SupportWidget\s*\/>\s*<\/>)\s*;/.exec(
+      /if\s*\(\s*token\s*===\s*null\s*\)\s*(?:\{\s*)?return\s*<>\s*<LandingPage\s+catalog=\{catalog\}\s*\/>\s*<SupportWidget\s*\/>\s*<\/>\s*;/.exec(
         pageSource
       );
     const landingReturnIndex = landingBranch?.index ?? -1;

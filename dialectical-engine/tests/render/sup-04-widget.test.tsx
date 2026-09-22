@@ -111,7 +111,7 @@ describe("SUP-04 product-route support widget", () => {
   it("publishes the exact primary-control measurement hook on all three owner surfaces", async () => {
     const [home,create,publication] = await Promise.all([
       readFile("apps/ui/app/page.tsx","utf8"),
-      readFile("apps/ui/app/new/page.tsx","utf8"),
+      readFile("apps/ui/app/new/NewDebatePageClient.tsx","utf8"),
       readFile("apps/ui/components/PublicationControl.tsx","utf8")
     ]);
     expect(home).toMatch(/<section[^>]*data-support-primary-control[^>]*id="start-a-debate"/u);

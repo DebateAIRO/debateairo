@@ -8,7 +8,7 @@ ALTER TABLE core.run ADD CONSTRAINT run_argument_language_tag_format
   CHECK (argument_language_tag ~ '^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$');
 
 COMMENT ON COLUMN core.run.argument_language_tag IS
-  'BCP-47-shaped language tag detected from question_line; und means detection was not confident.';
+  'BCP-47-shaped language tag detected from question_line; und means detection was not confident. Deliberately retained after private-run erasure as low-entropy operational metadata; excluded from observation-role column grants.';
 COMMENT ON COLUMN core.run.argument_language_name IS
   'English language name used only to instruct debate model calls which language their natural-language fields must use.';
 
@@ -76,7 +76,8 @@ BEGIN
     p_run->>'askerRiskTier',p_run->>'riskTier',p_run->>'tierSource',
     p_run->>'tierProvenanceRef',p_run->>'compositionBudgetTier',p_run->>'planTier',
     COALESCE((p_run->>'freePublicRule')::boolean,false),
-    p_run->>'argumentLanguageTag',p_run->>'argumentLanguageName',
+    COALESCE(p_run->>'argumentLanguageTag','und'),
+    COALESCE(p_run->>'argumentLanguageName','the same language as the question'),
     p_run->'depthParams',jsonb_array_length(p_run->'discoveredPanel'),
     p_run->'discoveredPanel',(p_run->>'strangerSampleRate')::double precision,
     p_run->'envelopeBasis',(p_run->>'registerVersion')::bigint,

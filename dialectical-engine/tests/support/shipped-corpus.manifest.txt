@@ -213,6 +213,7 @@ apps/ui/app/global-error.tsx
 apps/ui/app/help/page.tsx
 apps/ui/app/layout.tsx
 apps/ui/app/login/page.tsx
+apps/ui/app/new/NewDebatePageClient.tsx
 apps/ui/app/new/defaults.tsx
 apps/ui/app/new/page.tsx
 apps/ui/app/page.tsx
@@ -240,6 +241,7 @@ apps/ui/components/DebatesBuffer.tsx
 apps/ui/components/EvaluatorDevMenu.tsx
 apps/ui/components/GuideModal.tsx
 apps/ui/components/InvestigationDrawer.tsx
+apps/ui/components/LanguageSwitcher.tsx
 apps/ui/components/LegacyRunClaimControls.tsx
 apps/ui/components/LibraryComposer.tsx
 apps/ui/components/LoginFlow.tsx
@@ -266,7 +268,11 @@ apps/ui/components/consent/CookieConsent.tsx
 apps/ui/components/consent/CookiePreferencesCard.tsx
 apps/ui/components/consent/PrivacyPolicyModal.tsx
 apps/ui/components/consent/modalSemantics.ts
+apps/ui/components/debateReferenceDesign.chrome.source-test.mjs
+apps/ui/components/debateReferenceDesign.drawers.source-test.mjs
+apps/ui/components/debateReferenceDesign.public.source-test.mjs
 apps/ui/components/debateReferenceDesign.source-test.mjs
+apps/ui/components/debateReferenceDesign.views.source-test.mjs
 apps/ui/components/landing/LandingChrome.tsx
 apps/ui/components/landing/LandingHero.tsx
 apps/ui/components/landing/LandingMethod.tsx
@@ -274,6 +280,9 @@ apps/ui/components/landing/LandingPage.tsx
 apps/ui/components/landing/LandingPricing.tsx
 apps/ui/components/landing/LandingSample.tsx
 apps/ui/components/landing/cards.ts
+apps/ui/components/languageSwitcherPlacement.source-test.mjs
+apps/ui/components/languageSwitcherState.test.mjs
+apps/ui/components/languageSwitcherState.ts
 apps/ui/components/modeTransition.test.mjs
 apps/ui/components/modeTransition.ts
 apps/ui/components/support/Assistant.tsx
@@ -289,6 +298,21 @@ apps/ui/lib/debateHeaderOverflow.ts
 apps/ui/lib/debatePresentation.ts
 apps/ui/lib/debateTreeUtils.ts
 apps/ui/lib/format.ts
+apps/ui/lib/i18n/I18nProvider.tsx
+apps/ui/lib/i18n/auth.test.mjs
+apps/ui/lib/i18n/catalog.test.mjs
+apps/ui/lib/i18n/compose.test.mjs
+apps/ui/lib/i18n/consent.test.mjs
+apps/ui/lib/i18n/debateChrome.test.mjs
+apps/ui/lib/i18n/debateDrawers.test.mjs
+apps/ui/lib/i18n/debateViews.test.mjs
+apps/ui/lib/i18n/locales.ts
+apps/ui/lib/i18n/public.test.mjs
+apps/ui/lib/i18n/server.ts
+apps/ui/lib/i18n/settings.test.mjs
+apps/ui/lib/i18n/support.test.mjs
+apps/ui/lib/i18n/translate.test.mjs
+apps/ui/lib/i18n/translate.ts
 apps/ui/lib/makerIdentity.ts
 apps/ui/lib/mfaEnrollment.ts
 apps/ui/lib/models.ts
@@ -325,7 +349,9 @@ apps/ui/next-env.d.ts
 apps/ui/next.config.mjs
 apps/ui/scripts/assert-production-auth-routes.mjs
 apps/ui/scripts/next-config-csp.test.mjs
+apps/ui/scripts/no-hardcoded-english.test.mjs
 apps/ui/scripts/run-node-tests.mjs
+apps/ui/scripts/server-client-boundary.source-test.mjs
 apps/ui/server.mjs
 apps/ui/trusted-client-ip.d.mts
 apps/ui/trusted-client-ip.mjs
@@ -367,6 +393,7 @@ packages/evidence/src/index.ts
 packages/graph/src/index.ts
 packages/judgement/src/index.ts
 packages/judgement/src/s04.ts
+packages/kernel/src/argument-language.ts
 packages/kernel/src/index.ts
 packages/kernel/src/support-credentials.ts
 packages/kernel/src/support-text-views.ts

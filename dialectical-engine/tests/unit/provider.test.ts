@@ -11,6 +11,26 @@ afterEach(async () => {
 });
 
 describe("FX-HR-H1 — one provider interface", () => {
+  it("records the argument language beside the sealed contract hash on every artifact receipt", async () => {
+    const artifacts: Record<string, unknown>[] = [];
+    const gateway = new OpenAICompatibleProviderGateway({
+      endpoint: "http://fixture/v1", model: "fixture", maker: "fixture",
+      fetchImplementation: async () => new Response(JSON.stringify({
+        id: "call", model: "fixture", choices: [{ message: { content: "ok" } }]
+      })),
+      persistRawArtifact: async (artifact) => { artifacts.push(artifact.metadata); return artifact.artifactId; },
+      appendLedgerEntry: async () => "ledger:test",
+      assertNoOpenWriteTransaction: () => undefined
+    });
+    await gateway.call({
+      runId: null, subjectItemId: "node:test", callSiteKey: "fixture", role: "EVALUATOR",
+      lane: "served", bound: { maxAttempts: 1, tokenCeiling: 8, deadlineMs: 1000 },
+      contractHash: "sealed-evaluator-contract", argumentLanguageName: "Romanian",
+      providerRef: "provider", packet: { messages: [{ role: "user", content: "x" }] }
+    });
+    expect(artifacts).toEqual([expect.objectContaining({ argument_language_name: "Romanian" })]);
+  });
+
   it("preserves observed usage in raw artifact metadata and uses null when absent", async () => {
     const artifacts: Record<string, unknown>[] = [];
     let responseUsage: unknown = { prompt_tokens: 3, completion_tokens: 2, total_tokens: 5, x_cost_usd: 0.01 };

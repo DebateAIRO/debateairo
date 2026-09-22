@@ -187,6 +187,9 @@ const COMPOSITION = JSON.stringify({ segments: [
 type RequestKind = "PANEL" | "REVIEW" | "JUDGE" | "CONFORMANCE" | "R9" | "COMPOSE" | "EVALUATOR";
 
 function classify(body: string): RequestKind {
+  const primaryContract = (JSON.parse(body) as {
+    messages: readonly { role: string; content: string }[];
+  }).messages[0]?.content ?? "";
   // W7 / V-BLIND-CONTEXT: the panel and review keys are STRUCTURAL — keys of the
   // organ's own JSON contract — never prose. The sentences they replaced
   // ("Assess an existing debate node authored by another maker", "Review an
@@ -201,18 +204,18 @@ function classify(body: string): RequestKind {
   // itself pinned by `tests/unit/t03-judge-panel.test.ts`. Both keys are bare
   // identifiers, so they survive the packet's JSON encoding, which a quoted
   // fragment would not (it arrives as \").
-  if (body.includes("fatalFlags") && !body.includes("restatement_text")) return "PANEL";
-  if (body.includes("edge_bearings")) return "REVIEW";
+  if (primaryContract.includes("fatalFlags") && !primaryContract.includes("restatement_text")) return "PANEL";
+  if (primaryContract.includes("edge_bearings")) return "REVIEW";
   // T9: the EVALUATOR replaced BOTH retired serve-path organs. Its marker is
   // tested BEFORE "restatement_text" because the evaluator's criteria list
   // names `restatement`, and before the COMPOSE marker for the same reason —
   // a later branch would swallow it and answer with a judgement, which is what
   // this double did when the synthesis loop first reached it.
-  if (body.includes("fairness_to_losers")) return "EVALUATOR";
-  if (body.includes("restatement_text")) return "JUDGE";
-  if (body.includes("conforms,findings")) return "CONFORMANCE";
-  if (body.includes("{pass}")) return "R9";
-  if (body.includes("served_number_refs")) return "COMPOSE";
+  if (primaryContract.includes("fairness_to_losers")) return "EVALUATOR";
+  if (primaryContract.includes("restatement_text")) return "JUDGE";
+  if (primaryContract.includes("conforms,findings")) return "CONFORMANCE";
+  if (primaryContract.includes("{pass}")) return "R9";
+  if (primaryContract.includes("served_number_refs")) return "COMPOSE";
   return "JUDGE";
 }
 

@@ -5,7 +5,9 @@ import {
   EVALUATOR_CONTRACT_TEXT,
   buildEvaluatorPromptPacket,
   buildSchemaRepairPacket,
-  buildSynthesizerPromptPacket
+  buildSynthesizerPromptPacket,
+  evaluatorVerdictSchema,
+  parseComposerOutput
 } from "@debateai/runner";
 import type { EvaluatorRequest, SynthesizerRequest } from "@debateai/serve";
 
@@ -48,5 +50,29 @@ describe("runner argument-language packets", () => {
     const repair = buildSchemaRepairPacket(packet, "schema mismatch");
     expect(repair.messages.slice(0, 3)).toEqual(packet.messages);
     expect(repair.messages[1]).toEqual(packet.messages[1]);
+  });
+
+  it("rejects a localized null sentinel at the repairable evaluator schema gate", () => {
+    expect(evaluatorVerdictSchema.safeParse({
+      satisfied: true,
+      objection: "niciuna",
+      criteria: {
+        fairness_to_losers: true,
+        statement_label_agreement: true,
+        no_overstatement: true,
+        restatement: true,
+        citation_tracing: true
+      }
+    }).success).toBe(false);
+  });
+
+  it.each([
+    ["segment_id", { segment_id: "segment:concluzie-finală", node_refs: ["primary"], served_number_refs: [] }],
+    ["node_refs", { segment_id: "segment:verdict", node_refs: ["principală"], served_number_refs: [] }],
+    ["served_number_refs", { segment_id: "segment:verdict", node_refs: ["primary"], served_number_refs: ["număr:final"] }]
+  ] as const)("rejects a localized %s identifier at the repairable composer schema gate", (_field, segment) => {
+    expect(() => parseComposerOutput(JSON.stringify({
+      segments: [{ ...segment, text: "Text natural în limba română." }]
+    }))).toThrowError(expect.objectContaining({ code: "COMPOSITION_CONTRACT_ERROR" }));
   });
 });

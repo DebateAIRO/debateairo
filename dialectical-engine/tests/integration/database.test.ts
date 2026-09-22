@@ -475,6 +475,9 @@ async function startProviderDouble(
     request.on("end", () => {
       const body = Buffer.concat(chunks).toString("utf8");
       bodies.push(body);
+      const primaryContract = (JSON.parse(body) as {
+        messages: readonly { role: string; content: string }[];
+      }).messages[0]?.content ?? "";
       // J12 coherence (T3/S2-2): every M>=2 fixture below now runs a judge panel, so
       // each authored node draws one assess call per non-author maker. Those legs are
       // answered FROM THE CONTRACT and never consume `pending`, so every fixture's
@@ -490,7 +493,7 @@ async function startProviderDouble(
       // WITHOUT the judge's `restatement_text` — a negative pinned by
       // `tests/unit/t03-judge-panel.test.ts`. Bare identifiers survive the JSON
       // encoding that defeats a quoted fragment (T3 N4, below).
-      if (body.includes("fatalFlags") && !body.includes("restatement_text")) {
+      if (primaryContract.includes("fatalFlags") && !primaryContract.includes("restatement_text")) {
         calls += 1;
         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
           id: `panel-assess-${calls}`,
@@ -507,12 +510,12 @@ async function startProviderDouble(
       // because an evaluator request carries the candidate statement, not the
       // segment contract. Without this the evaluator was handed whatever sat at
       // the head of the queue — a judgement — and failed its own schema.
-      const requestKind: ResponseClass = body.includes("edge_bearings") ? "REVIEW"
-        : body.includes("restatement_text") ? "JUDGE"
-          : body.includes("fairness_to_losers") ? "EVALUATOR"
-            : body.includes("conforms,findings") ? "CONFORMANCE"
-              : body.includes("{pass}") ? "R9"
-                : body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
+      const requestKind: ResponseClass = primaryContract.includes("edge_bearings") ? "REVIEW"
+        : primaryContract.includes("restatement_text") ? "JUDGE"
+          : primaryContract.includes("fairness_to_losers") ? "EVALUATOR"
+            : primaryContract.includes("conforms,findings") ? "CONFORMANCE"
+              : primaryContract.includes("{pass}") ? "R9"
+                : primaryContract.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
       const matching = requestKind === "GENERAL" ? -1 : pending.findIndex((entry) => entry.kind === requestKind);
       const selected = pending.splice(matching < 0 ? 0 : matching, 1)[0];
       // T5/S3-1: a review response must measure exactly the edges THIS call
@@ -742,18 +745,22 @@ describe("S-LANG argument language persistence", () => {
       kind: "legacy",
       legacyAskerId: askerId
     });
-    const stored = await database.pool.query<{
-      argument_language_tag: string;
-      argument_language_name: string;
-    }>(
-      `SELECT argument_language_tag,argument_language_name
-       FROM core.run WHERE run_id=$1`,
-      [accepted.run_ref]
-    );
-    expect(stored.rows[0]).toEqual({
-      argument_language_tag: "ro",
-      argument_language_name: "Romanian"
-    });
+    try {
+      const stored = await database.pool.query<{
+        argument_language_tag: string;
+        argument_language_name: string;
+      }>(
+        `SELECT argument_language_tag,argument_language_name
+         FROM core.run WHERE run_id=$1`,
+        [accepted.run_ref]
+      );
+      expect(stored.rows[0]).toEqual({
+        argument_language_tag: "ro",
+        argument_language_name: "Romanian"
+      });
+    } finally {
+      await database.pool.query("DELETE FROM core.work_item WHERE run_id=$1", [accepted.run_ref]);
+    }
   });
 });
 

@@ -31,6 +31,14 @@ type ModeToggleModule = {
   ModeToggle: () => ReturnType<typeof createElement>;
 };
 
+type I18nProviderModule = {
+  I18nProvider: (props: {
+    locale: "en";
+    catalog: Readonly<Record<string, string>>;
+    children?: ReturnType<typeof createElement>;
+  }) => ReturnType<typeof createElement>;
+};
+
 const root = process.cwd();
 const globalsPath = resolve(root, "apps/ui/app/globals.css");
 const layoutPath = resolve(root, "apps/ui/app/layout.tsx");
@@ -525,7 +533,13 @@ describe("T9-C3 mode control and document guard", () => {
     // PROPERTY: the real control treats the document marker as initial truth and
     // one activation atomically flips marker, accessible state, label, and storage.
     expect(existsSync(modeTogglePath), "apps/ui/components/ModeToggle.tsx exists").toBe(true);
-    const { ModeToggle } = await vi.importActual<ModeToggleModule>("../../apps/ui/components/ModeToggle.js");
+    const [{ ModeToggle }, { I18nProvider }] = await Promise.all([
+      vi.importActual<ModeToggleModule>("../../apps/ui/components/ModeToggle.js"),
+      vi.importActual<I18nProviderModule>("../../apps/ui/lib/i18n/I18nProvider.js")
+    ]);
+    const chromeCatalog = JSON.parse(
+      readFileSync(resolve(root, "apps/ui/messages/en/chrome.json"), "utf8")
+    ) as Readonly<Record<string, string>>;
     const dom = new JSDOM("<!doctype html><html data-mode='chamber'><body><div id='root'></div></body></html>", {
       url: "https://app.debateai.test/"
     });
@@ -545,7 +559,11 @@ describe("T9-C3 mode control and document guard", () => {
     const reactRoot = createRoot(dom.window.document.getElementById("root")!);
     try {
       await act(async () => {
-        reactRoot.render(createElement(ModeToggle));
+        reactRoot.render(createElement(
+          I18nProvider,
+          { locale: "en", catalog: chromeCatalog },
+          createElement(ModeToggle)
+        ));
         await Promise.resolve();
       });
       const button = dom.window.document.querySelector<HTMLButtonElement>("button[data-mode-toggle]");

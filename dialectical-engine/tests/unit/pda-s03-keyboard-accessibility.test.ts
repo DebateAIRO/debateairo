@@ -41,6 +41,28 @@ vi.mock("next/navigation", async (importOriginal) => ({
   useRouter: () => ({ push: vi.fn() })
 }));
 
+vi.mock("@/lib/i18n/server", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { resolve } = await import("node:path");
+  return {
+    loadNamespace: async (_locale: string, namespace: string) => JSON.parse(
+      readFileSync(resolve(process.cwd(), "apps/ui/messages/en", `${namespace}.json`), "utf8")
+    )
+  };
+});
+
+vi.mock("@/lib/i18n/I18nProvider", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { resolve } = await import("node:path");
+  const catalog = JSON.parse(
+    readFileSync(resolve(process.cwd(), "apps/ui/messages/en/chrome.json"), "utf8")
+  );
+  return {
+    I18nProvider: ({ children }: { children: unknown }) => children,
+    useChromeI18n: () => ({ locale: "en", catalog })
+  };
+});
+
 const expectedTabs = [
   { label: "Your debates", href: "/?tab=yours" },
   { label: "Public debates", href: "/?tab=public" }

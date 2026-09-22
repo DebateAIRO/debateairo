@@ -41,12 +41,13 @@ test("real time catalogues select the CLDR form for representative locales", () 
 test("Croatian catalogues use the numeral forms for minutes and model counts", () => {
   const timeCatalog = JSON.parse(readFileSync(join(process.cwd(), "messages/hr/time.json"), "utf8"));
   const homeCatalog = JSON.parse(readFileSync(join(process.cwd(), "messages/hr/home.json"), "utf8"));
+  const numbers = (...values) => values;
   assert.deepEqual(
-    [1, 2, 5].map((count) => tPlural(timeCatalog, "time.minutes", count, "hr")),
+    numbers(1, 2, 5).map((count) => tPlural(timeCatalog, "time.minutes", count, "hr")),
     ["prije 1 minutu", "prije 2 minute", "prije 5 minuta"]
   );
   assert.deepEqual(
-    [1, 2, 5].map((count) => tPlural(homeCatalog, "home.models", count, "hr")),
+    numbers(1, 2, 5).map((count) => tPlural(homeCatalog, "home.models", count, "hr")),
     ["1 model", "2 modela", "5 modela"]
   );
 });
@@ -59,17 +60,18 @@ test("count catalogues render the numeral in the grammatical position and form",
     const messages = catalog(locale, namespace);
     return counts.map((count) => tPlural(messages, key, count, locale));
   };
+  const numbers = (...values) => values;
 
-  assert.deepEqual(rendered("cs", "home", "home.models", [1, 2, 1.5, 5]), [
+  assert.deepEqual(rendered("cs", "home", "home.models", numbers(1, 2, 1.5, 5)), [
     "1 model", "2 modely", "1.5 modelu", "5 modelů"
   ]);
-  assert.deepEqual(rendered("ro", "home", "home.models", [1, 2, 20]), [
+  assert.deepEqual(rendered("ro", "home", "home.models", numbers(1, 2, 20)), [
     "1 model", "2 modele", "20 de modele"
   ]);
-  assert.deepEqual(rendered("sk", "home", "home.models", [1, 2, 1.5, 5]), [
+  assert.deepEqual(rendered("sk", "home", "home.models", numbers(1, 2, 1.5, 5)), [
     "1 model", "2 modely", "1.5 modelu", "5 modelov"
   ]);
-  assert.deepEqual(rendered("sl", "home", "home.models", [1, 2, 3, 5]), [
+  assert.deepEqual(rendered("sl", "home", "home.models", numbers(1, 2, 3, 5)), [
     "1 model", "2 modela", "3 modeli", "5 modelov"
   ]);
   for (const [key, expected] of Object.entries({
@@ -78,11 +80,11 @@ test("count catalogues render the numeral in the grammatical position and form",
     "time.days": ["преди 1 ден", "преди 5 дни"],
     "time.weeks": ["преди 1 седмица", "преди 5 седмици"]
   })) {
-    assert.deepEqual(rendered("bg", "time", key, [1, 5]), expected, `bg ${key}`);
+    assert.deepEqual(rendered("bg", "time", key, numbers(1, 5)), expected, `bg ${key}`);
   }
-  assert.deepEqual(rendered("bg", "home", "home.models", [1, 5]), ["1 модел", "5 модела"]);
-  assert.deepEqual(rendered("ar", "home", "home.models", [100]), ["100 نموذج"]);
-  assert.deepEqual(rendered("ar", "time", "time.minutes", [100]), ["قبل 100 دقيقة"]);
+  assert.deepEqual(rendered("bg", "home", "home.models", numbers(1, 5)), ["1 модел", "5 модела"]);
+  assert.deepEqual(rendered("ar", "home", "home.models", numbers(100)), ["100 نموذج"]);
+  assert.deepEqual(rendered("ar", "time", "time.minutes", numbers(100)), ["قبل 100 دقيقة"]);
 });
 
 test("date and number helpers honor the requested locale", () => {

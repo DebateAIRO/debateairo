@@ -35,7 +35,9 @@ describe("Support-visible global Account navigation",() => {
     const asker = [...document.querySelectorAll<HTMLElement>(".roleChip")]
       .find(element => element.textContent?.trim() === "ASKER");
 
-    expect(account?.getAttribute("href")).toBe("/settings");
+    // Owner decision: Account remains the neutral login entry; Settings keeps
+    // the dedicated signed-in account-management destination.
+    expect(account?.getAttribute("href")).toBe("/login");
     expect(newDebate?.getAttribute("href")).toBe("/new");
     expect(settings?.getAttribute("href")).toBe("/settings");
     expect(asker?.tagName).toBe("SPAN");
