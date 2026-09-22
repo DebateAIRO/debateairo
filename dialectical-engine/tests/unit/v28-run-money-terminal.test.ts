@@ -93,8 +93,12 @@ describe("V-28 the runner tells a money stop from an attempt stop from a failure
   });
 
   it("lets every other failure travel untouched", () => {
+    // `PROVIDER_USAGE_UNREPORTED` was in this list in round 1 and is NOT any
+    // more: ruling R2 made an unbillable vendor end the run cleanly, because it
+    // is a vendor or configuration fault and discarding the work would charge
+    // the asker for nothing. It keeps its own stop kind, so the condition-mark
+    // record still names the real cause — see `v28-run-body-budget-stop.test.ts`.
     expect(envelopeStopKind(new TypedDomainError("PROVIDER_CALL_FAILED", "x"))).toBeNull();
-    expect(envelopeStopKind(new TypedDomainError("PROVIDER_USAGE_UNREPORTED", "x"))).toBeNull();
     expect(envelopeStopKind(new TypeError("boom"))).toBeNull();
     expect(envelopeStopKind(undefined)).toBeNull();
   });

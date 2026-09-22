@@ -150,7 +150,17 @@ export const ENVELOPE_STOP_CODES = Object.freeze({
   /** The attempt ceiling pinned on the run head (`assertModelAttemptAllowed`). */
   RUN_COST_ENVELOPE_EXHAUSTED: "ATTEMPTS",
   /** The money ceiling sealed in `costEnvelopePolicy` (the gateway's seam). */
-  RUN_COST_ENVELOPE_MONEY_REACHED: "MONEY"
+  RUN_COST_ENVELOPE_MONEY_REACHED: "MONEY",
+  /**
+   * RULING R2 (review round 2). A hosted vendor answered and reported no usage,
+   * so the call cannot be billed and the money ceiling cannot be honoured for
+   * anything that follows. That is a VENDOR or CONFIGURATION fault, not the
+   * asker's, so the run ends the same clean way a money stop ends rather than
+   * discarding work the asker will still be charged for. It keeps its own kind,
+   * and therefore its own condition-mark reason: an operator told "you ran out
+   * of money" would go and raise a ceiling that was never the problem.
+   */
+  PROVIDER_USAGE_UNREPORTED: "USAGE"
 } as const);
 
 export type EnvelopeStopKind = typeof ENVELOPE_STOP_CODES[keyof typeof ENVELOPE_STOP_CODES];
@@ -158,18 +168,60 @@ export type EnvelopeStopKind = typeof ENVELOPE_STOP_CODES[keyof typeof ENVELOPE_
 /** The condition-mark record's reason, per stop: the operator's lift differs. */
 const ENVELOPE_STOP_REASONS: Readonly<Record<EnvelopeStopKind, string>> = Object.freeze({
   ATTEMPTS: "RUN_COST_ENVELOPE_EXHAUSTED",
-  MONEY: "RUN_COST_ENVELOPE_MONEY_REACHED"
+  MONEY: "RUN_COST_ENVELOPE_MONEY_REACHED",
+  USAGE: "PROVIDER_USAGE_UNREPORTED"
 });
 
-/**
- * `null` for anything that is not one of the two envelope refusals — including
- * `PROVIDER_USAGE_UNREPORTED`, which is a refusal to TRUST a vendor rather than
- * a bound being reached, and therefore a failure the run must not paper over
- * with a components-only answer.
- */
+/** `null` for anything that is not one of the three envelope refusals. */
 export function envelopeStopKind(error: unknown): EnvelopeStopKind | null {
   if (!(error instanceof TypedDomainError)) return null;
   return ENVELOPE_STOP_CODES[error.code as keyof typeof ENVELOPE_STOP_CODES] ?? null;
+}
+
+/**
+ * C1 (review round 2) — WHAT A RUN-BODY PHASE DOES WITH AN ENVELOPE REFUSAL.
+ *
+ * The envelope terminal cannot be built during authoring, expansion or review:
+ * it needs the propagation, the served root and the fact bundle, and none of
+ * them exists yet. So a spend refusal raised there cannot become a terminal on
+ * the spot — it must STOP THE PHASE and let the run reach the envelope
+ * evaluation that already stands in front of the serve chain, where the terminal
+ * IS buildable and the components produced so far are what it serves.
+ *
+ * `null` means "this is not a phase stop, let it travel". The ATTEMPT ceiling is
+ * deliberately `null`: it has always propagated from these phases, changing that
+ * is a behaviour nobody ruled, and V-28 is about money.
+ */
+export function expansionPhaseStop(error: unknown): EnvelopeStopKind | null {
+  const stop = envelopeStopKind(error);
+  return stop === "MONEY" || stop === "USAGE" ? stop : null;
+}
+
+export type ReviewFailureOutcome =
+  | { readonly kind: "RETHROW" }
+  | { readonly kind: "BUDGET_STOP"; readonly stop: EnvelopeStopKind }
+  | { readonly kind: "UNAVAILABLE" };
+
+/**
+ * C1, second half — the node-review catch had a rethrow list that did not know
+ * about money, so a refusal raised during a review came out as
+ * `NODE_REVIEW_UNAVAILABLE`: a diagnostic naming the wrong cause, and one no
+ * envelope path can recognise. The list is a DECISION now, so it can be tested
+ * instead of read.
+ */
+const REVIEW_RETHROWN_CODES: readonly string[] = Object.freeze([
+  "RUN_COST_ENVELOPE_EXHAUSTED",
+  "CALL_BUDGET_EXHAUSTED",
+  "PRODUCER_GRADING_FORBIDDEN"
+]);
+
+export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
+  const stop = expansionPhaseStop(error);
+  if (stop !== null) return Object.freeze({ kind: "BUDGET_STOP" as const, stop });
+  if (error instanceof TypedDomainError && REVIEW_RETHROWN_CODES.includes(error.code)) {
+    return Object.freeze({ kind: "RETHROW" as const });
+  }
+  return Object.freeze({ kind: "UNAVAILABLE" as const });
 }
 
 const compositionSchema = z.object({
@@ -3267,6 +3319,17 @@ export class WalkingSkeletonRunner {
     // DR-184/C-10: reviews are interleaved at round boundaries. Coverage is
     // invariant; reviewer assignment may change because rotation observes the
     // latest landed review, and that behaviour change is deliberately declared.
+    /**
+     * C1 (review round 2) — WHICH SPEND BOUND, IF ANY, STOPPED THIS RUN BODY.
+     *
+     * Set by the authoring, expansion and review phases when the gateway refuses
+     * on money or on an unbillable vendor. It is NOT an error path: the phase
+     * stops where it is, the run keeps everything it has produced, and the
+     * envelope evaluation in front of the serve chain turns it into the ruled
+     * components-only terminal. `null` all the way through is a run that was
+     * never stopped by a spend bound, which is every run today.
+     */
+    let runBodyBudgetStop: EnvelopeStopKind | null = null;
     const reviewScheduledNodeIds = new Set<string>();
     const reviewPendingAuthoredNodes = async (): Promise<void> => {
       if (effectiveMakerCount <= 1) return;
@@ -3322,11 +3385,16 @@ export class WalkingSkeletonRunner {
             });
           }
         } catch (error) {
-          if (error instanceof TypedDomainError && [
-            "RUN_COST_ENVELOPE_EXHAUSTED",
-            "CALL_BUDGET_EXHAUSTED",
-            "PRODUCER_GRADING_FORBIDDEN"
-          ].includes(error.code)) throw error;
+          const outcome = reviewFailureOutcome(error);
+          if (outcome.kind === "RETHROW") throw error;
+          // C1: a spend refusal stops REVIEWING, it does not fail the run. The
+          // nodes already reviewed keep their reviews; the rest stay unreviewed
+          // and are disclosed as such, exactly as they are when a reviewer's
+          // transport dies.
+          if (outcome.kind === "BUDGET_STOP") {
+            runBodyBudgetStop = outcome.stop;
+            return;
+          }
           throw new TypedDomainError(
             "NODE_REVIEW_UNAVAILABLE",
             `No valid cross-maker review was recorded for node ${authoredNode.nodeId}`
@@ -3429,6 +3497,11 @@ export class WalkingSkeletonRunner {
     let activeExpansionRound = expansionPlan[0]?.round ?? null;
     let stoppedByAdaptiveRule = false;
     for (const [legIndex, leg] of expansionPlan.entries()) {
+      // C1: an earlier leg, or a review between rounds, reached a spend bound.
+      // Expansion stops here and the run carries what it has to the envelope
+      // evaluation in front of the serve chain, which turns it into the ruled
+      // components-only terminal.
+      if (runBodyBudgetStop !== null) break;
       if (activeExpansionRound !== null && leg.round !== activeExpansionRound) {
         await reviewPendingAuthoredNodes();
         activeExpansionRound = leg.round;
@@ -3442,7 +3515,9 @@ export class WalkingSkeletonRunner {
       }
       const role = leg.polarity === "support" ? "defender" : "critic";
       const plannedSubtreeIndices = subtreeIndices(leg.childIndex);
-      const authored = await authorPosition({
+      let authored: Awaited<ReturnType<typeof authorPosition>>;
+      try {
+      authored = await authorPosition({
         authorIndex: leg.authorIndex,
         // DL4-F4, the leg that carried the injection: `parent.statement` is the
         // PREVIOUS model's output. It is material, it gets its own fenced
@@ -3460,6 +3535,15 @@ export class WalkingSkeletonRunner {
         explorationDecision: leg.polarity === "support" ? "deepen" : "challenge",
         edges: [{ targetNodeId: parent.nodeId, targetStatement: parent.statement, polarity: leg.polarity }]
       });
+      } catch (error) {
+        // C1: a spend refusal is not an expansion failure. Nothing is recorded
+        // as halted — the leg was never attempted against a vendor — and the
+        // branch simply stops being expanded.
+        const stop = expansionPhaseStop(error);
+        if (stop === null) throw error;
+        runBodyBudgetStop = stop;
+        break;
+      }
       if (authored.kind === "HALTED") {
         const indices = plannedSubtreeIndices;
         indices.forEach((index) => haltedIndices.add(index));
@@ -3483,12 +3567,16 @@ export class WalkingSkeletonRunner {
     // attacks its named target; both S07 edges carry UNKNOWN magnitude until
     // independently judged.
     for (const exchange of buildCrossRootExchangePlan(effectiveMakerCount)) {
+      // C1: same rule as the expansion loop above.
+      if (runBodyBudgetStop !== null) break;
       const authorRoot = authoredNodes.get(exchange.authorRootIndex);
       const targetRoot = authoredNodes.get(exchange.targetRootIndex);
       if (authorRoot === undefined || targetRoot === undefined) {
         throw new TypedDomainError("DEBATE_ROOT_MISSING", "A cross-root exchange requires both authored roots");
       }
-      const authored = await authorPosition({
+      let authored: Awaited<ReturnType<typeof authorPosition>>;
+      try {
+      authored = await authorPosition({
         authorIndex: exchange.authorIndex,
         leg: {
           kind: "cross-root",
@@ -3511,6 +3599,12 @@ export class WalkingSkeletonRunner {
           { targetNodeId: targetRoot.nodeId, targetStatement: targetRoot.statement, polarity: "attack" }
         ]
       });
+      } catch (error) {
+        const stop = expansionPhaseStop(error);
+        if (stop === null) throw error;
+        runBodyBudgetStop = stop;
+        break;
+      }
       if (authored.kind === "HALTED") {
         haltedExpansionRecords.push(authored.record);
       } else {
@@ -4163,13 +4257,22 @@ export class WalkingSkeletonRunner {
         downgradedBand: steppedDown
       }).certaintyBand ?? capped;
     };
-    const initialEnvelopeDecision = await evaluateEnvelope();
+    /**
+     * C1 (review round 2): the run body's own spend stop is asked HERE, the
+     * first point at which the ruled terminal can be built — the propagation
+     * has run, the served root is chosen and the fact bundle exists, so the
+     * components the run produced before it ran out are exactly what this
+     * terminal serves. A money or usage stop during authoring, expansion or
+     * review arrives as `runBodyBudgetStop` rather than as an exception,
+     * because there was no terminal to build where it was raised.
+     */
+    const initialEnvelopeDecision = await evaluateEnvelope(0, runBodyBudgetStop !== null);
     let result: Awaited<ReturnType<typeof runServeGateChain>>;
     // F4: no `restatementStatus === "PASS"` conjunct. The envelope terminal
     // fires on HARD_STOP whenever no served statement exists yet, independent
     // of restatement status — never serving over budget.
     if (initialEnvelopeDecision.kind === "HARD_STOP") {
-      result = await makeEnvelopeTerminal(initialEnvelopeDecision);
+      result = await makeEnvelopeTerminal(initialEnvelopeDecision, runBodyBudgetStop ?? "ATTEMPTS");
     } else {
       await recordEnvelope(initialEnvelopeDecision);
       const candidateConfidenceBand = await servedCandidateConfidenceBand();
