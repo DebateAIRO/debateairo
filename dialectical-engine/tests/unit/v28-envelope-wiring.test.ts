@@ -2,11 +2,13 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   AskRefusal,
+  askRefusalPublicMessage,
   askRefusalRetryAfter,
   askRefusalStatus,
   evaluateAskAdmission,
   type RunCreationSettings
 } from "../../apps/api/src/index.js";
+import { dailyCostEnvelopeReached } from "@debateai/budget";
 import { TypedDomainError } from "@debateai/kernel";
 
 /**
@@ -174,5 +176,44 @@ describe("R1 — the day-spent refusal is a retry, not a rejection", () => {
 
   it("sends no Retry-After for a refusal that retrying will not fix", () => {
     expect(askRefusalRetryAfter("MAKER_INVENTORY_UNSATISFIED", new Date())).toBeNull();
+  });
+});
+
+/**
+ * RE-REVIEW I6 — THE 429 BODY WAS TELLING EVERY CALLER WHAT THE DEPLOYMENT
+ * SPENDS.
+ *
+ * `dailyCostEnvelopeReached` builds "spent N of M USD micro-units today" so the
+ * operator can see how close the day was, and the ask boundary returns
+ * `knownError.message` as the public body for any status below 500. So an
+ * anonymous caller who asked once after midnight could read the deployment's
+ * daily ceiling, and by asking again could watch the spend climb — a commercial
+ * figure, and a capacity oracle for anyone wanting to exhaust it. Same class as
+ * the support status-page leak (DL1-F4).
+ *
+ * The public body carries the CODE and `Retry-After`. The figures stay on the
+ * error for the operator's log, which is where they were useful.
+ */
+describe("I6 — the day-spent body tells the caller nothing about the money", () => {
+  it("returns the code, not the message, for the daily refusal", () => {
+    const refusal = dailyCostEnvelopeReached({
+      kind: "REACHED", spentMicrosToday: 1_999_999, ceilingMicros: 2_000_000
+    });
+
+    // The message the operator needs still exists on the error...
+    expect(refusal.message).toContain("1999999");
+    expect(refusal.message).toContain("2000000");
+    // ...and none of it reaches the caller.
+    const body = askRefusalPublicMessage(refusal.code, refusal.message);
+    expect(body).toBe("DAILY_COST_ENVELOPE_REACHED");
+    expect(body).not.toContain("1999999");
+    expect(body).not.toContain("2000000");
+  });
+
+  it("leaves every other ask refusal's message alone", () => {
+    // Those messages describe the ASK, which the caller sent, so withholding
+    // them would only make a well-formed refusal unactionable.
+    expect(askRefusalPublicMessage("MAKER_INVENTORY_UNSATISFIED", "no healthy maker"))
+      .toBe("no healthy maker");
   });
 });

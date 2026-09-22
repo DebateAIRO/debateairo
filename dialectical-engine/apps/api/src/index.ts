@@ -251,6 +251,17 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "CONVERGENCE_CONTROLS_INVALID",
   "CONVERGENCE_CONTROLS_PROVENANCE_MISSING",
   "CONVERGENCE_CONTROLS_UNRESOLVED",
+  "COST_ENVELOPE_CEILING_INVALID",
+  "COST_ENVELOPE_CHARGE_UNREPRESENTABLE",
+  "COST_ENVELOPE_DAY_INVALID",
+  "COST_ENVELOPE_GUARD_INPUT_INVALID",
+  "COST_ENVELOPE_PRICE_INVALID",
+  "COST_ENVELOPE_PRICE_UNPRICED",
+  "COST_ENVELOPE_PROJECTION_INVALID",
+  "COST_ENVELOPE_RESERVATION_TTL_INVALID",
+  "COST_ENVELOPE_RUN_REQUIRED",
+  "COST_ENVELOPE_SPEND_INVALID",
+  "COST_ENVELOPE_USAGE_INVALID",
   "CRITERION_ID_DUPLICATE",
   "CRITERION_ID_INVALID",
   "CRITERION_LABEL_INVALID",
@@ -1279,6 +1290,24 @@ export function askRefusalStatus(code: string): 422 | 429 {
   return code === "DAILY_COST_ENVELOPE_REACHED" ? 429 : 422;
 }
 
+/**
+ * I6 (re-review) — WHAT THE CALLER IS TOLD.
+ *
+ * The daily refusal's message carries the deployment's ceiling and its spend so
+ * far, because that is what an operator needs to see. It is NOT what a caller
+ * needs: it is a commercial figure, and a capacity oracle for anyone who wants
+ * to exhaust the day — ask once, read the ceiling, ask again and watch the
+ * number climb. Same class as the support status-page leak DL1-F4.
+ *
+ * So the public body for this one refusal is the CODE. Every other ask refusal
+ * keeps its message, because those describe the ASK the caller sent and
+ * withholding them would only make a lawful refusal unactionable. The figures
+ * stay on the error, and the boundary logs them for the operator.
+ */
+export function askRefusalPublicMessage(code: string, message: string): string {
+  return code === "DAILY_COST_ENVELOPE_REACHED" ? code : message;
+}
+
 /** The HTTP-date for the next UTC midnight, or `null` when retrying cannot help. */
 export function askRefusalRetryAfter(code: string, now: Date): string | null {
   if (askRefusalStatus(code) !== 429) return null;
@@ -1625,9 +1654,21 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // library that honours the header waits exactly as long as it must.
     const retryAfter = askRefusal ? askRefusalRetryAfter(knownError.code, new Date()) : null;
     if (retryAfter !== null) reply.header("retry-after", retryAfter);
+    // I6: the spend figures the refusal carries are the OPERATOR's, so they are
+    // logged here and withheld from the body below.
+    if (askRefusal && askRefusalPublicMessage(knownError.code, knownError.message) !== knownError.message) {
+      console.error(JSON.stringify(Object.freeze({
+        event: "api.ask.refused",
+        requestId: request.id,
+        code: knownError.code,
+        detail: knownError.message
+      })));
+    }
     return reply.status(statusCode).send({
       error: errorCode,
-      message: statusCode >= 500 || malformed ? errorCode : knownError.message
+      message: statusCode >= 500 || malformed
+        ? errorCode
+        : askRefusal ? askRefusalPublicMessage(knownError.code, knownError.message) : knownError.message
     });
   });
 

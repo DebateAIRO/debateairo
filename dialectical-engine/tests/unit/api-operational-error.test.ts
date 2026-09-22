@@ -100,6 +100,17 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "CONVERGENCE_CONTROLS_INVALID",
   "CONVERGENCE_CONTROLS_PROVENANCE_MISSING",
   "CONVERGENCE_CONTROLS_UNRESOLVED",
+  "COST_ENVELOPE_CEILING_INVALID",
+  "COST_ENVELOPE_CHARGE_UNREPRESENTABLE",
+  "COST_ENVELOPE_DAY_INVALID",
+  "COST_ENVELOPE_GUARD_INPUT_INVALID",
+  "COST_ENVELOPE_PRICE_INVALID",
+  "COST_ENVELOPE_PRICE_UNPRICED",
+  "COST_ENVELOPE_PROJECTION_INVALID",
+  "COST_ENVELOPE_RESERVATION_TTL_INVALID",
+  "COST_ENVELOPE_RUN_REQUIRED",
+  "COST_ENVELOPE_SPEND_INVALID",
+  "COST_ENVELOPE_USAGE_INVALID",
   "CRITERION_ID_DUPLICATE",
   "CRITERION_ID_INVALID",
   "CRITERION_LABEL_INVALID",
@@ -827,7 +838,12 @@ describe("API operational error diagnostics", () => {
       // code constant, a member of the gateway's refusal inventory, and a key of
       // the runner's envelope-stop map.
       for (const match of source.matchAll(
-        /"((?:RUN_COST_ENVELOPE|DAILY_COST_ENVELOPE|PROVIDER_USAGE)_[A-Z_]+)"/gu
+        // RE-REVIEW I4: the prefix set missed `COST_ENVELOPE_PRICE_UNPRICED` —
+        // the C2 control, raised per call at run time — because the regex only
+        // knew the three prefixes round 2 happened to have written. The whole
+        // `COST_ENVELOPE_` family is swept now, so the next one is covered
+        // before anyone notices it exists.
+        /"((?:COST_ENVELOPE|RUN_COST_ENVELOPE|DAILY_COST_ENVELOPE|PROVIDER_USAGE)_[A-Z_]+)"/gu
       )) swept.add(match[1]!);
     }
 
