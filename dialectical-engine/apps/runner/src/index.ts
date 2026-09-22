@@ -119,7 +119,7 @@ import {
   type VerdictLabelBasis
 } from "@debateai/serve";
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
-import { SERVED_ROOT_SELECTION_RULE, TypedDomainError, type CompositionBudgetTier, type ServedRootRule, type WayOfKnowing } from "@debateai/kernel";
+import { SERVED_ROOT_SELECTION_RULE, TypedDomainError, exhaustive, type CompositionBudgetTier, type ServedRootRule, type WayOfKnowing } from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 
@@ -2029,6 +2029,7 @@ export function decideMakerPositionServe<T extends MakerPositionDisclosureRoot>(
           ...input.materialisedNodeIds.filter((nodeId) => !reviewed.has(nodeId) && !unjudged.has(nodeId))
         ]);
       }
+      default: return exhaustive(footing);
     }
   })();
   const standing = projectJudgedStanding(input.snapshot, judgedStandingSeed);
