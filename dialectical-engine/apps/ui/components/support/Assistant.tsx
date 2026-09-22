@@ -151,16 +151,33 @@ const REQUEST_UNAVAILABLE = Object.freeze({
   ro: "Serviciul de suport nu este disponibil acum. Încearcă din nou sau alege „Vorbește cu o persoană”."
 });
 
+/**
+ * DL1-F5c: what the stored transcript says about an open case, and what the
+ * page shows once the bearer is gone — a reload, another tab, the next person
+ * at a shared browser. The API's own acknowledgement sentence carries the
+ * 30-day case capability twice (the code and the link); this one carries it
+ * nowhere, so it is what rests in `sessionStorage`.
+ */
+const CASE_OPENED_NOTICE = Object.freeze({
+  en: "A case is open for a person to read. Its code is never kept in this browser, so it is not shown here — use the case link from when it was opened, or ask for a person again.",
+  ro: "Un caz este deschis pentru ca o persoană să îl citească. Codul lui nu este păstrat în acest browser, așa că nu este afișat aici — folosește linkul cazului de la deschidere sau cere din nou o persoană."
+});
+
 const STATIC_ROUTES = new Set(["/","/new","/login","/sign-up","/settings","/help"]);
 const PUBLIC_DEBATE = /^\/public\/debate\/[A-Za-z0-9_-]+$/u;
+/** The API's case-capability grammar (`apps/api/src/support/session.ts`). */
+const CASE_BEARER = /^[A-Za-z0-9_-]{43}$/u;
 const SUPPORT_CASE = /^\/help(?:[?]|#)case=([A-Za-z0-9_-]{43})$/u;
 
 /**
- * DL3-F4: the single place a case link becomes an href. The API still mints the
- * retired `/help?case=…` form, so it is still recognised here — and rendered as
- * `/help#case=…`, because a bearer in the query string reaches the address bar,
- * browser history and any future access log, and a bearer in the fragment does
- * not reach a server at all.
+ * DL3-F4: the single place a case link becomes an href. The API mints the
+ * fragment form only (`apps/api/src/support/index.ts`, DL1-F5c), and the
+ * retired `/help?case=…` form is still recognised here for one release, for a
+ * link a person saved before the change — and rendered as `/help#case=…`,
+ * because a bearer in the query string reaches the address bar, browser history
+ * and any future access log, and a bearer in the fragment does not reach a
+ * server at all. Corrected in the final-review fix wave: the sentence above
+ * this function used to say the API still minted the query form.
  */
 function safeFirstPartyLink(link: string | undefined): string | null {
   if (link === undefined) return null;
@@ -171,7 +188,7 @@ function safeFirstPartyLink(link: string | undefined): string | null {
 
 function caseAcknowledgement(body: Readonly<Record<string,unknown>>): SupportCaseAcknowledgement | null {
   if (typeof body.case_acknowledgement !== "string"
-    || typeof body.case_token !== "string" || !/^[A-Za-z0-9_-]{43}$/u.test(body.case_token)
+    || typeof body.case_token !== "string" || !CASE_BEARER.test(body.case_token)
     || typeof body.sla_hours !== "number" || !Number.isSafeInteger(body.sla_hours)
     // DL1-F5c: the API mints the fragment form and nothing else, so the
     // tolerance for a query-string bearer from the server is gone. The
@@ -290,6 +307,33 @@ export const supportAssistantClient: SupportAssistantClient = Object.freeze({
 
 type ConversationMessage = SupportConversationMessage;
 
+/** DL1-F5c: the case capability, for as long as this page is on screen. */
+type SupportCaseBearer = Readonly<{ token: string;text: string }>;
+
+/**
+ * The only door a case bearer takes into this component's memory. The
+ * acknowledgement path has already checked the grammar; the escalate reply is a
+ * bare `{case_token,text}`, and a link is built only from a value that reads
+ * like the capability it claims to be.
+ */
+function caseBearerOf(token: string,text: string): SupportCaseBearer | null {
+  return CASE_BEARER.test(token) ? Object.freeze({ token,text }) : null;
+}
+
+/**
+ * The acknowledgement as it may rest in the browser: the fact that a case was
+ * opened, never the code that opens it. The id is the message's position, so it
+ * is a stable React key that carries nothing (it used to be `case-<token>`).
+ */
+function caseOpenedMessage(
+  index: number,language: SupportAssistantLanguage
+): ConversationMessage {
+  return Object.freeze({
+    id: `case-${index}`,role: "assistant" as const,
+    text: CASE_OPENED_NOTICE[language],caseOpened: true as const
+  });
+}
+
 export { SUPPORT_CONVERSATION_STORAGE_KEY };
 
 export function Assistant({
@@ -309,6 +353,14 @@ export function Assistant({
   // DL3-F3: the capability lives here and nowhere else. It is never written to
   // sessionStorage, so it cannot outlive the page that minted it.
   const [session,setSession] = useState<SupportSession | null>(null);
+  /**
+   * DL1-F5c: the case capability lives here and in the URL fragment, and in
+   * neither `sessionStorage` nor the transcript: it reads a whole case and
+   * replies as the reporter for thirty days, with no cookie, for anyone holding
+   * it. The stored acknowledgement is the token-free notice; this is what puts
+   * the code and its link back on screen for the page that opened the case.
+   */
+  const [caseBearer,setCaseBearer] = useState<SupportCaseBearer | null>(null);
   const [messages,setMessages] = useState<readonly ConversationMessage[]>([
     { id: "disclosure",role: "assistant",text: DISCLOSURE.en }
   ]);
@@ -421,6 +473,8 @@ export function Assistant({
 
   function beginNewConversation(): void {
     setSession(null);
+    // DL1-F5c: the bearer goes with the transcript it belongs to.
+    setCaseBearer(null);
     setMessages([{ id: "disclosure",role: "assistant",text: DISCLOSURE[language] }]);
     setOwnContext({ latest: true });
     setActiveTopic("reading");
@@ -431,6 +485,11 @@ export function Assistant({
 
   function appendReply(response: SupportReply): void {
     if (response.outcome === "SHREDDED") setSession(null);
+    const acknowledgement = response.caseAcknowledgement;
+    // DL1-F5c: the code and the link go to memory, the fact goes to the transcript.
+    if (acknowledgement !== undefined) {
+      setCaseBearer(caseBearerOf(acknowledgement.token,acknowledgement.text));
+    }
     setMessages((current) => [
       ...current,
       {
@@ -438,10 +497,7 @@ export function Assistant({
         role: "assistant",text: redactSupportText(response.text).text,
         outcome: response.outcome,...(response.link === undefined ? {} : { link: response.link })
       },
-      ...(response.caseAcknowledgement === undefined ? [] : [{
-        id: `case-${response.caseAcknowledgement.token}`,role: "assistant" as const,
-        text: response.caseAcknowledgement.text,link: response.caseAcknowledgement.link
-      }])
+      ...(acknowledgement === undefined ? [] : [caseOpenedMessage(current.length + 1,language)])
     ]);
   }
 
@@ -527,9 +583,8 @@ export function Assistant({
       if (isSupportReply(opened)) {
         appendReply(opened);
       } else {
-        setMessages((current) => [...current,{
-          id: `case-${opened.token}`,role: "assistant",text: opened.text
-        }]);
+        setCaseBearer(caseBearerOf(opened.token,opened.text));
+        setMessages((current) => [...current,caseOpenedMessage(current.length,language)]);
       }
     } catch {
       appendReply({ messageId: "",outcome: "DEGRADED",text: REQUEST_UNAVAILABLE[language] });
@@ -549,10 +604,8 @@ export function Assistant({
       if (isSupportReply(acknowledgement)) {
         appendReply(acknowledgement);
       } else {
-        setMessages((current) => [...current,{
-          id: `case-${acknowledgement.token}`,role: "assistant",
-          text: acknowledgement.text,link: acknowledgement.link
-        }]);
+        setCaseBearer(caseBearerOf(acknowledgement.token,acknowledgement.text));
+        setMessages((current) => [...current,caseOpenedMessage(current.length,language)]);
       }
     } catch {
       appendReply({ messageId: "",outcome: "DEGRADED",text: REQUEST_UNAVAILABLE[language] });
@@ -585,20 +638,32 @@ export function Assistant({
     <button type="button" aria-pressed={language === "ro"} onClick={() => chooseLanguage("ro")}>RO</button>
   </div>;
 
+  /**
+   * DL1-F5c: the acknowledgement the in-memory bearer belongs to — the newest
+   * one, which is the case this page just opened. Every other acknowledgement,
+   * and all of them after a reload or in another tab, render the stored
+   * token-free notice with no link, because the code is not there to render.
+   */
+  const liveCaseMessageId = caseBearer === null ? null : messages.reduce<string | null>(
+    (latest,message) => message.caseOpened === true ? message.id : latest,null
+  );
+
   const conversation = <div className="supportConversation" aria-label="Support conversation" aria-live="polite">
     {messages.map((message) => {
-      const link = safeFirstPartyLink(message.link);
+      const bearer = caseBearer !== null && message.id === liveCaseMessageId ? caseBearer : null;
+      const text = bearer === null ? message.text : bearer.text;
+      const link = bearer === null ? safeFirstPartyLink(message.link) : supportCaseLink(bearer.token);
       return <article className={`supportMessage supportMessage--${message.role}`} key={message.id} data-role={message.role}>
         {message.role === "assistant" ? <div className="supportMessageShell">
           <div className="supportMessageTab" aria-hidden />
           <div className="supportMessageCore">
-            <p>{message.text}</p>
+            <p>{text}</p>
             {link === null ? null : <footer className="supportCitation">
               <span>DOCS · PRODUCT GUIDE</span>
               <a href={link}>View source →</a>
             </footer>}
           </div>
-        </div> : <p>{message.text}</p>}
+        </div> : <p>{text}</p>}
       </article>;
     })}
   </div>;
