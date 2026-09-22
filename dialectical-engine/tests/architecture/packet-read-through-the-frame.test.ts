@@ -40,7 +40,41 @@ import { describe, expect, it } from "vitest";
  * which is model output and not a packet) must not trip it.
  */
 
-const SCANNED_ROOTS = ["tests/integration", "tests/support", "acceptance"] as const;
+/**
+ * INT1 (2026-09-22), T9 x T10. `tests/unit` joined the scan after the two
+ * packages clashed there: task 10c's "reaches the new vendor with the header
+ * built from its key file" posted `packet: { messages: [...] }` to the real
+ * `OpenAICompatibleProviderGateway`, task 9's door refused it
+ * `PROMPT_FRAME_ABSENT`, and neither review saw it coming because shape 3 was
+ * not looked for in this tree. It is now.
+ */
+const SCANNED_ROOTS = ["tests/integration", "tests/support", "acceptance", "tests/unit"] as const;
+
+/**
+ * Shape 4 — the frame's own spelling written out in a literal — is looked for
+ * in the three trees the UNIT GATE DOES NOT RUN, which is the whole reason this
+ * row exists: a private copy of the block layout rots there unseen, for months.
+ *
+ * `tests/unit` is deliberately not among them. This narrows the RULE; it is not
+ * a hole in the directory, because shapes 1–3 still apply there. Four unit
+ * suites have the frame's spelling as their SUBJECT and cannot express what
+ * they measure without writing it out:
+ *
+ *   - `prompt-frame.test.ts` — the builder's own tests: the minted fence's
+ *     pattern, a forced collision, a tampered boundary marker;
+ *   - `prompt-injection-corpus.test.ts` — layer 4's attack payloads, which forge
+ *     the fence and the envelope on purpose, and the mask that strips both
+ *     before the clean and attacked renders are compared;
+ *   - `judgement-prompt-source.test.ts` — contracts carrying a reserved frame
+ *     token, which `buildFramedPrompt` must refuse at build time;
+ *   - `judgement.test.ts` — the exact envelope a hand-off emits, pinned.
+ *
+ * Every one of those runs in `pnpm run test:ci-gate` on every commit, so a
+ * spelling that drifts from `prompt-frame.ts` goes red within seconds — the
+ * opposite of the silent rot shape 4 was written for. A hand-rolled READER that
+ * matters is caught by shapes 1–3 wherever it lives.
+ */
+const FRAME_LITERAL_ROOTS = ["tests/integration", "tests/support", "acceptance"] as const;
 
 const ITERATION_METHODS = new Set([
   "find", "findLast", "findIndex", "map", "filter", "some", "every", "forEach", "flatMap"
@@ -81,7 +115,45 @@ function unwrap(node: ts.Expression): ts.Expression {
 
 const NAMES_MESSAGES = /\bmessages\b/u;
 
-export function scanPacketShapes(file: string, source: string): readonly PacketShapeOffence[] {
+/**
+ * THE ONE ALLOWANCE for shape 3, and the reason it cannot be abused: a packet
+ * built by hand is permitted only where the statement around it asserts one of
+ * the DOOR'S OWN refusals. Such a call is proving that `assertFramedPrompt`
+ * REFUSES the packet, so by construction it never leaves the process and can
+ * never be a hand-off that skipped the frame. A case that expects the call to
+ * SUCCEED cannot satisfy this and must use the builder.
+ *
+ * It needs no annotation in the test: the assertion already says what the case
+ * is for, which is one fewer marker to keep honest.
+ */
+const ASSERTS_DOOR_REFUSAL = /\bPROMPT_FRAME_[A-Z_]+\b/u;
+
+/**
+ * The smallest complete statement around a node: walk up until the parent is a
+ * statement container. Scoped this tightly so the allowance reads ONE `expect`,
+ * never a whole `describe` block that happens to mention a frame code elsewhere.
+ */
+function enclosingStatement(node: ts.Node): ts.Node {
+  let cursor = node;
+  while (cursor.parent !== undefined && !ts.isBlock(cursor.parent) && !ts.isSourceFile(cursor.parent)
+    && !ts.isModuleBlock(cursor.parent) && !ts.isCaseClause(cursor.parent)
+    && !ts.isDefaultClause(cursor.parent)) {
+    cursor = cursor.parent;
+  }
+  return cursor;
+}
+
+export interface PacketShapeScanOptions {
+  /** Shape 4. False under `tests/unit` — see `FRAME_LITERAL_ROOTS`. */
+  readonly frameLiterals?: boolean;
+}
+
+export function scanPacketShapes(
+  file: string,
+  source: string,
+  options: PacketShapeScanOptions = {}
+): readonly PacketShapeOffence[] {
+  const frameLiterals = options.frameLiterals ?? true;
   const root = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   const offences: PacketShapeOffence[] = [];
   const lineOf = (node: ts.Node): number => root.getLineAndCharacterOfPosition(node.getStart(root)).line + 1;
@@ -131,13 +203,15 @@ export function scanPacketShapes(file: string, source: string): readonly PacketS
     if (ts.isPropertyAssignment(node) && node.name.getText(root) === "packet") {
       const value = unwrap(node.initializer);
       if (ts.isObjectLiteralExpression(value)
-        && value.properties.some((property) => property.name?.getText(root) === "messages")) {
+        && value.properties.some((property) => property.name?.getText(root) === "messages")
+        && !ASSERTS_DOOR_REFUSAL.test(enclosingStatement(node).getText(root))) {
         offences.push({ file, line: lineOf(node), rule: "HAND_BUILT_GATEWAY_PACKET" });
       }
     }
     // Shape 4: the fence or the envelope format spelled in a literal
-    if (ts.isStringLiteralLike(node) || ts.isRegularExpressionLiteral(node) || ts.isTemplateHead(node)
-      || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) {
+    if (frameLiterals
+      && (ts.isStringLiteralLike(node) || ts.isRegularExpressionLiteral(node) || ts.isTemplateHead(node)
+      || ts.isTemplateMiddle(node) || ts.isTemplateTail(node))) {
       const text = node.getText(root);
       if (FRAME_LITERALS.some((literal) => literal.test(text))) {
         offences.push({ file, line: lineOf(node), rule: "HAND_ROLLED_FRAME_READER" });
@@ -189,6 +263,26 @@ describe("a model packet is read through the frame, never parsed bare (V-11 adde
     expect(offend("gateway.call({ packet: buildFramedPrompt({ contract, material }).packet });")).toEqual([]);
     // A relay probe posts messages to the relay's own HTTP surface: allowed.
     expect(offend("postMessages(relay.handle, [{ role: 'user', content }]);")).toEqual([]);
+    // Shape 3, THE ONE ALLOWANCE: a case proving the DOOR refuses the packet.
+    expect(offend([
+      "await expect(provider.classify({",
+      "  packet: { messages: [{ role: 'user', content: 'samples' }] }",
+      "})).rejects.toMatchObject({ code: 'PROMPT_FRAME_ABSENT' });"
+    ].join("\n"))).toEqual([]);
+    expect(offend([
+      "expect(() => gateway.call({ packet: { messages: [notTheFence] } }))",
+      "  .toThrow(expect.objectContaining({ code: 'PROMPT_FRAME_FENCE_MISMATCH' }));"
+    ].join("\n"))).toEqual([]);
+    // ...and it reaches ONE statement, never a neighbour that merely names a code.
+    expect(offend([
+      "await expect(a.call({ packet: unframed })).rejects.toMatchObject({ code: 'PROMPT_FRAME_ABSENT' });",
+      "await b.call({ packet: { messages: [{ role: 'user', content: 'ping' }] } });"
+    ].join("\n"))).toEqual(["2:HAND_BUILT_GATEWAY_PACKET"]);
+    // A refusal that is not the door's does not buy a hand-built packet.
+    expect(offend([
+      "await expect(gateway.call({ packet: { messages: [{ role: 'user', content: 'x' }] } }))",
+      "  .rejects.toMatchObject({ code: 'RUN_COST_ENVELOPE_EXHAUSTED' });"
+    ].join("\n"))).toEqual(["1:HAND_BUILT_GATEWAY_PACKET"]);
     // Shape 4.
     expect(offend("const fence = /#\\|DEBATEAI-FENCE-[0-9a-f]{32}\\|#/u.exec(system)?.[0];"))
       .toEqual(["1:HAND_ROLLED_FRAME_READER"]);
@@ -201,7 +295,23 @@ describe("a model packet is read through the frame, never parsed bare (V-11 adde
     ].join("\n"))).toEqual([]);
   });
 
-  it("finds none of them under tests/integration/, tests/support/ or acceptance/", async () => {
+  /**
+   * Shape 4 off is a narrowing of ONE shape, never of the file: shapes 1–3 keep
+   * their full force on the same source. This is what `tests/unit` is scanned
+   * with, so the pair below is the whole difference between the two roots.
+   */
+  it("drops only shape 4 where the frame's spelling is the subject", () => {
+    const source = [
+      "expect(framed.fence).toMatch(/#\\|DEBATEAI-FENCE-[0-9a-f]{32}\\|#/u);",
+      "await gateway.call({ packet: { messages: [{ role: 'user', content: 'ping' }] } });"
+    ].join("\n");
+    const rules = (options: { readonly frameLiterals?: boolean }): readonly string[] =>
+      scanPacketShapes("fixture.ts", source, options).map((offence) => `${offence.line}:${offence.rule}`);
+    expect(rules({})).toEqual(["1:HAND_ROLLED_FRAME_READER", "2:HAND_BUILT_GATEWAY_PACKET"]);
+    expect(rules({ frameLiterals: false })).toEqual(["2:HAND_BUILT_GATEWAY_PACKET"]);
+  });
+
+  it("finds none of them under tests/integration/, tests/support/, acceptance/ or tests/unit/", async () => {
     const files = (await Promise.all(SCANNED_ROOTS.map((rootDirectory) => typescriptFiles(rootDirectory)))).flat().sort();
     // Vacuity guard: the trees are large; an empty scan is a broken scan.
     expect(files.length).toBeGreaterThan(80);
@@ -211,7 +321,8 @@ describe("a model packet is read through the frame, never parsed bare (V-11 adde
 
     const offenders: string[] = [];
     for (const file of files) {
-      for (const offence of scanPacketShapes(file, await readFile(file, "utf8"))) {
+      const frameLiterals = FRAME_LITERAL_ROOTS.some((rootDirectory) => file.startsWith(`${rootDirectory}/`));
+      for (const offence of scanPacketShapes(file, await readFile(file, "utf8"), { frameLiterals })) {
         offenders.push(`${offence.file}:${offence.line} ${offence.rule}`);
       }
     }
