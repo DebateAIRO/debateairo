@@ -286,9 +286,20 @@ export function createReservedSupportModelPort(input: Readonly<{
         // here is that the refusal carries the name the route layer has always
         // had for this condition, and the operator gets one line naming the ref
         // that could not be composed. A ref is configuration, never a secret.
-        input.reportDiagnostic?.({
+        // Re-review finding 1: the sink is the caller's code. Unguarded, a sink
+        // that throws escaped as a plain TypeError, which `answer.ts` re-throws
+        // instead of degrading — a 500 to the visitor caused by a broken log
+        // line. The guard is the one this repository already uses for a support
+        // diagnostic (`support/index.ts`): try the sink, fall back to the
+        // console. Nothing here holds a credential, so a log line is lawful.
+        const diagnostic = Object.freeze({
           code: `SUPPORT_RELAY_NOT_COMPOSED:${result.modelRef}`
         });
+        try {
+          (input.reportDiagnostic ?? console.error)(diagnostic);
+        } catch {
+          console.error(diagnostic);
+        }
         throw new SupportModelError("SUPPORT_RELAY_NOT_COMPOSED");
       }
       let durable: Readonly<{ kind: "RECORDED" | "DAILY_CAP" }>;

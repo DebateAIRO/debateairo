@@ -9,6 +9,7 @@ import {
   RelayAdapter,
   SUPPORT_HERMES_MODEL,
   SUPPORT_HERMES_PROVIDER_REF,
+  SUPPORT_MODEL_STARTUP_REFUSAL_CODES,
   createSupportModelAdapter,
   parseSupportModelTargetJson
 } from "../../apps/api/src/support/model.js";
@@ -209,6 +210,66 @@ describe("V-30 hosted: the support chat reaches a paid API and refuses a relay",
     expect(seen).toEqual([]);
   });
 
+  /**
+   * Re-review finding 1. The diagnostic sink is the caller's code, and a sink
+   * that throws must never change what the visitor gets. Unguarded, this call
+   * sat inside `complete()`'s own `try`, so a broken log line turned a vendor
+   * answer that had ALREADY BEEN PAID FOR into SUPPORT_MODEL_UNAVAILABLE and
+   * opened the degraded circuit.
+   *
+   * The guard swallows and COUNTS rather than falling back to a log line: this
+   * module holds a vendor credential and is pinned to contain no `console.` at
+   * all, so a readable count is the honest record it is allowed to keep.
+   */
+  it("keeps the vendor's answer when the diagnostic sink throws, and counts the loss", async () => {
+    const path = credentialFile(VENDOR_CREDENTIAL);
+    const adapter = createSupportModelAdapter(
+      parseSupportModelTargetJson(vendorTarget({ authorization_file: path }), HOSTED),
+      {
+        readAuthorizationHeader: readCustodyAuthorizationHeader,
+        fetchImplementation: recordingFetch({
+          ...ANSWER, usage: { prompt_tokens: 9, completion_tokens: 4 }
+        }).implementation,
+        reportDiagnostic: () => { throw new TypeError("the sink is broken"); }
+      }
+    );
+    const completion = await adapter.complete(ask());
+    expect(completion.text).toBe("the answer");
+    expect(completion.usage).toEqual({ input_tokens: 9, output_tokens: 4 });
+    expect(adapter.diagnosticFailures()).toBe(1);
+  });
+
+  /**
+   * Re-review finding 2. `??` stops at a `cost_usd` that is PRESENT and
+   * unusable, so a vendor that reports `cost_usd: null` (or a string, or a
+   * negative) alongside a usable `x_cost_usd` lost the money it did report.
+   * RED was recorded by inlining the old form:
+   *   `const costUsd = row.cost_usd ?? row.x_cost_usd;`
+   * which yields `usage.cost_usd` undefined for every row below.
+   */
+  it.each([
+    // `null` survives `??` on its own; it is here because it is the shape
+    // vendors actually send, and because a non-finite number reaches the wire
+    // as `null` too — JSON has no NaN.
+    ["null", null],
+    ["a string", "0.004"],
+    ["negative", -1]
+  ])("falls through to the vendor's own cost field when cost_usd is %s", async (_name, costUsd) => {
+    const completion = await createSupportModelAdapter(
+      parseSupportModelTargetJson(
+        vendorTarget({ authorization_header: VENDOR_CREDENTIAL }), LOCAL
+      ),
+      {
+        readAuthorizationHeader: () => { throw new TypeError("NO_FILE_IS_READ_FOR_AN_INLINE_KEY"); },
+        fetchImplementation: recordingFetch({
+          ...ANSWER,
+          usage: { prompt_tokens: 11, completion_tokens: 5, cost_usd: costUsd, x_cost_usd: 0.004 }
+        }).implementation
+      }
+    ).complete(ask());
+    expect(completion.usage).toEqual({ input_tokens: 11, output_tokens: 5, cost_usd: 0.004 });
+  });
+
   it("says nothing about cost on the local relay, which reports its own", async () => {
     const seen: string[] = [];
     await createSupportModelAdapter(parseSupportModelTargetJson(RELAY_TARGET, LOCAL), {
@@ -283,7 +344,14 @@ describe("V-30 the hosted credential cannot escape", () => {
     const source = await readFile(
       new URL("../../apps/api/src/support/model.ts", import.meta.url), "utf8"
     );
-    expect(source).not.toMatch(/child_process|spawnSync|execFile|console\./u);
+    // The pin is on the CODE. Matching the raw file made the module's own
+    // comments unable to say the word — the guard added for re-review finding 1
+    // explains that it may not log, and the explanation tripped the pin.
+    const code = source
+      .replace(/\/\*[\s\S]*?\*\//gu, "")
+      .replace(/(^|[^:])\/\/.*$/gmu, "$1");
+    expect(code).toContain("class SupportChatCompletionsAdapter");
+    expect(code).not.toMatch(/child_process|spawnSync|execFile|console\s*\./u);
   });
 });
 
@@ -441,5 +509,29 @@ describe("V-30(2) the local-mode instructions say local mode is for a computer y
       expect(runbook, tool).toContain(tool);
     }
     expect(runbook).toMatch(/no-hang\s+proof/u);
+  });
+
+  /**
+   * Re-review finding 3, the same shape as task 10's pin on the credential
+   * reader's codes: the closed set is read from the SOURCE, so the kit's table
+   * of hosted refusals cannot fall behind a code the support chat can raise at
+   * start-up.
+   */
+  it("names every support start-up refusal in the kit's table of hosted refusals", async () => {
+    const source = await readFile(
+      new URL("../../apps/api/src/support/model.ts", import.meta.url), "utf8"
+    );
+    const declaration = source.indexOf("export const SUPPORT_MODEL_STARTUP_REFUSAL_CODES");
+    expect(declaration).toBeGreaterThan(-1);
+    const codes = [...source
+      .slice(declaration, source.indexOf("] as const);", declaration))
+      .matchAll(/"([A-Z_]+)"/gu)].map((match) => match[1]!);
+    expect(codes).toEqual([...SUPPORT_MODEL_STARTUP_REFUSAL_CODES]);
+    const kit = await readFile(
+      new URL("../../deploy/vps/README.md", import.meta.url), "utf8"
+    );
+    const section = kit.slice(kit.indexOf("## 11. Providers and vendors"));
+    expect(section).not.toBe("");
+    for (const code of codes) expect(section, code).toContain(code);
   });
 });

@@ -27,6 +27,18 @@ const PRINTABLE_HEADER_LINE = /^[\x20-\x7e]+$/u;
 /** The relay's inline bearer, pinned exactly as it has always been. */
 const RELAY_BEARER_LINE = /^Bearer [^\s]+$/u;
 
+/**
+ * The refusals a support model TARGET can raise at start-up that are this
+ * module's OWN — everything else a bad target can produce comes from the debate
+ * path and is listed in the kit beside the debate codes
+ * (`PROVIDER_*`, task 10). An INVENTORY, pinned against the kit's §11 table by
+ * test, so an operator is never met by a code the runbook does not name.
+ */
+export const SUPPORT_MODEL_STARTUP_REFUSAL_CODES = Object.freeze([
+  "SUPPORT_MODEL_PATH_NOT_RATIFIED",
+  "SUPPORT_MODEL_CREDENTIAL_ABSENT"
+] as const);
+
 export type SupportModelDeployment = Readonly<{
   mode: DeploymentMode;
   nodeEnv: string | undefined;
@@ -68,6 +80,15 @@ export interface SupportModelPort {
     language: "en" | "ro";
     signal?: AbortSignal;
   }>): Promise<Readonly<{ text: string;usage?: SupportModelUsage }>>;
+}
+
+/**
+ * A shipped transport: a port that also says how many diagnostics it could not
+ * deliver, because a module holding a vendor credential may not write a log
+ * line of its own (re-review finding 1).
+ */
+export interface SupportModelAdapter extends SupportModelPort {
+  diagnosticFailures(): number;
 }
 
 export class SupportModelError extends TypedDomainError {
@@ -386,6 +407,7 @@ class SupportChatCompletionsAdapter implements SupportModelPort {
   readonly #fetch: typeof fetch;
   readonly #transport: SupportTransportPolicy;
   readonly #report: ((diagnostic: Readonly<{ code: string }>) => void) | undefined;
+  #diagnosticFailures = 0;
 
   constructor(input: SupportModelAdapterInput, transport: SupportTransportPolicy) {
     let url: URL;
@@ -426,7 +448,24 @@ class SupportChatCompletionsAdapter implements SupportModelPort {
    */
   #reportMissingCost(usage: SupportModelUsage | undefined): void {
     if (this.#transport.reportsCost || usage?.cost_usd !== undefined) return;
-    this.#report?.({ code: "SUPPORT_MODEL_COST_UNREPORTED" });
+    // Re-review finding 1: the sink is the CALLER's code, and this call sits
+    // inside `complete()`'s own `try`. Unguarded, a sink that throws turned a
+    // vendor answer that had already been paid for into SUPPORT_MODEL_UNAVAILABLE
+    // and opened the degraded circuit — a broken log line costing money and an
+    // answer. The guard SWALLOWS AND COUNTS rather than falling back to a log
+    // line, because this module holds a vendor credential and is pinned to
+    // contain no `console.` at all; the count is the record it is allowed to
+    // keep, and `diagnosticFailures()` is how a caller or a test reads it.
+    try {
+      this.#report?.({ code: "SUPPORT_MODEL_COST_UNREPORTED" });
+    } catch {
+      this.#diagnosticFailures += 1;
+    }
+  }
+
+  /** How many diagnostics this adapter could not deliver. Never resets. */
+  diagnosticFailures(): number {
+    return this.#diagnosticFailures;
   }
 
   async complete(input: Parameters<SupportModelPort["complete"]>[0]) {
@@ -520,7 +559,7 @@ export function createSupportModelAdapter(
     fetchImplementation?: typeof fetch;
     reportDiagnostic?: (diagnostic: Readonly<{ code: string }>) => void;
   }>
-): SupportModelPort {
+): SupportModelAdapter {
   const authorizationHeader = target.authorizationFile === undefined
     ? target.authorizationHeader
     : resolveProviderTargetCredentials(

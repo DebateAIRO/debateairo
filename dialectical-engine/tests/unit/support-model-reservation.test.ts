@@ -490,6 +490,37 @@ describe("SUP-01 final model-call reservation", () => {
   });
 
   /**
+   * Re-review finding 1. The sink is the caller's code. Unguarded, a sink that
+   * throws escaped as a plain TypeError, which `answer.ts` re-throws rather than
+   * degrading — a 500 to the visitor instead of the DEGRADED answer, caused by a
+   * broken log line. The guard is the one this repository already uses
+   * (`support/index.ts:232-241`): try the sink, fall back to `console.error`.
+   */
+  it("still refuses with the typed code when the diagnostic sink throws", async () => {
+    const reservations = ledger();
+    const logged: unknown[] = [];
+    const consoleError = console.error;
+    console.error = (...parts: readonly unknown[]) => { logged.push(parts[0]); };
+    try {
+      const admitted = createReservedSupportModelPort({
+        configuration: configuration(enabledState()),
+        ledger: reservations,
+        durableCalls: recordedDurableCalls(),
+        modelFor: () => undefined,
+        reportDiagnostic: () => { throw new TypeError("the sink is broken"); },
+        nonce: () => "nonce-broken-sink-00000000000000000000"
+      });
+
+      await expect(admitted.complete({ system: "system",messages: [],language: "en" }))
+        .rejects.toMatchObject({ code: "SUPPORT_RELAY_NOT_COMPOSED" });
+    } finally {
+      console.error = consoleError;
+    }
+    expect(logged).toEqual([{ code: "SUPPORT_RELAY_NOT_COMPOSED:development:claude-cli" }]);
+    expect(reservations.activeCount()).toBe(0);
+  });
+
+  /**
    * DL1-F8. `#events` grew one frozen record per model call for the lifetime of
    * the process and nothing in production ever read it back, so the ledger's
    * memory tracked uptime x the daily cap. The retained window is now a fixed
