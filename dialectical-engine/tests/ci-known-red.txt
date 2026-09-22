@@ -34,14 +34,14 @@
 #     tripwire"): they pass solo; listing them would hide a real regression. Integration
 #     tests, outside this job's directories anyway.
 #   - registration.test.ts "S3c B4 keeps the isolated production RSS curve…": V-25 keys the
-#     bound by platform + architecture + Node version, so a host with no published entry —
-#     ubuntu, and any darwin_arm64 host not on node v22.23.1 — SKIPS it loudly, naming its
-#     own runtime. A skip is never a failure, so the case belongs on no list, and the 60 s
-#     child budget that killed it under node 26 is now 240 s (measured 105-110 s per run).
-#     The node v26.8.2 darwin_arm64 measurement was taken (worst curve 255.3 MiB of 14
-#     observations) and is deliberately NOT sealed: the ruled 32 MiB rounding increment
-#     leaves it 0.7 MiB of margin against a 22.6 MiB spread, so its headroom is an open
-#     owner ruling. Until that ruling, this Mac skips rather than gate on noise.
+#     bound by platform + architecture + Node version. node_v22.23.1_darwin_arm64 (256 MiB,
+#     history) and node_v26.8.2_darwin_arm64 (288 MiB) are published, so this Mac RUNS the
+#     case; a host with no entry — ubuntu — SKIPS it loudly, naming its own runtime. A skip
+#     is never a failure, so the case belongs on no list either way. The 60 s child budget
+#     that killed it under node 26 is now 240 s: the case adds about 110 s to the gate on
+#     this host. The 288 MiB ceiling is the headroom rule the coordinator amended on
+#     2026-09-22 (Task 3) — worst of at least ten rounds plus one 32 MiB increment — after
+#     14 rounds measured a 22.6 MiB spread that left the original rule 0.7 MiB of margin.
 
 tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > 'DebateCanvas agreed review mark' binds its 'agreed review verdict' role
 #   source: pristine dev@7bae9806, 2026-09-18. UI design-token pin owned by the apps/ui lane.

@@ -293,17 +293,22 @@ describe("S3 ruled authentication policy", () => {
     isolated_measurement_ceiling_mib: number;
     curve_rss_mib: Record<"0" | "25" | "50" | "100", number>;
   };
+  type IsolatedRuntimeVersion = {
+    ceiling_rule: string;
+    measurement_rounds?: number;
+    measurement: IsolatedRuntimeMeasurement;
+  };
   const RSS_RUNTIME = `node_${process.version}_${process.platform}_${process.arch}`;
   const RSS_MEASUREMENT_VERSIONS = (AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS
     .find((row) => row.rowKey === "rateLimitPolicy")!.value as {
       sketch_design: {
         isolated_limiter_resident_measurement_versions?: {
           measurement_rounding_increment_mib: number;
-          by_runtime: Record<string, IsolatedRuntimeMeasurement>;
+          by_runtime: Record<string, IsolatedRuntimeVersion>;
         };
       };
     }).sketch_design.isolated_limiter_resident_measurement_versions;
-  const RSS_MEASUREMENT = RSS_MEASUREMENT_VERSIONS?.by_runtime[RSS_RUNTIME];
+  const RSS_MEASUREMENT = RSS_MEASUREMENT_VERSIONS?.by_runtime[RSS_RUNTIME]?.measurement;
   if (RSS_MEASUREMENT === undefined) {
     const published = Object.keys(RSS_MEASUREMENT_VERSIONS?.by_runtime ?? {});
     console.warn(
@@ -326,27 +331,55 @@ describe("S3 ruled authentication policy", () => {
     // The exact published set. A runtime may only be added by the change that
     // measures it, and were an entry to vanish the live curve case would skip
     // in SILENCE on that host — the failure this list makes impossible.
-    // node_v26.8.2_darwin_arm64 is measured but NOT published: the ruled
-    // rounding rule leaves it 0.7 MiB of margin against a 22.6 MiB spread, so
-    // its headroom awaits an owner ruling (see the row's own note). Until then
-    // this host skips loudly rather than compare against a bound it can breach.
     expect(Object.keys(versions!.by_runtime).sort())
-      .toEqual(["node_v22.23.1_darwin_arm64"]);
+      .toEqual(["node_v22.23.1_darwin_arm64", "node_v26.8.2_darwin_arm64"]);
 
     // Constraint 5: the sealed measurement is superseded, never edited. The
-    // historical entry is the sealed object itself, member for member.
-    expect(versions!.by_runtime["node_v22.23.1_darwin_arm64"])
+    // historical entry wraps the sealed object itself, member for member.
+    expect(versions!.by_runtime["node_v22.23.1_darwin_arm64"]!.measurement)
       .toEqual(sealedSketch.isolated_limiter_resident_measurement);
     expect(sealedSketch.isolated_limiter_resident_measurement.runtime)
       .toBe("node_v22.23.1_darwin_arm64");
 
-    // The headroom rule, recomputed rather than asserted as a literal: the
-    // ruled 32 MiB rounding increment applied to the worst measured curve point
-    // (the same rule booted_process_resident_bound publishes as
-    // provisioning_rounding_increment_mib, ceil(368.7 / 32) * 32 = 384).
+    // Every entry names the rule its ceiling was derived under, and the rule is
+    // RECOMPUTED here rather than asserted as a literal. Two rules exist, and
+    // the row says which is which instead of leaving the change silent:
+    //
+    //   WORST_..._ROUNDED_UP_TO_INCREMENT  — the original, calibrated on five
+    //     rounds with a 5 MiB spread. The sealed node 22 entry keeps it as
+    //     history: ceil(250 / 32) * 32 = 256. It is the same rule
+    //     booted_process_resident_bound publishes as
+    //     provisioning_rounding_increment_mib, ceil(368.7 / 32) * 32 = 384.
+    //
+    //   WORST_OF_AT_LEAST_TEN_ROUNDS_PLUS_ONE_INCREMENT_ROUNDED_UP — amended by
+    //     the coordinator on 2026-09-22 (Task 3) for this and every future
+    //     entry. Under node 26 the spread is 22.6 MiB over 14 rounds, and the
+    //     original rule left 0.7 MiB of margin: a fence that fails on noise
+    //     teaches everyone to ignore it. One whole increment of headroom gives
+    //     ceil((255.3 + 32) / 32) * 32 = 288, which still catches any
+    //     regression above ~33 MiB (about 13 %) — the class of leak this case
+    //     exists for.
     const increment = versions!.measurement_rounding_increment_mib;
     expect(increment).toBe(32);
-    for (const [runtime, entry] of Object.entries(versions!.by_runtime)) {
+    const derive: Readonly<Record<string, (worst: number) => number>> = {
+      WORST_MEASURED_CURVE_POINT_ROUNDED_UP_TO_INCREMENT:
+        (worst) => Math.ceil(worst / increment) * increment,
+      WORST_OF_AT_LEAST_TEN_ROUNDS_PLUS_ONE_INCREMENT_ROUNDED_UP:
+        (worst) => Math.ceil((worst + increment) / increment) * increment
+    };
+    expect(versions!.by_runtime["node_v22.23.1_darwin_arm64"]!.ceiling_rule)
+      .toBe("WORST_MEASURED_CURVE_POINT_ROUNDED_UP_TO_INCREMENT");
+    expect(versions!.by_runtime["node_v26.8.2_darwin_arm64"]!.ceiling_rule)
+      .toBe("WORST_OF_AT_LEAST_TEN_ROUNDS_PLUS_ONE_INCREMENT_ROUNDED_UP");
+    // The amended rule's own precondition: it may not be claimed without
+    // declaring the rounds that back it.
+    expect(versions!.by_runtime["node_v26.8.2_darwin_arm64"]!.measurement_rounds)
+      .toBeGreaterThanOrEqual(10);
+
+    for (const [runtime, version] of Object.entries(versions!.by_runtime)) {
+      const entry = version.measurement;
+      const rule = derive[version.ceiling_rule];
+      expect(rule, `${runtime}: unknown ceiling rule ${version.ceiling_rule}`).toBeDefined();
       expect(entry.runtime, runtime).toBe(runtime);
       expect(entry.measurement, runtime)
         .toBe("isolated_process_rss_at_100_percent_slot_occupancy");
@@ -355,7 +388,7 @@ describe("S3 ruled authentication policy", () => {
       expect(Math.max(...Object.values(entry.curve_rss_mib)), runtime)
         .toBe(entry.max_measured_curve_rss_mib);
       expect(entry.isolated_measurement_ceiling_mib, runtime)
-        .toBe(Math.ceil(entry.max_measured_curve_rss_mib / increment) * increment);
+        .toBe(rule!(entry.max_measured_curve_rss_mib));
       expect(entry.max_measured_curve_rss_mib, runtime)
         .toBeLessThanOrEqual(entry.isolated_measurement_ceiling_mib);
     }
@@ -366,7 +399,10 @@ describe("S3 ruled authentication policy", () => {
     // bite. A measurement filed under the wrong runtime, or a ceiling somebody
     // typed rather than derived, would otherwise parse member by member and
     // then hand a host a bound that was never measured for it.
-    const sealedEntry = RSS_MEASUREMENT_VERSIONS!.by_runtime["node_v22.23.1_darwin_arm64"]!;
+    const sealedVersion = RSS_MEASUREMENT_VERSIONS!.by_runtime["node_v22.23.1_darwin_arm64"]!;
+    const sealedEntry = sealedVersion.measurement;
+    const tenRoundVersion =
+      RSS_MEASUREMENT_VERSIONS!.by_runtime["node_v26.8.2_darwin_arm64"]!;
     const republished = (versions: unknown) => AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS
       .map((row) => row.rowKey !== "rateLimitPolicy" ? row : {
         ...row,
@@ -384,18 +420,36 @@ describe("S3 ruled authentication policy", () => {
     // The control: unmodified, the deployment set resolves.
     expect(() => authPolicyFromRegisterRows(AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS)).not.toThrow();
 
+    const sealedAs = (measurement: unknown) =>
+      ({ "node_v22.23.1_darwin_arm64": { ...sealedVersion, measurement } });
+
     for (const [label, versions] of [
-      ["a key that is not a runtime", wrap({ whatever: sealedEntry })],
+      ["a key that is not a runtime", wrap({ whatever: sealedVersion })],
       ["a measurement under another runtime's key",
-        wrap({ "node_v26.8.2_darwin_arm64": sealedEntry })],
-      ["a ceiling that is not the curve rounded up",
-        wrap({ "node_v22.23.1_darwin_arm64": { ...sealedEntry, isolated_measurement_ceiling_mib: 1_024 } })],
+        wrap({ "node_v26.8.2_darwin_arm64": sealedVersion })],
+      ["a ceiling that is not what its own rule derives",
+        wrap(sealedAs({ ...sealedEntry, isolated_measurement_ceiling_mib: 1_024 }))],
       ["a 100 % figure that disagrees with its own curve",
-        wrap({ "node_v22.23.1_darwin_arm64": { ...sealedEntry, measured_100_percent_rss_mib: 1 } })],
+        wrap(sealedAs({ ...sealedEntry, measured_100_percent_rss_mib: 1 }))],
       ["a worst point that disagrees with the curve",
-        wrap({ "node_v22.23.1_darwin_arm64": { ...sealedEntry, max_measured_curve_rss_mib: 300, isolated_measurement_ceiling_mib: 320 } })],
+        wrap(sealedAs({ ...sealedEntry, max_measured_curve_rss_mib: 300, isolated_measurement_ceiling_mib: 320 }))],
       ["an unknown extra member",
-        wrap({ "node_v22.23.1_darwin_arm64": { ...sealedEntry, sneaked: 1 } })]
+        wrap(sealedAs({ ...sealedEntry, sneaked: 1 }))],
+      // The amendment's own guards: a rule name nobody defined, history
+      // relabelled under the ten-round rule without the rounds to back it, and
+      // the ten-round entry keeping its 288 while claiming the original rule.
+      ["a ceiling rule that does not exist",
+        wrap({ "node_v22.23.1_darwin_arm64": { ...sealedVersion, ceiling_rule: "WHATEVER_I_LIKE" } })],
+      ["the ten-round rule claimed without ten rounds",
+        wrap({ "node_v22.23.1_darwin_arm64": {
+          ceiling_rule: "WORST_OF_AT_LEAST_TEN_ROUNDS_PLUS_ONE_INCREMENT_ROUNDED_UP",
+          measurement_rounds: 9,
+          measurement: { ...sealedEntry, isolated_measurement_ceiling_mib: 288 }
+        } })],
+      ["a ten-round ceiling relabelled as the original rule",
+        wrap({ "node_v26.8.2_darwin_arm64": {
+          ...tenRoundVersion, ceiling_rule: "WORST_MEASURED_CURVE_POINT_ROUNDED_UP_TO_INCREMENT"
+        } })]
     ] as const) {
       expect(() => authPolicyFromRegisterRows(republished(versions)), label)
         .toThrowError(expect.objectContaining({ code: "AUTH_POLICY_INVALID" }));
