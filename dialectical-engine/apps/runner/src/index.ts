@@ -160,7 +160,15 @@ export const ENVELOPE_STOP_CODES = Object.freeze({
    * and therefore its own condition-mark reason: an operator told "you ran out
    * of money" would go and raise a ceiling that was never the problem.
    */
-  PROVIDER_USAGE_UNREPORTED: "USAGE"
+  PROVIDER_USAGE_UNREPORTED: "USAGE",
+  /**
+   * SMALL (round 3): a dead path today — the daily envelope is asked only when a
+   * NEW run is admitted, never mid-run — and listed anyway, for consistency with
+   * `RUN_LEVEL_SPEND_STOP_CODES` in the kernel. If it is ever raised while a run
+   * is under way, the difference between being listed and not is the difference
+   * between the run keeping its work and failing outright.
+   */
+  DAILY_COST_ENVELOPE_REACHED: "MONEY"
 } as const);
 
 export type EnvelopeStopKind = typeof ENVELOPE_STOP_CODES[keyof typeof ENVELOPE_STOP_CODES];
@@ -1819,6 +1827,65 @@ export function buildCrossRootExchangePlan(effectiveMakerCount: number): readonl
 export interface MakerPositionDisclosureRoot {
   readonly nodeId: string;
   readonly maker: string;
+}
+
+/**
+ * RE-REVIEW 2(a) — WHAT AN ANSWER MAY SAY ABOUT THE MAKER POSITIONS BEHIND IT.
+ *
+ * One decision, taken once, because the answer says this in two places that must
+ * agree: the fact bundle's condition MARKS and the condition-mark RECORDS that
+ * `assertRequiredConditionMarkRecords` pairs with them. They were computed by
+ * two separate `effectiveMakerCount > 1` tests, and a state where those two
+ * disagree is an answer that asserts a mark nothing explains.
+ *
+ * THE STATE THAT EXPOSED IT. A spend stop on root 1 of a two-maker run leaves
+ * one authored position while `effectiveMakerCount` is still 2 — it is the
+ * planned panel size and is never recomputed. The old code then demanded an
+ * UNSERVED position from a set that had none and threw
+ * `UNSERVED_MAKER_POSITION_UNRESOLVED`, before the envelope evaluation and with
+ * no catch between, so a root that had been authored, panelled, reviewed and
+ * PAID FOR was discarded anyway.
+ *
+ * The rule is now about what EXISTS rather than about what was planned:
+ *
+ *  · a position was authored and not served  -> disclose it, as always;
+ *  · a genuine mono-maker run                -> its own two marks, as always;
+ *  · a multi-maker run with nothing unserved -> say NOTHING about maker
+ *    positions. There is no second position to name, and naming one would be a
+ *    falsehood; borrowing the mono-maker marks would be another, since
+ *    `SINGLE-LINEAGE` carries the reason `MONO_MAKER_RUN` and this run was not
+ *    one. What the reader gets instead is the envelope terminal's own record,
+ *    whose reason is the spend-stop code — `RUN_COST_ENVELOPE_MONEY_REACHED` or
+ *    `PROVIDER_USAGE_UNREPORTED` — which says exactly why the second maker never
+ *    wrote anything, and which the operator can act on.
+ */
+export function buildMakerPositionDisclosure(input: Readonly<{
+  effectiveMakerCount: number;
+  authoredMakerPositions: readonly MakerPositionDisclosureRoot[];
+  servedRoot: MakerPositionDisclosureRoot;
+  monoMakerConditionMarks: readonly ConditionMarkRecord["mark"][];
+  monoMakerRecords?: readonly ConditionMarkRecord[];
+}>): Readonly<{
+  conditionMarks: readonly ConditionMarkRecord["mark"][];
+  records: readonly ConditionMarkRecord[];
+}> {
+  if (input.effectiveMakerCount === 1) {
+    return Object.freeze({
+      conditionMarks: Object.freeze([...input.monoMakerConditionMarks]),
+      records: Object.freeze([...(input.monoMakerRecords ?? [])])
+    });
+  }
+  const unserved = input.authoredMakerPositions
+    .filter((root) => root.nodeId !== input.servedRoot.nodeId);
+  if (unserved.length === 0) {
+    return Object.freeze({ conditionMarks: Object.freeze([]), records: Object.freeze([]) });
+  }
+  return Object.freeze({
+    conditionMarks: Object.freeze(["UNSERVED-MAKER-POSITION" as const]),
+    records: Object.freeze([
+      buildUnservedMakerPositionRecord(input.authoredMakerPositions, input.servedRoot)
+    ])
+  });
 }
 
 export function buildUnservedMakerPositionRecord(
@@ -3896,27 +3963,11 @@ export class WalkingSkeletonRunner {
       // the node's receipt is not disclosed to the reader of the answer.
       ...new Set(panelDegradations.map((record) => record.mark))
     ]);
-    const factBundle: FactBundle = buildFactBundle({
-      facts: Object.freeze([servedRoot.statement]),
-      residualObjections: Object.freeze([]),
-      badges: Object.freeze([]),
-      conditionMarks: Object.freeze([...new Set([
-        ...(effectiveMakerCount > 1 ? ["UNSERVED-MAKER-POSITION" as const] : [...monoMakerConditionMarks]),
-        ...hiddenConditionMarks
-      ])]),
-      reversalPoint: servedRoot.reversalPoint,
-      buildsOnPrevious: {
-        value: memoryDisclosure?.matched === true,
-        answerRef: memoryDisclosure?.prior?.answer_id ?? null
-      },
-      memoryDisclosure
-    });
-    let finalSegments: readonly ComposedSegment[] = [];
-    let compositionRawArtifactRef: string | null = null;
-    let compositionAttempt = 0;
-    const conformanceRawArtifactRefs: string[] = [];
-    let conditionMarkRecords: readonly ConditionMarkRecord[] = effectiveMakerCount === 1
-      ? [
+    /**
+     * RE-REVIEW 2(a): the maker-position disclosure is ONE decision now, so the
+     * fact bundle's marks and the records paired with them cannot disagree.
+     */
+    const monoMakerRecords: readonly ConditionMarkRecord[] = Object.freeze([
           Object.freeze({
             mark: "SINGLE-LINEAGE",
             scope: "answer",
@@ -3940,8 +3991,34 @@ export class WalkingSkeletonRunner {
             servedRootRule: null,
             affectedNodeIds: Object.freeze([servedRoot.nodeId])
           })
-        ]
-      : [buildUnservedMakerPositionRecord(authoredMakerPositions, servedRoot)];
+    ] satisfies readonly ConditionMarkRecord[]);
+    const makerPositionDisclosure = buildMakerPositionDisclosure({
+      effectiveMakerCount,
+      authoredMakerPositions,
+      servedRoot,
+      monoMakerConditionMarks: monoMakerConditionMarks,
+      monoMakerRecords
+    });
+    const factBundle: FactBundle = buildFactBundle({
+      facts: Object.freeze([servedRoot.statement]),
+      residualObjections: Object.freeze([]),
+      badges: Object.freeze([]),
+      conditionMarks: Object.freeze([...new Set([
+        ...makerPositionDisclosure.conditionMarks,
+        ...hiddenConditionMarks
+      ])]),
+      reversalPoint: servedRoot.reversalPoint,
+      buildsOnPrevious: {
+        value: memoryDisclosure?.matched === true,
+        answerRef: memoryDisclosure?.prior?.answer_id ?? null
+      },
+      memoryDisclosure
+    });
+    let finalSegments: readonly ComposedSegment[] = [];
+    let compositionRawArtifactRef: string | null = null;
+    let compositionAttempt = 0;
+    const conformanceRawArtifactRefs: string[] = [];
+    let conditionMarkRecords: readonly ConditionMarkRecord[] = makerPositionDisclosure.records;
     conditionMarkRecords = Object.freeze([
       ...conditionMarkRecords,
       // T7 / S3-2: one typed record per frozen branch, minted at the round
@@ -4152,13 +4229,13 @@ export class WalkingSkeletonRunner {
      */
     const evaluateEnvelope = (
       pendingModelAttempts = 0,
-      moneyEnvelopeReached = false
+      forceHardStop = false
     ): Promise<BudgetPressureDecision> =>
       this.#budget.evaluateRunPressure({
         runId: run.runId,
         basis: envelopeBasis,
         pendingModelAttempts,
-        moneyEnvelopeReached,
+        forceHardStop,
         pendingRows: BATTERY_BUDGET_CONTRACTS
           .filter((row) => row.budgetClass === "ENRICHMENT" || row.skipPolicy === "PROTECTED_CORE_REFUSES_SKIP")
           .map((row) => ({ batteryRowId: row.batteryRowId, affectedNodeIds: [servedRoot.nodeId] })),
