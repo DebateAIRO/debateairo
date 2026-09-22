@@ -9,56 +9,56 @@
 # exactly as vitest prints it. `#` lines are comments. Every active entry is followed
 # by a `# source:` comment.
 #
-# RE-BASELINED at DEV-SYNC 2026-09-18 (docs/missions/2026-09-01-security-hardening/
-# DEV-SYNC-2026-09-18.md §4). The one source cited below:
-#   - "pristine dev@7bae9806, 2026-09-18" — `vitest run tests/unit tests/architecture` on an
-#     untouched worktree of origin/dev at 7bae9806, same host, same day: 3 705 tests, 18
-#     failed. Every entry below fails there under the identical name, so none of them is
-#     caused by this branch. (s13-contract, s10-carrier-erasure-red, s04-contract and one
-#     s14-contract case also fail there and are GREEN here through B20's pins.)
+# RE-BASELINED at DEV-SYNC 2026-09-22 (docs/missions/2026-09-01-security-hardening/
+# DEV-SYNC-2026-09-22.md). The one source cited below:
+#   - "dev's closing four-count at a61206dc" — the algorithm mission's own D79 gate on a
+#     quiet host, 12 failures over 5367 tests, listed name by name in
+#     .hermes/reports/2026-09-01-algorithm-live-loop/closing-runs/four-count-a61206dc-failures.txt
+#     and ruled in DECISIONS.md D79 (i). `a61206dc` is the closing PRODUCT tip of dev; the
+#     two commits between it and cbf1b281 are records-only, so that list is dev's state at
+#     cbf1b281. Every entry below appears in it, so none is caused by this branch.
 #
-# What the re-baseline removed (of the 12 entries of 2026-09-02, 3 are carried; 9 are inherited from dev):
-#   - green on the merged tree, deleted: load01-run-projection, obs-l2-s04-zone "15 mutants",
-#     pro01-runner-tree, s6-content-encryption, t9-mode-tokens, xrev01-node-review;
-#   - scaffold "enforces purity…": green since ccbbe77f. Its entry had been hiding a row this
-#     branch itself introduced (apps/replay read process.env) — the reason an entry must be
-#     deleted the moment it can be, and never outlive the defect it was written for;
-#   - s14-contract "deterministic locale tiebreak": green since 057b05b3 (B30);
-#   - obs-l2-s04-zone "calls the resolver…": green since the zone base re-baseline the
-#     live-loop mission ruled for this sync (DECISIONS.md:870-871, :1340);
-#   - scaffold "matches all 28 dependency-edge rows": the case is named "27" on dev
-#     (4fdf48ba retired the web row); carried below under its present name.
+# What this re-baseline changed (12 entries in, 5 out — the list shrank by 7):
+#   - THE THREE role-token-map ENTRIES WERE RENAMED ON DEV, not fixed: dev's title template
+#     dropped the quotes around the two names, so the listed spellings matched nothing and
+#     the gate reported the same rows as NEW. Two are re-listed below under the exact names
+#     vitest prints today; the third ('DebateMap root hub') is GREEN since dev's 830b1331
+#     and is simply gone. A renamed entry is the quietest way for a list like this to rot:
+#     it neither fails nor goes stale, it just stops meaning anything.
+#   - green on the merged tree, deleted: s7-authorization-contract "hardens every immutable
+#     memory scope carrier" (dev's D79 (e)2 — the assertion was VACUOUS LIVE and was
+#     repaired); s8-publication-contract "ships the deliberate controls…" (dev's 84f94f17
+#     restored the two S8 structural laws a merge had discarded); text-control-bytes (dev's
+#     6947fab9 escaped its own two raw control bytes); v2ui-pages "kills MUT-A", "kills
+#     MUT-C" and UI-02d "pins tree, thread, outline…" (dev's UI restorations e1c7f5ba,
+#     22f131c0, 830b1331, 3423285f, b1c57927).
+#   - carried, unchanged and still dev's: scaffold "27 dependency-edge rows", v2ui-pages
+#     DR-160 and v2ui-pages XREV-01.
 #
 # Deliberately NOT listed:
 #   - the two load-coupled `registration-database` cases ("deep-queue slack", "post-hash RSS
 #     tripwire"): they pass solo; listing them would hide a real regression. Integration
-#     tests, outside this job's directories anyway.
+#     tests, outside this job's directories anyway. Both are in dev's twelve.
 #   - registration.test.ts "S3c B4 keeps the isolated production RSS curve…": sealed for
-#     node_v22.23.1_darwin_arm64. CI (ubuntu) skips it loudly. On a darwin_arm64 host that
-#     runs another Node (the Mac mini: v26.5.0) its child measurement hits the 60 s budget —
-#     on pristine dev as well. Run the gate under the pinned Node 22.23.1 (.nvmrc); V-25.
+#     node_v22.23.1_darwin_arm64, and in dev's twelve, so it is NOT this branch's doing.
+#     It stays unlisted on purpose: the sealed bound is a security property and the
+#     re-measurement under Node 26 is owned elsewhere (V-25, and the mission's Task 3).
+#     dev's own D79 (h) measured the cause and refuted the earlier account: the row is not
+#     a real bound violation but a 60-second harness budget against work that needs 106
+#     seconds. Listing it would hide that. CI (ubuntu) skips it loudly.
+#   - the four `tests/render` rows of dev's twelve (t1-canvas ×2, t3-library, ui02e): that
+#     directory is in neither `test:ci-gate` nor `test:s00`, so nothing here gates them.
 
-tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > 'DebateCanvas agreed review mark' binds its 'agreed review verdict' role
-#   source: pristine dev@7bae9806, 2026-09-18. UI design-token pin owned by the apps/ui lane.
-tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > 'DebateCanvas disputed review mark' binds its 'disputed review verdict' role
-#   source: pristine dev@7bae9806, 2026-09-18. UI design-token pin owned by the apps/ui lane.
-tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > 'DebateMap root hub' binds its 'reasoning accent' role
-#   source: pristine dev@7bae9806, 2026-09-18. UI design-token pin owned by the apps/ui lane.
-tests/architecture/s7-authorization-contract.test.ts > Accounts S7 ownership architecture > hardens every immutable memory scope carrier and derives it from run ownership
-#   source: pristine dev@7bae9806, 2026-09-18; carried from the 2026-09-02 list (dev baseline b5a6b6eb; live-mission authority at dev@1c9578a).
-tests/architecture/s8-publication-contract.test.ts > Accounts S8 publication architecture > ships the deliberate controls and public-only reader in the UI composition
-#   source: pristine dev@7bae9806, 2026-09-18. Source pin on a UI page (expects PublicAnswerDisclosure) that dev's UI rework moved.
+tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role
+#   source: dev's closing four-count at a61206dc, row 1. Deferred by V, not broken: D79 (c)(1)
+#   ruled the card review marks out of scope for that round and into V's UI programme, and
+#   D79 (d) ruled the positive tests stay RED as an honest "ruled, not yet built".
+tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
+#   source: dev's closing four-count at a61206dc, row 2. Same ruling as the row above.
 tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > matches all 27 dependency-edge rows and structural rules 1–5
-#   source: pristine dev@7bae9806, 2026-09-18; carried from the 2026-09-02 list under its old name ("28"). Exactly three rows, all dev's: apps/{api,runner,scheduler} -> obs-capture undeclared.
-tests/unit/text-control-bytes.test.ts > HYG-01 tracked text control-byte guard > finds no forbidden raw control bytes in cached or untracked repository text sources
-#   source: pristine dev@7bae9806, 2026-09-18. Two of dev's own tracked files: .claude/skills/heartbeat-orchestrator/scripts/graph-png/mermaid.min.js and .hermes/reports/debate-tiers/probes/REV-S01-p1-security--probe-a-contract-edge.test.ts.
-tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps > kills MUT-A: deleting the V3ScoreBadges JSX render site
-#   source: pristine dev@7bae9806, 2026-09-18. UI source pin owned by the apps/ui lane.
-tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps > kills MUT-C: deleting the maker meta line from the contentful node header
-#   source: pristine dev@7bae9806, 2026-09-18. UI source pin owned by the apps/ui lane.
+#   source: dev's closing four-count at a61206dc, row 3. Exactly three rows, all dev's:
+#   apps/{api,runner,scheduler} -> obs-capture undeclared. V's ticketed debt F31 (D79 (j)4).
 tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps > uses DR-160 content-aware overflow instead of a fixed collapse breakpoint
-#   source: pristine dev@7bae9806, 2026-09-18; carried from the 2026-09-02 list (dev baseline b5a6b6eb).
-tests/unit/v2ui-pages.test.ts > UI-02d — every non-canvas maker surface preserves its recorded maker prop > pins tree, thread, outline, split, map, and drawer at all eight call sites
-#   source: pristine dev@7bae9806, 2026-09-18. UI source pin owned by the apps/ui lane.
+#   source: dev's closing four-count at a61206dc, row 11. UI source pin owned by the apps/ui lane.
 tests/unit/v2ui-pages.test.ts > XREV-01 — node review uses the existing V2 card and drawer vocabulary > shows typed review outcome and reviewer house on cards, including honest absence
-#   source: pristine dev@7bae9806, 2026-09-18. UI source pin owned by the apps/ui lane.
+#   source: dev's closing four-count at a61206dc, row 12. UI source pin owned by the apps/ui lane.
