@@ -14,9 +14,11 @@ import { LedgerRepository } from "@debateai/ledger";
  * `@debateai/providers` taking on the ledger. See ./cost-envelope.ts.
  */
 export {
+  COST_ENVELOPE_CHARGE_UNREPRESENTABLE,
   COST_ENVELOPE_CURRENCY,
   COST_MICROS_PER_USD,
   DAILY_COST_ENVELOPE_REACHED,
+  MAX_REPORTED_USAGE_COUNTER,
   PROJECTED_INPUT_BYTES_PER_TOKEN,
   PROVIDER_USAGE_UNREPORTED,
   RUN_COST_ENVELOPE_MONEY_REACHED,
@@ -34,7 +36,8 @@ export {
   type DailyCostEnvelopeDecision,
   type ProviderTargetPrice,
   type ReportedUsage,
-  type RunCostEnvelopeDecision
+  type RunCostEnvelopeDecision,
+  type UsageCounterRead
 } from "./cost-envelope.js";
 
 /**

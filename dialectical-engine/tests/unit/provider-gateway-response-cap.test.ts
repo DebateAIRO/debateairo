@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { OpenAICompatibleProviderGateway, ProviderCallFailedError } from "@debateai/providers";
 import {
   CostEnvelopeGuard,
+  projectedCallCeilingMicros,
   type ModelSpendEntry,
   type ModelSpendStore
 } from "@debateai/budget";
@@ -53,13 +54,26 @@ function completionOfExactly(totalBytes: number, model = "configured/model") {
   return { text: `${head}${"a".repeat(contentLength)}${tail}`, contentLength };
 }
 
+/** One micro-unit per token on both sides, so a charge reads as a token count. */
+const METERED_PRICE = Object.freeze({
+  inputMicrosPerMillionTokens: 1_000_000,
+  outputMicrosPerMillionTokens: 1_000_000
+});
+
 /**
  * The same gateway with the REAL money seam over an in-memory
- * `ledger.model_spend`: the charge is the shipped rule, not a fake of it, so
- * "one row, non-zero" below means one row this deployment would really write.
+ * `ledger.model_spend`: the charge is the shipped rule, not a fake of it, so a
+ * row below is one row this deployment would really write. The request body is
+ * captured, because the projection a fallback charge must equal is computed
+ * from the exact bytes that were sent.
  */
-function meteredGatewayWith(fetchImplementation: typeof fetch) {
+function meteredGatewayWith(
+  fetchImplementation: typeof fetch,
+  deployment: Readonly<{ requireReportedUsage: boolean; price?: typeof METERED_PRICE }> =
+    { requireReportedUsage: true }
+) {
   const rows: ModelSpendEntry[] = [];
+  const sent: { requestBytes: number } = { requestBytes: 0 };
   const store: ModelSpendStore = {
     recordSpend: async (entry) => { rows.push(entry); },
     readRunSpentMicros: async () => 0,
@@ -71,23 +85,37 @@ function meteredGatewayWith(fetchImplementation: typeof fetch) {
     policy: { perRunCeilingMicros: 1_000_000_000, dailyCeilingMicros: 1_000_000_000 }
   }).providerSeam({
     runId: "run-1",
-    price: { inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 },
-    requireReportedUsage: true
+    price: deployment.price ?? METERED_PRICE,
+    requireReportedUsage: deployment.requireReportedUsage
   });
   const gateway = new OpenAICompatibleProviderGateway({
     endpoint: "http://fixture/v1", model: "configured/model", maker: "fixture",
-    fetchImplementation,
-    persistRawArtifact: async (artifact) => artifact.artifactId,
+    fetchImplementation: async (input, init) => {
+      sent.requestBytes = Buffer.byteLength(String(init?.body ?? ""), "utf8");
+      return fetchImplementation(input, init);
+    },
+    persistRawArtifact: async (artifact) => { artifacts.push(artifact); return artifact.artifactId; },
     appendLedgerEntry: async () => "ledger:1",
     assertNoOpenWriteTransaction: () => undefined,
     sleepImplementation: async () => {}
   });
+  const artifacts: Array<{ metadata: Readonly<Record<string, unknown>> }> = [];
   return {
     gateway: {
       call: (request: ReturnType<typeof callRequest>) =>
         gateway.call({ ...request, costEnvelope: seam })
     },
-    rows
+    rows,
+    artifacts,
+    /** The MOST this call could cost, from the bytes actually sent. */
+    projectedMicros: () => projectedCallCeilingMicros(deployment.price ?? METERED_PRICE, {
+      requestBytes: sent.requestBytes,
+      completionTokenCeiling: 64
+    }),
+    projectedPromptMicros: () => projectedCallCeilingMicros(deployment.price ?? METERED_PRICE, {
+      requestBytes: sent.requestBytes,
+      completionTokenCeiling: 0
+    })
   };
 }
 
@@ -214,7 +242,7 @@ describe("L4-F3 — bounded usage counters, unknown members dropped", () => {
   it("charges a malformed counter once, on one call, and does not retry it", async () => {
     for (const usage of MALFORMED_COUNTERS) {
       let calls = 0;
-      const { gateway, rows } = meteredGatewayWith(async () => {
+      const { gateway, rows, projectedMicros } = meteredGatewayWith(async () => {
         calls += 1;
         return new Response(completionWithUsage(usage));
       });
@@ -225,13 +253,59 @@ describe("L4-F3 — bounded usage counters, unknown members dropped", () => {
       // ONE billed call — the retry cannot repair a count the vendor will
       // report the same way again...
       expect(calls, JSON.stringify(usage)).toBe(1);
-      // ...ONE row for it, and never a zero one...
+      // ...ONE row for it, charged EXACTLY the maximum this call was admitted
+      // against and never a micro-unit more (round 2, Critical A: the first of
+      // these fixtures used to be charged its own 2 147 483 648, which is the
+      // whole day)...
       expect(rows, JSON.stringify(usage)).toHaveLength(1);
-      expect(rows[0]!.chargeMicros, JSON.stringify(usage)).toBeGreaterThan(0);
+      expect(rows[0]!.chargeMicros, JSON.stringify(usage)).toBe(projectedMicros());
       expect(rows[0]!.spendSource).toBe("RUN");
       // ...and the refusal arrives under its own name, not PROVIDER_CALL_FAILED.
       expect(refusal, JSON.stringify(usage)).toMatchObject({ code: "PROVIDER_USAGE_INVALID" });
     }
+  });
+
+  /**
+   * Round 2, Critical B. `2**60` is not a safe integer, so before this round it
+   * reached `chargeMicrosForUsage` and threw a BARE `TypeError` out of the
+   * charge — which the gateway's short-circuit (`instanceof TypedDomainError`)
+   * did not recognise, so the loop retried: three billed calls, no rows, the
+   * original bug. It is now an unreadable count like any other.
+   */
+  it("charges a count past the bounded range at the projection, once", async () => {
+    for (const usage of [{ prompt_tokens: 2 ** 31 }, { prompt_tokens: 2 ** 60 }]) {
+      let calls = 0;
+      const { gateway, rows, projectedMicros } = meteredGatewayWith(async () => {
+        calls += 1;
+        return new Response(completionWithUsage(usage));
+      });
+
+      const refusal = await gateway.call(callRequest(3))
+        .then(() => null, (thrown: unknown) => thrown);
+
+      expect(calls, JSON.stringify(usage)).toBe(1);
+      expect(rows, JSON.stringify(usage)).toHaveLength(1);
+      expect(rows[0]!.chargeMicros, JSON.stringify(usage)).toBe(projectedMicros());
+      expect(refusal, JSON.stringify(usage)).toMatchObject({ code: "PROVIDER_USAGE_INVALID" });
+    }
+  });
+
+  /**
+   * Round 2, Important. An ABSENT side is not a malformed one: the vendor told
+   * the truth about the part it reported, and the ledger stays honest to the
+   * invoice for the rest.
+   */
+  it("charges an absent side as zero, beside a side the vendor did report", async () => {
+    const { gateway, rows } = meteredGatewayWith(
+      async () => new Response(completionWithUsage({ prompt_tokens: 1_000 }))
+    );
+
+    await expect(gateway.call(callRequest())).resolves.toMatchObject({ content: "ok" });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      inputTokens: 1_000, outputTokens: 0, chargeMicros: 1_000
+    });
   });
 
   it("still records nothing for a vendor that reported no usage at all", async () => {
@@ -244,6 +318,42 @@ describe("L4-F3 — bounded usage counters, unknown members dropped", () => {
     await expect(gateway.call(callRequest())).rejects.toMatchObject({
       code: "PROVIDER_USAGE_UNREPORTED"
     });
+    expect(rows).toEqual([]);
+  });
+
+  /**
+   * Round 2, Important. A WELL-FORMED block that simply reports nothing this
+   * can bill — `{}`, or one carrying only a total — is the "vendor reported
+   * nothing" case, not the malformed one. Hosted refuses it as before, and
+   * LOCAL, where the relays report nothing and cost nothing, must not gain a
+   * fabricated row.
+   */
+  it("writes no fabricated row for an empty usage block in local mode", async () => {
+    for (const usage of [{}, { total_tokens: 40 }]) {
+      const { gateway, rows, artifacts } = meteredGatewayWith(
+        async () => new Response(completionWithUsage(usage)),
+        { requireReportedUsage: false }
+      );
+
+      await expect(gateway.call(callRequest()), JSON.stringify(usage))
+        .resolves.toMatchObject({ content: "ok" });
+      expect(rows, JSON.stringify(usage)).toEqual([]);
+      // Minor 7, again at the gateway: a block that carries nothing the strict
+      // schema keeps is recorded as absent, never as `{}`.
+      expect(artifacts[0]?.metadata.usage, JSON.stringify(usage))
+        .toEqual(Object.keys(usage).length === 0 ? null : usage);
+    }
+  });
+
+  it("records artifact usage as null when the block strips to nothing", async () => {
+    const { gateway, artifacts, rows } = meteredGatewayWith(
+      async () => new Response(completionWithUsage({ prompt_tokens_details: { cached_tokens: 0 } })),
+      { requireReportedUsage: false }
+    );
+
+    await expect(gateway.call(callRequest())).resolves.toMatchObject({ content: "ok" });
+    expect(artifacts[0]?.metadata.usage).toBeNull();
+    // ...and an unknown member is not a malformed count, so nothing is charged.
     expect(rows).toEqual([]);
   });
 });

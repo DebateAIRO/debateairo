@@ -51,6 +51,29 @@ export const DAILY_COST_ENVELOPE_REACHED = "DAILY_COST_ENVELOPE_REACHED" as cons
 export const PROVIDER_USAGE_UNREPORTED = "PROVIDER_USAGE_UNREPORTED" as const;
 
 /**
+ * A charge that could not be computed exactly. Round 2, Critical B: it is a
+ * TYPED refusal because it is raised inside the gateway's attempt loop, which
+ * retries anything it cannot recognise — and a retry of a charge failure is a
+ * second billed call for the same unanswerable question.
+ */
+export const COST_ENVELOPE_CHARGE_UNREPRESENTABLE =
+  "COST_ENVELOPE_CHARGE_UNREPRESENTABLE" as const;
+
+/**
+ * The largest usage count this engine will BILL, and the same bound the
+ * gateway's strict usage schema applies (`MAX_USAGE_COUNTER` in
+ * `@debateai/providers`; `tests/unit/v28-cost-envelope.test.ts` pins the two
+ * literals equal, because the two packages cannot import each other).
+ *
+ * Round 2, Critical A: without it, "readable" meant any non-negative integer,
+ * so a vendor answering `prompt_tokens: 2**31` — one count above the schema's
+ * own bound — was charged 2 147 483 648 micro-units against a call admitted at
+ * a few hundred. One malformed response exhausted the day. A count above this
+ * bound is UNREADABLE, and an unreadable count falls back to the projection.
+ */
+export const MAX_REPORTED_USAGE_COUNTER = 2 ** 31 - 1;
+
+/**
  * How many bytes of a serialised request packet are assumed to be ONE token
  * when a call's maximum charge is projected BEFORE it is made.
  *
@@ -117,7 +140,19 @@ function ceilDivToMicros(count: number, pricePerMillion: number): number {
   const product = BigInt(count) * BigInt(pricePerMillion);
   const micros = (product + TOKENS_PER_MILLION - 1n) / TOKENS_PER_MILLION;
   const narrowed = Number(micros);
-  if (!Number.isSafeInteger(narrowed)) throw new TypeError("COST_ENVELOPE_CHARGE_UNREPRESENTABLE");
+  /**
+   * Round 2, Critical B — TYPED, not a bare `TypeError`. This throw happens
+   * INSIDE the gateway's attempt loop, and that loop decides whether to retry by
+   * asking `error instanceof TypedDomainError`. An untyped failure here was
+   * therefore retried: three billed calls, no ledger row — the exact bug the
+   * charge was moved to fix. The code is already in both roots' KNOWN_DOMAIN_CODES.
+   */
+  if (!Number.isSafeInteger(narrowed)) {
+    throw new TypedDomainError(
+      COST_ENVELOPE_CHARGE_UNREPRESENTABLE,
+      "A charge this large cannot be represented exactly in micro-units"
+    );
+  }
   return narrowed;
 }
 
@@ -251,58 +286,100 @@ export function decideDailyCostEnvelope(input: Readonly<{
  */
 export function readReportedUsage(usage: unknown): ReportedUsage | null {
   const parts = readUsageCounters(usage);
-  if (parts.promptTokens === null && parts.completionTokens === null) return null;
-  return Object.freeze({
-    promptTokens: parts.promptTokens ?? 0,
-    completionTokens: parts.completionTokens ?? 0
-  });
+  const prompt = typeof parts.promptTokens === "number" ? parts.promptTokens : null;
+  const completion = typeof parts.completionTokens === "number" ? parts.completionTokens : null;
+  if (prompt === null && completion === null) return null;
+  return Object.freeze({ promptTokens: prompt ?? 0, completionTokens: completion ?? 0 });
 }
 
 /**
- * The two priced sides read INDEPENDENTLY: a number for a side this can bill,
- * `null` for one it cannot. Anything that is not a non-negative integer is
- * unreadable — a float, a negative, a string, an absent member, a usage block
- * that is not an object at all.
+ * What one side of a usage block says: a count this can bill, a member that is
+ * not there at all, or one that is there and cannot be read.
  *
- * The bound the strict schema applies (2^31-1) is deliberately NOT applied
- * here. This read exists for the CHARGE, which must record money the vendor has
- * already taken; refusing an over-large count is the acceptance decision's job,
- * and it still makes it.
+ * The three are NOT the same fact and round 2 turns on the difference: an
+ * ABSENT side is a vendor telling the truth about the part it reported, and a
+ * MALFORMED one is a vendor whose numbers cannot be trusted at all.
+ */
+export type UsageCounterRead = number | "ABSENT" | "MALFORMED";
+
+/**
+ * The usage block read member by member.
+ *
+ * `malformed` is true when ANY of the four bounded members is present and
+ * unreadable — including `total_tokens` and `x_cost_usd`, which are never
+ * charged but do say whether this vendor's block can be trusted — or when the
+ * block is not an object at all. A member the schema STRIPS (a vendor's own
+ * `prompt_tokens_details`) is not malformed: that is C-I1's whole point.
+ *
+ * "Readable" is bounded by `MAX_REPORTED_USAGE_COUNTER` and by
+ * `Number.isSafeInteger`, so nothing here can hand the charge a count the
+ * strict schema would have refused, and nothing can reach `BigInt` arithmetic
+ * that cannot come back (round 2, Criticals A and B).
  */
 export function readUsageCounters(usage: unknown): Readonly<{
-  promptTokens: number | null;
-  completionTokens: number | null;
+  promptTokens: UsageCounterRead;
+  completionTokens: UsageCounterRead;
+  malformed: boolean;
 }> {
   if (typeof usage !== "object" || usage === null || Array.isArray(usage)) {
-    return Object.freeze({ promptTokens: null, completionTokens: null });
+    return Object.freeze({
+      promptTokens: "MALFORMED", completionTokens: "MALFORMED", malformed: true
+    });
   }
   const row = usage as Readonly<Record<string, unknown>>;
-  const counted = (value: unknown): number | null =>
-    typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
+  const counted = (value: unknown): UsageCounterRead => {
+    if (value === undefined) return "ABSENT";
+    return typeof value === "number" && Number.isSafeInteger(value)
+      && value >= 0 && value <= MAX_REPORTED_USAGE_COUNTER
+      ? value
+      : "MALFORMED";
+  };
+  const promptTokens = counted(row.prompt_tokens);
+  const completionTokens = counted(row.completion_tokens);
+  const cost = row.x_cost_usd;
+  const costMalformed = cost !== undefined
+    && !(typeof cost === "number" && Number.isFinite(cost) && cost >= 0);
   return Object.freeze({
-    promptTokens: counted(row.prompt_tokens),
-    completionTokens: counted(row.completion_tokens)
+    promptTokens,
+    completionTokens,
+    malformed: promptTokens === "MALFORMED"
+      || completionTokens === "MALFORMED"
+      || counted(row.total_tokens) === "MALFORMED"
+      || costMalformed
   });
 }
 
 /**
- * FIX ROUND 1, Important 1 — WHAT A BILLED CALL IS CHARGED WHEN ITS COUNTS
- * CANNOT BE READ.
+ * WHAT A BILLED CALL IS CHARGED WHEN ITS COUNTS CANNOT BE READ.
  *
- * `readReportedUsage` answers "what did the vendor tell us"; this answers "what
- * do we charge for a call that has already been paid for". They differ in
- * exactly one place: a usage block that IS there but carries a count this
- * cannot read — `completion_tokens: 300.5`, a negative, a string, a count past
- * the bounded range. The strict parse refuses that answer and the engine throws
- * it away, but the vendor billed for it, so the ledger must show something, and
- * the only honest figure left is the maximum the engine itself projected for
- * the call BEFORE it was sent — the same number `assertCallAllowed` admitted it
- * against, so the charge can never exceed what the per-run gate already allowed.
+ * `readReportedUsage` answers "what did the vendor tell us". This answers "what
+ * do we charge for a call that has already been paid for", and the answer turns
+ * on the difference between a side that is ABSENT and one that is MALFORMED
+ * (round 2, Important — round 1 treated both as absent and charged the
+ * projection for both):
  *
- * `null` — nothing is charged — is kept for the ONE case where the vendor said
- * nothing about usage at all: no `usage` member, or an explicit null. A charge
- * there would be inventing spend for a local relay that costs nothing, and
- * hosted refuses that answer anyway (`PROVIDER_USAGE_UNREPORTED`).
+ *  · READABLE  → the vendor's own count, exactly as before. It may exceed the
+ *    projection, because the projection is a margin and not a guarantee (see
+ *    PROJECTED_INPUT_BYTES_PER_TOKEN); that is the vendor's invoice.
+ *  · ABSENT, in an otherwise WELL-FORMED block → ZERO. The vendor told the
+ *    truth about the side it reported, and the ledger stays honest to the
+ *    invoice for the side it did not.
+ *  · MALFORMED → this side's share of the projection. The strict parse refuses
+ *    the answer and the engine throws it away, but the vendor billed for it, so
+ *    the ledger must show something and the only defensible figure left is the
+ *    maximum the engine itself projected BEFORE the call. A FALLBACK charge can
+ *    therefore never exceed what `assertCallAllowed` admitted this attempt
+ *    against, which is the property Critical A was about.
+ *  · ABSENT, in a block that carries a malformed member anywhere → the
+ *    projection too. Nothing in a block whose numbers are wrong can be read as
+ *    "the vendor says zero".
+ *
+ * `null` — nothing is charged — for the two cases where the vendor said nothing
+ * this can bill and said it CLEANLY: no `usage` member at all (or an explicit
+ * null), and a well-formed block with neither priced side readable (`{}`, or
+ * one carrying only a total). A charge there would fabricate spend for a local
+ * relay that costs nothing, and hosted refuses such an answer anyway
+ * (`PROVIDER_USAGE_UNREPORTED`).
  */
 export function chargeableUsage(
   usage: unknown,
@@ -316,10 +393,19 @@ export function chargeableUsage(
     projection?.completionTokenCeiling, "COST_ENVELOPE_PROJECTION_INVALID"
   );
   const parts = readUsageCounters(usage);
+  const readable = typeof parts.promptTokens === "number"
+    || typeof parts.completionTokens === "number";
+  if (!readable && !parts.malformed) return null;
+  const side = (read: UsageCounterRead, projected: number): number => {
+    if (typeof read === "number") return read;
+    // An absent side is zero only while the rest of the block can be trusted.
+    return read === "MALFORMED" || !readable ? projected : 0;
+  };
   return Object.freeze({
-    promptTokens: parts.promptTokens
-      ?? Math.ceil(requestBytes / PROJECTED_INPUT_BYTES_PER_TOKEN),
-    completionTokens: parts.completionTokens ?? completionTokenCeiling
+    promptTokens: side(
+      parts.promptTokens, Math.ceil(requestBytes / PROJECTED_INPUT_BYTES_PER_TOKEN)
+    ),
+    completionTokens: side(parts.completionTokens, completionTokenCeiling)
   });
 }
 

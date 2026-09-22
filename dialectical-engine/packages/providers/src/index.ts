@@ -934,6 +934,10 @@ export interface OpenAICompatibleGatewayOptions {
 export const PROVIDER_COST_ENVELOPE_REFUSAL_CODES = Object.freeze([
   "RUN_COST_ENVELOPE_MONEY_REACHED",
   "PROVIDER_USAGE_UNREPORTED",
+  // Round 2, Critical B: a charge that cannot be computed exactly is raised
+  // HERE, inside the attempt loop, and a retry would be a second billed call
+  // for the same unrepresentable number.
+  "COST_ENVELOPE_CHARGE_UNREPRESENTABLE",
   // SMALL (round 3): the gateway's seam cannot raise this today — the daily
   // envelope is asked when a NEW run is admitted, not per call — but retrying a
   // day that is spent would be as pointless as retrying a run that is, and the

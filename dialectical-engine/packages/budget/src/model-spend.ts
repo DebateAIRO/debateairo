@@ -23,6 +23,7 @@ import { randomUUID } from "node:crypto";
 import { TypedDomainError } from "@debateai/kernel";
 import type { Pool } from "pg";
 import {
+  COST_ENVELOPE_CHARGE_UNREPRESENTABLE,
   chargeMicrosForUsage,
   chargeableUsage,
   costEnvelopeDay,
@@ -238,15 +239,37 @@ export class CostEnvelopeGuard {
       // cannot read is charged at the call's own projected maximum, because the
       // vendor billed for it either way.
       recordCall: async (observed) => {
-        const usage = chargeableUsage(observed.usage, observed.projection);
-        if (usage === null) return;
+        /**
+         * Round 2, Critical B — THE CHARGE COMPUTATION MAY ONLY FAIL TYPED.
+         *
+         * This runs inside the gateway's attempt loop, which decides whether to
+         * retry by asking `error instanceof TypedDomainError`. An untyped throw
+         * from the arithmetic was therefore RETRIED — a second billed call for a
+         * number that will be just as unrepresentable — and none of them was
+         * recorded. Only the pure computation is wrapped: a failure of the STORE
+         * is the ledger's own (the never-charge path) and must keep its name.
+         */
+        let usage: ReturnType<typeof chargeableUsage>;
+        let chargeMicros: number;
+        try {
+          usage = chargeableUsage(observed.usage, observed.projection);
+          if (usage === null) return;
+          chargeMicros = chargeMicrosForUsage(input.price, usage);
+        } catch (error) {
+          if (error instanceof TypedDomainError) throw error;
+          throw new TypedDomainError(
+            COST_ENVELOPE_CHARGE_UNREPRESENTABLE,
+            `The charge for ${observed.providerRef} could not be computed:`
+              + ` ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
         await this.#store.recordSpend(Object.freeze({
           spendId: randomUUID(),
           spendSource: "RUN",
           runId: input.runId,
           providerRef: observed.providerRef,
           chargedOn: costEnvelopeDay(this.#clock()),
-          chargeMicros: chargeMicrosForUsage(input.price, usage),
+          chargeMicros,
           inputTokens: usage.promptTokens,
           outputTokens: usage.completionTokens
         }));

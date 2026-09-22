@@ -1,13 +1,16 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
+  COST_ENVELOPE_CHARGE_UNREPRESENTABLE,
   COST_ENVELOPE_CURRENCY,
   COST_MICROS_PER_USD,
   DAILY_COST_ENVELOPE_REACHED,
+  MAX_REPORTED_USAGE_COUNTER,
   PROJECTED_INPUT_BYTES_PER_TOKEN,
   PROVIDER_USAGE_UNREPORTED,
   RUN_COST_ENVELOPE_MONEY_REACHED,
   chargeMicrosForUsage,
+  chargeableUsage,
   decideDailyCostEnvelope,
   decideRunCostEnvelope,
   projectedCallCeilingMicros,
@@ -186,6 +189,111 @@ describe("V-28 a vendor that reports no usage cannot be bounded", () => {
 
   it("names the refusal with its own code", () => {
     expect(PROVIDER_USAGE_UNREPORTED).toBe("PROVIDER_USAGE_UNREPORTED");
+  });
+});
+
+/**
+ * ROUND 2 — WHAT IS CHARGED FOR A CALL WHOSE COUNTS CANNOT BE READ.
+ *
+ * The rule has to answer three different vendors, and round 1 answered all
+ * three the same way:
+ *
+ *  · a count this CAN read is the invoice, whatever it says;
+ *  · a side the vendor did not mention is ZERO, because the vendor told the
+ *    truth about the side it did mention (Important);
+ *  · a count that is there and WRONG — a float, a negative, a string, or one
+ *    past the bound the strict schema applies — is this side's share of the
+ *    projection, and nothing in that block can be read as "the vendor says
+ *    zero" (Criticals A and B: round 1 charged `prompt_tokens: 2**31` at face
+ *    value, and `2**60` threw an untyped error out of the arithmetic).
+ */
+describe("round 2 — the charge for an unreadable count", () => {
+  const PRICE = Object.freeze({
+    inputMicrosPerMillionTokens: 1_000_000,
+    outputMicrosPerMillionTokens: 1_000_000
+  });
+  /** 400 projected input tokens, 64 projected output tokens. */
+  const PROJECTION = Object.freeze({ requestBytes: 800, completionTokenCeiling: 64 });
+
+  it("stops reading a count at the same bound the gateway's schema applies", async () => {
+    // The two packages cannot import each other, so the bound is declared twice
+    // and pinned equal here — the discipline `PRINTABLE_HEADER_LINE` already
+    // follows between @debateai/crypto and @debateai/providers.
+    const providers = await readFile(
+      new URL("../../packages/providers/src/index.ts", import.meta.url), "utf8"
+    );
+    const declared = /const MAX_USAGE_COUNTER = (.+);/u.exec(providers)?.[1];
+    // The LITERAL is compared, not a value evaluated out of another package's
+    // source: if the gateway's bound is ever re-spelled, this fails and a human
+    // re-pins the pair deliberately.
+    expect(declared).toBe("2 ** 31 - 1");
+    expect(MAX_REPORTED_USAGE_COUNTER).toBe(2 ** 31 - 1);
+
+    expect(readReportedUsage({ prompt_tokens: MAX_REPORTED_USAGE_COUNTER }))
+      .toEqual({ promptTokens: MAX_REPORTED_USAGE_COUNTER, completionTokens: 0 });
+    // One above it, and 2**60, are not counts this engine will bill.
+    expect(readReportedUsage({ prompt_tokens: 2 ** 31 })).toBeNull();
+    expect(readReportedUsage({ prompt_tokens: 2 ** 60 })).toBeNull();
+  });
+
+  it("charges a readable count, a zero for an absent side, the projection for a wrong one", () => {
+    const projected = { prompt: 400, completion: 64 };
+    for (const [usage, expected] of [
+      // Both readable.
+      [{ prompt_tokens: 12, completion_tokens: 7 }, { promptTokens: 12, completionTokens: 7 }],
+      // ABSENT completion beside a readable prompt: zero, not the projection.
+      [{ prompt_tokens: 12 }, { promptTokens: 12, completionTokens: 0 }],
+      // MALFORMED completion beside a readable prompt: this side's projection.
+      [
+        { prompt_tokens: 12, completion_tokens: 300.5 },
+        { promptTokens: 12, completionTokens: projected.completion }
+      ],
+      // Nothing readable and something wrong: the whole projection, because
+      // "absent" cannot be trusted in a block whose numbers are wrong.
+      [{ prompt_tokens: 2 ** 31 }, { promptTokens: projected.prompt, completionTokens: projected.completion }],
+      [{ prompt_tokens: 2 ** 60 }, { promptTokens: projected.prompt, completionTokens: projected.completion }],
+      [{ completion_tokens: -1 }, { promptTokens: projected.prompt, completionTokens: projected.completion }],
+      [{ total_tokens: 1.5 }, { promptTokens: projected.prompt, completionTokens: projected.completion }],
+      [{ prompt_tokens: "3" }, { promptTokens: projected.prompt, completionTokens: projected.completion }],
+      [{ x_cost_usd: -1 }, { promptTokens: projected.prompt, completionTokens: projected.completion }],
+      // A usage member that is not a block at all.
+      ["nonsense", { promptTokens: projected.prompt, completionTokens: projected.completion }],
+      // WELL FORMED and silent: nothing is charged at all.
+      [{}, null],
+      [{ total_tokens: 40 }, null],
+      [{ x_cost_usd: 0.25 }, null],
+      // An unknown member is stripped, not malformed (C-I1).
+      [{ prompt_tokens_details: { cached_tokens: 0 } }, null],
+      // No usage member at all.
+      [undefined, null],
+      [null, null]
+    ] as const) {
+      expect(chargeableUsage(usage, PROJECTION), JSON.stringify(usage) ?? "undefined")
+        .toEqual(expected);
+    }
+  });
+
+  it("never charges a fallback above what the call was admitted against", () => {
+    const admitted = projectedCallCeilingMicros(PRICE, PROJECTION);
+    for (const usage of [
+      { prompt_tokens: 2 ** 31 }, { prompt_tokens: 2 ** 60 },
+      { completion_tokens: -1 }, { total_tokens: 1.5 }, { prompt_tokens: "3" }
+    ]) {
+      const charged = chargeMicrosForUsage(PRICE, chargeableUsage(usage, PROJECTION)!);
+      expect(charged, JSON.stringify(usage)).toBe(admitted);
+    }
+  });
+
+  it("fails TYPED when a charge cannot be represented, so the gateway cannot retry it", () => {
+    // Reached only by a caller that builds the usage itself — the read above
+    // can no longer hand this function a count this large.
+    expect(() => chargeMicrosForUsage(
+      { inputMicrosPerMillionTokens: Number.MAX_SAFE_INTEGER, outputMicrosPerMillionTokens: 1 },
+      { promptTokens: MAX_REPORTED_USAGE_COUNTER, completionTokens: 0 }
+    )).toThrowError(expect.objectContaining({
+      name: "TypedDomainError",
+      code: COST_ENVELOPE_CHARGE_UNREPRESENTABLE
+    }));
   });
 });
 
