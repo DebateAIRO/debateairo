@@ -753,6 +753,21 @@ export class VllmOpenAICompatibleProviderGateway implements ProviderGateway {
   }
 }
 
+// V-11 addendum layers 1-3: THE one frame every hand-off is built with, and the
+// door that refuses a packet built any other way. See ./prompt-frame.ts.
+export {
+  FRAMED_MATERIAL_FORMAT,
+  PROMPT_FRAME_VERSION,
+  assertFramedPrompt,
+  buildFramedPrompt,
+  buildFramedRepairPrompt,
+  promptContractFingerprintText,
+  type FramedMaterialField,
+  type FramedPrompt,
+  type FramedRepairLocator,
+  type PromptContract
+} from "./prompt-frame.js";
+
 // DR-181/DR-182's provider health probe (moved here by ruling J21 so the API and
 // the runner share ONE implementation). See ./provider-probe.ts.
 export {
