@@ -1,9 +1,11 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import type { Pool } from "pg";
-import type { ProviderGateway } from "@debateai/providers";
+import { promptContractFingerprintText, type ProviderGateway } from "@debateai/providers";
 import { runEvaluatorJudgeGradingAddon } from "../../apps/evaluator-worker/src/index.js";
 import {
   ADDON_MAX_PROVIDER_ATTEMPTS,
+  BLIND_JUDGE_GRADE_PROMPT_CONTRACT,
   EVALUATOR_MAKER,
   EVALUATOR_PROVIDER_REF,
   PostgresEvaluatorAddonRepository,
@@ -162,6 +164,34 @@ describe("judge-grading evaluator add-on", () => {
       gradedRawArtifactRef: "artifact:graded",
       graderRawArtifactRef: "artifact:grader"
     })]);
+  });
+
+  /**
+   * FW-B / B-I2 (final review B, Important 2) — A CHANGED PROMPT CONTRACT IS A
+   * NEW SEALED IDENTITY.
+   *
+   * RUN1 rewrote this prompt — it moved onto the frame and its sentences were
+   * reordered — while the identity recorded with every call stayed
+   * `sha256("evaluator-blind-judge-grade/v1")`, a hash of the NAME. Ledger rows
+   * from before and after the rewrite therefore carried the same
+   * `contract_hash`, so lineage could not say which prompt produced a grade.
+   *
+   * The hash is now derived from `promptContractFingerprintText`, which folds in
+   * the frame version, the contract id, the owners' instruction and the
+   * code-owned answer form: any edit to any of them is a new identity on the day
+   * it ships, with no literal for anyone to forget to bump.
+   */
+  it("records an identity derived from the prompt, not from its name", async () => {
+    const records = repository();
+    const gateway = provider();
+
+    await runEvaluatorJudgeAddon({ ...baseInput, provider: gateway, repository: records });
+
+    const request = gateway.call.mock.calls[0]![0];
+    expect(request.contractHash).toBe(createHash("sha256")
+      .update(promptContractFingerprintText(BLIND_JUDGE_GRADE_PROMPT_CONTRACT)).digest("hex"));
+    expect(request.contractHash).not.toBe(createHash("sha256")
+      .update("evaluator-blind-judge-grade/v1").digest("hex"));
   });
 
   it("enforces the hard retry ceiling even when policy configuration asks for more", async () => {

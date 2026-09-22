@@ -16,6 +16,7 @@ import {
   ProviderContentUnacceptedError,
   buildFramedPrompt,
   buildFramedRepairPrompt,
+  promptContractFingerprintText,
   schemaFailureLocator,
   type CallBound,
   type FramedPrompt,
@@ -546,7 +547,9 @@ export async function runEvaluatorJudgeAddon(input: {
         tokenCeiling: policy.value.tokenCeiling,
         deadlineMs: policy.value.deadlineMs
       },
-      contractHash: createHash("sha256").update("evaluator-blind-judge-grade/v1").digest("hex"),
+      // B-I2: derived from the prompt contract, never from its name — see
+      // `BLIND_JUDGE_GRADE_CONTRACT_HASH`.
+      contractHash: BLIND_JUDGE_GRADE_CONTRACT_HASH,
       providerRef: input.family.value.providerRef,
       packet,
       // REVIEW ITEM 1: this used to append a bare user turn carrying
@@ -1543,7 +1546,9 @@ export async function runEvaluatorQuestionTagger(input: {
       role: "CLASSIFIER",
       lane: "evaluator",
       bound: input.bound,
-      contractHash: createHash("sha256").update("evaluator-domain-tagger/v1").digest("hex"),
+      // B-I2: derived from the prompt contract, never from its name — see
+      // `DOMAIN_TAGGER_CONTRACT_HASH`.
+      contractHash: DOMAIN_TAGGER_CONTRACT_HASH,
       providerRef: input.family.value.providerRef,
       // V-11 addendum: `rawQuestion` is a visitor's text — the other untrusted
       // source — and the domain list is the engine's. Two fields, one fence.
@@ -3671,6 +3676,30 @@ export const DOMAIN_TAGGER_PROMPT_CONTRACT: PromptContract = Object.freeze({
   instruction: "Classify the raw question. Never invent an existing domain id.",
   answerForm: "Return strict JSON only: SELECT_EXISTING with domain_id, PROPOSE_NEW with proposed_name, or REFUSED with reason."
 });
+
+/**
+ * FW-B / B-I2 — THE IDENTITY RECORDED WITH EVERY CALL, DERIVED FROM THE PROMPT.
+ *
+ * Both hashes used to be `sha256` of a NAME literal (`evaluator-blind-judge-
+ * grade/v1`, `evaluator-domain-tagger/v1`). RUN1 then rewrote both prompts —
+ * onto the frame, with the sentences reordered — and the literals did not move,
+ * so ledger rows from before and after the rewrite carry the same
+ * `contract_hash` and lineage cannot say which prompt produced a grade or a tag.
+ *
+ * `promptContractFingerprintText` is the same derivation the judge and serve
+ * rows already seal (`policy.hashes.*`): it folds in the frame VERSION, the
+ * contract id, the owners' instruction and the code-owned answer form. So a
+ * changed prompt contract is a NEW identity on the day it ships, with no literal
+ * anyone can forget to bump — which is constraint 5 applied where it was missed.
+ */
+function promptContractHash(contract: PromptContract): string {
+  return createHash("sha256").update(promptContractFingerprintText(contract)).digest("hex");
+}
+
+export const BLIND_JUDGE_GRADE_CONTRACT_HASH: string =
+  promptContractHash(BLIND_JUDGE_GRADE_PROMPT_CONTRACT);
+export const DOMAIN_TAGGER_CONTRACT_HASH: string =
+  promptContractHash(DOMAIN_TAGGER_PROMPT_CONTRACT);
 
 
 /**

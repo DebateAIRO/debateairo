@@ -750,6 +750,17 @@ daily call cap is the only ceiling until the cost envelope (V-28) is published. 
 carries no cost is logged once as `SUPPORT_MODEL_COST_UNREPORTED`, so an empty column is never
 mistaken for a call that was free.
 
+**The support chat's prompt tripwires.** Every support hand-off is sent through the same safety
+frame the debate steps use: the visitor's message travels inside a per-call boundary marker as
+evidence, and the instruction half is the engine's. Two signals are recorded on the way, and both
+are signals and never gates — nothing here refuses a call or changes an answer a visitor is
+served. A line reading `SUPPORT_PROMPT_TRIPWIRE:PROMPT_MATERIAL_INSTRUCTION_LIKE` means a visitor
+wrote something phrased as an order rather than as a question, which is common enough to be
+uninteresting on its own. `SUPPORT_PROMPT_TRIPWIRE:PROMPT_CANARY_ECHOED` and
+`SUPPORT_PROMPT_TRIPWIRE:PROMPT_FENCE_ECHOED` mean the model's answer repeated a marker it was
+told never to repeat, which is worth a look at the case. No line carries the visitor's words, the
+answer, or any part of either.
+
 `DEBATEAI_DEPLOYMENT_MODE` is read by the strict environment loader of both services, so neither
 can start without answering the question. A production unit that omits it refuses with
 `DEPLOYMENT_MODE_UNRESOLVED`; a typo refuses with `DEPLOYMENT_MODE_INVALID`.

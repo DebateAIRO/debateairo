@@ -86,7 +86,14 @@ const INSTRUCTION_LIKE = Object.freeze([
   /\b(esti|ești|sunte(t|ț)i)\s+acum\b/iu,
   /\bac(t|ț)ioneaz(a|ă)\s+ca\b/iu,
   /\bcomport(a|ă)-te\s+ca\b/iu,
-  /\bprefa-te\s+c(a|ă)\b/iu,
+  // FW-B (final review B, Minor 2): `prefă` is the only correct spelling and it
+  // was not an alternative, and a trailing `\b` after `ă` never matches — `\b`
+  // is defined on `\w` = [A-Za-z0-9_], so between `ă` and a space neither side
+  // is a word character and there is no boundary. Measured before the fix:
+  // "Prefa-te ca esti" → 1 hit, "Prefă-te că ești" → 0, "Prefa-te că ești" → 0.
+  // The explicit boundary class is a NON-LETTER lookahead, which holds for every
+  // alphabet the two languages are written in.
+  /\bpref(a|ă)-te\s+c(a|ă)(?!\p{L})/iu,
   /\binstruc(t|ț)iuni\s+noi\b/iu,
   /\bde\s+acum\s+(inainte|înainte)\b/iu,
   /\bprompt(ul)?\s+de\s+sistem\b/iu,

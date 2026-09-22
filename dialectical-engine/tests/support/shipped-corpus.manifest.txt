@@ -40,6 +40,7 @@ apps/api/src/support/limits.ts
 apps/api/src/support/model-reservation.ts
 apps/api/src/support/model.ts
 apps/api/src/support/own-context.ts
+apps/api/src/support/prompt.ts
 apps/api/src/support/queue.ts
 apps/api/src/support/session.ts
 apps/api/src/support/shred.ts

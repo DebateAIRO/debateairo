@@ -1,8 +1,12 @@
 import { TypedDomainError } from "@debateai/kernel";
 import {
   assertDeploymentProviderTargets,
+  assertFramedPrompt,
   parseProviderDiscoveryTargets,
   resolveProviderTargetCredentials,
+  scanPromptTripwires,
+  type PromptFramePresence,
+  type PromptPacket,
   type ProviderDiscoveryTarget
 } from "@debateai/providers";
 import type { DeploymentMode } from "@debateai/register";
@@ -62,21 +66,23 @@ export type SupportModelTarget = Readonly<{
   authorizationFile?: string;
 }>;
 
-export type SupportModelMessage = Readonly<{
-  role: "user" | "assistant";
-  content: string;
-}>;
-
 export type SupportModelUsage = Readonly<{
   input_tokens?: number;
   output_tokens?: number;
   cost_usd?: number;
 }>;
 
+/**
+ * FW-B / B-I1 + D-I3. The port carries ONE framed PACKET, not a system string
+ * and a list of turns. That is the fix, stated in the signature: there is no
+ * longer a parameter through which a caller can hand this transport an
+ * instruction and a visitor's words separately, so the only prompt it can post
+ * is one `buildFramedPrompt` made (see `./prompt.ts`) and
+ * `assertFramedPrompt` accepts.
+ */
 export interface SupportModelPort {
   complete(input: Readonly<{
-    system: string;
-    messages: readonly SupportModelMessage[];
+    packet: PromptPacket;
     language: "en" | "ro";
     signal?: AbortSignal;
   }>): Promise<Readonly<{ text: string;usage?: SupportModelUsage }>>;
@@ -448,16 +454,42 @@ class SupportChatCompletionsAdapter implements SupportModelPort {
    */
   #reportMissingCost(usage: SupportModelUsage | undefined): void {
     if (this.#transport.reportsCost || usage?.cost_usd !== undefined) return;
-    // Re-review finding 1: the sink is the CALLER's code, and this call sits
-    // inside `complete()`'s own `try`. Unguarded, a sink that throws turned a
-    // vendor answer that had already been paid for into SUPPORT_MODEL_UNAVAILABLE
-    // and opened the degraded circuit — a broken log line costing money and an
-    // answer. The guard SWALLOWS AND COUNTS rather than falling back to a log
-    // line, because this module holds a vendor credential and is pinned to
-    // contain no `console.` at all; the count is the record it is allowed to
-    // keep, and `diagnosticFailures()` is how a caller or a test reads it.
+    this.#reportDiagnostic("SUPPORT_MODEL_COST_UNREPORTED");
+  }
+
+  /**
+   * FW-B / B-I1, layer 5. The frame plants a per-call canary and a boundary
+   * marker; without a scan they are decoration. This is the same
+   * `scanPromptTripwires` the provider gateway runs, over the same
+   * `PromptFramePresence` the door just read, so the support chat is measured by
+   * the instrument the debate lane is measured by.
+   *
+   * SIGNALS, never gates (the owner's word): nothing here refuses a call or
+   * changes an answer — the visitor is served exactly what they would have been
+   * served. Constraint 6 governs what travels: the signal's typed code and
+   * nothing else. The support diagnostic sink carries a code only, so the field
+   * name and the capped count stay inside the scan; no material, no answer, no
+   * excerpt and no offset can reach a log line from here.
+   */
+  #reportTripwires(frame: PromptFramePresence, answer: string): void {
+    for (const signal of scanPromptTripwires({ frame, contractId: frame.contractId, answer })) {
+      this.#reportDiagnostic(`SUPPORT_PROMPT_TRIPWIRE:${signal.signal}`);
+    }
+  }
+
+  /**
+   * Re-review finding 1: the sink is the CALLER's code, and these calls sit
+   * inside `complete()`'s own `try`. Unguarded, a sink that throws turned a
+   * vendor answer that had already been paid for into SUPPORT_MODEL_UNAVAILABLE
+   * and opened the degraded circuit — a broken log line costing money and an
+   * answer. The guard SWALLOWS AND COUNTS rather than falling back to a log
+   * line, because this module holds a vendor credential and is pinned to
+   * contain no `console.` at all; the count is the record it is allowed to
+   * keep, and `diagnosticFailures()` is how a caller or a test reads it.
+   */
+  #reportDiagnostic(code: string): void {
     try {
-      this.#report?.({ code: "SUPPORT_MODEL_COST_UNREPORTED" });
+      this.#report?.({ code });
     } catch {
       this.#diagnosticFailures += 1;
     }
@@ -469,6 +501,19 @@ class SupportChatCompletionsAdapter implements SupportModelPort {
   }
 
   async complete(input: Parameters<SupportModelPort["complete"]>[0]) {
+    /**
+     * THE DOOR — the same `assertFramedPrompt` the provider gateway holds, run
+     * before the first byte leaves the process, so "no call site can assemble a
+     * prompt without the frame" is a property of this transport and not of a
+     * list of remembered callers (V-11 addendum, layer 1).
+     *
+     * OUTSIDE the try on purpose. A frame refusal is a defect at a call site,
+     * not a vendor being unavailable: swallowed into SUPPORT_MODEL_UNAVAILABLE
+     * it would degrade one visitor's answer and open the circuit, and the
+     * mistake would look like an outage. It travels as its own typed
+     * `PROMPT_FRAME_*` code instead — now in the operational alphabet (F-I2).
+     */
+    const frame = assertFramedPrompt(input.packet);
     try {
       const timeoutSignal = AbortSignal.timeout(this.#timeoutMs);
       const signal = input.signal === undefined
@@ -480,13 +525,13 @@ class SupportChatCompletionsAdapter implements SupportModelPort {
           authorization: this.#authorizationHeader
         },
         signal,
+        // The packet the door just accepted, on the wire verbatim. Nothing is
+        // appended, re-ordered or re-labelled here: the bytes a test reads off
+        // this body are the bytes `buildFramedPrompt` produced.
         body: JSON.stringify({
           model: this.#model,
           stream: false,
-          messages: [
-            { role: "system",content: input.system },
-            ...input.messages
-          ]
+          messages: input.packet.messages
         })
       });
       if (!response.ok) unavailable();
@@ -509,10 +554,12 @@ class SupportChatCompletionsAdapter implements SupportModelPort {
       if (typeof content !== "string"
         || content.trim() === ""
         || [...content].length > MAX_COMPLETION_CODE_POINTS) unavailable();
+      const text = content.trim();
       const usage = readUsage(decoded.usage);
       this.#reportMissingCost(usage);
+      this.#reportTripwires(frame,text);
       return Object.freeze({
-        text: content.trim(),
+        text,
         ...(usage === undefined ? {} : { usage })
       });
     } catch (error) {

@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { TypedDomainError } from "@debateai/kernel";
+import type { PromptPacket } from "@debateai/providers";
 import type { SupportKeyPort } from "./keys.js";
+import { buildSupportSummaryPrompt } from "./prompt.js";
 import { redactSupportMessage } from "./session.js";
 import { SHREDDED_NOTICE,type SupportLanguage } from "./templates.js";
 
@@ -72,9 +74,15 @@ function boundedSummary(text: string): string | null {
 }
 
 export function createAdvisorySummaryService(input: Readonly<{
+  /**
+   * FW-B / B-I1 + D-I3. One framed PACKET, not a system string and a turn: the
+   * transcript is a visitor's words plus a model's answers, so it is untrusted
+   * on both halves and rides inside the fence like every other hand-off's
+   * material. The shape matches `SupportModelPort["complete"]`, which is what
+   * the API's composition hands this port.
+   */
   complete(request: Readonly<{
-    system: string;
-    messages: readonly Readonly<{ role: "user";content: string }>[];
+    packet: PromptPacket;
     language: SupportLanguage;
     signal: AbortSignal;
   }>): Promise<string>;
@@ -95,8 +103,10 @@ export function createAdvisorySummaryService(input: Readonly<{
       const deadlineAt = new Date(createdAtMs + timeoutMs);
       const signal = AbortSignal.timeout(timeoutMs);
       const completion = input.complete({
-        system: SUPPORT_SUMMARY_PROMPT,
-        messages: [{ role: "user",content: request.transcript }],
+        packet: buildSupportSummaryPrompt({
+          instruction: SUPPORT_SUMMARY_PROMPT,
+          transcript: request.transcript
+        }).packet,
         language: request.language,signal
       }).then((text) => Object.freeze({ kind: "DONE" as const,text }));
       const timeout = new Promise<Readonly<{ kind: "TIMED_OUT" }>>((resolve) => {

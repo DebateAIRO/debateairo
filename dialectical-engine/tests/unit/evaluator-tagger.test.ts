@@ -1,6 +1,12 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { ProviderCallFailedError, type ProviderGateway } from "@debateai/providers";
 import {
+  ProviderCallFailedError,
+  promptContractFingerprintText,
+  type ProviderGateway
+} from "@debateai/providers";
+import {
+  DOMAIN_TAGGER_PROMPT_CONTRACT,
   EVALUATOR_MAKER,
   EVALUATOR_PROVIDER_REF,
   type EvaluatorProviderFamilyRow,
@@ -223,6 +229,28 @@ describe("ask-time evaluator tagger", () => {
       state: "SKIPPED",
       reason: "TAGGER_ALREADY_TAGGED"
     }));
+  });
+
+  /**
+   * FW-B / B-I2 (final review B, Important 2). RUN1 reordered this prompt's
+   * sentences and moved it onto the frame while the identity recorded with every
+   * call stayed `sha256("evaluator-domain-tagger/v1")` — a hash of the NAME, so
+   * a tag produced before the rewrite and one produced after are
+   * indistinguishable in the ledger. The hash is derived from the prompt itself
+   * now, through `promptContractFingerprintText` (which folds in the frame
+   * version too), so an edit cannot ship under an old identity.
+   */
+  it("records an identity derived from the prompt, not from its name", async () => {
+    const records = repository();
+    const gateway = provider(JSON.stringify({ decision: "SELECT_EXISTING", domain_id: "domain:software" }));
+
+    await runEvaluatorQuestionTagger({ ...baseInput, provider: gateway, repository: records });
+
+    const request = gateway.call.mock.calls[0]![0] as { contractHash: string };
+    expect(request.contractHash).toBe(createHash("sha256")
+      .update(promptContractFingerprintText(DOMAIN_TAGGER_PROMPT_CONTRACT)).digest("hex"));
+    expect(request.contractHash).not.toBe(createHash("sha256")
+      .update("evaluator-domain-tagger/v1").digest("hex"));
   });
 
   it("re-asserts provider isolation before the observed vLLM call boundary", async () => {

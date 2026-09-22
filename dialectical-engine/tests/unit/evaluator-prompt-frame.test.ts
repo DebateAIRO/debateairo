@@ -12,6 +12,23 @@ import {
 import {
   createOpenAiPublicAggregateProvider
 } from "../../packages/evaluator/src/public-aggregate-provider.js";
+import {
+  CONSUMER_PROMPT_VERSION,
+  buildEvaluatorConsumerPrompt,
+  type EvaluatorConsumerJob
+} from "../../packages/evaluator/src/consumer.js";
+
+/** The smallest job `buildEvaluatorConsumerPrompt` accepts: the version travels either way. */
+const CONSUMER_JOB: EvaluatorConsumerJob = Object.freeze({
+  consumerSelectionId: "selection:frame",
+  consumerModelId: "consumer/model",
+  target: { provider: "provider:graded", modelId: "model:graded", modelVersion: "graded-v1" },
+  domain: null,
+  profileCells: [],
+  ranks: [],
+  blindedSamples: [],
+  adjacentDomains: []
+});
 
 /**
  * REVIEW ITEMS 1 AND 2 — the two evaluator paths RUN1 framed on the way IN and
@@ -166,5 +183,35 @@ describe("item 2 — the public aggregate transport holds the same door", () => 
     expect(() => readPromptFrame({ messages: retry })).not.toThrow();
     // ...and it carries the refusal CODE, which is engine vocabulary.
     expect(retry.map((message) => message.content).join("\n")).toContain("CONSUMER_CONTENT_REFUSED");
+  });
+});
+
+/**
+ * FW-B / B-I2 (final review B, Important 2) — THE CONSUMER'S PROMPT VERSION.
+ *
+ * RUN1 moved the consumer aggregate into a fenced field: a different prompt,
+ * sent to a different shape of context. `CONSUMER_PROMPT_VERSION` stayed 1, and
+ * that number is folded into `aggregateSnapshotHash` and written on every
+ * consumer output row. So after deploy every output produced under the
+ * PRE-FRAME prompt still matched the current snapshot hash, the claim returned
+ * `ALREADY_CURRENT`, and no output was ever regenerated under the framed
+ * prompt — the prompt changed and nothing downstream could tell.
+ *
+ * Version 2 is the new sealed identity; version 1 stays recorded as history on
+ * the rows it produced (the column is `bigint CHECK (prompt_version > 0)`, so
+ * nothing is rewritten and no migration is owed).
+ */
+describe("B-I2 — a changed consumer prompt is a new version, not a silent edit", () => {
+  it("has moved past the pre-frame version its outputs were written under", () => {
+    expect(CONSUMER_PROMPT_VERSION).toBe(2);
+  });
+
+  it("carries that version into the prompt the consumer actually sends", () => {
+    const packet = buildEvaluatorConsumerPrompt(CONSUMER_JOB);
+    const aggregate = readPromptFrame(packet).fields
+      .find((field) => field.name === "evaluator_aggregate");
+    expect(JSON.parse(aggregate!.content)).toMatchObject({
+      prompt_version: CONSUMER_PROMPT_VERSION
+    });
   });
 });

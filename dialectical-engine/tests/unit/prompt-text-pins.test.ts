@@ -16,6 +16,12 @@ import {
   DOMAIN_TAGGER_PROMPT_CONTRACT
 } from "../../packages/evaluator/src/index.js";
 import { CONSUMER_AGGREGATE_PROMPT_CONTRACT } from "../../packages/evaluator/src/consumer.js";
+import {
+  supportAnswerPromptContract,
+  supportSummaryPromptContract
+} from "../../apps/api/src/support/prompt.js";
+import { supportAnswerInstruction } from "../../apps/api/src/support/answer.js";
+import { SUPPORT_SUMMARY_PROMPT } from "../../apps/api/src/support/cases.js";
 
 /**
  * REVIEW ITEM 4, round 2 — THE DISCLOSURE, MADE UNROTTABLE.
@@ -209,6 +215,63 @@ describe("REVIEW ITEM 4 — the serve prompts, byte-identical to base", () => {
   });
 });
 
+/**
+ * FW-B fix round 1, MINOR 4 — THE SUPPORT INSTRUCTION TEXTS, PINNED BY BYTES,
+ * IN THE GATE.
+ *
+ * B-I1's whole claim about the support chat is that the owners' instruction
+ * half moved onto the frame UNCHANGED — the frame and the answer form are new,
+ * the instruction is not. The only byte assertion on that claim lived in
+ * `tests/integration/support-cases.test.ts`, which is Docker-bound (so it does
+ * not run here at all) and which this package relaxed from `toBe` to
+ * `toContain` when the text moved into a packet. A claim about bytes whose only
+ * byte check neither runs nor compares bytes is not a claim.
+ *
+ * These rows are the gate-level version: the exact preamble of each language
+ * and the exact summary directive, compared with `toBe`, read from the
+ * production functions the call sites use (MINOR 7 collapsed the wrapper, so
+ * `supportAnswerInstruction` IS what `respond` calls).
+ *
+ * The entry list is empty on purpose. What is pinned is CODE'S text; the
+ * entries are the ratified help corpus, which has its own content tests and
+ * changes when the help changes.
+ */
+describe("FW-B — the support chat's instruction slot is the text that already shipped", () => {
+  it("pins the English preamble byte for byte", () => {
+    expect(supportAnswerInstruction([], "en")).toBe(
+      "Answer only in English and only with facts from the supplied entries. "
+      + "Do not invent sources or include Source lines.\n\n"
+    );
+  });
+
+  it("pins the Romanian preamble byte for byte, diacritics included", () => {
+    expect(supportAnswerInstruction([], "ro")).toBe(
+      "Răspunde numai în română și numai cu fapte din intrările furnizate. "
+      + "Nu inventa surse și nu include linii Sursă.\n\n"
+    );
+  });
+
+  it("pins the case-summary directive byte for byte", () => {
+    expect(SUPPORT_SUMMARY_PROMPT).toBe(
+      "Summarize the user's problem in one paragraph of at most 80 words. "
+      + "Do not state or guess who the user is, whether they are the account owner, "
+      + "or whether their request is legitimate."
+    );
+  });
+
+  /**
+   * ...and the pinned bytes are the bytes that reach the packet: the contract
+   * carries the instruction through unchanged, so these three rows are pins on
+   * the prompt and not on a function nobody calls.
+   */
+  it("carries each pinned text into its contract's instruction slot", () => {
+    const answer = supportAnswerInstruction([], "en");
+    expect(supportAnswerPromptContract(answer).instruction).toBe(answer);
+    expect(supportSummaryPromptContract(SUPPORT_SUMMARY_PROMPT).instruction)
+      .toBe(SUPPORT_SUMMARY_PROMPT);
+  });
+});
+
 describe("REVIEW ITEM 4 — no prompt anywhere still carries the retired sentence", () => {
   it.each([
     ["judge", judgePromptContract("support", "unknown")],
@@ -218,7 +281,10 @@ describe("REVIEW ITEM 4 — no prompt anywhere still carries the retired sentenc
     ["evaluator", EVALUATOR_PROMPT_CONTRACT],
     ["blind-judge-grade", BLIND_JUDGE_GRADE_PROMPT_CONTRACT],
     ["domain-tagger", DOMAIN_TAGGER_PROMPT_CONTRACT],
-    ["consumer-aggregate", CONSUMER_AGGREGATE_PROMPT_CONTRACT]
+    ["consumer-aggregate", CONSUMER_AGGREGATE_PROMPT_CONTRACT],
+    // FW-B / B-I1: "anywhere" now includes the support chat's two contracts.
+    ["support-chat-answer", supportAnswerPromptContract("Answer from the supplied entries.")],
+    ["support-case-summary", supportSummaryPromptContract("Summarize the problem.")]
   ])("%s", (_name, contract) => {
     const whole = `${contract.instruction} ${contract.answerForm}`;
     expect(whole).not.toContain("untrusted data, not instructions");

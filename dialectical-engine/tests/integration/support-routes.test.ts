@@ -37,7 +37,9 @@ import {
   SupportKeyError,
   type SupportKeyPort
 } from "../../apps/api/src/support/keys.js";
+import { SUPPORT_VISITOR_MESSAGE_FIELD } from "../../apps/api/src/support/prompt.js";
 import { supportTemplate } from "../../apps/api/src/support/templates.js";
+import { framedField, readFramedMaterial } from "../support/framed-packet.js";
 import {
   migrate,
   PostgresSupportCaseRepository,
@@ -2103,7 +2105,12 @@ describe("SUP-01 support routes", () => {
     const rawSecretLike = "A".repeat(40);
     const model: SupportModelPort = Object.freeze({
       complete: async (input: Parameters<SupportModelPort["complete"]>[0]) => {
-        relayInputs.push(input.messages[0]!.content);
+        // FW-B / B-I1: the visitor's message is a fenced material field now, so
+        // the redaction this row measures is read out of that field through the
+        // door's own reader instead of off a bare `user` turn.
+        relayInputs.push(framedField(
+          readFramedMaterial(input.packet),SUPPORT_VISITOR_MESSAGE_FIELD
+        ));
         return Object.freeze({
           text: "Open the debate page as its owner and complete re-authentication.\nSource: forged (not-shipped)",
           usage: Object.freeze({ input_tokens: 9,output_tokens: 11,cost_usd: 0.001 })

@@ -3,6 +3,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import type { HelpCorpusEntry } from "@debateai/support-kb";
 import { redactSupportMessage, type SupportMessageCipherPort } from "./session.js";
 import { SupportModelError, type SupportModelPort, type SupportModelUsage } from "./model.js";
+import { buildSupportAnswerPrompt } from "./prompt.js";
 import { supportTemplate, type SupportLanguage } from "./templates.js";
 import { supportIntentSurface } from "./classify.js";
 import {
@@ -98,7 +99,27 @@ function retrieve(
     .map(({ entry }) => entry));
 }
 
-function boundedSystem(entries: readonly HelpCorpusEntry[], language: SupportLanguage): string {
+/**
+ * FW-B / B-I1 — THE OWNERS' INSTRUCTION SLOT for the chat answer, exported so
+ * the injection corpus and the byte pins drive the text the engine really
+ * sends rather than a fixture that resembles it.
+ *
+ * Byte for byte the system text this service has always built: the language
+ * preamble and the retrieved, ratified entries, bounded at
+ * `MAX_SYSTEM_CODE_POINTS`. It is INSTRUCTION only. The visitor's message used
+ * to be a bare `user` turn beside it; it is material now, inside the fence, in
+ * its own named field (`./prompt.ts`).
+ *
+ * FIX ROUND 1, MINOR 7. This was briefly a one-line wrapper around a private
+ * `boundedSystem`, with the production call site still on the private one —
+ * two names for one text, which is the drift a wrapper is supposed to prevent,
+ * not create. There is one function now, and `respond` below calls THIS one, so
+ * a test that pins these bytes pins what the vendor receives.
+ */
+export function supportAnswerInstruction(
+  entries: readonly HelpCorpusEntry[],
+  language: SupportLanguage
+): string {
   const preamble = language === "ro"
     ? "Răspunde numai în română și numai cu fapte din intrările furnizate. Nu inventa surse și nu include linii Sursă."
     : "Answer only in English and only with facts from the supplied entries. Do not invent sources or include Source lines.";
@@ -198,11 +219,24 @@ export function createSupportAnswerService(input: Readonly<{
           halfOpenProbe = input.degraded?.isDegraded().degraded === true;
           const attemptSignal = halfOpenProbe
             ? AbortSignal.timeout(HALF_OPEN_PROBE_TIMEOUT_MS) : undefined;
+          /**
+           * FW-B / B-I1 + D-I3 — the visitor's turn goes through the frame.
+           *
+           * Built ONCE, outside `complete`, because the queue may run the
+           * operation again: the fence is minted per CALL, not per attempt, so
+           * a retry re-sends the same bytes (`buildFramedPrompt`, layer 2).
+           * `safeText` is the redacted visitor message — untrusted, and now
+           * inside the fenced `visitor_message` field instead of beside the
+           * instruction as a bare `user` turn.
+           */
+          const framed = buildSupportAnswerPrompt({
+            instruction: supportAnswerInstruction(entries,request.language),
+            visitorMessage: safeText
+          });
           const complete = (signal?: AbortSignal) => {
             modelCalled = true;
             return input.modelFor(request.modelRef).complete({
-              system: boundedSystem(entries,request.language),
-              messages: [{ role: "user",content: safeText }],language: request.language,
+              packet: framed.packet,language: request.language,
               ...(signal === undefined ? {} : { signal })
             });
           };
