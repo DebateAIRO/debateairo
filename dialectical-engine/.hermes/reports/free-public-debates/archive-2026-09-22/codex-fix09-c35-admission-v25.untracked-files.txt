@@ -1,0 +1,3 @@
+dialectical-engine/packages/obs-capture/src/chain/private-key-helper.ts
+dialectical-engine/packages/obs-capture/src/chain/signer.ts
+dialectical-engine/tests/unit/fix09-chain-keys.test.ts

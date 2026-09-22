@@ -1,0 +1,35 @@
+diff --git a/dialectical-engine/packages/obs-capture/src/chain/index.ts b/dialectical-engine/packages/obs-capture/src/chain/index.ts
+index 4dd9d0a7..389def48 100644
+--- a/dialectical-engine/packages/obs-capture/src/chain/index.ts
++++ b/dialectical-engine/packages/obs-capture/src/chain/index.ts
+@@ -8,3 +8,13 @@ export {
+   type ChainedAgentActionInput,
+   type ChainedAgentActionResult,
+ } from "./agent-action-gateway.js";
++export {
++  CHAIN_SIGNER_PROFILES,
++  prepareChainedWriterSigner,
++  type ChainedSignerCommitCheck,
++  type ChainedSignerReadiness,
++  type ChainedSignerReleaseRecord,
++  type ChainedWriterSignerProfile,
++  type PinnedSignerSession,
++  type ReleasedChainedSigner,
++} from "./signer.js";
+diff --git a/dialectical-engine/tests/unit/fix09-capture-gate.test.ts b/dialectical-engine/tests/unit/fix09-capture-gate.test.ts
+index 3d0bb209..cd75532a 100644
+--- a/dialectical-engine/tests/unit/fix09-capture-gate.test.ts
++++ b/dialectical-engine/tests/unit/fix09-capture-gate.test.ts
+@@ -3,11 +3,7 @@ import { describe, expect, it } from "vitest";
+ 
+ // The authority requires this executable to remain a single checked-in .mjs file.
+ // @ts-expect-error TypeScript does not synthesize declarations for that boundary.
+-import {
+-  assertChildArgv,
+-  parseGateManifest,
+-  validateVitestReport,
+-} from "../../tools/fix09-capture-gate.mjs";
++import { assertChildArgv, parseGateManifest, validateVitestReport } from "../../tools/fix09-capture-gate.mjs";
+ 
+ type GateRule = Readonly<{
+   child_argv: readonly string[];
