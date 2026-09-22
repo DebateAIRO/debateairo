@@ -105,13 +105,36 @@ export interface CostEnvelopeGuardInput {
    * reaching its first CHARGED call, which is the window in which a newly
    * admitted run is invisible to the day's spend; it should not be longer,
    * because inside it a reservation and that run's early charges are both
-   * counted. Two minutes by default: a full debate's first model call happens in
-   * seconds, and any value here is bounded by one per-run ceiling per ask.
+   * counted.
+   *
+   * C-I2 — THIRTY MINUTES, AND THE ARITHMETIC THAT CHOSE IT. PROVISIONAL, in
+   * the same sense and for the same reason as the money values on
+   * `costEnvelopePolicy`: no paid run has been measured yet, so this is an
+   * engineering bound the owner resets from the first measurement.
+   *
+   * Two minutes — the round-1 value — was chosen from the HAPPY path ("a full
+   * debate's first model call happens in seconds"). The window that matters is
+   * the UNhappy one, and the deployment's own sealed rows set it:
+   *
+   *   judge deadline x its attempts     3 x 180 s = 540 s   (`acceptanceOrganCostBounds`;
+   *                                                          the kit's runner.env declares
+   *                                                          120 s x 3, which is smaller)
+   * + the run-death cooldown                      600 s     (`runDeathPolicy.cooldown_ms`)
+   * + queueing behind another run on a busy runner
+   *   ------------------------------------------------
+   *   = 19 minutes before the margin; 30 leaves 11 for the queue.
+   *
+   * Below that sum the daily ceiling degrades to the ask rate limit exactly
+   * when it is most needed: during a vendor outage every ask sees committed = 0,
+   * is admitted, and can later spend a whole per-run ceiling. The cost of the
+   * longer window is the conservative direction — a reservation and that run's
+   * early charges counted together for up to thirty minutes — which can only
+   * refuse a new run early, never admit one late.
    */
   readonly reservationTtlMs?: number;
 }
 
-export const DEFAULT_RESERVATION_TTL_MS = 120_000 as const;
+export const DEFAULT_RESERVATION_TTL_MS = 1_800_000 as const;
 
 export interface ProviderSeamInput {
   readonly runId: string;

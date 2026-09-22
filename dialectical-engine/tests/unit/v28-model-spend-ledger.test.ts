@@ -1,11 +1,17 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   CostEnvelopeGuard,
   costEnvelopeDay,
+  DEFAULT_RESERVATION_TTL_MS,
   type ModelSpendEntry,
   type ModelSpendStore
 } from "@debateai/budget";
 import { costEnvelopePolicyFromValue, COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW } from "@debateai/register";
+import {
+  DEVELOPMENT_ORGAN_COST_BOUNDS,
+  DEVELOPMENT_RUN_DEATH_POLICY
+} from "../../apps/runner/src/dev-deployment-register.js";
 
 /**
  * V-28 — THE PERSISTED SPEND, BEHIND A REPOSITORY SEAM.
@@ -350,5 +356,62 @@ describe("V-28 the day boundary", () => {
 
   it("refuses an instant that is not one", () => {
     expect(() => costEnvelopeDay(new Date("nonsense"))).toThrowError(TypeError);
+  });
+});
+
+/**
+ * C-I2 (final review, area C) — HOW LONG AN ADMISSION RESERVATION MUST HOLD.
+ *
+ * The reservation is the only thing that makes an ADMITTED run visible to the
+ * day before its first charge lands. At two minutes it expired long before a
+ * slow first call reported anything, and in that gap the daily ceiling degraded
+ * to the ask rate limit: during a vendor outage every ask saw committed = 0,
+ * was admitted, and could later spend a whole per-run ceiling. The window has to
+ * cover the WORST first-charge latency the deployment's own sealed rows allow,
+ * and the two that set it are the judge's deadline times its attempts and the
+ * run-death cooldown.
+ */
+describe("C-I2 the reservation covers the wait for a first charge", () => {
+  it("holds for thirty minutes by default", () => {
+    expect(DEFAULT_RESERVATION_TTL_MS).toBe(30 * 60_000);
+  });
+
+  it("covers the judge's own deadline x attempts plus the run-death cooldown", () => {
+    // The numbers are not restated here: they are the rows the dev deployment
+    // seeds and the kit's `runner.env` declares, read from the seeder itself.
+    const judge = DEVELOPMENT_ORGAN_COST_BOUNDS.organs.JUDGE;
+    const exhaustion = judge.deadlineMs * judge.maxAttempts;
+    const cooldown = DEVELOPMENT_RUN_DEATH_POLICY.cooldown_ms;
+    expect(exhaustion + cooldown).toBeLessThanOrEqual(DEFAULT_RESERVATION_TTL_MS);
+    // ...and the rest of the window is the queueing margin, which must exist.
+    expect(DEFAULT_RESERVATION_TTL_MS - (exhaustion + cooldown)).toBeGreaterThan(0);
+  });
+
+  it("stamps that window on the reservation the guard opens", async () => {
+    const { store, reservations } = fakeStore();
+    const now = new Date("2026-09-22T11:00:00.000Z");
+    await new CostEnvelopeGuard({
+      store,
+      policy: { perRunCeilingMicros: 1_000, dailyCeilingMicros: 1_000 },
+      clock: () => now
+    }).assertDailyEnvelopeAdmitsNewRun();
+
+    expect(reservations).toHaveLength(1);
+    expect(reservations[0]!.expiresAt.getTime() - now.getTime())
+      .toBe(DEFAULT_RESERVATION_TTL_MS);
+  });
+
+  it("says, where the value is, that it is PROVISIONAL and what it must cover", async () => {
+    const source = await readFile(
+      new URL("../../packages/budget/src/model-spend.ts", import.meta.url), "utf8"
+    );
+    const stated = source.slice(
+      source.indexOf("* I1 — how long an admission reservation"),
+      source.indexOf("export const DEFAULT_RESERVATION_TTL_MS")
+    );
+    expect(stated).toContain("PROVISIONAL");
+    expect(stated).toMatch(/judge deadline/iu);
+    expect(stated).toMatch(/cooldown/u);
+    expect(stated).toMatch(/queue/iu);
   });
 });
