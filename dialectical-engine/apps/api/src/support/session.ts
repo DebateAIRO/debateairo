@@ -398,6 +398,14 @@ export interface SupportCasePort {
     toolCalls?: readonly SupportCaseToolCall[];
     kbVersion?: string;
     slaHours?: number;
+    /**
+     * DL1-F7. `false` when this source has spent its share of the daily model
+     * budget. The case still opens — escalation to a person is the safety valve
+     * and no spending rule may stand in front of it — and only the MODEL-backed
+     * advisory summary is skipped. Absent means summarise, so every existing
+     * caller behaves as before.
+     */
+    summarize?: boolean;
   }>): Promise<Readonly<{
     record: SupportCaseRecord;
     token: string;
@@ -412,6 +420,8 @@ export interface SupportCasePort {
     toolCalls?: readonly SupportCaseToolCall[];
     kbVersion?: string;
     slaHours?: number;
+    /** DL1-F7, as in `open`: skips only the model-backed summary. */
+    summarize?: boolean;
   }>): Promise<
     | Readonly<{ kind: "OPENED";record: SupportCaseRecord;token: string }>
     | Readonly<{ kind: "ALREADY_OPENED";record: SupportCaseRecord }>
@@ -479,8 +489,12 @@ export function createSupportCaseService(input: Readonly<{
     });
   }
 
-  function scheduleSummary(prepared: Awaited<ReturnType<typeof prepare>>): void {
-    if (input.summaries === undefined) return;
+  function scheduleSummary(
+    prepared: Awaited<ReturnType<typeof prepare>>,summarize = true
+  ): void {
+    // DL1-F7: the one model call this path makes. A source that has spent its
+    // share opens its case and simply goes without the advisory summary.
+    if (input.summaries === undefined || !summarize) return;
     const transcript = prepared.messages.map((message) =>
       `${message.role === "user" ? "USER" : "ASSISTANT"}> ${message.text}`
     ).join("\n");
@@ -509,7 +523,7 @@ export function createSupportCaseService(input: Readonly<{
           triggerPredicate: prepared.triggerPredicate,toolCalls: prepared.toolCalls,
           kbVersion: prepared.kbVersion,slaHours: prepared.slaHours
         });
-        scheduleSummary(prepared);
+        scheduleSummary(prepared,request.summarize ?? true);
         return Object.freeze({ record,token: prepared.token });
       } catch (error) {
         if (error instanceof TypedDomainError) throw error;
@@ -546,7 +560,9 @@ export function createSupportCaseService(input: Readonly<{
             return prepared;
           }
         });
-        if (result.kind === "OPENED" && prepared !== undefined) scheduleSummary(prepared);
+        if (result.kind === "OPENED" && prepared !== undefined) {
+          scheduleSummary(prepared,request.summarize ?? true);
+        }
         return result;
       } finally {
         prepared?.transcriptSnapshot.fill(0);

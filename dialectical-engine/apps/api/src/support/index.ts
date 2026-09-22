@@ -253,6 +253,15 @@ async function openEscalatedCase(
   language: SupportLanguage,
   predicate: Parameters<NonNullable<SupportApplication["cases"]>["open"]>[0]["triggerPredicate"],
   createdAt: Date,
+  /**
+   * DL1-F7. Charges this source's share of the daily model budget and reports
+   * whether it had one. A THUNK, so it is spent only when a case really opens:
+   * this funnel returns early when the composition has no case port or the
+   * predicate is absent, and a budget must not be charged for a call nobody
+   * makes. A spent share NEVER refuses the case — escalation to a person is the
+   * safety valve — it only drops the model-backed advisory summary.
+   */
+  chargeModelShare: () => boolean,
   triggerGeneration = `predicate:${predicate ?? "E1"}`
 ): Promise<
   | Readonly<{ kind: "OPENED";record: Awaited<ReturnType<NonNullable<SupportApplication["cases"]>["open"]>>["record"];token: string }>
@@ -269,7 +278,8 @@ async function openEscalatedCase(
     triggerPredicate: predicate,
     toolCalls,
     kbVersion: session.kbVersion,
-    slaHours: 48
+    slaHours: 48,
+    summarize: chargeModelShare()
   } as const;
   if (application.cases.openOnce !== undefined) {
     return application.cases.openOnce({ ...request,triggerGeneration });
@@ -308,6 +318,15 @@ export function installSupportRoutes(
    * for a second — the same freshness the configuration port already caches at.
    */
   let statusCache: Readonly<{ at: number;body: Readonly<Record<string,unknown>> }> | null = null;
+  /**
+   * DL1-F7. One unit of this source's share of the daily model cap. Every model
+   * call the support surface makes goes through here: the relay answer below,
+   * and — through `openEscalatedCase` — the model-backed advisory summary a
+   * newly opened case fires. Without the second door four or five addresses
+   * could still take the whole 500/day, which is the finding's own scenario.
+   */
+  const modelShare = (route: SupportRoutePath,sourceKey: string): boolean =>
+    admit.charge("supportModelCalls",route,sourceKey);
 
   api.post("/v1/support/sessions", policy("POST /v1/support/sessions"), async (request, reply) => {
     if (application === undefined) return unavailable(reply);
@@ -565,7 +584,8 @@ export function installSupportRoutes(
         });
         const opened = escalationBeforeResponse === null ? null
           : await openEscalatedCase(
-            application,found,responseLanguage,escalationBeforeResponse.predicate,now
+            application,found,responseLanguage,escalationBeforeResponse.predicate,now,
+            () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)
           );
         return reply.send({
           message_id: messageId,...incident,...openedCaseReceipt(opened,responseLanguage)
@@ -598,7 +618,8 @@ export function installSupportRoutes(
         }
         const opened = escalationBeforeResponse === null ? null
           : await openEscalatedCase(
-            application,found,responseLanguage,escalationBeforeResponse.predicate,now
+            application,found,responseLanguage,escalationBeforeResponse.predicate,now,
+            () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)
           );
         return reply.send({
           outcome: classification.outcome,text,
@@ -632,7 +653,8 @@ export function installSupportRoutes(
         });
         const opened = escalationBeforeResponse === null ? null
           : await openEscalatedCase(
-            application,found,responseLanguage,escalationBeforeResponse.predicate,now
+            application,found,responseLanguage,escalationBeforeResponse.predicate,now,
+            () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)
           );
         return reply.send({
           message_id: messageId,outcome,text,...openedCaseReceipt(opened,responseLanguage)
@@ -672,7 +694,8 @@ export function installSupportRoutes(
           });
           const opened = escalationBeforeResponse === null ? null
             : await openEscalatedCase(
-              application,found,responseLanguage,escalationBeforeResponse.predicate,now
+              application,found,responseLanguage,escalationBeforeResponse.predicate,now,
+              () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)
             );
           return reply.send({
             message_id: messageId,outcome,text,...openedCaseReceipt(opened,responseLanguage)
@@ -712,6 +735,7 @@ export function installSupportRoutes(
           const opened = escalation !== null
             ? await openEscalatedCase(
               application,found,responseLanguage,escalation.predicate,now,
+              () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256),
               escalation.predicate === "E4"
                 ? `tool:${toolCalls.at(-1)?.at.toISOString() ?? now.toISOString()}`
                 : `predicate:${escalation.predicate}`
@@ -739,7 +763,8 @@ export function installSupportRoutes(
         });
         const opened = escalationBeforeResponse === null ? null
           : await openEscalatedCase(
-            application,found,responseLanguage,escalationBeforeResponse.predicate,now
+            application,found,responseLanguage,escalationBeforeResponse.predicate,now,
+            () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)
           );
         return reply.send({
           message_id: messageId,outcome,text,...openedCaseReceipt(opened,responseLanguage)
@@ -756,6 +781,7 @@ export function installSupportRoutes(
         });
         const opened = await openEscalatedCase(
           application,found,responseLanguage,escalationBeforeAnswer.predicate,now,
+          () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256),
           `message:${userMessageId}`
         );
         if (opened === null) return unavailable(reply);
@@ -812,7 +838,8 @@ export function installSupportRoutes(
         });
         if (escalationBeforeAnswer !== null) {
           await openEscalatedCase(
-            application,found,responseLanguage,escalationBeforeAnswer.predicate,now
+            application,found,responseLanguage,escalationBeforeAnswer.predicate,now,
+            () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)
           );
         }
         return reply.send({
@@ -859,7 +886,8 @@ export function installSupportRoutes(
         }
         if (escalationBeforeAnswer !== null) {
           await openEscalatedCase(
-            application,found,responseLanguage,escalationBeforeAnswer.predicate,now
+            application,found,responseLanguage,escalationBeforeAnswer.predicate,now,
+            () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)
           );
         }
         return reply.send({
@@ -878,8 +906,7 @@ export function installSupportRoutes(
          * to that source like every other window it can hit, and to every other
          * source like nothing at all.
          */
-        if (!admit.charge("supportModelCalls",
-          "POST /v1/support/sessions/{id}/messages", ipSha256)) {
+        if (!modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)) {
           await recordRateLimitEvidence(application,{
             sessionId: found.sessionId,messageSha256,ipSha256,at: now
           });
@@ -905,7 +932,8 @@ export function installSupportRoutes(
         });
         const opened = escalationAfterAnswer === null ? null
           : await openEscalatedCase(
-            application,found,responseLanguage,escalationAfterAnswer.predicate,now
+            application,found,responseLanguage,escalationAfterAnswer.predicate,now,
+            () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)
           );
         return reply.send({
           message_id: result.messageId,
@@ -962,7 +990,8 @@ export function installSupportRoutes(
       const opened = escalation === null ? null
         : await openEscalatedCase(
           application,found,found.language,escalation.predicate,
-          (application.clock ?? (() => new Date()))()
+          (application.clock ?? (() => new Date()))(),
+          () => modelShare("POST /v1/support/messages/{id}/rating",sourceOf(application,request))
         );
       return reply.send({
         rating: body.rating,case_opened: opened?.kind === "OPENED",
@@ -991,7 +1020,9 @@ export function installSupportRoutes(
       if (language === null) return reply.status(400).send({ error: "SUPPORT_LANGUAGE_INVALID" });
       const opened = await openEscalatedCase(
         application,found,language,"E1",
-        (application.clock ?? (() => new Date()))(),"manual"
+        (application.clock ?? (() => new Date()))(),
+        () => modelShare("POST /v1/support/sessions/{id}/escalate",sourceOf(application,request)),
+        "manual"
       );
       if (opened === null) return unavailable(reply);
       if (opened.kind === "ALREADY_OPENED") {
