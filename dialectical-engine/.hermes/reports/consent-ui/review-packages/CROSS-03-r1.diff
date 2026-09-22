@@ -1,0 +1,942 @@
+# Review package — lane /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/consent-s02/dialectical-engine — range c334136d..4ef2f7d3 — generated 2026-09-07 06:45:07
+
+## Commits
+4ef2f7d3 06:31 fix(consent-ui CROSS-03): a nested surface answers Escape before the surface that contains it (V-20 (b′)) + the non-blocking residue of the C9, CROSS-01 and CROSS-02 reviews
+
+## Stat
+ .../apps/ui/components/consent/CookieConsent.tsx   |  31 +++--
+ .../components/consent/CookiePreferencesCard.tsx   |  25 ++--
+ .../apps/ui/components/consent/modalSemantics.ts   |  98 ++++++++++++----
+ .../ADR-0022-shared-modal-semantics.md             |  57 ++++++++++
+ .../tests/render/consent-bar.test.tsx              |  27 ++++-
+ .../tests/render/consent-modal-semantics.test.tsx  | 126 ++++++++++++++++-----
+ .../tests/render/consent-policy-link.test.tsx      |  10 ++
+ dialectical-engine/tests/support/consentMarkers.ts |  29 +++++
+ .../tests/unit/consent-s02-style-contract.test.ts  |  23 +++-
+ 9 files changed, 347 insertions(+), 79 deletions(-)
+
+## Diff (-U10)
+diff --git a/dialectical-engine/apps/ui/components/consent/CookieConsent.tsx b/dialectical-engine/apps/ui/components/consent/CookieConsent.tsx
+index 83f94113..692881c7 100644
+--- a/dialectical-engine/apps/ui/components/consent/CookieConsent.tsx
++++ b/dialectical-engine/apps/ui/components/consent/CookieConsent.tsx
+@@ -124,21 +124,21 @@ export function CookieConsent() {
+    * focus back there when the card closes (S01-R18's bar direction, V-22).
+    *
+    * It is a SECOND reference and not a use of `openerRef` above, because the two hold
+    * different things: `openerRef` holds the node that asked for the card, which for the
+    * bar entry is unmounted by the very commit that opens the card, while this one is
+    * attached by the bar and is therefore re-attached to the FRESH button when the bar
+    * comes back — which happens in the layout phase of that commit, before the card's
+    * cleanup reads it. This component still moves no focus itself; it lends a node and the
+    * ONE helper decides (SPEC §Out of scope bans a second implementation).
+    */
+-  const manageRef = useRef<HTMLButtonElement | null>(null);
++  const chooseRef = useRef<HTMLButtonElement | null>(null);
+ 
+   useEffect(() => {
+     setSurface(readConsent() === null ? "bar" : "silent");
+   }, []);
+ 
+   /**
+    * Opening the card, from either control. `initial` is recomputed from STORAGE
+    * at every open — not from the last open, and never from where the request
+    * came from — so the two entry points are indistinguishable to the card
+    * (S01-R17, S01-R21, B1's class).
+@@ -182,54 +182,65 @@ export function CookieConsent() {
+    * reachable only when a valid `v: 1` decision is in storage.
+    */
+   const dismiss = useCallback((): void => {
+     setSurface(readConsent() === null ? "bar" : "silent");
+   }, []);
+ 
+   if (surface === undefined || surface === "silent") return null;
+ 
+   if (surface === "card") {
+     /**
+-     * **DOM ORDER IS LOAD-BEARING, and this is the whole of it.** The shared
+-     * helper resolves which of two unrelated open surfaces is topmost by
+-     * DOCUMENT POSITION — `CONTAINED_BY || FOLLOWING` — and not by the order
+-     * they opened in (S02 `DECISIONS.md` 2026-09-07, CODE-REV-S02-C5C6 r1 N2,
+-     * measured; ticket `t_457c9898`). The policy modal is therefore the card's
+-     * LATER SIBLING: with the two swapped, one press of the dismiss key closes
+-     * the CARD and leaves the policy standing over nothing. `S01-S40` is the pin.
++     * **THE ARRANGEMENT BELOW IS A RECORDED CONSTRAINT, NOT THE MECHANISM.**
++     * The policy modal is the card's LATER SIBLING because V-20 recorded that
++     * shape, and `S01-S40` pins it — but nothing about which surface answers
++     * the dismiss key now depends on it. The shared helper resolves two
++     * UNRELATED open surfaces by the order they OPENED in, and applies
++     * containment only where one surface is nested inside the other; it makes
++     * no `compareDocumentPosition` call and has no `FOLLOWING` arm (V-20 (b′),
++     * `modalSemantics.ts` `topmostSurface()`; ADR-0022's two 2026-09-07
++     * addenda). Swap these two and the policy still answers, because it is
++     * still the one opened last.
++     *
++     * The sentences this replaces said the opposite — "DOM ORDER IS
++     * LOAD-BEARING … topmost by DOCUMENT POSITION — `CONTAINED_BY ||
++     * FOLLOWING` — and not by the order they opened in", citing ticket
++     * `t_457c9898`. Every clause of that was false from `c334136d` onward
++     * (CODE-REV-CROSS-02 r1 N5, measured); the FOLLOWING arm it described is
++     * the defect CODE-REV-S02-C9 r1 B1 reported, and `t_457c9898` carries the
++     * same dead premise.
+      * (Written without spelling that key: S01-S45's slice-wide guard is
+      * grep-shaped and a grep does not know what a comment is — `COMMON.md` §8,
+      * and CODE-S01-C5 F1 measured a JSDoc mention counting as a hit.)
+      *
+      * The modal is mounted CONDITIONALLY, so every open is a fresh read (S02
+      * `DECISIONS.md` 2026-09-07, the N7 ruling) — the same treatment the card
+      * itself gets from `key={opens}`.
+      */
+     return (
+       <>
+         <CookiePreferencesCard
+           key={opens}
+           initial={initial}
+           onSave={(choice: ConsentChoice): void =>
+             settle(decisionFor("save-choices", { quality: choice.quality, analytics: choice.analytics }))
+           }
+           onEssentialOnly={(): void => settle(decisionFor("essential-only"))}
+           onDismiss={dismiss}
+           onRequestPolicy={(): void => setPolicyOpen(true)}
+-          returnFocusRef={manageRef}
++          returnFocusRef={chooseRef}
+         />
+         {policyOpen && (
+           <PrivacyPolicyModal open mode="read" onClose={(): void => setPolicyOpen(false)} />
+         )}
+       </>
+     );
+   }
+ 
+   return (
+     <CookieBar
+       onEssentialOnly={(): void => settle(decisionFor("essential-only"))}
+       onChoose={openCard}
+       onAcceptAll={(): void => settle(decisionFor("accept-all"))}
+-      chooseRef={manageRef}
++      chooseRef={chooseRef}
+     />
+   );
+ }
+diff --git a/dialectical-engine/apps/ui/components/consent/CookiePreferencesCard.tsx b/dialectical-engine/apps/ui/components/consent/CookiePreferencesCard.tsx
+index 9d43e1c8..0484bf27 100644
+--- a/dialectical-engine/apps/ui/components/consent/CookiePreferencesCard.tsx
++++ b/dialectical-engine/apps/ui/components/consent/CookiePreferencesCard.tsx
+@@ -55,29 +55,38 @@ export type CookiePreferencesCardProps = {
+   initial: ConsentToggles;
+   /** R04 row 4 — the current toggles. */
+   onSave: (choice: ConsentChoice) => void;
+   /** R04 row 3 — byte-identical to the bar's own `Essential only`. */
+   onEssentialOnly: () => void;
+   /** Closing without deciding. Driven by the shared helper in cluster C6. */
+   onDismiss: () => void;
+   /** Opens the S02 policy modal in read-only mode, over the card (S01-R20). */
+   onRequestPolicy: () => void;
+   /**
+-   * Handed straight to the shared helper, which uses it when the opener it captured did
+-   * not survive the commit that opened this card (S01-R18, V-22). The caller owns it
+-   * because the control it names — the bar's `Choose what to store` — is unmounted while
+-   * this card is open and comes back as a fresh node; nothing this component could capture
+-   * would still be on the page at close.
++   * Handed straight to the shared helper, which uses it when the opener it captured is not
++   * a usable element AT CLOSE — because the commit that opened this card removed it, or
++   * because it left the page while the card was open (S01-R18, V-22). The trigger is the
++   * opener's state when the card closes, never which commit put it in that state
++   * (CODE-REV-CROSS-01 r1 N3; the earlier wording named only the opening commit and so
++   * described a strictly narrower rule than the helper ships). The caller owns it because
++   * the control it names — the bar's `Choose what to store` — is unmounted while this card
++   * is open and comes back as a fresh node; nothing this component could capture would
++   * still be on the page at close.
+    *
+-   * Spelled without the word this file's own source-text guard bans for the page-wide
+-   * object (`consent-card.test.tsx`), which a grep cannot tell from a comment
+-   * (`COMMON.md` §8).
++   * "The page" here IS the page-wide object, spelled around on purpose: this file's own
++   * source-text guards ban that word, the dismiss key's name and the focus call outright,
++   * comments included, because a grep cannot tell a comment from code (`COMMON.md` §8;
++   * CODE-S01-C5 F1 measured a JSDoc mention counting as a hit). Both guards are live —
++   * `tests/render/consent-card.test.tsx` scans this file alone,
++   * `tests/render/consent-policy-link.test.tsx` scans it beside `CookieConsent.tsx`, and
++   * `tests/render/consent-guards.test.tsx` (S01-S45) scans the whole directory bar the
++   * helper. Rewriting this paragraph with the plain word turns the first of them RED.
+    */
+   returnFocusRef?: RefObject<HTMLElement | null>;
+ };
+ 
+ export function CookiePreferencesCard({
+   initial,
+   onSave,
+   onEssentialOnly,
+   onDismiss,
+   onRequestPolicy,
+diff --git a/dialectical-engine/apps/ui/components/consent/modalSemantics.ts b/dialectical-engine/apps/ui/components/consent/modalSemantics.ts
+index 6eb7ee69..322844d0 100644
+--- a/dialectical-engine/apps/ui/components/consent/modalSemantics.ts
++++ b/dialectical-engine/apps/ui/components/consent/modalSemantics.ts
+@@ -13,22 +13,29 @@
+  */
+ 
+ import * as React from "react";
+ 
+ export type ModalSurface = Readonly<{
+   containerRef: React.RefObject<HTMLElement | null>;
+   initialFocusRef: React.RefObject<HTMLElement | null>;
+   onClose: () => void;
+   /**
+    * OPTIONAL, and the only member added since the contract was fixed (V-22, ruled after
+-   * both slices merged). The control focus should return to WHEN THE CAPTURED OPENER DID
+-   * NOT SURVIVE the opening commit — never a general override of it.
++   * both slices merged). The control focus should return to WHEN THE CAPTURED OPENER IS
++   * NOT A USABLE ELEMENT AT CLOSE — because the opening commit removed it, or because it
++   * left the document while the surface was open — never a general override of it.
++   *
++   * The trigger is the opener's STATE when the cleanup runs (`opener.isConnected` below),
++   * not the CAUSE that put it in that state; the earlier wording named only the opening
++   * commit and so described a strictly narrower rule than the code ships
++   * (CODE-REV-CROSS-01 r1 N3, and the case `returns focus to the named control when the
++   * captured opener has since left the page` pins the broader one).
+    *
+    * It exists because the capture is unusable for a whole CLASS of surfaces: one whose
+    * opener is unmounted by the same commit that opens it. The platform moves focus to
+    * `document.body` as the opener leaves the document, and it does so before any hook tier
+    * runs — `useLayoutEffect` sees `body` too (measured: CODE-REV-S01-C6 r1 B2) — so the
+    * capture is `body`, and even a captured reference would be a detached node. A
+    * PARENT-owned ref escapes that: React re-attaches it in the layout phase of the commit
+    * that remounts the control, which is before this hook's passive cleanup reads it. The
+    * cookie bar and its preferences card are the first member of the class; every
+    * mutually-exclusive surface pair is another.
+@@ -43,31 +50,36 @@ export type ModalSurface = Readonly<{
+ 
+ /**
+  * One entry per OPEN surface. `read()` returns the caller's current surface object, so a
+  * re-rendered consumer's fresh `onClose` is the one that runs.
+  */
+ type StackEntry = Readonly<{ read: () => ModalSurface }>;
+ 
+ /**
+  * The Esc stack: a module-level REGISTRY of open surfaces, in REGISTRATION order, shared by
+  * every surface in the app. The entry that receives `Escape` is the LAST REGISTERED one whose
+- * container is still in the document — the surface the visitor opened most recently. Removal
+- * stays `lastIndexOf` + `splice`, so a surface that closes out of order takes out its own entry
+- * and leaves the rest in order.
++ * container is still in the document — the surface the visitor opened most recently — unless
++ * another open surface is NESTED INSIDE it, in which case the innermost such surface wins
++ * (`topmostSurface()` below states the walk). Removal stays `lastIndexOf` + `splice`, so a
++ * surface that closes out of order takes out its own entry and leaves the rest in order.
+  *
+- * There is NO arrangement constraint: where a surface renders in the document does not affect
+- * which one answers the key (V-20 option (b), ruled 2026-09-07 under CODE-REV-S02-C9 r1 B1).
+- * The previous rule ranked by `compareDocumentPosition`, and it was measurably wrong on
+- * `/sign-up`, where both slices' surfaces coexist: `app/layout.tsx` mounts `<CookieConsent />`
+- * AFTER `{children}` while the sign-up policy renders INSIDE them, so the cookie card was later
+- * in document order while the policy was higher in paint, and ONE `Escape` closed the card
+- * underneath the open policy — discarding the visitor's unsaved category choices.
++ * There is NO ARRANGEMENT CONSTRAINT between UNRELATED surfaces: where two surfaces that do not
++ * contain one another render in the document does not affect which one answers the key (V-20
++ * option (b), ruled 2026-09-07 under CODE-REV-S02-C9 r1 B1; extended to (b′) with the
++ * containment tiebreak under CODE-REV-CROSS-02 r1 N2). The rule this replaced ranked by
++ * `compareDocumentPosition` — `CONTAINED_BY || FOLLOWING` — and the FOLLOWING arm was measurably
++ * wrong on `/sign-up`, where both slices' surfaces coexist: `app/layout.tsx` mounts
++ * `<CookieConsent />` AFTER `{children}` while the sign-up policy renders INSIDE them, so the
++ * cookie card was later in document order while the policy was higher in paint, and ONE
++ * `Escape` closed the card underneath the open policy — discarding the visitor's unsaved
++ * category choices. Containment is kept because it cannot mix unrelated surfaces up; FOLLOWING
++ * is gone because that is exactly what it did.
+  *
+  * Open order rather than the `--z-*` ladder, because every surface here opens FROM the one below
+  * it and its scrim covers that surface's controls: the last-opened surface IS the one on top in
+  * every state a visitor can reach, and a z-rank would restate the ladder in TypeScript.
+  */
+ const surfaceStack: StackEntry[] = [];
+ 
+ /** Exactly one `document` keydown listener exists while the stack is non-empty. */
+ let listenerAttached = false;
+ 
+@@ -117,43 +129,79 @@ function trapTab(entry: StackEntry, event: KeyboardEvent): void {
+   // platform will not focus (a hidden or invisible one) cannot turn Tab into a dead key.
+   for (let attempt = 0; attempt < focusable.length; attempt += 1) {
+     cursor = (cursor + step + focusable.length) % focusable.length;
+     const next = focusable[cursor]!;
+     focusElement(next);
+     if (document.activeElement === next) return;
+   }
+ }
+ 
+ /**
+- * The topmost surface: the LAST REGISTERED entry whose container is still in the document.
++ * The topmost surface: the LAST REGISTERED entry whose container is still in the document, and
++ * then the DEEPEST surface nested inside that one, if any is open.
++ *
++ * Two passes, in this order:
++ *
++ * 1. **The incumbent, by open order.** Walk back from the last registered entry and take the
++ *    first whose container is `null` or still connected. An entry whose container is `null` — a
++ *    surface that renders no container of its own — still receives `Escape`. An entry whose
++ *    container has LEFT the document is skipped, because it is no longer on screen at all, and
++ *    the walk continues to the entry below it; that is the one guard this function keeps from the
++ *    document-order version it replaces.
++ * 2. **The containment tiebreak** (V-20 (b′)). Keep scanning DOWNWARDS from the incumbent. A
++ *    lower entry replaces the incumbent when, and only when, its container is inside the
++ *    incumbent's — `Node.contains`. Because each replacement is strictly deeper, one pass reaches
++ *    the innermost open surface: anything nested in the new incumbent was nested in the old one
++ *    too, so nothing already scanned can be missed.
+  *
+- * An entry whose container is `null` — a surface that renders no container of its own — still
+- * receives `Escape`, exactly as before. An entry whose container has LEFT the document is
+- * skipped, because it is no longer on screen at all, and the walk continues to the entry below
+- * it; that is the one guard this function keeps from the document-order version it replaces.
++ * **There is no `FOLLOWING` arm and no document-order comparison between UNRELATED surfaces.**
++ * That comparison is what produced CODE-REV-S02-C9 r1 B1: `app/layout.tsx` mounts
++ * `<CookieConsent />` after `{children}`, so on `/sign-up` the cookie card is later in the
++ * document than the sign-up policy while the policy is the one opened last and painted on top,
++ * and one `Escape` closed the card underneath it. Containment cannot mix unrelated surfaces up;
++ * document order can, and did.
+  *
+  * Registration order IS open order for every surface a visitor can reach, because they open one
+  * at a time — each from a control of the surface below it. The one shape where the two part
+  * company is a pair mounted in a SINGLE commit: registration happens in `React.useEffect`, which
+- * runs CHILD-FIRST, so a nested inner surface registers BEFORE its outer one and the OUTER one
+- * answers `Escape`. No surface in this product has that shape (both policy modals are mounted
+- * conditionally, by a state change the visitor causes), it is pinned as-is in
+- * `tests/render/consent-modal-semantics.test.tsx`, and a future overlay pair that needs its
+- * inner surface on top opens that surface in a later commit.
++ * runs CHILD-FIRST, so a nested inner surface registers BEFORE its outer one and "last
++ * registered" names the surface UNDERNEATH. Pass 2 is what stops that being B1's harm in a new
++ * shape (CODE-REV-CROSS-02 r1 N2). No surface in this product nests today — both policy modals
++ * are siblings, mounted conditionally by a state change the visitor causes — so the tiebreak
++ * changes nothing a visitor can reach; it is there for the next overlay pair, and both shapes
++ * are pinned in `tests/render/consent-modal-semantics.test.tsx`.
+  */
+ function topmostSurface(): StackEntry | undefined {
+-  for (let index = surfaceStack.length - 1; index >= 0; index -= 1) {
++  let top: StackEntry | undefined;
++  let topContainer: HTMLElement | null = null;
++  let index = surfaceStack.length - 1;
++  for (; index >= 0; index -= 1) {
++    const entry = surfaceStack[index]!;
++    const container = entry.read().containerRef.current;
++    if (container === null || container.isConnected) {
++      top = entry;
++      topContainer = container;
++      break;
++    }
++  }
++  if (top === undefined) return undefined;
++  // A `null` incumbent renders no node, so nothing can be nested inside it and open order
++  // decides alone.
++  for (index -= 1; topContainer !== null && index >= 0; index -= 1) {
+     const entry = surfaceStack[index]!;
+     const container = entry.read().containerRef.current;
+-    if (container === null || container.isConnected) return entry;
++    if (container === null || !container.isConnected) continue;
++    if (!topContainer.contains(container)) continue;
++    top = entry;
++    topContainer = container;
+   }
+-  return undefined;
++  return top;
+ }
+ 
+ function handleDocumentKeydown(event: KeyboardEvent): void {
+   const top = topmostSurface();
+   if (top === undefined) return;
+   if (event.key === "Escape") {
+     event.preventDefault();
+     event.stopPropagation();
+     top.read().onClose();
+     return;
+diff --git a/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md b/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md
+index 730f00a7..262d528d 100644
+--- a/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md
++++ b/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md
+@@ -144,20 +144,77 @@ surface IS the one on top in every state a visitor can reach, and a z-rank would
+ ladder in TypeScript. **The one shape where the two part company** is a pair mounted in a SINGLE
+ commit — React runs effects child-first, so a nested inner surface registers before its outer one
+ and the OUTER one answers `Escape`. No surface in this repository has that shape today (both
+ policy modals are mounted conditionally by a state change the visitor causes); a future overlay
+ pair that needs its inner surface on top opens that surface in a later commit. Pinned by seven
+ cases in `tests/render/consent-cross-slice.test.tsx` — the first suite in this mission to mount
+ both slices in ONE document, in `layout.tsx`'s order — and by five in
+ `tests/render/consent-modal-semantics.test.tsx`. **Status: this is the orchestrator's ruling under
+ V-20 and V may undo it; the cost of undoing is this one function.**
+ 
++### Addendum 2026-09-07 — a CONTAINMENT-ONLY tiebreak on top of open order (V-20 (b′))
++
++Appended by seat `CODE-CROSS-03` as the one product change ticket `t_ed4c5e73` authorises;
++nothing above this heading is edited. The addendum directly above ("topmost is the surface
++opened LAST", V-20 (b)) keeps every sentence except its last two, which said the OUTER surface
++of a pair mounted in one commit answers `Escape` and that the shape is pinned as-is: those are
++superseded here.
++
++**`topmostSurface()` now runs two passes.** Pass 1 is unchanged — walk back from the last
++registered entry and take the first whose container is `null` or still connected. Pass 2 keeps
++scanning downwards and replaces the incumbent by any connected entry whose container the
++incumbent's container `contains` (`Node.contains`), repeating until nothing deeper is open. **So
++`Escape` reaches the innermost open surface of a nested group, and open order decides everything
++else.** The exported surface, the single `document` listener, the focus trap, the focus return,
++the `null`-container branch and the detached-entry skip are all unchanged.
++
++Why: (b) as ruled shipped a behaviour INVERSION for the one shape where open order and paint
++order part company. React runs effects child-first, so a pair mounted in a SINGLE commit
++registers `[inner, outer]` and "last registered" names the surface UNDERNEATH — one `Escape`
++would close the outer surface, discard whatever the visitor had in it, and leave focus trapped
++in the inner surface that refused the key. That is `CODE-REV-S02-C9` r1 **B1**'s exact harm in a
++different shape, reported as `CODE-REV-CROSS-02` r1 **N2** and measured by that seat before it
++was proposed: under the containment variant the full consent suite set ran
++`3 failed | 190 passed (193)`, the three failures being exactly the three synthetic cases that
++existed to pin the inversion, every cross-slice case green.
++
++**Why containment and not the whole DOM rank.** The previous rule was `CONTAINED_BY ||
++FOLLOWING`, and it was the `FOLLOWING` arm that produced B1: it ranked two UNRELATED surfaces —
++the cookie card, mounted after `{children}` by `app/layout.tsx`, and the sign-up policy inside
++them — by an accident of mount position. `CONTAINED_BY` cannot do that, because it only ever
++relates a surface to one that encloses it, which is a real z-order the browser also paints. The
++ADR's own argument against a DOM rank ("it would restate the ladder in TypeScript") is answered
++rather than abandoned: one `Node.contains` call, on the one relation where the DOM and the paint
++agree by construction, and no comparison at all between unrelated surfaces.
++
++No surface in this repository nests today — both policy modals are conditional siblings — so
++this changes nothing a visitor can reach; it removes the trap for the shape they cannot. Pinned
++by four cases in `tests/render/consent-modal-semantics.test.tsx` (the nested pair in one commit,
++the nested pair in a later commit, the three-deep chain, and the `Tab` trap reading the same
++entry) and left green by all seven of `tests/render/consent-cross-slice.test.tsx`, so B1 stays
++discharged. **Status: this is the orchestrator's ruling under V-20 and V may undo it; the cost
++of undoing is the second loop of one function.**
++
++### Addendum 2026-09-07 — correction to the V-22 addendum's trigger clause (CODE-REV-CROSS-01 r1 N3)
++
++The V-22 addendum above describes `returnFocusRef` as "the control focus returns to when the
++opener captured at open did not survive the opening commit". That names the CAUSE where the code
++tests the STATE: `modalSemantics.ts`'s cleanup evaluates `opener.isConnected` **at close**, so
++the named control also serves an opener that was on the page at open and left the document while
++the surface was open — a strictly broader rule than the sentence, and one the case
++`returns focus to the named control when the captured opener has since left the page` already
++pinned. Read that clause as: **when the captured opener is not a usable element at close —
++because the opening commit removed it, or because it left the document while the surface was
++open.** The addendum's decision and its precedence sentence (surviving-capture-first, not
++named-control-first) are unaffected. The same clause is corrected in place in the
++`ModalSurface` member's JSDoc and in `CookiePreferencesCard`'s prop doc.
++
+ ## Options considered
+ 
+ - **A React context provider owning the stack.** Rejected: it would force slice S01's
+   preferences card and slice S02's policy modal into one React tree, and they are mounted from
+   different components in different slices.
+ - **A per-surface `keydown` listener with a "topmost" flag.** Rejected: a surface cannot know
+   it is topmost without a shared registry, which is the module this ADR introduces.
+ - **Retrofitting the seven existing overlays now.** Rejected as out of scope for this mission;
+   it is ticket `A11Y-OVERLAYS` (`t_8962842f`).
+ 
+diff --git a/dialectical-engine/tests/render/consent-bar.test.tsx b/dialectical-engine/tests/render/consent-bar.test.tsx
+index e5f7d987..3ce91a1f 100644
+--- a/dialectical-engine/tests/render/consent-bar.test.tsx
++++ b/dialectical-engine/tests/render/consent-bar.test.tsx
+@@ -1,30 +1,39 @@
+ // @vitest-environment jsdom
+ 
+ import { readFileSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { act } from "react";
+ import { createRoot, type Root } from "react-dom/client";
+ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+ import { CONSENT_KEY } from "../../apps/ui/lib/consent.js";
+ import { CookieBar } from "../../apps/ui/components/consent/CookieBar.js";
++import {
++  S01_CLOSE_MARKER,
++  S01_OPEN_MARKER,
++  S02_CLOSE_MARKER,
++  S02_OPEN_MARKER
++} from "../support/consentMarkers.js";
+ 
+ // The acceptance command is pinned to the lane root, so source fixtures resolve
+ // from process.cwd(); `import.meta.url` can carry a non-file scheme under vitest
+ // (TOOLING-TRAPS, CODE-T1C3 / CODE-T5C1).
+ const barSource = (): string =>
+   readFileSync(resolve(process.cwd(), "apps/ui/components/consent/CookieBar.tsx"), "utf8");
+ const globalsSource = (): string =>
+   readFileSync(resolve(process.cwd(), "apps/ui/app/globals.css"), "utf8");
+ 
+-const OPEN_MARKER = "/* === consent-ui S01 === */";
+-const CLOSE_MARKER = "/* === end consent-ui S01 === */";
++// The four marker literals live in `tests/support/consentMarkers.ts`, so S01's suite and S02's
++// read the same bytes and a rename cannot fail one slice's file with the other slice's message
++// (CODE-REV-S02-C9 r1 N3). The local aliases keep this file's existing call sites unchanged.
++const OPEN_MARKER = S01_OPEN_MARKER;
++const CLOSE_MARKER = S01_CLOSE_MARKER;
+ const COLOUR_LITERAL = /oklch\(|#[0-9a-f]{3,8}\b|\brgba?\(/i;
+ 
+ /** The ONE delimited S01 block, markers included (S01-R25, S01-S16). */
+ function s01Block(): string {
+   const css = globalsSource();
+   const start = css.indexOf(OPEN_MARKER);
+   const end = css.indexOf(CLOSE_MARKER);
+   expect(start, "globals.css opens the consent-ui S01 block").toBeGreaterThan(-1);
+   expect(end, "globals.css closes the consent-ui S01 block").toBeGreaterThan(start);
+   return css.slice(start, end + CLOSE_MARKER.length);
+@@ -219,21 +228,21 @@ describe("S01-C3 the cookie bar (10a)", () => {
+     expect(localStorage.getItem(CONSENT_KEY), "Escape writes nothing").toBeNull();
+ 
+     const controls = [...bar.querySelectorAll("button,a,[role='button']")];
+     expect(
+       controls.map((control) => control.textContent?.trim()),
+       "there is no fourth control and no ×"
+     ).toEqual(BUTTONS);
+     expect(bar.textContent?.includes("×"), "the bar renders no close glyph").toBe(false);
+   });
+ 
+-  it("ships R09's geometry inside ONE delimited S01 block at the end of globals.css", () => {
++  it("ships R09's geometry inside ONE delimited S01 block, followed only by whitespace or S02's delimited block", () => {
+     // PROPERTY (S01-R09, S01-R25): every one of R09's numbers appears in the
+     // shipped stylesheet as written, the slice's rules live in exactly ONE
+     // delimited block appended after every existing rule, and every colour in
+     // it is a `var(--token)` reference.
+     // jsdom computes NO layout, so this asserts the declared rule TEXT and not
+     // a rendered pixel — the 22px insets, the 7px bezel, the 52x4 gold tab and
+     // the 560px copy column are V's, acceptance steps 1-2 in both modes.
+     const css = globalsSource();
+     expect(css.split(OPEN_MARKER).length - 1, "exactly one S01 block is opened").toBe(1);
+     expect(css.split(CLOSE_MARKER).length - 1, "exactly one S01 block is closed").toBe(1);
+@@ -243,23 +252,31 @@ describe("S01-C3 the cookie bar (10a)", () => {
+     // block in the file" — which was true while S01's lane was alone and became false the
+     // moment `slice/consent-s01` was merged into `slice/consent-s02`. Both slices append a
+     // delimited block at the end of `globals.css`; the vertical-slice law ACCEPTS that
+     // conflict and fixes the resolution as S01's block first and S02's second
+     // (`slices/S02/PLAN.md` S02-S66 and §"The single-writer rule against S01"). What S01
+     // actually owns — its rules live in ONE block appended after every pre-existing rule, and
+     // nothing of S01's is stranded outside it — is unchanged, and this is that property in the
+     // form that survives the merge: after S01's closing marker there is nothing but whitespace,
+     // or S02's ONE delimited block and then nothing but whitespace. A third block, a stray
+     // rule between the two, or anything at all after S02's closing marker still fails here.
++    //
++    // WHAT THE RELAXATION GAVE UP, and who now owns it (CODE-REV-S02-C9 r1 N4, mutant GX3):
++    // this case no longer catches S02's whole block being NESTED INSIDE S01's — the tail below
++    // is empty in that arrangement and every assertion here passes. The CO-OWNER of that
++    // property is `tests/unit/consent-s02-style-contract.test.ts`'s
++    // `S02-S59 · appends exactly one delimited S02 block and ends the file with it`, whose
++    // `after.trim() === ""` arm reds on GX3 because S01's closing marker then follows S02's.
++    // Neither file pins "S01's block is at the end" alone any more; the pair does.
+     const tail = css.slice(css.indexOf(CLOSE_MARKER) + CLOSE_MARKER.length);
+-    const S02_OPEN = "/* === consent-ui S02 === */";
+-    const S02_CLOSE = "/* === end consent-ui S02 === */";
++    const S02_OPEN = S02_OPEN_MARKER;
++    const S02_CLOSE = S02_CLOSE_MARKER;
+     const s02At = tail.indexOf(S02_OPEN);
+     if (s02At === -1) {
+       expect(tail.trim(), "nothing but whitespace follows the S01 block").toBe("");
+     } else {
+       expect(tail.split(S02_OPEN).length - 1, "exactly one S02 block is opened after S01's").toBe(1);
+       expect(tail.split(S02_CLOSE).length - 1, "exactly one S02 block is closed after S01's").toBe(1);
+       expect(tail.slice(0, s02At).trim(), "nothing but whitespace between the two blocks").toBe("");
+       expect(
+         tail.slice(tail.indexOf(S02_CLOSE) + S02_CLOSE.length).trim(),
+         "nothing but whitespace follows S02's closing marker"
+diff --git a/dialectical-engine/tests/render/consent-modal-semantics.test.tsx b/dialectical-engine/tests/render/consent-modal-semantics.test.tsx
+index 9dca3518..3fda10ef 100644
+--- a/dialectical-engine/tests/render/consent-modal-semantics.test.tsx
++++ b/dialectical-engine/tests/render/consent-modal-semantics.test.tsx
+@@ -144,50 +144,65 @@ describe("consent modal semantics helper", () => {
+     );
+ 
+     await act(async () => {
+       pressEscape();
+     });
+ 
+     expect(innerClose).toHaveBeenCalledTimes(1);
+     expect(outerClose).toHaveBeenCalledTimes(0);
+   });
+ 
+-  it("delivers one Escape to the LAST-REGISTERED surface of a pair mounted in ONE commit", async () => {
+-    // The one arrangement where "opened last" and "painted on top" part company, pinned here so
+-    // it is on the record rather than discovered. The two surfaces mount in ONE commit, the
+-    // inner as a React CHILD of the outer; React runs effects CHILD-FIRST, so registration order
+-    // is [inner, outer] and the OUTER one — the surface underneath — answers Escape.
++  it("delivers one Escape to the nested INNER surface of a pair mounted in ONE commit", async () => {
++    // PROPERTY (V-20 (b′)): when one open surface's container is a DOM DESCENDANT of another
++    // open surface's container, Escape reaches the DESCENDANT — whatever order the two
++    // registered in — and exactly one `onClose` runs.
+     //
+-    // Before V-20 (b) this case asserted the reverse, because the rank was document position and
+-    // containment won outright. Open order was ruled on 2026-09-07 (CODE-REV-S02-C9 r1 B1): the
+-    // document-order rule handed Escape to the cookie card UNDERNEATH an open sign-up policy on
+-    // `/sign-up`, an arrangement a visitor reaches and this one is not. NO SURFACE IN THIS
+-    // PRODUCT MOUNTS A PAIR IN ONE COMMIT — both policy modals are mounted conditionally, by a
+-    // state change the visitor causes, so every reachable pair registers in the order it opened.
+-    // A future overlay pair that needs its inner surface on top opens it in a LATER commit,
+-    // which the case below pins.
++    // This is the one arrangement where open order alone gets it wrong. The two surfaces mount
++    // in ONE commit, the inner as a React CHILD of the outer; React runs effects CHILD-FIRST, so
++    // registration order is [inner, outer] and "last registered" names the OUTER surface — the
++    // one UNDERNEATH. Under plain open order (V-20 (b), shipped at c334136d) the outer surface
++    // answered, which is CODE-REV-S02-C9 r1 B1's exact harm in a different shape: the key closes
++    // the surface the visitor is not looking at, discards what they had in it, and leaves focus
++    // trapped in the surface that refused the key (CODE-REV-CROSS-02 r1 N2, measured).
++    //
++    // (b′) keeps open order and adds a CONTAINMENT-ONLY tiebreak: the last connected entry is
++    // the incumbent, and a lower entry replaces it only when the incumbent's container
++    // `contains` it. There is no FOLLOWING arm — document order between UNRELATED surfaces is
++    // what produced B1 and it is not consulted anywhere. No surface in this product nests today
++    // (both policy modals are siblings, mounted conditionally by a state change the visitor
++    // causes — CODE-REV-CROSS-02 r1's sweep), so the tiebreak changes nothing a visitor can
++    // reach; it exists so the next nested overlay does not re-create B1.
+     const outerClose = vi.fn();
+     const innerClose = vi.fn();
+ 
+     await render(
+       <TestSurface open name="outer" onClose={outerClose}>
+         <TestSurface open name="inner" onClose={innerClose} />
+       </TestSurface>
+     );
+     expect(openSurfaceCount()).toBe(2);
+ 
++    // The premise, asserted rather than assumed: the inner container really is nested inside
++    // the outer one, so a pass here cannot come from the two being unrelated siblings.
++    const outerContainer = document.querySelector<HTMLElement>('[data-surface="outer"]')!;
++    const innerContainer = document.querySelector<HTMLElement>('[data-surface="inner"]')!;
++    expect(
++      outerContainer.contains(innerContainer),
++      "the inner surface's container is nested inside the outer one's"
++    ).toBe(true);
++
+     await act(async () => {
+       pressEscape();
+     });
+ 
+-    expect(outerClose).toHaveBeenCalledTimes(1);
+-    expect(innerClose).toHaveBeenCalledTimes(0);
++    expect(innerClose).toHaveBeenCalledTimes(1);
++    expect(outerClose).toHaveBeenCalledTimes(0);
+   });
+ 
+   it("delivers one Escape to a nested inner surface that opened in a LATER commit", async () => {
+     // The reachable half of the case above, and the shape every consumer in this product has:
+     // the outer surface is already open when the inner one opens, so registration order is
+     // [outer, inner] and the inner surface — the one the visitor opened last, and the one its
+     // own scrim covers the outer with — answers Escape. Nesting neither helps nor hinders it.
+     const outerClose = vi.fn();
+     const innerClose = vi.fn();
+ 
+@@ -205,44 +220,47 @@ describe("consent modal semantics helper", () => {
+     expect(openSurfaceCount()).toBe(2);
+ 
+     await act(async () => {
+       pressEscape();
+     });
+ 
+     expect(innerClose).toHaveBeenCalledTimes(1);
+     expect(outerClose).toHaveBeenCalledTimes(0);
+   });
+ 
+-  it("delivers one Escape to exactly one of three surfaces, and it is the last registered", async () => {
+-    // Three at once, mounted in ONE commit and nested, so child-first registration order is
+-    // [c, b, a] and `a` — the last registered — takes the key. What the assertion pins is that
+-    // EXACTLY ONE `onClose` runs (REQ-REV-01 B3), whichever it is: `toEqual` on the whole array
+-    // fails both if a second surface acts and if the wrong one does.
++  it("delivers one Escape to exactly one of three surfaces, and it is the innermost", async () => {
++    // Three at once, mounted in ONE commit and nested `a > b > c`, so child-first registration
++    // order is [c, b, a] and `a` — the last registered — is the incumbent the walk starts at.
++    // (b′) then descends the containment chain twice, `a` → `b` → `c`, so the INNERMOST surface
++    // takes the key: the tiebreak repeats until nothing deeper is open, it does not stop at the
++    // first descendant it meets. What the assertion pins is that EXACTLY ONE `onClose` runs
++    // (REQ-REV-01 B3), whichever it is: `toEqual` on the whole array fails both if a second
++    // surface acts and if the wrong one does.
+     const closed: string[] = [];
+     const record = (name: string) => () => {
+       closed.push(name);
+     };
+ 
+     await render(
+       <TestSurface open name="a" onClose={record("a")}>
+         <TestSurface open name="b" onClose={record("b")}>
+           <TestSurface open name="c" onClose={record("c")} />
+         </TestSurface>
+       </TestSurface>
+     );
+     expect(openSurfaceCount()).toBe(3);
+ 
+     await act(async () => {
+       pressEscape();
+     });
+ 
+-    expect(closed).toEqual(["a"]);
++    expect(closed).toEqual(["c"]);
+   });
+ 
+   it("delivers one Escape by OPEN order when two surfaces opened out of DOM order", async () => {
+     // THE discriminating case, and the mechanism V-20 (b) ruled on: `first-dom` is rendered
+     // BEFORE `second-dom` in the document but OPENS after it, so registration order is
+     // [second-dom, first-dom] while document order puts `second-dom` last. Ranking by document
+     // position gives the key to `second-dom`; ranking by open order gives it to `first-dom`,
+     // which is the surface the visitor just opened and — because it opened from a control of the
+     // one below it, under its own scrim — the one they are looking at.
+     //
+@@ -411,40 +429,92 @@ describe("consent modal semantics helper", () => {
+ 
+     await act(async () => {
+       pressEscape();
+     });
+ 
+     expect(closed, "the walk skipped both detached entries and stopped at the live one").toEqual([
+       "live"
+     ]);
+   });
+ 
++  it("delivers Escape to a registered surface that renders NO container of its own", async () => {
++    // PROPERTY (CODE-REV-CROSS-02 r1 N1): an entry whose container is `null` is RETURNED by the
++    // walk, not skipped — the third branch `topmostSurface()`'s doc comment states as a
++    // behaviour, and the only one nothing pinned. The comment claimed it; mutant M5 `NONULL`
++    // (`container !== null && container.isConnected`) survived every suite in the mission.
++    //
++    // A container-less surface is also the one incumbent no containment tiebreak can displace:
++    // with no node there is nothing for a lower entry to be a descendant OF, so open order
++    // decides alone. Both halves are asserted here.
++    //
++    // Unreachable in this product today — both consumers attach their container ref before the
++    // registering effect runs — so this is a contract pin for the next consumer, and it is GREEN
++    // at BASE by construction: its RED is the mutant's, not the base helper's.
++    const belowClose = vi.fn();
++    const containerlessClose = vi.fn();
++    const captured: { ref: { current: HTMLElement | null } | null } = { ref: null };
++
++    function ContainerlessSurface({ onClose }: { onClose: () => void }): ReactNode {
++      const containerRef = useRef<HTMLElement | null>(null);
++      const initialFocusRef = useRef<HTMLElement | null>(null);
++      captured.ref = containerRef;
++      useModalSurface(true, { containerRef, initialFocusRef, onClose });
++      return null;
++    }
++
++    await render(
++      <>
++        <TestSurface open name="below" onClose={belowClose} />
++        <ContainerlessSurface onClose={containerlessClose} />
++      </>
++    );
++    expect(openSurfaceCount()).toBe(2);
++
++    // The precondition, asserted rather than assumed: the later-registered surface really holds
++    // a `null` container, so a pass cannot come from the `isConnected` branch instead.
++    expect(captured.ref!.current, "the container-less surface has no container node").toBeNull();
++    expect(
++      document.querySelector('[data-surface="below"]'),
++      "the surface underneath is rendered, so it is a real rival for the key"
++    ).not.toBeNull();
++
++    await act(async () => {
++      pressEscape();
++    });
++
++    expect(containerlessClose).toHaveBeenCalledTimes(1);
++    expect(belowClose).toHaveBeenCalledTimes(0);
++  });
++
+   it("traps Tab in the same surface Escape reaches, for the same nested pair", async () => {
+     // The Tab trap reads the same `topmostSurface()` the Escape branch reads, so the nested pair
+-    // is asserted for Tab too and the two must agree. Mounted in ONE commit, that surface is the
+-    // OUTER one (child-first registration), so Tab from `close-outer` advances to the outer
+-    // surface's OWN next control — `outer-2` — instead of jumping into the inner surface.
+-    // Under the document-order rank this landed on `close-inner`; the pair moved together, which
+-    // is the property, and `outer-2` is only reachable as the answer if Tab and Escape read the
+-    // same entry.
++    // is asserted for Tab too and the two must agree — that agreement IS the property, and the
++    // title states it rather than an outcome. Under (b′) the surface Escape reaches is the INNER
++    // one, so Tab from `close-outer` — a control OUTSIDE the trapped surface — enters the inner
++    // surface at its first candidate, `close-inner`.
++    //
++    // `outer-2` is the discriminator and is why it is rendered: it is the outer surface's own
++    // next control, and it is exactly where Tab lands if the trap reads the OUTER entry. So this
++    // case fails in a NAMED direction under plain open order (V-20 (b)) as well as under a
++    // document-order rank, instead of merely failing.
+     await render(
+       <TestSurface open name="outer" onClose={vi.fn()} buttons={["outer-2"]}>
+         <TestSurface open name="inner" onClose={vi.fn()} />
+       </TestSurface>
+     );
+ 
+     await act(async () => {
+       labelled("close-outer").focus();
+       pressTab();
+     });
+ 
+-    expect(document.activeElement).toBe(labelled("outer-2"));
++    expect(document.activeElement).toBe(labelled("close-inner"));
+   });
+ 
+   it("moves initial focus to the element the caller names, not the first one", async () => {
+     await render(
+       <TestSurface
+         open
+         name="only"
+         onClose={vi.fn()}
+         buttons={["second", "third"]}
+         initialFocus="third"
+diff --git a/dialectical-engine/tests/render/consent-policy-link.test.tsx b/dialectical-engine/tests/render/consent-policy-link.test.tsx
+index 2baeb768..ead33b15 100644
+--- a/dialectical-engine/tests/render/consent-policy-link.test.tsx
++++ b/dialectical-engine/tests/render/consent-policy-link.test.tsx
+@@ -266,20 +266,30 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
+     mountSettings();
+     expect(bar(), "a valid decision means no bar").toBeNull();
+     activate(labelled("Cookie preferences"));
+     expect(card(), "the card opened from Settings").not.toBeNull();
+ 
+     press("Escape");
+ 
+     expect(card(), "the card is gone").toBeNull();
+     expect(bar(), "and no bar returns").toBeNull();
+     expect(raw(), "byte-for-byte what was stored").toBe(stored);
++    // CODE-REV-CROSS-01 r1 N1. The third of S01-R18's three focus landings, and the only one
++    // that was unpinned: no bar returns here, so `returnFocusRef.current` is `null` at the
++    // cleanup and the helper's SURVIVING-CAPTURE branch is the only one that can run. The
++    // sibling case at `:312` covers the same entry point with nothing stored, where a bar DOES
++    // return; `:359` covers the bar direction. Asserted in the existing `it()`, so no count
++    // moves (COMMON §10.42).
++    expect(
++      document.activeElement,
++      "focus returns to the Settings opener, which never left the page"
++    ).toBe(labelled("Cookie preferences"));
+   });
+ 
+   it("gives the card its initial focus and its Tab wrap from the shared helper", () => {
+     // PROPERTY (S01-R18, S01-S41): initial focus lands on the first OPERABLE
+     // toggle — Essential is locked and is not a choice — and Tab cycles within the
+     // card. Neither is implemented here: the card hands the helper a container and
+     // an initial-focus target and the helper does the rest.
+     mountBar();
+     activate(labelled("Choose what to store"));
+ 
+diff --git a/dialectical-engine/tests/support/consentMarkers.ts b/dialectical-engine/tests/support/consentMarkers.ts
+new file mode 100644
+index 00000000..243f6421
+--- /dev/null
++++ b/dialectical-engine/tests/support/consentMarkers.ts
+@@ -0,0 +1,29 @@
++/**
++ * The four delimiters that fence each consent slice's block in `apps/ui/app/globals.css`.
++ *
++ * ONE source for four load-bearing constants that cross a slice boundary
++ * (CODE-REV-S02-C9 r1 **N3**). Before this module `tests/render/consent-bar.test.tsx` — S01's
++ * suite — carried S02's two markers as its own literals, so renaming an S02 marker would fail
++ * S01's suite with a message about S02's block: a failure in the wrong slice's file, and one
++ * whose fix is in a file the failing suite does not name.
++ *
++ * These strings are the CSS comments themselves, byte for byte, because both suites use them as
++ * `indexOf`/`split` needles against the raw stylesheet. Changing one here changes the contract
++ * for both slices at once, which is the point.
++ *
++ * Owners: `tests/render/consent-bar.test.tsx` (S01's block, plus the S02 markers it must
++ * tolerate after the S02-S66 merge) and `tests/unit/consent-s02-style-contract.test.ts`
++ * (S02's block).
++ */
++
++/** Opens slice S01's ONE delimited block. */
++export const S01_OPEN_MARKER = "/* === consent-ui S01 === */";
++
++/** Closes slice S01's ONE delimited block. */
++export const S01_CLOSE_MARKER = "/* === end consent-ui S01 === */";
++
++/** Opens slice S02's ONE delimited block, which follows S01's after the S02-S66 merge. */
++export const S02_OPEN_MARKER = "/* === consent-ui S02 === */";
++
++/** Closes slice S02's ONE delimited block, and is the last non-whitespace text in the file. */
++export const S02_CLOSE_MARKER = "/* === end consent-ui S02 === */";
+diff --git a/dialectical-engine/tests/unit/consent-s02-style-contract.test.ts b/dialectical-engine/tests/unit/consent-s02-style-contract.test.ts
+index 617fb674..aac6e8ce 100644
+--- a/dialectical-engine/tests/unit/consent-s02-style-contract.test.ts
++++ b/dialectical-engine/tests/unit/consent-s02-style-contract.test.ts
+@@ -1,40 +1,44 @@
+ import { readFileSync } from "node:fs";
+ import { resolve } from "node:path";
+ 
+ import { describe, expect, it } from "vitest";
+ 
+ // `.js`, not `.ts`: the root `tsconfig.json` resolves modules as `node16`, which requires an
+ // explicit extension on a relative ESM import. Same idiom as `tests/unit/t9-mode-tokens.test.ts:326`.
+ import { contrastRatio } from "../support/contrast.js";
++import { S02_CLOSE_MARKER, S02_OPEN_MARKER } from "../support/consentMarkers.js";
+ 
+ /**
+  * S02-C8 — the style contract for slice S02 of mission `consent-ui`.
+  *
+  * `apps/ui/app/globals.css` is the one file both slices write, so S02's whole stylesheet lives
+  * in ONE delimited block appended at the end of it and this suite is that block's contract:
+  * where it starts and stops (S02-S59), what may not appear inside it (S02-S60), the geometry
+  * and the checkbox-group values the design fixes (S02-S61, S02-S62), the reduced-motion rule
+  * (S02-S63), the measured contrast of the disabled `I have read it` (S02-S64), and the standing
+  * guard that keeps the fixed scrim's containing block the viewport (S02-S65).
+  *
+  * jsdom computes no layout and this suite renders nothing: every assertion here is about the
+  * STYLESHEET's text. Whether the result LOOKS right is V's at acceptance steps 1-2, 5 and 13.
+  * Precedent for reading `globals.css` from a vitest unit test: `tests/unit/t9-mode-tokens.test.ts:35`.
+  */
+ 
+ const root = process.cwd();
+ const globalsPath = resolve(root, "apps/ui/app/globals.css");
+ const css = readFileSync(globalsPath, "utf8");
+ 
+-const OPEN_MARKER = "/* === consent-ui S02 === */";
+-const CLOSE_MARKER = "/* === end consent-ui S02 === */";
++// The marker literals live in `tests/support/consentMarkers.ts`, so this suite and S01's
++// `tests/render/consent-bar.test.tsx` read the same bytes across the slice boundary
++// (CODE-REV-S02-C9 r1 N3). The local aliases keep this file's existing call sites unchanged.
++const OPEN_MARKER = S02_OPEN_MARKER;
++const CLOSE_MARKER = S02_CLOSE_MARKER;
+ 
+ function occurrences(haystack: string, needle: string): number {
+   return haystack.split(needle).length - 1;
+ }
+ 
+ type Rule = { selector: string; body: string; at: string | null };
+ 
+ function stripComments(text: string): string {
+   return text.replace(/\/\*[\s\S]*?\*\//g, "");
+ }
+@@ -202,35 +206,48 @@ function s02Block(): string {
+   const close = css.indexOf(CLOSE_MARKER);
+   if (open === -1 || close === -1 || close < open) {
+     throw new Error(
+       `The S02 block is not delimited in ${globalsPath}: open=${open}, close=${close}`
+     );
+   }
+   return css.slice(open + OPEN_MARKER.length, close);
+ }
+ 
+ describe("S02-C8 consent-ui style contract", () => {
+-  it("S02-S59 · appends exactly one delimited S02 block and ends the file with it", () => {
++  it("S02-S59 · writes no duplicated comment inside the S02 block", () => {
+     // THE ONE THING `stripComments()` MADE INVISIBLE (orchestrator note on `t_4f97ca86`,
+     // 2026-09-07 03:09, from `CODE-S02-C8-REWORK-R1` R1). Every other assertion in this file
+     // reads the block through `stripComments()`, so a comment DUPLICATED inside the S02 block —
+     // the shape `CODE-REV-S02-C8 r1` N2 found as an ORPHANED comment, one commit earlier — is
+     // unreachable by any mutant this suite can build. Comment text is the only documentation a
+     // stylesheet carries, and a paragraph pasted twice is a real defect that nothing else here
+     // can see. The `> 0` arm is a satisfiability arm: an empty comment list would satisfy the
+     // uniqueness assertion vacuously, which is the `TOOLING-TRAPS` "guard that cannot fail" class.
++    //
++    // It has its own `it()` because comment uniqueness is not block delimitation
++    // (CODE-REV-S02-C9 r1 N2): it rode inside the delimitation case below only because the
++    // packet that ordered it said "the FIRST line of that suite's next lawful edit", and a case
++    // whose title does not describe its first assertion is the class N1 and N2 both name. The
++    // operands are unchanged; only the `it()` they sit in is new.
+     const comments = s02Block().match(/\/\*[\s\S]*?\*\//g) ?? [];
+     expect(comments.length, "the S02 block is commented at all").toBeGreaterThan(0);
+     expect(new Set(comments).size, "no comment is duplicated inside the S02 block").toBe(
+       comments.length
+     );
++  });
+ 
++  it("S02-S59 · appends exactly one delimited S02 block and ends the file with it", () => {
++    // The CO-OWNED property (CODE-REV-S02-C9 r1 N4): since S01's own case relaxed its
++    // end-of-file assertion for the S02-S66 merge, `after.trim() === ""` below is the only
++    // arm in the mission that reds when S02's block is NESTED INSIDE S01's — S01's closing
++    // marker then follows S02's, so the tail is not empty. `tests/render/consent-bar.test.tsx`
++    // names this case as the co-owner from its side.
+     expect(occurrences(css, OPEN_MARKER)).toBe(1);
+     expect(occurrences(css, CLOSE_MARKER)).toBe(1);
+     expect(css.indexOf(OPEN_MARKER)).toBeLessThan(css.indexOf(CLOSE_MARKER));
+ 
+     const after = css.slice(css.indexOf(CLOSE_MARKER) + CLOSE_MARKER.length);
+     expect(after.trim()).toBe("");
+   });
+ 
+   it("S02-S60 · writes no colour literal and declares no token inside the S02 block", () => {
+     const block = s02Block();

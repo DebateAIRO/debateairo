@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_CWD_REVIEW50",
+  "ticket": "t_f412f468",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_FINAL_OPERATOR_CWD_BINDING",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "freeze": "8f9d3097d6c19ba3af03580f760492795b3324f8",
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_OPERATOR_CWD_REVIEW50.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_OPERATOR_CWD_REVIEW50.md",
+      "sha256": "29fa63532df38f783e053d83b43953630a126cca3725f995769ab9f607804524",
+      "bytes": 1835
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_CWD_REVIEW50-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_CWD_REVIEW50-dispositions.json",
+      "sha256": "a5ffb84d6aa551da335356e3db2a62703905160511ec9bf50dc6164f9d05b7a4",
+      "bytes": 1490
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_CWD_REVIEW50-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_OPERATOR_CWD_REVIEW50-custody.json",
+      "sha256": "a62ebb75f4180dc616b0868c27fb8be0039387fb42336aeffa40c22e70fb362e",
+      "bytes": 1036
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_OPERATOR_CWD_REVIEW50.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_OPERATOR_CWD_REVIEW50.md",
+      "sha256": "555df416643274a5333fa560ae06f894f458be595dad7acecaf84ac050eb7d6e",
+      "bytes": 1364
+    }
+  ]
+}

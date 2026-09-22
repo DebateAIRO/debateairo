@@ -1,0 +1,1181 @@
+{
+  "schemaVersion": 2,
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "inventory": "FINAL18 8e57b2dfcd1ece63058be87d62cad23d6ecda69a6e3bbba8ad42c421eaf303ff; 44 reviewed bilingual entries, KB7ef4244d unchanged",
+  "technical": "Product0d34 independently reviewed PASS;262 policy and494 affected full44/real POST checks passed. Inherited76 normalized typecheck diagnostics qualified; last broad typecheck atb103. Historical composed34 suites1701pass1TODO is not a fresh monolithic run; structural3x60 remains PENDING.",
+  "ownerGate": "WORKING_PREVIEW_VERIFIED_WITH_FORGOT_CONNECTOR_UNRESOLVED only after actual/product/manual proof; CP1 incomplete, CP2 gated",
+  "forgot": "Unresolved/actionless; no repeated question, no CP1 completion or acceptance.",
+  "initialSourceCustody": "Inherited intake-wide gap unverified; scoped current custody only",
+  "keyCompleted": {
+    "ACTION_COMPOSE": "609c167e950851a80ff2bd2b9d4d8556a7bb4b265cdd3add7da1a85fbe996582",
+    "ROW_PROOF_RECHECK_PASS": "4af43720e6d967ca07bed6884a64c8277ac32e901043e3750857297d921d0a6b",
+    "CORRECTNESS4_REWORK": "85f56ada4fa62c7b2f4284823f8821817de06dd4291340a16215c96583cb0f4d",
+    "SECURITY4_REWORK": "e65f4bd3ab01a1acdfe9da3664e47b13cb673185c5fd003b62f379d0a75fdcb9",
+    "ACTIONFIX2": "c46b6f93e6a374f795b8bd3d564155b2c546a9c45a4607a122d7f9b97e230743",
+    "CORRECTNESS5_PASS": "7f916efb139973d8ce18434fac33bcee8a1deddcbaba84a36ea2e906ec04fa70",
+    "SECURITY5_PASS": "77835ae71433cf9ea5fb0468c6914297989e41825a2bdf1cc5e878b959217289",
+    "LIVE2_FAILURE": "e77d985f5e4d685f92c74d8fde228832f596aec39806d629304dda373fe71c8e",
+    "NEGATED_ORACLE": "23a0d8b219d74f86b92086ff86a447f7467a521e3d072e475c2b13be9b59d0d4",
+    "HARNESS_FIX3": "e13ea4b9662873830453e74df0b34969addc2c95f29fbf25a0e249414ef81c79",
+    "HARNESS_REVIEW3_REWORK": "4c43bae8b56b8328a619491abea18420d8f442627d8bf15ee98de83c69a8bd91",
+    "HARNESS_FIX4": "ec90a5f1979be16e0dd4cc1a8cd436da133f37574216193adff1c2999192db1f",
+    "HARNESS_REVIEW4_PASS": "463314e7a21612a422f99d9c0ef73d088a63631bf403a5009c0909ac7a480189",
+    "LIVE3_FAILURE": "8b4760af20d6d62925260e4fa2541416eab16b2b117dca88dc22f94b2a36525f",
+    "RUNTIME_DIAG": "8b98b4b3a82379e6bb6c956bae85668a33bacc8e77213aeb71a96634e95ddf64",
+    "SOURCE_ORACLE": "c8391fb188569bb34eaaed49eece2286b87e275e9805dae6036dabf422f81fdb",
+    "FALLBACK_BINDING": "2fb1406d943a8f5f467d88565a48d4598f9bc74faa01b52a50c5289a0c29ed2f",
+    "HARNESS_FIX5": "b75679ce4002d42157135947b049f5e7dbcc3676e6d1b10af7ba2d8dba18d453",
+    "CORRECTNESS6": "a5314a464f63f60d9ad7f4abaaba5c14b3e44bfd1f3de04ae2ef1f3f5b446c54",
+    "SECURITY6_REWORK": "00d62cdb30d85038ec57e35ff9fb13b188a4b112de781a20fc27cb39f9b4681f",
+    "HARNESS_REVIEW5_REWORK": "7b4e3c096c138ed89b458e72a311b44fe7b2995115c4db756b46c62e0a4587de",
+    "COMPOUND_ALIAS": "04d1c20bc2b338242591daee2065e7ee7e1c8146f01ab9f8c6500ef418880108",
+    "HARNESS_FIX6": "26a6a5a91a1c4fa05867f1aabd3befdf505a86dcb3a709da763ee0d5f95718b7",
+    "CORRECTNESS7": "1f234252c84a88a3ffd4a33dcb7ae2d38399541bc61538cf7a1b15752ae5061f",
+    "SECURITY7": "7abbf4921ab162b6e8a980d07d5f342be869b08fee76afb2d34ff6032fe9e869",
+    "HARNESS_REVIEW6_REWORK": "ae6e91017c42cd3984051060b5b87799ccb43fb8dcae2dd2443b265bd50418af",
+    "HARNESS_FIX7": "a47f3173bcd43ae13aa27d5078cc0df44eb06b6a9ebe224336343ec80ed44dc0",
+    "HARNESS_REVIEW7_PASS": "b9f1084d8dea022541b84c598f08d0882ba5dea24095285de7473e3aa86252f3",
+    "LIVE4_FAILURE": "5cca00617bb68d3e08dbfbe08c37076dcd7af1195f4e0b1360793323e1fb0217",
+    "INJECTION_DIAG": "97b6bce9bcf0a256f6bc30ad254e0e5bfff6c292096a4765e11c111308efd82d",
+    "HARNESS_FIX8": "03937fcd98b1a65c08969857d3749bcba40c6645230265821beff3ac4ccff23f",
+    "HARNESS_REVIEW8_REWORK": "b3106b0d68e151f3fa2b1919b72fd23b567a16a765de0485f823dfe6a7c383eb",
+    "RUNTIME5": "4ca8f2e32146cb5f1e79fa0f4a0298be9816516154b7e87e736e02ba5aa9cc9f",
+    "HARNESS_FIX9": "566a0aaad9e7ae55f06cb932e6c0fc615daea1520c1d55f41e88624d3dd9f170",
+    "HARNESS_REVIEW9": "88c703faab0a42cfcdab5631c32edcc8d54fd9db9c4eac1b50b9813e346f3016",
+    "LIVE5_ZERO_TRAFFIC_FAILURE": "2112f2c951dd60765dbcc685af07d81398e869ada6ca6291d7726cfa09a6a6d4",
+    "LIVE6_PARTIAL_FAILURE": "8a3f9e3d6ea9137f79978c675c5115b5c29a60afa28146f6d288b90fe8d546fb",
+    "INJECTION_SERVER_DIAG": "707ad7cb1c64f73ba5036603da4e48c59ecac984eff148d1c822a20dcdfe4c51",
+    "INJECTION_FIX": "30672307739916b478c8f60609d200e645f9c66f85fb37cfc6134df4c3fa4444",
+    "HARNESS_BIND10_PREPARED_ONLY": "65973a9d66796ca86b1fd4ce04b2f52383f741327a46b67826c3fdab7cedbbd6",
+    "CORRECTNESS8": "e103c412e00862f22c7dfe421f7f3fc40a374ce30cdb6d98737a12f8f4c0a61b",
+    "SECURITY8_REWORK": "7eaea27eb3a1f2248d63020e4788b02dd62f8eb32ebbc023bf702a2dae0a1832",
+    "LOCK_HANDOFF_FIX": "21f8e192aab0c9425af642e0509c52821685f62a9c5ecf065dda0eab5dce4604",
+    "CORRECTNESS9": "45ce694a5282352fbce1144832b28fd296b8f188f3eee078c58ee22100ac6c46",
+    "SECURITY9": "c3ed01fa00e0cc745b3a233b8cbcff1e35c664a7f7d6f62f312ff4b7aa0b594a",
+    "HARNESS_BIND11": "2670c95c586c1ec835c2671698a1e6e46cf88d5de1a752e74c673b89283c0263",
+    "QUALITY_FIX2": "cf471ac5d9a125d2ab5df4a535074cd6b9d4fa036f88716c66c3e53799000213",
+    "QUALITY_REVIEW_CODE_REWORK_EDITORIAL_PASS": "0e2f1532039f3aad317da38173388c1af70c7a18ddfa842d789c66646fd929d5",
+    "CAPTURE_CONTROLS18_PASS": "788c9831ead233e74c346ae1823b9b55e6d5930d364c4c02407f19365fd59cab",
+    "QUALITY_REVIEW2_CODE_METADATA_PLAN_PASS": "018b528e310864b76c53c4a504acd87993ccceb40ab09ffe4f518fe132b086ab",
+    "BIND18_SIGNIN_CLASSIFIER_REWORK": "c70e38bd11b73a6b3b5ecc5e5e9be546c1b89091184c853043716c499357c416",
+    "SIGNIN_CLASSIFIER_FIX": "a154befaffef8692cae8e7d9641d97a91e17d1bf5e12b4e2e17cf7d013736899",
+    "SIGNIN_CLASSIFIER_REVIEW_PASS": "18161143b8f6bc7db552f35a40483ae697b0912ff56a821ab8fe9d4b77bcb7db",
+    "BIND19_ACCOUNT_RETRIEVAL_REWORK": "1a540ad8fcb5aded21017b511f1ddd9abd15a55e06fb87a489bf43b98ffa2b00",
+    "ACCOUNT_RANKING_FIX": "7f91654db26af84b693a12b74977246ba2baed2659c92837c6f959a8a2142d13",
+    "ACCOUNT_RANKING_REVIEW_PASS": "10fb9084b70c18dec7c7ae72cfecbf347c465d1bfcf7a2f0b94652ad41bd9c37",
+    "CAPTURE_PREP20_UNBOUND": "fc767885c3dcf49d00d3f94e4899249180aaecd5d2b8c89cdafacbc360cc343b"
+  },
+  "at": "2026-09-20T23:24:36.078785+00:00",
+  "active": [
+    "GUIDE_UI_OUTPUT_FIX51"
+  ],
+  "seat": "/root/preview",
+  "ticket": "t_c7f65888",
+  "adminFreeze": "740d99ad4ae04498f1a073578b1afac2f6493886",
+  "heavyLease": "GUIDE_UI_OUTPUT_FIX51",
+  "gitLease": null,
+  "productUnchanged": true,
+  "harness": {
+    "node": "GUIDE_HARNESS_BIND16",
+    "review": "GUIDE_HARNESS_REVIEW16",
+    "status": "PASS_CONSUMED",
+    "controls": 136,
+    "retainedPrefix": 130,
+    "new": 6,
+    "orderedEight": "fa91eede37beb7ac5f51366a9d4c7e89d62dc72c1033810d868bd5d2bf0c354c",
+    "matrix": 54,
+    "adapterNegatives": 3
+  },
+  "uiPreflight": {
+    "node": "GUIDE_COMPACT_UI_PROBE6",
+    "status": "PASS_ZERO_SUPPORT_UI_TRANSITIONS_CONSUMED",
+    "receipt": "392e17e43ada7b00b915bc2f6b1967acc813a3c33f7179618e09a258de93c324",
+    "consumption": "9a16d1f1bc4ed81a32084cacabb4cf7df5bd2db8f3602759abe3fcd2a2ea9528",
+    "transitions": 5,
+    "postReadyStageRecords": 40,
+    "privateControlChecks": 5,
+    "guardedStatus": 3,
+    "guardedCaseList": 3,
+    "forwardedSupport": 0
+  },
+  "runtime": {
+    "state": "RUNTIME9_LAST_READY_LIVE31_POSTFAILURE_CUSTODY_UNESTABLISHED",
+    "runtime7": "stopped with verified custody",
+    "runtime8Pid": 82483,
+    "dataPlanePreserved": true,
+    "unrelatedPreserved": true,
+    "recoveryNode": "GUIDE_PREVIEW_RECOVER34",
+    "closedFailedLogAuthorization": "source-derived fixed-code local projection only",
+    "safeStartupCode": "DEV_AUTH_STACK_SUPPORT_MODEL_FAILED",
+    "diagnosis": "Existing startup runs a Hermes model handshake before relay bind; wrapper exposes only outer DEV stage. Safe metadata checks did not identify a changed corrective condition.",
+    "closedFailedLogFiltered": true,
+    "runtime9Started": true,
+    "nextDiagnostic": "Latest two startup requests approved and exhausted; no new startup request.",
+    "newStartupHandshakeAttempts": 2,
+    "approvalRequested": "APPROVED by user; exact bounded two-request scope recorded in decision.",
+    "autoReviewReason": "Paid external model handshake using stored credentials lacked explicit authorization for exact payload, destination and paid side effect.",
+    "runtime9Pid": 9800,
+    "startedAtUtc": "2026-09-21T07:59:03.445Z",
+    "ordinaryTlsHelp": 200,
+    "listeners": 12,
+    "startupHandshakeAttempts": 2,
+    "diagnosticSourceTimes": [
+      "2026-09-21T07:55:46.698Z",
+      "2026-09-21T07:56:05.342Z"
+    ],
+    "withdrawnManualTimestampReport": true,
+    "lastReadinessUtc": "2026-09-21T09:52:32.597Z"
+  },
+  "actual": {
+    "node": "GUIDE_LIVE8",
+    "namespace": "GUIDE_LIVE_GUIDE16",
+    "state": "FAILURE_CONSUMED",
+    "rowsCompleted": 20,
+    "rowsAttempted": 21,
+    "historicalPartial": "LIVE7/GUIDE12:15completed; never combine with new run",
+    "capacityMeasuredUTC": "2026-09-20T16:52:47.181Z",
+    "gateSha256": "0eb9b35461a61aecf77120f9303e1a47de267c05ffbba133a6153583b426cac3",
+    "rowProof": "ALL54_PASS_REPORTED",
+    "capacity": {
+      "freeSessions": 5,
+      "recent10mMessages": 0,
+      "dailyMessageHeadroom": 70,
+      "perSession": 40,
+      "chars": 2000,
+      "modelCallsHeadroom": 478,
+      "relay": 2,
+      "queue": 10,
+      "injectionThreshold": 3,
+      "cooldown": false,
+      "waiters": 0
+    },
+    "sessionsCreated": 3,
+    "messagesSent": 21,
+    "lastCanonical": 22,
+    "failure": {
+      "code": "GUIDE_HARNESS_EXPECTED_PRIMARY_SOURCE_MISSING",
+      "phase": "DIAGNOSTIC_PROJECTED",
+      "httpStatus": 200,
+      "outcome": "ANSWER_GROUNDED",
+      "origin": "ACCEPTED_DRAFT",
+      "sources": [
+        "app-navigation"
+      ],
+      "actions": [],
+      "apiDomEqual": true
+    },
+    "progressAuthority": "sealed consumed original preview receipt",
+    "phase": "DIAGNOSTIC_PROJECTED",
+    "failedCanonical": 26,
+    "receipt": "c83366391969de5ec01b50707317895b46e27c6c014a7c636d723ef19cbe3d2b",
+    "consumption": "2ff4087a38b4ba206eb5117fdd8f5009c40af1fa8ca23f990df91ceb44a8a08d"
+  },
+  "next": "Consume bounded real UI-child path fix, independent affected review, then resolve final capture under existing explicit approval and its limits.",
+  "preparedHelpers": [
+    "prepare-continuation-review40.py",
+    "prepare-live32-from-bind40.py",
+    "prepare-actual-review24-after-bind40.py",
+    "prepare-owner-testability24-after-bind40.py"
+  ],
+  "ownerQuota": "Require natural availability after five-session capture then one fresh measured manual-capacity frame; no quota reset",
+  "estimate": "Previous13:52 conditional earliest no longer reliable; depends on footerless helper, same-session transition proof and remaining21 continuation. No completion promise.",
+  "preservedFailures": "PROBE2 argv rejected; PROBE3 pre-hydration first mode click; PROBE4 checkpoint undefined and counts lost; PROBE5 compact READY then unclassified, exact exception unknown; source-proved full-only selectors corrected in BIND16. All receipts immutable.",
+  "futureQuota": "Conservative49 prior daily messages remain after LIVE8; no later successful capacity read. Proposed31 plus6 owner reserve requires fresh gate;5 session allowance requires natural expiry before2 owner sessions.",
+  "sourceDiagnosis": {
+    "node": "GUIDE_SOURCE_DIAG",
+    "status": "ORACLE_PRIMARY_SET_INCOMPLETE_OBSERVED_PRODUCT_ANSWER_SOURCE_SUPPORTED_CONSUMED",
+    "receipt": "cd2044c52ad6557d27e066dc450ba9b8fefc93d37899ae61872a4235cf52386b",
+    "consumption": "f562e4ad28e8870723aa37a4f55e9d212386ba08a13f2fb959c241e34fc30440",
+    "productChangeRequired": false,
+    "separateReviewPending": false,
+    "review": "GUIDE_ORACLE_REVIEW17 PASS consumed8e43420ca5345f874dd0b0a0aed7de007294c1f5ab31fbaed414d33409ab01f7"
+  },
+  "verificationPlan": {
+    "decision": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/decisions/GUIDE-CP1-FOCUSED-LIVE-VERIFICATION-20260920.md",
+    "status": "Adopted same-product segmented31: retain ALL10 LIVE31, execute fixed remaining21 after proof/review/gate. No completed response resampling.",
+    "freshActual": 31,
+    "offline": 58,
+    "canonical": 54,
+    "newOwnerRows": [
+      55,
+      56,
+      57,
+      58
+    ],
+    "sessions": 5,
+    "maxModelCalls": 27,
+    "retainedActual": 0,
+    "groups": [
+      [
+        1
+      ],
+      [
+        2,
+        15,
+        19,
+        23,
+        27,
+        31,
+        35,
+        39,
+        47,
+        43
+      ],
+      [
+        10,
+        18,
+        26,
+        34,
+        56,
+        58,
+        54
+      ],
+      [
+        5,
+        13,
+        21,
+        25,
+        29,
+        37,
+        45,
+        53
+      ],
+      [
+        8,
+        12,
+        42,
+        55,
+        57
+      ]
+    ],
+    "manualReserve": {
+      "messages": 6,
+      "naturallyAvailableSessions": 2
+    },
+    "supersedes": "15 retained plus39 fresh withdrawn; full54 actual is deferred release-candidate evaluation, not completed CP1 live coverage"
+  },
+  "estimateAtUtc": "2026-09-21T09:21:14.357162+00:00",
+  "harnessPending": {
+    "node": "GUIDE_HARNESS_BIND20",
+    "ticket": "t_1e8c584c",
+    "freeze": "a19d7ec370deb0ece9bbafa26370da8517c2b0d6",
+    "phase": "Author reports FULL58 PASS attempt2; final mechanical binding and finite controls underway, seal pending",
+    "reportedCounts": {
+      "rows": 58,
+      "actualPlan": 31,
+      "modelCeiling": 27
+    },
+    "failureProvenance": "Attempt1 stale editorial snapshot included old context.ts bytes25058; final inventory13 binds current25776 source. Preserve old snapshot unchanged for unchanged reviewed components and FINAL13/current ranking authority. No source/oracle relaxation.",
+    "uiPreflight": "Author will bind existing proven five-transition all-Support-aborted controller, unique GUIDE_LIVE20 output/log and literal argv before capacity; no browser execution yet"
+  },
+  "actualNext": {
+    "node": "GUIDE_LIVE31",
+    "namespace": "actualGUIDE23",
+    "status": "FAILED_CAPTURE_ROW47_NO_RETRY_CONSUMED",
+    "attempted": 10,
+    "completedApiReplies": 10,
+    "completeThreeImageRows": 9,
+    "row47": "valid footerless refusal; top image and safe geometry; baseline early says sufficient whole short current body",
+    "receipt": "02f12acf61e118937aa2a56d77c63773df2e667ad09e3980cef24c9f2ba12340",
+    "consumption": "e549bfe46d087142ac26a867ff05cd7040b75f0ec29a317c35846d6ffb35bd11",
+    "modelProviderCallCount": "UNAVAILABLE",
+    "sessions": 2,
+    "sessionCreationTimesUtc": [
+      "2026-09-21T09:52:36.856Z",
+      "2026-09-21T09:53:08.483Z"
+    ],
+    "originalProfile": "removed by reviewed capture finally before packaging",
+    "fullFiveNaturalNotBefore": "2026-09-21T10:53:13.483Z",
+    "conservativeDailyPlanning": "measured57 plus10 sends upper bound67 absent other traffic; at least33 headroom under that assumption only; new frame still required"
+  },
+  "parallelProductPreflight": {
+    "node": "GUIDE_PRODUCT_PREFLIGHT",
+    "ticket": "t_3352e6d5",
+    "freeze": "59d66a012b4578d23fd4b0926ee06b7187812d1e",
+    "status": "REWORK_RETAINED15_PRODUCT_SCOPE_CONSUMED",
+    "heavy": false,
+    "reportedFindings": [
+      "13 of15 screenshots do not show their corresponding current reply",
+      "seq2 Account: detailed settings claims with app-navigation citation only; settings exists in retrieved context",
+      "seq35: human email flow conflated with server case guarantees",
+      "seq39: navigation claims outside cited/derived sources; system/action authority to be checked",
+      "seq15: scoring diagnostics answer nonresponsive despite public field categories"
+    ],
+    "receipt": "b6f5e12b5c86691079d98b17a1646c6732d3cf755851d761e58b3cf955526a0c",
+    "consumption": "144906369c0f03732214aec774a7ab823f722e17351d623f27cf0630b92edd59",
+    "contentPass": 11,
+    "contentRework": [
+      2,
+      15,
+      35,
+      39
+    ],
+    "visualEvidenceMissing": 13,
+    "productAutoscrollDefect": "NOT_PROVED"
+  },
+  "activeAuthorOutputsSealed": true,
+  "qualityFixProgress": {
+    "node": "GUIDE_QUALITY_FIX2",
+    "status": "IMPLEMENTED_REVIEW_REQUIRED_CONSUMED",
+    "receipt": "136d1f3a933e96c96ae9e7ec44f85f2dc7bf1571f3c232ee8595750d3a3db0fb",
+    "consumption": "cf471ac5d9a125d2ab5df4a535074cd6b9d4fa036f88716c66c3e53799000213",
+    "changedFiles": 8,
+    "authorizedPaths": 9,
+    "scopeAmendments": [
+      {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_FIX2-scope-amendment1.json",
+        "sha256": "025f51a43fe15a71b323a8f17366625579dcbb9d6b76b9ec880f289c1192d3bc",
+        "bytes": 2087
+      },
+      {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_FIX2-scope-amendment2.json",
+        "sha256": "9c5f787229db4ffae6a8554333b288a1c36fce5648a956279675299034d51ca9",
+        "bytes": 1966
+      }
+    ],
+    "checks": "513pass1TODO; final owner prompts select product-identity/account-access; strict44 admitted with owner fields blank",
+    "review": "GUIDE_QUALITY_REVIEW2 active static independent code, metadata and focused31-plan"
+  },
+  "capturePreparation": {
+    "node": "GUIDE_CAPTURE_PREP20",
+    "ticket": "t_53587c62",
+    "freeze": "f1b37bed0004587f85c8a1d5b08850d7c6c3690f",
+    "phase": "PREPARED_UNBOUND_CAPTURE_CONSUMED",
+    "revision": null,
+    "preparationBase": "0f4290c290fd38caa0ccfb3b6781fb8c33999a22",
+    "receiptContract": "PREPARED_UNBOUND_CAPTURE; special consumer required, not generic clean-old-revision consumer",
+    "remaining": "Final product binding + full58 + composed controls + separate review + supported reload + actual31 + quality/manual gates",
+    "receipt": "86b74b972f7df024f2418313482d9a9fd8d280b9124fda69584f8f7e5f252e09",
+    "consumption": "fc767885c3dcf49d00d3f94e4899249180aaecd5d2b8c89cdafacbc360cc343b",
+    "artifacts": 35,
+    "syntax": "16MJS+1TS+5JSON passed;0 behavioral/operational traffic",
+    "schemaNote": "Flat receipt omits preparationBase; consumed exact receipt-bound manifest43cb0c... base plus frozen input equality. Initial consumer and dependent pre-create abort preserved."
+  },
+  "signinCorrection": {
+    "node": "GUIDE_SIGNIN_CLASSIFIER_FIX",
+    "ticket": "t_e69d062f",
+    "base": "5d6e028ae5defc24e0690219d6128949e73b750d",
+    "phase": "Final independent PASS_SIGNIN_CLASSIFIER_DELTA consumed;648 affected tests and actual POST2/2 passed",
+    "scope": "five authorized files; public location target/operation and sign-in ZoneRule flag; preserve all restricted intents",
+    "futurePrepared": [
+      "prepare-signin-classifier-review.py",
+      "prepare-focused-guide-binding19.py",
+      "prepare-final-preview19.py"
+    ],
+    "futurePreparedStatus": "syntax checked, NOT executed; no freeze while author Git lease active",
+    "revision": "0f4290c290fd38caa0ccfb3b6781fb8c33999a22",
+    "typecheck": "76 normalized diagnostics matched7d9816c9fde8d1f83d2828485402016bfd02d53b1ad1c3f0f95f0d3567a14f4a; raw current0f5196 differs from baseline06e6 due capture bytes; no owned-path diagnostics",
+    "recovery": "Original requirements interrupted/resumed same task21:35UTC after1h40 post-commit handoff stall; no live command/process reported running",
+    "receipt": "2c5cc5c7fb2d8214ed535411dad21996c9dd2144f8c8b1166bda2156b0831fd0",
+    "consumption": "a154befaffef8692cae8e7d9641d97a91e17d1bf5e12b4e2e17cf7d013736899",
+    "inventorySha256": "1c85461f95b03938048a53c0d535eb901cfce691a2107049e4b93e89477c5cdb"
+  },
+  "infrastructureBlock": {
+    "kind": "SELECTED_MODEL_AT_CAPACITY",
+    "reportedBy": [
+      "/root/baseline",
+      "/root/preview"
+    ],
+    "action": "Retried SAME original native agents with existing scope/state; no replacements or model changes",
+    "at": "2026-09-20T23:02:25.715010+00:00",
+    "reviewProgress": "Original baseline earlyPASS_SIGNIN_CLASSIFIER_DELTA,39 inputs matched, packaging not sealed",
+    "bindingProgress": "BIND19 final offline58/harness preparation not sealed",
+    "scope": "Model execution capacity, not app quota; no reset/credit action",
+    "reviewRetry": "SUCCESS: sealed0f3698db508eeed75eb00dad277abfbd56d60c0b7a82cd27695f37ebf7a9cf40 consumed18161143b8f6bc7db552f35a40483ae697b0912ff56a821ab8fe9d4b77bcb7db",
+    "previewRetry": "Original /root/preview BIND19 retry still active; no new phase proof yet",
+    "goalStatus": "active, unbudgeted; do not mark complete or blocked from a first capacity-blocked goal turn",
+    "currentStatus": "Prior selected-model capacity errors resolved by same-original retries; all author/reviewer preparations subsequently sealed. No current capacity error reported."
+  },
+  "rankingCorrection": {
+    "node": "GUIDE_ACCOUNT_RANKING_FIX",
+    "ticket": "t_63aadd8c",
+    "freeze": "2973d97f190d852e6d53293968a6158fc9a8faf8",
+    "base": "0f4290c290fd38caa0ccfb3b6781fb8c33999a22",
+    "scope": [
+      "packages/support-kb/src/context.ts",
+      "tests/unit/support-context.test.ts",
+      "tests/unit/support-answer-context.test.ts",
+      "tests/integration/support-routes.test.ts"
+    ],
+    "required": "Full44 competing corpus and four owner cases; actual full-corpus POST row58; final13 inventory; KB content/attestation/classifier unchanged",
+    "phase": "SEALED_CONSUMED_AND_INDEPENDENT_PASS",
+    "revision": "456cafb9e56a737de550570b5736ec52d79ddf48",
+    "receipt": "3e00268fb0d1f4ba0029a4cf341a716075b7c37e4161a805bbcd962e448c50d5",
+    "reviewReceipt": "6899c5389e0a122bf30f3fe901eba60495667cb2d5f13c6c8b087b9d031ee8d3",
+    "tests": "381/381 affected; unfiltered44 owner4 plus real answer and POST58",
+    "finalMechanism": "Narrow contiguous crea/creeaz\u0103 equivalence only for canonical action-bound guide labels; prose-only labels remain exact. Broad ordered-inflection attempt failed5 regressions and was narrowed; preserve failure."
+  },
+  "updatedAt": "2026-09-22T07:57:32.751554+00:00",
+  "activeNode": "GUIDE_OPERATOR_CWD_REVIEW50",
+  "activeAgent": "/root/baseline",
+  "productRevision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "finalBinding": {
+    "receipt": "8ba367a17a6bbd1d486144c19f01dd69e9cb0403dcb93d464def9d4190c194c2",
+    "manifest": "826cba3b0f601696dbc49fe28f3062f88502e53f03c313557a6c189ecaae1d8a",
+    "consumption": "de945dc1a3d6e99ac2cd5bbd002f5c554b4391ba76480f72e6dc72a65d5d68ce",
+    "nestedArtifactsVerified": 46,
+    "offline58": "PASS",
+    "focused20": "PASS",
+    "binding13": "PASS"
+  },
+  "finalBindingReview": {
+    "verdict": "PASS_FINAL_BINDING",
+    "receipt": "de3929978b4d263bdac886356adc5df76b9f165269da3f161f364b6708f0300e",
+    "consumption": "68b5164c4f84a90e13978080733a483597543ff95a80ca423c72651d23b5dcc4"
+  },
+  "runtime7": {
+    "status": "PASS consumed",
+    "pid": 12272,
+    "pgid": 12272,
+    "receipt": "34b9bed27346ad2b8952bfcf464175c0e2594e3bc5743bf9a6f10e071293730c",
+    "consumption": "fcd69cf2e3373df80cabdb0f5e3f0f0d003d3ba538902cbcbace36d062e56984"
+  },
+  "eta": "No dependable finish ETA; 31-request pacing alone approximately16minutes.",
+  "live20": {
+    "verdict": "STOPPED_PRETRAFFIC_WRAPPER_CONTRACT_MISMATCH",
+    "receipt": "1e7e3bdfd209bf4db92b2d9d7a72ee5e48221a29bd33e3460c2a33d5f6a8cb95",
+    "consumption": "45e07ef78cce8ea668f6a1e7e534830e140c7b675db1b98561a52ba3af7cb1b6",
+    "uiTransitions": 5,
+    "supportTraffic": 0,
+    "capacityReads": 0,
+    "modelCalls": 0
+  },
+  "currentCorrections": [],
+  "binding21": {
+    "verdict": "PASS_CORRECTED_OPERATION_CONTRACT",
+    "receipt": "ef6acc4a84a187de491238a17be943070389fb20c65652a71ae306d2bccb40f0",
+    "consumption": "87178003a28ab357d9e0ed314894faf7c8c72d9126be94b906b90d558bea50b7"
+  },
+  "review21": {
+    "verdict": "REWORK_BOUNDED_SUCCESSOR_CUSTODY",
+    "receipt": "c6c9f75bb84db83ea2f03d24371136ba191f5e0bb90cca5539c304de46aa9a71",
+    "consumption": "04b42f986e2fef694486eced7860b5e29deb070ccac32b85069d3d51d56e736f"
+  },
+  "futureHelpers": [
+    "prepare-complete-capture30.py",
+    "prepare-live29-from-fix30.py",
+    "prepare-actual-review22-after-fix30.py",
+    "prepare-owner-testability22-after-fix30.py"
+  ],
+  "staleHelpers": [
+    "prepare-live20.py",
+    "prepare-live21.py",
+    "prepare-actual-review20.py",
+    "prepare-actual-review21.py",
+    "prepare-owner-testability21.py"
+  ],
+  "fix22": {
+    "verdict": "PASS_SUCCESSOR_CUSTODY_CORRECTED",
+    "receipt": "4e2485b5654266832f33089884ced63b31886974678210e6934c6a3dce72b3d5",
+    "consumption": "289e5a73b0db89a9e5c7b3bb2dfe15ec1f1386970af83691904077a886899510"
+  },
+  "review22": {
+    "verdict": "REWORK_BOUNDED_FINAL_CONTRACT_SELF_BINDING",
+    "receipt": "1190d8a32356b63b4ca1dfe4210c5e6cc873babe2930bdb461a9e9938f8fc6c9",
+    "consumption": "f6c8f2eb6e60f17437ff39b398a879790e5c5940393191a2fe7ca9ce805503dc"
+  },
+  "deferredOwnerContract": "Retain FIX22-owner-capacity-contract.json; included byhash in finalFIX23manifest.",
+  "fix23": {
+    "verdict": "PASS_LITERAL_COMMAND_BINDING",
+    "receipt": "28cbc83a4013b3e6a48c97c3f8c7169b6e9b386bfb02051bd0d05855a1244859",
+    "consumption": "c3540b7c1ea6f51f841c98858e1318a95a501d0412feff8433bf884eda140af4",
+    "contractSha": "7502ed0d8bb8618e4ba56c2157efd24a5d9af92258b91ebc90d4ef6c82727c9c",
+    "proof": "6/6 actual parser PASS; first reporter typo failure preserved"
+  },
+  "review23": {
+    "ticket": "t_179862b9",
+    "freeze": "69f333f685b66b105cb2f69c1b2d207372d6ab4e",
+    "verdict": "PASS_FINAL_LITERAL_COMMAND_BINDING",
+    "receipt": "ac4fc6b27c914edc330e3f2fbf2d91a5e9d85f95b5d29aa6f23da527245602b0",
+    "consumption": "a9ce81e8883fe8406007e19a4be67954e17e3d336ad9a6ac4703407d24df01b6"
+  },
+  "live21": {
+    "verdict": "STOPPED_PRECAPACITY_CUSTODY_MISSING",
+    "receipt": "e5d1f2ea329086994eb722a01e036c772c9a21387d531b4509dab49b22040018",
+    "consumption": "0b3084472638bd6a4dc958542e298e295442fb227b5a3f5803246901521cd77b",
+    "phase1": "PASS5transitions/0Support",
+    "phase2": "PASS ordinaryTLS/currentRuntime7",
+    "phase3": "missing childenv before any status/DB read",
+    "traffic": 0
+  },
+  "live22": {
+    "verdict": "STOPPED_PRIVATE_ENVIRONMENT_VALIDATION",
+    "receipt": "662fbb16d812751d7ee149ac8ac8e62ca24b9bebdf5eb5a3f2f06e871cbcffbc",
+    "consumption": "45a4cefc864984daf3ee0cf338b0b6f274617943a7ddd133dbfabc4cf21661d5",
+    "traffic": 0,
+    "cause": "broad API-process loader rejects unrelated provider-panel target set before childenv/phase3"
+  },
+  "privateConnectionHandling": "Source is existing product .local/dev-auth/api.env via supported loader; do not read/hash/display private values. Prior historical dev-only literal appeared once in child tool output, not repeated or copied into artifacts.",
+  "administrativeFailure": "LIVE22 first freeze rejected public product loader reference outside missionroots; failure preserved. Input hash/product revision retained, missionfreeze excludes public source. Futurehelpers verify tracked source refs without staging them.",
+  "live23": {
+    "verdict": "STOPPED_COUNTS_PRINCIPAL_PERMISSION",
+    "receipt": "f1f6229a93d13bcd09b49984660d21f8de470fb96111b915eb59a96499b5e85b",
+    "consumption": "e96ba8aec92be75f52f268f4d19fcc84fabbd60e01e47d433b9186268faeedd8",
+    "statusReads": 1,
+    "databaseQueryAttempts": 1,
+    "capacityArtifacts": 0,
+    "supportModelRequests": 0,
+    "cause": "generic DATABASE_URL principal lacks support-schema access"
+  },
+  "live24": {
+    "verdict": "STOPPED_ROW_PROOF_MATRIX_COUNT",
+    "receipt": "e6da49e326c20405c5a471cf68215faecb44e78108e8a82e8164f5ba03a6b5cb",
+    "consumption": "a81b3262f31260e833475caa9b072b00a7f88944559d71bf2a5c2c36d2bd8977",
+    "capacity": "PASS01:01:10.114Z KB7ef;5slots;49messageheadroom;calls0;cooldownfalse;relayavailable. EXPIRED/NOT REUSABLE",
+    "gate": "PASS",
+    "rowProof": "expected54 vs actual58 in gated importer line91; no row result",
+    "actualSupportModelRequests": 0
+  },
+  "privateConnectionKey": "SUPPORT_DATABASE_URL only; source/grants witnesses in LIVE23; no role/config changes or values in artifacts.",
+  "fix25": {
+    "verdict": "PASS_REAL_GATED58_CONTRACT",
+    "receipt": "222c98f001b98012cfa65d898566ec3a5208803d3639c099c870bab9fd8fb842",
+    "consumption": "b95615564c489f3bc1c3b660805f6ddd58fd687c202fd4c2944182078a666000",
+    "manifest": "f2dbc94a4117048158064da4b88e356c07b8337d82dfad0994ac9c5379c92960",
+    "nestedArtifacts": 45,
+    "receiptArtifacts": 46,
+    "contract": "f9c73d53a70f3474d41c6fd094e7a5b0fdd632919e8df35c72df6ab9c4b5ff0e",
+    "finalRealGated58": "104b78a1e92c1f42b9bad338633d7a470dec753c288259c3de39b86f74f00d44",
+    "scope": "inert fixture; exact final eight-key GUIDE21 control proof; no operational traffic"
+  },
+  "actualNamespace": "GUIDE21 now has preserved failed1-row actual receipt; cannot reuse. New full31 must use freshGUIDE22 under FIX29. No carry of row1.",
+  "trafficSinceRuntime7": "LIVE23 status1/failedDB1; LIVE24 status1/aggregate1; LIVE28 status1/aggregate1/session1/message1 accepted. No further operational traffic after screenshot failure.",
+  "fix25Milestone": {
+    "oldGatedRed": "Reproduced expected54 vs actual58 through real shared phase child",
+    "correctedGatedGreen": "58 passed through real current gated child with inert fixture; not operational",
+    "additionalNecessaryIssue": "FIX22 control proof extra node key rejected exact-eight-key gate schema. Temporary BIND21 reference passes but has prior stale GUIDE18 labeling; root directed final exact-eight-key proof with corrected GUIDE21 provenance and final real gated rerun.",
+    "operationalTraffic": 0,
+    "seal": "PASS consumed, independentREVIEW25 found bounded capture dependency only"
+  },
+  "review25": {
+    "ticket": "t_3962b425",
+    "freeze": "8ac36d406e32bdf4a2f768d28b216d929e65c967",
+    "status": "REWORK consumed",
+    "verdict": "REWORK_BOUNDED_CAPTURE_PROOF_DEPENDENCY",
+    "receipt": "151bde9d34faa6b5914ae021a8936d4f96042a8b8329d59abb23615a8cce3eb4",
+    "consumption": "0aa6911be9044aac77afca731efe5391d50e2e9fb4c56086419e9fd8edd88744"
+  },
+  "fix26": {
+    "verdict": "PASS_CAPTURE_PROOF_DEPENDENCY",
+    "receipt": "e87f3084ee66b5342ad33b63fc67281cee3c14f8b160f9d653f758a2c32ef3c9",
+    "consumption": "53a5808a8ad48c463b9dd909de5f25e605a01a5920fc788800aa94ab0ed86be6",
+    "manifest": "6481466e8f5906d1a848794081a551960f04d1833bbe25abc0223d94c090e447",
+    "contract": "e64a497a30cf7ed84b5f721e3eab8b743489a33e334917ab124e5ec6a42f7d94",
+    "nestedArtifacts": 38,
+    "positive": "real inert gated58 producer to capture sentinel PASS",
+    "negatives": "5 fail before capture log/child/browser; no operational traffic"
+  },
+  "review26": {
+    "ticket": "t_aeee4ff7",
+    "freeze": "ffe8fbbefbf3a99e1674aa498024246e434a9f17",
+    "status": "PASS consumed",
+    "verdict": "PASS_CAPTURE_PROOF_DEPENDENCY_FINAL_BINDING",
+    "receipt": "82ed42e251dd249d42e3d69e532e3c4b34c4efc1b18c94953a26147c01283401",
+    "consumption": "76380cfe04f93381579830ed87c31141d129ed8656c060b9a904bd340e86b6ff"
+  },
+  "live25": {
+    "ticket": "t_419471a7",
+    "freeze": "e67fc7f155e4775dbcb69b4573595cacf43a92ef",
+    "status": "STOPPED consumed",
+    "verdict": "STOPPED_ZERO_PHASE_ORCHESTRATION_LOADER",
+    "receipt": "de2e3291c5cbdc4bfe537289872b4202b0046c428877f4461818cb50590b5006",
+    "consumption": "7ae15900984b610b827315a6c76f205e346133ad157afc26a1819be5e1dcaf3c",
+    "phaseCount": 0,
+    "supportModelRequests": 0,
+    "cause": "plain Node cannot resolve TypeScript dependency; supported node --import tsx required"
+  },
+  "live26": {
+    "ticket": "t_0fbb505d",
+    "freeze": "2cdc1bb68778aeed805f9675ac3cd943acad2368",
+    "status": "STOPPED consumed",
+    "verdict": "STOPPED_PHASE1_OPERATOR_LOG_COLLISION",
+    "receipt": "cab65173516453fc831d9ea012a39772245217e41b39b25c4206825e234f7f0e",
+    "consumption": "850b0532048a99ac983590b0ce4dc822868e7a9b332d34848bee9130f74a2f52",
+    "loader": "PASS",
+    "phase1": "FAIL before UI child",
+    "createdOperationalPaths": [
+      "logs/GUIDE_LIVE25-preflight.log"
+    ],
+    "otherOperationalPathsAbsent": 111,
+    "supportModelRequests": 0
+  },
+  "operatorFix27": {
+    "ticket": "t_c68906dd",
+    "freeze": "039f040ab73187dbe4330505e260139a6676bb76",
+    "status": "PASS consumed",
+    "receipt": "de8b028ad0d55b35a8792e7f0c93aed7135f9d752d8a0e31ec54710cae6dbccc",
+    "consumption": "587f18cc90677da68bfcc82fe30283eaa909686ae3f93cf0801334dcdc6f75cd",
+    "manifest": "d44706d23e593771db275e63c58270b882c6e43b33025190ec054d5595c9cbf6",
+    "operatorContract": "d0f8c0962d22cf50ae47ecd7bf22f7fed49bb6df6c38718de297cfec350b7d39",
+    "nestedArtifacts": 33,
+    "receiptArtifacts": 34,
+    "controls": "18/18 exact operator/preflight and35/35 binding; first inert undefinedenv failure preserved"
+  },
+  "operatorReview27": {
+    "ticket": "t_da0aba1b",
+    "freeze": "c5355964ee47f1c15ba6a58306784fbe5f769fb7",
+    "status": "REWORK consumed",
+    "verdict": "REWORK_BOUNDED_OPERATOR_ABSENCE_SET",
+    "receipt": "0d280082a139f5158d33c7405ae16a735abb4905a95e4c8b7fa66217a8f472d9",
+    "consumption": "81c3dce3ff23b2926601d82250ae546f2eb7b134f704e6907622354883eae3e1",
+    "finding": "Runtime future set121 lacks rowProof.result and owner-testability, although separate binding verifier123 includes both. All other scoped operator/binding controls retained PASS."
+  },
+  "operatorFix28": {
+    "ticket": "t_7c6e8882",
+    "freeze": "e78fdf01d07f756b32e73dfa384473e63a1c614f",
+    "status": "PASS consumed",
+    "receipt": "132cc735100d73dd3a556cd17a8d26d81a91b91091c1e1478d263fa90cee9c16",
+    "consumption": "ff9d09d6cad4a22f0d438c03bb40c782142604e880743498fa7495173624a58f",
+    "manifest": "63c62da25386bd146437a47ee0e1c584714e416ad729a4f273f18d0f0f6f6e5e",
+    "operatorContract": "37ed60d1022dfeb97ec4ecb2939eaeac7ddcf515aec5d71c164857237dc3f186",
+    "nestedArtifacts": 25,
+    "receiptArtifacts": 26,
+    "controls": "20/20 focused and30/30 binding; real123uniquefuture paths; no operational traffic"
+  },
+  "operatorReview28": {
+    "ticket": "t_2ff58f09",
+    "freeze": "e1fd6f6d882e463b98d3cffab9f61009f50fa1bc",
+    "status": "PASS consumed",
+    "verdict": "PASS_OPERATOR_COMPLETE_ABSENCE_SET_FINAL_BINDING",
+    "receipt": "0b308d350d96956cb1f1b7f9a4ce32f918732c28eb04b96a2cdd5e1a51517e52",
+    "consumption": "96316631f5322f841f7b4130813d508b4ec6cb87265cb2fb026804637515382f"
+  },
+  "live27": {
+    "ticket": "t_0d922a12",
+    "freeze": "161a2fe838130ca2cb780ba2033641c954e1617f",
+    "status": "STOPPED consumed",
+    "verdict": "STOPPED_PREFLIGHT_RUNTIME_PROCESS_CHECK",
+    "receipt": "0fa8836b455342844899acb086c5cc89007378e53ebcfce7eab4c988cf6e2e7d",
+    "consumption": "fe05efd0c98d8f693af7e27272326cebe07bfba10838adba11f1e94dfc5611bc",
+    "phaseCount": 0,
+    "traffic": 0,
+    "futurePathsAbsent": 123,
+    "cause": "default sandbox ps statusnull; cause unproven, not proof of runtime loss"
+  },
+  "administrative27": "Root flat-manifest expectation corrected by verifying sealed input-index chain; no implementation changes or traffic. Future owner helper still needs explicit retained FIX22 contract custody chain resolved before use.",
+  "live28": {
+    "ticket": "t_0874e640",
+    "freeze": "2336d56dc12cc18e2cb59ba6b29f7fcde2141324",
+    "status": "STOPPED consumed",
+    "phaseMilestones": {
+      "preflight": "2026-09-21T02:16:02.129Z",
+      "readiness": "2026-09-21T02:16:02.311Z",
+      "capacity": "2026-09-21T02:16:03.019Z",
+      "gate": "2026-09-21T02:16:03.057Z",
+      "gated58": "2026-09-21T02:16:03.539Z"
+    },
+    "authority": "original preview progress, not sealed completion",
+    "verdict": "STOPPED_CAPTURE_SCREENSHOT_TARGET_MISMATCH",
+    "receipt": "0a00e24cf41daff2effb19accf199f3c8ca1491b4e1b46bc702202bce98835d6",
+    "consumption": "c56af0ff0bb657995cf829dafc3e263b1b234e97fd90e889540c32e980ad9bb7",
+    "attemptedRows": 1,
+    "completedRows": 1,
+    "sessions": 1,
+    "messages": 1,
+    "firstRow": "Pricing/full/EN HTTP200 grounded accepted draft; API/DOM text/source/action equality PASS; screenshot target mismatch before all3PNG writes",
+    "screenshots": 0,
+    "idle": "NOT_STARTED",
+    "sessionTimestamps": "not recorded; no invented timestamp"
+  },
+  "ownerContractCustody": "Resolved directly through consumed FIX22receipt4e2485b5 and manifest, with REVIEW23 retained; owner contract exactdf5580ba. Future owner helper uses this direct verified chain and require_escalated for local process inspection.",
+  "captureFix29": {
+    "ticket": "t_99f8b1a6",
+    "freeze": "62e83d32e2eaf46c778815c71f68d8845898e3e4",
+    "status": "PASS consumed",
+    "cause": "Author source-conclusive: actual UI renders citation labels, but screenshot helper compared visible labels to API source ids; row1 Navigate Dialectical Engine vs app-navigation. Harness-only; product unchanged.",
+    "correction": "Compare source labels while retaining exact count/order/text/action/currenttarget guards; inert real-markup short/long full/compact EN/RO and stale-target negatives; identifier-free first/second session observation times.",
+    "authority": "original author reported source finding; tests/seal/review pending",
+    "receipt": "ebbd092e04d289df6be75abf71430c7135d5277b97f5e664089cce2f65d35bb2",
+    "consumption": "e040626248ad29e954bf2aaa4eceb33c2807e7bbb2d3c5a16886491a7b1aea3a",
+    "manifest": "56088ba0863a3bb68909411c2f1b4c95cfa71742ed62f06427f83f26ff1b2aea",
+    "commandContract": "6d1d5a7d80190c67ef29516532708fcda61bb8384bfc30c08b0c620fccc21433",
+    "operatorContract": "b8e1069f138f844be820b3169df0037bd7b4931d722d78953503501db33ac956",
+    "nestedArtifacts": 30,
+    "receiptArtifacts": 31,
+    "controls": "4realmarkup browsercases,12stale/previous/wrong-index negatives,25binding; no live traffic",
+    "additionalContainedCase": "Short footer already inside pane permits equal scroll only when contained; long overflow still requires forward scroll."
+  },
+  "naturalNextFullRun": {
+    "notBeforeUtc": "2026-09-21T03:21:15.789581+00:00",
+    "basis": "LIVE28 root consumption timestamp upper-bounds session creation, plus1hour+5seconds. Timing only, not fresh capacity PASS.",
+    "ownerEstimate": "conditional roughly07:25Europe/Bucharest if correction/review/new31run pass; no promise"
+  },
+  "captureReview29": {
+    "ticket": "t_91c29a7f",
+    "freeze": "568ee46b3c2fa4de0900e8cdf9c142515b937cea",
+    "status": "REWORK consumed",
+    "verdict": "REWORK_BOUNDED_COMPLETE_FULL_CAPTURE",
+    "receipt": "b896c7f3b401c1c893169983e3dda07f979b6afc9884dcb0fb69739a5708c42b",
+    "consumption": "9755b854158e0158085233c065fcc7dfadd71887fda45717623163f0c454e3cc",
+    "finding": "FullROlong completePNG779x416 clips through fixed overflowhidden .supportDesk, blank lower region and absent footer. File-exists check falsely claimed complete. Original pane top/footer reachability, labels, shortcontained, targetguards and29/22 binding retainedPASS."
+  },
+  "captureFix30": {
+    "ticket": "t_ce9f0dca",
+    "freeze": "c413aa99d2eb7c0c03ac7c8fef3c920375586103",
+    "status": "dispatched, inert clipping/restoration/image-completeness controls only; no live traffic"
+  },
+  "guideCaptureFix30": {
+    "verdict": "PASS_COMPLETE_FULL_ANSWER_CAPTURE",
+    "receipt": "eb7851ecdc7cf1f880750dabc85ff48a451fcb839123d4e1cac21e44de237850",
+    "consumption": "3d8f126a0936b3f8b7cd8f6d3e86589b5cb7652cb269c632184320e802abffa0"
+  },
+  "guideCaptureReview30": {
+    "verdict": "REWORK_BOUNDED_ROW1_PAYMENT_CLAIM",
+    "screenshotVerdict": "PASS_COMPLETE_FULL_ANSWER_CAPTURE_FINAL_BINDING",
+    "receipt": "181d9158928279429f753397d591fc37ebe8b59994ff33dc6a5c4096f8a0aff9",
+    "consumption": "91b41aef050e5aa490be3889e82b945fd7569a4ba7cf93c2bb3f8c2774e69177"
+  },
+  "guidePricingClaimFix": {
+    "status": "consumed",
+    "revision": "b103ce27a060c48fcf5613c1bf44be53c7cb2a0c",
+    "receipt": "a2ffe74777aa68c9f73527612cfc69b0998fea44a83a8e5c9fd0ce3c0fde95b6",
+    "consumption": "80bb55c93f7b1f7d95620d984a667601e7616d3475fef9a7e1a5d8d0e20cb72b",
+    "tests": 444,
+    "final14": "7d788822be63d0bbebb32cff32ce57caa90c7094f43c675bbc3c7c29722fccf9"
+  },
+  "latestEta": "Preview is healthy; live verification has not begun because the runner readiness guard is stale. No firm completion ETA.",
+  "live28NaturalBound": "2026-09-21T03:21:15.789581Z elapsed; planning bound only, no fresh capacity PASS",
+  "guidePricingClaimReview": {
+    "verdict": "REWORK_BOUNDED_FINANCIAL_POLARITY",
+    "receipt": "9cf61d48730daa5c361b3e35c96e7fa89b8057431d097b88801c55b1238a6e6f",
+    "consumption": "895c7e260f5da4e1e29610283c22299521d8bceaa58a84d066998163c22818a7"
+  },
+  "guidePreviewBind31": {
+    "verdict": "PREPARED_NOT_EXECUTED_PRODUCT_REWORK",
+    "receipt": "f2b2a5496038cbfd2e56ef0a722fda203f22b86f0ed5dff49d664218fa78d6a9",
+    "consumption": "316b5ced5952b192faf31901de1acb2d047d6a11e9417cec68e2fc5611249f47",
+    "traffic": 0,
+    "runtimeChanged": false
+  },
+  "pricingRework": "Earlier negation licensed later positive payment; modal negatives rejected. Follow-up drafted, not dispatched until sealed predecessor custody.",
+  "guidePricingClaimFix2": {
+    "status": "consumed",
+    "revision": "130adf47da2e889005e73c3adb7ebb49fd50b529",
+    "receipt": "9ec55a4253b5da6644fea495642a942a564ef93f8be4c3be614e79b8afdfa787",
+    "consumption": "e3274a9c3c01264142427b41319ae3ccee36bd6aa71850d668d1193b9939d153",
+    "tests": 460,
+    "policyTests": 231,
+    "final15": "af384dafb2d33b06daaa2ca6866b15c0a39d6874cfa02d98368ee693c10dcf8f",
+    "typecheck": "No fresh broad typecheck; inherited76 qualified at base b103, Vitest transpilation only for final changed files"
+  },
+  "guidePricingClaimReview2": {
+    "verdict": "REWORK_BOUNDED_FINANCIAL_POLARITY_ORDER",
+    "receipt": "d4a299d65316879cd282850369a09333d8f87ab12649ceb9d3d93cea85cef46a",
+    "consumption": "9bcaad5770673d71de7dd97092ddae0222313e02538adc3157b743a00778c0e7"
+  },
+  "pricingRework2": "Reverse order Payment is not available, but checkout happens in creator still accepted; direct after-subject cannot/can\u2019t/does not/isn\u2019t negatives dropped. No runtime or paid traffic.",
+  "guidePricingClaimFix3": {
+    "status": "consumed",
+    "revision": "8cdb75d75055ccb41b6325da23bf233b24e2614b",
+    "receipt": "372c0c2913e924cea2d7086568866b3f91f2a6f391e6e1e902e2ed03277bae0a",
+    "consumption": "326aa7c2129e5078fd434174961865eebe7162c3c7ef550eb916e0b5733e6401",
+    "tests": 468,
+    "policyTests": 239,
+    "final16": "3021c43e9d036469397e9bcf6f85bd519d8f59590ca98fd2cc44857e9005f329"
+  },
+  "guidePricingClaimReview3": {
+    "verdict": "REWORK_BOUNDED_FINANCIAL_SUFFIX_CONSTRUCTION",
+    "receipt": "32c102162719491b52428ab6c10e40d03004affdfd16d28954247975fdf2d27d",
+    "consumption": "aaf136ddfa8abddafbe3bf43a2e8128c27982ea36abd515b615f189279b8edb4"
+  },
+  "guideFinancialFallbackFix": {
+    "status": "consumed",
+    "revision": "c683a0c752553fe2b4e226bc3f70879ce2460b74",
+    "receipt": "6839ec8867ce1cc51bed8990e71003a0e3669566b1958aaf0a5b4e97f22d2dea",
+    "consumption": "c82bde5635ba01b2a31f3cae286b9296a36e111ddad18d1e7b16d490a38c02a4",
+    "tests": 480,
+    "policyTests": 248,
+    "final17": "70d1df94466d6452b1724fa67bc10310bfa14c96e012e2b3c25600dfec22cd48"
+  },
+  "financialDecision": "docs/missions/support-conversation-20260914/decisions/GUIDE-FINANCIAL-REVIEWED-FALLBACK-20260921.md",
+  "guideFinancialFallbackReview": {
+    "verdict": "REWORK_BOUNDED_ROMANIAN_FINANCIAL_EQUIVALENTS",
+    "receipt": "e44341ecd6b50b6b3866418c12c8a78ad75c9d3eeff1bb3be287a41f3a400a25",
+    "consumption": "1800e6e9515d80c296fa470f05f9d5bef26c9dd3a4e16ff27ff9bbaa61a84aef"
+  },
+  "guideFinancialFallbackFix2": {
+    "status": "consumed",
+    "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+    "receipt": "4ae2916588e6b7a8a0740e44902ee4e5b80d6036a5a95891b0cd43c6d3504c90",
+    "consumption": "8e0676e48029cffc667ddd99557909f88f18dee048d1d91c0b4dc3fcee058b1b",
+    "tests": 494,
+    "policyTests": 262,
+    "final18": "8e57b2dfcd1ece63058be87d62cad23d6ecda69a6e3bbba8ad42c421eaf303ff"
+  },
+  "guideFinancialFallbackReview2": {
+    "verdict": "PASS_FINANCIAL_REVIEWED_FALLBACK",
+    "receipt": "01c59dabcfd2555727a1e9d145350345fbc2a252bd2aae9f5e4330acf585bb43",
+    "consumption": "84a087d062f454208f4c87bdd4b3c1808c37cfbcb50020b8799f2066f078df54",
+    "remainingFindings": 0
+  },
+  "guidePreviewBind32": {
+    "verdict": "FAIL_RUNTIME8_SUPERVISOR_EXITED_REVIEW_REQUIRED",
+    "consumptionSha256": "fb04584dff3da35ffca95f52b7d724f3cad0b236dbf91ce6a601c4f33ccc86c9",
+    "full58": "PASS",
+    "binding17": "PASS"
+  },
+  "guidePreviewRecover33": {
+    "verdict": "BLOCKED_AUTOREVIEW_PAID_STARTUP_HANDSHAKE",
+    "receiptSha256": "3316ff14cbee72de9e05edcd01f6c7f97e0ec8ed7c11c082807ee77444d52c2e",
+    "consumptionSha256": "f7e49b5def4db40312b076e13017e2aeaf4260ecbe9272ed5ee9eb890a239596",
+    "newModelTraffic": 0,
+    "runtime9Started": false
+  },
+  "guidePreviewRecover34": {
+    "verdict": "PASS_RECOVERED_BOUND_REVIEW_REQUIRED",
+    "receiptSha256": "727d0967c49ef12efcf4d7381cc2cbfa837f0ce33842b46a2df0283a5172c0aa",
+    "consumptionSha256": "b242fac85debc6a713cd35ca847780eaf0287b3d28da4ef3c29320e7483feca7"
+  },
+  "guidePreviewReview34": {
+    "verdict": "REWORK_FINAL_OPERATOR_EMBEDDED_CONTRACT_HASH",
+    "receiptSha256": "9e71e4b922b93e91a168617031dfe06c05ceb44d66b174c8387528b94c85d0c2",
+    "consumptionSha256": "cd168662454e36ff9685681f9bb4f4d7298abd1974b9897664ca1639fb160a27",
+    "retainedPasses": "Runtime9, startup accounting, full58, screenshot, future absence"
+  },
+  "operatorFix35": {
+    "verdict": "PASS_LITERAL_OPERATOR_HASH_FIXED_REVIEW_REQUIRED",
+    "receiptSha256": "f34a48e01eb63eabbf9fc1a3ac2a9545e114736db881336d3018cbc5d3622665",
+    "consumptionSha256": "07288f9d089723c20fb3c062383c4bc3a87199039a0129d44764512f097273c8",
+    "operatorSha256": "41de17e7eb11219ca183a4f156e13225ca6a79446035a5450a0e8d3665c4e153",
+    "controls": "10/10"
+  },
+  "operatorReview35": {
+    "verdict": "PASS_FINAL_OPERATOR_RUNTIME_BINDING",
+    "receiptSha256": "80826a4ec4ad04a25e1c946d3b6436bc825d86386cc48dca4738c998353af6d4",
+    "consumptionSha256": "6ea305467e5e78632d5a9e5dfb8bf8f4943d112e8cf86f0e45913106184581b8"
+  },
+  "live29": {
+    "state": "STOPPED_READINESS",
+    "operatorExit": 1,
+    "preflight": "PASS_ZERO_SUPPORT_UI_TRANSITIONS",
+    "uiTransitions": 5,
+    "forwardedSupport": 0,
+    "failure": "GUIDE_CAPTURE_RUNTIME_CUSTODY_INVALID",
+    "cause": "Retained BIND21 readiness hard-codes Runtime7 and api8787; current Runtime9 authoritative api8890.",
+    "capacityReads": 0,
+    "actualRequests": 0,
+    "modelCalls": 0
+  },
+  "live29ConsumptionSha256": "f5b7283407994e8e4ea48d006e09e001a0362bc287e67820c859b7e0457c6a00",
+  "runtimeBind36": {
+    "verdict": "PASS_RUNTIME_SCHEMA_BOUND_REVIEW_REQUIRED",
+    "receiptSha256": "8b3b9418e53cab318985292a3c1d09891c676779fa79e963b16494a7f60fd260",
+    "consumptionSha256": "e7f2c383e6830f114ade67e3c23ac3ecab0998499dda816daa1d2fc7d13b7609",
+    "controls": "18/18",
+    "commandSha256": "30da55750cd96c3323234f988a07cf2961025db7ebe486176bd79858897e46e4",
+    "operatorSha256": "293c8a65f70871b4be9cce21f13ca7a2aa522b1afc7c8c19a23d9ea91bce678a"
+  },
+  "runtimeReview36": {
+    "verdict": "REWORK_RUNTIME_PROCESS_IDENTITY_GUARD",
+    "receiptSha256": "abcc23b939a9cce4e8e33d5afbbdd8098c9c89fc4a795e11e7aa0a23d440ced9",
+    "consumptionSha256": "67b8daf72eac718531a9a6402c787ed2e7f59ee9e62c9c221d1ea805fc5ef41d",
+    "finding": "Real readiness and idle must parse one ps row and match expected PID/PGID/PPID1; marker-only check accepted wrong fixture identity."
+  },
+  "processBind37": {
+    "verdict": "PASS_PROCESS_IDENTITY_BOUND_REVIEW_REQUIRED",
+    "receiptSha256": "59bbc2b4b6f0282d1ebf8f42394aa74dc3d8f27fda844ba9ce8eec0172513382",
+    "consumptionSha256": "070d87656de81f1d9ab864fcddb2e070fded482427c2ea9bb19904f41d986cb5",
+    "controls": "28/28",
+    "commandSha256": "a569348814688b64eab8368ef383bc77b7ec80605c08290489024fe8ca926f1f",
+    "operatorSha256": "4bbf33ade77da4270c7c61c92742ef02dbc32743f94cec44356af1d34440f0e7"
+  },
+  "processReview37": {
+    "verdict": "PASS_FINAL_PROCESS_RUNTIME_OPERATOR_BINDING",
+    "receiptSha256": "cf73704c90411be3d192e8997f9d44e67e235b0b34e44f5c287dc8e06b1172d2",
+    "consumptionSha256": "15192e8ebd01933732ceca89e499872cf3590bb1a48eada4f4225e86b6ae9f2d"
+  },
+  "live30": {
+    "state": "CAPTURE_RUNNING",
+    "toolSessionId": 87674,
+    "toolChunk": "c65d10",
+    "preflightExit": 0,
+    "readinessExit": 0,
+    "capacityExit": 0,
+    "gateExit": 0,
+    "rowProofExit": 0,
+    "logicalRows": 58,
+    "gatePassedAtUtc": "2026-09-21T08:50:32.567Z",
+    "rowProofPassedAtUtc": "2026-09-21T08:50:33.060Z",
+    "actual31Completed": false
+  },
+  "preparedHelpersStatus": {
+    "current": [
+      "prepare-operator-cwd-review50.py",
+      "prepare-live38-after-bind50.py",
+      "prepare-actual-review24-after-bind50.py",
+      "prepare-owner-testability24-after-bind50.py",
+      "record-working-preview-after-bind50.py"
+    ],
+    "obsolete": "All after-fix49 and earlier downstream drafts. LIVE38 after-fix49 failed pre-ticket cwd assertion; never rerun it."
+  },
+  "footerFix38Progress": {
+    "authority": "author and independent review sealed and consumed",
+    "controls": "6/6 rc0",
+    "supportForwarded": 0,
+    "externalRequests": 0,
+    "phase": "PASS_FINAL_FOOTER_CAPTURE_BINDING",
+    "proven": "old backward-scroll RED; corrected contained no-scroll; genuine below-pane forward reveal; unreachable rejection; target guards",
+    "failureProvenance": "two geometry fixture setup failures, wrapped-code extraction failure and summary-only attempt4 failure preserved",
+    "productIssue": "not revealed",
+    "receipt": "11bc46a82fa493b8060e1b51ea4718f43beb14ffb37bd9d7281ed5b90359901a",
+    "consumption": "15d6f60a18f3b252fc02adde796c5774902a148860b8751301b94f85540e0ba9",
+    "manifest": "0758b442ca84b0f7ba45919107aca34bc556803b36f5f89c030e163454f655d5",
+    "bindingControls": "10/10",
+    "futurePaths": "154/154 unique absent",
+    "reviewReceipt": "cca50ea2a71680b62e293723669fa0fcfe05be19ace41b0cb822735196f73d73",
+    "reviewConsumption": "d7ca0ddcabda791f1c6325a6763d6d359756b8c717ee92203db70ae706c618b3"
+  },
+  "continuationDecision": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/decisions/GUIDE-CP1-SAME-REVISION-CONTINUATION-20260921.md",
+    "sha256": "92d680a1033a10f7ae336d161255b289047849aece1122cb1e353d3f76acd39f",
+    "bytes": 7194
+  },
+  "continuationProgress": {
+    "node": "GUIDE_CONTINUATION_BIND40",
+    "state": "FIX46_consumed_REVIEW46_running",
+    "actualCompiledUiProof": "PASS reported",
+    "remaining21Controller": "implemented reported; final binding pending",
+    "capacityCoreControls": "14/14 PASS reported, accepts 3/27/24 and rejects 2/26/23",
+    "remaining": "REVIEW46; LIVE35 exact remaining21; all31 review; fresh owner frame",
+    "authorEstimate": "20\u201330 minutes for binding only; no reliable final completion estimate",
+    "traffic": "no live Support/model traffic authorized in BIND40",
+    "priorLive31": "all ten retained; remains FAILED_CAPTURE_ROW47_NO_RETRY",
+    "bindingControls": "15/15 PASS reported; prior stale helper-digest expectation failure retained",
+    "commandContractSha256": "2257cae89fbe2592ddbb0d1ba6533931cb9c6fe1824465240ead8b9586af2e26",
+    "ownerPaths": "retained GUIDE_LIVE21 capacity and GUIDE_LIVE25 walkthrough mechanically consistent",
+    "receiptSha256": "7a6b277e59ea2e835de2277f75b30f89c51de5afdefadcea2b35d42635de8fdc",
+    "manifestSha256": "739f0f1a7c344340c773cf74d557b8eb7d00fa18a7525da7e9b3bfdf1880d4f3",
+    "consumptionSha256": "77c379c40ddf58e9538795649ef869fa321b061502863c885441dc39f2e88812",
+    "defect": "Actual capture omits sessionVersionFailure so undefined fails strict null predicate; positive control masked it. Share real completion-state initialization.",
+    "review40Receipt": "e545f0070b0e34870d13c3426b2c45fe152fa304c6602c38e1f002b8ee7c0ff9",
+    "review40Consumption": "18a9f5e2943831d35b9ee03e42f8a6e9af339c0438eb0f712ec0180773fe8f66",
+    "retained": "All ten LIVE31 answers remain retained. LIVE32 has no answers. All other REVIEW43 and ancestor dispositions PASS.",
+    "fix41Receipt": "b92648b18e1aac8a62760d0d72a5a4a22c01cb00f012d86a49f2b48817cec8f9",
+    "fix41Consumption": "ca044ae58f22b8f5ed19a640cc3e08d9d6c78a22f8a5d29be76e453a3f7c046b",
+    "review41Receipt": "58724214bf58d087dc75c22b2341750162039bb5f3f8d0c95b3223af6a952b7c",
+    "review41Consumption": "17d78f51e8cee4b24b2f11b25258c2c9bc55ba3efce6137cbf831dd9cf1554b1",
+    "fix42Receipt": "c9fd940cdeabc99c6603cac5c9169bce0257e256b0071817e3797ec824c464a5",
+    "fix42Manifest": "b0f0fce78550f53da05ffb4b5ebf16a1034af50479305a95c3616c7cf09a55bf",
+    "fix42Consumption": "0b612a5e345b29dbc6b44550d68d930a4a212ec9b66b8a99ce18a18c85f54a0a",
+    "fix42Controls": "actual completion8/8; bindings10/10",
+    "review42Receipt": "d1b19c128fa9a6408af7713da0f84de89d20cbc1d7202618c8996139d8cfb839",
+    "review42Consumption": "8a17402ec4089844898ba3b46f549ac347f6e7f60ae0443aa28307325d1ce19c",
+    "fix43Receipt": "b0e0c0c31f74ae442d0aaa6157183aca01ca755dc04cff601f59d26335a7126a",
+    "fix43Manifest": "2a992451eb679d3a7d47859171729b83f1e985a33314e4a8c3c1085734bf5a04",
+    "fix43Consumption": "77153a618e81095e5166856c9cae9eb064d52ce4a92de17a015dd295ff6fb79a",
+    "review43Receipt": "25159c5c460897cd7c0ac0ac5b7265b0e2f792854bd20be0afb832ff3cd355f6",
+    "review43Consumption": "8ec4ba21588de86da545954a54352e058f7da3faaf7228f1ace65094a1eacd77",
+    "fix44Receipt": "f88633caa6c9d155494995e97ce34c9ccba5e57e5a26dc56aaf5f4c14b339ffd",
+    "fix44Manifest": "a4e3bcc1186cb2f18f0f850bc451805972596932f7b38db4e495a9fa26de0805",
+    "fix44Consumption": "784d2b441554a6af699706f201760e445798c40b80b0a2f564b7240340902833",
+    "review44Receipt": "dba07a037dcb5cf1aed59e377d3dcea1724cb14c57d02367a8ab048b471de52a",
+    "review44Consumption": "44969534e80967d45168085af1c93bbda2d6720436c57e967a9b96a542ca89e3",
+    "fix45Receipt": "fae1d9cf45ce19a19fbdfbca35b50199b76e15d88302aa574d9d7a85c7ae330b",
+    "fix45Manifest": "1056272a247f8650f47de9796d829c659412eec5c92534c3885cbb48c606cd98",
+    "fix45Consumption": "3aa4e8098c542a309633e6857f574b24952477104b56ee5ab3898e32acb45b5c",
+    "review45Receipt": "f769c5f530833008ff8eda4cca41fcb3861f256d781432cf432811d88e79eb53",
+    "review45Consumption": "1395407a8e768af30f4512f66a1f9535f9557aa02a1d499c9b0d1e62dd040f81",
+    "importMilestone": {
+      "state": "author successors prepared; real load/link controls and final binding pending",
+      "edges": [
+        "capacity to phase-contract",
+        "gate to phase-contract",
+        "row child to matrix",
+        "row child to pre-request-verifier"
+      ],
+      "retainedHelpers": "BIND21 contract helper and BIND40 matrix/verifier",
+      "matrixScope": "BIND40 GUIDE_MATRIX remains full matrix; GUIDE_ACTUAL_SEQUENCES separately selects21; replay explicitly requires58",
+      "estimate": "author15\u201320 minutes to bind/test/seal; final finish time unpromised"
+    },
+    "fix46Receipt": "1a8242ef00128422ecdd00be8be2044c378afe6d388d02ab549950b9e2923fd7",
+    "fix46Manifest": "18530a13b0638ecb1a47160635c26de535038dc8d647fd5d0d44965b2b6975b9",
+    "fix46Consumption": "d4d8c4fca3ec8c4f4ec6ef8830a40eb95e853dc2077d7fed65f117d484ee4b1e",
+    "closure31Sha256": "2b50440b9474c79e91c832481a7644356c26dddf9733c3ca1c52148b88201e66"
+  },
+  "live32": {
+    "verdict": "FAILED_PREFLIGHT_SELF_COLLISION_ZERO_TRAFFIC",
+    "receipt": "c10b012b4f7ed1c0e5326c862fe3e963baab2efbcab25d1e31aa86f3e6e932a9",
+    "manifest": "fad7deb865cb9d8b0f7c2cbbc49392d9b0fcea89eed4e3bb87421059989b3ca0",
+    "consumption": "f5285174203df910642ae89fc6a0fceaed94dc39fe2e097a5c3b4c87e3966be2",
+    "phase": "preflight=1; others NOT_RUN",
+    "counts": {
+      "Support": 0,
+      "model": 0,
+      "status": 0,
+      "DB": 0,
+      "sessions": 0,
+      "messages": 0,
+      "answers": 0
+    },
+    "cause": "Preflight rejects its own operator-created prerequisite as a preexisting future output."
+  },
+  "live33": {
+    "verdict": "FAILED_PREFLIGHT_UI_OUTPUT_MODE_ZERO_SUPPORT",
+    "receipt": "796105e7291e027e4afe47e3bde3945de3a82454e041bb357c5208f7af65d268",
+    "manifest": "db01086779adf8d93d7f67e97eca617b90c345674c686ee15c34ee6fc7ae99ac",
+    "consumption": "f629e892fd2b5933bfe29e655621278b1082ee66c19ef904b4aa0991d9b7972e",
+    "phase": "preflight=1 at PREFLIGHT_UI_COMPLETE; others NOT_RUN",
+    "actualSupport": 0,
+    "model": 0,
+    "status": 0,
+    "DB": 0,
+    "UI": "passed with synthetic intercepted message1/create0/forwardedDynamic0",
+    "cause": "Real UI producer wrote0644 while lifecycle requires0600; fixture wrote0600 and masked mismatch."
+  },
+  "live34": {
+    "verdict": "FAILED_CAPACITY_MODULE_LINK_ZERO_OPERATIONAL_TRAFFIC",
+    "receipt": "990ef45470a54bb994a47518b7e1b29975971e02cf99acb6d52482f3b9e5c082",
+    "manifest": "e01364f0a28d0e22a84f5f6ebabe9a77f604f1a13bd4d9fc8d195fa283277ee9",
+    "consumption": "e425b72942763369edf8493881ff745d0001d531dd6b40e4b6eb12a789411aa9",
+    "phases": "preflight0 at11:45:35.315Z; readiness0 at11:45:35.504Z; capacity1; later NOT_RUN",
+    "actualSupport": 0,
+    "model": 0,
+    "status": 0,
+    "DB": 0,
+    "cause": "ERR_MODULE_NOT_FOUND: BIND40 phase-capacity imports absent local phase-contract.mjs",
+    "runtime": "Runtime9 PID/PGID9800; ordinary TLS Help200; untouched"
+  },
+  "live35": {
+    "status": "STOPPED_CAPTURE_ZERO_SUPPORT",
+    "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+    "retainedActual": 10,
+    "remainingActual": 21,
+    "review46": "PASS_FINAL_PHASE_IMPORT_BINDING",
+    "review46ConsumptionSha256": "1c012fb6b02acf4b313658160176560658f7717f7e7d7e2460b7cbbd7ea6268b",
+    "failure": "GUIDE_HARNESS_COMPACT_STATE_TRANSITION_ABSENT",
+    "attempted": 0,
+    "completed": 0,
+    "sessions": 0,
+    "modelRequests": 0
+  },
+  "captureFix47": {
+    "verdict": "PASS_CAPTURE_ACTIVATION_BOUND_REVIEW_REQUIRED",
+    "receiptSha256": "142670b951843aa82accc8d7ef8dba6156623b9033e35db227b7d4d7b5bfba0a",
+    "consumptionSha256": "b175ae490a73d7dda1ce1d481a585b8f56e1083899405808172676ea1fa43dbf",
+    "uiCases": 3,
+    "bindingControls": 7,
+    "actualSupportRequests": 0,
+    "forwardedDynamic": 0
+  },
+  "live36": {
+    "status": "FAILED_CAPTURE_ROW10_NO_RETRY_CONSUMED",
+    "actualNamespace": "GUIDE_LIVE_GUIDE25",
+    "remainingActual": 21,
+    "retainedActual": 10,
+    "review47Consumption": "a0ba0e0f8b2b81d474e71f0558f3ac3ba330eebc66a83b14c9e1bc377c847c51",
+    "failure": "GUIDE_CAPTURE_ORIGINAL_PANE_FOOTER_UNREACHABLE",
+    "attempted": 1,
+    "apiReplies": 1,
+    "completeScreenshotRows": 0,
+    "partialStartImages": 1,
+    "sessions": 1,
+    "sends": 1,
+    "modelBranches": 1,
+    "row": 10,
+    "sessionAtUtc": "2026-09-21T12:41:51.789Z",
+    "receiptSha256": "2c7ca0ea660fbbfc1b0e8f9d8c59a1c599f0d00df0438481df872e0efbb8f115",
+    "consumptionSha256": "9dded4414993f1bb738f1a83c5eed52e36fb90f6f7d80dc15fb6fd0ebefc290c",
+    "diagnosis": "CAPTURE_CONTROLLER_PANE_SELECTION_ERROR; actual scrolling parent is supportWidgetPanel; product usability defect not proved"
+  },
+  "continuation48": {
+    "status": "ADOPTED_CONDITIONAL_ON_FINAL_REVIEW",
+    "retainedLive31": 10,
+    "retainedLive36": 1,
+    "remaining": 20,
+    "actualSegmentsIfCompleted": 3,
+    "newSessions": 3,
+    "newModelCeiling": 17,
+    "ownerReserve": 6,
+    "feasibilityTicket": "t_e85f7666",
+    "decisionSha256": "2420e9ef1abd8c2cac685cbf1324d0d9d24cf8adf83f368bf2aa0a32357ac921",
+    "feasibilityConsumption": "dcb65143759d832408e30fbec31adc9ce542089203580f1fc2a081da75846443"
+  },
+  "captureFix48Progress": {
+    "phase": "CONSUMED_PASS_PENDING_INDEPENDENT_REVIEW",
+    "realCompiledReactUi": "PASS3/3 reported, immutable browser-control-final.json",
+    "targetAssistantIndex": 1,
+    "forwardedDynamic": 0,
+    "supportRequests": 0,
+    "qualification": "Independent final review and actual20 still pending",
+    "platformInterruption": "Selected model is at capacity; same original preview resumed, no replacement/model switch or completed-control rerun",
+    "finalContractSha256": "8488cc18fd0f507ba64cd82add66543af2b74c26586e8846d008b520a6533166",
+    "logicalRows": 58,
+    "remainingActual": 20,
+    "newModelCeiling": 17,
+    "receiptSha256": "6286e5016df39e1dd3e1a30a12c6e83dac9dda090b12ef76749a8b7c609a3bb9",
+    "consumptionSha256": "c3e89bb7248815d568c4b4136ad3cdbf13f56f46a2f00e2cd5a9565fe8a9f2ac",
+    "nestedArtifacts": 71,
+    "receiptArtifacts": 72
+  },
+  "live37": {
+    "status": "FAILED_PREFLIGHT_PREDECESSOR_COMPOSITION_VALIDATOR_ZERO_TRAFFIC_CONSUMED",
+    "remainingActual": 20,
+    "retainedLive31": 10,
+    "retainedLive36": 1,
+    "actualNamespace": "GUIDE_LIVE_GUIDE26",
+    "segmentsIfCompleted": 3,
+    "sessionTimesIfCompleted": 6,
+    "review48Consumption": "8801497f87b54d10c655f9f69acce94b2ae5d33a5bd7dfe6bb7d29bea047bbfc",
+    "failure": "GUIDE_CONTINUATION_COMPOSITION_CONTRACT_INVALID",
+    "preflight": 1,
+    "actualSessions": 0,
+    "actualMessages": 0,
+    "modelRequests": 0,
+    "receiptSha256": "8dca6b393c4ac87d260b6b0dba0f2e4c3f601453e97e5b2e1ca105a087c3f200",
+    "consumptionSha256": "9c7e0312e1ea2a5555b59bf2c9a307b86693275e7a31b6788a713c06ec2621fc"
+  },
+  "preflightFix49": {
+    "verdict": "PASS_PREFLIGHT_SCHEMA_BOUND_REVIEW_REQUIRED",
+    "receiptSha256": "b14edd9998d8b512bdb1dc19ae2bf29dddb8ed200b092516b14eb460e21a8ab1",
+    "consumptionSha256": "ed281e6203c1215ade234c4072a7c8c3cbf0cb29fb665b1c147b615f79b2d2b9",
+    "contractSha256": "1be2c74d25dbf4fd45f72fb1360f06836547e868b7b19993e17a0f949fcbd7e6",
+    "controls": 15,
+    "passed": 15,
+    "allOperationalTraffic": 0
+  },
+  "review49": {
+    "verdict": "PASS_FINAL_PREFLIGHT_SCHEMA_BINDING",
+    "consumption": "5f39e8e6a86dbf8f30b40c845efe5d7186cca63a0fadd12d0ab6003216b0922d"
+  },
+  "operatorCwd50": {
+    "status": "CONSUMED_AUTHOR_PASS_PENDING_REVIEW",
+    "receiptSha256": "b1328082b9359f9355eff4dc85b97400150cd8df17ab943778585c7bc21b1618",
+    "consumptionSha256": "c80d538dcf9476ea8935a32ad05454c732f9ff2ac633e545746b9a397544f46e",
+    "finalMetadataSha256": "545bf330bb4651cf81bc143755427912d198cc859a4891aa91d0e228cd07116c",
+    "onlyChangedField": "cwd",
+    "inertGuardExit": 0,
+    "operationalPhases": 0
+  },
+  "launch50": {
+    "reviewVerdict": "PASS_FINAL_OPERATOR_CWD_BINDING",
+    "reviewConsumption": "f7c66d8fb959ad7693b646b5b6b8e19bc939d9b2f79ee66722cb53887312c2f1",
+    "operatorMetadataSha256": "545bf330bb4651cf81bc143755427912d198cc859a4891aa91d0e228cd07116c",
+    "commandContractSha256": "1be2c74d25dbf4fd45f72fb1360f06836547e868b7b19993e17a0f949fcbd7e6",
+    "retainedActual": 11,
+    "remainingActual": 20,
+    "actualSegments": 3
+  },
+  "live38": {
+    "state": "FAILED_PREFLIGHT_UI_OUTPUT_PATH_BINDING_ZERO_TRAFFIC",
+    "launches": 1,
+    "phases": 1,
+    "newQuestions": 0,
+    "newSessions": 0,
+    "newModelCalls": 0,
+    "retainedActual": 11,
+    "remainingActual": 20,
+    "approvalScope": "One sealed operator, 20 public Support questions, up to17 model-attributed branches in3 sessions, configured external paid provider. No restart or completed-question resend.",
+    "approval": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE38-explicit-approval-20260922.json",
+      "sha256": "0949ee14d0f28728b0f39d3fc193a9d950d9c5c4f84a199a6be963c2ebab5e98",
+      "bytes": 1726
+    },
+    "consumptionSha256": "312c4ee0a245565a12ae7da852611f2d5f8192b8173b60171ce9450c6d6f7ca6"
+  },
+  "fix51": {
+    "scope": "actual selected UI-child closed output/profile binding",
+    "productUnchanged": true,
+    "operationalTrafficPermitted": false,
+    "reviewGenerator": "prepare-ui-output-review51.py"
+  }
+}

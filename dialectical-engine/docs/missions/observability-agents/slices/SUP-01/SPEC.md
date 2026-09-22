@@ -87,10 +87,12 @@ an independent Fable 5.1 seat (the KB author), never by the coding seat, from th
 and nothing else: `apps/ui/components/GuideModal.tsx:7-41`,
 `apps/ui/lib/v3/missingCapabilities.ts:8-10`, `apps/ui/components/PublicAnswerDisclosure.tsx:5`,
 `apps/ui/app/new/page.tsx:27-33` (risk and budget tiers), the anonymous route facts
-(`apps/api/src/index.ts:118-119`), the publish/unpublish/delete rules
-(`apps/api/src/index.ts:693`), and `docs/founding/ui-boundary-contract.md` (extracted, never
-quoted). Entries carry no pricing (`apps/ui/components/landing/LandingPricing.tsx:34` is a
-placeholder), no model count (`cards.ts:107` says "Five", `apps/ui/app/page.tsx:62` says
+(`apps/api/src/index.ts:118-119`), publish (`apps/api/src/index.ts:995-1039`), unpublish
+(`apps/api/src/index.ts:1040-1081`), and private-debate deletion
+(`apps/api/src/index.ts:675-703`), and `docs/founding/ui-boundary-contract.md` (extracted,
+never quoted). Entries carry no pricing (`apps/ui/components/landing/LandingPricing.tsx:34`
+is a placeholder), no model count (`apps/ui/components/landing/cards.ts:107` says "Five",
+`apps/ui/app/page.tsx:62` says
 "Several"), and no statement about what a verdict label proves
 (`docs/visuals/verdict-forensics.png` contradicts the landing copy) until V ratifies text.
 
@@ -100,6 +102,12 @@ verification code or link, two-factor / TOTP / recovery codes, account recovery,
 contact change, sessions or sign-out, account deletion, or "does account X exist" to the
 `REFUSE_ZONE` text with the first-party link (`/login`, `/sign-up`, or `/settings`) and
 records `outcome = REFUSE_ZONE`. No model call is made for that message.
+
+The separate deterministic coercion list contains the exact English phrase `I am being
+told what to type by someone on the phone` and Romanian phrase `Cineva la telefon îmi spune
+ce să scriu`; either produces `REFUSE_SAFETY` before any model call. If the same message
+also names a password, verification code, recovery, contact change, session, or another
+R05 zone intent, `REFUSE_ZONE` takes precedence.
 
 ### SUP-01-R06 — Injection is refused and recorded
 A deterministic detector (instruction-like text addressed to the assistant, role or
@@ -160,6 +168,8 @@ are register rows (`support_limit_*`) with these defaults.
 ### SUP-01-R12 — Transcripts are private, encrypted, and carry no raw payloads
 Schema `support` (additive migration; no deletion anywhere): `support.session`,
 `support.message`, `support.abuse_event`, `support.case`, `support.session_key`.
+`support.session.identity_owner_ref` is nullable, is copied only from the authenticated
+identity session at support-session creation, and is null for an anonymous session.
 Message content is encrypted at rest with a per-session data key wrapped by a support KEK
 stored as a secret file in the custody root (`secrets/support-kek.bin`, same custody
 pattern as `apps/runner/src/dev-secret-files.ts:18`). Only the assistant's text and typed

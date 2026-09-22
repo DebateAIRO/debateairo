@@ -1,0 +1,28 @@
+{
+  "condition": "Explicit authorization for the automatically rejected paid Z.AI/GLM startup handshake is missing.",
+  "consecutiveGoalTurns": 3,
+  "originalTurn": "Safe startup diagnosis completed; paid diagnostic rejected; explicit approval requested; recovery receipt sealed and consumed.",
+  "previousTurnClassification": "no_progress",
+  "currentTurnClassification": "no_progress",
+  "at": "2026-09-21T07:16:58.737715+00:00",
+  "revalidation": {
+    "cleanProduct": true,
+    "receiptSha256": "3316ff14cbee72de9e05edcd01f6c7f97e0ec8ed7c11c082807ee77444d52c2e",
+    "consumptionSha256": "f7e49b5def4db40312b076e13017e2aeaf4260ecbe9272ed5ee9eb890a239596",
+    "heavyLease": null,
+    "gitLease": null,
+    "newRuntimeReceiptAbsent": true,
+    "newActual31ReceiptAbsent": true,
+    "explicitApprovalReceived": false
+  },
+  "safeNextAction": "Await explicit response to the pending exact-payload provider approval; no repeat request, paid call, or workaround.",
+  "goalStatus": "active; prior approval blocker resolved",
+  "impasse": "No live recovery job, no outstanding authorized work that resolves startup, no explicit provider-request approval; repeated offline tests or an alternate paid invocation would not resolve the authorization boundary.",
+  "resolution": {
+    "userReply": "approved",
+    "approvalDecision": "docs/missions/support-conversation-20260914/decisions/GUIDE-OWNER-STARTUP-APPROVAL-20260921.md",
+    "resolved": true,
+    "result": "Exactly two approved startup requests completed; Runtime9 recovered. Original audit retained as history.",
+    "recordedAt": "2026-09-21T08:19:39.013021+00:00"
+  }
+}

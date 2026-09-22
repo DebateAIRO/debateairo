@@ -1,0 +1,16 @@
+===== R3 RED FRAME: the four-selector focus rule DELETED =====
+   → expected [ '.consentPolicyLink', …(3) ] to deeply equal []
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S65c · every focusable control the block styles carries a `--focus` ring inside the block
+AssertionError: expected [ '.consentPolicyLink', …(3) ] to deeply equal []
+- Expected
++ Received
+- []
++ [
++   ".consentPolicyLink",
++   ".policyClose",
++   ".policyPill",
++   ".policyPrimary",
++ ]
+ Test Files  1 failed (1)
+      Tests  1 failed | 8 passed (9)

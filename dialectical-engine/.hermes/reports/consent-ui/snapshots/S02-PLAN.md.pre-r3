@@ -1,0 +1,2224 @@
+# S02 — PLAN v0 (scaffold REQ-01; steps by heartbeat-architecture)
+
+**Status: SCAFFOLD.** REQ-01 created this file with the trace skeleton, the law below, and
+the table headers. **Steps and clusters: the `heartbeat-architecture` seat.** Requirements
+does not author steps; architecture does not edit `SPEC.md`.
+
+**Tracking `SPEC.md` v3 (REQ-01 rework round 2, 2026-09-06).** `SPEC.md` is now **v3**; the
+frozen v1 and v2 are archived beside it as `SPEC-v1.md` and `SPEC-v2.md`. **Read `SPEC.md`,
+never an archive.** No R-id was renumbered in either round, so every trace row below still
+resolves; the rows whose short description changed in v2 are marked **v2** and are R08, R14,
+R16, R17, R18 and R22. The v2 changes that reach this file: S02 owns and writes
+`apps/ui/components/consent/modalSemantics.ts` (the ONE shared modal-semantics helper,
+`COMMON.md` §10.7), and the Boundaries section says so. **The v3 change that reaches this file
+is the checkbox test idiom (REQ-REV-01 B4/B5): see the two failure modes below — v2's wording
+here named an idiom that is measured not to work, and it is now one idiom, named once.**
+
+## Quantifiability law
+
+> A stranger can mark every step done or not-done with no judgement call.
+>
+> - WRONG: "improve error handling"
+> - RIGHT: "requests with a missing id return 400 with a message, and the test asserting
+>   this passes"
+>
+> A step nobody can verify mechanically is not a step; split it until it is. Each step names
+> its cluster, its acceptance test, and its file surface.
+
+Binding additions for this mission:
+
+- **Banned in any step or acceptance criterion:** improve, better, robust, handle,
+  appropriate. They mean the deciding is not finished.
+- **Every pinned number carries its derivation** in the same step (the SPEC does this for
+  680px, 92vh and the 8px scroll slack — steps inherit the obligation for any new number).
+- **Three-run law:** each cluster's ONE verification command runs three times and the WORST
+  run is the verdict. Green-green-red is RED. Re-running until green is falsification.
+- **`UNVERIFIED` is a legal, respected step outcome.** A guess presented as a result is not.
+- Report suites as `passed/total`, name every failure, and state whether it predates the
+  slice. **The baseline authority is `docs/missions/consent-ui/BASELINE.md`** — read it before
+  reporting any suite. Red at base and inherited, never claimed: `pnpm typecheck` (8
+  diagnostics in `tests/unit/s14-ui.test.ts`; run `pnpm run generate:contract` first),
+  `tests/architecture/auth-front-door-parity.test.ts` (exit 1, `Tests 2 failed (2)`, ENOENT on
+  deleted `web/` files), and `tests/unit/t9-mode-tokens.test.ts` (exit 1,
+  `Tests 2 failed | 6 passed (8)`) — S02 edits none of these. **Green at base and must stay
+  green:** `tests/render/auth-flow-integration.test.tsx` (exit 0, `Tests 17 passed (17)`) —
+  S02 edits three of its cases and adds one — and `tests/unit/v2ui-node-runner.test.ts`
+  (exit 0, `Tests 2 passed (2)`), which carries the copy ban constraining `SignUpFlow.tsx`
+  (S02-R21).
+
+## SPEC trace (R-id · step ids · cluster)
+
+Every requirement in `SPEC.md` has a row. **The step and cluster columns are filled by
+ARCH-S02 (2026-09-06).** No requirement is left without at least one step, and no step
+exists without a requirement (the reverse check is the table under §Refutation table).
+
+| R-id | Requirement (short) | PLAN steps | Cluster |
+|---|---|---|---|
+| S02-R01 | Bordered two-row checkbox group, 17px check squares | S02-S17 · S02-S62 | C3 · C8 |
+| S02-R02 | Both labels byte-exact; 18+ row reworded per V-6 | S02-S18 | C3 |
+| S02-R03 | `adult-affirmed` kept + `privacy-accepted` added; both `required`; no new `<form>`; **both keyboard-reachable** | S02-S19 · S02-S20 · S02-S22 · S02-S70 · S02-S71 | C3 · C7 |
+| S02-R04 | The 18+ row is a plain toggle | S02-S21 | C3 |
+| S02-R05 | Unchecked privacy row (square / text / link) opens the modal, box stays unchecked | S02-S49 · S02-S50 · S02-S51 · S02-S71 | C7 |
+| S02-R06 | Checked privacy row unchecks directly, no modal | S02-S52 | C7 |
+| S02-R07 | `I have read it` ticks, closes, returns focus | S02-S47 · S02-S53 | C6 · C7 |
+| S02-R08 | **v2** `×` / Esc / backdrop leave it unchecked, return focus; **Esc acts only as the topmost surface** (B3) | S02-S03 · S02-S47 · S02-S54 · S02-S55 · S02-S56 | C1 · C6 · C7 |
+| S02-R09 | Modal geometry (680 / 92vh, derived) | S02-S34 · S02-S61 · S02-S65 | C5 · C8 |
+| S02-R10 | Modal header copy byte-exact | S02-S35 | C5 |
+| S02-R11 | Eight jump pills in design order + the pill→section mapping | S02-S11 · S02-S14 · S02-S36 · S02-S48 | C2 · C5 · C6 |
+| S02-R12 | Eleven sections verbatim + the accent-token mapping | S02-S12 · S02-S13 · S02-S15 · S02-S37 | C2 · C5 |
+| S02-R13 | Footer contact line + `I have read it`; NO `Download PDF`; end marker | S02-S38 | C5 |
+| S02-R14 | **v2** **`PrivacyPolicyModal` interface — byte-identical to S01-R20**, now carrying the read-mode `Close` button (N9) and the Esc-stack rule (B3) | S02-S01 · S02-S07 · S02-S33 · S02-S39 · S02-S47 · S02-S56 · S02-S57 · S02-S58 · S02-S72 | C1 · C5 · C6 · C7 |
+| S02-R15 | Scroll-to-end gate: `scrollTop + clientHeight >= scrollHeight - 8`, latching | S02-S40 · S02-S41 · S02-S42 · S02-S43 · S02-S44 · S02-S64 | C6 · C8 |
+| S02-R16 | **v2** Modal a11y: dialog, focus trap, Esc, focus restore, scrollable region — **and S02 writes the ONE shared helper `apps/ui/components/consent/modalSemantics.ts`** that provides all of it, S01 included (P4) | S02-S01 · S02-S02 · S02-S03 · S02-S04 · S02-S05 · S02-S06 · S02-S07 · S02-S08 · S02-S09 · S02-S10 · S02-S34 · S02-S45 · S02-S46 · S02-S72 | C1 · C5 · C6 |
+| S02-R17 | **v2** `Create account` disabled until BOTH boxes are checked — **implementation PINNED: uncontrolled inputs + `onChange` mirror into React state for `disabled` only; `FormData` is the truth at submit** (B2, probe-proven); **the mirror records the SETTLED value, so it cannot diverge from the DOM** (B1) | S02-S25 · S02-S26 · S02-S27 · S02-S28 · S02-S29 · S02-S30 · S02-S49 · S02-S50 · S02-S51 · S02-S54 · S02-S55 · S02-S56 · S02-S71 | C4 · C7 |
+| S02-R18 | **v2** Submit handler refuses `client.register` if either is unchecked — **it tests the two `FormData` reads, never R17's React mirror** (B2) | S02-S31 · S02-S32 | C4 |
+| S02-R19 | Registration request keeps its exact four-argument shape | S02-S23 · S02-S32 · S02-S67 | C3 · C4 · C9 |
+| S02-R20 | Policy content as data in `apps/ui/lib/privacyPolicy.ts` | S02-S11 · S02-S12 · S02-S13 · S02-S14 · S02-S15 · S02-S16 | C2 |
+| S02-R21 | `SignUpFlow.tsx` gains no `terms` / `privacy notice` / storage substring | S02-S24 · S02-S68 | C3 · C9 |
+| S02-R22 | **v2** No new token; neither token block nor the token test is edited (set-equality citation corrected to `:376-377`, N2) | S02-S59 · S02-S60 · S02-S66 · S02-S68 | C8 · C9 |
+| S02-R23 | Both modes, live, including with the modal open | S02-S60 (mechanical) · S02-S69 · V acceptance step 14 | C8 · C9 · V |
+| S02-R24 | `prefers-reduced-motion` block for its own selectors | S02-S08 · S02-S48 · S02-S63 | C1 · C6 · C8 |
+
+**Rows: 24. Requirements in SPEC.md: 24.** Every requirement traced.
+
+**Every step id in this table is written out in full — NO RANGE NOTATION**
+(`ARCH-REV-S02-r1` **N2**). R16's row previously read `S02-S01 … S02-S10`, which made five
+defined steps (`S02-S02`, `S02-S04`, `S02-S05`, `S02-S06`, `S02-S09`) reach the trace only
+through an ellipsis a script cannot expand: the literal token count was **64 of 69** while the
+round-1 handoff stated *"steps NOT in any trace row: []"*. Both statements were derived from
+tools that disagreed about what "in the trace" means. **The rule for this file is now the
+mechanical one: a step is in the trace iff its id appears literally in a trace row**, and the
+counting command below is what settles it — so the number is reproducible instead of
+convention-dependent.
+
+**Counting rule and command for the numbers above** (`COMMON.md` §10.3 / §10.10
+corollary — a count carries the command that produced it and its pasted output). Run from
+`docs/missions/consent-ui/slices/S02/`. Output pasted verbatim in §A9 → *Trace and count
+re-measurement*, re-run after this rework round:
+
+```
+$ grep -cE '^\*\*S02-R[0-9]{2} ' SPEC.md          # requirements defined in the frozen SPEC
+$ grep -cE '^\| S02-R[0-9]{2} \|' PLAN.md         # trace rows in this file
+$ grep -oE 'S02-S[0-9]{2}' PLAN.md | sort -u | wc -l   # distinct step ids anywhere in this file
+$ python3 ../../../../.hermes/reports/consent-ui/probes/arch-rev-s02-trace.py   # both directions, mechanically
+```
+
+§Steps defines exactly `S02-S01`…`S02-S72` — the original 69 plus the three appended by
+rework round 1 (`S02-S70`, `S02-S71` from N3; `S02-S72`, the ADR, from the orchestrator's
+note). **No existing step was renumbered.** Every one of the 72 appears in the refutation
+table and in at least one trace row.
+
+## Steps
+
+**Authored by ARCH-S02, 2026-09-06.** Each step states: an id · what changes, in one
+mechanically checkable sentence · its cluster · its acceptance test · its file surface. Steps
+that add a number restate that number's derivation.
+
+**Lane root for every path below** (paths are written repo-relative for reading and are
+absolute under this prefix for running):
+`/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/consent-s02/dialectical-engine/`
+
+### How to read a step (stated once so 69 steps do not repeat it)
+
+- **RED-first is structural.** Every step that adds behaviour names the test that is RED
+  before it and GREEN after. Where a step's test is GREEN before the change as well, the step
+  **says so in the RED column** and explains what it is a control for. A step that quietly
+  passes before and after is not a step; there are exactly two such controls in this plan
+  (`S02-S28`, `S02-S32`) and both are labelled.
+- **The cadence inside every cluster,** run by the coding seat and not repeated per step:
+  write the failing test → run the cluster command and read the failure → write the minimal
+  implementation → run the cluster command → run it **three times, worst run is the verdict**
+  → run the standing gates (§Clusters) → commit on `slice/consent-s02`.
+- **Two failure shapes that look BROKEN and are the declared RED of this plan.** `TOOLING-TRAPS.md`
+  classifies a command BROKEN on `no test files found` or `cannot find module`. Both are the
+  *expected* pre-fix RED here, and they are distinguished mechanically, not by judgement:
+  (a) `No test files found` is the declared RED **only when every filter path in the command is
+  a file this PLAN creates and names**; (b) `Cannot find module '<X>'` is the declared RED
+  **only when `<X>` is the module the step itself creates**. Any other module name, or a missing
+  path this plan does not name, is BROKEN and is a finding.
+- **The one idiom for the submit button** (`SPEC.md` R17 hook, REQ-REV-01 B4): `field(name).click()`
+  wrapped in `await act(async () => { … })`. There is no second idiom. `field(x).checked = true`
+  fires no React change and can never move that button; `dispatchEvent(new Event("change"…))`
+  and `dispatchEvent(new Event("click"…))` are **measured dead**. Assignment remains correct —
+  and is the required idiom — for anything that exercises the HANDLER and `FormData`
+  (`S02-S22`, `S02-S31`, `S02-S32`) and for the deliberate no-dispatch halves of R17's cases 5
+  and 6 (`S02-S29`, `S02-S30`).
+- **`.click()` TOGGLES.** A step that pre-assigns `.checked = true` and then clicks must reset
+  to `false` first, or the click drives the box the wrong way. This is stated inside
+  `S02-S29`, which is where it bites.
+
+---
+
+### Cluster S02-C1 — the ONE shared modal-semantics helper
+
+Creates `apps/ui/components/consent/modalSemantics.ts` and `tests/render/consent-modal-semantics.test.tsx`.
+**This is the mission's first artefact** (`SPEC.md` §Parallel-safety; `COMMON.md` §10.7):
+S01's preferences card cannot satisfy S01-R18 or the Esc stack until it exists, and it
+references no CSS token, so it needs nothing from the other lane.
+
+**The module's exported surface, fixed here so C5/C6 and S01 can be written against it:**
+
+```ts
+export type ModalSurface = Readonly<{
+  containerRef: React.RefObject<HTMLElement | null>;
+  initialFocusRef: React.RefObject<HTMLElement | null>;
+  onClose: () => void;
+}>;
+export function useModalSurface(open: boolean, surface: ModalSurface): void;
+export function backdropCloseHandler(
+  scrim: HTMLElement | null, onClose: () => void
+): (event: { target: EventTarget | null }) => void;
+export function prefersReducedMotion(): boolean;
+export function openSurfaceCount(): number;   // test-visible depth of the Esc stack
+```
+
+- **S02-S01 · The Esc stack: one Escape, one surface, and it is the topmost.**
+  Serves `SPEC.md` R16, R14, R08. Creates `apps/ui/components/consent/modalSemantics.ts` and
+  `tests/render/consent-modal-semantics.test.tsx`.
+  **Test:** mount two components through `useModalSurface`, outer first then inner; dispatch
+  ONE `new KeyboardEvent("keydown", { key: "Escape", bubbles: true })` on `document` inside
+  `act`. **Property:** the inner surface's `onClose` was called exactly once and the outer
+  surface's `onClose` was called zero times.
+  **RED before** (`Cannot find module '…/modalSemantics'` — the module this step creates),
+  **GREEN after.**
+  **Acceptance:** a stranger runs the C1 command and reads `Tests 1 passed (1)`; with the
+  module's stack replaced by a per-surface listener, the same run reports the outer `onClose`
+  called once and fails. Cluster **C1**.
+
+- **S02-S02 · Initial focus lands on the element the caller names.**
+  Serves R16. Edits `modalSemantics.ts`, `consent-modal-semantics.test.tsx`.
+  **Test:** mount one surface whose `initialFocusRef` points at a `<button>` that is not first
+  in DOM order. **Property:** after mount, `document.activeElement` is that button.
+  **RED before, GREEN after. Acceptance:** `Tests 2 passed (2)`. Cluster **C1**.
+
+- **S02-S03 · Focus returns to whatever was focused when the surface opened.**
+  Serves R16, R07, R08. Edits both files.
+  **Test:** focus a `<input id="opener">`, open the surface, then close it. **Property:**
+  `document.activeElement` is `#opener` again. **RED before, GREEN after. Acceptance:**
+  `Tests 3 passed (3)`. Cluster **C1**.
+
+- **S02-S04 · Tab from the last focusable inside the surface goes to the first.**
+  Serves R16. Edits both files.
+  **Test:** focus the last focusable, dispatch `keydown` `Tab` (no shift). **Property:**
+  `document.activeElement` is the first focusable of that surface and
+  `event.defaultPrevented` is `true`. **RED before, GREEN after. Acceptance:**
+  `Tests 4 passed (4)`. Cluster **C1**.
+
+- **S02-S05 · Shift+Tab from the first focusable goes to the last.**
+  Serves R16. Edits both files.
+  **Test:** focus the first focusable, dispatch `keydown` `Tab` with `shiftKey: true`.
+  **Property:** `document.activeElement` is the last focusable. **RED before, GREEN after.
+  Acceptance:** `Tests 5 passed (5)`. Cluster **C1**.
+
+- **S02-S06 · The focusable set is recomputed on every Tab, never cached at open.**
+  Serves R16 (and the R15 interaction: `I have read it` is `disabled` at open and enabled
+  later). Edits both files.
+  **Test:** mount with a `disabled` trailing button; remove `disabled`; Tab from the last
+  *enabled* control. **Property:** focus reaches the newly enabled button rather than wrapping
+  past it. **RED before** (a cached list wraps to the first), **GREEN after. Acceptance:**
+  `Tests 6 passed (6)`. Cluster **C1**.
+  **Derivation of the focusable selector, pinned so C5/C6 do not re-derive it:**
+  `a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])`.
+
+- **S02-S07 · A backdrop click closes only when the click landed ON the backdrop.**
+  Serves R14, R08. Edits both files.
+  **Test:** call the handler returned by `backdropCloseHandler(scrim, onClose)` twice — once
+  with `{ target: scrim }`, once with `{ target: aChildElement }`. **Property:** `onClose` was
+  called exactly once, on the first. **RED before, GREEN after. Acceptance:**
+  `Tests 7 passed (7)`. Cluster **C1**.
+
+- **S02-S08 · `prefersReducedMotion()` is safe when `matchMedia` does not exist.**
+  Serves R24, R14. Edits both files.
+  **Test:** with the jsdom default (**measured: `typeof window.matchMedia === "undefined"` in
+  jsdom 30.0.1**) call it; then `vi.stubGlobal`-style assign a `matchMedia` returning
+  `{ matches: true }` and call it again. **Property:** `false` in the first case with no throw,
+  `true` in the second. **RED before, GREEN after. Acceptance:** `Tests 8 passed (8)`.
+  Cluster **C1**.
+
+- **S02-S09 · Closing the inner surface hands Escape back to the outer one.**
+  Serves R16. Edits both files.
+  **Test:** open outer, open inner, close inner, dispatch one Escape. **Property:** the outer
+  surface's `onClose` is now called exactly once. **RED before** (a stack that never pops
+  leaves the closed inner surface on top and swallows the key), **GREEN after. Acceptance:**
+  `Tests 9 passed (9)`. Cluster **C1**.
+
+- **S02-S10 · Exactly one document-level `keydown` listener exists across all surfaces.**
+  Serves R16 (`SPEC.md`: "Neither slice registers a second document-level keydown listener").
+  Edits both files.
+  **Test:** spy on `document.addEventListener`, mount two surfaces, count calls whose first
+  argument is `"keydown"`. **Property:** the count is exactly `1` with two surfaces open, and
+  `document.removeEventListener` has been called for `"keydown"` once after both close.
+  **RED before, GREEN after. Acceptance:** `Tests 10 passed (10)`. Cluster **C1**.
+
+- **S02-S72 · The ADR for the shared modal-semantics boundary is written, as part of C1.**
+  *(New in rework round 1 — orchestrator note on `t_3160e2d5`. Appended, so no existing step id
+  moves.)*
+  Serves R16 and R14 (the boundary those two requirements create) and §Is an ADR warranted?
+  below. Creates `docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md`.
+  **Operation:** the C1 coding seat TRANSCRIBES a decision that already exists in this plan —
+  it decides nothing new. Sources, in this order: `DECISIONS.md`'s entries *"Who writes the ONE
+  shared modal-semantics helper?"*, *"The Esc stack's implementation shape"* and *"The focus
+  trap's focusable set"*; this file's §DDD and module boundaries → *Is an ADR warranted?*; and
+  the exported-surface block at the head of §Cluster S02-C1.
+  **Content, fixed so the step is not a judgement call:** `Status: Proposed` (V ratifies; no
+  seat writes `Accepted`) · Context: seven existing `aria-modal` overlays with no focus trap,
+  no Esc handling and no focus return, and `createPortal` / `Escape` / `focusTrap` / `.focus()`
+  / `addEventListener("keydown"` at **0 hits** under `apps/ui` · Decision: one shared module
+  `apps/ui/components/consent/modalSemantics.ts` owning focus trap, initial focus, focus
+  return, backdrop close, `prefers-reduced-motion` and the Esc STACK, with the exported surface
+  quoted verbatim from §Cluster S02-C1 · Consequences: S01 consumes it unchanged; ticket
+  `A11Y-OVERLAYS` (`t_8962842f`) retrofits the seven existing overlays; exactly one
+  `document`-level `keydown` listener exists across the app.
+  **Acceptance — mechanical, and it adds no vitest case:**
+  ```
+  test -f docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md && echo EXISTS  -> EXISTS
+  grep -c 'Status: Proposed' docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md -> 1
+  for s in useModalSurface backdropCloseHandler prefersReducedMotion openSurfaceCount; do \
+    grep -c "$s" docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md; done      -> each >= 1
+  ```
+  **C1's `Tests 10 passed (10)` and the C1 verification command are UNCHANGED by this step** —
+  it writes no test, and the ADR path is outside every vitest filter.
+  Cluster **C1**.
+  **Why it is a step and not a note:** the plan and the packet already agreed the ADR is
+  warranted, and an ADR nobody is told to write is an ADR nobody writes. It sits in C1 because
+  C1 creates the module the ADR describes, and the two must not diverge.
+  **Number `0022` is not invented, and it is not the next free id either — it is the
+  orchestrator's allocation, and this paragraph is the CORRECTION of the number this plan
+  carried through rework round 1** (`COMMON.md` §10.23; orchestrator CORRECTION on `t_50321020`;
+  applied by ARCH-S02-REWORK-R2). What round 0 measured is still true: `ls
+  docs/architecture/01-decisions/` at base `2b670d30` lists `ADR-0001` … `ADR-0018` plus
+  `README.md`, so the next free id **on disk** is `0019`. What round 0 could not see is that
+  `ADR-0019` and `ADR-0020` are both **reserved by the HALTED `translation` mission** (37 and 14
+  references under `docs/missions/translation`), which is why this plan's original `0019`/`0020`
+  pair was a collision and not an allocation. **The orchestrator has now allocated, against a
+  repo-wide grep at allocation time and recorded in the ledger:
+  `ADR-0021-consent-storage-contract.md` to S01 (S01-C2) and
+  `ADR-0022-shared-modal-semantics.md` to S02 (S02-C1).** `0022` is what this step writes, what
+  the three acceptance arms above grep, and what C1's `allowed` row names. **The collision this
+  seat's round-0 predecessor found and reported is therefore CLOSED by the orchestrator, at the
+  cost of a number** — no ADR file exists at any of the four ids, so nothing on disk moved.
+  **Residual, reported and NOT repaired here because it is S01's name and outside this packet's
+  authorisation:** the C1 row of §Per-cluster boundaries still names S01's ADR as
+  `ADR-0019-consent-storage-contract.md` in its `forbidden` column; under §10.23 that string is
+  now `ADR-0021-consent-storage-contract.md`. It sits in a `forbidden` column, so no seat acts
+  on it, and it is carried to the handoff as a candidate finding rather than fixed.
+
+---
+
+### Cluster S02-C2 — the policy content module
+
+Creates `apps/ui/lib/privacyPolicy.ts` and `tests/unit/consent-privacy-policy-data.test.ts`.
+Pure data; no DOM, no token, no dependency on any other cluster. **Runs concurrently with C1.**
+
+**The module's exported surface, fixed here:**
+
+```ts
+export type PolicyJump = Readonly<{ label: string; target: string }>;
+export type PolicySection = Readonly<{
+  no: string; title: string; accent: string; body: string; items: readonly string[];
+}>;
+export const POLICY_JUMP: readonly PolicyJump[];      // 8
+export const POLICY_SECTIONS: readonly PolicySection[]; // 11
+```
+`accent` holds the CSS custom-property NAME without `var()` — e.g. `"--ok-dot"` — so the
+component composes `var(${accent})` and the data file stays free of markup.
+
+- **S02-S11 · The eight jump pills, in the design's own order, with their targets.**
+  Serves R11, R20. Creates both files.
+  **Test:** `POLICY_JUMP` deep-equals the eight records
+  `CONTROLLER→policy-section-05 · WHAT WE COLLECT→policy-section-01 · LAWFUL BASIS→policy-section-06 ·
+  PUBLISHING→policy-section-03 · MODELS & TRANSFERS→policy-section-04 · RETENTION→policy-section-07 ·
+  YOUR GDPR RIGHTS→policy-section-08 · COMPLAINTS→policy-section-11`, **and**
+  `POLICY_JUMP.map(p => p.label)` is NOT deep-equal to a sorted copy of itself.
+  **Property:** the order is the design's (`design-data.js:51`) and has not been sorted into
+  document order. **RED before, GREEN after. Acceptance:** `Tests 1 passed (1)`. Cluster **C2**.
+
+- **S02-S12 · Eleven sections, numbered `01`…`11`, titles in order.**
+  Serves R12, R20. Edits both files.
+  **Test:** `POLICY_SECTIONS.length === 11`; `.map(s => s.no)` equals `["01"…"11"]`;
+  `.map(s => s.title)` equals the eleven titles of `SPEC.md` §Copy in order.
+  **Property:** the section list is complete and ordered. **RED before, GREEN after.
+  Acceptance:** `Tests 2 passed (2)`. Cluster **C2**.
+
+- **S02-S13 · Bullet counts are exactly `[3,0,0,0,0,4,0,5,0,0,0]`, total 12.**
+  Serves R12, R20. Edits both files.
+  **Test:** `.map(s => s.items.length)` deep-equals that array and its sum is `12`.
+  **Property:** only sections 01, 06 and 08 carry lists, with the counts the design gives.
+  **Derivation of 12:** 3 + 4 + 5, the three list-bearing sections at `design-data.js:58-61`,
+  `:67-72`, `:74-80`. **RED before, GREEN after. Acceptance:** `Tests 3 passed (3)`.
+  Cluster **C2**.
+
+- **S02-S14 · Every pill target resolves to a section id, and only to the mapped one.**
+  Serves R11, R20. Edits both files.
+  **Test:** for each `POLICY_JUMP` entry, exactly one `POLICY_SECTIONS` record has
+  `` `policy-section-${s.no}` === entry.target ``; the eight resolved `no` values are
+  `["05","01","06","03","04","07","08","11"]` in that order.
+  **Property:** the pill→section mapping of R11's table is the data's, not a coincidence of
+  ordering. **RED before, GREEN after. Acceptance:** `Tests 4 passed (4)`. Cluster **C2**.
+
+- **S02-S15 · Each section carries R12's accent token name.**
+  Serves R12. Edits both files.
+  **Test:** `.map(s => s.accent)` deep-equals
+  `["--ok-dot","--gold","--reasoning","--con","--ink","--ok-dot","--gold","--reasoning","--muted","--con","--ink"]`.
+  **Property:** the eleven-row accent mapping of R12 is data, checkable in one line.
+  **RED before, GREEN after. Acceptance:** `Tests 5 passed (5)`. Cluster **C2**.
+
+- **S02-S16 · The strings ship DECODED characters, never six-character escapes; bodies are byte-exact.**
+  Serves R20, `SPEC.md` §Copy (REQ-REV-01 N8/N11). Edits both files.
+  **Test:** the test file holds the eleven `body` strings and the twelve bullet strings of
+  `SPEC.md` §Copy as literals and asserts equality against the module; **plus** a scan of every
+  string in `POLICY_JUMP` and `POLICY_SECTIONS` asserting zero matches of `/\\u[0-9A-Fa-f]{4}/`
+  and at least one match each of `—` (em dash), `’` (in `children’s`) and `→`
+  (in `Settings → Privacy`) as **characters**.
+  **Property:** what the reader sees is the decoded text; a `\uXXXX` copied into a context that
+  is not re-parsed as a JS literal would ship six visible characters and this fails.
+  **RED before, GREEN after. Acceptance:** `Tests 6 passed (6)`. Cluster **C2**.
+
+---
+
+### Cluster S02-C3 — the checkbox group: structure, copy, form semantics
+
+Edits `apps/ui/components/SignUpFlow.tsx`; creates `tests/render/consent-signup-group.test.tsx`;
+edits `tests/render/auth-flow-integration.test.tsx` (three one-line additions, nothing else).
+
+**This cluster deliberately asserts NOTHING about the privacy row's click behaviour and
+NOTHING about the submit button's `disabled` state.** Those are C7's and C4's, and a C3
+assertion about them would be an assertion a later cluster has to rewrite.
+
+**LINE NUMBERS IN THIS PLAN ARE READING AIDS, NEVER EDIT INSTRUCTIONS
+(`ARCH-REV-S02-r1` N6, swept as a class by ARCH-S02-REWORK-R1).** Every step that pins a
+pre-edit line number in a file its own chain edits now carries a **text anchor** and a
+**count arm**; the line number is retained only as "measured at base `2b670d30`", because the
+C3/C4/C7 chain inserts lines into both `SignUpFlow.tsx` and `auth-flow-integration.test.tsx`
+and every number below its own insertion point moves. **The class members, swept and each
+fixed in its own step:** `S02-S17`, `S02-S18`, `S02-S22`, `S02-S23`, `S02-S25`, `S02-S31`,
+`S02-S32`, and the C3 row of §Per-cluster boundaries.
+
+**The sweep claim, restated with the command that proves it (`ARCH-REV-S02-r2` **N6**;
+`COMMON.md` §10.10's corollary — a count carries its counting rule and the command that
+produced it).** Round 1 listed the C3 row of §Per-cluster boundaries among the swept members
+while that row still read *"three inserted lines at `:324`, `:448`, `:466`"* — pre-edit numbers,
+bare, used as an edit instruction, in the row the plan itself calls the coding seat's `allowed`
+list. It now carries `S02-S22`'s text anchor and count arms.
+
+**The counting rule, and it is deliberately NOT "how many times do the three numbers appear".**
+That count is `9` and always will be non-zero, because `S02-S22` retains the numbers as a
+declared reading aid and because this paragraph and the corrected row quote them in order to
+say they were removed. **A raw occurrence count cannot express the finding.** The defect N6
+names is *an unqualified pre-edit position*, so the rule is: **count the lines that mention
+`:324`, `:448` or `:466` and carry NO qualifier marking the number as a reading aid rather than
+an instruction.** The qualifier vocabulary is fixed and greppable:
+`reading aid` · `pre-edit` · `base position` · `measured at base`, plus the two words that mark
+a line as being the command rather than an instruction, `grep ` and `printf `. **Target: `0`.**
+
+**Command and output, run from `docs/missions/consent-ui/slices/S02/`, once inline and once
+from `.hermes/reports/consent-ui/probes/arch-s02-rework-r2-b3.sh` under `/bin/bash` with
+`LC_ALL=C` (`COMMON.md` §10.21 — ASCII anchors only) — both agree:**
+
+```
+$ grep -n ':324\|:448\|:466' PLAN.md | grep -c -v 'reading aid\|pre-edit\|base position\|measured at base\|grep \|printf '
+0
+$ grep -c ':324\|:448\|:466' PLAN.md          # the raw count, REPORTED not asserted
+9
+```
+
+**And the guard is proved to discriminate, not merely to be satisfiable** (`COMMON.md` §10.16):
+fed the exact string the boundary row used to carry, it returns `1`.
+
+```
+$ printf 'auth-flow-integration.test.tsx (three inserted lines at :324, :448, :466 and nothing else)\n' \
+    | grep ':324\|:448\|:466' | grep -c -v 'reading aid\|pre-edit\|base position\|measured at base\|grep \|printf '
+1
+```
+**Members deliberately NOT changed, with
+the reason:** `S02-S19`/`S02-S24` cite `apps/ui/components/authRoutes.source-test.mjs:45`,
+`:48`, `:165` — S02 never edits that file (it is in "must stay green, not be changed"), so
+those numbers cannot shift; `S02-S65` and the G2 gate cite `globals.css` lines, and S02's only
+`globals.css` edit is an APPEND at the end of the file, which shifts nothing above it.
+
+- **S02-S17 · The single `.authCheck` label becomes the bordered two-row group.**
+  Serves R01. Edits `apps/ui/components/SignUpFlow.tsx`; creates
+  `tests/render/consent-signup-group.test.tsx`.
+  **Edit anchor (not a line number):** the single element whose className is `authCheck`.
+  **Count arm before the edit:** `grep -c 'authCheck' apps/ui/components/SignUpFlow.tsx` → `1`
+  (measured at base `2b670d30`; it is the block at `:185-188` today). **Count arm after:**
+  the same grep → `0`, and `grep -c 'consentRow' …` → the number of rows the component
+  renders. If the before-count is not `1`, the file has moved under this plan and the seat
+  stops and says so rather than guessing which block to replace.
+  **Test:** render `SignUpFlow`; **property:** exactly one `.consentGroup` element exists, it
+  contains exactly two `.consentRow` elements, and `input[name="adult-affirmed"]` and
+  `input[name="privacy-accepted"]` are each inside a different one of them, in that DOM order.
+  **RED before** (`.consentGroup` does not exist), **GREEN after. Acceptance:** a stranger runs
+  the C3 command and reads a nonzero pass count with `Test Files 3 passed (3)`. Cluster **C3**.
+  **Markup shape fixed by ARCH (DECISIONS 2026-09-06):** row 1 is a `<label className="consentRow">`
+  wrapping its input and its text; row 2 is a `<div className="consentRow">` whose input carries
+  `aria-labelledby` at the row-2 text span — HTML's `<label>` content model forbids the
+  interactive `Privacy Policy` control as a descendant.
+
+- **S02-S18 · Both labels are byte-exact.**
+  Serves R02. Edits the component and the new test.
+  **Test:** row 1's `textContent` trimmed equals `I am 18 or over.`; row 2's trimmed
+  `textContent` equals `I agree to the Privacy Policy, including that my debates may be
+  published publicly.`; the `Privacy Policy` control's own `textContent` equals
+  `Privacy Policy`.
+  **Property:** the design's wording ships, and the link text is exactly the two words.
+  **RED before** (the live string is `I affirm that I am at least 18 years old.` — **text
+  anchor**, present exactly once: `grep -c 'I affirm that I am at least 18 years old.'
+  apps/ui/components/SignUpFlow.tsx` → `1`, measured at base at `:187`), **GREEN after**, when
+  the same grep returns `0` and `grep -c 'I am 18 or over.'` returns `1`. **Acceptance:** the
+  three equality assertions pass. Cluster **C3**.
+
+- **S02-S19 · Form semantics: two real checkboxes, both `required`, both `disabled` with the form.**
+  Serves R03. Edits the component and the new test.
+  **Test:** both inputs have `type === "checkbox"`, `required === true`, and
+  `disabled === true` when the component is rendered in its `sent` state; the document still
+  contains exactly one `<form>`.
+  **Property:** the new box is a real form control and the existing one keeps `required` on the
+  same tag, so `authRoutes.source-test.mjs:45` and `:165` stay green.
+  **RED before** (`privacy-accepted` does not exist), **GREEN after. Acceptance:** as above,
+  plus the C3 command's `v2ui-node-runner` file passing. Cluster **C3**.
+
+- **S02-S20 · Both inputs have their sentence as their accessible name.**
+  Serves R03. Edits the component and the new test.
+  **Test:** `adult-affirmed`'s closest `label` ancestor exists and its `textContent` is row 1's
+  sentence; `privacy-accepted`'s `aria-labelledby` names an element whose `textContent` is row
+  2's sentence.
+  **Property:** the accessible name is mechanically resolvable for both, by two different
+  legal mechanisms. **RED before, GREEN after. Acceptance:** both assertions pass.
+  Cluster **C3**.
+
+- **S02-S21 · The 18+ row is a plain toggle and opens nothing.**
+  Serves R04. Edits the component and the new test.
+  **Test:** three cases — `.click()` the `adult-affirmed` input, then (fresh mount) its text
+  span, then (fresh mount) the row element. **Property:** in each case `checked` flips to
+  `true` and `document.querySelector('[role="dialog"]')` is `null`.
+  **RED before** (the row element does not exist), **GREEN after. Acceptance:** three cases
+  pass. Cluster **C3**.
+
+- **S02-S22 · The three existing submit cases each gain exactly one line.**
+  Serves R03, R19; the reason is quoted from `SPEC.md` §Tests row 1:
+  > "The slice ticks BOTH boxes in all three, keeping the existing one-line idiom exactly as
+  > it is — one added line per case, `field("privacy-accepted").checked = true;`, and nothing
+  > else."
+  Edits `tests/render/auth-flow-integration.test.tsx` — **one inserted line after each of the
+  three occurrences of the text anchor**, no other character changed.
+  **Edit anchor (not a line number — `ARCH-REV-S02-r1` N6).** The three target lines are the
+  IDENTICAL string `field("adult-affirmed").checked = true;`, so a line number cannot name one
+  of them and inserting at the first shifts the other two. The seat inserts
+  `field("privacy-accepted").checked = true;` **after every occurrence** of that anchor, and
+  the three occurrences are identified by the `it(...)` case they sit in:
+  1. `renders the non-enumerating registration state and resends only to the submitted email`
+  2. `keeps registration failures generic and separates primary and recovery autofill`
+  3. `keeps resend failures generic without changing the non-enumerating success message`
+  **Count arms, both mandatory** (measured at base `2b670d30`; the line numbers `:324`, `:448`,
+  `:466` are the base positions and are a reading aid only):
+  ```
+  before: grep -c 'field("adult-affirmed").checked = true;'  <file>  -> 3
+          grep -c 'field("privacy-accepted").checked = true;' <file>  -> 0
+  after:  grep -c 'field("adult-affirmed").checked = true;'  <file>  -> 3
+          grep -c 'field("privacy-accepted").checked = true;' <file>  -> 3
+  ```
+  **Why the count arm is load-bearing and the pass count is not:** `Tests 17 passed (17)` holds
+  even if a line lands in the wrong case, so the suite summary cannot tell a stranger the edit
+  was made correctly; the pair of counts can, and `3`/`3` is reachable only by inserting one
+  line per case.
+  **Test:** the three cases themselves. **Property:** the house assignment idiom reaches the
+  DOM, `FormData` reads the DOM, `register` fires — which is true only because R17 keeps the
+  inputs uncontrolled and R18 reads `FormData`.
+  **RED before `S02-S17`** — `field("privacy-accepted")` fails at
+  `auth-flow-integration.test.tsx:37` (`expect(input, "missing rendered input …").not.toBeNull()`)
+  because the input does not exist — **GREEN after. Acceptance:**
+  `tests/render/auth-flow-integration.test.tsx` reports `Tests 17 passed (17)`, unchanged from
+  `BASELINE.md`. Cluster **C3**.
+  **This is the assignment idiom and it is correct here** — the claim is about the HANDLER and
+  `FormData`, not about the button.
+
+- **S02-S23 · The registration call still takes exactly four positional arguments.**
+  Serves R19. Adds no assertion; the pin already exists in
+  `tests/render/auth-flow-integration.test.tsx`.
+  **Anchor (not a line number — `ARCH-REV-S02-r1` N6; `S02-S22` inserts a line ABOVE this pin
+  and moves it):** the single `expect(register).toHaveBeenCalledWith(` call inside the case
+  `renders the non-enumerating registration state and resends only to the submitted email`.
+  **Count arm:** `grep -c 'toHaveBeenCalledWith' tests/render/auth-flow-integration.test.tsx`
+  is unchanged by this slice, and the argument list keeps exactly four entries.
+  Measured at base `2b670d30` it is `:327-332`, inside the case beginning at `:316`.
+  **Test:** that existing `toHaveBeenCalledWith`. **Property:** nothing about the privacy
+  acceptance is sent to the server. **GREEN before and after by design**; it is listed as a step
+  because R19 must trace to one, and because adding a fifth argument is the exact mutant it
+  catches. **Acceptance:** that case passes. Cluster **C3**.
+
+- **S02-S24 · No banned substring enters `SignUpFlow.tsx`.**
+  Serves R21. Edits the component only (a negative constraint on `S02-S17`…`S02-S22`).
+  **Test:** `apps/ui/components/authRoutes.source-test.mjs:48` via
+  `tests/unit/v2ui-node-runner.test.ts`. **Property:** none of
+  `localStorage|sessionStorage|Bearer|Google|Model API|terms|privacy notice` appears in the
+  file, case-insensitively — the designed label is safe, and `Privacy Policy` is not
+  `privacy notice`.
+  **GREEN before and after; it is a constraint, and the mutant it catches is a class name,
+  comment or `aria-describedby` value containing `terms`.** **Acceptance:**
+  `tests/unit/v2ui-node-runner.test.ts` inside the C3 command reports its 2 tests passing.
+  Cluster **C3**.
+
+- **S02-S70 · `adult-affirmed` is focusable, and activation from focus toggles it, opening nothing.**
+  *(New in rework round 1 — `ARCH-REV-S02-r1` N3. Appended, so
+  no existing step id moves.)*
+  Serves R03 (`SPEC.md:96-97`, `:621-622`: "both inputs exist by name and are
+  keyboard-toggleable" — the hook that had no step). Edits `apps/ui/components/SignUpFlow.tsx`
+  and `tests/render/consent-signup-group.test.tsx`.
+  **Test:** call `field("adult-affirmed").focus()`; assert `document.activeElement` **is** that
+  input (it is a real `<input type="checkbox">`, not a `div[role=checkbox]`, and it carries no
+  `tabindex="-1"`); then `await act(async () => { field("adult-affirmed").click(); })` — the
+  activation behaviour a browser runs for `Space` on a focused checkbox — and assert
+  `checked === true`, `document.querySelector('[role="dialog"]')` is `null`, and
+  `document.activeElement` is still that input.
+  **MEASURED LIMITATION, and it is why this step is NOT worded as the verdict words it.**
+  jsdom 30.0.1 **does not implement Space-activates-checkbox**: dispatching `keydown` +
+  `keypress` + `keyup` with `key: " "`, `code: "Space"`, `keyCode: 32` on a focused checkbox
+  produces `checked=false` and `clickEventsSeen=0`, while a `.click()` on the same element
+  gives `checked=true, clickEventsSeen=1`. A step written as "dispatch `Space` and assert it
+  toggles" is therefore **RED forever against a correct implementation** — the same defect
+  class as REQ-REV-01 B4/B5, an idiom prescribed without being executed. This step asserts the
+  two halves jsdom CAN observe (the input is focusable; activation from the focused state
+  toggles and opens nothing) and hands the keystroke itself to V.
+  **RED before** (`document.activeElement`/`checked` assertions still hold today, but the
+  no-dialog + focus-retention conjunction is asserted nowhere and the group does not exist
+  yet), **GREEN after. Acceptance:** the case passes inside the C3 command. Cluster **C3**.
+  **What this step does NOT establish, handed to V:** that a real browser's `Space` keystroke
+  reaches the element's activation behaviour — **V acceptance step 14**.
+
+---
+
+### Cluster S02-C4 — the gate: the R17 mirror and the R18 handler refusal
+
+Edits `apps/ui/components/SignUpFlow.tsx`; creates `tests/render/consent-signup-gate.test.tsx`;
+edits `tests/render/auth-flow-integration.test.tsx` (ADDS one case). **Follows C3** (same file).
+
+**Implementation shape, pinned by `SPEC.md` R17 and not open here:** both inputs stay
+uncontrolled (no `checked` prop); each carries an `onChange` that mirrors
+`event.currentTarget.checked` into a React boolean; those two booleans compute ONLY the submit
+button's `disabled`; `FormData` stays the truth at submit.
+
+**One qualification, added by the B1 correction and stated here because C4 is where the mirror
+is written (`ARCH-REV-S02-r1` B1):** for `privacy-accepted`, "mirrors its
+`event.currentTarget.checked`" means the **settled** value —
+`event.currentTarget.checked && !event.nativeEvent.defaultPrevented`. C7's row handler cancels
+that change, and mirroring the in-flight `true` records a state the DOM never reaches. Nothing
+else in R17 moves: the inputs stay uncontrolled, the booleans still compute only `disabled`,
+and `FormData` is still the truth at submit. `adult-affirmed`'s handler is the literal form.
+The full mechanism, the measured handler ORDER it depends on, and the rejected alternatives are
+in `§Cluster S02-C7` and in `DECISIONS.md`. **A C4 seat writes the guard on `privacy-accepted`
+from the start; it is not a C7 edit to C4's work.**
+
+**`SPEC.md` R17's six cases, in R17's own words — of which FOUR are in this cluster
+(1, 2, 3, 6) and TWO are in `S02-C7` (4 and 5).** The N12 ruling (DECISIONS, 2026-09-06)
+applies: R17's case text governs the two absolute sentences at `SPEC.md:356` and `:692`, and
+cases 5 and 6 are written as R17 writes them.
+**Cases 4 and 5 are the ONE place where R17's case text could not be followed literally**
+(`ARCH-REV-S02-r2` **B3**; V-DECISIONS **V-18**): their ROUTE — a bare privacy `.click()` —
+contradicts R05, which the same SPEC states and which V's goal requires. **The PROPERTY each
+asserts is preserved exactly; only the route changes**, and the two steps are written out at
+the end of `§Cluster S02-C7`. This is recorded, not repaired: `SPEC.md` is frozen
+(md5 `ad060bda81db71f00f4c70b1dbf63f2f`) and stays so.
+**Oracle, re-run by ARCH-S02 at authoring time**
+(`node .hermes/reports/consent-ui/probes/v3-r17-cases-probe.mjs`, 6 cases × 4 implementation
+variants × 3 runs, output pasted in §Clusters): all six PASS under the pinned variant; case 6
+is RED under exactly the two controlled variants. **That oracle ran the R17 mirror ALONE, with
+no row click rule — the stage this cluster leaves the component in — which is exactly why it
+could not see B3.** The three-stage successor
+(`node .hermes/reports/consent-ui/probes/arch-s02-rework-r2-r17-post-c7-fixed.mjs`) runs the
+same six cases at the C4 stage, the C7 stage and the pre-B1-fix stage, and it is the oracle any
+future edit to these six must re-run.
+
+- **S02-S25 · Case 1 — neither box → `disabled`.**
+  Serves R17. Creates `tests/render/consent-signup-gate.test.tsx`; edits the component.
+  **Test:** fresh mount, no interaction. **Property:** the `Create account` button's `disabled`
+  is `true`. **RED before** — today's button is `disabled={busy || sent}` and is therefore
+  **enabled** at idle. **Text anchor, not a line number** (`ARCH-REV-S02-r1` N6; C3 edits this
+  file above the button and moves it): the `<button className="authPrimary" type="submit"`
+  element; count arm `grep -c 'className="authPrimary"' apps/ui/components/SignUpFlow.tsx` →
+  `1`, measured at base `2b670d30` at `:190`. — **GREEN after. Acceptance:** the case passes.
+  Cluster **C4**.
+
+- **S02-S26 · Case 2 — only `adult-affirmed`, via `.click()` → `disabled`.**
+  Serves R17. Edits both files.
+  **Test:** `await act(async () => { field("adult-affirmed").click(); })`. **Property:** the
+  button's `disabled` is still `true`. **RED before, GREEN after. Acceptance:** the case passes.
+  Cluster **C4**.
+
+- **S02-S27 · Case 3 — only `privacy-accepted`, via `.click()` → `disabled`.**
+  Serves R17. Edits both files.
+  **Test:** same idiom on the other input. **Property:** the button's `disabled` is still
+  `true`. **RED before, GREEN after. Acceptance:** the case passes. Cluster **C4**.
+  **Note for the coding seat — invariance under C7, stated PER CASE and never as a
+  generalisation (`ARCH-REV-S02-r2` **B3**).** At this point in the plan the privacy row's click
+  still toggles the box natively; C7 is what makes it open the modal instead. Whether a case
+  survives that change depends on the value it expects, so the six are split here and each row
+  is measured
+  (`node .hermes/reports/consent-ui/probes/arch-s02-rework-r2-r17-post-c7-fixed.mjs`, three
+  stages × three runs, output in §Clusters):
+
+  | case | step | clicks the privacy row? | expects | invariant under C7? |
+  |---|---|---|---|---|
+  | 1 | `S02-S25` | no interaction at all | `disabled=true` | **yes** |
+  | 2 | `S02-S26` | clicks `adult-affirmed` only | `disabled=true` | **yes** |
+  | 3 | `S02-S27` | **yes**, clicks the **input** | `disabled=true` | **yes** — the click is the same event either way and both paths leave the box unticked, so C7 adds no assertion that changes it |
+  | 4 | `S02-S28` | **yes** | `disabled=FALSE` | **NO** — after C7 a bare click cannot tick the box, so the case is unsatisfiable as R17 words it. It is re-routed through the modal's acknowledgement and **lives in cluster C7**, at the end of §Cluster S02-C7 |
+  | 5 | `S02-S29` | **yes**, in its second half | `disabled=FALSE` | **NO** — same mechanism, same re-route; its first half (assignment announces nothing) IS invariant |
+  | 6 | `S02-S30` | **yes** | `disabled=true` | **yes** |
+
+  **The rule this table encodes:** a C4 case that expects the button ENABLED cannot be reached
+  without the modal, because after C7 the acknowledgement is the only route that ticks
+  `privacy-accepted`. Cases 3 and 6 keep clicking the privacy row in this cluster precisely
+  because they expect `disabled=true`, which both mechanisms produce.
+
+**CASES 4 AND 5 ARE NOT IN THIS CLUSTER, and this is the one place the plan says so
+(`ARCH-REV-S02-r2` **B3**; V-DECISIONS row **V-18**, default (a); DECISIONS entry
+"R17 cases 4 and 5 vs R05").** Both expect `Create account` to be **enabled**, and after C7 the
+only route to a ticked `privacy-accepted` is the modal's acknowledgement — which does not exist
+until C7 wires the modal into `SignUpFlow.tsx`. Written as R17 words them they are green in C4
+and RED in C7's own command, and C7 may not edit C4's test file (§Per-cluster boundaries), so a
+C7 seat would be deadlocked by construction. Steps `S02-S28` and `S02-S29` therefore keep their
+ids, keep the property R17 states, and are written out **at the end of §Cluster S02-C7**, in
+`tests/render/consent-signup-modal.test.tsx`, which C7 creates and owns. **No step is
+renumbered and no requirement loses a step:** the R17 trace row already reads `C4 · C7`.
+**Consequence, stated because it is a real loss and not a wash:** `S02-S28` was C4's only
+positive control, so `S02-C4`'s own command can no longer catch an implementation that
+hard-codes `disabled` to `true`. That mutant is caught in `S02-C7` instead — by `S02-S28` in its
+new home and, independently, by `S02-S53` — and C4's mutant-class row in §The cluster map now
+says so rather than claiming a detection C4 no longer has.
+
+- **S02-S30 · Case 6 — the pin that goes RED if a seat makes the inputs controlled.**
+  Serves R17. Edits both files.
+  **Test:** assign `.checked = true` on `adult-affirmed` only, WITHOUT dispatching; then
+  `.click()` `privacy-accepted` inside `act` (that click is what forces a React re-render);
+  then assert **both** that the button is still `disabled` **and that
+  `field("adult-affirmed").checked` is still `true`**.
+  **Property:** an uncontrolled input keeps an assigned value across a re-render; a controlled
+  input is re-rendered from React state and reset to `false`. **The second assertion is the
+  discriminating one** — measured green under all four variants without it.
+  **RED before, GREEN after. Acceptance:** the case passes, and it is measured RED under
+  exactly the two controlled variants (the probe's matrix). Cluster **C4**.
+
+- **S02-S31 · The handler refuses to call `client.register` when either `FormData` read is not `"on"`.**
+  Serves R18. Edits `apps/ui/components/SignUpFlow.tsx`; ADDS one case to
+  `tests/render/auth-flow-integration.test.tsx` (`SPEC.md` §Tests row 2: "A NEW case the slice
+  must add").
+  **Implementation, pinned, anchored on text and not on line numbers**
+  (`ARCH-REV-S02-r1` N6; C3 and C4 both edit this file): inside the function
+  `submitRegistration`, **after** the single statement `const data = new FormData(form);` and
+  **before** the single `await client.register(` call, read
+  `data.get("adult-affirmed") === "on"` and `data.get("privacy-accepted") === "on"` off
+  **that same `FormData` instance** and `return` without calling `register` if either is false.
+  **Count arms:** `grep -c 'const data = new FormData(form);' apps/ui/components/SignUpFlow.tsx`
+  → `1` and `grep -c 'client.register(' …` → `1`, both before and after. Measured at base
+  `2b670d30` the function spans `:60-81`, the `FormData` line is `:63` and the call is `:68`;
+  those numbers are a reading aid only.
+  **The values it tests are the two `FormData` reads, never R17's React mirror** — reading the
+  mirror would take `auth-flow-integration.test.tsx` from 18 passed to 15.
+  **Test:** fill valid email, recovery email and password; assign `.checked = true` on exactly
+  one input; `await submit()`; assert `register` was **not** called. Then the same with the
+  other input. **Property:** a scripted submit that bypasses HTML constraint validation
+  (`auth-flow-integration.test.tsx:41-48` dispatches a bare `new Event("submit")`) still cannot
+  register. **RED before** (`register` is called today), **GREEN after. Acceptance:**
+  `tests/render/auth-flow-integration.test.tsx` reports `Tests 18 passed (18)` —
+  17 at base plus this one. Cluster **C4**.
+  **This is the assignment idiom and it is correct here:** the claim is about the handler and
+  `FormData`, not about the button.
+
+- **S02-S32 · The three existing submit cases still register, after the refusal lands.**
+  Serves R18, R19. Adds no assertion; it is the regression guard for `S02-S31`.
+  **Test:** the three cases named by their `it(...)` titles — `renders the non-enumerating
+  registration state and resends only to the submitted email`, `keeps registration failures
+  generic and separates primary and recovery autofill`, `keeps resend failures generic without
+  changing the non-enumerating success message` — now each ticking both boxes
+  (`S02-S22`). Their base line numbers `:316`, `:436`, `:456` are a reading aid and **shift by
+  `S02-S22`'s own insertions** (`ARCH-REV-S02-r1` N6). **Property:** the refusal reads the DOM through `FormData`, which is what the
+  assignment idiom sets — so the same handler satisfies both the gate and the existing suite.
+  **GREEN before and after — declared control.** It is the step that fails, loudly and
+  immediately, if a seat implements `S02-S31` against the React mirror. **Acceptance:**
+  `Tests 18 passed (18)`, no failure named. Cluster **C4**.
+
+---
+
+### Cluster S02-C5 — the policy modal, rendered
+
+Creates `apps/ui/components/consent/PrivacyPolicyModal.tsx` and
+`tests/render/consent-policy-modal-render.test.tsx`. **Follows C1 and C2** (imports both).
+Renders the component directly; nothing here touches `SignUpFlow.tsx`.
+
+- **S02-S33 · The prop type has exactly four members and `open: false` renders nothing.**
+  Serves R14. Creates both files.
+  **Test:** render with `open={false}` and assert the container has zero child nodes; plus two
+  type-level pins in the same file — a `const props: PrivacyPolicyModalProps = { open: true,
+  mode: "read", onClose: () => {} }` (proving `onAcknowledge` is optional) and a
+  `// @ts-expect-error` line assigning a fifth member (proving the type is closed).
+  **Property:** the interface is exactly
+  `{ open: boolean; mode: "read" | "consent"; onClose: () => void; onAcknowledge?: () => void }`,
+  byte-identical to `slices/S01/SPEC.md` S01-R20.
+  **RED before, GREEN after.** The type pins are verified by the **typecheck standing gate**:
+  a wrong prop set produces a 9th diagnostic, and the gate's acceptance is "no diagnostic
+  outside the 8 pinned in `tests/unit/s14-ui.test.ts`". **Acceptance:** `Tests 1 passed (1)`
+  and the typecheck gate unchanged at 8. Cluster **C5**.
+
+- **S02-S34 · Scrim, bezel, core, gold tab, and the three dialog ARIA attributes.**
+  Serves R09 (structure), R16 (ARIA). Edits both files.
+  **Test:** with `open`, assert one `.policyScrim` containing one `[role="dialog"]`; the dialog
+  has `aria-modal="true"` and an `aria-labelledby` whose value is the `id` of the element whose
+  `textContent` is `What we store, and why`; a `.policyTab` element exists inside the core.
+  **Property:** the dialog is announced as one, and its name resolves to its own title.
+  **RED before, GREEN after. Acceptance:** `Tests 2 passed (2)`. Cluster **C5**.
+
+- **S02-S35 · Header copy is byte-exact and `×` is labelled.**
+  Serves R10. Edits both files.
+  **Test:** three `textContent` equalities — `PRIVACY POLICY · v2.1 · EFFECTIVE 12 AUG 2026`,
+  `What we store, and why`, and `Your rights and our obligations under the GDPR (EU) 2016/679,
+  in plain language. Eleven sections — scroll to the end.` — plus a control whose
+  `aria-label` is `Close` and whose `textContent` is `×`.
+  **Property:** the reader sees the design's strings, with U+00B7 and U+2014 as characters.
+  **RED before, GREEN after. Acceptance:** `Tests 3 passed (3)`. Cluster **C5**.
+
+- **S02-S36 · Eight pills render in order and every `data-jump` resolves inside the modal.**
+  Serves R11. Edits both files.
+  **Test:** `[...dialog.querySelectorAll("button[data-jump]")]` has length 8; their
+  `textContent`s equal `POLICY_JUMP`'s labels in order; every `button.dataset.jump` is the
+  `id` of exactly one element inside the same dialog; each pill is `type="button"`.
+  **Property:** the mapping is live in the rendered DOM, not only in the data.
+  **jsdom computes no layout and implements no scrolling, so the SCROLL itself is V acceptance
+  step 12** — this step pins the resolution, `S02-S48` pins the call.
+  **RED before, GREEN after. Acceptance:** `Tests 4 passed (4)`. Cluster **C5**.
+
+- **S02-S37 · Eleven sections with number, title, body, bullets and their accent.**
+  Serves R12. Edits both files.
+  **Test:** eleven `[id^="policy-section-"]` elements in document order with ids
+  `policy-section-01`…`-11`; their titles in order; the total count of bullet elements across
+  the modal is 12; each section's number element carries `data-accent="<token name>"` and an
+  inline style whose `--accent` custom property is `var(<token name>)`.
+  **Property:** the accent reaches the DOM as a token reference, so it follows the mode with
+  nothing wired (R23), and the number/dot colour is checkable without computing style.
+  **RED before, GREEN after. Acceptance:** `Tests 5 passed (5)`. Cluster **C5**.
+
+- **S02-S38 · Footer contact line, end marker last in the scroll region, and NO `Download PDF`.**
+  Serves R13. Edits both files.
+  **Test:** an element whose `textContent` is `Questions: privacy@dezbatere.ro`; the scroll
+  region's **last** element child has `textContent`
+  `END OF POLICY · GDPR (EU) 2016/679 · v2.1`; and
+  `[...dialog.querySelectorAll("*")].every(el => el.textContent?.trim() !== "Download PDF")`.
+  **Property:** the honesty rule holds — the repo generates no policy PDF, so no control claims
+  one — and the end marker is genuinely the last thing to scroll past, which is what R15's
+  criterion means.
+  **RED before, GREEN after. Acceptance:** `Tests 6 passed (6)`. Cluster **C5**.
+
+- **S02-S39 · `mode="read"` and `mode="consent"` differ in exactly the specified way.**
+  Serves R14. Edits both files.
+  **Test:** two cases. With `mode="read"`: no control's text is `I have read it`, exactly one
+  control's text is `Close`, the contact line is still present, and a `vi.fn()` passed as
+  `onAcknowledge` is never called even after clicking every control in the footer. With
+  `mode="consent"`: the converse — an `I have read it` control exists and no `Close` control
+  does.
+  **Property:** S01 can open the same component read-only with no consent side effect.
+  **RED before, GREEN after. Acceptance:** `Tests 8 passed (8)`. Cluster **C5**.
+
+---
+
+### Cluster S02-C6 — the policy modal's behaviour: the scroll gate and the a11y wiring
+
+Edits `apps/ui/components/consent/PrivacyPolicyModal.tsx`; creates
+`tests/render/consent-policy-modal-behaviour.test.tsx`. **Follows C5** (same component file).
+
+**The criterion, from R15, evaluated on the scroll container and not restated per step:**
+`container.scrollTop + container.clientHeight >= container.scrollHeight - 8`, evaluated (a) at
+mount, (b) on every `scroll` of that container, (c) on `resize`; once true it **latches**.
+**The 8px slack is derived:** the body text is 11.5px at `line-height: 1.65` ≈ 19px per line,
+so 8px is under half a line — the marker cannot count as reached while a line of policy is
+still hidden — while still absorbing sub-pixel and zoom rounding, which exact equality does not.
+
+**How a jsdom test drives it, measured by ARCH-S02** (`scratchpad/arch-consent-s02/env-probe.mjs`):
+`Object.defineProperty(el, "scrollTop"|"clientHeight"|"scrollHeight", { value, configurable: true, writable: true })`
+shadows jsdom's prototype getters (which all return `0`) and **can be redefined between
+assertions** — `configurable: true` is load-bearing, without it the latch case cannot scroll
+back up.
+
+- **S02-S40 · The boundary: `scrollHeight - 9` is not reached, `scrollHeight - 8` is.**
+  Serves R15. Creates the test file; edits the component.
+  **Test:** define `clientHeight: 200`, `scrollHeight: 500`; set `scrollTop: 291`, dispatch
+  `scroll` → assert `I have read it` is `disabled`; set `scrollTop: 292`, dispatch `scroll` →
+  assert it is not.
+  **Property:** the comparison is `>= scrollHeight - 8`, not `>`, `>=  scrollHeight`, or a
+  different slack. **Derivation of 291/292:** `291 + 200 = 491 < 492` and `292 + 200 = 492 >= 500 - 8`.
+  **RED before, GREEN after. Acceptance:** `Tests 2 passed (2)`. Cluster **C6**.
+
+- **S02-S41 · The gate latches: scrolling back to the top leaves it enabled.**
+  Serves R15. Edits both files.
+  **Test:** reach the end, then redefine `scrollTop: 0` and dispatch `scroll`. **Property:**
+  the button is still not `disabled`. **RED before, GREEN after. Acceptance:** `Tests 3 passed (3)`.
+  Cluster **C6**.
+
+- **S02-S42 · A policy short enough to need no scrolling enables the button at mount.**
+  Serves R15. Edits both files.
+  **Test:** define `scrollHeight === clientHeight === 200` before the effect runs and dispatch
+  no event. **Property:** the criterion is satisfied at mount and no special case is written.
+  **RED before, GREEN after. Acceptance:** `Tests 4 passed (4)`. Cluster **C6**.
+
+- **S02-S43 · The criterion is re-evaluated on `resize`.**
+  Serves R15. Edits both files.
+  **Test:** mount with metrics that do not satisfy it; redefine them so they do; dispatch
+  `resize` on `window` (not on the container). **Property:** the button enables without any
+  `scroll` event. **RED before, GREEN after. Acceptance:** `Tests 5 passed (5)`. Cluster **C6**.
+
+- **S02-S44 · While disabled the button is announced as disabled and says why; no tooltip.**
+  Serves R15. Edits both files.
+  **Test:** before the gate opens, the button has `disabled`, `aria-disabled === "true"`, and
+  an accessible description resolving to `Scroll to the end of the policy to continue.`
+  (an `aria-describedby` at an element carrying exactly that text); and the button has **no**
+  `title` attribute.
+  **Property:** the reason is available to a screen reader and the SPEC's "no tooltip is added"
+  holds. **RED before, GREEN after. Acceptance:** `Tests 6 passed (6)`. Cluster **C6**.
+
+- **S02-S45 · The scroll region is keyboard-reachable and named.**
+  Serves R16. Edits both files.
+  **Test:** the scroll container has `tabindex === "0"` and
+  `getAttribute("aria-label") === "Privacy Policy text"` — **the string is pinned here, in the
+  plan, exactly as `S02-S44` pins its own** (`ARCH-REV-S02-r1` N4: the previous wording asserted
+  equality "against the label the component sets", which makes the expected value whatever the
+  implementation chose, so that half of the assertion could not fail and only the `tabindex`
+  half discriminated).
+  **Derivation of the string:** the dialog's own accessible name is already its title
+  (`What we store, and why`, `S02-S34`), so the region needs a name that says what is *inside*
+  it and not what the dialog is; `Privacy Policy text` is the shortest phrase that does, it
+  reuses the design's own two-word noun, and it is not one of the substrings
+  `authRoutes.source-test.mjs:48` bans (that guard reads `SignUpFlow.tsx` only, and `Privacy
+  Policy` is not `privacy notice`).
+  **Property:** a keyboard-only user can focus and `PageDown` the policy — the only way such a
+  user can satisfy R15 — and the region announces what it contains. **RED before, GREEN after.
+  Acceptance:** `Tests 7 passed (7)`. Cluster **C6**.
+
+- **S02-S46 · The modal takes its focus behaviour from the helper, and only from it.**
+  Serves R16. Edits both files.
+  **Test:** with the modal open, `document.activeElement` is the `×` button; `Tab` from the
+  last focusable wraps to the first; after closing, focus is back on the element focused before
+  opening; **and** `document.addEventListener` was called with `"keydown"` exactly once across
+  mounting the modal (the helper's single listener, `S02-S10`).
+  **Property:** `PrivacyPolicyModal` implements none of this itself.
+  **RED before, GREEN after. Acceptance:** `Tests 8 passed (8)`. Cluster **C6**.
+
+- **S02-S47 · `I have read it` acknowledges; `×`, Esc and backdrop only close.**
+  Serves R07, R08, R14. Edits both files.
+  **Test:** four cases with `vi.fn()` spies for `onClose` and `onAcknowledge`. Clicking
+  `I have read it` (after the gate is open) → `onAcknowledge` called exactly once,
+  `onClose` called exactly once, in that order. Clicking `×`, pressing `Escape`, and clicking
+  the scrim → each calls `onClose` once and `onAcknowledge` **zero** times.
+  **Property:** the box can only be ticked by the acknowledgement path.
+  **RED before, GREEN after. Acceptance:** `Tests 12 passed (12)`. Cluster **C6**.
+
+- **S02-S48 · A pill click resolves its target and asks it to scroll, honouring reduced motion.**
+  Serves R11, R24. Edits both files.
+  **Test:** assign `vi.fn()` to `scrollIntoView` on every `[id^="policy-section-"]` element
+  (**measured: `Element.prototype.scrollIntoView` does not exist in jsdom 30.0.1, so the
+  component calls it optionally — `target?.scrollIntoView?.(…)` — and the test supplies it**);
+  click each of the eight pills; assert the stub on the mapped section was called exactly once
+  and every other section's stub zero times, with `{ block: "start", behavior: "smooth" }`.
+  Then, with `window.matchMedia` stubbed to report `matches: true`, assert the argument is
+  `behavior: "auto"`.
+  **Property:** the handler resolves R11's mapping and does not animate for a reader who asked
+  for no animation. **This asserts the CALL, never that anything scrolled** — the scroll is V
+  acceptance step 12.
+  **RED before, GREEN after. Acceptance:** `Tests 14 passed (14)`. Cluster **C6**.
+
+---
+
+### Cluster S02-C7 — wiring the modal into the sign-up card
+
+Edits `apps/ui/components/SignUpFlow.tsx`; creates `tests/render/consent-signup-modal.test.tsx`.
+**Follows C3, C4, C5 and C6.**
+
+**The one click rule for the privacy row, pinned by ARCH (DECISIONS 2026-09-06), stated once:**
+one `onClick` on the row — if the box is CHECKED, do not `preventDefault`, and if the click did
+not originate on the input call `input.click()` so the box unchecks through the path React
+listens to, then return without opening anything; if it is UNCHECKED, `event.preventDefault()`
+unconditionally and open the modal with `mode="consent"`.
+
+**THE MIRROR RULE THAT MAKES THE CLICK RULE SAFE — the B1 correction
+(ARCH-REV-S02-r1 B1; ARCH-S02-REWORK-R1, 2026-09-06). Read it with the click rule above; the
+click rule alone is measured to ship a defect.** The class is *every place where the DOM
+checkbox state and the R17 mirror can diverge*, and it has two members:
+
+1. **Member 1 — the open path, and it is the load-bearing half.** `privacy-accepted`'s
+   `onChange` mirrors the **settled** checked value, never the in-flight one:
+   `setPrivacyMirror(event.currentTarget.checked && !event.nativeEvent.defaultPrevented)`.
+   **Measured mechanism:** React 19.2.8 fires the ROW's `onClick` **before** the INPUT's
+   `onChange`, and that `onChange` sees `currentTarget.checked === true` **and**
+   `nativeEvent.defaultPrevented === true`, because jsdom's pre-click activation sets
+   `.checked` before dispatch and its canceled-activation steps revert it *after* dispatch.
+   Trace, verbatim: `onClick(mirror=false,domChecked=true) -> onChange(checked=true,defaultPrevented=true)`.
+   The guard is correct precisely **because** the row handler runs first: by the time the
+   mirror is written, `defaultPrevented` already records that this change will not happen.
+   `adult-affirmed`'s `onChange` is unchanged (nothing ever cancels its change), so
+   `SPEC.md` R17 point 2 is satisfied literally there and satisfied in substance here —
+   see the DECISIONS entry for the frozen-text imprecision, recorded and not repaired.
+2. **Member 2 — the dismissal paths, and it is defence in depth, labelled as such.** `×`,
+   `Esc` and a backdrop click each resync the mirror from the DOM before closing:
+   `setPrivacyMirror(privacyInputRef.current?.checked ?? false)`. **Measured: with member 1 in
+   place this changes no observable outcome** (the `×`, `Esc` and backdrop routes end
+   `DOM=false mirror=false btnDisabled=true` with and without it), so it is not sold as the
+   fix. It is kept because it makes invariant 2 structural instead of accidental: the mirror
+   cannot outlive the DOM across a close, whatever a later edit does to the open path.
+
+**Why the verdict's own first wording is NOT what is pinned here, measured:** driving the
+mirror to `false` inside the row handler (`setPrivacyMirror(false)` beside `preventDefault()`)
+**does not work** — the `onChange` runs *after* it and overwrites it with `true`. Measured over
+8 routes: it still desyncs on open-by-square and still lets two clicks reach `register()`.
+Full matrix and the three rejected alternatives are in `DECISIONS.md`
+(`### Rework round 1 — ARCH-REV-S02-r1's verdict, applied`).
+
+**THE MIRROR ARM, added by the B1 correction to all six route steps below
+(`S02-S49`, `S02-S50`, `S02-S51`, `S02-S54`, `S02-S55`, `S02-S56`). Written out once, and each
+step names it rather than restating it — two formulations of one rule is the B4 defect class.**
+
+> **Mirror arm:** after the route under test, `await act(async () => { field("adult-affirmed").click(); })`
+> and assert the `Create account` button's `disabled` is **still `true`**.
+>
+> **Why the extra click is the whole point:** `disabled` is computed from *both* mirrors, so
+> with `adult-affirmed` false the button is disabled whatever the privacy mirror says. Ticking
+> `adult-affirmed` is what makes the privacy mirror the only remaining term — so a desynced
+> `true` shows up as an ENABLED button and the assertion fails. Without this click the step
+> asserts nothing about the mirror. **Measured against the defect it exists to catch:** on the
+> unfixed rule the square route and the `×` route end `mirror=true btnDisabled=false`; on the
+> pinned rule all six end `mirror=false btnDisabled=true`
+> (`.hermes/reports/consent-ui/probes/arch-s02-rework-r1-c7-mirror-fixed.mjs`, three runs).
+> **It uses the ONE button idiom** (`field(name).click()` inside `await act`), never an
+> assignment.
+
+- **S02-S49 · Clicking the unchecked check SQUARE opens the modal; box and mirror stay `false`.**
+  Serves R05, and R17's mirror invariant. Creates the test file; edits the component.
+  **Test:** `.click()` the `privacy-accepted` input, **then the mirror arm above**.
+  **Property:** a `[role="dialog"]` is in the document, `field("privacy-accepted").checked === false`,
+  and after `field("adult-affirmed").click()` the `Create account` button is still `disabled`.
+  **RED before** (today the click ticks the box and opens nothing; and against the *pre-B1* rule
+  the third assertion is the one that fails — `disabled` is `false`), **GREEN after.
+  Acceptance:** `Tests 1 passed (1)`. Cluster **C7**.
+
+- **S02-S50 · Clicking the row's TEXT does the same.**
+  Serves R05, R17. Edits both files.
+  **Test:** `.click()` the row-2 text span, **then the mirror arm**. **Property:** dialog
+  present, box still `false`, button still `disabled` after the mirror arm.
+  **RED before, GREEN after. Acceptance:** `Tests 2 passed (2)`. Cluster **C7**.
+
+- **S02-S51 · Clicking the `Privacy Policy` control does the same.**
+  Serves R05, R17. Edits both files.
+  **Test:** `.click()` the `<button type="button">` whose text is `Privacy Policy`,
+  **then the mirror arm**. **Property:** dialog present, box still `false`, button still
+  `disabled` after the mirror arm.
+  **RED before, GREEN after. Acceptance:** `Tests 3 passed (3)`. Cluster **C7**.
+  **This is the single most likely implementation slip in the slice** (`SPEC.md` R05) — all
+  three entry points are pinned separately for that reason, and a `preventDefault` that covers
+  only one of them fails exactly one of these three cases.
+
+- **S02-S52 · Clicking the CHECKED privacy row unchecks it directly, with no modal.**
+  Serves R06. Edits both files.
+  **Test:** reach the checked state through the modal path (open, satisfy the gate, click
+  `I have read it`), then `.click()` the row's text span. **Property:**
+  `field("privacy-accepted").checked === false` and `document.querySelector('[role="dialog"]')`
+  is `null`. **RED before, GREEN after. Acceptance:** `Tests 4 passed (4)`. Cluster **C7**.
+
+- **S02-S53 · `I have read it` ticks the box, closes the modal, returns focus — AND the button enables.**
+  Serves R07 and its R17 interaction. Edits both files.
+  **Test:** open the modal, satisfy the scroll gate, click `I have read it`; assert
+  `field("privacy-accepted").checked === true`, no `[role="dialog"]`, and
+  `document.activeElement` is the `privacy-accepted` input; **then**
+  `await act(async () => { field("adult-affirmed").click(); })` and assert the `Create account`
+  button's `disabled` is `false`.
+  **Property, and it is the reason this step exists:** the acknowledgement handler must set
+  **both** `privacyInputRef.current.checked = true` **and** the R17 mirror
+  (`setPrivacyMirror(true)`). Setting only the DOM leaves the button disabled (V acceptance
+  step 8 fails); setting only the mirror leaves `FormData` empty and R18 refuses the
+  registration. This is the B2/B4 class arriving from inside the component.
+  **RED before, GREEN after. Acceptance:** `Tests 5 passed (5)`. Cluster **C7**.
+  **Idiom note:** the assertion about the BUTTON is reached by `.click()` on `adult-affirmed`
+  and by the component's own state update on `privacy-accepted` — never by a `.checked`
+  assignment.
+
+- **S02-S54 · `×` closes, leaves the box unchecked and the mirror `false`, returns focus to the input.**
+  Serves R08, R17. Edits both files.
+  **Test:** open, click `×`, **then the mirror arm** (stated once above `S02-S49`).
+  **Property:** no dialog, `checked === false`, `document.activeElement` is the
+  `privacy-accepted` input, and after `field("adult-affirmed").click()` the `Create account`
+  button is still `disabled`.
+  **RED before, GREEN after** — and against the *pre-B1* rule this step's mirror arm is the one
+  that fails (measured `after x: Create account .disabled  false`, which is exactly what
+  `SPEC.md:661-665` V acceptance step 7 forbids). **Acceptance:** `Tests 6 passed (6)`.
+  Cluster **C7**.
+
+- **S02-S55 · A backdrop click closes, leaves the box unchecked and the mirror `false`, returns focus.**
+  Serves R08, R17. Edits both files.
+  **Test:** open, click the `.policyScrim` element itself, **then the mirror arm**.
+  **Property:** as `S02-S54`. **RED before, GREEN after. Acceptance:** `Tests 7 passed (7)`.
+  Cluster **C7**.
+
+- **S02-S56 · Esc closes the modal AND NOTHING ELSE ACTS ON THAT EVENT (the B3 pin).**
+  Serves R08, R14, R17. Edits both files.
+  **Test:** fill the email, recovery-email and password fields; click `adult-affirmed`; open
+  the modal; dispatch ONE `keydown` with `key: "Escape"`. **Property, all six in one case:**
+  (a) the dialog is gone; (b) the `<form>` and both checkbox inputs are still in the document;
+  (c) the three text fields still hold what was typed; (d) `field("adult-affirmed").checked` is
+  still `true` and `field("privacy-accepted").checked` is still `false`; (e)
+  `document.activeElement` is the `privacy-accepted` input; **(f) the `Create account` button is
+  still `disabled`** — the mirror arm, and here it needs no extra click because the case has
+  already ticked `adult-affirmed`, so the privacy mirror is already the only remaining term.
+  **RED before, GREEN after. Acceptance:** `Tests 8 passed (8)`.
+  **This is the pin REQ-REV-01 r3 prediction 2 names as the mission's most likely next defect
+  — "both SPECs specify it, both pin it in jsdom, and nobody has ever run it."** Its mechanism
+  half is `S02-S01`; this is its consumer half. Cluster **C7**.
+
+- **S02-S57 · The modal is rendered OUTSIDE the `<form>`.**
+  Serves R14 and the ARCH placement decision. Edits both files.
+  **Test:** with the modal open, `document.querySelector("form").contains(document.querySelector('[role="dialog"]'))`
+  is `false`, and the dialog's parent chain reaches `body` without passing through the form.
+  **Property:** no control inside the modal can submit the registration form, whatever its
+  `type` attribute says, and `Enter` inside the modal cannot register an account.
+  **RED before, GREEN after. Acceptance:** `Tests 9 passed (9)`. Cluster **C7**.
+
+- **S02-S58 · The sign-up card opens the modal in `mode="consent"`.**
+  Serves R14. Edits both files.
+  **Test:** open the modal from the card; assert a control whose text is `I have read it`
+  exists and no control whose text is `Close` does (the `mode="consent"` signature pinned by
+  `S02-S39`). **Property:** the read-only mode belongs to S01's card, not to this one.
+  **RED before, GREEN after. Acceptance:** `Tests 10 passed (10)`. Cluster **C7**.
+
+- **S02-S71 · Activation from the focused UNCHECKED `privacy-accepted` opens the modal, box `false`.**
+  The keyboard route goes THROUGH the read gate, not around it.
+  *(New in rework round 1 — `ARCH-REV-S02-r1` N3. Appended, so no existing step id moves.)*
+  Serves R05, R03, and R17's mirror invariant. Edits `apps/ui/components/SignUpFlow.tsx` and
+  `tests/render/consent-signup-modal.test.tsx`.
+  **Test:** `field("privacy-accepted").focus()`; assert `document.activeElement` is that input;
+  then `await act(async () => { field("privacy-accepted").click(); })` — the activation
+  behaviour a browser runs for `Space` on a focused checkbox — and assert (a) a
+  `[role="dialog"]` is present, (b) `field("privacy-accepted").checked === false`,
+  (c) `document.activeElement` is still that input, and (d) **the mirror arm** (stated once
+  above `S02-S49`): after `field("adult-affirmed").click()` the `Create account` button is
+  still `disabled`.
+  **Measured, all four, on the pinned rule:**
+  `dialog=true DOM=false mirror=false activeElement=privacy-accepted`.
+  **Why this step exists and what it is evidence FOR.** `DECISIONS.md:99` routes a contested
+  reading to V — `SPEC.md` R03 says both inputs are "toggled by `Space`", while R05/R06 make
+  the unchecked privacy row open the modal instead. The reviewer's finding was that the
+  recommendation had **no mechanical evidence anywhere in the plan**. This step is that
+  evidence: it shows that from the focused, unchecked state the activation path is R05's, so
+  the recommendation ("R05/R06 governs; letting `Space` tick the box would be a keyboard-only
+  route around the read gate, which is the one thing V's goal forbids") is a measured claim and
+  not an opinion.
+  **Same measured jsdom limitation as `S02-S70`:** jsdom 30.0.1 does not turn a `Space`
+  keystroke into activation (`clickEventsSeen=0`), so the step drives the activation directly
+  and the keystroke is V's.
+  **RED before, GREEN after. Acceptance:** `Tests 11 passed (11)`. Cluster **C7**.
+  **What this step does NOT establish, handed to V:** that a real browser's `Space` on the
+  focused privacy box opens the modal rather than ticking — **V acceptance step 14**, and it is
+  the observation that settles the contested row.
+
+**R17 CASES 4 AND 5 LIVE HERE, not in `S02-C4`** (`ARCH-REV-S02-r2` **B3**; V-DECISIONS row
+**V-18** default (a)). They keep their step ids, they keep the property R17 states, and only the
+ROUTE to the "both boxes checked" state changes: the modal's acknowledgement instead of a bare
+privacy `.click()`, because after the click rule above a bare click cannot tick the box. **The
+acknowledgement route, written out once so neither step restates it** (two formulations of one
+rule is the B4 class):
+
+> **Acknowledgement route:** `await act(async () => { field("privacy-accepted").click(); })` to
+> open the policy in `mode="consent"`; drive the scroll region's metrics to a scrolled-to-end
+> state with `Object.defineProperty(region, "scrollTop"|"clientHeight"|"scrollHeight",
+> { value, configurable: true })` and dispatch one `scroll` event, so `S02-S40`'s gate
+> (`scrollTop + clientHeight >= scrollHeight - 8`) latches; assert the `I have read it` control
+> is **no longer `disabled`**; then `.click()` it inside `act`. **Post-conditions asserted by
+> both steps:** `field("privacy-accepted").checked === true` and no `[role="dialog"]` remains.
+> **It is the same route `S02-S52` and `S02-S53` already use** — this block names it rather
+> than inventing a second one — and it uses the ONE button idiom, never an assignment.
+
+- **S02-S28 · Case 4 — BOTH boxes checked → NOT `disabled`, reached the only lawful way.**
+  Serves R17. Edits `apps/ui/components/SignUpFlow.tsx` and
+  `tests/render/consent-signup-modal.test.tsx`.
+  **Test:** from a fresh mount, run the **acknowledgement route** above, then
+  `await act(async () => { field("adult-affirmed").click(); })`.
+  **Property, and it is R17 case 4's property unchanged:** with both boxes checked the
+  `Create account` button's `disabled` is `false` — asserted together with
+  `field("privacy-accepted").checked === true`, so "enabled" can never be reached with an empty
+  box.
+  **Measured, three runs identical**
+  (`node .hermes/reports/consent-ui/probes/arch-s02-rework-r2-r17-post-c7-fixed.mjs`):
+  `STAGE c7: 6/6 pass, 0 FAIL`; and at `STAGE c4` this case reports
+  `ERROR:NO MODAL AT THIS STAGE`, which is the measurement that moved it out of C4.
+  **RED before, GREEN after — and this is an upgrade the move pays for.** In `S02-C4` this step
+  was a declared GREEN-before-and-after control; here the modal does not exist until C7 wires
+  it, so the case genuinely fails first and genuinely discriminates.
+  **It is still the positive control for cases 1-3**, and it is now also the control that stops
+  a `disabled` hard-coded `true` — the mutant `S02-C4`'s command can no longer see, named in
+  C4's row of §The cluster map. **Acceptance:** `Tests 12 passed (12)`. Cluster **C7**.
+
+- **S02-S29 · Case 5 — assignment announces nothing; the reset stays; the tick is lawful.**
+  Serves R17 (REQ-REV-01 B5). Edits both files.
+  **Test, in R17's order, with only the last movement re-routed:** assign `.checked = true` on
+  **both** inputs WITHOUT dispatching → assert the button is still `disabled`; **then set both
+  back to `.checked = false`**; then `await act(async () => { field("adult-affirmed").click(); })`;
+  then run the **acknowledgement route** above → assert the button is no longer `disabled`.
+  **The reset is still load-bearing, and it is load-bearing on `adult-affirmed` — measured,
+  three runs identical** (`node .hermes/reports/consent-ui/probes/arch-s02-rework-r2-alternatives.mjs`):
+  without the reset, `adultCheckedAfterClick=false route=ACKNOWLEDGED btnDisabled=true` — the
+  click toggles the already-assigned box back to `false`, `onChange` fires with `false`, and the
+  button correctly stays disabled. With it, `btnDisabled=false`. Dropping the reset "because the
+  privacy half no longer clicks" was considered and is rejected by that measurement (DECISIONS).
+  **Property, unchanged:** a DOM assignment does not reach React, and a real activation does.
+  **RED before** (its acknowledgement half cannot run until the modal is wired), **GREEN after.**
+  **Still measured to detect nothing about controlled inputs** — that guarantee is `S02-S30`'s,
+  and this case documents the toggle. **Acceptance:** `Tests 13 passed (13)`. Cluster **C7**.
+
+---
+
+### Cluster S02-C8 — the CSS block and the style contract
+
+Edits `apps/ui/app/globals.css` (**the ONE delimited block, appended at the END of the file,
+after S01's**); creates `tests/unit/consent-s02-style-contract.test.ts`.
+**This is the only cluster with `globals.css` in its file surface.** It shares no file with
+C1-C7, so it *could* run concurrently; it is **scheduled last but one** because its selectors
+must match the class names C3, C5 and C6 introduce.
+
+- **S02-S59 · Exactly one delimited S02 block, and it is the end of the file.**
+  Serves R22. Creates the test; edits `globals.css`.
+  **Test:** the file contains exactly one `/* === consent-ui S02 === */` and exactly one
+  `/* === end consent-ui S02 === */`, in that order, and nothing but whitespace follows the
+  closing marker. **Property:** the single-writer contract against S01 is mechanically visible;
+  a second block, or content appended after it, fails.
+  **RED before, GREEN after. Acceptance:** `Tests 1 passed (1)`. Cluster **C8**.
+
+- **S02-S60 · Inside the block: no colour literal and no token declaration.**
+  Serves R22, R23. Edits both files.
+  **Test:** slice the file between the two markers and assert zero matches of
+  `/oklch\(|#[0-9a-f]{3,8}\b|\brgba?\(/i` and zero matches of `/^\s*--[a-z0-9-]+\s*:/im`.
+  **Property:** every colour in S02's CSS is a `var(--token)` reference — which is *why* both
+  surfaces follow the mode toggle live with nothing wired (**R23**, whose browser confirmation
+  is V acceptance step 14) — and S02 declares no token, so
+  `tests/unit/t9-mode-tokens.test.ts:376-377`'s set equality is untouched.
+  **RED before, GREEN after. Acceptance:** `Tests 2 passed (2)`, and the t9 standing gate still
+  reports its hit list as exactly the one pre-existing `.drawerScrim` line. Cluster **C8**.
+
+- **S02-S61 · The modal geometry rules are present, with their derivations.**
+  Serves R09. Edits both files.
+  **Test:** the block contains, as source text, `width: min(680px, calc(100vw - 32px))`,
+  `max-height: 92vh`, `z-index: var(--z-policy-scrim)`, `z-index: var(--z-policy-card)`,
+  `background: var(--scrim)`, the header `padding: 22px 24px 14px`, the scroll region
+  `flex: 1`, `min-height: 0`, `overflow: auto`, `padding: 16px 24px 8px`, the footer
+  `padding: 14px 24px`, and the gold tab at `top: 0`, `left: 24px`, `width: 52px`,
+  `height: 4px`, `border-radius: var(--r-tab)`.
+  **Derivations, restated here because the step pins the numbers:** **680** is the artboard's
+  own modal width — 760px artboard less the 40px inset on each side
+  (`turn-10-cookie-consent.html:48,50`); **`calc(100vw - 32px)`** is REQ-01's responsive clamp;
+  **92vh** approximates the artboard's vertical proportion (660 less 34px top and bottom = 592,
+  i.e. 89.7%); **52×4** is the tab as drawn at `:52`.
+  **Property:** the geometry is in the stylesheet. **jsdom computes no layout, so whether it
+  LOOKS right is V acceptance steps 5 and 13, not this test's claim.**
+  **RED before, GREEN after. Acceptance:** `Tests 3 passed (3)`. Cluster **C8**.
+
+- **S02-S62 · The checkbox-group rules are present, with their design citations.**
+  Serves R01. Edits both files.
+  **Test:** the block contains the container rule (`1px solid var(--line)`,
+  `border-radius: 11px`, `background: var(--shell)`, `padding: 2px 13px`), the row rule
+  (`display: flex`, `align-items: flex-start`, `gap: 10px`, `padding: 11px 0`,
+  `cursor: pointer`, and a `border-bottom: 1px solid var(--line)` on the first row only), the
+  square rule (`appearance: none`, `width: 17px`, `height: 17px`, `border-radius: 5px`,
+  `border: 1.5px solid var(--ok-edge)`), the checked rule (`background: var(--ok-dot)`), the
+  glyph rule (`content: "✓"`, `color: var(--core)`, `font-size: 10px`, `font-weight: 800`) and
+  the label rule (`font-size: 11.5px`, `line-height: 1.5`).
+  **Every number here is read literally off `turn-8a-checkbox-group.html:1-10`.**
+  **Property:** the 8a artboard's values are in the stylesheet. **The rendered geometry is V's
+  at acceptance steps 1-2.** **RED before, GREEN after. Acceptance:** `Tests 4 passed (4)`.
+  Cluster **C8**.
+
+- **S02-S63 · A `prefers-reduced-motion` rule exists inside S02's own block.**
+  Serves R24. Edits both files.
+  **Test:** the sliced block matches `/@media \(prefers-reduced-motion: reduce\)/`.
+  **Property:** S02 carries its own reduced-motion rule; there is no global reset in this
+  codebase (the four existing blocks at `globals.css:269,3663,4681,5244` are each
+  component-scoped). **RED before, GREEN after. Acceptance:** `Tests 5 passed (5)`.
+  Cluster **C8**.
+
+- **S02-S64 · The disabled `I have read it` clears 4.5:1 in both modes, and the test computes it.**
+  Serves R15's accessibility clause and closes the contrast gap that three review rounds left
+  UNVERIFIED (`reviews/REQ-REV-01.md` §Not verified, item 1). Edits both files.
+  **Test:** import `contrastRatio` from `tests/support/contrast.ts`; composite the disabled
+  button's label and face over the footer's `--shell` ground per channel
+  (`α·fg + (1-α)·bg`, α = the `opacity` the block declares) using the token values from
+  `COMMON.md` §7; assert the ratio is `>= 4.5` in **both** Terracotta and Chamber; and assert
+  the block declares that same `opacity` for the disabled state.
+  **The pinned value is `opacity: .65`, and its derivation is a measurement:** stepping α by
+  0.05, `.60` gives Terracotta **4.13** (fails), `.65` gives Terracotta **4.79** / Chamber
+  **7.17**, `.70` gives **5.54 / 8.09** — `.65` is the smallest 0.05 step clearing 4.5:1 in
+  both modes, i.e. the most dimmed (most legibly disabled) value that still passes. Output
+  pasted in §Clusters.
+  **Property:** the one contrast nobody has measured is measured, by a command, in the suite.
+  `tests/support/contrast.ts` accepts `#RRGGBB` only, which is why the compositing happens in
+  the test. **RED before, GREEN after. Acceptance:** `Tests 6 passed (6)`. Cluster **C8**.
+
+- **S02-S65 · No auth-shell ancestor may become a containing block for the fixed scrim.**
+  Serves the ARCH placement decision that keeps `S02-S57` true in a browser. Edits the test
+  only (a standing assertion over `globals.css`).
+  **Test:** for every rule whose selector text contains any of `.appShell`, `.authScreen`,
+  `.authCard`, `.authCardInner`, `.authPanel`, `.authPanelCore`, `.authForm`, assert the
+  declaration body contains none of `transform:`, `filter:`, `perspective:`, `will-change:`,
+  `contain:`.
+  **Property:** the modal is rendered inline inside the auth card and relies on
+  `position: fixed` escaping its ancestors; that is true today (measured: none of the seven
+  declares any of those properties) and this step is what keeps it true. Substring selector
+  matching over-includes (`.authCardInner` matches `.authCard`) and never under-includes,
+  which is the safe direction.
+  **GREEN before and after at base; it is a standing guard, and the mutant it catches is a
+  future `transform` on `.authCard`.** **Acceptance:** `Tests 7 passed (7)`. Cluster **C8**.
+
+---
+
+### Cluster S02-C9 — integration, the cross-slice merge, and V-acceptance readiness
+
+**No product edit.** This cluster exists so the slice is proved green *together* and so the
+one cross-lane operation is a named step with a recorded commit.
+
+- **S02-S66 · Pull S01's tokens into this lane. THE LAST STEP THAT CHANGES THE LANE.**
+  Serves R22, and the browser truth of R01 and R09.
+  **Precondition:** S01's token cluster is committed on `slice/consent-s01`.
+  **Operation, performed by the ORCHESTRATOR, never by a coding seat:**
+  `git merge slice/consent-s01` inside `.worktrees/consent-s02/dialectical-engine`.
+  **The coding seat records, and does not perform:** `git log -1 --format=%h slice/consent-s01`
+  and the resulting merge commit, in `PROGRESS.md`'s handoff.
+  **Expected conflict, accepted, not a reason to serialize** (vertical-slice law §6): both
+  slices append a delimited block at the end of `globals.css`; the resolution is both blocks,
+  S01's first, S02's second.
+  **Acceptance:** `grep -c -- '--scrim:' apps/ui/app/globals.css` returns `2` (one per token
+  block) where it returned `0` before the merge, and the C8 command is still green.
+  Cluster **C9**.
+
+- **S02-S67 · The whole slice is green together.**
+  Serves R19 (the existing suite keeps asserting the four-argument `register` call) and every
+  requirement above it, jointly.
+  **Test:** the C9 command — all eight S02 test files plus
+  `tests/render/auth-flow-integration.test.tsx` in one run.
+  **Property:** no cluster's fix broke another's, and no test file was silently skipped (the
+  `Test Files 9 passed (9)` arm).
+  **Acceptance:** `Test Files 9 passed (9)` and `Tests <n> passed (<n>)` with no `failed`, on
+  the worst of three runs. Cluster **C9**.
+
+- **S02-S68 · The standing gates are reported as DELTAS, not as colours.**
+  Serves R21 (the node-runner copy guard) and R22 (the token contract S02 must not disturb).
+  **Test:** the three standing-gate commands of §Clusters.
+  **Property:** `pnpm typecheck` shows no diagnostic outside the 8 pinned in
+  `tests/unit/s14-ui.test.ts`; `tests/unit/t9-mode-tokens.test.ts` still reports exactly
+  `Tests 2 failed | 6 passed (8)` with a colour-literal hit list of exactly the one
+  `.drawerScrim` line; `tests/unit/v2ui-node-runner.test.ts` is exit 0 / `Tests 2 passed (2)`.
+  **Acceptance:** the three deltas match `BASELINE.md`; a seat reports them in those words and
+  never as "green". Cluster **C9**.
+
+- **S02-S69 · V's fourteen acceptance steps are runnable in the dev stack.**
+  Serves R23 (both modes, live, including with the modal open — V acceptance step 14) and the
+  §V acceptance section as a whole.
+  **Operation:** after the CSS lands, stop the dev stack, `rm -rf apps/ui/.next`, restart it via
+  the `dev-stack` launch config (never by killing children) — **its dev server reads
+  `globals.css` only at boot**, so a CSS edit is invisible without this.
+  **Property:** V can execute `SPEC.md` §V acceptance steps 1-14 at `https://localhost:3000/sign-up`
+  in both modes.
+  **Acceptance — three observable commands with their expected outputs, in this order**
+  (`ARCH-REV-S02-r1` N5: the previous acceptance, "the Grok gate's precondition holds", was a
+  judgement call against this plan's own quantifiability law at `§Quantifiability law`).
+  **Precondition, stated because it is not this seat's to arrange:** the dev stack must be
+  serving this slice's code — either V has merged `slice/consent-s02`, or the `dev-stack`
+  launch config is pointed at `.worktrees/consent-s02/dialectical-engine`. A seat that cannot
+  satisfy that reports `UNVERIFIED — dev stack not serving this branch` and does not guess.
+  ```
+  1  rm -rf apps/ui/.next && test ! -d apps/ui/.next && echo GONE      -> GONE
+  2  # restart via the dev-stack launch config, never by killing children, then:
+     curl -sk https://localhost:3000/sign-up | grep -c 'consentGroup'  -> at least 1
+  3  curl -sk https://localhost:3000/sign-up | grep -c 'privacy-accepted' -> at least 1
+  ```
+  **Why step 1 is an arm and not a note:** the dev server reads `globals.css` only at boot, so
+  without the `.next` removal and the restart the page V opens is the pre-edit stylesheet and
+  every geometry step V runs is a measurement of the wrong build. **What these three commands
+  do NOT establish:** anything about appearance — they prove the class and the input reach the
+  served HTML, nothing more. Cluster **C9**.
+  **What only V can settle here, listed so no test pretends otherwise:** the 720px stack and
+  the 680/92vh modal geometry (step 5), the 17px squares (steps 1-2), the eight pills actually
+  scrolling (step 12), the narrow-viewport behaviour (step 13), the Esc stack in a real browser
+  (step 7), and the live mode flip with the modal open (step 14).
+
+**Sequencing note from requirements (intake C8 + `COMMON.md` §10.7), not a step:** **two**
+S02 artefacts S01 also needs, in this order. (1) `apps/ui/components/consent/modalSemantics.ts`
+— the shared focus trap / initial focus / focus return / backdrop close / reduced-motion / Esc
+stack; S01's preferences card cannot satisfy S01-R18 or the Esc-stack rule without it.
+(2) `PrivacyPolicyModal.tsx`, the standalone prop-driven component S02-R14 describes, which
+itself consumes (1). Building both first unblocks S01's wiring cluster. ARCH owns the actual
+ordering.
+
+**ARCH-S02's answer to that note:** the order is `S02-C1` (the helper, alone, first — it needs
+no token and therefore no merge, so it is buildable at base and hands S01 what it is blocked
+on in one commit), then `S02-C5`/`S02-C6` (the modal). `S02-C2` (the policy data) runs
+concurrently with `S02-C1` because they share no file. The full order, the concurrency
+statement and the merge step are in §Clusters; the merge into this lane is one step,
+`S02-S66`, and it is LAST.
+
+## Clusters (id · steps · ONE verification command · file surface · mutant class)
+
+**Authored by ARCH-S02, 2026-09-06. Every command below was RUN by its author at authoring
+time (charge A9); the classification and the verbatim summary lines are in §A9.**
+
+### The ONE verification idiom, written out verbatim because it is the thing that was executed
+
+`TOOLING-TRAPS.md` records six variants of "an acceptance command that looks like verification
+and verifies nothing". **ARCH-S02 measured a seventh in this lane and it is why the third arm
+exists:** `pnpm exec vitest run <existing-file> <file-that-does-not-exist>` runs only the
+existing file, prints `Tests 17 passed (17)` and **exits 0** — a cluster command naming a file
+that was never created reports GREEN having never executed it. The remedy is an anchored
+`Test Files <n> passed (<n>)` arm with `<n>` the exact number of paths in the command.
+
+This is the exact function ARCH-S02 executed against all nine clusters
+(`scratchpad/arch-consent-s02/a9.sh`); `$1` is `<n>`, the rest are the file paths:
+
+```sh
+run() {
+  id="$1"; n="$2"; shift 2
+  out=$(pnpm exec vitest run "$@" 2>&1); vt=$?
+  sum=$(printf '%s' "$out" | grep -E '^[[:space:]]*Tests[[:space:]]+' | tail -1)
+  fil=$(printf '%s' "$out" | grep -E '^[[:space:]]*Test Files[[:space:]]+' | tail -1)
+  printf '%s' "$sum" | grep -qE "^[[:space:]]*Tests[[:space:]]+[1-9][0-9]* passed" \
+    && ! printf '%s' "$sum" | grep -q 'failed' \
+    && printf '%s' "$fil" | grep -qE "^[[:space:]]*Test Files[[:space:]]+${n} passed \(${n}\)"; guard=$?
+  [ "$vt" -eq 0 ] && [ "$guard" -eq 0 ]; v=$?
+  echo "$id | vt=$vt guard=$guard VERDICT=$v"
+}
+```
+
+**Four load-bearing properties, each closing a measured variant:** capture first, so nothing
+can steal the runner's exit status (variant 3) · **anchor** to the summary line, so a test's
+TITLE cannot satisfy the guard (variant 4) · require a **nonzero** pass count and **reject a
+summary containing `failed`** (variant 2) · assert the **file count**, so a filter that matched
+nothing cannot pass (variant 7, measured here).
+
+**Every term above is pure ASCII, deliberately** (`COMMON.md` §10.16). `Tests`, `Test Files`,
+`passed` and `failed` are ASCII words on the summary lines. **No term in this plan matches
+vitest's `✓`/`×` status glyph**, because in a `.sh` file under `/bin/bash` the shell gets BSD
+`grep` in the C locale, where `.` matches ONE BYTE and those glyphs are 2-3 bytes — a term that
+matched the glyph would be `0` forever in any script, in CI, and in the three-run loop, while
+matching happily in this tool's `ugrep`-shim shell. Where a failing test must be NAMED (the G2
+delta below), the anchor is the **test name**, never the glyph.
+
+**`run_c9` — the C9 variant, adding the two merge arms** (`ARCH-REV-S02-r1` **N1**: the round-1
+C9 command claimed a mutant it could not detect. Nine vitest files contained exactly one that
+reads `globals.css`, and its seven steps assert only about S02's OWN block, so losing S01's
+block failed nothing):
+
+```sh
+run_c9() {
+  n="$1"; shift
+  run S02-C9 "$n" "$@"; rc=$?
+  s01=$(grep -c -- '--scrim:' apps/ui/app/globals.css)          # S01's two token blocks
+  s02=$(grep -c -- '=== consent-ui S02 ===' apps/ui/app/globals.css)   # S02's open + end markers
+  echo "S02-C9 | mergeArms: --scrim:=$s01 (expect 2)  S02markers=$s02 (expect 2)"
+  [ "$rc" -eq 0 ] && [ "$s01" -eq 2 ] && [ "$s02" -eq 2 ]
+}
+```
+
+**Why `2` and `2`, derived not conventional:** `--scrim` is declared once in each of the two
+token blocks S01 owns (`:root` and `html[data-mode="chamber"]`), so `2` is "both of S01's
+blocks survived the merge"; S02's block is delimited by an opening and a closing marker
+(`S02-S59`), so `2` is "S02's block survived, exactly once". **This makes C9 unable to go green
+before the merge, and that is correct, not a defect:** `S02-S66` — the merge — is C9's FIRST
+step. At base both arms read `0`, which is one more declared reason C9 is RED there (§A9).
+
+**THE CHAIN RULE, new in rework round 1** (`ARCH-REV-S02-r1` **N7** — mandatory, and it is the
+structural gap B1 fell through). **Every cluster that edits `apps/ui/components/SignUpFlow.tsx`
+runs the test file of every EARLIER cluster in that chain, with `<n>` raised accordingly.** The
+chain is `C3 → C4 → C7`, and `tests/unit/v2ui-node-runner.test.ts` is in all three because it
+is the source guard that scans that same component (`COMMON.md` §10.18: a cluster that edits a
+file a scanning test covers RUNS that test in its own command):
+
+| Cluster | files, in command order | `<n>` |
+|---|---|---|
+| C3 | `consent-signup-group` · `auth-flow-integration` · `v2ui-node-runner` | 3 |
+| C4 | `consent-signup-gate` · **`consent-signup-group`** · `auth-flow-integration` · `v2ui-node-runner` | **4** (was 3) |
+| C7 | `consent-signup-modal` · **`consent-signup-group`** · **`consent-signup-gate`** · `auth-flow-integration` · **`v2ui-node-runner`** | **5** (was 2) |
+| C9 | all eight S02 files · `auth-flow-integration` · **`v2ui-node-runner`** | **10** (was 9) |
+
+**The class has a SECOND chain, and the finding sampled only the first.** `heartbeat-protocol`
+§2.2: a reported finding is a sample of a class, never the whole class. N7 names `C4` and `C7`;
+the same shape is in `C5 → C6`, which also share a component file
+(`apps/ui/components/consent/PrivacyPolicyModal.tsx`, §Concurrency). `C6`'s round-1 command
+listed only `consent-policy-modal-behaviour.test.tsx`, so `C5`'s
+`consent-policy-modal-render.test.tsx` was never re-run by `C6` and a `C6` regression into
+`C5`'s render pins — a dropped section, a broken `aria-labelledby`, a `Download PDF` control
+reintroduced — was invisible until `C9`. **`C6`'s command therefore becomes 2 files.** The
+sweep over every cluster pair sharing a product file is complete and is the table above plus
+this paragraph: `C1`/`C2`/`C8` share a product file with nobody, so they are unaffected.
+
+**The known-GOOD / known-BAD validation and the per-term mutant table are in §A9 (parts 2, 3
+and 4) and are NOT restated here** — two formulations of one rule is the B4 defect class, and
+§A9 is where they were executed. Round 1's four-case validation, which ARCH-REV-S02 reproduced,
+is subsumed by that table: A/B there are parts 2A/2B here, C is the **T3 variant-7** mutant, D
+is the **T2** mutant.
+
+**Run every command from the level holding `package.json`** —
+`.worktrees/consent-s02/dialectical-engine/`, not the worktree root, where every command
+returns `No test files found` (`TOOLING-TRAPS.md`, "The worktree root is NOT the project root").
+
+**The three-run law:** each cluster's ONE command runs three times and the WORST run is the
+verdict. Green-green-red is RED.
+
+### The cluster map
+
+| Cluster | Steps | ONE verification command (`run <id> <n> <files>`, idiom above) | File surface — this becomes the coding seat's `allowed` list | Mutant class the command detects |
+|---|---|---|---|---|
+| **S02-C1** shared modal semantics | S02-S01 … S02-S10 · **S02-S72** | `run S02-C1 1 tests/render/consent-modal-semantics.test.tsx` **+ the three ADR arms of `S02-S72`** (they read a `.md` path no vitest filter reaches, so they are stated in the step and reported beside the command, exactly as the standing gates are) | **create** `apps/ui/components/consent/modalSemantics.ts` · **create** `tests/render/consent-modal-semantics.test.tsx` · **create** `docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md` (`S02-S72`) | A per-surface Esc listener instead of a stack (both surfaces close on one key) · a stack that never pops · a focus set cached at open · focus not returned · a second `document` keydown listener · an unguarded `window.matchMedia` (throws in every render test) · **the ADR missing, or written `Accepted` instead of `Proposed`** (the `S02-S72` arms) |
+| **S02-C2** policy content | S02-S11 … S02-S16 | `run S02-C2 1 tests/unit/consent-privacy-policy-data.test.ts` | **create** `apps/ui/lib/privacyPolicy.ts` · **create** `tests/unit/consent-privacy-policy-data.test.ts` | Pills sorted into document order · a dropped or renumbered section · a wrong bullet count · a wrong pill→section target · a `\uXXXX` escape shipped as six visible characters · a mistyped body string |
+| **S02-C3** checkbox group | S02-S17 … S02-S24 · **S02-S70** | `run S02-C3 3 tests/render/consent-signup-group.test.tsx tests/render/auth-flow-integration.test.tsx tests/unit/v2ui-node-runner.test.ts` | **edit** `apps/ui/components/SignUpFlow.tsx` · **create** `tests/render/consent-signup-group.test.tsx` · **edit** `tests/render/auth-flow-integration.test.tsx` (three inserted lines only) | The second input missing or misnamed · `required` dropped from either tag · the old 18+ wording left in place · a second `<form>` · an accessible name that does not resolve · **an input made unfocusable (`tabindex="-1"`, or a `div[role=checkbox]` substituted) — `S02-S70`** · a banned substring (`terms`, `privacy notice`, `localStorage`) entering `SignUpFlow.tsx` |
+| **S02-C4** the gate | S02-S25 · S02-S26 · S02-S27 · S02-S30 · S02-S31 · S02-S32 — **six, not eight: `S02-S28` and `S02-S29` moved to `S02-C7` (`ARCH-REV-S02-r2` B3)** | `run S02-C4 4 tests/render/consent-signup-gate.test.tsx `**`tests/render/consent-signup-group.test.tsx`**` tests/render/auth-flow-integration.test.tsx tests/unit/v2ui-node-runner.test.ts` | **edit** `apps/ui/components/SignUpFlow.tsx` · **create** `tests/render/consent-signup-gate.test.tsx` · **edit** `tests/render/auth-flow-integration.test.tsx` (one added case) | **Controlled inputs** (S02-S30 goes red; measured RED under exactly the two controlled variants) · the handler reading the React mirror instead of `FormData` (the three existing cases drop to 15/18) · the refusal placed after `client.register` · **any C4 regression into C3's group, copy and accessible-name pins — the chain arm added by N7**. **What this command can NO LONGER detect, stated rather than implied:** a `disabled` hard-coded `true` — every case left in this cluster expects `disabled === true`, so the cluster has no positive control. It is detected in `S02-C7`, by `S02-S28` in its new home and independently by `S02-S53`, and there is no lawful way to detect it here, because after C7 the modal is the only route that ticks `privacy-accepted` and the modal does not exist at C4 |
+| **S02-C5** modal, rendered | S02-S33 … S02-S39 | `run S02-C5 1 tests/render/consent-policy-modal-render.test.tsx` | **create** `apps/ui/components/consent/PrivacyPolicyModal.tsx` · **create** `tests/render/consent-policy-modal-render.test.tsx` | A fifth prop or a missing one · `aria-labelledby` pointing at nothing · a `data-jump` with no matching id · a section list of 10 or 12 · a `Download PDF` control · `I have read it` rendered in `mode="read"` · the end marker not last in the scroll region |
+| **S02-C6** modal, behaviour | S02-S40 … S02-S48 | `run S02-C6 2 tests/render/consent-policy-modal-behaviour.test.tsx `**`tests/render/consent-policy-modal-render.test.tsx`** (the chain rule, second member — both clusters write `PrivacyPolicyModal.tsx`) | **edit** `apps/ui/components/consent/PrivacyPolicyModal.tsx` · **create** `tests/render/consent-policy-modal-behaviour.test.tsx` | A gate written as `>` or with a different slack (S02-S40's 291/292 pair) · a gate that un-latches · a gate not evaluated at mount or on `resize` · `onAcknowledge` called from a dismissal route · focus not trapped or not returned · an unguarded `scrollIntoView` (throws in jsdom) · smooth scrolling under `prefers-reduced-motion` · **any C6 regression into C5's render pins — the chain arm, second member of N7's class** |
+| **S02-C7** sign-up ↔ modal wiring | S02-S49 … S02-S58 · **S02-S71** · **S02-S28 · S02-S29** (R17 cases 4 and 5, moved here by `ARCH-REV-S02-r2` B3 — thirteen steps, not eleven) | `run S02-C7 5 tests/render/consent-signup-modal.test.tsx `**`tests/render/consent-signup-group.test.tsx tests/render/consent-signup-gate.test.tsx`**` tests/render/auth-flow-integration.test.tsx `**`tests/unit/v2ui-node-runner.test.ts`** | **edit** `apps/ui/components/SignUpFlow.tsx` · **create** `tests/render/consent-signup-modal.test.tsx` | A `preventDefault` covering only one of the three entry points (each is a separate case) · the box ticking as the modal opens · **the R17 mirror left `true` after an open-or-dismiss route, so `Create account` enables with the box empty — the B1 defect, caught by the mirror arm on `S02-S49`/`S50`/`S51`/`S54`/`S55`/`S56`/`S71`** · the acknowledgement setting the DOM but not the R17 mirror, so `Create account` never enables · Esc reaching a second surface · focus not returned to the input · the modal rendered inside the `<form>` · **a `disabled` hard-coded `true` — the mutant `S02-C4` lost when cases 4 and 5 moved here, caught by `S02-S28` and independently by `S02-S53`** · **any C7 regression into C3's or C4's pins, including a banned substring entering `SignUpFlow.tsx` — the chain arms added by N7** |
+| **S02-C8** CSS + style contract | S02-S59 … S02-S65 | `run S02-C8 1 tests/unit/consent-s02-style-contract.test.ts` | **edit** `apps/ui/app/globals.css` (**ONE delimited block appended at the END, after S01's; nothing above it touched**) · **create** `tests/unit/consent-s02-style-contract.test.ts` | A `#hex`/`rgba(` literal inside S02's block (which would also add a second hit to the t9 colour-literal gate) · a token DECLARED by S02 (which would break t9's set equality) · a second S02 block · content appended after the closing marker · a missing reduced-motion rule · a disabled opacity that fails 4.5:1 · a future `transform` on `.authCard` that would trap the fixed scrim |
+| **S02-C9** integration + merge | S02-S66 … S02-S69 | `run_c9 10 tests/render/consent-modal-semantics.test.tsx tests/unit/consent-privacy-policy-data.test.ts tests/render/consent-signup-group.test.tsx tests/render/consent-signup-gate.test.tsx tests/render/consent-policy-modal-render.test.tsx tests/render/consent-policy-modal-behaviour.test.tsx tests/render/consent-signup-modal.test.tsx tests/unit/consent-s02-style-contract.test.ts tests/render/auth-flow-integration.test.tsx `**`tests/unit/v2ui-node-runner.test.ts`** — `run_c9` is `run` plus the **two merge arms** below (`ARCH-REV-S02-r1` N1) | **no product edit** · one `git merge slice/consent-s01`, performed by the ORCHESTRATOR | One cluster's fix breaking another's · a test file silently absent from the slice (the `Test Files 10 passed (10)` arm) · **the merge losing S01's `globals.css` block (the `--scrim:` count arm) or S02's (the marker count arm)** — both are now IN the command, not only in `S02-S66`'s prose |
+
+### Concurrency — which clusters may run at the same time, and which must follow
+
+Two clusters may run concurrently **iff they share no file**. Measured over the surfaces above:
+
+- **`S02-C1` ∥ `S02-C2`** — disjoint (`modalSemantics.ts` vs `privacyPolicy.ts`; different test
+  files). **These two are the mission's opening move** and neither waits on the other lane.
+- **`S02-C8` ∥ everything** — `globals.css` and its own test are in no other cluster's surface.
+  It is nevertheless **scheduled second-to-last**, because its selectors must match the class
+  names `S02-S17`, `S02-S34` and `S02-S37` introduce. Concurrency is available if a second seat
+  is free and the class names are agreed from this PLAN.
+- **`S02-C3` → `S02-C4` → `S02-C7`** — strictly sequential; all three write
+  `apps/ui/components/SignUpFlow.tsx`.
+- **`S02-C5` → `S02-C6`** — strictly sequential; both write `PrivacyPolicyModal.tsx`.
+- **`S02-C5` requires `S02-C1` and `S02-C2`** (it imports both modules).
+- **`S02-C7` requires `S02-C3`, `S02-C4`, `S02-C5`, `S02-C6`.**
+- **`S02-C9` requires all of them**, and is the only cluster that touches the other lane.
+
+**Also concurrent, and it is the point of the cut: `S02-C3`/`S02-C4` (the `SignUpFlow` chain)
+runs in parallel with `S02-C5`/`S02-C6` (the modal chain)** — they share no file. A two-seat
+schedule is C1∥C2 → {C3→C4} ∥ {C5→C6} → C7 → C8 → C9.
+
+### Standing gates — run and REPORTED by every cluster, deliberately NOT folded into the guard
+
+`BASELINE.md`'s rule is "assert the DELTA, never the absolute". Two of the three gates below
+are **RED at base by design**, so folding them into the cluster guard — which asserts a GREEN
+summary with no `failed` — would make every cluster command permanently red and unable to
+discriminate anything. They are therefore separate, named, and classified under §A9 beside the
+cluster commands.
+
+| Gate | Command (from the lane's `dialectical-engine/`) | The DELTA that is the acceptance |
+|---|---|---|
+| **G1 typecheck** | `pnpm run generate:contract && pnpm typecheck` | **MONOTONE DELTA, three asserted arms:** `generate:contract` exit `0` · `grep -cE '^\$ tsc --noEmit$'` on the captured output is `1` (**the run actually happened** — without this the guard passes vacuously when the script does not run, `COMMON.md` §10.19) · **zero** diagnostics outside `tests/unit/s14-ui.test.ts`. The pinned total (`8`, measured) is **reported, never asserted** — it is another mission's number and this guard must not go red the day they repair it (`TOOLING-TRAPS.md`). A seat reports "no diagnostic outside the pin", **never "green"**. `generate:contract` must run first — `packages/contract/generated/**` is gitignored and absent from a fresh worktree. |
+| **G2 token contract** | `pnpm exec vitest run tests/unit/t9-mode-tokens.test.ts` | **NAMED-FAILURE-SET DELTA (`COMMON.md` §10.12) + HIT-LIST COUNT (§10.18), anchored on ASCII test NAMES and never on the `×` glyph:** exit `1` · exactly **2** lines matching `^ FAIL +tests/unit/t9-mode-tokens\.test\.ts > ` · one of them ending `> renders one accessible toggle that reads the document mode, flips it, and persists it` and one ending `> leaves no mode-inert colour literal in the four Wave-0 product files` · the colour-literal **hit list counted at exactly 1** (`^\+ +"/.*:[0-9]+:`) with the pinned element (`.../apps/ui/app/globals.css:<n>:background: color-mix(...)`) asserted **separately so it cannot silently vanish** (the line number may shift). A third failing test, a different failing test, or a second hit is S02's finding. |
+| **G3 live source guard** | `pnpm exec vitest run tests/unit/v2ui-node-runner.test.ts` | exit 0, `Tests 2 passed (2)`. This is the guard that actually bites for R21 — `tests/architecture/auth-front-door-parity.test.ts` carries the same `terms` ban at `:86` but is RED at base on two `ENOENT`s and never reaches its assertions. |
+
+`tests/architecture/auth-front-door-parity.test.ts` is **RED at base and inherited, never
+claimed**: exit 1, `Tests 2 failed (2)`, both `ENOENT` on `web/package.json` and
+`web/components/LoginFlow.tsx`. S02 does not touch it and must not report it as anything else.
+
+### A9 — every cluster command RUN at base and PROVEN SATISFIABLE (rework round 1)
+
+**Re-run in full by ARCH-S02-REWORK-R1 under `COMMON.md` §10.16-§10.20**, because N7 changed
+three of the nine commands (`C4` 3→4 files, `C7` 2→5, `C9` 9→10), the chain-rule sweep changed
+a fourth (`C6` 1→2), and N1 added the two merge arms to `C9`. Round 1's A9 measured a command
+set that no longer exists.
+
+Run in `.worktrees/consent-s02/dialectical-engine` at `2b670d30`, branch `slice/consent-s02`,
+**lane `git status --porcelain` = 0 entries before and after**. Classified by CAUSE
+(`COMMON.md` §10.17): **BROKEN** = the command itself cannot run
+(`startup error|unexpected argument|failed to load|usage:|command not found`, or
+`no test files found` for a file that EXISTS); **RED-by-design** = `No test files found` /
+`cannot find module` / `Failed to resolve import` for a file or module this PLAN creates;
+**GREEN** = the summary line. The three cause counters are printed separately
+(`brokenSigs`, `cannotFindModule`, `noTestFiles`) so no reader has to infer which one fired.
+
+**A9 is a satisfiability proof, not a "does it run" check.** The proof has four parts and all
+four were executed: (1) every command run at base; (2) the guard fed **known-GOOD** synthetic
+captures, returning `VERDICT=0`; (3) **one mutant per guard term**, each flipping it; (4) the
+whole thing run **twice** — once inline in the authoring shell and once **from a `.sh` file
+under `/bin/bash`** — with both verdicts reported. The script is
+`scratchpad/arch-s02-rework-r1/a9.sh`. **Packet note: this seat's `allowed` list names new
+probe files as `arch-s02-rework-r1-*.mjs`, and §10.16 mandates a `.sh`; the script therefore
+lives in scratch, which the same list allows, and the orchestrator copies it at seat exit
+(`COMMON.md` §10.11).**
+
+**Why both shells, and why every guard term in this plan is ASCII.** Measured:
+
+```
+grep flavour, INLINE in the authoring shell : ugrep 7.8.4 aarch64-apple-macosx +neon/AArch64
+grep flavour, INSIDE the .sh under /bin/bash: grep (BSD grep, GNU compatible) 2.6.0-FreeBSD
+LC_ALL inside the script                     : C
+```
+
+Two different `grep` implementations under two different locales. **The two verdicts agree
+line for line**, because no term in this plan matches vitest's `✓`/`×` status glyph — those are
+2-3 bytes and `.` matches ONE BYTE in the C locale, so a glyph-matching term is `0` forever in
+any script, in CI and in the three-run loop while matching happily inline. Where a failing test
+must be identified, the anchor is the **test NAME** (`^ FAIL +<file> > <suite> > <name>$`), which
+is what gate **G2** below does.
+
+**PART 1 — the nine cluster commands at base. Result: 9 of 9 RAN, ZERO BROKEN, all nine
+correctly RED for their declared reason.** Verbatim, from the `.sh` run:
+
+```
+S02-C1 | vt=1 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=1
+S02-C1 | Tests    : <none>
+S02-C1 | TestFiles: <none>
+S02-C1 | raw      : No test files found, exiting with code 1
+S02-C2 | vt=1 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=1
+S02-C2 | Tests    : <none>
+S02-C2 | TestFiles: <none>
+S02-C2 | raw      : No test files found, exiting with code 1
+S02-C3 | vt=0 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=0
+S02-C3 | Tests    :       Tests  19 passed (19)
+S02-C3 | TestFiles:  Test Files  2 passed (2)
+S02-C4 | vt=0 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=0
+S02-C4 | Tests    :       Tests  19 passed (19)
+S02-C4 | TestFiles:  Test Files  2 passed (2)
+S02-C5 | vt=1 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=1
+S02-C5 | Tests    : <none>
+S02-C5 | TestFiles: <none>
+S02-C5 | raw      : No test files found, exiting with code 1
+S02-C6 | vt=1 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=1
+S02-C6 | Tests    : <none>
+S02-C6 | TestFiles: <none>
+S02-C6 | raw      : No test files found, exiting with code 1
+S02-C7 | vt=0 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=0
+S02-C7 | Tests    :       Tests  19 passed (19)
+S02-C7 | TestFiles:  Test Files  2 passed (2)
+S02-C8 | vt=1 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=1
+S02-C8 | Tests    : <none>
+S02-C8 | TestFiles: <none>
+S02-C8 | raw      : No test files found, exiting with code 1
+S02-C9 | vt=0 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=0
+S02-C9 | Tests    :       Tests  19 passed (19)
+S02-C9 | TestFiles:  Test Files  2 passed (2)
+S02-C9 | mergeArms: '--scrim:'=0 (expect 2)  'consent-ui S02' markers=0 (expect 2)
+### lane porcelain: 0 entries
+```
+
+**The INLINE run of the same nine, for comparison — identical verdicts, identical counters:**
+
+```
+S02-C1 | vt=1 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=1 | <none> | <none>
+S02-C2 | vt=1 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=1 | <none> | <none>
+S02-C3 | vt=0 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=0 |       Tests  19 passed (19) |  Test Files  2 passed (2)
+S02-C4 | vt=0 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=0 |       Tests  19 passed (19) |  Test Files  2 passed (2)
+S02-C5 | vt=1 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=1 | <none> | <none>
+S02-C6 | vt=1 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=1 | <none> | <none>
+S02-C7 | vt=0 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=0 |       Tests  19 passed (19) |  Test Files  2 passed (2)
+S02-C8 | vt=1 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=1 | <none> | <none>
+S02-C9 | vt=0 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=0 |       Tests  19 passed (19) |  Test Files  2 passed (2)
+### lane porcelain: 0 entries
+```
+
+**Classification, per cluster, and why each is RED rather than BROKEN:**
+
+| Cluster | `<n>` | Classification at base | The declared reason |
+|---|---|---|---|
+| S02-C1, C2, C5, C8 | 1 | **RED (declared)** | `No test files found` — **every** filter path in the command is a test file this PLAN creates and names, so it is RED-by-design and not BROKEN (`COMMON.md` §10.17). |
+| S02-C6 | 2 | **RED (declared)** | Both paths are files this PLAN creates (`C6`'s own, and `C5`'s under the chain rule). |
+| S02-C3 | 3 | **RED (discriminates)** | 2 of 3 files exist and are green (19 tests); the third is created by the cluster. `vt=0` but the guard is `1` — **the `Test Files` arm is the only thing that makes this RED instead of a false GREEN** (variant 7). |
+| S02-C4 | 4 | **RED (discriminates)** | 2 of 4 exist. Same shape; `<n>` raised from 3 by the chain rule (N7). |
+| S02-C7 | 5 | **RED (discriminates)** | 2 of 5 exist. `<n>` raised from 2 by the chain rule — **the single largest change this rework makes to the command set, and the one that closes the structural gap B1 fell through.** |
+| S02-C9 | 10 | **RED (discriminates), twice over** | 2 of 10 exist, **and** both merge arms read `0` because `S02-S66` has not run. Two independent declared reasons. |
+
+`cannotFindModule` is `0` everywhere at base only because no test file exists yet to import a
+missing module; once a cluster's test file is written and its module is not,
+`Cannot find module` is that cluster's declared RED and **not** BROKEN — the discriminator is
+in §How to read a step, and it is the packet finding P2.
+
+**PART 2 — the guard fed KNOWN-GOOD synthetic captures. All three `VERDICT=0`.** The guard is a
+PURE function of `(n, runner exit, Tests line, Test Files line)`, split out of `run()` exactly
+so a synthetic capture can be fed to it:
+
+```
+-- A: n=1,  exit 0, '      Tests  10 passed (10)'   / ' Test Files  1 passed (1)'
+      terms: T1=0  T2=0  T3=0  T4=0  -> VERDICT=0
+-- B: n=5,  exit 0, '      Tests  63 passed (63)'   / ' Test Files  5 passed (5)'
+      terms: T1=0  T2=0  T3=0  T4=0  -> VERDICT=0
+-- C: n=10, exit 0, '      Tests  120 passed (120)' / ' Test Files  10 passed (10)'
+      terms: T1=0  T2=0  T3=0  T4=0  -> VERDICT=0
+```
+
+**This is the arm round 1 did not have, and it is the one that matters:** nine RED commands
+prove only that the guard says no. Until it says YES on a capture that deserves a yes, an
+unsatisfiable guard — one no green run could ever pass — is indistinguishable from a strict one.
+
+**PART 3 — ONE MUTANT PER GUARD TERM. Every one flips the verdict.**
+
+| Term | What it asserts | The mutant that flips it | Result |
+|---|---|---|---|
+| **T1** | `^\s*Tests\s+[1-9][0-9]* passed` on the summary line | `Tests  0 passed (0)` — an empty suite with the right file count | `T1=1 VERDICT=1` |
+| **T1** | (anchoring) | the words appear in a TEST TITLE, not at line start: `x should print Tests  9 passed (9) when done` | `T1=1 VERDICT=1` |
+| **T2** | the summary contains no `failed` | `Tests  1 failed \| 9 passed (10)` | `T2=1 VERDICT=1` |
+| **T3** | `Test Files <n> passed (<n>)` | **variant 7**: one named file did not exist, so `Test Files 4 passed (4)` against `n=5` | `T3=1 VERDICT=1` |
+| **T3** | (presence) | the `Test Files` line absent entirely | `T3=1 VERDICT=1` |
+| **T4** | the runner exited `0` | a green-looking summary with `vt=1` | `T4=1 VERDICT=1` |
+
+**PART 4 — the C9 MERGE ARMS and their mutants** (`ARCH-REV-S02-r1` **N1**). Live at base both
+arms read `0`; the pure form is exercised on four cases:
+
+```
+-- live, at base: '--scrim:'=0 (expect 2)  'consent-ui S02' markers=0 (expect 2)   -> 1
+-- known-GOOD synthetic (post-merge): s01=2 s02=2                                  -> 0
+-- mutant: the merge lost S01's block  s01=0 s02=2                                 -> 1
+-- mutant: the merge lost S02's block  s01=2 s02=0                                 -> 1
+-- mutant: S02's block duplicated      s01=2 s02=4                                 -> 1
+```
+
+Round 1's C9 column claimed the mutant *"the merge losing S01's or S02's `globals.css` block"*
+against a command that could not detect it. It can now, and the claim is measured rather than
+asserted.
+
+**PART 5 — the THREE standing gates, now MECHANICAL commands with their own mutants**
+(`COMMON.md` §10.18 hit-list counting, §10.19 sub-command exit codes, §10.20 reported and not
+folded). Round 1 stated these as prose deltas; a prose delta cannot be run three times.
+
+```
+      G1 raw   : generateExit=0 typecheckExit=1 tscRan=1 s14=8 all=8
+      G1 terms: generateExit=0 tscRanFingerprint=1 diagnosticsElsewhere=0 | s14Total=8 (reported, NOT asserted)
+   G1 VERDICT=0   (the DELTA holds)
+   mutants:  a diagnostic OUTSIDE the pinned file       -> 1
+             typecheck never ran (no fingerprint line)  -> 1
+             generate:contract never ran (exit 127)     -> 1
+             the OTHER mission REPAIRS its 8 (s14 -> 0) -> 0   <- the guard MUST survive this
+
+      G2 terms: exit=1 FAILlines=2 toggleNamed=1 literalNamed=1 hitList=1 pinnedHit=1
+   G2 VERDICT=0   (named-failure-set delta + hit-list count, both anchored on ASCII)
+   mutants:  a THIRD test fails -> 1
+             a SECOND colour literal (hit list 2) -> 1
+             the PINNED hit silently vanished -> 1
+             a DIFFERENT test failed instead of the toggle -> 1
+             the file went green, i.e. the pin itself disappeared -> 1
+
+S02-G3 | vt=0 VERDICT=0 | brokenSigs=0 cannotFindModule=0 noTestFiles=0
+S02-G3 | Tests    :       Tests  2 passed (2)
+S02-G3 | TestFiles:  Test Files  1 passed (1)
+   G3 VERDICT=0   (green at base, so the ordinary guard applies unchanged)
+```
+
+**G1 is in the MONOTONE-DELTA form, and that is a correction to round 0.** `TOOLING-TRAPS.md`
+("assert what must not appear, never what must remain broken"): a guard that asserts the pinned
+diagnostic TOTAL is asserting **another mission's number**, and it goes red the day that mission
+repairs its own file — a guard that fails on someone else's SUCCESS. So the three asserted arms
+are (a) `generate:contract` exited `0`, (b) **`tsc` actually ran** — `grep -cE '^\$ tsc --noEmit$'`
+is `1`, which is the fingerprint that stops a run that never happened from passing vacuously
+(`COMMON.md` §10.19), and (c) **zero** diagnostics outside `tests/unit/s14-ui.test.ts`. The
+total (`8`) is **printed and not asserted**, and the last mutant above proves the difference:
+the guard stays green when the other mission drops to `0`. **G2 keeps its exact-count form
+because `COMMON.md` §10.12 and §10.18 require it there** (the named-failure-set must be exactly
+the pinned set, and the hit list must be exactly the baseline count plus the pinned element) —
+these are this mission's own pins on its own file, not another mission's number.
+
+**G2's two named failures, quoted so the anchor is checkable:**
+`tests/unit/t9-mode-tokens.test.ts > T9-C3 mode control and document guard > renders one accessible toggle that reads the document mode, flips it, and persists it`
+and `… > leaves no mode-inert colour literal in the four Wave-0 product files`.
+**The hit-list arm counts the received ARRAY's elements** (`^\+ +"/.*:[0-9]+:`), not the `FAIL`
+line: a second offending colour literal adds an array element and changes neither the `FAIL`
+count nor the summary, so counting failures alone would miss it (`COMMON.md` §10.18). The
+pinned element is asserted separately so it cannot silently vanish. All three gates match
+`BASELINE.md`. **G1 and G2 are RED for their pinned, inherited reasons — a seat reports the
+delta, never the word "green".**
+
+**PART 6 — the ADR id measurement behind `S02-S72`:**
+
+```
+$ ls docs/architecture/01-decisions/ | tail -3
+ADR-0017-durable-execution-hatchet.md
+ADR-0018-deployment-topology.md
+README.md
+```
+
+Highest on disk is `0018`; the orchestrator allocated `0019` to S01 and `0020` to S02.
+
+### Trace and count re-measurement (rework round 1)
+
+Every count in this file carries the command that produced it and that command's pasted output
+(`COMMON.md` §10.10 corollary; `ARCH-REV-S02-r1` **N2**, **N8**). Re-run after this round's
+edits, from `docs/missions/consent-ui/slices/S02/`:
+
+```
+$ grep -cE '^\*\*S02-R[0-9]{2} ' SPEC.md
+24
+$ grep -cE '^\| S02-R[0-9]{2} \|' PLAN.md
+24
+$ grep -oE 'S02-S[0-9]{2}' PLAN.md | sort -u | wc -l
+      72
+$ grep -cE '^- \*\*S02-S[0-9]{2} ' PLAN.md
+72
+$ md5 -q SPEC.md
+ad060bda81db71f00f4c70b1dbf63f2f
+```
+
+And mechanically, both directions at once
+(`python3 .hermes/reports/consent-ui/probes/arch-rev-s02-trace.py`, run from the repo root):
+
+```
+SPEC R-ids defined: 24 unique: 24
+PLAN trace rows: 24
+R-ids in SPEC missing a trace row: []
+trace rows with no SPEC R-id     : []
+
+steps DEFINED as '- **S02-Snn ' headers: 72 unique: 72
+duplicate step definitions: []
+distinct S02-Snn tokens anywhere in PLAN: 72
+tokens referenced but never DEFINED: []
+
+distinct step ids appearing in the trace table: 72
+DEFINED steps that appear in NO trace row (range '...' not expanded): []
+
+refutation-table rows: 72 unique: 72
+DEFINED steps with no refutation row: []
+refutation rows for undefined steps  : []
+
+steps per cluster (by document position):
+    S02-C1 11 S02-S01 .. S02-S72
+    S02-C2 6 S02-S11 .. S02-S16
+    S02-C3 9 S02-S17 .. S02-S70
+    S02-C4 6 S02-S25 .. S02-S32
+    S02-C5 7 S02-S33 .. S02-S39
+    S02-C6 9 S02-S40 .. S02-S48
+    S02-C7 13 S02-S49 .. S02-S29
+    S02-C8 7 S02-S59 .. S02-S65
+    S02-C9 4 S02-S66 .. S02-S69
+    total: 72
+```
+
+**`S02-C4` reads `6` and `S02-C7` reads `13` — those two numbers ARE `ARCH-REV-S02-r2` B3**,
+re-measured after the move, not adjusted by hand. **The probe groups steps by the
+`### Cluster S02-Cn` heading a step sits UNDER**, so a step whose body says `Cluster **C7**`
+while sitting in C4's section would be counted in C4 and the two statements would silently
+disagree — the B4 class. `S02-S28` and `S02-S29` are therefore written out **physically inside
+§Cluster S02-C7**, after `S02-S71`, exactly as `S02-S70`/`S02-S71`/`S02-S72` were appended
+inside their own cluster sections in round 1. **`total: 72` is unchanged and no id moved:** the
+`C7` range now prints `S02-S49 .. S02-S29` because the range is first-and-last by document
+position, not a numeric span.
+
+**`distinct step ids appearing in the trace table` now reads 72, not 64** — that number IS
+`ARCH-REV-S02-r1` N2, and it moved because the range notation was expanded, not because the
+counting rule was reinterpreted.
+
+**The two counts N8 found wrong, restated with the command that produces each** (run from the
+same directory; `COMMON.md` §10.10 corollary):
+
+```
+$ grep -c '^- 2026-09-06 · .*· ARCH-S02$' DECISIONS.md          # round-0 architecture entries
+28
+$ grep -c '^- 2026-09-06 · .*Rejected.*· ARCH-S02$' DECISIONS.md  # of those, carrying a 'Rejected' clause
+4
+$ grep -c '^- 2026-09-06 · .*· ARCH-S02-REWORK-R1.*$' DECISIONS.md  # entries appended by THIS round
+14
+$ grep -c -i 'REJECTED' DECISIONS.md                            # the whole file, any form
+9
+```
+
+**28, not the 30 the round-0 handoff stated; 4 with the marker word, not 9.** The round-0
+substance was broader than 4 — several entries record an alternative without using the word —
+but a count offered as the evidence for `COMMON.md` §10.1's discharge of brainstorming's human
+gate has to be the measured one. **This round's own answer to that discharge is the four
+rejected B1 mechanisms, each with the measurement that rejected it** (`DECISIONS.md`, entry
+"Rejected alternatives for B1"), which is a stronger record than a marker-word count.
+
+
+### The R17 oracle, re-run by ARCH-S02 at authoring time
+
+`node .hermes/reports/consent-ui/probes/v3-r17-cases-probe.mjs`, React 19.2.8 / jsdom 30.0.1,
+6 cases × 4 implementation variants × 3 runs, **all three runs identical**. Run 3 verbatim:
+
+```
+  case                                                                      A   B   C   D
+  case 1  neither box -> disabled                                           PASS  PASS  PASS  PASS
+  case 2  only adult-affirmed via click() -> disabled                       PASS  PASS  PASS  PASS
+  case 3  only privacy-accepted via click() -> disabled                     PASS  PASS  PASS  PASS
+  case 4  both via click() -> NOT disabled                                  PASS  PASS  PASS  PASS
+  case 5  assign true both/no dispatch -> disabled; reset false; click both -> enables PASS  PASS  PASS  PASS
+  case 6  assign adult only/no dispatch; click privacy; adult .checked STILL true + still disabled PASS  RED   PASS  RED
+  legend: A=uncontrolled+FormData (pinned)  B=controlled+mirror  C=uncontrolled+mirror  D=controlled+FormData
+```
+
+**What this buys the six steps `S02-S25`…`S02-S30`:** the controlled-inputs guarantee lives on
+case 6 and nowhere else (RED under exactly B and D). A coding seat that finds case 5 detecting
+nothing has not found a defect — that is measured and recorded.
+
+**What it does NOT buy, and this is `ARCH-REV-S02-r2` B3.** This oracle's four variants all
+carry the R17 mirror **and no row click rule** — the component as `S02-C4` leaves it. Under
+that component a bare privacy `.click()` ticks the box, so cases 4 and 5 pass. They do not
+survive `S02-C7`, which is where the click rule and the B1 mirror correction land, and since
+round 1 the N7 chain rule puts `consent-signup-gate.test.tsx` inside **C7's own** verification
+command. **"All six PASS under the pinned variant" was true of the stage it was measured at and
+false of the finished component, and the plan carried it as if it were unconditional.**
+
+### The three-stage R17 oracle — the successor probe, and B3's discharge
+
+Any future edit to R17's six cases re-runs THIS one, not only the four-variant matrix above: it
+is the one that runs the cases against the component at more than one stage.
+
+`node .hermes/reports/consent-ui/probes/arch-s02-rework-r2-r17-post-c7-fixed.mjs`,
+React 19.2.8 / jsdom 30.0.1, **three invocations, all identical**, corrected case-4/case-5
+route. Run 3 verbatim:
+
+```
+===== STAGE c4 =====
+  PASS  S02-S25 case1 neither          -> expect disabled=true 
+  PASS  S02-S26 case2 only adult       -> expect disabled=true 
+  PASS  S02-S27 case3 only privacy     -> expect disabled=true 
+  FAIL  S02-S28 case4 BOTH via the modal ack -> expect disabled=FALSE  ERROR:NO MODAL AT THIS STAGE — the acknowledgement route does not exist until C7 wires the modal into SignUpFlow; this case cannot live in cluster C4
+  FAIL  S02-S29 case5 assign,reset,modal ack -> expect disabled=FALSE  ERROR:NO MODAL AT THIS STAGE — the acknowledgement route does not exist until C7 wires the modal into SignUpFlow; this case cannot live in cluster C4
+  PASS  S02-S30 case6 assign adult,click privacy -> disabled=true+adult stays true
+  ---- STAGE c4: 4/6 pass, 2 FAIL
+
+===== STAGE c7 =====
+  PASS  S02-S25 case1 neither          -> expect disabled=true 
+  PASS  S02-S26 case2 only adult       -> expect disabled=true 
+  PASS  S02-S27 case3 only privacy     -> expect disabled=true 
+  PASS  S02-S28 case4 BOTH via the modal ack -> expect disabled=FALSE
+  PASS  S02-S29 case5 assign,reset,modal ack -> expect disabled=FALSE
+  PASS  S02-S30 case6 assign adult,click privacy -> disabled=true+adult stays true
+  ---- STAGE c7: 6/6 pass, 0 FAIL
+
+===== STAGE c7-unfixed =====
+  ---- STAGE c7-unfixed: 6/6 pass, 0 FAIL
+```
+
+**Read the two stage lines together — they are the whole of B3's remedy.** `STAGE c7: 6/6 pass`
+is the discharge: the corrected cases are satisfiable against the finished component.
+`STAGE c4: 4/6 pass` with `NO MODAL AT THIS STAGE` is the reason they had to leave C4: the
+acknowledgement is the only lawful route to a ticked `privacy-accepted`, and it does not exist
+until C7. **`STAGE c7-unfixed` no longer discriminates** (6/6) and is retained only as the
+reviewer's contrast control — under the corrected route the desync is not what makes the cases
+pass, which is precisely the property that was missing before.
+
+**The RED control, the reviewer's own probe left byte-untouched, run in the same session:**
+
+```
+$ node .hermes/reports/consent-ui/probes/arch-rev-s02-r2-r17-post-c7.mjs
+  ---- STAGE c4: 6/6 pass, 0 FAIL
+  ---- STAGE c7: 4/6 pass, 2 FAIL
+  ---- STAGE c7-unfixed: 6/6 pass, 0 FAIL
+```
+
+### The contrast measurement behind `S02-S64`, run by ARCH-S02
+
+`node scratchpad/arch-consent-s02/env-probe.mjs`, WCAG 2.2 relative luminance (the same formula
+as `tests/support/contrast.ts:1-11`), disabled `I have read it` composited over the footer's
+`--shell` ground, both modes:
+
+```
+   opacity 0.45 : Terracotta #969189/#f4efe8 2.74   |   Chamber #80796e/#1c1813 4.10
+   opacity 0.50 : Terracotta #8c8880/#f4f0e9 3.11   |   Chamber #8a8478/#1b1713 4.80
+   opacity 0.55 : Terracotta #827e76/#f5f0e9 3.57   |   Chamber #948e82/#1a1612 5.53
+   opacity 0.60 : Terracotta #78746c/#f5f1ea 4.13   |   Chamber #9f988b/#1a1612 6.29
+   opacity 0.65 : Terracotta #6e6a63/#f6f1eb 4.79   |   Chamber #a9a295/#191511 7.17
+   opacity 0.70 : Terracotta #646159/#f6f2ec 5.54   |   Chamber #b4ac9f/#181511 8.09
+   enabled (no opacity) : Terracotta 14.00   |   Chamber 15.72
+```
+
+**`opacity: .65` is the pin**: the smallest 0.05 step clearing 4.5:1 in BOTH modes, i.e. the
+most dimmed value that still passes. Terracotta is the binding mode (4.79 vs Chamber's 7.17).
+
+### The jsdom facts behind `S02-S08`, `S02-S40`…`S02-S43` and `S02-S48`, run by ARCH-S02
+
+```
+jsdom 30.0.1
+M2 typeof window.matchMedia : undefined
+M3 default scrollTop/clientHeight/scrollHeight : 0 0 0
+M3 after defineProperty                       : 0 200 500
+M3 redefine scrollTop=292 -> reached? (292+200>=500-8): true
+M3 redefine scrollTop=291 -> reached? (291+200>=500-8): false
+M3 typeof el.scrollIntoView                   : undefined
+M3 typeof el.focus / document.activeElement   : function BODY
+```
+
+**Two of these would have cost a coding round each:** an unguarded `window.matchMedia` call
+throws in every render test that mounts the modal, and an unguarded `scrollIntoView` throws on
+every pill click. Both now have a guarded shape pinned in `S02-S08` and `S02-S48`.
+
+A cluster is the smallest group of steps verifiable together, independently of the rest of the
+slice. It is also the review unit: a reviewer probes a cluster, never a whole-slice diff. The
+`mutant class` column names the defect the cluster's command would catch if introduced —
+a cluster whose command passes under its own mutant is not a verification.
+
+## DDD and module boundaries (ARCH-S02)
+
+### Bounded contexts this slice touches
+
+| Context | What S02 does in it | Who else is in it |
+|---|---|---|
+| **Registration** (`apps/ui/components/SignUpFlow.tsx`, `packages/contract`) | Adds a second pre-condition to the *local* act of registering. **Adds nothing to the request.** `client.register(email, password, recoveryEmail, adultAffirmed)` keeps four positional arguments (`packages/contract/src/client.ts:215-220`). | `apps/api`, `migrations`, the contract package — **all read-only for this mission**. |
+| **Policy content** (`apps/ui/lib/privacyPolicy.ts`, new) | Introduces the policy as **data**: two frozen exported constants, transcribed from the design. No component, no storage, no network. | Nobody. This module is new and S02 is its only writer. |
+| **Modal semantics** (`apps/ui/components/consent/modalSemantics.ts`, new) | Introduces the mission's one behavioural boundary: focus trap, initial focus, focus return, backdrop close, reduced-motion, **and the Esc stack**. | **S01 consumes it unchanged**; ticket `A11Y-OVERLAYS` (`t_8962842f`) will later retrofit seven existing overlays onto it. |
+| **Consent surfaces** (`apps/ui/components/consent/`) | Owns `PrivacyPolicyModal.tsx` and `modalSemantics.ts`. | **S01 owns everything else in that directory**, including `apps/ui/lib/consent.ts` and the browser-local consent preferences. |
+| **Browser-local consent preferences** (`localStorage['debateai.consent']`) | **S02 does not enter this context at all.** It reads and writes no storage, and `SignUpFlow.tsx` may not even contain the substring `localStorage` (R21, enforced by `authRoutes.source-test.mjs:48`). | S01 alone. |
+
+### Invariants S02 owns
+
+1. **The privacy box is ticked only through the modal's acknowledgement.** Every other route —
+   a click on the unchecked square, text or link; `×`; `Esc`; a backdrop click — leaves it
+   `false`. Pinned by `S02-S49`…`S02-S51`, `S02-S54`…`S02-S56`.
+2. **The DOM is the truth at submit; React state is the truth for the button.** `FormData` is
+   read for the refusal (`S02-S31`); the mirror computes only `disabled` (`S02-S25`…`S02-S30`).
+   Violating this in either direction breaks a measured test: reading the mirror at submit takes
+   `auth-flow-integration.test.tsx` from 18 to 15; controlling the inputs turns `S02-S30` red.
+3. **Exactly one surface acts on one `Escape`, and it is the topmost.** Owned by
+   `modalSemantics.ts`, pinned at the mechanism (`S02-S01`) and at both consumers (`S02-S56`).
+4. **Exactly one `document`-level `keydown` listener exists across both slices**
+   (`S02-S10`).
+5. **The modal owns no consent state and reads or writes no storage** — it is prop-driven, and
+   `onAcknowledge` fires only from `I have read it` and only in `mode="consent"` (`S02-S39`,
+   `S02-S47`).
+6. **The scroll gate latches.** Once satisfied it never re-closes (`S02-S41`).
+7. **Every colour S02 ships is a `var(--token)` reference** (`S02-S60`) — which is what makes
+   invariant 8 free.
+8. **Both surfaces follow `html[data-mode]` with nothing wired** (R23).
+
+### Domain terms this slice introduces
+
+`consent group` (the bordered two-row box) · `consent row` · `privacy acceptance` (the local,
+un-transmitted fact, distinct from `adult affirmation`, which IS transmitted) · `policy jump`
+(a pill) · `policy section` · `scroll-to-end gate` · `acknowledgement` (the only tick path) ·
+`modal surface` (a registration in the Esc stack) · `Esc stack` (topmost consumes).
+
+### What S02 must NOT touch
+
+`apps/api/**` · `packages/**` (the registration request keeps its exact shape, R19) ·
+`migrations/**` · `tools/**` · `apps/runner/**` · `apps/scheduler/**` · MFA / verify-email /
+login / recovery flows · `tests/unit/registration*.test.ts` · `tests/integration/**` · **both
+`globals.css` token blocks and `tests/unit/t9-mode-tokens.test.ts` (S01 is their sole writer)**
+· `apps/ui/app/layout.tsx` · `apps/ui/app/settings/page.tsx` · `apps/ui/components/AuthShell.tsx`
+· `apps/ui/lib/consent.ts` and every other S01-owned file under `apps/ui/components/consent/` ·
+the retrofit of the seven existing overlays (ticket `A11Y-OVERLAYS`, `t_8962842f`) ·
+`apps/ui/scripts/node-test-manifest.json` (**not needed — S02 adds no `*.source-test.mjs`;
+DECISIONS records when it would be**).
+
+### Is an ADR warranted?
+
+**Yes, for `modalSemantics.ts`. It is not written by the ARCHITECTURE seat — it is written by
+the C1 CODING seat, as step `S02-S72`, and the path is fixed:
+`docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md`, status `Proposed` (V
+ratifies).** *(Rework round 1: round 0 named this an unnumbered `ADR-0NN` with no step and no
+owner, which is an ADR nobody writes. The orchestrator's note on `t_3160e2d5` allocated the
+number and the owner; `S02-S72` carries the acceptance arms and the id measurement.)* The
+Esc-stack rule — *the
+topmost open surface consumes Esc and no other surface acts on the same event* — is law for
+every future overlay in this repo, not for these two: `A11Y-OVERLAYS` (`t_8962842f`) exists
+precisely to retrofit seven existing `aria-modal` overlays onto it, and today
+`createPortal`/`Escape`/`focusTrap`/`.focus()`/`addEventListener("keydown"` return **0 hits**
+under `apps/ui`. That is a new repo-wide boundary and it outlives the mission, which is the
+ADR test. Creating the file is outside the ARCHITECTURE seat's `allowed` list; this paragraph
+plus the DECISIONS lines is what `S02-S72` transcribes, and no seat decides anything new there.
+
+Nothing else here warrants one: the policy data module and the two components are mission-local
+and die with the slice's file surface.
+
+---
+
+## Boundaries (allowed / forbidden)
+
+**Allowed — S02's exclusive write surface** (from `SPEC.md` §Parallel-safety):
+`apps/ui/components/SignUpFlow.tsx` · `apps/ui/components/consent/PrivacyPolicyModal.tsx` ·
+**`apps/ui/components/consent/modalSemantics.ts` — the ONE shared modal-semantics helper
+(focus trap, initial focus, focus return, backdrop close, `prefers-reduced-motion`, Esc
+stack), written by S02 and consumed unchanged by S01 (`COMMON.md` §10.7). It is the first
+artefact of the mission: S01's preferences card cannot satisfy its own S01-R18 or the Esc
+stack until it exists** · `apps/ui/lib/privacyPolicy.ts` · ONE delimited block `/* === consent-ui S02 === */ … /* ===
+end consent-ui S02 === */` at the end of `apps/ui/app/globals.css`, after S01's · its changes
+to `tests/render/auth-flow-integration.test.tsx` · new tests under `tests/render/` ·
+`apps/ui/scripts/node-test-manifest.json` **only** if it adds a `consent/*.source-test.mjs` ·
+**`docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md`** (added in rework round 1
+by the orchestrator's note on `t_3160e2d5`; written by the C1 coding seat as `S02-S72`, status
+`Proposed`, V ratifies — **S02 may create that one file and no other ADR**).
+
+**Forbidden:** `apps/api/**` · `packages/**` (including
+`packages/contract/src/client.ts` — the registration request keeps its exact shape, S02-R19) ·
+`migrations/**` · `tools/**` · `apps/runner/**` · `apps/scheduler/**` · MFA / verify-email /
+login / recovery flows · `tests/unit/registration*.test.ts` · `tests/integration/**` · **both
+`globals.css` token blocks and `tests/unit/t9-mode-tokens.test.ts` (S01 is their sole
+writer, S02-R22)** · `apps/ui/app/layout.tsx` · `apps/ui/app/settings/page.tsx` ·
+`apps/ui/lib/consent.ts` and every other S01-owned file under `apps/ui/components/consent/`
+(that is: everything there except this slice's own `PrivacyPolicyModal.tsx` and
+`modalSemantics.ts`) · **the retrofit of the seven existing overlays onto the shared helper —
+that is ticket `A11Y-OVERLAYS` (`t_8962842f`), outside this mission** ·
+any protocol document · `~/.claude/skills` and `.claude/skills` · a new npm dependency
+without a DECISIONS line and a V row.
+
+**Must stay green, not be changed:** `apps/ui/components/authRoutes.source-test.mjs` — `:45`
+(`name="adult-affirmed"` still followed by `required`), `:48` (the copy ban), `:165` (the
+sign-up + login `<form>` count stays 3). And `tests/render/auth-flow-integration.test.tsx:327-332`
+keeps asserting exactly four positional arguments to `register`.
+
+**Git:** coding seats commit only on `slice/consent-s02`, inside `.worktrees/consent-s02`,
+only when their owned clusters are GREEN on the worst of three runs, and never amend a
+reviewed commit. No push, no merge, no Done — V performs every merge and every Done.
+
+### Per-cluster boundaries (ARCH-S02) — each row IS the coding seat's `allowed` list
+
+A seat dispatched on a cluster may write the files in its row and nothing else. Every file not
+in its row is forbidden to it, including files another S02 cluster owns.
+
+**RUNNING a test file is not WRITING it — stated because the chain rule (`ARCH-REV-S02-r1` N7)
+now puts other clusters' test files inside `C4`'s, `C6`'s, `C7`'s and `C9`'s verification
+commands.** Those files are **read-only** to the seat: if an earlier cluster's test goes red,
+that is a finding against the current seat's change, and the remedy is to fix the change — never
+to edit the earlier test. A seat that believes the earlier test is itself wrong files a finding
+and stops (`heartbeat-protocol` §2.7). The `allowed` column below is unchanged by the chain
+rule and remains the write surface.
+
+| Cluster | `allowed` (exhaustive) | `forbidden` beyond the slice-level list above |
+|---|---|---|
+| **S02-C1** | `apps/ui/components/consent/modalSemantics.ts` (create) · `tests/render/consent-modal-semantics.test.tsx` (create) · **`docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md` (create — `S02-S72`, status `Proposed`; V ratifies)** | `SignUpFlow.tsx` · `PrivacyPolicyModal.tsx` · `privacyPolicy.ts` · `globals.css` · `auth-flow-integration.test.tsx` · every other ADR in `docs/architecture/01-decisions/`, including S01's `ADR-0019-consent-storage-contract.md` |
+| **S02-C2** | `apps/ui/lib/privacyPolicy.ts` (create) · `tests/unit/consent-privacy-policy-data.test.ts` (create) | everything C1 and C3-C8 own |
+| **S02-C3** | `apps/ui/components/SignUpFlow.tsx` · `tests/render/consent-signup-group.test.tsx` (create) · `tests/render/auth-flow-integration.test.tsx` (**three inserted lines, one after each occurrence of `field("adult-affirmed").checked = true;`, identified by the three `it(...)` titles listed in `S02-S22`; count arms `3`/`3`. `S02-S22` is the authoritative statement of this edit — the numbers this row used to carry (`:324`, `:448`, `:466`) were pre-edit positions that shift as soon as the first line is inserted, which is `ARCH-REV-S02-r1` N6 and was carried over as `ARCH-REV-S02-r2` N6**) | `globals.css` · both consent components · `privacyPolicy.ts` |
+| **S02-C4** | `apps/ui/components/SignUpFlow.tsx` · `tests/render/consent-signup-gate.test.tsx` (create) · `tests/render/auth-flow-integration.test.tsx` (**one added case and nothing else**) | as C3, **plus `tests/render/consent-signup-group.test.tsx`, which C4's command RUNS and C4 may not WRITE** |
+| **S02-C5** | `apps/ui/components/consent/PrivacyPolicyModal.tsx` (create) · `tests/render/consent-policy-modal-render.test.tsx` (create) | `modalSemantics.ts` (**consume it; if it needs a change, that is a finding against C1, not an edit here**) · `privacyPolicy.ts` (same rule) · `SignUpFlow.tsx` · `globals.css` |
+| **S02-C6** | `apps/ui/components/consent/PrivacyPolicyModal.tsx` · `tests/render/consent-policy-modal-behaviour.test.tsx` (create) | as C5, **plus `tests/render/consent-policy-modal-render.test.tsx`, which C6's command RUNS and C6 may not WRITE** |
+| **S02-C7** | `apps/ui/components/SignUpFlow.tsx` · `tests/render/consent-signup-modal.test.tsx` (create) | `PrivacyPolicyModal.tsx` · `modalSemantics.ts` · `privacyPolicy.ts` · `globals.css` · **`tests/render/consent-signup-group.test.tsx` and `tests/render/consent-signup-gate.test.tsx`, which C7's command RUNS and C7 may not WRITE** |
+| **S02-C8** | `apps/ui/app/globals.css` (**ONE delimited block appended at the END of the file; not one character above the opening marker**) · `tests/unit/consent-s02-style-contract.test.ts` (create) | every `.ts`/`.tsx` under `apps/ui/components/` and `apps/ui/lib/` · both `globals.css` token blocks · `tests/unit/t9-mode-tokens.test.ts` |
+| **S02-C9** | nothing — **no product edit**; the merge is the orchestrator's | every file |
+
+### The single-writer rule against S01, and the mechanics of the cross-slice dependency
+
+**The only file both slices write is `apps/ui/app/globals.css`.** S01 appends
+`/* === consent-ui S01 === */ … */` at the end; **S02 appends
+`/* === consent-ui S02 === */ … /* === end consent-ui S02 === */` after it and touches nothing
+above its own opening marker** (`S02-S59` asserts both halves). The two blocks conflict
+trivially at merge time; that is **accepted** (vertical-slice law §6) and the resolution is
+both blocks in that order. It is not a reason to serialize the lanes.
+
+**Two S02-owned TypeScript files are consumed unchanged by S01:**
+`apps/ui/components/consent/modalSemantics.ts` (S01's card takes its focus trap, focus return
+and the Esc stack from it — S01-R18) and `apps/ui/components/consent/PrivacyPolicyModal.tsx`
+(S01's `Privacy notice` link opens it with `mode="read"` — S01-R20, whose interface paragraph
+is byte-identical to S02-R14 and which **neither slice may change alone**).
+
+**The dependency measured in both directions, and why it is NOT a deadlock:**
+
+- **S02 needs four of S01's tokens** — `--ok-edge`, `--scrim`, `--z-policy-scrim`,
+  `--z-policy-card` (measured: `grep -c -- '<token>:' apps/ui/app/globals.css` → `0` for each;
+  the fifth token `SPEC.md` R22 names, `--ok-dot`, **already exists** with `2` declarations and
+  is not S01's to add).
+- **But no S02 cluster is blocked by that.** `modalSemantics.ts` and `privacyPolicy.ts`
+  reference no token; the two components reference tokens only through CSS classes; and
+  `S02-C8`'s CSS may be written and fully verified against an undeclared custom property,
+  because `tests/unit/t9-mode-tokens.test.ts:376-377` asserts set equality over
+  **declarations** and its colour-literal gate (`:541-561`) scans for `#hex`/`rgb(`/`oklch(`
+  literals — a `var()` reference is neither. **Only the browser appearance waits on S01.**
+- **The merge is therefore ONE step and it is LAST:** `S02-S66` in cluster `S02-C9`.
+  **The orchestrator performs `git merge slice/consent-s01` inside the lane; a coding seat
+  never runs `merge`.** The seat records the commit it received —
+  `git log -1 --format=%h slice/consent-s01` — and the merge commit, in its handoff.
+- **In the other direction:** S01's lane pulls `slice/consent-s02` after `S02-C1` is committed
+  (the helper), and again after `S02-C5`/`S02-C6` (the modal). That is S01's PLAN's business;
+  S02's obligation is only to land `S02-C1` **first**, which is why it is the first cluster.
+
+## Refutation table (step · failure caught · failure NOT caught)
+
+**Authored by ARCH-S02.** Every step owes an honest second column. Where jsdom cannot observe
+the thing, the second column says so and names the V step that can.
+
+| Step | Failure this step's test CATCHES | Failure it does NOT catch |
+|---|---|---|
+| S02-S01 | Two surfaces closing on one `Escape`; a per-surface listener; a FIFO instead of a LIFO stack | Whether a real browser delivers the key to `document` at all (V step 7); an `Escape` typed while focus is outside the modal |
+| S02-S02 | Initial focus left on `body`, or landing on the first focusable rather than the named one | Whether the focus ring is *visible* in either mode (V steps 1-14, `--focus`) |
+| S02-S03 | Focus dropped to `body` on close | Focus return when the opener has been removed from the DOM meanwhile |
+| S02-S04 | A trap that lets Tab escape forward to the page behind | Browser-native focus order differences (jsdom does not implement sequential focus navigation; the test drives the handler) |
+| S02-S05 | A trap implemented in one direction only — the single commonest way to half-build one | As S02-S04 |
+| S02-S06 | A focusable list cached at open, so `I have read it` is unreachable after the gate opens | A control made focusable by CSS (`visibility`, `display`) rather than by attribute |
+| S02-S07 | A scrim handler that closes on any click inside the modal | Pointer-down-inside/up-outside drags, which a real browser reports as a scrim click |
+| S02-S08 | An unguarded `window.matchMedia` — **which throws in every render test that mounts the modal** (measured: `undefined` in jsdom 30.0.1) | Whether the OS/browser setting is actually honoured (V, with reduced motion enabled) |
+| S02-S09 | A stack that never pops, swallowing every later `Escape` | A surface unmounted without closing (React `StrictMode` double-invocation is not exercised) |
+| S02-S10 | A second `document` keydown listener — the exact defect REQ-REV-01 B3 predicts two parallel lanes would produce | A listener added on `window` instead of `document` |
+| S02-S11 | Pills sorted into document order — the coder's reflex the design forbids | A label with a typo that is still in the right position **(caught by the deep equality, not by the sort check)** |
+| S02-S12 | A dropped, duplicated or renumbered section | A body string swapped between two sections **(caught by S02-S16)** |
+| S02-S13 | Bullets added to a section that has none, or a list truncated | A bullet with the right count and the wrong text **(caught by S02-S16)** |
+| S02-S14 | A pill pointing at a section that does not exist, or at the wrong one | Whether clicking it scrolls **(V step 12; the CALL is pinned by S02-S48)** |
+| S02-S15 | An accent taken from document order rather than R12's table (e.g. section 09 given `--con`) | Whether the token renders the design's colour (V steps 11, and the token values are S01's) |
+| S02-S16 | A `\uXXXX` escape shipped as six visible characters; any body or bullet mistranscription | A character that is visually identical but a different codepoint in **both** the SPEC and the module |
+| S02-S17 | The group missing, or one input outside it | Whether the box *looks* like the artboard (V steps 1-2) |
+| S02-S18 | The old 18+ wording surviving; a comma or capital wrong in either sentence | Whether `Privacy Policy` is visibly underlined and bold (V step 1) |
+| S02-S19 | `required` dropped from either tag; a `<div role="checkbox">` substituted; a second `<form>` | Native constraint validation, which a bare `new Event("submit")` bypasses — so `required` gates nothing in any test here (`auth-flow-integration.test.tsx:41-48`) |
+| S02-S20 | An input with no accessible name, or one naming the wrong row | Whether a screen reader announces the link inside the name usefully |
+| S02-S21 | The 18+ row opening the modal; a row whose text does not toggle its input | Pointer/touch behaviour on the 17px hit target (V steps 1-3) |
+| S02-S22 | The `privacy-accepted` input being absent or misnamed (`field()` fails on a null lookup); **a line inserted into the wrong case, or into only two of the three — the `3`/`3` count arm, which the pass count cannot see** (N6) | Nothing about the button — **this is an assignment and assignments never move the button** |
+| S02-S23 | A fifth argument added to `client.register`; a reordered argument list | A changed value inside one of the four (the case pins all four literally) |
+| S02-S24 | A class name, comment or attribute containing `terms`/`privacy notice`/`localStorage` entering `SignUpFlow.tsx` | The same substrings in `PrivacyPolicyModal.tsx` or `privacyPolicy.ts`, which the guard does not read — and which is exactly why the policy prose lives there |
+| S02-S25 | A button left `disabled={busy \|\| sent}` — i.e. the gate never implemented | An implementation that hard-codes `disabled` to `true` **(that is S02-S28's job)** |
+| S02-S26 | A gate written as `a \|\| p` instead of `a && p` | As S02-S25 |
+| S02-S27 | The same, from the other side; a mirror wired to only one input | As S02-S25 |
+| S02-S28 | `disabled` hard-coded `true` — the mutant no other case in the slice's gate suite catches, now caught in **C7** · an acknowledgement that closes the modal without ticking the box, or ticks the box without setting the R17 mirror (the paired assertion `checked === true` **and** `disabled === false`) · **a regression to the bare-click route, which after C7 can only pass if a bare click ticks the box — the thing V's goal forbids** | Whether the button *looks* enabled (V step 8) · any route that ticks the box outside the acknowledgement — those are `S02-S49`…`S02-S51`, `S02-S54`…`S02-S56`, `S02-S71`. **It is no longer a GREEN-before-and-after control:** in C7 the modal does not exist until this cluster wires it, so the case fails first (B3) |
+| S02-S29 | A regression to the pre-B5 form of the case (no reset), which cannot pass against a correct implementation — **re-measured under the new route: without the reset, `adultCheckedAfterClick=false … btnDisabled=true`, so the reset is load-bearing on `adult-affirmed`** · an acknowledgement that sets the mirror but not the DOM (its `checked === true` arm) | **Nothing at all about controlled inputs — measured green under all four variants.** That guarantee is S02-S30's · nothing about the first half's timing: the assignment half is invariant under C7 and was never the broken half |
+| S02-S30 | **Controlled inputs** — measured RED under exactly the two controlled variants, and only because of the second assertion (`.checked` survives a re-render) | A controlled input whose `onChange` also writes the DOM property back synchronously |
+| S02-S31 | `register` called with one box unchecked; a refusal placed after the call | Whether the browser's own `required` validation would have stopped a *human* — it would, and no test here observes it |
+| S02-S32 | The refusal reading R17's React mirror instead of `FormData` — which takes the suite from 18 to 15 | Nothing new; **it is GREEN before and after and is a regression control** |
+| S02-S33 | A fifth prop, a missing prop, or `onAcknowledge` made required; content rendered when `open` is `false` | A prop with the right name and the wrong runtime behaviour |
+| S02-S34 | `aria-labelledby` pointing at a missing id; a missing `aria-modal`; the gold tab absent from the DOM | Whether the tab is 52×4 and gold **(V step 5; the CSS is `S02-S61`)** |
+| S02-S35 | Any character wrong in the eyebrow, title or lede; a `×` with no accessible name | Font, size and letter-spacing (V step 5) |
+| S02-S36 | Fewer or more than eight pills; a wrong order; a `data-jump` resolving to nothing | Whether the pill *scrolls* the region **(V step 12)** |
+| S02-S37 | A section count of 10 or 12; a wrong id; a bullet total other than 12; an accent not reaching the DOM as a token reference | Whether the accent colour is *visible* on the number and the dot (V step 11) |
+| S02-S38 | A `Download PDF` control (the honesty rule); an end marker that is not last in the scroll region | Whether the marker is reachable by scrolling in a real browser **(V step 6)** |
+| S02-S39 | `I have read it` rendered in read mode; `Close` missing in read mode; `onAcknowledge` fired from read mode | Whether S01's card actually passes `mode="read"` — that is S01's own hook |
+| S02-S40 | `>` instead of `>=`; a different slack; a criterion using `offsetHeight` | Whether a real browser's fractional `scrollTop` lands inside the 8px window **(V step 6)** |
+| S02-S41 | A gate recomputed on every scroll with no latch — the hostile behaviour REQ-01 rejected | A latch that survives a *remount* (a fresh modal correctly starts disabled) |
+| S02-S42 | A gate that requires a scroll event before it will ever enable | Whether a real short policy exists — this one does not; the case is defensive |
+| S02-S43 | A criterion bound only to `scroll` | An `IntersectionObserver`-based implementation (deliberately rejected; jsdom implements none) |
+| S02-S44 | A button that is visually greyed but not announced disabled, and a `title` tooltip the SPEC forbids | Whether the description is *read out* by a real screen reader |
+| S02-S45 | A scroll region a keyboard user cannot focus, **and now also a missing or renamed accessible name — the `aria-label` string is pinned in the step, so both halves discriminate** (N4; before this round the name half was a tautology) | Whether `PageDown` actually scrolls it **(V step 14)**; whether the name is a GOOD name, which no test can judge |
+| S02-S46 | The component re-implementing focus behaviour instead of consuming the helper (the listener count arm catches it) | A helper bug — that is C1's surface and C1's pins |
+| S02-S47 | `onAcknowledge` fired from `×`, `Esc` or the backdrop — i.e. any route that ticks the box without reading | Ordering subtleties a user could perceive (close-then-acknowledge vs the reverse) |
+| S02-S48 | An unguarded `scrollIntoView` (**throws in jsdom 30.0.1 — measured**); a pill resolving the wrong target; smooth scrolling under reduced motion | **That anything scrolled. It asserts the CALL. The scroll is V step 12.** |
+| S02-S49 | The square ticking the box as the modal opens — the slip `SPEC.md` R05 calls the most likely in the slice — **and, via the mirror arm, the R17 mirror left `true` while the DOM says `false`, which is B1's first member and which the DOM assertion alone cannot see** | Whether the overlay dims the page (V step 4); a mirror desync introduced by a route this plan does not enumerate |
+| S02-S50 | A `preventDefault` attached to the input only, so a text click still toggles; **plus the mirror arm** | As S02-S49 |
+| S02-S51 | A `preventDefault` attached to the row but not surviving the link's own handler; a link that navigates; **plus the mirror arm** | Whether `Enter` on the link opens it in a browser **(V step 14)** |
+| S02-S52 | A checked row re-opening the modal instead of unticking | Whether unticking *feels* immediate (V step 10) |
+| S02-S53 | **The acknowledgement setting the DOM but not the R17 mirror, so `Create account` never enables** — the B2/B4 class arriving from inside the component | A mirror set without the DOM (that shows up in `S02-S31`'s FormData refusal instead) |
+| S02-S54 | `×` ticking the box; focus dropped to `body`; **and B1's second member — a mirror still `true` after the dismissal, which is exactly the state that enables `Create account` with the box empty and which `SPEC.md:661-665` V step 7 forbids** | Whether `×` is visible at the top right (V step 5) |
+| S02-S55 | A backdrop click ticking the box or being ignored; **plus the mirror arm** | Drag-out gestures (see S02-S07) |
+| S02-S56 | **A second surface acting on one `Escape`** — the B3 defect; a card whose typed fields are cleared by the close; focus not returned | **The Esc stack in a REAL browser — nobody has run it (V step 7).** This is the pin REQ-REV-01 r3 names as the mission's most likely next defect |
+| S02-S57 | A modal control submitting the registration form; a modal rendered inside `<form>` | Whether `position: fixed` actually escapes `.authCard`'s `overflow: hidden` in a browser — **inferred from CSS text, confirmed at V steps 4-5; `S02-S65` is what keeps the inference true** |
+| S02-S58 | The card opening the modal in read mode, so `I have read it` never appears | Whether S01 opens it in read mode — S01's own hook |
+| S02-S59 | A second S02 block; content appended after the closing marker; an edit above the opening marker | An edit *inside* S01's block (S01's own single-writer pins own that) |
+| S02-S60 | A `#hex` or `rgba()` literal in S02's CSS (which would also add a second hit to the t9 gate); a token declared by S02 (which would break t9's set equality) | Whether the tokens *resolve* before S01's block lands — they do not, and that is expected until `S02-S66` |
+| S02-S61 | A geometry rule dropped or mistyped; a z-index written as a number instead of a token | **Whether the modal is 680px wide, 92vh tall, or clipped at phone width — jsdom computes no layout (V steps 5 and 13)** |
+| S02-S62 | A square that is not 17px, a radius that is not 5px, a missing checked fill, the wrong glyph colour | **Whether the group LOOKS like artboard 8a in either mode (V steps 1-2)** |
+| S02-S63 | Animation shipped with no reduced-motion rule | Whether the rule actually suppresses the animation (V, with reduced motion enabled) |
+| S02-S64 | A disabled state dimmed past legibility — **the contrast three review rounds left UNVERIFIED** | Contrast of anything else S02 renders; and the composite assumes the footer's `--shell` ground, so a disabled button placed on a different ground is unmeasured |
+| S02-S65 | A future `transform`/`filter`/`will-change` on `.authCard` or any auth-shell ancestor, which would trap the fixed scrim inside the card | A stacking context created by a component's inline style rather than by `globals.css` |
+| S02-S66 | A merge that loses either slice's `globals.css` block — **and the arm is now IN the C9 command (`run_c9`), not only in this step's prose, which is what N1 found** | Whether S01's token VALUES are right — S01 owns that, and `t9-mode-tokens` is S01's gate |
+| S02-S67 | One cluster's fix breaking another's; **a test file silently absent from the slice** (the `Test Files 10 passed (10)` arm) | Anything V has not run |
+| S02-S68 | A ninth typecheck diagnostic; a third t9 failure; a second colour-literal hit; the node-runner guard going red | Suites outside the three gates |
+| S02-S69 | A dev stack still serving the pre-edit `globals.css` (its dev server reads it only at boot) — **now by three observable commands rather than a judgement call** (N5) | Everything V's fourteen steps exist to catch; the three commands prove the class and the input reach the served HTML and nothing about appearance |
+| S02-S70 | An input made unfocusable — `tabindex="-1"`, a `div[role="checkbox"]` substituted, or `.focus()` landing on an ancestor — and the 18+ row opening a dialog or losing focus on activation | **That a real browser's `Space` keystroke reaches the activation behaviour at all — measured: jsdom 30.0.1 produces `clickEventsSeen=0` for `Space` on a focused checkbox, so no jsdom test can claim it (V step 14)** |
+| S02-S71 | The keyboard route TICKING the box instead of opening the modal — the keyboard-only path around the read gate that V's goal forbids — and, via the mirror arm, the same route desyncing the mirror | **The `Space` keystroke itself (V step 14), which is also the observation that settles the contested row `DECISIONS.md:99` routes to V** |
+| S02-S72 | The ADR absent, or written `Accepted` when only V may accept it, or naming a surface the module does not export (the four export-name arms) | **Whether the ADR's reasoning is RIGHT — an ADR is a record, and V ratifies it; the arms check that the record exists and matches the code's surface, never that the decision was wise** |
+
+**Which steps are the idiom rule below** (stated by REQ-01 in the next two paragraphs and NOT
+restated here — two formulations of one rule is the B4 defect class): the button-state steps
+that use `field(name).click()` inside `act` are `S02-S25`…`S02-S30` and the second half of
+`S02-S53`; the handler/`FormData` steps that correctly use `field(x).checked = true` are
+`S02-S22`, `S02-S31`, `S02-S32` and the deliberate no-dispatch halves of `S02-S29` and
+`S02-S30`. Every step touching a checkbox says which of the two it is, in its own text.
+
+Every step owes an honest second column. The SPEC already concedes where jsdom cannot observe
+the thing and V must: the checkbox group's and modal's pixel geometry (S02-R01, S02-R09), the
+jump pills' actual scrolling (S02-R11 — jsdom pins the mapping, V pins the scroll), and the
+narrow-viewport behaviour (V step 13). Those belong in the right-hand column, not in a test
+that pretends to cover them. Note also that a bare `new Event("submit")` bypasses HTML
+constraint validation (`tests/render/auth-flow-integration.test.tsx:41-48`), so `required`
+alone catches nothing in a test — S02-R18's handler-level refusal is what the pin must
+exercise.
+
+**Two failure modes this slice's steps must not pretend to catch (REQ-REV-01 B2, narrowed by
+B4/B5, measured):**
+(a) `field(x).checked = true` fires no React `change`, so it can never move the submit
+button's `disabled` state — a step whose test asserts the BUTTON after an assignment is
+asserting nothing and will read as an implementation bug when it fails. **Button-state steps use
+exactly one idiom: `field(name).click()` inside `await act(async () => { … })`.** Not a
+`change` dispatch: `dispatchEvent(new Event("change", { bubbles: true }))` and `dispatchEvent(new
+Event("click", { bubbles: true }))` are **measured dead** — React routes a checkbox's `onChange`
+through the click event and requires a real `MouseEvent`, so neither even changes the DOM box
+(`.hermes/reports/consent-ui/probes/b2-idiom-matrix.mjs`, three identical runs). And `.click()`
+**toggles**, so a step that pre-assigns `.checked = true` must set it back to `false` before
+clicking — see `SPEC.md` R17 cases 5 and 6, which state the mechanism and say which case catches
+which regression. (b) Conversely, a step that exercises R18's
+refusal is testing the HANDLER and `FormData`, so the assignment idiom is correct there and a
+dispatched change is unnecessary. Every step touching the checkbox state states which of the
+two it is.

@@ -1,15 +1,15 @@
-## ObservationAgent (REQ-OBS, `t_3af6affd`) — metrics + infrastructure health, standalone, read-only
+## ObservationAgent (REQ-OBS, `t_3af6affd`) — metrics + infrastructure health, standalone, read-only; reviewer-authorized rework R1 (2026-09-02)
 
 Requirements: `docs/missions/observability-agents/requirements/observationagent.md` (Q1–Q8, findings F1–F8, 14 V rows D1–D14)
-Slices: `docs/missions/observability-agents/slices/OBS-0{1..7}/{SPEC,PLAN,PROGRESS,DECISIONS}.md` — SPEC frozen; PLAN scaffold for ARCH
+Slices: `docs/missions/observability-agents/slices/OBS-0{1..7}/{SPEC,PLAN,PROGRESS,DECISIONS}.md` — SPEC frozen; PLAN filled by Architecture and peer-reviewed before CODE dispatch
 
 - **OBS-01** Agent skeleton + infra liveness + Mac notification + kill/mute — V stops `hatchet-lite`, sees a banner naming hatchet and the impact within 15 s, starts it, sees all-clear within 15 s, mutes, kills. FOUNDATION: runs first, alone.
 - **OBS-02** Product process liveness + restart witnesses + expected-set — V kills the UI child; one banner names the dev stack as root within 15 s; restart clears it.
-- **OBS-03** Stall / queue / no-progress detectors + FixAgent view `observation.defect_signal_v` — V freezes the runner with `kill -STOP`; WORKER_LOST ≤ 45 s, STALL at the claim deadline, NO_PROGRESS at 300 s; `kill -CONT` clears.
-- **OBS-04** Capture health, blind periods, spool — V sees `obs_capture: NOT WIRED` today (silence never reads as health); after FIX wires capture, a `chmod 000` on the spool dir raises CAPTURE_GAP ≤ 20 s.
-- **OBS-05** Capacity: Postgres connections/locks/transactions, host disk/memory/load, certificate expiry — V lowers a threshold with `oactl thresholds apply`, opens idle sessions, sees the banner ≤ 35 s, clears.
-- **OBS-06** Throughput, provider failure rate, Hatchet queue/dispatch/failed tasks — V watches counts move on `oactl status --throughput`; a frozen runner plus one ask raises the Hatchet queue signal.
-- **OBS-07** Channels: sendmail (.eml in the dev capture dir), Kanban ticket on `ops-alerts`, loopback status page `:9797/status`, severity routing, storm summary naming the root.
+- **OBS-03** Stall / queue / no-progress detectors + FixAgent view `observation.defect_signal_v` — `kill -STOP` proves only WORKER_LOST and suppression while heartbeat is stale; `kill -CONT` clears; isolated healthy-infrastructure fixtures prove SEVERE STALL/QUEUE_NOT_DRAINING/NO_PROGRESS/SUSPICIOUS_SUCCESS rows.
+- **OBS-04** Capture health, blind periods, spool — V sees `obs_capture: NOT WIRED` today (silence never reads as health); after FIX wires capture, a causal typed gap-row integration drill raises CAPTURE_GAP ≤ 20 s; changing directory mode is not treated as loss.
+- **OBS-05** Capacity: Postgres connections/locks/transactions, host disk/memory/load, certificate expiry — V lowers a threshold, records baseline B, opens 25 idle sessions, and sees exact measured total U ≥ B+25 in the banner ≤ 35 s before clear.
+- **OBS-06** Throughput, provider failure rate, Hatchet queue/dispatch/failed tasks — V watches counts move; provider latency is `NOT OBSERVABLE` pending a safe timing source; a frozen runner plus 10 asks sustains the default queue ≥10/5m signal.
+- **OBS-07** Channels: validated dev capture directory projected only to the sendmail child, Kanban ticket on `ops-alerts`, loopback status page `:9797/status`, severity routing, and a five-typed-signal fixture proving one root summary ≤15 s after the fifth detection.
 - OBS-08 Server install (systemd, host sendmail, tunnelled status) — DEFERRED until the Hetzner deployment exists; no directory.
 
 Interfaces: FixAgent reads `observation.defect_signal_v` (C4, V-3 default); shared read-only `obs.*`; no `obs.occurrence` writes; no RP-0 dependency.

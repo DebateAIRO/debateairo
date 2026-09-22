@@ -1,0 +1,728 @@
+# Review package — lane /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/consent-s02/dialectical-engine — range 2127c4ad..bd314084 — generated 2026-09-07 05:01:41
+
+## Commits
+bd314084 04:51 feat(consent-ui CROSS-01): focus returns to the banner's opener via an optional returnFocusRef on the shared helper (V-22)
+
+## Stat
+ .../apps/ui/components/consent/CookieBar.tsx       |  13 +-
+ .../apps/ui/components/consent/CookieConsent.tsx   |  16 ++
+ .../components/consent/CookiePreferencesCard.tsx   |  20 ++-
+ .../apps/ui/components/consent/modalSemantics.ts   |  53 ++++++-
+ .../ADR-0022-shared-modal-semantics.md             |  21 +++
+ .../tests/render/consent-modal-semantics.test.tsx  | 167 ++++++++++++++++++++-
+ .../tests/render/consent-policy-link.test.tsx      |  50 +++---
+ 7 files changed, 302 insertions(+), 38 deletions(-)
+
+## Diff (-U10)
+diff --git a/dialectical-engine/apps/ui/components/consent/CookieBar.tsx b/dialectical-engine/apps/ui/components/consent/CookieBar.tsx
+index cb21f24b..bfc094d4 100644
+--- a/dialectical-engine/apps/ui/components/consent/CookieBar.tsx
++++ b/dialectical-engine/apps/ui/components/consent/CookieBar.tsx
+@@ -10,36 +10,46 @@
+  *
+  * It is a labelled REGION, not a dialog: it never pulls focus, never traps it,
+  * and offers no dismissal that is not a decision (S01-R12, S01-R13). A visitor
+  * has to be able to read the page before deciding, and `Essential only` is the
+  * one-click way out, so nothing is coerced.
+  *
+  * Copy is byte-exact from `SPEC.md` §Copy (S01-R11); geometry lives in the ONE
+  * delimited `consent-ui S01` block at the end of `apps/ui/app/globals.css`
+  * (S01-R09, S01-R10) and every colour there is a `var(--token)` reference.
+  */
++import type { RefObject } from "react";
++
+ export type CookieBarProps = {
+   /** Writes R04 row 2 and closes the bar. */
+   onEssentialOnly: () => void;
+   /**
+    * Opens the preferences card. `opener` is carried only so focus can be
+    * returned to this button on close (S01-R18); it is never a discriminator of
+    * behaviour — the stored decision is (S01-R14, B1). Same shape as
+    * `requestPreferences` in `apps/ui/lib/consent.ts`, which the Settings
+    * re-entry uses, so the two entry points hand the machine the same thing.
+    */
+   onChoose: (opener: HTMLElement | null) => void;
+   /** Writes R04 row 1 and closes the bar. */
+   onAcceptAll: () => void;
++  /**
++   * Attached to `Choose what to store`, so the ONE shared helper can put focus back on
++   * THIS bar's control when the card closes (S01-R18's bar direction, V-22). The bar is
++   * unmounted while the card is open, so the reference is re-attached to the fresh button
++   * when the bar returns — which is the whole point of it being the caller's ref and not
++   * the card's capture. The bar still moves no focus itself: it only lends the node.
++   */
++  chooseRef?: RefObject<HTMLButtonElement | null>;
+ };
+ 
+-export function CookieBar({ onEssentialOnly, onChoose, onAcceptAll }: CookieBarProps) {
++export function CookieBar({ onEssentialOnly, onChoose, onAcceptAll, chooseRef }: CookieBarProps) {
+   return (
+     <div className="consentBar" role="region" aria-label="Cookie consent">
+       <div className="consentBarBezel">
+         <div className="consentBarCore">
+           <span className="consentTab" aria-hidden="true" />
+           <div className="consentCopy">
+             <div className="consentEyebrow">YOUR DATA, ON THE RECORD</div>
+             <div className="consentTitle">
+               We store only what keeps the bench running — unless you say otherwise.
+             </div>
+@@ -49,20 +59,21 @@ export function CookieBar({ onEssentialOnly, onChoose, onAcceptAll }: CookieBarP
+               Settings.
+             </p>
+           </div>
+           <div className="consentActions">
+             <button type="button" className="consentGhost" onClick={onEssentialOnly}>
+               Essential only
+             </button>
+             <button
+               type="button"
+               className="consentGhost consentGhostStrong"
++              ref={chooseRef}
+               onClick={(event) => onChoose(event.currentTarget)}
+             >
+               Choose what to store
+             </button>
+             <button type="button" className="consentPrimary" onClick={onAcceptAll}>
+               Accept all
+             </button>
+           </div>
+         </div>
+       </div>
+diff --git a/dialectical-engine/apps/ui/components/consent/CookieConsent.tsx b/dialectical-engine/apps/ui/components/consent/CookieConsent.tsx
+index 5fc5a682..83f94113 100644
+--- a/dialectical-engine/apps/ui/components/consent/CookieConsent.tsx
++++ b/dialectical-engine/apps/ui/components/consent/CookieConsent.tsx
+@@ -112,20 +112,34 @@ export function CookieConsent() {
+    * itself: focus trap, initial focus, focus return, backdrop close and the Esc
+    * stack are all `apps/ui/components/consent/modalSemantics.ts`'s, which S02
+    * owns and cluster C6 wires in (SPEC §Out of scope bans a second one).
+    *
+    * Written without the literal call spelling on purpose: S01-S45's slice-wide
+    * guard is grep-shaped and a grep does not know what a comment is
+    * (`COMMON.md` §8).
+    */
+   const openerRef = useRef<HTMLElement | null>(null);
+ 
++  /**
++   * The bar's `Choose what to store` control, lent to the shared helper so it can put
++   * focus back there when the card closes (S01-R18's bar direction, V-22).
++   *
++   * It is a SECOND reference and not a use of `openerRef` above, because the two hold
++   * different things: `openerRef` holds the node that asked for the card, which for the
++   * bar entry is unmounted by the very commit that opens the card, while this one is
++   * attached by the bar and is therefore re-attached to the FRESH button when the bar
++   * comes back — which happens in the layout phase of that commit, before the card's
++   * cleanup reads it. This component still moves no focus itself; it lends a node and the
++   * ONE helper decides (SPEC §Out of scope bans a second implementation).
++   */
++  const manageRef = useRef<HTMLButtonElement | null>(null);
++
+   useEffect(() => {
+     setSurface(readConsent() === null ? "bar" : "silent");
+   }, []);
+ 
+   /**
+    * Opening the card, from either control. `initial` is recomputed from STORAGE
+    * at every open — not from the last open, and never from where the request
+    * came from — so the two entry points are indistinguishable to the card
+    * (S01-R17, S01-R21, B1's class).
+    *
+@@ -194,26 +208,28 @@ export function CookieConsent() {
+       <>
+         <CookiePreferencesCard
+           key={opens}
+           initial={initial}
+           onSave={(choice: ConsentChoice): void =>
+             settle(decisionFor("save-choices", { quality: choice.quality, analytics: choice.analytics }))
+           }
+           onEssentialOnly={(): void => settle(decisionFor("essential-only"))}
+           onDismiss={dismiss}
+           onRequestPolicy={(): void => setPolicyOpen(true)}
++          returnFocusRef={manageRef}
+         />
+         {policyOpen && (
+           <PrivacyPolicyModal open mode="read" onClose={(): void => setPolicyOpen(false)} />
+         )}
+       </>
+     );
+   }
+ 
+   return (
+     <CookieBar
+       onEssentialOnly={(): void => settle(decisionFor("essential-only"))}
+       onChoose={openCard}
+       onAcceptAll={(): void => settle(decisionFor("accept-all"))}
++      chooseRef={manageRef}
+     />
+   );
+ }
+diff --git a/dialectical-engine/apps/ui/components/consent/CookiePreferencesCard.tsx b/dialectical-engine/apps/ui/components/consent/CookiePreferencesCard.tsx
+index 835fbb1f..9d43e1c8 100644
+--- a/dialectical-engine/apps/ui/components/consent/CookiePreferencesCard.tsx
++++ b/dialectical-engine/apps/ui/components/consent/CookiePreferencesCard.tsx
+@@ -1,13 +1,13 @@
+ "use client";
+ 
+-import { useId, useRef, useState } from "react";
++import { useId, useRef, useState, type RefObject } from "react";
+ import {
+   COOKIE_CATEGORIES,
+   type ConsentToggles,
+   type CookieCategory
+ } from "../../lib/consent";
+ import { backdropCloseHandler, useModalSurface } from "./modalSemantics";
+ 
+ /**
+  * 10b — the per-category preferences card.
+  *
+@@ -54,28 +54,41 @@ export type CookiePreferencesCardProps = {
+    */
+   initial: ConsentToggles;
+   /** R04 row 4 — the current toggles. */
+   onSave: (choice: ConsentChoice) => void;
+   /** R04 row 3 — byte-identical to the bar's own `Essential only`. */
+   onEssentialOnly: () => void;
+   /** Closing without deciding. Driven by the shared helper in cluster C6. */
+   onDismiss: () => void;
+   /** Opens the S02 policy modal in read-only mode, over the card (S01-R20). */
+   onRequestPolicy: () => void;
++  /**
++   * Handed straight to the shared helper, which uses it when the opener it captured did
++   * not survive the commit that opened this card (S01-R18, V-22). The caller owns it
++   * because the control it names — the bar's `Choose what to store` — is unmounted while
++   * this card is open and comes back as a fresh node; nothing this component could capture
++   * would still be on the page at close.
++   *
++   * Spelled without the word this file's own source-text guard bans for the page-wide
++   * object (`consent-card.test.tsx`), which a grep cannot tell from a comment
++   * (`COMMON.md` §8).
++   */
++  returnFocusRef?: RefObject<HTMLElement | null>;
+ };
+ 
+ export function CookiePreferencesCard({
+   initial,
+   onSave,
+   onEssentialOnly,
+   onDismiss,
+-  onRequestPolicy
++  onRequestPolicy,
++  returnFocusRef
+ }: CookiePreferencesCardProps) {
+   const titleId = useId();
+   const [toggles, setToggles] = useState<ConsentToggles>({
+     quality: initial.quality,
+     analytics: initial.analytics
+   });
+ 
+   const scrimRef = useRef<HTMLDivElement | null>(null);
+   const cardRef = useRef<HTMLElement | null>(null);
+   const firstOperableRef = useRef<HTMLElement | null>(null);
+@@ -90,21 +103,22 @@ export function CookiePreferencesCard({
+   const firstOperableId = COOKIE_CATEGORIES.find((category) => !category.locked)?.id;
+ 
+   /**
+    * The card is mounted only while it is open — `CookieConsent` renders it in the
+    * `card` surface and nowhere else, with a fresh `key` per open — so `open` is
+    * the constant `true` and the helper's mount/unmount IS the open/close.
+    */
+   useModalSurface(true, {
+     containerRef: cardRef,
+     initialFocusRef: firstOperableRef,
+-    onClose: onDismiss
++    onClose: onDismiss,
++    returnFocusRef
+   });
+ 
+   /** The locked category is not in `ConsentToggles`: its state is the constant `true`. */
+   const stateOf = (id: CookieCategory["id"]): boolean =>
+     id === "essential" ? true : toggles[id];
+ 
+   const flip = (category: CookieCategory): void => {
+     // The id is read into a `const` BEFORE the guard: TypeScript keeps a const
+     // local's narrowing inside the updater closure, and does not keep a
+     // parameter property's — measured, `TS7053` at the `setToggles` call, seen
+diff --git a/dialectical-engine/apps/ui/components/consent/modalSemantics.ts b/dialectical-engine/apps/ui/components/consent/modalSemantics.ts
+index 8febb7a5..a33dc1a8 100644
+--- a/dialectical-engine/apps/ui/components/consent/modalSemantics.ts
++++ b/dialectical-engine/apps/ui/components/consent/modalSemantics.ts
+@@ -11,36 +11,60 @@
+  * contract fixed in `docs/missions/consent-ui/slices/S02/PLAN.md` §Cluster S02-C1; neither
+  * slice changes it alone.
+  */
+ 
+ import * as React from "react";
+ 
+ export type ModalSurface = Readonly<{
+   containerRef: React.RefObject<HTMLElement | null>;
+   initialFocusRef: React.RefObject<HTMLElement | null>;
+   onClose: () => void;
++  /**
++   * OPTIONAL, and the only member added since the contract was fixed (V-22, ruled after
++   * both slices merged). The control focus should return to WHEN THE CAPTURED OPENER DID
++   * NOT SURVIVE the opening commit — never a general override of it.
++   *
++   * It exists because the capture is unusable for a whole CLASS of surfaces: one whose
++   * opener is unmounted by the same commit that opens it. The platform moves focus to
++   * `document.body` as the opener leaves the document, and it does so before any hook tier
++   * runs — `useLayoutEffect` sees `body` too (measured: CODE-REV-S01-C6 r1 B2) — so the
++   * capture is `body`, and even a captured reference would be a detached node. A
++   * PARENT-owned ref escapes that: React re-attaches it in the layout phase of the commit
++   * that remounts the control, which is before this hook's passive cleanup reads it. The
++   * cookie bar and its preferences card are the first member of the class; every
++   * mutually-exclusive surface pair is another.
++   *
++   * A surface that omits it keeps the captured-opener behaviour exactly, and a surface
++   * that supplies it keeps that behaviour too for every open where the opener is still on
++   * the page — see the ordering note in the cleanup below, which is measured law and not
++   * a preference.
++   */
++  returnFocusRef?: React.RefObject<HTMLElement | null>;
+ }>;
+ 
+ /**
+  * One entry per OPEN surface. `read()` returns the caller's current surface object, so a
+  * re-rendered consumer's fresh `onClose` is the one that runs.
+  */
+ type StackEntry = Readonly<{ read: () => ModalSurface }>;
+ 
+ /**
+  * The Esc stack: a module-level REGISTRY of open surfaces, shared by every surface in the app.
+  * It is not a LIFO — removal is `lastIndexOf` + `splice`, and the entry that receives `Escape`
+  * is never "the last one registered": that entry is only where `topmostSurface()` starts. It
+- * decides from DOM POSITION — a surface contained by another is drawn over it and wins, and
+- * among unrelated siblings the one later in DOCUMENT order wins. `compareDocumentPosition`
+- * knows nothing of the `--z-*` ladder, so what makes that right for this product is its
+- * ARRANGEMENT: the policy modal renders AFTER the card (V-20; CODE-REV-S02-C5C6 r1 N2).
++ * decides from DOM POSITION, in this order: CONTAINMENT first — a surface contained by
++ * another is drawn over it and wins outright — and only among UNRELATED surfaces does
++ * document order decide, the later one winning. `compareDocumentPosition` knows nothing of
++ * the `--z-*` ladder, so a surface that means to sit on top of another either nests inside
++ * it or renders after it; no other arrangement is supported (V-20; CODE-REV-S02-C5C6 r1 N2,
++ * and CODE-REV-S02-C7 r1 N5, which found this comment naming one consumer's arrangement as
++ * if it were the rule).
+  */
+ const surfaceStack: StackEntry[] = [];
+ 
+ /** Exactly one `document` keydown listener exists while the stack is non-empty. */
+ let listenerAttached = false;
+ 
+ const FOCUSABLE_SELECTOR =
+   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+ 
+ /**
+@@ -166,21 +190,40 @@ export function useModalSurface(open: boolean, surface: ModalSurface): void {
+     if (!open) return undefined;
+     const entry: StackEntry = { read: () => surfaceRef.current };
+     const opener = document.activeElement as HTMLElement | null;
+     surfaceStack.push(entry);
+     attachListener();
+     focusElement(surfaceRef.current.initialFocusRef.current);
+     return () => {
+       const index = surfaceStack.lastIndexOf(entry);
+       if (index !== -1) surfaceStack.splice(index, 1);
+       if (surfaceStack.length === 0) detachListener();
+-      focusElement(opener);
++      // The captured opener wins whenever it SURVIVED, and the named control serves only
++      // when it did not. `document.body` is the degenerate value `document.activeElement`
++      // takes when no element holds focus, and it is exactly what the capture becomes for
++      // the class this member exists for, so it counts as "did not survive" rather than as
++      // an opener — otherwise every surface would return focus to the body it captured and
++      // the member would never be reached.
++      //
++      // The ORDER is load-bearing and is not V-22's wording. Measured here: with the named
++      // control preferred unconditionally, a surface whose opener is still on the page
++      // loses its focus return to whatever else the caller lent — the cookie card opened
++      // from Settings with nothing stored brings the bar back underneath it, and the bar's
++      // control would take a focus that belongs to the Settings opener (S01-R18 names both
++      // directions). Surviving-first satisfies both; named-first satisfies one.
++      const survived = opener !== null && opener !== document.body && opener.isConnected;
++      const named = surfaceRef.current.returnFocusRef?.current ?? null;
++      if (survived) {
++        focusElement(opener);
++        return;
++      }
++      if (named !== null && named.isConnected) focusElement(named);
+     };
+   }, [open]);
+ }
+ 
+ /** Closes only when the click landed ON the scrim, never on a descendant of it. */
+ export function backdropCloseHandler(
+   scrim: HTMLElement | null, onClose: () => void
+ ): (event: { target: EventTarget | null }) => void {
+   return (event) => {
+     if (scrim === null) return;
+diff --git a/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md b/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md
+index fb1aaf6f..f8cde220 100644
+--- a/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md
++++ b/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md
+@@ -91,20 +91,41 @@ export function useModalSurface(open: boolean, surface: ModalSurface): void;
+ export function backdropCloseHandler(
+   scrim: HTMLElement | null, onClose: () => void
+ ): (event: { target: EventTarget | null }) => void;
+ export function prefersReducedMotion(): boolean;
+ export function openSurfaceCount(): number;   // test-visible depth of the Esc stack
+ ```
+ 
+ `openSurfaceCount` exists so the stack's depth is observable from a test without exporting the
+ stack itself.
+ 
++### Addendum 2026-09-07 — a fourth, OPTIONAL `ModalSurface` member (V-22)
++
++Appended by seat `CODE-CROSS-01` as the one cross-slice change ticket `t_c1068d6f` authorises;
++nothing above this heading is edited. `ModalSurface` gains `returnFocusRef?:
++React.RefObject<HTMLElement | null>` — the control focus returns to when the opener captured at
++open did not survive the opening commit. The three original members and every other export are
++unchanged, and a surface that omits the member behaves exactly as before. It exists because the
++capture cannot serve a whole CLASS of surfaces — any surface whose opener is unmounted by the same
++commit that opens it, of which every mutually-exclusive surface pair is a member: the platform has
++moved focus to `document.body` before any hook tier runs (`useLayoutEffect` too — measured,
++CODE-REV-S01-C6 r1 B2), so the capture is `body` and a captured reference would be detached, while
++a parent-owned ref is re-attached to the fresh control in the layout phase of the commit that
++remounts it, before this hook's passive cleanup reads it. **The precedence is
++surviving-capture-first, not named-control-first** — V-22's default and CODE-REV-S01-C6 r1's remedy
++both word it the other way, and that wording is measurably wrong: a surface whose opener IS still
++on the page would lose its focus return to whatever else the caller lent it, which takes S01-R18's
++Settings direction off `Cookie preferences` the moment the cookie bar returns underneath the card.
++Both directions of S01-R18, and both sentences of V-22's own worked example, hold only under
++surviving-first. Pinned by four cases in `tests/render/consent-modal-semantics.test.tsx` and one in
++`tests/render/consent-policy-link.test.tsx`.
++
+ ## Options considered
+ 
+ - **A React context provider owning the stack.** Rejected: it would force slice S01's
+   preferences card and slice S02's policy modal into one React tree, and they are mounted from
+   different components in different slices.
+ - **A per-surface `keydown` listener with a "topmost" flag.** Rejected: a surface cannot know
+   it is topmost without a shared registry, which is the module this ADR introduces.
+ - **Retrofitting the seven existing overlays now.** Rejected as out of scope for this mission;
+   it is ticket `A11Y-OVERLAYS` (`t_8962842f`).
+ 
+diff --git a/dialectical-engine/tests/render/consent-modal-semantics.test.tsx b/dialectical-engine/tests/render/consent-modal-semantics.test.tsx
+index de8d030f..cbf9d075 100644
+--- a/dialectical-engine/tests/render/consent-modal-semantics.test.tsx
++++ b/dialectical-engine/tests/render/consent-modal-semantics.test.tsx
+@@ -1,13 +1,13 @@
+ // @vitest-environment jsdom
+ 
+-import { act, useRef, type ReactNode } from "react";
++import { act, useRef, type ReactNode, type RefObject } from "react";
+ import { createRoot, type Root } from "react-dom/client";
+ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+ import {
+   backdropCloseHandler,
+   openSurfaceCount,
+   prefersReducedMotion,
+   useModalSurface
+ } from "../../apps/ui/components/consent/modalSemantics.js";
+ 
+ let root: Root | null = null;
+@@ -23,35 +23,41 @@ async function settle(): Promise<void> {
+ type TestSurfaceProps = {
+   open: boolean;
+   name: string;
+   onClose: () => void;
+   /** Extra buttons rendered after the close button, in this order. */
+   buttons?: readonly string[];
+   /** Label of the control the caller names as initial focus; defaults to the close button. */
+   initialFocus?: string;
+   /** Label of a button rendered with `disabled`, so the focusable set can change while open. */
+   disabledButton?: string;
++  /**
++   * The caller-named control focus should return to (V-22). Omitted by every case that
++   * predates it, so those keep exercising the captured-opener path unchanged.
++   */
++  returnFocusRef?: RefObject<HTMLElement | null>;
+   children?: ReactNode;
+ };
+ 
+ function TestSurface({
+   open,
+   name,
+   onClose,
+   buttons = [],
+   initialFocus,
+   disabledButton,
++  returnFocusRef,
+   children
+ }: TestSurfaceProps): ReactNode {
+   const containerRef = useRef<HTMLElement | null>(null);
+   const initialFocusRef = useRef<HTMLElement | null>(null);
+-  useModalSurface(open, { containerRef, initialFocusRef, onClose });
++  useModalSurface(open, { containerRef, initialFocusRef, onClose, returnFocusRef });
+   if (!open) return null;
+   const closeLabel = `close-${name}`;
+   const named = initialFocus ?? closeLabel;
+   const claim = (label: string) => (node: HTMLElement | null) => {
+     if (label === named) initialFocusRef.current = node;
+   };
+   return (
+     <div
+       data-surface={name}
+       ref={(node) => {
+@@ -458,20 +464,177 @@ describe("consent modal semantics helper", () => {
+     });
+     expect(document.activeElement).toBe(opener);
+ 
+     await render(<Harness open />);
+     expect(document.activeElement).toBe(labelled("close-only"));
+ 
+     await render(<Harness open={false} />);
+     expect(document.activeElement).toBe(opener);
+   });
+ 
++  it("returns focus to the named control when the opener was unmounted by the same commit", async () => {
++    // PROPERTY (V-22's default; S01-R18's bar direction): when `returnFocusRef` names a
++    // control that IS in the document at close, the helper prefers it over the
++    // `document.activeElement` it captured at open.
++    //
++    // The captured opener cannot serve this arrangement and no hook tier can rescue it:
++    // the commit that opens the surface also unmounts the opener, so the platform has
++    // already moved focus to `document.body` before any effect runs, and the control that
++    // comes back is a FRESH node (measured: CODE-REV-S01-C6 r1 B2). The fixture reproduces
++    // exactly that — opener and surface are mutually exclusive, like the cookie bar and
++    // its preferences card — and the ref is the parent's, so React re-attaches it in the
++    // layout phase of the commit that remounts the control, before this passive cleanup.
++    function Harness({ open }: { open: boolean }): ReactNode {
++      const returnFocusRef = useRef<HTMLElement | null>(null);
++      return open ? (
++        <TestSurface open name="only" onClose={vi.fn()} returnFocusRef={returnFocusRef} />
++      ) : (
++        <button
++          type="button"
++          ref={(node) => {
++            returnFocusRef.current = node;
++          }}
++        >
++          opener
++        </button>
++      );
++    }
++
++    await render(<Harness open={false} />);
++    const first = labelled("opener");
++    await act(async () => {
++      first.focus();
++    });
++    expect(document.activeElement, "the opener holds focus before the surface opens").toBe(first);
++
++    await render(<Harness open />);
++    expect(document.activeElement, "focus moved into the surface").toBe(labelled("close-only"));
++    expect(first.isConnected, "and the commit that opened it removed the opener").toBe(false);
++
++    await render(<Harness open={false} />);
++    const returned = labelled("opener");
++    expect(returned, "the control that came back is a fresh node").not.toBe(first);
++    expect(document.activeElement, "focus is on the control the caller named").toBe(returned);
++  });
++
++  it("keeps the captured opener ahead of the named control while the opener is on the page", async () => {
++    // PROPERTY: `returnFocusRef` serves the opens where the capture did NOT survive; it is
++    // not a general override. A caller that lends a control and still has its opener on the
++    // page gets the opener — which is what keeps the cookie card's Settings direction on
++    // `Cookie preferences` even though the bar returns underneath it and re-attaches the
++    // very ref the bar entry needs (measured; see the ordering note in the helper).
++    function Harness({ open }: { open: boolean }): ReactNode {
++      const returnFocusRef = useRef<HTMLElement | null>(null);
++      return (
++        <>
++          <input id="opener" name="opener" />
++          <button
++            type="button"
++            ref={(node) => {
++              returnFocusRef.current = node;
++            }}
++          >
++            named
++          </button>
++          <TestSurface open={open} name="only" onClose={vi.fn()} returnFocusRef={returnFocusRef} />
++        </>
++      );
++    }
++
++    await render(<Harness open={false} />);
++    const opener = document.querySelector<HTMLInputElement>("#opener")!;
++    await act(async () => {
++      opener.focus();
++    });
++
++    await render(<Harness open />);
++    expect(document.activeElement).toBe(labelled("close-only"));
++    expect(labelled("named").isConnected, "the named control is on the page and would win").toBe(
++      true
++    );
++
++    await render(<Harness open={false} />);
++    expect(document.activeElement, "the surviving opener kept the return").toBe(opener);
++  });
++
++  it("returns focus to the named control when the captured opener has since left the page", async () => {
++    // PROPERTY: "did the capture survive?" is asked at CLOSE, not at open. An opener that
++    // was on the page when the surface opened and has been removed while it was open is as
++    // unusable as one the opening commit removed, so the named control takes the return.
++    function Harness({ open, opener }: { open: boolean; opener: boolean }): ReactNode {
++      const returnFocusRef = useRef<HTMLElement | null>(null);
++      return (
++        <>
++          {opener ? <input id="opener" name="opener" /> : null}
++          <button
++            type="button"
++            ref={(node) => {
++              returnFocusRef.current = node;
++            }}
++          >
++            named
++          </button>
++          <TestSurface open={open} name="only" onClose={vi.fn()} returnFocusRef={returnFocusRef} />
++        </>
++      );
++    }
++
++    await render(<Harness open={false} opener />);
++    const opener = document.querySelector<HTMLInputElement>("#opener")!;
++    await act(async () => {
++      opener.focus();
++    });
++
++    await render(<Harness open opener />);
++    expect(document.activeElement, "the surface captured a live opener").toBe(
++      labelled("close-only")
++    );
++
++    await render(<Harness open opener={false} />);
++    expect(opener.isConnected, "and the capture has now left the document").toBe(false);
++
++    await render(<Harness open={false} opener={false} />);
++    expect(document.activeElement, "so the named control took the return").toBe(labelled("named"));
++  });
++
++  it("never hands focus to a named control that is not in the document", async () => {
++    // PROPERTY: the named control is taken only while it is connected. Focus lands nowhere
++    // rather than on a node that has left the page.
++    //
++    // NOT RED at base, and said so rather than implied: the base helper reads no such
++    // member at all, so this case passes there for the wrong reason — its RED is the
++    // `named.isConnected` mutant, watched in the handoff. And the assertion that
++    // DISCRIMINATES that mutant is the spy, not the active element: focusing a detached
++    // node and focusing nothing leave `document.activeElement` identical, so a purely
++    // behavioural assertion here would pin nothing.
++    const stale = document.createElement("button");
++    expect(stale.isConnected, "the named control is genuinely off-document").toBe(false);
++    const stealFocus = vi.spyOn(stale, "focus");
++
++    function Harness({ open }: { open: boolean }): ReactNode {
++      const returnFocusRef = useRef<HTMLElement | null>(stale);
++      return <TestSurface open={open} name="only" onClose={vi.fn()} returnFocusRef={returnFocusRef} />;
++    }
++
++    await render(<Harness open={false} />);
++    expect(document.activeElement, "nothing holds focus, so the capture will be the body").toBe(
++      document.body
++    );
++
++    await render(<Harness open />);
++    expect(document.activeElement).toBe(labelled("close-only"));
++
++    await render(<Harness open={false} />);
++    expect(stealFocus, "the detached name was never asked for focus").not.toHaveBeenCalled();
++    expect(document.activeElement, "and focus went nowhere else either").toBe(document.body);
++  });
++
+   it("wraps Tab from the last focusable back to the first", async () => {
+     await render(
+       <TestSurface open name="only" onClose={vi.fn()} buttons={["second", "third"]} />
+     );
+ 
+     let event: KeyboardEvent | null = null;
+     await act(async () => {
+       labelled("third").focus();
+       event = pressTab();
+     });
+diff --git a/dialectical-engine/tests/render/consent-policy-link.test.tsx b/dialectical-engine/tests/render/consent-policy-link.test.tsx
+index 95aee354..503484c0 100644
+--- a/dialectical-engine/tests/render/consent-policy-link.test.tsx
++++ b/dialectical-engine/tests/render/consent-policy-link.test.tsx
+@@ -315,59 +315,55 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
+     activate(opener);
+     expect(card(), "the card is open").not.toBeNull();
+     expect(document.activeElement, "focus moved into the card").not.toBe(opener);
+ 
+     press("Escape");
+ 
+     expect(card(), "the card is gone").toBeNull();
+     expect(document.activeElement, "focus is back on `Cookie preferences`").toBe(opener);
+   });
+ 
+-  it("does NOT return focus to the bar opener, and records exactly why (FINDING C6-F1)", () => {
+-    // NOT a requirement met — a MEASUREMENT, in the idiom `consent-mount.test.tsx`
+-    // used for the Esc listener that did not exist yet, so the gap is a fact in
+-    // the record rather than a claim in a handoff.
++  it("returns focus to the RETURNED bar's opener when the card closes", () => {
++    // PROPERTY (S01-R18, S01-S41, the BAR direction; V-22 option (a)): after the card
++    // closes with nothing decided, focus is on the `Choose what to store` control of the
++    // bar that came back.
+     //
+-    // S01-R18 asks for focus to return to `Choose what to store` (`CookieBar.tsx:61`).
+-    // It cannot, and no edit inside C6's file surface can make it:
+-    //   * the helper returns focus to whatever `document.activeElement` held when
+-    //     the surface REGISTERED, and it registers in a `React.useEffect`
+-    //     (`modalSemantics.ts:165-178`), i.e. after the commit;
+-    //   * S01-R14 and the states table make the bar and the card mutually
+-    //     exclusive, so that same commit REMOVED the bar — asserted below — and
+-    //     the platform moves focus to `document.body` when the focused element
+-    //     leaves the document;
+-    //   * so the captured opener is `document.body`, and even a captured
+-    //     reference to the old button would be a DETACHED node: the bar that
+-    //     returns is a fresh mount with a fresh button.
+-    // Every lawful remedy is outside this cluster: a fourth `ModalSurface` member
+-    // (S02's file, a cross-slice interface change), a focus move written in S01
+-    // (banned — the ONE helper owns focus), or the returning bar taking focus
+-    // itself (`CookieBar.tsx`, cluster C3). Reported as C6-F1; the SETTINGS
+-    // direction, where the opener survives, is asserted GREEN in the case above.
++    // It is the one direction the captured opener cannot serve, which is why the helper
++    // grew an optional `returnFocusRef` for it: S01-R14 makes the bar and the card
++    // mutually exclusive, so the commit that opened the card REMOVED the bar — asserted
++    // below — and the platform moves focus to `document.body` the moment the focused
++    // element leaves the document. Every hook tier is too late (`useLayoutEffect` sees
++    // `body` too — measured, CODE-REV-S01-C6 r1 B2), and a captured reference to the old
++    // button would be a DETACHED node, because the bar that returns is a fresh mount with
++    // a fresh button — also asserted below. What lands the focus is `CookieConsent`'s own
++    // ref, handed to the bar and to the card, which React re-attaches to the fresh button
++    // in the layout phase of the commit that remounts it, before the card's passive
++    // cleanup reads it.
++    //
++    // This case REPLACES the C6-F1 measurement that recorded the gap. S01 still writes no
++    // focus move of its own: it passes a reference, and the ONE helper moves the focus.
++    // The SETTINGS direction, where the opener survives, is the case above.
+     mountBar();
+     const opener = labelled("Choose what to store");
+     activate(opener);
+     expect(card(), "the card is open").not.toBeNull();
+     expect(opener.isConnected, "and the bar that owned the opener is gone with it").toBe(false);
+ 
+     press("Escape");
+ 
+     expect(card(), "the card is gone").toBeNull();
+     expect(bar(), "and the bar is back").not.toBeNull();
+-    expect(
+-      labelled("Choose what to store"),
+-      "as a FRESH node, so no captured reference could have been restored"
+-    ).not.toBe(opener);
+-    expect(document.activeElement, "focus is on the body — R18's bar direction is UNMET").toBe(
+-      document.body
++    const returned = labelled("Choose what to store");
++    expect(returned, "as a FRESH node, so no captured reference could have been restored").not.toBe(
++      opener
+     );
++    expect(document.activeElement, "focus is on the returned bar's opener").toBe(returned);
+   });
+ 
+   it("writes no modal machinery of its own: the card imports all of it", () => {
+     // PROPERTY (S01-R18, SPEC §Out of scope, S01-S41): exactly ONE focus trap and
+     // ONE document-level Escape listener exist across the two slices, and the card
+     // gets its semantics by consuming them. The guard is grep-shaped and a grep
+     // does not know what a comment is (`COMMON.md` §8; CODE-S01-C5 F1 measured a
+     // JSDoc mention counting as a hit), so the tokens may not appear in a comment
+     // either. C7's S01-S45 runs the same class over the whole directory; this is
+     // the two wiring files, at the moment they are wired.

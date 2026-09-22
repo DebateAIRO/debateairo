@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "pid": 95978,
+  "process_group": 95978,
+  "command": [
+    "pnpm",
+    "dev:auth:up"
+  ],
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "profile": "support-preview",
+  "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/UIFIX1-stack-detached.log",
+  "detached": true,
+  "started_at": "2026-09-14T13:25:17.779Z"
+}

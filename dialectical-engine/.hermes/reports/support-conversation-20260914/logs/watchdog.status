@@ -1,0 +1,12 @@
+{
+  "state": "RUNNING",
+  "checked_at": "2026-09-17T20:24:51.457020+00:00",
+  "last_event": "2026-09-17T20:17:24.145436+00:00",
+  "idle_seconds": 60,
+  "pid": 21451,
+  "signature": "c1c3f28fed72ab2b981fb75fd326b2541cb8ac865a8cb7d52ecc0d6bf3b4571c",
+  "auto_dispatch": false,
+  "auto_accept": false,
+  "notify_unchanged": false,
+  "note": "Native agent lifecycle remains authoritative; no CPU observability here. This watchdog never declares a live read-only agent dead."
+}

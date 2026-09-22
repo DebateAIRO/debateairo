@@ -1,0 +1,55 @@
+{
+  "at": "2026-09-20T11:27:47.006137+00:00",
+  "scope": "Mechanical comparison only to delegated FIND_CURRENT known source evidence, no renewed semantic investigation",
+  "sourceReceipt": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIND_CURRENT-receipt.json",
+    "sha256": "8e7f4b99d8b846898508511932477ffd911146ee2a1b16dc6fec48875b371f30",
+    "bytes": 6478
+  },
+  "files": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/apps/ui/components/LoginFlow.tsx",
+      "previousSha256": "c946e45428214da4de31a5e267be0a24e9acc12f24aa55f01a683de2e8d20db6",
+      "currentSha256": "c946e45428214da4de31a5e267be0a24e9acc12f24aa55f01a683de2e8d20db6",
+      "same": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/apps/ui/components/authRoutes.source-test.mjs",
+      "previousSha256": "90baeda62815606a49f06332d1d960ca852b5b8934324cbbfd4196f35e394a2f",
+      "currentSha256": "90baeda62815606a49f06332d1d960ca852b5b8934324cbbfd4196f35e394a2f",
+      "same": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/packages/contract/src/client.ts",
+      "previousSha256": "d3315cbc254e2c50d81d52e1caf60d3e20e0d0430f806267826b6078add0a790",
+      "currentSha256": "d3315cbc254e2c50d81d52e1caf60d3e20e0d0430f806267826b6078add0a790",
+      "same": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/apps/api/src/index.ts",
+      "previousSha256": "09fb43043584e1d5a13bbd29a804e161ebbbe4c955381c48b6c6b6e6c494dbee",
+      "currentSha256": "09fb43043584e1d5a13bbd29a804e161ebbbe4c955381c48b6c6b6e6c494dbee",
+      "same": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/apps/api/src/recovery.ts",
+      "previousSha256": "6e53b34bb0e9af764ab015f4797bbf51742d724baf89a68307157c4da9b36233",
+      "currentSha256": "6e53b34bb0e9af764ab015f4797bbf51742d724baf89a68307157c4da9b36233",
+      "same": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/apps/api/src/sessions.ts",
+      "previousSha256": "175294140ba9f90a7087a9b6c13ba538b7eba1371a4c093e9a1c2ffc3e4ed5b5",
+      "currentSha256": "175294140ba9f90a7087a9b6c13ba538b7eba1371a4c093e9a1c2ffc3e4ed5b5",
+      "same": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/packages/db/src/recovery.ts",
+      "previousSha256": "8e520585a25570c44aade4fcaf90045cc08139b3c9dda99723698b804ab822b2",
+      "currentSha256": "8e520585a25570c44aade4fcaf90045cc08139b3c9dda99723698b804ab822b2",
+      "same": true
+    }
+  ],
+  "allSevenUnchanged": true,
+  "limits": "Does not prove absence elsewhere or resolve canonical Forgot destination; owner question remains pending."
+}

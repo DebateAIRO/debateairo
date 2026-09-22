@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_ACTIVATION_REVIEW47",
+  "ticket": "t_d30fe353",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_FINAL_CAPTURE_ACTIVATION_BINDING",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "parentThread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "reviewedOn": "2026-09-21",
+  "freeze": "d8f844ea1b14f8590e682a9a56a563cfe9352e49",
+  "resolvedFailure": "LIVE35_COMPACT_ACTIVATION_WITH_VISIBLE_CONSENT",
+  "authorReceiptSha256": "142670b951843aa82accc8d7ef8dba6156623b9033e35db227b7d4d7b5bfba0a",
+  "authorConsumptionSha256": "b175ae490a73d7dda1ce1d481a585b8f56e1083899405808172676ea1fa43dbf",
+  "reviewedSources": {
+    "captureOpenModeSha256": "89ced5df1706552cfb42db9b288d259966f923972707d5163566203a4be0f37a",
+    "captureSha256": "574501d1ffbdbd1a5bfc40ef83e8cfcad054e4005469a08c2ea9923a9cc50805",
+    "uiControlSha256": "81fdac92c7179448162c5f743521950a029c943619d595a97655f1d5c821fc1f",
+    "moduleClosureSha256": "5265e5736d158b3b0d5e98928264b047a8baef0273d794a61fb309a9fc7f88b4",
+    "commandContractSha256": "980b9fdd62e85c2c6b731a78825f5d82373f773e2357027768c40f224cbd0acf",
+    "operatorSha256": "b8d98de4ffe1b1966577f1d75933206603788c50f5f9077c2217f911fc72a092"
+  },
+  "controls": {
+    "compiledUiCases": 3,
+    "legacyNegative": "PASS_EXPECTED_FAILURE",
+    "correctedVisible": "READY",
+    "alreadySettled": "READY_INITIAL_COOKIE_HIDDEN",
+    "bindingControls": "7/7",
+    "futurePathsAbsent": 115,
+    "actualSupportRequests": 0,
+    "forwardedDynamicRequests": 0
+  },
+  "scope": {
+    "heavyCommands": 0,
+    "newTestsExecuted": 0,
+    "newRuntimeActions": 0,
+    "newBrowserActions": 0,
+    "newHttpRequests": 0,
+    "supportRequests": 0,
+    "modelRequests": 0,
+    "productWrites": 0,
+    "gitWrites": 0
+  },
+  "artifacts": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_CAPTURE_ACTIVATION_REVIEW47.md",
+      "missionRelative": "docs/missions/support-conversation-20260914/reviews/GUIDE_CAPTURE_ACTIVATION_REVIEW47.md",
+      "sha256": "f601f3a2560474e4cdedbefc63947760046427a95a2314dc95d49fca5b516165",
+      "bytes": 2932
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_ACTIVATION_REVIEW47-dispositions.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_ACTIVATION_REVIEW47-dispositions.json",
+      "sha256": "025318a1b80104c07bd0031e0dee899433f7f7440e1e70bc21631ac53f71f01b",
+      "bytes": 1792
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_ACTIVATION_REVIEW47-custody.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_ACTIVATION_REVIEW47-custody.json",
+      "sha256": "6ea87585f7e5d46a0c3c7589dbac7aec88baee4eec20eaca6d886e0efb919332",
+      "bytes": 1100
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/GUIDE_CAPTURE_ACTIVATION_REVIEW47.md",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/GUIDE_CAPTURE_ACTIVATION_REVIEW47.md",
+      "sha256": "dcd0d4a8e0c97373866cc75302bafc771e685520f28d7ca3b5f06f6ab005fe76",
+      "bytes": 1367
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_ACTIVATION_REVIEW47-manifest.json",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_ACTIVATION_REVIEW47-manifest.json",
+      "sha256": "5ba10c3cc314f2f49a8238d1dbca761e0bf09113ea2ee216c32000218bac6f2f",
+      "bytes": 2138
+    }
+  ],
+  "receiptSelfExcluded": true
+}

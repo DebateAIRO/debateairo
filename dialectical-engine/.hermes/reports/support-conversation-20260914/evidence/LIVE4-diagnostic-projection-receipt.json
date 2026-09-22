@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "revision": "6e5ab5fc41acebbff4264efc7d481df3db8dce44",
+  "kind": "RETROSPECTIVE_STRICT_SEVEN",
+  "source": "LIVE4-superseded-actual-relay-receipt.json",
+  "new_support_requests": 0,
+  "attribution_strengthened": false,
+  "producer_keys": [
+    "attemptId",
+    "code",
+    "predicate",
+    "hasSources",
+    "hasActions",
+    "sourceCount",
+    "actionCount"
+  ],
+  "requests": [
+    {
+      "sequence": 1,
+      "diagnostic": {
+        "status": "ATTRIBUTED",
+        "cursorStart": 722,
+        "cursorEnd": 1065,
+        "candidateCount": 1,
+        "validCount": 1,
+        "invalidCount": 0,
+        "duplicateCount": 0,
+        "record": {
+          "attemptId": "9c5d6775-e091-440f-a41f-5bfa58cf6bee",
+          "code": "SUPPORT_DRAFT_TEXT_INTERNAL_IDENTIFIER",
+          "predicate": "NARRATIVE_INTERNAL_IDENTIFIER",
+          "hasSources": true,
+          "hasActions": true,
+          "sourceCount": 3,
+          "actionCount": 1
+        }
+      }
+    },
+    {
+      "sequence": 2,
+      "diagnostic": {
+        "status": "NO_REJECTION_EVENT",
+        "cursorStart": 1065,
+        "cursorEnd": 1065,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0
+      }
+    },
+    {
+      "sequence": 3,
+      "diagnostic": {
+        "status": "NO_REJECTION_EVENT",
+        "cursorStart": 1065,
+        "cursorEnd": 1065,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0
+      }
+    },
+    {
+      "sequence": 4,
+      "diagnostic": {
+        "status": "NO_REJECTION_EVENT",
+        "cursorStart": 1065,
+        "cursorEnd": 1065,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0
+      }
+    },
+    {
+      "sequence": 5,
+      "diagnostic": {
+        "status": "NO_REJECTION_EVENT",
+        "cursorStart": 1065,
+        "cursorEnd": 1065,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0
+      }
+    },
+    {
+      "sequence": 6,
+      "diagnostic": {
+        "status": "NO_REJECTION_EVENT",
+        "cursorStart": 1065,
+        "cursorEnd": 1065,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0
+      }
+    },
+    {
+      "sequence": 7,
+      "diagnostic": {
+        "status": "NO_REJECTION_EVENT",
+        "cursorStart": 1065,
+        "cursorEnd": 1065,
+        "candidateCount": 0,
+        "validCount": 0,
+        "invalidCount": 0,
+        "duplicateCount": 0
+      }
+    }
+  ]
+}

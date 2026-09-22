@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_PANE_REVIEW48",
+  "ticket": "t_75f5344e",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_FINAL_COMPACT_PANE_CONTINUATION_BINDING",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "dispositions": [
+    {
+      "id": "GCPR48-D1",
+      "scope": "compact pane selector and helper wiring",
+      "verdict": "PASS",
+      "basis": "Compact capture selects .supportWidgetPanel; full remains .supportChatScroll; actual capture imports the reviewed helper and retains strict target identity plus restoration."
+    },
+    {
+      "id": "GCPR48-D2",
+      "scope": "compiled React row10 and long controls",
+      "verdict": "PASS",
+      "basis": "Ordinal-1 compiled replay reproduces the old selector failure, proves corrected row10 footer containment/paint and proves discriminating forward scroll with the long case at 390x844."
+    },
+    {
+      "id": "GCPR48-D3",
+      "scope": "row10 layered evidence",
+      "verdict": "PASS_QUALIFIED_WORKING_PREVIEW",
+      "basis": "Actual response/API-DOM/source/action equality and actual start PNG are retained; separate exact compiled replay proves helper rendering. Replay images remain labeled non-actual and LIVE36 remains failed without live end/expanded images."
+    },
+    {
+      "id": "GCPR48-D4",
+      "scope": "traffic boundary",
+      "verdict": "PASS",
+      "basis": "Support/status/private/external and forwarded dynamic requests are zero; six auth attempts are intercepted and aborted before the controlled replay renders."
+    },
+    {
+      "id": "GCPR48-D5",
+      "scope": "remaining20 schedule and capacity",
+      "verdict": "PASS",
+      "basis": "Exact 20-row order, compact54 keyboard Help to full43 same-session continuation, three sessions, 17 model ceiling, 31-second spacing and 3/26/23 gate with 2/25/22 negatives are bound."
+    },
+    {
+      "id": "GCPR48-D6",
+      "scope": "three-segment composition",
+      "verdict": "PASS",
+      "basis": "Ten LIVE31 plus row10 LIVE36 plus future20 compose to31 unique cases across three actual segments and six times; failed provenance, row47 exception and replay qualification remain distinct."
+    },
+    {
+      "id": "GCPR48-D7",
+      "scope": "LIVE37 GUIDE26 command closure",
+      "verdict": "PASS",
+      "basis": "Seven self-bound argv, final operator digest, exact35 reachable closure, fresh namespaces and115 absent future paths agree."
+    },
+    {
+      "id": "GCPR48-D8",
+      "scope": "unrelated ancestor dispositions",
+      "verdict": "RETAIN_PASS",
+      "basis": "REVIEW47 and unrelated process/schema/owner/principal/product/full58 evidence remain unchanged and were not reopened."
+    }
+  ],
+  "limits": [
+    "Row10 replay images are synthetic-response compiled-UI evidence and are not actual LIVE36 images.",
+    "Actual remaining20 execution, content review of remaining20/composed31 and fresh owner availability remain required.",
+    "Forgot destination remains unresolved; no CP1 acceptance or CP2 readiness claim."
+  ]
+}

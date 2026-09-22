@@ -25,12 +25,12 @@ Slot: `UNSET → SET(spike passed) | DEFERRED_TO_MISSION(spike killed)`. Ingest:
 "second source" · "structured fields only" · "evidenced merge" · "explicit deferral". Never "log line" for anything stored.
 
 ## 5. Acceptance — V runs this personally (SPIKE-D1 passed; FIX-09 merged; dev stack up)
-1. Start a debate; while its runner task executes, `kill -9 <runner pid>` (the process, not the container).
+1. Start a debate; while its runner task executes, `RUNNER_PID="$(pgrep -f 'tsx apps/runner/src/main.ts' | head -n 1)"; test -n "$RUNNER_PID"; kill -9 "$RUNNER_PID"` → the runner process exits while the Postgres and Hatchet containers remain up.
 2. Hatchet dashboard `http://localhost:8888` shows the run FAILED.
 3. Within `pollIntervalMs` + 5 s: `docker exec debateai-v3-postgres-1 psql -U debateai -d debateai -At -c "SELECT source, runtime, code, run_ref, work_item_ref FROM obs.occurrence WHERE source='hatchet' ORDER BY occ_seq DESC LIMIT 1"` → `hatchet|ingest|<code>|<uuid>|<uuid>`.
-4. `SELECT count(*) FROM obs.source_link` → increases by 1 only if a first-party twin exists (a spool-drained row from the killed runner); `SELECT source_set FROM obs.incident WHERE fingerprint = …` → includes `hatchet`.
-5. `SELECT count(*) FROM (SELECT o::text t FROM obs.occurrence o) s WHERE t ILIKE '%traceback%' OR t ILIKE '%stack%' AND source='hatchet'` → `0` (no log text).
-6. `docker stop debateai-v3-hatchet-lite-1`; run FIX-01's failing job → its row lands normally (capture path unaffected); `SELECT code FROM obs.occurrence WHERE runtime='ingest' AND capture_point='self' ORDER BY occ_seq DESC LIMIT 1` → a Hatchet-unreachable code; `docker start debateai-v3-hatchet-lite-1`.
+4. `docker exec debateai-v3-postgres-1 psql -U debateai -d debateai -At -c "SELECT count(*) FROM obs.source_link WHERE left_occurrence_id = (SELECT occurrence_id FROM obs.occurrence WHERE source='hatchet' ORDER BY occ_seq DESC LIMIT 1) OR right_occurrence_id = (SELECT occurrence_id FROM obs.occurrence WHERE source='hatchet' ORDER BY occ_seq DESC LIMIT 1)"` → `1` only if a first-party twin exists, otherwise `0`; `docker exec debateai-v3-postgres-1 psql -U debateai -d debateai -At -c "SELECT source_set FROM obs.incident WHERE fingerprint = (SELECT fingerprint FROM obs.occurrence WHERE source='hatchet' ORDER BY occ_seq DESC LIMIT 1)"` → a JSON array containing `hatchet`.
+5. `docker exec debateai-v3-postgres-1 psql -U debateai -d debateai -At -c "SELECT count(*) FROM obs.occurrence o LEFT JOIN obs.occurrence_detail d ON d.occurrence_id = o.occurrence_id WHERE o.source='hatchet' AND (o::text ILIKE '%traceback%' OR o::text ILIKE '%stack%' OR COALESCE(d::text, '') ILIKE '%traceback%' OR COALESCE(d::text, '') ILIKE '%stack%')"` → `0` (no Hatchet log text in either row surface).
+6. `docker stop debateai-v3-hatchet-lite-1`; run FIX-01's failing job → its row lands normally (capture path unaffected); `docker exec debateai-v3-postgres-1 psql -U debateai -d debateai -At -c "SELECT code FROM obs.occurrence WHERE runtime='ingest' AND capture_point='self' ORDER BY occ_seq DESC LIMIT 1"` → a Hatchet-unreachable code; `docker start debateai-v3-hatchet-lite-1`.
 V vetoes Done only after steps 1–6 match. If SPIKE-D1 killed: this section is replaced by the exit report's deferral statement.
 
 ## 6. Out of scope

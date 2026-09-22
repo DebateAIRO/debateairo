@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "revision": "43cf9386ea3c9e7c79523ec38debe63271d19292",
+  "runtime_log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/LIVE3-stack-detached-r2.log",
+  "baseline_byte_offset": 722,
+  "actual_requests_before_finite_matrix": 0,
+  "captured_at": "2026-09-14T14:40:46.350Z"
+}

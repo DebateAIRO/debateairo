@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_CWD_REVIEW50",
+  "ticket": "t_f412f468",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_FINAL_OPERATOR_CWD_BINDING",
+  "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "reviewedOn": "2026-09-21",
+  "dispositions": [
+    {"id":"GOCR50-D1","scope":"metadata structural delta","verdict":"PASS","basis":"Exact comparison finds only cwd changed from source root S to detached product L; node, argv, source, contract and operatorOwned remain identical."},
+    {"id":"GOCR50-D2","scope":"recorded inert guard","verdict":"PASS","basis":"Guard was recorded from L with numeric status0 and PASS_INERT_GUARD, exiting before private preparation, prerequisite creation or any phase."},
+    {"id":"GOCR50-D3","scope":"future paths and traffic","verdict":"PASS","basis":"All116 future paths remain absent; operational phases and browser/runtime/HTTP/status/capacity/DB/Support/model traffic are zero."},
+    {"id":"GOCR50-D4","scope":"superseded draft","verdict":"PRESERVED_NOT_SELECTED","basis":"The draft that also changed node remains immutable and is not the final operator metadata."},
+    {"id":"GOCR50-D5","scope":"REVIEW49 and ancestors","verdict":"RETAIN_PASS","basis":"All underlying implementation and evidence bytes are unchanged and outside this launch-only review."}
+  ],
+  "limits": ["LIVE38 has not started and all20 requests remain unsent.","No Forgot, CP1 acceptance or CP2 readiness claim."]
+}

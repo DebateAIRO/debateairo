@@ -1,0 +1,14 @@
+$ tsx apps/runner/src/dev-auth-stack-cli.ts
+DEV_PROVIDER_SLOT_UNAVAILABLE class (a) tier=free model=gpt-5.6-luna
+DEV_PROVIDER_SLOT_UNAVAILABLE class (a) tier=free model=glm-5.3-flash
+DEV_AUTH_STACK_DATA_FAILED:DEV_AUTH_DATA_PLANE_REGISTER_FAILED:DEV_AUTH_DATA_PLANE_REGISTER_FAILED
+[ELIFECYCLE] Command failed with exit code 1.
+$ tsx apps/runner/src/dev-auth-stack-cli.ts
+DEV_PROVIDER_SLOT_UNAVAILABLE class (a) tier=free model=gpt-5.6-luna
+DEV_PROVIDER_SLOT_UNAVAILABLE class (a) tier=free model=glm-5.3-flash
+(node:39455) [HATCHET_V0_REMOVED] DeprecationWarning: The v0 SDK, including the step module, has been deprecated and was removed in v1.14.0. Please migrate to the v1 SDK: https://docs.hatchet.run/home/v1-sdk-improvements
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:39455) [HATCHET_V0_REMOVED] DeprecationWarning: The v0 SDK, including the workflow module, has been deprecated and was removed in v1.14.0. Please migrate to the v1 SDK: https://docs.hatchet.run/home/v1-sdk-improvements
+ConcurrencyLimitStrategy and StickyStrategy have been moved to @hatchet-dev/typescript-sdk/v1.
+DEV_AUTH_STACK_RUNNER_FAILED:DEV_RUNNER_PROCESS_READINESS_INVALID
+[ELIFECYCLE] Command failed with exit code 1.

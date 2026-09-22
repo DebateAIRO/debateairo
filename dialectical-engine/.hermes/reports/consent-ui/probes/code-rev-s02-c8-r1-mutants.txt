@@ -1,0 +1,22 @@
+### baseline:       Tests  8 passed (8)
+M1 drop .policyBezel from prefers-reduced-motion | after mutant:       Tests  1 failed | 7 passed (8)
+M1 drop .policyBezel from prefers-reduced-motion | restored: OK  (      Tests  8 passed (8))
+M2 drop .policyScrim from prefers-reduced-motion | after mutant:       Tests  1 failed | 7 passed (8)
+M2 drop .policyScrim from prefers-reduced-motion | restored: OK  (      Tests  8 passed (8))
+M3 add an uncovered animated selector | after mutant:       Tests  1 failed | 7 passed (8)
+M3 add an uncovered animated selector | restored: OK  (      Tests  8 passed (8))
+ANCHOR NOT UNIQUE (0) for '.authCard {\n  position: relative;'
+M4 transform on .authCard (S02-S65) | MUTANT NOT APPLIED (anchor)
+M5 width clamp 680 -> 720 | after mutant:       Tests  1 failed | 7 passed (8)
+M5 width clamp 680 -> 720 | restored: OK  (      Tests  8 passed (8))
+M6 .consentBox width 17px -> 16px | after mutant:       Tests  1 failed | 7 passed (8)
+M6 .consentBox width 17px -> 16px | restored: OK  (      Tests  8 passed (8))
+M7 hairline on every .consentRow | after mutant:       Tests  1 failed | 7 passed (8)
+M7 hairline on every .consentRow | restored: OK  (      Tests  8 passed (8))
+M8 .policyGateHint display:none | after mutant:       Tests  1 failed | 7 passed (8)
+M8 .policyGateHint display:none | restored: OK  (      Tests  8 passed (8))
+M9 disabled opacity .65 -> .60 | after mutant:       Tests  1 failed | 7 passed (8)
+M9 disabled opacity .65 -> .60 | restored: OK  (      Tests  8 passed (8))
+ANCHOR NOT UNIQUE (6) for '  background: var(--gold);'
+M10 colour literal inside the block | MUTANT NOT APPLIED (anchor)
+### final porcelain: 1 entries

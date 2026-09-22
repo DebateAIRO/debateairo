@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "mission": "support-conversation-20260914",
+  "node": "FREEZE",
+  "ticket": "t_31897858",
+  "created_at": "2026-09-14T08:33:48Z",
+  "agent": "/root/baseline",
+  "codex_thread_id": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "codex_session_id": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "git": {
+    "ref": "refs/heads/codex/support-conversation-mission",
+    "commit": "1b305e4d28e33bf77bb181eef200b7065f2c9334",
+    "tree": "285d090a8aa9075650610213477c86394058d124",
+    "parent": "b7ca2c413bf3242ce18e29a397dc9a3aa9228893",
+    "expected_old_ref": "0000000000000000000000000000000000000000",
+    "private_index_removed": true,
+    "added_paths": 24,
+    "modified_paths": 0,
+    "deleted_paths": 0
+  },
+  "files": [
+    {"group":"mission_record","path":"dialectical-engine/docs/missions/support-conversation-20260914/OWNER-REQUEST.md","sha256":"94988b203a1af29bf6723caca0509e93b60dbcf263b6fe50e9a6746d161f333a"},
+    {"group":"mission_record","path":"dialectical-engine/docs/missions/support-conversation-20260914/00-intake.md","sha256":"f4d4fe7b8a94385e661133737bd0ccbbfcacd0ad343a86510d4c8335535a30be"},
+    {"group":"mission_record","path":"dialectical-engine/docs/missions/support-conversation-20260914/INSTRUCTIONS.md","sha256":"4582bc82bdcdef28ac4e06b4a4eb1a413fee84e8e07bc4374049a9c0ca451bf9"},
+    {"group":"mission_record","path":"dialectical-engine/docs/missions/support-conversation-20260914/board-ids.json","sha256":"60846a181bba170f921336a2bac63f5e777e55916e75438b92c227028082bd9f"},
+    {"group":"mission_record","path":"dialectical-engine/docs/missions/support-conversation-20260914/V-DECISIONS-PACKET.md","sha256":"2bfa5592a63ba63abddf6c54d978eb1a35a68185dfce42980a8f3b17c28e6a11"},
+    {"group":"specification","path":"dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/SPEC.md","sha256":"a4567fbcc88234ff0c1dae74f367e6c01a13b906b8c49b699af1b2ea02c866db"},
+    {"group":"specification","path":"dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PLAN.md","sha256":"21f1f4ef580e68105cd0d6924f4d15ef59bb8c47654724f8e85e12708fa6415e"},
+    {"group":"specification","path":"dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/DECISIONS.md","sha256":"d6ad36c67069fd95f824f6fc6eb4fd89ac3f1c3cdf2e9fc34764134dfa512ed4"},
+    {"group":"specification","path":"dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/DONE.md","sha256":"618350ec7d364070efc404cdf82f1fef24a5d94e1aa99526338cc82740174fee"},
+    {"group":"specification","path":"dialectical-engine/docs/missions/support-conversation-20260914/slices/CP2/SPEC.md","sha256":"5656ed6bc290a255a2f846397a2575b616a0829b3cad8ae465cac9bfa152296a"},
+    {"group":"specification","path":"dialectical-engine/docs/missions/support-conversation-20260914/slices/CP3/SPEC.md","sha256":"ff9ffea163ebe2a68256caf254b44a759c42000b865c9d8a9b6ad1ed5cc6fc4e"},
+    {"group":"packet","path":"dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md","sha256":"137c11e08636b99933025e04925cc30530f7a22336a287ba16a23288e5934c24"},
+    {"group":"packet","path":"dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REQ.md","sha256":"500e79ebd9b033c663c0cdd48b9248b9af4a43bcc200ac3f8993f6ff30aa5fac"},
+    {"group":"packet","path":"dialectical-engine/.hermes/planning/support-conversation-20260914/packets/BASE.md","sha256":"ded35a9049ef15fbebd3f59c580bbd3b66bc619556e533218348f7e0bd9e5d33"},
+    {"group":"packet","path":"dialectical-engine/.hermes/planning/support-conversation-20260914/packets/FIND.md","sha256":"af9dad7d42660d1261d5542b31cc6d4d514c5ff01e7b31de324c58d0c3d40511"},
+    {"group":"packet","path":"dialectical-engine/.hermes/planning/support-conversation-20260914/packets/PREVIEW.md","sha256":"e395336a63a29e8284873c18d98b26d4cfa6bf7dcad0021d4a505c9fff28e92d"},
+    {"group":"packet","path":"dialectical-engine/.hermes/planning/support-conversation-20260914/packets/FREEZE.md","sha256":"ef86a83ebe43eb50e3271f37fe35f7b87989104ddcbf546ed966b4f21d8bea7f"},
+    {"group":"completed_evidence","path":"dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/BASE.md","sha256":"b739336e30087e2855be7ebe4bf463a05c0a139c6f59d888aa87f7f6dbed8802"},
+    {"group":"completed_evidence","path":"dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIND.md","sha256":"75c47fc6e3088a82202da1adf127348d08faa0a9d0da05e4335d61257ccb2829"},
+    {"group":"completed_evidence","path":"dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/REQ.md","sha256":"697b63836fbfd23a3298e50ec62ef8bdbe166679679002db7c601cf3df620dd3"},
+    {"group":"completed_evidence","path":"dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/baseline-manifest.json","sha256":"7ed6e1a4e96c2413f58c6eca2abb582f0c9da3084e4c440eb05c8b5da9c0a109"},
+    {"group":"completed_self_report","path":"dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/BASE.md","sha256":"9a618eed0a0faac2ce669050f9035e1a02d5c3b19707ec6f500aaeda9cce7455"},
+    {"group":"completed_self_report","path":"dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FIND.md","sha256":"7db76a3f9497b7e822778cca8b6a8c1b74185440e5981eaffc8b66cbf0ce0154"},
+    {"group":"completed_self_report","path":"dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/REQ.md","sha256":"d4032389021c59be1cda1f0194820a8ec01e581c6f299e4283c42594ab9025e1"}
+  ],
+  "verification": {
+    "committed_blob_sha256_checked": 24,
+    "committed_blob_sha256_mismatches": 0,
+    "source_head_after": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "source_branch_after": "integration/debate-tiers",
+    "source_status_entries_after": 157,
+    "source_tracked_unstaged_after": 56,
+    "source_staged_after": 0,
+    "source_staged_binary_diff_sha256_after": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "source_unstaged_binary_diff_sha256_after": "606ad70f5e8b852724469816ca922d5685a4117668daeeed1a4d740b8988035e",
+    "tests_run": 0,
+    "heavy_lease_used": false
+  },
+  "excluded": [
+    "active PREVIEW evidence, logs, reports and runtime outputs",
+    "living LEDGER, STATE, watchdog and agent process files",
+    "FREEZE evidence, manifest and self-report receipts",
+    "all other mission files",
+    "all product changes other than those inherited from the parent commit"
+  ],
+  "external_receipts": [
+    {"path":"dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FREEZE.md","bytes":4438,"sha256":"311e480d10c65c1ab21f218a5be91d5a5908565acdf362e16efaee71c2c2e164"},
+    {"path":"dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FREEZE.md","bytes":4410,"sha256":"e53f64f0cfd874c29a142809cdc5daf88204a0231cbf61c8d8a3a9d68e77c977"}
+  ]
+}

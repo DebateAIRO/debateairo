@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE36",
+  "sequence": 10,
+  "failureCode": "GUIDE_CAPTURE_ORIGINAL_PANE_FOOTER_UNREACHABLE",
+  "classification": "CAPTURE_CONTROLLER_PANE_SELECTION_ERROR",
+  "evidence": {
+    "apiStatus": 200,
+    "outcome": "ANSWER_GROUNDED",
+    "apiDomTextEqual": true,
+    "apiDomSourcesEqual": true,
+    "apiDomActionsEqual": true,
+    "bodyEndPainted": true,
+    "footerExpected": true,
+    "footerPresent": true,
+    "footerPaintedByViewportHitTest": false,
+    "selectedPane": ".supportAssistantCompact",
+    "selectedPaneScrollTop": 0,
+    "selectedPaneScrollHeight": 882,
+    "selectedPaneClientHeight": 882,
+    "selectedPaneMaximumScrollTop": 0,
+    "viewport": { "width": 390, "height": 844 },
+    "footerRect": { "top": 821.03125, "bottom": 887.203125, "left": 56, "right": 308.390625 },
+    "footerCenterBelowViewport": true,
+    "actualProductScrollContainer": ".supportWidgetPanel",
+    "productScrollContract": "max-height:70vh; overflow:auto",
+    "captureExpandedViewportBeforeFailure": false,
+    "viewportAtFailureWasRestoredCompactViewport": true
+  },
+  "sourceAnchors": [
+    ".hermes/reports/support-conversation-20260914/probes/GUIDE_CONTINUATION_BIND40/screenshot-evidence-successor.mjs:231 selects compact paneSelector=root",
+    "apps/ui/components/support/SupportWidget.tsx renders .supportAssistantCompact inside .supportWidgetPanel",
+    "apps/ui/app/globals.css .supportWidgetPanel uses max-height:70vh and overflow:auto"
+  ],
+  "conclusion": "The controller measured and attempted to scroll the compact content root rather than the product's controlling scroll ancestor. The failure happened before expanded evidence capture, in the restored 390x844 viewport. Containment within the 882px-tall off-viewport content root could not prove viewport paint, while the actual parent panel is constrained to 70vh and overflow:auto. Existing evidence therefore classifies this as a controller pane-selection error and does not establish a product usability defect. A bounded successor should select .supportWidgetPanel for compact original-pane evidence and exercise this exact real path without resending row 10."
+}

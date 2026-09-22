@@ -1,0 +1,63 @@
+{
+  "at": "2026-09-14T09:03:16.671482+00:00",
+  "ref": "refs/heads/codex/support-conversation-mission",
+  "commit": "65f71d79d571db9a0a8de3923a87fc8ac59db466",
+  "tree": "0ee9bc3a58dcbb855273a3c9ef2b831a7597eb13",
+  "parent": "1b305e4d28e33bf77bb181eef200b7065f2c9334",
+  "files": [
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/SPEC-v2.md",
+      "sha256": "a692cc55515a2a581330aaaf8a5549e844f64e848c1d620234aff2d5c362d029"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PLAN.md",
+      "sha256": "b48b5bed46f005df176219a9bebe9d5fe28de35c3ff6fe46c756dae9c46c49e0"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/DONE.md",
+      "sha256": "7481c49de9d86da03dc4cd5107dbe8057a456950acb24bcd46c7f78ccbdb3456"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/DECISIONS.md",
+      "sha256": "3735793940a480dd6566d4eef938f9aac2ca2ebd8fd4dc5be5fdf84cc681cb8d"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/PLANREV-p1.md",
+      "sha256": "26d08f974026987de9b67471d134bd6ea90e463a9733c1ac67fa857832cc1714"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/PLANREV.md",
+      "sha256": "c95155726f64b7e28cadefe3b6dcc302b769f51bdd8c5442150a22910c3f18de"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/REQ-FIX1.md",
+      "sha256": "d28a4fbf7ae4d34da1e583a8688f7bc034ac68754fb0779884957561395347df"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/REQ-FIX1.md",
+      "sha256": "210004b0e7c481b09379eb5189fbd386fd144b99b962eda4ac3357bffed9ec32"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REQ-FIX1.md",
+      "sha256": "b5b60564526c7108723a0fd9aabe766d41cce80d43bdeacab72b35c01487a14c"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/KB.md",
+      "sha256": "7954412d14b1b6c5f30795db9dc277249f7b2e7f893e39dd34190ced32d5e413"
+    }
+  ],
+  "source_before": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "606ad70f5e8b852724469816ca922d5685a4117668daeeed1a4d740b8988035e",
+    "lane_ref": "b7ca2c413bf3242ce18e29a397dc9a3aa9228893"
+  },
+  "source_after": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "606ad70f5e8b852724469816ca922d5685a4117668daeeed1a4d740b8988035e",
+    "lane_ref": "b7ca2c413bf3242ce18e29a397dc9a3aa9228893"
+  },
+  "private_index_removed": true,
+  "tested": "metadata only; no product tests"
+}

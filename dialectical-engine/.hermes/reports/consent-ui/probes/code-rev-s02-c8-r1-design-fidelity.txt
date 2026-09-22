@@ -1,0 +1,269 @@
+################ 10c PRIVACY POLICY MODAL ################
+
+-- [10c#6] .policyScrim  (the overlay)
+   DIFFERS-BY-DESIGN position: design absolute  |  block fixed
+   OK      inset: 0
+   DIFFERS  background: design rgba(10, 8, 6, .42)  |  block var(--scrim)
+
+-- [10c#7] .policyBezel  (the outer card)
+   DIFFERS  position: design absolute  |  block relative
+   ABSENT-BY-DESIGN left: design 40px
+   ABSENT-BY-DESIGN right: design 40px
+   ABSENT-BY-DESIGN top: design 34px
+   ABSENT-BY-DESIGN bottom: design 34px
+   OK      background: var(--shell)
+   OK      border: 1px solid var(--line-strong)
+   DIFFERS-BY-DESIGN border-radius: design 16px  |  block var(--r-panel)
+   OK      padding: 7px
+   DIFFERS-BY-DESIGN box-shadow: design 0 30px 70px -25px rgba(0, 0, 0, .55)  |  block var(--shadow-pop)
+   OK      color: var(--ink)
+
+-- [10c#8] .policyCore  (the inner core)
+   OK      position: relative
+   ABSENT-BY-DESIGN height: design 100%
+   ABSENT-BY-DESIGN box-sizing: design border-box
+   OK      overflow: hidden
+   OK      display: flex
+   OK      flex-direction: column
+   OK      background: var(--core)
+   OK      border: 1px solid var(--line)
+   OK      border-radius: 11px
+
+-- [10c#9] .policyTab  (the gold tab)
+   OK      position: absolute
+   OK      top: 0
+   OK      left: 24px
+   OK      width: 52px
+   OK      height: 4px
+   OK      border-radius: var(--r-tab)
+   OK      background: var(--gold)
+   OK      z-index: 2
+
+-- [10c#10] .policyHead  (the header band)
+   OK      flex: 0 0 auto
+   OK      padding: 22px 24px 14px
+   OK      border-bottom: 1px solid var(--line)
+
+-- [10c#11] .policyHead  (the header flex row (merged into .policyHead))
+   OK      display: flex
+   OK      align-items: flex-start
+   OK      gap: 14px
+
+-- [10c#12] .policyHeadText  (the header text column)
+   OK      flex: 1
+   OK      min-width: 0
+
+-- [10c#13] .policyEyebrow  (the eyebrow)
+   OK      font-family: var(--font-mono)
+   OK      font-size: 9px
+   OK      font-weight: 700
+   OK      letter-spacing: .16em
+   OK      color: var(--gold)
+
+-- [10c#14] .policyTitle  (the title)
+   OK      margin-top: 9px
+   OK      font-family: var(--font-display)
+   OK      font-size: 21px
+   OK      font-weight: 600
+   OK      letter-spacing: -.018em
+
+-- [10c#15] .policyLede  (the lede)
+   OK      margin-top: 5px
+   OK      font-size: 11.5px
+   OK      line-height: 1.55
+   OK      color: var(--text-2)
+
+-- [10c#16] .policyClose  (the close control)
+   OK      flex: 0 0 auto
+   OK      display: grid
+   OK      place-items: center
+   OK      width: 28px
+   OK      height: 28px
+   OK      border-radius: var(--r-pill)
+   OK      border: 1px solid var(--line-strong)
+   OK      color: var(--muted)
+   OK      font-size: 14px
+   OK      cursor: pointer
+
+-- [10c#17] .policyBody  (the scroll region)
+   OK      flex: 1
+   OK      min-height: 0
+   OK      overflow: auto
+   OK      padding: 16px 24px 8px
+
+-- [10c#18] .policyJumps  (the jump pill row)
+   OK      display: flex
+   OK      gap: 8px
+   OK      flex-wrap: wrap
+   OK      margin-bottom: 16px
+
+-- [10c#19] .policyPill  (a jump pill)
+   OK      padding: 4px 10px
+   OK      border-radius: var(--r-pill)
+   OK      border: 1px solid var(--line-strong)
+   OK      background: var(--shell)
+   OK      font-family: var(--font-mono)
+   OK      font-size: 8.5px
+   OK      font-weight: 700
+   OK      letter-spacing: .08em
+   OK      color: var(--muted)
+   OK      cursor: pointer
+
+-- [10c#20] .policySection  (a section)
+   OK      padding-bottom: 16px
+   OK      margin-bottom: 16px
+   OK      border-bottom: 1px solid var(--line)
+
+-- [10c#21] .policySectionHead  (the section head)
+   OK      display: flex
+   OK      align-items: baseline
+   OK      gap: 12px
+
+-- [10c#22] .policyNo  (the section number)
+   OK      flex: 0 0 26px
+   OK      font-family: var(--font-mono)
+   OK      font-size: 10.5px
+   OK      font-weight: 700
+   OK      color: var(--accent)
+
+-- [10c#23] .policySectionTitle  (the section title)
+   OK      font-family: var(--font-display)
+   OK      font-size: 15.5px
+   OK      font-weight: 600
+   OK      letter-spacing: -.012em
+
+-- [10c#24] .policyText  (the section body)
+   OK      margin: 7px 0 0 38px
+   OK      font-size: 11.5px
+   OK      line-height: 1.65
+   OK      color: var(--text-2)
+   OK      text-wrap: pretty
+
+-- [10c#25] .policyItems  (the bullet list)
+   OK      margin: 9px 0 0 38px
+   OK      display: flex
+   OK      flex-direction: column
+   OK      gap: 5px
+
+-- [10c#26] .policyItem  (a bullet row)
+   OK      display: flex
+   OK      gap: 9px
+   OK      font-size: 11px
+   OK      line-height: 1.5
+
+-- [10c#27] .policyDot  (the bullet dot)
+   OK      flex: 0 0 auto
+   OK      margin-top: 5px
+   OK      width: 5px
+   OK      height: 5px
+   OK      border-radius: var(--r-dot)
+   OK      background: var(--accent)
+
+-- [10c#28] .policyItemText  (the bullet text)
+   OK      color: var(--text-2)
+
+-- [10c#29] .policyEnd  (the end marker)
+   OK      text-align: center
+   OK      padding-bottom: 6px
+   OK      font-family: var(--font-mono)
+   OK      font-size: 9px
+   OK      letter-spacing: .14em
+   OK      color: var(--muted)
+
+-- [10c#30] .policyFoot  (the footer)
+   OK      flex: 0 0 auto
+   OK      display: flex
+   OK      align-items: center
+   OK      gap: 10px
+   OK      padding: 14px 24px
+   OK      border-top: 1px solid var(--line)
+   OK      background: var(--shell)
+
+-- [10c#31] .policyContact  (the contact line)
+   OK      font-size: 10.5px
+   OK      color: var(--muted)
+
+-- [10c#32] .policyMail  (the mail address)
+   OK      font-weight: 700
+   OK      color: var(--ink)
+
+-- [10c#33] .policyFootSpacer  (the spacer)
+   OK      flex: 1
+
+-- [10c#34] DOWNLOAD PDF -- deliberately absent from the product (COMMON section 3 honesty law); no class in the 29
+
+-- [10c#35] .policyPrimary  (the primary button)
+   OK      padding: 10px 18px
+   OK      border-radius: var(--r-pill)
+   OK      background: var(--ink)
+   OK      color: var(--bg)
+   OK      font-size: 12px
+   OK      font-weight: 700
+   OK      cursor: pointer
+
+################ 8a CHECKBOX GROUP ################
+
+-- [8a#0] .consentGroup  (the group container)
+   OK      border: 1px solid var(--line)
+   OK      border-radius: 11px
+   OK      background: var(--shell)
+   OK      padding: 2px 13px
+
+-- [8a#1] .consentRow  (row 1 (carries the hairline))
+   OK      display: flex
+   OK      align-items: flex-start
+   OK      gap: 10px
+   OK      padding: 11px 0
+   ABSENT-BY-DESIGN border-bottom: design 1px solid var(--line)
+   OK      cursor: pointer
+
+-- [8a#2] .consentBox  (the square, drawn CHECKED on the artboard)
+   OK      flex: 0 0 auto
+   ABSENT-BY-DESIGN margin-top: design 1px
+   OK      width: 17px
+   OK      height: 17px
+   OK      border-radius: 5px
+   OK      border: 1.5px solid var(--ok-edge)
+   DIFFERS-BY-DESIGN background: design var(--ok-dot)  |  block none
+   OK      display: grid
+   OK      place-items: center
+   ABSENT-BY-DESIGN font-size: design 10px
+   ABSENT-BY-DESIGN font-weight: design 800
+   ABSENT-BY-DESIGN color: design var(--core)
+
+-- [8a#3] .consentText  (the row-1 label)
+   OK      font-size: 11.5px
+   OK      line-height: 1.5
+
+-- [8a#4] .consentRow  (row 2 (no hairline))
+   OK      display: flex
+   OK      align-items: flex-start
+   OK      gap: 10px
+   OK      padding: 11px 0
+   OK      cursor: pointer
+
+-- [8a#5] .consentBox  (the square, drawn CHECKED)
+   OK      flex: 0 0 auto
+   ABSENT-BY-DESIGN margin-top: design 1px
+   OK      width: 17px
+   OK      height: 17px
+   OK      border-radius: 5px
+   OK      border: 1.5px solid var(--ok-edge)
+   DIFFERS-BY-DESIGN background: design var(--ok-dot)  |  block none
+   OK      display: grid
+   OK      place-items: center
+   ABSENT-BY-DESIGN font-size: design 10px
+   ABSENT-BY-DESIGN font-weight: design 800
+   ABSENT-BY-DESIGN color: design var(--core)
+
+-- [8a#6] .consentText  (the row-2 label)
+   OK      font-size: 11.5px
+   OK      line-height: 1.5
+
+-- [8a#7] .consentPolicyLink  (the Privacy Policy control)
+   OK      font-weight: 700
+   OK      color: var(--ink)
+   OK      text-decoration: underline
+   OK      text-underline-offset: 3px
+
+################ TOTAL: 188 design declarations checked, 2 unexplained mismatch(es)

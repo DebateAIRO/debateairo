@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "topic": "en_creation",
+  "support_api": "actual",
+  "relay": "actual_unchanged",
+  "synthetic_overrides": false,
+  "credential_or_recovery_operations": 0,
+  "status": 200,
+  "outcome": "ANSWER_GROUNDED",
+  "source_count": 1,
+  "action_count": 0,
+  "completed": true
+}

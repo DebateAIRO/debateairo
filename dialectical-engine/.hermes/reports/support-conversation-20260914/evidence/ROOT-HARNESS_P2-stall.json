@@ -1,0 +1,14 @@
+{
+  "at": "2026-09-14T23:40:17.246891+00:00",
+  "node": "HARNESS_P2",
+  "observations": {
+    "lastToolBeforeStall": "2026-09-14T20:30:05.342Z",
+    "lastMessageBeforeStall": "2026-09-14T20:31:02.135Z",
+    "usageMetadataContinuedThrough": "2026-09-14T21:45:52.780Z",
+    "rootInterruptedAndResumedSameSession": true,
+    "workerRecovery": "No command/process active; only copied prior consumer and preserved RED fixture; no post-RED implementation bytes.",
+    "cause": "UNKNOWN"
+  },
+  "custody": "Worker explicitly released suspended heavy lease; root returned it to FIX_P2. HARNESS_P2 now code-only and must request a fresh short lease when the exact test command is ready.",
+  "scope": "No new product/model/preview action and no new functional review pass."
+}

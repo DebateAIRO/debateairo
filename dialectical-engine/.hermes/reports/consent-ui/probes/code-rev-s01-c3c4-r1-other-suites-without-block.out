@@ -1,0 +1,4 @@
+tests/unit/pda-s03-keyboard-accessibility.test.ts        exit=1   Tests 2 failed | 3 passed (5)
+tests/unit/v2ui-pages.test.ts                            exit=1   Tests 5 failed | 36 passed (41)
+tests/architecture/role-token-map.test.ts                exit=1   Tests 3 failed | 46 passed (49)
+tests/render/t3-library.test.tsx                         exit=1   Tests 4 failed | 11 passed (15)

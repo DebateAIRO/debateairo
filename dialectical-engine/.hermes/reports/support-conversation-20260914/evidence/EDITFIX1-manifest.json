@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "node": "EDITFIX1",
+  "status": "READY_FOR_PEER_REVIEW",
+  "inputRevision": "1d84592c0d639dfebaea4ac3aa9cb0711555e251",
+  "commit": "bebbfa65217c24908cb60db4c40194304ff8d080",
+  "catalogCanonicalSha256": "24784328a4bb8d4e5205b3036dd369268180df792243db1c296a0a7ed2a0f9fe",
+  "files": [
+    {
+      "path": "packages/support-kb/content/account-access.en.md",
+      "finding": "N1",
+      "beforeSha256": "21d6620fccb24e988af8ea341181367d50606bb72f70d558456dbd3f055c9fe6",
+      "afterSha256": "17aac248d75d7ad161fba2a44068d20743a9759ae56c9b30359c7e1d5550c2e7"
+    },
+    {
+      "path": "packages/support-kb/content/account-access.ro.md",
+      "finding": "N1",
+      "beforeSha256": "e6205651dce1732ebf9d025da5629be3d602d441d2a4f3859ce6ef1389f7403f",
+      "afterSha256": "5048de52b22b474fb8185e718fcaf235cd23896eff8fd7e42f4399d5266e9410"
+    },
+    {
+      "path": "packages/support-kb/content/support-cases.en.md",
+      "finding": "B1",
+      "beforeSha256": "9505919e08ef35a16040e061d1b38a05ce072b93d24afc6fb91ef91663ea1f8b",
+      "afterSha256": "96ea24b2aff54d46beeb25cec255041f335e93c52590829ad64f53ad62fe9aa2"
+    },
+    {
+      "path": "packages/support-kb/content/support-cases.ro.md",
+      "finding": "B1",
+      "beforeSha256": "1f8fcd67294588ec7df7ad6a222ea363d4951dd3f8f711118e0d6a33108f3092",
+      "afterSha256": "2346f0b14cfd3ac25ccd609d8268809da9975dc2079179778e10df3da7f88aac"
+    }
+  ],
+  "unchangedReceiptFiles": {
+    "checked": 29,
+    "mismatches": 0
+  },
+  "ownerRatification": false,
+  "editorialAttestation": false
+}

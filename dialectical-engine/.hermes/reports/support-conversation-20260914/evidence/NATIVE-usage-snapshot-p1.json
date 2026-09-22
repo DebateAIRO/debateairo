@@ -1,0 +1,168 @@
+{
+  "snapshotAt": "2026-09-14T16:55:35.082318+00:00",
+  "source": "Native token_usage_record metadata only; no message, tool-argument, completion, credential or external-account data copied",
+  "semantics": "Provider-reported response usage, deduplicated by response ID across the six known local mission sessions. Input includes cached input; reasoning is a subset of output. Counts are cumulative observed work, not unique context content, prices, billing or usage-limit percentages. Snapshot is partial while root/FIX_P1 run. Prior self-report UNAVAILABLE described their visibility then; native metadata discovered during REV1 transport diagnosis now provides these numbers.",
+  "sessions": [
+    {
+      "agent": "/root",
+      "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-04-27-01a09ef2-30b5-7ee2-b12d-0599616d139a.jsonl",
+      "firstRecordAt": "2026-09-14T08:04:41.260Z",
+      "lastRecordAt": "2026-09-14T16:55:34.433Z",
+      "uniqueResponseRecords": 761,
+      "observedUsage": {
+        "input_tokens": 94297414,
+        "cached_input_tokens": 92772480,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 508668,
+        "reasoning_output_tokens": 204285,
+        "total_tokens": 94806082
+      },
+      "lastThreadCumulativeUsage": {
+        "input_tokens": 94297414,
+        "cached_input_tokens": 92772480,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 508668,
+        "reasoning_output_tokens": 204285,
+        "total_tokens": 94806082
+      },
+      "observedEqualsCumulative": true,
+      "noncachedInputTokens": 1524934
+    },
+    {
+      "agent": "/root/requirements",
+      "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-10-46-01a09ef7-fa46-7b73-bc98-70f84abd06cc.jsonl",
+      "firstRecordAt": "2026-09-14T08:10:59.411Z",
+      "lastRecordAt": "2026-09-14T16:55:33.411Z",
+      "uniqueResponseRecords": 752,
+      "observedUsage": {
+        "input_tokens": 108843004,
+        "cached_input_tokens": 107270784,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 391352,
+        "reasoning_output_tokens": 88481,
+        "total_tokens": 109234356
+      },
+      "lastThreadCumulativeUsage": {
+        "input_tokens": 108843004,
+        "cached_input_tokens": 107270784,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 391352,
+        "reasoning_output_tokens": 88481,
+        "total_tokens": 109234356
+      },
+      "observedEqualsCumulative": true,
+      "noncachedInputTokens": 1572220
+    },
+    {
+      "agent": "/root/preview",
+      "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-21-56-01a09f02-346a-7fb0-aa70-0424f1fdd21e.jsonl",
+      "firstRecordAt": "2026-09-14T08:22:05.710Z",
+      "lastRecordAt": "2026-09-14T16:19:37.165Z",
+      "uniqueResponseRecords": 1050,
+      "observedUsage": {
+        "input_tokens": 140392396,
+        "cached_input_tokens": 138486400,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 409628,
+        "reasoning_output_tokens": 108583,
+        "total_tokens": 140802024
+      },
+      "lastThreadCumulativeUsage": {
+        "input_tokens": 140392396,
+        "cached_input_tokens": 138486400,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 409628,
+        "reasoning_output_tokens": 108583,
+        "total_tokens": 140802024
+      },
+      "observedEqualsCumulative": true,
+      "noncachedInputTokens": 1905996
+    },
+    {
+      "agent": "/root/baseline",
+      "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-10-40-01a09ef7-e096-7c31-9b35-806840028cf0.jsonl",
+      "firstRecordAt": "2026-09-14T08:10:49.958Z",
+      "lastRecordAt": "2026-09-14T16:32:25.192Z",
+      "uniqueResponseRecords": 241,
+      "observedUsage": {
+        "input_tokens": 27804846,
+        "cached_input_tokens": 26767872,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 146299,
+        "reasoning_output_tokens": 35039,
+        "total_tokens": 27951145
+      },
+      "lastThreadCumulativeUsage": {
+        "input_tokens": 27804846,
+        "cached_input_tokens": 26767872,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 146299,
+        "reasoning_output_tokens": 35039,
+        "total_tokens": 27951145
+      },
+      "observedEqualsCumulative": true,
+      "noncachedInputTokens": 1036974
+    },
+    {
+      "agent": "/root/forgot_destination",
+      "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-10-55-01a09ef8-1b81-7cb1-9a2d-015a5e8346b6.jsonl",
+      "firstRecordAt": "2026-09-14T08:11:03.753Z",
+      "lastRecordAt": "2026-09-14T16:33:47.620Z",
+      "uniqueResponseRecords": 219,
+      "observedUsage": {
+        "input_tokens": 27965970,
+        "cached_input_tokens": 26983552,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 120833,
+        "reasoning_output_tokens": 30611,
+        "total_tokens": 28086803
+      },
+      "lastThreadCumulativeUsage": {
+        "input_tokens": 27965970,
+        "cached_input_tokens": 26983552,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 120833,
+        "reasoning_output_tokens": 30611,
+        "total_tokens": 28086803
+      },
+      "observedEqualsCumulative": true,
+      "noncachedInputTokens": 982418
+    },
+    {
+      "agent": "/root/plan_review",
+      "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-38-35-01a09f11-6f5f-74b2-9bba-1442a15308ef.jsonl",
+      "firstRecordAt": "2026-09-14T08:38:45.864Z",
+      "lastRecordAt": "2026-09-14T16:45:39.230Z",
+      "uniqueResponseRecords": 279,
+      "observedUsage": {
+        "input_tokens": 38032378,
+        "cached_input_tokens": 37116160,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 139856,
+        "reasoning_output_tokens": 38665,
+        "total_tokens": 38172234
+      },
+      "lastThreadCumulativeUsage": {
+        "input_tokens": 38032378,
+        "cached_input_tokens": 37116160,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 139856,
+        "reasoning_output_tokens": 38665,
+        "total_tokens": 38172234
+      },
+      "observedEqualsCumulative": true,
+      "noncachedInputTokens": 916218
+    }
+  ],
+  "uniqueResponseRecords": 3302,
+  "aggregateObservedUsage": {
+    "input_tokens": 437336008,
+    "cached_input_tokens": 429397248,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 1716636,
+    "reasoning_output_tokens": 505664,
+    "total_tokens": 439052644
+  },
+  "aggregateNoncachedInputTokens": 7938760,
+  "allObservedEqualsCumulative": true
+}

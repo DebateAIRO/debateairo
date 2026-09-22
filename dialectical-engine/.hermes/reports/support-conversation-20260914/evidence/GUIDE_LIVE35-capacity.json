@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "measuredAtUtc": "2026-09-21T12:14:44.571Z",
+  "finalCommit": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "kbVersion": "7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",
+  "supportRegisterVersion": "8",
+  "supportSchemaVersion": 1,
+  "supportSnapshotSha256": "0b70f96ba473d55fa94baea77b076b1f2712fe47a2e3e9b9bab40b9555add629",
+  "fullSnapshotSha256": "31fc7602bd5d8f92f557194b2ba4a5c92fe9469f46f81969903ab3d40fcb196a",
+  "supportEnabled": true,
+  "supportModelRef": "development:hermes-glm-5.3-flash",
+  "limits": {
+    "support_limit_anon_msgs_10m": 20,
+    "support_limit_anon_msgs_24h": 100,
+    "support_limit_anon_sessions_1h": 5,
+    "support_limit_session_msgs": 40,
+    "support_limit_msg_chars": 2000,
+    "support_relay_concurrency": 2,
+    "support_queue_depth": 10,
+    "support_daily_call_cap": 500,
+    "support_lock_after_injections": 3,
+    "support_ip_cooldown_minutes": 60
+  },
+  "observed": {
+    "maxAnonSessionEvents1hByIp": 0,
+    "maxAnonMessageEvents10mByIp": 0,
+    "maxAnonMessageEvents24hByIp": 52,
+    "anyIpCooldownActive": false,
+    "callsToday": 15,
+    "liveRelayWaiters": 0,
+    "relayState": "AVAILABLE"
+  }
+}

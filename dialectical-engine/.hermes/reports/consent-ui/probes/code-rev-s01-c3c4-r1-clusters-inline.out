@@ -1,0 +1,12 @@
+########## INLINE RUN 1 ##########
+S01-C2 verdict=0   summary:      Tests  6 passed (6)  files: Test Files  1 passed (1)   ADR Status:Proposed lines: 1, debateai.consent mentions: 4   tsc ran: 1 exit 1, diagnostics outside the pin: 0
+S01-C3 verdict=0   summary:      Tests  6 passed (6)  files: Test Files  1 passed (1)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+S01-C4 verdict=0   summary:      Tests  9 passed (9)  files: Test Files  1 passed (1)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+########## INLINE RUN 2 ##########
+S01-C2 verdict=0   summary:      Tests  6 passed (6)  files: Test Files  1 passed (1)   ADR Status:Proposed lines: 1, debateai.consent mentions: 4   tsc ran: 1 exit 1, diagnostics outside the pin: 0
+S01-C3 verdict=0   summary:      Tests  6 passed (6)  files: Test Files  1 passed (1)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+S01-C4 verdict=0   summary:      Tests  9 passed (9)  files: Test Files  1 passed (1)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+########## INLINE RUN 3 ##########
+S01-C2 verdict=0   summary:      Tests  6 passed (6)  files: Test Files  1 passed (1)   ADR Status:Proposed lines: 1, debateai.consent mentions: 4   tsc ran: 1 exit 1, diagnostics outside the pin: 0
+S01-C3 verdict=0   summary:      Tests  6 passed (6)  files: Test Files  1 passed (1)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+S01-C4 verdict=0   summary:      Tests  9 passed (9)  files: Test Files  1 passed (1)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0

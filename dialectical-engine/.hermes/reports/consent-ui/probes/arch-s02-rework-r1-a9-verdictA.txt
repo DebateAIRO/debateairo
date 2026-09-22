@@ -1,0 +1,113 @@
+=============== A9 / part 1: the NINE cluster commands, at base ===============
+S02-C1 | vt=1 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=1
+S02-C1 | Tests    : <none>
+S02-C1 | TestFiles: <none>
+S02-C1 | raw      : No test files found, exiting with code 1
+S02-C2 | vt=1 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=1
+S02-C2 | Tests    : <none>
+S02-C2 | TestFiles: <none>
+S02-C2 | raw      : No test files found, exiting with code 1
+S02-C3 | vt=0 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=0
+S02-C3 | Tests    :       Tests  19 passed (19)
+S02-C3 | TestFiles:  Test Files  2 passed (2)
+S02-C4 | vt=0 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=0
+S02-C4 | Tests    :       Tests  19 passed (19)
+S02-C4 | TestFiles:  Test Files  2 passed (2)
+S02-C5 | vt=1 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=1
+S02-C5 | Tests    : <none>
+S02-C5 | TestFiles: <none>
+S02-C5 | raw      : No test files found, exiting with code 1
+S02-C6 | vt=1 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=1
+S02-C6 | Tests    : <none>
+S02-C6 | TestFiles: <none>
+S02-C6 | raw      : No test files found, exiting with code 1
+S02-C7 | vt=0 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=0
+S02-C7 | Tests    :       Tests  19 passed (19)
+S02-C7 | TestFiles:  Test Files  2 passed (2)
+S02-C8 | vt=1 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=1
+S02-C8 | Tests    : <none>
+S02-C8 | TestFiles: <none>
+S02-C8 | raw      : No test files found, exiting with code 1
+S02-C9 | vt=0 VERDICT=1 | brokenSigs=0 cannotFindModule=0 noTestFiles=0
+S02-C9 | Tests    :       Tests  19 passed (19)
+S02-C9 | TestFiles:  Test Files  2 passed (2)
+S02-C9 | mergeArms: '--scrim:'=0 (expect 2)  'consent-ui S02' markers=0 (expect 2)
+
+=============== A9 / part 2: the guard fed KNOWN-GOOD synthetic captures ===============
+-- A: n=1, exit 0, a clean green summary  (MUST be VERDICT=0)
+      terms: T1(Tests N passed, N>0)=0  T2(no 'failed')=0  T3(Test Files 1 passed (1))=0  T4(exit 0)=0  -> VERDICT=0
+   -> 0
+-- B: n=5, exit 0, a clean green summary  (MUST be VERDICT=0)
+      terms: T1(Tests N passed, N>0)=0  T2(no 'failed')=0  T3(Test Files 5 passed (5))=0  T4(exit 0)=0  -> VERDICT=0
+   -> 0
+-- C: n=10, exit 0, a clean green summary (MUST be VERDICT=0)
+      terms: T1(Tests N passed, N>0)=0  T2(no 'failed')=0  T3(Test Files 10 passed (10))=0  T4(exit 0)=0  -> VERDICT=0
+   -> 0
+
+=============== A9 / part 3: ONE MUTANT PER GUARD TERM (each MUST flip) ===============
+-- T1 mutant: zero tests ran but the file count is right (an empty suite)
+      terms: T1(Tests N passed, N>0)=1  T2(no 'failed')=0  T3(Test Files 1 passed (1))=0  T4(exit 0)=0  -> VERDICT=1
+   -> 1 (expect 1)
+-- T1 mutant: the summary word appears in a TEST TITLE, not anchored at line start
+      terms: T1(Tests N passed, N>0)=1  T2(no 'failed')=0  T3(Test Files 1 passed (1))=0  T4(exit 0)=0  -> VERDICT=1
+   -> 1 (expect 1)
+-- T2 mutant: some passed, some failed
+      terms: T1(Tests N passed, N>0)=1  T2(no 'failed')=1  T3(Test Files 1 passed (1))=0  T4(exit 0)=0  -> VERDICT=1
+   -> 1 (expect 1)
+-- T3 mutant: variant 7 — one of the named files did not exist, so only 4 of 5 ran
+      terms: T1(Tests N passed, N>0)=0  T2(no 'failed')=0  T3(Test Files 5 passed (5))=1  T4(exit 0)=0  -> VERDICT=1
+   -> 1 (expect 1)
+-- T3 mutant: the file count line is absent entirely
+      terms: T1(Tests N passed, N>0)=0  T2(no 'failed')=0  T3(Test Files 5 passed (5))=1  T4(exit 0)=0  -> VERDICT=1
+   -> 1 (expect 1)
+-- T4 mutant: a green-looking summary with a nonzero runner exit
+      terms: T1(Tests N passed, N>0)=0  T2(no 'failed')=0  T3(Test Files 1 passed (1))=0  T4(exit 0)=1  -> VERDICT=1
+   -> 1 (expect 1)
+
+=============== A9 / part 4: the C9 MERGE ARMS, and their mutants ===============
+-- live, at base (both arms are 0 before the merge; that is one more declared RED reason)
+S02-C9 | mergeArms: '--scrim:'=0 (expect 2)  'consent-ui S02' markers=0 (expect 2)
+   -> 1 (expect 1 at base)
+-- known-GOOD synthetic (post-merge): 
+      s01=2 s02=2
+      -> 0
+-- mutant: the merge lost S01's block  
+      s01=0 s02=2
+      -> 1
+-- mutant: the merge lost S02's block  
+      s01=2 s02=0
+      -> 1
+-- mutant: S02's block duplicated      
+      s01=2 s02=4
+      -> 1
+
+=============== A9 / part 5: the THREE standing gates, mechanical ===============
+      G1 terms: generateExit=0 typecheckExit=1 s14Diagnostics=8 elsewhere=0
+   G1 VERDICT=0 (expect 0 — the DELTA holds)
+-- G1 mutants:
+   a 9th diagnostic in the pinned file : 1 (expect 1)
+   a diagnostic OUTSIDE the pinned file: 1 (expect 1)
+   generate:contract never ran (§10.19): 1 (expect 1)
+   typecheck vacuously exits 0         : 1 (expect 1)
+      G2 terms: exit=1 FAILlines=2 toggleNamed=1 literalNamed=1 hitList=1 pinnedHit=1
+   G2 VERDICT=0 (expect 0 — the named-failure-set delta holds)
+-- G2 mutants:
+   a THIRD test fails                  : 1 (expect 1)
+   a SECOND colour literal (hit list 2): 1 (expect 1)
+   the PINNED hit silently vanished    : 1 (expect 1)
+   a DIFFERENT test failed instead     : 1 (expect 1)
+   the file went green (pin gone)      : 1 (expect 1)
+-- G3 live source guard (green at base, so the ordinary guard applies):
+S02-G3 | vt=0 VERDICT=0 | brokenSigs=0 cannotFindModule=0 noTestFiles=0
+S02-G3 | Tests    :       Tests  2 passed (2)
+S02-G3 | TestFiles:  Test Files  1 passed (1)
+   G3 VERDICT=0 (expect 0)
+
+=============== A9 / part 6: environment and lane hygiene ===============
+grep flavour in THIS shell : grep (BSD grep, GNU compatible) 2.6.0-FreeBSD
+LC_ALL                     : C
+$ ls docs/architecture/01-decisions/ | tail -3
+ADR-0017-durable-execution-hatchet.md
+ADR-0018-deployment-topology.md
+README.md
+### lane porcelain: 0 entries

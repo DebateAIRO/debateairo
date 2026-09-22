@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_CWD_BIND50",
+  "ticket": "t_469c6c88",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_OPERATOR_CWD_BOUND_REVIEW_REQUIRED",
+  "controls": {
+    "passed": 5,
+    "total": 5,
+    "checks": [
+      "only cwd differs from sealed FIX49 operator metadata",
+      "cwd equals exact product worktree L",
+      "existing absolute Node --import tsx argv unchanged",
+      "inert guard from L exited0 with PASS_INERT_GUARD",
+      "all116 future outputs absent"
+    ]
+  },
+  "binding": {
+    "predecessorSha256": "63379645c09e162cc780f15cc069ef212cb644b54ea26a30baa1ecb6f36eb0d0",
+    "successorSha256": "545bf330bb4651cf81bc143755427912d198cc859a4891aa91d0e228cd07116c",
+    "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "argv": [
+      "/Users/vladmihaimiron/.local/bin/node",
+      "--import",
+      "tsx",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_SCHEMA_FIX49/run-operator.mjs"
+    ],
+    "commandContract": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_PREFLIGHT_SCHEMA_FIX49-command-contract.json",
+      "sha256": "1be2c74d25dbf4fd45f72fb1360f06836547e868b7b19993e17a0f949fcbd7e6",
+      "bytes": 48358
+    },
+    "script": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_SCHEMA_FIX49/run-operator.mjs",
+      "sha256": "466ef588b04c6f45a13c607baab099a4fef9919150601791ba4a1ad0c8178f47",
+      "bytes": 10915
+    }
+  },
+  "guard": {
+    "status": 0,
+    "code": "PASS_INERT_GUARD",
+    "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "operationalPhases": 0
+  },
+  "futureAbsence": {
+    "expected": 116,
+    "present": 0
+  },
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "supersededDraft": "GUIDE_OPERATOR_CWD_BIND50-operator-contract-superseded-node-changed.json"
+}

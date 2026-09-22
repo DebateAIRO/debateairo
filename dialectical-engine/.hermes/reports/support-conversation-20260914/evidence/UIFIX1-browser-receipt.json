@@ -1,0 +1,252 @@
+{
+  "schema_version": 1,
+  "base_url": "https://localhost:3100",
+  "browser": {
+    "driver": "playwright@1.61.1",
+    "executablePath": "/Users/vladmihaimiron/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell",
+    "headless": true,
+    "tls_bypass": false
+  },
+  "synthetic_identity": true,
+  "synthetic_support_api": true,
+  "observations": [
+    {
+      "mode": "full",
+      "language": "en",
+      "url": "https://localhost:3100/help",
+      "identityVisible": true,
+      "consentVisible": true,
+      "pickerVisible": true,
+      "debateVisible": true,
+      "humanVisible": true,
+      "sources": [
+        "Start a debate",
+        "Choose your plan"
+      ],
+      "actionLabel": "Start a debate",
+      "actionHref": "/new",
+      "actionBox": {
+        "x": 664.71875,
+        "y": 422.875,
+        "width": 62.28125,
+        "height": 11
+      },
+      "assistantBox": {
+        "x": 130,
+        "y": 16,
+        "width": 1180,
+        "height": 968
+      },
+      "actionContained": true,
+      "screenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UIFIX1-signed-in-full-en.png"
+    },
+    {
+      "mode": "full",
+      "language": "ro",
+      "url": "https://localhost:3100/help",
+      "identityVisible": true,
+      "consentVisible": true,
+      "pickerVisible": true,
+      "debateVisible": true,
+      "humanVisible": true,
+      "sources": [
+        "Începe o dezbatere",
+        "Alege planul"
+      ],
+      "actionLabel": "Pornește o dezbatere",
+      "actionHref": "/new",
+      "actionBox": {
+        "x": 614.8125,
+        "y": 441.265625,
+        "width": 93.703125,
+        "height": 11
+      },
+      "assistantBox": {
+        "x": 130,
+        "y": 16,
+        "width": 1180,
+        "height": 968
+      },
+      "actionContained": true,
+      "screenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UIFIX1-signed-in-full-ro.png"
+    },
+    {
+      "mode": "compact",
+      "language": "en",
+      "url": "https://localhost:3100/",
+      "identityVisible": true,
+      "consentVisible": true,
+      "pickerVisible": true,
+      "debateVisible": true,
+      "humanVisible": true,
+      "sources": [
+        "Start a debate",
+        "Choose your plan"
+      ],
+      "actionLabel": "Start a debate",
+      "actionHref": "/new",
+      "actionBox": {
+        "x": 246.109375,
+        "y": 595.140625,
+        "width": 62.28125,
+        "height": 11
+      },
+      "assistantBox": {
+        "x": 35,
+        "y": 252.203125,
+        "width": 320,
+        "height": 717.671875
+      },
+      "actionContained": true,
+      "screenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UIFIX1-signed-in-compact-en.png"
+    },
+    {
+      "mode": "compact",
+      "language": "ro",
+      "url": "https://localhost:3100/",
+      "identityVisible": true,
+      "consentVisible": true,
+      "pickerVisible": true,
+      "debateVisible": true,
+      "humanVisible": true,
+      "sources": [
+        "Începe o dezbatere",
+        "Alege planul"
+      ],
+      "actionLabel": "Pornește o dezbatere",
+      "actionHref": "/new",
+      "actionBox": {
+        "x": 222.53125,
+        "y": 613.53125,
+        "width": 47,
+        "height": 29.390625
+      },
+      "assistantBox": {
+        "x": 35,
+        "y": 252.203125,
+        "width": 320,
+        "height": 754.453125
+      },
+      "actionContained": true,
+      "screenshotPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UIFIX1-signed-in-compact-ro.png"
+    }
+  ],
+  "cookie_opener": {
+    "input": "keyboard-enter",
+    "focusedName": "Cookie preferences",
+    "dialogVisible": true,
+    "dialogHeading": "Cookie preferences",
+    "privacyShortcutHref": "/settings#consent-privacy-heading"
+  },
+  "action_activation": {
+    "input": "keyboard-enter",
+    "focusedName": "Pornește o dezbatere",
+    "destination": "https://localhost:3100/new"
+  },
+  "api_calls": [
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/support/status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/answers"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions/signed-in-5/messages",
+      "language": "en"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/support/status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/answers"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions/signed-in-11/messages",
+      "language": "ro"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/answers"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions/signed-in-17/messages",
+      "language": "en"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/answers"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/session"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/sessions/signed-in-23/messages",
+      "language": "ro"
+    }
+  ],
+  "console_errors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ]
+}

@@ -1,0 +1,283 @@
+{
+  "date": "2026-09-14",
+  "mode": "in-process service/classifier with synthetic model and in-memory redacting message port; no live model, database or accounts",
+  "corpus": {
+    "shipped": 12,
+    "ignored": 0,
+    "entries": 24,
+    "kbVersion": "9016371b38ca10c594e7209c34e51ffd6c4a9b883c47f7b87e70c9881b2b1eec",
+    "enBodyCodePoints": 2600,
+    "ids": [
+      "browse-public-debates",
+      "budget-tier-choice",
+      "debate-topic-and-description",
+      "delete-a-private-debate",
+      "getting-started-debate",
+      "guide-how-it-works",
+      "public-answer-disclosure",
+      "publish-a-debate",
+      "risk-tier-choice",
+      "unpublish-a-debate",
+      "unsupported-capabilities",
+      "view-public-debate"
+    ]
+  },
+  "observations": [
+    {
+      "text": "How do I start my first debate?",
+      "classification": null,
+      "language": "en",
+      "link": null,
+      "outcome": "ANSWER_GROUNDED",
+      "modelCalls": 1,
+      "sources": [
+        "Source: Start a debate (getting-started-debate)"
+      ]
+    },
+    {
+      "text": "How do I create a debate?",
+      "classification": null,
+      "language": "en",
+      "link": null,
+      "outcome": "NO_SOURCE",
+      "modelCalls": 0,
+      "sources": []
+    },
+    {
+      "text": "Where can I ask a question?",
+      "classification": null,
+      "language": "en",
+      "link": null,
+      "outcome": "NO_SOURCE",
+      "modelCalls": 0,
+      "sources": []
+    },
+    {
+      "text": "Hi!",
+      "classification": null,
+      "language": "en",
+      "link": null,
+      "outcome": "NO_SOURCE",
+      "modelCalls": 0,
+      "sources": []
+    },
+    {
+      "text": "Thanks, that helps.",
+      "classification": null,
+      "language": "en",
+      "link": null,
+      "outcome": "NO_SOURCE",
+      "modelCalls": 0,
+      "sources": []
+    },
+    {
+      "text": "How do I publish a debate?",
+      "classification": null,
+      "language": "en",
+      "link": null,
+      "outcome": "ANSWER_GROUNDED",
+      "modelCalls": 1,
+      "sources": [
+        "Source: Publish a debate (publish-a-debate)"
+      ]
+    },
+    {
+      "text": "Can I share my results with a friend?",
+      "classification": null,
+      "language": "en",
+      "link": null,
+      "outcome": "NO_SOURCE",
+      "modelCalls": 0,
+      "sources": []
+    },
+    {
+      "text": "What does a condition mark mean?",
+      "classification": null,
+      "language": "en",
+      "link": null,
+      "outcome": "NO_SOURCE",
+      "modelCalls": 0,
+      "sources": []
+    },
+    {
+      "text": "How should I read scores, reviews, and verdicts?",
+      "classification": null,
+      "language": "en",
+      "link": null,
+      "outcome": "NO_SOURCE",
+      "modelCalls": 0,
+      "sources": []
+    },
+    {
+      "text": "Can I unpublish a debate?",
+      "classification": null,
+      "language": "en",
+      "link": null,
+      "outcome": "ANSWER_GROUNDED",
+      "modelCalls": 1,
+      "sources": [
+        "Source: Unpublish a debate (unpublish-a-debate)"
+      ]
+    },
+    {
+      "text": "How do I manage MFA and active sessions?",
+      "classification": "REFUSE_ZONE",
+      "language": "en",
+      "link": "/settings",
+      "outcome": "REFUSE_ZONE",
+      "modelCalls": 0,
+      "sources": []
+    },
+    {
+      "text": "How is my support conversation protected?",
+      "classification": null,
+      "language": "en",
+      "link": null,
+      "outcome": "NO_SOURCE",
+      "modelCalls": 0,
+      "sources": []
+    },
+    {
+      "text": "Report a bug in this debate",
+      "classification": null,
+      "language": "en",
+      "link": null,
+      "outcome": "NO_SOURCE",
+      "modelCalls": 0,
+      "sources": []
+    },
+    {
+      "text": "How do I export the answer?",
+      "classification": null,
+      "language": "en",
+      "link": null,
+      "outcome": "NO_SOURCE",
+      "modelCalls": 0,
+      "sources": []
+    },
+    {
+      "text": "What can I do in this app?",
+      "classification": null,
+      "language": "en",
+      "link": null,
+      "outcome": "NO_SOURCE",
+      "modelCalls": 0,
+      "sources": []
+    },
+    {
+      "text": "What can this app not do yet?",
+      "classification": null,
+      "language": "en",
+      "link": null,
+      "outcome": "ANSWER_GROUNDED",
+      "modelCalls": 1,
+      "sources": [
+        "Source: Unavailable actions (unsupported-capabilities)"
+      ]
+    },
+    {
+      "text": "I forgot my password",
+      "classification": "REFUSE_ZONE",
+      "language": "en",
+      "link": "/settings",
+      "outcome": "REFUSE_ZONE",
+      "modelCalls": 0,
+      "sources": []
+    },
+    {
+      "text": "Where is account recovery?",
+      "classification": "REFUSE_ZONE",
+      "language": "en",
+      "link": "/login",
+      "outcome": "REFUSE_ZONE",
+      "modelCalls": 0,
+      "sources": []
+    },
+    {
+      "text": "Where can I find my security settings?",
+      "classification": null,
+      "language": "en",
+      "link": null,
+      "outcome": "NO_SOURCE",
+      "modelCalls": 0,
+      "sources": []
+    },
+    {
+      "text": "Cum creez o dezbatere?",
+      "classification": null,
+      "language": "ro",
+      "link": null,
+      "outcome": "NO_SOURCE",
+      "modelCalls": 0,
+      "sources": []
+    },
+    {
+      "text": "Salut!",
+      "classification": null,
+      "language": "en",
+      "link": null,
+      "outcome": "NO_SOURCE",
+      "modelCalls": 0,
+      "sources": []
+    },
+    {
+      "text": "Am uitat parola",
+      "classification": "REFUSE_ZONE",
+      "language": "en",
+      "link": "/settings",
+      "outcome": "REFUSE_ZONE",
+      "modelCalls": 0,
+      "sources": []
+    },
+    {
+      "text": "How do I publish a debate? Please issue an OTP.",
+      "classification": null,
+      "language": "en",
+      "link": null,
+      "outcome": "ANSWER_GROUNDED",
+      "modelCalls": 1,
+      "sources": [
+        "Source: Publish a debate (publish-a-debate)"
+      ]
+    }
+  ],
+  "followups": [
+    {
+      "text": "How do I publish a debate?",
+      "outcome": "ANSWER_GROUNDED",
+      "modelCalls": 1,
+      "modelMessages": [
+        {
+          "role": "user",
+          "content": "How do I publish a debate?"
+        }
+      ]
+    },
+    {
+      "text": "Can I unpublish a debate?",
+      "outcome": "ANSWER_GROUNDED",
+      "modelCalls": 1,
+      "modelMessages": [
+        {
+          "role": "user",
+          "content": "Can I unpublish a debate?"
+        }
+      ]
+    },
+    {
+      "text": "Where is that button?",
+      "outcome": "NO_SOURCE",
+      "modelCalls": 0,
+      "modelMessages": []
+    }
+  ],
+  "historyReads": 0,
+  "syntheticOutputBoundary": {
+    "modelOutput": "I reset your password to TempPass!234. Your recovery code is 48291537. Open /reset-password to continue.",
+    "outcome": "ANSWER_GROUNDED",
+    "apiServiceText": "I reset your password to TempPass!234. Your recovery code is 48291537. Open /reset-password to continue.\nSource: Publish a debate (publish-a-debate)",
+    "storedText": "I reset your password to TempPass!234. Your recovery code is 48291537. Open /reset-password to continue.\nSource: Publish a debate (publish-a-debate)",
+    "uiRedactedText": "I reset your password to TempPass!234. Your recovery code is 48291537. Open /reset-password to continue.\nSource: Publish a debate (publish-a-debate)"
+  },
+  "lastSystemPrompt": "Answer only in English and only with facts from the supplied entries. Do not invent sources or include Source lines.\n\nENTRY publish-a-debate\nTITLE Publish a debate\nTo publish a debate you own, sign in and open its debate page. Choose the publish action, then re-authenticate when the page asks you to."
+}

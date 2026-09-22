@@ -1,0 +1,59 @@
+{
+  "at": "2026-09-14T15:39:30.975028+00:00",
+  "ref": "refs/heads/codex/support-conversation-mission",
+  "commit": "bb9d2c1c92184defc0747aaaf22b50d4e65c07fc",
+  "tree": "5abb29b560271acc2503f075db633413bc7ed478",
+  "parent": "4bf7f1849b6c8bf520eec22c46808152316232af",
+  "files": [
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/board-ids.json",
+      "sha256": "e918335ceb31c4fc820e7cbcbb17a61de111680248f573e9774db7353d5e50d0"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PROGRESS.md",
+      "sha256": "9b557903e1196a1382bfffa3e1aae38de6836f00fa1ea360d946e37d22c97e85"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/PRODDELTA.md",
+      "sha256": "242391af13738cd48b6f96874a3d27f406a869234e13d1f6dea7d9664098aeeb"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/PRODDELTA.md",
+      "sha256": "ea75e0895d4dc4fc9dc9641fbf8722c0d16dba6131c1c0caa1737e560c54a8b3"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/LEDGER.md",
+      "sha256": "630bf63a6d6be561586e73fc3359956d0c38d8cd92c5a08d03fced16a591856f"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md",
+      "sha256": "ae06874b32369654e12263161842e7caf19315641b6bcd0506591ceca4762c9c"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/PRODDELTA-consumption.json",
+      "sha256": "c8157acf327a812607b0eed5143c4eb74c9204cd4eaea50bbc0e75cb828791a5"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/SKILLS-completed-assessments.json",
+      "sha256": "6780816eb4dab41166a913593468e3f2fae4f1467b16d58a67b0528e4ec7a477"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/NATIVE-transcript-index.json",
+      "sha256": "06bca6bd56fc66bf3207f74f7fce26e6dfbb7bdc8f3902bfc06c8011c6d0310b"
+    }
+  ],
+  "source_before": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813",
+    "lane_ref": "43cf9386ea3c9e7c79523ec38debe63271d19292"
+  },
+  "source_after": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813",
+    "lane_ref": "43cf9386ea3c9e7c79523ec38debe63271d19292"
+  },
+  "private_index_removed": true,
+  "tested": "metadata only; no product tests; PRODDELTA completed; active FIX4 outputs excluded"
+}

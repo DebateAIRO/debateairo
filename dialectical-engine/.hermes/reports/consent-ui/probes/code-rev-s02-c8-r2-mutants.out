@@ -1,0 +1,36 @@
+### baseline:       Tests  9 passed (9)
+R1 ladder .70 expected 5.54 -> 5.61 | expect=CATCH got=CAUGHT |      Tests  1 failed | 8 passed (9)
+       ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S60 · writes no colour literal and declares no token inside the S02 block 1ms~ ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S61 · carries the 10c modal geometry, every number derived from the artboard 2ms
+      restored OK (      Tests  9 passed (9))
+R2 composite Math.round -> Math.floor (the literal B1 bug) | expect=CATCH got=CAUGHT |      Tests  1 failed | 8 passed (9)
+       ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S60 · writes no colour literal and declares no token inside the S02 block 1ms~ ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S61 · carries the 10c modal geometry, every number derived from the artboard 2ms
+      restored OK (      Tests  9 passed (9))
+R3 DELETE the four-selector focus rule (N1 discharge) | expect=CATCH got=CAUGHT |      Tests  1 failed | 8 passed (9)
+       ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S60 · writes no colour literal and declares no token inside the S02 block 1ms~ ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S61 · carries the 10c modal geometry, every number derived from the artboard 2ms
+      restored OK (      Tests  9 passed (9))
+R4 new ring var(--focus) -> var(--accent) | expect=CATCH got=CAUGHT |      Tests  1 failed | 8 passed (9)
+       ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S60 · writes no colour literal and declares no token inside the S02 block 1ms~ ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S61 · carries the 10c modal geometry, every number derived from the artboard 2ms
+      restored OK (      Tests  9 passed (9))
+R5 .policyBody ring var(--focus) -> var(--accent) | expect=CATCH got=CAUGHT |      Tests  1 failed | 8 passed (9)
+       ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S60 · writes no colour literal and declares no token inside the S02 block 1ms~ ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S61 · carries the 10c modal geometry, every number derived from the artboard 2ms
+      restored OK (      Tests  9 passed (9))
+R6 .consentBox ring var(--focus) -> var(--accent) | expect=CATCH got=CAUGHT |      Tests  1 failed | 8 passed (9)
+       ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S60 · writes no colour literal and declares no token inside the S02 block 1ms~ ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S61 · carries the 10c modal geometry, every number derived from the artboard 2ms
+      restored OK (      Tests  9 passed (9))
+R7 ring on a NON-focusable selector (.policyTab) | expect=CATCH got=CAUGHT |      Tests  1 failed | 8 passed (9)
+       ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S60 · writes no colour literal and declares no token inside the S02 block 1ms~ ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S61 · carries the 10c modal geometry, every number derived from the artboard 2ms
+      restored OK (      Tests  9 passed (9))
+R9 transform: translateZ(0) on .authCard (S02-S65, above the block) | expect=CATCH got=CAUGHT |      Tests  1 failed | 8 passed (9)
+       ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S60 · writes no colour literal and declares no token inside the S02 block 1ms~ ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S61 · carries the 10c modal geometry, every number derived from the artboard 2ms
+      restored OK (      Tests  9 passed (9))
+R10 colour literal inside the block (S02-S60) | expect=CATCH got=CAUGHT |      Tests  1 failed | 8 passed (9)
+       × tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S60 · writes no colour literal and declares no token inside the S02 block 5ms~   → expected [ '#A8823E' ] to deeply equal []
+      restored OK (      Tests  9 passed (9))
+R11 declared alpha .65 -> .60 | expect=CATCH got=CAUGHT |      Tests  1 failed | 8 passed (9)
+       ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S60 · writes no colour literal and declares no token inside the S02 block 1ms~ ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S61 · carries the 10c modal geometry, every number derived from the artboard 2ms
+      restored OK (      Tests  9 passed (9))
+R8 RE-DUPLICATE the gate-hint comment (N2 class; residual R1 says stripComments is blind) | expect=NOT-caught (residual R1 is real) got=NOT-caught |      Tests  9 passed (9)
+       ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S60 · writes no colour literal and declares no token inside the S02 block 1ms~ ✓ tests/unit/consent-s02-style-contract.test.ts > S02-C8 consent-ui style contract > S02-S61 · carries the 10c modal geometry, every number derived from the artboard 2ms
+      restored OK (      Tests  9 passed (9))
+### final:       Tests  9 passed (9)
+### porcelain: []

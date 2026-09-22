@@ -1,0 +1,6 @@
+1 - 0.7                       = 0.30000000000000004
+0.7*38 + (1-0.7)*233          = 96.5 -> Math.round = 97  Math.floor = 96
+0.7*38 +   0.30 *233          = 96.49999999999999 -> Math.round = 96  Math.floor = 96
+is the shipped sum an exact tie (x*2 is an odd integer)?  true
+Math.round(x) === Math.floor(x) for the hand-typed value?  true
+0.65 shipped = 106.25 round 106 | hand .35 = 106.25 round 106 -> same channel? true

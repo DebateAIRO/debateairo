@@ -1,0 +1,20 @@
+== main tree PLAN.md:1248-1252 ==
+  **The pinned value is `opacity: .65`, and its derivation is a measurement:** stepping α by
+  0.05, `.60` gives Terracotta **4.13** (fails), `.65` gives Terracotta **4.79** / Chamber
+  **7.17**, `.70` gives **5.54 / 8.09** — `.65` is the smallest 0.05 step clearing 4.5:1 in
+  both modes, i.e. the most dimmed (most legibly disabled) value that still passes. Output
+  pasted in §Clusters.
+
+== main tree DECISIONS.md:107-111 ==
+- 2026-09-06 · `Element.prototype.scrollIntoView` in the test environment · **It does not exist either. Measured, same probe: `typeof el.scrollIntoView` → `undefined`.** So the jump-pill handler calls it optionally — `target?.scrollIntoView?.({ block: "start", behavior: prefersReducedMotion() ? "auto" : "smooth" })` — and `S02-S28` stubs it per target element to assert WHICH target was resolved and WHICH behaviour was passed · One `?.` removes a whole class of jsdom breakage, and stubbing turns `SPEC.md` R11's "jsdom pins the mapping" into a strictly stronger pin (the handler's resolution) without ever claiming jsdom scrolled anything · ARCH-S02
+- 2026-09-06 · Can a jsdom test drive the scroll-gate arithmetic? · **Yes. Measured: `Object.defineProperty(el, "scrollHeight"|"clientHeight"|"scrollTop", { value, configurable: true, writable: true })` shadows the prototype getters and can be redefined between assertions.** Same probe: `scrollTop=292, clientHeight=200, scrollHeight=500` → reached `true`; `scrollTop=291` → `false`. `configurable: true` is load-bearing — without it the latch case cannot scroll back up · ARCH-S02
+- 2026-09-06 · The disabled `I have read it` contrast, left UNVERIFIED by REQ-01 and by all three review rounds · **`opacity: .65`.** Derivation, executed not asserted: WCAG 2.2 ratio of the composited label over the composited button face on the `--shell` footer ground, both modes, `opacity` stepped by 0.05 — `.60` → Terracotta **4.13** (fails 4.5), `.65` → Terracotta **4.79** / Chamber **7.17**, `.70` → 5.54 / 8.09. `.65` is the smallest 0.05 step that clears 4.5:1 in BOTH modes, and it is the most-dimmed (most legibly "disabled") value that does. Enabled state measures 14.00 / 15.72 · `tests/support/contrast.ts` takes `#RRGGBB` only, so `S02-S43` composites `α·fg + (1-α)·bg` per channel in the test and passes the flattened hexes to `contrastRatio` — the number's derivation is the test. Probe output pasted in `PLAN.md` §Clusters · ARCH-S02
+
+**Verification mechanics.**
+
+== any 5.61 in the S02 mission docs? ==
+   none
+
+== mtimes (were PLAN/DECISIONS touched after the r1 verdict 02:47?) ==
+2026-09-06 22:51:53 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/consent-ui/slices/S02/PLAN.md
+2026-09-07 02:23:05 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/consent-ui/slices/S02/DECISIONS.md

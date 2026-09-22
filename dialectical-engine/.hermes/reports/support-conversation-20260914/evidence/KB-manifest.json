@@ -1,0 +1,260 @@
+{
+  "schemaVersion": 1,
+  "node": "KB",
+  "sourceBase": "b7ca2c413bf3242ce18e29a397dc9a3aa9228893",
+  "branch": "codex/support-conversation-cp1",
+  "status": "UNREVIEWED_DRAFT",
+  "catalogCanonicalSha256": "24784328a4bb8d4e5205b3036dd369268180df792243db1c296a0a7ed2a0f9fe",
+  "editorialManifestContract": {
+    "schemaVersion": 1,
+    "catalogRequiredFields": {
+      "sha256": "lowercase SHA256 of SUPPORT_CATALOG_CANONICAL",
+      "reviewedBy": "literal SOL",
+      "reviewerSession": "nonblank actual separate editorial session id",
+      "reviewedOn": "valid YYYY-MM-DD review date",
+      "evidence": "nonblank durable review-evidence locator"
+    },
+    "articleRequiredFields": {
+      "id": "lowercase article slug",
+      "lang": "en or ro",
+      "sha256": "lowercase SHA256 of exact markdown file bytes",
+      "reviewedBy": "literal SOL",
+      "reviewerSession": "nonblank actual separate editorial session id",
+      "reviewedOn": "valid YYYY-MM-DD review date",
+      "evidence": "nonblank durable review-evidence locator"
+    },
+    "eligibility": "both language bytes and the canonical catalog digest must match their real separate-review records; owner ratification remains independent"
+  },
+  "draftArticles": [
+    {
+      "id": "account-access",
+      "lang": "en",
+      "path": "packages/support-kb/content/account-access.en.md",
+      "sha256": "21d6620fccb24e988af8ea341181367d50606bb72f70d558456dbd3f055c9fe6",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "account-access",
+      "lang": "ro",
+      "path": "packages/support-kb/content/account-access.ro.md",
+      "sha256": "e6205651dce1732ebf9d025da5629be3d602d441d2a4f3859ce6ef1389f7403f",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "account-settings",
+      "lang": "en",
+      "path": "packages/support-kb/content/account-settings.en.md",
+      "sha256": "2cab95047c1c34109794f3fc1ad620784bbb97b9267160d471551454d296f628",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "account-settings",
+      "lang": "ro",
+      "path": "packages/support-kb/content/account-settings.ro.md",
+      "sha256": "e2b2834ff96da50a0511b2647ae490f6f99af80e317a74caddb16ee8262bc5d9",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "budget-tier-choice",
+      "lang": "en",
+      "path": "packages/support-kb/content/budget-tier-choice.en.md",
+      "sha256": "a49d563ef7bfec75ed179a70adb54c25947aa9cbe4db557698eacc84d1d3c683",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "budget-tier-choice",
+      "lang": "ro",
+      "path": "packages/support-kb/content/budget-tier-choice.ro.md",
+      "sha256": "e648150ae607bb98c55059eaea6162ffc2cd09df437721b75c8c7b226ef4984d",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "debate-topic-and-description",
+      "lang": "en",
+      "path": "packages/support-kb/content/debate-topic-and-description.en.md",
+      "sha256": "695b7b405e599260acd7c5a51f897f46b52b238f2860a20168cd14cfdc176bad",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "debate-topic-and-description",
+      "lang": "ro",
+      "path": "packages/support-kb/content/debate-topic-and-description.ro.md",
+      "sha256": "90f1fff60a4245eeda7b5131b671772b425e8ab682f967c4c31c2ad42c7207a2",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "export-json",
+      "lang": "en",
+      "path": "packages/support-kb/content/export-json.en.md",
+      "sha256": "c31c5bd3a2eb80e1352f27431e459f8272ae37605a9988210cff2aa82d6b7ea5",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "export-json",
+      "lang": "ro",
+      "path": "packages/support-kb/content/export-json.ro.md",
+      "sha256": "5016b1370fbbd83ed2e647cfdeb8a2c10b4052ef8861807abed2ee4b0ae8f02b",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "getting-started-debate",
+      "lang": "en",
+      "path": "packages/support-kb/content/getting-started-debate.en.md",
+      "sha256": "a438b7c7a91342dee7c5edb2efe48e586be2cc33d9a2eafabaadad2882f6f9e8",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "getting-started-debate",
+      "lang": "ro",
+      "path": "packages/support-kb/content/getting-started-debate.ro.md",
+      "sha256": "f2a848dbaa9131d3165f50ce2004f1fba874032a48d7bdf1ba90f96c8aa205af",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "guide-how-it-works",
+      "lang": "en",
+      "path": "packages/support-kb/content/guide-how-it-works.en.md",
+      "sha256": "05316f05e559cd866948ab7f464a681d6875fe8aad5143e956eeb20077bc46c5",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "guide-how-it-works",
+      "lang": "ro",
+      "path": "packages/support-kb/content/guide-how-it-works.ro.md",
+      "sha256": "94acc4db2ccecb9a0d4f5b82350e91d26643b76c6caff879019edc107a3e3000",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "privacy-consent",
+      "lang": "en",
+      "path": "packages/support-kb/content/privacy-consent.en.md",
+      "sha256": "54cca7dbfb790c9d6aac077b00775e5ac6d5bc277be38733e92047bc63c262d5",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "privacy-consent",
+      "lang": "ro",
+      "path": "packages/support-kb/content/privacy-consent.ro.md",
+      "sha256": "e9b04331a2aa76d3ed9bd45c2199263dc476ae62d15c33db30ed537fedeb5c5d",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "risk-tier-choice",
+      "lang": "en",
+      "path": "packages/support-kb/content/risk-tier-choice.en.md",
+      "sha256": "3ca67a93a3b159c0b284b2bd75093fd9bc70e20d03c357f4ac1fdcb3df522715",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "risk-tier-choice",
+      "lang": "ro",
+      "path": "packages/support-kb/content/risk-tier-choice.ro.md",
+      "sha256": "f40e8583d9ec012f6510c4f6ae6a6527680bc279f393388dc8cd2a31762f4d96",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "support-cases",
+      "lang": "en",
+      "path": "packages/support-kb/content/support-cases.en.md",
+      "sha256": "9505919e08ef35a16040e061d1b38a05ce072b93d24afc6fb91ef91663ea1f8b",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "support-cases",
+      "lang": "ro",
+      "path": "packages/support-kb/content/support-cases.ro.md",
+      "sha256": "1f8fcd67294588ec7df7ad6a222ea363d4951dd3f8f711118e0d6a33108f3092",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "support-status-limits",
+      "lang": "en",
+      "path": "packages/support-kb/content/support-status-limits.en.md",
+      "sha256": "7f111d034af0d6ba0765c9bf008d6d8981f8a589e1731695e9bbf7d5f213f15f",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "support-status-limits",
+      "lang": "ro",
+      "path": "packages/support-kb/content/support-status-limits.ro.md",
+      "sha256": "884956c2b04303c8412a4859746a526d5577e9392e2066843aa977500857511f",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "unsupported-capabilities",
+      "lang": "en",
+      "path": "packages/support-kb/content/unsupported-capabilities.en.md",
+      "sha256": "6e7f19d6d7c00fe4d10660e4dff7ad52e16ae8ff3d85cea13717780af586ec6f",
+      "ownerRatified": false,
+      "editorialAttested": false
+    },
+    {
+      "id": "unsupported-capabilities",
+      "lang": "ro",
+      "path": "packages/support-kb/content/unsupported-capabilities.ro.md",
+      "sha256": "c07bb1a6a85f14a034a134a08250f22721f772ce54bd77d18ff63f7df93d350b",
+      "ownerRatified": false,
+      "editorialAttested": false
+    }
+  ],
+  "clusterFiles": [
+    {
+      "path": "packages/support-kb/package.json",
+      "sha256": "11ae5b086ed8242c86eb21f2e99af208c217fb87d1e72947b78ad973a84f6b19"
+    },
+    {
+      "path": "packages/support-kb/src/catalog.ts",
+      "sha256": "be0c28d2629fa01cba3351e31f6f4864391fcc091b33d978e52551471bc41e36"
+    },
+    {
+      "path": "packages/support-kb/src/context.ts",
+      "sha256": "e7c9c6ff6a223c419630d62c2befc5fb3d9fdecc3c6fff207474f4f42aa5fae0"
+    },
+    {
+      "path": "packages/support-kb/src/index.ts",
+      "sha256": "63bb5bb52c8457e5126ccefd953d667c48a71712c6fd06d635c2df186d3ae239"
+    },
+    {
+      "path": "packages/support-kb/src/navigation.ts",
+      "sha256": "d55c80d91d7e0d737787220539b26dc10ebf8f497d09a58e86e0160c81469cfe"
+    },
+    {
+      "path": "tests/architecture/support-catalog-coverage.test.ts",
+      "sha256": "78c69649a3459eee15a7c1c40bde9ceaf21d7b7812ea5cbcc4e8dfe2cd1a78fe"
+    },
+    {
+      "path": "tests/unit/support-context.test.ts",
+      "sha256": "1260593faf5160d5f3c47b41c6606919b0ddfc64cb2e18314047069057eeacfd"
+    },
+    {
+      "path": "tests/unit/support-kb.test.ts",
+      "sha256": "171bab4197f3111ba09c163572667a4a85ff04b3e6bd4fbf877b1f61c4677b5c"
+    },
+    {
+      "path": "tests/unit/support-navigation.test.ts",
+      "sha256": "5c2489530cc0614906720f45f485c54876a7830a4e62a322cd25101fd1101052"
+    }
+  ]
+}

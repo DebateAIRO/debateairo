@@ -1,0 +1,162 @@
+{
+  "at": "2026-09-17T07:55:52.022160+00:00",
+  "node": "HARNESS_FEEDBACK",
+  "ticket": "t_139b6d7a",
+  "receipt": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/HARNESS_FEEDBACK-receipt.json",
+    "sha256": "f01ee126b7817e63fddbd9a47c7e516fcb661843585fe39f9a354d8980accb95"
+  },
+  "artifactsVerified": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/HARNESS_FEEDBACK/matrix.mjs",
+      "sha256": "45cc15c878112aa0caccef05f9161f70c7fddf0097c63e9350a03f32ac7c1468",
+      "bytes": 1894
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/HARNESS_FEEDBACK/controls.mjs",
+      "sha256": "af3f69f64a268e3693a7391b8f7f1be5693e28f598ab83d664f02f6d3bd681fd",
+      "bytes": 5436
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/HARNESS_FEEDBACK/pre-request-verifier.ts",
+      "sha256": "a52eab4c80b58079e4d8ee4f8ace25922b23d3360d5f18d11339adeee43dddb1",
+      "bytes": 11126
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/HARNESS_FEEDBACK/capture-owner-feedback.mjs",
+      "sha256": "57f5c706d5d6242d67e52bb844ac155b9774d852056328d991cbde08e94288e9",
+      "bytes": 12622
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/HARNESS_FEEDBACK/verify-feedback-harness.mjs",
+      "sha256": "77219c9e10904c8ad95f4268c9972740706a6d44ad8a99ca975a76204de6d1f0",
+      "bytes": 9832
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/HARNESS_FEEDBACK/README.md",
+      "sha256": "e82478712bae7e87b528efb197619a1a05b74b015ceb4a3df6c0511470e4fd88",
+      "bytes": 1828
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/HARNESS_FEEDBACK-controls-red.log",
+      "sha256": "6832bcb73a84de2e4d3663ab9b80d12fcaeac164c925307e5a181a56096b85a6",
+      "bytes": 1160
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/HARNESS_FEEDBACK-controls-green.log",
+      "sha256": "a6e91c88778b91514a2c5d925f7a8dec9e4382738a58ace7b55c176c12bfc85f",
+      "bytes": 886,
+      "status": "SUPERSEDED_INTERMEDIATE_GREEN"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/HARNESS_FEEDBACK-controls-final.log",
+      "sha256": "a5f70a319d24c6ba67a2e453c76527a46e0089109e8833d567c1d89563c145c3",
+      "bytes": 1290,
+      "status": "FINAL_GREEN"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/HARNESS_FEEDBACK.md",
+      "sha256": "2e2489d5c47cdcc5c65734e5b90cc00d10fa68bbf7b589e45a410f0c5358b561",
+      "bytes": 4826
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/HARNESS_FEEDBACK.md",
+      "sha256": "1555388dc42b8949efc7e4ad80df366f352ebbeb0d4f5ee6049b47bd463255b3",
+      "bytes": 4873
+    }
+  ],
+  "retainedMechanismsVerified": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P3/diagnostic-consumer.mjs",
+      "sha256": "6f60ecfca6622517a032be204773c572584dd48b949ffe0eccdf2e399cb91db5"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P3/response-evidence.mjs",
+      "sha256": "4c26d1b9125703db664959ad4b8395eee7c5a171ea79dc3df744ba5f3ffcf182"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P3/session-version-gate.mjs",
+      "sha256": "48bd1fa418e1d7c9e25b0bcba06fed20f58d63bcfc32818bc5ad32b10ae42dc4"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P3/console-classifier.mjs",
+      "sha256": "9ebf232a8c37c587013ce28404186230ddb3925b5e96a79131b64e31d9d9a33f"
+    }
+  ],
+  "retainedNativeProof": {
+    "retainedNativeSkillProof": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIND_CURRENT-consumption.json",
+      "sha256": "be7a4e24bc4e0bbee94bdf68dbc36135a29453003251392dd6f3ad6665b58e99",
+      "skills": {
+        "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-21-56-01a09f02-346a-7fb0-aa70-0424f1fdd21e.jsonl",
+        "bodyProof": {
+          "using-superpowers": {
+            "nativeTimestamp": "2026-09-14T08:22:05.736Z",
+            "nativeCallId": "call_FHHFhkV558N32PlY0D3ZCP3f",
+            "bodyPhrase": "This is not negotiable. You cannot rationalize your way out of this.",
+            "outputBodySha256": "4dbbba2a1985e33c85a6d33115f1ed446a727bc8d850625458c13c637e4d18d1"
+          },
+          "heartbeat-protocol": {
+            "nativeTimestamp": "2026-09-14T08:22:19.688Z",
+            "nativeCallId": "call_3lgoYDdkEnaZkcM1LAibgIwf",
+            "bodyPhrase": "One role per node: a seat that reviews does not code, and no seat reviews its own work",
+            "outputBodySha256": "3b8189c5dbacbde20d47f8fdae7badb9d8bb2ed6b48a11595a58414e9f10b4c9"
+          },
+          "heartbeat-worker": {
+            "nativeTimestamp": "2026-09-14T08:40:57.019Z",
+            "nativeCallId": "call_wmJilPJZwgUstWP0IPTaWEBz",
+            "bodyPhrase": "Check the packet against reality and stop if it is wrong",
+            "outputBodySha256": "f349dd7f9e631f274feec3ca42231a04c76ec9230f21ebc9058ee08e53440b39"
+          },
+          "verification-before-completion": {
+            "nativeTimestamp": "2026-09-14T08:40:57.019Z",
+            "nativeCallId": "call_wmJilPJZwgUstWP0IPTaWEBz",
+            "bodyPhrase": "NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE",
+            "outputBodySha256": "f349dd7f9e631f274feec3ca42231a04c76ec9230f21ebc9058ee08e53440b39"
+          }
+        }
+      },
+      "method": "Same preview native session; retained actual tool-output BODY reads, not a fresh-read claim."
+    }
+  },
+  "retainedProofSource": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE_P3-consumption.json",
+    "sha256": "8fa9e99d630de693eada9d4758983cff78008115c9bdeff8e7eaafaea77d31b8"
+  },
+  "controls": {
+    "schemaVersion": 1,
+    "controls": 25,
+    "passed": 25,
+    "names": [
+      "matrix has the exact nine ordered prompts",
+      "duplicate sequence rejected",
+      "changed prompt rejected",
+      "changed branch rejected",
+      "model accepted draft attribution is diagnostic-backed",
+      "model reviewed fallback attribution is diagnostic-backed",
+      "ambiguous model attribution fails closed",
+      "recovery is attributed by current branch proof",
+      "unsupported topic is attributed by zero-source proof",
+      "deterministic attribution rejects any model diagnostic",
+      "API and DOM mismatch fails closed",
+      "verified recovery action must equal the supplied first-party destination",
+      "recovery action cannot be inferred or substituted",
+      "gate rejects placeholders and unverified recovery destinations",
+      "declared control count is derived from the completed result",
+      "pre-request branch proof row 1",
+      "pre-request branch proof row 2",
+      "pre-request branch proof row 3",
+      "pre-request branch proof row 4",
+      "pre-request branch proof row 5",
+      "pre-request branch proof row 6",
+      "pre-request branch proof row 7",
+      "pre-request branch proof row 8",
+      "pre-request branch proof row 9",
+      "future capture module parses without executing traffic"
+    ]
+  },
+  "limits": [
+    "Inert25 controls only; no live capture or final snapshot claim.",
+    "Root checked sealed evidence custody; final gate and technical reviews precede runtime capture."
+  ]
+}

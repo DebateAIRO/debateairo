@@ -1,0 +1,21 @@
+{
+  "at": "2026-09-14T18:02:10.291543+00:00",
+  "scope": "Reviewer interim claim; final report/probe/log hashes pending",
+  "revision": "e0dcfe77f49655bea774bdfacf988b911be4ff06",
+  "openClasses": {
+    "F2": "Unmatched quoted value, seven-word tail and dotted-token suffix survive canonical redaction; in-memory user persistence and model transit demonstrated.",
+    "F3": "Additional positive modal/coordination forms pass answer persistence/return and summary parser.",
+    "F5": "Decoded backslash path passes answer persistence/return and summary parser."
+  },
+  "benignControls": "This display name after a negative credential sentence rejects; your display name accepts; two of52 ordinary catalog labels reject in neutral framing.",
+  "confirmedControls": [
+    "Deep credential/link encodings fail closed",
+    "Malformed structural escapes reject",
+    "All35 hyphenated IDs plus encoded/control forms reject",
+    "Current aliases map canonically and unknown/stale/duplicate/alias-in-prose/canonical-ID-in-prose fail closed",
+    "No context leak observed in probe"
+  ],
+  "probeScope": "One direct-import run, in-memory ports; no DB/HTTP/socket/browser/preview/relay/provider/account traffic",
+  "heavyLease": "RELEASED by reviewer; no more probes planned",
+  "rootDecision": "Wait for final exact evidence and correctness architecture decision; preserve open findings. Require whole-value fail-closed span invariant rather than larger word bound."
+}

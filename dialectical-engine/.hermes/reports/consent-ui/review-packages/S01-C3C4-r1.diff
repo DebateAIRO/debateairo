@@ -1,0 +1,1635 @@
+# Review package — lane /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/consent-s01/dialectical-engine — range 87b50e1e..9dd8042e — generated 2026-09-06 23:46:29
+
+## Commits
+9dd8042e 23:41 feat(consent-ui S01-C4): cookie preferences card
+7131d61d 23:28 feat(consent-ui S01-C3): cookie bar
+b21fe942 23:18 fix(consent-ui S01-C2): strict decision predicate + typed save-choices
+
+## Stat
+ dialectical-engine/apps/ui/app/globals.css         | 337 ++++++++++++++++
+ .../apps/ui/components/consent/CookieBar.tsx       |  71 ++++
+ .../components/consent/CookiePreferencesCard.tsx   | 156 ++++++++
+ dialectical-engine/apps/ui/lib/consent.ts          |  38 +-
+ .../ADR-0021-consent-storage-contract.md           |  22 +-
+ .../tests/render/consent-bar.test.tsx              | 378 ++++++++++++++++++
+ .../tests/render/consent-card.test.tsx             | 436 +++++++++++++++++++++
+ .../tests/render/consent-storage.test.tsx          |  33 ++
+ 8 files changed, 1463 insertions(+), 8 deletions(-)
+
+## Diff (-U10)
+diff --git a/dialectical-engine/apps/ui/app/globals.css b/dialectical-engine/apps/ui/app/globals.css
+index 5401e48d..4c3da70d 100644
+--- a/dialectical-engine/apps/ui/app/globals.css
++++ b/dialectical-engine/apps/ui/app/globals.css
+@@ -7229,10 +7229,347 @@ a:focus-visible {
+   .publicArgumentGrid { grid-template-columns: minmax(0, 1fr); }
+ }
+ 
+ @media (max-width: 480px) {
+   .publicVerdictCore { padding: 18px 15px 13px; }
+   .publicThresholdLabel { display: none; }
+   .publicArgumentTop { align-items: flex-start; flex-direction: column; }
+   .publicArgumentSpacer { display: none; }
+   .publicModelPill { max-width: 100%; }
+ }
++
++/* === consent-ui S01 === */
++/* Slice S01 — cookie consent: the bar (10a) and the preferences card (10b).
++   The ONE delimited block this slice may append, at the very end of the file
++   (S01-R25). Every colour here is a var(--token) reference; the ten tokens the
++   slice adds live in the two token blocks at the top, which S01 also owns. */
++
++.consentBar {
++  position: fixed;
++  left: 22px;
++  right: 22px;
++  bottom: calc(22px + var(--safe-b));
++  z-index: var(--z-consent-bar);
++}
++
++.consentBarBezel {
++  background: var(--shell);
++  border: 1px solid var(--line-strong);
++  border-radius: var(--r-panel);
++  box-shadow: var(--shadow-pop);
++  padding: 7px;
++}
++
++.consentBarCore {
++  align-items: center;
++  background: var(--core);
++  border: 1px solid var(--line);
++  border-radius: 10px;
++  display: flex;
++  gap: 24px;
++  overflow: hidden;
++  padding: 17px 20px 16px;
++  position: relative;
++}
++
++.consentTab {
++  position: absolute;
++  top: 0;
++  left: 20px;
++  width: 52px;
++  height: 4px;
++  border-radius: var(--r-tab);
++  background: var(--gold);
++}
++
++.consentCopy {
++  flex: 1;
++  min-width: 0;
++}
++
++.consentEyebrow {
++  color: var(--gold);
++  font-family: var(--font-mono);
++  font-size: 9px;
++  font-weight: 700;
++  letter-spacing: .16em;
++}
++
++.consentTitle {
++  color: var(--ink);
++  font-family: var(--font-display);
++  font-size: 16px;
++  font-weight: 600;
++  letter-spacing: -.015em;
++  margin-top: 7px;
++}
++
++.consentBody {
++  color: var(--text-2);
++  font-family: var(--font-sans);
++  font-size: 11.5px;
++  line-height: 1.6;
++  margin: 6px 0 0;
++  max-width: 560px;
++  text-wrap: pretty;
++}
++
++.consentActions {
++  align-items: center;
++  display: flex;
++  flex: 0 0 auto;
++  gap: 9px;
++}
++
++.consentGhost {
++  background: transparent;
++  border: 1px solid var(--line-strong);
++  border-radius: var(--r-pill);
++  color: var(--muted);
++  cursor: pointer;
++  font-family: var(--font-sans);
++  font-size: 11.5px;
++  font-weight: 600;
++  padding: 9px 15px;
++  white-space: nowrap;
++}
++
++.consentGhostStrong { color: var(--ink); }
++
++.consentPrimary {
++  background: var(--ink);
++  border: 1px solid var(--ink);
++  border-radius: var(--r-pill);
++  color: var(--bg);
++  cursor: pointer;
++  font-family: var(--font-sans);
++  font-size: 12px;
++  font-weight: 700;
++  padding: 10px 19px;
++  white-space: nowrap;
++}
++
++.consentGhost:focus-visible,
++.consentPrimary:focus-visible {
++  outline: 2px solid var(--focus);
++  outline-offset: 2px;
++}
++
++/* --- 10b: the preferences card. One presentation serves both entry points
++   (the bar's "Choose what to store" and Settings -> Privacy), because there is
++   no bar in Settings to replace or to grow from (S01-R14). --- */
++
++.consentScrim {
++  position: fixed;
++  inset: 0;
++  z-index: var(--z-consent-scrim);
++  align-items: center;
++  background: var(--scrim);
++  display: flex;
++  justify-content: center;
++  padding: 16px;
++}
++
++.consentCard {
++  position: relative;
++  z-index: var(--z-consent-card);
++  width: min(520px, calc(100vw - 32px));
++  max-height: 92vh;
++  background: var(--shell);
++  border: 1px solid var(--line-strong);
++  border-radius: 18px;
++  box-shadow: var(--shadow-pop);
++  display: flex;
++  padding: 7px;
++}
++
++.consentCardCore {
++  position: relative;
++  overflow: hidden;
++  background: var(--core);
++  border: 1px solid var(--line);
++  border-radius: 12px;
++  display: flex;
++  flex: 1;
++  flex-direction: column;
++  min-height: 0;
++  padding: 22px 24px 20px;
++}
++
++.consentCardCore .consentTab { left: 24px; }
++
++.consentCardTitle {
++  color: var(--ink);
++  font-family: var(--font-display);
++  font-size: 18px;
++  font-weight: 600;
++  letter-spacing: -.015em;
++  margin-top: 9px;
++}
++
++.consentLede {
++  color: var(--text-2);
++  font-family: var(--font-sans);
++  font-size: 11.5px;
++  line-height: 1.6;
++  margin-top: 6px;
++}
++
++.consentCatList {
++  border-top: 1px solid var(--line);
++  margin-top: 16px;
++  min-height: 0;
++  overflow-y: auto;
++}
++
++.consentCatRow {
++  align-items: flex-start;
++  border-bottom: 1px solid var(--line);
++  display: flex;
++  gap: 14px;
++  padding: 14px 0;
++}
++
++.consentCatMain { flex: 1; min-width: 0; }
++
++.consentCatHead { align-items: center; display: flex; gap: 8px; }
++
++.consentCatName {
++  color: var(--ink);
++  font-family: var(--font-sans);
++  font-size: 12.5px;
++  font-weight: 700;
++}
++
++.consentTag {
++  border-radius: var(--r-pill);
++  font-family: var(--font-mono);
++  font-size: 8px;
++  font-weight: 700;
++  letter-spacing: .08em;
++  padding: 2px 8px;
++}
++
++.consentTag-essential {
++  background: var(--ok-bg);
++  border: 1px solid var(--ok-border);
++  color: var(--ok-dot);
++}
++
++.consentTag-quality {
++  background: var(--gold-bg);
++  border: 1px solid var(--gold-border);
++  color: var(--gold);
++}
++
++.consentTag-analytics {
++  background: var(--muted-bg);
++  border: 1px solid var(--muted-border);
++  color: var(--muted);
++}
++
++.consentCatDesc {
++  color: var(--text-2);
++  font-family: var(--font-sans);
++  font-size: 11px;
++  line-height: 1.55;
++  margin-top: 4px;
++}
++
++.consentCatDetail {
++  color: var(--muted);
++  font-family: var(--font-mono);
++  font-size: 9px;
++  margin-top: 5px;
++}
++
++.consentSwitch {
++  align-items: center;
++  background: var(--shell);
++  border: 1px solid var(--line-strong);
++  border-radius: var(--r-pill);
++  box-sizing: border-box;
++  cursor: pointer;
++  display: flex;
++  flex: 0 0 auto;
++  height: 22px;
++  justify-content: flex-start;
++  margin-top: 2px;
++  padding: 2px;
++  width: 38px;
++}
++
++.consentSwitch[aria-checked="true"] {
++  background: var(--ok-dot);
++  border-color: var(--ok-edge);
++  justify-content: flex-end;
++}
++
++/* The locked track keeps the design's softer fill so "on and not yours to
++   change" reads differently from "on because you chose it" (design-data.js:44). */
++.consentSwitch[aria-checked="true"][aria-disabled="true"] { background: var(--ok-soft); }
++
++.consentSwitch[aria-disabled="true"] { cursor: not-allowed; }
++
++.consentSwitch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
++
++.consentKnob {
++  background: var(--muted);
++  border-radius: var(--r-dot);
++  box-shadow: var(--shadow-thumb);
++  height: 16px;
++  width: 16px;
++}
++
++.consentSwitch[aria-checked="true"] .consentKnob { background: var(--core); }
++
++.consentCardFooter {
++  align-items: center;
++  display: flex;
++  gap: 9px;
++  margin-top: 18px;
++}
++
++.consentFooterGap { flex: 1; }
++
++.consentLink {
++  background: transparent;
++  border: 0;
++  color: var(--muted);
++  cursor: pointer;
++  font-family: var(--font-sans);
++  font-size: 10.5px;
++  padding: 0;
++  text-decoration: underline;
++  text-underline-offset: 3px;
++}
++
++.consentLink:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
++
++/* Below the derived 720px breakpoint the designed row stops fitting: the three
++   labels measure ~118 + 155 + 100 = 373px, plus two 9px gaps = ~391px; a
++   readable copy column needs ~260px; the row gap is 24px and the core's
++   horizontal padding is 40px — 391 + 260 + 24 + 40 = 715px. 720 also sits below
++   the 768px tablet-portrait width, so tablets keep the designed layout. */
++@media (max-width: 719.98px) {
++  .consentBar {
++    left: 12px;
++    right: 12px;
++    bottom: calc(12px + var(--safe-b));
++  }
++
++  .consentBarCore {
++    align-items: stretch;
++    flex-direction: column;
++    gap: 14px;
++  }
++
++  .consentActions { flex-wrap: wrap; }
++
++  .consentGhost,
++  .consentPrimary {
++    flex: 1 1 auto;
++    min-width: 0;
++    white-space: nowrap;
++  }
++}
++/* === end consent-ui S01 === */
+diff --git a/dialectical-engine/apps/ui/components/consent/CookieBar.tsx b/dialectical-engine/apps/ui/components/consent/CookieBar.tsx
+new file mode 100644
+index 00000000..cb21f24b
+--- /dev/null
++++ b/dialectical-engine/apps/ui/components/consent/CookieBar.tsx
+@@ -0,0 +1,71 @@
++"use client";
++
++/**
++ * 10a — the first-visit cookie bar.
++ *
++ * Presentational and prop-driven (S01-S13): it is handed the three controls
++ * S01-R04 names and reaches no storage of its own, so `CookieConsent` (the ONE
++ * state machine, cluster C5) stays the only reader and writer of
++ * `debateai.consent`.
++ *
++ * It is a labelled REGION, not a dialog: it never pulls focus, never traps it,
++ * and offers no dismissal that is not a decision (S01-R12, S01-R13). A visitor
++ * has to be able to read the page before deciding, and `Essential only` is the
++ * one-click way out, so nothing is coerced.
++ *
++ * Copy is byte-exact from `SPEC.md` §Copy (S01-R11); geometry lives in the ONE
++ * delimited `consent-ui S01` block at the end of `apps/ui/app/globals.css`
++ * (S01-R09, S01-R10) and every colour there is a `var(--token)` reference.
++ */
++export type CookieBarProps = {
++  /** Writes R04 row 2 and closes the bar. */
++  onEssentialOnly: () => void;
++  /**
++   * Opens the preferences card. `opener` is carried only so focus can be
++   * returned to this button on close (S01-R18); it is never a discriminator of
++   * behaviour — the stored decision is (S01-R14, B1). Same shape as
++   * `requestPreferences` in `apps/ui/lib/consent.ts`, which the Settings
++   * re-entry uses, so the two entry points hand the machine the same thing.
++   */
++  onChoose: (opener: HTMLElement | null) => void;
++  /** Writes R04 row 1 and closes the bar. */
++  onAcceptAll: () => void;
++};
++
++export function CookieBar({ onEssentialOnly, onChoose, onAcceptAll }: CookieBarProps) {
++  return (
++    <div className="consentBar" role="region" aria-label="Cookie consent">
++      <div className="consentBarBezel">
++        <div className="consentBarCore">
++          <span className="consentTab" aria-hidden="true" />
++          <div className="consentCopy">
++            <div className="consentEyebrow">YOUR DATA, ON THE RECORD</div>
++            <div className="consentTitle">
++              We store only what keeps the bench running — unless you say otherwise.
++            </div>
++            <p className="consentBody">
++              Essential cookies hold your session, MFA state and device record. Analytics and
++              model-quality telemetry are optional and never sold. You can change this any time in
++              Settings.
++            </p>
++          </div>
++          <div className="consentActions">
++            <button type="button" className="consentGhost" onClick={onEssentialOnly}>
++              Essential only
++            </button>
++            <button
++              type="button"
++              className="consentGhost consentGhostStrong"
++              onClick={(event) => onChoose(event.currentTarget)}
++            >
++              Choose what to store
++            </button>
++            <button type="button" className="consentPrimary" onClick={onAcceptAll}>
++              Accept all
++            </button>
++          </div>
++        </div>
++      </div>
++    </div>
++  );
++}
+diff --git a/dialectical-engine/apps/ui/components/consent/CookiePreferencesCard.tsx b/dialectical-engine/apps/ui/components/consent/CookiePreferencesCard.tsx
+new file mode 100644
+index 00000000..0b4d26d2
+--- /dev/null
++++ b/dialectical-engine/apps/ui/components/consent/CookiePreferencesCard.tsx
+@@ -0,0 +1,156 @@
++"use client";
++
++import { useId, useState } from "react";
++import {
++  COOKIE_CATEGORIES,
++  type ConsentToggles,
++  type CookieCategory
++} from "../../lib/consent";
++
++/**
++ * 10b — the per-category preferences card.
++ *
++ * Presentational and prop-driven (S01-S20): it holds only the two operable
++ * toggle booleans in local state and reaches no storage, so `CookieConsent`
++ * (the ONE state machine, cluster C5) stays the only reader and writer of
++ * `debateai.consent`. It is opened from the bar and from Settings, and it
++ * behaves identically from both: **the discriminator is the stored decision,
++ * never the entry point** (S01-R14/R17, REQ-REV-01 B1), which is why the
++ * caller hands it `initial` rather than the card asking where it came from.
++ *
++ * Every string it shows for a category comes from `COOKIE_CATEGORIES`
++ * (S01-R28), so V's ruling on the five cookie names (contested row Q7-01) is a
++ * one-line data edit rather than a component change.
++ *
++ * **It writes no modal semantics of its own.** Focus trap, initial focus, focus
++ * return, backdrop close, reduced motion and the Esc stack all come from the
++ * ONE shared helper `modalSemantics.ts`, which S02 owns and cluster C6 wires in
++ * (S01-R18/R20, SPEC §Out of scope). `onDismiss` is the callback that helper
++ * will drive; this cluster accepts it and wires nothing to it, because a
++ * temporary second implementation is still a second implementation.
++ */
++export type ConsentChoice = {
++  /** Always true — the locked category is not a choice (S01-R04). */
++  essential: true;
++  quality: boolean;
++  analytics: boolean;
++};
++
++export type CookiePreferencesCardProps = {
++  /**
++   * The two operable toggles as the card opens: a valid stored decision's
++   * booleans, or R17's defaults when nothing valid is stored. Which of the two
++   * is a question about STORAGE, and the caller has already answered it.
++   */
++  initial: ConsentToggles;
++  /** R04 row 4 — the current toggles. */
++  onSave: (choice: ConsentChoice) => void;
++  /** R04 row 3 — byte-identical to the bar's own `Essential only`. */
++  onEssentialOnly: () => void;
++  /** Closing without deciding. Driven by the shared helper in cluster C6. */
++  onDismiss: () => void;
++  /** Opens the S02 policy modal in read-only mode, over the card (S01-R20). */
++  onRequestPolicy: () => void;
++};
++
++export function CookiePreferencesCard({
++  initial,
++  onSave,
++  onEssentialOnly,
++  onDismiss,
++  onRequestPolicy
++}: CookiePreferencesCardProps) {
++  const titleId = useId();
++  const [toggles, setToggles] = useState<ConsentToggles>({
++    quality: initial.quality,
++    analytics: initial.analytics
++  });
++
++  /** The locked category is not in `ConsentToggles`: its state is the constant `true`. */
++  const stateOf = (id: CookieCategory["id"]): boolean =>
++    id === "essential" ? true : toggles[id];
++
++  const flip = (category: CookieCategory): void => {
++    // The id is read into a `const` BEFORE the guard: TypeScript keeps a const
++    // local's narrowing inside the updater closure, and does not keep a
++    // parameter property's — measured, `TS7053` at the `setToggles` call, seen
++    // only by the apps/ui project typecheck (COMMON §10.30), never by vitest.
++    const id = category.id;
++    if (category.locked || id === "essential") return;
++    setToggles((current) => ({ ...current, [id]: !current[id] }));
++  };
++
++  return (
++    <div className="consentScrim">
++      <div className="consentCard" role="dialog" aria-modal="true" aria-labelledby={titleId}>
++        <div className="consentCardCore">
++          <span className="consentTab" aria-hidden="true" />
++          <div className="consentEyebrow">CHOOSE WHAT TO STORE</div>
++          <div className="consentCardTitle" id={titleId}>
++            Cookie preferences
++          </div>
++          <div className="consentLede">Asked once. Revisit any time from Settings → Privacy.</div>
++          <div className="consentCatList">
++            {COOKIE_CATEGORIES.map((category) => {
++              const on = stateOf(category.id);
++              return (
++                <div className="consentCatRow" key={category.id}>
++                  <div className="consentCatMain">
++                    <div className="consentCatHead">
++                      <span className="consentCatName">{category.name}</span>
++                      <span className={`consentTag consentTag-${category.id}`}>{category.tag}</span>
++                    </div>
++                    <div className="consentCatDesc">{category.description}</div>
++                    <div className="consentCatDetail">{category.detail}</div>
++                  </div>
++                  <button
++                    type="button"
++                    role="switch"
++                    aria-checked={on}
++                    aria-disabled={category.locked || undefined}
++                    aria-label={category.name}
++                    className="consentSwitch"
++                    onClick={() => flip(category)}
++                    // Space and Enter, per S01-R17. `preventDefault` is what
++                    // keeps this ONE activation: a real browser fires a native
++                    // click as the default action of Enter's keydown and of
++                    // Space's keyup, and cancelling the keydown cancels both,
++                    // so the toggle flips once rather than twice. jsdom fires
++                    // neither, so this handler is the only path there — the
++                    // pin is on the HANDLER, never on the browser
++                    // (TOOLING-TRAPS, ARCH-S02-REWORK-R1).
++                    onKeyDown={(event) => {
++                      if (event.key !== " " && event.key !== "Enter") return;
++                      event.preventDefault();
++                      flip(category);
++                    }}
++                  >
++                    <span className="consentKnob" />
++                  </button>
++                </div>
++              );
++            })}
++          </div>
++          <div className="consentCardFooter">
++            <button type="button" className="consentLink" onClick={onRequestPolicy}>
++              Privacy notice
++            </button>
++            <span className="consentFooterGap" />
++            <button type="button" className="consentGhost" onClick={onEssentialOnly}>
++              Essential only
++            </button>
++            <button
++              type="button"
++              className="consentPrimary"
++              onClick={() =>
++                onSave({ essential: true, quality: toggles.quality, analytics: toggles.analytics })
++              }
++            >
++              Save choices
++            </button>
++          </div>
++        </div>
++      </div>
++    </div>
++  );
++}
+diff --git a/dialectical-engine/apps/ui/lib/consent.ts b/dialectical-engine/apps/ui/lib/consent.ts
+index 7b44b911..3dbf46f4 100644
+--- a/dialectical-engine/apps/ui/lib/consent.ts
++++ b/dialectical-engine/apps/ui/lib/consent.ts
+@@ -83,34 +83,49 @@ export const COOKIE_CATEGORIES: readonly CookieCategory[] = [
+ /** The three controls that write a decision. Two surfaces offer `essential-only`. */
+ export type ConsentControl = "accept-all" | "essential-only" | "save-choices";
+ 
+ /** The two operable category toggles, as the preferences card currently shows them. */
+ export type ConsentToggles = {
+   quality: boolean;
+   analytics: boolean;
+ };
+ 
+ /**
+- * A *valid stored decision* parses, carries `v === 1`, and holds all five
+- * members at their declared types. Anything else — including a record whose
+- * `essential` is not `true`, which this module never writes — is no decision,
+- * because re-asking is the conservative reading of consent (S01-R02, S01-R03).
++ * The exact shape `new Date().toISOString()` emits — millisecond precision, `Z`
++ * suffix — which S01-R01 names as `decidedAt`'s only form.
++ */
++const ISO_UTC_MS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
++
++/**
++ * A *valid stored decision* parses to a non-array object with **exactly the
++ * five members and no others**, `v === 1`, `essential === true`, `quality` and
++ * `analytics` boolean, and `decidedAt` matching {@link ISO_UTC_MS}. Anything
++ * else re-asks, because re-asking is the conservative reading of consent
++ * (S01-R01, S01-R02, S01-R03; row **V-19** default (a), which extends the
++ * earlier `essential !== true` ruling from its instance to its whole class).
++ *
++ * The two members V-19 added — a sixth key, and a `decidedAt` that is a string
++ * but not that instant — cannot arrive from this product: nothing else writes
++ * the key. They arrive from DevTools, a hand edit or an extension, and a record
++ * whose timestamp cannot be parsed cannot answer "when was consent given".
+  */
+ function isDecision(value: unknown): value is ConsentDecision {
+   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+   const record = value as Record<string, unknown>;
+   return (
++    Object.keys(record).length === 5 &&
+     record.v === CONSENT_VERSION &&
+     record.essential === true &&
+     typeof record.quality === "boolean" &&
+     typeof record.analytics === "boolean" &&
+-    typeof record.decidedAt === "string"
++    typeof record.decidedAt === "string" &&
++    ISO_UTC_MS.test(record.decidedAt)
+   );
+ }
+ 
+ /**
+  * Reads the stored decision, or `null` when there is none.
+  *
+  * A value whose `v` is not the integer {@link CONSENT_VERSION} is no decision:
+  * the caller re-asks and the next decision overwrites the key. There is no v0 to
+  * carry forward, so no code here branches on any other version (S01-R02).
+  *
+@@ -142,21 +157,34 @@ export function writeConsent(decision: ConsentDecision): void {
+   } catch {
+     // Deliberately empty; see the contract above.
+   }
+ }
+ 
+ /**
+  * The decision a control writes — S01-R04's four rows, and the only place they
+  * live. `essential-only` ignores `toggles` on purpose: it is offered by the bar
+  * and by the card, and both must produce the identical object, so the entry
+  * point is never a discriminator of behaviour.
++ *
++ * **`save-choices` REQUIRES the toggles, and the compiler is the guard.** An
++ * omitted argument used to coerce to `false`/`false`, so a wiring mistake wrote
++ * a full denial for a visitor who had left the optional quality toggle ON — a
++ * silent, type-legal denial of consent that no test in this slice could see
++ * (`reviews/CODE-REV-S01-C1C2-r1.md` **N2**; orchestrator ruling on ticket
++ * `t_117e7f43`). The overloads below make `decisionFor("save-choices")` a
++ * compile error, so absence can no longer read as denial.
+  */
++export function decisionFor(
++  control: "accept-all" | "essential-only",
++  toggles?: ConsentToggles
++): ConsentDecision;
++export function decisionFor(control: "save-choices", toggles: ConsentToggles): ConsentDecision;
+ export function decisionFor(control: ConsentControl, toggles?: ConsentToggles): ConsentDecision {
+   const chosen: Pick<ConsentDecision, "quality" | "analytics"> =
+     control === "accept-all"
+       ? { quality: true, analytics: true }
+       : control === "essential-only"
+         ? { quality: false, analytics: false }
+         : { quality: toggles?.quality === true, analytics: toggles?.analytics === true };
+ 
+   return {
+     v: CONSENT_VERSION,
+diff --git a/dialectical-engine/docs/architecture/01-decisions/ADR-0021-consent-storage-contract.md b/dialectical-engine/docs/architecture/01-decisions/ADR-0021-consent-storage-contract.md
+index efe94785..f0c9a33f 100644
+--- a/dialectical-engine/docs/architecture/01-decisions/ADR-0021-consent-storage-contract.md
++++ b/dialectical-engine/docs/architecture/01-decisions/ADR-0021-consent-storage-contract.md
+@@ -58,23 +58,39 @@ members and no others** (S01-R01):
+ - `essential` is always `true` and is **stored explicitly, never omitted**.
+ - `quality` and `analytics` are booleans.
+ - `decidedAt` is the UTC ISO-8601 string produced by `new Date().toISOString()`
+   and records when **this** stored decision was taken. A later re-save
+   overwrites it; there is no first-decision timestamp.
+ 
+ **2. A stored value whose `v` is not `1` is treated as no decision** (S01-R02):
+ the visitor is asked again and the next decision overwrites the key. **No
+ migration code is written**, and no branch on any other version exists.
+ 
+-**3. A value that is absent, unparseable, not an object, or missing any of the
+-five members is treated as no decision, and no read or write ever throws**
+-(S01-R03). Every `localStorage` access is wrapped in `try/catch`:
++**3. A stored value is a decision if and only if it satisfies this predicate;
++anything else re-asks, and no read or write ever throws** (S01-R03, row
++**V-19** default (a)). Stated once, and the code states nothing else:
++
++> the raw string parses, and the parsed value is a non-array object with
++> **exactly five own members**, `v === 1`, `essential === true`, `quality` and
++> `analytics` both boolean, and `decidedAt` a string matching
++> `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$`.
++
++R01 declares the record's shape and R03 declares the rejection rule, and the two
++did not compose: a record carrying a sixth member, or a hand-edited `decidedAt`,
++satisfied R03's "missing any of the five" test while violating R01's "exactly
++these five members and no others". V-19 closes the gap in R01's direction, which
++extends the earlier ruling on `essential !== true` from its instance to its whole
++class. Nothing in this product writes such a record — decision 6 makes this
++module the only writer — so both shapes arrive only from DevTools, a hand edit or
++an extension; re-asking such a visitor is the conservative reading of consent,
++and a record whose timestamp cannot be parsed cannot answer *when* consent was
++given. Every `localStorage` access is wrapped in `try/catch`:
+ 
+ - If a **read** throws or returns nothing, the visitor is asked.
+ - If a **write** throws, the surface still closes and the decision lives in React
+   state for the lifetime of that page — a visitor is never trapped by a storage
+   failure — and the ask returns on the next full page load.
+ 
+ **4. Clearing site data restores the first-visit state** (S01-R05). Removing
+ `debateai.consent` and reloading asks again. This is a property of the design, not
+ a feature: it is the only place the decision lives.
+ 
+diff --git a/dialectical-engine/tests/render/consent-bar.test.tsx b/dialectical-engine/tests/render/consent-bar.test.tsx
+new file mode 100644
+index 00000000..5ee6599e
+--- /dev/null
++++ b/dialectical-engine/tests/render/consent-bar.test.tsx
+@@ -0,0 +1,378 @@
++// @vitest-environment jsdom
++
++import { readFileSync } from "node:fs";
++import { resolve } from "node:path";
++import { act } from "react";
++import { createRoot, type Root } from "react-dom/client";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { CONSENT_KEY } from "../../apps/ui/lib/consent.js";
++import { CookieBar } from "../../apps/ui/components/consent/CookieBar.js";
++
++// The acceptance command is pinned to the lane root, so source fixtures resolve
++// from process.cwd(); `import.meta.url` can carry a non-file scheme under vitest
++// (TOOLING-TRAPS, CODE-T1C3 / CODE-T5C1).
++const barSource = (): string =>
++  readFileSync(resolve(process.cwd(), "apps/ui/components/consent/CookieBar.tsx"), "utf8");
++const globalsSource = (): string =>
++  readFileSync(resolve(process.cwd(), "apps/ui/app/globals.css"), "utf8");
++
++const OPEN_MARKER = "/* === consent-ui S01 === */";
++const CLOSE_MARKER = "/* === end consent-ui S01 === */";
++const COLOUR_LITERAL = /oklch\(|#[0-9a-f]{3,8}\b|\brgba?\(/i;
++
++/** The ONE delimited S01 block, markers included (S01-R25, S01-S16). */
++function s01Block(): string {
++  const css = globalsSource();
++  const start = css.indexOf(OPEN_MARKER);
++  const end = css.indexOf(CLOSE_MARKER);
++  expect(start, "globals.css opens the consent-ui S01 block").toBeGreaterThan(-1);
++  expect(end, "globals.css closes the consent-ui S01 block").toBeGreaterThan(start);
++  return css.slice(start, end + CLOSE_MARKER.length);
++}
++
++const withoutComments = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, "");
++
++/** The block with every at-rule (media queries) removed — the unconditional rules. */
++function unconditional(css: string): string {
++  let out = "";
++  let index = 0;
++  for (;;) {
++    const at = css.indexOf("@media", index);
++    if (at === -1) return out + css.slice(index);
++    out += css.slice(index, at);
++    let depth = 0;
++    let cursor = css.length;
++    for (let position = css.indexOf("{", at); position < css.length; position += 1) {
++      if (css[position] === "{") depth += 1;
++      else if (css[position] === "}") {
++        depth -= 1;
++        if (depth === 0) {
++          cursor = position + 1;
++          break;
++        }
++      }
++    }
++    index = cursor;
++  }
++}
++
++/** The body of the at-rule whose prelude contains `query`. */
++function atRule(css: string, query: string): string {
++  const at = css.indexOf(query);
++  expect(at, `the block carries ${query}`).toBeGreaterThan(-1);
++  const open = css.indexOf("{", at);
++  let depth = 0;
++  for (let position = open; position < css.length; position += 1) {
++    if (css[position] === "{") depth += 1;
++    else if (css[position] === "}") {
++      depth -= 1;
++      if (depth === 0) return css.slice(open + 1, position);
++    }
++  }
++  throw new Error(`unbalanced at-rule for ${query}`);
++}
++
++/** Every declaration this stylesheet fragment applies to exactly `selector`. */
++function declarationsFor(css: string, selector: string): string {
++  const bodies: string[] = [];
++  const rules = /([^{}]+)\{([^{}]*)\}/g;
++  for (;;) {
++    const match = rules.exec(css);
++    if (match === null) break;
++    const selectors = (match[1] ?? "").split(",").map((one) => one.trim());
++    if (selectors.includes(selector)) bodies.push(match[2] ?? "");
++  }
++  expect(bodies.length, `${selector} is declared`).toBeGreaterThan(0);
++  return bodies.join(" ");
++}
++
++function expectDeclarations(css: string, selector: string, declarations: string[]): void {
++  const body = declarationsFor(css, selector);
++  for (const declaration of declarations) {
++    expect(body.includes(declaration), `${selector} declares ${declaration}`).toBe(true);
++  }
++}
++
++// SPEC §Copy, extracted from `slices/S01/SPEC.md` with a codepoint dump rather
++// than retyped (TOOLING-TRAPS, CODE-S01-C1C2): the title carries U+2014 EM DASH
++// at index 43 and is 70 characters; every other bar string is pure ASCII.
++const EYEBROW = "YOUR DATA, ON THE RECORD";
++const TITLE = "We store only what keeps the bench running — unless you say otherwise.";
++const BODY =
++  "Essential cookies hold your session, MFA state and device record. Analytics and model-quality telemetry are optional and never sold. You can change this any time in Settings.";
++const BUTTONS = ["Essential only", "Choose what to store", "Accept all"];
++
++let root: Root | null = null;
++let container: HTMLDivElement | null = null;
++
++// vitest.config.ts:19 sets fileParallelism:false and there is no shared setup
++// file, so a leaked key survives into later test files in the same worker.
++// Precedent: tests/render/t1-canvas.test.tsx:105,133.
++beforeEach(() => {
++  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
++  localStorage.clear();
++  container = document.createElement("div");
++  document.body.append(container);
++  root = createRoot(container);
++});
++
++afterEach(() => {
++  if (root !== null) act(() => root!.unmount());
++  root = null;
++  container = null;
++  document.body.replaceChildren();
++  vi.unstubAllGlobals();
++  localStorage.clear();
++});
++
++type BarHandlers = {
++  onEssentialOnly?: () => void;
++  onChoose?: (opener: HTMLElement | null) => void;
++  onAcceptAll?: () => void;
++};
++
++function mountBar(handlers: BarHandlers = {}): HTMLElement {
++  act(() => {
++    root!.render(
++      <CookieBar
++        onEssentialOnly={handlers.onEssentialOnly ?? ((): void => {})}
++        onChoose={handlers.onChoose ?? ((): void => {})}
++        onAcceptAll={handlers.onAcceptAll ?? ((): void => {})}
++      />
++    );
++  });
++  const bar = document.querySelector<HTMLElement>('[role="region"][aria-label="Cookie consent"]');
++  expect(bar, "the bar renders as a labelled region").not.toBeNull();
++  return bar!;
++}
++
++function text(selector: string): string {
++  const element = document.querySelector(selector);
++  expect(element, `missing rendered element ${selector}`).not.toBeNull();
++  return element!.textContent ?? "";
++}
++
++describe("S01-C3 the cookie bar (10a)", () => {
++  it("renders the five bar strings of SPEC §Copy byte-exact, and reaches no storage", () => {
++    // PROPERTY (S01-R11): the eyebrow, the Fraunces title, the body paragraph
++    // and the three button labels equal SPEC §Copy's strings by `textContent`,
++    // so any paraphrase — a swapped dash, a dropped sentence, a reworded
++    // button — fails. The bar is presentational: it is handed three callbacks
++    // and never touches `localStorage` itself, so the ONE state machine
++    // (`CookieConsent`, cluster C5) stays the only writer.
++    mountBar();
++
++    expect(text(".consentEyebrow"), "eyebrow").toBe(EYEBROW);
++    expect(text(".consentTitle"), "Fraunces title").toBe(TITLE);
++    expect(text(".consentBody"), "body paragraph").toBe(BODY);
++    expect(
++      [...document.querySelectorAll("button")].map((button) => button.textContent?.trim()),
++      "the three button labels"
++    ).toEqual(BUTTONS);
++  });
++
++  it("is a labelled region whose focusable descendants are the three buttons in DOM order", () => {
++    // PROPERTY (S01-R12): the bar exposes `role="region"` with
++    // `aria-label="Cookie consent"`, and its focusable descendants are exactly
++    // the three controls in the design's DOM order — the order in which a
++    // reader meets the least-committing option first. Focus is never pulled
++    // into the bar and never trapped there, so the visitor can read the page
++    // before deciding: the component owns no `.focus()` call and registers no
++    // listener of its own.
++    const bar = mountBar();
++
++    expect(bar.getAttribute("role"), "the bar's role").toBe("region");
++    expect(bar.getAttribute("aria-label"), "the bar's accessible name").toBe("Cookie consent");
++
++    const focusable = [
++      ...bar.querySelectorAll<HTMLElement>(
++        'a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])'
++      )
++    ].filter((element) => !element.hasAttribute("disabled"));
++    expect(
++      focusable.map((element) => element.textContent?.trim()),
++      "every focusable descendant, in DOM order"
++    ).toEqual(BUTTONS);
++
++    expect(document.activeElement, "the bar never pulls focus on mount").toBe(document.body);
++
++    const source = barSource();
++    expect(source.includes(".focus()"), "CookieBar.tsx calls .focus()").toBe(false);
++    expect(source.includes("addEventListener"), "CookieBar.tsx registers a listener").toBe(false);
++  });
++
++  it("offers no dismissal that is not a decision: Escape leaves it standing and writes nothing", () => {
++    // PROPERTY (S01-R13): the bar leaves only by a decision. There is no close
++    // control and no fourth affordance of any kind, Escape does nothing to it,
++    // and nothing reaches storage on a keystroke — the design gives 10a three
++    // buttons and no close glyph, and row V-7 says the bar shows until they
++    // choose.
++    const bar = mountBar();
++
++    act(() => {
++      document.dispatchEvent(
++        new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })
++      );
++    });
++
++    expect(document.body.contains(bar), "the bar survives Escape").toBe(true);
++    expect(localStorage.getItem(CONSENT_KEY), "Escape writes nothing").toBeNull();
++
++    const controls = [...bar.querySelectorAll("button,a,[role='button']")];
++    expect(
++      controls.map((control) => control.textContent?.trim()),
++      "there is no fourth control and no ×"
++    ).toEqual(BUTTONS);
++    expect(bar.textContent?.includes("×"), "the bar renders no close glyph").toBe(false);
++  });
++
++  it("ships R09's geometry inside ONE delimited S01 block at the end of globals.css", () => {
++    // PROPERTY (S01-R09, S01-R25): every one of R09's numbers appears in the
++    // shipped stylesheet as written, the slice's rules live in exactly ONE
++    // delimited block appended after every existing rule, and every colour in
++    // it is a `var(--token)` reference.
++    // jsdom computes NO layout, so this asserts the declared rule TEXT and not
++    // a rendered pixel — the 22px insets, the 7px bezel, the 52x4 gold tab and
++    // the 560px copy column are V's, acceptance steps 1-2 in both modes.
++    const css = globalsSource();
++    expect(css.split(OPEN_MARKER).length - 1, "exactly one S01 block is opened").toBe(1);
++    expect(css.split(CLOSE_MARKER).length - 1, "exactly one S01 block is closed").toBe(1);
++    expect(css.trimEnd().endsWith(CLOSE_MARKER), "the S01 block is the last block in the file").toBe(
++      true
++    );
++
++    const block = withoutComments(s01Block());
++    const base = unconditional(block);
++
++    expectDeclarations(base, ".consentBar", [
++      "position: fixed",
++      "left: 22px",
++      "right: 22px",
++      "bottom: calc(22px + var(--safe-b))",
++      "z-index: var(--z-consent-bar)"
++    ]);
++    expectDeclarations(base, ".consentBarBezel", [
++      "background: var(--shell)",
++      "border: 1px solid var(--line-strong)",
++      "border-radius: var(--r-panel)",
++      "padding: 7px",
++      "box-shadow: var(--shadow-pop)"
++    ]);
++    expectDeclarations(base, ".consentBarCore", [
++      "background: var(--core)",
++      "border: 1px solid var(--line)",
++      "border-radius: 10px",
++      "padding: 17px 20px 16px",
++      "overflow: hidden",
++      "position: relative",
++      "display: flex",
++      "align-items: center",
++      "gap: 24px"
++    ]);
++    expectDeclarations(base, ".consentTab", [
++      "position: absolute",
++      "top: 0",
++      "left: 20px",
++      "width: 52px",
++      "height: 4px",
++      "border-radius: var(--r-tab)",
++      "background: var(--gold)"
++    ]);
++    expectDeclarations(base, ".consentBody", ["max-width: 560px"]);
++    expectDeclarations(base, ".consentActions", ["display: flex", "gap: 9px"]);
++    expectDeclarations(base, ".consentGhost", ["white-space: nowrap"]);
++    expectDeclarations(base, ".consentPrimary", ["white-space: nowrap"]);
++
++    const literals = s01Block()
++      .split("\n")
++      .filter((line) => COLOUR_LITERAL.test(line));
++    expect(literals, "no colour literal anywhere in the S01 block").toEqual([]);
++  });
++
++  it("stacks below 720px, the width at which the designed row stops fitting", () => {
++    // PROPERTY (S01-R10): below the measured breakpoint the button group moves
++    // under the copy block and nothing is allowed to wrap mid-label.
++    // 720 is DERIVED, not conventional: the three labels at the designed
++    // 11.5-12px / 600-700 measure about 118 + 155 + 100 = 373px, plus two 9px
++    // gaps = ~391px; a readable copy column needs ~260px; the row gap is 24px
++    // and the core's horizontal padding is 40px — 391 + 260 + 24 + 40 = 715px,
++    // so the designed row stops fitting just under 720. 720 also sits below the
++    // 768px tablet-portrait width, so tablets keep the designed layout.
++    // Whether it ACTUALLY stacks is V's, acceptance step 14.
++    const stacked = withoutComments(atRule(withoutComments(s01Block()), "@media (max-width: 719.98px)"));
++
++    expectDeclarations(stacked, ".consentBarCore", [
++      "flex-direction: column",
++      "align-items: stretch",
++      "gap: 14px"
++    ]);
++    expectDeclarations(stacked, ".consentActions", ["flex-wrap: wrap"]);
++    for (const selector of [".consentGhost", ".consentPrimary"]) {
++      expectDeclarations(stacked, selector, [
++        "flex: 1 1 auto",
++        "min-width: 0",
++        "white-space: nowrap"
++      ]);
++    }
++    expectDeclarations(stacked, ".consentBar", [
++      "left: 12px",
++      "right: 12px",
++      "bottom: calc(12px + var(--safe-b))"
++    ]);
++  });
++
++  it("carries no route-conditional offset, so no layout-level component learns its route", () => {
++    // PROPERTY (S01-R29): the bar's bottom offset is the same expression on
++    // every route. The one surface it overlays is the debate route's
++    // `.tokenDock` (`globals.css:3396-3403`, z-index 40, rendered only on the
++    // owner debate view at `DebatePageClient.tsx:1525-1529`), which holds
++    // exactly one NON-interactive status pill — so the bar at
++    // `--z-consent-bar: 45` covers a status indicator and never a control.
++    // Teaching a layout-level component which route it is on would trade a
++    // temporary overlap for permanent coupling.
++    const block = withoutComments(s01Block());
++
++    // NOTE (packet defect, reported on the ticket): `S01-S18`'s acceptance says
++    // "exactly one `bottom:` declaration for `.consentBar`", which contradicts
++    // `S01-S17`'s own requirement that the media query drop the three insets to
++    // 12px. The PROPERTY — route-independence — is asserted here in the form
++    // that satisfies both frozen requirements R09 and R10: exactly one
++    // unconditional `bottom:` for `.consentBar`, and every `bottom:` it has
++    // anywhere is a viewport-width form carrying the safe-area inset.
++    const unconditionalBottoms = declarationsFor(unconditional(block), ".consentBar").match(
++      /bottom:[^;]*/g
++    );
++    expect(unconditionalBottoms, "the unconditional bottom offset of the bar").toEqual([
++      "bottom: calc(22px + var(--safe-b))"
++    ]);
++
++    // Scoped to the `bottom` PROPERTY on rules that select `.consentBar`, in
++    // the media query too. An unscoped /bottom:/ also matches `border-bottom:`,
++    // which C4 added to the same block — measured, and it turned this case red
++    // against a correct stylesheet.
++    const barBottoms: string[] = [];
++    const rules = /([^{}]+)\{([^{}]*)\}/g;
++    for (;;) {
++      const match = rules.exec(block);
++      if (match === null) break;
++      const selectors = (match[1] ?? "").split(",").map((one) => one.trim());
++      if (!selectors.includes(".consentBar")) continue;
++      for (const declaration of (match[2] ?? "").split(";")) {
++        const [property, ...rest] = declaration.split(":");
++        if (property?.trim() === "bottom") barBottoms.push(rest.join(":").trim());
++      }
++    }
++    expect(barBottoms.length, "the bar declares a bottom offset in both layouts").toBe(2);
++    for (const value of barBottoms) {
++      expect(value, "every bar offset is a plain inset plus the safe-area inset").toMatch(
++        /^calc\(\d+px \+ var\(--safe-b\)\)$/
++      );
++    }
++
++    const selectors = [...block.matchAll(/([^{}@]+)\{/g)].map((match) => match[1]?.trim() ?? "");
++    expect(
++      selectors.filter((selector) => /debate|tokendock/i.test(selector)),
++      "no selector in the S01 block is conditioned on a route"
++    ).toEqual([]);
++  });
++});
+diff --git a/dialectical-engine/tests/render/consent-card.test.tsx b/dialectical-engine/tests/render/consent-card.test.tsx
+new file mode 100644
+index 00000000..431b1d8f
+--- /dev/null
++++ b/dialectical-engine/tests/render/consent-card.test.tsx
+@@ -0,0 +1,436 @@
++// @vitest-environment jsdom
++
++import { readFileSync } from "node:fs";
++import { resolve } from "node:path";
++import { act } from "react";
++import { createRoot, type Root } from "react-dom/client";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { CONSENT_KEY, COOKIE_CATEGORIES } from "../../apps/ui/lib/consent.js";
++import { CookiePreferencesCard } from "../../apps/ui/components/consent/CookiePreferencesCard.js";
++
++// The acceptance command is pinned to the lane root, so source fixtures resolve
++// from process.cwd(); `import.meta.url` can carry a non-file scheme under vitest
++// (TOOLING-TRAPS, CODE-T1C3 / CODE-T5C1).
++const cardSource = (): string =>
++  readFileSync(
++    resolve(process.cwd(), "apps/ui/components/consent/CookiePreferencesCard.tsx"),
++    "utf8"
++  );
++const globalsSource = (): string =>
++  readFileSync(resolve(process.cwd(), "apps/ui/app/globals.css"), "utf8");
++
++// SPEC §Copy, extracted with a codepoint dump rather than retyped: the lede
++// carries U+2192 RIGHT ARROW (TOOLING-TRAPS, CODE-S01-C1C2).
++const EYEBROW = "CHOOSE WHAT TO STORE";
++const TITLE = "Cookie preferences";
++const LEDE = "Asked once. Revisit any time from Settings → Privacy.";
++const FOOTER = ["Privacy notice", "Essential only", "Save choices"];
++/** Every string the card renders that is NOT one of the twelve category strings. */
++const CARD_CHROME = [EYEBROW, TITLE, LEDE, ...FOOTER];
++
++const OPEN_MARKER = "/* === consent-ui S01 === */";
++const CLOSE_MARKER = "/* === end consent-ui S01 === */";
++const COLOUR_LITERAL = /oklch\(|#[0-9a-f]{3,8}\b|\brgba?\(/i;
++
++// The four CSS readers below are duplicated from `consent-bar.test.tsx` rather
++// than shared: a helper module would be a file outside cluster C4's own surface
++// (PLAN §Boundaries, "a cluster may write no file outside its own row").
++
++/** The ONE delimited S01 block, markers included (S01-R25). */
++function s01Block(): string {
++  const css = globalsSource();
++  const start = css.indexOf(OPEN_MARKER);
++  const end = css.indexOf(CLOSE_MARKER);
++  expect(start, "globals.css opens the consent-ui S01 block").toBeGreaterThan(-1);
++  expect(end, "globals.css closes the consent-ui S01 block").toBeGreaterThan(start);
++  return css.slice(start, end + CLOSE_MARKER.length);
++}
++
++const withoutComments = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, "");
++
++/** The block with every at-rule removed — the unconditional rules. */
++function unconditional(css: string): string {
++  let out = "";
++  let index = 0;
++  for (;;) {
++    const at = css.indexOf("@media", index);
++    if (at === -1) return out + css.slice(index);
++    out += css.slice(index, at);
++    let depth = 0;
++    let cursor = css.length;
++    for (let position = css.indexOf("{", at); position < css.length; position += 1) {
++      if (css[position] === "{") depth += 1;
++      else if (css[position] === "}") {
++        depth -= 1;
++        if (depth === 0) {
++          cursor = position + 1;
++          break;
++        }
++      }
++    }
++    index = cursor;
++  }
++}
++
++/** Every declaration this stylesheet fragment applies to exactly `selector`. */
++function declarationsFor(css: string, selector: string): string {
++  const bodies: string[] = [];
++  const rules = /([^{}]+)\{([^{}]*)\}/g;
++  for (;;) {
++    const match = rules.exec(css);
++    if (match === null) break;
++    const selectors = (match[1] ?? "").split(",").map((one) => one.trim());
++    if (selectors.includes(selector)) bodies.push(match[2] ?? "");
++  }
++  expect(bodies.length, `${selector} is declared`).toBeGreaterThan(0);
++  return bodies.join(" ");
++}
++
++function expectDeclarations(css: string, selector: string, declarations: string[]): void {
++  const body = declarationsFor(css, selector);
++  for (const declaration of declarations) {
++    expect(body.includes(declaration), `${selector} declares ${declaration}`).toBe(true);
++  }
++}
++
++let root: Root | null = null;
++
++beforeEach(() => {
++  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
++  localStorage.clear();
++  const container = document.createElement("div");
++  document.body.append(container);
++  root = createRoot(container);
++});
++
++afterEach(() => {
++  if (root !== null) act(() => root!.unmount());
++  root = null;
++  document.body.replaceChildren();
++  vi.unstubAllGlobals();
++  localStorage.clear();
++});
++
++type CardHandlers = {
++  initial?: { quality: boolean; analytics: boolean };
++  onSave?: (choice: { essential: true; quality: boolean; analytics: boolean }) => void;
++  onEssentialOnly?: () => void;
++  onDismiss?: () => void;
++  onRequestPolicy?: () => void;
++};
++
++/** R17's defaults when no valid `v: 1` decision is stored, from EITHER entry point. */
++const DEFAULTS = { quality: true, analytics: false };
++
++function mountCard(handlers: CardHandlers = {}): HTMLElement {
++  act(() => {
++    root!.render(
++      <CookiePreferencesCard
++        initial={handlers.initial ?? DEFAULTS}
++        onSave={handlers.onSave ?? ((): void => {})}
++        onEssentialOnly={handlers.onEssentialOnly ?? ((): void => {})}
++        onDismiss={handlers.onDismiss ?? ((): void => {})}
++        onRequestPolicy={handlers.onRequestPolicy ?? ((): void => {})}
++      />
++    );
++  });
++  const card = document.querySelector<HTMLElement>('[role="dialog"]');
++  expect(card, "the card renders as a dialog").not.toBeNull();
++  return card!;
++}
++
++const switches = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>('[role="switch"]')];
++const checked = (): string[] =>
++  switches().map((control) => control.getAttribute("aria-checked") ?? "");
++
++function press(control: HTMLElement, key: string): void {
++  act(() => {
++    control.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
++  });
++}
++
++function clickLabelled(label: string): void {
++  const button = [...document.querySelectorAll("button")].find(
++    (candidate) => candidate.textContent?.trim() === label
++  );
++  expect(button, `missing rendered control ${label}`).toBeDefined();
++  act(() => {
++    (button as HTMLButtonElement).click();
++  });
++}
++
++describe("S01-C4 the cookie preferences card (10b)", () => {
++  it("renders the three categories from COOKIE_CATEGORIES, all twelve strings, in the design's order", () => {
++    // PROPERTY (S01-R16, S01-R28): the card renders the three categories in
++    // `cookieCats` order — name, tag pill, description and mono detail line —
++    // and every one of the twelve strings comes from `COOKIE_CATEGORIES`, so a
++    // component that inlines one fails and V's ruling on the five cookie names
++    // (contested row Q7-01) stays a one-line data edit.
++    mountCard();
++
++    const rows = [...document.querySelectorAll(".consentCatRow")];
++    expect(rows.length, "one row per category").toBe(3);
++    expect(
++      rows.map((row) => [
++        row.querySelector(".consentCatName")?.textContent,
++        row.querySelector(".consentTag")?.textContent,
++        row.querySelector(".consentCatDesc")?.textContent,
++        row.querySelector(".consentCatDetail")?.textContent
++      ]),
++      "the twelve strings, by row, in the design's order"
++    ).toEqual(
++      COOKIE_CATEGORIES.map((category) => [
++        category.name,
++        category.tag,
++        category.description,
++        category.detail
++      ])
++    );
++
++    // The containment arm: a category string INLINED in the component appears
++    // either as a quoted literal or as a JSX text node, i.e. bounded by a quote
++    // or an angle bracket. That distinguishes it from `onEssentialOnly` (an
++    // identifier) and from the footer's own `Essential only` label, neither of
++    // which is a category string.
++    const source = cardSource();
++    for (const value of COOKIE_CATEGORIES.flatMap((category) => [
++      category.name,
++      category.tag,
++      category.description,
++      category.detail
++    ])) {
++      const inlined = new RegExp(`["'>]\\s*${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*["'<]`);
++      expect(inlined.test(source), `"${value}" is inlined in CookiePreferencesCard.tsx`).toBe(false);
++    }
++
++    expect(source.includes("localStorage"), "the card reaches storage itself").toBe(false);
++  });
++
++  it("renders the card's own four strings of SPEC §Copy byte-exact", () => {
++    // PROPERTY (S01-R16 / §Copy): the eyebrow, the Fraunces title and the lede
++    // are the design's, byte for byte — the lede's U+2192 included, since it is
++    // the sentence that promises the Settings re-entry R21 exists to keep.
++    mountCard();
++
++    expect(document.querySelector(".consentEyebrow")?.textContent, "eyebrow").toBe(EYEBROW);
++    expect(document.querySelector(".consentCardTitle")?.textContent, "title").toBe(TITLE);
++    expect(document.querySelector(".consentLede")?.textContent, "lede").toBe(LEDE);
++  });
++
++  it("opens at R17's defaults when nothing valid is stored, in category order", () => {
++    // PROPERTY (S01-R17): each category row carries ONE `role="switch"` control
++    // whose `aria-checked` is the single source of truth for its state, and a
++    // card opened with no valid stored decision shows Essential on, Model
++    // quality telemetry on and Product analytics off — from EITHER entry point,
++    // because the discriminator is the stored decision and never the opener
++    // (REQ-REV-01 B1's class).
++    mountCard({ initial: DEFAULTS });
++
++    expect(switches().length, "one switch per category").toBe(3);
++    expect(checked(), "aria-checked in category order").toEqual(["true", "true", "false"]);
++  });
++
++  it("reflects a seeded decision's booleans on open", () => {
++    // PROPERTY (S01-R17): when a valid decision exists the toggles are ITS
++    // booleans, again from either entry point — R17's hook case.
++    mountCard({ initial: { quality: false, analytics: true } });
++
++    expect(checked(), "the seeded decision, reflected").toEqual(["true", "false", "true"]);
++  });
++
++  it("locks Essential against click, Space and Enter alike", () => {
++    // PROPERTY (S01-R17): Essential is permanently `true` and inert. It stays
++    // FOCUSABLE — `aria-disabled`, not `disabled` — so a keyboard visitor can
++    // still reach it and be told it is locked, but no activation changes it.
++    mountCard();
++    const essential = switches()[0]!;
++
++    expect(essential.getAttribute("aria-disabled"), "Essential announces itself locked").toBe(
++      "true"
++    );
++
++    // Asserted after EVERY activation, never once at the end. Three flips of a
++    // boolean land back where they started, so a single closing assertion is
++    // satisfied by a switch that moved three times — measured: a mutant that
++    // holds `essential` in state and flips it like the others passed 9/9
++    // against the closing form and is caught by this one.
++    act(() => {
++      essential.click();
++    });
++    expect(checked(), "a click does not move the locked switch").toEqual(["true", "true", "false"]);
++
++    press(essential, " ");
++    expect(checked(), "Space does not move the locked switch").toEqual(["true", "true", "false"]);
++
++    press(essential, "Enter");
++    expect(checked(), "Enter does not move the locked switch").toEqual(["true", "true", "false"]);
++
++    // jsdom computes no styles, so `cursor: not-allowed` is asserted as the
++    // shipped rule TEXT; whether a mouse user PERCEIVES the lock is V's,
++    // acceptance step 6.
++    const block = s01Block();
++    expect(
++      block.includes('.consentSwitch[aria-disabled="true"]'),
++      "the locked switch is styled by its own ARIA state"
++    ).toBe(true);
++    expect(
++      declarationsFor(withoutComments(block), '.consentSwitch[aria-disabled="true"]').includes(
++        "cursor: not-allowed"
++      ),
++      "the locked switch declares cursor: not-allowed"
++    ).toBe(true);
++  });
++
++  it("flips the two operable toggles on click, on Space and on Enter", () => {
++    // PROPERTY (S01-R17): the two operable switches respond identically to the
++    // three activations a switch must answer. The pin is on the component's own
++    // keydown handler, never on the browser: jsdom implements no native
++    // activation from a key, so a test that dispatched Space and waited for the
++    // BROWSER to click would be red against a correct implementation
++    // (TOOLING-TRAPS, ARCH-S02-REWORK-R1).
++    mountCard();
++    const [, quality, analytics] = switches() as [HTMLElement, HTMLElement, HTMLElement];
++
++    act(() => {
++      quality.click();
++    });
++    expect(checked(), "click turns the quality toggle off").toEqual(["true", "false", "false"]);
++
++    press(quality, " ");
++    expect(checked(), "Space turns it back on").toEqual(["true", "true", "false"]);
++
++    press(quality, "Enter");
++    expect(checked(), "Enter turns it off again").toEqual(["true", "false", "false"]);
++
++    act(() => {
++      analytics.click();
++    });
++    expect(checked(), "click turns the analytics toggle on").toEqual(["true", "false", "true"]);
++
++    press(analytics, " ");
++    expect(checked(), "Space turns it off").toEqual(["true", "false", "false"]);
++
++    press(analytics, "Enter");
++    expect(checked(), "Enter turns it on").toEqual(["true", "false", "true"]);
++  });
++
++  it("ships R15's card geometry inside the SAME delimited S01 block", () => {
++    // PROPERTY (S01-R15, S01-R25): R15's numbers appear in the shipped
++    // stylesheet as written, inside the ONE block cluster C3 opened — never a
++    // second one — and the card's two layers come from tokens rather than from
++    // literals. jsdom computes no layout: the rendered 520px width, the 92vh
++    // cap and the 38x22 toggle are V's, acceptance steps 6 and 14.
++    const css = globalsSource();
++    expect(css.split(OPEN_MARKER).length - 1, "still exactly one S01 block").toBe(1);
++
++    const base = unconditional(withoutComments(s01Block()));
++
++    expectDeclarations(base, ".consentCard", [
++      "width: min(520px, calc(100vw - 32px))",
++      "max-height: 92vh",
++      "background: var(--shell)",
++      "padding: 7px",
++      "border-radius: 18px",
++      "z-index: var(--z-consent-card)"
++    ]);
++    expectDeclarations(base, ".consentCardCore", [
++      "background: var(--core)",
++      "border: 1px solid var(--line)",
++      "border-radius: 12px",
++      "padding: 22px 24px 20px",
++      "position: relative",
++      "overflow: hidden"
++    ]);
++    expectDeclarations(base, ".consentCardCore .consentTab", ["left: 24px"]);
++    expectDeclarations(base, ".consentCatRow", [
++      "padding: 14px 0",
++      "border-bottom: 1px solid var(--line)"
++    ]);
++    expectDeclarations(base, ".consentSwitch", ["width: 38px", "height: 22px", "padding: 2px"]);
++    expectDeclarations(base, ".consentKnob", ["width: 16px", "height: 16px"]);
++    expectDeclarations(base, ".consentScrim", [
++      "background: var(--scrim)",
++      "z-index: var(--z-consent-scrim)"
++    ]);
++    // The category list is the element that scrolls under the 92vh cap.
++    expectDeclarations(base, ".consentCatList", ["overflow-y: auto"]);
++
++    const literals = s01Block()
++      .split("\n")
++      .filter((line) => COLOUR_LITERAL.test(line));
++    expect(literals, "no colour literal anywhere in the S01 block").toEqual([]);
++  });
++
++  it("writes R04's rows from the footer's three controls, and offers no fourth", () => {
++    // PROPERTY (S01-R19, S01-R04): `Essential only` and `Save choices` each
++    // invoke exactly one callback carrying the decision R04's table names, and
++    // the footer is the design's three controls in the design's order with no
++    // close glyph — 10b is drawn without one, so none is added (row V-11).
++    const saved: unknown[] = [];
++    const essentialOnly: number[] = [];
++    mountCard({
++      initial: DEFAULTS,
++      onSave: (choice) => saved.push(choice),
++      onEssentialOnly: () => essentialOnly.push(1)
++    });
++
++    const footer = document.querySelector(".consentCardFooter");
++    expect(footer, "the card has a footer").not.toBeNull();
++    expect(
++      [...footer!.querySelectorAll("button,a,[role='button']")].map((control) =>
++        control.textContent?.trim()
++      ),
++      "exactly three footer controls, in the design's order"
++    ).toEqual(FOOTER);
++    expect(document.body.textContent?.includes("×"), "the card renders no close glyph").toBe(false);
++
++    // R04 row 4 — the CURRENT toggles: quality off, analytics on.
++    const [, quality, analytics] = switches() as [HTMLElement, HTMLElement, HTMLElement];
++    act(() => {
++      quality.click();
++    });
++    act(() => {
++      analytics.click();
++    });
++    clickLabelled("Save choices");
++    expect(saved, "Save choices writes the current toggles, once").toEqual([
++      { essential: true, quality: false, analytics: true }
++    ]);
++
++    // R04 row 3 — `Essential only` from the card, whatever the toggles say.
++    clickLabelled("Essential only");
++    expect(essentialOnly.length, "Essential only fires exactly once").toBe(1);
++
++    expect(localStorage.getItem(CONSENT_KEY), "the card itself stores nothing").toBeNull();
++  });
++
++  it("announces itself as a modal dialog named by its own visible title", () => {
++    // PROPERTY (S01-R18): a screen-reader user is told what the surface is
++    // before its contents. The three attributes are NECESSARY, not sufficient —
++    // whether a screen reader announces it correctly is UNVERIFIED by anyone
++    // and is stated as such in the PLAN's refutation table for S01-S24.
++    const card = mountCard();
++
++    expect(card.getAttribute("role"), "role").toBe("dialog");
++    expect(card.getAttribute("aria-modal"), "aria-modal").toBe("true");
++    const labelledBy = card.getAttribute("aria-labelledby");
++    expect(labelledBy, "aria-labelledby is set").toBeTruthy();
++    expect(
++      document.getElementById(labelledBy!)?.textContent,
++      "aria-labelledby points at the visible title"
++    ).toBe(TITLE);
++
++    // SPEC §Out of scope bans a second document-level Esc listener and a second
++    // focus trap of any kind: the shared `modalSemantics.ts` (S02's, wired in
++    // cluster C6) is the only one. Asserted mechanically here. The switch's own
++    // JSX `onKeyDown` is R17's activation handler on a single control — it
++    // registers nothing on the document and is not a listener this file owns;
++    // `S01-S45`'s slice-wide guard bans `addEventListener("keydown"`, the
++    // string `Escape` and `.focus()`, none of which appear.
++    const source = cardSource();
++    expect(source.includes("addEventListener"), "the card registers a listener").toBe(false);
++    expect(source.includes(".focus()"), "the card moves focus itself").toBe(false);
++    expect(/\bdocument\b/.test(source), "the card reaches the document").toBe(false);
++    expect(/["']Escape["']/.test(source), "the card acts on Escape").toBe(false);
++  });
++});
+diff --git a/dialectical-engine/tests/render/consent-storage.test.tsx b/dialectical-engine/tests/render/consent-storage.test.tsx
+index 9f659c0e..49dacf5f 100644
+--- a/dialectical-engine/tests/render/consent-storage.test.tsx
++++ b/dialectical-engine/tests/render/consent-storage.test.tsx
+@@ -113,20 +113,53 @@ describe("S01-C2 consent storage contract", () => {
+       ["an array, not an object", "[]"],
+       ["null literal", "null"],
+       ["missing four of the five members", '{"v":1}'],
+       ["missing decidedAt", '{"v":1,"essential":true,"quality":true,"analytics":false}'],
+       ["essential omitted", '{"v":1,"quality":true,"analytics":false,"decidedAt":"2026-01-01T00:00:00.000Z"}'],
+       // R01 declares `essential` always true; a record saying otherwise was not
+       // written by this module, so it is no decision — the conservative reading.
+       [
+         "essential not true",
+         '{"v":1,"essential":false,"quality":true,"analytics":false,"decidedAt":"2026-01-01T00:00:00.000Z"}'
++      ],
++      // R01 says "exactly these five members and no others" (row V-19, default
++      // (a)): a SIXTH member was not written by this module, and accepting it
++      // hands an unaudited value to the caller inside a `ConsentDecision`.
++      [
++        "a sixth member beyond R01's five",
++        '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":"2026-01-01T00:00:00.000Z","rogue":"injected"}'
++      ],
++      // R01 says `decidedAt` is "the UTC ISO-8601 string produced by
++      // `new Date().toISOString()`". On a consent record the timestamp is the
++      // evidentiary member: a record whose stamp cannot be parsed cannot answer
++      // "when was consent given", so it is no decision and the visitor re-asks.
++      [
++        "decidedAt is not an instant at all",
++        '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":"yesterday"}'
++      ],
++      [
++        "decidedAt is empty",
++        '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":""}'
++      ],
++      [
++        "decidedAt is epoch milliseconds as a string",
++        '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":"1788723500905"}'
++      ],
++      [
++        "decidedAt is an impossible instant",
++        '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":"2026-13-45T99:99:99Z"}'
++      ],
++      // `toISOString()` always emits the millisecond field, so a second-precision
++      // stamp is the near-miss most likely to arrive from a hand edit.
++      [
++        "decidedAt carries no milliseconds",
++        '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":"2026-01-01T00:00:00Z"}'
+       ]
+     ] as const) {
+       localStorage.setItem(CONSENT_KEY, raw);
+       expect(readConsent(), label).toBeNull();
+     }
+ 
+     localStorage.clear();
+     expect(readConsent(), "clearing site data restores the first-visit state").toBeNull();
+ 
+     const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {

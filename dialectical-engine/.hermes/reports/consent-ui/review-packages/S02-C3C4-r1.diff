@@ -1,0 +1,578 @@
+# Review package — lane /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/consent-s02-form/dialectical-engine — range 91877847..fb44696d — generated 2026-09-06 23:43:08
+
+## Commits
+fb44696d 23:37 feat(consent-ui S02-C4): create-account gate on both boxes
+0928c38c 23:28 feat(consent-ui S02-C3): sign-up consent checkbox group
+
+## Stat
+ .../apps/ui/components/SignUpFlow.tsx              |  64 ++++++-
+ .../tests/render/auth-flow-integration.test.tsx    |  45 +++++
+ .../tests/render/consent-signup-gate.test.tsx      |  97 ++++++++++
+ .../tests/render/consent-signup-group.test.tsx     | 205 +++++++++++++++++++++
+ 4 files changed, 406 insertions(+), 5 deletions(-)
+
+## Diff (-U10)
+diff --git a/dialectical-engine/apps/ui/components/SignUpFlow.tsx b/dialectical-engine/apps/ui/components/SignUpFlow.tsx
+index 8d145de8..b3c4718e 100644
+--- a/dialectical-engine/apps/ui/components/SignUpFlow.tsx
++++ b/dialectical-engine/apps/ui/components/SignUpFlow.tsx
+@@ -11,20 +11,24 @@ type RegistrationClient = Pick<ContractClient, "register" | "resendVerification"
+ type Validity = Readonly<{ state: "idle" | "ok" | "bad"; text: string }>;
+ 
+ /* The document's ✓/✗ rules under the password field (Turn 8 · 8a). */
+ const PASSWORD_RULES: ReadonlyArray<{ label: string; met: (value: string) => boolean }> = [
+   { label: "At least eight characters", met: (value) => value.length >= 8 },
+   { label: "One capital letter", met: (value) => /[A-Z]/.test(value) },
+   { label: "One number", met: (value) => /[0-9]/.test(value) },
+   { label: "One special character", met: (value) => /[^A-Za-z0-9]/.test(value) }
+ ];
+ 
++/* The id the privacy row's input points at with aria-labelledby: its sentence holds an
++   interactive control, so the row cannot be a <label> (see the consent group below). */
++const PRIVACY_CONSENT_TEXT_ID = "signup-privacy-consent-text";
++
+ // Deliberately permissive: the address is checked for shape, not existence.
+ const shapedEmail = (value: string) => /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(value);
+ 
+ function emailValidity(value: string, sent: boolean): Validity {
+   const trimmed = value.trim();
+   if (trimmed.length === 0) return { state: "idle", text: "" };
+   if (!shapedEmail(trimmed)) return { state: "bad", text: "✗ That does not look like an email address" };
+   return sent
+     ? { state: "ok", text: "✓ Valid address · verification link sent — awaiting confirmation" }
+     : { state: "ok", text: "✓ Valid address" };
+@@ -44,30 +48,39 @@ export function SignUpFlow({
+   client = contractClient
+ }: Readonly<{ client?: RegistrationClient }>) {
+   const [email, setEmail] = useState("");
+   const [recoveryEmail, setRecoveryEmail] = useState("");
+   const [password, setPassword] = useState("");
+   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
+   const [message, setMessage] = useState<string | null>(null);
+   const [busy, setBusy] = useState(false);
+   const [error, setError] = useState<string | null>(null);
+   const [loginHref, setLoginHref] = useState("/login");
++  /* The two consent boxes stay UNCONTROLLED. These mirrors exist for ONE purpose:
++     computing the submit button's `disabled`, so it reflects the boxes live.
++     FormData is the truth at submit — see submitRegistration. */
++  const [adultAffirmed, setAdultAffirmed] = useState(false);
++  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+ 
+   useEffect(() => {
+     const next = new URLSearchParams(window.location.search).get("next");
+     if (next !== null) setLoginHref(`/login?next=${encodeURIComponent(next)}`);
+   }, []);
+ 
+   async function submitRegistration(event: FormEvent<HTMLFormElement>): Promise<void> {
+     event.preventDefault();
+     const form = event.currentTarget;
+     const data = new FormData(form);
++    /* Defence in depth. A bare `new Event("submit")` bypasses HTML constraint
++       validation, so `required` alone gates nothing against a scripted submit.
++       These are the two FormData reads, never the mirrors above. */
++    if (data.get("adult-affirmed") !== "on" || data.get("privacy-accepted") !== "on") return;
+     const submitted = String(data.get("email") ?? "").trim();
+     setBusy(true);
+     setError(null);
+     try {
+       const result = await client.register(
+         submitted,
+         String(data.get("password") ?? ""),
+         String(data.get("recovery-email") ?? "").trim(),
+         data.get("adult-affirmed") === "on"
+       );
+@@ -175,26 +188,67 @@ export function SignUpFlow({
+               const met = rule.met(password);
+               return (
+                 <li className="authRule" key={rule.label} data-met={password.length === 0 ? undefined : met}>
+                   {password.length === 0 ? "·" : met ? "✓" : "✗"} {rule.label}
+                 </li>
+               );
+             })}
+           </ul>
+         </div>
+ 
+-        <label className="authCheck">
+-          <input name="adult-affirmed" type="checkbox" required disabled={busy || sent} />
+-          <span>I affirm that I am at least 18 years old.</span>
+-        </label>
++        {/* Consent group — design artboard 8a (turn-8a-checkbox-group.html:1-10).
++            Row 1 is a <label> wrapping its input, so the square, the text and the row
++            all toggle it natively. Row 2 cannot be a <label>: its Privacy Policy
++            control is interactive content, which the <label> content model forbids —
++            so it is a <div> and the input takes its name from aria-labelledby. */}
++        <div className="consentGroup">
++          <label className="consentRow">
++            <input
++              className="consentBox"
++              name="adult-affirmed"
++              type="checkbox"
++              required
++              disabled={busy || sent}
++              onChange={(event) => setAdultAffirmed(event.currentTarget.checked)}
++            />
++            <span className="consentText">I am 18 or over.</span>
++          </label>
++          <div className="consentRow">
++            <input
++              className="consentBox"
++              name="privacy-accepted"
++              type="checkbox"
++              required
++              disabled={busy || sent}
++              aria-labelledby={PRIVACY_CONSENT_TEXT_ID}
++              /* The SETTLED value, not the in-flight one: a cancelled change never
++                 reaches the DOM, so mirroring its `true` would record a state the box
++                 never holds. `adult-affirmed`'s handler is the literal form. */
++              onChange={(event) =>
++                setPrivacyAccepted(
++                  event.currentTarget.checked && !event.nativeEvent.defaultPrevented
++                )
++              }
++            />
++            <span className="consentText" id={PRIVACY_CONSENT_TEXT_ID}>
++              I agree to the{" "}
++              <button type="button" className="consentPolicyLink">Privacy Policy</button>
++              , including that my debates may be published publicly.
++            </span>
++          </div>
++        </div>
+ 
+-        <button className="authPrimary" type="submit" disabled={busy || sent}>
++        <button
++          className="authPrimary"
++          type="submit"
++          disabled={busy || sent || !adultAffirmed || !privacyAccepted}
++        >
+           {busy ? "Creating…" : "Create account"}
+         </button>
+ 
+         <p className="authPanelFooter">Already have one? <Link href={loginHref}>Log in</Link></p>
+ 
+         {sent && message !== null ? (
+           <p className="authFinePrint" role="status" aria-live="polite">
+             {message} The verification page continues into mandatory authenticator setup. No account status is
+             revealed here.
+           </p>
+diff --git a/dialectical-engine/tests/render/auth-flow-integration.test.tsx b/dialectical-engine/tests/render/auth-flow-integration.test.tsx
+index 9d9e75b8..12bc9468 100644
+--- a/dialectical-engine/tests/render/auth-flow-integration.test.tsx
++++ b/dialectical-engine/tests/render/auth-flow-integration.test.tsx
+@@ -315,20 +315,21 @@ describe("rendered auth flow integration", () => {
+ 
+   it("renders the non-enumerating registration state and resends only to the submitted email", async () => {
+     const register = vi.fn().mockResolvedValue({ message: REGISTRATION_MESSAGE });
+     const resendVerification = vi.fn().mockResolvedValue({ message: RESEND_MESSAGE });
+     await act(async () => root!.render(<SignUpFlow client={{ register, resendVerification }} />));
+ 
+     field("email").value = " person@example.test ";
+     field("recovery-email").value = " recovery@example.test ";
+     field("password").value = "correct horse battery staple";
+     field("adult-affirmed").checked = true;
++    field("privacy-accepted").checked = true;
+     await submit();
+ 
+     expect(register).toHaveBeenCalledWith(
+       "person@example.test",
+       "correct horse battery staple",
+       "recovery@example.test",
+       true
+     );
+     expect(document.body.textContent).toContain(REGISTRATION_MESSAGE);
+     expect(document.body.textContent).toContain("No account status is revealed here.");
+@@ -439,37 +440,81 @@ describe("rendered auth flow integration", () => {
+     );
+     const resendVerification = vi.fn();
+     await act(async () => root!.render(<SignUpFlow client={{ register, resendVerification }} />));
+ 
+     expect(field("email").autocomplete).toBe("section-primary-email email");
+     expect(field("recovery-email").autocomplete).toBe("section-recovery-email email");
+     field("email").value = "person@example.test";
+     field("recovery-email").value = "recovery@example.test";
+     field("password").value = "password";
+     field("adult-affirmed").checked = true;
++    field("privacy-accepted").checked = true;
+     await submit();
+ 
+     expect(document.querySelector('[role="alert"]')?.textContent)
+       .toBe("Account creation could not be completed.");
+     expect(document.body.textContent).not.toMatch(/ContractHttpError|duplicate account/);
+   });
+ 
+   it("keeps resend failures generic without changing the non-enumerating success message", async () => {
+     const register = vi.fn().mockResolvedValue({ message: REGISTRATION_MESSAGE });
+     const resendVerification = vi.fn().mockRejectedValue(
+       new Error("network ECONNREFUSED api.internal")
+     );
+     await act(async () => root!.render(<SignUpFlow client={{ register, resendVerification }} />));
+ 
+     field("email").value = "person@example.test";
+     field("recovery-email").value = "recovery@example.test";
+     field("password").value = "password";
+     field("adult-affirmed").checked = true;
++    field("privacy-accepted").checked = true;
+     await submit();
+     expect(document.body.textContent).toContain(REGISTRATION_MESSAGE);
+ 
+     await click("Verify email");
+     expect(document.querySelector('[role="alert"]')?.textContent)
+       .toBe("Verification instructions could not be resent.");
+     expect(document.body.textContent).not.toMatch(/ECONNREFUSED|api\.internal/);
+   });
++
++  // S02-S31 (SPEC.md S02-R18): a bare `new Event("submit")` bypasses HTML constraint
++  // validation, so `required` gates nothing against a scripted submit. The handler
++  // refuses from the two FormData reads — never from R17's React mirror, which an
++  // assignment never updates.
++  it("refuses to register when either consent box is left unticked", async () => {
++    const registerWithoutPrivacy = vi.fn();
++    await act(async () =>
++      root!.render(
++        <SignUpFlow client={{ register: registerWithoutPrivacy, resendVerification: vi.fn() }} />
++      )
++    );
++
++    field("email").value = "person@example.test";
++    field("recovery-email").value = "recovery@example.test";
++    field("password").value = "correct horse battery staple";
++    field("adult-affirmed").checked = true;
++    await submit();
++
++    expect(registerWithoutPrivacy).not.toHaveBeenCalled();
++
++    await act(async () => root!.unmount());
++    document.body.replaceChildren();
++    const container = document.createElement("div");
++    document.body.append(container);
++    root = createRoot(container);
++
++    const registerWithoutAdult = vi.fn();
++    await act(async () =>
++      root!.render(
++        <SignUpFlow client={{ register: registerWithoutAdult, resendVerification: vi.fn() }} />
++      )
++    );
++
++    field("email").value = "person@example.test";
++    field("recovery-email").value = "recovery@example.test";
++    field("password").value = "correct horse battery staple";
++    field("privacy-accepted").checked = true;
++    await submit();
++
++    expect(registerWithoutAdult).not.toHaveBeenCalled();
++  });
+ });
+diff --git a/dialectical-engine/tests/render/consent-signup-gate.test.tsx b/dialectical-engine/tests/render/consent-signup-gate.test.tsx
+new file mode 100644
+index 00000000..0b35164e
+--- /dev/null
++++ b/dialectical-engine/tests/render/consent-signup-gate.test.tsx
+@@ -0,0 +1,97 @@
++// @vitest-environment jsdom
++
++/**
++ * S02-C4 — the create-account gate: R17's onChange mirror and the button's
++ * `disabled`, computed from both mirrors.
++ *
++ * Steps pinned here: S02-S25 (case 1), S02-S26 (case 2), S02-S27 (case 3),
++ * S02-S30 (case 6). R17's cases 4 and 5 are NOT here: both expect the button
++ * ENABLED, and after S02-C7 the modal's acknowledgement is the only route that
++ * ticks `privacy-accepted`, so they live in `consent-signup-modal.test.tsx`
++ * (PLAN §Cluster S02-C7; ARCH-REV-S02-r2 B3; V-DECISIONS V-18).
++ *
++ * THE ONE IDIOM for every assertion about the BUTTON is
++ * `field(name).click()` wrapped in `await act(async () => { … })`.
++ * `field(x).checked = true` fires no React change event and can never move this
++ * button; `dispatchEvent(new Event("change"|"click", …))` are measured dead
++ * (SPEC.md R17 hook; probe b2-idiom-matrix.mjs). `.click()` TOGGLES.
++ *
++ * Every case here expects `disabled === true`, and each is invariant under C7:
++ * at this stage a click on the privacy box toggles it natively, after C7 it opens
++ * the modal instead — both routes leave the box unticked, so the expectation holds.
++ */
++
++import { act } from "react";
++import { createRoot, type Root } from "react-dom/client";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
++
++let root: Root | null = null;
++
++function field(name: string): HTMLInputElement {
++  const input = document.querySelector<HTMLInputElement>(`input[name="${name}"]`);
++  expect(input, `missing rendered input ${name}`).not.toBeNull();
++  return input!;
++}
++
++function createAccountButton(): HTMLButtonElement {
++  const button = document.querySelector<HTMLButtonElement>("button.authPrimary");
++  expect(button, "missing the Create account button").not.toBeNull();
++  return button!;
++}
++
++async function mount(): Promise<void> {
++  await act(async () =>
++    root!.render(<SignUpFlow client={{ register: vi.fn(), resendVerification: vi.fn() }} />)
++  );
++}
++
++describe("create-account gate on both consent boxes", () => {
++  beforeEach(async () => {
++    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
++    const container = document.createElement("div");
++    document.body.append(container);
++    root = createRoot(container);
++    await mount();
++  });
++
++  afterEach(async () => {
++    if (root !== null) await act(async () => root!.unmount());
++    root = null;
++    document.body.replaceChildren();
++    vi.unstubAllGlobals();
++  });
++
++  /* S02-S25 — R17 case 1. */
++  it("keeps Create account disabled with neither box ticked", () => {
++    expect(createAccountButton().disabled).toBe(true);
++  });
++
++  /* S02-S26 — R17 case 2. */
++  it("keeps Create account disabled with only the 18+ box ticked", async () => {
++    await act(async () => { field("adult-affirmed").click(); });
++
++    expect(field("adult-affirmed").checked).toBe(true);
++    expect(createAccountButton().disabled).toBe(true);
++  });
++
++  /* S02-S27 — R17 case 3. */
++  it("keeps Create account disabled with only the privacy box ticked", async () => {
++    await act(async () => { field("privacy-accepted").click(); });
++
++    expect(field("adult-affirmed").checked).toBe(false);
++    expect(createAccountButton().disabled).toBe(true);
++  });
++
++  /* S02-S30 — R17 case 6: the pin that goes RED if a seat makes the inputs
++     controlled. The click on the OTHER box is what forces a React re-render;
++     the surviving `.checked` is the discriminating assertion. */
++  it("keeps an assigned box ticked across a re-render and the button disabled", async () => {
++    field("adult-affirmed").checked = true;
++
++    await act(async () => { field("privacy-accepted").click(); });
++
++    expect(createAccountButton().disabled).toBe(true);
++    expect(field("adult-affirmed").checked).toBe(true);
++  });
++});
+diff --git a/dialectical-engine/tests/render/consent-signup-group.test.tsx b/dialectical-engine/tests/render/consent-signup-group.test.tsx
+new file mode 100644
+index 00000000..343b8f43
+--- /dev/null
++++ b/dialectical-engine/tests/render/consent-signup-group.test.tsx
+@@ -0,0 +1,205 @@
++// @vitest-environment jsdom
++
++/**
++ * S02-C3 — the sign-up consent checkbox group (design artboard 8a).
++ *
++ * Steps pinned here: S02-S17 (structure), S02-S18 (byte-exact copy),
++ * S02-S19 (form semantics), S02-S20 (accessible names), S02-S21 (the 18+ row is a
++ * plain toggle), S02-S70 (the 18+ input is focusable and activation toggles it).
++ *
++ * This file deliberately asserts NOTHING about the privacy row's click behaviour
++ * (cluster S02-C7) and NOTHING about the submit button's `disabled` state
++ * (cluster S02-C4) — an assertion about either would be one a later cluster rewrites.
++ */
++
++import { act } from "react";
++import { createRoot, type Root } from "react-dom/client";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
++
++/** Copy — byte-exact from SPEC.md §Copy / turn-8a-checkbox-group.html:4,8. */
++const ROW_ONE_TEXT = "I am 18 or over.";
++const ROW_TWO_TEXT =
++  "I agree to the Privacy Policy, including that my debates may be published publicly.";
++const POLICY_CONTROL_TEXT = "Privacy Policy";
++
++let root: Root | null = null;
++
++async function settle(): Promise<void> {
++  await act(async () => {
++    await Promise.resolve();
++    await Promise.resolve();
++    await Promise.resolve();
++  });
++}
++
++function field(name: string): HTMLInputElement {
++  const input = document.querySelector<HTMLInputElement>(`input[name="${name}"]`);
++  expect(input, `missing rendered input ${name}`).not.toBeNull();
++  return input!;
++}
++
++function rows(): readonly HTMLElement[] {
++  return [...document.querySelectorAll<HTMLElement>(".consentGroup .consentRow")];
++}
++
++/** The same input, reached THROUGH the group, so a case scoped this way is RED
++ *  until the group exists (PLAN S02-S21/S02-S70: "the group does not exist yet"). */
++function groupField(name: string): HTMLInputElement {
++  const input = document.querySelector<HTMLInputElement>(
++    `.consentGroup .consentRow input[name="${name}"]`
++  );
++  expect(input, `missing input ${name} inside .consentGroup .consentRow`).not.toBeNull();
++  return input!;
++}
++
++async function mount(client?: {
++  register: ReturnType<typeof vi.fn>;
++  resendVerification: ReturnType<typeof vi.fn>;
++}): Promise<void> {
++  const stub = client ?? { register: vi.fn(), resendVerification: vi.fn() };
++  await act(async () => root!.render(<SignUpFlow client={stub} />));
++}
++
++/** Drive the card into its `sent` state the way a real registration does. */
++async function registerSuccessfully(): Promise<void> {
++  const register = vi.fn().mockResolvedValue({ message: "sent" });
++  await mount({ register, resendVerification: vi.fn() });
++  field("email").value = "person@example.test";
++  field("recovery-email").value = "recovery@example.test";
++  field("password").value = "correct horse battery staple";
++  field("adult-affirmed").checked = true;
++  field("privacy-accepted").checked = true;
++  const form = document.querySelector<HTMLFormElement>("form");
++  expect(form).not.toBeNull();
++  await act(async () => {
++    form!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
++  });
++  await settle();
++  expect(register).toHaveBeenCalledTimes(1);
++}
++
++describe("sign-up consent checkbox group", () => {
++  beforeEach(() => {
++    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
++    const container = document.createElement("div");
++    document.body.append(container);
++    root = createRoot(container);
++  });
++
++  afterEach(async () => {
++    if (root !== null) await act(async () => root!.unmount());
++    root = null;
++    document.body.replaceChildren();
++    vi.unstubAllGlobals();
++  });
++
++  /* S02-S17 — structure. */
++  it("renders one bordered group holding exactly two rows, one input in each, adult first", async () => {
++    await mount();
++
++    const groups = document.querySelectorAll(".consentGroup");
++    expect(groups).toHaveLength(1);
++
++    const consentRows = rows();
++    expect(consentRows).toHaveLength(2);
++
++    const adult = field("adult-affirmed");
++    const privacy = field("privacy-accepted");
++    expect(consentRows[0].contains(adult)).toBe(true);
++    expect(consentRows[1].contains(privacy)).toBe(true);
++    expect(consentRows[0].contains(privacy)).toBe(false);
++    expect(consentRows[1].contains(adult)).toBe(false);
++    expect(adult.compareDocumentPosition(privacy) & Node.DOCUMENT_POSITION_FOLLOWING)
++      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
++  });
++
++  /* S02-S18 — copy is byte-exact. */
++  it("carries the design's two sentences and the two-word policy control verbatim", async () => {
++    await mount();
++
++    const consentRows = rows();
++    expect(consentRows[0].textContent?.trim()).toBe(ROW_ONE_TEXT);
++    expect(consentRows[1].textContent?.trim()).toBe(ROW_TWO_TEXT);
++
++    const control = consentRows[1].querySelector(".consentPolicyLink");
++    expect(control, "missing the Privacy Policy control").not.toBeNull();
++    expect(control!.textContent).toBe(POLICY_CONTROL_TEXT);
++  });
++
++  /* S02-S19 — form semantics. */
++  it("keeps both boxes real, required, single-form controls that disable with the card", async () => {
++    await mount();
++
++    for (const name of ["adult-affirmed", "privacy-accepted"]) {
++      const input = field(name);
++      expect(input.type, `${name} type`).toBe("checkbox");
++      expect(input.required, `${name} required`).toBe(true);
++      expect(input.disabled, `${name} disabled at idle`).toBe(false);
++    }
++    expect(document.querySelectorAll("form")).toHaveLength(1);
++
++    await registerSuccessfully();
++
++    expect(field("adult-affirmed").disabled, "adult-affirmed disabled when sent").toBe(true);
++    expect(field("privacy-accepted").disabled, "privacy-accepted disabled when sent").toBe(true);
++    expect(document.querySelectorAll("form")).toHaveLength(1);
++  });
++
++  /* S02-S20 — both accessible names resolve, by two legal mechanisms. */
++  it("gives each input its own sentence as an accessible name", async () => {
++    await mount();
++
++    const adultLabel = field("adult-affirmed").closest("label");
++    expect(adultLabel, "adult-affirmed has no label ancestor").not.toBeNull();
++    expect(adultLabel!.textContent?.trim()).toBe(ROW_ONE_TEXT);
++
++    const labelledBy = field("privacy-accepted").getAttribute("aria-labelledby");
++    expect(labelledBy, "privacy-accepted has no aria-labelledby").not.toBeNull();
++    const named = document.getElementById(labelledBy!);
++    expect(named, `aria-labelledby="${labelledBy}" names no element`).not.toBeNull();
++    expect(named!.textContent?.trim()).toBe(ROW_TWO_TEXT);
++  });
++
++  /* S02-S21 — the 18+ row is a plain toggle, from all three surfaces, and opens nothing. */
++  it("toggles the 18+ box from its input and opens no dialog", async () => {
++    await mount();
++    await act(async () => { groupField("adult-affirmed").click(); });
++    expect(field("adult-affirmed").checked).toBe(true);
++    expect(document.querySelector('[role="dialog"]')).toBeNull();
++  });
++
++  it("toggles the 18+ box from its text and opens no dialog", async () => {
++    await mount();
++    const text = rows()[0].querySelector<HTMLElement>(".consentText");
++    expect(text, "row 1 has no .consentText span").not.toBeNull();
++    await act(async () => { text!.click(); });
++    expect(field("adult-affirmed").checked).toBe(true);
++    expect(document.querySelector('[role="dialog"]')).toBeNull();
++  });
++
++  it("toggles the 18+ box from the row itself and opens no dialog", async () => {
++    await mount();
++    await act(async () => { rows()[0].click(); });
++    expect(field("adult-affirmed").checked).toBe(true);
++    expect(document.querySelector('[role="dialog"]')).toBeNull();
++  });
++
++  /* S02-S70 — focusable, and activation from focus toggles it, opening nothing.
++     jsdom 30.0.1 does not implement Space-activates-checkbox (measured, DECISIONS
++     2026-09-06 / PLAN S02-S70): the keystroke itself is V acceptance step 14. */
++  it("keeps the 18+ input focusable and lets activation from focus toggle it", async () => {
++    await mount();
++
++    const adult = groupField("adult-affirmed");
++    adult.focus();
++    expect(document.activeElement).toBe(adult);
++    expect(adult.getAttribute("tabindex")).toBeNull();
++
++    await act(async () => { adult.click(); });
++
++    expect(adult.checked).toBe(true);
++    expect(document.querySelector('[role="dialog"]')).toBeNull();
++    expect(document.activeElement).toBe(adult);
++  });
++});

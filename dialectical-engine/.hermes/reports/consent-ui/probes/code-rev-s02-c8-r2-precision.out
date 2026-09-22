@@ -1,0 +1,21 @@
+Terracotta: distinct reachable ratios over alpha in (0,1] = 613
+   ratios in the BLIND WINDOW [4.495, 4.5) — true FAIL, but toFixed(2) -> "4.50" -> not flagged:
+      (none reachable)
+Chamber: distinct reachable ratios over alpha in (0,1] = 643
+   ratios in the BLIND WINDOW [4.495, 4.5) — true FAIL, but toFixed(2) -> "4.50" -> not flagged:
+      alpha ~ 0.47837  true ratio 4.498360  formats "4.50"
+      alpha range covered: 0.47837 .. 0.47837  (1 distinct ratios)
+Chamber tokens --shell #221D17 --ink #F2EAD9 --bg #14110E
+blind-window alpha interval: [0.478366, 0.480487]  width 2.121e-3
+alpha 0.478: Chamber true 4.484481 -> "4.48"  flaggedBEFORE=true  flaggedAFTER=true | Terracotta true 2.927853 -> "2.93" flaggedBEFORE=true flaggedAFTER=true
+alpha 0.4784: Chamber true 4.498360 -> "4.50"  flaggedBEFORE=true  flaggedAFTER=false | Terracotta true 2.927853 -> "2.93" flaggedBEFORE=true flaggedAFTER=true
+alpha 0.47837: Chamber true 4.498360 -> "4.50"  flaggedBEFORE=true  flaggedAFTER=false | Terracotta true 2.927853 -> "2.93" flaggedBEFORE=true flaggedAFTER=true
+alpha 0.4785: Chamber true 4.498360 -> "4.50"  flaggedBEFORE=true  flaggedAFTER=false | Terracotta true 2.927853 -> "2.93" flaggedBEFORE=true flaggedAFTER=true
+Chamber: distinct reachable ratios over alpha in (0,1] = 643
+   ratios in the BLIND WINDOW [4.495, 4.5) — true FAIL, but toFixed(2) -> "4.50" -> not flagged:
+      alpha ~ 0.47837  true ratio 4.498360  formats "4.50"
+      alpha range covered: 0.47837 .. 0.47837  (1 distinct ratios)
+
+EXHAUSTIVE alpha sweep (200k steps):
+  alphas where the REPORTED ARRAY differs (before vs after refactor): 424  e.g. alpha 0.47837 before=[Terracotta+Chamber] after=[Terracotta]
+  alphas where the ASSERTION FLIPS fail->pass (before non-empty, after empty): 0 — NONE

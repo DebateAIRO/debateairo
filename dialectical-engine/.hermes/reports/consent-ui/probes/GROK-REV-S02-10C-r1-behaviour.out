@@ -1,0 +1,28 @@
+(node:99459) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:99463) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-grok-10c/dialectical-engine
+
+(node:99469) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ .review-scratch/GROK-REV-S02-10C-r1/behaviour.probe.test.tsx > S02-10C adversarial behaviour > unchecked privacy SQUARE opens the modal and leaves the box + mirror false 47ms
+ ✓ .review-scratch/GROK-REV-S02-10C-r1/behaviour.probe.test.tsx > S02-10C adversarial behaviour > unchecked privacy TEXT opens the modal and leaves the box false 14ms
+ ✓ .review-scratch/GROK-REV-S02-10C-r1/behaviour.probe.test.tsx > S02-10C adversarial behaviour > unchecked Privacy Policy CONTROL opens the modal and leaves the box false 12ms
+ ✓ .review-scratch/GROK-REV-S02-10C-r1/behaviour.probe.test.tsx > S02-10C adversarial behaviour > 18+ row toggles and opens nothing 9ms
+ ✓ .review-scratch/GROK-REV-S02-10C-r1/behaviour.probe.test.tsx > S02-10C adversarial behaviour > scroll gate: slack-9 disabled, slack-8 enabled, latch, short policy at mount, resize 10ms
+ ✓ .review-scratch/GROK-REV-S02-10C-r1/behaviour.probe.test.tsx > S02-10C adversarial behaviour > short policy enables I have read it at mount 7ms
+ ✓ .review-scratch/GROK-REV-S02-10C-r1/behaviour.probe.test.tsx > S02-10C adversarial behaviour > resize can latch the gate without a scroll 8ms
+ ✓ .review-scratch/GROK-REV-S02-10C-r1/behaviour.probe.test.tsx > S02-10C adversarial behaviour > × / Esc / backdrop each leave the box unchecked, focus back on the input, submit still disabled 29ms
+ ✓ .review-scratch/GROK-REV-S02-10C-r1/behaviour.probe.test.tsx > S02-10C adversarial behaviour > I have read it ticks the box, enables Create account only with both boxes, 4-arg register 28ms
+ ✓ .review-scratch/GROK-REV-S02-10C-r1/behaviour.probe.test.tsx > S02-10C adversarial behaviour > R18: one box assigned (no change event) refuses register; both assigned still 4 args 11ms
+ ✓ .review-scratch/GROK-REV-S02-10C-r1/behaviour.probe.test.tsx > S02-10C adversarial behaviour > checked privacy row unchecks directly with no modal 16ms
+ ✓ .review-scratch/GROK-REV-S02-10C-r1/behaviour.probe.test.tsx > S02-10C adversarial behaviour > conditional remount is a fresh read: close after latch, reopen, button disabled again 22ms
+ ✓ .review-scratch/GROK-REV-S02-10C-r1/behaviour.probe.test.tsx > S02-10C adversarial behaviour > Tab from last focusable wraps; Esc does not submit 12ms
+
+ Test Files  1 passed (1)
+      Tests  13 passed (13)
+   Start at  08:27:21
+   Duration  921ms (transform 103ms, setup 0ms, import 207ms, tests 226ms, environment 395ms)
+

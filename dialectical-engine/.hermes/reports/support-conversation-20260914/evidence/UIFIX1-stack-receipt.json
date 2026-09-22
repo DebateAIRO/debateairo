@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "profile": "support-preview",
+  "supported_command": [
+    "pnpm",
+    "dev:auth:up"
+  ],
+  "detached_launcher_pid": 71877,
+  "detached_launcher_ppid": 1,
+  "detached_process_group": 71877,
+  "ready_marker": "DEV_AUTH_STACK_READY=https://localhost:3100:RUNNER_REGISTERED",
+  "ordinary_tls_help_status": 200,
+  "preview_listeners": [
+    3100,
+    3101,
+    8890,
+    8891,
+    8892,
+    8893,
+    8894,
+    8895,
+    8896
+  ],
+  "preserved_existing_listeners": [
+    8790,
+    8791,
+    8792,
+    8793,
+    8794,
+    8795,
+    8796
+  ],
+  "historical_log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UIFIX1-stack-at-handoff.log",
+  "prior_preview_exit_cause": "UNKNOWN",
+  "prior_preview_evidence": "The consumed historical UI log ends after its ready marker. Later browser navigation observed connection refused, but no exit or cleanup marker establishes why it stopped.",
+  "global_ca_trust_changed": false,
+  "existing_services_stopped": false,
+  "idle_boundary_recheck": {
+    "checked_at_utc": "2026-09-14T12:50:37Z",
+    "detached_launcher_ppid": 1,
+    "ordinary_tls_help_status": 200,
+    "preview_listeners_present": true,
+    "preserved_existing_listeners_present": true,
+    "evidence": "UIFIX1-stack-idle-check.log"
+  }
+}

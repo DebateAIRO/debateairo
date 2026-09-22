@@ -1,0 +1,79 @@
+{
+  "at": "2026-09-14T15:57:11.479002+00:00",
+  "ref": "refs/heads/codex/support-conversation-mission",
+  "commit": "6f703e8b927a7d5b9affa17b156ec77992dbc3e2",
+  "tree": "d844d18b9c29023e9e4d3d749ff770962940f183",
+  "parent": "bb9d2c1c92184defc0747aaaf22b50d4e65c07fc",
+  "files": [
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/board-ids.json",
+      "sha256": "e918335ceb31c4fc820e7cbcbb17a61de111680248f573e9774db7353d5e50d0"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PROGRESS.md",
+      "sha256": "03794539f113a311a7548146750ab70760ce213c534042371bcdc63579306d5c"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/FIX4-IMPLEMENTATION.md",
+      "sha256": "0abb9f97e0dc29cb923958f5bf8ea9c3e9a8473af68c54c3d1136e16da7e5b23"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/LEDGER.md",
+      "sha256": "ba44c94734b38307e9eaaf3ac9ac2ee582974d725803b5852846bc27525f37e8"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md",
+      "sha256": "c4ac6aa4f7b1c2474ccbcf5bfda25ede0ea937e5c612b115333b7b8c2b834efb"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/LIVE4.md",
+      "sha256": "f6bdf49b7098515b3718f34bbdfd584132f666cb6d4a88b1f34b6b1c791d7fdc"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FIX4.md",
+      "sha256": "432b0f85564b5b2456e2e19916d43f5a1a712350c54d275cd164b227fc3532fd"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX4.md",
+      "sha256": "9d4bf58903c52959369d406613c58cfedd48fc75e6529738de158d5f4464701a"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX4-manifest.json",
+      "sha256": "e1b113374522545c4961015b60729e38665618f8abd839f066a1e412822f7164"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX4-lane-manifest.json",
+      "sha256": "f1a21d3953d2343a37f1a65d7e5905db21b558ee22ddce1eaa8b2778398f284e"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX4-consumption.json",
+      "sha256": "281a0a333e5faa83f3d672848fe30bd04f27f9e6ea56e5561d67079273cd2c71"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX4-skills.json",
+      "sha256": "376883df8a2eddab209f3da37860593980b3a09cb5e35fb015aaa92923e8fee0"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE-pre-LIVE4-inventory.json",
+      "sha256": "ef0bae15ff14d27425cbaa40a2b4e43c69ff816ff89aea981511d1c728bd28f6"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE4-required-suites.json",
+      "sha256": "d90fa96499bb825c9add0a4df40d0c05d25fed758a5f826c811850961c4dfa7e"
+    }
+  ],
+  "source_before": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813",
+    "lane_ref": "6e5ab5fc41acebbff4264efc7d481df3db8dce44"
+  },
+  "source_after": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813",
+    "lane_ref": "6e5ab5fc41acebbff4264efc7d481df3db8dce44"
+  },
+  "private_index_removed": true,
+  "tested": "metadata only; no product tests; FIX4 consumed; LIVE4 not yet dispatched"
+}

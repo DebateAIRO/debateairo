@@ -1,0 +1,167 @@
+{
+  "at": "2026-09-14T13:15:33.030879+00:00",
+  "ref": "refs/heads/codex/support-conversation-mission",
+  "commit": "6241d226b59050eb62aaa911b7b6708d5cba021f",
+  "tree": "8643466e69736d892cb11f9c1a05f1c8ff4853e9",
+  "parent": "65f71d79d571db9a0a8de3923a87fc8ac59db466",
+  "files": [
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/board-ids.json",
+      "sha256": "9cbd7e69fa5adec4e32886fbad7562f787159e77913e07a90e266d71f8615cb3"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PROGRESS.md",
+      "sha256": "9fa51172e72860383fbfef28ebe20818bce67bd5b6b39896ec43ca20a62309b5"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/CP1-REVIEW-SCOPE.md",
+      "sha256": "764ddf20a85f1ee898d5cc357862997035f8d6da6e8dc63d4cbdc9b406662903"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/CP1-SUMMARY-CONTRACT.md",
+      "sha256": "581f5382621be644f6bec845a21d7245416b2024e8a1f17de93ef2dc10bd3c74"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV1-prep.md",
+      "sha256": "87b14599df1d1c4dace4185c5e40fef56c1e85c0b8aa5d61bc0fca4cb4f6e92e"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV2-prep.md",
+      "sha256": "7ac23fbc1e6d8ed6a9d837dd5e35eaba4ac5de93b7145585fa0a27fd8741005b"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV3-prep.md",
+      "sha256": "cbca94e3b5dc3d65ad30f1be48fb125f624f0dc7037a4dcde11d150edca6a61a"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/LEDGER.md",
+      "sha256": "dd9c5cb6138e48cdae0655ef41849016076be25ad65632c6e56ef1becd0e7930"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/FIX2.md",
+      "sha256": "19b7217a1e3822dbcf2e12dd9d89a745076d5faaf23855d285ae60efb1f587d3"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/LIVE.md",
+      "sha256": "16015ab835d46ffe5fe79b6549615cc5457225de59ce26e888b4536982132d43"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REVIEW-COMMON-draft.md",
+      "sha256": "747c8d73443b64e18704c5aca95c04970b5d65dec1ac471be889c81f4341fe42"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REV1-draft.md",
+      "sha256": "99c3a6708ea9dbb9c0618af371c56206a03ea4f92bad6c28ff3c720f9422a164"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REV2-draft.md",
+      "sha256": "d4c5e90ae0f18d77431a1bd0fd4d5157612b96772328f4a93efea39facea8208"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/REV3-draft.md",
+      "sha256": "13bada2ee15894a32e93341a5b9759d9384b3c90b2b18e5e4bfba0a31041e089"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/NAV.md",
+      "sha256": "16b7c2062761269c32aef4911e3eb04dc7df2577f2ffe313170da21648640356"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/NAV-manifest.json",
+      "sha256": "1e2e58a374fcbe7c6043ad9767366a684b8ea487b7ad7c9fcca76f5cc89b54f4"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/NAV.md",
+      "sha256": "eb6acb81eadde07a2c7626a39bd71c6a2dfc4e3b72cc9716bc59dba54d511c20"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UI.md",
+      "sha256": "9ea5ca24a6f9fba1ae69d477d372cde7790544876e537b332cb3ca80de5b50d4"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UI-manifest.json",
+      "sha256": "c3d29165f1b18c838875d141aad7fbd2470bb918bffb5d569b6d9f5fa2a6fbfa"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/UI.md",
+      "sha256": "6db28ba8637996cbf742a737566ec72453aaa69468b6c1992fa88de16be933a5"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX1.md",
+      "sha256": "6917288401bcbd33242fa709511274e488df5f7a5301088568a678ab2a44c655"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX1-manifest.json",
+      "sha256": "7b07ce904517636ff07989ab8801bd15733edeed4af65aae87a3d7367e77ecf2"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FIX1.md",
+      "sha256": "86146ea78a281db4af0bc6131161eb14306bc3b5b9cd1cbdda0aa39f7c238318"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UIFIX1.md",
+      "sha256": "2afcb7cc6b716360bcfdaacc3e28828e381679f7c03c8fbd69e27250deede776"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UIFIX1-manifest.json",
+      "sha256": "d23f942f037c17c94997dea356339a6d2332b01d061b887ee57dbb2751e947ec"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/UIFIX1.md",
+      "sha256": "b16e282d26a211e6ec7fe519f1eed084f11f11dfa68e1101c8dc387fa022240c"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE.md",
+      "sha256": "cd24e134802ca6a1d48266641db59ea8832b3ce1ff07d23e51d10c8d780c2333"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE-manifest.json",
+      "sha256": "fdab1c9da9e704ec62aabae0e4c97fe6c31998239e33bfa35d926add8add061e"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/LIVE.md",
+      "sha256": "db20d9335f9f9b76d42aed7406f7faeb4ce7865181e60e93f16f1a262ca56fb2"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX1-consumption.json",
+      "sha256": "edbc9ea6631388893aac6acac4b6fb5f1ebbc56fe16a1755537327dab3a9e302"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UI-consumption.json",
+      "sha256": "b4d8753d51267b36dd542527a970c624fb418db157543f8a8154a3666979ec13"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UIFIX1-consumption.json",
+      "sha256": "3f1e28907bebc20389fd52deb6bef9ee216ee50f839cd7bef0051265e64740f0"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE-pre-LIVE-inventory.json",
+      "sha256": "c5f4669f7553fe9063da44d2c84e340722551bb4e0466a2fe94e8e806e5aa353"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE-source-preservation.json",
+      "sha256": "a30272c14ad104a4e89e657965695359a076a2cbd655d7acda50e0dcd61aa7a8"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE-required-suites.json",
+      "sha256": "fcbc23ac4d6704a87b87d560002c2c1b23237f63fc56cf694602b731395d5464"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE-actual-relay-receipt.json",
+      "sha256": "febf97ebaffc5213540ab04ec1ce348ff07a005a81634e80e5c08ce5f90dc625"
+    }
+  ],
+  "source_before": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "606ad70f5e8b852724469816ca922d5685a4117668daeeed1a4d740b8988035e",
+    "lane_ref": "085fff68f8b22743978d1efafd7ad9fd204e5a6f"
+  },
+  "source_after": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "606ad70f5e8b852724469816ca922d5685a4117668daeeed1a4d740b8988035e",
+    "lane_ref": "085fff68f8b22743978d1efafd7ad9fd204e5a6f"
+  },
+  "private_index_removed": true,
+  "tested": "metadata only; no product tests; no running FIX2 output included"
+}

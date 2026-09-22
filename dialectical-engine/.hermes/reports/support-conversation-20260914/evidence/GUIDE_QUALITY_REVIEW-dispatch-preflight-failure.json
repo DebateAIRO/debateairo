@@ -1,0 +1,6 @@
+{
+  "at": "2026-09-20T18:54:31.917879+00:00",
+  "phase": "packet check before freeze/dispatch",
+  "error": "Future knowledge-dispositions path lacked inline new marker despite allowed-prefix declaration",
+  "productRuntimeTraffic": 0
+}

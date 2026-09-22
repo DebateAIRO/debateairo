@@ -1,0 +1,1016 @@
+# Review package — lane /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/consent-s02/dialectical-engine — range bd314084..c334136d — generated 2026-09-07 05:38:45
+
+## Commits
+c334136d 05:31 fix(consent-ui CROSS-02): Escape reaches the most recently opened surface — the Esc stack ranks by open order, not document position (V-20 (b); CODE-REV-S02-C9 r1 B1)
+
+## Stat
+ .../apps/ui/components/consent/modalSemantics.ts   |  76 +++--
+ .../ADR-0022-shared-modal-semantics.md             |  32 +++
+ .../tests/render/consent-cross-slice.test.tsx      | 308 +++++++++++++++++++++
+ .../tests/render/consent-modal-semantics.test.tsx  | 227 +++++++--------
+ .../tests/render/consent-policy-link.test.tsx      |  22 +-
+ 5 files changed, 507 insertions(+), 158 deletions(-)
+
+## Diff (-U10)
+diff --git a/dialectical-engine/apps/ui/components/consent/modalSemantics.ts b/dialectical-engine/apps/ui/components/consent/modalSemantics.ts
+index a33dc1a8..6eb7ee69 100644
+--- a/dialectical-engine/apps/ui/components/consent/modalSemantics.ts
++++ b/dialectical-engine/apps/ui/components/consent/modalSemantics.ts
+@@ -41,30 +41,37 @@ export type ModalSurface = Readonly<{
+   returnFocusRef?: React.RefObject<HTMLElement | null>;
+ }>;
+ 
+ /**
+  * One entry per OPEN surface. `read()` returns the caller's current surface object, so a
+  * re-rendered consumer's fresh `onClose` is the one that runs.
+  */
+ type StackEntry = Readonly<{ read: () => ModalSurface }>;
+ 
+ /**
+- * The Esc stack: a module-level REGISTRY of open surfaces, shared by every surface in the app.
+- * It is not a LIFO — removal is `lastIndexOf` + `splice`, and the entry that receives `Escape`
+- * is never "the last one registered": that entry is only where `topmostSurface()` starts. It
+- * decides from DOM POSITION, in this order: CONTAINMENT first — a surface contained by
+- * another is drawn over it and wins outright — and only among UNRELATED surfaces does
+- * document order decide, the later one winning. `compareDocumentPosition` knows nothing of
+- * the `--z-*` ladder, so a surface that means to sit on top of another either nests inside
+- * it or renders after it; no other arrangement is supported (V-20; CODE-REV-S02-C5C6 r1 N2,
+- * and CODE-REV-S02-C7 r1 N5, which found this comment naming one consumer's arrangement as
+- * if it were the rule).
++ * The Esc stack: a module-level REGISTRY of open surfaces, in REGISTRATION order, shared by
++ * every surface in the app. The entry that receives `Escape` is the LAST REGISTERED one whose
++ * container is still in the document — the surface the visitor opened most recently. Removal
++ * stays `lastIndexOf` + `splice`, so a surface that closes out of order takes out its own entry
++ * and leaves the rest in order.
++ *
++ * There is NO arrangement constraint: where a surface renders in the document does not affect
++ * which one answers the key (V-20 option (b), ruled 2026-09-07 under CODE-REV-S02-C9 r1 B1).
++ * The previous rule ranked by `compareDocumentPosition`, and it was measurably wrong on
++ * `/sign-up`, where both slices' surfaces coexist: `app/layout.tsx` mounts `<CookieConsent />`
++ * AFTER `{children}` while the sign-up policy renders INSIDE them, so the cookie card was later
++ * in document order while the policy was higher in paint, and ONE `Escape` closed the card
++ * underneath the open policy — discarding the visitor's unsaved category choices.
++ *
++ * Open order rather than the `--z-*` ladder, because every surface here opens FROM the one below
++ * it and its scrim covers that surface's controls: the last-opened surface IS the one on top in
++ * every state a visitor can reach, and a z-rank would restate the ladder in TypeScript.
+  */
+ const surfaceStack: StackEntry[] = [];
+ 
+ /** Exactly one `document` keydown listener exists while the stack is non-empty. */
+ let listenerAttached = false;
+ 
+ const FOCUSABLE_SELECTOR =
+   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+ 
+ /**
+@@ -110,52 +117,43 @@ function trapTab(entry: StackEntry, event: KeyboardEvent): void {
+   // platform will not focus (a hidden or invisible one) cannot turn Tab into a dead key.
+   for (let attempt = 0; attempt < focusable.length; attempt += 1) {
+     cursor = (cursor + step + focusable.length) % focusable.length;
+     const next = focusable[cursor]!;
+     focusElement(next);
+     if (document.activeElement === next) return;
+   }
+ }
+ 
+ /**
+- * The topmost surface — derived from the DOM, never from the order the surfaces registered in.
+- * Registration happens in `React.useEffect`, which runs CHILD-FIRST within one commit, so for a
+- * nested pair mounted together the LAST registered entry is the surface UNDERNEATH. Document
+- * position is the property itself: a surface contained by another is drawn over it, and among
+- * unrelated surfaces the later one in document order is on top. Entries whose container is not
+- * in the DOM yet (`null`) cannot be compared and leave the incumbent standing, so a surface that
+- * renders no container still receives `Escape`; an entry whose container has LEFT the document
+- * is a different case and is skipped outright, because it is no longer on screen at all.
++ * The topmost surface: the LAST REGISTERED entry whose container is still in the document.
++ *
++ * An entry whose container is `null` — a surface that renders no container of its own — still
++ * receives `Escape`, exactly as before. An entry whose container has LEFT the document is
++ * skipped, because it is no longer on screen at all, and the walk continues to the entry below
++ * it; that is the one guard this function keeps from the document-order version it replaces.
++ *
++ * Registration order IS open order for every surface a visitor can reach, because they open one
++ * at a time — each from a control of the surface below it. The one shape where the two part
++ * company is a pair mounted in a SINGLE commit: registration happens in `React.useEffect`, which
++ * runs CHILD-FIRST, so a nested inner surface registers BEFORE its outer one and the OUTER one
++ * answers `Escape`. No surface in this product has that shape (both policy modals are mounted
++ * conditionally, by a state change the visitor causes), it is pinned as-is in
++ * `tests/render/consent-modal-semantics.test.tsx`, and a future overlay pair that needs its
++ * inner surface on top opens that surface in a later commit.
+  */
+ function topmostSurface(): StackEntry | undefined {
+-  if (surfaceStack.length === 0) return undefined;
+-  let top = surfaceStack[surfaceStack.length - 1]!;
+-  for (const candidate of surfaceStack) {
+-    const held = top.read().containerRef.current;
+-    const other = candidate.read().containerRef.current;
+-    if (held === null || other === null || held === other) continue;
+-    // A container that has left the document cannot be compared for stacking: jsdom answers
+-    // DISCONNECTED|FOLLOWING|IMPLEMENTATION_SPECIFIC in BOTH directions, so a detached node
+-    // reads as "above" whichever way it is asked and the entry iterated last would win. A
+-    // detached candidate therefore never wins, and a detached incumbent never stands.
+-    if (!other.isConnected) continue;
+-    if (!held.isConnected) {
+-      top = candidate;
+-      continue;
+-    }
+-    const relation = held.compareDocumentPosition(other);
+-    const above =
+-      (relation & Node.DOCUMENT_POSITION_CONTAINED_BY) !== 0 ||
+-      (relation & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+-    if (above) top = candidate;
++  for (let index = surfaceStack.length - 1; index >= 0; index -= 1) {
++    const entry = surfaceStack[index]!;
++    const container = entry.read().containerRef.current;
++    if (container === null || container.isConnected) return entry;
+   }
+-  return top;
++  return undefined;
+ }
+ 
+ function handleDocumentKeydown(event: KeyboardEvent): void {
+   const top = topmostSurface();
+   if (top === undefined) return;
+   if (event.key === "Escape") {
+     event.preventDefault();
+     event.stopPropagation();
+     top.read().onClose();
+     return;
+diff --git a/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md b/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md
+index f8cde220..730f00a7 100644
+--- a/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md
++++ b/dialectical-engine/docs/architecture/01-decisions/ADR-0022-shared-modal-semantics.md
+@@ -112,20 +112,52 @@ CODE-REV-S01-C6 r1 B2), so the capture is `body` and a captured reference would
+ a parent-owned ref is re-attached to the fresh control in the layout phase of the commit that
+ remounts it, before this hook's passive cleanup reads it. **The precedence is
+ surviving-capture-first, not named-control-first** — V-22's default and CODE-REV-S01-C6 r1's remedy
+ both word it the other way, and that wording is measurably wrong: a surface whose opener IS still
+ on the page would lose its focus return to whatever else the caller lent it, which takes S01-R18's
+ Settings direction off `Cookie preferences` the moment the cookie bar returns underneath the card.
+ Both directions of S01-R18, and both sentences of V-22's own worked example, hold only under
+ surviving-first. Pinned by four cases in `tests/render/consent-modal-semantics.test.tsx` and one in
+ `tests/render/consent-policy-link.test.tsx`.
+ 
++### Addendum 2026-09-07 — topmost is the surface opened LAST, not the one later in the document (V-20 (b))
++
++Appended by seat `CODE-CROSS-02` as the one cross-slice change ticket `t_cde7254d` authorises;
++nothing above this heading is edited, and the **Decision** paragraph's sentence "*Topmost is
++derived from the DOM, never from the order the surfaces registered in … comes last in document
++order (`compareDocumentPosition`)*" is superseded by this one. **`topmostSurface()` now returns the
++LAST REGISTERED entry whose container is still in the document**; an entry whose container is
++`null` still receives `Escape`, an entry whose container has left the document is skipped and the
++walk continues below it, and there is no arrangement constraint on any consumer. Everything else
++this ADR decides — one module, one `document` listener, the queried-at-`Tab` focusable set, the
++guarded `prefers-reduced-motion`, the exported surface — is unchanged.
++
++Why: the document-order rule was measurably wrong wherever both slices' surfaces coexist.
++`app/layout.tsx` mounts `<CookieConsent />` AFTER `{children}`, so on `/sign-up` the cookie
++preferences card is LATER in the document than the privacy policy that renders inside
++`SignUpFlow`, while the policy is HIGHER in paint (`--z-policy-card: 78` over
++`--z-consent-card: 76`). One `Escape` therefore closed the card underneath the open policy,
++discarding the visitor's unsaved category choices and leaving focus trapped in a surface that had
++just refused the key (`CODE-REV-S02-C9` r1 **B1**, measured three times with a control that
++discriminated document order from open order). Open order rather than a `--z-*` rank because every
++overlay here opens FROM a control of the surface below it, under its own scrim: the last-opened
++surface IS the one on top in every state a visitor can reach, and a z-rank would restate the
++ladder in TypeScript. **The one shape where the two part company** is a pair mounted in a SINGLE
++commit — React runs effects child-first, so a nested inner surface registers before its outer one
++and the OUTER one answers `Escape`. No surface in this repository has that shape today (both
++policy modals are mounted conditionally by a state change the visitor causes); a future overlay
++pair that needs its inner surface on top opens that surface in a later commit. Pinned by seven
++cases in `tests/render/consent-cross-slice.test.tsx` — the first suite in this mission to mount
++both slices in ONE document, in `layout.tsx`'s order — and by five in
++`tests/render/consent-modal-semantics.test.tsx`. **Status: this is the orchestrator's ruling under
++V-20 and V may undo it; the cost of undoing is this one function.**
++
+ ## Options considered
+ 
+ - **A React context provider owning the stack.** Rejected: it would force slice S01's
+   preferences card and slice S02's policy modal into one React tree, and they are mounted from
+   different components in different slices.
+ - **A per-surface `keydown` listener with a "topmost" flag.** Rejected: a surface cannot know
+   it is topmost without a shared registry, which is the module this ADR introduces.
+ - **Retrofitting the seven existing overlays now.** Rejected as out of scope for this mission;
+   it is ticket `A11Y-OVERLAYS` (`t_8962842f`).
+ 
+diff --git a/dialectical-engine/tests/render/consent-cross-slice.test.tsx b/dialectical-engine/tests/render/consent-cross-slice.test.tsx
+new file mode 100644
+index 00000000..1c070848
+--- /dev/null
++++ b/dialectical-engine/tests/render/consent-cross-slice.test.tsx
+@@ -0,0 +1,308 @@
++// @vitest-environment jsdom
++
++import { readFileSync } from "node:fs";
++import { resolve } from "node:path";
++import { act } from "react";
++import { createRoot, type Root } from "react-dom/client";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
++import { CookieConsent } from "../../apps/ui/components/consent/CookieConsent.js";
++import { openSurfaceCount } from "../../apps/ui/components/consent/modalSemantics.js";
++
++/**
++ * The CROSS-SLICE integration suite (`COMMON.md` §10.53): both slices' surfaces in ONE
++ * document, mounted in the order `apps/ui/app/layout.tsx:45-49` composes them — page content
++ * (which on `/sign-up` is `SignUpFlow`, and its policy modal renders INLINE inside it,
++ * `SignUpFlow.tsx:339-347`) and then `<CookieConsent />`.
++ *
++ * Promoted from the blind reviewer's own fixture,
++ * `.hermes/reports/consent-ui/probes/code-rev-s02-c9-r1-crossslice.probe.test.tsx`
++ * (CODE-REV-S02-C9 r1, finding B1). Changes from that file, all declared: the `LANE`
++ * environment variable becomes `process.cwd()`, which is where the acceptance command runs
++ * (same idiom as `consent-policy-link.test.tsx:29`); the `@/…` specifiers become the
++ * `../../apps/ui/….js` form every other suite in `tests/render/` uses; P4 carries the
++ * assertions the reviewer's REMEDY names instead of a `console.log`; P6 and P7 are rewritten
++ * to the mechanism and the outcome this commit ships. P1, P2, P3 and P5 are the reviewer's.
++ *
++ * Why this file exists at all: nine clusters of this mission ran without one test mounting both
++ * slices together, and B1 — one `Escape` closing the cookie card UNDERNEATH the open sign-up
++ * policy — lived in exactly that gap.
++ */
++
++const CSS = readFileSync(resolve(process.cwd(), "apps/ui/app/globals.css"), "utf8");
++
++let root: Root | null = null;
++let container: HTMLDivElement | null = null;
++
++/**
++ * `PrivacyPolicyModal`'s scroll gate reads these three metrics, and jsdom reports 0 for all of
++ * them. Stubbed on the prototype and scoped to `.policyBody`, so the gate sees a scrollable
++ * region that is NOT yet at its end.
++ */
++const KEYS = ["scrollTop", "clientHeight", "scrollHeight"] as const;
++const METRICS: Record<string, number> = { scrollTop: 0, clientHeight: 200, scrollHeight: 500 };
++function stub(): void {
++  for (const k of KEYS)
++    Object.defineProperty(HTMLElement.prototype, k, {
++      configurable: true,
++      get(this: HTMLElement): number {
++        return this.classList.contains("policyBody") ? METRICS[k]! : 0;
++      }
++    });
++}
++function unstub(): void {
++  for (const k of KEYS) delete (HTMLElement.prototype as unknown as Record<string, unknown>)[k];
++}
++
++beforeEach(() => {
++  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
++  localStorage.clear();
++  stub();
++  container = document.createElement("div");
++  document.body.append(container);
++  root = createRoot(container);
++});
++
++afterEach(() => {
++  if (root !== null) act(() => root!.unmount());
++  root = null;
++  container = null;
++  document.body.replaceChildren();
++  unstub();
++  vi.unstubAllGlobals();
++  localStorage.clear();
++  expect(openSurfaceCount(), "no surface leaked out of this case").toBe(0);
++});
++
++const labelled = (label: string): HTMLButtonElement => {
++  const found = [...document.querySelectorAll<HTMLButtonElement>("button")].filter(
++    (b) => b.textContent?.trim() === label
++  );
++  expect(found.length, `expected exactly one control labelled ${label}`).toBe(1);
++  return found[0]!;
++};
++const dialogs = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>('[role="dialog"]')];
++const card = (): HTMLElement | null => document.querySelector<HTMLElement>(".consentCard");
++const policy = (): HTMLElement | null => document.querySelector<HTMLElement>(".policyBezel");
++const bar = (): HTMLElement | null =>
++  document.querySelector<HTMLElement>('[role="region"][aria-label="Cookie consent"]');
++const privacyBox = (): HTMLInputElement =>
++  document.querySelector<HTMLInputElement>('input[name="privacy-accepted"]')!;
++const press = (key: string): void => {
++  act(() => {
++    document.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
++  });
++};
++const activate = (b: HTMLButtonElement): void => {
++  act(() => {
++    b.focus();
++    b.click();
++  });
++};
++
++/** BOTH slices mounted in ONE document, the way `layout.tsx:45-49` composes them. */
++async function mountBoth(): Promise<void> {
++  const client = { register: vi.fn(), resendVerification: vi.fn() };
++  await act(async () => {
++    root!.render(
++      <div className="appShell">
++        <SignUpFlow client={client} />
++        <CookieConsent />
++      </div>
++    );
++  });
++  await act(async () => {
++    await Promise.resolve();
++    await Promise.resolve();
++  });
++}
++
++describe("cross-slice integration — both consent surfaces in one document", () => {
++  it("P1 · both slices' surfaces coexist in one document", async () => {
++    await mountBoth();
++    expect(document.querySelectorAll(".consentGroup .consentRow").length, "S02 rows").toBe(2);
++    expect(bar(), "S01 cookie bar").not.toBeNull();
++    expect(dialogs().length, "no dialog open at rest").toBe(0);
++  });
++
++  it("P2 · the Esc STACK: cookie card open + policy from `Privacy notice` -> Esc closes ONLY the policy", async () => {
++    await mountBoth();
++    activate(labelled("Choose what to store"));
++    expect(card(), "the cookie preferences card must be open").not.toBeNull();
++    activate(labelled("Privacy notice"));
++    expect(policy(), "the policy must be open over the card").not.toBeNull();
++    expect(dialogs().length, "two surfaces open").toBe(2);
++
++    press("Escape");
++
++    expect(policy(), "Escape closes the policy").toBeNull();
++    expect(card(), "and the card underneath STAYS open").not.toBeNull();
++    expect(dialogs().length, "exactly one surface left").toBe(1);
++
++    press("Escape");
++    expect(card(), "a second Escape closes the card").toBeNull();
++  });
++
++  it("P3 · the S01 card asks for READ mode; the sign-up card asks for CONSENT mode", async () => {
++    await mountBoth();
++    activate(labelled("Choose what to store"));
++    activate(labelled("Privacy notice"));
++    const readButtons = [...document.querySelectorAll("button")].map((b) => b.textContent?.trim());
++    expect(readButtons, "read mode: a Close, and NO `I have read it`").toContain("Close");
++    expect(readButtons).not.toContain("I have read it");
++    press("Escape");
++    press("Escape");
++
++    await act(async () => {
++      privacyBox().click();
++    });
++    const consentButtons = [...document.querySelectorAll("button")].map((b) =>
++      b.textContent?.trim()
++    );
++    expect(consentButtons, "consent mode: `I have read it` present").toContain("I have read it");
++    expect(consentButtons, "consent mode: no bare `Close` label").not.toContain("Close");
++    press("Escape");
++  });
++
++  /**
++   * P4 — THE BINDING CASE (CODE-REV-S02-C9 r1 B1, ticket `t_cde7254d`).
++   *
++   * PROPERTY: `Escape` reaches the surface the visitor most recently OPENED, which on this page
++   * is the one painted on top (`--z-policy-card: 78` over `--z-consent-card: 76`,
++   * `globals.css:93-94`) — never the surface underneath it.
++   *
++   * This is the arrangement no single-slice suite can reach. `<CookieConsent />` is mounted
++   * AFTER `{children}` (`layout.tsx:45-49`) while the sign-up policy renders inside them, so the
++   * cookie card is LATER in document order and HIGHER on the screen is the policy. Ranking by
++   * `compareDocumentPosition` — the mechanism at base `bd314084` — hands `Escape` to the card:
++   * the visitor loses the category choices they were making, the bar flashes back underneath,
++   * and the policy they are reading stays open with focus trapped inside it.
++   */
++  it("P4 · one Escape closes the sign-up policy, not the cookie card underneath it", async () => {
++    await mountBoth();
++    expect(openSurfaceCount(), "nothing is open at rest").toBe(0);
++
++    activate(labelled("Choose what to store"));
++    expect(card(), "the cookie preferences card is open").not.toBeNull();
++    expect(openSurfaceCount(), "one surface on the stack").toBe(1);
++
++    await act(async () => {
++      privacyBox().click();
++    });
++    expect(policy(), "the sign-up policy is open OVER the card").not.toBeNull();
++    expect(openSurfaceCount(), "two surfaces on the stack").toBe(2);
++    expect(dialogs().length, "two dialogs in the document").toBe(2);
++
++    press("Escape");
++
++    expect(openSurfaceCount(), "(i) exactly one surface consumed the Escape: 2 -> 1").toBe(1);
++    expect(card(), "(ii) the cookie card the visitor was filling in is STILL open").not.toBeNull();
++    expect(bar(), "(ii) so the cookie bar has NOT come back underneath").toBeNull();
++    expect(policy(), "(iii) the policy — the surface on top — is the one that closed").toBeNull();
++    expect(dialogs().length, "exactly one dialog left").toBe(1);
++
++    press("Escape");
++    expect(openSurfaceCount(), "a second Escape closes the card").toBe(0);
++  });
++
++  it("P5 · the MERGED stylesheet resolves both families with no shared selector", () => {
++    // The suite already runs in jsdom, so the ambient document IS the parser.
++    const style = document.createElement("style");
++    style.textContent = CSS;
++    document.head.append(style);
++    const sheet = document.styleSheets[document.styleSheets.length - 1]!;
++    const rules = [...(sheet.cssRules as unknown as CSSRule[])];
++    const sel = (r: CSSRule): string =>
++      (r as unknown as { selectorText?: string }).selectorText ?? "";
++    const has = (s: string): boolean =>
++      rules.some((r) =>
++        sel(r)
++          .split(",")
++          .map((x) => x.trim())
++          .includes(s)
++      );
++    for (const s of [
++      ".consentBar",
++      ".consentCard",
++      ".policyScrim",
++      ".consentGroup",
++      ".consentBox",
++      ".consentPolicyLink"
++    ]) {
++      expect(has(s), `the merged sheet must carry a rule for ${s}`).toBe(true);
++    }
++    expect(rules.length, "the merged sheet parsed into rules").toBeGreaterThan(500);
++    style.remove();
++  });
++
++  /**
++   * P6 — the MECHANISM pin, and P4's mirror image.
++   *
++   * The reviewer built this case as the control that discriminated document order from open
++   * order: with the two surfaces opened the OTHER way round, ranking by document position gives
++   * `Escape` to the cookie card in BOTH orders, which is what proved the winner was not the
++   * last-opened surface. Under V-20 (b) the answer is no longer the same in both orders — it is
++   * the surface opened LAST in each of them. Here that surface is the cookie card, so the
++   * ASSERTIONS below are unchanged from the reviewer's fixture and only their reason moved;
++   * P4 is the same pair in the opposite order and expects the opposite surface. Neither case
++   * alone pins open order — the PAIR does, and a helper that ranks by document position, or by
++   * the FIRST registered entry, fails one of the two.
++   */
++  it("P6 · with the policy opened FIRST, Escape closes the cookie card — the one opened LAST", async () => {
++    await mountBoth();
++    await act(async () => {
++      privacyBox().click(); // the sign-up policy FIRST
++    });
++    expect(policy(), "the sign-up policy is open").not.toBeNull();
++    activate(labelled("Choose what to store")); // the cookie card SECOND
++    expect(card(), "the cookie card is open").not.toBeNull();
++    expect(dialogs().length, "two surfaces open").toBe(2);
++
++    press("Escape");
++
++    expect(card(), "the cookie card — opened last — is the one that closed").toBeNull();
++    expect(policy(), "and the policy, opened first, is STILL open").not.toBeNull();
++    expect(openSurfaceCount(), "exactly one surface consumed the Escape").toBe(1);
++
++    press("Escape");
++  });
++
++  /**
++   * P7 — what the visitor is left with, asserted rather than logged.
++   *
++   * The reviewer's version recorded the DEFECT's aftermath (the bar back, the policy still
++   * trapping focus). This one records the shipped outcome: the surface that closes is the one
++   * the visitor was last in, their unsaved category choices survive underneath, and focus
++   * returns to the control that opened the policy — the privacy checkbox in the sign-up card,
++   * which is still on the page.
++   */
++  it("P7 · the closed policy returns focus to its own opener and leaves the card's state alone", async () => {
++    const switches = (): HTMLElement[] => [
++      ...document.querySelectorAll<HTMLElement>('.consentCard [role="switch"]')
++    ];
++    const checked = (): string[] =>
++      switches().map((control) => control.getAttribute("aria-checked") ?? "");
++
++    await mountBoth();
++    activate(labelled("Choose what to store"));
++    expect(switches().length, "the card's three category switches are present").toBe(3);
++    const [, quality] = switches() as [HTMLElement, HTMLElement, HTMLElement];
++    act(() => quality.click()); // an UNSAVED choice, which is what the defect discarded
++    const before = checked();
++
++    await act(async () => {
++      privacyBox().click();
++    });
++    press("Escape");
++
++    expect(policy(), "the policy closed").toBeNull();
++    expect(card(), "the card is still there").not.toBeNull();
++    expect(bar(), "the bar has not come back underneath it").toBeNull();
++    expect(checked(), "and the visitor's unsaved category choices are untouched").toEqual(before);
++    expect(document.activeElement, "focus returns to the control that opened the policy").toBe(
++      privacyBox()
++    );
++
++    press("Escape");
++  });
++});
+diff --git a/dialectical-engine/tests/render/consent-modal-semantics.test.tsx b/dialectical-engine/tests/render/consent-modal-semantics.test.tsx
+index cbf9d075..9dca3518 100644
+--- a/dialectical-engine/tests/render/consent-modal-semantics.test.tsx
++++ b/dialectical-engine/tests/render/consent-modal-semantics.test.tsx
+@@ -96,83 +96,40 @@ async function render(element: ReactNode): Promise<void> {
+   });
+   await settle();
+ }
+ 
+ function pressEscape(): void {
+   document.dispatchEvent(
+     new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })
+   );
+ }
+ 
+-/**
+- * A SPEC-CONFORMANT `compareDocumentPosition`, installed for one case only.
+- *
+- * jsdom 30.0.1 answers `DISCONNECTED|FOLLOWING|IMPLEMENTATION_SPECIFIC` (37) in BOTH directions
+- * for any pair involving a disconnected node, which the DOM standard forbids: the two directions
+- * must disagree. Under that violation a connected candidate displaces a detached incumbent by
+- * coincidence, so the incumbent half of the guard in `topmostSurface()` cannot be discriminated.
+- * The shim answers 37 one way and `DISCONNECTED|PRECEDING|IMPLEMENTATION_SPECIFIC` (35) the
+- * other — a disconnected node sorts AFTER a connected one — and the case asserts that
+- * consistency before it relies on it, so it can never pass through a broken shim.
+- */
+-let conformantCDP: PropertyDescriptor | undefined;
+-
+-function installConformantCDP(): void {
+-  const original = Object.getOwnPropertyDescriptor(Node.prototype, "compareDocumentPosition")!;
+-  conformantCDP = original;
+-  const real = original.value as (this: Node, other: Node) => number;
+-  Object.defineProperty(Node.prototype, "compareDocumentPosition", {
+-    configurable: true,
+-    writable: true,
+-    value(this: Node, other: Node): number {
+-      if (this.isConnected && other.isConnected) return real.call(this, other);
+-      const direction = other.isConnected
+-        ? Node.DOCUMENT_POSITION_PRECEDING
+-        : Node.DOCUMENT_POSITION_FOLLOWING;
+-      return (
+-        Node.DOCUMENT_POSITION_DISCONNECTED |
+-        Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC |
+-        direction
+-      );
+-    }
+-  });
+-}
+-
+-function restoreConformantCDP(): void {
+-  if (conformantCDP === undefined) return;
+-  Object.defineProperty(Node.prototype, "compareDocumentPosition", conformantCDP);
+-  conformantCDP = undefined;
+-}
+-
+ function pressTab(shiftKey = false): KeyboardEvent {
+   const event = new KeyboardEvent("keydown", {
+     key: "Tab",
+     shiftKey,
+     bubbles: true,
+     cancelable: true
+   });
+   document.dispatchEvent(event);
+   return event;
+ }
+ 
+ describe("consent modal semantics helper", () => {
+   beforeEach(() => {
+     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+     container = document.createElement("div");
+     document.body.append(container);
+     root = createRoot(container);
+   });
+ 
+   afterEach(async () => {
+-    // First, so a failed assertion inside the shimmed case cannot leak the prototype patch
+-    // into the next one.
+-    restoreConformantCDP();
+     if (root !== null) await act(async () => root!.unmount());
+     root = null;
+     container?.remove();
+     container = null;
+     document.body.innerHTML = "";
+     vi.unstubAllGlobals();
+     vi.restoreAllMocks();
+   });
+ 
+   it("delivers one Escape to the topmost open surface only", async () => {
+@@ -187,69 +144,119 @@ describe("consent modal semantics helper", () => {
+     );
+ 
+     await act(async () => {
+       pressEscape();
+     });
+ 
+     expect(innerClose).toHaveBeenCalledTimes(1);
+     expect(outerClose).toHaveBeenCalledTimes(0);
+   });
+ 
+-  it("delivers one Escape to the nested inner surface, not to the outer one it mounted with", async () => {
+-    // The two surfaces mount in ONE commit, the inner as a React CHILD of the outer. React runs
+-    // effects child-first, so registration order is [inner, outer] and "the last registered
+-    // entry" names the surface UNDERNEATH. Topmost is a DOM property, not an effect-order one.
++  it("delivers one Escape to the LAST-REGISTERED surface of a pair mounted in ONE commit", async () => {
++    // The one arrangement where "opened last" and "painted on top" part company, pinned here so
++    // it is on the record rather than discovered. The two surfaces mount in ONE commit, the
++    // inner as a React CHILD of the outer; React runs effects CHILD-FIRST, so registration order
++    // is [inner, outer] and the OUTER one — the surface underneath — answers Escape.
++    //
++    // Before V-20 (b) this case asserted the reverse, because the rank was document position and
++    // containment won outright. Open order was ruled on 2026-09-07 (CODE-REV-S02-C9 r1 B1): the
++    // document-order rule handed Escape to the cookie card UNDERNEATH an open sign-up policy on
++    // `/sign-up`, an arrangement a visitor reaches and this one is not. NO SURFACE IN THIS
++    // PRODUCT MOUNTS A PAIR IN ONE COMMIT — both policy modals are mounted conditionally, by a
++    // state change the visitor causes, so every reachable pair registers in the order it opened.
++    // A future overlay pair that needs its inner surface on top opens it in a LATER commit,
++    // which the case below pins.
+     const outerClose = vi.fn();
+     const innerClose = vi.fn();
+ 
+     await render(
+       <TestSurface open name="outer" onClose={outerClose}>
+         <TestSurface open name="inner" onClose={innerClose} />
+       </TestSurface>
+     );
+     expect(openSurfaceCount()).toBe(2);
+ 
+     await act(async () => {
+       pressEscape();
+     });
+ 
++    expect(outerClose).toHaveBeenCalledTimes(1);
++    expect(innerClose).toHaveBeenCalledTimes(0);
++  });
++
++  it("delivers one Escape to a nested inner surface that opened in a LATER commit", async () => {
++    // The reachable half of the case above, and the shape every consumer in this product has:
++    // the outer surface is already open when the inner one opens, so registration order is
++    // [outer, inner] and the inner surface — the one the visitor opened last, and the one its
++    // own scrim covers the outer with — answers Escape. Nesting neither helps nor hinders it.
++    const outerClose = vi.fn();
++    const innerClose = vi.fn();
++
++    function Harness({ innerOpen }: { innerOpen: boolean }): ReactNode {
++      return (
++        <TestSurface open name="outer" onClose={outerClose}>
++          <TestSurface open={innerOpen} name="inner" onClose={innerClose} />
++        </TestSurface>
++      );
++    }
++
++    await render(<Harness innerOpen={false} />);
++    expect(openSurfaceCount()).toBe(1);
++    await render(<Harness innerOpen />);
++    expect(openSurfaceCount()).toBe(2);
++
++    await act(async () => {
++      pressEscape();
++    });
++
+     expect(innerClose).toHaveBeenCalledTimes(1);
+     expect(outerClose).toHaveBeenCalledTimes(0);
+   });
+ 
+-  it("delivers one Escape to the innermost of three nested surfaces", async () => {
++  it("delivers one Escape to exactly one of three surfaces, and it is the last registered", async () => {
++    // Three at once, mounted in ONE commit and nested, so child-first registration order is
++    // [c, b, a] and `a` — the last registered — takes the key. What the assertion pins is that
++    // EXACTLY ONE `onClose` runs (REQ-REV-01 B3), whichever it is: `toEqual` on the whole array
++    // fails both if a second surface acts and if the wrong one does.
+     const closed: string[] = [];
+     const record = (name: string) => () => {
+       closed.push(name);
+     };
+ 
+     await render(
+       <TestSurface open name="a" onClose={record("a")}>
+         <TestSurface open name="b" onClose={record("b")}>
+           <TestSurface open name="c" onClose={record("c")} />
+         </TestSurface>
+       </TestSurface>
+     );
+     expect(openSurfaceCount()).toBe(3);
+ 
+     await act(async () => {
+       pressEscape();
+     });
+ 
+-    expect(closed).toEqual(["c"]);
++    expect(closed).toEqual(["a"]);
+   });
+ 
+-  it("delivers one Escape by document position when two surfaces opened out of DOM order", async () => {
+-    // Same class as the nested pair: the surface that registered LAST is not the topmost one.
+-    // Here `later` is rendered BEFORE `earlier` in the DOM but opens after it, so registration
+-    // order is [earlier, later] while document order — which is what the visitor sees stacked —
+-    // puts `earlier` on top. This is the arm of the rule that containment alone cannot decide.
++  it("delivers one Escape by OPEN order when two surfaces opened out of DOM order", async () => {
++    // THE discriminating case, and the mechanism V-20 (b) ruled on: `first-dom` is rendered
++    // BEFORE `second-dom` in the document but OPENS after it, so registration order is
++    // [second-dom, first-dom] while document order puts `second-dom` last. Ranking by document
++    // position gives the key to `second-dom`; ranking by open order gives it to `first-dom`,
++    // which is the surface the visitor just opened and — because it opened from a control of the
++    // one below it, under its own scrim — the one they are looking at.
++    //
++    // This is the abstract form of CODE-REV-S02-C9 r1 B1: on `/sign-up` the cookie card is later
++    // in the document (`layout.tsx` mounts `<CookieConsent />` after `{children}`) while the
++    // sign-up policy, which renders inside `{children}`, is the one opened last and painted on
++    // top. `tests/render/consent-cross-slice.test.tsx` pins it on the real surfaces.
+     const firstDomClose = vi.fn();
+     const secondDomClose = vi.fn();
+ 
+     function Harness({ firstDomOpen }: { firstDomOpen: boolean }): ReactNode {
+       return (
+         <>
+           <TestSurface open={firstDomOpen} name="first-dom" onClose={firstDomClose} />
+           <TestSurface open name="second-dom" onClose={secondDomClose} />
+         </>
+       );
+@@ -257,35 +264,33 @@ describe("consent modal semantics helper", () => {
+ 
+     await render(<Harness firstDomOpen={false} />);
+     expect(openSurfaceCount()).toBe(1);
+     await render(<Harness firstDomOpen />);
+     expect(openSurfaceCount()).toBe(2);
+ 
+     await act(async () => {
+       pressEscape();
+     });
+ 
+-    expect(secondDomClose).toHaveBeenCalledTimes(1);
+-    expect(firstDomClose).toHaveBeenCalledTimes(0);
++    expect(firstDomClose).toHaveBeenCalledTimes(1);
++    expect(secondDomClose).toHaveBeenCalledTimes(0);
+   });
+ 
+   it("never lets a surface whose container has detached consume Escape", async () => {
+-    // `topmostSurface()` compares containers by document position, and jsdom answers a
+-    // comparison involving a DETACHED node with DISCONNECTED|FOLLOWING|IMPLEMENTATION_SPECIFIC
+-    // in BOTH directions (measured, 37 each way) — so "above" is true whichever node is asked,
+-    // and the surface iterated LAST simply wins. The detaching surface therefore mounts SECOND
+-    // here, which is the arrangement that lets it capture the key; mounted first it would lose
+-    // to the same coincidence and the case would pass against a module that has no guard.
++    // The `isConnected` guard is the one clause `topmostSurface()` kept when it moved from
++    // document order to open order, and this is the arrangement that discriminates it: the
++    // detaching surface mounts SECOND, so it is the LAST-REGISTERED entry — the one the walk
++    // starts at — and only the guard stops it swallowing the key.
+     // The reachable shape is React 19's cleanup-returning callback ref: it does NOT null the
+     // ref on detach, so a surface that stays registered while it stops rendering its container
+     // holds a stale detached node. The precondition is asserted, not assumed, so the case
+-    // cannot pass through the `null` branch that already skips such an entry.
++    // cannot pass through the `null` branch that already returns such an entry.
+     const staleClose = vi.fn();
+     const liveClose = vi.fn();
+     const captured: { ref: { current: HTMLElement | null } | null } = { ref: null };
+ 
+     function DetachingSurface({ mounted }: { mounted: boolean }): ReactNode {
+       const containerRef = useRef<HTMLElement | null>(null);
+       const initialFocusRef = useRef<HTMLElement | null>(null);
+       captured.ref = containerRef;
+       useModalSurface(true, { containerRef, initialFocusRef, onClose: staleClose });
+       if (!mounted) return null;
+@@ -328,116 +333,118 @@ describe("consent modal semantics helper", () => {
+     expect(stale!.isConnected).toBe(false);
+ 
+     await act(async () => {
+       pressEscape();
+     });
+ 
+     expect(liveClose).toHaveBeenCalledTimes(1);
+     expect(staleClose).toHaveBeenCalledTimes(0);
+   });
+ 
+-  it("never lets a DETACHED INCUMBENT stand, under a conformant compareDocumentPosition", async () => {
+-    // The other half of the same guard, and the half jsdom's default cannot see. The case above
+-    // pins "a detached CANDIDATE never wins"; this one pins "a detached INCUMBENT never stands",
+-    // which is the four-line clause in `topmostSurface()`. Under jsdom's two-way FOLLOWING the
+-    // connected surface displaces the detached incumbent whether or not that clause exists, so
+-    // the mutant survives there (measured by CODE-S02-C5C6 as MN7b) — the shim is what makes the
+-    // property observable. The stale surface registers LAST, so it is the incumbent
+-    // `topmostSurface()` starts from, and under the shim it compares as PRECEDING the live one,
+-    // i.e. NOT above: without the clause it stays `top` and swallows the key.
+-    installConformantCDP();
+-
+-    const staleClose = vi.fn();
+-    const liveClose = vi.fn();
+-    const captured: { ref: { current: HTMLElement | null } | null } = { ref: null };
++  it("never lets a DETACHED entry receive Escape, however many have detached", async () => {
++    // The same guard as the case above, taken to the shape only an open-order walk has: the two
++    // most recently registered surfaces have both detached, so the guard has to keep WALKING
++    // rather than step over one entry. It replaces the case that installed a spec-conformant
++    // `compareDocumentPosition` shim to make the "detached incumbent" half of the old
++    // document-order comparison observable; there is no comparison left to shim, and the shim
++    // and its helpers went with it. The outcome that case pinned — a detached surface never
++    // receives Escape, even though it is the entry the walk starts at — is what these two cases
++    // pin between them, now without patching a DOM prototype.
++    const closed: string[] = [];
++    const record = (name: string) => () => {
++      closed.push(name);
++    };
++    const captured: Record<string, { current: HTMLElement | null } | null> = {};
+ 
+-    function DetachingSurface({ mounted }: { mounted: boolean }): ReactNode {
++    function DetachingSurface({ name, mounted }: { name: string; mounted: boolean }): ReactNode {
+       const containerRef = useRef<HTMLElement | null>(null);
+       const initialFocusRef = useRef<HTMLElement | null>(null);
+-      captured.ref = containerRef;
+-      useModalSurface(true, { containerRef, initialFocusRef, onClose: staleClose });
++      captured[name] = containerRef;
++      useModalSurface(true, { containerRef, initialFocusRef, onClose: record(name) });
+       if (!mounted) return null;
+       return (
+         <div
+-          data-surface="stale"
++          data-surface={name}
+           ref={(node) => {
+             containerRef.current = node;
+             return () => {};
+           }}
+         >
+           <button
+             type="button"
+             ref={(node) => {
+               initialFocusRef.current = node;
+             }}
+           >
+-            close-stale
++            {`close-${name}`}
+           </button>
+         </div>
+       );
+     }
+ 
+     function Harness({ mounted }: { mounted: boolean }): ReactNode {
+       return (
+         <>
+-          <TestSurface open name="live" onClose={liveClose} />
+-          <DetachingSurface mounted={mounted} />
++          <TestSurface open name="live" onClose={record("live")} />
++          <DetachingSurface name="stale-1" mounted={mounted} />
++          <DetachingSurface name="stale-2" mounted={mounted} />
+         </>
+       );
+     }
+ 
+     await render(<Harness mounted />);
+-    expect(openSurfaceCount()).toBe(2);
++    expect(openSurfaceCount()).toBe(3);
+     await render(<Harness mounted={false} />);
+-    expect(openSurfaceCount()).toBe(2);
+-
+-    const stale = captured.ref!.current;
+-    expect(stale, "the stale surface must still hold its container ref").not.toBeNull();
+-    expect(stale!.isConnected).toBe(false);
+-    const live = document.querySelector<HTMLElement>('[data-surface="live"]');
+-    expect(live, "the live surface must still be rendered").not.toBeNull();
+-
+-    // The shim's own consistency, asserted rather than assumed: exactly one direction is
+-    // FOLLOWING and exactly one is PRECEDING. jsdom's default answers 37 both ways and would
+-    // fail this precondition, so the case cannot silently degrade into the old arrangement.
+-    const staleToLive = stale!.compareDocumentPosition(live!);
+-    const liveToStale = live!.compareDocumentPosition(stale!);
+-    const following = Node.DOCUMENT_POSITION_FOLLOWING;
+-    const preceding = Node.DOCUMENT_POSITION_PRECEDING;
+-    expect(staleToLive, "detached -> connected is DISCONNECTED|PRECEDING|IMPL_SPECIFIC").toBe(35);
+-    expect(liveToStale, "connected -> detached is DISCONNECTED|FOLLOWING|IMPL_SPECIFIC").toBe(37);
+-    expect((staleToLive & following) !== 0).toBe(false);
+-    expect((liveToStale & preceding) !== 0).toBe(false);
++    expect(openSurfaceCount(), "both stale surfaces stay registered").toBe(3);
++
++    // The preconditions, asserted rather than assumed: each stale surface still holds its
++    // container ref (so the case cannot pass through the `null` branch, which RETURNS the entry
++    // rather than skipping it), and both of those nodes have left the document.
++    for (const name of ["stale-1", "stale-2"]) {
++      const node = captured[name]!.current;
++      expect(node, `${name} must still hold its container ref`).not.toBeNull();
++      expect(node!.isConnected, `${name} has left the document`).toBe(false);
++    }
++    expect(
++      document.querySelector('[data-surface="live"]'),
++      "the live surface must still be rendered"
++    ).not.toBeNull();
+ 
+     await act(async () => {
+       pressEscape();
+     });
+ 
+-    expect(liveClose).toHaveBeenCalledTimes(1);
+-    expect(staleClose).toHaveBeenCalledTimes(0);
++    expect(closed, "the walk skipped both detached entries and stopped at the live one").toEqual([
++      "live"
++    ]);
+   });
+ 
+-  it("traps Tab inside the nested inner surface, not inside the outer one", async () => {
+-    // The Tab trap reads the same "topmost" the Escape branch reads, so the nested pair must be
+-    // asserted for Tab too: focus sitting in the outer surface is pulled into the inner one.
++  it("traps Tab in the same surface Escape reaches, for the same nested pair", async () => {
++    // The Tab trap reads the same `topmostSurface()` the Escape branch reads, so the nested pair
++    // is asserted for Tab too and the two must agree. Mounted in ONE commit, that surface is the
++    // OUTER one (child-first registration), so Tab from `close-outer` advances to the outer
++    // surface's OWN next control — `outer-2` — instead of jumping into the inner surface.
++    // Under the document-order rank this landed on `close-inner`; the pair moved together, which
++    // is the property, and `outer-2` is only reachable as the answer if Tab and Escape read the
++    // same entry.
+     await render(
+       <TestSurface open name="outer" onClose={vi.fn()} buttons={["outer-2"]}>
+         <TestSurface open name="inner" onClose={vi.fn()} />
+       </TestSurface>
+     );
+ 
+     await act(async () => {
+       labelled("close-outer").focus();
+       pressTab();
+     });
+ 
+-    expect(document.activeElement).toBe(labelled("close-inner"));
++    expect(document.activeElement).toBe(labelled("outer-2"));
+   });
+ 
+   it("moves initial focus to the element the caller names, not the first one", async () => {
+     await render(
+       <TestSurface
+         open
+         name="only"
+         onClose={vi.fn()}
+         buttons={["second", "third"]}
+         initialFocus="third"
+diff --git a/dialectical-engine/tests/render/consent-policy-link.test.tsx b/dialectical-engine/tests/render/consent-policy-link.test.tsx
+index 503484c0..2baeb768 100644
+--- a/dialectical-engine/tests/render/consent-policy-link.test.tsx
++++ b/dialectical-engine/tests/render/consent-policy-link.test.tsx
+@@ -11,23 +11,24 @@ import { ConsentSettingsPanel } from "../../apps/ui/components/consent/ConsentSe
+ import { openSurfaceCount } from "../../apps/ui/components/consent/modalSemantics.js";
+ 
+ /**
+  * Cluster S01-C6 — the cross-slice cluster.
+  *
+  * Everything asserted here is a property of S01's WIRING, never of S02's two
+  * files: `apps/ui/components/consent/modalSemantics.ts` and
+  * `PrivacyPolicyModal.tsx` are S02's, are consumed unchanged, and have their own
+  * suites (`consent-modal-semantics.test.tsx`, `consent-policy-modal-*.test.tsx`).
+  * What S01 owns is: that the card asks for the modal in READ mode and hands it no
+- * `onAcknowledge`; that the modal element is rendered AFTER the card so the
+- * helper's document-order stack puts it on top; and that the card takes its own
+- * modal semantics from the same helper instead of writing a second copy.
++ * `onAcknowledge`; that the modal element is rendered AFTER the card — V-20's
++ * recorded arrangement for this pair, which under V-20 (b) no longer decides which
++ * of them takes the dismiss key; and that the card takes its own modal semantics
++ * from the same helper instead of writing a second copy.
+  */
+ 
+ // The acceptance command is pinned to the lane root, so source fixtures resolve
+ // from process.cwd(); `import.meta.url` can carry a non-file scheme under vitest
+ // (TOOLING-TRAPS, CODE-T1C3 / CODE-T5C1). Same idiom as consent-mount.test.tsx.
+ const consentSource = (): string =>
+   readFileSync(resolve(process.cwd(), "apps/ui/components/consent/CookieConsent.tsx"), "utf8");
+ const cardSource = (): string =>
+   readFileSync(
+     resolve(process.cwd(), "apps/ui/components/consent/CookiePreferencesCard.tsx"),
+@@ -193,36 +194,39 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
+     expect(checked(), "with every toggle exactly as it was").toEqual(before);
+     expect(raw(), "and storage untouched").toBe(storedBefore);
+     expect(raw(), "which is still nothing at all").toBeNull();
+     expect(bar(), "the bar stays away while the card is open").toBeNull();
+   });
+ 
+   it("moves the visitor exactly ONE surface per Escape, with the policy over the card", () => {
+     // PROPERTY (S01-R20's Esc stack, REQ-REV-01 **B3**, S01-S40): the topmost open
+     // surface consumes Escape and no other surface acts on the same event.
+     //
+-    // The mechanism is DOCUMENT ORDER, not open order (S02 DECISIONS 2026-09-07,
+-    // CODE-REV-S02-C5C6 r1 N2): `topmostSurface()` resolves unrelated siblings
+-    // with `CONTAINED_BY || FOLLOWING`. So the arrangement is the requirement —
+-    // the `<PrivacyPolicyModal>` element is rendered AFTER the card, and with the
+-    // two swapped one Escape closes the CARD and leaves the policy open.
++    // The mechanism is OPEN ORDER, not document order (V-20 option (b), ruled
++    // 2026-09-07 after CODE-REV-S02-C9 r1 B1): `topmostSurface()` returns the
++    // LAST-REGISTERED entry whose container is still in the document. Here the
++    // policy is the surface opened second, which is why it takes the key; where
++    // the two elements sit relative to each other no longer decides anything.
++    // The document-position assertion below is KEPT as V-20's RECORDED
++    // ARRANGEMENT for this pair — the shape the slice ships and the one V rules
++    // on — and is no longer the reason the policy wins.
+     mountBar();
+     activate(labelled("Choose what to store"));
+     const [, quality] = switches() as [HTMLElement, HTMLElement, HTMLElement];
+     act(() => quality.click());
+     const before = checked();
+     activate(labelled("Privacy notice"));
+ 
+     expect(policy(), "the policy is open over the card").not.toBeNull();
+     expect(
+       card()!.compareDocumentPosition(policy()!) & Node.DOCUMENT_POSITION_FOLLOWING,
+-      "the policy element FOLLOWS the card in document order — the helper's own topmost rule"
++      "the policy element FOLLOWS the card in document order — V-20's recorded arrangement"
+     ).not.toBe(0);
+     expect(openSurfaceCount(), "two surfaces on the stack").toBe(2);
+ 
+     press("Escape");
+ 
+     expect(policy(), "(a) the policy dialog is gone").toBeNull();
+     expect(card(), "(b) the preferences card is STILL in the document").not.toBeNull();
+     expect(checked(), "with its toggle values unchanged").toEqual(before);
+     expect(bar(), "(c) and the bar is still absent").toBeNull();
+     expect(openSurfaceCount(), "one surface left").toBe(1);

@@ -1,0 +1,37 @@
+{
+  "at": "2026-09-20T12:43:45.102886+00:00",
+  "commit": "c7dc7c747dbd362413aa6a854170856da5d6a9a8",
+  "parent": "fba5c54c8e0e70d75f957518273fb19d984357e9",
+  "tree": "86a52a80e3fcd5281a34aec021cfadfdb8dbfcb4",
+  "records": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/GUIDE_SECURITY8.md",
+      "sha256": "6978feba22778ad927c688831a87bbad2ccc90826dfa28fdef58e0dd51bb6023",
+      "bytes": 5745
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/tooling/prepare-lock-reviews.py",
+      "sha256": "4762fb483977a289738c26205b7d445886c82e36a93f277d823084d03bc998d2",
+      "bytes": 7415
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/tooling/resume-admin.py",
+      "sha256": "aebab78fafb9122f484c3284fff57339de22341d6d3c7fc6404d053231d52651",
+      "bytes": 7691
+    }
+  ],
+  "before": {
+    "head": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19",
+    "productRef": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718"
+  },
+  "after": {
+    "head": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19",
+    "productRef": "78988fc2e5e24595bd9cd6ec0a3965c6039dc718"
+  },
+  "privateIndexRemoved": true,
+  "historicalIntakeGap": "unverified; no broader continuity claim"
+}

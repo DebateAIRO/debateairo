@@ -1,0 +1,21 @@
+revision 479763da1f586a217f36204cc81138aaa81c6f81
+files 19
+1e1571a014af8293469ba6d0753c3f83dce8134b692ee0a079b860c4a73a7ef0      2795  apps/ui/components/TopBar.tsx
+78cdc5c6b433c8a5d7abc942f236e27c13bf81c938ed0f8cedca69dc710c8228      1369  apps/ui/components/landing/LandingChrome.tsx
+e0caa4e5bee015c6f2784544055806edb53750c43b5a470073a175f6d332ec43      4889  apps/ui/app/page.tsx
+cb34c7b3f6c4d07b83591808f634685d3071c3468c5652dfa5b64d380edb4b30     20529  apps/ui/app/new/page.tsx
+7becd2f9da12e385444a0190d07174684170447655d0b0001268b79adffc37c8      9368  apps/ui/app/settings/page.tsx
+34fae4bddf9e66231daf7596164916410f6c5927e724d4bd757567acf334144c     78176  apps/ui/app/debate/[id]/DebatePageClient.tsx
+80a26625bd72da1e683d0fcb54efe75692417525780ec3ffcb838a883e31c5d9     38791  apps/ui/components/support/Assistant.tsx
+4e69daab93c514b7695b66805de8cae8d73ee85268a57435d946444e80342e1c      3435  apps/ui/components/support/SupportWidget.tsx
+d061cfae3620aef186cad4823fb378346e8628298db3447fd9af4d3c30229926      2358  apps/ui/components/support/DebatePicker.tsx
+a5550b3e9bbd8de81fd5cce7e653528b34994b904c9e50b139f96611ed4752f2      1120  apps/ui/components/support/ConsentToggle.tsx
+bd23bed0caeefb09346580bad4d91320e7e96594285562235558294ac1dfffd2      6268  apps/ui/components/support/CaseView.tsx
+f33cd1d8b57ecd076aff02135fe4070e7b7b51ee090bad4f64c0e08a668cedf5     10682  packages/support-kb/src/catalog.ts
+16e1eb66a8f72a0bed59c00ab879bcddd54e191de5046baec8610d859ec77c76     22479  apps/api/src/support/answer.ts
+2248e2a8a025670915cd97802c61513539ab6798780f589088ddb4c301149852     44976  apps/api/src/support/index.ts
+bfc30fc2b6895c3768f311f33d2f5292968e5f182df81bdd4220fea2d8151a22      6299  apps/api/src/support/own-context.ts
+7bcb12bcf6c5930194c047a300b22be2e2331bdbc6ad5d0b650f4d1fdc1dbcfe     19199  apps/api/src/support/cases.ts
+ec3dcfd9e53f725e939a7f6d62f8a5f71094cab007e11f8261ce12104219b565      8272  apps/api/src/support/model.ts
+449015f503515a956dba85e1a998594bf1aa0092b6967c8ff512fe0af9fc033d     26343  apps/api/src/main.ts
+3ac60a1a868e72db7e51149664e5552911cdd2979485222d546b5fd03b579082    107423  packages/db/src/support.ts

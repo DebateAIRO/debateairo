@@ -1,0 +1,93 @@
+=== MUTANT m01_controlled ===
+    S02-C3 VERDICT=0 |      Tests  28 passed (28) | Test Files  3 passed (3)
+    S02-C4 VERDICT=1 |      Tests  1 failed | 31 passed (32) | Test Files  1 failed | 3 passed (4)
+      failed: tests/render/consent-signup-gate.test.tsx > create-account gate on both consent boxes > keeps an assigned box ticked across a re-render and the button disabled
+    reverted; porcelain(SRC)=0
+=== MUTANT m02_hardcoded_disabled ===
+    S02-C3 VERDICT=0 |      Tests  28 passed (28) | Test Files  3 passed (3)
+    S02-C4 VERDICT=0 |      Tests  32 passed (32) | Test Files  4 passed (4)
+    reverted; porcelain(SRC)=0
+=== MUTANT m03_delete_group ===
+    S02-C3 VERDICT=1 |      Tests  6 failed | 22 passed (28) | Test Files  1 failed | 2 passed (3)
+      failed: tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > carries the design's two sentences and the two-word policy control verbatim
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > keeps the 18+ input focusable and lets activation from focus toggle it
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > renders one bordered group holding exactly two rows, one input in each, adult first
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > toggles the 18+ box from its input and opens no dialog
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > toggles the 18+ box from its text and opens no dialog
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > toggles the 18+ box from the row itself and opens no dialog
+    S02-C4 VERDICT=1 |      Tests  6 failed | 26 passed (32) | Test Files  1 failed | 3 passed (4)
+      failed: tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > carries the design's two sentences and the two-word policy control verbatim
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > keeps the 18+ input focusable and lets activation from focus toggle it
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > renders one bordered group holding exactly two rows, one input in each, adult first
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > toggles the 18+ box from its input and opens no dialog
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > toggles the 18+ box from its text and opens no dialog
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > toggles the 18+ box from the row itself and opens no dialog
+    reverted; porcelain(SRC)=0
+=== MUTANT m04_drop_required ===
+    S02-C3 VERDICT=1 |      Tests  1 failed | 27 passed (28) | Test Files  1 failed | 2 passed (3)
+      failed: tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > keeps both boxes real, required, single-form controls that disable with the card
+    S02-C4 VERDICT=1 |      Tests  1 failed | 31 passed (32) | Test Files  1 failed | 3 passed (4)
+      failed: tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > keeps both boxes real, required, single-form controls that disable with the card
+    reverted; porcelain(SRC)=0
+=== MUTANT m05_no_aria ===
+    S02-C3 VERDICT=1 |      Tests  1 failed | 27 passed (28) | Test Files  1 failed | 2 passed (3)
+      failed: tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > gives each input its own sentence as an accessible name
+    S02-C4 VERDICT=1 |      Tests  1 failed | 31 passed (32) | Test Files  1 failed | 3 passed (4)
+      failed: tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > gives each input its own sentence as an accessible name
+    reverted; porcelain(SRC)=0
+=== MUTANT m06_old_wording ===
+    S02-C3 VERDICT=1 |      Tests  2 failed | 26 passed (28) | Test Files  1 failed | 2 passed (3)
+      failed: tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > carries the design's two sentences and the two-word policy control verbatim
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > gives each input its own sentence as an accessible name
+    S02-C4 VERDICT=1 |      Tests  2 failed | 30 passed (32) | Test Files  1 failed | 3 passed (4)
+      failed: tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > carries the design's two sentences and the two-word policy control verbatim
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > gives each input its own sentence as an accessible name
+    reverted; porcelain(SRC)=0
+=== MUTANT m07_mirror_truth ===
+    S02-C3 VERDICT=1 |      Tests  4 failed | 24 passed (28) | Test Files  2 failed | 1 passed (3)
+      failed: tests/render/auth-flow-integration.test.tsx > rendered auth flow integration > keeps registration failures generic and separates primary and recovery autofill
+tests/render/auth-flow-integration.test.tsx > rendered auth flow integration > keeps resend failures generic without changing the non-enumerating success message
+tests/render/auth-flow-integration.test.tsx > rendered auth flow integration > renders the non-enumerating registration state and resends only to the submitted email
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > keeps both boxes real, required, single-form controls that disable with the card
+    S02-C4 VERDICT=1 |      Tests  4 failed | 28 passed (32) | Test Files  2 failed | 2 passed (4)
+      failed: tests/render/auth-flow-integration.test.tsx > rendered auth flow integration > keeps registration failures generic and separates primary and recovery autofill
+tests/render/auth-flow-integration.test.tsx > rendered auth flow integration > keeps resend failures generic without changing the non-enumerating success message
+tests/render/auth-flow-integration.test.tsx > rendered auth flow integration > renders the non-enumerating registration state and resends only to the submitted email
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > keeps both boxes real, required, single-form controls that disable with the card
+    reverted; porcelain(SRC)=0
+=== MUTANT m08_no_refusal ===
+    S02-C3 VERDICT=1 |      Tests  1 failed | 27 passed (28) | Test Files  1 failed | 2 passed (3)
+      failed: tests/render/auth-flow-integration.test.tsx > rendered auth flow integration > refuses to register when either consent box is left unticked
+    S02-C4 VERDICT=1 |      Tests  1 failed | 31 passed (32) | Test Files  1 failed | 3 passed (4)
+      failed: tests/render/auth-flow-integration.test.tsx > rendered auth flow integration > refuses to register when either consent box is left unticked
+    reverted; porcelain(SRC)=0
+=== MUTANT m09_no_type_button ===
+    S02-C3 VERDICT=0 |      Tests  28 passed (28) | Test Files  3 passed (3)
+    S02-C4 VERDICT=0 |      Tests  32 passed (32) | Test Files  4 passed (4)
+    reverted; porcelain(SRC)=0
+=== MUTANT m10_swap_names ===
+    S02-C3 VERDICT=1 |      Tests  12 failed | 16 passed (28) | Test Files  3 failed (3)
+      failed: tests/render/auth-flow-integration.test.tsx > rendered auth flow integration > keeps registration failures generic and separates primary and recovery autofill
+tests/render/auth-flow-integration.test.tsx > rendered auth flow integration > keeps resend failures generic without changing the non-enumerating success message
+tests/render/auth-flow-integration.test.tsx > rendered auth flow integration > refuses to register when either consent box is left unticked
+tests/render/auth-flow-integration.test.tsx > rendered auth flow integration > renders the non-enumerating registration state and resends only to the submitted email
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > gives each input its own sentence as an accessible name
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > keeps both boxes real, required, single-form controls that disable with the card
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > keeps the 18+ input focusable and lets activation from focus toggle it
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > renders one bordered group holding exactly two rows, one input in each, adult first
+    S02-C4 VERDICT=1 |      Tests  15 failed | 17 passed (32) | Test Files  4 failed (4)
+      failed: tests/render/auth-flow-integration.test.tsx > rendered auth flow integration > keeps registration failures generic and separates primary and recovery autofill
+tests/render/auth-flow-integration.test.tsx > rendered auth flow integration > keeps resend failures generic without changing the non-enumerating success message
+tests/render/auth-flow-integration.test.tsx > rendered auth flow integration > refuses to register when either consent box is left unticked
+tests/render/auth-flow-integration.test.tsx > rendered auth flow integration > renders the non-enumerating registration state and resends only to the submitted email
+tests/render/consent-signup-gate.test.tsx > create-account gate on both consent boxes > keeps Create account disabled with only the 18+ box ticked
+tests/render/consent-signup-gate.test.tsx > create-account gate on both consent boxes > keeps Create account disabled with only the privacy box ticked
+tests/render/consent-signup-gate.test.tsx > create-account gate on both consent boxes > keeps an assigned box ticked across a re-render and the button disabled
+tests/render/consent-signup-group.test.tsx > sign-up consent checkbox group > gives each input its own sentence as an accessible name
+    reverted; porcelain(SRC)=0
+=== MUTANT m11_no_b1_guard ===
+    S02-C3 VERDICT=0 |      Tests  28 passed (28) | Test Files  3 passed (3)
+    S02-C4 VERDICT=0 |      Tests  32 passed (32) | Test Files  4 passed (4)
+    reverted; porcelain(SRC)=0
+=== FINAL porcelain (tracked) ===
+       1

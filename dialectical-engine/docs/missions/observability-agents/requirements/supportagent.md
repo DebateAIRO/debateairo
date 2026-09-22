@@ -45,7 +45,7 @@ Engine", brand domain `dezbatere.ro`, `apps/ui/components/TopBar.tsx:31`).
 | Escalation to a human | case row committed ≤ 2 s after the trigger; verbatim transcript + one-paragraph (≤ 80 words) advisory summary ≤ 60 s p100; V's reply visible to the user in the product; SLA text from register row (default 48 h) | SUP-02 acceptance steps 1–6; `summary_at − created_at` SQL |
 | Languages | ro + en; per-message detection stored; reply language = detected or user override in 100 % of eval turns; every template and every corpus entry exists in both languages | Eval structural assertion; SUP-01-R10 |
 | Tone | plain sentences, ≤ 120 words unless a procedure (≤ 10 numbered steps); identifies as an AI in the first message; never promises an outcome; never claims an action it did not take; never states a conclusion about who the user is | Fixed copy in the SPECs; eval rubric; V's sample |
-| Refusal rules | fixed bilingual templates per class: `REFUSE_ZONE` (+ first-party link), `REFUSE_INJECTION` (+ recorded), `REFUSE_OTHER_USER`, `REFUSE_SAFETY` (straight to a person), `NO_SOURCE`; zone-adjacent and safety classes decided BEFORE any model call | Eval classes C and D 100 %; SUP-01-R05/R06 |
+| Refusal rules | fixed bilingual templates per class: `REFUSE_ZONE` (+ first-party link), `REFUSE_INJECTION` (+ recorded), `REFUSE_OTHER_USER`, `REFUSE_SAFETY` (straight to a person), `NO_SOURCE`; zone-adjacent and safety classes decided BEFORE any model call; the fixed coercion list and zone-over-safety precedence are specified in SUP-02-R01 | Eval classes C and D 100 %; SUP-01-R05/R06 and SUP-02-R01 |
 | Evaluation set | N = 60 scripted conversations (A 20 grounded en/ro · B 6 no-source · C 10 zone-adjacent · D 12 injection/exfiltration incl. corpus poisoning · E 6 own-context · F 3 incident · G 3 escalation); authored by an independent Fable 5.1 seat (never the coder), ratified by V; three runs, WORST run is the verdict; `applicable/total` and `pending` slices printed | `pnpm support:eval --runs 3`; gates every release of every SUP slice |
 
 ## Q2 Knowledge sources
@@ -54,7 +54,7 @@ Engine", brand domain `dezbatere.ro`, `apps/ui/components/TopBar.tsx:31`).
 
 | Source | What exactly | Scope and rule | Who writes / versions it |
 |---|---|---|---|
-| Help Corpus | `packages/support-kb/content/<id>.<lang>.md`, front matter `id, lang, title, status, sources, verified_against, ratified_by, ratified_on`; only `status: shipped` + `ratified_by: V` entries load; `kb_version` = SHA-256 of the manifest, recorded per session | The ONLY free-text source. Every answer cites an entry id. Entries carry no pricing (`apps/ui/components/landing/LandingPricing.tsx:34` is `[PLACEHOLDER]`), no model count (`apps/ui/components/landing/cards.ts:107` "Five" vs `apps/ui/app/page.tsx:62` "Several"), no claim about what a verdict label proves (`docs/visuals/verdict-forensics.png` contradicts the landing copy) until V ratifies text | Drafted by an independent Fable 5.1 KB-author seat from the seeds: `apps/ui/components/GuideModal.tsx:7-41`, `apps/ui/lib/v3/missingCapabilities.ts:8-10`, `apps/ui/components/PublicAnswerDisclosure.tsx:5`, `apps/ui/app/new/page.tsx:27-33`, the anonymous routes (`apps/api/src/index.ts:118-119`), the publish/unpublish/delete rules (`apps/api/src/index.ts:693`), `docs/founding/ui-boundary-contract.md` (extracted, never quoted). Ratified by V. Versioned by git + `kb_version` |
+| Help Corpus | `packages/support-kb/content/<id>.<lang>.md`, front matter `id, lang, title, status, sources, verified_against, ratified_by, ratified_on`; only `status: shipped` + `ratified_by: V` entries load; `kb_version` = SHA-256 of the manifest, recorded per session | The ONLY free-text source. Every answer cites an entry id. Entries carry no pricing (`apps/ui/components/landing/LandingPricing.tsx:34` is `[PLACEHOLDER]`), no model count (`apps/ui/components/landing/cards.ts:107` "Five" vs `apps/ui/app/page.tsx:62` "Several"), no claim about what a verdict label proves (`docs/visuals/verdict-forensics.png` contradicts the landing copy) until V ratifies text | Drafted by an independent Fable 5.1 KB-author seat from the seeds: `apps/ui/components/GuideModal.tsx:7-41`, `apps/ui/lib/v3/missingCapabilities.ts:8-10`, `apps/ui/components/PublicAnswerDisclosure.tsx:5`, `apps/ui/app/new/page.tsx:27-33`, the anonymous routes (`apps/api/src/index.ts:118-119`), publish (`apps/api/src/index.ts:995-1039`), unpublish (`apps/api/src/index.ts:1040-1081`), and private-debate deletion (`apps/api/src/index.ts:675-703`), `docs/founding/ui-boundary-contract.md` (extracted, never quoted). Ratified by V. Versioned by git + `kb_version` |
 | The user's OWN debates and runs | METADATA ONLY: `run_id, created_at, run_state, terminal_state, staleness_state, visibility(+public_ref), progress_stage, last_event_at, failure_code` | Signed-in only; explicit per-session consent toggle, default off, timestamped; ownership by `core.run_is_owned_by` (`migrations/0037_run_ownership.sql:289`) with the subject from the identity session (`apps/api/src/index.ts:368`, `apps/api/src/sessions.ts:34`), never from the conversation; question text, node claims, answers and provider payloads never enter the model context (privacy posture, COMMON §3) | Read-only projection defined in SUP-03-R03; contested row SUP-D2 for any widening |
 | V-published incident state | `support.public_incident` {id, started_at, ended_at, severity, affected_surface, summary_en, summary_ro, published_by=V, published_at, source_ref} | The only incident source; when no open row exists the assistant says NO_INCIDENT (fixed text: "I have no record of a current known incident. That doesn't rule one out …"). Raw `obs.incident` (`migrations/0034_obs_foundation.sql:120`) is never read | V via `pnpm support:incident publish|resolve`; the ObservationAgent product may later write here under its own V-approval rule — REQ-SYNTH diffs this interface |
 | First-party route allow-list | `/`, `/new`, `/login`, `/sign-up`, `/settings`, `/help`, `/public/debate/{id}` | The assistant links; it never performs. Links are same-origin anchors only | Fixed in SUP-01-R07 |
@@ -86,7 +86,7 @@ consented own-run metadata, per-account limits and a list of their cases.
 `authorizationPolicyInventory` (`apps/api/src/index.ts:98-144`; the `onRoute` hook at `:339`
 refuses undeclared routes) with policy `public` and the identity session optional (looked up
 by the existing hook at `:386`/`:408`), and mirrored in the contract inventory
-(`packages/contract/src/index.ts:641`): create session · post message (reply, or SSE for
+(`packages/contract/src/index.ts:642`): create session · post message (reply, or SSE for
 streaming — Architecture's call) · read own session · rate · consent (signed-in) · escalate ·
 read case by token · post case message · status (switch + degraded flag). The UI proxy
 forwards only allow-listed headers and the two `__Host-debateai-*` cookies
@@ -202,7 +202,7 @@ CLI subscriptions wrapped as local relays; no key material anywhere until V lift
 | Concurrency | Unbounded spawn, no queue or semaphore in `relay-core`/`claude-relay`/`grok-relay`; practical ceiling = what V's Mac survives; the support module imposes its own cap (2) and queue | Provider rate limits (UNVERIFIED numbers); scales server-side |
 | Cost per conversation | Subscription-billed; Claude cost field optional (`acceptance/claude-relay.ts:47`); Codex unmetered (`acceptance/model-shim.ts:138`); Grok handshake measured $0.030 (`docs/missions/2026-08-06-v3-programming/handoffs/GROK-01-codex-handoff.md:144`) → a 6-turn conversation on Grok ≈ $0.18 — UNVERIFIED extrapolation | Reference: grok-4.6 HTTP at $2/$6 per 1M in/out (`docs/missions/2026-08-21-observability-loop/research/grok-requirements.md:260`); a 6-turn conversation ≈ 12k in / 1.2k out ≈ $0.03 — UNVERIFIED extrapolation; Claude/OpenAI prices not cited |
 | Availability | Only while V's machine is up and the CLI signed in; an expired OAuth is a loud failure (`acceptance/claude-relay.test.ts:248`); a 03:00 question is unanswered (row V-2's own example) | Provider SLA (UNVERIFIED); independent of V's laptop |
-| Secrets governance | None — no key exists; child env scrubbed | New: key custody file, rotation, leak monitoring, the `audit:source` exemption question (row V-6), processor terms for user text (the 2026-08-17 synthesis promotes provider retention to blocking for Bot B; Bot A handles no secrets and may ship under ordinary terms) |
+| Secrets governance | None — no key exists; child env scrubbed | New: key custody file, rotation, leak monitoring, the `audit:source` exemption question (row V-6), processor terms for user text (the 2026-08-17 synthesis promotes provider retention to blocking for Bot B; Bot A's model context receives no secrets and may ship under ordinary terms) |
 
 **Recommendation.** VERDICT: (a) relay-only for phase 1, with SUP-01 measuring and printing
 the latency percentiles and the availability window so row V-2 is re-presented to V with
@@ -286,7 +286,7 @@ above (Q5, Q4).
   provider rate limits and SLAs for the key-based variant — no measurement in the repo.
 - Deflection and resolution baselines — zero users today; targets are judgement.
 - Whether an architecture test asserts equality between the contract route inventory
-  (`packages/contract/src/index.ts:641`) and the API policy inventory — the two lists are
+  (`packages/contract/src/index.ts:642`) and the API policy inventory — the two lists are
   hand-maintained; if such a test exists, every SUP slice adding a route edits both.
 - The lawful in-place path to change a sealed register row without a datadir swap
   (DR-188 elevated it to mandatory; status unknown to this seat) — Architecture names it.
@@ -311,3 +311,49 @@ above (Q5, Q4).
 3. Packet Q6 example "open `/` as an anonymous visitor" vs COMMON's ownership of the landing
    files by ui-overhaul. Resolution: SUP-01 on `/help`; SUP-04 mounts on `/` with the
    overlap disclosed for merge time.
+
+## Handoff
+
+SKILLS LOADED: using-superpowers, heartbeat-protocol, heartbeat-requirements,
+superpowers:brainstorming, receiving-code-review, verification-before-completion
+
+This handoff was reconstructed by the round-1 rework worker from the complete on-disk
+artifact and `REQ-REV-SUP.md`; it does not impersonate the ended author session.
+
+| Slice | Requirement rows | PLAN trace rows | Dependency |
+|---|---:|---:|---|
+| SUP-01 | 18 | 18 | none |
+| SUP-02 | 10 | 10 | SUP-01 |
+| SUP-03 | 8 | 8 | SUP-01 |
+| SUP-04 | 6 | 6 | SUP-01 |
+| SUP-05 | 6 | 6 | SUP-01 |
+| SUP-06 | 8 | 8 | SUP-01 |
+| SUP-07 | 6 | 6 | SUP-01 |
+
+Trace total: 62 requirements / 62 PLAN rows. Unresolved contradictions: zero after the
+three quoted tensions in `## Resolved tensions inside the packet (both sides quoted)` and
+the round-1 B1/B2 repairs in the cited slice requirements.
+
+Packet defects left for the controller: REQ-SUP's stale same-house review-route label;
+the broad MFA-research grep; the unflagged Q2/private-content, Q3/operator-auth, and Q6
+landing-file tensions; live tree-count text; and the packet/reviewer conflict over whether
+an ended seat excuses missing receipts. The reviewer packet's dispatched-model label and
+missing board handoff remain controller-owned. `comments read through: 3` is the round-1
+reviewer's readback; this repo-only rework worker did not query or mutate the board.
+
+### Sub-delegation receipts (retrospective; historical violation preserved)
+
+The ended author launched three read-only Explore children with `model: opus`, contrary to
+the Fable roster. A later document cannot reverse that provider choice. The round-1
+reviewer measured zero Write/Edit calls in all three child transcripts; this rework worker
+launched no replacement child.
+
+| Child id | Search scope | Returned facts used in this artifact | Independent close-out evidence |
+|---|---|---|---|
+| `a085f12963927c6cc` | API and UI surface inventory | no operator authorization path; risk/budget option locations; static worker refusal | `apps/api/src/index.ts:432-433`; `apps/ui/app/new/page.tsx:27-36`; `apps/ui/app/admin/workers/page.tsx:12-15` |
+| `a40bd49ad9f2da6e2` | model-access substrate under DR-179 | relay creates a CLI child per call; no support-level queue exists in that path | `acceptance/relay-core.ts:118-128` (spawn at 122) |
+| `af6f2f68214726cd7` | knowledge-source and documentation inventory | ownership is the existing SQL predicate; no reusable product FAQ was found | `migrations/0037_run_ownership.sql:286-296`; FAQ absence remains a bounded author claim, not runtime proof |
+
+Historical disposition: disclosed and independently sampled, but not erasable. The
+controller must post the missing `READY FOR PEER REVIEW` board comment if a durable board
+marker is still required.

@@ -1,62 +1,64 @@
-# PLAN — OBS-02 Product process liveness, restart witnesses, expected-set
+# PLAN — OBS-02 Product liveness and witnesses
 
-> **For agentic workers:** the Architecture seat fills the steps. The Requirements seat (REQ-OBS) authored only the SPEC-trace skeleton, the quantifiability law and the cluster table headers. Programming-time skills: `superpowers:subagent-driven-development` or `superpowers:executing-plans`; every coder: `superpowers:test-driven-development`, `superpowers:verification-before-completion`.
+> **Worker skills:** `superpowers:subagent-driven-development` or `superpowers:executing-plans`; every coder also uses `superpowers:test-driven-development` and `superpowers:verification-before-completion`.
 
-**Goal:** probe the API, UI, TLS front door, runner process and Kanban; name the dev stack as root when it exits; witness container restarts and never-starts; record scheduler job completions.
+SKILLS LOADED: superpowers:using-superpowers, superpowers:brainstorming, superpowers:writing-plans, superpowers:verification-before-completion
 
-**Spec:** `docs/missions/observability-agents/slices/OBS-02/SPEC.md` (FROZEN 2026-09-01)
+**Status:** READY FOR PEER REVIEW. **Base:** merged, V-approved OBS-01. No migration.
 
-**Status:** SCAFFOLD — steps not yet authored (ARCH seat fills).
+## Dispatch boundary
 
-## Quantifiability law (binding on Architecture)
+- Contribute only module directories, `targets.dev.d/OBS-02.json`, OBS-02 defaults, and tests. Do not edit OBS-01 targets, core verbs, or the frozen manifest.
+- The job-witness verb is module-owned at `src/modules/job-witness/oactl/witness.ts`; discovery is lexical.
+- `THROUGHPUT_ANOMALY` is DEGRADED with `IMPACT_SLOW`; `INFRA_NOT_READY` is live-but-not-ready.
+- Worker Vitest is not V acceptance. V personally runs the SPEC's 11 steps.
 
-- Every step is markable done / not-done by a stranger with no judgement call.
-- Forbidden acceptance words: improve, better, robust, handle, appropriate.
-- Every step names: cluster id · acceptance test · file surface.
-- Every PLAN step traces to a SPEC requirement; every SPEC requirement has ≥ 1 step.
-- Three-run law: each cluster's verification command runs THREE times; the worst run is the verdict (green-green-red = RED).
-- Acceptance commands live in labelled fenced blocks, never in table cells; every command is RUN by its author in a hostile configuration before it is written down; capture-first idiom, anchored summary guard, nonzero pass count.
-- UNVERIFIED is a valid, respected answer on any claim.
+## SPEC trace
 
-## SPEC-trace table (one row per requirement; Architecture fills the step cells)
+| Requirement | Steps | Acceptance test | File surface |
+|---|---|---|---|
+| R01–R02 | C1-1..C1-3 | five-probe/expected-set tests | product-liveness, expectations, target fragment |
+| R03–R05 | C2-1..C2-3 | root/restart/never-start tests | witness modules |
+| R06 | C3-1 | latency/band/copy tests | samples and defaults |
+| R07 | C3-2 | exit/report receipt tests | job-witness module/oactl |
+| R08, R10 | C3-3 | exact status/digest/default tests | module projections/defaults |
+| R09 | C1-4, C2-4 | source/argv boundary tests | architecture tests |
 
-| Requirement | SPEC sentence (short) | Steps (OBS-02-Cx-y) | Cluster | Acceptance test | File surface |
-|---|---|---|---|---|---|
-| OBS-02-R01 | five probes: api exact-401, ui pair, tls system-trust, runner ps, kanban 30 s | | | | |
-| OBS-02-R02 | expected-set model; `NOT_RUNNING` INFO once per transition | | | | |
-| OBS-02-R03 | dev-stack root attribution: one composite SEVERE, members suppressed | | | | |
-| OBS-02-R04 | container restart witness from `docker inspect` | | | | |
-| OBS-02-R05 | never-started witness at 60 s | | | | |
-| OBS-02-R06 | probe latency samples; p95 thresholds; `IMPACT_SLOW` | | | | |
-| OBS-02-R07 | `oactl witness` job completion; `NO SCHEDULE RULED` until D10 | | | | |
-| OBS-02-R08 | status/digest additions | | | | |
-| OBS-02-R09 | no `process.kill`/`child_process` in probe modules; argv allow-list unchanged | | | | |
-| OBS-02-R10 | defaults + routing rows for this slice | | | | |
+## Implementation clusters
 
-## Clusters (Architecture fills the cells; headers fixed)
+### C1 — five probes and expected set
 
-| Cluster | PLAN steps | ONE verification command (fenced block below) | File surface | Three-run verdict |
-|---|---|---|---|---|
-| OBS-02-C1 | | | | |
-| OBS-02-C2 | | | | |
-| OBS-02-C3 | | | | |
+1. **C1-1 RED:** define exact API 401, UI pair, system-trust TLS, runner `ps`, and 30s Kanban fixtures.
+2. **C1-2 GREEN:** implement the module and validated OBS-02 target fragment through the frozen manifest.
+3. **C1-3 GREEN:** implement expected-set transitions and one `NOT_RUNNING` INFO per down period.
+4. **C1-4 REFUTE:** duplicate a target and add `process.kill`; require RED, then revert.
 
-### Verification commands (labelled fenced blocks; one per cluster; capture-first idiom)
-
-```text
-OBS-02-C1: <architecture fills>
+```zsh
+set -o pipefail; test_paths=(tests/unit/obs-agent-02-probes.test.ts tests/integration/obs-agent-02-expected-set.test.ts tests/architecture/obs-agent-02-boundaries.test.ts); for test_path in "${test_paths[@]}"; do test -f "$test_path" || { printf 'MISSING_TEST %s\n' "$test_path" >&2; exit 1; }; done; for run in 1 2 3; do out="$(mktemp "${TMPDIR:-/tmp}/obs-02-c1.XXXXXX")" || exit 1; NO_COLOR=1 pnpm exec vitest run "${test_paths[@]}" --reporter=verbose 2>&1 | tee "$out"; test "${pipestatus[1]}" -eq 0 || exit 1; grep -Eq '^[[:space:]]*Tests[[:space:]]+[1-9][0-9]*[[:space:]]+passed[[:space:]]+\([1-9][0-9]*\)[[:space:]]*$' "$out" || exit 1; done
 ```
 
-```text
-OBS-02-C2: <architecture fills>
+### C2 — attribution and container witnesses
+
+1. **C2-1 RED→GREEN:** collapse a stack-root exit into one dev-stack SEVERE and suppress member OPEN rows.
+2. **C2-2 RED→GREEN:** compare Docker start timestamps and emit one restart INFO with two timestamps.
+3. **C2-3 RED→GREEN:** emit never-started after 60s without first-seen and clear after appearance.
+4. **C2-4 REFUTE:** inject member failures under a root exit and mutating Docker argv; both must fail, then revert.
+
+```zsh
+set -o pipefail; test_paths=(tests/unit/obs-agent-02-attribution.test.ts tests/integration/obs-agent-02-witness.test.ts tests/architecture/obs-agent-02-docker.test.ts); for test_path in "${test_paths[@]}"; do test -f "$test_path" || { printf 'MISSING_TEST %s\n' "$test_path" >&2; exit 1; }; done; for run in 1 2 3; do out="$(mktemp "${TMPDIR:-/tmp}/obs-02-c2.XXXXXX")" || exit 1; NO_COLOR=1 pnpm exec vitest run "${test_paths[@]}" --reporter=verbose 2>&1 | tee "$out"; test "${pipestatus[1]}" -eq 0 || exit 1; grep -Eq '^[[:space:]]*Tests[[:space:]]+[1-9][0-9]*[[:space:]]+passed[[:space:]]+\([1-9][0-9]*\)[[:space:]]*$' "$out" || exit 1; done
 ```
 
-```text
-OBS-02-C3: <architecture fills>
+### C3 — latency, completion witness, projections
+
+1. **C3-1 RED→GREEN:** store numeric probe latency and implement the ruled DEGRADED `THROUGHPUT_ANOMALY`/`IMPACT_SLOW` band.
+2. **C3-2 RED→GREEN:** implement module-owned `oactl witness`, preserve child exit code, record report status, and print `NO SCHEDULE RULED` pending D10.
+3. **C3-3 GREEN:** add defaults, routing, status, and digest projections with exact copy.
+4. **C3-4 REFUTE:** force missing report JSON and polluted job title; require typed output and no product signal, then revert.
+
+```zsh
+set -o pipefail; test_paths=(tests/unit/obs-agent-02-latency.test.ts tests/integration/obs-agent-02-job-witness.test.ts tests/architecture/obs-agent-02-output.test.ts); for test_path in "${test_paths[@]}"; do test -f "$test_path" || { printf 'MISSING_TEST %s\n' "$test_path" >&2; exit 1; }; done; for run in 1 2 3; do out="$(mktemp "${TMPDIR:-/tmp}/obs-02-c3.XXXXXX")" || exit 1; NO_COLOR=1 pnpm exec vitest run "${test_paths[@]}" --reporter=verbose 2>&1 | tee "$out"; test "${pipestatus[1]}" -eq 0 || exit 1; grep -Eq '^[[:space:]]*Tests[[:space:]]+[1-9][0-9]*[[:space:]]+passed[[:space:]]+\([1-9][0-9]*\)[[:space:]]*$' "$out" || exit 1; done
 ```
 
-## Boundaries Architecture must state before any step is dispatched
+## Acceptance handoff
 
-- How a slice adds an `oactl` verb and target entries without editing OBS-01-owned files (verb/target discovery), or the exact append protocol if it cannot.
-- Standing tests that READ the files this slice WRITES.
-- The two impact codes this SPEC adds to the closed vocabulary (`IMPACT_SLOW`, `IMPACT_RUNNER_GONE`) must be added to the `CHECK` constraint by a migration or the constraint must be defined as a lookup table in OBS-01 — ARCH decides the mechanism and records it in DECISIONS.
+The canonical V gate is exactly `SPEC.md` lines 65–79, numbered 1–11. Do not copy or renumber it here. Missing implementation leaves results **UNVERIFIED**.

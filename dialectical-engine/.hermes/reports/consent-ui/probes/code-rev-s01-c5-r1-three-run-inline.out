@@ -1,0 +1,16 @@
+# CODE-REV-S01-C5 r1 — the INLINE arm (COMMON §10.16), captured from the tool shell.
+# shell=/bin/zsh  grep=ugrep 7.8.4 aarch64-apple-macosx  locale=unset/unset
+# Same four command texts as cmd-c{1,3,4,5}.sh, pasted into the tool shell rather
+# than executed from a file. commit d5e217f7 for every run.
+INLINE run 1 :: S01-C1 verdict=0   summary:      Tests  2 failed | 7 passed (9)   hit-list: 1 (pinned .drawerScrim line: 1)   tsc ran: 1 exit 1, diagnostics outside the pin: 0
+INLINE run 2 :: S01-C1 verdict=0   summary:      Tests  2 failed | 7 passed (9)   hit-list: 1 (pinned .drawerScrim line: 1)   tsc ran: 1 exit 1, diagnostics outside the pin: 0
+INLINE run 3 :: S01-C1 verdict=0   summary:      Tests  2 failed | 7 passed (9)   hit-list: 1 (pinned .drawerScrim line: 1)   tsc ran: 1 exit 1, diagnostics outside the pin: 0
+INLINE run 1 :: S01-C3 verdict=0   summary:      Tests  7 passed (7)  files: Test Files  1 passed (1)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+INLINE run 2 :: S01-C3 verdict=0   summary:      Tests  7 passed (7)  files: Test Files  1 passed (1)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+INLINE run 3 :: S01-C3 verdict=0   summary:      Tests  7 passed (7)  files: Test Files  1 passed (1)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+INLINE run 1 :: S01-C4 verdict=0   summary:      Tests  11 passed (11)  files: Test Files  1 passed (1)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+INLINE run 2 :: S01-C4 verdict=0   summary:      Tests  11 passed (11)  files: Test Files  1 passed (1)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+INLINE run 3 :: S01-C4 verdict=0   summary:      Tests  11 passed (11)  files: Test Files  1 passed (1)   hit-list: 1 (pinned: 1)  t9 failures: 2  S01 css blocks: 1   tsc ran: 1 exit 1, outside the pin: 0
+INLINE run 1 :: S01-C5 verdict=0   summary:      Tests  4 failed | 38 passed (42)  files: Test Files  1 failed | 2 passed (3)   failures: 4 (unpinned: 0)  guarded-green: 2  consent-mount lines: 11 (failing: 0)  hit-list: 1   tsc ran: 1 exit 1, outside the pin: 0
+INLINE run 2 :: S01-C5 verdict=0   summary:      Tests  4 failed | 38 passed (42)  files: Test Files  1 failed | 2 passed (3)   failures: 4 (unpinned: 0)  guarded-green: 2  consent-mount lines: 11 (failing: 0)  hit-list: 1   tsc ran: 1 exit 1, outside the pin: 0
+INLINE run 3 :: S01-C5 verdict=0   summary:      Tests  4 failed | 38 passed (42)  files: Test Files  1 failed | 2 passed (3)   failures: 4 (unpinned: 0)  guarded-green: 2  consent-mount lines: 11 (failing: 0)  hit-list: 1   tsc ran: 1 exit 1, outside the pin: 0

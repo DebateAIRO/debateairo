@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "url": "https://localhost:3100/login?next=%2Fnew",
+  "browser": {
+    "driver": "playwright@1.61.1",
+    "executablePath": "/Users/vladmihaimiron/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell",
+    "headless": true,
+    "tls_bypass": false
+  },
+  "matching_controls": [],
+  "exact_destination": null
+}

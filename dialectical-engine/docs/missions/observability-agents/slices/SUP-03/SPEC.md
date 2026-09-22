@@ -101,9 +101,36 @@ owned run whose question text contains an injection payload → the answer is un
 
 ## Acceptance — V runs these in the real dev stack
 
-1. `pnpm dev:auth:up`; sign in at `https://localhost:3000/login` with the provisioned QA
-   identity (`.local/dev-auth/qa-account-*.json`, V's file); open `/help`. Expected: the
-   CONSENT_TOGGLE is visible and off.
+1. `pnpm dev:auth:up`; terminal, paste this key-only fixture probe (it prints paths, never
+   credential values):
+
+   ```sh
+   support_fixture_index=/tmp/debateai-support-login-capable-qa-files
+   : > "$support_fixture_index"
+   for support_fixture_file in .local/dev-auth/qa-account-*.json; do
+     if jq -e '(.email | type == "string" and length > 0) and (.password | type == "string" and length > 0) and (.login_proof == "authenticated_then_logged_out")' "$support_fixture_file" >/dev/null; then
+       printf '%s\n' "$support_fixture_file" >> "$support_fixture_index"
+     fi
+   done
+   sort -u -o "$support_fixture_index" "$support_fixture_index"
+   support_fixture_count=$(wc -l < "$support_fixture_index" | tr -d ' ')
+   test "$support_fixture_count" -ge 2 || { printf 'FAIL: need two login-capable QA fixtures; found %s\n' "$support_fixture_count" >&2; exit 1; }
+   printf 'PASS login-capable QA fixtures: %s\n' "$support_fixture_count"
+   sed -n '1,2p' "$support_fixture_index"
+   ```
+
+   Expected: exit 0, `PASS login-capable QA fixtures: <n>` with `n` ≥ 2, followed by two
+   distinct paths. A recovery-only JSON lacking non-empty `password` and
+   `login_proof = authenticated_then_logged_out` is absent. If the probe exits 1, stop:
+   V provisions a second QA identity through the existing `/sign-up`, verification and MFA
+   screens, proves one successful sign-in then sign-out, saves V's credential record under
+   `.local/dev-auth/qa-account-<timestamp>-support.json` with mode 0600 and non-empty
+   `email`, `password`, and `login_proof: "authenticated_then_logged_out"`, then reruns the
+   probe. Do not continue until it exits 0. Designate the first printed path QA-A and the
+   second QA-B. In separate browser profiles, sign in with each; expected: both reach the
+   signed-in landing page. As QA-B, create or select one debate from `/new` and record its
+   run id as `F`. As QA-A, create or select one QA-A debate, then open `/help`. Expected:
+   the CONSENT_TOGGLE is visible and off.
 2. Type `Why is my debate stuck?` Expected: CONSENT_NEEDED text within 1 s.
 3. Switch the toggle on. psql: `SELECT consent_own_context_at IS NOT NULL FROM
    support.session ORDER BY created_at DESC LIMIT 1;` Expected: `t`.
@@ -111,12 +138,14 @@ owned run whose question text contains an injection payload → the answer is un
    the status of this debate?` Expected: within 8 s an answer naming the run state,
    visibility and last event time, ending with the STATE_SOURCE line; no question text is
    quoted back by the assistant.
-5. psql: `SELECT jsonb_object_keys(result) FROM support.tool_call ORDER BY at DESC LIMIT 12;`
-   Expected: only keys from the R03 list.
+5. psql: `SELECT jsonb_object_keys(CASE WHEN jsonb_typeof(result) = 'object' THEN result
+   ELSE '{}'::jsonb END) AS key FROM support.tool_call ORDER BY at DESC LIMIT 12;`
+   Expected: the latest owned-result row contributes only keys from the R03 list; an enum
+   result contributes zero rows and does not make the query fail.
 6. Type `What is the status of debate 00000000-0000-4000-8000-000000000000?` Expected:
-   REFUSE_OTHER_USER text. Then, with a run id V takes from another account
-   (psql: `SELECT run_id FROM core.run ORDER BY created_at LIMIT 1;`, provided it is not the
-   QA identity's), ask the same question. Expected: the byte-identical REFUSE_OTHER_USER text.
+   REFUSE_OTHER_USER text. Then ask the same question with QA-B's run id `F` from step 1.
+   Expected: the byte-identical REFUSE_OTHER_USER text. psql: `SELECT result #>> '{}'
+   FROM support.tool_call ORDER BY at DESC LIMIT 1;` Expected: `NOT_OWNED`.
 7. Type `List my debates.` Expected: a list of run ids (short), dates and states; no titles.
 8. Switch the toggle off; repeat step 4's question. Expected: CONSENT_NEEDED.
 9. Sign out; open `/help`; type `Why is my debate stuck?` Expected: ANON_CONTEXT text.

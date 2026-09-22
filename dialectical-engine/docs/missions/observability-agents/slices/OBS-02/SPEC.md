@@ -1,6 +1,6 @@
 # SPEC — OBS-02 Product process liveness, restart witnesses, expected-set
 
-**Status:** FROZEN at creation (2026-09-01, REQ-OBS). No agent edits this file after creation. Scope change = new SPEC version, ratified by V.
+**Status:** FROZEN at creation (2026-09-01, REQ-OBS); amended 2026-09-02 only for reviewer-authorized REQ-REV-OBS round-1 findings B1/B7/N2/N7. The abandoned draft alternatives remain visible in git/reviewer history and the superseding choices are appended to DECISIONS.
 
 **Mission:** `observability-agents` · **Product:** ObservationAgent · **Traces to:** `requirements/observationagent.md` Q1 rows 5, 6 (presence half), 7, 9, 10, 13, 17 · Q2 · Q3 · Q5. Builds on OBS-01 (module directory, signal store, channels, thresholds).
 
@@ -19,7 +19,7 @@ Make the product's own processes visible: the API on 8790, the UI on 3001, the T
 - The supervisor races child exits and stops everything (`dev-auth-stack.ts:155-159`, `superviseDevelopmentAuthStack` `:185-204`); a stopped stack is the DESIGNED state when V is not running it.
 - Containers: `restart=no` for both; `docker inspect` exposes `State.Status`, `State.StartedAt`, `State.FinishedAt`, `State.ExitCode`, `RestartCount`, `HostConfig.RestartPolicy.Name` (measured 2026-09-01 20:44 UTC).
 - Scheduler jobs are one-shot CLIs (`apps/scheduler/src/cli.ts:5-24`); nothing schedules them (no crontab, no launchd, measured; E6-06 `POST-SYNTHESIS-RULINGS.md:68-69`); the target plan makes them profiled one-shots with a completion criterion (`docs/missions/2026-08-21-docker-hatchet/architecture/Plan.md` §2.7.2, V-11).
-- Hermes Kanban serves `127.0.0.1:9119` and stays on the host (`Plan.md:238`); the CLI reached it during this seat's run.
+- Hermes Kanban serves `127.0.0.1:9119` and stays on the host (`Plan.md:240`); the CLI reached it during this seat's run.
 - `EvaluatorDispatchBinding.state` is `"UNBOUND"` (`packages/evaluator/src/dispatch-binding.ts:7-8, 27-35`) — no evaluator-worker process exists to probe.
 
 ## Requirements
@@ -28,7 +28,7 @@ Make the product's own processes visible: the API on 8790, the UI on 3001, the T
 Module `product-liveness` probes on the OBS-01 cadence (5 s / 2 s): **api** — the exact-401 contract above (any other status or body = failure); **ui** — `/login` 200 text/html containing `Back to the graph.` AND `/api/v1/session` exact 401; **tls_front_door** — `GET https://localhost:3000/login` → 200 using system trust only (no `rejectUnauthorized=false`; a trust failure is a probe failure with `evidence.last_status = TLS_TRUST`); **runner** — a process whose command line contains `apps/runner/src/main.ts` exists (`ps -Ao pid,command`); **kanban** — `GET http://127.0.0.1:9119/` returns any HTTP status 200–499 within 2 s (every 30 s). Probes never send credentials, cookies or bodies.
 
 ### OBS-02-R02 — Expected-set model
-`targets.dev.json` gives every component an `expected` value: `always` (postgres, hatchet, docker, kanban, observation_agent), `when_dev_stack` (api, ui, tls_front_door, runner), `never` (evaluator_worker — recorded as `UNBOUND by register`, no probe). A `when_dev_stack` component that is DOWN while no member of the group has been UP in the last 10 min is `IMPACT_DEV_STACK_NOT_RUNNING` — one INFO signal on `component=dev_stack` per transition, digest only, no banner.
+`deploy/observation-agent/targets.dev.d/OBS-02.json` gives this slice's components an `expected` value: `always` (kanban), `when_dev_stack` (api, ui, tls_front_door, runner), `never` (evaluator_worker — recorded as `UNBOUND by register`, no probe); OBS-01's fragment owns postgres, hatchet, docker and observation_agent. The lexical target loader rejects duplicate component keys. A `when_dev_stack` component that is DOWN while no member of the group has been UP in the last 10 min is `IMPACT_DEV_STACK_NOT_RUNNING` — one INFO signal on `component=dev_stack` per transition, digest only, no banner.
 
 ### OBS-02-R03 — Dev-stack root attribution
 When ≥ 1 member of the `when_dev_stack` group was UP within the last 10 min and ALL members are DOWN in the same cycle, the agent opens ONE `dev_stack SEVERE INFRA_DOWN` signal with `IMPACT_DEV_STACK_EXITED` and suppresses the four member signals (they are listed in `evidence.members`). When only some members are DOWN, each gets its own signal (`api SEVERE`, `ui SEVERE`, `tls_front_door SEVERE`, `runner SEVERE`). Members that recover clear the composite when all four are UP for 2 cycles.
@@ -40,7 +40,7 @@ Every 5 s, for `debateai-v3-postgres-1` and `debateai-v3-hatchet-lite-1`, the `w
 An `expected: always` component that has not been UP once within 60 s of agent start opens `EXPECTED_ABSENT SEVERE` (`IMPACT_EXPECTED_ABSENT`); it clears on the first UP.
 
 ### OBS-02-R06 — Probe latency samples and thresholds
-Every probe's round-trip (ms) is written to `observation.sample_ring` (`metric_key = probe.<component>.latency_ms`). p95 over the last 5 min above the threshold opens `INFRA_DEGRADED DEGRADED` — hmm, class name fixed as `INFRA_NOT_READY`? No: class `CAPACITY` is for resources; latency uses class `THROUGHPUT_ANOMALY` with `impact_code = IMPACT_LATENCY`? The vocabulary must stay closed: this requirement uses class `INFRA_NOT_READY`, severity DEGRADED, `evidence.p95_ms` and `evidence.threshold_ms`, impact `IMPACT_HATCHET_NOT_READY` is wrong for api/ui — therefore this SPEC ADDS one impact code to the vocabulary: `IMPACT_SLOW` "<component> answered its liveness probe in P ms at p95 over 5 minutes: users are waiting." Defaults v1: api 500 ms, ui 2000 ms (dev mode), tls_front_door 2500 ms.
+Every probe's round-trip (ms) is written to `observation.sample_ring` (`metric_key = probe.<component>.latency_ms`). A p95 over the last 5 minutes above the component threshold opens `THROUGHPUT_ANOMALY` with severity DEGRADED, `evidence.p95_ms`, `evidence.threshold_ms`, and the Q2-owned `IMPACT_SLOW` template. Defaults v1: api 500 ms, ui 2000 ms (dev mode), tls_front_door 2500 ms. The abandoned draft alternatives recorded in DECISIONS are not vocabulary members and `INFRA_NOT_READY` remains reserved for a live-but-not-ready component.
 
 ### OBS-02-R07 — Scheduler job completion witness
 `pnpm -C apps/observation-agent oactl witness --job <name> -- <command…>` runs the given command as a child, records `observation.job_completion(job, started_at, completed_at, exit_code, report_ok)` (`report_ok` = stdout parsed as one JSON object, per `apps/scheduler/src/cli.ts:21`), and exits with the child's exit code. The agent never launches a job by itself. While no cadence row exists in thresholds for a job, `status.json` shows `scheduler.<job>: NO SCHEDULE RULED (V row D10)`. When a cadence row exists (`schedule.<job>.cadence_s`, `grace_s`), a missing completion within `cadence_s + grace_s` opens `SCHEDULE_MISSED SEVERE` (`IMPACT_SCHEDULE_MISSED`).
@@ -52,7 +52,7 @@ Every probe's round-trip (ms) is written to `observation.sample_ring` (`metric_k
 The agent never sends a signal to, spawns, or waits on any product process; `process.kill` appears nowhere under `apps/observation-agent/src/modules/product-liveness/**` or `src/modules/witness/**` (architecture test `tests/architecture/obs-agent-02-*.test.ts`), and the docker argv allow-list of OBS-01-R12 is unchanged.
 
 ### OBS-02-R10 — Defaults and routing rows for this slice
-`deploy/observation-agent/thresholds/defaults/OBS-02.json` ships: probe cadences, the 10-min group memory, the 60 s never-started window, the three latency thresholds, and routing rows for `dev_stack`, `api`, `ui`, `tls_front_door`, `runner`, `kanban` (`INFRA_DOWN` = SEVERE; `dev_stack` composite = SEVERE; `RESTART_WITNESSED`, `IMPACT_DEV_STACK_NOT_RUNNING` = INFO; `EXPECTED_ABSENT` = SEVERE).
+`deploy/observation-agent/thresholds/defaults/OBS-02.json` ships: probe cadences, the 10-min group memory, the 60 s never-started window, the three latency thresholds, and routing rows for `dev_stack`, `api`, `ui`, `tls_front_door`, `runner`, `kanban` (`INFRA_DOWN` = SEVERE; `dev_stack` composite = SEVERE; probe-latency `THROUGHPUT_ANOMALY` = DEGRADED; `RESTART_WITNESSED`, `IMPACT_DEV_STACK_NOT_RUNNING` = INFO; `EXPECTED_ABSENT` = SEVERE).
 
 ## States
 
@@ -60,7 +60,7 @@ Per component as OBS-01. Group `dev_stack`: `NOT_RUNNING` (INFO once) → `RUNNI
 
 ## Vocabulary (copy V will read)
 
-Titles `dialectical-engine: dev_stack SEVERE`, `dialectical-engine: api SEVERE`, `dialectical-engine: ui SEVERE`, `dialectical-engine: tls_front_door SEVERE`, `dialectical-engine: runner SEVERE`, `dialectical-engine: kanban SEVERE`. Bodies: `IMPACT_DEV_STACK_EXITED`, `IMPACT_DEV_STACK_NOT_RUNNING` (digest only), `IMPACT_API_DOWN`, `IMPACT_UI_DOWN`, `IMPACT_TLS_DOWN`, `IMPACT_WORKER_LOST` is NOT used here (that is OBS-03's heartbeat class) — runner process absence uses `IMPACT_RUNNER_GONE` "The runner process is gone: queued debate work is not picked up." (ADDED to the vocabulary by this SPEC), `IMPACT_RESTART`, `IMPACT_EXPECTED_ABSENT`, `IMPACT_SLOW`, `IMPACT_SCHEDULE_MISSED`, `IMPACT_CLEARED`.
+Titles `dialectical-engine: dev_stack SEVERE`, `dialectical-engine: api SEVERE`, `dialectical-engine: ui SEVERE`, `dialectical-engine: tls_front_door SEVERE`, `dialectical-engine: runner SEVERE`, `dialectical-engine: kanban SEVERE`. Bodies: `IMPACT_DEV_STACK_EXITED`, `IMPACT_DEV_STACK_NOT_RUNNING` (digest only), `IMPACT_API_DOWN`, `IMPACT_UI_DOWN`, `IMPACT_TLS_DOWN`, `IMPACT_WORKER_LOST` is NOT used here (that is OBS-03's heartbeat class) — runner process absence uses Q2-owned `IMPACT_RUNNER_GONE` "The runner process is gone: queued debate work is not picked up." — plus `IMPACT_RESTART`, `IMPACT_EXPECTED_ABSENT`, Q2-owned `IMPACT_SLOW`, `IMPACT_SCHEDULE_MISSED`, `IMPACT_CLEARED`.
 
 ## V-runnable acceptance (real dev stack, this Mac)
 
@@ -84,7 +84,7 @@ Runner heartbeat age via Hatchet (OBS-03) · installing launchd plists for the p
 
 ## Parallel-safety (single-writer rule)
 
-OWNED: `apps/observation-agent/src/modules/product-liveness/**`, `src/modules/witness/**`, `src/modules/expectations/**`, `src/modules/job-witness/**`, `src/oactl/witness.ts` (new verb file; the verb table in `src/oactl/main.ts` is OBS-01's — ARCH states how a slice adds a verb without editing OBS-01's file, e.g. verb discovery by directory), `deploy/observation-agent/thresholds/defaults/OBS-02.json`, the `expected` and product-target entries of `deploy/observation-agent/targets.dev.json` (this file is OBS-01's; OBS-02 appends entries — sequenced after OBS-01 merges), `tests/{unit,integration,architecture}/obs-agent-02-*.test.ts`. NEVER: OBS-01's files except the two appends named, product files, zone.
+OWNED: `apps/observation-agent/src/modules/product-liveness/**`, `src/modules/witness/**`, `src/modules/expectations/**`, `src/modules/job-witness/**` including `src/modules/job-witness/oactl/witness.ts`, `deploy/observation-agent/thresholds/defaults/OBS-02.json`, `deploy/observation-agent/targets.dev.d/OBS-02.json`, `tests/{unit,integration,architecture}/obs-agent-02-*.test.ts`. OBS-01's loaders discover the owned verb and target fragment; this slice edits no OBS-01 file. NEVER: another slice's files, central registration/verb tables, product files, zone.
 
 ## Absorbed predecessor slices
 

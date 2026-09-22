@@ -1,0 +1,11 @@
+T1 TAB TRANSCRIPT (shared container)
+start=close-first shift=false -> close-second
+start=close-first shift=true -> close-second
+start=close-second shift=false -> close-first
+start=close-second shift=true -> close-first
+start=outside shift=false -> close-first
+start=outside shift=true -> close-second
+start=nothing shift=false -> close-first
+start=nothing shift=true -> close-second
+
+stdout | probes/code-rev-cross-03-r2-tab-discrimination.probe.test.tsx > CODE-REV-CROSS-03 r2 — can a Tab assertion discriminate the tiebreak? > T2 CONTROL — a genuinely NESTED pair, where the candidate lists DIFFER

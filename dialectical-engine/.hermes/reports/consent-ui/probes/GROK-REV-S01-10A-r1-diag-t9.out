@@ -1,0 +1,65 @@
+(node:73395) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73413) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-grok-10a/dialectical-engine
+
+(node:73434) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/unit/t9-mode-tokens.test.ts > T9-C3 token contract > declares the complete inventory and the same mode-bearing key set in both modes 334ms
+ ✓ tests/unit/t9-mode-tokens.test.ts > T9-C3 token contract > switches the real stylesheet live between the two background and stance palettes 58ms
+ ✓ tests/unit/t9-mode-tokens.test.ts > T9-C3 token contract > clears all 34 published contrast rows against all four surfaces 182ms
+ ✓ tests/unit/t9-mode-tokens.test.ts > T9-C3 token contract > clears 4.5:1 for --muted on --muted-bg over --core, and 3:1 for the toggle's ON-vs-OFF state, in both modes 190ms
+ × tests/unit/t9-mode-tokens.test.ts > T9-C3 mode control and document guard > renders one accessible toggle that reads the document mode, flips it, and persists it 99ms
+   → expected '☀' to be '☀ Terracotta' // Object.is equality
+ ✓ tests/unit/t9-mode-tokens.test.ts > T9-C3 mode control and document guard > loads the named variable fonts and installs the blocking storage guard before children 1ms
+ ✓ tests/unit/t9-mode-tokens.test.ts > T9-C3 mode control and document guard > keeps the pre-paint storage guard inside head and before body 0ms
+ ✓ tests/unit/t9-mode-tokens.test.ts > T9-C3 mode control and document guard > keeps hydration-warning suppression on both document root elements 0ms
+ × tests/unit/t9-mode-tokens.test.ts > T9-C3 mode control and document guard > leaves no mode-inert colour literal in the four Wave-0 product files 6ms
+   → expected [ Array(1) ] to deeply equal []
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/t9-mode-tokens.test.ts > T9-C3 mode control and document guard > renders one accessible toggle that reads the document mode, flips it, and persists it
+AssertionError: expected '☀' to be '☀ Terracotta' // Object.is equality
+
+Expected: "☀ Terracotta"
+Received: "☀"
+
+ ❯ tests/unit/t9-mode-tokens.test.ts:558:35
+    556|       expect(button!.getAttribute("aria-pressed")).toBe("true");
+    557|       expect(button!.getAttribute("aria-label")).toBe("Switch to Terra…
+    558|       expect(button!.textContent).toBe("☀ Terracotta");
+       |                                   ^
+    559|
+    560|       await act(async () => button!.click());
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/unit/t9-mode-tokens.test.ts > T9-C3 mode control and document guard > leaves no mode-inert colour literal in the four Wave-0 product files
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-grok-10a/dialectical-engine/apps/ui/app/globals.css:6116:background: color-mix(in srgb, #0a0806 32%, transparent);",
++ ]
+
+ ❯ tests/unit/t9-mode-tokens.test.ts:646:18
+    644|       }
+    645|     }
+    646|     expect(hits).toEqual([]);
+       |                  ^
+    647|   });
+    648| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 7 passed (9)
+   Start at  08:20:01
+   Duration  1.41s (transform 109ms, setup 0ms, import 445ms, tests 873ms, environment 0ms)

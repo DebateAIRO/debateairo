@@ -25,8 +25,8 @@ Call: `ATTEMPT(i)` → `SUCCEEDED` | `RETRY` → … → `EXHAUSTED(reason ∈ {
 "exhausted call" (all attempts spent) · "attempt" (one provider request) · "ledger ref". Never "response body" in any stored field.
 
 ## 5. Acceptance — V runs this personally (dev stack up; FIX-01 and FIX-03 merged)
-1. Point the dev provider at a closed port (V edits the dev register value the runner reads, restarts the stack) and start a debate whose question line contains the token `CANARY-QUESTION-4419`.
-2. The debate fails in the UI after the configured retries.
+1. `FIX05_PROVIDER_URL=http://127.0.0.1:1 FIX05_QUESTION_CANARY=CANARY-QUESTION-4419 pnpm exec vitest run tests/integration/fix05-provider-exhaustion.test.ts --reporter=verbose` → the named integration case drives the real provider gateway from a runner work item against the closed loopback port, prints `FIX05_PROVIDER_EXHAUSTED`, and exits 0 only after the configured retries are exhausted; the test never inserts an occurrence directly.
+2. The case's run reaches the product failed state and prints its `run_ref`; use that value in step 4.
 3. `docker exec debateai-v3-postgres-1 psql -U debateai -d debateai -At -c "SELECT capture_point, taxonomy_class, code, fallback_minimized, run_ref, attempt_ref, ledger_ref FROM obs.occurrence WHERE capture_point='provider' ORDER BY occ_seq DESC LIMIT 1"` → `provider|PROVIDER_EXHAUSTED|PROVIDER_CALL_FAILED|f|<uuid>|<uuid>|<uuid>` (or `OBS_CAPTURE_SELF|t` if RP-0 is still unratified — record it; Done waits).
 4. `docker exec debateai-v3-postgres-1 psql -U debateai -d debateai -At -c "SELECT count(*) FROM obs.occurrence WHERE capture_point='provider' AND run_ref = '<run_ref from step 3>'"` → `1` (one exhausted call, one row, however many attempts).
 5. `docker exec debateai-v3-postgres-1 psql -U debateai -d debateai -At -c "SELECT count(*) FROM (SELECT o::text t FROM obs.occurrence o UNION ALL SELECT d::text FROM obs.occurrence_detail d) s WHERE t LIKE '%CANARY-QUESTION-4419%'"` → `0`; `grep -rc 'CANARY-QUESTION-4419' .obs-spool/ ; echo $?` → `1` (no match).
@@ -36,7 +36,7 @@ V vetoes Done only after steps 1–5 match with the registered code in step 3.
 The runner's gateway seam (FIX-03) · provider discovery/probe endpoints in `apps/api/src/provider-discovery.ts` · budget/spend accounting for the product's own provider calls · the diagnosis worker's own model calls (FIX-12).
 
 ## 7. File surface (single-writer) and parallel safety
-Allowed: `packages/providers/src/index.ts` (whole file; working region `call()` incl. the post-loop throws) · tests `tests/unit/fix05-*.test.ts`.
+Allowed: `packages/providers/src/index.ts` (whole file; working region `call()` incl. the post-loop throws) · tests `tests/unit/fix05-*.test.ts`, `tests/integration/fix05-*.test.ts`.
 Read-only: `packages/obs-capture/src/{index,context,kinds}.ts` · `apps/runner/src/index.ts` (FIX-03).
 Forbidden: `apps/runner/**`, `apps/scheduler/**`, `packages/obs-capture/**` (no writes), the zone.
 Parallel-safe with: every other slice (no file overlap). Acceptance order: after FIX-01 and FIX-03.

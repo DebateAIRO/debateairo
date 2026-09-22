@@ -1,0 +1,32 @@
+{
+  "at": "2026-09-20T15:02:25.656488+00:00",
+  "commit": "18966aa64dc68575443af32ff244fef8cd23befa",
+  "parent": "db905310d456c361d093626db4cb26e01fd53ce7",
+  "tree": "458ad993d0866dc8620e1ec01ee7a4e039f57e30",
+  "records": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/decisions/GUIDE_HARNESS_BIND14-scope-clarification.md",
+      "sha256": "8ec1a8e89fd5ad8793d348093c8edb5b93cdeb32ebe9ba66839aba69299ce407",
+      "bytes": 1558
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/LEDGER.md",
+      "sha256": "9e9528eb7e617435615b0b6402cd00dbb89a923545d94a0dee768878735d4127",
+      "bytes": 130398
+    }
+  ],
+  "before": {
+    "head": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19",
+    "productRef": "152eed4da1cd3e66b74d8301159ba76427552409"
+  },
+  "after": {
+    "head": "18374fa8dc0ab7af30c9dba6b3a2586e72f017df",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "8733b44b04eb1ec1a5d8762e6dccb3a21f86a82ed85067874437bd3760b81d19",
+    "productRef": "152eed4da1cd3e66b74d8301159ba76427552409"
+  },
+  "privateIndexRemoved": true,
+  "historicalIntakeGap": "unverified; no broader continuity claim"
+}

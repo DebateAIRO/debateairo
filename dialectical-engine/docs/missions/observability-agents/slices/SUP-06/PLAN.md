@@ -25,7 +25,7 @@ caps and degrades instead of inventing; spend is visible in one command.
 
 | Requirement | SPEC sentence (anchor) | Step ids | Cluster |
 |---|---|---|---|
-| SUP-06-R01 | "Rows and defaults: `support_limit_anon_msgs_10m` 20 … `pnpm support:limits set <row> <value>` … within 5 s without an API restart" | | |
+| SUP-06-R01 | "Rows and defaults: `support_limit_anon_msgs_10m` 20 … `pnpm support:limits set <row> <value>` accepts every mutable `support_*` register row and rejects other prefixes … within 5 s without an API restart" | | |
 | SUP-06-R02 | "When the support session is bound to an `identity_owner_ref`, the account limits apply in addition" | | |
 | SUP-06-R03 | "At most `support_relay_concurrency` model calls are in flight … FIFO queue … QUEUED text with its position … DEGRADED text immediately" | | |
 | SUP-06-R04 | "After `support_daily_call_cap` model calls in a UTC day, model-backed replies return DEGRADED until 00:00 UTC" | | |

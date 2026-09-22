@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREFLIGHT_SCHEMA_FIX49",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "files": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_SCHEMA_FIX49/phase-preflight.mjs",
+      "purpose": "real entrypoint uses shared schema2 validation and emits 11/20 metadata"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_SCHEMA_FIX49/preflight-schema.mjs",
+      "purpose": "strict composition/cardinality/contract/UI binding and UI-child boundary seam"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_SCHEMA_FIX49/composition.mjs",
+      "purpose": "unchanged reviewed schema2 three-segment composer copied into append-only node"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_SCHEMA_FIX49/capture-public-guide.mjs",
+      "purpose": "mechanically rebound unchanged remaining20 capture/composer to LIVE38"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_SCHEMA_FIX49/replay-row-proofs.mjs",
+      "purpose": "mechanically rebound unchanged logical58 proof to LIVE38"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_SCHEMA_FIX49/run-operator.mjs",
+      "purpose": "mechanically rebound final contract/LIVE38 operator"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_SCHEMA_FIX49/generate-binding.mjs",
+      "purpose": "deterministic seven-phase closure and fresh namespace generator"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_SCHEMA_FIX49/run-final-controls.mjs",
+      "purpose": "production-shaped real preflight compatibility and negative controls"
+    }
+  ]
+}

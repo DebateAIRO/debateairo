@@ -1,0 +1,10 @@
+{
+  "state": "BLOCKED DRAFT; LIVE3 failed; ARCHCHECK and SECDELTA active; GATE and final reviews pending",
+  "base": "b7ca2c413bf3242ce18e29a397dc9a3aa9228893",
+  "revision": "43cf9386ea3c9e7c79523ec38debe63271d19292",
+  "patch": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/review-packages/CP1-p1/CP1-43cf9386.patch",
+  "sha256": "d7ea2623e0d6a14e392412e3de39849fb1c9957ec4ffff76e967a2acc8e7546c",
+  "inventorySha256": "4d0b92219766d0106cfcfca65ff882b0fc8d0523bdfa20d1fb2245a4e7709e40",
+  "pathCount": 97,
+  "ownerAcceptance": "PENDING"
+}

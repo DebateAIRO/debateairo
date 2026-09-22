@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "phase": "PRETRAFFIC",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "contractSha256": "980b9fdd62e85c2c6b731a78825f5d82373f773e2357027768c40f224cbd0acf",
+  "checkedAbsent": 115,
+  "retainedRows": 10,
+  "remainingRows": 21,
+  "ui": {
+    "completed": true,
+    "createSessionAttempts": 0,
+    "messageAttempts": 1,
+    "forwardedDynamicRequests": 0
+  }
+}

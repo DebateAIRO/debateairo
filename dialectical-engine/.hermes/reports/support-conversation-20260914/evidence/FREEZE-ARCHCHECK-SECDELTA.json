@@ -1,0 +1,91 @@
+{
+  "at": "2026-09-14T15:20:27.192611+00:00",
+  "ref": "refs/heads/codex/support-conversation-mission",
+  "commit": "15ab51dab76be4c7c57ea109120b2bef541c6733",
+  "tree": "0b4859637c6fff019942c95d1ba6477712fe2e75",
+  "parent": "95292edad48e479f69a8024a6ade921ef0356b0f",
+  "files": [
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/board-ids.json",
+      "sha256": "ebbdcde66693402b897408fa205b3c3090e3023abe15fa6d0dd75edd58073af9"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PROGRESS.md",
+      "sha256": "ebbdc3fdf1c593424249b5eeaaeeb37fe56a130e42367d121db05aac447366fd"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/CP1-BOUNDARY-CORRECTION.md",
+      "sha256": "48b9ab06b8ec54cf8c0dc859738d2469b065e0ad065f912e72efee50c0cda2e2"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/ARCHCHECK.md",
+      "sha256": "00eb8a2df56c6a3caef2e568ef19e301e6f470e722507af58b432c41c7043e99"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/reviews/SECDELTA.md",
+      "sha256": "c9cc465a563d6642db223580223182fc6421ac0a01a73865172017fc6f2f09c2"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/LEDGER.md",
+      "sha256": "a72f2f9882b7bdf9494d5db88a50e72b8802a34e50126e61ccbad8723e741d03"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md",
+      "sha256": "ae06874b32369654e12263161842e7caf19315641b6bcd0506591ceca4762c9c"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/FIX4.md",
+      "sha256": "a625f70a0c05ec2308e2d3ff7d3a42e78bef09feef9030e423ce56c061aeb653"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/ARCHCHECK-SECDELTA-consumption.json",
+      "sha256": "c4d77eb4b2517e60c1322211dd3ae3483242557a277af4766d79c3a95fb8d48a"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FREEZE-LIVE3.json",
+      "sha256": "e45f4d57e9be3a0d41201f787cd96f78c70fe7096e7a6c1f2b84b939aa6b57c9"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/ARCHCHECK.md",
+      "sha256": "521f4e280451e6c90d245dfc498e7cd8328ae59be548ded45b1b75b66d870417"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/SECDELTA.md",
+      "sha256": "44d5c0f32b8630fbcb6f52e46fc1fd6f82332fd8b539e8b64fe20e3395f93dd1"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/SECDELTA/redaction-probe.ts",
+      "sha256": "6b4faf1e5e9be17d84d93e43a189c28366109d01601d2d06c71a29f291c2739e"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/SECDELTA/policy-probe.ts",
+      "sha256": "4c50fd7f86e8ab56e642f000b1bbf50b4c4773d17b49477d8c26d6f1e67f904e"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/SECDELTA/redaction-transit-probe.ts",
+      "sha256": "95c17d59961bcd5cc1a3f425d2569a9c4e9136a28e2e3fd8ac9717d230373b70"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/SECDELTA/answer-sink-probe.ts",
+      "sha256": "188244624d4bddb938aae457afc785db161195d3d3cd8536fe321c248ad4e4d0"
+    },
+    {
+      "path": "dialectical-engine/.hermes/reports/support-conversation-20260914/probes/SECDELTA/summary-sink-probe.ts",
+      "sha256": "e3138249b085bfb23355775821fb12856927a667c6f944889c6b2654fc91fd0f"
+    }
+  ],
+  "source_before": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813",
+    "lane_ref": "43cf9386ea3c9e7c79523ec38debe63271d19292"
+  },
+  "source_after": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813",
+    "lane_ref": "43cf9386ea3c9e7c79523ec38debe63271d19292"
+  },
+  "private_index_removed": true,
+  "tested": "metadata only; no product tests; ARCHCHECK and SECDELTA consumed; FIX4 not yet dispatched"
+}

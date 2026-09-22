@@ -24,7 +24,7 @@ import {
 import { ModelMetaLine } from "@/components/ModelPresentation";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 import type { Node as ContractNode } from "@debateai/contract";
-import { v3NodeScoreDetails, wayOfKnowingLabel } from "@/lib/v3/adapter";
+import { v3NodeHonestyRows, wayOfKnowingLabel } from "@/lib/v3/adapter";
 import { abstentionKindLabel, conditionMarkLabel } from "@/lib/v3/labels";
 import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
 
@@ -364,7 +364,6 @@ export function NodeDetailDrawer({
  * numbers, no defaults.
  */
 function NodeHonestyDetails({ v3 }: { v3: ContractNode }) {
-  const [baseScore, finalStrength] = v3NodeScoreDetails(v3);
   const reviewLabel = v3.review?.outcome === "agree"
     ? "REVIEW AGREED BY:"
     : v3.review?.outcome === "dispute"
@@ -372,34 +371,7 @@ function NodeHonestyDetails({ v3 }: { v3: ContractNode }) {
       : v3.review?.outcome === "cannot-assess"
         ? "REVIEW COULD NOT ASSESS:"
         : null;
-  const defeaters = v3.defeater_refs.length > 0
-    ? v3.defeater_refs.join(", ")
-    : v3.defeater_exhaustion_marked
-      ? "Rotation exhausted and marked"
-      : "Obligation remains open";
-  const disagreement = v3.disagreement === null
-    ? "No disagreement record"
-    : JSON.stringify(v3.disagreement);
-  const rows = [
-    {
-      key: "BASE SCORE",
-      value: `${baseScore.percentage.text} · ${baseScore.source}`,
-      title: baseScore.percentage.detail
-    },
-    {
-      key: "FINAL STRENGTH",
-      value: `${finalStrength.percentage.text} · ${finalStrength.source}`,
-      title: finalStrength.percentage.detail
-    },
-    { key: "REPLAY", value: finalStrength.replay_handle, title: undefined },
-    {
-      key: "RESTATEMENT",
-      value: `Stranger restatement check ${v3.stranger_restatement.check_status.toLowerCase().replaceAll("_", " ")}`,
-      title: undefined
-    },
-    { key: "DEFEATERS", value: defeaters, title: undefined },
-    { key: "JUDGE DISAGREEMENT", value: disagreement, title: undefined }
-  ] as const;
+  const rows = v3NodeHonestyRows(v3);
 
   return (
     <section aria-label="V3 node honesty" className="drawerHonesty">

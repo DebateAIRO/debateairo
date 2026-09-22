@@ -1,0 +1,39 @@
+{
+  "at": "2026-09-14T15:24:27.456426+00:00",
+  "ref": "refs/heads/codex/support-conversation-mission",
+  "commit": "4bf7f1849b6c8bf520eec22c46808152316232af",
+  "tree": "847317bde1830f2886d95a96c2a67e829a7abbe5",
+  "parent": "15ab51dab76be4c7c57ea109120b2bef541c6733",
+  "files": [
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/board-ids.json",
+      "sha256": "e918335ceb31c4fc820e7cbcbb17a61de111680248f573e9774db7353d5e50d0"
+    },
+    {
+      "path": "dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PROGRESS.md",
+      "sha256": "85a6f62d8733df90ae275afa152f0e2fc7bddce4954fee35f2ffed3c1d1b9efc"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md",
+      "sha256": "ae06874b32369654e12263161842e7caf19315641b6bcd0506591ceca4762c9c"
+    },
+    {
+      "path": "dialectical-engine/.hermes/planning/support-conversation-20260914/packets/PRODDELTA.md",
+      "sha256": "ec197cc5d7eb26e7ae874e59d1f64980c1d95c91642a45b100d2c535da71342d"
+    }
+  ],
+  "source_before": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813",
+    "lane_ref": "43cf9386ea3c9e7c79523ec38debe63271d19292"
+  },
+  "source_after": {
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "index": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktree": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813",
+    "lane_ref": "43cf9386ea3c9e7c79523ec38debe63271d19292"
+  },
+  "private_index_removed": true,
+  "tested": "metadata only; no product tests; FIX4 active allowed outputs excluded; PRODDELTA not yet dispatched"
+}

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_ACTIVATION_FIX47",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "productChanged": false,
+  "changedCapturePaths": [
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_ACTIVATION_FIX47/capture-open-mode.mjs",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_ACTIVATION_FIX47/capture-public-guide.mjs"
+  ],
+  "behavior": {
+    "before": "cookie consent settled only after compact READY wait",
+    "after": "visible consent settled through exposed UI immediately before compact activation"
+  },
+  "retained": [
+    "full/compact readiness",
+    "language selection",
+    "same-session Help transition",
+    "screenshot/restoration",
+    "private-control assertions",
+    "fixed remaining21 plan"
+  ],
+  "freshNamespaces": {
+    "operational": "LIVE36",
+    "actual": "GUIDE_LIVE_GUIDE25",
+    "composed": "GUIDE_LIVE36-composed31-manifest.json"
+  }
+}

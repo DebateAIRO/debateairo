@@ -1,0 +1,14 @@
+########## SCRIPT ARM (/bin/bash), 3 runs, commit 0dc569e9 ##########
+--- script run 1 ---
+S02-C8 | vt=0 guard=0 VERDICT=0 |       Tests  9 passed (9) |  Test Files  1 passed (1)
+--- script run 2 ---
+S02-C8 | vt=0 guard=0 VERDICT=0 |       Tests  9 passed (9) |  Test Files  1 passed (1)
+--- script run 3 ---
+S02-C8 | vt=0 guard=0 VERDICT=0 |       Tests  9 passed (9) |  Test Files  1 passed (1)
+########## INLINE ARM (tool shell), 3 runs, commit 0dc569e9 ##########
+--- inline run 1 ---
+S02-C8 | vt=0 guard=0 VERDICT=0 |       Tests  9 passed (9) |  Test Files  1 passed (1)
+--- inline run 2 ---
+S02-C8 | vt=0 guard=0 VERDICT=0 |       Tests  9 passed (9) |  Test Files  1 passed (1)
+--- inline run 3 ---
+S02-C8 | vt=0 guard=0 VERDICT=0 |       Tests  9 passed (9) |  Test Files  1 passed (1)

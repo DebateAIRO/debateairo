@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREFLIGHT_SCHEMA_FIX49",
+  "ticket": "t_d5f212de",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_PREFLIGHT_SCHEMA_BOUND_REVIEW_REQUIRED",
+  "controls": 15,
+  "passed": 15,
+  "checks": [
+    {
+      "name": "schema2 composition binds retained11 remaining20",
+      "result": "PASS",
+      "compositionSha256": "7e39c79b7dabd06a03f067be81b582709641a55c1ecabafe3209a6dfee5d7cf3"
+    },
+    {
+      "name": "legacy schema1 consumer rejects production-shaped schema2 composition",
+      "result": "PASS"
+    },
+    {
+      "name": "real preflight entrypoint reaches intercepted UI child boundary",
+      "result": "PASS",
+      "retainedRows": 11,
+      "remainingRows": 20
+    },
+    {
+      "name": "wrong schema rejected before UI child",
+      "result": "PASS",
+      "status": 1
+    },
+    {
+      "name": "retained cardinality rejected before UI child",
+      "result": "PASS",
+      "status": 1
+    },
+    {
+      "name": "remaining cardinality rejected before UI child",
+      "result": "PASS",
+      "status": 1
+    },
+    {
+      "name": "composition binding mismatch rejected before UI child",
+      "result": "PASS",
+      "status": 1
+    },
+    {
+      "name": "all seven literal phase argv self-bind final FIX49 contract",
+      "result": "PASS",
+      "phaseCount": 7
+    },
+    {
+      "name": "fresh LIVE38 preflight row-proof and capture children bound",
+      "result": "PASS"
+    },
+    {
+      "name": "reachable module closure includes shared schema validator",
+      "result": "PASS",
+      "moduleCount": 34,
+      "moduleClosureSha256": "b1c36e08c3b91c41002b425ffbd406b132552cce2bbd5a7d31b5a6c960278cf8"
+    },
+    {
+      "name": "real operator accepts actual finalized contract hash",
+      "result": "PASS"
+    },
+    {
+      "name": "real operator rejects stale contract hash",
+      "result": "PASS",
+      "status": 1
+    },
+    {
+      "name": "all LIVE38 and actual GUIDE26 future outputs remain absent",
+      "result": "PASS",
+      "count": 116
+    },
+    {
+      "name": "all changed or copied executable modules parse",
+      "result": "PASS",
+      "count": 6
+    },
+    {
+      "name": "proof serialized",
+      "result": "PASS"
+    }
+  ],
+  "bindings": {
+    "contractSha256": "1be2c74d25dbf4fd45f72fb1360f06836547e868b7b19993e17a0f949fcbd7e6",
+    "compositionSha256": "7e39c79b7dabd06a03f067be81b582709641a55c1ecabafe3209a6dfee5d7cf3",
+    "moduleClosureSha256": "b1c36e08c3b91c41002b425ffbd406b132552cce2bbd5a7d31b5a6c960278cf8",
+    "retainedRows": 11,
+    "remainingRows": 20
+  },
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "retainedEvidence": {
+    "compiledReactReplay": true,
+    "logicalRows": 58,
+    "capacityAndComposer": true
+  }
+}

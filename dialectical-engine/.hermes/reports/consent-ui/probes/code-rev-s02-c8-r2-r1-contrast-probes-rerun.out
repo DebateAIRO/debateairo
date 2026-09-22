@@ -1,0 +1,57 @@
+===== r1 probe code-rev-s02-c8-r1-contrast-ladder.mjs re-run at 0dc569e9 (COMMON §10.10) =====
+tokens read from the shipped stylesheet:
+  Terracotta  --ink #29261F  --bg #F9F6F1  --shell #EFE9E0  --core #FDFBF6
+  Chamber     --ink #F2EAD9  --bg #14110E  --shell #221D17  --core #181410
+A round-channel, label & face over --shell (author/test model)
+    T@0.60=4.13  C@0.60=6.29  T@0.65=4.79  C@0.65=7.17  T@0.70=5.54  C@0.70=8.09
+B float-channel, label & face over --shell
+    T@0.60=4.12  C@0.60=6.30  T@0.65=4.78  C@0.65=7.18  T@0.70=5.57  C@0.70=8.14
+C round-channel, label & face over --core
+    T@0.60=3.98  C@0.60=6.20  T@0.65=4.60  C@0.65=7.11  T@0.70=5.39  C@0.70=8.09
+D round-channel, label & face over --bg (page)
+    T@0.60=4.03  C@0.60=6.17  T@0.65=4.65  C@0.65=7.06  T@0.70=5.47  C@0.70=8.04
+E label over the FACE, face over --shell (no group opacity)
+    T@0.60=1.85  C@0.60=1.93  T@0.65=2.40  C@0.65=2.58  T@0.70=3.12  C@0.70=3.44
+F linear-light compositing over --shell
+    T@0.60=2.39  C@0.60=9.41  T@0.65=2.68  C@0.65=10.17  T@0.70=3.04  C@0.70=10.93
+G label over --shell at alpha, face UNDIMMED (--ink)
+    T@0.60=13.41  C@0.60=15.03  T@0.65=13.44  C@0.65=15.17  T@0.70=13.53  C@0.70=15.20
+H label UNDIMMED (--bg), face over --shell at alpha
+    T@0.60=4.32  C@0.60=6.57  T@0.65=4.99  C@0.65=7.43  T@0.70=5.74  C@0.70=8.37
+
+Models printing Terracotta 5.54 (±0.005) at alpha .70:
+  A round-channel, label & face over --shell (author/test model) -> 5.5450
+
+Model A ladder in 0.05 steps (both modes), 4.5:1 gate:
+  alpha 0.40  Terracotta 2.39  Chamber 3.55  -> FAIL
+  alpha 0.45  Terracotta 2.74  Chamber 4.10  -> FAIL
+  alpha 0.50  Terracotta 3.11  Chamber 4.80  -> FAIL
+  alpha 0.55  Terracotta 3.57  Chamber 5.53  -> FAIL
+  alpha 0.60  Terracotta 4.13  Chamber 6.29  -> FAIL
+  alpha 0.65  Terracotta 4.79  Chamber 7.17  -> PASS
+  alpha 0.70  Terracotta 5.54  Chamber 8.09  -> PASS
+  alpha 0.75  Terracotta 6.50  Chamber 9.19  -> PASS
+  alpha 0.80  Terracotta 7.60  Chamber 10.31  -> PASS
+  alpha 0.85  Terracotta 8.97  Chamber 11.50  -> PASS
+  alpha 0.90  Terracotta 10.43  Chamber 12.89  -> PASS
+  alpha 0.95  Terracotta 12.13  Chamber 14.22  -> PASS
+  alpha 1.00  Terracotta 14.00  Chamber 15.72  -> PASS
+
+===== r1 probe code-rev-s02-c8-r1-find-561.mjs re-run =====
+alpha=0.65 round  -> 4.7891  label=246,241,235 face=110,106,99
+alpha=0.65 floor  -> 4.7845  label=245,241,235 face=110,106,98
+alpha=0.65 ceil   -> 4.7562  label=246,242,236 face=111,107,99
+alpha=0.65 trunc  -> 4.7845  label=245,241,235 face=110,106,98
+alpha=0.65 raw    -> 4.7830  label=246,241,235 face=110,106,99
+alpha=0.70 round  -> 5.5450  label=246,242,236 face=100,97,89
+alpha=0.70 floor  -> 5.6077  label=246,242,235 face=100,96,88
+alpha=0.70 ceil   -> 5.5613  label=246,243,236 face=101,97,89
+alpha=0.70 trunc  -> 5.6077  label=246,242,235 face=100,96,88
+alpha=0.70 raw    -> 5.5714  label=246,242,236 face=100,97,89
+face green=95 -> 5.6668
+face green=96 -> 5.6056
+face green=97 -> 5.5450
+face green=98 -> 5.4849
+face red=99 -> 5.5635
+face red=100 -> 5.5450
+face red=101 -> 5.5263

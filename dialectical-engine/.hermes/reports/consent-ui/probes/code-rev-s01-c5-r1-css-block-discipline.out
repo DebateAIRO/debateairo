@@ -1,0 +1,48 @@
+S01 delimiters:      1 marker line(s) -> 7244:/* === consent-ui S01 === */ 
+chamber block starts at :115 ; S01 block starts at :7244
++    56 ROOT-TOKEN-BLOCK     /* the 10b toggle knob's own shadow — consent-ui S01. One pixel tighter than
++    57 ROOT-TOKEN-BLOCK        --shadow-thumb, which is the .ndSlider thumb's and belongs to another
++    58 ROOT-TOKEN-BLOCK        surface, so it is copied rather than re-valued (CODE-REV-S01-C3C4 r1 N3) */
++    59 ROOT-TOKEN-BLOCK     --shadow-knob: 0 1px 3px rgba(0,0,0,.3);
++  7342 S01-BLOCK          /* Borderless, because the design is: 10a's `Accept all` and 10b's `Save
++  7343 S01-BLOCK             choices` are drawn with padding and no border (turn-10-cookie-consent.html:39,
++  7344 S01-BLOCK             :130). With `* { box-sizing: border-box }` (:176-177) and `width: auto` the
++  7345 S01-BLOCK             used size is content + padding + border, so a 1px edge the artboard omits
++  7346 S01-BLOCK             ships the primary 2px taller and 2px wider — and breaks the equality the
++  7347 S01-BLOCK             design builds on, where a ghost pill's `9px 15px` + 1px border and a
++  7348 S01-BLOCK             primary's `10px` + 0 border are both 10px of effective edge in the same row
++  7349 S01-BLOCK             (CODE-REV-S01-C3C4 r1 N2). */
+-       (removed)            border: 1px solid var(--ink);
++  7352 S01-BLOCK            border: none;
++  7369 S01-BLOCK          /* 10a's own spring, transcribed from the artboard
++  7370 S01-BLOCK             (turn-10-cookie-consent.html:39) and scoped to the BAR's primary: 10b draws
++  7371 S01-BLOCK             `Save choices` with no transition, and one class serving two artboards must
++  7372 S01-BLOCK             take each artboard's values (CODE-REV-S01-C3C4 r1 N1's class, N4's ruling).
++  7373 S01-BLOCK             Its reduced-motion counterpart is the block at the end of this file. */
++  7374 S01-BLOCK          .consentBar .consentPrimary {
++  7375 S01-BLOCK            transition: transform .5s cubic-bezier(.34,1.56,.64,1);
++  7376 S01-BLOCK          }
++  7377 S01-BLOCK          
++  7378 S01-BLOCK          .consentBar .consentPrimary:hover { transform: scale(1.04); }
++  7379 S01-BLOCK          
+-       (removed)            box-shadow: var(--shadow-thumb);
++  7541 S01-BLOCK            box-shadow: var(--shadow-knob);
++  7555 S01-BLOCK          /* 10b draws `Save choices` one pixel tighter each side than 10a draws `Accept
++  7556 S01-BLOCK             all` (`padding:10px 18px` at turn-10-cookie-consent.html:130, against
++  7557 S01-BLOCK             `10px 19px` at :39). One class serves both surfaces, so the second artboard
++  7558 S01-BLOCK             states its own value here rather than inheriting the first's
++  7559 S01-BLOCK             (CODE-REV-S01-C3C4 r1 N1). */
++  7560 S01-BLOCK          .consentCardFooter .consentPrimary { padding: 10px 18px; }
++  7561 S01-BLOCK          
++  7605 S01-BLOCK          
++  7606 S01-BLOCK          /* S01-R27: the slice animates one thing — 10a's primary — so it ships the
++  7607 S01-BLOCK             scoped counterpart itself. There is no global reduced-motion reset here; the
++  7608 S01-BLOCK             four existing blocks (:269, :3663, :4681, :5244) are each scoped to their own
++  7609 S01-BLOCK             component, and this one names only the selectors above. */
++  7610 S01-BLOCK          @media (prefers-reduced-motion: reduce) {
++  7611 S01-BLOCK            .consentBar .consentPrimary { transition: none; }
++  7612 S01-BLOCK          
++  7613 S01-BLOCK            .consentBar .consentPrimary:hover { transform: none; }
++  7614 S01-BLOCK          }
+
+ADDED=42 REMOVED=2 TOTAL=44

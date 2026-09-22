@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_LIVE38",
+  "ticket": "t_8d677c9a",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "FAILED_PREFLIGHT_UI_OUTPUT_PATH_BINDING_ZERO_TRAFFIC",
+  "approval": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE38-explicit-approval-20260922.json",
+    "sha256": "0949ee14d0f28728b0f39d3fc193a9d950d9c5c4f84a199a6be963c2ebab5e98"
+  },
+  "operator": {
+    "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "argv": [
+      "/Users/vladmihaimiron/.local/bin/node",
+      "--import",
+      "tsx",
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_SCHEMA_FIX49/run-operator.mjs"
+    ],
+    "sandboxPermissions": "require_escalated",
+    "toolCapturedOutput": true,
+    "toolChunkId": "85c77c",
+    "numericStatus": 1
+  },
+  "phaseStatus": {
+    "preflight": 1,
+    "readiness": null,
+    "capacity": null,
+    "gate": null,
+    "rowProof": null,
+    "capture": null,
+    "idle": null
+  },
+  "failure": {
+    "code": "GUIDE_CONTINUATION_UI_OUTPUT_PATH_INVALID",
+    "parentCode": "GUIDE_CONTINUATION_UI_PREFLIGHT_FAILED",
+    "stage": "UI_CHILD_PATH_GUARD_BEFORE_BROWSER",
+    "actualOutput": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTINUATION_UI_PROOF-run-LIVE38.json",
+    "acceptedOperationalOutput": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CONTINUATION_UI_PROOF-run-LIVE37.json",
+    "acceptedControlOutput": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_UI_WRITER_FIX45-actual-ui-control.json",
+    "sourcePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_CAPTURE_PANE_FIX48/ui-transition-live-preflight.mjs",
+    "sourceLine": 11,
+    "classification": "HARNESS_PATH_BINDING_NOT_PRODUCT_RUNTIME_OR_MODEL"
+  },
+  "counts": {
+    "operatorLaunches": 1,
+    "phasesAttempted": 1,
+    "phasesCompleted": 0,
+    "uiChildProcesses": 1,
+    "browserLaunches": 0,
+    "sessionsCreated": 0,
+    "questionsSent": 0,
+    "externalModelRequests": 0,
+    "actualRepliesAdded": 0,
+    "screenshotsCompleted": 0
+  },
+  "traffic": {
+    "browser": 0,
+    "runtime": 0,
+    "http": 0,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0
+  },
+  "retained": {
+    "actualReplies": 11,
+    "unchanged": true,
+    "remainingQuestionsUnsent": 20,
+    "actualGuide26Unused": true
+  },
+  "createdContractPaths": [
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE38-stop.json",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_LIVE38-prerequisites.json",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_CONTINUATION_UI_PROOF-LIVE38.log",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/GUIDE_PREFLIGHT_SCHEMA_FIX49-operator-preflight.log"
+  ],
+  "createdContractPathCount": 4,
+  "uncreatedContractPathCount": 112,
+  "noRetry": true
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_OPERATOR_CWD_REVIEW50",
+  "ticket": "t_f412f468",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "freeze": "8f9d3097d6c19ba3af03580f760492795b3324f8",
+  "authorReceiptSha256": "b1328082b9359f9355eff4dc85b97400150cd8df17ab943778585c7bc21b1618",
+  "authorReceiptBytes": 3597,
+  "authorConsumptionSha256": "c80d538dcf9476ea8935a32ad05454c732f9ff2ac633e545746b9a397544f46e",
+  "predecessorOperatorMetadataSha256": "63379645c09e162cc780f15cc069ef212cb644b54ea26a30baa1ecb6f36eb0d0",
+  "finalOperatorMetadataSha256": "545bf330bb4651cf81bc143755427912d198cc859a4891aa91d0e228cd07116c",
+  "commandContractSha256": "1be2c74d25dbf4fd45f72fb1360f06836547e868b7b19993e17a0f949fcbd7e6",
+  "operatorScriptSha256": "466ef588b04c6f45a13c607baab099a4fef9919150601791ba4a1ad0c8178f47",
+  "controlProofSha256": "b67fbd0a346f3406a1a73de5d240957affd0816d902d0965ae43b7008b73b150",
+  "inertGuardLogSha256": "a73a672931331fd80c7dfeb08a85e85cf4652c0194a1f9c9091cbd0c53fa8324",
+  "futurePathsAbsent": 116
+}

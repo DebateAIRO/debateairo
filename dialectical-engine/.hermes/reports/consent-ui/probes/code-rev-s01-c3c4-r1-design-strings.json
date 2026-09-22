@@ -1,0 +1,39 @@
+{
+  "bar": [
+    "style=\"position:absolute; left:22px; right:22px; bottom:22px; background:; border:1px solid ; border-radius:16px; padding:7px; box-shadow:;\">",
+    "YOUR DATA, ON THE RECORD",
+    "We store only what keeps the bench running — unless you say otherwise.",
+    "Essential cookies hold your session, MFA state and device record. Analytics and model-quality telemetry are optional and never sold. You can change this any time in Settings.",
+    "Essential only",
+    "Choose what to store",
+    "Accept all"
+  ],
+  "card": [
+    "CHOOSE WHAT TO STORE",
+    "Cookie preferences",
+    "Asked once. Revisit any time from Settings → Privacy.",
+    "Privacy notice",
+    "Essential only",
+    "Save choices"
+  ],
+  "cats": [
+    {
+      "name": "Essential",
+      "tag": "ALWAYS ON",
+      "desc": "Session, MFA state and the device record that lets you spot a login you do not recognise.",
+      "detail": "de_session · de_mfa · de_device — 30 days"
+    },
+    {
+      "name": "Model quality telemetry",
+      "tag": "OPTIONAL",
+      "desc": "Which arguments you challenge or flag, used to tune judge panels. Never tied to your debates’ text.",
+      "detail": "de_quality — 90 days · first-party"
+    },
+    {
+      "name": "Product analytics",
+      "tag": "OPTIONAL",
+      "desc": "Aggregate page and feature usage. No cross-site tracking, no advertising, never sold.",
+      "detail": "de_analytics — 90 days · first-party"
+    }
+  ]
+}

@@ -28,7 +28,7 @@ user reads the reply in the product.
 
 | Requirement | SPEC sentence (anchor) | Step ids | Cluster |
 |---|---|---|---|
-| SUP-02-R01 | "A case is opened when ANY of these is true; each is decided by deterministic code … never by the model's own judgement … E1 … E8" | | |
+| SUP-02-R01 | "A case is opened when ANY of these is true; each is decided by deterministic code … E2 … fixed coercion list includes exactly `I am being told what to type by someone on the phone` … a co-occurring zone intent takes precedence … E1 … E8" | | |
 | SUP-02-R02 | "`support.case` gains: `identity_owner_ref` … `trigger_predicate` … `tool_calls` … `support.case_event` records every state transition" | | |
 | SUP-02-R03 | "≤ 80 words … `summary_authoritative = false` … label 'Model-written summary — advisory' … forbids any statement about who the user is" | | |
 | SUP-02-R04 | "row is committed before the user sees the acknowledgement (≤ 2 s) … `summary_at − created_at` ≤ 60 s at p100 … `summary_status = TIMED_OUT`" | | |

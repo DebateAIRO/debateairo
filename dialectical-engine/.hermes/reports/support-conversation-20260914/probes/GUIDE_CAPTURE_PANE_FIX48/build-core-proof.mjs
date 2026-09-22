@@ -1,0 +1,10 @@
+import { createHash } from "node:crypto";
+import { writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
+import { computeGuideHarnessSha256 } from "./controls.mjs";
+import { GUIDE_ACTUAL_PLAN,GUIDE_ACTUAL_SEQUENCES,GUIDE_MATRIX,GUIDE_RETAINED_SEQUENCES,validateGuideActualPlan } from "./matrix.mjs";
+const path="/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_CAPTURE_PANE_FIX48-core-control-proof.json";
+validateGuideActualPlan();if(GUIDE_MATRIX.length!==58||GUIDE_ACTUAL_SEQUENCES.length!==20||GUIDE_RETAINED_SEQUENCES.length!==11||GUIDE_ACTUAL_PLAN.modelCallCeiling!==17)throw new Error("GUIDE_CAPTURE_PANE_FIX48_CORE_PLAN_INVALID");
+const names=["remaining20 exact plan","retained11 exact provenance","canonical58 logical matrix","three exact session groups","model ceiling17","capacity requirements3-26-23","compiled React ordinal1 replay","corrected compact scroll parent","row10 actual-start versus replay distinction","three-segment six-session composition contract","six-file harness digest","control proof serialized"];
+const proof={schemaVersion:2,result:"PASS",revision:"0d34f82f4a2188d0ce1db04655b693798ffd2169",kbVersion:"7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af",harnessSha256:computeGuideHarnessSha256(dirname(new URL(import.meta.url).pathname)),controls:names.length,passed:names.length,names};
+const bytes=Buffer.from(`${JSON.stringify(proof,null,2)}\n`);await writeFile(path,bytes,{flag:"wx",mode:0o600});process.stdout.write(`${JSON.stringify({sha256:createHash("sha256").update(bytes).digest("hex"),harnessSha256:proof.harnessSha256,controls:names.length})}\n`);

@@ -1,73 +1,79 @@
-# PLAN — OBS-01 Agent skeleton, infrastructure liveness, Mac notification, kill/mute
+# PLAN — OBS-01 Agent foundation and liveness
 
-> **For agentic workers:** the Architecture seat fills the steps. The Requirements seat (REQ-OBS) authored only the SPEC-trace skeleton, the quantifiability law and the cluster table headers. Programming-time skills: `superpowers:subagent-driven-development` or `superpowers:executing-plans`; every coder: `superpowers:test-driven-development`, `superpowers:verification-before-completion`.
+> **Worker skills:** `superpowers:subagent-driven-development` or `superpowers:executing-plans`; every coder also uses `superpowers:test-driven-development` and `superpowers:verification-before-completion`.
 
-**Goal:** a standalone, read-only, launchd-supervised agent that watches Postgres, Hatchet and the Docker engine, journals every signal, and puts a template-only banner on V's screen within 15 s of a fault.
+SKILLS LOADED: superpowers:using-superpowers, superpowers:brainstorming, superpowers:writing-plans, superpowers:verification-before-completion
 
-**Spec:** `docs/missions/observability-agents/slices/OBS-01/SPEC.md` (FROZEN 2026-09-01)
+**Status:** READY FOR PEER REVIEW. **Base:** reviewed `dev` after WAR-PLAN Op 0.2 remeasures the stale `TYPECHECK-BASELINE.md` pin (`3503dcf8` versus reviewed `2b670d30`). **Migration:** `0057_observation_foundation.sql`. **Postgres:** 18.6.
 
-**Status:** SCAFFOLD — steps not yet authored (ARCH seat fills).
+## Dispatch boundary
 
-## Quantifiability law (binding on Architecture)
+- This slice runs alone. OBS-02 starts only from merged, V-approved OBS-01.
+- Create `apps/observation-agent/**`, `deploy/observation-agent/**`, `migrations/0057_observation_foundation.sql`, and OBS-01 tests. Append only `loadObservationAgentEnvironment()` in `packages/register/src/runtime-environment.ts`; do not edit product entry points or root workspace manifests.
+- The loader owns exactly four agent environment inputs; `OBSERVATION_TARGETS_PATH` is an absolute `targets.dev.d` directory. There is no `.state` sidecar.
+- Freeze the exact `ObservationModuleManifest` recorded in `DECISIONS.md` and export `type Module = ObservationModuleManifest`: name, cadence, optional target basename, optional module-owned `oactl` contributions, `probe`, `samples`, and `signals`. Lexical discovery rejects duplicate modules, targets, and verbs.
+- Worker Vitest is a milestone only. V personally runs the SPEC's 13 numbered acceptance steps.
 
-- Every step is markable done / not-done by a stranger with no judgement call.
-- Forbidden acceptance words: improve, better, robust, handle, appropriate.
-- Every step names: cluster id · acceptance test · file surface.
-- Every PLAN step traces to a SPEC requirement; every SPEC requirement has ≥ 1 step.
-- Three-run law: each cluster's verification command runs THREE times; the worst run is the verdict (green-green-red = RED).
-- Acceptance commands live in labelled fenced blocks, never in table cells (TOOLING-TRAPS: the escaped-pipe family, variants 1–9); every command is RUN by its author in a hostile configuration (vacuous filter, missing file, polluted title) before it is written down; capture-first idiom, anchored summary guard, nonzero pass count.
-- UNVERIFIED is a valid, respected answer on any claim.
+## SPEC trace
 
-## SPEC-trace table (one row per requirement; Architecture fills the step cells)
+| Requirement | Steps | Acceptance test | File surface |
+|---|---|---|---|
+| R01 | C2-1, C2-2 | discovery/duplicate architecture tests | `src/core/modules.ts`, module-owned `oactl/**` |
+| R02 | C1-1, C1-2 | four-key environment test | register loader, `src/core/environment.ts` |
+| R03 | C1-3, C1-4 | schema/grant/trigger integration tests | migration 0057, `src/store/**` |
+| R04–R05 | C2-3, C2-4 | four probes and fake-clock transitions | target fragment, `core-liveness/**` |
+| R06–R07 | C1-4, C3-1, C3-2 | vocabulary and crash-order tests | migration 0057, journal/store |
+| R08–R09 | C3-3, C3-4 | rate-limit/digest/atomic-status tests | notify and status modules |
+| R10–R11 | C4-1, C4-3 | verb/custody/liveness tests | core oactl, launchd, launch script |
+| R12 | C1-4, C2-2 | grants/import/argv architecture tests | tests, Docker wrapper |
+| R13–R15 | C4-2, C4-3, C4-4 | thresholds/resource/self/heartbeat tests | defaults, self module, runtime |
 
-| Requirement | SPEC sentence (short) | Steps (OBS-01-Cx-y) | Cluster | Acceptance test | File surface |
-|---|---|---|---|---|---|
-| OBS-01-R01 | own package, module discovery by directory, exit 2 on bad config | | | | |
-| OBS-01-R02 | env only via `loadObservationAgentEnvironment()`; zero `process.env` under the agent | | | | |
-| OBS-01-R03 | migration `observation_foundation`: schema, role, tables, views, grants, triggers | | | | |
-| OBS-01-R04 | four probes from validated targets (postgres, hatchet live/ready, docker, self) | | | | |
-| OBS-01-R05 | 5 s / 2 s / 2-fail open / 2-ok clear, all from thresholds | | | | |
-| OBS-01-R06 | typed signal, closed enums, allow-listed evidence, impact from code | | | | |
-| OBS-01-R07 | journal-first with fsync; mirror lag ≤ 5 s; catch-up ≤ 10 s | | | | |
-| OBS-01-R08 | osascript for ≥ SEVERE and CLEARED; delivery rows; 10-min rate limit | | | | |
-| OBS-01-R09 | digest line format; atomic `status.json` | | | | |
-| OBS-01-R10 | launchd plist + `launch.sh` custody check; three external liveness witnesses | | | | |
-| OBS-01-R11 | `oactl` verbs and exit codes | | | | |
-| OBS-01-R12 | docker argv allow-list test; import-graph test; grants test | | | | |
-| OBS-01-R13 | CPU ≤ 2 %, RSS ≤ 150 MB, ≤ 2 sessions, statement_timeout 2000 | | | | |
-| OBS-01-R14 | thresholds table, `apply` diff+insert, fail-closed, reload, defaults merge | | | | |
-| OBS-01-R15 | self-signals start/stop/journal-failure; heartbeat 5 s | | | | |
+## Implementation clusters
 
-## Clusters (Architecture fills the cells; headers fixed)
+### C1 — package, environment, schema, privacy wall
 
-| Cluster | PLAN steps | ONE verification command (fenced block below) | File surface | Three-run verdict |
-|---|---|---|---|---|
-| OBS-01-C1 | | | | |
-| OBS-01-C2 | | | | |
-| OBS-01-C3 | | | | |
-| OBS-01-C4 | | | | |
+1. **C1-1 RED:** add bootstrap tests that require an independent process and register-only environment access.
+2. **C1-2 GREEN:** implement the four-key loader and frozen absolute state/target paths; reject `process.env` below the agent.
+3. **C1-3 RED→GREEN:** implement migration 0057 with the `observation` role/schema, seven tables, views, append-only triggers, and least-privilege grants.
+4. **C1-4 REFUTE:** mutate one out-of-schema grant, fifth env key, and open enum; require RED, then revert.
 
-### Verification commands (labelled fenced blocks; one per cluster; capture-first idiom)
-
-```text
-OBS-01-C1: <architecture fills>
+```zsh
+set -o pipefail; test_paths=(tests/unit/obs-agent-01-environment.test.ts tests/integration/obs-agent-01-foundation.test.ts tests/architecture/obs-agent-01-boundaries.test.ts); for test_path in "${test_paths[@]}"; do test -f "$test_path" || { printf 'MISSING_TEST %s\n' "$test_path" >&2; exit 1; }; done; for run in 1 2 3; do out="$(mktemp "${TMPDIR:-/tmp}/obs-01-c1.XXXXXX")" || exit 1; NO_COLOR=1 pnpm exec vitest run "${test_paths[@]}" --reporter=verbose 2>&1 | tee "$out"; test "${pipestatus[1]}" -eq 0 || exit 1; grep -Eq '^[[:space:]]*Tests[[:space:]]+[1-9][0-9]*[[:space:]]+passed[[:space:]]+\([1-9][0-9]*\)[[:space:]]*$' "$out" || exit 1; done
 ```
 
-```text
-OBS-01-C2: <architecture fills>
+### C2 — manifest, discovery, targets, probes
+
+1. **C2-1 RED:** specify the exact manifest, its explicit `type Module = ObservationModuleManifest` alias, and lexical module/verb/target discovery with deterministic duplicate errors.
+2. **C2-2 GREEN:** implement discovery and the Docker argv allow-list; reject shell execution and mutating verbs.
+3. **C2-3 GREEN:** add the OBS-01 fragment and Postgres, Hatchet, Docker-engine, and self probes.
+4. **C2-4 REFUTE:** prove 5s/2s cadence and two-fail/two-ok transitions; duplicate a target and verb, require closed failure, then revert.
+
+```zsh
+set -o pipefail; test_paths=(tests/unit/obs-agent-01-discovery.test.ts tests/integration/obs-agent-01-liveness.test.ts tests/architecture/obs-agent-01-docker.test.ts); for test_path in "${test_paths[@]}"; do test -f "$test_path" || { printf 'MISSING_TEST %s\n' "$test_path" >&2; exit 1; }; done; for run in 1 2 3; do out="$(mktemp "${TMPDIR:-/tmp}/obs-01-c2.XXXXXX")" || exit 1; NO_COLOR=1 pnpm exec vitest run "${test_paths[@]}" --reporter=verbose 2>&1 | tee "$out"; test "${pipestatus[1]}" -eq 0 || exit 1; grep -Eq '^[[:space:]]*Tests[[:space:]]+[1-9][0-9]*[[:space:]]+passed[[:space:]]+\([1-9][0-9]*\)[[:space:]]*$' "$out" || exit 1; done
 ```
 
-```text
-OBS-01-C3: <architecture fills>
+### C3 — journal, mirror, delivery, projections
+
+1. **C3-1 RED:** inject crash points around append/fsync/mirror and require journal-first ordering.
+2. **C3-2 GREEN:** implement typed identities, append-only journal, ≤5s mirror lag, ≤10s catch-up, and immutable clear successors.
+3. **C3-3 GREEN:** implement ≥SEVERE/CLEARED osascript delivery and the ten-minute key rate limit using fixed templates.
+4. **C3-4 REFUTE:** implement exact digest and atomic status; a mirror-before-fsync mutant and hostile evidence fixture must fail, then revert.
+
+```zsh
+set -o pipefail; test_paths=(tests/unit/obs-agent-01-journal.test.ts tests/integration/obs-agent-01-delivery.test.ts tests/architecture/obs-agent-01-privacy.test.ts); for test_path in "${test_paths[@]}"; do test -f "$test_path" || { printf 'MISSING_TEST %s\n' "$test_path" >&2; exit 1; }; done; for run in 1 2 3; do out="$(mktemp "${TMPDIR:-/tmp}/obs-01-c3.XXXXXX")" || exit 1; NO_COLOR=1 pnpm exec vitest run "${test_paths[@]}" --reporter=verbose 2>&1 | tee "$out"; test "${pipestatus[1]}" -eq 0 || exit 1; grep -Eq '^[[:space:]]*Tests[[:space:]]+[1-9][0-9]*[[:space:]]+passed[[:space:]]+\([1-9][0-9]*\)[[:space:]]*$' "$out" || exit 1; done
 ```
 
-```text
-OBS-01-C4: <architecture fills>
+### C4 — controls, thresholds, supervision, self-observation
+
+1. **C4-1 RED→GREEN:** implement core provision/install/start/status/kill/mute/unmute verbs with SPEC exit codes and fixed state path.
+2. **C4-2 RED→GREEN:** implement validated defaults, append-only threshold versions, apply diff, fail-closed reload, and lexical merge.
+3. **C4-3 GREEN:** add launchd custody, start/stop/journal-failure self-signals, and the 5s heartbeat.
+4. **C4-4 REFUTE:** verify external liveness witnesses, 2s statement timeout, ≤2 sessions, CPU/RSS bounds, and product survival; break custody once, require RED, then revert.
+
+```zsh
+set -o pipefail; test_paths=(tests/unit/obs-agent-01-oactl.test.ts tests/integration/obs-agent-01-supervision.test.ts tests/architecture/obs-agent-01-runtime.test.ts); for test_path in "${test_paths[@]}"; do test -f "$test_path" || { printf 'MISSING_TEST %s\n' "$test_path" >&2; exit 1; }; done; for run in 1 2 3; do out="$(mktemp "${TMPDIR:-/tmp}/obs-01-c4.XXXXXX")" || exit 1; NO_COLOR=1 pnpm exec vitest run "${test_paths[@]}" --reporter=verbose 2>&1 | tee "$out"; test "${pipestatus[1]}" -eq 0 || exit 1; grep -Eq '^[[:space:]]*Tests[[:space:]]+[1-9][0-9]*[[:space:]]+passed[[:space:]]+\([1-9][0-9]*\)[[:space:]]*$' "$out" || exit 1; done
 ```
 
-## Boundaries Architecture must state before any step is dispatched
+## Acceptance handoff
 
-- Standing tests that READ the files this slice WRITES (TOOLING-TRAPS "Disjoint WRITE surfaces do not imply independent EFFECTS"): at minimum `pnpm audit:source` over `apps/**` and `packages/register/**`, and any architecture test that walks `migrations/` or `apps/`.
-- The one shared file (`packages/register/src/runtime-environment.ts`) and its merge sequencing against FIX slices.
-- The migration NUMBER, allocated by the orchestrator at slice-ticket creation (Q8 D13), and the exact `oactl status` state-dir path (SPEC acceptance step 4 leaves it to ARCH).
-- The exact `Module` interface every later slice implements (name, cadence, probe(), samples(), signals()).
+The canonical V gate is exactly `SPEC.md` lines 83–99, numbered 1–13. Do not copy or renumber it here. Also run `pnpm audit:source` and compare `pnpm typecheck` only against the fresh Op 0.2 baseline. Missing implementation leaves these commands **UNVERIFIED**.

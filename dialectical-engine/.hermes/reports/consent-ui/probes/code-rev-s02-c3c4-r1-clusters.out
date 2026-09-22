@@ -1,0 +1,38 @@
+grep flavour in this shell: grep (BSD grep, GNU compatible) 2.6.0-FreeBSD
+LC_ALL=[] LANG=[]
+HEAD: fb44696d  porcelain:        0
+===== RUN 1 =====
+S02-C3 | vt=0 guard=0 VERDICT=0
+S02-C3 | Tests    :       Tests  28 passed (28)
+S02-C3 | TestFiles:  Test Files  3 passed (3)
+S02-C3 | FAILlines: 0
+S02-C3 run1 exit=0
+S02-C4 | vt=0 guard=0 VERDICT=0
+S02-C4 | Tests    :       Tests  32 passed (32)
+S02-C4 | TestFiles:  Test Files  4 passed (4)
+S02-C4 | FAILlines: 0
+S02-C4 run1 exit=0
+===== RUN 2 =====
+S02-C3 | vt=0 guard=0 VERDICT=0
+S02-C3 | Tests    :       Tests  28 passed (28)
+S02-C3 | TestFiles:  Test Files  3 passed (3)
+S02-C3 | FAILlines: 0
+S02-C3 run2 exit=0
+S02-C4 | vt=0 guard=0 VERDICT=0
+S02-C4 | Tests    :       Tests  32 passed (32)
+S02-C4 | TestFiles:  Test Files  4 passed (4)
+S02-C4 | FAILlines: 0
+S02-C4 run2 exit=0
+===== RUN 3 =====
+S02-C3 | vt=0 guard=0 VERDICT=0
+S02-C3 | Tests    :       Tests  28 passed (28)
+S02-C3 | TestFiles:  Test Files  3 passed (3)
+S02-C3 | FAILlines: 0
+S02-C3 run3 exit=0
+S02-C4 | vt=0 guard=0 VERDICT=0
+S02-C4 | Tests    :       Tests  32 passed (32)
+S02-C4 | TestFiles:  Test Files  4 passed (4)
+S02-C4 | FAILlines: 0
+S02-C4 run3 exit=0
+===== DONE =====
+porcelain at end:        0

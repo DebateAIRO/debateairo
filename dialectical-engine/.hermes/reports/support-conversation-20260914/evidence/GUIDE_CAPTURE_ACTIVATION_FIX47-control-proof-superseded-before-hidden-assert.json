@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_CAPTURE_ACTIVATION_FIX47",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_CAPTURE_ACTIVATION_BOUND_REVIEW_REQUIRED",
+  "controls": 7,
+  "passed": 7,
+  "checks": [
+    {
+      "name": "final seven phase self paths and LIVE36 contract",
+      "result": "PASS",
+      "contractSha256": "980b9fdd62e85c2c6b731a78825f5d82373f773e2357027768c40f224cbd0acf"
+    },
+    {
+      "name": "reachable closure binds actual shared activation helper",
+      "result": "PASS",
+      "count": 32,
+      "moduleClosureSha256": "5265e5736d158b3b0d5e98928264b047a8baef0273d794a61fb309a9fc7f88b4"
+    },
+    {
+      "name": "real compiled UI legacy negative and corrected visible/already-settled positives",
+      "result": "PASS",
+      "cases": 3,
+      "intercepted": {
+        "support": 0,
+        "status": 0,
+        "auth": 4,
+        "privateOrOtherApi": 0,
+        "external": 0,
+        "forwardedDynamic": 0
+      }
+    },
+    {
+      "name": "actual capture loads through shared helper to gate boundary",
+      "result": "PASS"
+    },
+    {
+      "name": "real operator accepts final digest and rejects stale digest",
+      "result": "PASS"
+    },
+    {
+      "name": "fresh LIVE36/GUIDE25 outputs absent with retained owner paths",
+      "result": "PASS",
+      "count": 115
+    },
+    {
+      "name": "proof serialized",
+      "result": "PASS"
+    }
+  ],
+  "contractSha256": "980b9fdd62e85c2c6b731a78825f5d82373f773e2357027768c40f224cbd0acf",
+  "moduleClosureSha256": "5265e5736d158b3b0d5e98928264b047a8baef0273d794a61fb309a9fc7f88b4",
+  "traffic": {
+    "runtime": false,
+    "http": false,
+    "status": 0,
+    "capacity": 0,
+    "database": 0,
+    "support": 0,
+    "model": 0,
+    "browserCompiledUi": true,
+    "dynamicForwarded": 0
+  }
+}

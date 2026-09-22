@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "node": "GUIDE_PREFLIGHT_SCHEMA_FIX49",
+  "revision": "0d34f82f4a2188d0ce1db04655b693798ffd2169",
+  "verdict": "PASS_PREFLIGHT_SCHEMA_BOUND_REVIEW_REQUIRED",
+  "changed": {
+    "entrypoint": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_SCHEMA_FIX49/phase-preflight.mjs",
+    "sharedValidator": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_SCHEMA_FIX49/preflight-schema.mjs",
+    "composition": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/GUIDE_PREFLIGHT_SCHEMA_FIX49/composition.mjs",
+    "before": {
+      "schemaVersion": 1,
+      "retainedRows": 10,
+      "remainingRows": 21
+    },
+    "after": {
+      "schemaVersion": 2,
+      "retainedRows": 11,
+      "remainingRows": 20
+    },
+    "boundary": "intercepted immediately before unchanged actual UI child spawn"
+  },
+  "phases": [
+    {
+      "phase": "preflight",
+      "directCompositionConsumer": true,
+      "disposition": "CORRECTED_SCHEMA2_11_20"
+    },
+    {
+      "phase": "readiness",
+      "directCompositionConsumer": false,
+      "disposition": "COMPATIBLE_UNCHANGED"
+    },
+    {
+      "phase": "capacity",
+      "directCompositionConsumer": false,
+      "disposition": "COMPATIBLE_UNCHANGED_3_26_23"
+    },
+    {
+      "phase": "gate",
+      "directCompositionConsumer": false,
+      "disposition": "COMPATIBLE_UNCHANGED"
+    },
+    {
+      "phase": "rowProof",
+      "directCompositionConsumer": false,
+      "disposition": "COMPATIBLE_UNCHANGED_LOGICAL58"
+    },
+    {
+      "phase": "capture",
+      "directCompositionConsumer": false,
+      "disposition": "COMPATIBLE_UNCHANGED_REMAINING20_COMPOSER_SCHEMA2"
+    },
+    {
+      "phase": "idle",
+      "directCompositionConsumer": false,
+      "disposition": "COMPATIBLE_UNCHANGED"
+    }
+  ],
+  "retained": {
+    "compiledReactReplay": "PASS3_OF_3_NOT_RERUN",
+    "logicalRows": "PASS58_OF_58_NOT_RERUN",
+    "actualGuideNamespace": "GUIDE_LIVE_GUIDE26_UNUSED",
+    "ownerOutputs": "UNCHANGED_UNUSED"
+  }
+}
