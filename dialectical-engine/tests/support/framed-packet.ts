@@ -1,5 +1,7 @@
 import {
   buildFramedPrompt,
+  readPromptFrame,
+  type FramedMaterialField,
   type FramedPrompt,
   type PromptContract,
   type PromptPacket
@@ -45,4 +47,74 @@ export function framedPacketOfWireSize(
 ): PromptPacket {
   const overhead = wireBytes(framedFixturePacket("").messages);
   return framedFixturePacket("a".repeat(totalBytes - overhead));
+}
+
+/* ------------------------------------------------------------ the reader */
+
+/**
+ * Fix round 4 — THE ONE READER a test double or helper may use on a model
+ * packet.
+ *
+ * Three rounds of string sweeps missed shape assumptions INSIDE test doubles:
+ * `JSON.parse(message.content)` on a user message that is now a fenced block
+ * (it threw into a `catch` and returned `[]` silently, so every review fixture
+ * answered with zero edge bearings), a payload key read off the bare envelope,
+ * and a route on `system.startsWith(...)` where the system message now opens
+ * with the owners' editable instruction. Each was a private copy of the
+ * packet's shape; each rotted, unrun, the moment the shape moved.
+ *
+ * This reader has no private copy. It calls `readPromptFrame` — the exact code
+ * the gateway's door runs — so what a test reads is what the provider was sent,
+ * and a packet the door would refuse is refused here with the door's own code
+ * instead of being read as nothing. `tests/architecture/packet-read-through-the-frame.test.ts`
+ * forbids the three shapes above under `tests/integration/` and `acceptance/`,
+ * so the next prompt change cannot break a suite silently again.
+ */
+export interface FramedMaterial {
+  /** The prompt contract the packet was built for, e.g. `serve.synthesizer.v1`. */
+  readonly contractId: string;
+  /** Every material field of every block, in wire order — a repair turn's included. */
+  readonly fields: readonly FramedMaterialField[];
+}
+
+/** A packet as a double sees it before the type is known: any role string, any content string. */
+export interface WirePacket {
+  readonly messages: readonly { readonly role: string; readonly content: string }[];
+}
+
+export function readFramedMaterial(packet: PromptPacket | WirePacket): FramedMaterial {
+  const frame = readPromptFrame(packet as PromptPacket);
+  return Object.freeze({ contractId: frame.contractId, fields: frame.fields });
+}
+
+/**
+ * The content of ONE named field. A field that is not there is a loud failure,
+ * never an empty default — the empty default is exactly what let ~40 review
+ * fixtures emit `edge_bearings: []` without a test going red.
+ */
+export function framedField(material: FramedMaterial, name: string): string {
+  const field = material.fields.find((entry) => entry.name === name);
+  if (field === undefined) {
+    throw new TypeError(`FRAMED_FIELD_ABSENT:${name}`);
+  }
+  return field.content;
+}
+
+/**
+ * The packet inside the body a provider double received on the wire
+ * (`{ model, max_tokens, messages }`). Only the messages are returned; a body
+ * without them is refused rather than read as an empty packet.
+ */
+export function wirePacket(body: string): WirePacket {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    throw new TypeError("WIRE_PACKET_NOT_JSON");
+  }
+  const messages = (parsed as { messages?: unknown } | null)?.messages;
+  if (!Array.isArray(messages)) {
+    throw new TypeError("WIRE_PACKET_MESSAGES_ABSENT");
+  }
+  return Object.freeze({ messages: messages as WirePacket["messages"] });
 }
