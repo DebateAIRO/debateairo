@@ -22,6 +22,7 @@
     "generate:contract": "tsx packages/contract/src/generate.ts",
     "db:migrate": "tsx apps/runner/src/migrate-cli.ts",
     "db:provision-principals": "tsx apps/runner/src/production-database-principals-cli.ts",
+    "keys:rotate-kek": "tsx apps/runner/src/rotate-kek-cli.ts",
     "dev:auth:provision-principals": "tsx apps/runner/src/dev-database-principals-cli.ts",
     "dev:auth:generate-secrets": "tsx apps/runner/src/dev-secret-files-cli.ts",
     "dev:auth:seed-register": "tsx apps/runner/src/dev-deployment-register-cli.ts",

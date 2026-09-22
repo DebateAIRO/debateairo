@@ -807,3 +807,28 @@ describe("V-3 rotate: the publication store follows the API's own rule", () => {
     ])).toBe(true);
   });
 });
+
+/**
+ * INT2 (SYNC2 into integration), 2026-09-22 — the deferred one-line script.
+ *
+ * `rotate-kek-cli.ts`, `packages/crypto/SECRET_STORE_LAYOUT.md` and the VPS
+ * runbook all call this command `pnpm keys:rotate-kek`, and until now none of
+ * them could: the script did not exist, so an operator following the written
+ * procedure got "Command not found" at the moment a master key is suspected of
+ * exposure. Declared here rather than in a source-text grep of the runbook,
+ * because what must be true is that the NAME the documents use resolves to the
+ * CLI the tests above drive.
+ */
+describe("V-3 rotate: the operator's command has the name the documents give it", () => {
+  it("declares keys:rotate-kek, running the CLI through tsx like its siblings", async () => {
+    const manifest = JSON.parse(await readFile(
+      new URL("../../package.json", import.meta.url), "utf8"
+    )) as { scripts: Record<string, string> };
+
+    expect(manifest.scripts["keys:rotate-kek"])
+      .toBe("tsx apps/runner/src/rotate-kek-cli.ts");
+    // The sibling shape, so the name cannot drift into a different runner: every
+    // operator CLI under apps/runner/src is invoked by `tsx <path>`.
+    expect(manifest.scripts["db:migrate"]).toMatch(/^tsx apps\/runner\/src\/.+-cli\.ts$/u);
+  });
+});

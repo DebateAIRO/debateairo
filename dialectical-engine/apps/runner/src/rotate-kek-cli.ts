@@ -1,8 +1,10 @@
 /**
- * V-3 — the operator's master-key rotation. Named `pnpm keys:rotate-kek` once
- * that one-line script exists; until then:
+ * V-3 — the operator's master-key rotation. Run as `pnpm keys:rotate-kek`
+ * (declared in package.json at INT2, 2026-09-22), or spelled out as
  *
  *   pnpm exec tsx apps/runner/src/rotate-kek-cli.ts
+ *
+ * which is the form the VPS runbook invokes under `systemd-run`.
  *
  * Re-wraps every stored key under the CURRENT master keys, then verifies that
  * every record opens under those keys ALONE. Content is never re-encrypted.
