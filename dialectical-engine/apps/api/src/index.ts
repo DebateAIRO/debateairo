@@ -251,11 +251,23 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "CONVERGENCE_CONTROLS_INVALID",
   "CONVERGENCE_CONTROLS_PROVENANCE_MISSING",
   "CONVERGENCE_CONTROLS_UNRESOLVED",
+  "COST_ENVELOPE_CEILING_INVALID",
+  "COST_ENVELOPE_CHARGE_UNREPRESENTABLE",
+  "COST_ENVELOPE_DAY_INVALID",
+  "COST_ENVELOPE_GUARD_INPUT_INVALID",
+  "COST_ENVELOPE_PRICE_INVALID",
+  "COST_ENVELOPE_PRICE_UNPRICED",
+  "COST_ENVELOPE_PROJECTION_INVALID",
+  "COST_ENVELOPE_RESERVATION_TTL_INVALID",
+  "COST_ENVELOPE_RUN_REQUIRED",
+  "COST_ENVELOPE_SPEND_INVALID",
+  "COST_ENVELOPE_USAGE_INVALID",
   "CRITERION_ID_DUPLICATE",
   "CRITERION_ID_INVALID",
   "CRITERION_LABEL_INVALID",
   "CRITIC_UNAVAILABLE_BAND_CAP_UNRESOLVED",
   "CRITIQUE_CONTEXT_NOT_ISOLATED",
+  "DAILY_COST_ENVELOPE_REACHED",
   "DATABASE_POOL_FAILED",
   "DEBATE_EXPANSION_PARENT_MISSING",
   "DEBATE_MAKER_UNRESOLVED",
@@ -368,6 +380,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "LIVENESS_TIME_INVALID",
   "MAKER_INVENTORY_UNSATISFIED",
   "MAKER_POLICY_INVALID",
+  "MAKER_POSITION_DISCLOSURE_UNRESOLVED",
   "MAKER_POSITION_UNAVAILABLE",
   "MALFORMED_ARROW_ORDER",
   "MEMORY_ASKER_SCOPE_MISMATCH",
@@ -435,6 +448,8 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PROVIDER_CALL_INSIDE_TRANSACTION",
   "PROVIDER_CONTENT_UNACCEPTED",
   "PROVIDER_RUN_REQUIRED",
+  "PROVIDER_USAGE_INVALID",
+  "PROVIDER_USAGE_UNREPORTED",
   "PUBLICATION_LEASE_SCOPE_EXPANSION_FORBIDDEN",
   "QUERY_SET_REF_REQUIRED",
   "RAW_ARTIFACT_RUN_REQUIRED",
@@ -459,6 +474,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_CONTENT_ENCRYPTION_REQUIRED",
   "RUN_CONTENT_ROLLBACK_INCOMPLETE",
   "RUN_COST_ENVELOPE_EXHAUSTED",
+  "RUN_COST_ENVELOPE_MONEY_REACHED",
   "RUN_COST_ENVELOPE_UNRESOLVED",
   "RUN_DEPTH_PARAMS_INVALID",
   "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
@@ -1261,6 +1277,47 @@ export interface EvaluatorDevMenuApplication {
  * be admitted. Typed errors from deployment reads or persistence deliberately
  * do not receive this marker and therefore remain internal failures.
  */
+/**
+ * RULING R1 (V-28, review round 2) — THE DAY-SPENT REFUSAL IS A RETRY.
+ *
+ * Every ask refusal answers 422 ("this request is wrong") except this one, which
+ * is not wrong: it is well formed, it would have been admitted an hour earlier,
+ * and it will be admitted again after midnight. 429 with `Retry-After` says "not
+ * now, and here is when" — the next UTC midnight, the instant the daily envelope
+ * resets — so a caller waits the right amount of time instead of hammering the
+ * surface or giving up on a debate it could still have.
+ */
+export function askRefusalStatus(code: string): 422 | 429 {
+  return code === "DAILY_COST_ENVELOPE_REACHED" ? 429 : 422;
+}
+
+/**
+ * I6 (re-review) — WHAT THE CALLER IS TOLD.
+ *
+ * The daily refusal's message carries the deployment's ceiling and its spend so
+ * far, because that is what an operator needs to see. It is NOT what a caller
+ * needs: it is a commercial figure, and a capacity oracle for anyone who wants
+ * to exhaust the day — ask once, read the ceiling, ask again and watch the
+ * number climb. Same class as the support status-page leak DL1-F4.
+ *
+ * So the public body for this one refusal is the CODE. Every other ask refusal
+ * keeps its message, because those describe the ASK the caller sent and
+ * withholding them would only make a lawful refusal unactionable. The figures
+ * stay on the error, and the boundary logs them for the operator.
+ */
+export function askRefusalPublicMessage(code: string, message: string): string {
+  return code === "DAILY_COST_ENVELOPE_REACHED" ? code : message;
+}
+
+/** The HTTP-date for the next UTC midnight, or `null` when retrying cannot help. */
+export function askRefusalRetryAfter(code: string, now: Date): string | null {
+  if (askRefusalStatus(code) !== 429) return null;
+  const midnight = new Date(Date.UTC(
+    now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1
+  ));
+  return midnight.toUTCString();
+}
+
 export class AskRefusal extends Error {
   readonly code: string;
 
@@ -1578,7 +1635,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const statusCode = malformed ? 400
       : authFlow ? knownError.statusCode
         : argon2Unavailable ? 503
-          : askRefusal ? 422 : 500;
+          // R1: an ask refusal is 422, except the one that will pass tomorrow.
+          : askRefusal ? askRefusalStatus(knownError.code) : 500;
     const errorCode = malformed
       ? "MALFORMED_REQUEST"
       : authFlow ? knownError.code
@@ -1593,9 +1651,25 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         diagnostic: apiOperationalErrorDiagnostic(knownError)
       })));
     }
+    // R1: `Retry-After` names the instant the daily envelope resets, so a client
+    // library that honours the header waits exactly as long as it must.
+    const retryAfter = askRefusal ? askRefusalRetryAfter(knownError.code, new Date()) : null;
+    if (retryAfter !== null) reply.header("retry-after", retryAfter);
+    // I6: the spend figures the refusal carries are the OPERATOR's, so they are
+    // logged here and withheld from the body below.
+    if (askRefusal && askRefusalPublicMessage(knownError.code, knownError.message) !== knownError.message) {
+      console.error(JSON.stringify(Object.freeze({
+        event: "api.ask.refused",
+        requestId: request.id,
+        code: knownError.code,
+        detail: knownError.message
+      })));
+    }
     return reply.status(statusCode).send({
       error: errorCode,
-      message: statusCode >= 500 || malformed ? errorCode : knownError.message
+      message: statusCode >= 500 || malformed
+        ? errorCode
+        : askRefusal ? askRefusalPublicMessage(knownError.code, knownError.message) : knownError.message
     });
   });
 
@@ -2277,6 +2351,17 @@ export interface RunCreationSettings {
   readonly batteryVersion: string;
   readonly settlementWatchHandle: string;
   readonly memoryPullPolicy?: MemoryQuestionRegistration["pullPolicy"];
+  /**
+   * V-28(2) — THE DAILY MONEY ENVELOPE, asked of a NEW run and nowhere else.
+   *
+   * Absent means no daily bound, which is local mode's behaviour byte-for-byte:
+   * the relays and loopback model servers spend nothing this could bound. The
+   * hosted composition supplies `CostEnvelopeGuard.assertDailyEnvelopeAdmitsNew-
+   * Run`, which refuses `DAILY_COST_ENVELOPE_REACHED` once the application's UTC
+   * day has reached the sealed ceiling. Runs already under way never consult it
+   * and finish.
+   */
+  readonly assertDailyCostEnvelope?: () => Promise<void>;
   readonly resolveDiscoveredPanel: () => Promise<readonly DiscoveredPanelMember[]>;
   readonly resolveEnvelopeBasis: (input: {
     readonly depthParams: Readonly<Record<string, unknown>>;
@@ -2311,6 +2396,25 @@ export async function evaluateAskAdmission(
   readonly discoveredPanel: readonly DiscoveredPanelMember[];
   readonly criticUnavailableCap: ReturnType<typeof applyCriticUnavailableCap>;
 }> {
+  /**
+   * V-28(2) — FIRST, before anything is discovered or probed.
+   *
+   * Panel discovery probes every configured vendor, and a probe is itself a
+   * request to a paid gateway. Taking the money decision after it would spend
+   * money to find out that no money may be spent, so the day's ceiling is the
+   * first question this function asks.
+   *
+   * It is marked as an ask REFUSAL, like every other decision taken at this
+   * stage: the boundary answers 422 with the typed code for an `AskRefusal` and
+   * 500 INTERNAL_ERROR for anything else, so an unwrapped budget-reached ask
+   * would read to the caller — and in the operator's logs — as the engine having
+   * broken, when in fact it worked exactly as ruled.
+   */
+  try {
+    await settings.assertDailyCostEnvelope?.();
+  } catch (error) {
+    markAskRefusal(error);
+  }
   const risk = settings.resolveRisk(ask.risk_tier, ask.tier_source, ask.tier_provenance_ref);
   const discoveredPanel = await settings.resolveDiscoveredPanel();
   const makers = Object.freeze([...new Set(discoveredPanel.map((member) => member.maker))]);

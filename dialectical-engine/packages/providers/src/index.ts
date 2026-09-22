@@ -84,6 +84,13 @@ export interface ProviderCallRequest {
    * database (DL4-F3).
    */
   readonly assertAttemptAllowed?: () => void | Promise<void>;
+  /**
+   * V-28: the money bound for THIS call. Per request and not per gateway,
+   * because the price is the target's but the SPEND is the run's, and a gateway
+   * is built once per target and then serves every run that reaches it.
+   * Absent = no money bound, which is local mode byte-for-byte.
+   */
+  readonly costEnvelope?: ProviderCostEnvelopeSeam;
 }
 
 export class ProviderCallFailedError extends TypedDomainError {
@@ -147,7 +154,47 @@ export type ProviderDiscoveryTarget = Readonly<{
    * downstream can re-open it and no gateway carries a file name.
    */
   authorizationFile?: string;
+  /**
+   * V-28: this vendor's price, in USD micro-units per MILLION tokens — the unit
+   * every vendor publishes. Integers, because money is never a float, and BOTH
+   * sides or neither, because input and output are priced differently and half a
+   * price cannot bill a call.
+   *
+   * Optional here and REQUIRED in hosted mode (`assertHostedProviderTargets`): a
+   * local relay or loopback model server costs no money, so demanding a price of
+   * it would be an outage rather than a protection.
+   */
+  inputPriceMicrosPerMillionTokens?: number;
+  outputPriceMicrosPerMillionTokens?: number;
 }>;
+
+/**
+ * The target's price in the shape `@debateai/budget` charges with, or `null`
+ * when the target declares none. One reader, so no call site re-derives the
+ * field names or the unit.
+ */
+export function providerTargetPrice(target: ProviderDiscoveryTarget): Readonly<{
+  inputMicrosPerMillionTokens: number;
+  outputMicrosPerMillionTokens: number;
+}> | null {
+  if (target.inputPriceMicrosPerMillionTokens === undefined
+    || target.outputPriceMicrosPerMillionTokens === undefined) {
+    return null;
+  }
+  return Object.freeze({
+    inputMicrosPerMillionTokens: target.inputPriceMicrosPerMillionTokens,
+    outputMicrosPerMillionTokens: target.outputPriceMicrosPerMillionTokens
+  });
+}
+
+/** An integer price in micro-units per million tokens, or a typed refusal. */
+function providerTargetPriceAmount(value: unknown): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0
+    || value > Number.MAX_SAFE_INTEGER) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_PRICE_INVALID");
+  }
+  return value;
+}
 
 function requiredProviderTargetText(value: unknown, code: string): string {
   if (typeof value !== "string" || value.trim() === "" || value !== value.trim()) {
@@ -214,10 +261,29 @@ export function parseProviderDiscoveryTargets(
     }
     const row = candidate as Readonly<Record<string, unknown>>;
     if (Object.keys(row).some((key) => ![
-      "provider_ref", "base_url", "model", "authorization_header", "authorization_file"
+      "provider_ref", "base_url", "model", "authorization_header", "authorization_file",
+      // V-28: the vendor's price, declared beside the vendor.
+      "input_price_micros_per_million", "output_price_micros_per_million"
     ].includes(key))) {
       throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
     }
+    // Both sides or neither. A target with one half declared is an operator's
+    // half-finished edit, and billing a call at half its price is worse than
+    // refusing to start: the envelope would under-count every call for as long
+    // as nobody noticed.
+    const declaresInputPrice = row.input_price_micros_per_million !== undefined;
+    const declaresOutputPrice = row.output_price_micros_per_million !== undefined;
+    if (declaresInputPrice !== declaresOutputPrice) {
+      throw new TypeError("PROVIDER_DISCOVERY_TARGET_PRICE_INVALID");
+    }
+    const price = declaresInputPrice
+      ? Object.freeze({
+          inputPriceMicrosPerMillionTokens:
+            providerTargetPriceAmount(row.input_price_micros_per_million),
+          outputPriceMicrosPerMillionTokens:
+            providerTargetPriceAmount(row.output_price_micros_per_million)
+        })
+      : undefined;
     const providerRef = requiredProviderTargetText(
       row.provider_ref,
       "PROVIDER_DISCOVERY_TARGET_PROVIDER_REF_INVALID"
@@ -256,7 +322,8 @@ export function parseProviderDiscoveryTargets(
       baseUrl: normalizedProviderBaseUrl(row.base_url),
       model: requiredProviderTargetText(row.model, "PROVIDER_DISCOVERY_TARGET_MODEL_INVALID"),
       ...(authorizationHeader === undefined ? {} : { authorizationHeader }),
-      ...(authorizationFile === undefined ? {} : { authorizationFile })
+      ...(authorizationFile === undefined ? {} : { authorizationFile }),
+      ...(price === undefined ? {} : price)
     }));
   }
   if (targetsByRef.size !== configuredByRef.size) {
@@ -454,6 +521,51 @@ export function assertHostedProviderTargets(
 }
 
 /**
+ * V-28 — A HOSTED DEBATE TARGET MUST DECLARE ITS PRICE.
+ *
+ * Without one its calls cannot be billed against the per-run or the daily
+ * envelope, so its spend is unbounded in exactly the way V-28(3) refuses to
+ * allow — and unbounded SILENTLY, since every call would charge zero. Same
+ * fail-closed reasoning as the vendor that reports no usage, one step earlier:
+ * refuse at boot, where the operator can fix the declaration, rather than
+ * mid-debate.
+ *
+ * DELIBERATELY SEPARATE from `assertHostedProviderTargets`. That function is the
+ * URL-and-credential rule, and the support chat's own model target goes through
+ * it too (V-30, `parseSupportModelTargetJson`) — but the support chat keeps its
+ * OWN spend accounting on `support.message`, which task 12 owns and task 11 was
+ * told not to duplicate, so nothing would read a price declared on it. A
+ * requirement nobody consumes is configuration theatre. The rule therefore lives
+ * with the control that consumes it, and the two shipped roots call it on the
+ * DEBATE targets beside the mode decision.
+ */
+export function assertPricedProviderTargets(
+  targets: readonly ProviderDiscoveryTarget[],
+  mode: "hosted" | "local"
+): void {
+  if (mode !== "hosted") return;
+  for (const target of targets) {
+    const price = providerTargetPrice(target);
+    if (price === null) {
+      throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
+    }
+    /**
+     * C2 (review round 2) — A DECLARED PRICE OF ZERO IS NOT A PRICE.
+     *
+     * Zero is a lawful integer and it PROPAGATES: every projection and every
+     * charge comes back 0, the run's total never moves, and both ceilings bound
+     * nothing — silently, with every other check green. One mistyped line in the
+     * target declaration and the whole control is off. The floor is one
+     * micro-unit per million tokens (1e-6 USD per million), far below any real
+     * vendor and impossible to reach by accident.
+     */
+    if (price.inputMicrosPerMillionTokens < 1 || price.outputMicrosPerMillionTokens < 1) {
+      throw new TypeError(`PROVIDER_TARGET_PRICE_ZERO:${target.providerRef}`);
+    }
+  }
+}
+
+/**
  * The ONE decision both shipped composition roots take over their parsed targets. The mode comes
  * from the register loader (`DEPLOYMENT_MODE`), so it is resolved before the first target is read.
  */
@@ -606,6 +718,54 @@ export interface ProviderLedgerInput {
   readonly finishedAt: Date;
 }
 
+/**
+ * V-28 (DL4-F2) — THE MONEY SEAM.
+ *
+ * The gateway holds the two facts only it knows (the exact bytes about to be
+ * sent, and this attempt's own token bound) and the usage the vendor reported;
+ * the POLICY — prices, ceilings, the running total, whether this deployment
+ * requires reported usage — lives entirely behind this interface, in
+ * `@debateai/budget`. That is what keeps this package free of the ledger and
+ * keeps every money rule testable without a database.
+ *
+ * Both members may refuse by throwing a typed error. A refusal from
+ * `assertCallAllowed` is raised BEFORE the request is sent, so nothing is
+ * recorded for it — exactly like `assertAttemptAllowed`. A refusal from
+ * `recordCall` is raised AFTER a call that has already been made and paid for,
+ * so the attempt is in the ledger with its artifact first. Neither is retried:
+ * see `PROVIDER_COST_ENVELOPE_REFUSAL_CODES`.
+ */
+export interface ProviderCostEnvelopeSeam {
+  readonly assertCallAllowed: (projection: Readonly<{
+    /** Bytes of the request body that is about to be sent, measured exactly. */
+    requestBytes: number;
+    /** This attempt's `max_tokens`, which a length retry raises (W10/2). */
+    completionTokenCeiling: number;
+  }>) => void | Promise<void>;
+  /**
+   * CHARGE what the vendor billed. Called for every attempt that produced a
+   * response body, whatever the engine then decides about it, and it NEVER
+   * refuses: it records money already taken, and a refusal here would be a
+   * reason not to record it (I4).
+   */
+  readonly recordCall: (observed: Readonly<{
+    providerRef: string;
+    /** The vendor's usage block as it arrived, or `null` if it reported none. */
+    usage: unknown;
+  }>) => void | Promise<void>;
+  /**
+   * The HOSTED requirement, asked only of a SUCCESSFUL completion: a vendor that
+   * answered and reported no usage cannot be billed, so nothing that follows can
+   * be bounded. Separate from `recordCall` because an error page reports no
+   * usage either, and a transport failure must not be renamed as an unbillable
+   * vendor (I4).
+   */
+  readonly assertUsageReported: (observed: Readonly<{
+    providerRef: string;
+    usage: unknown;
+  }>) => void | Promise<void>;
+}
+
 export interface OpenAICompatibleGatewayOptions {
   readonly endpoint: string;
   readonly model: string;
@@ -618,6 +778,24 @@ export interface OpenAICompatibleGatewayOptions {
   /** L4-F8: seam for the bounded backoff between HTTP attempts; real time by default. */
   readonly sleepImplementation?: (milliseconds: number) => Promise<void>;
 }
+
+/**
+ * V-28: refusals the money seam raises. Neither is repaired by asking again — a
+ * ceiling already reached is still reached one backoff later, and a vendor that
+ * reports no usage will report none on the retry — so both leave the attempt
+ * loop unwrapped rather than being absorbed into it and re-emerging as
+ * PROVIDER_CALL_FAILED after the ceiling is spent, which is the confusion the
+ * model-identity short-circuit exists to avoid.
+ */
+export const PROVIDER_COST_ENVELOPE_REFUSAL_CODES = Object.freeze([
+  "RUN_COST_ENVELOPE_MONEY_REACHED",
+  "PROVIDER_USAGE_UNREPORTED",
+  // SMALL (round 3): the gateway's seam cannot raise this today — the daily
+  // envelope is asked when a NEW run is admitted, not per call — but retrying a
+  // day that is spent would be as pointless as retrying a run that is, and the
+  // list is the kernel's, minus the one the gateway never sees.
+  "DAILY_COST_ENVELOPE_REACHED"
+] as const);
 
 /** L4-F3: a provider body is streamed and abandoned past this many bytes; nothing of it is persisted. */
 const MAX_PROVIDER_RESPONSE_BYTES = 4 * 1024 * 1024;
@@ -803,8 +981,30 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       // taken on the freshest state rather than on state read up to a backoff ago.
       if (attempt > 1) await sleep(providerBackoffMs(attempt));
       await request.assertAttemptAllowed?.();
-      attemptsMade = attempt;
       const attemptTokenCeiling = lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures);
+      // The packet cap (L4-F2) is taken on the body actually sent, which carries the
+      // per-attempt bound a length retry raised (W10/2).
+      const body = JSON.stringify({
+        model: this.#options.model,
+        max_tokens: attemptTokenCeiling,
+        messages: attemptPacket.messages
+      });
+      /**
+       * V-28 (DL4-F2) — THE MONEY DECISION, TAKEN BEFORE THE CALL.
+       *
+       * Vendor usage is only known AFTER the response, so "refuse the call that
+       * would cross" is decided on the sum so far plus this call's configured
+       * MAXIMUM: the bytes right there in `body`, and the bound this attempt
+       * will ask for. Outside the try on purpose — a refusal here is not an
+       * attempt that failed, it is an attempt that never happened, so it writes
+       * no ledger row and burns nothing of the attempt ceiling, exactly as
+       * `assertAttemptAllowed` above does.
+       */
+      await request.costEnvelope?.assertCallAllowed({
+        requestBytes: Buffer.byteLength(body, "utf8"),
+        completionTokenCeiling: attemptTokenCeiling
+      });
+      attemptsMade = attempt;
       const inputHash = digest(JSON.stringify(attemptPacket));
       const attemptId = randomUUID();
       const startedAt = new Date();
@@ -815,13 +1015,6 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         if (this.#options.authorizationHeader !== undefined) {
           headers.authorization = this.#options.authorizationHeader;
         }
-        // The packet cap (L4-F2) is taken on the body actually sent, which carries the
-        // per-attempt bound a length retry raised (W10/2).
-        const body = JSON.stringify({
-          model: this.#options.model,
-          max_tokens: attemptTokenCeiling,
-          messages: attemptPacket.messages
-        });
         if (Buffer.byteLength(body, "utf8") > MAX_PROVIDER_REQUEST_PACKET_BYTES) {
           packetRefused = true;
           throw new TypedDomainError(
@@ -845,6 +1038,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         const candidate = z.object({ id: z.string(), model: modelIdSchema }).passthrough().safeParse(decoded);
         const observedUsage = z.object({ usage: usageSchema.nullable().optional() })
           .passthrough().safeParse(decoded);
+        /** Read ONCE: the artifact's record, the charge and the hosted check agree by construction. */
+        const reportedUsage = observedUsage.success ? observedUsage.data.usage ?? null : null;
         const strict = responseSchema.safeParse(decoded);
         const finishReason = observedFinishReason(decoded);
         const content = strict.success ? strict.data.choices[0]!.message.content : null;
@@ -893,7 +1088,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             status: response.status,
             attempt,
             ...(tripwires.length === 0 ? {} : { prompt_tripwires: tripwires }),
-            usage: observedUsage.success ? observedUsage.data.usage ?? null : null,
+            usage: reportedUsage,
             // W10/1: the reason this completion stopped, recorded on EVERY
             // attempt. `raw_artifact.metadata` is unconstrained jsonb, so the
             // truncation is durable even though `parse_status` cannot name it.
@@ -909,8 +1104,36 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           contractHash: request.contractHash,
           contentHash: digest(rawText)
         });
+        /**
+         * V-28 / I4 — THE CHARGE, at the one point every attempt with a body
+         * passes through, and BEFORE any decision the engine takes about that
+         * body. The vendor has already billed for this call; whether the engine
+         * goes on to accept, refuse or retry it changes nothing about the money.
+         * It sits after `persistRawArtifact` so a charge is never recorded
+         * against a call the ledger cannot show.
+         */
+        await request.costEnvelope?.recordCall({
+          providerRef: request.providerRef,
+          usage: reportedUsage
+        });
         if (!response.ok) throw new Error(`PROVIDER_HTTP_STATUS_${response.status}`);
         assertBoundedProviderResponse(decoded);
+        /**
+         * V-28 — THE HOSTED REQUIREMENT, asked only of a SUCCESSFUL completion.
+         *
+         * The CHARGE is taken earlier, right after the artifact is recorded
+         * (I4): a 200 the engine then refuses — an over-long model id, a usage
+         * block with an unknown field — was still billed by the vendor and is
+         * still retried, so charging here missed real money, repeatedly. This
+         * check stays here, after `assertBoundedProviderResponse`, so a
+         * malformed usage block is still named PROVIDER_USAGE_INVALID rather
+         * than collapsed into "the vendor reported nothing", and after the
+         * `!response.ok` throw so an error page stays a transport failure.
+         */
+        await request.costEnvelope?.assertUsageReported({
+          providerRef: request.providerRef,
+          usage: reportedUsage
+        });
         // W10/1: a refusal that arrived with `finish_reason: "length"` is a
         // TRUNCATION, and it is named as one. The classifier's own verdict
         // (PARSE_FAILED on a half-written object) describes the symptom; the
@@ -1042,9 +1265,16 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          *    proved it answers with the wrong model. Retrying it was three real
          *    calls, three artifacts and three ledger rows for an answer that
          *    cannot become correct.
+         *  · V-28: a MONEY refusal from the cost-envelope seam. A ceiling that
+         *    is already reached is still reached one backoff later, and a vendor
+         *    that reported no usage will report none again, so retrying either
+         *    only spends the attempt ceiling to arrive at the same refusal —
+         *    under a name (PROVIDER_CALL_FAILED) that hides which control spoke.
          */
         const shortCircuit = error instanceof TypedDomainError
-          && (error.code.startsWith("PROMPT_FRAME_") || error.code === "PROVIDER_MODEL_IDENTITY_CHANGED");
+          && (error.code.startsWith("PROMPT_FRAME_")
+            || error.code === "PROVIDER_MODEL_IDENTITY_CHANGED"
+            || (PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).includes(error.code));
         lastContentRejection = null;
         lastError = error;
         if (!ledgerRecorded) {

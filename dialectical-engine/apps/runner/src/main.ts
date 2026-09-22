@@ -10,12 +10,17 @@ import {
 } from "@debateai/crypto";
 import { configureContentEncryption, createPool, RunRepository } from "@debateai/db";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
-import { assertHostedCostEnvelopesSealed, loadRunnerEnvironment } from "@debateai/register";
+import {
+  assertHostedCostEnvelopesSealed,
+  loadRunnerEnvironment,
+  readCostEnvelopePolicy
+} from "@debateai/register";
+import { CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { assertDeploymentProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, resolveProviderTargetCredentials } from "@debateai/providers";
+import { assertDeploymentProviderTargets, assertPricedProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
 import { createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, WalkingSkeletonRunner } from "./index.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
@@ -71,6 +76,10 @@ const declaredProviderTargets = parseProviderDiscoveryTargets(
 assertDeploymentProviderTargets(declaredProviderTargets, {
   mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
 });
+// V-28: and a hosted DEBATE target must carry its price, or its calls cannot be
+// billed against the per-run and daily envelopes. Separate from the rule above
+// because the support chat's target shares that one and keeps its own accounting.
+assertPricedProviderTargets(declaredProviderTargets, environment.DEPLOYMENT_MODE);
 // V-9(2): each vendor's credential file, read once under the custody contract.
 const providerTargets = resolveProviderTargetCredentials(
   declaredProviderTargets, readCustodyAuthorizationHeader
@@ -80,15 +89,44 @@ const hatchet = new Hatchet({
   api_url: environment.HATCHET_API_URL, tenant_id: environment.HATCHET_TENANT_ID,
   tls_config: { tls_strategy: environment.HATCHET_TLS_STRATEGY }
 });
-const providerTopology = createRunnerProviderTopology(providerTargets, (target) =>
-  createPostgresProviderGateway(pool, {
+/**
+ * V-28 (DL4-F2) — THE PER-RUN MONEY ENVELOPE, wired per target.
+ *
+ * HOSTED only, and the mode decides it once here rather than at every call:
+ * local mode is the relays and loopback model servers, which report no usage and
+ * cost no money, and V-28(3) leaves it untouched with the attempt ceiling it has
+ * always had. In hosted mode `assertPricedProviderTargets` above has already
+ * refused any target with no declared price, so `providerTargetPrice` below
+ * cannot be null there — the refusal is kept anyway, because a control that
+ * depends on another control having run is one edit away from being none.
+ */
+const costEnvelopeGuard = environment.DEPLOYMENT_MODE === "hosted"
+  ? new CostEnvelopeGuard({
+      store: new PostgresModelSpendStore(pool),
+      policy: await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)
+    })
+  : undefined;
+const providerTopology = createRunnerProviderTopology(providerTargets, (target) => {
+  const price = providerTargetPrice(target);
+  if (costEnvelopeGuard !== undefined && price === null) {
+    throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
+  }
+  return createPostgresProviderGateway(pool, {
     endpoint: target.baseUrl,
     model: target.model,
     maker: target.maker,
     ...(target.authorizationHeader === undefined
-      ? {} : { authorizationHeader: target.authorizationHeader })
-  })
-);
+      ? {} : { authorizationHeader: target.authorizationHeader }),
+    ...(costEnvelopeGuard === undefined || price === null ? {} : {
+      // The run is not known until a work item is claimed, so the seam is built
+      // per call from the run the gateway was handed. Hosted requires the vendor
+      // to report usage: a call that cannot be billed cannot be bounded.
+      buildCostEnvelopeSeam: (runId: string) => costEnvelopeGuard.providerSeam({
+        runId, price, requireReportedUsage: true
+      })
+    })
+  });
+});
 const runRepository = new RunRepository(pool);
 // V-20: taken on the DECLARED targets, because the three optional keys describe
 // what the operator wrote, credential included — a credential resolved from a

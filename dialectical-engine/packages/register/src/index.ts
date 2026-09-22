@@ -786,12 +786,14 @@ export {
 export {
   DEPLOYMENT_MODES,
   assertHostedCostEnvelopesSealed,
+  assertHostedSupportAdmissionSealed,
   assertProductionFloors,
   readSealedCostEnvelopeStatus,
   resolveDeploymentMode,
   CostEnvelopesNotSealedError,
   DeploymentModeInvalidError,
   DeploymentModeUnresolvedError,
+  SupportAdmissionScopesNotSealedError,
   type DeploymentMode,
   type SealedCostEnvelopeStatus,
   loadApiEnvironment,
@@ -821,6 +823,15 @@ export {
   type AuthPolicyRegisterRow,
   type AuthRouteLimit
 } from "./auth-policy.js";
+// V-28 (DL4-F2): the per-run and daily spending ceilings, in money.
+export {
+  COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
+  COST_ENVELOPE_POLICY_ROW_KEY,
+  costEnvelopePolicyFromValue,
+  readCostEnvelopePolicy,
+  type CostEnvelopePolicy,
+  type CostEnvelopePolicyValue
+} from "./cost-envelope-policy.js";
 export {
   MFA_POLICY_REGISTER_ROW,
   MFA_POLICY_ROW_KEY,

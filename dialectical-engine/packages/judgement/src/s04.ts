@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ABSTENTION_KINDS, CLAIM_TYPES, type AbstentionKind, type ClaimType } from "@debateai/kernel";
+import { ABSTENTION_KINDS, CLAIM_TYPES, isRunLevelSpendStop, type AbstentionKind, type ClaimType } from "@debateai/kernel";
 import type { CompositionMapRegisterRow } from "@debateai/register";
 
 export { CLAIM_TYPES };
@@ -340,6 +340,11 @@ export async function runJudgePanel(input: {
       const judged = await member.judge();
       judgements.push({ ...judged, memberRole: member.memberRole, contractHash: member.contractHash });
     } catch (error) {
+      // V-28: a RUN-LEVEL spend stop is not this member's failure, it is the
+      // run's, and noting it would carry the panel on to the next member — one
+      // more billed call for a run that has just been told it cannot pay. It
+      // leaves untouched, keeping the code that says which control spoke.
+      if (isRunLevelSpendStop(error)) throw error;
       notes.push({
         memberRole: member.memberRole,
         contractHash: member.contractHash,

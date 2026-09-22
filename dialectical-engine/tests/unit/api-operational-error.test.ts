@@ -100,11 +100,23 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "CONVERGENCE_CONTROLS_INVALID",
   "CONVERGENCE_CONTROLS_PROVENANCE_MISSING",
   "CONVERGENCE_CONTROLS_UNRESOLVED",
+  "COST_ENVELOPE_CEILING_INVALID",
+  "COST_ENVELOPE_CHARGE_UNREPRESENTABLE",
+  "COST_ENVELOPE_DAY_INVALID",
+  "COST_ENVELOPE_GUARD_INPUT_INVALID",
+  "COST_ENVELOPE_PRICE_INVALID",
+  "COST_ENVELOPE_PRICE_UNPRICED",
+  "COST_ENVELOPE_PROJECTION_INVALID",
+  "COST_ENVELOPE_RESERVATION_TTL_INVALID",
+  "COST_ENVELOPE_RUN_REQUIRED",
+  "COST_ENVELOPE_SPEND_INVALID",
+  "COST_ENVELOPE_USAGE_INVALID",
   "CRITERION_ID_DUPLICATE",
   "CRITERION_ID_INVALID",
   "CRITERION_LABEL_INVALID",
   "CRITIC_UNAVAILABLE_BAND_CAP_UNRESOLVED",
   "CRITIQUE_CONTEXT_NOT_ISOLATED",
+  "DAILY_COST_ENVELOPE_REACHED",
   "DATABASE_POOL_FAILED",
   "DEBATE_EXPANSION_PARENT_MISSING",
   "DEBATE_MAKER_UNRESOLVED",
@@ -217,6 +229,7 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "LIVENESS_TIME_INVALID",
   "MAKER_INVENTORY_UNSATISFIED",
   "MAKER_POLICY_INVALID",
+  "MAKER_POSITION_DISCLOSURE_UNRESOLVED",
   "MAKER_POSITION_UNAVAILABLE",
   "MALFORMED_ARROW_ORDER",
   "MEMORY_ASKER_SCOPE_MISMATCH",
@@ -284,6 +297,8 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PROVIDER_CALL_INSIDE_TRANSACTION",
   "PROVIDER_CONTENT_UNACCEPTED",
   "PROVIDER_RUN_REQUIRED",
+  "PROVIDER_USAGE_INVALID",
+  "PROVIDER_USAGE_UNREPORTED",
   "PUBLICATION_LEASE_SCOPE_EXPANSION_FORBIDDEN",
   "QUERY_SET_REF_REQUIRED",
   "RAW_ARTIFACT_RUN_REQUIRED",
@@ -308,6 +323,7 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_CONTENT_ENCRYPTION_REQUIRED",
   "RUN_CONTENT_ROLLBACK_INCOMPLETE",
   "RUN_COST_ENVELOPE_EXHAUSTED",
+  "RUN_COST_ENVELOPE_MONEY_REACHED",
   "RUN_COST_ENVELOPE_UNRESOLVED",
   "RUN_DEPTH_PARAMS_INVALID",
   "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
@@ -784,6 +800,58 @@ describe("API operational error diagnostics", () => {
     expect([...codes].sort()).toEqual([...EXPECTED_DOMAIN_CODES].sort());
     for (const code of EXPECTED_DOMAIN_CODES) {
       expect(apiOperationalErrorDiagnostic(new TypedDomainError(code, "declared"))).toBe(code);
+    }
+  });
+
+  /**
+   * I2 (review round 2) — THE SPEND CODES, SWEPT FROM THE SOURCE THAT RAISES
+   * THEM RATHER THAN RESTATED IN A LITERAL.
+   *
+   * `EXPECTED_DOMAIN_CODES` above is a hand-committed list, so the doc comment's
+   * promise that "a missing member turns a test red" was false for a code nobody
+   * had added to BOTH lists: V-28 shipped three that reached the boundary as
+   * `RUNNER_EXECUTION_FAILED:UNRECOGNIZED_DOMAIN_ERROR`, which tells an operator
+   * that the engine broke when it had in fact enforced a ceiling.
+   *
+   * This row sweeps the modules that RAISE the spend refusals — the money
+   * arithmetic, the persisted-spend guard, the gateway's own refusal inventory
+   * and the runner's envelope-stop map — and requires every code it finds to be
+   * recognised by the formatter. No literal to keep in step: a fourth spend code
+   * added tomorrow reddens this row on the day it is written.
+   *
+   * SCOPE, stated rather than implied: this sweeps the V-28 family, not the
+   * whole tree. A whole-tree sweep of `new TypedDomainError("…")` finds about
+   * 244 further codes that are not in `KNOWN_DOMAIN_CODES`, because that list is
+   * deliberately scoped to codes which can REACH this boundary (its own comment
+   * cites the producer log it was generated from). Widening it is a separate
+   * piece of work and is named in the task report, not smuggled in here.
+   */
+  it("recognises every spend refusal its own source can raise (V-28)", async () => {
+    const sources = await Promise.all([
+      "packages/budget/src/cost-envelope.ts",
+      "packages/budget/src/model-spend.ts",
+      "packages/providers/src/index.ts",
+      "apps/runner/src/index.ts"
+    ].map((path) => readFile(path, "utf8")));
+    const swept = new Set<string>();
+    for (const source of sources) {
+      // The three shapes these modules declare a spend refusal in: an exported
+      // code constant, a member of the gateway's refusal inventory, and a key of
+      // the runner's envelope-stop map.
+      for (const match of source.matchAll(
+        // RE-REVIEW I4: the prefix set missed `COST_ENVELOPE_PRICE_UNPRICED` —
+        // the C2 control, raised per call at run time — because the regex only
+        // knew the three prefixes round 2 happened to have written. The whole
+        // `COST_ENVELOPE_` family is swept now, so the next one is covered
+        // before anyone notices it exists.
+        /"((?:COST_ENVELOPE|RUN_COST_ENVELOPE|DAILY_COST_ENVELOPE|PROVIDER_USAGE)_[A-Z_]+)"/gu
+      )) swept.add(match[1]!);
+    }
+
+    // The sweep must actually find something, or it is a test that cannot fail.
+    expect(swept.size).toBeGreaterThanOrEqual(3);
+    for (const code of swept) {
+      expect(apiOperationalErrorDiagnostic(new TypedDomainError(code, "swept"))).toBe(code);
     }
   });
 

@@ -87,6 +87,7 @@ import {
   type PromptPacket,
   type ProviderCallRequest,
   type ProviderCallResult,
+  type ProviderCostEnvelopeSeam,
   type ProviderGateway
 } from "@debateai/providers";
 import {
@@ -118,7 +119,7 @@ import {
   type VerdictLabelBasis
 } from "@debateai/serve";
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
-import { SERVED_ROOT_SELECTION_RULE, TypedDomainError, type CompositionBudgetTier, type ServedRootRule, type WayOfKnowing } from "@debateai/kernel";
+import { SERVED_ROOT_SELECTION_RULE, TypedDomainError, exhaustive, type CompositionBudgetTier, type ServedRootRule, type WayOfKnowing } from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 
@@ -134,6 +135,153 @@ export const RUNNER_BRANCHING_FACTOR = ENGINE_BRANCHING_FACTOR;
 export const RUNNER_COMPOSITION_SEGMENT_CAP = ENGINE_COMPOSITION_SEGMENT_CAP;
 export const RUNNER_FIXED_ORGANS_PER_COMPOSITION = ENGINE_FIXED_ORGANS_PER_COMPOSITION;
 export const RUNNER_MAX_RECOMPOSE = ENGINE_MAX_RECOMPOSE;
+
+/**
+ * V-28 (DL4-F2) — WHICH CEILING STOPPED THE RUN, if either did.
+ *
+ * Two independent bounds refuse the next provider call, and the serve leg's
+ * catch has to tell them apart from a genuine failure, which must keep
+ * travelling. Both end the run the same way — the components-only envelope
+ * terminal, which serves the nodes already verified — but they are reached by
+ * different questions and are lifted by different operator actions, so the
+ * distinction is named rather than inferred from a count.
+ */
+export const ENVELOPE_STOP_CODES = Object.freeze({
+  /** The attempt ceiling pinned on the run head (`assertModelAttemptAllowed`). */
+  RUN_COST_ENVELOPE_EXHAUSTED: "ATTEMPTS",
+  /** The money ceiling sealed in `costEnvelopePolicy` (the gateway's seam). */
+  RUN_COST_ENVELOPE_MONEY_REACHED: "MONEY",
+  /**
+   * RULING R2 (review round 2). A hosted vendor answered and reported no usage,
+   * so the call cannot be billed and the money ceiling cannot be honoured for
+   * anything that follows. That is a VENDOR or CONFIGURATION fault, not the
+   * asker's, so the run ends the same clean way a money stop ends rather than
+   * discarding work the asker will still be charged for. It keeps its own kind,
+   * and therefore its own condition-mark reason: an operator told "you ran out
+   * of money" would go and raise a ceiling that was never the problem.
+   */
+  PROVIDER_USAGE_UNREPORTED: "USAGE",
+  /**
+   * SMALL (round 3): a dead path today — the daily envelope is asked only when a
+   * NEW run is admitted, never mid-run — and listed anyway, for consistency with
+   * `RUN_LEVEL_SPEND_STOP_CODES` in the kernel. If it is ever raised while a run
+   * is under way, the difference between being listed and not is the difference
+   * between the run keeping its work and failing outright.
+   *
+   * ROUND 4, RULING R-C: its OWN kind. Round 3 filed it under `MONEY`, so the
+   * record it would have minted carried the per-run reason and sent the
+   * operator to raise the wrong ceiling. A spent day is lifted by waiting for
+   * the next one, not by re-sealing the per-run envelope.
+   */
+  DAILY_COST_ENVELOPE_REACHED: "DAILY"
+} as const);
+
+export type EnvelopeStopKind = typeof ENVELOPE_STOP_CODES[keyof typeof ENVELOPE_STOP_CODES];
+
+/**
+ * The condition-mark record's reason, per stop: the operator's lift differs.
+ * A bijection with `ENVELOPE_STOP_CODES` — each kind carries back the one code
+ * that maps to it — and pinned as one by `v28-run-body-budget-stop.test.ts`, so
+ * a kind can never again lift as another ceiling's.
+ */
+export const ENVELOPE_STOP_REASONS: Readonly<Record<EnvelopeStopKind, string>> = Object.freeze({
+  ATTEMPTS: "RUN_COST_ENVELOPE_EXHAUSTED",
+  MONEY: "RUN_COST_ENVELOPE_MONEY_REACHED",
+  USAGE: "PROVIDER_USAGE_UNREPORTED",
+  DAILY: "DAILY_COST_ENVELOPE_REACHED"
+});
+
+/**
+ * ROUND 4, RULING R-B — what a reader is told to DO about an answer that rests
+ * on one lineage because a spend bound stopped the run before the other maker
+ * positions could be afforded. One lift per stop, because "re-ask with more
+ * money", "wait for the next day" and "fix the vendor" are different actions.
+ * The ATTEMPT ceiling is listed for completeness of the record: it is never a
+ * run-body stop (`RUN_BODY_STOP_KINDS`), so no such record is ever minted for it.
+ */
+const SINGLE_LINEAGE_SPEND_STOP_LIFT_PATHS: Readonly<Record<EnvelopeStopKind, string>> = Object.freeze({
+  ATTEMPTS: "Re-ask under a larger attempt ceiling so the other maker positions can be authored",
+  MONEY: "Re-ask under a larger per-run cost envelope so the other maker positions can be afforded",
+  USAGE: "Restore a vendor that reports usage, then re-ask so the other maker positions can be billed",
+  DAILY: "Re-ask after the daily cost envelope resets so the other maker positions can be afforded"
+});
+
+/** `null` for anything that is not one of the envelope refusals listed above. */
+export function envelopeStopKind(error: unknown): EnvelopeStopKind | null {
+  if (!(error instanceof TypedDomainError)) return null;
+  return ENVELOPE_STOP_CODES[error.code as keyof typeof ENVELOPE_STOP_CODES] ?? null;
+}
+
+/**
+ * C1 (review round 2) — WHAT A RUN-BODY PHASE DOES WITH AN ENVELOPE REFUSAL.
+ *
+ * The envelope terminal cannot be built during authoring, expansion or review:
+ * it needs the propagation, the served root and the fact bundle, and none of
+ * them exists yet. So a spend refusal raised there cannot become a terminal on
+ * the spot — it must STOP THE PHASE and let the run reach the envelope
+ * evaluation that already stands in front of the serve chain, where the terminal
+ * IS buildable and the components produced so far are what it serves.
+ *
+ * `null` means "this is not a phase stop, let it travel". The ATTEMPT ceiling is
+ * deliberately `null`: it has always propagated from these phases, changing that
+ * is a behaviour nobody ruled, and V-28 is about money.
+ */
+/**
+ * C3 (re-review) — WHICH QUESTION THE ENVELOPE IS ASKED, per stop.
+ *
+ * Only the ATTEMPT ceiling asks "does ONE MORE attempt fit?" — the question
+ * T17B's `pendingModelAttempts` exists for. Money and an unbillable vendor ask
+ * neither of the attempt questions: a run can have dozens of attempts left and
+ * still be unable to pay for, or bill, a single one, so the hard stop is
+ * asserted on its own footing and the attempt count is reported as it stands.
+ */
+export function envelopeStopPendingAttempts(stop: EnvelopeStopKind): Readonly<{
+  pendingModelAttempts: number;
+  forceHardStop: boolean;
+}> {
+  return stop === "ATTEMPTS"
+    ? Object.freeze({ pendingModelAttempts: 1, forceHardStop: false })
+    : Object.freeze({ pendingModelAttempts: 0, forceHardStop: true });
+}
+
+/**
+ * The kinds that stop a run-body phase, enumerated POSITIVELY: a fifth kind
+ * added tomorrow does not become a phase stop by omission, it has to be listed
+ * and reasoned about. `ATTEMPTS` is deliberately absent (see above).
+ */
+const RUN_BODY_STOP_KINDS: readonly EnvelopeStopKind[] = Object.freeze(["MONEY", "USAGE", "DAILY"]);
+
+export function expansionPhaseStop(error: unknown): EnvelopeStopKind | null {
+  const stop = envelopeStopKind(error);
+  return stop !== null && RUN_BODY_STOP_KINDS.includes(stop) ? stop : null;
+}
+
+export type ReviewFailureOutcome =
+  | { readonly kind: "RETHROW" }
+  | { readonly kind: "BUDGET_STOP"; readonly stop: EnvelopeStopKind }
+  | { readonly kind: "UNAVAILABLE" };
+
+/**
+ * C1, second half — the node-review catch had a rethrow list that did not know
+ * about money, so a refusal raised during a review came out as
+ * `NODE_REVIEW_UNAVAILABLE`: a diagnostic naming the wrong cause, and one no
+ * envelope path can recognise. The list is a DECISION now, so it can be tested
+ * instead of read.
+ */
+const REVIEW_RETHROWN_CODES: readonly string[] = Object.freeze([
+  "RUN_COST_ENVELOPE_EXHAUSTED",
+  "CALL_BUDGET_EXHAUSTED",
+  "PRODUCER_GRADING_FORBIDDEN"
+]);
+
+export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
+  const stop = expansionPhaseStop(error);
+  if (stop !== null) return Object.freeze({ kind: "BUDGET_STOP" as const, stop });
+  if (error instanceof TypedDomainError && REVIEW_RETHROWN_CODES.includes(error.code)) {
+    return Object.freeze({ kind: "RETHROW" as const });
+  }
+  return Object.freeze({ kind: "UNAVAILABLE" as const });
+}
 
 const compositionSchema = z.object({
   segments: z.array(z.object({
@@ -1714,6 +1862,211 @@ export interface MakerPositionDisclosureRoot {
   readonly maker: string;
 }
 
+/**
+ * RE-REVIEW 2(a) — WHAT AN ANSWER MAY SAY ABOUT THE MAKER POSITIONS BEHIND IT.
+ *
+ * One decision, taken once, because the answer says this in two places that must
+ * agree: the fact bundle's condition MARKS and the condition-mark RECORDS that
+ * `assertRequiredConditionMarkRecords` pairs with them. They were computed by
+ * two separate `effectiveMakerCount > 1` tests, and a state where those two
+ * disagree is an answer that asserts a mark nothing explains.
+ *
+ * THE STATE THAT EXPOSED IT. A spend stop on root 1 of a two-maker run leaves
+ * one authored position while `effectiveMakerCount` is still 2 — it is the
+ * planned panel size and is never recomputed. The old code then demanded an
+ * UNSERVED position from a set that had none and threw
+ * `UNSERVED_MAKER_POSITION_UNRESOLVED`, before the envelope evaluation and with
+ * no catch between, so a root that had been authored, panelled, reviewed and
+ * PAID FOR was discarded anyway.
+ *
+ * The rule is now about what EXISTS rather than about what was planned:
+ *
+ *  · a position was authored and not served  -> disclose it, as always;
+ *  · a genuine mono-maker run                -> its own two marks, as always;
+ *  · a multi-maker run with ONE authored root -> ROUND 4, RULING R-B: the answer
+ *    SAYS it rests on one lineage. Round 3 said nothing here, on the ground that
+ *    `SINGLE-LINEAGE` meant `MONO_MAKER_RUN`; but the mark is the closed
+ *    vocabulary and the record's REASON is a free string, so the mark carries
+ *    the truth and the reason names what actually happened: the run-level
+ *    spend-stop code (`RUN_COST_ENVELOPE_MONEY_REACHED`,
+ *    `PROVIDER_USAGE_UNREPORTED`, `DAILY_COST_ENVELOPE_REACHED`) — never
+ *    `MONO_MAKER_RUN`, which means one maker was CONFIGURED, a different fact
+ *    with a different lift. The only way the run body reaches one authored root
+ *    at M > 1 is a spend stop (a halted root 1 throws `MAKER_POSITION_UNAVAILABLE`
+ *    first), so that state with NO stop is refused loudly rather than given a
+ *    mark with no reason.
+ *
+ * `monoMakerRecords` is REQUIRED (round 4, R-C): the marks and the records are
+ * the two halves of one statement, and an optional half is how they diverge.
+ */
+export function buildMakerPositionDisclosure(input: Readonly<{
+  effectiveMakerCount: number;
+  runBodyBudgetStop: EnvelopeStopKind | null;
+  authoredMakerPositions: readonly MakerPositionDisclosureRoot[];
+  servedRoot: MakerPositionDisclosureRoot;
+  monoMakerConditionMarks: readonly ConditionMarkRecord["mark"][];
+  monoMakerRecords: readonly ConditionMarkRecord[];
+}>): Readonly<{
+  conditionMarks: readonly ConditionMarkRecord["mark"][];
+  records: readonly ConditionMarkRecord[];
+}> {
+  if (input.effectiveMakerCount === 1) {
+    return Object.freeze({
+      conditionMarks: Object.freeze([...input.monoMakerConditionMarks]),
+      records: Object.freeze([...input.monoMakerRecords])
+    });
+  }
+  const unserved = input.authoredMakerPositions
+    .filter((root) => root.nodeId !== input.servedRoot.nodeId);
+  if (unserved.length === 0) {
+    if (input.runBodyBudgetStop === null) {
+      throw new TypedDomainError(
+        "MAKER_POSITION_DISCLOSURE_UNRESOLVED",
+        `A ${input.effectiveMakerCount}-maker run authored one maker position and no spend bound stopped it; the run body cannot produce this state and no lineage disclosure is minted without a reason`
+      );
+    }
+    return Object.freeze({
+      conditionMarks: Object.freeze(["SINGLE-LINEAGE" as const]),
+      records: Object.freeze([Object.freeze({
+        mark: "SINGLE-LINEAGE" as const,
+        scope: "answer" as const,
+        subjectRef: input.servedRoot.nodeId,
+        reason: ENVELOPE_STOP_REASONS[input.runBodyBudgetStop],
+        liftPath: SINGLE_LINEAGE_SPEND_STOP_LIFT_PATHS[input.runBodyBudgetStop],
+        servedRootRule: null,
+        affectedNodeIds: Object.freeze([input.servedRoot.nodeId])
+      } satisfies ConditionMarkRecord)])
+    });
+  }
+  return Object.freeze({
+    conditionMarks: Object.freeze(["UNSERVED-MAKER-POSITION" as const]),
+    records: Object.freeze([
+      buildUnservedMakerPositionRecord(input.authoredMakerPositions, input.servedRoot)
+    ])
+  });
+}
+
+/** The footing on which judged standing is projected for the served answer. */
+export type MakerPositionServeFooting = "MONO_MAKER" | "CROSS_REVIEWED" | "SPEND_STOPPED";
+
+export interface MakerPositionServeDecision<T extends MakerPositionDisclosureRoot> {
+  readonly footing: MakerPositionServeFooting;
+  /** The node ids that seeded `projectJudgedStanding` — what "reviewed" meant on this footing. */
+  readonly judgedStandingSeed: readonly string[];
+  readonly standing: ReturnType<typeof projectJudgedStanding>;
+  readonly propagation: PropagationOutcome;
+  readonly servableMakerPositions: readonly T[];
+  readonly servedRootSelection: ServedRootSelection<T>;
+  readonly servedRoot: T;
+  readonly disclosure: ReturnType<typeof buildMakerPositionDisclosure>;
+}
+
+/**
+ * ROUND 4 (V-28, RULINGS R-A / R-B) — THE POST-AUTHORING SERVE DECISION, TAKEN ONCE.
+ *
+ * Three rounds fixed the joint where a spend refusal was RAISED and each moved
+ * the death one statement downstream: `MAKER_POSITION_UNAVAILABLE`, then
+ * `UNSERVED_MAKER_POSITION_UNRESOLVED`, then
+ * `NO_SERVABLE_MAKER_POSITION_AFTER_REVIEW`. The mechanism never changed. With
+ * two makers and root 1 refused, the review guard (rightly) reviews nothing —
+ * MONEY would be refused again and USAGE would be a billed call — so the
+ * reviewed set is empty, and the serve-time projection seeded judged standing
+ * from `effectiveMakerCount <= 1 ? every node : the reviewed set`. That keys on
+ * the PLANNED panel size, which is never recomputed, so a paid-for root 0 was
+ * hidden for want of a review no money could buy, the propagation ran over zero
+ * nodes, no authored root was servable, and the run threw.
+ *
+ * R-A: a spend-stopped multi-maker run is projected on the single-maker footing,
+ * because no judged standing can be bought once the envelope is reached. The
+ * M = 1 branch seeds EVERY materialised node, since a mono run never reviews;
+ * here every node the stop DENIED a review seeds its own basis in the same
+ * way. For a stop during root authoring, or on the first review call, that is
+ * every node and the projection is the M = 1 branch character for character.
+ * For a stop after reviews have landed, their outcomes are kept as they are:
+ * `agree`/`dispute` seed as always, and a review that returned `cannot-assess`
+ * or whose transport died (`unjudgedReviewNodeIds`) keeps its node hidden WITH
+ * its T6 / J14 record — seeding those too would erase a reviewer's verdict and
+ * drop its disclosure from the answer, which nobody ruled.
+ *
+ * ONE decision, because the projection at the serve site and the disclosure at
+ * the fact bundle are two halves of the same statement about what the answer
+ * rests on, and the round-3 fix proved that a decision taken in two places is
+ * one the runner can reach in one place and not the other. Pure — no pool, no
+ * `this` — so `v28-spend-stopped-serve-decision.test.ts` drives it with the
+ * exact state the refusal leaves behind; the runner's wiring to it is pinned by
+ * `tests/architecture/v28-serve-decision-wiring.test.ts`.
+ */
+export function decideMakerPositionServe<T extends MakerPositionDisclosureRoot>(input: Readonly<{
+  effectiveMakerCount: number;
+  runBodyBudgetStop: EnvelopeStopKind | null;
+  /** The maker ROOTS that exist — what was authored, never what was planned. */
+  authoredMakerPositions: readonly T[];
+  /** The operator-resolved graph, before any standing projection. */
+  snapshot: EvaluationSnapshot;
+  materialisedNodeIds: readonly string[];
+  /** Nodes whose cross-maker review LANDED as a judgement (`agree`/`dispute`). */
+  reviewedNodeIds: readonly string[];
+  /** Nodes a review RAN for and left without judged standing: transport died, or `cannot-assess`. */
+  unjudgedReviewNodeIds: readonly string[];
+  monoMakerConditionMarks: readonly ConditionMarkRecord["mark"][];
+  /** The mono-maker records name the served root, which is only known here. */
+  monoMakerRecords: (servedRoot: T) => readonly ConditionMarkRecord[];
+}>): MakerPositionServeDecision<T> {
+  const footing: MakerPositionServeFooting = input.effectiveMakerCount <= 1
+    ? "MONO_MAKER"
+    : input.runBodyBudgetStop === null ? "CROSS_REVIEWED" : "SPEND_STOPPED";
+  const judgedStandingSeed: readonly string[] = (() => {
+    switch (footing) {
+      case "MONO_MAKER":
+        return input.materialisedNodeIds;
+      case "CROSS_REVIEWED":
+        return input.reviewedNodeIds;
+      case "SPEND_STOPPED": {
+        const reviewed = new Set(input.reviewedNodeIds);
+        const unjudged = new Set(input.unjudgedReviewNodeIds);
+        return Object.freeze([
+          ...input.reviewedNodeIds,
+          ...input.materialisedNodeIds.filter((nodeId) => !reviewed.has(nodeId) && !unjudged.has(nodeId))
+        ]);
+      }
+      default: return exhaustive(footing);
+    }
+  })();
+  const standing = projectJudgedStanding(input.snapshot, judgedStandingSeed);
+  const propagation = evaluate(standing.snapshot);
+  const propagatedNodeIds = new Set(propagation.strengths.map((row) => row.nodeId));
+  const servableMakerPositions = Object.freeze(
+    input.authoredMakerPositions.filter((root) => propagatedNodeIds.has(root.nodeId))
+  );
+  if (servableMakerPositions.length === 0) {
+    throw new TypedDomainError(
+      "NO_SERVABLE_MAKER_POSITION_AFTER_REVIEW",
+      "Every authored maker position was excluded after cross-maker review transport exhaustion"
+    );
+  }
+  // T10: propagation picks the served root, configuration order does not.
+  const servedRootSelection = selectServedRootByStrength(servableMakerPositions, propagation.strengths);
+  const servedRoot = servedRootSelection.root;
+  const disclosure = buildMakerPositionDisclosure({
+    effectiveMakerCount: input.effectiveMakerCount,
+    runBodyBudgetStop: input.runBodyBudgetStop,
+    authoredMakerPositions: input.authoredMakerPositions,
+    servedRoot,
+    monoMakerConditionMarks: input.monoMakerConditionMarks,
+    monoMakerRecords: input.monoMakerRecords(servedRoot)
+  });
+  return Object.freeze({
+    footing,
+    judgedStandingSeed: Object.freeze([...judgedStandingSeed]),
+    standing,
+    propagation,
+    servableMakerPositions,
+    servedRootSelection,
+    servedRoot,
+    disclosure
+  });
+}
+
 export function buildUnservedMakerPositionRecord(
   authoredMakerPositions: readonly MakerPositionDisclosureRoot[],
   servedRoot: MakerPositionDisclosureRoot
@@ -3183,8 +3536,27 @@ export class WalkingSkeletonRunner {
         }) };
     };
 
+    /**
+     * C1 (review round 2) — WHICH SPEND BOUND, IF ANY, STOPPED THIS RUN BODY.
+     *
+     * Set by the authoring, expansion and review phases when the gateway refuses
+     * on money or on an unbillable vendor. It is NOT an error path: the phase
+     * stops where it is, the run keeps everything it has produced, and the
+     * envelope evaluation in front of the serve chain turns it into the ruled
+     * components-only terminal. `null` all the way through is a run that was
+     * never stopped by a spend bound, which is every run today.
+     *
+     * RE-REVIEW: declared HERE, before the secondary and additional ROOT loops.
+     * Round 2 declared it after them, so a refusal while authoring root 1 or 2
+     * threw MAKER_POSITION_UNAVAILABLE and discarded a root 0 that had already
+     * been minted and panelled. Root 0 existing is exactly what makes the
+     * terminal buildable, so that run had something to serve and served nothing.
+     */
+    let runBodyBudgetStop: EnvelopeStopKind | null = null;
     if (effectiveMakerCount > 1) {
-      const secondary = await authorPosition({
+      let secondary: Awaited<ReturnType<typeof authorPosition>> | null = null;
+      try {
+      secondary = await authorPosition({
         authorIndex: 1,
         leg: { kind: "independent-root" },
         callSiteKey: "JUDGE:root:secondary",
@@ -3196,17 +3568,30 @@ export class WalkingSkeletonRunner {
         explorationDecision: "continue",
         edges: []
       });
-      if (secondary.kind === "HALTED") {
-        throw new TypedDomainError(
-          "MAKER_POSITION_UNAVAILABLE",
-          "The secondary maker position failed after the full cooldown and final-retry courtesy"
-        );
+      } catch (error) {
+        const stop = expansionPhaseStop(error);
+        if (stop === null) throw error;
+        // Root 0 is already minted and panelled, so the run HAS something to
+        // serve. Stopping here keeps it; throwing would discard it.
+        runBodyBudgetStop = stop;
       }
-      authoredNodes.set(1, secondary.value);
+      if (secondary !== null) {
+        if (secondary.kind === "HALTED") {
+          throw new TypedDomainError(
+            "MAKER_POSITION_UNAVAILABLE",
+            "The secondary maker position failed after the full cooldown and final-retry courtesy"
+          );
+        }
+        authoredNodes.set(1, secondary.value);
+      }
     }
 
     for (let makerIndex = 2; makerIndex < effectiveMakerCount; makerIndex += 1) {
-      const additionalRoot = await authorPosition({
+      // RE-REVIEW C2(a): root 0 is minted, so the run has something to serve.
+      if (runBodyBudgetStop !== null) break;
+      let additionalRoot: Awaited<ReturnType<typeof authorPosition>>;
+      try {
+      additionalRoot = await authorPosition({
         authorIndex: makerIndex,
         leg: { kind: "independent-root" },
         callSiteKey: `JUDGE:root:${makerIndex}`,
@@ -3218,6 +3603,12 @@ export class WalkingSkeletonRunner {
         explorationDecision: "continue",
         edges: []
       });
+      } catch (error) {
+        const stop = expansionPhaseStop(error);
+        if (stop === null) throw error;
+        runBodyBudgetStop = stop;
+        break;
+      }
       if (additionalRoot.kind === "HALTED") {
         throw new TypedDomainError(
           "MAKER_POSITION_UNAVAILABLE",
@@ -3233,6 +3624,10 @@ export class WalkingSkeletonRunner {
     const reviewScheduledNodeIds = new Set<string>();
     const reviewPendingAuthoredNodes = async (): Promise<void> => {
       if (effectiveMakerCount <= 1) return;
+      // RE-REVIEW I5: three call sites are unconditional, and each review is a
+      // billed call. The guard lives HERE rather than at each of them, so a
+      // fourth call site added tomorrow inherits it.
+      if (runBodyBudgetStop !== null) return;
       for (const authoredNode of authoredNodes.values()) {
         if (reviewScheduledNodeIds.has(authoredNode.nodeId)) continue;
         reviewScheduledNodeIds.add(authoredNode.nodeId);
@@ -3285,11 +3680,16 @@ export class WalkingSkeletonRunner {
             });
           }
         } catch (error) {
-          if (error instanceof TypedDomainError && [
-            "RUN_COST_ENVELOPE_EXHAUSTED",
-            "CALL_BUDGET_EXHAUSTED",
-            "PRODUCER_GRADING_FORBIDDEN"
-          ].includes(error.code)) throw error;
+          const outcome = reviewFailureOutcome(error);
+          if (outcome.kind === "RETHROW") throw error;
+          // C1: a spend refusal stops REVIEWING, it does not fail the run. The
+          // nodes already reviewed keep their reviews; the rest stay unreviewed
+          // and are disclosed as such, exactly as they are when a reviewer's
+          // transport dies.
+          if (outcome.kind === "BUDGET_STOP") {
+            runBodyBudgetStop = outcome.stop;
+            return;
+          }
           throw new TypedDomainError(
             "NODE_REVIEW_UNAVAILABLE",
             `No valid cross-maker review was recorded for node ${authoredNode.nodeId}`
@@ -3392,9 +3792,19 @@ export class WalkingSkeletonRunner {
     let activeExpansionRound = expansionPlan[0]?.round ?? null;
     let stoppedByAdaptiveRule = false;
     for (const [legIndex, leg] of expansionPlan.entries()) {
+      // C1: an earlier leg, or a review between rounds, reached a spend bound.
+      // Expansion stops here and the run carries what it has to the envelope
+      // evaluation in front of the serve chain, which turns it into the ruled
+      // components-only terminal.
+      if (runBodyBudgetStop !== null) break;
       if (activeExpansionRound !== null && leg.round !== activeExpansionRound) {
         await reviewPendingAuthoredNodes();
         activeExpansionRound = leg.round;
+        // RE-REVIEW I5: the review above can itself reach the bound, and the
+        // loop-top check has already run for this iteration. Without this the
+        // leg below would be authored — one more billed call — after the run
+        // was told it cannot pay.
+        if (runBodyBudgetStop !== null) break;
       }
       const skipped = haltedIndices.has(leg.parentIndex) || haltedIndices.has(leg.childIndex)
         || frozenIndices.has(leg.parentIndex) || frozenIndices.has(leg.childIndex);
@@ -3405,7 +3815,9 @@ export class WalkingSkeletonRunner {
       }
       const role = leg.polarity === "support" ? "defender" : "critic";
       const plannedSubtreeIndices = subtreeIndices(leg.childIndex);
-      const authored = await authorPosition({
+      let authored: Awaited<ReturnType<typeof authorPosition>>;
+      try {
+      authored = await authorPosition({
         authorIndex: leg.authorIndex,
         // DL4-F4, the leg that carried the injection: `parent.statement` is the
         // PREVIOUS model's output. It is material, it gets its own fenced
@@ -3423,6 +3835,15 @@ export class WalkingSkeletonRunner {
         explorationDecision: leg.polarity === "support" ? "deepen" : "challenge",
         edges: [{ targetNodeId: parent.nodeId, targetStatement: parent.statement, polarity: leg.polarity }]
       });
+      } catch (error) {
+        // C1: a spend refusal is not an expansion failure. Nothing is recorded
+        // as halted — the leg was never attempted against a vendor — and the
+        // branch simply stops being expanded.
+        const stop = expansionPhaseStop(error);
+        if (stop === null) throw error;
+        runBodyBudgetStop = stop;
+        break;
+      }
       if (authored.kind === "HALTED") {
         const indices = plannedSubtreeIndices;
         indices.forEach((index) => haltedIndices.add(index));
@@ -3446,12 +3867,16 @@ export class WalkingSkeletonRunner {
     // attacks its named target; both S07 edges carry UNKNOWN magnitude until
     // independently judged.
     for (const exchange of buildCrossRootExchangePlan(effectiveMakerCount)) {
+      // C1: same rule as the expansion loop above.
+      if (runBodyBudgetStop !== null) break;
       const authorRoot = authoredNodes.get(exchange.authorRootIndex);
       const targetRoot = authoredNodes.get(exchange.targetRootIndex);
       if (authorRoot === undefined || targetRoot === undefined) {
         throw new TypedDomainError("DEBATE_ROOT_MISSING", "A cross-root exchange requires both authored roots");
       }
-      const authored = await authorPosition({
+      let authored: Awaited<ReturnType<typeof authorPosition>>;
+      try {
+      authored = await authorPosition({
         authorIndex: exchange.authorIndex,
         leg: {
           kind: "cross-root",
@@ -3474,6 +3899,12 @@ export class WalkingSkeletonRunner {
           { targetNodeId: targetRoot.nodeId, targetStatement: targetRoot.statement, polarity: "attack" }
         ]
       });
+      } catch (error) {
+        const stop = expansionPhaseStop(error);
+        if (stop === null) throw error;
+        runBodyBudgetStop = stop;
+        break;
+      }
       if (authored.kind === "HALTED") {
         haltedExpansionRecords.push(authored.record);
       } else {
@@ -3491,30 +3922,79 @@ export class WalkingSkeletonRunner {
     const { materialised, snapshot: operatorResolvedSnapshot } =
       await this.#resolveOperatorResolvedSnapshot(run.runId);
     let snapshot: EvaluationSnapshot = operatorResolvedSnapshot;
-    const reviewedNodeIds = effectiveMakerCount <= 1
-      ? materialised.nodes.map((node) => node.nodeId)
-      : await this.#judgements.readReviewedNodeIds(run.runId);
-    const standing = projectJudgedStanding(snapshot, reviewedNodeIds);
-    snapshot = standing.snapshot;
+    const monoMakerConditionMarks = effectiveMakerCount === 1
+      ? ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE"] as const
+      : [] as const;
+    /**
+     * The two records a genuine mono-maker run mints, built for the root the
+     * decision below serves. Their reason is `MONO_MAKER_RUN` — one maker was
+     * CONFIGURED — and they are consumed on the M = 1 footing only; a
+     * multi-maker run cut short by a spend bound gets its own `SINGLE-LINEAGE`
+     * record whose reason names the stop (round 4, R-B).
+     */
+    const monoMakerRecords = (monoServedRoot: AuthoredDebateNode): readonly ConditionMarkRecord[] => Object.freeze([
+          Object.freeze({
+            mark: "SINGLE-LINEAGE",
+            scope: "answer",
+            subjectRef: monoServedRoot.nodeId,
+            reason: "MONO_MAKER_RUN",
+            liftPath: "RUN_DIFFERENT_MAKER_CRITIQUE",
+            servedRootRule: null,
+            affectedNodeIds: Object.freeze([monoServedRoot.nodeId])
+          }),
+          Object.freeze({
+            mark: "CRITIQUE-UNAVAILABLE",
+            scope: "answer",
+            subjectRef: monoServedRoot.nodeId,
+            reason: [
+              ...(absentAtClaim.length === 0 ? [] : [
+                `CLAIM_PANEL_REVISED:${absentAtClaim.map(({ member, failureCode }) => `${member.provider_ref}=${failureCode}`).join(",")}`
+              ]),
+              `MONO_LINEAGE_DEPTH_NOT_EXPANDED:requested_depth=${expansionDepth}`
+            ].join("|"),
+            liftPath: "RUN_DIFFERENT_MAKER_CRITIQUE",
+            servedRootRule: null,
+            affectedNodeIds: Object.freeze([monoServedRoot.nodeId])
+          })
+    ] satisfies readonly ConditionMarkRecord[]);
+    const propagationStartedAt = new Date();
+    /**
+     * ROUND 4 (V-28, R-A / R-B): projection, propagation, served-root selection
+     * and the maker-position disclosure are ONE decision, taken here and read
+     * again at the fact bundle. The reviewed set is read from the ledger only
+     * when a review could have run; what it MEANS for the projection — the
+     * footing — is the decision's, not this site's. A spend-stopped run is
+     * projected on the single-maker footing (R-A): the review guard above
+     * bought no review for the roots that exist, and none can be bought now.
+     */
+    const makerPositionServe = decideMakerPositionServe({
+      effectiveMakerCount,
+      runBodyBudgetStop,
+      authoredMakerPositions,
+      snapshot,
+      materialisedNodeIds: materialised.nodes.map((node) => node.nodeId),
+      reviewedNodeIds: effectiveMakerCount <= 1
+        ? []
+        : await this.#judgements.readReviewedNodeIds(run.runId),
+      unjudgedReviewNodeIds: [
+        ...hiddenReviewRecords.map(({ nodeId }) => nodeId),
+        ...unassessedReviewRecords.map(({ nodeId }) => nodeId)
+      ],
+      monoMakerConditionMarks,
+      monoMakerRecords
+    });
+    const standing = makerPositionServe.standing;
+    snapshot = makerPositionServe.standing.snapshot;
     const classHNodeIds = new Set(standing.hiddenNodeIds);
     const classDNodeIds = new Set(standing.derivedStandingNodeIds);
-    const propagationStartedAt = new Date();
-    const propagation = evaluate(snapshot);
+    const propagation = makerPositionServe.propagation;
     const threshold = this.settings.hiddenNodeScoreThreshold;
     const lowScoreRows = threshold === undefined
       ? []
       : propagation.strengths.filter((row) => row.strength <= threshold.value);
-    const propagatedNodeIds = new Set(propagation.strengths.map((row) => row.nodeId));
-    const servableMakerPositions = authoredMakerPositions.filter((root) => propagatedNodeIds.has(root.nodeId));
-    if (servableMakerPositions.length === 0) {
-      throw new TypedDomainError(
-        "NO_SERVABLE_MAKER_POSITION_AFTER_REVIEW",
-        "Every authored maker position was excluded after cross-maker review transport exhaustion"
-      );
-    }
-    // T10: propagation picks the served root, configuration order does not.
-    const servedRootSelection = selectServedRootByStrength(servableMakerPositions, propagation.strengths);
-    const servedRoot = servedRootSelection.root;
+    const servableMakerPositions = makerPositionServe.servableMakerPositions;
+    const servedRootSelection = makerPositionServe.servedRootSelection;
+    const servedRoot = makerPositionServe.servedRoot;
     // T11: the three-state label is derived HERE — from the propagated numbers
     // only, before composition and before any synthesis step, so the derivation
     // stays acyclic (confirm-item 3: the round-3 objection is a mark, never a
@@ -3638,9 +4118,6 @@ export class WalkingSkeletonRunner {
       finishedAt: new Date()
     });
     const memoryDisclosure = await this.#memory.readDisclosure(run.runId);
-    const monoMakerConditionMarks = effectiveMakerCount === 1
-      ? ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE"] as const
-      : [] as const;
     /**
      * T6 / S4-2 / J14 — the two routes into class H/D, carried as ONE list.
      *
@@ -3711,12 +4188,18 @@ export class WalkingSkeletonRunner {
       // the node's receipt is not disclosed to the reader of the answer.
       ...new Set(panelDegradations.map((record) => record.mark))
     ]);
+    /**
+     * RE-REVIEW 2(a) / ROUND 4: the maker-position disclosure is the serve
+     * decision's, taken above with the projection it belongs to, so the fact
+     * bundle's marks and the records paired with them cannot disagree — and
+     * cannot be reached at one site and not the other.
+     */
     const factBundle: FactBundle = buildFactBundle({
       facts: Object.freeze([servedRoot.statement]),
       residualObjections: Object.freeze([]),
       badges: Object.freeze([]),
       conditionMarks: Object.freeze([...new Set([
-        ...(effectiveMakerCount > 1 ? ["UNSERVED-MAKER-POSITION" as const] : [...monoMakerConditionMarks]),
+        ...makerPositionServe.disclosure.conditionMarks,
         ...hiddenConditionMarks
       ])]),
       reversalPoint: servedRoot.reversalPoint,
@@ -3730,33 +4213,7 @@ export class WalkingSkeletonRunner {
     let compositionRawArtifactRef: string | null = null;
     let compositionAttempt = 0;
     const conformanceRawArtifactRefs: string[] = [];
-    let conditionMarkRecords: readonly ConditionMarkRecord[] = effectiveMakerCount === 1
-      ? [
-          Object.freeze({
-            mark: "SINGLE-LINEAGE",
-            scope: "answer",
-            subjectRef: servedRoot.nodeId,
-            reason: "MONO_MAKER_RUN",
-            liftPath: "RUN_DIFFERENT_MAKER_CRITIQUE",
-            servedRootRule: null,
-            affectedNodeIds: Object.freeze([servedRoot.nodeId])
-          }),
-          Object.freeze({
-            mark: "CRITIQUE-UNAVAILABLE",
-            scope: "answer",
-            subjectRef: servedRoot.nodeId,
-            reason: [
-              ...(absentAtClaim.length === 0 ? [] : [
-                `CLAIM_PANEL_REVISED:${absentAtClaim.map(({ member, failureCode }) => `${member.provider_ref}=${failureCode}`).join(",")}`
-              ]),
-              `MONO_LINEAGE_DEPTH_NOT_EXPANDED:requested_depth=${expansionDepth}`
-            ].join("|"),
-            liftPath: "RUN_DIFFERENT_MAKER_CRITIQUE",
-            servedRootRule: null,
-            affectedNodeIds: Object.freeze([servedRoot.nodeId])
-          })
-        ]
-      : [buildUnservedMakerPositionRecord(authoredMakerPositions, servedRoot)];
+    let conditionMarkRecords: readonly ConditionMarkRecord[] = makerPositionServe.disclosure.records;
     conditionMarkRecords = Object.freeze([
       ...conditionMarkRecords,
       // T7 / S3-2: one typed record per frozen branch, minted at the round
@@ -3965,11 +4422,15 @@ export class WalkingSkeletonRunner {
      * max` those two have opposite answers, and before this argument existed
      * both were being derived from the post-consumption count alone.
      */
-    const evaluateEnvelope = (pendingModelAttempts = 0): Promise<BudgetPressureDecision> =>
+    const evaluateEnvelope = (
+      pendingModelAttempts = 0,
+      forceHardStop = false
+    ): Promise<BudgetPressureDecision> =>
       this.#budget.evaluateRunPressure({
         runId: run.runId,
         basis: envelopeBasis,
         pendingModelAttempts,
+        forceHardStop,
         pendingRows: BATTERY_BUDGET_CONTRACTS
           .filter((row) => row.budgetClass === "ENRICHMENT" || row.skipPolicy === "PROTECTED_CORE_REFUSES_SKIP")
           .map((row) => ({ batteryRowId: row.batteryRowId, affectedNodeIds: [servedRoot.nodeId] })),
@@ -3984,7 +4445,15 @@ export class WalkingSkeletonRunner {
       decision
     });
     const makeEnvelopeTerminal = async (
-      decision: Extract<BudgetPressureDecision, { kind: "HARD_STOP" }>
+      decision: Extract<BudgetPressureDecision, { kind: "HARD_STOP" }>,
+      /**
+       * V-28: WHICH ceiling stopped the run. The terminal and its condition mark
+       * are the same for both — the answer a reader gets is components-only
+       * either way — but the RECORD says which bound was reached, because
+       * "re-ask with more attempts" and "re-ask with more money" are different
+       * things for the operator to do and the lift path must not lie about it.
+       */
+      stop: EnvelopeStopKind = "ATTEMPTS"
     ) => {
       await recordEnvelope(decision);
       finalSegments = [];
@@ -4005,7 +4474,7 @@ export class WalkingSkeletonRunner {
           mark: decision.terminal.conditionMark,
           scope: "answer",
           subjectRef: run.runId,
-          reason: "RUN_COST_ENVELOPE_EXHAUSTED",
+          reason: ENVELOPE_STOP_REASONS[stop],
           liftPath: null,
           servedRootRule: null,
           affectedNodeIds: decision.terminal.servedNodeIds
@@ -4114,13 +4583,22 @@ export class WalkingSkeletonRunner {
         downgradedBand: steppedDown
       }).certaintyBand ?? capped;
     };
-    const initialEnvelopeDecision = await evaluateEnvelope();
+    /**
+     * C1 (review round 2): the run body's own spend stop is asked HERE, the
+     * first point at which the ruled terminal can be built — the propagation
+     * has run, the served root is chosen and the fact bundle exists, so the
+     * components the run produced before it ran out are exactly what this
+     * terminal serves. A money or usage stop during authoring, expansion or
+     * review arrives as `runBodyBudgetStop` rather than as an exception,
+     * because there was no terminal to build where it was raised.
+     */
+    const initialEnvelopeDecision = await evaluateEnvelope(0, runBodyBudgetStop !== null);
     let result: Awaited<ReturnType<typeof runServeGateChain>>;
     // F4: no `restatementStatus === "PASS"` conjunct. The envelope terminal
     // fires on HARD_STOP whenever no served statement exists yet, independent
     // of restatement status — never serving over budget.
     if (initialEnvelopeDecision.kind === "HARD_STOP") {
-      result = await makeEnvelopeTerminal(initialEnvelopeDecision);
+      result = await makeEnvelopeTerminal(initialEnvelopeDecision, runBodyBudgetStop ?? "ATTEMPTS");
     } else {
       await recordEnvelope(initialEnvelopeDecision);
       const candidateConfidenceBand = await servedCandidateConfidenceBand();
@@ -4303,7 +4781,8 @@ export class WalkingSkeletonRunner {
       })
         }));
       } catch (error) {
-        if (!(error instanceof TypedDomainError) || error.code !== "RUN_COST_ENVELOPE_EXHAUSTED") throw error;
+        const stop = envelopeStopKind(error);
+        if (stop === null) throw error;
         // The gateway REFUSED a next provider call, so the question here is
         // whether one more attempt fits — not whether the run has overspent.
         // Asking with the pending attempt counted is what makes this context
@@ -4311,7 +4790,16 @@ export class WalkingSkeletonRunner {
         // WITHIN and keeps its answer, while this refused attempt is a
         // HARD_STOP and gets the ruled components-only terminal instead of a
         // rethrow that produced no envelope record at all.
-        const exhausted = await evaluateEnvelope(1);
+        //
+        // V-28: a MONEY refusal asks neither of those questions. The run may
+        // have dozens of attempts left and still be unable to pay for one, so
+        // the pending attempt is 0 (it would be a falsehood about the attempt
+        // ledger) and the hard stop is asserted on its own footing.
+        // RE-REVIEW C3: which question this stop asks is a named decision, so a
+        // third stop kind added tomorrow cannot quietly fall to the attempt
+        // branch the way USAGE did.
+        const asked = envelopeStopPendingAttempts(stop);
+        const exhausted = await evaluateEnvelope(asked.pendingModelAttempts, asked.forceHardStop);
         // NO restatement conjunct. F4 / goal 248-251: the protected-core guard
         // was keyed on R9's gate-hood and is KNOWINGLY RETIRED with it, so the
         // envelope terminal fires on HARD_STOP whenever no served statement
@@ -4320,7 +4808,7 @@ export class WalkingSkeletonRunner {
         // The two changes are orthogonal and both stand: T17B's `pendingModelAttempts`
         // fixes WHICH question is asked, F4 removes a guard from the answer.
         if (exhausted.kind !== "HARD_STOP") throw error;
-        result = await makeEnvelopeTerminal(exhausted);
+        result = await makeEnvelopeTerminal(exhausted, stop);
       }
       if (!result.conditionMarks.includes("DEFECT") && !result.conditionMarks.includes("ENVELOPE_EXHAUSTED")) {
         const finalEnvelopeDecision = await evaluateEnvelope();
@@ -4681,11 +5169,23 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "CONVERGENCE_CONTROLS_INVALID",
   "CONVERGENCE_CONTROLS_PROVENANCE_MISSING",
   "CONVERGENCE_CONTROLS_UNRESOLVED",
+  "COST_ENVELOPE_CEILING_INVALID",
+  "COST_ENVELOPE_CHARGE_UNREPRESENTABLE",
+  "COST_ENVELOPE_DAY_INVALID",
+  "COST_ENVELOPE_GUARD_INPUT_INVALID",
+  "COST_ENVELOPE_PRICE_INVALID",
+  "COST_ENVELOPE_PRICE_UNPRICED",
+  "COST_ENVELOPE_PROJECTION_INVALID",
+  "COST_ENVELOPE_RESERVATION_TTL_INVALID",
+  "COST_ENVELOPE_RUN_REQUIRED",
+  "COST_ENVELOPE_SPEND_INVALID",
+  "COST_ENVELOPE_USAGE_INVALID",
   "CRITERION_ID_DUPLICATE",
   "CRITERION_ID_INVALID",
   "CRITERION_LABEL_INVALID",
   "CRITIC_UNAVAILABLE_BAND_CAP_UNRESOLVED",
   "CRITIQUE_CONTEXT_NOT_ISOLATED",
+  "DAILY_COST_ENVELOPE_REACHED",
   "DATABASE_POOL_FAILED",
   "DEBATE_EXPANSION_PARENT_MISSING",
   "DEBATE_MAKER_UNRESOLVED",
@@ -4798,6 +5298,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "LIVENESS_TIME_INVALID",
   "MAKER_INVENTORY_UNSATISFIED",
   "MAKER_POLICY_INVALID",
+  "MAKER_POSITION_DISCLOSURE_UNRESOLVED",
   "MAKER_POSITION_UNAVAILABLE",
   "MALFORMED_ARROW_ORDER",
   "MEMORY_ASKER_SCOPE_MISMATCH",
@@ -4865,6 +5366,8 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PROVIDER_CALL_INSIDE_TRANSACTION",
   "PROVIDER_CONTENT_UNACCEPTED",
   "PROVIDER_RUN_REQUIRED",
+  "PROVIDER_USAGE_INVALID",
+  "PROVIDER_USAGE_UNREPORTED",
   "PUBLICATION_LEASE_SCOPE_EXPANSION_FORBIDDEN",
   "QUERY_SET_REF_REQUIRED",
   "RAW_ARTIFACT_RUN_REQUIRED",
@@ -4889,6 +5392,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_CONTENT_ENCRYPTION_REQUIRED",
   "RUN_CONTENT_ROLLBACK_INCOMPLETE",
   "RUN_COST_ENVELOPE_EXHAUSTED",
+  "RUN_COST_ENVELOPE_MONEY_REACHED",
   "RUN_COST_ENVELOPE_UNRESOLVED",
   "RUN_DEPTH_PARAMS_INVALID",
   "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
@@ -5605,11 +6109,22 @@ export function declareHatchetWalkingSkeletonTask(input: {
 export function createPostgresProviderGateway(
   pool: Pool,
   options: Omit<OpenAICompatibleGatewayOptions, "persistRawArtifact" | "appendLedgerEntry" | "assertNoOpenWriteTransaction">
+    & {
+      /**
+       * V-28 (DL4-F2): the money bound, built per CALL from the run the gateway
+       * was handed. A gateway is constructed once per target — the price is the
+       * target's — but the spend belongs to the run, and one gateway serves
+       * every run that reaches it, so the seam cannot be a construction-time
+       * value. Absent = no money bound, which is local mode byte-for-byte.
+       */
+      readonly buildCostEnvelopeSeam?: (runId: string) => ProviderCostEnvelopeSeam;
+    }
 ): ProviderGateway {
+  const { buildCostEnvelopeSeam, ...gatewayOptions } = options;
   const ledger = new LedgerRepository(pool);
   const budget = new BudgetRepository(pool);
   const http = new OpenAICompatibleProviderGateway({
-    ...options,
+    ...gatewayOptions,
     assertNoOpenWriteTransaction,
     persistRawArtifact: (artifact) => ledger.appendRawArtifact(artifact),
     appendLedgerEntry: async (entry) => (await ledger.append(entry)).ledgerEntryId
@@ -5676,6 +6191,18 @@ export function createPostgresProviderGateway(
           // run id is the leased one the S06 seam bound above, not a re-read of the request.
           ...(authenticatedEvaluatorScope ? {} : {
             assertAttemptAllowed: () => budget.assertModelAttemptAllowed(leasedRunId)
+          }),
+          /**
+           * V-28: the money envelope binds EVERY call, the authenticated evaluator
+           * scope included. That scope is exempt from the ATTEMPT ceiling because
+           * its attempts are billed to the evaluator rather than to the run
+           * (`ledger_entry_is_authenticated_scope`), but its calls are made against
+           * the same paid vendor with the same money, so exempting them from the
+           * money ceiling would leave a hole the size of the evaluator leg. The run
+           * id is the leased one, for the same reason as the attempt hook above.
+           */
+          ...(buildCostEnvelopeSeam === undefined ? {} : {
+            costEnvelope: buildCostEnvelopeSeam(leasedRunId)
           })
         });
       } catch (error) {
