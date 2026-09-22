@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   COST_ENVELOPE_CURRENCY,
@@ -134,10 +135,12 @@ describe("V-28 the per-run envelope refuses the call that WOULD cross", () => {
 });
 
 /**
- * The DAILY envelope is the owner's addition to V-28 (part 2): application-wide,
- * across every run and every vendor. When it is reached no NEW run starts until
- * the next day; a run already under way finishes, because stopping it would
- * throw away work already paid for.
+ * The DAILY envelope is the owner's addition to V-28 (part 2): every debate run
+ * together, across every vendor they touch. When it is reached no NEW run starts
+ * until the next day; a run already under way finishes, because stopping it
+ * would throw away work already paid for. What it does NOT count today — the
+ * support chat and the discovery probes — is pinned at the end of this file
+ * (C-I8).
  */
 describe("V-28 the daily envelope stops new runs, not running ones", () => {
   it("admits a new run while the day's spend is under the ceiling", () => {
@@ -325,5 +328,44 @@ describe("V-28 amendment: hosted start-up refuses an admission row without the s
     expect(() => assertHostedSupportAdmissionSealed("local", {
       supportReads: null, supportSessions: null, supportModelCalls: null
     })).not.toThrow();
+  });
+});
+
+/**
+ * C-I8 (final review, area C) — THE COMMENT AN OPERATOR MEETS FIRST MUST BE TRUE.
+ *
+ * The sealed row's own header claimed the daily ceiling was "what the WHOLE
+ * application may spend in a UTC day, across every run and every vendor". Two
+ * paid surfaces are outside it today: the support chat, which is bounded by a
+ * call cap and never in money, and the per-vendor discovery probe, which is a
+ * real `max_tokens: 8` completion charged nowhere. The deferral is recorded
+ * honestly in the mission record; it was not in the code.
+ *
+ * These cases pin the CLAIM against the CODE, in both directions, so the
+ * comment cannot drift back into an overclaim and cannot stay wrong once the
+ * two surfaces are wired in.
+ */
+describe("C-I8 the daily ceiling claims only what it counts", () => {
+  const source = (path: string) => readFile(new URL(path, import.meta.url), "utf8");
+
+  it("names the debate runs it covers and the two surfaces it does not", async () => {
+    const policy = await source("../../packages/register/src/cost-envelope-policy.ts");
+    const header = policy.slice(0, policy.indexOf("export const COST_ENVELOPE_POLICY_ROW_KEY"));
+    expect(header).not.toMatch(/across every run and every vendor/u);
+    expect(header).toMatch(/debate/iu);
+    expect(header).toMatch(/support chat/iu);
+    expect(header).toMatch(/probe/iu);
+  });
+
+  it("agrees with the ledger's only shipped writer, which writes RUN rows", async () => {
+    const spend = await source("../../packages/budget/src/model-spend.ts");
+    expect(spend).toContain("spendSource: \"RUN\"");
+    expect(spend).not.toContain("spendSource: \"SUPPORT\"");
+  });
+
+  it("agrees with the probe, which makes a real completion and charges nothing", async () => {
+    const probe = await source("../../packages/providers/src/provider-probe.ts");
+    expect(probe).toContain("max_tokens: 8");
+    expect(probe).not.toMatch(/costEnvelope|recordCall|chargeMicrosForUsage/u);
   });
 });

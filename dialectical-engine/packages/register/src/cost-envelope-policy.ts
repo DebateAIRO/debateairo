@@ -10,9 +10,28 @@ import type { Pool } from "pg";
  *  - `per_run_ceiling_micros` — what ONE debate may spend across every vendor
  *    it touches. The gateway sums vendor-reported usage times the price
  *    configured with each target and refuses the call that would cross it.
- *  - `daily_ceiling_micros` — what the WHOLE application may spend in a UTC day,
- *    across every run and every vendor. When it is reached no new run starts
+ *  - `daily_ceiling_micros` — what every DEBATE RUN together may spend in a UTC
+ *    day, across every vendor they touch. When it is reached no new run starts
  *    until the next day; runs already under way finish.
+ *
+ * WHAT THE DAILY CEILING DOES NOT COUNT TODAY (C-I8, and say it here rather
+ * than in a document the operator reads second). The ceiling is enforced over
+ * `ledger.model_spend`, and the only shipped writer of that table is the debate
+ * runs' provider seam, which writes `RUN` rows. Two paid surfaces are therefore
+ * OUTSIDE it:
+ *
+ *  - the SUPPORT CHAT. In hosted mode it calls a paid vendor of its own and is
+ *    bounded by a call cap (`support_daily_call_cap`) and its own per-message
+ *    accounting, never in money against this row. The ledger already carries a
+ *    `SUPPORT` spend source and the daily sum already includes it, so wiring it
+ *    in is one call at that transport's own seam and needs no migration.
+ *  - the DISCOVERY PROBES. Each ask-time and claim-time health probe is a real
+ *    `max_tokens: 8` completion per vendor (`packages/providers/src/provider-probe.ts`)
+ *    and is charged nowhere.
+ *
+ * Both are small beside a debate run and both are bounded in CALLS; neither is
+ * bounded in MONEY by this row. An operator reading this ceiling as the day's
+ * whole spend would be wrong by those two amounts.
  *
  * WHY ONE ROW AND NOT TWO. They are read together at exactly one moment — the
  * hosted boot's fail-closed check — and a deployment that sealed one and not the
