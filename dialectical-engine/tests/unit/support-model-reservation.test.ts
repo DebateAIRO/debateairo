@@ -459,6 +459,68 @@ describe("SUP-01 final model-call reservation", () => {
   });
 
   /**
+   * V-30 review finding 3. The configured `supportModelRef` and the composed
+   * model map can disagree — a hosted cutover that publishes a vendor target
+   * before the support configuration row, or the reverse. The condition already
+   * has a name, `SUPPORT_RELAY_NOT_COMPOSED`, and it was being answered with the
+   * generic UNAVAILABLE: every visitor saw DEGRADED and no log line said why.
+   * The refusal now carries the name, and the diagnostic carries the ref that
+   * could not be composed, which is the one fact an operator needs.
+   */
+  it("names the uncomposed model ref instead of degrading silently", async () => {
+    const reservations = ledger();
+    const seen: string[] = [];
+    let durableCalls = 0;
+    const admitted = createReservedSupportModelPort({
+      configuration: configuration(enabledState()),
+      ledger: reservations,
+      durableCalls: recordedDurableCalls(() => { durableCalls += 1; }),
+      modelFor: () => undefined,
+      reportDiagnostic: (diagnostic) => { seen.push(diagnostic.code); },
+      nonce: () => "nonce-uncomposed-000000000000000000000"
+    });
+
+    await expect(admitted.complete({ system: "system",messages: [],language: "en" }))
+      .rejects.toMatchObject({ code: "SUPPORT_RELAY_NOT_COMPOSED" });
+    expect(seen).toEqual(["SUPPORT_RELAY_NOT_COMPOSED:development:claude-cli"]);
+    // The reservation is released before any durable call is recorded: an
+    // uncomposed model must not spend a slot of the daily cap.
+    expect(durableCalls).toBe(0);
+    expect(reservations.activeCount()).toBe(0);
+  });
+
+  /**
+   * Re-review finding 1. The sink is the caller's code. Unguarded, a sink that
+   * throws escaped as a plain TypeError, which `answer.ts` re-throws rather than
+   * degrading — a 500 to the visitor instead of the DEGRADED answer, caused by a
+   * broken log line. The guard is the one this repository already uses
+   * (`support/index.ts:232-241`): try the sink, fall back to `console.error`.
+   */
+  it("still refuses with the typed code when the diagnostic sink throws", async () => {
+    const reservations = ledger();
+    const logged: unknown[] = [];
+    const consoleError = console.error;
+    console.error = (...parts: readonly unknown[]) => { logged.push(parts[0]); };
+    try {
+      const admitted = createReservedSupportModelPort({
+        configuration: configuration(enabledState()),
+        ledger: reservations,
+        durableCalls: recordedDurableCalls(),
+        modelFor: () => undefined,
+        reportDiagnostic: () => { throw new TypeError("the sink is broken"); },
+        nonce: () => "nonce-broken-sink-00000000000000000000"
+      });
+
+      await expect(admitted.complete({ system: "system",messages: [],language: "en" }))
+        .rejects.toMatchObject({ code: "SUPPORT_RELAY_NOT_COMPOSED" });
+    } finally {
+      console.error = consoleError;
+    }
+    expect(logged).toEqual([{ code: "SUPPORT_RELAY_NOT_COMPOSED:development:claude-cli" }]);
+    expect(reservations.activeCount()).toBe(0);
+  });
+
+  /**
    * DL1-F8. `#events` grew one frozen record per model call for the lifetime of
    * the process and nothing in production ever read it back, so the ledger's
    * memory tracked uptime x the daily cap. The retained window is now a fixed

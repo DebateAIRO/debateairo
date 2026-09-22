@@ -16,7 +16,6 @@ import {
 } from "../../apps/api/src/support/answer.js";
 import { createSupportCaseAccessService,type SupportCaseAccessPort } from "../../apps/api/src/support/cases.js";
 import {
-  KeyBasedAdapter,
   RelayAdapter,
   type SupportModelPort
 } from "../../apps/api/src/support/model.js";
@@ -2981,11 +2980,4 @@ describe("SUP-01 support routes", () => {
     await server.close();
   });
 
-  it("keeps the key-based adapter seam nonfunctional", async () => {
-    await expect(new KeyBasedAdapter().complete({
-      system: "bounded",
-      messages: [{ role: "user",content: "question" }],
-      language: "en"
-    })).rejects.toMatchObject({ code: "SUPPORT_MODEL_PATH_NOT_RATIFIED" });
-  });
 });

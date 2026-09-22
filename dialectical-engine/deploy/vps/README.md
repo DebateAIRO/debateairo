@@ -569,7 +569,25 @@ configuration, never an inference from `NODE_ENV`:
 | Set by | `DEBATEAI_DEPLOYMENT_MODE=hosted` in `runner.env` and `api.env` | the setting absent outside production, or `DEBATEAI_DEPLOYMENT_MODE=local` |
 
 The relays are the LOCAL deployment — a supported product path, **not** development-only code.
-What this host does is refuse them, which is a different statement.
+What this host does is refuse them, which is a different statement. Local mode's own
+instructions are `deploy/dev-auth/README.md`; they say plainly that local mode is meant for a
+computer you do not share, and why (V-30(2)).
+
+**The support chat is a provider like any other (V-30(1)).** It reads its own one-entry target,
+`SUPPORT_MODEL_TARGET_JSON` in `api.env`, through the same mode decision and the same
+credential-file contract as the debate targets: hosted refuses a relay target for support with
+the same codes listed below, and the vendor's credential is named by `authorization_file`, never
+inline. Its members are `provider_ref`, `base_url` (`https:`, path ending in `/v1`), `model` and
+`authorization_file` — the API service's own copy of the key file, from step 2 of the procedure
+below. The support model ref published in the support configuration row must equal the
+`provider_ref` written here, or the chat has no model, every answer is DEGRADED, and the log
+carries `SUPPORT_RELAY_NOT_COMPOSED:` and the ref that could not be composed.
+
+**What the support chat cannot tell you yet.** Its spend row records the tokens a vendor
+reports, but most vendors report no money at all, so the `cost_usd` column stays empty and the
+daily call cap is the only ceiling until the cost envelope (V-28) is published. A reply that
+carries no cost is logged once as `SUPPORT_MODEL_COST_UNREPORTED`, so an empty column is never
+mistaken for a call that was free.
 
 `DEBATEAI_DEPLOYMENT_MODE` is read by the strict environment loader of both services, so neither
 can start without answering the question. A production unit that omits it refuses with
@@ -588,6 +606,8 @@ can start without answering the question. A production unit that omits it refuse
 | `PROVIDER_AUTHORIZATION_FILE_UNUSABLE:` the provider ref, then the reason | the credential file is there but cannot be used: it failed custody (`SECRET_CUSTODY_INVALID`), the custody group could not be resolved (`CUSTODY_GROUP_UNRESOLVED`), or its contents are not one printable header line (`PROVIDER_CREDENTIAL_FILE_INVALID`). Neither the path nor a byte of the credential appears in the message. |
 | `COST_ENVELOPES_NOT_SEALED` | the per-run and daily cost envelopes (V-28) are not published yet. A hosted runner refuses to claim work until they are. |
 | `RUNNER_PRIMARY_PROVIDER_REF_DRIFT` | `PROVIDER_REF` does not name the FIRST entry of `PROVIDER_DISCOVERY_TARGETS_JSON`. |
+| `SUPPORT_MODEL_CREDENTIAL_ABSENT` | the support chat's target names a vendor API and declares no credential at all — no `authorization_file`. Every row above applies to `SUPPORT_MODEL_TARGET_JSON` as well; these last two are the support chat's own. |
+| `SUPPORT_MODEL_PATH_NOT_RATIFIED` | `SUPPORT_MODEL_TARGET_JSON` is neither of the two lawful shapes: a vendor API (`https:`, path ending in `/v1`) or, in LOCAL mode only, the ratified loopback relay. A target that IS an API target but is malformed refuses with the matching `PROVIDER_DISCOVERY_*` code instead, so this one means "this is not a target". |
 
 ### The credential-file contract
 

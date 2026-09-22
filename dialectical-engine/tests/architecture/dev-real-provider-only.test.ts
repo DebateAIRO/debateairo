@@ -45,8 +45,15 @@ describe("development debate provider boundary", () => {
   it("builds the Support model map only from the dedicated target instead of debate discovery",async () => {
     const main = await readFile("apps/api/src/main.ts","utf8");
     const support = main.slice(main.indexOf("const supportModels"),main.indexOf("const supportStatus"));
-    expect(main).toContain("parseSupportModelTargetJson(environment.SUPPORT_MODEL_TARGET_JSON)");
+    // V-30/task 12: the dedicated target is still the ONLY source of the map,
+    // and it is now read through the deployment's own mode decision, so a
+    // hosted API can never be composed from the debate panel and a relay can
+    // never be composed on the hosted site.
+    expect(main).toMatch(
+      /parseSupportModelTargetJson\(environment\.SUPPORT_MODEL_TARGET_JSON,\s*\{\s*mode: environment\.DEPLOYMENT_MODE,\s*nodeEnv: environment\.NODE_ENV\s*\}\)/u
+    );
     expect(support).toContain("supportModelTarget.providerRef");
+    expect(support).toContain("createSupportModelAdapter(supportModelTarget");
     expect(support).not.toContain("providerDiscoveryTargets.map");
   });
 });

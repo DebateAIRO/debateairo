@@ -13,13 +13,17 @@ function adapter(fetchImplementation: typeof fetch): RelayAdapter {
 
 describe("support relay response boundary", () => {
   it("accepts only the dedicated loopback Hermes GLM target",() => {
+    // V-30/task 12: the parse now takes the deployment it is parsing for. The
+    // local mode is what this case has always measured, and every assertion
+    // below is unchanged.
+    const local = { mode: "local",nodeEnv: undefined } as const;
     const source = JSON.stringify({
       provider_ref: "development:hermes-glm-5.3-flash",
       base_url: "http://127.0.0.1:8794/v1",
       model: "z-ai/glm-5.3-flash",
       authorization_header: "Bearer support-only"
     });
-    expect(parseSupportModelTargetJson(source)).toEqual({
+    expect(parseSupportModelTargetJson(source,local)).toEqual({
       providerRef: "development:hermes-glm-5.3-flash",
       baseUrl: "http://127.0.0.1:8794/v1",
       model: "z-ai/glm-5.3-flash",
@@ -31,7 +35,7 @@ describe("support relay response boundary", () => {
       source.replace("127.0.0.1","localhost"),
       source.replace("Bearer support-only",""),
       source.slice(0,-1) + ',"fallback":"development:codex-cli"}'
-    ]) expect(() => parseSupportModelTargetJson(invalid)).toThrow("SUPPORT_MODEL_PATH_NOT_RATIFIED");
+    ]) expect(() => parseSupportModelTargetJson(invalid,local)).toThrow("SUPPORT_MODEL_PATH_NOT_RATIFIED");
   });
 
   it("propagates the caller abort signal into fetch", async () => {

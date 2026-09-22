@@ -69,7 +69,9 @@ import {
 import { riskSignalFailureIdentity } from "./risk-signal-identity.js";
 import { createSupportKeyPort } from "./support/keys.js";
 import { createSupportAnswerService } from "./support/answer.js";
-import { RelayAdapter,parseSupportModelTargetJson } from "./support/model.js";
+import {
+  createSupportModelAdapter,parseSupportModelTargetJson,type SupportModelPort
+} from "./support/model.js";
 import {
   SupportModelReservationLedger,createReservedSupportModelPort
 } from "./support/model-reservation.js";
@@ -461,15 +463,21 @@ const supportRelayQueue = new SupportRelayQueue({
   reportCleanupFailure: reportSupportDiagnostic
 });
 const supportDegraded = new SupportDegradedState();
+// V-30(1): the support chat's model is configuration, on the SAME mode decision
+// the debate targets take above. Hosted refuses a relay target here exactly as
+// it refuses one there; local keeps today's relay path.
 const supportModelTarget = environment.SUPPORT_MODEL_TARGET_JSON === undefined
-  ? undefined : parseSupportModelTargetJson(environment.SUPPORT_MODEL_TARGET_JSON);
-const supportModels = new Map<string,RelayAdapter>(supportModelTarget === undefined ? [] : [[
+  ? undefined : parseSupportModelTargetJson(environment.SUPPORT_MODEL_TARGET_JSON,{
+    mode: environment.DEPLOYMENT_MODE,nodeEnv: environment.NODE_ENV
+  });
+const supportModels = new Map<string,SupportModelPort>(supportModelTarget === undefined ? [] : [[
   supportModelTarget.providerRef,
-  new RelayAdapter({
-    baseUrl: supportModelTarget.baseUrl,
-    authorizationHeader: supportModelTarget.authorizationHeader,
-    model: supportModelTarget.model,
-    timeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS
+  // V-9(2): a declared credential FILE is resolved here, through the same
+  // custody-checked loader the debate targets use — one seam, one contract.
+  createSupportModelAdapter(supportModelTarget,{
+    readAuthorizationHeader: readCustodyAuthorizationHeader,
+    timeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS,
+    reportDiagnostic: reportSupportDiagnostic
   })
 ] as const]);
 const supportModelReservations = new SupportModelReservationLedger({
@@ -482,7 +490,10 @@ const supportAdmittedModel = createReservedSupportModelPort({
   configuration: supportConfiguration,
   ledger: supportModelReservations,
   durableCalls: supportRelayCallRecords,
-  modelFor: (modelRef) => supportModels.get(modelRef)
+  modelFor: (modelRef) => supportModels.get(modelRef),
+  // V-30: a configured model ref that names no composed model says so, once,
+  // instead of degrading every visitor's answer with no reason recorded.
+  reportDiagnostic: reportSupportDiagnostic
 });
 const supportCaseSummaries = new PostgresSupportCaseSummaryRepository(supportPool);
 const supportSummaryService = createAdvisorySummaryService({
