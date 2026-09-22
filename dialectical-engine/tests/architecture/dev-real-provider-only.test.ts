@@ -62,7 +62,7 @@ describe("development debate provider boundary", () => {
       readFile("apps/runner/src/dev-provider-set-publish-cli.ts", "utf8")
     ]);
     expect(deployment).toContain(
-      "loadDevelopmentProviderPanelFromEnvironment(loadDevelopmentCommandEnvironment(), loadModelConfigConfiguredProviders(process.cwd()))"
+      "loadDevelopmentProviderPanelFromEnvironment(commandEnvironment, loadModelConfigConfiguredProviders(process.cwd()))"
     );
     expect(dataPlane).toContain(
       "loadDevelopmentProviderPanelFromEnvironment(commandEnvironment, loadModelConfigConfiguredProviders(process.cwd()))"

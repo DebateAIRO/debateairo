@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import pg from "pg";
 import { migrate } from "../../packages/db/src/index.js";
 import { createObservationDatabasePort } from "../../apps/observation-agent/src/core/database.js";
+import { observationRepoRoot } from "../../apps/observation-agent/src/core/paths.js";
 import type { ModuleStatusProjection } from "../../apps/observation-agent/src/core/types.js";
 import { ObservationModuleRuntime } from "../../apps/observation-agent/src/core/runtime.js";
 import { ObservationJournal } from "../../apps/observation-agent/src/journal/journal.js";
@@ -207,7 +208,8 @@ async function runOpenFixture(plan: ReturnType<typeof planAcceptanceFixture>): P
     await runtime.run({
       modules: [fixtureCaptureModule(detectedAt, "UP")],
       now: detectedAt, timeoutMs: 2_000, database,
-      stateDir: plan.stateDir, targets: Object.freeze([]), thresholdVersion: 1,
+      stateDir: plan.stateDir, repoRoot: observationRepoRoot(),
+      targets: Object.freeze([]), thresholdVersion: 1,
       moduleThresholds: Object.freeze({ "capture-health": Object.freeze({
         expected_runtimes: Object.freeze(["runner"]), detector_interval_ms: 15_000,
         blind_window_s: 120, gap_window_s: 300, gap_severe_lost_count: 100
@@ -277,7 +279,8 @@ async function runCloseFixture(): Promise<void> {
     const module = fixtureCaptureModule(detectedAt, "DOWN");
     const run = (now: Date) => runtime.run({
       modules: [module], now, timeoutMs: 2_000, database,
-      stateDir, targets: Object.freeze([]), thresholdVersion: 1,
+      stateDir, repoRoot: observationRepoRoot(),
+      targets: Object.freeze([]), thresholdVersion: 1,
       moduleThresholds: Object.freeze({ "capture-health": Object.freeze({
         expected_runtimes: Object.freeze(["runner"]), detector_interval_ms: 15_000,
         blind_window_s: 120, gap_window_s: 300, gap_severe_lost_count: 100

@@ -1,0 +1,21 @@
+# DISPATCH w5-records-3 · 2026-09-05 22:32 · records round 2 (AMENDMENT 2: B1 A3 supersession, N1–N3) · same seat resumed
+
+# ---- AMENDMENT 2 (22:30 2026-09-05) — after codex W5-RECORDS r1 (CHANGES: 1 blocking, 4 follow-ups) · round 2 of max 3 ----
+
+verdict (final snapshot): /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5-records/codex-r1-verdict.final-snapshot.md — read B1, N1, N2, N3 whole before acting.
+
+- **B1 (blocking, W5-R2-F3):** A3 preserved an unsupported causal clearance. Append a dated supersession of A3's last sentence and
+  the timeout portion of `/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/w5-dev-reconciliation.md` :515/:517 stating: **observed intermittent, one failure in two runs;
+  cause and merge influence undetermined.** Retain the local Node fixture description, the 105 ms measurement, the explicitly provisional
+  handshake inference, and 81/1/0/1. Cover :471's "two runs already resolved the only disagreement" the same way.
+- **N1:** at both historical carriers (report :388/:390 and `/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5/26-wholefile-audit.log`), append: **926 is the reviewer's reproduced
+  path census; 925 is the rename-detected result; 927 is the superseded, non-reproducing filing claim with no established alternative
+  semantics** — a census/input-count error. The accepted two-divergence conclusion stands.
+- **N2:** E1b's first sentence overstates the refutation. Append: **m2 does not prove the claimed dataflow property; it proves only that the
+  spelling check fires.** Attribute the demonstrated old-oracle miss to m1 / log 09 and the new substantive kill to m1 / log 10.
+- **N3:** publish ONE enumerated receipt in `/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/w5-records.md` distinguishing source statements, correction groups, open
+  notes and files; update the handoff's housekeeping; append a count clarification to E1. A completion count must name what it counts.
+- N4 (board contracts) is the orchestrator's — done on the board now.
+Same rules: append only; pre-edit hashes reproduced; nothing rewritten. Markers with `comments read through: w5-records-codex-r1-2026-09-05`;
+end with `REWORK READY FOR REVIEW`.
+readonly +: /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5/28-fourcount-run1.log · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5/27-suite-run2.log (evidence for A3: one failure in two runs — read, do not annotate).

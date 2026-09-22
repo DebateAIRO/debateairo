@@ -497,7 +497,7 @@ select {
   border-color: var(--line-strong);
   background: var(--surface-1);
   color: var(--text);
-  box-shadow: 0 8px 20px -18px rgba(0,0,0,.8);
+  box-shadow: var(--shadow-card);
 }
 
 .supportTopicDiamond {
@@ -1018,7 +1018,7 @@ select {
   border: 1px solid var(--line-2);
   border-radius: 12px;
   background: var(--surface-1);
-  box-shadow: 0 12px 28px -26px rgba(0,0,0,.9);
+  box-shadow: var(--shadow-card);
 }
 
 .supportMetadata {
@@ -2788,40 +2788,47 @@ a:focus-visible {
   white-space: nowrap;
 }
 
-.debateInlineActions {
+.debateInlineActions,
+.debateUtilityActions {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.debateOverflow {
+.debateOverflow,
+.debateUtilityOverflow {
   display: none;
 }
 
-.debateView[data-actions-collapsed="true"] .debateInlineActions {
+.debateView[data-actions-collapsed="true"] .debateInlineActions,
+.debateView[data-actions-collapsed="true"] .debateUtilityActions {
   position: absolute;
   width: max-content;
   visibility: hidden;
   pointer-events: none;
 }
 
-.debateView[data-actions-collapsed="true"] .debateOverflow {
+.debateView[data-actions-collapsed="true"] .debateOverflow,
+.debateView[data-actions-collapsed="true"] .debateUtilityOverflow {
   position: relative;
   display: block;
   width: 44px;
 }
 
-.debateOverflow > summary {
+.debateOverflow > summary,
+.debateUtilityOverflow > summary {
   display: inline-flex;
   list-style: none;
   cursor: pointer;
 }
 
-.debateOverflow > summary::-webkit-details-marker {
+.debateOverflow > summary::-webkit-details-marker,
+.debateUtilityOverflow > summary::-webkit-details-marker {
   display: none;
 }
 
-.debateOverflow:not([open]) .debateOverflowMenu {
+.debateOverflow:not([open]) .debateOverflowMenu,
+.debateUtilityOverflow:not([open]) .debateOverflowMenu {
   display: none;
 }
 
@@ -4527,7 +4534,8 @@ a:focus-visible {
   .debateOverflowMenu {
     gap: 8px;
   }
-  .debateInlineActions :where(.btn, .btnGhost) {
+  .debateInlineActions :where(.btn, .btnGhost),
+  .debateUtilityActions :where(.btn, .btnGhost) {
     width: 44px;
     padding-inline: 0;
     justify-content: center;
@@ -4611,10 +4619,12 @@ a:focus-visible {
     grid-template-columns: minmax(0, 1fr) 44px 44px;
     gap: 8px;
   }
-  .debateInlineActions {
+  .debateInlineActions,
+  .debateUtilityActions {
     display: none;
   }
-  .debateOverflow {
+  .debateOverflow,
+  .debateUtilityOverflow {
     position: relative;
     display: block;
     width: 44px;
@@ -6087,7 +6097,7 @@ a:focus-visible {
   border-bottom: 1px solid var(--line);
 }
 .ndRowText { flex: 1; }
-/* Slider and steering rows pin the label column so the tracks line up. */
+/* Slider rows pin the label column so the tracks line up. */
 .ndRowSlider .ndRowText { flex: 0 0 200px; }
 .ndLabel { display: block; font-size: 13.5px; font-weight: 700; }
 .ndHint { margin-top: 4px; font-size: 11.5px; color: var(--text-2); }
@@ -6175,30 +6185,6 @@ a:focus-visible {
   font-weight: 700;
   color: var(--pro);
 }
-
-/* The two steering fields sit side by side, top-aligned. */
-.ndRowSteering { align-items: flex-start; }
-.ndSteerField { flex: 1; min-width: 0; }
-.ndSteerInput {
-  display: block;
-  width: 100%;
-  margin-top: 8px;
-  padding: 10px 13px;
-  border-radius: 9px;
-  border: 1px solid var(--line);
-  background: var(--shell);
-  color: var(--ink);
-  font-family: inherit;
-  font-size: 11px;
-  /* the document's two-line resting box: 2 x 14px + 10px padding either side */
-  line-height: 14px;
-  min-height: 40px;
-  overflow: hidden;
-  resize: none;
-}
-.ndSteerInput::placeholder { color: var(--muted); }
-.ndSteerInput[data-italic="true"]::placeholder { font-style: italic; }
-.ndSteerInput:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 
 .ndOptionsToggle {
   display: flex;
@@ -6383,8 +6369,6 @@ a:focus-visible {
   .ndScreen { padding: 28px 20px 36px; }
   .ndRow { flex-wrap: wrap; }
   .ndRowSlider .ndRowText { flex: 1 1 100%; }
-  .ndRowSteering { flex-direction: column; }
-  .ndSteerField { width: 100%; }
 }
 
 /* ============================================================
@@ -6824,7 +6808,7 @@ a:focus-visible {
   color: var(--muted);
   font-family: var(--font-sans);
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: none;
   cursor: pointer;
 }
@@ -6959,11 +6943,22 @@ a:focus-visible {
   display: none;
 }
 
+/* V's ruling 2026-09-20: the header's utility actions are NOT hidden chrome.
+   2b670d30 clipped them to one pixel and marked them aria-hidden, which took
+   Library, Replay, Workspace, Honesty, Export, How-it-works and Settings away
+   from sighted and screen-reader users alike — and those are their ONLY render
+   sites, so the actions were unreachable, not merely relocated.
+
+   They keep the .debateUtilityActions / .debateUtilityOverflow names rather
+   than reverting to the DR-160 names, because T1-C1 (25155f3a) ruled that the
+   compact instrument chrome must contain no element matching
+   .debateInlineActions or .debateOverflow, and t1-canvas.test.tsx:192-193
+   enforces that. The DR-160 collapse machinery is therefore extended to these
+   names instead of the markup being renamed to it — same behaviour, one source
+   of truth, neither ruling broken. */
 .debateView > .tokenDock,
 .debateView > .scoringInsightsPanel,
-.debateView > section.card,
-.debateUtilityActions,
-.debateUtilityOverflow {
+.debateView > section.card {
   position: absolute !important;
   width: 1px !important;
   height: 1px !important;
@@ -7226,7 +7221,7 @@ a:focus-visible {
 }
 
 .drawerScrim[data-drawer-scrim] {
-  background: color-mix(in srgb, #0a0806 32%, transparent);
+  background: color-mix(in srgb, var(--ink) 32%, transparent);
 }
 
 .drawer[data-drawer-panel] {

@@ -106,11 +106,16 @@ describe("DR-184 review resilience mutation ledger", () => {
   });
 
   it("T5 pins the corrected per-site final-retry ceiling and formula version", () => {
+    // T17 (DR-184-v4): the grid moves for measured reasons — the panel leg
+    // v2 counted at zero, the post-compose organ v2 billed once per recompose
+    // round instead of once per run, and F-T17T9-3 dropped the retired
+    // composition arm from the serve leg entirely (every cell falls by exactly
+    // one serve site x 3 organ attempts). Per-site attempts are unchanged.
     const expected = [
-      [28, 28, 28, 28, 28],
-      [88, 152, 280, 536, 1048],
-      [144, 240, 432, 816, 1584],
-      [216, 344, 600, 1112, 2136]
+      [22, 22, 22, 22, 22],
+      [106, 194, 370, 722, 1426],
+      [228, 396, 732, 1404, 2748],
+      [426, 698, 1242, 2330, 4506]
     ];
     for (let panelSize = 1; panelSize <= 4; panelSize += 1) {
       for (let depth = 1; depth <= 5; depth += 1) {
@@ -124,10 +129,14 @@ describe("DR-184 review resilience mutation ledger", () => {
           finalRetryAttempts: 1,
           branchingFactor: 2,
           compositionSegmentCap: 2,
-          fixedOrgansPerComposition: 4
+          fixedOrgansPerComposition: 4,
+          reviewerCallsPerNode: 1,
+          synthesizerMaxRounds: 3,
+          evaluatorMaxRounds: 3,
+          maxDepth: 5
         });
         expect(basis.max_model_attempts).toBe(expected[panelSize - 1]![depth - 1]);
-        expect(basis.formula_version).toBe("DR-184-v2");
+        expect(basis.formula_version).toBe("DR-184-v4");
       }
     }
   });

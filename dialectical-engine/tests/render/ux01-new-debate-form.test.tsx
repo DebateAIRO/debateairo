@@ -12,8 +12,10 @@ process.env.TZ = "UTC";
 
 const pageMocks = vi.hoisted(() => ({
   authToken: "token:test-user-alpha",
+  contractClientHasPlanTierReader: true,
   createDebate: vi.fn(),
   readDeployment: vi.fn(),
+  readPlanTiers: vi.fn(),
   readSession: vi.fn(),
   push: vi.fn()
 }));
@@ -37,6 +39,14 @@ const hooks = vi.hoisted(() => {
       };
       return [slots[index] as T, set] as const;
     },
+    // Client components reached by this walker may hold refs (the merge mounted
+    // SupportWidget, which holds three). A ref is one slot that survives re-renders,
+    // so it uses the same cursor discipline as useState and is cleared by reset().
+    useRef<T>(initial: T) {
+      const index = cursor++;
+      if (!(index in slots)) slots[index] = { current: initial };
+      return slots[index] as { current: T };
+    },
     useEffect(effect: () => void | (() => void), dependencies?: readonly unknown[]) {
       const index = cursor++;
       const previous = slots[index] as readonly unknown[] | undefined;
@@ -57,6 +67,7 @@ const hooks = vi.hoisted(() => {
 vi.mock("react", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react")>()),
   useEffect: hooks.useEffect,
+  useRef: hooks.useRef,
   useState: hooks.useState
 }));
 vi.mock("next/navigation", () => ({
@@ -66,11 +77,23 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/components/AuthGate", () => ({
   AuthGate: ({ children }: { children: (token: string) => React.ReactNode }) => children(pageMocks.authToken)
 }));
-vi.mock("@/lib/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../apps/ui/lib/api.js")>()),
-  contractClient: { readDeployment: pageMocks.readDeployment, readSession: pageMocks.readSession },
-  createDebate: pageMocks.createDebate
-}));
+vi.mock("@/lib/api", async (importOriginal) => {
+  const contractClient = {
+    readDeployment: pageMocks.readDeployment,
+    readPlanTiers: pageMocks.readPlanTiers,
+    readSession: pageMocks.readSession
+  };
+  return {
+    ...(await importOriginal<typeof import("../../apps/ui/lib/api.js")>()),
+    contractClient: new Proxy(contractClient, {
+      get(target, property, receiver) {
+        if (property === "readPlanTiers" && !pageMocks.contractClientHasPlanTierReader) return undefined;
+        return Reflect.get(target, property, receiver);
+      }
+    }),
+    createDebate: pageMocks.createDebate
+  };
+});
 
 const session: Session = {
   asker_id: "asker:test-user-alpha",
@@ -103,6 +126,13 @@ function findElement(node: ReactNode, predicate: (element: ReactElement) => bool
   if (!isValidElement(node)) return null;
   if (predicate(node)) return node;
   return findElement((node.props as { children?: ReactNode }).children, predicate);
+}
+
+function collectElements(node: ReactNode, predicate: (element: ReactElement) => boolean): ReactElement[] {
+  if (Array.isArray(node)) return node.flatMap((child) => collectElements(child, predicate));
+  if (!isValidElement(node)) return [];
+  const children = collectElements((node.props as { children?: ReactNode }).children, predicate);
+  return predicate(node) ? [node, ...children] : children;
 }
 
 async function renderRealNewDebatePageState(): Promise<{ html: string; tree: ReactNode }> {
@@ -146,8 +176,10 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
   beforeEach(() => {
     hooks.reset();
     pageMocks.authToken = "token:test-user-alpha";
+    pageMocks.contractClientHasPlanTierReader = true;
     pageMocks.createDebate.mockReset().mockResolvedValue({ id: "run:new" });
     pageMocks.readDeployment.mockReset();
+    pageMocks.readPlanTiers.mockReset().mockResolvedValue({ free: [], premium: [] });
     pageMocks.readSession.mockReset().mockResolvedValue(session);
     pageMocks.push.mockReset();
   });
@@ -159,7 +191,8 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
       tier_source: "ASKER",
       tier_provenance_ref: "asker:ui-selection",
       composition_budget_tier: "low",
-      depth: 1,
+      // V-12: M10 supersedes dev's depth-1 default with Free depth 2.
+      depth: 2,
       decision_scope: "personal"
     });
     expect(config).not.toHaveProperty("agent_count");
@@ -240,36 +273,75 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
     expect(openHtml).toContain('id="additionalRunOptions"');
   });
 
-  it("carries the two steering fields into the ask as trimmed non-empty lines", async () => {
+  /* S1-2 was superseded by V-12: the later DONE(S01) ruling keeps both
+     steering boxes for every client shape. Free owns their empty defaults and
+     native lock; Premium makes the same fields editable and carries their text. */
+  it("V-12 renders both empty steering boxes locked on Free for a client without readPlanTiers", async () => {
+    pageMocks.contractClientHasPlanTierReader = false;
+    try {
+      hooks.beginRender();
+      const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
+      const tree = evaluateElementTree(<NewDebatePage />);
+      const steering = collectElements(tree, (element) =>
+        ["steeringPresets", "steeringAnnotations"].includes(
+          String((element.props as { id?: string }).id ?? "")
+        ));
+
+      // V-12: both controls exist independently of the mocked client's methods.
+      expect(steering.map((element) => (element.props as { id?: string }).id)).toEqual([
+        "steeringPresets",
+        "steeringAnnotations"
+      ]);
+      // V-12: Free applies the native lock to both controls.
+      expect(steering.every((element) => (element.props as { disabled?: boolean }).disabled === true)).toBe(true);
+      // V-12: M10 opens with both steering defaults empty.
+      expect(steering.map((element) => (element.props as { value?: string }).value)).toEqual(["", ""]);
+      const depth = findElement(tree, (element) => (element.props as { id?: string }).id === "treeDepth");
+      // V-12: M10 opens Free at Tree depth 2.
+      expect((depth?.props as { value?: number }).value).toBe(2);
+    } finally {
+      pageMocks.contractClientHasPlanTierReader = true;
+    }
+  });
+
+  it("V-12 enables both steering boxes on Premium and carries their text", async () => {
     const initial = await renderRealNewDebatePageState();
-    chooseRiskTier(initial.tree, "standard");
-    const write = (id: string, value: string) => {
-      const field = findElement(initial.tree, (element) =>
-        element.type === "textarea" && (element.props as { id?: string }).id === id);
-      expect(field, `missing ${id} field`).not.toBeNull();
-      // The auto-growing fields read currentTarget, so the event has to carry a
-      // node-shaped target rather than a bare value bag.
-      const node = { value, style: { height: "" }, scrollHeight: 50 };
-      (field!.props as { onChange: (event: unknown) => void })
-        .onChange({ target: node, currentTarget: node });
-    };
-    write("steeringPresets", "Prefer primary sources\n\n  Surface the strongest counter-case early  ");
-    write("steeringAnnotations", "Add a note the run will carry\n   ");
+    const premium = findElement(initial.tree, (element) =>
+      (element.props as Record<string, unknown>)["data-field"] === "planTier"
+      && (element.props as Record<string, unknown>)["data-value"] === "premium");
+    // V-12: Premium remains a reachable tier from the same screen.
+    expect(premium).not.toBeNull();
+    (premium!.props as { onClick: () => void }).onClick();
+
     hooks.beginRender();
     const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
+    const premiumTree = evaluateElementTree(<NewDebatePage />);
+    const steering = collectElements(premiumTree, (element) =>
+      ["steeringPresets", "steeringAnnotations"].includes(
+        String((element.props as { id?: string }).id ?? "")
+      ));
+    // V-12: Premium exposes both textareas without the Free lock.
+    expect(steering).toHaveLength(2);
+    // V-12: neither Premium textarea is disabled.
+    expect(steering.every((element) => (element.props as { disabled?: boolean }).disabled !== true)).toBe(true);
+
+    const typed = ["Prefer primary sources", "Flag unsupported claims"];
+    steering.forEach((field, index) => {
+      const node = { value: typed[index], style: { height: "" }, scrollHeight: 50 };
+      (field.props as { onChange: (event: unknown) => void }).onChange({ target: node, currentTarget: node });
+    });
+    hooks.beginRender();
     const form = findElement(evaluateElementTree(<NewDebatePage />), (element) => element.type === "form");
+    // V-12: the rendered Premium screen still has its real submit boundary.
     expect(form).not.toBeNull();
     await (form!.props as { onSubmit: (event: { preventDefault: () => void }) => Promise<void> })
       .onSubmit({ preventDefault: vi.fn() });
-    expect(pageMocks.createDebate.mock.calls.at(-1)![1]).toMatchObject({
-      steering_presets: ["Prefer primary sources", "Surface the strongest counter-case early"],
-      steering_annotations: ["Add a note the run will carry"]
+    const config = pageMocks.createDebate.mock.calls.at(-1)![1] as Record<string, unknown>;
+    // V-12: Premium carries the two independently derived literal values.
+    expect(config).toMatchObject({
+      steering_presets: ["Prefer primary sources"],
+      steering_annotations: ["Flag unsupported claims"]
     });
-  });
-
-  it("sends empty steering lists when the asker steers nothing", async () => {
-    const config = await submitRenderedPage();
-    expect(config).toMatchObject({ steering_presets: [], steering_annotations: [] });
   });
 
   it("renders depth 1..5 while keeping retired apparatus and all machine-owned fields out of the DOM", async () => {

@@ -1,0 +1,16 @@
+transfer(F-T1-ORACLE-LOGINFP): the depth oracle decides what a declaration DEFINES, not what its first operation looks like
+
+Explicit transfer of lane/t1-oracle-loginfp's one-file test delta (60641339 vs 2af816f1,
+tests/unit/s1-1-depth-contract.test.ts) onto integration, per codex T1-ORACLE-LOGINFP r3
+(verdict file agent-reports/t1-oracle-loginfp-codex-r3.md). The lane is dev-reconciled-based
+(D66) and is merged into dev by V; integration carries the same fix by this transfer.
+
+Three rounds: a run spelling 1,2,3,4,5 is a site whatever follows; a longer literal is
+simulated over a closed grammar (slice with integer-literal args; reverse/sort as
+permutations) with a third outcome — unknown values with a downstream selector report,
+terminal unknowns are withheld (dev's LoginFlow six login slots, a terminal .map into JSX).
+Comments are blanked to spaces in place so one representation gives one verdict per
+occurrence. Source-only: 16 of 27 layout classes wrong at round 2, 0 of 27 at this tip.
+The lane's trap lines are appended separately.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>

@@ -1,0 +1,6 @@
+# DISPATCH w5-records-2 · 2026-09-05 20:46 · the 9th annotation (round-2 ledger granted) · same seat resumed
+
+# ---- AMENDMENT 1 (20:46 2026-09-05) — the round-2 resolution ledger, mislocated in the original (orchestrator #31) ----
+allowed +: /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/devsync/31-r2-resolution-ledger.md (append-only, dated annotation — the original false m2 sentences at :104 and :107 are preserved and annotated, never rewritten).
+P2 (/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/LEDGER.md:319 and /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/packets/w5-codex-r2.md:19) is the orchestrator's and is corrected by appended rows/notes — not yours.
+P3: your tickets are now marked on the board with your session. Append the 9th annotation, update your report's table, keep the marker.

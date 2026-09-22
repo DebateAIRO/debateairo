@@ -1,0 +1,26 @@
+# DISPATCH t1-oracle-evaluator-worker-r2-3 · 2026-09-07 09:58 · V-AUTHORISED rework (AMENDMENT 2 + 'make it worth it') · same seat resumed
+
+# ---- AMENDMENT 2 (V-AUTHORISED 04:06 2026-09-07) — V-AUTHORISED bounded rework for R1–R3 · V's words: "I authorize one more rework with the current setup, but please make it worth it" ----
+verdict (final snapshot): /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-evaluator/codex-r2b-verdict.final-snapshot.md — read R1, R2, R3 WHOLE with their Required fixes; B1–B11 are disposed.
+- **R1 (A1 unsound):** narrow A1 to a PROVED terminal consumption context; logical operators must not terminate solely because their immediate operand
+  is NOT_ARRAY — propagate through a soundly established condition context, or conservatively return UNKNOWN for value-producing logical/conditional
+  expressions; pin the logical-wrapper and unknown-call counterexamples the verdict lists; remeasure the census after the sound rule (no file exemption).
+- **R2 (B9 incomplete):** obtain each sibling operand's value under the bounded admitted grammar, stopping at that operand; fold exact array/set cells in
+  order and convert the enclosing spread result to coll=array; UNKNOWN for an unmodelled sibling; a parenthesis-only special case is insufficient.
+- **R3 (B11 not implemented):** the data-driven candidate assertions with INDEPENDENTLY derived identity/line/span expectations and exact Value/Cell
+  payloads, explicit reasons; admitted/exhausted original-body pairs for map AND flatMap incl. return-only blocks.
+Same grants; the old emitter and fallback still active; gates, then ONE full suite (fourcount5). Markers: `comments read through:
+t1-oracle-evaluator-r2b-2026-09-07`; end with `REWORK READY FOR REVIEW` or `BLOCKED`. This round exists by V's authority only.
+**MAKE IT WORTH IT — what "worth it" means here, so this is the LAST rework:**
+1. Fix R1, R2, R3 exactly as the verdict specifies (above).
+2. **Boundary sweep of EVERY rule in §3 R4, before filing** — the reviewer found eleven, then three, defects by testing the boundary of a rule you had tested
+   only on its happy path. For each rule (purity clauses 1–4; the exact return-only form; node/depth limits; every operation's arity and return kind;
+   NOT_ARRAY continuation; collection kinds; each ordered transform; binding elisions and rejection; nested payloads; wrappers; the comma role; unknown
+   enclosing calls; freeze / includes / JSX; A1's terminal context; sibling spreads; the Prim transfers), write ONE admitted-boundary and ONE rejected-boundary
+   assertion, DERIVED FROM THE SPEC TEXT, not from what the implementation prints. Never pin a value the implementation produced (B8's lesson).
+3. **Run the reviewer's own attack list as a checklist** — every counterexample class codex used in r1, r1b, r2, r2b (its "Requested probes" and "Required
+   fix" sections) — and state each result in a table: class · input · expected by the spec · observed · STRENGTH. Anything the spec does not decide → UNKNOWN,
+   stated, not smoothed.
+4. Remeasure the census after R1 (33 candidates; report the verdict split from the run, not from memory).
+5. Then the gates and ONE full suite (fourcount5), every name attributed, none unexplained.
+A round that fixes the three named defects and leaves a boundary untested is not worth it. Return only at REWORK READY FOR REVIEW or BLOCKED.

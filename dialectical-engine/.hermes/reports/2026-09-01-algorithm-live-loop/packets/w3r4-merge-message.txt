@@ -1,0 +1,13 @@
+Merge lane/w3b round 4 (2d400dd5) into mission/2026-09-01-algorithm-live-loop
+
+One commit, one test file (tests/integration/t16-algorithm-register.test.ts, +10 −1).
+- F-GATE-1: the t16 envelope expectation learns `maxDepth` from the owner
+  (EXPANSION_DEPTH_MAX via @debateai/contract). RED at the ticket's exact name
+  (10 keys vs 9), GREEN 16/16; oracle 46/46; typecheck 0.
+- F-T1B-5: the seat refused the real-site pin and proved the premise false by
+  measurement (no shipped file's site list differs under the conjunct rule vs
+  mutant m11; instrument validated on m10's control). Disposition per codex r4:
+  see agent-reports/w3-codex-r4.md.
+Gated by codex W3 r4 (gpt-6-astra). Records: logs/w3/r4-*.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>

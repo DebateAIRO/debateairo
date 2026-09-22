@@ -2,6 +2,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { observationRepoRoot } from "../../apps/observation-agent/src/core/paths.js";
 
 const scratchDirectories: string[] = [];
 const database = Object.freeze({
@@ -156,6 +157,7 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
     });
     const router = await createOwnedSignalRouter(catalog.routerContribution!, {
       stateDir: await scratch(),
+      repoRoot: observationRepoRoot(),
       delivery: {} as never,
       osascript: async () => {
         osascriptActions += 1;
@@ -244,7 +246,8 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
     }`);
     const invalidCatalog = await discoverObservationModules(invalidRouterRoot);
     await expect(createOwnedSignalRouter(invalidCatalog.routerContribution!, {
-      stateDir: await scratch(), delivery: {} as never, osascript: async () => ({
+      stateDir: await scratch(), repoRoot: observationRepoRoot(),
+      delivery: {} as never, osascript: async () => ({
         deliveredAt: new Date(), externalRef: null
       }), moduleName: "routing", targetFragment,
       configuration: targetFragment.configuration, thresholds: Object.freeze({}),
@@ -253,7 +256,8 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
 
     (globalThis as typeof globalThis & { __obsRouterCreates: number }).__obsRouterCreates = 0;
     await expect(createOwnedSignalRouter(catalog.routerContribution!, {
-      stateDir: await scratch(), delivery: {} as never, osascript: async () => ({
+      stateDir: await scratch(), repoRoot: observationRepoRoot(),
+      delivery: {} as never, osascript: async () => ({
         deliveredAt: new Date(), externalRef: null
       }), moduleName: "other", targetFragment,
       configuration: targetFragment.configuration, thresholds: Object.freeze({}),
@@ -560,6 +564,7 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
       timeoutMs: 2_000,
       database,
       stateDir: "/tmp/observation-state",
+      repoRoot: observationRepoRoot(),
       targets: catalog.targets,
       targetFragments: catalog.fragments,
       moduleThresholds: {
@@ -630,6 +635,7 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
       timeoutMs: 2_000,
       database,
       stateDir: "/tmp/observation-state",
+      repoRoot: observationRepoRoot(),
       targets: [],
       thresholdVersion: 1
     });
@@ -757,6 +763,7 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
       timeoutMs: 2_000,
       database,
       stateDir: "/tmp/observation-state",
+      repoRoot: observationRepoRoot(),
       targets: [],
       thresholdVersion: 1
     } as const;

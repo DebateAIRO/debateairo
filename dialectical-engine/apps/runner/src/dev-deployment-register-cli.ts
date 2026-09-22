@@ -1,6 +1,7 @@
 import { createPool } from "@debateai/db";
 import { loadDevelopmentCommandEnvironment, loadMigrationEnvironment } from "@debateai/register";
 import {
+  resolveDevelopmentSynthesisRoleRefs,
   DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX,
   seedDevelopmentDeploymentRegister,
   serializeDevelopmentDeploymentRegisterReceipt
@@ -13,9 +14,13 @@ import {
 const environment = loadMigrationEnvironment();
 const pool = createPool(environment.MIGRATION_DATABASE_URL);
 try {
-  loadDevelopmentProviderPanelFromEnvironment(loadDevelopmentCommandEnvironment(), loadModelConfigConfiguredProviders(process.cwd()));
+  const commandEnvironment = loadDevelopmentCommandEnvironment();
+  const providerPanel = loadDevelopmentProviderPanelFromEnvironment(commandEnvironment, loadModelConfigConfiguredProviders(process.cwd()));
+  const roleRefs = resolveDevelopmentSynthesisRoleRefs(providerPanel, commandEnvironment);
   const receipt = await seedDevelopmentDeploymentRegister({
     adminPool: pool,
+    providerPanel,
+    roleRefs,
     repositoryRoot: process.cwd()
   });
   console.log(`${DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX}${

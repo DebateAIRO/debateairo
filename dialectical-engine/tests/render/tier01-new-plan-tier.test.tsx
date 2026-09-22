@@ -248,6 +248,8 @@ describe("S01 /new plan tier", () => {
   it("S03-24 R16 renders the Free card from the plan-tier roster response", async () => {
     vi.resetModules();
     vi.doMock("@debateai/contract", () => ({
+      EXPANSION_DEPTH_MIN: 1,
+      EXPANSION_DEPTH_MAX: 5,
       PLAN_TIER_ROSTERS: {
         free: ["gpt-5.6-luna", "claude-sonnet-5"],
         premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build"]

@@ -492,7 +492,16 @@ describe("S02 severity and unordered condition marks", () => {
     expect(new Set(Object.keys(CONDITION_MARK_SEVERITY))).toEqual(
       new Set(CONDITION_MARKS),
     );
-    expect(Object.keys(CONDITION_MARK_SEVERITY)).toHaveLength(28);
+    // J13(b) 29 -> 31, T7 31 -> 32 (BRANCH-FROZEN-LOW-LEVERAGE), T11 32 -> 33
+    // (LABEL-BASIS-INCOMPLETE), T9 33 -> 37 (SYNTHESIS-OBJECTION-STANDING,
+    // DIGEST-COMPRESSED, DIGEST-CANNOT-EXIST, PROTECTED-CORE-GUARD-RETIRED).
+    // MERGE T9B: lane/s07 pinned 36 (32 + T9's four) and integration 19bbb4c4
+    // pinned 33 (32 + T7's one); BOTH mints survive the merge, so the exact
+    // count at this tree is 37 — counted from the shipped array, not summed
+    // from these comments. Every new mark was minted MID-LIST, so the DR-176
+    // severity map is DERIVED from CONDITION_MARKS, so it grew with the
+    // vocabulary; only this count pin is stated by hand.
+    expect(Object.keys(CONDITION_MARK_SEVERITY)).toHaveLength(37);
     expect(Object.values(CONDITION_MARK_SEVERITY).every((value) => value === "DEGRADED")).toBe(
       true,
     );

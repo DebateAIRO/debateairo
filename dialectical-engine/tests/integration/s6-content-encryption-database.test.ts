@@ -45,6 +45,7 @@ import { EvidenceRepository } from "../../packages/evidence/src/index.js";
 import { CritiqueRepository } from "@debateai/critique";
 import { GraphRepository } from "@debateai/graph";
 import { JudgementRepository } from "@debateai/judgement";
+import { recordNodeReviewAlone } from "../support/unsafeReviewWrites.js";
 import { LedgerRepository } from "@debateai/ledger";
 import { MemoryRepository } from "@debateai/memory";
 import { ServeRepository } from "@debateai/serve";
@@ -555,7 +556,7 @@ async function createBoundedEvaluatorFixture(pool: Pool, marker: string): Promis
     valueLaden: false
   }));
   const judgement = new JudgementRepository(pool);
-  await judgement.recordNodeReview({
+  await recordNodeReviewAlone(pool, {
     runId,
     nodeId,
     authorRawArtifactRef: authorArtifactId,
@@ -4542,7 +4543,7 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
     )).rows[0]!.restatement_id;
 
     const reviewReasons = [`s6-review-reason-${marker}`];
-    const nodeReviewId = await new JudgementRepository(database.pool).recordNodeReview({
+    const nodeReviewId = await recordNodeReviewAlone(database.pool, {
       runId,
       nodeId,
       authorRawArtifactRef: authorArtifactId,

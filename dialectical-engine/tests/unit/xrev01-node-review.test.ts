@@ -50,7 +50,13 @@ describe("XREV-01 cross-maker node review", () => {
     const call = vi.fn(async () => ({
       rawArtifactRef: "artifact:review",
       ledgerEntryRef: "ledger:review",
-      content: JSON.stringify({ outcome: "dispute", reasons: ["The conclusion outruns the supplied premise."] }),
+      // T5/S3-1: the review artifact always carries edge_bearings — a node that
+      // sources no edges measures none, and says so rather than omitting the key.
+      content: JSON.stringify({
+        outcome: "dispute",
+        reasons: ["The conclusion outruns the supplied premise."],
+        edge_bearings: []
+      }),
       provider: "test",
       model: "model-b",
       maker: "house-b",
@@ -67,7 +73,8 @@ describe("XREV-01 cross-maker node review", () => {
       authorMaker: "house-a",
       providerRef: "provider:b",
       contractHash: "b".repeat(64),
-      bound: { maxAttempts: 1, tokenCeiling: 256, deadlineMs: 1_000 }
+      bound: { maxAttempts: 1, tokenCeiling: 256, deadlineMs: 1_000 },
+      edges: []
     })).resolves.toMatchObject({
       outcome: "dispute",
       reasons: ["The conclusion outruns the supplied premise."],
@@ -90,7 +97,14 @@ describe("XREV-01 cross-maker node review", () => {
       }),
       connect: vi.fn(async () => ({
         query: vi.fn(async (sql: string, values?: readonly unknown[]) => {
-          if (sql.includes("pg_advisory_lock")) return { rows: [] };
+          // `acquireRunContentLease` acquires with pg_TRY_advisory_lock and reads
+          // `acquired` off the row. That form is pinned by
+          // tests/architecture/s6-content-encryption-contract.test.ts, which also
+          // forbids the blocking `pg_advisory_lock(hashtextextended($1,0))` this
+          // stub used to answer. Answering with no row reads as CONTENTION and
+          // sends the lease into its unlock-and-retry loop instead of the
+          // envelope check this row is about.
+          if (sql.includes("pg_try_advisory_lock")) return { rows: [{ acquired: true }] };
           if (sql.includes("run_private_content_is_live")) return {
             rows: [{ run_id: String((values?.[0] as readonly string[])[0]), live: true }]
           };

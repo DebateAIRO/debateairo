@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { observationRepoRoot } from "../../apps/observation-agent/src/core/paths.js";
 import { parseModuleStatusProjection } from "../../apps/observation-agent/src/core/runtime.js";
 import { createHatchetThroughputModule } from "../../apps/observation-agent/src/modules/hatchet-throughput/module.js";
 import {
@@ -47,6 +48,7 @@ async function projections(
     timeoutMs: 2_000,
     database,
     stateDir: "/tmp/obs-06-status-fixture",
+    repoRoot: observationRepoRoot(),
     targets,
     targetFragment: null,
     configuration: Object.freeze({}),
@@ -189,7 +191,8 @@ describe("OBS-06 exact throughput status", () => {
     const module = createProviderHealthModule({ readCalls: async () => Object.freeze(calls) });
     const context = Object.freeze({
       now, timeoutMs: 2_000, database,
-      stateDir: "/tmp/obs-06-status-fixture", targets: Object.freeze([]),
+      stateDir: "/tmp/obs-06-status-fixture", repoRoot: observationRepoRoot(),
+      targets: Object.freeze([]),
       targetFragment: null, configuration: Object.freeze({}),
       thresholds: Object.freeze({ window_minutes: 5, minimum_calls: 10, failure_ratio: 0.5 })
     });

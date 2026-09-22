@@ -218,10 +218,19 @@ describe("S13 / FX-S22-04 / FX-PT-MEM — real PostgreSQL memory path", () => {
       });
       let lockWaiters = 0;
       for (let attempt = 0; attempt < 30 && lockWaiters < 2; attempt += 1) {
+        // pg_stat_activity.query reports the TOP-LEVEL statement, never a
+        // function body. 2d1f86b8 (DEV-11E item 4) moved the ordered run lock
+        // into the SECURITY DEFINER capability core.lock_owned_live_runs, so
+        // the memory writer's visible statement is now
+        // `SELECT run_id FROM core.lock_owned_live_runs(...)`
+        // (packages/memory/src/index.ts:470) and matches neither old branch.
+        // The lock is the same fixed-order FOR UPDATE over every requested id.
         lockWaiters = Number((await database.pool.query<{ count: string }>(
           `SELECT count(*) FROM pg_stat_activity
            WHERE wait_event_type='Lock'
-             AND (query LIKE '%run_ownership_event%' OR query LIKE '%core.run WHERE run_id%FOR UPDATE%')`
+             AND (query LIKE '%run_ownership_event%'
+               OR query LIKE '%lock_owned_live_runs%'
+               OR query LIKE '%core.run WHERE run_id%FOR UPDATE%')`
         )).rows[0]!.count);
         if (lockWaiters < 2) await new Promise((resolve) => setTimeout(resolve, 5));
       }

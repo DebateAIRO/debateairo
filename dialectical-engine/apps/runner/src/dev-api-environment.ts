@@ -564,3 +564,56 @@ export async function assembleDevelopmentApiEnvironment(
   );
   return Object.freeze({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused });
 }
+
+/**
+ * F-DIAG-DEV-API-CLI — the EXPLICIT set of codes `dev-api-environment-cli.ts` may print.
+ *
+ * The previous form lived in the CLI's own catch block and admitted a caught message on its
+ * SHAPE (`/^DEV_API_ENVIRONMENT_[A-Z_]+$/u`), so any message that merely looked like a code
+ * was printed verbatim. The landed pattern in `apps/runner/src/dev-auth-stack.ts:84-108`
+ * considered and rejected exactly that rule, in its own words: an uppercase-shaped message is
+ * still attacker- or driver-influenced text. A shape is not a vocabulary.
+ *
+ * Every entry was read out of a producer by grep at authoring time (2026-09-07); the comment
+ * carries the line of that code's FIRST throw in this module. The CLI's three producers are
+ * `assembleDevelopmentApiEnvironment` (this module), `loadDevelopmentProviderPanelFromEnvironment`
+ * (dev-provider-panel.ts, which throws only DEV_CLI_PROVIDER_PANEL_* — a different vocabulary
+ * that never matched the removed regex either) and `loadDevelopmentCommandEnvironment`
+ * (packages/register/src/runtime-environment.ts:36, a zod parse). So this module is the only
+ * producer of the codes below, and the set is written where the throws are.
+ */
+export const DEVELOPMENT_API_ENVIRONMENT_ERROR_CODES: ReadonlySet<string> = new Set([
+  "DEV_API_ENVIRONMENT_CONCURRENT_LOCKED", //                  :250
+  "DEV_API_ENVIRONMENT_CREDENTIAL_CUSTODY_INVALID", //         :101
+  "DEV_API_ENVIRONMENT_CREDENTIAL_FILE_INVALID", //            :142
+  "DEV_API_ENVIRONMENT_CREDENTIAL_REQUIRED", //                :344
+  "DEV_API_ENVIRONMENT_CUSTODY_ROOT_INVALID", //               :91
+  "DEV_API_ENVIRONMENT_DATABASE_CREDENTIAL_INVALID", //        :174
+  "DEV_API_ENVIRONMENT_DEFINITION_INVALID", //                 :223
+  "DEV_API_ENVIRONMENT_DRIFT", //                              :257
+  "DEV_API_ENVIRONMENT_HATCHET_TOKEN_INVALID", //              :196
+  "DEV_API_ENVIRONMENT_HISTORICAL_REGISTER_SOURCE_INVALID", // :408
+  "DEV_API_ENVIRONMENT_OWNER_UNVERIFIED", //                   :75
+  "DEV_API_ENVIRONMENT_PUBLISH_FAILED", //                     :288
+  "DEV_API_ENVIRONMENT_SECRET_CUSTODY_INVALID" //              :124
+]);
+
+/** The one line printed for a failure that is not one of the codes above. */
+const DEVELOPMENT_API_ENVIRONMENT_FAILED = "DEV_API_ENVIRONMENT_FAILED";
+
+/**
+ * The code the CLI prints for a caught failure. Pure, so it is testable without the CLI's
+ * top-level try/catch, which cannot be imported.
+ *
+ * ONE read of the message. Validating one read and emitting another is not an allow-list: a
+ * message accessor that answers differently on the second read would pass the check and then
+ * emit the unchecked value (dev-auth-stack.ts:300-305, codex r1 F3). The snapshot decides
+ * membership and is the only thing that can be returned.
+ */
+export function developmentApiEnvironmentErrorCode(error: unknown): string {
+  if (!(error instanceof TypeError)) return DEVELOPMENT_API_ENVIRONMENT_FAILED;
+  const message: unknown = error.message;
+  return typeof message === "string" && DEVELOPMENT_API_ENVIRONMENT_ERROR_CODES.has(message)
+    ? message
+    : DEVELOPMENT_API_ENVIRONMENT_FAILED;
+}

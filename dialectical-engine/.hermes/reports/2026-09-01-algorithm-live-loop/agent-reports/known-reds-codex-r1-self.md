@@ -1,0 +1,22 @@
+CODEX REVIEW KNOWN-REDS r1 — APPROVE · comments read through: known-reds-r1-2026-09-09
+SKILLS LOADED: superpowers:using-superpowers, heartbeat-protocol (Codex node contract and Claude router), heartbeat-reviewer, superpowers:verification-before-completion, superpowers:systematic-debugging
+
+Self-report — independent Codex reviewer for tip `0b2ca8863f376aed44cda583ecdac9fb56f4a43a`; findings and evidence are in `known-reds-codex-r1.md` beside this file.
+
+The most useful correction came from following an unmatched query all the way through the double: load01 returns its generic run row, not the empty-row branch quoted by the worker, new tooling note and reviewer packet. All three repeated the same inaccurate intermediate value. The missing `acquired` field still explains the retry, so this changes evidence precision rather than the repair direction. Upgrade: every causal finding should name the actually selected branch and returned shape. The saved price of this defect is 120.78 seconds per focused failing run; I did not pay for another reproduction.
+
+I nearly treated “required nodes and edges” as “complete valid Answer.” Reading the enclosing schema caught that shortcut: the new elements are valid, but the existing cast still masks top-level and composed-segment omissions. Population also does not establish a nonempty-tree requirement. Upgrade: report consumed-shape validity and full-schema validity separately. STRENGTH: entailed by the source comparison.
+
+What cost this review avoidable work: the catalog's Codex heartbeat entry sent me through a long spine/adapter, while the newer Claude router says seats should reach a short role contract directly. One combined read reported 32,636 output tokens and truncated; recovering the missing ranges required several more reads. This is tool-output volume, not billed model-token usage. Upgrade: reconcile the catalog entry with the short router and keep bounded reads below the output limit. I also guessed one nonexistent repository filename before using the located index.ts match; no file was written and the failed lookup supplied no evidence.
+
+The packet was strongest where it provided immutable heads, saved failures, exact observer questions and a strict execution boundary. Both permitted unit files ran once and passed (10/10 in 1.71 s; 3/3 in 446 ms). Comparing all six saved compiler-output spans and checking the official stamp tool provided more useful evidence than another compiler run. No database was needed or started.
+
+Packet friction was specific: its global absence-of-failures sentence exceeds the measured scope; its S8 range enters the next test; its canonical records block describes a separate baseline worktree although the emitted baseline headers name the untouched lane. These are N8–N10, charged to the packet, without making the worker manufacture new baseline evidence. The no-Git-mutation limit was compatible with landing review: read-only three-tree merge calculation plus the verified fast-forward relationship yields the existing HEAD tree.
+
+Dead ends rejected: reverting the product lock would contradict the landed query-form contract; retaining the stale pro01 branch would widen the double unnecessarily; replaying the database tests would violate the review packet. I consumed saved mutants and did not invent new ones. The worker self-report was present at my first artifact read, so there is no missing-deliverable charge.
+
+My limits: no worker transcript was supplied to prove each skill-body load, no runtime experiment isolated load01's cause, and no concurrent-versus-isolated comparison proves T9 scheduling invariance. I used consistent-with/undetermined for those wider claims. I loaded systematic-debugging late, before filing required-fix recommendations; it should have been part of the initial review bootstrap once the sibling-failure analysis was identified. Actual model-token accounting is unavailable here, so I do not invent a token total.
+
+Handoff: 0 blockers; 10 nonblocking findings grouped into 7 proposed tickets, all recorded in the main review. Only these two authorized output files were written; no source, board, DECISIONS, saved log or Git mutation was made. The next seat should route the corrections and judge the existing tree, not restart the two repaired diagnoses.
+
+REVIEW: approve — the review is complete within the static/saved-artifact boundary, and its concrete evidence corrections and verification limits are durable in the companion report.

@@ -1,4 +1,5 @@
 import { readdir,readFile } from "node:fs/promises";
+import { sep } from "node:path";
 import { describe,expect,it } from "vitest";
 import {
   renderInert,renderTranscript,runSupportInboxCommand,UNTRUSTED_SUPPORT_TEXT
@@ -8,7 +9,14 @@ describe("SUP-02 terminal inbox boundary", () => {
   it("has no model/provider dependency and no support tool file", async () => {
     const source = await readFile("apps/runner/src/support-inbox-cli.ts","utf8");
     expect(source).not.toMatch(/support\/model|packages\/providers|@debateai\/providers/iu);
-    const tools = await readdir("tools",{ recursive: true });
+    // The rule is about SOURCE checked into `tools/`. `tools/acceptance-bundle/
+    // node_modules/` is an install artifact with ZERO tracked entries
+    // (`git ls-files tools | grep -i support` -> nothing), and it carries three
+    // @debateai/* copies whose names match /support/, so an unfiltered walk is red
+    // on every machine that has run `pnpm install` and green only on one that has
+    // not. Installed dependencies are excluded; everything else still counts.
+    const tools = (await readdir("tools",{ recursive: true }))
+      .filter((path) => !path.split(sep).includes("node_modules"));
     expect(tools.filter((path) => /support/iu.test(path))).toEqual([]);
   });
 

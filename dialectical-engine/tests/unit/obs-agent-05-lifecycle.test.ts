@@ -1,4 +1,7 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { observationRepoRoot } from "../../apps/observation-agent/src/core/paths.js";
 import { ObservationModuleRuntime } from "../../apps/observation-agent/src/core/runtime.js";
 import type { ObservationSignal } from "../../apps/observation-agent/src/core/signals.js";
 import { createPostgresCapacityModule } from "../../apps/observation-agent/src/modules/postgres-capacity/module.js";
@@ -46,13 +49,17 @@ describe("OBS-05 capacity lifecycle", () => {
         observedAt: at
       })
     });
+    const certificateRepoRoots: string[] = [];
     const certificate = createCertificateCapacityModule({
-      readSnapshot: async (_target, at) => Object.freeze({
-        days: at < new Date(start.getTime() + 86_400_000) ? -1 : 365,
-        notAfter: at < new Date(start.getTime() + 86_400_000)
-          ? new Date("2026-09-02T12:00:00.000Z") : new Date("2027-09-03T12:00:00.000Z"),
-        observedAt: at
-      })
+      readSnapshot: async (_target, at, repoRoot) => {
+        certificateRepoRoots.push(repoRoot);
+        return Object.freeze({
+          days: at < new Date(start.getTime() + 86_400_000) ? -1 : 365,
+          notAfter: at < new Date(start.getTime() + 86_400_000)
+            ? new Date("2026-09-02T12:00:00.000Z") : new Date("2027-09-03T12:00:00.000Z"),
+          observedAt: at
+        });
+      }
     });
     const runtime = new ObservationModuleRuntime({
       modules: Object.freeze([postgres, host, certificate]),
@@ -63,7 +70,7 @@ describe("OBS-05 capacity lifecycle", () => {
     });
     const input = (now: Date) => ({
       modules: [postgres, host, certificate], now, timeoutMs: 2_000,
-      database, stateDir: "unused", targets: [], thresholdVersion: 5,
+      database, stateDir: "unused", repoRoot: observationRepoRoot(), targets: [], thresholdVersion: 5,
       targetFragments: [Object.freeze({ basename: "OBS-05.json", targets: Object.freeze([]), configuration: Object.freeze({}) })],
       moduleThresholds: {
         "postgres-capacity": { clear_samples: 2 },
@@ -86,5 +93,8 @@ describe("OBS-05 capacity lifecycle", () => {
     expect(signals.filter(({ state }) => state === "CLEARED")).toHaveLength(8);
     expect(samples).toHaveLength(132);
     expect(samples.every(({ value }) => typeof value === "number" && Number.isFinite(value))).toBe(true);
+    expect(certificateRepoRoots).toEqual([observationRepoRoot(), observationRepoRoot()]);
+    expect(existsSync(join(certificateRepoRoots[0]!, "apps/observation-agent/src/core/paths.ts")))
+      .toBe(true);
   });
 });

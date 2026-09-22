@@ -196,6 +196,62 @@ export function constructEdge(input: {
   return Object.freeze({ kind: "ACCEPTED", edge: input.proposedEdge });
 }
 
+export interface EdgeMeasurement {
+  readonly edgeId: string;
+  readonly bearing: number | null;
+}
+
+/**
+ * T5 / S3-1 — the measured-update path, scoped to a CALLER'S transaction.
+ *
+ * The review that produced these bearings and the bearings themselves are one
+ * fact: a review that commits without them is irreversible (`ledger.node_review`
+ * is append-only and node-unique) and removes the node from every future work
+ * set, so the magnitude could never be repaired. The composition root therefore
+ * runs both writes in ONE transaction, which is why this is exported as a
+ * client-scoped function rather than living only behind `GraphWriter`.
+ *
+ * A `null` bearing is the reviewer's per-edge cannot-assess: skipped, and the
+ * edge stays UNKNOWN exactly as it does today.
+ */
+export async function recordEdgeMeasurementsOnClient(
+  client: PoolClient,
+  runId: string,
+  measurements: readonly EdgeMeasurement[]
+): Promise<readonly string[]> {
+  const measured: string[] = [];
+  for (const measurement of measurements) {
+    if (measurement.bearing === null) continue;
+    if (!Number.isFinite(measurement.bearing) || measurement.bearing < 0 || measurement.bearing > 1) {
+      throw new TypedDomainError(
+        "EDGE_BEARING_OUT_OF_RANGE",
+        `Edge ${measurement.edgeId} was measured at ${String(measurement.bearing)}`
+      );
+    }
+    // The one shipped MEASURED writer. Stating it as typed data rather than
+    // as three SQL literals is what keeps the vocabulary under the compiler.
+    const write: {
+      readonly strength: number;
+      readonly magnitudeStatus: MagnitudeStatus;
+      readonly strengthSource: StrengthSource;
+    } = { strength: measurement.bearing, magnitudeStatus: "MEASURED", strengthSource: "REVIEWER" };
+    const updated = await client.query(
+      `UPDATE core.edge
+          SET strength=$3, magnitude_status=$4, strength_source=$5
+        WHERE run_id=$1 AND edge_id=$2 AND magnitude_status='UNKNOWN'`,
+      [runId, measurement.edgeId, write.strength, write.magnitudeStatus, write.strengthSource]
+    );
+    if (updated.rowCount === 0) {
+      throw new TypedDomainError(
+        "EDGE_MEASUREMENT_REFUSED",
+        `Edge ${measurement.edgeId} is not an unmeasured edge of this run`
+      );
+    }
+    measured.push(measurement.edgeId);
+  }
+  return Object.freeze(measured);
+}
+
 function sameEdgePayload(
   row: {
     readonly strength: number | null;
@@ -420,7 +476,8 @@ export class GraphWriter {
       kind: attacking ? "rebutting" : null,
       strength: null,
       magnitudeStatus: "UNKNOWN",
-      strengthSource: "EVIDENCE_VERIFIER",
+      // T5 / S3-1: the stamp names the role that will measure this edge.
+      strengthSource: "REVIEWER",
       provenanceRef: input.edgeProvenanceRef
     });
     return Object.freeze({ nodeId, placeholderEdgeId });

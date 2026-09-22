@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { observationRepoRoot } from "../../apps/observation-agent/src/core/paths.js";
 import { ObservationModuleRuntime } from "../../apps/observation-agent/src/core/runtime.js";
 import { signalSchema } from "../../apps/observation-agent/src/core/signals.js";
 
@@ -38,7 +39,8 @@ function snapshot(input: Readonly<{
 function context(now: Date, stateDir: string) {
   return {
     now, timeoutMs: 2_000, database,
-    stateDir, targets: [], targetFragment: null, configuration: {},
+    stateDir, repoRoot: observationRepoRoot(),
+    targets: [], targetFragment: null, configuration: {},
     thresholds: {
       detector_interval_ms: 15_000, blind_window_s: 120,
       gap_window_s: 300, gap_severe_lost_count: 100,

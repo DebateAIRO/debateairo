@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { LEDGER_OUTCOMES } from "@debateai/kernel";
 import {
   auditArchitecture,
+  auditEdgeManifest,
   auditMigrationReplaySafety,
   auditOrphans,
   auditSurfaceAttachmentLiterals,
@@ -18,10 +19,29 @@ describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
     ]);
   });
 
-  it("matches all 28 dependency-edge rows and structural rules 1–5", async () => {
+  // 28 -> 27: the `web` edge row retired with its surface (apps/ui replaces it —
+  // .hermes/reports/2026-09-01-algorithm-live-loop/PROGRESS.md:32,
+  // DECISIONS.md:810), and its unguarded manifest read was what made this audit
+  // throw ENOENT instead of reporting.
+  it("matches all 27 dependency-edge rows and structural rules 1–5", async () => {
     const report = await auditArchitecture();
-    expect(report.edgeRowsChecked).toBe(28);
+    expect(report.edgeRowsChecked).toBe(27);
     expect(report.violations).toEqual([]);
+  });
+
+  // PROPERTY: a declared edge row whose directory ships no package.json is
+  // REPORTED as a violation and never thrown. A crashed audit does not report
+  // zero violations, it reports NOTHING — that is exactly how the retired `web`
+  // row hid five real edge violations for the whole merge window, and why the
+  // records that counted three were guessing. The second half pins the other
+  // direction: a row that DOES ship a manifest must stay silent, so a guard
+  // that reports every row cannot pass.
+  it("reports a declared edge row with no manifest instead of throwing", async () => {
+    const missing = await auditEdgeManifest("bogus", "packages/does-not-exist");
+    expect(missing.violations).toEqual(["bogus has no manifest at packages/does-not-exist"]);
+    expect(missing.dependencies).toEqual([]);
+    const present = await auditEdgeManifest("kernel", "packages/kernel");
+    expect(present.violations).toEqual([]);
   });
 
   it("enforces purity, one provider gateway, source-constant, exhaustive-switch and labeled-number gates", async () => {
@@ -179,10 +199,6 @@ describe("FX-ORPH-02 / FX-ORPH-03 / FX-ORPH-06 — reports are wired", () => {
     expect(report.neverCalled).toEqual(expect.arrayContaining([
       expect.objectContaining({ package: "packages/kernel.exhaustive" }),
       expect.objectContaining({ package: "packages/graph.constructEdge" }),
-      expect.objectContaining({ package: "packages/judgement.runJudgePanel" }),
-      expect.objectContaining({ package: "packages/judgement.measureDispersion" }),
-      expect.objectContaining({ package: "packages/judgement.applyCorrelatedErrorDiscount" }),
-      expect.objectContaining({ package: "packages/judgement.applyDeclaredDisagreement" }),
       expect.objectContaining({ package: "packages/judgement.createTypedNonAnswer" }),
       expect.objectContaining({ package: "packages/battery/decision.decideSplitClassification" }),
       expect.objectContaining({ package: "packages/ledger.LedgerRepository.recordDecision" }),
@@ -192,11 +208,14 @@ describe("FX-ORPH-02 / FX-ORPH-03 / FX-ORPH-06 — reports are wired", () => {
       expect.objectContaining({ package: "packages/battery/decision.resolveRegeneration" }),
       expect.objectContaining({ package: "packages/battery/decision.selectRivalCarver" })
     ]));
+    // T3 / S2-2: the four panel surfaces are production-reachable now that the
+    // runner's per-node judgement path calls them. Attachment is DERIVED from
+    // reachability, so these rows flip only when the wiring is really there.
     expect(report.s04Surface).toEqual([
-      expect.objectContaining({ package: "packages/judgement.runJudgePanel", attachment: "UNATTACHED" }),
-      expect.objectContaining({ package: "packages/judgement.measureDispersion", attachment: "UNATTACHED" }),
-      expect.objectContaining({ package: "packages/judgement.applyCorrelatedErrorDiscount", attachment: "UNATTACHED" }),
-      expect.objectContaining({ package: "packages/judgement.applyDeclaredDisagreement", attachment: "UNATTACHED" }),
+      expect.objectContaining({ package: "packages/judgement.runJudgePanel", attachment: "ATTACHED" }),
+      expect.objectContaining({ package: "packages/judgement.measureDispersion", attachment: "ATTACHED" }),
+      expect.objectContaining({ package: "packages/judgement.applyCorrelatedErrorDiscount", attachment: "ATTACHED" }),
+      expect.objectContaining({ package: "packages/judgement.applyDeclaredDisagreement", attachment: "ATTACHED" }),
       expect.objectContaining({ package: "packages/judgement.createTypedNonAnswer", attachment: "UNATTACHED" }),
       expect.objectContaining({ package: "packages/judgement.resolveClaimType", attachment: "ATTACHED" })
     ]);

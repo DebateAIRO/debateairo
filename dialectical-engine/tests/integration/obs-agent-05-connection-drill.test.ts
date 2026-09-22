@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { observationRepoRoot } from "../../apps/observation-agent/src/core/paths.js";
 import { ObservationModuleRuntime } from "../../apps/observation-agent/src/core/runtime.js";
 import { renderImpact, type ObservationSignal } from "../../apps/observation-agent/src/core/signals.js";
 import { createPostgresCapacityModule } from "../../apps/observation-agent/src/modules/postgres-capacity/module.js";
@@ -39,7 +40,7 @@ describe("OBS-05 measured connection drill", () => {
     });
     await runtime.run({
       modules: [module], now: observedAt, timeoutMs: 2_000, database,
-      stateDir: "unused", targets: [], thresholdVersion: 2,
+      stateDir: "unused", repoRoot: observationRepoRoot(), targets: [], thresholdVersion: 2,
       moduleThresholds: { "postgres-capacity": { connections_severe_percent: 20 } }
     });
     expect(measuredUsed).toBeGreaterThanOrEqual(baseline + additionalClients);

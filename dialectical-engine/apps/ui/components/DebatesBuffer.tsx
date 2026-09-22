@@ -33,7 +33,7 @@ function LibraryRow({
   confidenceBand?: string | null;
 }) {
   return (
-    <Link className="libRow" href={href}>
+    <Link className="libRow" href={href} data-library-row>
       <div className="libRowBody">
         <div className="libRowClaim">{claim}</div>
         <p className="libRowMeta">

@@ -1,0 +1,12 @@
+tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle DebateCanvas agreed review mark binds its agreed review verdict role
+tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle DebateCanvas disputed review mark binds its disputed review verdict role
+tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law matches all 27 dependency-edge rows and structural rules 1–5
+tests/integration/registration-database.test.ts > S3 registration and verification on real PostgreSQL S3d post-hash main-process secondary RSS tripwire stays flat and counts every refusal
+tests/integration/registration-database.test.ts > S3 registration and verification on real PostgreSQL S3d rework3 B1/B3 probes deep-queue slack and the following audit window
+tests/render/t1-canvas.test.tsx > card anatomy keeps BASE, FINAL, and an accessible Details control on one card
+tests/render/t1-canvas.test.tsx > card anatomy maps all completed review outcomes and absence to four distinct compact states
+tests/render/t3-library.test.tsx > lists renders every library row as a shell/core bezel
+tests/render/ui02e-debate-canvas.test.tsx > UI-02e renders the real DebateCanvas gate surface keeps typed maker and score absence visible instead of collapsing to silence
+tests/unit/registration.test.ts > S3 ruled authentication policy S3c B4 keeps the isolated production RSS curve below the published measured bound
+tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps uses DR-160 content-aware overflow instead of a fixed collapse breakpoint
+tests/unit/v2ui-pages.test.ts > XREV-01 — node review uses the existing V2 card and drawer vocabulary shows typed review outcome and reviewer house on cards, including honest absence

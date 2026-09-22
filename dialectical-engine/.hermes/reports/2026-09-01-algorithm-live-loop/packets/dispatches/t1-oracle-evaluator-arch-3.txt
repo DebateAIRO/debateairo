@@ -1,0 +1,22 @@
+# DISPATCH t1-oracle-evaluator-arch-3 · 2026-09-06 15:34 · architecture round 3 of 3 (AMENDMENT 2) · same seat resumed
+
+# ---- AMENDMENT 2 (15:34 2026-09-06) — ARCHITECTURE ROUND 3 OF 3, THE LAST · after codex PLAN review r2 (CHANGES: 6 blocking, 2 follow-ups) ----
+verdict (final snapshot): /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-evaluator/codex-plan-r2-verdict.final-snapshot.md — read it WHOLE; "Exact changes for the architecture
+seat's LAST round" is this round's contract; R2-B1–B6 are the reasons. The classic-parser architecture is RETAINED (the reviewer says so). In one line each:
+R2-B1 the callback value domain cannot implement its own predicate controls (define a concrete primitive expression-result type preserving boolean
+truth until operators/conditionals/filters consume it; when results abstract into array cells; ToBoolean for NaN and strings) · R2-B2 the NOT_ARRAY
+list includes operations that return arrays (split the operation list by actual return contract and receiver knowledge; unsupported reduce → UNKNOWN;
+find/at/indexing need known element info or → UNKNOWN; .length vs member access distinguished; keep the narrow includes → boolean) · R2-B3 the
+ownership walk stops before unmodelled value-producing syntax (unmodelled enclosing calls → UNKNOWN and advance the consumed span to the rejected
+containing use; rule-1 precedence; the internal ownership result for nested array/binding extraction, collection kind, multiple bound outputs) ·
+R2-B4 parse failure and the carried fixture floor require incompatible outputs (file-level parse failure conservative: exactly one INCONCLUSIVE with
+path/line/diagnostic per deliberate truncated fixture, no fabricated DOMAIN occurrence; public signatures and relationship of parseModule / the
+fragment harness — which must NOT silently re-lex the ceiling arms, F1) · R2-B5 the revised round states still cannot all be green as scheduled
+(preserve candidate-vs-emission separation with ONE explicit stage contract; per-round green sets that are actually reachable) · R2-B6 the clause
+matrix still has equivalent controls and missing assignments (finish the clause → non-equivalent mutant → discriminating control matrix).
+F1 (inherited ceiling lexical defect) is correctly scoped: carry it as the named follow-up; pin ceiling behaviour during extraction.
+F2 (round 0 needs an execution gate in the worker dispatch) is the ORCHESTRATOR's — I write it into the round-0 dispatch; you may list what it must
+prove. D-R2-1 authority is CLEAR (D68 ADDENDUM): mark the stale "grant does not exist" / U9 text SUPERSEDED in this revision.
+Revise in place as before (dated "§N — REVISION 3" blocks; originals preserved and marked). STRENGTH on every claim. No code. This is the LAST
+architecture round: what the reviewer still finds open after it goes to V as a plan decision. Markers: `comments read through:
+t1-oracle-evaluator-plan-codex-r2-2026-09-06`; end with `PLAN READY FOR REVIEW` or `BLOCKED <reason>`.

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { observationRepoRoot } from "../../apps/observation-agent/src/core/paths.js";
 import { createPostgresCapacityModule } from "../../apps/observation-agent/src/modules/postgres-capacity/module.js";
 import {
   readPostgresCapacity,
@@ -33,6 +34,7 @@ function context(now = at(0), thresholds: Readonly<Record<string, number>> = {})
     timeoutMs: 2_000,
     database,
     stateDir: "/tmp/obs-05-fixture",
+    repoRoot: observationRepoRoot(),
     targets: [],
     targetFragment: null,
     configuration: {},

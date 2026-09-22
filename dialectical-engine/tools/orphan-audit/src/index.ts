@@ -14,7 +14,7 @@ const rows: readonly Row[] = [
   ["battery-decision", "packages/battery/decision", ["kernel"]],
   ["contract", "packages/contract", ["kernel"]],
   ["db", "packages/db", ["kernel", "crypto"]],
-  ["register", "packages/register", ["kernel", "db"]],
+  ["register", "packages/register", ["kernel", "db", "contract"]],
   ["ledger", "packages/ledger", ["kernel", "db", "register"]],
   ["providers", "packages/providers", ["kernel", "register", "ledger", "obs-capture"]],
   ["graph", "packages/graph", ["kernel", "db", "ledger", "register"]],
@@ -25,14 +25,24 @@ const rows: readonly Row[] = [
   ["liveness", "packages/liveness", ["kernel", "db", "ledger", "providers", "register", "graph"]],
   ["settlement", "packages/settlement", ["kernel", "db", "ledger", "providers", "register", "graph"]],
   ["valuation", "packages/valuation", ["kernel", "db", "ledger", "register", "graph", "propagation"]],
-  ["budget", "packages/budget", ["kernel", "db", "ledger", "register"]],
+  ["budget", "packages/budget", ["kernel", "db", "ledger", "register", "contract"]],
   ["battery", "packages/battery", ["kernel", "db", "ledger", "register", "budget", "graph", "battery-decision", "evidence", "judgement", "critique", "valuation", "serve", "settlement"]],
   ["serve", "packages/serve", ["kernel", "db", "ledger", "register", "graph", "propagation", "providers", "contract", "valuation", "memory", "liveness"]],
-  ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "providers"]],
-  ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget"]],
+  // `support-kb` is DECLARED, not a violation: V's support program depends on
+  // the package in shipped code. `@debateai/support-kb` entered apps/api's and
+  // apps/runner's manifests on the second merge parent at 9c68ceb3 ("feat(support):
+  // SUP-01 C1 — schema, role grants, kill switch, reservation, status"); the table
+  // lagged the product only because this audit was crashing on the retired `web`
+  // manifest read and had never reported a verdict. Both rows are the same commit.
+  ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "providers", "support-kb"]],
+  ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget", "contract", "support-kb"]],
   ["apps/replay", "apps/replay", ["published-arithmetic"]],
   ["apps/scheduler", "apps/scheduler", ["kernel", "db", "ledger", "register", "propagation", "serve", "battery", "settlement", "liveness"]],
-  ["web", "web", ["contract"]],
+  // The `web` row retired with its surface: `web/` is retired in favour of
+  // apps/ui (.hermes/reports/2026-09-01-algorithm-live-loop/PROGRESS.md:32,
+  // DECISIONS.md:810). It is not a pnpm workspace member and ships no
+  // package.json on either merge parent, so the unguarded manifest read below
+  // threw ENOENT and the architecture audit crashed instead of reporting.
   ["tools/orphan-audit", "tools/orphan-audit", ["kernel", "contract"]],
   ["tools/acceptance-bundle", "tools/acceptance-bundle", ["kernel", "contract", "register", "db"]]
 ];
@@ -42,6 +52,41 @@ function workspaceName(dependency: string): string | null {
   return dependency.slice("@debateai/".length);
 }
 
+/**
+ * The manifest read behind every edge row, and the guard on it.
+ *
+ * A declared row whose directory ships no `package.json` is a VIOLATION, never
+ * a throw. This audit spent the whole merge window dying on `ENOENT …
+ * web/package.json` here, and a crashed audit does not report zero violations —
+ * it reports NOTHING, so every count taken from that state was a guess. Three
+ * separate records predicted three `obs-capture` violations; the first finished
+ * run produced five. The row's absence must be readable IN the verdict.
+ *
+ * Only file absence is absorbed. A manifest that exists but does not parse is a
+ * different defect and stays loud: reporting a corrupt manifest as "no manifest"
+ * would be the same class of lie this guard exists to end.
+ */
+export async function auditEdgeManifest(name: string, directory: string): Promise<{
+  readonly dependencies: readonly string[];
+  readonly violations: readonly string[];
+}> {
+  let text: string;
+  try {
+    text = await readFile(join(root, directory, "package.json"), "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    return { dependencies: [], violations: [`${name} has no manifest at ${directory}`] };
+  }
+  const manifest = JSON.parse(text) as {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+  const dependencies = Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })
+    .map(workspaceName)
+    .filter((value): value is string => value !== null);
+  return { dependencies, violations: [] };
+}
+
 export async function auditArchitecture(): Promise<{
   readonly edgeRowsChecked: number;
   readonly violations: readonly string[];
@@ -49,14 +94,10 @@ export async function auditArchitecture(): Promise<{
   const violations: string[] = [];
   const graph = new Map<string, string[]>();
   for (const [name, directory, allowed] of rows) {
-    const manifest = JSON.parse(await readFile(join(root, directory, "package.json"), "utf8")) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    };
-    const actual = Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })
-      .map(workspaceName)
-      .filter((value): value is string => value !== null);
-    graph.set(name, actual);
+    const manifest = await auditEdgeManifest(name, directory);
+    violations.push(...manifest.violations);
+    const actual = manifest.dependencies;
+    graph.set(name, [...actual]);
     for (const dependency of actual) {
       if (!allowed.includes(dependency)) violations.push(`${name} -> ${dependency} is not a declared edge`);
     }
@@ -78,16 +119,16 @@ export async function auditArchitecture(): Promise<{
   const replaySource = await readFile(join(root, "apps/replay/src/index.ts"), "utf8");
   const replayImport = replaySource.match(/import\s*\{([^}]+)\}\s*from\s*["']@debateai\/published-arithmetic["']/)?.[1]
     ?.split(",").map((name) => name.trim()).sort();
-  if (JSON.stringify(replayImport) !== JSON.stringify(["agg", "product", "σ"].sort())) {
-    violations.push("apps/replay must import exactly agg, σ, product from published-arithmetic");
+  if (JSON.stringify(replayImport) !== JSON.stringify(["agg", "σ"].sort())) {
+    violations.push("apps/replay must import exactly agg, σ from published-arithmetic");
   }
   const arithmeticSource = await readFile(join(root, "packages/published-arithmetic/src/index.ts"), "utf8");
   const arithmeticExports = [...arithmeticSource.matchAll(/export function\s+([^\s(]+)/g)].map((match) => match[1]).sort();
-  if (JSON.stringify(arithmeticExports) !== JSON.stringify(["agg", "product", "σ"].sort())) {
-    violations.push("published-arithmetic must export exactly agg, σ, product");
+  if (JSON.stringify(arithmeticExports) !== JSON.stringify(["agg", "σ"].sort())) {
+    violations.push("published-arithmetic must export exactly agg, σ");
   }
   const replayWithoutImport = replaySource.replace(/import[^;]+;/g, "");
-  if (/(?:function|const|let|class)\s+(?:agg|σ|product)\b/.test(replayWithoutImport)) {
+  if (/(?:function|const|let|class)\s+(?:agg|σ)\b/.test(replayWithoutImport)) {
     violations.push("apps/replay declares a local arithmetic symbol");
   }
   return { edgeRowsChecked: rows.length, violations };
@@ -115,47 +156,35 @@ function withoutUiSurface(paths: readonly string[]): string[] {
   return paths.filter((path) => !path.startsWith(uiSurfaceDirectory));
 }
 
+/**
+ * FX-ORPH-04, after the `web/` retirement.
+ *
+ * This walk used to read the legacy Next app's presentation projection
+ * (`web/lib/v3Presentation.ts`) to derive the fields the UI consumes, and to
+ * sweep the same app's routed sources for death-list markers. `web/` is retired
+ * in favour of apps/ui (.hermes/reports/2026-09-01-algorithm-live-loop/
+ * PROGRESS.md:32, DECISIONS.md:810), and apps/ui ships no equivalent artifact —
+ * measured: no `= answer;` destructuring exists anywhere under apps/ui — so the
+ * served-vs-consumed field walk and the death-list reachability sweep retire
+ * with their subject instead of being re-pointed by analogy.
+ *
+ * What never depended on `web/` stays, and is still asserted: the generated
+ * contract version, and the closed event vocabulary's declared consumers, both
+ * read from @debateai/contract.
+ */
 export async function auditS14TypeGraph(): Promise<{
   readonly contractVersion: string;
-  readonly servedWithoutConsumer: readonly string[];
-  readonly consumedWithoutServed: readonly string[];
   readonly eventsWithoutConsumer: readonly string[];
-  readonly deathListReachable: readonly string[];
 }> {
   const inventory = JSON.parse(await readFile(join(root, "packages/contract/generated/field-inventory.json"), "utf8")) as {
     contractVersion: string;
-    resources: { AnswerSchema: string[] };
   };
-  const projection = await readFile(join(root, "web/lib/v3Presentation.ts"), "utf8");
-  const destructuring = projection.match(/const\s*\{([\s\S]*?)\}\s*=\s*answer;/)?.[1] ?? "";
-  const consumed = [...destructuring.matchAll(/\b([a-z][a-z0-9_]*)\b/g)].map((match) => match[1]!);
-  const served = inventory.resources.AnswerSchema;
-  const servedWithoutConsumer = served.filter((field) => !consumed.includes(field));
-  const consumedWithoutServed = [...new Set(consumed.filter((field) => !served.includes(field)))];
   const eventsWithoutConsumer = Object.entries(EVENT_CONSUMERS)
     .filter(([, consumers]) => consumers.length === 0)
     .map(([event]) => event);
-
-  const webFiles = await sourceFiles(join(root, "web"));
-  const sources = await Promise.all(webFiles.map(async (path) => ({
-    path: relative(join(root, "web"), path),
-    source: await readFile(path, "utf8")
-  })));
-  const reachableText = sources
-    .filter(({ path }) => path.startsWith("app/") || path === "lib/api.ts" || path === "lib/serverApi.ts" || path === "lib/v3Presentation.ts")
-    .map(({ source }) => source)
-    .join("\n");
-  const deathMarkers = [
-    "DebateTree", "ArgumentFocusView", "DebateOutline", "listDebates", "ScoringRefreshState",
-    "indexScoringResponse", "force_refresh", "DIALECTICAL_COORDINATOR_URL", "/api/debates"
-  ];
-  const deathListReachable = deathMarkers.filter((marker) => reachableText.includes(marker));
   return {
     contractVersion: inventory.contractVersion,
-    servedWithoutConsumer,
-    consumedWithoutServed,
-    eventsWithoutConsumer,
-    deathListReachable
+    eventsWithoutConsumer
   };
 }
 
@@ -170,6 +199,15 @@ type CallableDeclaration = {
   readonly id: string;
   readonly callName: string;
   readonly body: string;
+  /**
+   * `this`-field name (with its `#`, if private) -> the class it is constructed
+   * from, for every field of the declaring class whose construction is
+   * unambiguous. A method body sees only its own text, so without this map a
+   * `this.#field.method(` call can only be resolved by the unqualified-name
+   * fallback below — which gives up the moment two classes declare a method of
+   * the same name.
+   */
+  readonly fieldClasses?: ReadonlyMap<string, string>;
 };
 
 function maskNonCode(source: string): string {
@@ -268,6 +306,28 @@ function braceDepthAt(source: string, start: number, index: number): number {
   return depth;
 }
 
+/**
+ * Every `this.<field> = … new ClassName(` assignment in one class body, keyed by
+ * field name. A field assigned two different classes is DROPPED rather than
+ * guessed: an orphan audit that over-approximates reachability hides the orphans
+ * it exists to find.
+ */
+function constructedFields(classBody: string): ReadonlyMap<string, string> {
+  const candidates = new Map<string, Set<string>>();
+  for (const match of classBody.matchAll(
+    /\bthis\s*\.\s*(#?[A-Za-z_$][\w$]*)\s*=[^;]*?\bnew\s+([A-Za-z_$][\w$]*)\s*\(/g
+  )) {
+    const seen = candidates.get(match[1]!) ?? new Set<string>();
+    seen.add(match[2]!);
+    candidates.set(match[1]!, seen);
+  }
+  const resolved = new Map<string, string>();
+  for (const [field, classes] of candidates) {
+    if (classes.size === 1) resolved.set(field, [...classes][0]!);
+  }
+  return resolved;
+}
+
 function callableDeclarations(source: string): readonly CallableDeclaration[] {
   const masked = maskNonCode(source);
   const declarations: CallableDeclaration[] = [];
@@ -283,6 +343,7 @@ function callableDeclarations(source: string): readonly CallableDeclaration[] {
     const classClose = matchingBrace(masked, classOpen);
     if (classClose === null) continue;
     const classBody = masked.slice(classOpen + 1, classClose);
+    const fieldClasses = constructedFields(classBody);
     const methodPattern = /(?:^|\n)\s*(?:(?:public|private|protected|static|readonly|async|override)\s+)*(constructor|[A-Za-z_$][\w$]*)\s*(?:<[^\n{};]*>)?\s*\(/g;
     const methods = [...classBody.matchAll(methodPattern)]
       .filter((methodMatch) => braceDepthAt(classBody, 0, methodMatch.index) === 0)
@@ -293,7 +354,8 @@ function callableDeclarations(source: string): readonly CallableDeclaration[] {
       declarations.push({
         id: `${className}.${methodName}`,
         callName: methodName === "constructor" ? className : methodName,
-        body: classBody.slice(methodMatch.index + methodMatch[0].length, methods[methodIndex + 1]?.index)
+        body: classBody.slice(methodMatch.index + methodMatch[0].length, methods[methodIndex + 1]?.index),
+        fieldClasses
       });
     }
   }
@@ -323,7 +385,11 @@ export async function auditSurfaceReachability(): Promise<{
     }
   }
 
-  const referencedDeclarations = (source: string, currentId?: string): readonly string[] => {
+  const referencedDeclarations = (
+    source: string,
+    currentId?: string,
+    fieldClasses?: ReadonlyMap<string, string>
+  ): readonly string[] => {
     const referenced = new Set<string>();
     const constructedVariables = new Map<string, string>();
     for (const match of source.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new\s+([A-Za-z_$][\w$]*)\s*\(/g)) {
@@ -339,6 +405,21 @@ export async function auditSurfaceReachability(): Promise<{
     for (const match of source.matchAll(/\bnew\s+([A-Za-z_$][\w$]*)\s*\(/g)) {
       for (const id of byCallName.get(match[1]!) ?? []) {
         if (id.endsWith(".constructor")) referenced.add(id);
+      }
+    }
+    // `this.#field.method(` — the field's class comes from the DECLARING class
+    // body, which this method body does not contain. Without it the call falls
+    // through to the unqualified-name fallback, which resolves a name only while
+    // it is unique in the whole tree; a second class declaring `read(`
+    // anywhere then detaches a live edge with no diagnostic.
+    if (fieldClasses !== undefined) {
+      for (const match of source.matchAll(
+        /\bthis\s*\.\s*(#?[A-Za-z_$][\w$]*)\s*\.\s*([A-Za-z_$][\w$]*)\s*\(/g
+      )) {
+        const fieldClass = fieldClasses.get(match[1]!);
+        if (fieldClass === undefined) continue;
+        const exact = `${fieldClass}.${match[2]!}`;
+        if (declarations.has(exact)) referenced.add(exact);
       }
     }
     const currentClass = currentId?.includes(".") === true ? currentId.slice(0, currentId.indexOf(".")) : null;
@@ -376,7 +457,7 @@ export async function auditSurfaceReachability(): Promise<{
     reachable.add(id);
     const declaration = declarations.get(id);
     if (declaration === undefined) continue;
-    pending.push(...referencedDeclarations(declaration.body, declaration.id));
+    pending.push(...referencedDeclarations(declaration.body, declaration.id, declaration.fieldClasses));
   }
   return {
     declaredEntryPointFiles: productionEntryPointFiles,
@@ -556,6 +637,25 @@ export function auditSurfaceAttachmentLiterals(name: string, source: string): re
     .map((match) => `${name}:${lineAt(source, match.index)} hand-authors s*Surface attachment instead of deriving production reachability`);
 }
 
+/**
+ * J10(b) — the ONE reconciliation between the source-purity law and the goal.
+ *
+ * The purity law refuses every exported numeric source literal outside
+ * packages/published-arithmetic, because a bare number in source is a policy
+ * value that belongs in a register/law carrier. Goal T1 (S1-1) nevertheless
+ * ORDERS the 1–5 expansion-depth bound to be declared ONCE as an exported
+ * contract constant, which every other surface imports. Both rules are correct;
+ * they collide on exactly two names.
+ *
+ * These two exports ARE the law carrier for that bound, so they are recognized
+ * as such — by NAME, in ONE file. This is deliberately not a path prefix and
+ * not a package exemption: a third numeric export in this very file still trips
+ * the law, and the law is unchanged everywhere else.
+ */
+const GOAL_RULED_LAW_CARRIERS: ReadonlyMap<string, readonly string[]> = new Map([
+  ["packages/contract/src/index.ts", ["EXPANSION_DEPTH_MIN", "EXPANSION_DEPTH_MAX"]]
+]);
+
 export async function auditSourceRules(): Promise<{ readonly blocking: readonly string[] }> {
   const blocking: string[] = [];
   const engineFiles = withoutUiSurface([
@@ -590,7 +690,10 @@ export async function auditSourceRules(): Promise<{ readonly blocking: readonly 
     if (/switch\s*\(/.test(source) && (!/default\s*:/.test(source) || !/exhaustive\s*\(/.test(source))) {
       blocking.push(`${where} has a switch without default + exhaustive fall-through`);
     }
-    if (/export\s+const\s+[A-Z][A-Z0-9_]*\s*=\s*-?\d+(?:\.\d+)?\s*[;\n]/.test(source) && !where.startsWith("packages/published-arithmetic/")) {
+    const numericExports = [...source.matchAll(/export\s+const\s+([A-Z][A-Z0-9_]*)\s*=\s*-?\d+(?:\.\d+)?\s*[;\n]/g)]
+      .map((match) => match[1]!)
+      .filter((name) => !(GOAL_RULED_LAW_CARRIERS.get(where) ?? []).includes(name));
+    if (numericExports.length > 0 && !where.startsWith("packages/published-arithmetic/")) {
       blocking.push(`${where} exports a numeric source literal instead of a register/law carrier`);
     }
   }
@@ -721,10 +824,10 @@ export async function auditOrphans(): Promise<{
     neverCalled: [
       { package: "packages/kernel.exhaustive", reason: "closed-switch fall-through carrier is present; the S00 runtime path has no switch" },
       { package: "packages/graph.constructEdge", reason: "S02 exposes the pure construction seam, but its current callers are test fixtures; the first production caller belongs to a later graph-construction slice" },
-      { package: "packages/judgement.runJudgePanel", reason: "S04 proves the P15 panel bulkhead in the pure surface; the current production shell is honestly single-judge until panel routing is composed" },
-      { package: "packages/judgement.measureDispersion", reason: "S04 proves typed dispersion at two judgements; the current single-judge production shell persists null" },
-      { package: "packages/judgement.applyCorrelatedErrorDiscount", reason: "S04 proves first-appearance family discounting; production attachment waits for multi-member routing" },
-      { package: "packages/judgement.applyDeclaredDisagreement", reason: "S04 proves declared disagreement decisions in the pure surface; the single-judge production shell records truthful NOT_MEASURED instead" },
+      // T3 / S2-2: runJudgePanel, measureDispersion, applyCorrelatedErrorDiscount
+      // and applyDeclaredDisagreement left this list when the runner's judgement
+      // path was wired to the panel. They are production-reachable now, and the
+      // s04Surface rows below derive that attachment from reachability.
       { package: "packages/judgement.createTypedNonAnswer", reason: "S04 enforces spec section 12.3 at the pure seam; ignorance-ledger production attachment belongs to the serving shell" },
       { package: "packages/serve.projectProvenance", reason: "DR-081 layer projection is pure and test-covered; the S14 enriched provenance read owns its production attachment once V supplies the flip row" },
       { package: "packages/battery/decision.decideSplitClassification", reason: "callers are test fixtures; production SPLIT-loop attachment belongs to a later runner slice." },
@@ -751,10 +854,10 @@ export async function auditOrphans(): Promise<{
       { package: "tools/acceptance-bundle", reason: "S00 scaffolds its read edges; S15 owns invocation" }
     ],
     s04Surface: deriveSurfaceRows([
-      { package: "packages/judgement.runJudgePanel", evidence: "pure P15 bulkhead only; production runner is honestly single-judge" },
-      { package: "packages/judgement.measureDispersion", evidence: "pure >=2-judgement measurement only; production single-judge path persists null" },
-      { package: "packages/judgement.applyCorrelatedErrorDiscount", evidence: "pure multi-member family grouping only; no production panel routing exists" },
-      { package: "packages/judgement.applyDeclaredDisagreement", evidence: "two-way declared predicate evaluation is pure-only; production single-judge path truthfully records NOT_MEASURED" },
+      { package: "packages/judgement.runJudgePanel", evidence: "T3/S2-2: the runner's per-node panel routes every other healthy maker through the P15 producer bulkhead" },
+      { package: "packages/judgement.measureDispersion", evidence: "T3/S2-2: the runner measures panel dispersion per node and persists it on the reduced judgement" },
+      { package: "packages/judgement.applyCorrelatedErrorDiscount", evidence: "T3/S2-2: the runner discounts repeated provider families before the panel's selection arithmetic" },
+      { package: "packages/judgement.applyDeclaredDisagreement", evidence: "T3/S2-2: the runner declares the disagreement decision against the sealed threshold and records the band downgrade" },
       { package: "packages/judgement.createTypedNonAnswer", evidence: "pure spec section 12.3 enforcement only; serving-shell attachment remains later work" },
       { package: "packages/judgement.resolveClaimType", evidence: "Judge.judge calls the shared resolver for code-first then bounded model classification" }
     ], reachableCallables),

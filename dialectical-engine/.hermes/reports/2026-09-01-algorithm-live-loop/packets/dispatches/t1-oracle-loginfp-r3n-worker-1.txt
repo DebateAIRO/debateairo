@@ -1,0 +1,15 @@
+# DISPATCH t1-oracle-loginfp-r3n-worker-1 · 2026-09-06 08:05 · records-only, same seat resumed
+
+# T1-ORACLE-LOGINFP-R3-N — RECORDS-ONLY PACKET (round 1 of max 3) · corrections owed on the parked oracle lane's reports
+
+mission dir : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop · ticket /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/board/T1-ORACLE-LOGINFP-R3-N.md · verdict /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-loginfp/codex-r3-verdict.final-snapshot.md (N1, N2 whole; the "Per-artifact custody audit" section)
+context     : V ruled (D68) to build a real evaluator; lane/t1-oracle-loginfp is PARKED at 60641339 as the control corpus — do not touch the lane, its code, or its logs.
+allowed  : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t1-oracle-loginfp.md (append) · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t1-oracle-loginfp-self.md (append)
+readonly : the verdict · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-loginfp/*
+forbidden: all_others · no code · no git · no edits to the board or the DECISIONS file · no credential values (D18)
+
+OUTCOME: N1 — the final summaries agree with their artifacts by dated appends: the six names and the 37 total corrected; log 40 qualified as a
+revision-labelled source-only frame without tree-state custody; the stale self-report reconciled with the regenerated logs 41–43; historical logs
+and sent packets untouched. N2 — every finding and claim in both reports labelled entailed / consistent-with / undetermined (D67), direct recorded
+results separated from attribution and from unproved completeness, "consistent-with" the ceiling for any attribution not directly measured.
+Append only. Markers with `comments read through: t1-oracle-loginfp-codex-r3-2026-09-06`; end with `READY FOR PEER REVIEW`.

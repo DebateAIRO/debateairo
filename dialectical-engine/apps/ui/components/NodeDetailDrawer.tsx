@@ -249,7 +249,11 @@ export function NodeDetailDrawer({
             <div className="drawerProse" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"} onMouseUp={onChallenge ? selectProse : undefined}>
               {generation.argument}
             </div>
-          ) : null}
+          ) : (
+            <div className="muted" style={{ marginTop: 12 }}>
+              No argument text yet.
+            </div>
+          )}
           {generation?.argument && onChallenge ? (
             <div className="drawerSelectHint">▲ Select any sentence above to challenge it.</div>
           ) : null}

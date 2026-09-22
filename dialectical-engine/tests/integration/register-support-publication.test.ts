@@ -1,5 +1,7 @@
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import type { Pool, PoolClient } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -15,9 +17,11 @@ import {
   type SupportConfigurationKey
 } from "../../packages/register/src/index.js";
 import { createSupportConfigurationPort } from "../../packages/register/src/support-config.js";
-import { buildDevelopmentDeploymentRegisterHistoricalPublicationRows } from
+import { seedDevelopmentDeploymentRegister, buildDevelopmentDeploymentRegisterPublicationRows } from
   "../../apps/runner/src/dev-deployment-register.js";
+import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 import {
+  readLegacyDevelopmentV4Rows,
   DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256,
   LEGACY_REGISTER_V1_SNAPSHOT_SHA256
 } from "../support/registerFixtures.js";
@@ -100,7 +104,7 @@ async function applyMigrationsBeforeSupportPublication(pool: Pool): Promise<void
 
 async function insertPre0055History(
   pool: Pool,
-  version: "1" | "4",
+  version: "1" | "4" | "5",
   rows: readonly RegisterPublicationRow[]
 ): Promise<void> {
   const client = await pool.connect();
@@ -305,6 +309,48 @@ afterEach(async () => {
 });
 
 describe("REGISTER-SUPPORT-PUBLICATION database contract", () => {
+  it("preserves legacy algorithm version 5 while allocating and replaying the new development receipt", async () => {
+    await database.stop();
+    database = await startTestDatabase();
+    await applyMigrationsBeforeSupportPublication(database.pool);
+    const bootstrap = await loadBootstrapRegister();
+    await insertPre0055History(database.pool, "1", buildBootstrapRegisterPublicationRows(bootstrap));
+    const rows = await buildDevelopmentDeploymentRegisterPublicationRows(bootstrap, TEST_DEVELOPMENT_PROVIDER_PANEL);
+    await insertPre0055History(database.pool, "5", rows);
+    const before = (await database.pool.query("SELECT * FROM register.register_row WHERE register_version=5 ORDER BY row_key")).rows;
+    await migrate(database.pool);
+    const repositoryRoot = await mkdtemp(join(tmpdir(), "dev-register-upgrade-"));
+    try {
+      await mkdir(join(repositoryRoot, ".local/dev-auth"), { recursive: true, mode: 0o700 });
+      const input = { adminPool: database.pool, providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL, repositoryRoot };
+      const receipt = await seedDevelopmentDeploymentRegister(input);
+      expect(BigInt(receipt.registerVersion)).toBeGreaterThan(5n);
+      expect(await seedDevelopmentDeploymentRegister(input)).toEqual(receipt);
+      expect((await database.pool.query("SELECT * FROM register.register_row WHERE register_version=5 ORDER BY row_key")).rows).toEqual(before);
+      expect((await database.pool.query("SELECT profile FROM register.required_row_version WHERE register_version=$1", [receipt.registerVersion])).rows).toHaveLength(1);
+    } finally { await rm(repositoryRoot, { recursive: true, force: true }); }
+  });
+
+  it("allocates development after an existing support publication without changing the support head", async () => {
+    const port = createPostgresRegisterPublicationPort(database.pool);
+    await port.importHistorical({ registerVersion: parseRegisterVersionText("4"), rows: await readLegacyDevelopmentV4Rows() });
+    const support = await port.publishSupport({
+      publicationId: randomUUID(), baseRegisterVersion: parseRegisterVersionText("4"),
+      expectedSupportRegisterVersion: null, schemaVersion: 1, sourceRef: "test:support-before-dev",
+      patch: Object.entries(SUPPORT_VALUES).map(([key, value]) => ({ key: key as SupportConfigurationKey,
+        valueJsonText: parseCanonicalRegisterJson(Buffer.from(value)) }))
+    });
+    const repositoryRoot = await mkdtemp(join(tmpdir(), "dev-register-support-upgrade-"));
+    try {
+      await mkdir(join(repositoryRoot, ".local/dev-auth"), { recursive: true, mode: 0o700 });
+      const input = { adminPool: database.pool, providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL, repositoryRoot };
+      const receipt = await seedDevelopmentDeploymentRegister(input);
+      expect(BigInt(receipt.registerVersion)).toBeGreaterThan(BigInt(support.registerVersion));
+      expect(await seedDevelopmentDeploymentRegister(input)).toEqual(receipt);
+      expect((await port.readSupportStatus())?.supportRegisterVersion).toBe(support.registerVersion);
+    } finally { await rm(repositoryRoot, { recursive: true, force: true }); }
+  });
+
   it("upgrades exact historical v1/v4 bytes, initializes production off, ignores generic versions, and rolls back forward", async () => {
     await database.stop();
     database = await startTestDatabase();
@@ -312,7 +358,7 @@ describe("REGISTER-SUPPORT-PUBLICATION database contract", () => {
 
     const bootstrap = await loadBootstrapRegister();
     const v1Rows = buildBootstrapRegisterPublicationRows(bootstrap);
-    const v4Rows = await buildDevelopmentDeploymentRegisterHistoricalPublicationRows(bootstrap);
+    const v4Rows = await readLegacyDevelopmentV4Rows();
     expect(computeRegisterSnapshotSha256(v1Rows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);
     expect(computeRegisterSnapshotSha256(v4Rows))
       .toBe(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256);

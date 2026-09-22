@@ -18,11 +18,13 @@ describe("FX-REG-01 — bootstrap equality and loud resolution", () => {
   });
 
   it("resolves parent → run → deployment and records the supplying level", () => {
+    // Generic resolver: the sample values are arbitrary and deliberately not
+    // scoring-operator names, which are now a one-member repealed vocabulary.
     expect(resolveRegisterValue("operator", {
-      parent: { operator: "strict-and" },
-      run: { operator: "accumulate" },
-      deployment: { operator: "strict-and" }
-    })).toEqual({ value: "strict-and", suppliedBy: "parent" });
+      parent: { operator: "from-parent" },
+      run: { operator: "from-run" },
+      deployment: { operator: "from-deployment" }
+    })).toEqual({ value: "from-parent", suppliedBy: "parent" });
     expect(() => resolveRegisterValue("missing", {
       parent: {}, run: {}, deployment: {}
     })).toThrow("Unresolved register key");

@@ -1,0 +1,116 @@
+commit=4f83405f35e4d4ac5611defd92a7591e2551e6e3 tree=706c420f31de5873774ca6e8c63e6f8e34d7d0c0  gate=closing-run  2026-09-17 22:28:58 EEST
+node v26.5.0 · pnpm 10.28.2 · claude 2.1.274 (Claude Code) · codex codex-cli 0.154.0 · grok grok 1.0.34 (3736acbc8658) [stable]
+binaries: ACCEPTANCE_CLAUDE_BINARY=/Users/stefannour/.local/bin/claude ACCEPTANCE_CODEX_BINARY=/opt/homebrew/bin/codex ACCEPTANCE_GROK_BINARY=/Users/stefannour/.local/bin/grok (runnable: 3 of 3)
+ports: DB 55432 · API 58080 · SHIM 58090 · GROK RELAY 58091 · stranger sample rate 0
+credential: present in the environment (length 43); never logged
+$ ./node_modules/.bin/tsx acceptance/run-acceptance.ts --service-credential <env> --depth-params {"depth":2}
+<<<OUTPUT
+[ACC-01 DB] 2026-09-17 22:28:59.790 EEST [21194] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+[ACC-01 DB] 2026-09-17 22:28:59.791 EEST [21194] LOG:  listening on IPv4 address "127.0.0.1", port 55432
+
+[ACC-01 DB] 2026-09-17 22:28:59.791 EEST [21194] LOG:  listening on IPv6 address "::1", port 55432
+
+[ACC-01 DB] 2026-09-17 22:28:59.791 EEST [21194] LOG:  listening on Unix socket "/tmp/.s.PGSQL.55432"
+
+[ACC-01 DB] 2026-09-17 22:28:59.798 EEST [21200] LOG:  database system was shut down at 2026-09-17 22:22:58 EEST
+
+[ACC-01 DB] 2026-09-17 22:28:59.803 EEST [21194] LOG:  database system is ready to accept connections
+
+RELAY DEGRADED xAI SANDBOX-PROFILE-UNAVAILABLE GROK_CLI_FAILED
+[ACC-01 DB] 2026-09-17 22:33:59.800 EEST [21198] LOG:  checkpoint starting: time
+
+[ACC-01 DB] 2026-09-17 22:35:05.707 EEST [21198] LOG:  checkpoint complete: wrote 655 buffers (4.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=65.904 s, sync=0.002 s, total=65.908 s; sync files=145, longest=0.001 s, average=0.001 s; distance=5452 kB, estimate=5452 kB; lsn=0/2A65130, redo lsn=0/2A5EB30
+
+[ACC-01 DB] 2026-09-17 22:38:59.709 EEST [21198] LOG:  checkpoint starting: time
+
+[ACC-01 DB] 2026-09-17 22:39:05.760 EEST [21198] LOG:  checkpoint complete: wrote 60 buffers (0.4%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=6.047 s, sync=0.002 s, total=6.052 s; sync files=42, longest=0.001 s, average=0.001 s; distance=140 kB, estimate=4921 kB; lsn=0/2A8DFB8, redo lsn=0/2A81B78
+
+[ACC-01 DB] 2026-09-17 22:43:59.763 EEST [21198] LOG:  checkpoint starting: time
+
+[ACC-01 DB] 2026-09-17 22:44:04.612 EEST [21198] LOG:  checkpoint complete: wrote 48 buffers (0.3%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=4.847 s, sync=0.002 s, total=4.850 s; sync files=46, longest=0.001 s, average=0.001 s; distance=139 kB, estimate=4443 kB; lsn=0/2AB7800, redo lsn=0/2AA4948
+
+[ACC-01 DB] 2026-09-17 22:48:59.614 EEST [21198] LOG:  checkpoint starting: time
+
+[ACC-01 DB] 2026-09-17 22:49:03.548 EEST [21198] LOG:  checkpoint complete: wrote 39 buffers (0.2%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=3.931 s, sync=0.002 s, total=3.935 s; sync files=35, longest=0.001 s, average=0.001 s; distance=128 kB, estimate=4011 kB; lsn=0/2AC4BA8, redo lsn=0/2AC4B18
+
+[ACC-01 DB] 2026-09-17 22:53:59.550 EEST [21198] LOG:  checkpoint starting: time
+
+[ACC-01 DB] 2026-09-17 22:54:05.596 EEST [21198] LOG:  checkpoint complete: wrote 60 buffers (0.4%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=6.043 s, sync=0.003 s, total=6.047 s; sync files=47, longest=0.001 s, average=0.001 s; distance=238 kB, estimate=3634 kB; lsn=0/2B0D990, redo lsn=0/2B00500
+
+[ACC-01 DB] 2026-09-17 22:58:59.595 EEST [21198] LOG:  checkpoint starting: time
+
+[ACC-01 DB] 2026-09-17 22:59:04.840 EEST [21198] LOG:  checkpoint complete: wrote 52 buffers (0.3%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=5.243 s, sync=0.002 s, total=5.245 s; sync files=44, longest=0.001 s, average=0.001 s; distance=185 kB, estimate=3289 kB; lsn=0/2B3C6A8, redo lsn=0/2B2EA18
+
+[ACC-01 DB] 2026-09-17 23:03:59.842 EEST [21198] LOG:  checkpoint starting: time
+
+[ACC-01 DB] 2026-09-17 23:04:05.409 EEST [21198] LOG:  checkpoint complete: wrote 55 buffers (0.3%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=5.550 s, sync=0.014 s, total=5.568 s; sync files=44, longest=0.005 s, average=0.001 s; distance=211 kB, estimate=2981 kB; lsn=0/2B63A48, redo lsn=0/2B639B8
+
+[ACC-01 DB] 2026-09-17 23:08:59.411 EEST [21198] LOG:  checkpoint starting: time
+
+[ACC-01 DB] 2026-09-17 23:09:04.956 EEST [21198] LOG:  checkpoint complete: wrote 55 buffers (0.3%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=5.542 s, sync=0.002 s, total=5.546 s; sync files=44, longest=0.001 s, average=0.001 s; distance=219 kB, estimate=2705 kB; lsn=0/2B9AA38, redo lsn=0/2B9A9A8
+
+[ACC-01 DB] 2026-09-17 23:13:59.958 EEST [21198] LOG:  checkpoint starting: time
+
+[ACC-01 DB] 2026-09-17 23:14:04.502 EEST [21198] LOG:  checkpoint complete: wrote 45 buffers (0.3%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=4.541 s, sync=0.003 s, total=4.545 s; sync files=39, longest=0.001 s, average=0.001 s; distance=155 kB, estimate=2450 kB; lsn=0/2BC1790, redo lsn=0/2BC1738
+
+[ACC-01 DB] 2026-09-17 23:18:59.501 EEST [21198] LOG:  checkpoint starting: time
+
+[ACC-01 DB] 2026-09-17 23:19:05.967 EEST [21198] LOG:  checkpoint complete: wrote 64 buffers (0.4%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=6.461 s, sync=0.003 s, total=6.466 s; sync files=51, longest=0.001 s, average=0.001 s; distance=282 kB, estimate=2233 kB; lsn=0/2C082F8, redo lsn=0/2C08268
+
+[ACC-01 DB] 2026-09-17 23:23:59.970 EEST [21198] LOG:  checkpoint starting: time
+
+[ACC-01 DB] 2026-09-17 23:24:04.718 EEST [21198] LOG:  checkpoint complete: wrote 47 buffers (0.3%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=4.744 s, sync=0.003 s, total=4.749 s; sync files=39, longest=0.001 s, average=0.001 s; distance=178 kB, estimate=2028 kB; lsn=0/2C34D68, redo lsn=0/2C34D10
+
+[ACC-01 DB] 2026-09-17 23:28:59.719 EEST [21198] LOG:  checkpoint starting: time
+
+[ACC-01 DB] 2026-09-17 23:29:06.177 EEST [21198] LOG:  checkpoint complete: wrote 64 buffers (0.4%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=6.454 s, sync=0.003 s, total=6.459 s; sync files=49, longest=0.001 s, average=0.001 s; distance=283 kB, estimate=1853 kB; lsn=0/2C7BAA8, redo lsn=0/2C7BA50
+
+[ACC-01 DB] 2026-09-17 23:33:59.179 EEST [21198] LOG:  checkpoint starting: time
+
+[ACC-01 DB] 2026-09-17 23:34:03.526 EEST [21198] LOG:  checkpoint complete: wrote 43 buffers (0.3%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=4.345 s, sync=0.001 s, total=4.348 s; sync files=33, longest=0.001 s, average=0.001 s; distance=172 kB, estimate=1685 kB; lsn=0/2CAE890, redo lsn=0/2CA6B10
+
+[ACC-01 DB] 2026-09-17 23:38:59.527 EEST [21198] LOG:  checkpoint starting: time
+
+[ACC-01 DB] 2026-09-17 23:39:04.571 EEST [21198] LOG:  checkpoint complete: wrote 50 buffers (0.3%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=5.041 s, sync=0.002 s, total=5.044 s; sync files=42, longest=0.001 s, average=0.001 s; distance=221 kB, estimate=1539 kB; lsn=0/2CDE208, redo lsn=0/2CDE1B0
+
+[ACC-01 DB] 2026-09-17 23:43:59.567 EEST [21198] LOG:  checkpoint starting: time
+
+[ACC-01 DB] 2026-09-17 23:44:05.134 EEST [21198] LOG:  checkpoint complete: wrote 55 buffers (0.3%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=5.563 s, sync=0.003 s, total=5.567 s; sync files=46, longest=0.001 s, average=0.001 s; distance=215 kB, estimate=1406 kB; lsn=0/2D141B8, redo lsn=0/2D14160
+
+(node:21192) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ACC-01 run id: d7b73d79-44af-4a7f-af4f-f510d06e7114
+ACC-01 answer id: 244b8c12-8819-42e9-aa05-c907784814f1
+FAIR-01 graph: 27 nodes · 15 attack edge(s)
+FAIR-01 makers: Anthropic, OpenAI, xAI · independent attack edges: 15
+PRO-01 model calls (all outcomes): 114
+DISC-01 panel/ceiling/probe evidence: 3 / 396 / 9
+T17 envelope at terminal: WITHIN · 114/396 model attempts (panel included)
+PRO-01 per-node maker lineage: [{"nodeId":"716ea8d3-146b-4484-ba7a-e9fa3abd7546","depth":0,"childKind":null,"maker":"OpenAI","modelId":"gpt-6-astra","providerRef":"acceptance:codex-cli"},{"nodeId":"a79641be-8514-43a3-80aa-10e5907bf20f","depth":0,"childKind":null,"maker":"Anthropic","modelId":"claude-opus-5","providerRef":"acceptance:claude-cli"},{"nodeId":"f6f024d6-309b-4ae1-bb15-436c36f073a7","depth":0,"childKind":null,"maker":"xAI","modelId":"grok-4.6-build","providerRef":"acceptance:grok-cli"},{"nodeId":"af9f49cf-838f-471f-aaa1-9c20aedaa7bc","depth":1,"childKind":"support","maker":"Anthropic","modelId":"claude-opus-5","providerRef":"acceptance:claude-cli"},{"nodeId":"98aa2e93-27e3-47d7-9a99-e2ccf486c8b3","depth":1,"childKind":"defeater","maker":"Anthropic","modelId":"claude-opus-5","providerRef":"acceptance:claude-cli"},{"nodeId":"3cf0db25-e3b3-4206-a742-4e237a808799","depth":2,"childKind":"support","maker":"xAI","modelId":"grok-4.6-build","providerRef":"acceptance:grok-cli"},{"nodeId":"cc77e04f-c2f2-469c-8c4e-7a155fea854c","depth":2,"childKind":"defeater","maker":"xAI","modelId":"grok-4.6-build","providerRef":"acceptance:grok-cli"},{"nodeId":"43637ca5-f9e9-4179-9902-ca12032635f8","depth":2,"childKind":"support","maker":"xAI","modelId":"grok-4.6-build","providerRef":"acceptance:grok-cli"},{"nodeId":"7898e8e1-b51d-4778-9648-e1afb93621fa","depth":2,"childKind":"defeater","maker":"xAI","modelId":"grok-4.6-build","providerRef":"acceptance:grok-cli"},{"nodeId":"e7dfd7b5-5f16-44b1-9c04-e76d74b07a48","depth":1,"childKind":"support","maker":"xAI","modelId":"grok-4.6-build","providerRef":"acceptance:grok-cli"},{"nodeId":"ef0410a6-1466-484f-a57b-9e46d0b5c4f0","depth":1,"childKind":"defeater","maker":"xAI","modelId":"grok-4.6-build","providerRef":"acceptance:grok-cli"},{"nodeId":"0c99f01b-ed3f-44b1-bd9b-939f53c59fa4","depth":2,"childKind":"support","maker":"OpenAI","modelId":"gpt-6-astra","providerRef":"acceptance:codex-cli"},{"nodeId":"98646b37-50e4-4f0b-ad9f-7f39046b0e60","depth":2,"childKind":"defeater","maker":"OpenAI","modelId":"gpt-6-astra","providerRef":"acceptance:codex-cli"},{"nodeId":"e2e6d184-3599-4310-9df3-9df5205f9b91","depth":2,"childKind":"support","maker":"OpenAI","modelId":"gpt-6-astra","providerRef":"acceptance:codex-cli"},{"nodeId":"d23dd0af-ef53-47eb-9c72-6ee6a282d422","depth":2,"childKind":"defeater","maker":"OpenAI","modelId":"gpt-6-astra","providerRef":"acceptance:codex-cli"},{"nodeId":"23c9001b-90c7-4427-b467-04280ec64fa8","depth":1,"childKind":"support","maker":"OpenAI","modelId":"gpt-6-astra","providerRef":"acceptance:codex-cli"},{"nodeId":"11464564-a786-4c5b-abcd-b9c7bf2d7457","depth":1,"childKind":"defeater","maker":"OpenAI","modelId":"gpt-6-astra","providerRef":"acceptance:codex-cli"},{"nodeId":"0ea1c198-01e4-4a3d-a54c-976214e2bb42","depth":2,"childKind":"support","maker":"Anthropic","modelId":"claude-opus-5","providerRef":"acceptance:claude-cli"},{"nodeId":"24799154-9b47-4afb-8d67-30a2b1ba9161","depth":2,"childKind":"defeater","maker":"Anthropic","modelId":"claude-opus-5","providerRef":"acceptance:claude-cli"},{"nodeId":"19deae76-c3cf-40a9-9943-7840623c20dc","depth":2,"childKind":"support","maker":"Anthropic","modelId":"claude-opus-5","providerRef":"acceptance:claude-cli"},{"nodeId":"78e47591-3964-4bc7-bc60-42ebdcd35eab","depth":2,"childKind":"defeater","maker":"Anthropic","modelId":"claude-opus-5","providerRef":"acceptance:claude-cli"},{"nodeId":"cee1b2cb-710a-462c-9b52-932c19824de4","depth":1,"childKind":"support","maker":"OpenAI","modelId":"gpt-6-astra","providerRef":"acceptance:codex-cli"},{"nodeId":"f833756f-1326-4263-83ef-32b3f49eb73a","depth":1,"childKind":"support","maker":"OpenAI","modelId":"gpt-6-astra","providerRef":"acceptance:codex-cli"},{"nodeId":"e06cfc2a-9a99-4ebc-8089-d756cbc33022","depth":1,"childKind":"support","maker":"Anthropic","modelId":"claude-opus-5","providerRef":"acceptance:claude-cli"},{"nodeId":"05ae21ed-b64d-4771-927a-bf6ad4007175","depth":1,"childKind":"support","maker":"Anthropic","modelId":"claude-opus-5","providerRef":"acceptance:claude-cli"},{"nodeId":"347adac8-44f3-40a4-81c8-75c5c8e32177","depth":1,"childKind":"support","maker":"xAI","modelId":"grok-4.6-build","providerRef":"acceptance:grok-cli"},{"nodeId":"04a50c32-0077-4404-bd23-b31eb3b8ae37","depth":1,"childKind":"support","maker":"xAI","modelId":"grok-4.6-build","providerRef":"acceptance:grok-cli"}]
+XREV-01 per-node review lineage: [{"nodeId":"716ea8d3-146b-4484-ba7a-e9fa3abd7546","outcome":"agree","authorMaker":"OpenAI","reviewerMaker":"Anthropic","reviewerModelId":"claude-opus-5","reviewerProviderRef":"acceptance:claude-cli","reviewArtifactRef":"62b7a0dd-efce-40b3-a87a-d43f186e561d"},{"nodeId":"a79641be-8514-43a3-80aa-10e5907bf20f","outcome":"cannot-assess","authorMaker":"Anthropic","reviewerMaker":"OpenAI","reviewerModelId":"gpt-6-astra","reviewerProviderRef":"acceptance:codex-cli","reviewArtifactRef":"1b368226-c2b4-409d-bf77-b6f2b5d1479e"},{"nodeId":"f6f024d6-309b-4ae1-bb15-436c36f073a7","outcome":"agree","authorMaker":"xAI","reviewerMaker":"OpenAI","reviewerModelId":"gpt-6-astra","reviewerProviderRef":"acceptance:codex-cli","reviewArtifactRef":"1edf69f6-9835-4085-b907-1c603612ef4a"},{"nodeId":"af9f49cf-838f-471f-aaa1-9c20aedaa7bc","outcome":"agree","authorMaker":"Anthropic","reviewerMaker":"xAI","reviewerModelId":"grok-4.6-build","reviewerProviderRef":"acceptance:grok-cli","reviewArtifactRef":"c862290b-c9f4-44c0-845e-788d7485b0e7"},{"nodeId":"98aa2e93-27e3-47d7-9a99-e2ccf486c8b3","outcome":"dispute","authorMaker":"Anthropic","reviewerMaker":"OpenAI","reviewerModelId":"gpt-6-astra","reviewerProviderRef":"acceptance:codex-cli","reviewArtifactRef":"5a4c4cff-e92f-4204-9bfd-c035dda9137d"},{"nodeId":"3cf0db25-e3b3-4206-a742-4e237a808799","outcome":"agree","authorMaker":"xAI","reviewerMaker":"Anthropic","reviewerModelId":"claude-opus-5","reviewerProviderRef":"acceptance:claude-cli","reviewArtifactRef":"c7493a85-0754-405c-b516-faa2a4648ad3"},{"nodeId":"cc77e04f-c2f2-469c-8c4e-7a155fea854c","outcome":"dispute","authorMaker":"xAI","reviewerMaker":"OpenAI","reviewerModelId":"gpt-6-astra","reviewerProviderRef":"acceptance:codex-cli","reviewArtifactRef":"20c1e8ed-a819-42fc-b7b4-2905e65c9067"},{"nodeId":"43637ca5-f9e9-4179-9902-ca12032635f8","outcome":"agree","authorMaker":"xAI","reviewerMaker":"Anthropic","reviewerModelId":"claude-opus-5","reviewerProviderRef":"acceptance:claude-cli","reviewArtifactRef":"ef2c87d4-c02f-451b-9d62-11da34ee61f9"},{"nodeId":"7898e8e1-b51d-4778-9648-e1afb93621fa","outcome":"dispute","authorMaker":"xAI","reviewerMaker":"OpenAI","reviewerModelId":"gpt-6-astra","reviewerProviderRef":"acceptance:codex-cli","reviewArtifactRef":"3073b7a2-bbb5-47ff-b0aa-d2d74ed2b9fd"},{"nodeId":"e7dfd7b5-5f16-44b1-9c04-e76d74b07a48","outcome":"agree","authorMaker":"xAI","reviewerMaker":"Anthropic","reviewerModelId":"claude-opus-5","reviewerProviderRef":"acceptance:claude-cli","reviewArtifactRef":"066979b6-e4c6-47fd-be39-d1ef7d9b2e67"},{"nodeId":"ef0410a6-1466-484f-a57b-9e46d0b5c4f0","outcome":"dispute","authorMaker":"xAI","reviewerMaker":"OpenAI","reviewerModelId":"gpt-6-astra","reviewerProviderRef":"acceptance:codex-cli","reviewArtifactRef":"be483b08-fddf-404e-a961-5ea5b40a8ef5"},{"nodeId":"0c99f01b-ed3f-44b1-bd9b-939f53c59fa4","outcome":"agree","authorMaker":"OpenAI","reviewerMaker":"xAI","reviewerModelId":"grok-4.6-build","reviewerProviderRef":"acceptance:grok-cli","reviewArtifactRef":"25492392-8e67-4134-9e1f-88e6ef88e662"},{"nodeId":"98646b37-50e4-4f0b-ad9f-7f39046b0e60","outcome":"agree","authorMaker":"OpenAI","reviewerMaker":"Anthropic","reviewerModelId":"claude-opus-5","reviewerProviderRef":"acceptance:claude-cli","reviewArtifactRef":"bb5d61eb-b9fb-4dba-ac0c-f268644bf6a9"},{"nodeId":"e2e6d184-3599-4310-9df3-9df5205f9b91","outcome":"dispute","authorMaker":"OpenAI","reviewerMaker":"xAI","reviewerModelId":"grok-4.6-build","reviewerProviderRef":"acceptance:grok-cli","reviewArtifactRef":"a95ffef7-dcdd-48d5-940d-d388847d8db4"},{"nodeId":"d23dd0af-ef53-47eb-9c72-6ee6a282d422","outcome":"agree","authorMaker":"OpenAI","reviewerMaker":"Anthropic","reviewerModelId":"claude-opus-5","reviewerProviderRef":"acceptance:claude-cli","reviewArtifactRef":"400e0fd7-3676-4d8f-8831-aca0ae27c70e"},{"nodeId":"23c9001b-90c7-4427-b467-04280ec64fa8","outcome":"agree","authorMaker":"OpenAI","reviewerMaker":"xAI","reviewerModelId":"grok-4.6-build","reviewerProviderRef":"acceptance:grok-cli","reviewArtifactRef":"de050010-76ab-4561-b6ee-4627dff3f72f"},{"nodeId":"11464564-a786-4c5b-abcd-b9c7bf2d7457","outcome":"agree","authorMaker":"OpenAI","reviewerMaker":"Anthropic","reviewerModelId":"claude-opus-5","reviewerProviderRef":"acceptance:claude-cli","reviewArtifactRef":"b4f39436-2f74-4bb6-94fe-60bac00cf06a"},{"nodeId":"0ea1c198-01e4-4a3d-a54c-976214e2bb42","outcome":"agree","authorMaker":"Anthropic","reviewerMaker":"xAI","reviewerModelId":"grok-4.6-build","reviewerProviderRef":"acceptance:grok-cli","reviewArtifactRef":"c4408079-c25c-4d21-8401-889a79ac71d6"},{"nodeId":"24799154-9b47-4afb-8d67-30a2b1ba9161","outcome":"dispute","authorMaker":"Anthropic","reviewerMaker":"OpenAI","reviewerModelId":"gpt-6-astra","reviewerProviderRef":"acceptance:codex-cli","reviewArtifactRef":"4d3f10aa-5b76-4a96-b950-aefe7cdad184"},{"nodeId":"19deae76-c3cf-40a9-9943-7840623c20dc","outcome":"agree","authorMaker":"Anthropic","reviewerMaker":"xAI","reviewerModelId":"grok-4.6-build","reviewerProviderRef":"acceptance:grok-cli","reviewArtifactRef":"01a33d99-369b-4a41-8beb-6ad1921b6b3c"},{"nodeId":"78e47591-3964-4bc7-bc60-42ebdcd35eab","outcome":"dispute","authorMaker":"Anthropic","reviewerMaker":"OpenAI","reviewerModelId":"gpt-6-astra","reviewerProviderRef":"acceptance:codex-cli","reviewArtifactRef":"81c500c0-e9a8-40d5-a27e-d8a0603edbb9"},{"nodeId":"cee1b2cb-710a-462c-9b52-932c19824de4","outcome":"agree","authorMaker":"OpenAI","reviewerMaker":"xAI","reviewerModelId":"grok-4.6-build","reviewerProviderRef":"acceptance:grok-cli","reviewArtifactRef":"4d34d624-69ed-418b-8d22-d10c7812e8af"},{"nodeId":"f833756f-1326-4263-83ef-32b3f49eb73a","outcome":"agree","authorMaker":"OpenAI","reviewerMaker":"Anthropic","reviewerModelId":"claude-opus-5","reviewerProviderRef":"acceptance:claude-cli","reviewArtifactRef":"3f04d168-3851-42ec-8266-3b08b1a7c9d3"},{"nodeId":"e06cfc2a-9a99-4ebc-8089-d756cbc33022","outcome":"dispute","authorMaker":"Anthropic","reviewerMaker":"xAI","reviewerModelId":"grok-4.6-build","reviewerProviderRef":"acceptance:grok-cli","reviewArtifactRef":"6bb9913a-3647-453e-b381-53b11f77db69"},{"nodeId":"05ae21ed-b64d-4771-927a-bf6ad4007175","outcome":"dispute","authorMaker":"Anthropic","reviewerMaker":"OpenAI","reviewerModelId":"gpt-6-astra","reviewerProviderRef":"acceptance:codex-cli","reviewArtifactRef":"74bba6eb-a779-4620-97e6-d84ad846e741"},{"nodeId":"347adac8-44f3-40a4-81c8-75c5c8e32177","outcome":"agree","authorMaker":"xAI","reviewerMaker":"Anthropic","reviewerModelId":"claude-opus-5","reviewerProviderRef":"acceptance:claude-cli","reviewArtifactRef":"517beab6-6625-482b-ad1e-5853ece25995"},{"nodeId":"04a50c32-0077-4404-bd23-b31eb3b8ae37","outcome":"dispute","authorMaker":"xAI","reviewerMaker":"OpenAI","reviewerModelId":"gpt-6-astra","reviewerProviderRef":"acceptance:codex-cli","reviewArtifactRef":"7c80adfe-c675-473c-b3fc-9230765a3d7e"}]
+ACC-01 UI: http://localhost:3000/debate/d7b73d79-44af-4a7f-af4f-f510d06e7114
+DOD-1 panel-reduced-tau: 27 node(s) · every tau has a non-author voice: true · single-voice panel node ids: none
+DOD-2 measured-edges: 30/30 edge(s) carry a PRESENT magnitude · by the FAIR-01 rule (attack polarity, NODE target): 15/15
+DOD-3 root-final-vs-tau: 3 root(s) · a root final strength differs from its tau: true · witness node id: 716ea8d3-146b-4484-ba7a-e9fa3abd7546 · roots: [{"nodeId":"716ea8d3-146b-4484-ba7a-e9fa3abd7546","tau":0.96,"finalStrength":0.9605029422656,"finalDiffersFromTau":true},{"nodeId":"a79641be-8514-43a3-80aa-10e5907bf20f","tau":0.96,"finalStrength":0.94810170968064,"finalDiffersFromTau":true},{"nodeId":"f6f024d6-309b-4ae1-bb15-436c36f073a7","tau":0.97,"finalStrength":0.9718418641845952,"finalDiffersFromTau":true}]
+DOD-5 surviving-objection: strongest 11464564-a786-4c5b-abcd-b9c7bf2d7457 @ 0.973756 · final round satisfied: true · SYNTHESIS-OBJECTION-STANDING: false
+DOD-6 evaluator-loop: 2/3 round(s) within the sealed evaluatorLoopMaxRounds · rounds: [{"round":1,"synthesizerStage":"INITIAL","evaluatorSatisfied":false},{"round":2,"synthesizerStage":"RETRY","evaluatorSatisfied":true}]
+DOD-7 verdict-label: CONTESTED · terminal DOWNGRADED · serve state RECOMPOSED_ONCE
+DOD-8 confidence-band: CAPPED · basis LOOKED_UP/RAN/REASONING: 0/0/5 · ceiling register row key: wayOfKnowingCeiling
+[ACC-01 DB] 2026-09-17 23:47:58.086 EEST [21194] LOG:  received fast shutdown request
+2026-09-17 23:47:58.086 EEST [21194] LOG:  aborting any active transactions
+
+[ACC-01 DB] 2026-09-17 23:47:58.087 EEST [21194] LOG:  background worker "logical replication launcher" (PID 21203) exited with exit code 1
+
+[ACC-01 DB] 2026-09-17 23:47:58.087 EEST [21198] LOG:  shutting down
+
+[ACC-01 DB] 2026-09-17 23:47:58.088 EEST [21198] LOG:  checkpoint starting: shutdown immediate
+
+[ACC-01 DB] 2026-09-17 23:47:58.111 EEST [21198] LOG:  checkpoint complete: wrote 173 buffers (1.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.019 s, sync=0.003 s, total=0.024 s; sync files=96, longest=0.001 s, average=0.001 s; distance=674 kB, estimate=1333 kB; lsn=0/2DBC9C0, redo lsn=0/2DBC9C0
+
+[ACC-01 DB] 2026-09-17 23:47:58.118 EEST [21194] LOG:  database system is shut down
+
+OUTPUT>>>
+EXIT = 0
+finished 2026-09-17 23:47:58 EEST
+porcelain AFTER: [ M dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/V-DECISIONS-PACKET.md;]

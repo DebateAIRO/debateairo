@@ -2,6 +2,7 @@ import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { observationRepoRoot } from "../../apps/observation-agent/src/core/paths.js";
 
 const scratchDirectories: string[] = [];
 const database = Object.freeze({
@@ -156,6 +157,7 @@ async function runProjection(projection: unknown): Promise<unknown> {
     timeoutMs: 2_000,
     database,
     stateDir: "/tmp/observation-state",
+    repoRoot: observationRepoRoot(),
     targets: [],
     thresholdVersion: 1
   });

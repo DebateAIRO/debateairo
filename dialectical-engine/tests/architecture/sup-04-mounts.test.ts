@@ -1,6 +1,6 @@
 import { readFile,readdir } from "node:fs/promises";
 import { extname,join } from "node:path";
-import ts from "typescript";
+import ts from "typescript-classic";
 import { describe,expect,it } from "vitest";
 
 async function sourceFiles(directory: string): Promise<string[]> {

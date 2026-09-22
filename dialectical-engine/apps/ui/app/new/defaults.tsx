@@ -48,19 +48,12 @@ export type NewDebateAskDefaults = {
   readonly decisionScope: string;
   readonly asOf: string;
   readonly depth: number;
+  readonly steeringPresets?: string;
+  readonly steeringAnnotations?: string;
   readonly asOfWasEdited: boolean;
   readonly planTier?: PlanTier;
   readonly riskTierWasEdited?: boolean;
-  readonly steeringPresets?: string;
-  readonly steeringAnnotations?: string;
 };
-
-// Both steering fields are line-oriented in the contract, so a blank textarea
-// and a textarea of blank lines both mean "the asker steered nothing".
-export function steeringLines(value: string | undefined): string[] {
-  if (value === undefined) return [];
-  return value.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
-}
 
 export function buildNewDebateAskConfig(defaults: NewDebateAskDefaults, submitTime: Date): Record<string, unknown> {
   const asOf = defaults.asOfWasEdited ? new Date(defaults.asOf) : submitTime;
@@ -76,7 +69,9 @@ export function buildNewDebateAskConfig(defaults: NewDebateAskDefaults, submitTi
     depth: defaults.depth,
     decision_scope: defaults.decisionScope.trim(),
     as_of: asOf.toISOString(),
-    steering_presets: steeringLines(defaults.steeringPresets),
-    steering_annotations: steeringLines(defaults.steeringAnnotations)
+    steering_presets: (defaults.steeringPresets ?? "")
+      .split("\n").map((value) => value.trim()).filter(Boolean),
+    steering_annotations: (defaults.steeringAnnotations ?? "")
+      .split("\n").map((value) => value.trim()).filter(Boolean)
   };
 }
