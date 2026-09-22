@@ -85,7 +85,10 @@ describe("B10 sealed admission-policy register row", () => {
     expect(historicalRows).toContain("PRODUCT_ROLE_POLICY_REGISTER_ROW");
     expect(historicalRows).not.toContain("ADMISSION_POLICY_REGISTER_ROW");
     expect(devSeed).toContain("ADMISSION_POLICY_REGISTER_ROW");
-    const readIndex = apiMain.indexOf("await readAdmissionPolicy(pool, environment.REGISTER_VERSION)");
+    // DL7-F7: the read is a named boot stage now, owned by the custody ledger.
+    const readIndex = apiMain.indexOf(
+      'boot.run("admission-policy", () => readAdmissionPolicy(pool, environment.REGISTER_VERSION))'
+    );
     const limiterIndex = apiMain.indexOf("new AdmissionLimiter(");
     const composeIndex = apiMain.indexOf("buildApi({");
     expect(readIndex).toBeGreaterThan(-1);

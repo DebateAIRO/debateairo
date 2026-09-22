@@ -320,7 +320,11 @@ describe("S1 crypto foundation", () => {
     const apiMain = await readFile(
       new URL("../../apps/api/src/main.ts", import.meta.url), "utf8"
     );
-    expect(apiMain).toMatch(/^assertPublicationSecretDomains\(\{/m);
+    // DL7-F7: still at the process root and still unguarded by publication; it is
+    // a named boot stage now, so a failure zeroes the keys already loaded.
+    expect(apiMain).toMatch(
+      /^await boot[.]run\("publication-secret-domains", async \(\) => assertPublicationSecretDomains\(\{/m
+    );
   });
 
   it("makes both process compositions refuse a missing KEK_PATH with the typed code", () => {

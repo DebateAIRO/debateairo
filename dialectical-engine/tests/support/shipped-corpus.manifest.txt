@@ -12,6 +12,7 @@
 
 apps/api/src/account-erasure.ts
 apps/api/src/admission.ts
+apps/api/src/boot-custody.ts
 apps/api/src/client-ip.ts
 apps/api/src/graceful-shutdown.ts
 apps/api/src/index.ts

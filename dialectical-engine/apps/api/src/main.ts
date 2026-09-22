@@ -54,6 +54,7 @@ import {
   createSingleFlightErasureReconciler,
   PostgresAccountErasureApplication
 } from "./account-erasure.js";
+import { installBootCustody } from "./boot-custody.js";
 import { installStartupResourceOwner } from "./startup-resource-owner.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 import { RecoveryStartService } from "./recovery.js";
@@ -81,16 +82,23 @@ const supportKnowledge = loadHelpCorpus(resolve("packages/support-kb/content"));
 // V-19: before the first key file is opened, so a group this host cannot
 // resolve refuses at boot instead of at the first private debate.
 configureCustodyGroup(environment.DEBATEAI_CUSTODY_GROUP);
-const kek = loadKek(environment.KEK_PATH);
+/**
+ * DL7-F7. Custody of the boot's own secrets, from the first key load until the
+ * startup resource owner exists. Everything registered here is zeroed or closed
+ * if a later stage fails, so a boot that stops at, say, an unresolved register
+ * row no longer exits with three KEKs live in memory.
+ */
+const boot = installBootCustody();
+const kek = boot.holdKek(loadKek(environment.KEK_PATH));
 const corpusKek = environment.PUBLICATION_ENABLED === "true"
-  ? loadKek(environment.CORPUS_KEK_PATH!) : undefined;
+  ? boot.holdKek(loadKek(environment.CORPUS_KEK_PATH!)) : undefined;
 const blindIndexKey = loadSecretKey(environment.BLIND_INDEX_KEY_PATH);
 const sourceIpSalt = loadSecretKey(environment.AUDIT_SOURCE_IP_SALT_PATH);
 // L2-F8: this guarded the whole check on publication being enabled, so a
 // private-only deployment could point KEK_PATH and BLIND_INDEX_KEY_PATH at one
 // file and boot. The private domains are always checked; the corpus KEK and
 // publication store join the same check only when publication is on.
-assertPublicationSecretDomains({
+await boot.run("publication-secret-domains", async () => assertPublicationSecretDomains({
   privateKek: kek,
   ...(corpusKek === undefined ? {} : {
     corpusKek,
@@ -104,52 +112,48 @@ assertPublicationSecretDomains({
     { path: environment.AUDIT_SOURCE_IP_SALT_PATH, material: sourceIpSalt }
   ],
   additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH]
-});
-const pool = createPool(environment.DATABASE_URL);
-const authorizationPool = createPool(environment.AUTHORIZATION_DATABASE_URL!);
+}));
+const pool = boot.hold(createPool(environment.DATABASE_URL));
+const authorizationPool = boot.hold(createPool(environment.AUTHORIZATION_DATABASE_URL!));
 const publicationCleanupPool = environment.PUBLICATION_ENABLED === "true"
-  ? createPool(environment.PUBLICATION_CLEANUP_DATABASE_URL!) : pool;
+  ? boot.hold(createPool(environment.PUBLICATION_CLEANUP_DATABASE_URL!)) : pool;
 // Cleanup remains necessary when new encrypted writes are disabled: an intent
 // left by an earlier enabled process must not abort every erasure cycle under
 // the ordinary runtime principal.
-const contentProvisionPool = createPool(environment.CONTENT_PROVISION_DATABASE_URL);
+const contentProvisionPool = boot.hold(createPool(environment.CONTENT_PROVISION_DATABASE_URL));
 // Ask admission holds a session advisory lock while the count-changing run
 // commit uses that same backend. Keep both principal paths on explicit pool
 // instances so lock waiters cannot consume ordinary runtime/provision capacity.
-const serverAskAdmissionPool=createPool(environment.CONTENT_PROVISION_DATABASE_URL);
-const legacyAskAdmissionPool=createPool(environment.DATABASE_URL);
-if (serverAskAdmissionPool === contentProvisionPool
-  || serverAskAdmissionPool === pool
-  || legacyAskAdmissionPool === pool
-  || legacyAskAdmissionPool === contentProvisionPool
-  || legacyAskAdmissionPool === serverAskAdmissionPool) {
-  throw new TypeError("ASK_ADMISSION_DATABASE_POOLS_MUST_BE_SEPARATE");
-}
-const erasurePool = createPool(environment.ERASURE_DATABASE_URL);
-try {
-  await Promise.all([
-    assertAccountErasureDatabaseRole(pool,erasurePool),
-    assertAccountErasureDatabaseRole(legacyAskAdmissionPool,erasurePool),
-    assertPublicationDatabaseRoleSeparation(pool, authorizationPool),
-    ...(environment.PUBLICATION_ENABLED === "true" ? [
-      assertPublicationCleanupDatabaseRole(publicationCleanupPool)
-    ] : []),
-    assertContentProvisionDatabaseRole(pool,contentProvisionPool),
-    assertContentProvisionDatabaseRole(pool,serverAskAdmissionPool)
-  ]);
-} catch (error) {
-  await Promise.allSettled([...new Set([
-    pool,authorizationPool,publicationCleanupPool,contentProvisionPool,
-    serverAskAdmissionPool,legacyAskAdmissionPool,erasurePool
-  ])].map(async (databasePool) => databasePool.end()));
-  throw error;
-}
-const authPolicy = await readAuthPolicy(pool, environment.REGISTER_VERSION);
-const mfaPolicy = await readMfaPolicy(pool, environment.REGISTER_VERSION);
-const sessionPolicy = await readSessionPolicy(pool, environment.REGISTER_VERSION);
-const recoveryPolicy = await readRecoveryPolicy(pool, environment.REGISTER_VERSION);
-const admissionPolicy = await readAdmissionPolicy(pool, environment.REGISTER_VERSION);
-await readProductRolePolicy(pool, environment.REGISTER_VERSION);
+const serverAskAdmissionPool=boot.hold(createPool(environment.CONTENT_PROVISION_DATABASE_URL));
+const legacyAskAdmissionPool=boot.hold(createPool(environment.DATABASE_URL));
+await boot.run("ask-admission-pools", async () => {
+  if (serverAskAdmissionPool === contentProvisionPool
+    || serverAskAdmissionPool === pool
+    || legacyAskAdmissionPool === pool
+    || legacyAskAdmissionPool === contentProvisionPool
+    || legacyAskAdmissionPool === serverAskAdmissionPool) {
+    throw new TypeError("ASK_ADMISSION_DATABASE_POOLS_MUST_BE_SEPARATE");
+  }
+});
+const erasurePool = boot.hold(createPool(environment.ERASURE_DATABASE_URL));
+// DL7-F7: the hand-rolled pool cleanup this stage carried is the ledger's job
+// now, and it covers the KEKs the old one never reached.
+await boot.run("database-roles", () => Promise.all([
+  assertAccountErasureDatabaseRole(pool,erasurePool),
+  assertAccountErasureDatabaseRole(legacyAskAdmissionPool,erasurePool),
+  assertPublicationDatabaseRoleSeparation(pool, authorizationPool),
+  ...(environment.PUBLICATION_ENABLED === "true" ? [
+    assertPublicationCleanupDatabaseRole(publicationCleanupPool)
+  ] : []),
+  assertContentProvisionDatabaseRole(pool,contentProvisionPool),
+  assertContentProvisionDatabaseRole(pool,serverAskAdmissionPool)
+]));
+const authPolicy = await boot.run("auth-policy", () => readAuthPolicy(pool, environment.REGISTER_VERSION));
+const mfaPolicy = await boot.run("mfa-policy", () => readMfaPolicy(pool, environment.REGISTER_VERSION));
+const sessionPolicy = await boot.run("session-policy", () => readSessionPolicy(pool, environment.REGISTER_VERSION));
+const recoveryPolicy = await boot.run("recovery-policy", () => readRecoveryPolicy(pool, environment.REGISTER_VERSION));
+const admissionPolicy = await boot.run("admission-policy", () => readAdmissionPolicy(pool, environment.REGISTER_VERSION));
+await boot.run("product-role-policy", () => readProductRolePolicy(pool, environment.REGISTER_VERSION));
 // Exactly ONE process-owned Argon2 worker pool. It is created before the
 // repository and the registration service, both of which receive this same
 // instance, and every worker completes its ready handshake before `listen`, so
@@ -162,10 +166,13 @@ let announceArgon2BreakerTrip = (): void => { process.exitCode = 75; };
 const argon2Pool = new Argon2WorkerPool({
   onBreakerTripped: () => { announceArgon2BreakerTrip(); }
 });
-await argon2Pool.ready();
+boot.hold({ end: () => argon2Pool.close() });
+await boot.run("argon2-pool", () => argon2Pool.ready());
 const auditContextHasher = new AuditContextHasher(
   argon2Pool, sourceIpSalt, authPolicy.auditSourceIpKdf
 );
+// The hasher holds the Argon2 salt copy; it closes with the rest of the boot.
+boot.hold({ end: async () => auditContextHasher.close() });
 const identityRepository = new PostgresIdentityRepository(pool, auditContextHasher);
 sourceIpSalt.fill(0);
 const hatchet = new Hatchet({
@@ -174,12 +181,12 @@ const hatchet = new Hatchet({
   tls_config: { tls_strategy: environment.HATCHET_TLS_STRATEGY }
 });
 const dispatcher = new HatchetDispatcher(hatchet, environment.HATCHET_WORKFLOW_NAME);
-const deploymentMakers = await readDeploymentMakerCapability(pool, environment.REGISTER_VERSION);
-const discoveryPolicy = await readPanelDiscoveryPolicy(pool, environment.REGISTER_VERSION);
+const deploymentMakers = await boot.run("deployment-makers", () => readDeploymentMakerCapability(pool, environment.REGISTER_VERSION));
+const discoveryPolicy = await boot.run("discovery-policy", () => readPanelDiscoveryPolicy(pool, environment.REGISTER_VERSION));
 if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
   throw new TypeError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
 }
-const structuralInputs = await readStructuralCeilingPolicyInputs(pool, environment.REGISTER_VERSION);
+const structuralInputs = await boot.run("structural-ceilings", () => readStructuralCeilingPolicyInputs(pool, environment.REGISTER_VERSION));
 /**
  * T17: the sealed `envelopeFormulaInputs` row (T16). The reader is the loud
  * stop — a deployment that never sealed the row cannot boot the API, so no ask
@@ -187,7 +194,7 @@ const structuralInputs = await readStructuralCeilingPolicyInputs(pool, environme
  * constants that used to be re-declared at the call site below now come from
  * this row, which seeds them from the same `engine-shape.ts` exports.
  */
-const envelopeFormulaInputs = await readEnvelopeFormulaInputs(pool, environment.REGISTER_VERSION);
+const envelopeFormulaInputs = await boot.run("envelope-formula-inputs", () => readEnvelopeFormulaInputs(pool, environment.REGISTER_VERSION));
 const probes = new ProviderProbeRepository(pool);
 const providerDiscoveryTargets = parseProviderDiscoveryTargets(
   environment.PROVIDER_DISCOVERY_TARGETS_JSON,
@@ -201,7 +208,7 @@ const resolveProviderPanel = createProviderDiscoveryResolver({
   probeFreshnessMs: discoveryPolicy.probeFreshnessMs,
   probeTimeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS
 });
-const deploymentRiskTier = await readDeploymentRiskTier(pool, environment.REGISTER_VERSION);
+const deploymentRiskTier = await boot.run("deployment-risk-tier", () => readDeploymentRiskTier(pool, environment.REGISTER_VERSION));
 const dekStore = new FileUserDekStore(environment.USER_DEK_STORE_PATH, kek);
 const authenticationRiskSignals = new PostgresAuthenticationRiskSignalRepository(
   pool,auditContextHasher,dekStore,recoveryPolicy.riskSignals.rawSignalRetentionMs,
@@ -258,7 +265,7 @@ const mfa = new MfaEnrollmentService({
   argon2: argon2Pool,
   policy: mfaPolicy
 });
-const sessions = await SessionService.create({
+const sessions = await boot.run("session-service", () => SessionService.create({
   repository: new PostgresSessionRepository(authorizationPool, auditContextHasher),
   riskSignals:authenticationRiskSignals,
   onRiskSignalFailure:(error)=>console.error(
@@ -270,7 +277,7 @@ const sessions = await SessionService.create({
   mfaPolicy,
   sessionPolicy,
   blindIndexKey
-});
+}));
 const legacyRunClaim=new PostgresLegacyRunClaimApplication(
   new PostgresLegacyRunClaimRepository(pool,auditContextHasher)
 );
@@ -386,14 +393,16 @@ const authenticationRiskCleanupTimer=setInterval(
 );
 authenticationRiskCleanupTimer.unref();
 const evaluatorDevMenuPool = environment.EVALUATOR_DEV_MENU_ENABLED === "true"
-  ? createPool(environment.EVALUATOR_DEV_MENU_DATABASE_URL!)
+  ? boot.hold(createPool(environment.EVALUATOR_DEV_MENU_DATABASE_URL!))
   : undefined;
 const evaluatorDevMenu = evaluatorDevMenuPool !== undefined
   ? new PostgresEvaluatorDevMenuRepository(evaluatorDevMenuPool)
   : undefined;
-const supportPool = createPool(environment.SUPPORT_DATABASE_URL);
-const supportRelayLeasePool = createPool(environment.SUPPORT_DATABASE_URL,{ max: 18 });
-const supportKeys = await createSupportKeyPort({
+const supportPool = boot.hold(createPool(environment.SUPPORT_DATABASE_URL));
+const supportRelayLeasePool = boot.hold(
+  createPool(environment.SUPPORT_DATABASE_URL,{ max: 18 })
+);
+const supportKeys = await boot.run("support-keys", () => createSupportKeyPort({
   supportKekPath: environment.SUPPORT_KEK_PATH,
   protectedKeyPaths: [
     environment.KEK_PATH,
@@ -401,7 +410,11 @@ const supportKeys = await createSupportKeyPort({
     environment.BLIND_INDEX_KEY_PATH,
     environment.AUDIT_SOURCE_IP_SALT_PATH
   ].filter((path): path is string => path !== undefined)
-});
+}));
+// DL7-F7: the support KEK is the third key the boot holds, and every stage
+// after this one — the model target parse and eight repository constructions —
+// used to be able to throw with it live in memory.
+boot.hold({ end: () => supportKeys.close() });
 const supportSessions = new PostgresSupportSessionRepository(
   supportPool,
   createWrappedSupportSessionKey(supportKeys)
@@ -605,6 +618,11 @@ const startup = installStartupResourceOwner({
   // L2-F7: zeroed after every pool that borrows from them has closed.
   kekHandles: [kek, ...(corpusKek === undefined ? [] : [corpusKek])]
 });
+// DL7-F7: the boot ledger hands everything it held to the startup resource
+// owner, which is the lifecycle from here on. Exactly one owner at a time:
+// nothing can now be closed twice, and the ledger's own `run` becomes a
+// pass-through so a later stage answers to `startup.run` alone.
+boot.release();
 
 // EX_TEMPFAIL (75): a transient, restartable failure. systemd's
 // Restart=on-failure then replaces the process instead of leaving a latched

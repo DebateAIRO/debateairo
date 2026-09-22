@@ -206,8 +206,20 @@ describe("SUP-01 support capability boundary", () => {
       .toBeLessThan(main.indexOf("assertSupportDatabaseRole(pool, supportPool)"));
     expect(main).toContain('startup.run("support-attestation"');
     expect(main).toContain('startup.run("listen"');
-    expect(main.match(/\{ end: \(\) => supportKeys[.]close\(\) \}/gu) ?? []).toHaveLength(1);
-    expect(main.indexOf("const supportKeys = await createSupportKeyPort"))
+    /**
+     * DL7-F7: the support KEK has exactly one owner at any moment, and two in
+     * sequence. The boot custody ledger holds it from the moment the port is
+     * built — the stages between that and the startup owner used to be able to
+     * fail with the key live in memory — and hands it over at `boot.release()`,
+     * which happens after the startup owner is installed. So the port is closed
+     * once, by whichever owner is current, never twice.
+     */
+    expect(main.match(/\{ end: \(\) => supportKeys[.]close\(\) \}/gu) ?? []).toHaveLength(2);
+    expect(main.indexOf("boot.hold({ end: () => supportKeys.close() })"))
+      .toBeGreaterThan(main.indexOf("const supportKeys = await boot.run(\"support-keys\""));
+    expect(main.indexOf("boot.release()"))
+      .toBeGreaterThan(main.indexOf("installStartupResourceOwner({"));
+    expect(main.indexOf("const supportKeys = await boot.run(\"support-keys\""))
       .toBeLessThan(main.indexOf('startup.run("listen"'));
   });
 
