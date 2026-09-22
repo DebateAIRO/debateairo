@@ -112,6 +112,13 @@ export function buildDevelopmentProviderPanel(
 
 export function parseDevelopmentProviderPanelTargets(source: string): DevelopmentProviderPanel {
   const targets = parseProviderDiscoveryTargets(source, configuredProviders);
+  // V-9(2): the shared parser understands `authorization_file`, but this stack
+  // does not resolve it — only the two shipped composition roots do. Carrying on
+  // would drop the credential silently and make every call UNAUTHENTICATED, which
+  // surfaces as an ABSENT probe with no explanation. Fail loudly, naming the field.
+  if (targets.some((target) => target.authorizationFile !== undefined)) {
+    throw new TypeError("DEV_CLI_PROVIDER_PANEL_AUTHORIZATION_FILE_UNSUPPORTED");
+  }
   return buildDevelopmentProviderPanel(targets.map((target) => Object.freeze({
     providerRef: target.providerRef,
     baseUrl: target.baseUrl,

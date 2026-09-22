@@ -40,7 +40,31 @@ const TARGET_KINDS = Object.freeze({
   },
   "loopback-http-relay": { base_url: "http://127.0.0.1:8791/v1" },
   "loopback-https": { base_url: "https://127.0.0.1:8443/v1" },
-  "offbox-http": { base_url: "http://gateway.internal/v1" }
+  "offbox-http": { base_url: "http://gateway.internal/v1" },
+  // Review finding 1. `LOOPBACK_HOSTS` was written as a PERMIT-list of four exact
+  // spellings for L4-F7; read as a hosted DENY-list it admitted every alias below.
+  // `https:` is no backstop here: the kit installs a private CA
+  // (`NODE_EXTRA_CA_CERTS`) and already runs internal TLS on loopback
+  // (`HATCHET_API_URL=https://127.0.0.1:8888`), so a TLS relay on an alias passes.
+  // The decision is taken on the PARSED address, not on the spelling.
+  "loopback-alias-https": { base_url: "https://127.0.0.2:8443/v1" },
+  "loopback-range-end-https": { base_url: "https://127.255.255.254/v1" },
+  "loopback-shorthand-https": { base_url: "https://127.1/v1" },
+  "loopback-decimal-https": { base_url: "https://2130706433/v1" },
+  "localhost-uppercase-https": { base_url: "https://LOCALHOST/v1" },
+  "localhost-trailing-dot-https": { base_url: "https://localhost./v1" },
+  "localhost-subdomain-https": { base_url: "https://relay.localhost/v1" },
+  "localhost-subdomain-dot-https": { base_url: "https://RELAY.LocalHost./v1" },
+  "ipv4-mapped-loopback-https": { base_url: "https://[::ffff:127.0.0.1]/v1" },
+  "ipv4-mapped-loopback-alias-https": { base_url: "https://[::ffff:127.0.0.2]/v1" },
+  "ipv6-loopback-expanded-https": { base_url: "https://[0:0:0:0:0:0:0:1]/v1" },
+  "unspecified-ipv4-https": { base_url: "https://0.0.0.0/v1" },
+  "unspecified-ipv6-https": { base_url: "https://[::]/v1" },
+  // NEGATIVE controls: real vendor hostnames that merely LOOK loopback-ish. A
+  // deny-list that refused these would be an outage, not a protection.
+  "vendor-loopback-lookalike-https": { base_url: "https://127.0.0.1.vendor.example/v1" },
+  "vendor-notlocalhost-https": { base_url: "https://notlocalhost.example/v1" },
+  "vendor-localhost-suffix-https": { base_url: "https://mylocalhost.example/v1" }
 } as const);
 
 type TargetKind = keyof typeof TARGET_KINDS;
@@ -83,7 +107,38 @@ const TABLE = Object.freeze([
     hosted: "PROVIDER_BASE_URL_TLS_REQUIRED:provider-1",
     localProduction: "PROVIDER_BASE_URL_TLS_REQUIRED:provider-1",
     localDevelopment: null
-  }
+  },
+  // Every spelling of "this machine" is refused in hosted mode. All of them are
+  // `https:`, so L4-F7 — which only ever constrained `http:` — admits them in
+  // local mode exactly as it did before: the local PERMIT-list is deliberately
+  // NOT widened, because widening a permit-list relaxes a floor.
+  ...([
+    "loopback-alias-https",
+    "loopback-range-end-https",
+    "loopback-shorthand-https",
+    "loopback-decimal-https",
+    "localhost-uppercase-https",
+    "localhost-trailing-dot-https",
+    "localhost-subdomain-https",
+    "localhost-subdomain-dot-https",
+    "ipv4-mapped-loopback-https",
+    "ipv4-mapped-loopback-alias-https",
+    "ipv6-loopback-expanded-https",
+    "unspecified-ipv4-https",
+    "unspecified-ipv6-https"
+  ] as const).map((kind) => ({
+    kind,
+    hosted: "PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    localProduction: null,
+    localDevelopment: null
+  })),
+  ...([
+    "vendor-loopback-lookalike-https",
+    "vendor-notlocalhost-https",
+    "vendor-localhost-suffix-https"
+  ] as const).map((kind) => ({
+    kind, hosted: null, localProduction: null, localDevelopment: null
+  }))
 ] as const satisfies readonly {
   kind: TargetKind;
   hosted: string | null;
@@ -182,6 +237,32 @@ describe("V-9 mode x provider target (task 10a)", () => {
     expect(JSON.stringify(caught, Object.getOwnPropertyNames(caught ?? {}))).not.toContain(SECRET);
     expect(JSON.stringify(caught, Object.getOwnPropertyNames(caught ?? {})))
       .not.toContain("v9-fixture-token-never-printed");
+  });
+
+  /**
+   * Review finding 1, the other half: the L4-F7 permit-list is a PERMIT-list, so
+   * widening it would ADMIT more cleartext targets in a local production
+   * deployment. The two predicates therefore differ on purpose, and each is the
+   * stricter reading of its own polarity. This case pins that they differ.
+   */
+  it("does not widen the local-mode cleartext permit-list", () => {
+    for (const host of ["127.0.0.2:8791", "[::ffff:127.0.0.1]:8791", "0.0.0.0:8791", "relay.localhost:8791"]) {
+      const target = parseProviderDiscoveryTargets(
+        JSON.stringify([{ provider_ref: "provider-1", model: "model-1", base_url: `http://${host}/v1` }]),
+        [{ providerRef: "provider-1", maker: "maker-1" }]
+      );
+      expect(() => assertDeploymentProviderTargets(target, { mode: "local", nodeEnv: "production" }))
+        .toThrowError(new TypeError("PROVIDER_BASE_URL_TLS_REQUIRED:provider-1"));
+    }
+    // ...while the four spellings L4-F7 always permitted stay permitted.
+    for (const host of ["127.0.0.1:8791", "[::1]:8791", "localhost:8791"]) {
+      const target = parseProviderDiscoveryTargets(
+        JSON.stringify([{ provider_ref: "provider-1", model: "model-1", base_url: `http://${host}/v1` }]),
+        [{ providerRef: "provider-1", maker: "maker-1" }]
+      );
+      expect(() => assertDeploymentProviderTargets(target, { mode: "local", nodeEnv: "production" }))
+        .not.toThrow();
+    }
   });
 
   it("refuses the whole set on the FIRST offending member, so one bad row stops the boot", () => {

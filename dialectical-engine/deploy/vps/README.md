@@ -622,13 +622,15 @@ the prompt, so it never appears on a command line or in shell history:
 ```sh
 install -d -m 0700 -o debateai-runner -g debateai-runner /etc/debateai/runner/providers
 install -d -m 0700 -o debateai-api -g debateai-api /etc/debateai/api/providers
-umask 077
-systemd-ask-password "Acme authorization header value" > /etc/debateai/runner/providers/acme.header
+( umask 077; systemd-ask-password "Acme authorization header value" > /etc/debateai/runner/providers/acme.header )
 install -m 0600 -o debateai-api -g debateai-api \
   /etc/debateai/runner/providers/acme.header /etc/debateai/api/providers/acme.header
 chown debateai-runner:debateai-runner /etc/debateai/runner/providers/acme.header
 chmod 0600 /etc/debateai/runner/providers/acme.header
 ```
+
+The `umask` runs in a subshell so pasting this block leaves your own shell session's mask
+untouched; the `chmod` afterwards is what actually fixes the mode, so the two are belt and braces.
 
 Check both trees — the `find` printing nothing is the pass:
 

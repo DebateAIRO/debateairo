@@ -1,11 +1,17 @@
 import { createServer, type Server } from "node:http";
-import { chmodSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { readCustodyAuthorizationHeader } from "../../packages/crypto/src/index.js";
+import {
+  configureCustodyGroup,
+  readCustodyAuthorizationHeader
+} from "../../packages/crypto/src/index.js";
+import {
+  parseDevelopmentProviderPanelTargets
+} from "../../apps/runner/src/dev-provider-panel.js";
 import {
   OpenAICompatibleProviderGateway,
   assertDeploymentProviderTargets,
@@ -133,8 +139,10 @@ describe("V-9 the credential is loaded through the custody contract (task 10b)",
     symlinkSync(real, link);
     expect(() => readCustodyAuthorizationHeader(link))
       .toThrowError(expect.objectContaining({ code: "SECRET_CUSTODY_INVALID" }));
+    // Review finding 2: a file nobody provisioned is NOT "this file is not safe
+    // to trust", and it is certainly not a KEK. It keeps its own honest name.
     expect(() => readCustodyAuthorizationHeader(join(root, "absent.header")))
-      .toThrowError(expect.objectContaining({ code: "KEK_UNRESOLVED" }));
+      .toThrowError(expect.objectContaining({ code: "PROVIDER_CREDENTIAL_FILE_ABSENT" }));
     const open = mkdtempSync(join(tmpdir(), "t10-open-"));
     roots.push(open);
     chmodSync(open, 0o755);
@@ -178,6 +186,33 @@ describe("V-9 the credential is loaded through the custody contract (task 10b)",
     expect(rendered).not.toContain("t10-fixture-token");
     expect(rendered).not.toContain(path);
     expect(rendered).not.toContain(root);
+  });
+
+  /**
+   * Review finding 5. The V-19 custody group is the ONE-inode variant §11 offers
+   * the owner: `0640` with the group's gid inside a `0750` directory with the
+   * same gid. The contract is shared with every key file, so it must admit a
+   * credential file too — and until this case existed that was assumed, not
+   * measured (the 0640 case above runs with NO group configured, which is the
+   * opposite arm).
+   */
+  it("admits the one-inode custody-group shape when the group is configured", () => {
+    const root = mkdtempSync(join(tmpdir(), "t10-group-"));
+    roots.push(root);
+    chmodSync(root, 0o750);
+    const path = writeCredential(root, "shared.header", CREDENTIAL, 0o640);
+    // The group the tree actually carries on this host — no group needs creating,
+    // and the gid form is what a host without a POSIX group database would use.
+    const gid = statSync(root).gid;
+    try {
+      configureCustodyGroup(String(gid));
+      expect(readCustodyAuthorizationHeader(path)).toBe(CREDENTIAL);
+    } finally {
+      configureCustodyGroup(undefined);
+    }
+    // ...and the same file refuses again the moment the group is not configured.
+    expect(() => readCustodyAuthorizationHeader(path))
+      .toThrowError(expect.objectContaining({ code: "SECRET_CUSTODY_INVALID" }));
   });
 
   it("zeroes the buffer it read the credential into", async () => {
@@ -246,6 +281,117 @@ describe("V-9 the target set resolves its credentials once, in memory (task 10b)
           "PROVIDER_AUTHORIZATION_FILE_UNUSABLE:vendor-a:PROVIDER_CREDENTIAL_FILE_INVALID"
         ));
     }
+  });
+
+  /**
+   * Review finding 2, at the boundary: "you never provisioned this" is a
+   * different operator action from "this file is not safe to trust", exactly as
+   * `KEK_UNRESOLVED` is a different action from `KEK_CUSTODY_INVALID`. It gets
+   * its own top-level refusal rather than a shared `UNUSABLE` bucket.
+   */
+  it("reports an absent credential file under its own name", () => {
+    const declared = parse([{
+      provider_ref: "vendor-a",
+      base_url: "https://api.vendor-a.example/v1",
+      model: "vendor-a-large",
+      authorization_file: "/etc/debateai/runner/providers/vendor-a.header"
+    }]);
+    expect(() => resolveProviderTargetCredentials(declared, () => {
+      throw Object.assign(new Error("PROVIDER_CREDENTIAL_FILE_ABSENT"), {
+        code: "PROVIDER_CREDENTIAL_FILE_ABSENT"
+      });
+    })).toThrowError(new TypeError("PROVIDER_AUTHORIZATION_FILE_ABSENT:vendor-a"));
+    // It still names no path: the provider ref is the whole message.
+    const caught = (() => {
+      try {
+        resolveProviderTargetCredentials(declared, () => {
+          throw Object.assign(new Error("x"), { code: "PROVIDER_CREDENTIAL_FILE_ABSENT" });
+        });
+        return null;
+      } catch (error) {
+        return error as Error;
+      }
+    })();
+    expect(caught?.message).not.toContain("/etc/debateai");
+  });
+});
+
+/**
+ * Review finding 3. `authorization_file` is understood by the shared parser but
+ * honoured only in the two shipped composition roots. The local development
+ * stack reads `authorizationHeader` alone, so a local user who wrote
+ * `authorization_file` would have got an UNAUTHENTICATED call and an ABSENT
+ * probe with no explanation. It refuses loudly instead, naming the field.
+ */
+describe("V-9 the local dev stack refuses a credential file it cannot honour", () => {
+  // The full development roster, so the refusal under test is the credential
+  // file and not the set-mismatch that guards this panel.
+  // A healthy relay must carry an inline credential in this stack, so the whole
+  // roster is healthy and credentialled and only the FIRST entry differs. The
+  // refusal under test is then the credential file, not the panel's set guards.
+  const roster = (first: Readonly<Record<string, unknown>>) => JSON.stringify([
+    {
+      provider_ref: "development:codex-cli",
+      base_url: "http://127.0.0.1:8791/v1",
+      model: "gpt-5-codex",
+      ...first
+    },
+    {
+      provider_ref: "development:claude-cli",
+      base_url: "http://127.0.0.1:8792/v1",
+      model: "claude-opus",
+      authorization_header: "Bearer local-relay-claude"
+    },
+    {
+      provider_ref: "development:grok-cli",
+      base_url: "http://127.0.0.1:8793/v1",
+      model: "grok-4",
+      authorization_header: "Bearer local-relay-grok"
+    }
+  ]);
+
+  it("refuses a dev panel target that names a credential file", () => {
+    expect(() => parseDevelopmentProviderPanelTargets(
+      roster({ authorization_file: "/home/somebody/.debateai/codex.header" })
+    )).toThrowError(new TypeError("DEV_CLI_PROVIDER_PANEL_AUTHORIZATION_FILE_UNSUPPORTED"));
+  });
+
+  it("still accepts the local stack's own inline relay credentials", () => {
+    expect(() => parseDevelopmentProviderPanelTargets(
+      roster({ authorization_header: "Bearer local-relay-codex" })
+    )).not.toThrow();
+  });
+
+  it("names the code in the dev stack's own refusal vocabulary", async () => {
+    const source = await readFile(
+      new URL("../../apps/runner/src/dev-auth-stack.ts", import.meta.url), "utf8"
+    );
+    expect(source).toContain("DEV_CLI_PROVIDER_PANEL_AUTHORIZATION_FILE_UNSUPPORTED");
+  });
+});
+
+/**
+ * Review finding 4. The one-printable-header-line rule is enforced twice on
+ * purpose — once where the file is read (`@debateai/crypto`) and once at the
+ * resolution boundary, where the reader is an injected seam. `@debateai/providers`
+ * does not depend on `@debateai/crypto` (adding that edge would move the
+ * lockfile), so the two literals are pinned EQUAL here instead of shared.
+ */
+describe("V-9 the header-line rule cannot drift between its two homes", () => {
+  it("defines the same pattern in @debateai/crypto and @debateai/providers", async () => {
+    const line = async (path: string) => {
+      const source = await readFile(new URL(path, import.meta.url), "utf8");
+      const found = source.split("\n").find((candidate) =>
+        candidate.includes("const PRINTABLE_HEADER_LINE ="));
+      expect(found, path).toBeDefined();
+      return found?.trim();
+    };
+    const [crypto, providers] = await Promise.all([
+      line("../../packages/crypto/src/index.ts"),
+      line("../../packages/providers/src/index.ts")
+    ]);
+    expect(providers).toBe(crypto);
+    expect(crypto).toContain("x20-\\x7e");
   });
 });
 

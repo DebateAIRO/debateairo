@@ -168,6 +168,21 @@ export class ProviderCredentialInvalidError extends CryptoError {
   }
 }
 
+/**
+ * Nothing is provisioned at that path. The same distinction `KEK_UNRESOLVED`
+ * draws against `KEK_CUSTODY_INVALID`, drawn again for a vendor credential: "you
+ * did not provision this" is a different operator action from "this file is not
+ * safe to trust", and calling a missing vendor key file a KEK sends an operator
+ * looking at the wrong tree. Like every refusal on this path it carries the code
+ * and nothing else — no path, no vendor, no length.
+ */
+export class ProviderCredentialAbsentError extends CryptoError {
+  constructor() {
+    super("PROVIDER_CREDENTIAL_FILE_ABSENT", "PROVIDER_CREDENTIAL_FILE_ABSENT");
+    this.name = "ProviderCredentialAbsentError";
+  }
+}
+
 /** The handle's master copy has been zeroed; it can never be revived. */
 export class KekDestroyedError extends CryptoError {
   constructor() {
@@ -822,10 +837,19 @@ const PRINTABLE_HEADER_LINE = /^[\x20-\x7e]+$/u;
  * gateway that needs it, and never written anywhere.
  */
 export function readCustodyAuthorizationHeader(path: string): string {
-  const material = readCustodyFile(path, "SECRET_CUSTODY_INVALID", {
-    maximum: MAX_PROVIDER_CREDENTIAL_BYTES,
-    refuseOversize: () => new ProviderCredentialInvalidError()
-  });
+  let material: Buffer;
+  try {
+    material = readCustodyFile(path, "SECRET_CUSTODY_INVALID", {
+      maximum: MAX_PROVIDER_CREDENTIAL_BYTES,
+      refuseOversize: () => new ProviderCredentialInvalidError()
+    });
+  } catch (error) {
+    // The shared reader speaks the KEK vocabulary for a path that does not
+    // exist. Translated here, at the only place that knows the file is a vendor
+    // credential, so the KEK loaders keep reporting exactly what they always did.
+    if (error instanceof KekUnresolvedError) throw new ProviderCredentialAbsentError();
+    throw error;
+  }
   try {
     const decoded = material.toString("latin1");
     const value = decoded.endsWith("\n") ? decoded.slice(0, -1) : decoded;
