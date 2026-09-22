@@ -539,6 +539,50 @@ describe("V-19 custody group: the live loaders on real files", () => {
   });
 
   /**
+   * FIX WAVE A-I3 (final review A). The group write modes were decided from the
+   * store ROOT's facts, but a new record's gid is inherited from the directory
+   * it lands in — never checked — and nothing read back what it had written.
+   * With the root group-owned and a leaf directory still in another group, the
+   * store wrote a 0640 record the READ contract refuses: a registration that
+   * "succeeded" whose user can never log in, or a rotation that rewrites
+   * readable 0600 records into unreadable ones.
+   *
+   * The write now sets the custody group on the temporary where it may, and
+   * always reads the written record's own facts back through `custodyAccepts`
+   * before the rename — so a record that would not be accepted is never
+   * published at all, and the refusal carries its typed code.
+   */
+  it.skipIf(FEWER_THAN_TWO_GROUPS)("refuses to publish a record the read contract would not accept", async () => {
+    const [custodyGid, strangerGid] = custodyGidPair();
+    const uid = process.getuid!();
+    const directory = await temporaryDirectory("debateai-custody-readback-");
+    const keyPath = join(directory, "kek.bin");
+    await writeFile(keyPath, generateDek(), { mode: 0o600 });
+    await chmod(keyPath, 0o600);
+    await chmod(directory, 0o700);
+    const root = join(directory, "user-deks");
+    await mkdir(root, { mode: 0o750 });
+    await chown(root, uid, custodyGid);
+    await chmod(root, 0o2750);
+    // The half-applied recipe: the root carries the custody group, the
+    // container the records land in does not.
+    const users = join(root, "users");
+    await mkdir(users, { mode: 0o750 });
+    await chown(users, uid, strangerGid);
+    await chmod(users, 0o2750);
+
+    configureCustodyGroup(String(custodyGid));
+    const store = new FileUserDekStore(root, loadKek(keyPath));
+    const userId = "44444444-4444-4444-8444-444444444444";
+    await expect(store.store(userId, generateDek())).rejects.toThrowError(
+      expect.objectContaining({ code: "SECRET_CUSTODY_INVALID" })
+    );
+    // Nothing was published: no half-written record for the reader to refuse.
+    await expect(stat(join(root, "users", userId, "dek.v1.json")))
+      .rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  /**
    * Item 3 of the 6a review. The store follows its root, and a root may only be
    * read as MORE permissive when it already is: a `chgrp -R` with no `chmod`
    * must not cause the next write to widen the tree on its own.

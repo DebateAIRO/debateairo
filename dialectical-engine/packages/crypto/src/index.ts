@@ -18,7 +18,7 @@ import {
   realpathSync,
   statSync
 } from "node:fs";
-import type { Dirent } from "node:fs";
+import type { Dirent, Stats } from "node:fs";
 import { chmod, lstat, mkdir, open, readFile, readdir, rename, rm, stat } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { performance } from "node:perf_hooks";
@@ -1741,6 +1741,9 @@ async function republishRecord(
     file = await fileSystem.open(temporary, "wx", modes.file);
     await file.writeFile(payload, "utf8");
     await fileSystem.chmod(temporary, modes.file);
+    // A-I3: a re-wrap must not turn a readable record into one the reader
+    // refuses. Checked before the rename, so the ORIGINAL record survives.
+    await assertPublishableUnderCustody(file, directory, modes, fileSystem);
     await file.sync();
     await file.close();
     file = undefined;
@@ -1911,6 +1914,71 @@ async function custodyWriteModes(
 }
 
 /**
+ * V-19, fix wave A-I3. The write half's last step, between `chmod` and the
+ * rename: give the temporary the custody GROUP where the writer may, then read
+ * the record's own facts back through the acceptance function the READER uses
+ * and refuse to publish anything that function would not accept.
+ *
+ * Why it is needed. `custodyWriteModes` decides the modes from the store ROOT,
+ * but a new file's gid comes from the directory it lands in — the parent's with
+ * setgid, the writing process's primary group without it — and nothing checked
+ * either. A root provisioned for the custody group above leaf directories that
+ * are still `debateai-api`-grouped (the recipe half-applied, or the root
+ * re-provisioned alone) produced a 0640 record the reader refuses: a
+ * registration that "succeeded" whose user can never log in.
+ *
+ * `fchown(fd, -1, gid)` is attempted rather than required — an owner may only
+ * set a group it belongs to, and on many hosts the gid is already right by
+ * inheritance — so the READ-BACK is the authority, not the chown's exit.
+ * `SECRET_CUSTODY_INVALID` is the reader's own code for "this exists and is not
+ * safe to trust", which is exactly what the refusal is saying, one moment
+ * earlier and about a record nobody has seen yet.
+ */
+async function assertPublishableUnderCustody(
+  file: Readonly<{ chown(uid: number, gid: number): Promise<void>;stat(): Promise<Stats> }>,
+  directory: string,
+  modes: CustodyWriteModes,
+  fileSystem: Pick<UserDekStoreFileSystem, "stat">
+): Promise<void> {
+  const custodyGid = currentCustodyGid();
+  // Single-owner modes are what this process creates by itself under its own
+  // umask, and the contract for them is unchanged; the group shape is the one
+  // that depends on facts the writer does not control.
+  if (custodyGid === undefined || modes !== GROUP_CUSTODY_MODES) return;
+  try {
+    await file.chown(-1, custodyGid);
+  } catch {
+    // Not permitted, or not needed. The read-back below decides.
+  }
+  const metadata = await file.stat();
+  const parent = await fileSystem.stat(directory);
+  if (!custodyAccepts(
+    {
+      isFile: metadata.isFile(),
+      nlink: metadata.nlink,
+      mode: metadata.mode,
+      uid: metadata.uid,
+      gid: metadata.gid,
+      size: metadata.size
+    },
+    {
+      isDirectory: parent.isDirectory(),
+      mode: parent.mode,
+      uid: parent.uid,
+      gid: parent.gid
+    },
+    {
+      callerUid: typeof process.getuid === "function" ? process.getuid() : undefined,
+      custodyGid,
+      // A wrapped-key record is a JSON envelope, not a 32-byte key.
+      expectedSize: undefined
+    }
+  )) {
+    throw new CryptoCustodyError("SECRET_CUSTODY_INVALID");
+  }
+}
+
+/**
  * V-3. `undefined` means "this record carries no label" (a v1 record); a present
  * label must be exactly the 16 hex characters `kekId` produces, because a record
  * whose label is malformed is a record whose provenance is unknown.
@@ -2063,6 +2131,9 @@ export class FileUserDekStore implements ReadableUserDekStore {
       file = await this.fileSystem.open(temporary, "wx", modes.file);
       await file.writeFile(userDekRecordJson(userId, this.keks.current, envelope), "utf8");
       await this.fileSystem.chmod(temporary, modes.file);
+      // A-I3: the record's own facts, through the reader's own acceptance
+      // function, before the rename publishes it.
+      await assertPublishableUnderCustody(file, directory, modes, this.fileSystem);
       await file.sync();
       await file.close();
       file = undefined;
@@ -2443,6 +2514,9 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
       file = await this.fileSystem.open(temporary, "wx", modes.file);
       await file.writeFile(JSON.stringify(record), "utf8");
       await this.fileSystem.chmod(temporary, modes.file);
+      // A-I3: the record's own facts, through the reader's own acceptance
+      // function, before the rename publishes it.
+      await assertPublishableUnderCustody(file, directory, modes, this.fileSystem);
       await file.sync();
       await file.close();
       file = undefined;
@@ -2907,6 +2981,9 @@ export class FilePublicationKeyStore implements PublicationKeyStore {
       file = await this.fileSystem.open(temporary, "wx", modes.file);
       await file.writeFile(JSON.stringify(record), "utf8");
       await this.fileSystem.chmod(temporary, modes.file);
+      // A-I3: the record's own facts, through the reader's own acceptance
+      // function, before the rename publishes it.
+      await assertPublishableUnderCustody(file, directory, modes, this.fileSystem);
       await file.sync();
       await file.close();
       file = undefined;
