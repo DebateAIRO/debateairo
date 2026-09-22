@@ -103,6 +103,27 @@ describe("V-28 the runner tells a money stop from an attempt stop from a failure
     expect(envelopeStopKind(undefined)).toBeNull();
   });
 
+  /**
+   * FW-F (final review, Minor) — A CODE THIS ENGINE DOES NOT KNOW IS NOT A STOP,
+   * WHATEVER `Object.prototype` HAPPENS TO CARRY UNDER THAT NAME.
+   *
+   * `TypedDomainError.code` is a plain `string`, and the stop table is a plain
+   * object, so looking the code up with `table[code]` answers for every key
+   * `Object.prototype` defines: `constructor` came back as the `Object`
+   * function, `__proto__` as the prototype itself. Both are truthy, so the
+   * `?? null` miss never fired and the caller was told the run had hit a spend
+   * bound. At the serve-chain catch that becomes a forced hard stop whose
+   * condition-mark record carries `reason: undefined` — a terminal naming a
+   * ceiling nobody reached. No such code is raised anywhere in the tree today
+   * (every `new TypedDomainError(` takes a literal or a literal-fed parameter),
+   * so this is closing the lookup, not repairing a live failure.
+   */
+  it("answers null for a code that is only a prototype member", () => {
+    for (const inherited of ["constructor", "toString", "hasOwnProperty", "valueOf", "__proto__"]) {
+      expect(envelopeStopKind(new TypedDomainError(inherited, "x")), inherited).toBeNull();
+    }
+  });
+
   it("ends in the run's own terminal state, never as a crash", () => {
     // The same terminal the attempt stop reaches — a state of the run, resolved
     // and readable, not a thrown failure the work item records as terminal.

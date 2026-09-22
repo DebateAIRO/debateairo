@@ -206,10 +206,24 @@ const SINGLE_LINEAGE_SPEND_STOP_LIFT_PATHS: Readonly<Record<EnvelopeStopKind, st
   DAILY: "Re-ask after the daily cost envelope resets so the other maker positions can be afforded"
 });
 
-/** `null` for anything that is not one of the envelope refusals listed above. */
+/**
+ * `null` for anything that is not one of the envelope refusals listed above.
+ *
+ * FW-F (final review, Minor): the membership question is `Object.hasOwn`, not a
+ * plain index with a `?? null` miss. `TypedDomainError.code` is an unconstrained
+ * `string`, and a plain object answers for every name `Object.prototype`
+ * defines — `constructor` returned the `Object` function, `__proto__` the
+ * prototype — each of them truthy, so the miss never fired and the caller was
+ * told a spend bound had been reached. At the serve-chain catch that is a forced
+ * hard stop whose condition-mark record reads `ENVELOPE_STOP_REASONS[<function>]`
+ * = `undefined`: a terminal naming a ceiling nobody reached. Driven by
+ * `tests/unit/v28-run-money-terminal.test.ts`.
+ */
 export function envelopeStopKind(error: unknown): EnvelopeStopKind | null {
   if (!(error instanceof TypedDomainError)) return null;
-  return ENVELOPE_STOP_CODES[error.code as keyof typeof ENVELOPE_STOP_CODES] ?? null;
+  return Object.hasOwn(ENVELOPE_STOP_CODES, error.code)
+    ? ENVELOPE_STOP_CODES[error.code as keyof typeof ENVELOPE_STOP_CODES]
+    : null;
 }
 
 /**
