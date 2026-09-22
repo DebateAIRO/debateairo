@@ -6,6 +6,8 @@ import {
 } from "@debateai/kernel";
 import { PanelMemberFailure, runJudgePanel } from "@debateai/judgement";
 import {
+  ENVELOPE_STOP_CODES,
+  ENVELOPE_STOP_REASONS,
   envelopeStopKind,
   envelopeStopPendingAttempts,
   expansionPhaseStop,
@@ -207,10 +209,41 @@ describe("C3 — which question each stop asks of the envelope", () => {
       .toEqual({ pendingModelAttempts: 1, forceHardStop: false });
   });
 
-  it("forces the hard stop for money and for an unbillable vendor alike", () => {
-    for (const stop of ["MONEY", "USAGE"] as const) {
+  it("forces the hard stop for money, for an unbillable vendor and for a spent day alike", () => {
+    for (const stop of ["MONEY", "USAGE", "DAILY"] as const) {
       expect(envelopeStopPendingAttempts(stop))
         .toEqual({ pendingModelAttempts: 0, forceHardStop: true });
     }
+  });
+});
+
+/**
+ * ROUND 4, RULING R-C — A DAILY STOP IS ITS OWN KIND, WITH ITS OWN REASON.
+ *
+ * Round 3 listed `DAILY_COST_ENVELOPE_REACHED` under the kind `MONEY`, so a
+ * daily stop raised mid-run — a dead path today, which is why nothing caught it
+ * — would have minted a record whose reason is `RUN_COST_ENVELOPE_MONEY_REACHED`
+ * and sent the operator to raise the per-run ceiling when the DAY was spent.
+ * The kind and the reason are now a bijection with the code, checked as one.
+ */
+describe("R-C — every stop kind lifts as itself", () => {
+  it("maps the daily code to its own kind", () => {
+    expect(envelopeStopKind(new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", "x"))).toBe("DAILY");
+    expect(ENVELOPE_STOP_CODES.DAILY_COST_ENVELOPE_REACHED).not.toBe(ENVELOPE_STOP_CODES.RUN_COST_ENVELOPE_MONEY_REACHED);
+  });
+
+  it("each code's kind carries that code back as its reason — never another ceiling's", () => {
+    const kinds = Object.values(ENVELOPE_STOP_CODES);
+    expect(new Set(kinds).size).toBe(kinds.length);
+    for (const [code, kind] of Object.entries(ENVELOPE_STOP_CODES)) {
+      expect(ENVELOPE_STOP_REASONS[kind], `reason for ${kind}`).toBe(code);
+    }
+    expect(Object.keys(ENVELOPE_STOP_REASONS).sort()).toEqual([...kinds].sort());
+  });
+
+  it("stops the phase on a daily refusal too, so the run keeps its work", () => {
+    expect(expansionPhaseStop(new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", "x"))).toBe("DAILY");
+    expect(reviewFailureOutcome(new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", "x")))
+      .toEqual({ kind: "BUDGET_STOP", stop: "DAILY" });
   });
 });

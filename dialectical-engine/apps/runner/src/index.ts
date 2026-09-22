@@ -167,20 +167,46 @@ export const ENVELOPE_STOP_CODES = Object.freeze({
    * `RUN_LEVEL_SPEND_STOP_CODES` in the kernel. If it is ever raised while a run
    * is under way, the difference between being listed and not is the difference
    * between the run keeping its work and failing outright.
+   *
+   * ROUND 4, RULING R-C: its OWN kind. Round 3 filed it under `MONEY`, so the
+   * record it would have minted carried the per-run reason and sent the
+   * operator to raise the wrong ceiling. A spent day is lifted by waiting for
+   * the next one, not by re-sealing the per-run envelope.
    */
-  DAILY_COST_ENVELOPE_REACHED: "MONEY"
+  DAILY_COST_ENVELOPE_REACHED: "DAILY"
 } as const);
 
 export type EnvelopeStopKind = typeof ENVELOPE_STOP_CODES[keyof typeof ENVELOPE_STOP_CODES];
 
-/** The condition-mark record's reason, per stop: the operator's lift differs. */
-const ENVELOPE_STOP_REASONS: Readonly<Record<EnvelopeStopKind, string>> = Object.freeze({
+/**
+ * The condition-mark record's reason, per stop: the operator's lift differs.
+ * A bijection with `ENVELOPE_STOP_CODES` — each kind carries back the one code
+ * that maps to it — and pinned as one by `v28-run-body-budget-stop.test.ts`, so
+ * a kind can never again lift as another ceiling's.
+ */
+export const ENVELOPE_STOP_REASONS: Readonly<Record<EnvelopeStopKind, string>> = Object.freeze({
   ATTEMPTS: "RUN_COST_ENVELOPE_EXHAUSTED",
   MONEY: "RUN_COST_ENVELOPE_MONEY_REACHED",
-  USAGE: "PROVIDER_USAGE_UNREPORTED"
+  USAGE: "PROVIDER_USAGE_UNREPORTED",
+  DAILY: "DAILY_COST_ENVELOPE_REACHED"
 });
 
-/** `null` for anything that is not one of the three envelope refusals. */
+/**
+ * ROUND 4, RULING R-B — what a reader is told to DO about an answer that rests
+ * on one lineage because a spend bound stopped the run before the other maker
+ * positions could be afforded. One lift per stop, because "re-ask with more
+ * money", "wait for the next day" and "fix the vendor" are different actions.
+ * The ATTEMPT ceiling is listed for completeness of the record: it is never a
+ * run-body stop (`RUN_BODY_STOP_KINDS`), so no such record is ever minted for it.
+ */
+const SINGLE_LINEAGE_SPEND_STOP_LIFT_PATHS: Readonly<Record<EnvelopeStopKind, string>> = Object.freeze({
+  ATTEMPTS: "Re-ask under a larger attempt ceiling so the other maker positions can be authored",
+  MONEY: "Re-ask under a larger per-run cost envelope so the other maker positions can be afforded",
+  USAGE: "Restore a vendor that reports usage, then re-ask so the other maker positions can be billed",
+  DAILY: "Re-ask after the daily cost envelope resets so the other maker positions can be afforded"
+});
+
+/** `null` for anything that is not one of the envelope refusals listed above. */
 export function envelopeStopKind(error: unknown): EnvelopeStopKind | null {
   if (!(error instanceof TypedDomainError)) return null;
   return ENVELOPE_STOP_CODES[error.code as keyof typeof ENVELOPE_STOP_CODES] ?? null;
@@ -218,9 +244,16 @@ export function envelopeStopPendingAttempts(stop: EnvelopeStopKind): Readonly<{
     : Object.freeze({ pendingModelAttempts: 0, forceHardStop: true });
 }
 
+/**
+ * The kinds that stop a run-body phase, enumerated POSITIVELY: a fifth kind
+ * added tomorrow does not become a phase stop by omission, it has to be listed
+ * and reasoned about. `ATTEMPTS` is deliberately absent (see above).
+ */
+const RUN_BODY_STOP_KINDS: readonly EnvelopeStopKind[] = Object.freeze(["MONEY", "USAGE", "DAILY"]);
+
 export function expansionPhaseStop(error: unknown): EnvelopeStopKind | null {
   const stop = envelopeStopKind(error);
-  return stop === "MONEY" || stop === "USAGE" ? stop : null;
+  return stop !== null && RUN_BODY_STOP_KINDS.includes(stop) ? stop : null;
 }
 
 export type ReviewFailureOutcome =
@@ -1850,21 +1883,29 @@ export interface MakerPositionDisclosureRoot {
  *
  *  · a position was authored and not served  -> disclose it, as always;
  *  · a genuine mono-maker run                -> its own two marks, as always;
- *  · a multi-maker run with nothing unserved -> say NOTHING about maker
- *    positions. There is no second position to name, and naming one would be a
- *    falsehood; borrowing the mono-maker marks would be another, since
- *    `SINGLE-LINEAGE` carries the reason `MONO_MAKER_RUN` and this run was not
- *    one. What the reader gets instead is the envelope terminal's own record,
- *    whose reason is the spend-stop code — `RUN_COST_ENVELOPE_MONEY_REACHED` or
- *    `PROVIDER_USAGE_UNREPORTED` — which says exactly why the second maker never
- *    wrote anything, and which the operator can act on.
+ *  · a multi-maker run with ONE authored root -> ROUND 4, RULING R-B: the answer
+ *    SAYS it rests on one lineage. Round 3 said nothing here, on the ground that
+ *    `SINGLE-LINEAGE` meant `MONO_MAKER_RUN`; but the mark is the closed
+ *    vocabulary and the record's REASON is a free string, so the mark carries
+ *    the truth and the reason names what actually happened: the run-level
+ *    spend-stop code (`RUN_COST_ENVELOPE_MONEY_REACHED`,
+ *    `PROVIDER_USAGE_UNREPORTED`, `DAILY_COST_ENVELOPE_REACHED`) — never
+ *    `MONO_MAKER_RUN`, which means one maker was CONFIGURED, a different fact
+ *    with a different lift. The only way the run body reaches one authored root
+ *    at M > 1 is a spend stop (a halted root 1 throws `MAKER_POSITION_UNAVAILABLE`
+ *    first), so that state with NO stop is refused loudly rather than given a
+ *    mark with no reason.
+ *
+ * `monoMakerRecords` is REQUIRED (round 4, R-C): the marks and the records are
+ * the two halves of one statement, and an optional half is how they diverge.
  */
 export function buildMakerPositionDisclosure(input: Readonly<{
   effectiveMakerCount: number;
+  runBodyBudgetStop: EnvelopeStopKind | null;
   authoredMakerPositions: readonly MakerPositionDisclosureRoot[];
   servedRoot: MakerPositionDisclosureRoot;
   monoMakerConditionMarks: readonly ConditionMarkRecord["mark"][];
-  monoMakerRecords?: readonly ConditionMarkRecord[];
+  monoMakerRecords: readonly ConditionMarkRecord[];
 }>): Readonly<{
   conditionMarks: readonly ConditionMarkRecord["mark"][];
   records: readonly ConditionMarkRecord[];
@@ -1872,19 +1913,156 @@ export function buildMakerPositionDisclosure(input: Readonly<{
   if (input.effectiveMakerCount === 1) {
     return Object.freeze({
       conditionMarks: Object.freeze([...input.monoMakerConditionMarks]),
-      records: Object.freeze([...(input.monoMakerRecords ?? [])])
+      records: Object.freeze([...input.monoMakerRecords])
     });
   }
   const unserved = input.authoredMakerPositions
     .filter((root) => root.nodeId !== input.servedRoot.nodeId);
   if (unserved.length === 0) {
-    return Object.freeze({ conditionMarks: Object.freeze([]), records: Object.freeze([]) });
+    if (input.runBodyBudgetStop === null) {
+      throw new TypedDomainError(
+        "MAKER_POSITION_DISCLOSURE_UNRESOLVED",
+        `A ${input.effectiveMakerCount}-maker run authored one maker position and no spend bound stopped it; the run body cannot produce this state and no lineage disclosure is minted without a reason`
+      );
+    }
+    return Object.freeze({
+      conditionMarks: Object.freeze(["SINGLE-LINEAGE" as const]),
+      records: Object.freeze([Object.freeze({
+        mark: "SINGLE-LINEAGE" as const,
+        scope: "answer" as const,
+        subjectRef: input.servedRoot.nodeId,
+        reason: ENVELOPE_STOP_REASONS[input.runBodyBudgetStop],
+        liftPath: SINGLE_LINEAGE_SPEND_STOP_LIFT_PATHS[input.runBodyBudgetStop],
+        servedRootRule: null,
+        affectedNodeIds: Object.freeze([input.servedRoot.nodeId])
+      } satisfies ConditionMarkRecord)])
+    });
   }
   return Object.freeze({
     conditionMarks: Object.freeze(["UNSERVED-MAKER-POSITION" as const]),
     records: Object.freeze([
       buildUnservedMakerPositionRecord(input.authoredMakerPositions, input.servedRoot)
     ])
+  });
+}
+
+/** The footing on which judged standing is projected for the served answer. */
+export type MakerPositionServeFooting = "MONO_MAKER" | "CROSS_REVIEWED" | "SPEND_STOPPED";
+
+export interface MakerPositionServeDecision<T extends MakerPositionDisclosureRoot> {
+  readonly footing: MakerPositionServeFooting;
+  /** The node ids that seeded `projectJudgedStanding` — what "reviewed" meant on this footing. */
+  readonly judgedStandingSeed: readonly string[];
+  readonly standing: ReturnType<typeof projectJudgedStanding>;
+  readonly propagation: PropagationOutcome;
+  readonly servableMakerPositions: readonly T[];
+  readonly servedRootSelection: ServedRootSelection<T>;
+  readonly servedRoot: T;
+  readonly disclosure: ReturnType<typeof buildMakerPositionDisclosure>;
+}
+
+/**
+ * ROUND 4 (V-28, RULINGS R-A / R-B) — THE POST-AUTHORING SERVE DECISION, TAKEN ONCE.
+ *
+ * Three rounds fixed the joint where a spend refusal was RAISED and each moved
+ * the death one statement downstream: `MAKER_POSITION_UNAVAILABLE`, then
+ * `UNSERVED_MAKER_POSITION_UNRESOLVED`, then
+ * `NO_SERVABLE_MAKER_POSITION_AFTER_REVIEW`. The mechanism never changed. With
+ * two makers and root 1 refused, the review guard (rightly) reviews nothing —
+ * MONEY would be refused again and USAGE would be a billed call — so the
+ * reviewed set is empty, and the serve-time projection seeded judged standing
+ * from `effectiveMakerCount <= 1 ? every node : the reviewed set`. That keys on
+ * the PLANNED panel size, which is never recomputed, so a paid-for root 0 was
+ * hidden for want of a review no money could buy, the propagation ran over zero
+ * nodes, no authored root was servable, and the run threw.
+ *
+ * R-A: a spend-stopped multi-maker run is projected on the single-maker footing,
+ * because no judged standing can be bought once the envelope is reached. The
+ * M = 1 branch seeds EVERY materialised node, since a mono run never reviews;
+ * here every node the stop DENIED a review seeds its own basis in the same
+ * way. For a stop during root authoring, or on the first review call, that is
+ * every node and the projection is the M = 1 branch character for character.
+ * For a stop after reviews have landed, their outcomes are kept as they are:
+ * `agree`/`dispute` seed as always, and a review that returned `cannot-assess`
+ * or whose transport died (`unjudgedReviewNodeIds`) keeps its node hidden WITH
+ * its T6 / J14 record — seeding those too would erase a reviewer's verdict and
+ * drop its disclosure from the answer, which nobody ruled.
+ *
+ * ONE decision, because the projection at the serve site and the disclosure at
+ * the fact bundle are two halves of the same statement about what the answer
+ * rests on, and the round-3 fix proved that a decision taken in two places is
+ * one the runner can reach in one place and not the other. Pure — no pool, no
+ * `this` — so `v28-spend-stopped-serve-decision.test.ts` drives it with the
+ * exact state the refusal leaves behind; the runner's wiring to it is pinned by
+ * `tests/architecture/v28-serve-decision-wiring.test.ts`.
+ */
+export function decideMakerPositionServe<T extends MakerPositionDisclosureRoot>(input: Readonly<{
+  effectiveMakerCount: number;
+  runBodyBudgetStop: EnvelopeStopKind | null;
+  /** The maker ROOTS that exist — what was authored, never what was planned. */
+  authoredMakerPositions: readonly T[];
+  /** The operator-resolved graph, before any standing projection. */
+  snapshot: EvaluationSnapshot;
+  materialisedNodeIds: readonly string[];
+  /** Nodes whose cross-maker review LANDED as a judgement (`agree`/`dispute`). */
+  reviewedNodeIds: readonly string[];
+  /** Nodes a review RAN for and left without judged standing: transport died, or `cannot-assess`. */
+  unjudgedReviewNodeIds: readonly string[];
+  monoMakerConditionMarks: readonly ConditionMarkRecord["mark"][];
+  /** The mono-maker records name the served root, which is only known here. */
+  monoMakerRecords: (servedRoot: T) => readonly ConditionMarkRecord[];
+}>): MakerPositionServeDecision<T> {
+  const footing: MakerPositionServeFooting = input.effectiveMakerCount <= 1
+    ? "MONO_MAKER"
+    : input.runBodyBudgetStop === null ? "CROSS_REVIEWED" : "SPEND_STOPPED";
+  const judgedStandingSeed: readonly string[] = (() => {
+    switch (footing) {
+      case "MONO_MAKER":
+        return input.materialisedNodeIds;
+      case "CROSS_REVIEWED":
+        return input.reviewedNodeIds;
+      case "SPEND_STOPPED": {
+        const reviewed = new Set(input.reviewedNodeIds);
+        const unjudged = new Set(input.unjudgedReviewNodeIds);
+        return Object.freeze([
+          ...input.reviewedNodeIds,
+          ...input.materialisedNodeIds.filter((nodeId) => !reviewed.has(nodeId) && !unjudged.has(nodeId))
+        ]);
+      }
+    }
+  })();
+  const standing = projectJudgedStanding(input.snapshot, judgedStandingSeed);
+  const propagation = evaluate(standing.snapshot);
+  const propagatedNodeIds = new Set(propagation.strengths.map((row) => row.nodeId));
+  const servableMakerPositions = Object.freeze(
+    input.authoredMakerPositions.filter((root) => propagatedNodeIds.has(root.nodeId))
+  );
+  if (servableMakerPositions.length === 0) {
+    throw new TypedDomainError(
+      "NO_SERVABLE_MAKER_POSITION_AFTER_REVIEW",
+      "Every authored maker position was excluded after cross-maker review transport exhaustion"
+    );
+  }
+  // T10: propagation picks the served root, configuration order does not.
+  const servedRootSelection = selectServedRootByStrength(servableMakerPositions, propagation.strengths);
+  const servedRoot = servedRootSelection.root;
+  const disclosure = buildMakerPositionDisclosure({
+    effectiveMakerCount: input.effectiveMakerCount,
+    runBodyBudgetStop: input.runBodyBudgetStop,
+    authoredMakerPositions: input.authoredMakerPositions,
+    servedRoot,
+    monoMakerConditionMarks: input.monoMakerConditionMarks,
+    monoMakerRecords: input.monoMakerRecords(servedRoot)
+  });
+  return Object.freeze({
+    footing,
+    judgedStandingSeed: Object.freeze([...judgedStandingSeed]),
+    standing,
+    propagation,
+    servableMakerPositions,
+    servedRootSelection,
+    servedRoot,
+    disclosure
   });
 }
 
@@ -3743,30 +3921,79 @@ export class WalkingSkeletonRunner {
     const { materialised, snapshot: operatorResolvedSnapshot } =
       await this.#resolveOperatorResolvedSnapshot(run.runId);
     let snapshot: EvaluationSnapshot = operatorResolvedSnapshot;
-    const reviewedNodeIds = effectiveMakerCount <= 1
-      ? materialised.nodes.map((node) => node.nodeId)
-      : await this.#judgements.readReviewedNodeIds(run.runId);
-    const standing = projectJudgedStanding(snapshot, reviewedNodeIds);
-    snapshot = standing.snapshot;
+    const monoMakerConditionMarks = effectiveMakerCount === 1
+      ? ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE"] as const
+      : [] as const;
+    /**
+     * The two records a genuine mono-maker run mints, built for the root the
+     * decision below serves. Their reason is `MONO_MAKER_RUN` — one maker was
+     * CONFIGURED — and they are consumed on the M = 1 footing only; a
+     * multi-maker run cut short by a spend bound gets its own `SINGLE-LINEAGE`
+     * record whose reason names the stop (round 4, R-B).
+     */
+    const monoMakerRecords = (monoServedRoot: AuthoredDebateNode): readonly ConditionMarkRecord[] => Object.freeze([
+          Object.freeze({
+            mark: "SINGLE-LINEAGE",
+            scope: "answer",
+            subjectRef: monoServedRoot.nodeId,
+            reason: "MONO_MAKER_RUN",
+            liftPath: "RUN_DIFFERENT_MAKER_CRITIQUE",
+            servedRootRule: null,
+            affectedNodeIds: Object.freeze([monoServedRoot.nodeId])
+          }),
+          Object.freeze({
+            mark: "CRITIQUE-UNAVAILABLE",
+            scope: "answer",
+            subjectRef: monoServedRoot.nodeId,
+            reason: [
+              ...(absentAtClaim.length === 0 ? [] : [
+                `CLAIM_PANEL_REVISED:${absentAtClaim.map(({ member, failureCode }) => `${member.provider_ref}=${failureCode}`).join(",")}`
+              ]),
+              `MONO_LINEAGE_DEPTH_NOT_EXPANDED:requested_depth=${expansionDepth}`
+            ].join("|"),
+            liftPath: "RUN_DIFFERENT_MAKER_CRITIQUE",
+            servedRootRule: null,
+            affectedNodeIds: Object.freeze([monoServedRoot.nodeId])
+          })
+    ] satisfies readonly ConditionMarkRecord[]);
+    const propagationStartedAt = new Date();
+    /**
+     * ROUND 4 (V-28, R-A / R-B): projection, propagation, served-root selection
+     * and the maker-position disclosure are ONE decision, taken here and read
+     * again at the fact bundle. The reviewed set is read from the ledger only
+     * when a review could have run; what it MEANS for the projection — the
+     * footing — is the decision's, not this site's. A spend-stopped run is
+     * projected on the single-maker footing (R-A): the review guard above
+     * bought no review for the roots that exist, and none can be bought now.
+     */
+    const makerPositionServe = decideMakerPositionServe({
+      effectiveMakerCount,
+      runBodyBudgetStop,
+      authoredMakerPositions,
+      snapshot,
+      materialisedNodeIds: materialised.nodes.map((node) => node.nodeId),
+      reviewedNodeIds: effectiveMakerCount <= 1
+        ? []
+        : await this.#judgements.readReviewedNodeIds(run.runId),
+      unjudgedReviewNodeIds: [
+        ...hiddenReviewRecords.map(({ nodeId }) => nodeId),
+        ...unassessedReviewRecords.map(({ nodeId }) => nodeId)
+      ],
+      monoMakerConditionMarks,
+      monoMakerRecords
+    });
+    const standing = makerPositionServe.standing;
+    snapshot = makerPositionServe.standing.snapshot;
     const classHNodeIds = new Set(standing.hiddenNodeIds);
     const classDNodeIds = new Set(standing.derivedStandingNodeIds);
-    const propagationStartedAt = new Date();
-    const propagation = evaluate(snapshot);
+    const propagation = makerPositionServe.propagation;
     const threshold = this.settings.hiddenNodeScoreThreshold;
     const lowScoreRows = threshold === undefined
       ? []
       : propagation.strengths.filter((row) => row.strength <= threshold.value);
-    const propagatedNodeIds = new Set(propagation.strengths.map((row) => row.nodeId));
-    const servableMakerPositions = authoredMakerPositions.filter((root) => propagatedNodeIds.has(root.nodeId));
-    if (servableMakerPositions.length === 0) {
-      throw new TypedDomainError(
-        "NO_SERVABLE_MAKER_POSITION_AFTER_REVIEW",
-        "Every authored maker position was excluded after cross-maker review transport exhaustion"
-      );
-    }
-    // T10: propagation picks the served root, configuration order does not.
-    const servedRootSelection = selectServedRootByStrength(servableMakerPositions, propagation.strengths);
-    const servedRoot = servedRootSelection.root;
+    const servableMakerPositions = makerPositionServe.servableMakerPositions;
+    const servedRootSelection = makerPositionServe.servedRootSelection;
+    const servedRoot = makerPositionServe.servedRoot;
     // T11: the three-state label is derived HERE — from the propagated numbers
     // only, before composition and before any synthesis step, so the derivation
     // stays acyclic (confirm-item 3: the round-3 objection is a mark, never a
@@ -3890,9 +4117,6 @@ export class WalkingSkeletonRunner {
       finishedAt: new Date()
     });
     const memoryDisclosure = await this.#memory.readDisclosure(run.runId);
-    const monoMakerConditionMarks = effectiveMakerCount === 1
-      ? ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE"] as const
-      : [] as const;
     /**
      * T6 / S4-2 / J14 — the two routes into class H/D, carried as ONE list.
      *
@@ -3964,47 +4188,17 @@ export class WalkingSkeletonRunner {
       ...new Set(panelDegradations.map((record) => record.mark))
     ]);
     /**
-     * RE-REVIEW 2(a): the maker-position disclosure is ONE decision now, so the
-     * fact bundle's marks and the records paired with them cannot disagree.
+     * RE-REVIEW 2(a) / ROUND 4: the maker-position disclosure is the serve
+     * decision's, taken above with the projection it belongs to, so the fact
+     * bundle's marks and the records paired with them cannot disagree — and
+     * cannot be reached at one site and not the other.
      */
-    const monoMakerRecords: readonly ConditionMarkRecord[] = Object.freeze([
-          Object.freeze({
-            mark: "SINGLE-LINEAGE",
-            scope: "answer",
-            subjectRef: servedRoot.nodeId,
-            reason: "MONO_MAKER_RUN",
-            liftPath: "RUN_DIFFERENT_MAKER_CRITIQUE",
-            servedRootRule: null,
-            affectedNodeIds: Object.freeze([servedRoot.nodeId])
-          }),
-          Object.freeze({
-            mark: "CRITIQUE-UNAVAILABLE",
-            scope: "answer",
-            subjectRef: servedRoot.nodeId,
-            reason: [
-              ...(absentAtClaim.length === 0 ? [] : [
-                `CLAIM_PANEL_REVISED:${absentAtClaim.map(({ member, failureCode }) => `${member.provider_ref}=${failureCode}`).join(",")}`
-              ]),
-              `MONO_LINEAGE_DEPTH_NOT_EXPANDED:requested_depth=${expansionDepth}`
-            ].join("|"),
-            liftPath: "RUN_DIFFERENT_MAKER_CRITIQUE",
-            servedRootRule: null,
-            affectedNodeIds: Object.freeze([servedRoot.nodeId])
-          })
-    ] satisfies readonly ConditionMarkRecord[]);
-    const makerPositionDisclosure = buildMakerPositionDisclosure({
-      effectiveMakerCount,
-      authoredMakerPositions,
-      servedRoot,
-      monoMakerConditionMarks: monoMakerConditionMarks,
-      monoMakerRecords
-    });
     const factBundle: FactBundle = buildFactBundle({
       facts: Object.freeze([servedRoot.statement]),
       residualObjections: Object.freeze([]),
       badges: Object.freeze([]),
       conditionMarks: Object.freeze([...new Set([
-        ...makerPositionDisclosure.conditionMarks,
+        ...makerPositionServe.disclosure.conditionMarks,
         ...hiddenConditionMarks
       ])]),
       reversalPoint: servedRoot.reversalPoint,
@@ -4018,7 +4212,7 @@ export class WalkingSkeletonRunner {
     let compositionRawArtifactRef: string | null = null;
     let compositionAttempt = 0;
     const conformanceRawArtifactRefs: string[] = [];
-    let conditionMarkRecords: readonly ConditionMarkRecord[] = makerPositionDisclosure.records;
+    let conditionMarkRecords: readonly ConditionMarkRecord[] = makerPositionServe.disclosure.records;
     conditionMarkRecords = Object.freeze([
       ...conditionMarkRecords,
       // T7 / S3-2: one typed record per frozen branch, minted at the round
@@ -5103,6 +5297,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "LIVENESS_TIME_INVALID",
   "MAKER_INVENTORY_UNSATISFIED",
   "MAKER_POLICY_INVALID",
+  "MAKER_POSITION_DISCLOSURE_UNRESOLVED",
   "MAKER_POSITION_UNAVAILABLE",
   "MALFORMED_ARROW_ORDER",
   "MEMORY_ASKER_SCOPE_MISMATCH",
