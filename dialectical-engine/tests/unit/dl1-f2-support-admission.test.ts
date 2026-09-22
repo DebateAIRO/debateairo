@@ -80,11 +80,14 @@ function fixtureAskApplication(): AskApplication {
 
 function harness(policy: AdmissionPolicy | null = PUBLISHED) {
   let now = new Date(T0);
+  // Unknown token on both doors: the route's own work, after admission.
+  const readByToken = vi.fn(async () => null);
+  const replyByToken = vi.fn(async () => null);
   const support = supportHarness({
     clock: () => now,
     // Composed so the case read reaches the admission gate instead of 503.
     caseAccess: Object.freeze({
-      listOwn: async () => [], readByToken: async () => null, replyByToken: async () => null
+      listOwn: async () => [], readByToken, replyByToken
     }) as NonNullable<Parameters<typeof supportHarness>[0]>["caseAccess"]
   });
   const api = buildApi({
@@ -97,13 +100,18 @@ function harness(policy: AdmissionPolicy | null = PUBLISHED) {
   });
   const refusalLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
   return Object.freeze({
-    api, support,
+    api, support, readByToken, replyByToken,
     advance: (ms: number) => { now = new Date(now.getTime() + ms); },
     status: (remoteAddress: string) =>
       api.inject({ method: "GET", url: "/v1/support/status", remoteAddress }),
     readCase: (remoteAddress: string, token: string) => api.inject({
       method: "GET", url: "/v1/support/case", remoteAddress,
       headers: { "x-support-case-token": token }
+    }),
+    replyToCase: (remoteAddress: string, token: string) => api.inject({
+      method: "POST", url: "/v1/support/case/messages", remoteAddress,
+      headers: { origin: TEST_APP_ORIGIN, "x-support-case-token": token },
+      payload: { text: "any news?" }
     }),
     readSession: (remoteAddress: string, id: string, token: string) => api.inject({
       method: "GET", url: `/v1/support/sessions/${id}`, remoteAddress,
@@ -231,6 +239,62 @@ describe("DL1-F2 support reads are metered per source", () => {
     try {
       for (let index = 0; index < 40; index += 1) {
         expect((await h.status(SOURCE_A)).statusCode, `read ${index + 1}`).toBe(200);
+      }
+    } finally {
+      await h.close();
+    }
+  });
+});
+
+/**
+ * Final review, area D, Minor 3. `POST /v1/support/case/messages` charged no
+ * per-source budget while its GET twin charged `supportReads`. Both doors take
+ * the same bearer and both answer the same typed 404 to a wrong one, so a
+ * wrong-token flood simply moved to the POST: a configuration read plus an
+ * indexed unique lookup per request, unmetered and with the whole case reply
+ * path behind it. One capability, one budget.
+ */
+describe("DL1-F2 the case reply is metered like the case read", () => {
+  it("charges and refuses on the same per-source budget as its GET twin", async () => {
+    const h = harness(policyWith({
+      support_reads: { key: "source", limit: 2, window_ms: QUARTER_MS, capacity: 64 }
+    }));
+    const unknown = "z".repeat(43);
+    try {
+      // The reply is admitted, does its own work, and answers the unknown token.
+      expect((await h.replyToCase(SOURCE_A, unknown)).statusCode).toBe(404);
+      // ...and it spent a unit of the SAME budget the read spends.
+      expect((await h.readCase(SOURCE_A, unknown)).statusCode).toBe(404);
+      h.support.spies.configuration.mockClear();
+      h.replyByToken.mockClear();
+
+      const refused = await h.replyToCase(SOURCE_A, unknown);
+      expect(refused.statusCode).toBe(429);
+      expect(refused.json()).toEqual(REFUSAL);
+      expect(refused.headers["retry-after"]).toBe("900");
+      // Refused at the door: no configuration read, no repository lookup.
+      expect(h.support.spies.configuration).not.toHaveBeenCalled();
+      expect(h.replyByToken).not.toHaveBeenCalled();
+      expect(h.refusalLines()).toContainEqual({
+        event: "api.admission.refused", route: "POST /v1/support/case/messages",
+        reason: "LIMIT", windowMs: QUARTER_MS
+      });
+
+      // Another source is untouched, and the window releases this one.
+      expect((await h.replyToCase(SOURCE_B, unknown)).statusCode).toBe(404);
+      h.advance(QUARTER_MS);
+      expect((await h.replyToCase(SOURCE_A, unknown)).statusCode).toBe(404);
+    } finally {
+      await h.close();
+    }
+  });
+
+  it("leaves a composition without the published budget unlimited, exactly as today", async () => {
+    const h = harness(SEALED);
+    try {
+      for (let index = 0; index < 20; index += 1) {
+        expect((await h.replyToCase(SOURCE_A, "z".repeat(43))).statusCode, `reply ${index + 1}`)
+          .toBe(404);
       }
     } finally {
       await h.close();

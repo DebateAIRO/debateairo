@@ -1143,6 +1143,18 @@ export function installSupportRoutes(
     policy("POST /v1/support/case/messages"),
     async (request,reply) => {
       if (application?.caseAccess === undefined) return unavailable(reply);
+      /**
+       * DL1-F2, final review. The same per-source budget its GET twin charges
+       * (`:GET /v1/support/case`): one case bearer, one capability, one budget.
+       * This door had none, so a wrong-token flood simply moved to it — a
+       * configuration read plus an indexed unique lookup per request, with the
+       * whole reply path behind it. Charged first, so a refusal costs neither.
+       */
+      if (!admit.gate(
+        reply, "supportReads", "POST /v1/support/case/messages", sourceNetwork(request)
+      )) {
+        return reply;
+      }
       const configuration = await application.configuration.current();
       if (configuration.kind !== "AVAILABLE") {
         return reply.status(503).send({ error: configuration.code });
