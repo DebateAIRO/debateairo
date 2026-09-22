@@ -57,8 +57,27 @@ export const PROVIDER_USAGE_UNREPORTED = "PROVIDER_USAGE_UNREPORTED" as const;
  * Vendor usage is only known after the response, so "refuse the call that WOULD
  * cross" is decided on the sum so far plus this call's configured maximum. Real
  * tokenizers average about 3.5-4 bytes per token for English and about 2.5 for
- * Romanian written with its diacritics; two is below both, so the projection is
- * a deliberate OVER-estimate and the envelope can only refuse early.
+ * Romanian written with its diacritics; two is below both, so the projection
+ * carries a healthy margin over the input it can see.
+ *
+ * A MARGIN, NOT A GUARANTEE — and the difference matters, so it is written down
+ * rather than implied. At least three things can make a call cost more than this
+ * projection bounds:
+ *
+ *  · CHAT-TEMPLATE TOKENS. Vendors wrap messages in their own role scaffolding
+ *    and system preamble before tokenizing; those tokens are billed and are not
+ *    in the bytes this sees.
+ *  · REASONING TOKENS. A thinking model bills tokens it generates before the
+ *    answer, and several vendors do not count them against `max_tokens`, so the
+ *    output side can exceed the bound this projects from.
+ *  · PREMIUM INPUT CLASSES. Cached-write, long-context and image or audio input
+ *    are priced above the flat per-token rate configured with the target, so the
+ *    same token count can cost more than the price used here.
+ *
+ * The consequence is bounded and worth stating: the envelope can be crossed by
+ * at most the shortfall of ONE call, because the next projection is taken
+ * against the real spend the vendor then reported. It is a ceiling with a last
+ * step over it, not a ceiling that can be walked past.
  */
 export const PROJECTED_INPUT_BYTES_PER_TOKEN = 2 as const;
 

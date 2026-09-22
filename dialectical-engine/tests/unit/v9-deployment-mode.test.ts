@@ -91,22 +91,9 @@ const TARGET_KINDS = Object.freeze({
 
 type TargetKind = keyof typeof TARGET_KINDS;
 
-/**
- * Every fixture carries V-28's price. Task 11 made a declared price a HOSTED
- * requirement — a target whose calls cannot be billed is unbounded spend, and
- * silently so — and this table is about the URL and credential rules, so the
- * price is supplied here rather than repeated in forty rows. The price rule has
- * its own table in `v28-provider-target-price.test.ts`.
- */
 function targets(kind: TargetKind) {
   return parseProviderDiscoveryTargets(
-    JSON.stringify([{
-      provider_ref: "provider-1",
-      model: "model-1",
-      input_price_micros_per_million: 3_000_000,
-      output_price_micros_per_million: 15_000_000,
-      ...TARGET_KINDS[kind]
-    }]),
+    JSON.stringify([{ provider_ref: "provider-1", model: "model-1", ...TARGET_KINDS[kind] }]),
     [{ providerRef: "provider-1", maker: "maker-1" }]
   );
 }
@@ -319,13 +306,9 @@ describe("V-9 mode x provider target (task 10a)", () => {
   });
 
   it("refuses the whole set on the FIRST offending member, so one bad row stops the boot", () => {
-    // Both rows carry V-28's price, so the FIRST offence is provider-2's
-    // cleartext URL and not a missing price on provider-1 — which is what this
-    // case is about.
-    const priced = { input_price_micros_per_million: 1, output_price_micros_per_million: 1 };
     const mixed = parseProviderDiscoveryTargets(JSON.stringify([
-      { provider_ref: "provider-1", model: "model-1", base_url: "https://a.vendor.example/v1", ...priced },
-      { provider_ref: "provider-2", model: "model-2", base_url: "http://127.0.0.1:8791/v1", ...priced }
+      { provider_ref: "provider-1", model: "model-1", base_url: "https://a.vendor.example/v1" },
+      { provider_ref: "provider-2", model: "model-2", base_url: "http://127.0.0.1:8791/v1" }
     ]), [
       { providerRef: "provider-1", maker: "maker-1" },
       { providerRef: "provider-2", maker: "maker-2" }

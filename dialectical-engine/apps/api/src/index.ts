@@ -1265,6 +1265,29 @@ export interface EvaluatorDevMenuApplication {
  * be admitted. Typed errors from deployment reads or persistence deliberately
  * do not receive this marker and therefore remain internal failures.
  */
+/**
+ * RULING R1 (V-28, review round 2) — THE DAY-SPENT REFUSAL IS A RETRY.
+ *
+ * Every ask refusal answers 422 ("this request is wrong") except this one, which
+ * is not wrong: it is well formed, it would have been admitted an hour earlier,
+ * and it will be admitted again after midnight. 429 with `Retry-After` says "not
+ * now, and here is when" — the next UTC midnight, the instant the daily envelope
+ * resets — so a caller waits the right amount of time instead of hammering the
+ * surface or giving up on a debate it could still have.
+ */
+export function askRefusalStatus(code: string): 422 | 429 {
+  return code === "DAILY_COST_ENVELOPE_REACHED" ? 429 : 422;
+}
+
+/** The HTTP-date for the next UTC midnight, or `null` when retrying cannot help. */
+export function askRefusalRetryAfter(code: string, now: Date): string | null {
+  if (askRefusalStatus(code) !== 429) return null;
+  const midnight = new Date(Date.UTC(
+    now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1
+  ));
+  return midnight.toUTCString();
+}
+
 export class AskRefusal extends Error {
   readonly code: string;
 
@@ -1582,7 +1605,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const statusCode = malformed ? 400
       : authFlow ? knownError.statusCode
         : argon2Unavailable ? 503
-          : askRefusal ? 422 : 500;
+          // R1: an ask refusal is 422, except the one that will pass tomorrow.
+          : askRefusal ? askRefusalStatus(knownError.code) : 500;
     const errorCode = malformed
       ? "MALFORMED_REQUEST"
       : authFlow ? knownError.code
@@ -1597,6 +1621,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         diagnostic: apiOperationalErrorDiagnostic(knownError)
       })));
     }
+    // R1: `Retry-After` names the instant the daily envelope resets, so a client
+    // library that honours the header waits exactly as long as it must.
+    const retryAfter = askRefusal ? askRefusalRetryAfter(knownError.code, new Date()) : null;
+    if (retryAfter !== null) reply.header("retry-after", retryAfter);
     return reply.status(statusCode).send({
       error: errorCode,
       message: statusCode >= 500 || malformed ? errorCode : knownError.message

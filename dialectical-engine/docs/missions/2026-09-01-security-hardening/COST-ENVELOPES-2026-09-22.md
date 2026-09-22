@@ -67,6 +67,10 @@ The last one is why each hosted vendor must declare a price **and** report usage
 
 **A request that arrives after the day is spent** is answered `429` with a `Retry-After` header naming the next UTC midnight: it is a well-formed request that would succeed tomorrow, not a broken one.
 
+## How close the ceiling is
+
+The per-run ceiling is checked before each call, against what the run has spent so far plus the most that call could cost. That projection is deliberately generous about the question it can see, but it is a margin and not a guarantee: vendors bill for their own message scaffolding, a thinking model can bill reasoning tokens that its answer-length bound does not cover, and cached, long-context or image input can be priced above the flat rate configured with the target. The consequence is bounded — a run can go over by at most the shortfall of one call, because the next check is taken against the real amount the vendor then reported. Treat the ceiling as a ceiling with one last step over it, not as a limit that can be walked past.
+
 ## What an operator has to configure
 
 Each provider target in `PROVIDER_DISCOVERY_TARGETS_JSON` carries its vendor's price, beside the base URL and the model, under two keys: `input_price_micros_per_million` and `output_price_micros_per_million`. Both are whole numbers of USD micro-units per million tokens — the unit vendors publish their prices in, so a vendor charging 3.00 USD per million input tokens is written as 3000000. Both keys or neither: input and output are priced differently, and half a price would under-count every call.

@@ -1,6 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { AskRefusal, evaluateAskAdmission, type RunCreationSettings } from "../../apps/api/src/index.js";
+import {
+  AskRefusal,
+  askRefusalRetryAfter,
+  askRefusalStatus,
+  evaluateAskAdmission,
+  type RunCreationSettings
+} from "../../apps/api/src/index.js";
 import { TypedDomainError } from "@debateai/kernel";
 
 /**
@@ -129,5 +135,44 @@ describe("V-28 both shipped roots carry the envelopes", () => {
       new URL("../../apps/runner/src/dev-deployment-register.ts", import.meta.url), "utf8"
     );
     expect(source).toContain("COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW");
+  });
+});
+
+/**
+ * RULING R1 (review round 2) — A DAY-SPENT ASK ANSWERS 429, NOT 422.
+ *
+ * 422 says "this request is wrong". The request is not wrong: it is well formed,
+ * it would have been admitted an hour earlier, and it will be admitted again
+ * after midnight. 429 says "not now, try later", and `Retry-After` says exactly
+ * when — the next UTC midnight, which is the instant the daily envelope resets,
+ * so a caller and any client library built on the header wait the right amount
+ * of time instead of hammering or giving up.
+ *
+ * Every other ask refusal keeps 422: those really are about the ask.
+ */
+describe("R1 — the day-spent refusal is a retry, not a rejection", () => {
+  it("answers 429 for the daily envelope and 422 for every other ask refusal", () => {
+    expect(askRefusalStatus("DAILY_COST_ENVELOPE_REACHED")).toBe(429);
+    for (const code of [
+      "MAKER_INVENTORY_UNSATISFIED",
+      "RUN_COST_ENVELOPE_UNRESOLVED",
+      "OWNER_PRIVATE_HISTORY_SCAN_SATURATED"
+    ]) {
+      expect(askRefusalStatus(code)).toBe(422);
+    }
+  });
+
+  it("names the next UTC midnight, whatever time of day it is asked", () => {
+    expect(askRefusalRetryAfter("DAILY_COST_ENVELOPE_REACHED", new Date("2026-09-22T00:00:00.000Z")))
+      .toBe("Wed, 23 Sep 2026 00:00:00 GMT");
+    expect(askRefusalRetryAfter("DAILY_COST_ENVELOPE_REACHED", new Date("2026-09-22T23:59:59.999Z")))
+      .toBe("Wed, 23 Sep 2026 00:00:00 GMT");
+    // Across a month end, so the date arithmetic is real and not a +1 on the day.
+    expect(askRefusalRetryAfter("DAILY_COST_ENVELOPE_REACHED", new Date("2026-09-30T18:00:00.000Z")))
+      .toBe("Thu, 01 Oct 2026 00:00:00 GMT");
+  });
+
+  it("sends no Retry-After for a refusal that retrying will not fix", () => {
+    expect(askRefusalRetryAfter("MAKER_INVENTORY_UNSATISFIED", new Date())).toBeNull();
   });
 });
