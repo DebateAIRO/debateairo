@@ -121,8 +121,8 @@ export type CreateSupportKeyPortInput = Readonly<{
   /**
    * V-3. The support KEK that was current before a rotation. Absent in the
    * steady state; set only for the length of a changeover, so that rows not yet
-   * re-wrapped still open. Its basename is `support-kek.bin` like the current
-   * one, so it lives in its own 0700 directory.
+   * re-wrapped still open. It is held to the SAME basename as the current key
+   * (SUPPORT_KEK_FILENAME above), so it lives in its own 0700 directory.
    */
   previousSupportKekPath?: string | undefined;
   protectedKeyPaths?: readonly string[];

@@ -26,8 +26,7 @@ import {
   renderRotationReport,
   rotateFileStore,
   rotateSupportKeys,
-  rotationFailed,
-  SUPPORT_ROTATION_BATCH_SIZE
+  rotationFailed
 } from "../../apps/runner/src/rotate-kek.js";
 import type {
   SupportKeyReplacement,
@@ -283,11 +282,12 @@ describe("V-3 rotate: the support rows behind the repository seam", () => {
   });
 
   it("writes in batches, because every UPDATE re-runs the shred-integrity check", async () => {
+    const batchSize = 4;
     const directory = await temporaryDirectory("debateai-rotate-support-batch-");
     const { duringPath, previousPath } = await ports(directory);
     const before = await createSupportKeyPort({ supportKekPath: previousPath });
     const rows: SupportWrappedKeyRow[] = [];
-    for (let index = 0; index < SUPPORT_ROTATION_BATCH_SIZE + 3; index += 1) {
+    for (let index = 0; index < batchSize + 2; index += 1) {
       const ref = `${index.toString(16).padStart(8, "0")}-1111-4111-8111-111111111111`;
       const lease = await before.createDataKey({ kind: "session", ref });
       rows.push({
@@ -301,11 +301,11 @@ describe("V-3 rotate: the support rows behind the repository seam", () => {
     const during = await createSupportKeyPort({
       supportKekPath: duringPath, previousSupportKekPath: previousPath
     });
-    const report = await rotateSupportKeys(repository, during);
+    const report = await rotateSupportKeys(repository, during, batchSize);
     expect(report.counts.rewrapped).toBe(rows.length);
     // One transaction per batch, never one per row: the integrity assertion is
     // a full-table scan that serialises on a guard row.
-    expect(repository.batches).toEqual([SUPPORT_ROTATION_BATCH_SIZE, 3]);
+    expect(repository.batches).toEqual([batchSize, 2]);
     await during.close();
   });
 });

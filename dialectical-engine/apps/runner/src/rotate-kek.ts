@@ -62,7 +62,7 @@ export interface SupportKeyRotationRepository {
  * interrupted batch repeats — nothing is half-written, because a batch is one
  * transaction, and the re-done rows are already-current no-ops on resume.
  */
-export const SUPPORT_ROTATION_BATCH_SIZE = 100;
+const SUPPORT_ROTATION_BATCH_SIZE = 100;
 
 export type RotationCounts = Readonly<{
   rewrapped: number;

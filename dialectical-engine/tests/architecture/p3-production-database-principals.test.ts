@@ -356,6 +356,11 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "apps/api", environmentKey: "AUTHORIZATION_DATABASE_URL", purpose: "STEP_UP_SESSION_ROTATION", binding: "WIRED" },
         { component: "apps/api", environmentKey: "PUBLICATION_CLEANUP_DATABASE_URL", purpose: "PUBLICATION_KEY_CLEANUP", binding: "WIRED_WHEN_ENABLED", condition: "PUBLICATION_ENABLED=true" },
         { component: "apps/api", environmentKey: "SUPPORT_DATABASE_URL", purpose: "SUPPORT_DATA_PLANE", binding: "WIRED" },
+        // V-3. `pnpm exec tsx apps/runner/src/rotate-kek-cli.ts` re-wraps
+        // support.session_key and support.case_key under a new master key. It is
+        // the same principal as the support data plane because that principal is
+        // the only one granted UPDATE on those two columns (0054:884-885).
+        { component: "apps/runner", environmentKey: "SUPPORT_DATABASE_URL", purpose: "SUPPORT_KEK_ROTATION", binding: "WIRED" },
         { component: "apps/runner", environmentKey: "DATABASE_URL", purpose: "RUNNER_PRODUCT_RUNTIME", binding: "WIRED" },
         { component: "apps/scheduler:replay-self-test", environmentKey: "REPLAY_SELF_TEST_DATABASE_URL", purpose: "REPLAY_SELF_TEST", binding: "WIRED" },
         { component: "apps/scheduler:liveness", environmentKey: "LIVENESS_DATABASE_URL", purpose: "LIVENESS_SWEEP", binding: "WIRED" },
