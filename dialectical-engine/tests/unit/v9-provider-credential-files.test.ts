@@ -371,6 +371,59 @@ describe("V-9 the local dev stack refuses a credential file it cannot honour", (
 });
 
 /**
+ * Re-review finding 1. The kit's refusal table had gone stale within one round:
+ * it still mapped an absent credential file to the KEK code the translation had
+ * just removed. A table an operator reads during an incident may not drift, so
+ * the codes are read OUT OF THE SOURCE and every one of them must appear in §11.
+ */
+describe("V-9 the kit names every refusal the credential path can emit", () => {
+  it("lists each code the resolver can produce, read from the source", async () => {
+    const providers = await readFile(
+      new URL("../../packages/providers/src/index.ts", import.meta.url), "utf8"
+    );
+    const closedSet = providers.slice(
+      providers.indexOf("const PROVIDER_CREDENTIAL_REFUSAL_CODES"),
+      providers.indexOf("] as const);", providers.indexOf("const PROVIDER_CREDENTIAL_REFUSAL_CODES"))
+    );
+    const codes = [...closedSet.matchAll(/"([A-Z_]+)"/gu)].map((match) => match[1]!);
+    expect(codes.length).toBeGreaterThan(0);
+    const absent = /const PROVIDER_CREDENTIAL_ABSENT_CODE = "([A-Z_]+)"/u.exec(providers)?.[1];
+    expect(absent).toBe("PROVIDER_CREDENTIAL_FILE_ABSENT");
+    const readme = await readFile(
+      new URL("../../deploy/vps/README.md", import.meta.url), "utf8"
+    );
+    const section = readme.slice(readme.indexOf("## 11. Providers and vendors"));
+    for (const code of [...codes, absent!, "PROVIDER_AUTHORIZATION_FILE_ABSENT"]) {
+      expect(section, code).toContain(code);
+    }
+    // ...and it may no longer promise a code the credential reader cannot emit.
+    expect(codes).not.toContain("KEK_UNRESOLVED");
+    expect(section).not.toContain("PROVIDER_AUTHORIZATION_FILE_UNUSABLE:<ref>:KEK_UNRESOLVED");
+  });
+
+  /**
+   * Re-review finding 3. `isThisMachineHost` decides on the LITERAL address in
+   * the URL; it performs no name resolution, so a public name with an A record
+   * of 127.0.0.1 is admitted. The comment and the kit must say that, because an
+   * operator who believes otherwise will not check the hostname themselves.
+   */
+  it("states plainly that the check is literal, not resolved", async () => {
+    const providers = await readFile(
+      new URL("../../packages/providers/src/index.ts", import.meta.url), "utf8"
+    );
+    expect(providers).not.toContain("no target that resolves to THIS MACHINE");
+    expect(providers).toMatch(/LITERAL address/u);
+    expect(providers).toMatch(/no name resolution/u);
+    const readme = await readFile(
+      new URL("../../deploy/vps/README.md", import.meta.url), "utf8"
+    );
+    const section = readme.slice(readme.indexOf("## 11. Providers and vendors"));
+    expect(section).toMatch(/real public name/u);
+    expect(section).toMatch(/resolves to this machine/u);
+  });
+});
+
+/**
  * Review finding 4. The one-printable-header-line rule is enforced twice on
  * purpose — once where the file is read (`@debateai/crypto`) and once at the
  * resolution boundary, where the reader is an injected seam. `@debateai/providers`

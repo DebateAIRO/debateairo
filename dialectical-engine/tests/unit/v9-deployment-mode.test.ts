@@ -60,6 +60,29 @@ const TARGET_KINDS = Object.freeze({
   "ipv6-loopback-expanded-https": { base_url: "https://[0:0:0:0:0:0:0:1]/v1" },
   "unspecified-ipv4-https": { base_url: "https://0.0.0.0/v1" },
   "unspecified-ipv6-https": { base_url: "https://[::]/v1" },
+  // Re-review finding 2: the rest of "this machine" as a host actually spells it.
+  // The three names are default `/etc/hosts` aliases on a Debian/Ubuntu host —
+  // the kit's own platform — and the two ranges are addresses a relay can be
+  // bound to on the web server itself.
+  "localhost-localdomain-https": { base_url: "https://localhost.localdomain/v1" },
+  "localhost-localdomain-dot-https": { base_url: "https://LOCALHOST.LOCALDOMAIN./v1" },
+  "ip6-localhost-name-https": { base_url: "https://ip6-localhost/v1" },
+  "ip6-loopback-name-https": { base_url: "https://ip6-loopback/v1" },
+  "this-network-https": { base_url: "https://0.0.0.1/v1" },
+  "this-network-high-https": { base_url: "https://0.1.2.3/v1" },
+  "link-local-ipv4-https": { base_url: "https://169.254.169.254/v1" },
+  "link-local-ipv4-low-https": { base_url: "https://169.254.0.1/v1" },
+  "link-local-ipv6-https": { base_url: "https://[fe80::1]/v1" },
+  "link-local-ipv6-top-https": { base_url: "https://[febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff]/v1" },
+  "ipv4-mapped-link-local-https": { base_url: "https://[::ffff:169.254.1.1]/v1" },
+  "ipv4-mapped-this-network-https": { base_url: "https://[::ffff:0.0.0.1]/v1" },
+  // Controls just OUTSIDE each new range, which must stay admitted.
+  "vendor-below-link-local-https": { base_url: "https://169.253.0.1/v1" },
+  "vendor-public-resolver-https": { base_url: "https://1.0.0.1/v1" },
+  "vendor-below-fe80-https": { base_url: "https://[fe00::1]/v1" },
+  "vendor-above-fe80-https": { base_url: "https://[fec0::1]/v1" },
+  "vendor-localdomain-suffix-https": { base_url: "https://localhost.localdomain.example/v1" },
+  "vendor-ip6-name-suffix-https": { base_url: "https://ip6-localhost.example/v1" },
   // NEGATIVE controls: real vendor hostnames that merely LOOK loopback-ish. A
   // deny-list that refused these would be an outage, not a protection.
   "vendor-loopback-lookalike-https": { base_url: "https://127.0.0.1.vendor.example/v1" },
@@ -125,7 +148,19 @@ const TABLE = Object.freeze([
     "ipv4-mapped-loopback-alias-https",
     "ipv6-loopback-expanded-https",
     "unspecified-ipv4-https",
-    "unspecified-ipv6-https"
+    "unspecified-ipv6-https",
+    "localhost-localdomain-https",
+    "localhost-localdomain-dot-https",
+    "ip6-localhost-name-https",
+    "ip6-loopback-name-https",
+    "this-network-https",
+    "this-network-high-https",
+    "link-local-ipv4-https",
+    "link-local-ipv4-low-https",
+    "link-local-ipv6-https",
+    "link-local-ipv6-top-https",
+    "ipv4-mapped-link-local-https",
+    "ipv4-mapped-this-network-https"
   ] as const).map((kind) => ({
     kind,
     hosted: "PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
@@ -135,7 +170,13 @@ const TABLE = Object.freeze([
   ...([
     "vendor-loopback-lookalike-https",
     "vendor-notlocalhost-https",
-    "vendor-localhost-suffix-https"
+    "vendor-localhost-suffix-https",
+    "vendor-below-link-local-https",
+    "vendor-public-resolver-https",
+    "vendor-below-fe80-https",
+    "vendor-above-fe80-https",
+    "vendor-localdomain-suffix-https",
+    "vendor-ip6-name-suffix-https"
   ] as const).map((kind) => ({
     kind, hosted: null, localProduction: null, localDevelopment: null
   }))

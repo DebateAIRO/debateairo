@@ -317,8 +317,35 @@ function ipv4Octets(value: string): readonly number[] | undefined {
 }
 
 /**
+ * Names that mean this machine on the kit's own platform: `localhost` plus the
+ * three aliases a stock Debian/Ubuntu `/etc/hosts` ships with. `.localhost` is
+ * handled as a suffix below — RFC 6761 reserves the whole subtree.
+ */
+const THIS_MACHINE_NAMES = new Set([
+  "localhost", "localhost.localdomain", "ip6-localhost", "ip6-loopback"
+]);
+
+/**
+ * An IPv4 address that cannot leave this machine or this link:
+ * `127.0.0.0/8` (loopback), `0.0.0.0/8` ("this network", which the stack treats
+ * as the local host) and `169.254.0.0/16` (link-local, where a relay bound to the
+ * web server's own autoconfigured address would sit).
+ */
+function isThisMachineIpv4(octets: readonly number[]): boolean {
+  return octets[0] === 127
+    || octets[0] === 0
+    || (octets[0] === 169 && octets[1] === 254);
+}
+
+/**
  * V-9(c), review finding 1 — "is this address THIS MACHINE?", decided on the
  * PARSED address rather than on the spelling.
+ *
+ * It reads the LITERAL address written in the target's `base_url` and performs
+ * NO NAME RESOLUTION: a public hostname whose A record points at `127.0.0.1` is
+ * admitted here, and the operator is told so in the kit (README §11). A
+ * resolved-address check is a separate control this function does not pretend to
+ * be.
  *
  * The four-spelling permit-list above, read as a deny-list, admitted every alias
  * of loopback: `127.0.0.2`, `127.1`, `localhost.`, `relay.localhost`,
@@ -327,13 +354,16 @@ function ipv4Octets(value: string): readonly number[] | undefined {
  * (`NODE_EXTRA_CA_CERTS`) and already runs internal TLS on loopback, so a TLS
  * relay on any of those aliases would have passed the hosted check.
  *
- * Refused: the whole `127.0.0.0/8` range, the unspecified addresses `0.0.0.0` and
- * `::`, `::1`, an IPv4-mapped or IPv4-compatible IPv6 form of either, and the
- * name `localhost` or anything under `.localhost` (RFC 6761 reserves it for this
- * machine). Case and one trailing dot are normalised away first.
+ * Refused: `127.0.0.0/8`, `0.0.0.0/8` and `169.254.0.0/16`; `::`, `::1` and
+ * `fe80::/10`; an IPv4-mapped or IPv4-compatible IPv6 form of any of the IPv4
+ * ranges; and the names `localhost`, `localhost.localdomain`, `ip6-localhost`,
+ * `ip6-loopback` or anything under `.localhost`. Case and one trailing dot are
+ * normalised away first.
  *
  * NOT refused: a real vendor whose name merely looks loopback-ish, such as
- * `127.0.0.1.vendor.example` or `notlocalhost.example`. A deny-list that refused
+ * `127.0.0.1.vendor.example`, `notlocalhost.example` or
+ * `localhost.localdomain.example`; and addresses just outside each range, such as
+ * `169.253.0.1`, `1.0.0.1`, `[fe00::1]` and `[fec0::1]`. A deny-list that refused
  * those would be an outage rather than a protection.
  */
 export function isThisMachineHost(hostname: string): boolean {
@@ -341,20 +371,24 @@ export function isThisMachineHost(hostname: string): boolean {
     ? hostname.slice(1, -1)
     : hostname;
   const host = bare.toLowerCase().replace(/\.$/u, "");
-  if (host === "localhost" || host.endsWith(".localhost")) return true;
+  if (THIS_MACHINE_NAMES.has(host) || host.endsWith(".localhost")) return true;
   const octets = ipv4Octets(host);
-  if (octets !== undefined) {
-    return octets[0] === 127 || octets.every((octet) => octet === 0);
-  }
+  if (octets !== undefined) return isThisMachineIpv4(octets);
   const groups = ipv6Groups(host);
   if (groups === undefined) return false;
-  if (groups.every((group) => group === 0)) return true;
+  // fe80::/10 — the link-local block, where an interface's autoconfigured
+  // address lives. A relay bound to the web server's own fe80: address is on
+  // this machine by any reading.
+  if ((groups[0]! & 0xffc0) === 0xfe80) return true;
   const leadingZeroes = groups.slice(0, 5).every((group) => group === 0);
   if (leadingZeroes && groups[5] === 0 && groups[6] === 0 && groups[7] === 1) return true;
   // `::ffff:a.b.c.d` (mapped) and `::a.b.c.d` (compatible) both carry an IPv4
-  // address in the last two groups; neither may reach this machine either.
+  // address in the last two groups — `::` itself is `::0.0.0.0` — so the same
+  // IPv4 decision settles them. That is what keeps the two families in step.
   if (leadingZeroes && (groups[5] === 0xffff || groups[5] === 0)) {
-    return (groups[6]! >> 8) === 127 || (groups[6] === 0 && groups[7] === 0);
+    return isThisMachineIpv4([
+      groups[6]! >> 8, groups[6]! & 0xff, groups[7]! >> 8, groups[7]! & 0xff
+    ]);
   }
   return false;
 }
@@ -389,9 +423,11 @@ export function assertProductionProviderTargets(
  *
  * - every base URL is `https:` — a cleartext hop would carry the vendor credential and every
  *   prompt in the clear, and there is no loopback exception here (see below);
- * - no target that resolves to THIS MACHINE (`isThisMachineHost`, decided on the parsed address
- *   and not on the spelling) — a relay or a local model server on the web server is precisely the
- *   local-mode path V ruled must not run hosted (V-30(1) says the same for the support chat);
+ * - no target whose base URL NAMES this machine (`isThisMachineHost`, decided on the parsed
+ *   LITERAL address and not on the spelling; it does no name resolution, so a public hostname
+ *   pointed at loopback is the operator's responsibility — README §11 says so) — a relay or a
+ *   local model server on the web server is precisely the local-mode path V ruled must not run
+ *   hosted (V-30(1) says the same for the support chat);
  * - no credential inline in `PROVIDER_DISCOVERY_TARGETS_JSON`. Hosted credentials live in
  *   custody-checked FILES (`authorization_file`, task 10b), so a bearer token can never sit in
  *   an `EnvironmentFile`, in `/proc/<pid>/environ` or in a process listing.
@@ -437,10 +473,21 @@ export function assertDeploymentProviderTargets(
  */
 const PROVIDER_CREDENTIAL_ABSENT_CODE = "PROVIDER_CREDENTIAL_FILE_ABSENT";
 
-/** The refusal codes `resolveProviderTargetCredentials` will repeat; anything else is UNKNOWN. */
+/**
+ * The refusal codes `resolveProviderTargetCredentials` will repeat; anything else
+ * is UNKNOWN. This is an INVENTORY of what the shipped reader can emit, and the
+ * kit's §11 table is pinned against it, so the two cannot drift.
+ *
+ * `KEK_UNRESOLVED` was dropped here: `readCustodyAuthorizationHeader` translates
+ * it to `PROVIDER_CREDENTIAL_FILE_ABSENT` at source, so nothing on this path can
+ * produce it any more and listing it would promise an operator a code they will
+ * never see. `CUSTODY_GROUP_UNRESOLVED` stays: the group is resolved eagerly at
+ * boot today, but `@debateai/crypto`'s own reader deliberately carries that error
+ * through its catch rather than collapsing it, and if that resolution ever
+ * becomes lazy the operator must still be told the real reason instead of UNKNOWN.
+ */
 const PROVIDER_CREDENTIAL_REFUSAL_CODES = Object.freeze([
   "SECRET_CUSTODY_INVALID",
-  "KEK_UNRESOLVED",
   "CUSTODY_GROUP_UNRESOLVED",
   "PROVIDER_CREDENTIAL_FILE_INVALID"
 ] as const);
