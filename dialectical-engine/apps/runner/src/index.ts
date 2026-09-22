@@ -135,6 +135,42 @@ export const RUNNER_COMPOSITION_SEGMENT_CAP = ENGINE_COMPOSITION_SEGMENT_CAP;
 export const RUNNER_FIXED_ORGANS_PER_COMPOSITION = ENGINE_FIXED_ORGANS_PER_COMPOSITION;
 export const RUNNER_MAX_RECOMPOSE = ENGINE_MAX_RECOMPOSE;
 
+/**
+ * V-28 (DL4-F2) — WHICH CEILING STOPPED THE RUN, if either did.
+ *
+ * Two independent bounds refuse the next provider call, and the serve leg's
+ * catch has to tell them apart from a genuine failure, which must keep
+ * travelling. Both end the run the same way — the components-only envelope
+ * terminal, which serves the nodes already verified — but they are reached by
+ * different questions and are lifted by different operator actions, so the
+ * distinction is named rather than inferred from a count.
+ */
+export const ENVELOPE_STOP_CODES = Object.freeze({
+  /** The attempt ceiling pinned on the run head (`assertModelAttemptAllowed`). */
+  RUN_COST_ENVELOPE_EXHAUSTED: "ATTEMPTS",
+  /** The money ceiling sealed in `costEnvelopePolicy` (the gateway's seam). */
+  RUN_COST_ENVELOPE_MONEY_REACHED: "MONEY"
+} as const);
+
+export type EnvelopeStopKind = typeof ENVELOPE_STOP_CODES[keyof typeof ENVELOPE_STOP_CODES];
+
+/** The condition-mark record's reason, per stop: the operator's lift differs. */
+const ENVELOPE_STOP_REASONS: Readonly<Record<EnvelopeStopKind, string>> = Object.freeze({
+  ATTEMPTS: "RUN_COST_ENVELOPE_EXHAUSTED",
+  MONEY: "RUN_COST_ENVELOPE_MONEY_REACHED"
+});
+
+/**
+ * `null` for anything that is not one of the two envelope refusals — including
+ * `PROVIDER_USAGE_UNREPORTED`, which is a refusal to TRUST a vendor rather than
+ * a bound being reached, and therefore a failure the run must not paper over
+ * with a components-only answer.
+ */
+export function envelopeStopKind(error: unknown): EnvelopeStopKind | null {
+  if (!(error instanceof TypedDomainError)) return null;
+  return ENVELOPE_STOP_CODES[error.code as keyof typeof ENVELOPE_STOP_CODES] ?? null;
+}
+
 const compositionSchema = z.object({
   segments: z.array(z.object({
     segment_id: z.string().trim().min(1),
@@ -3965,11 +4001,15 @@ export class WalkingSkeletonRunner {
      * max` those two have opposite answers, and before this argument existed
      * both were being derived from the post-consumption count alone.
      */
-    const evaluateEnvelope = (pendingModelAttempts = 0): Promise<BudgetPressureDecision> =>
+    const evaluateEnvelope = (
+      pendingModelAttempts = 0,
+      moneyEnvelopeReached = false
+    ): Promise<BudgetPressureDecision> =>
       this.#budget.evaluateRunPressure({
         runId: run.runId,
         basis: envelopeBasis,
         pendingModelAttempts,
+        moneyEnvelopeReached,
         pendingRows: BATTERY_BUDGET_CONTRACTS
           .filter((row) => row.budgetClass === "ENRICHMENT" || row.skipPolicy === "PROTECTED_CORE_REFUSES_SKIP")
           .map((row) => ({ batteryRowId: row.batteryRowId, affectedNodeIds: [servedRoot.nodeId] })),
@@ -3984,7 +4024,15 @@ export class WalkingSkeletonRunner {
       decision
     });
     const makeEnvelopeTerminal = async (
-      decision: Extract<BudgetPressureDecision, { kind: "HARD_STOP" }>
+      decision: Extract<BudgetPressureDecision, { kind: "HARD_STOP" }>,
+      /**
+       * V-28: WHICH ceiling stopped the run. The terminal and its condition mark
+       * are the same for both — the answer a reader gets is components-only
+       * either way — but the RECORD says which bound was reached, because
+       * "re-ask with more attempts" and "re-ask with more money" are different
+       * things for the operator to do and the lift path must not lie about it.
+       */
+      stop: EnvelopeStopKind = "ATTEMPTS"
     ) => {
       await recordEnvelope(decision);
       finalSegments = [];
@@ -4005,7 +4053,7 @@ export class WalkingSkeletonRunner {
           mark: decision.terminal.conditionMark,
           scope: "answer",
           subjectRef: run.runId,
-          reason: "RUN_COST_ENVELOPE_EXHAUSTED",
+          reason: ENVELOPE_STOP_REASONS[stop],
           liftPath: null,
           servedRootRule: null,
           affectedNodeIds: decision.terminal.servedNodeIds
@@ -4303,7 +4351,8 @@ export class WalkingSkeletonRunner {
       })
         }));
       } catch (error) {
-        if (!(error instanceof TypedDomainError) || error.code !== "RUN_COST_ENVELOPE_EXHAUSTED") throw error;
+        const stop = envelopeStopKind(error);
+        if (stop === null) throw error;
         // The gateway REFUSED a next provider call, so the question here is
         // whether one more attempt fits — not whether the run has overspent.
         // Asking with the pending attempt counted is what makes this context
@@ -4311,7 +4360,14 @@ export class WalkingSkeletonRunner {
         // WITHIN and keeps its answer, while this refused attempt is a
         // HARD_STOP and gets the ruled components-only terminal instead of a
         // rethrow that produced no envelope record at all.
-        const exhausted = await evaluateEnvelope(1);
+        //
+        // V-28: a MONEY refusal asks neither of those questions. The run may
+        // have dozens of attempts left and still be unable to pay for one, so
+        // the pending attempt is 0 (it would be a falsehood about the attempt
+        // ledger) and the hard stop is asserted on its own footing.
+        const exhausted = stop === "MONEY"
+          ? await evaluateEnvelope(0, true)
+          : await evaluateEnvelope(1);
         // NO restatement conjunct. F4 / goal 248-251: the protected-core guard
         // was keyed on R9's gate-hood and is KNOWINGLY RETIRED with it, so the
         // envelope terminal fires on HARD_STOP whenever no served statement
@@ -4320,7 +4376,7 @@ export class WalkingSkeletonRunner {
         // The two changes are orthogonal and both stand: T17B's `pendingModelAttempts`
         // fixes WHICH question is asked, F4 removes a guard from the answer.
         if (exhausted.kind !== "HARD_STOP") throw error;
-        result = await makeEnvelopeTerminal(exhausted);
+        result = await makeEnvelopeTerminal(exhausted, stop);
       }
       if (!result.conditionMarks.includes("DEFECT") && !result.conditionMarks.includes("ENVELOPE_EXHAUSTED")) {
         const finalEnvelopeDecision = await evaluateEnvelope();

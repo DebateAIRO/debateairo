@@ -274,6 +274,22 @@ export function decideBudgetPressure(input: {
    * guessing from a number that cannot distinguish them.
    */
   readonly pendingModelAttempts?: number;
+  /**
+   * V-28 (DL4-F2) — THE SECOND REASON A RUN CAN HARD-STOP.
+   *
+   * The attempt ceiling and the money ceiling are independent bounds on the same
+   * run: a cheap topology can exhaust its attempts with money to spare, and one
+   * expensive call can spend the money with dozens of attempts untouched. When
+   * the gateway refuses on money this flag says so, and the run takes the SAME
+   * components-only terminal the attempt ceiling has always taken — so the
+   * money stop inherits every guarantee that path carries (the verified
+   * components are served, a served statement is never retracted, DEFECT and
+   * ENVELOPE_EXHAUSTED stay independent) instead of growing a second one.
+   *
+   * `consumedModelAttempts` is still reported as it stands: the run did not
+   * overspend attempts, and saying it did would be a falsehood on the record.
+   */
+  readonly moneyEnvelopeReached?: boolean;
   readonly pendingRows: readonly PendingBudgetRow[];
   readonly verifiedNodeIds: readonly string[];
 }): BudgetPressureDecision {
@@ -300,7 +316,8 @@ export function decideBudgetPressure(input: {
    * character-for-character J28's comparison, and the refusal context supplies
    * the 1 that makes its own question the one being answered.
    */
-  if (input.consumedModelAttempts + pendingModelAttempts <= input.basis.maxModelAttempts) {
+  if (input.moneyEnvelopeReached !== true
+    && input.consumedModelAttempts + pendingModelAttempts <= input.basis.maxModelAttempts) {
     return Object.freeze({
       kind: "WITHIN_ENVELOPE",
       state: "WITHIN",
@@ -432,6 +449,8 @@ export class BudgetRepository {
     readonly basis: CostEnvelopeBasis;
     /** T17B/B1 — see `decideBudgetPressure`: which question the caller is asking. */
     readonly pendingModelAttempts?: number;
+    /** V-28 — see `decideBudgetPressure`: the money ceiling refused the next call. */
+    readonly moneyEnvelopeReached?: boolean;
     readonly pendingRows: readonly PendingBudgetRow[];
     readonly verifiedNodeIds: readonly string[];
   }): Promise<BudgetPressureDecision> {
@@ -441,6 +460,7 @@ export class BudgetRepository {
       // Resolved here rather than forwarded as `undefined`: the repo builds under
       // `exactOptionalPropertyTypes`, so an absent caller means 0, explicitly.
       pendingModelAttempts: input.pendingModelAttempts ?? 0,
+      moneyEnvelopeReached: input.moneyEnvelopeReached ?? false,
       pendingRows: input.pendingRows,
       verifiedNodeIds: input.verifiedNodeIds
     });
