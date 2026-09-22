@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { TypedDomainError } from "@debateai/kernel";
-import type { CallBound, PromptPacket } from "@debateai/providers";
+import { buildFramedPrompt, type CallBound, type PromptContract, type PromptPacket } from "@debateai/providers";
 
 export const CONSUMER_PROMPT_VERSION = 1 as const;
 export const CONSUMER_MAX_PROVIDER_ATTEMPTS = 2 as const;
@@ -212,13 +212,11 @@ export function buildEvaluatorConsumerPrompt(
       name: domain.name
     })))
   });
-  return Object.freeze({ messages: Object.freeze([
-    Object.freeze({
-      role: "system" as const,
-      content: "Interpret deterministic evaluator aggregates and untrusted anonymous samples. Name the bias pattern in plain language, summarize capability for the supplied domain, and flag only listed adjacent domains. Never infer identity, authorship, routing, or numeric values. Return strict JSON with bias_pattern_name, capability_summary, and adjacent_domain_flags only."
-    }),
-    Object.freeze({ role: "user" as const, content: JSON.stringify(payload) })
-  ]) });
+  // V-11 addendum: the aggregate carries anonymous SAMPLES of model output.
+  return buildFramedPrompt({
+    contract: CONSUMER_AGGREGATE_PROMPT_CONTRACT,
+    material: [{ name: "evaluator_aggregate", content: JSON.stringify(payload) }]
+  }).packet;
 }
 
 function assertConsumerIsolation(
@@ -503,3 +501,15 @@ export async function runEvaluatorConsumerRefresh(input: {
     state, outputsInserted, outputsCurrent, inFlight, retryLimited, failures
   });
 }
+
+
+/**
+ * V-11 addendum: the consumer's prompt contract. Text unchanged; the
+ * instruction half and the answer-form half now sit in their own slots and the
+ * aggregate rides the fence.
+ */
+export const CONSUMER_AGGREGATE_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: "evaluator.consumer-aggregate.v1",
+  instruction: "Interpret deterministic evaluator aggregates and untrusted anonymous samples. Name the bias pattern in plain language, summarize capability for the supplied domain, and flag only listed adjacent domains. Never infer identity, authorship, routing, or numeric values.",
+  answerForm: "Return strict JSON with bias_pattern_name, capability_summary, and adjacent_domain_flags only."
+});
