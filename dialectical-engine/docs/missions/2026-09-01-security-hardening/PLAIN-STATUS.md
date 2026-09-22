@@ -114,11 +114,14 @@ You asked for the building to be done by a team: **I (Claude Fable 5.1) coordina
 |---|---|---|
 | 1 | The second bringing-up-to-date with `dev` | **paused until 11:51 today** — all 8 collisions are resolved; the install stopped because `dev`'s new test tool is 10 hours short of your "packages must be 7 days old" rule, and I chose to wait rather than bend the rule (the agent resumes automatically) |
 | 2 | Repository hygiene: the dormant pre-push folder, the half gigabyte of recordings, the expired package exceptions, the package bot's 7-day wait, the stricter rule for the list of known-failing tests | **done, reviewed, merged** — built test-first; an independent reviewer found one weak test (it checked an empty list) which was fixed and re-reviewed; the checkout is 515 MB lighter |
-| 3 | The memory test re-measured under Node 26 | instructions written; runs alone, on a quiet machine |
+| 3 | The memory test re-measured under Node 26 | **built, under review** — measured 14 times on the quiet machine (233–255 MB); I ruled one extra step of headroom (fence at 288 MB), because the old rule would have left under 1 MB of margin and a fence that fails on noise gets ignored; the test now runs on this Mac instead of skipping, and the automatic check reports **zero** new failures for the first time |
 | 4 | Three small hardenings of the login surface (V-14, V-22, the e-mail-verification order) | **done, reviewed, merged** — approved on every point of your rulings; one safety-net test was fragile and was hardened and re-reviewed |
 | 5 | Three database items (V-17, V-29, the tamper check) | instructions written; **needs Docker running on this Mac** — it was not running when I checked |
 | 6 | Keys: the "team badge", then changing a master key | **done, reviewed, merged** — the hardest package so far. Three review rounds: the reviewer caught two "green report that lies" holes in the rotation (the support chat's final check would have accepted the *old* key; a key store the command never opened counted as a clean pass) — both fixed and re-checked. Rotation covers all three master keys; the rehearsal runs on a throwaway copy. One test that needs a database has not run yet (Docker) |
-| 7–10 | Data encryption and deletion, the support-chat leftovers, prompt-injection containment, AI vendors and spending ceilings | instructions being written |
+| 8 | The support-chat leftovers from the September re-check (eight findings) | **an agent is working on it** |
+| 9 | Prompt-injection containment plus the five extra layers, on the "safety frame + your instruction text" split | **an agent is working on it** (the largest package) |
+| 10 | The two deployment modes enforced in code; AI-vendor keys in the locked key folder; vendors as configuration; the GPU settings made optional | **an agent is working on it** |
+| 7, 11, 12, 14, 15 | Data encryption and deletion (needs Docker); the spending ceilings; the support chat on the paid path; the server kit; dev leftovers | instructions written; queued behind the packages above |
 
 Still true: nothing is pushed and no switch on your accounts is flipped without your "go" at that moment.
 
