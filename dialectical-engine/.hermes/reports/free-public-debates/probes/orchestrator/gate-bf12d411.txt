@@ -1,0 +1,8 @@
+head bf12d411 dirty 1
+tsc=17
+tests/integration/dev-api-process.test.ts rc=0  Tests 10 passed (10)
+tests/integration/dev-database-principals.test.ts rc=0  Tests 16 passed (16)
+tests/unit/v2ui-data-layer.test.ts rc=1  Tests 1 failed | 59 passed (60)
+tests/unit/evaluator-profiles.test.ts rc=1  Tests 2 failed | 5 passed (7)
+tests/render/t5-drawer.test.tsx rc=0  Tests 7 passed (7)
+CLUSTER_GREEN
