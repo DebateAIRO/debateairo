@@ -6,7 +6,7 @@
 
 ### The support-chat test bench is measuring again (22 September, evening)
 
-The support chat has a test bench: 60 scripted visitor questions, run three times against the real support code with a stand-in AI, checking each answer's outcome, language, cited help entries and that no forbidden action was taken. Since the privacy fix earlier today (a visitor's network address is now stored as a keyed code nobody can reverse, instead of a plain hash) the bench had scored **0 of 60 on every run**. The answers were not wrong: the bench itself handed the database a text label where the database's rule for that column only accepts the 64-character keyed code, so every test conversation was refused before it started. The bench now derives the code exactly the way production does. One file changed, committed on the work branch, nothing pushed: [tests/support-eval/run.ts](../../../tests/support-eval/run.ts).
+The support chat has a test bench: 60 scripted visitor questions, run three times against the real support code with a stand-in AI, checking each answer's outcome, language, cited help entries and that no forbidden action was taken. Since the privacy fix earlier today (a visitor's network address is now stored as a keyed code nobody can reverse, instead of a plain hash) the bench had scored **0 of 60 on every run**. The answers were not wrong: the bench itself handed the database a text label where the database's rule for that column only accepts the 64-character keyed code, so every test conversation was refused before it started. The bench now derives the code exactly the way production does. Committed and merged on 22 September (the same derivation landed through a small helper with its own test, which also reads the database's rule straight out of the migration file, so the bench cannot drift from it again): [tests/support-eval/run.ts](../../../tests/support-eval/run.ts). Nothing pushed.
 
 | | Before the fix | After the fix |
 |---|---|---|
@@ -23,6 +23,23 @@ PENDING is the best result this bench can give on its own, on purpose: it will o
 | The work branch | `security/dev-sync-2026-09-18`, clean, **nothing pushed anywhere** |
 | This Mac's Node version (Node is the program that runs the code) | 26.8.2 — exactly what `dev` now requires |
 | `dev`, the main V3 line | has moved on by 36 commits since this branch last absorbed it |
+
+### The final review and its fix wave — done (22 September, evening)
+
+Six independent reviewers (Claude Fable 5.1, one per area) read everything this execution added. Five areas passed; **one did not: the master keys.** Then five fix packages were built, reviewed and merged. Everything is verified on the combined branch. Full record: [FINAL-REVIEW-2026-09-22.md](FINAL-REVIEW-2026-09-22.md).
+
+| Area | Verdict | The finding that mattered | Fixed? |
+|---|---|---|---|
+| Master keys, custody | **not approved** | Changing a master key was built in the key library and the rotation command, but the website and the engine never read the *previous* key — following the runbook would have taken the site down, and the one order that avoided the outage would have lost a user's data | yes — both services read both keys during a changeover; the rotation checks every record twice; the runbook is rewritten in the order that works |
+| Prompt-injection containment | approved | The support chat talked to the AI model with no safety frame — the one place the "one frame at every hand-off" rule was not met | yes |
+| Deployment modes and money | approved | A normal OpenAI reply carries an extra field the code refused, so nothing was charged and both money ceilings were blind for that vendor. The first fix was itself caught by an independent re-check: one bad reply could have charged 2 million times the admitted amount | yes — a bad receipt can never charge more than what the gate allowed |
+| Support chat and website | approved | The support case link was left in the browser's storage, so the next visitor on a shared tab inherited the case | yes |
+| Automatic checks, server kit, records | approved | The server kit's rotation section was wrong for the reason above; two required settings were missing from the example | yes, plus a banner marking what package 14 still refreshes |
+| The engine room's main file | approved | The code that stops a debate on money was pinned by no test the automatic check runs | yes |
+
+Verified on the combined branch after all merges, in a clean copy: type check 0 errors · automatic check **0 new failures** (5 known, 0 stale) · no known-vulnerable packages · website builds, 136/136 tests, security smoke PASS · engine observation binding 6/6.
+
+**Still nothing pushed.** Three things are yours: the GitHub switches and the word "push"; Docker for the database-backed tests ([the Docker window](DOCKER-WINDOW-2026-09-22.md)); and the go-live lines that came out of the review ([GO-LIVE-CHECKLIST.md](GO-LIVE-CHECKLIST.md)).
 
 ### Your decisions — progress
 
