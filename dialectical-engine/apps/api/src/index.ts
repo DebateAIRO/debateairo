@@ -1119,9 +1119,14 @@ export const AUTH_BODY_LIMIT_BYTES = 16_384 as const;
 export const API_REQUEST_TIMEOUT_MS = 30_000 as const;
 export const API_MAX_PARAM_LENGTH = 100 as const;
 /**
- * The sealed password policy carries no maximum length (register rows are
- * V-ruled); the request shape is bounded here instead so an unbounded
- * password can never reach Argon2. A register-row maximum is proposed to V.
+ * The request-shape bound, in UTF-8 bytes, so an unbounded password can never
+ * reach Argon2. V-14 (ruled 2026-09-21) also made the maximum register policy:
+ * a deployment register publishes a superseding `passwordPolicy` row carrying
+ * `max_length: 1024`, which `RegistrationService` enforces beside the ruled
+ * minimum, counted in UTF-16 code units. This bound stays, and stays first: it
+ * is never looser than the policy rule (UTF-8 bytes are never fewer than UTF-16
+ * code units) and it is the only ceiling for a register version that publishes
+ * no maximum.
  */
 export const AUTH_PASSWORD_MAX_BYTES = 1_024 as const;
 /**

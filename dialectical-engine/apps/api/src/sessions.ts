@@ -27,7 +27,7 @@ import {
   type ReadableUserDekStore,
   type TokenKind
 } from "@debateai/crypto";
-import { AuthFlowError } from "./registration.js";
+import { AuthFlowError, storedArgon2EnvelopeNotOverPolicy } from "./registration.js";
 import { MfaVerificationLimiter } from "./mfa.js";
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
@@ -314,7 +314,19 @@ export class SessionService implements SessionApplication {
         createEmailBlindIndex(this.dependencies.blindIndexKey, normalizedEmail)
       );
       const passwordHash = identity?.passwordHash ?? this.dependencies.dummyPasswordHash;
-      const verified = await verifyPassword(this.dependencies.argon2, passwordHash, input.password);
+      // V-22. A stored envelope over twice the password policy never reaches
+      // Argon2 — but the attempt keeps its one-Argon shape, because the process
+      // dummy (minted at exactly the sealed cost) is verified in its place.
+      // Skipping the work instead would answer a planted account faster than a
+      // wrong password.
+      const envelopeAdmitted = storedArgon2EnvelopeNotOverPolicy(
+        passwordHash, this.dependencies.authPolicy.password.argon2id, "password"
+      );
+      const verified = await verifyPassword(
+        this.dependencies.argon2,
+        envelopeAdmitted ? passwordHash : this.dependencies.dummyPasswordHash,
+        input.password
+      ) && envelopeAdmitted;
       if (!verified || identity === null) {
         await this.dependencies.repository.recordLoginFailure({
           ...(identity === null ? {} : { actorToken: identity.auditToken }),
@@ -431,6 +443,10 @@ export class SessionService implements SessionApplication {
           challengeTokenHash!, recoveryCodeSlot(recoveryCode)
         );
         const verified = record !== null
+          // V-22: twice the MFA recovery-code policy, derived from that policy.
+          && storedArgon2EnvelopeNotOverPolicy(
+            record.codeHash, this.dependencies.mfaPolicy.recoveryCodes.argon2id, "recovery-code"
+          )
           && await verifyRecoveryCode(this.dependencies.argon2, record.codeHash, recoveryCode);
         if (verified && record !== null) {
           replacementRecoveryCode = generateRecoveryCode(record.codeSlot);
@@ -552,8 +568,19 @@ export class SessionService implements SessionApplication {
         }
         throw new AuthFlowError("MFA_RATE_LIMITED");
       }
+      // V-22, as in beginLogin: the password policy governs this record, and a
+      // refused envelope is replaced by the dummy rather than skipped, so the
+      // step-up keeps the same shape it has for a wrong password.
+      const envelopeAdmitted = identity !== null && storedArgon2EnvelopeNotOverPolicy(
+        identity.passwordHash, this.dependencies.authPolicy.password.argon2id, "password"
+      );
       const passwordVerified = identity !== null
-        && await verifyPassword(this.dependencies.argon2, identity.passwordHash, input.password);
+        && await verifyPassword(
+          this.dependencies.argon2,
+          envelopeAdmitted ? identity.passwordHash : this.dependencies.dummyPasswordHash,
+          input.password
+        )
+        && envelopeAdmitted;
       if (!passwordVerified || identity === null) throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
       const challenge: LoginChallengeRecord = Object.freeze({
         ...identity,

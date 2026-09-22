@@ -788,6 +788,7 @@ export {
 } from "./runtime-environment.js";
 
 export {
+  AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS,
   AUTH_POLICY_REGISTER_ROWS,
   AUTH_POLICY_ROW_KEYS,
   authPolicyFromRegisterRows,

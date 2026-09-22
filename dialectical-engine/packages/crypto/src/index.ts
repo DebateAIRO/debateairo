@@ -40,6 +40,7 @@ export {
   ARGON2ID_ENCODING_BOUNDS,
   Argon2InfrastructureError,
   Argon2WorkerPool,
+  argon2EnvelopeRefusal,
   parseEncodedArgon2id,
   type Argon2idEncodingParameters,
   type Argon2AuditParameters,

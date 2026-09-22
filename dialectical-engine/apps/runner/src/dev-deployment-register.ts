@@ -8,7 +8,7 @@ import { CLAIM_TYPES } from "@debateai/kernel";
 import {
   ADMISSION_POLICY_REGISTER_ROW,
   ALGORITHM_REGISTER_ROW_KEYS,
-  AUTH_POLICY_REGISTER_ROWS,
+  AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS,
   ENGINE_BAND_ORDER,
   MFA_POLICY_REGISTER_ROW,
   PRODUCT_ROLE_POLICY_REGISTER_ROW,
@@ -634,7 +634,10 @@ function developmentRows(
   );
   const rows = [
     ...bootstrapRows,
-    ...AUTH_POLICY_REGISTER_ROWS,
+    // V-14: a deployment register publishes the SUPERSEDING authentication
+    // rows (`passwordPolicy` with `max_length`). The sealed historical set is
+    // published unchanged by `persistBootstrapRegister` at its own version.
+    ...AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS,
     MFA_POLICY_REGISTER_ROW,
     SESSION_POLICY_REGISTER_ROW,
     RECOVERY_POLICY_REGISTER_ROW,

@@ -66,6 +66,11 @@ export const ARGON2_WORKER_JOB_FAILED = "ARGON2_WORKER_JOB_FAILED";
  *
  * tests/unit/argon2-worker-pool.test.ts pins the two copies to identical
  * behaviour over a shared corpus, so drift is a test failure, not a silent hole.
+ *
+ * This is the GLOBAL envelope only. V-22's per-use ceiling (twice the sealed
+ * cost that governs a given record) cannot live here: a worker request carries
+ * no policy, so that check belongs to the caller that knows which sealed cost
+ * governs the record — `argon2EnvelopeRefusal` in ./argon2-worker-pool.ts.
  */
 export const ARGON2ID_ENCODING_BOUNDS = Object.freeze({
   version: 19,
