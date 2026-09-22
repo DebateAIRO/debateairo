@@ -130,6 +130,26 @@ describe("V-28 the per-run seam reads and writes the persisted spend", () => {
   });
 });
 
+describe("C2 — the guard refuses to build a hosted seam that cannot bound anything", () => {
+  it("refuses a zero price where reported usage is required", () => {
+    const { store } = fakeStore();
+    expect(() => guardWith(store).providerSeam({
+      runId: "run-1",
+      price: { inputMicrosPerMillionTokens: 0, outputMicrosPerMillionTokens: 0 },
+      requireReportedUsage: true
+    })).toThrowError(expect.objectContaining({ code: "COST_ENVELOPE_PRICE_UNPRICED" }));
+  });
+
+  it("still builds one where it is not — local mode meters nothing", () => {
+    const { store } = fakeStore();
+    expect(() => guardWith(store).providerSeam({
+      runId: "run-1",
+      price: { inputMicrosPerMillionTokens: 0, outputMicrosPerMillionTokens: 0 },
+      requireReportedUsage: false
+    })).not.toThrow();
+  });
+});
+
 describe("V-28 the daily envelope stops the NEXT run, never the running one", () => {
   it("admits a new run while the day is under the ceiling", async () => {
     const { store } = fakeStore([{

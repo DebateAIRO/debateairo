@@ -125,6 +125,24 @@ export class CostEnvelopeGuard {
     if (typeof input?.runId !== "string" || input.runId.trim() === "") {
       throw new TypeError("COST_ENVELOPE_RUN_REQUIRED");
     }
+    /**
+     * C2 (review round 2), the second layer. `assertPricedProviderTargets`
+     * refuses a zero-priced target at boot; this refuses to BUILD a metered
+     * seam over one, so a composition that reached here another way still
+     * cannot run unbounded while reporting that it is metered. A control that
+     * depends on another control having run is one edit from being no control.
+     *
+     * Only where usage is required — that is the hosted, metered path. Local
+     * mode passes a zero price for a free local model, which is the point.
+     */
+    if (input.requireReportedUsage
+      && (input.price?.inputMicrosPerMillionTokens < 1
+        || input.price?.outputMicrosPerMillionTokens < 1)) {
+      throw new TypedDomainError(
+        "COST_ENVELOPE_PRICE_UNPRICED",
+        "A metered provider seam needs a price of at least one micro-unit per million tokens"
+      );
+    }
     return {
       assertCallAllowed: async (projection) => {
         const decision = decideRunCostEnvelope({

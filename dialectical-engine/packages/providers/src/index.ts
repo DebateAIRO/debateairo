@@ -545,8 +545,22 @@ export function assertPricedProviderTargets(
 ): void {
   if (mode !== "hosted") return;
   for (const target of targets) {
-    if (providerTargetPrice(target) === null) {
+    const price = providerTargetPrice(target);
+    if (price === null) {
       throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
+    }
+    /**
+     * C2 (review round 2) — A DECLARED PRICE OF ZERO IS NOT A PRICE.
+     *
+     * Zero is a lawful integer and it PROPAGATES: every projection and every
+     * charge comes back 0, the run's total never moves, and both ceilings bound
+     * nothing — silently, with every other check green. One mistyped line in the
+     * target declaration and the whole control is off. The floor is one
+     * micro-unit per million tokens (1e-6 USD per million), far below any real
+     * vendor and impossible to reach by accident.
+     */
+    if (price.inputMicrosPerMillionTokens < 1 || price.outputMicrosPerMillionTokens < 1) {
+      throw new TypeError(`PROVIDER_TARGET_PRICE_ZERO:${target.providerRef}`);
     }
   }
 }

@@ -107,6 +107,43 @@ describe("V-28 hosted refuses a DEBATE target whose spend cannot be bounded", ()
     })).not.toThrow();
   });
 
+  /**
+   * C2 (review round 2) — A DECLARED PRICE OF ZERO IS NOT A PRICE.
+   *
+   * Round 1 admitted 0 as a lawful integer, and 0 propagates: every projection
+   * and every charge comes back 0, the run's total never moves, and BOTH
+   * ceilings bound nothing — silently, with every check green. One mistyped
+   * configuration line and the whole control is off. Hosted therefore requires
+   * at least one micro-unit per million tokens on each priced side, which is
+   * 1e-6 USD per million tokens: far below any real vendor and impossible to
+   * reach by accident.
+   */
+  it("refuses a hosted target priced at zero — 0 bounds nothing, silently", () => {
+    for (const zeroed of [
+      { input_price_micros_per_million: 0, output_price_micros_per_million: 15_000_000 },
+      { input_price_micros_per_million: 3_000_000, output_price_micros_per_million: 0 },
+      { input_price_micros_per_million: 0, output_price_micros_per_million: 0 }
+    ]) {
+      const targets = parseProviderDiscoveryTargets(targetsJson(zeroed), CONFIGURED);
+      expect(() => assertPricedProviderTargets(targets, "hosted"))
+        .toThrowError(new TypeError("PROVIDER_TARGET_PRICE_ZERO:provider-1"));
+    }
+  });
+
+  it("admits the smallest price that is still a price", () => {
+    const targets = parseProviderDiscoveryTargets(targetsJson({
+      input_price_micros_per_million: 1, output_price_micros_per_million: 1
+    }), CONFIGURED);
+    expect(() => assertPricedProviderTargets(targets, "hosted")).not.toThrow();
+  });
+
+  it("leaves local mode alone, where a free local model is the point", () => {
+    const targets = parseProviderDiscoveryTargets(targetsJson({
+      input_price_micros_per_million: 0, output_price_micros_per_million: 0
+    }), CONFIGURED);
+    expect(() => assertPricedProviderTargets(targets, "local")).not.toThrow();
+  });
+
   it("leaves the URL-and-credential rule alone, so the support target is unaffected", () => {
     // A priceless https: target with a credential FILE still passes the shared
     // mode decision — which is what `parseSupportModelTargetJson` calls.
