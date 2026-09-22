@@ -2797,7 +2797,8 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
         valueJsonText: parseCanonicalRegisterJson(Buffer.from("true")),
         sourceRef: "deployment:forbidden-general"
       }],
-      sourceRef: "deployment:forbidden-general"
+      sourceRef: "deployment:forbidden-general",
+      deployment: "local"
     })).rejects.toMatchObject({ code: "42501" });
     const enabled = await operatorRegister.publishSupport({
       publicationId: randomUUID(),

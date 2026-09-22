@@ -808,7 +808,12 @@ export async function seedDevelopmentDeploymentRegister(
     publicationId,
     baseRegisterVersion: parseRegisterVersionText(String(bootstrap.registerVersion)),
     rows: publicationRows,
-    sourceRef: DEVELOPMENT_ALGORITHM_SOURCE_REF
+    sourceRef: DEVELOPMENT_ALGORITHM_SOURCE_REF,
+    // C-I5: this seeder IS the local deployment — a fixed roster of CLI relays
+    // on loopback, which is the local product path V-9(c) ruled. The hosted
+    // publication declares itself `hosted` and is then held to V-9(4)'s vendor
+    // vetting at this same door.
+    deployment: "local"
   });
   const receipt = createDevelopmentDeploymentRegisterMachineReceipt({
     registerVersion: imported.registerVersion,

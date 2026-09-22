@@ -477,7 +477,8 @@ describe("REGISTER-SUPPORT-PUBLICATION database contract", () => {
           valueJsonText: parseCanonicalRegisterJson(Buffer.from("true")),
           sourceRef: "deployment:general-later"
         }],
-        sourceRef: "deployment:general-later"
+        sourceRef: "deployment:general-later",
+        deployment: "local"
       });
       expect(generic.registerVersion).toBe("9007199254740994");
       expect(deployedRegisterVersion).toBe("4");

@@ -219,7 +219,8 @@ describe("DEV-05 complete development deployment register", () => {
           valueJsonText: parseCanonicalRegisterJson(Buffer.from("true")),
           sourceRef: "deployment:forbidden-general"
         }],
-        sourceRef: "deployment:forbidden-general"
+        sourceRef: "deployment:forbidden-general",
+        deployment: "local"
       })).rejects.toMatchObject({ code: "42501" });
     } finally {
       await operatorPool.end();
