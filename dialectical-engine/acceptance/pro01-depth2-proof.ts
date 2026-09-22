@@ -13,8 +13,9 @@ const dataDirectory = await mkdtemp(join(tmpdir(), "debateai-pro01-depth2-"));
 let ceremony: Awaited<ReturnType<typeof runAcceptanceCeremony>> | undefined;
 try {
   ceremony = await runAcceptanceCeremony(
+    // F-CREDENTIAL-ON-ARGV: the credential is read from ACCEPTANCE_SERVICE_CREDENTIAL
+    // in the environment of whoever runs this proof, never from the command line.
     parseAcceptanceArguments([
-      "--service-credential", "p".repeat(43),
       "--depth-params", '{"depth":2}',
       "--question", "Should a software company adopt a four-day workweek?"
     ]),

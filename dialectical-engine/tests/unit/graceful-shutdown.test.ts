@@ -118,6 +118,10 @@ describe("T3 graceful shutdown", () => {
 
     mail.resolve();
     await closing;
+    // VACUOUS-ORDERING GUARD: a stage that never ran is absent from flow.order,
+    // indexOf gives -1, and -1 precedes every real stage -- so "mail closes
+    // before the refusal audit" passed when mail never closed at all.
+    expect(flow.order).toContain("mail:end");
     expect(flow.order.indexOf("mail:end")).toBeLessThan(flow.order.indexOf("refusal-audit"));
   });
 
@@ -166,6 +170,8 @@ describe("T3 graceful shutdown", () => {
 
     durableWrite.resolve();
     await closing;
+    // VACUOUS-ORDERING GUARD (see the note at the mail:end assertion).
+    expect(flow.order).toContain("refusal-audit:durable");
     expect(flow.order.indexOf("refusal-audit:durable"))
       .toBeLessThan(flow.order.indexOf("audit-context-hasher"));
   });
@@ -315,6 +321,8 @@ describe("T3 graceful shutdown", () => {
     expect(failure).toMatchObject({ cause: argonFailure });
     expect(flow.primaryDatabase.end).toHaveBeenCalledTimes(1);
     expect(flow.evaluatorDatabase.end).toHaveBeenCalledTimes(1);
+    // VACUOUS-ORDERING GUARD (see the note at the mail:end assertion).
+    expect(flow.order).toContain("argon2-pool:failed");
     expect(flow.order.indexOf("argon2-pool:failed"))
       .toBeLessThan(flow.order.indexOf("primary-database"));
     expect(flow.order.indexOf("primary-database"))

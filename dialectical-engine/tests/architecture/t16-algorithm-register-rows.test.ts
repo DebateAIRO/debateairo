@@ -40,6 +40,15 @@ const POSITIVE_CONTROLS = [
     rule: "SEALED_DECIMAL"
   },
   {
+    // D77 (c) refitted epsilon to 0.005. A consumer that restates the NEW value
+    // is exactly as much a hardcoded policy as one that restated the old one,
+    // so the refit has to move the scanner's ban with it.
+    task: "T7 · branch freeze at the D77-refitted epsilon",
+    path: "packages/propagation/src/index.ts",
+    source: "const frozen = Math.abs(leverage) <= 0.005;\n",
+    rule: "SEALED_DECIMAL"
+  },
+  {
     task: "T9 · evaluator loop (integer, NOT a decimal)",
     path: "packages/serve/src/index.ts",
     source: "const evaluatorLoopMaxRounds = 3;\n",

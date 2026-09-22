@@ -71,13 +71,25 @@ describe("Accounts S7 ownership architecture", () => {
       liveness.indexOf("async recordQuery"),
       liveness.indexOf("async recordTriggerFired")
     );
-    expect(recordQuery.indexOf("ORDER BY run_id FOR UPDATE"))
+    // DEV-11E(4) / commit 2d1f86b8: the ordered run lock IS still taken, as the
+    // SECURITY DEFINER capability core.lock_owned_live_runs, whose body ends
+    // `ORDER BY run.run_id FOR UPDATE` (migrations/0040_account_erasure.sql).
+    // The runtime principal deliberately holds no UPDATE on core.run, so an
+    // inline `SELECT … FOR UPDATE` here is impossible by design, and
+    // s6-content-encryption-contract.test.ts:263 forbids the old inline form
+    // outright. Probing the retired literal made this assertion VACUOUS
+    // (-1 < any index); it is pinned as a real index now, and the ORDERING
+    // itself is pinned on the capability's body in the sibling test below.
+    const queryRunLock = recordQuery.indexOf("FROM core.lock_owned_live_runs(");
+    expect(queryRunLock).toBeGreaterThan(-1);
+    expect(queryRunLock)
       .toBeLessThan(recordQuery.indexOf("await allocateSequence(client)"));
   });
 
   it("hardens every immutable memory scope carrier and derives it from run ownership", async () => {
-    const [migration, memory] = await Promise.all([
+    const [migration, erasureMigration, memory] = await Promise.all([
       read("migrations/0037_run_ownership.sql"),
+      read("migrations/0040_account_erasure.sql"),
       read("packages/memory/src/index.ts")
     ]);
     expect(migration).toContain("memory_question_key_asker_scope_no_raw_user_uuid");
@@ -90,14 +102,28 @@ describe("Accounts S7 ownership architecture", () => {
     );
     expect(recordAndMatch).toContain("#ownerScopedCandidateRefs");
     expect(recordAndMatch).toContain("#evaluateCandidate");
+    // VACUOUS-ORDERING GUARD: indexOf returns -1 for a missing needle and -1 is
+    // less than every real index, so this comparison passed with no lease
+    // preparation at all until the presence assertion below was added.
+    expect(recordAndMatch).toContain("prepareLeasedContentEncryptionForRuns");
     expect(recordAndMatch.indexOf("prepareLeasedContentEncryptionForRuns"))
       .toBeLessThan(recordAndMatch.indexOf("await withWriteTransaction"));
-    const finalRunLock = recordAndMatch.indexOf("ORDER BY run_id FOR UPDATE");
+    const finalRunLock = recordAndMatch.indexOf("FROM core.lock_owned_live_runs(");
     const finalOwnershipCheck = recordAndMatch.indexOf("core.run_is_owned_by", finalRunLock);
     const firstAllocation = recordAndMatch.indexOf("await allocateSequence(client)");
     expect(finalRunLock).toBeGreaterThan(-1);
     expect(finalOwnershipCheck).toBeGreaterThan(finalRunLock);
     expect(firstAllocation).toBeGreaterThan(finalOwnershipCheck);
+    // The property these three protect is "lock both runs in a FIXED order,
+    // then revalidate ownership, then write". Both halves of the fixed order
+    // stay pinned: the caller sorts the run ids, and the capability orders by
+    // run_id inside the locking statement. Neither retires with the literal.
+    expect(recordAndMatch).toContain("[input.key.runId, selected.priorRunId].sort()");
+    const lockCapability = erasureMigration.slice(
+      erasureMigration.indexOf("CREATE OR REPLACE FUNCTION core.lock_owned_live_runs"),
+      erasureMigration.indexOf("REVOKE ALL ON FUNCTION core.lock_owned_live_runs")
+    );
+    expect(lockCapability).toMatch(/ORDER BY run\.run_id\s+FOR UPDATE/);
 
     const candidateRefs = memory.slice(
       memory.indexOf("async #ownerScopedCandidateRefs"),
@@ -114,11 +140,13 @@ describe("Accounts S7 ownership architecture", () => {
     );
     const candidatePreparation = evaluateCandidate.indexOf("prepareLeasedContentEncryptionForRun");
     const candidateTransaction = evaluateCandidate.indexOf("withWriteTransaction");
-    const candidateLock = evaluateCandidate.indexOf("FOR UPDATE");
+    const candidateLock = evaluateCandidate.indexOf("FROM core.lock_owned_live_runs(");
     const candidateOwnership = evaluateCandidate.indexOf("core.run_is_owned_by");
     const candidateFetch = evaluateCandidate.indexOf("const candidateRows = await client.query");
     const candidateDecrypt = evaluateCandidate.indexOf("decryptLeasedContentForRun");
+    expect(candidatePreparation).toBeGreaterThan(-1);
     expect(candidatePreparation).toBeLessThan(candidateTransaction);
+    expect(candidateLock).toBeGreaterThan(candidateTransaction);
     expect(candidateLock).toBeLessThan(candidateOwnership);
     expect(candidateOwnership).toBeLessThan(candidateFetch);
     expect(candidateFetch).toBeLessThan(candidateDecrypt);
@@ -134,10 +162,18 @@ describe("Accounts S7 ownership architecture", () => {
     const contradiction = memory.slice(memory.indexOf("async observeAnswerContradiction"));
     const contradictionPreparation = contradiction.indexOf("prepareLeasedContentEncryptionForRuns");
     const contradictionTransaction = contradiction.indexOf("withWriteTransaction");
-    const contradictionLock = contradiction.indexOf("ORDER BY run_id FOR UPDATE");
+    // Third site of the DEV-11E(4) lock move, and it was the last one still
+    // probing the retired literal: `ORDER BY run_id FOR UPDATE` has not existed
+    // in this method since 2d1f86b8, so contradictionLock was -1 and
+    // `expect(-1).toBeLessThan(contradictionOwnership)` passed on every run.
+    // observeAnswerContradiction takes the ordered lock through the same
+    // capability as the other two sites.
+    const contradictionLock = contradiction.indexOf("FROM core.lock_owned_live_runs(");
     const contradictionOwnership = contradiction.indexOf("core.run_is_owned_by");
     const contradictionDecrypt = contradiction.indexOf("decryptLeasedContentForRun");
+    expect(contradictionPreparation).toBeGreaterThan(-1);
     expect(contradictionPreparation).toBeLessThan(contradictionTransaction);
+    expect(contradictionLock).toBeGreaterThan(-1);
     expect(contradictionLock).toBeLessThan(contradictionOwnership);
     expect(contradictionOwnership).toBeLessThan(contradictionDecrypt);
     expect(contradiction.slice(contradictionTransaction)).not.toContain("decryptContentForRun");

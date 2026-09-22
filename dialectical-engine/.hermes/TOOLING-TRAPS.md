@@ -4874,6 +4874,15 @@ not in 4 000 lines of prose every author skims.
 - **Rule: when a jsdom global is missing under vitest, check `'<key>' in globalThis` under the bare runtime
   FIRST. A newer Node that merely DECLARES a web global silently disables vitest's jsdom copy of it.**
   Priced here: the block reproduces standalone in 13 s, and the whole diagnosis is two greps and one probe.
+- **ADDENDUM 2026-09-18 (D78, the Node 26 upgrade) — the last sentence of the third bullet is superseded,
+  and the trap is CLOSED at its source.** "On the declared Node 22.23.1 the key does not exist" described a
+  runtime the project no longer declares: `package.json` engines is Node 26.8.2 since 2026-09-18, and
+  `brew` ships 26.8.2 (nodejs.org's 26.9.0 was two days old and unbottled). The cure was not a flag and not
+  a shim: **vitest 5.0.1**, the first release whose `jsdom-keys` list carries `localStorage` and
+  `sessionStorage` (absent at 4.1.10 AND at 4.1.11 — a patch upgrade would not have helped), so the copy set
+  now includes them. Measured on the whole suite: 140 reds → 48, 96 of them this class, and zero
+  `--localstorage-file` warnings in the run log. **The RULE above stands unchanged and is the durable part**;
+  what dates is any sentence naming a particular Node or a particular runner version.
 
 ## An environment defect is a LOWER bound on the red count, never an upper one (same seat, same day)
 - Supplying the missing global as a pure measurement — `NODE_OPTIONS=--localstorage-file=<scratch>` , no repo

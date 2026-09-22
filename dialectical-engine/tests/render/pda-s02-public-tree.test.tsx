@@ -253,17 +253,30 @@ describe("S02 public argument-tree projection", () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const container = await render(<PublicDebatePageClient debate={publicTreeDebate} />);
     const viewButtons = [...container.querySelectorAll<HTMLButtonElement>('[role="group"][aria-label="View"] > button')];
-    expect(viewButtons.map((button) => button.textContent)).toEqual(["Thread", "Split", "Tree", "Map"]);
-    const defaultCanvas = container.querySelector<HTMLElement>(".canvasViewport");
-    expect(defaultCanvas).not.toBeNull();
-    expect(defaultCanvas!.textContent).not.toContain("⚐ Challenge");
-    expect(container.textContent).toContain("A public supporting claim.");
+    expect(viewButtons.map((button) => button.textContent)).toEqual(["Overview", "Thread", "Split", "Tree", "Map"]);
 
     const clickView = async (label: string) => {
       const button = viewButtons.find((candidate) => candidate.textContent === label);
       expect(button).not.toBeUndefined();
       await act(async () => button!.click());
     };
+
+    // V's ruling of 2026-09-20: a public visitor lands on the conclusion and
+    // the argument tree is ONE CLICK AWAY. Until that ruling this row encoded
+    // the older binary — public "Tree" both WAS the canvas and WAS the landing
+    // view — and there was no way to have the summary and the tree at once.
+    // What the row protects is unchanged and is all still asserted below: the
+    // tree is genuinely reachable, it carries the real projected claims, and it
+    // is read-only. Only the landing view moved, and that move is now pinned
+    // rather than assumed — the overview must be what a stranger sees first.
+    expect(container.querySelector('[data-design-turn="3b"]')).not.toBeNull();
+    expect(container.querySelector(".canvasViewport")).toBeNull();
+
+    await clickView("Tree");
+    const reachableCanvas = container.querySelector<HTMLElement>(".canvasViewport");
+    expect(reachableCanvas).not.toBeNull();
+    expect(reachableCanvas!.textContent).not.toContain("⚐ Challenge");
+    expect(container.textContent).toContain("A public supporting claim.");
 
     await clickView("Thread");
     expect(container.querySelector(".thread")).not.toBeNull();

@@ -55,6 +55,9 @@ describe("SUP-06 remains outside the identity security zone", () => {
     expect(main).toContain("reportCleanupFailure: reportSupportDiagnostic");
     expect(main).toMatch(/databasePools:\s*\[[\s\S]*?supportPool,\s*supportRelayLeasePool,/u);
     expect(main).toContain("assertSupportDatabaseRole(pool, supportRelayLeasePool)");
+    // VACUOUS-ORDERING GUARD: neither pool declaration was pinned present, so a
+    // missing supportPool gave indexOf -1 and this ordering passed regardless.
+    expect(main).toContain("const supportPool = createPool(environment.SUPPORT_DATABASE_URL)");
     expect(main.indexOf("const supportPool = createPool(environment.SUPPORT_DATABASE_URL)"))
       .toBeLessThan(main.indexOf("const supportRelayLeasePool"));
   });

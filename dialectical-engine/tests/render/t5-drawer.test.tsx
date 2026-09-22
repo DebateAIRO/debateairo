@@ -88,6 +88,37 @@ afterEach(async () => {
 });
 
 describe("Turn 5 reference drawer", () => {
+  it("says an argument is absent instead of leaving the prose area blank", async () => {
+    // PROPERTY (typed absence, DR-115's rule applied to prose): a node whose
+    // generation carries no argument text must SAY so. The drawer's other
+    // absences already do — "REVIEW N/A", "House unavailable", "SCORING N/A",
+    // "No scoring recommendation is available for this argument." — and a
+    // silent blank is the one form of absence this product does not allow.
+    //
+    // This guard did not exist when 1c1039d5 discarded the line that produced
+    // the text, which is why the loss went unnoticed for three weeks.
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const container = await render(
+      <NodeDetailDrawer
+        node={{ ...debateNode, active_generation: { ...debateNode.active_generation!, argument: "" } }}
+        token={null}
+        onClose={() => undefined}
+        onChallenge={() => undefined}
+        onFocusRecommendationNode={() => false}
+        canFocusRecommendationNode={() => false}
+        onQueued={() => undefined}
+        onError={() => undefined}
+        onAuthRejected={() => undefined}
+      />
+    );
+
+    expect(container.textContent).toContain(debateNode.claim);
+    expect(container.textContent).toContain("No argument text yet.");
+    // The select-to-challenge hint belongs to prose that exists; absence must
+    // not invite the reader to select text that is not there.
+    expect(container.textContent).not.toContain("Select any sentence above");
+  });
+
   it("renders the elevated panel, scrim, claim, way of knowing, and binding section copy", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const container = await renderDrawer(scoredNode());

@@ -415,3 +415,99 @@ them s7 `:98`. F31's 3+3 audit rows.
 RED frames, both mutant matrices), `agent-reports/dod-facts-review-2026-09-17.md` (the verdict and the
 scoped re-check); the SDD ledger `.superpowers/sdd/2026-09-17-ceremony-report-six-facts/progress.md`
 (ignored by version control, on this host).
+
+## 2026-09-18 03:06 — NEWEST ENTRY WINS
+
+**THE MISSION IS SIGNED OFF (D77 ADDENDUM 1 h).** The judge's whole-goal verdict is
+`agent-reports/w12-whole-goal-verdict-2026-09-18.md`: **MET**, with two things said openly — the
+mono-maker bullet is UNWITNESSED because V waived that run (D77 e), and every suite number on this branch
+was measured under Node 26.5.0 (a Node 22.23.1 run is still owed, D73 e/7). The V packet is FINAL.
+`origin/dev` = the commit that carries these records (the tip of `git log`); the mission branch is at the same commit.
+
+**What V ruled on 2026-09-18 (D77):** δ 0.02 → 0.01, ε 0.01 → 0.005 (refitted from the real run; the J2
+companions NOT refitted, said so); the seven confirm-items decided (1/2/5/6 yes, 3 no, 4 rename now, 7
+park); the mono run waived; the credential taken off the command line before the push. All three code
+changes landed, blind-reviewed and gated (ADDENDUM 1 a–c).
+
+**If a next session runs the ceremony:** `packets/readiness-ask-2026-09-16.md`, sections 3, 5 and 8 —
+export the credential, run the short form from the engine root as printed (no credential argument; the
+tool refuses it, exit 7), depth 2. The next run seals acceptance register version 3 (the new pair) beside
+version 2; nothing to reset. It is also the first witness that the child inherits the exported variable
+and that a log written under the new rules holds no trace of it.
+
+**What is left, none of it blocking:** the Node 22.23.1 run; the seven tickets filed at closure (the two
+for V's attention: `F-UI-VERDICT-LABEL-DRAWER-ONLY` — the label reaches the site only as a raw word in a
+drawer; `F-REGISTER-HISTORICAL-IMPORT-CAP` — one refit left before the sealing mechanism needs a
+decision); the V packet's §A rows at their defaults; a single-maker run if V ever wants bullet 4
+witnessed. **Read first, for humans:** `PLAIN-STATUS.md`.
+
+## 2026-09-19 01:34 — NEWEST ENTRY WINS
+
+**THE RUNTIME IS NODE 26.8.2 AND THE TEST ENVIRONMENT IS FIXED (D78).** `package.json` engines declares
+26.8.2 (Homebrew's newest; nodejs.org's 26.9.0 was two days old and unbottled), the runner is vitest
+5.0.1, and the `localStorage` caveat that rode on every gate number since 2026-09-16 is gone: the
+four-count at `53a09658` is **45 / 0 / 0 / 1** (45 failing of 5364) against 140 at `31f6e25b`. `origin/dev` = the commit that carries these records (the tip of `git log`).
+
+**The one thing to know before touching a register file:** `register.bootstrap.json` is **sealed register
+version 1**, not a plain file. `persistBootstrapRegister` seals it through `importHistorical`
+(replay-only), the production runbook has the operator confirm its exact snapshot hash and "unchanged
+row/value/source bytes", and editing it moves that hash and throws `FX-REG-SEALED_VERSION_MISMATCH`
+against any database already holding v1. A seat was told otherwise by its brief on 2026-09-18, changed
+it, measured the consequence and reported it — the edit was reverted (D78 d). Recording today's machine
+pins lawfully is `F-BOOTSTRAP-REGISTER-V2-RUNTIME-PINS`. The same law governs the acceptance register
+(D77 ADDENDUM 1 a/1): **a sealed value is never edited, only superseded.**
+
+**Still owed, none of it blocking:** the tickets filed at closure and after it — `F-UI-VERDICT-LABEL-DRAWER-ONLY`
+and `F-UI-DEFECTS-UNMASKED-BY-NODE26` (both for V's UI program; the second holds the four defects the
+storage failures were masking, each with its frame), `F-BOOTSTRAP-REGISTER-V2-RUNTIME-PINS`,
+`F-AUTH-MEMORY-BOUNDS-MEASURED-ON-NODE-22` (the registration service's two resident bounds were measured
+on Node 22 and never re-measured), `F-S3D-SEPARATION-PERMUTATION-FLAKE` (a permutation-test assertion that
+rejects ~1 % of the time by construction — do NOT raise its ceiling), `F-UI-TYPECHECK-NEEDS-A-BUILD` (the
+website typecheck fails from a clean tree and had been answered by a stale incremental cache), `F-STOPPING-DECISIONS-UNPERSISTED`, `F-REGISTER-V3-REQUIRED-ROW-PROFILE`
+with `F-T16-MANIFEST-PROVENANCE-STALE` (one migration), `F-REGISTER-HISTORICAL-IMPORT-CAP`,
+`F-J27-GATE-ACCEPTANCE-SITE`, `F-CLOSING-RUN-OUTDIR-OVERRIDE`. The Node 22.23.1 run that D73 e/7 owed is
+**retired**: the project no longer declares that runtime.
+
+**If a next session runs the ceremony:** `packets/readiness-ask-2026-09-16.md` sections 3, 5 and 8,
+unchanged by this upgrade — export the credential, run the short form from the engine root, depth 2. It
+seals acceptance register version 3 and is still the first witness of the credential rules (D77 f).
+**Read first, for humans:** `PLAIN-STATUS.md`.
+
+## 2026-09-20 00:22 — NEWEST ENTRY WINS
+
+**THE SUITE WENT 45 → 12 (D79).** V asked to "fix the tests"; three Opus 5 seats read all 45
+reds one by one under the law *never make a test pass by weakening it*. `origin/dev` = the commit that carries these records (the tip of `git log`).
+The full suite at `a61206dc` on a quiet host: **12 / 0 / 0 / 0** over 5367 tests (NEW 0 · CLEARED 33 · STILL 12 against
+the D78 gate); every remaining red is deferred by V, awaits V's decision, or is ticketed. Two ticketed rows are chance-
+and load-sensitive and traded places between that night's two full runs (LEDGER, the D79 GATE row), so the next
+count can change by a name with nothing changed — re-read the names, never only the number. (Corrected 2026-09-21:
+this paragraph first carried a template fragment where the count belonged.)
+
+**The thing to know before you trust any number in this repository.** Five distinct ways a check can
+look like it is working while checking nothing were found and recorded in
+`board/F-SAFEGUARD-MOVED-WITHOUT-ITS-TESTS.md` (three addenda). The two that bind a future gate reader:
+1. **A red test measures only up to its first failing assertion.** Everything after is UNMEASURED. A new
+   red appearing inside an already-red test when you fix it is a mask lifting, not a regression.
+2. **A green gate is evidence about the code the tests REACH.** A behaviour deleted together with its
+   guard produces no failure and appears in no four-count. Two such losses were recovered on 2026-09-20
+   — the drawer's empty state and the canvas independence pill — and neither failed a test nor appeared
+   in any gate; both were found by reading the discarded side of a merge.
+
+**The instrument for that class, run once and unfinished:** the merge-discard sweep — 16 conflicted
+merges, 5,505 (merge, file) pairs, **16 genuine one-side discards of which 5 are live in the V3 tree**.
+`1c9578a2` is closed. **Four live discards remain unswept for what else they dropped**: `apps/ui/app/page.tsx`,
+`apps/ui/components/DebatesBuffer.tsx`, `apps/ui/components/NodeDetailDrawer.tsx` and the already-restored
+`tests/architecture/s8-publication-contract.test.ts`. Finishing that sweep is the highest-value work left
+in this tree.
+
+**Open for V:** `F-DR160-TOOLBAR-NAME-OF-RECORD` (two governed designs disagree about whether the action
+toolbar belongs in the compact chrome; today's code satisfies the stricter one by naming alone — a
+one-minute decision with the measurement already in the ticket). Deferred by V's own ruling: the canvas
+review marks (ruled YES, not yet built — six tests stay red as an honest "agreed, not built") and the
+library row styling. `scaffold` stays red as ticketed debt F31.
+
+**Tickets from this round:** `F-SAFEGUARD-MOVED-WITHOUT-ITS-TESTS` (high, with the five families),
+`F-DR160-TOOLBAR-NAME-OF-RECORD`. Corrected at the source by the seats that reproduced them:
+`F-AUTH-MEMORY-BOUNDS-MEASURED-ON-NODE-22` (the sealed bounds do NOT need re-measuring; the harness needs
+a budget) and `F-S3D-SEPARATION-PERMUTATION-FLAKE` (~6 %, and the defect is a null resampled WITH
+replacement). **Read first, for humans:** `PLAIN-STATUS.md`.

@@ -40,8 +40,12 @@ export const CONSUMER_SOURCE_DIRECTORIES = [
 
 export const REGISTER_WRITER_FILES = ["apps/runner/src/dev-deployment-register.ts"] as const;
 
-/** Every decimal T16 seals. A consumer holding one of these holds a policy. */
-export const SEALED_DECIMALS = ["0.02", "0.01", "0.05", "0.70", "0.7", "0.35", "0.25", "0.5"] as const;
+/**
+ * Every decimal T16 seals — plus `0.02`, the δ seed D77 (c) superseded, which
+ * stays banned so a consumer cannot quietly restate the value the refit moved
+ * off. A consumer holding any of these holds a policy.
+ */
+export const SEALED_DECIMALS = ["0.02", "0.01", "0.005", "0.05", "0.70", "0.7", "0.35", "0.25", "0.5"] as const;
 
 /**
  * Policy identifiers. Row keys plus the value members that name a policy

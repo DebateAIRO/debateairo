@@ -1,0 +1,140 @@
+tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle 'DebateCanvas agreed review mark' binds its 'agreed review verdict' role
+tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle 'DebateCanvas disputed review mark' binds its 'disputed review verdict' role
+tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle 'DebateMap root hub' binds its 'reasoning accent' role
+tests/architecture/s04-contract.test.ts > S04 DDL and runtime attachment contract DR-128 mints only the claim-type composition structure and wires a loud register read
+tests/architecture/s10-carrier-erasure-red.test.ts > S10 carrier erasure — RED acceptance contracts filters completed private tombstones before any external key load
+tests/architecture/s13-contract.test.ts > S13 / cross-run memory architecture lands append-only memory carriers without a closure job or embedding dependency
+tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract carries the S04 orphan-audit wording fix and deterministic locale tiebreak
+tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract uses the generated contract client for both browser and SSR with no V2 wire mirror
+tests/architecture/s7-authorization-contract.test.ts > Accounts S7 ownership architecture hardens every immutable memory scope carrier and derives it from run ownership
+tests/architecture/s8-publication-contract.test.ts > Accounts S8 publication architecture ships the deliberate controls and public-only reader in the UI composition
+tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law matches all 27 dependency-edge rows and structural rules 1–5
+tests/integration/memory-database.test.ts > S13 / FX-S22-04 / FX-PT-MEM — real PostgreSQL memory path does not link a legacy candidate after an ownership claim changes its effective scope
+tests/integration/obs-l3-s06-runner-binding.test.ts > S06 deployment linkage evaluates the runner installer before the DB dependency in the real production entrypoint
+tests/integration/obs-l3-s06-runner-binding.test.ts > S06 provider gateway binding captures one provider occurrence after the real gateway exhausts all attempts
+tests/integration/obs-l3-s06-runner-binding.test.ts > S06 runner task binding captures the real task failure before terminal recording with declared context and Hatchet attempt index
+tests/integration/obs-l3-s06-runner-binding.test.ts > S06 runner task binding preserves the original task failure when terminal recording fails and captures the recording alarm
+tests/integration/registration-database.test.ts > S3 registration and verification on real PostgreSQL S3d post-hash main-process secondary RSS tripwire stays flat and counts every refusal
+tests/integration/s7-authorization-database.test.ts > S7 real PostgreSQL ownership and IDOR boundary locks every matching run before allocation while a rejected transfer is queued
+tests/render/consent-bar.test.tsx > S01-C3 the cookie bar (10a) carries no route-conditional offset, so no layout-level component learns its route
+tests/render/consent-bar.test.tsx > S01-C3 the cookie bar (10a) draws the bar's primary at the artboard's padding, borderless, with the design's hover spring
+tests/render/consent-bar.test.tsx > S01-C3 the cookie bar (10a) is a labelled region whose focusable descendants are the three buttons in DOM order
+tests/render/consent-bar.test.tsx > S01-C3 the cookie bar (10a) offers no dismissal that is not a decision: Escape leaves it standing and writes nothing
+tests/render/consent-bar.test.tsx > S01-C3 the cookie bar (10a) renders the five bar strings of SPEC §Copy byte-exact, and reaches no storage
+tests/render/consent-bar.test.tsx > S01-C3 the cookie bar (10a) ships R09's geometry inside ONE delimited S01 block, followed only by whitespace or S02's delimited block
+tests/render/consent-bar.test.tsx > S01-C3 the cookie bar (10a) stacks below 720px, the width at which the designed row stops fitting
+tests/render/consent-card.test.tsx > S01-C4 the cookie preferences card (10b) announces itself as a modal dialog named by its own visible title
+tests/render/consent-card.test.tsx > S01-C4 the cookie preferences card (10b) documents at the prop that `initial` is read once, by the mount
+tests/render/consent-card.test.tsx > S01-C4 the cookie preferences card (10b) draws the card's primary at 10b's own 18px padding and the knob at 10b's own shadow
+tests/render/consent-card.test.tsx > S01-C4 the cookie preferences card (10b) flips the two operable toggles on click, on Space and on Enter
+tests/render/consent-card.test.tsx > S01-C4 the cookie preferences card (10b) locks Essential against click, Space and Enter alike
+tests/render/consent-card.test.tsx > S01-C4 the cookie preferences card (10b) opens at R17's defaults when nothing valid is stored, in category order
+tests/render/consent-card.test.tsx > S01-C4 the cookie preferences card (10b) reflects a seeded decision's booleans on open
+tests/render/consent-card.test.tsx > S01-C4 the cookie preferences card (10b) renders the card's own four strings of SPEC §Copy byte-exact
+tests/render/consent-card.test.tsx > S01-C4 the cookie preferences card (10b) renders the three categories from COOKIE_CATEGORIES, all twelve strings, in the design's order
+tests/render/consent-card.test.tsx > S01-C4 the cookie preferences card (10b) ships R15's card geometry inside the SAME delimited S01 block
+tests/render/consent-card.test.tsx > S01-C4 the cookie preferences card (10b) writes R04's rows from the footer's three controls, and offers no fourth
+tests/render/consent-cross-slice.test.tsx > cross-slice integration — both consent surfaces in one document P1 · both slices' surfaces coexist in one document
+tests/render/consent-cross-slice.test.tsx > cross-slice integration — both consent surfaces in one document P2 · the Esc STACK: cookie card open + policy from `Privacy notice` -> Esc closes ONLY the policy
+tests/render/consent-cross-slice.test.tsx > cross-slice integration — both consent surfaces in one document P3 · the S01 card asks for READ mode; the sign-up card asks for CONSENT mode
+tests/render/consent-cross-slice.test.tsx > cross-slice integration — both consent surfaces in one document P4 · one Escape closes the sign-up policy, not the cookie card underneath it
+tests/render/consent-cross-slice.test.tsx > cross-slice integration — both consent surfaces in one document P5 · the MERGED stylesheet resolves both families with no shared selector
+tests/render/consent-cross-slice.test.tsx > cross-slice integration — both consent surfaces in one document P6 · with the policy opened FIRST, Escape closes the cookie card — the one opened LAST
+tests/render/consent-cross-slice.test.tsx > cross-slice integration — both consent surfaces in one document P7 · the closed policy returns focus to its own opener and leaves the card's state alone
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry dispatches Escape into a lane that now HAS the shared listener, and records what it does
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry gives Settings one Privacy panel whose button opens the same card, pre-filled
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry is mounted exactly once, app-wide, after {children} and never before <TopBar />
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry makes the bar a function of storage alone: clearing site data restores the first visit
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry mounts a FRESH card per open, so a reopen shows what was last saved
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry opens at R17's defaults from EITHER entry when nothing is stored
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry opens the card over a hidden bar, and each terminal control writes R04's own row
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry renders nothing on the server and nothing on the first client pass, and no second pre-paint script
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry returns the bar when the card is dismissed from the SETTINGS entry with a bare string stored
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry returns the bar when the card is dismissed from the SETTINGS entry with a future version stored
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry returns the bar when the card is dismissed from the SETTINGS entry with a local-time instant stored
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry returns the bar when the card is dismissed from the SETTINGS entry with a missing member stored
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry returns the bar when the card is dismissed from the SETTINGS entry with a non-ISO instant stored
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry returns the bar when the card is dismissed from the SETTINGS entry with a non-boolean toggle stored
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry returns the bar when the card is dismissed from the SETTINGS entry with a sixth member stored
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry returns the bar when the card is dismissed from the SETTINGS entry with an array stored
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry returns the bar when the card is dismissed from the SETTINGS entry with essential denied stored
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry returns the bar when the card is dismissed from the SETTINGS entry with malformed JSON stored
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry returns the bar when the card is dismissed from the SETTINGS entry with nothing stored
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry returns the bar when the card is dismissed from the first-visit entry, and writes nothing
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry shows the bar at mount with a bare string stored — present is not valid
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry shows the bar at mount with a future version stored — present is not valid
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry shows the bar at mount with a local-time instant stored — present is not valid
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry shows the bar at mount with a missing member stored — present is not valid
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry shows the bar at mount with a non-ISO instant stored — present is not valid
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry shows the bar at mount with a non-boolean toggle stored — present is not valid
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry shows the bar at mount with a sixth member stored — present is not valid
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry shows the bar at mount with an array stored — present is not valid
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry shows the bar at mount with essential denied stored — present is not valid
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry shows the bar at mount with malformed JSON stored — present is not valid
+tests/render/consent-mount.test.tsx > S01-C5 the consent state machine, its mount and the Settings re-entry stays silent when the card is dismissed from the SETTINGS entry WITH a valid decision
+tests/render/consent-policy-link.test.tsx > S01-C6 the Privacy notice link, the read-mode policy modal and the card's modal semantics changes nothing behind it when the policy is closed
+tests/render/consent-policy-link.test.tsx > S01-C6 the Privacy notice link, the read-mode policy modal and the card's modal semantics closes the card on Escape when the card is the only open surface, and the bar returns
+tests/render/consent-policy-link.test.tsx > S01-C6 the Privacy notice link, the read-mode policy modal and the card's modal semantics closes the card on a backdrop click through the shared helper, and not on a click inside it
+tests/render/consent-policy-link.test.tsx > S01-C6 the Privacy notice link, the read-mode policy modal and the card's modal semantics does not bring the policy back with a reopened card
+tests/render/consent-policy-link.test.tsx > S01-C6 the Privacy notice link, the read-mode policy modal and the card's modal semantics gives the card its initial focus and its Tab wrap from the shared helper
+tests/render/consent-policy-link.test.tsx > S01-C6 the Privacy notice link, the read-mode policy modal and the card's modal semantics moves the visitor exactly ONE surface per Escape, with the policy over the card
+tests/render/consent-policy-link.test.tsx > S01-C6 the Privacy notice link, the read-mode policy modal and the card's modal semantics opens a CLEAN card after EVERY route that closes it under an open policy
+tests/render/consent-policy-link.test.tsx > S01-C6 the Privacy notice link, the read-mode policy modal and the card's modal semantics opens a CLEAN card after the card was closed by its scrim under an open policy
+tests/render/consent-policy-link.test.tsx > S01-C6 the Privacy notice link, the read-mode policy modal and the card's modal semantics opens a CLEAN card after the card was settled by Save choices under an open policy
+tests/render/consent-policy-link.test.tsx > S01-C6 the Privacy notice link, the read-mode policy modal and the card's modal semantics opens the policy modal in READ mode over the card: a Close button, and no I have read it
+tests/render/consent-policy-link.test.tsx > S01-C6 the Privacy notice link, the read-mode policy modal and the card's modal semantics returns focus to the RETURNED bar's opener when the card closes
+tests/render/consent-policy-link.test.tsx > S01-C6 the Privacy notice link, the read-mode policy modal and the card's modal semantics returns focus to the Settings opener when the card closes
+tests/render/consent-policy-link.test.tsx > S01-C6 the Privacy notice link, the read-mode policy modal and the card's modal semantics stays silent on Escape from the Settings entry when a valid decision is stored
+tests/render/consent-policy-link.test.tsx > S01-C6 the Privacy notice link, the read-mode policy modal and the card's modal semantics writes no modal machinery of its own: the card imports all of it
+tests/render/consent-storage.test.tsx > S01-C2 consent storage contract carries the three category records with the twelve strings byte-exact, in the design's order
+tests/render/consent-storage.test.tsx > S01-C2 consent storage contract delivers a preference request to its subscriber with the opener, and stops on unsubscribe
+tests/render/consent-storage.test.tsx > S01-C2 consent storage contract re-asks for an absent, unparseable, non-object or short value, and never throws on any access
+tests/render/consent-storage.test.tsx > S01-C2 consent storage contract round-trips one decision under debateai.consent with exactly the five members of R01
+tests/render/consent-storage.test.tsx > S01-C2 consent storage contract treats a stored value whose v is not 1 as no decision, and carries no migration code
+tests/render/consent-storage.test.tsx > S01-C2 consent storage contract writes exactly the four control rows of R04, stamping v and the moment of the call
+tests/render/load01-debate-page.test.tsx > LOAD-01 real debate-page render T21 renders HOLDING with its honest remaining time and no error banner
+tests/render/load01-debate-page.test.tsx > LOAD-01 real debate-page render renders a mid-session run.terminal failure as failed with no live progress
+tests/render/pda-s02-public-page.test.tsx > S02 public debate answer surface preserves the published answer fields and disclosure after the client-shell split
+tests/render/pda-s02-public-tree.test.tsx > S02 public argument-tree projection renders every reading mode, real projected claims, and a read-only node drawer
+tests/render/pda-s02-public-tree.test.tsx > S02 public argument-tree projection renders no tree controls for a legacy answer-only publication
+tests/render/pda-s02-scoring-chrome.test.tsx > S02 public scoring diagnostics opens the owner diagnostics drawer over the same DR-115 unavailable payload
+tests/render/sup-04-widget.test.tsx > SUP-04 product-route support widget expands on Enter, focuses the message control, and follows the Romanian override
+tests/render/t1-canvas.test.tsx > card anatomy binds rendered maker dots to maker-owned model tokens only
+tests/render/t1-canvas.test.tsx > card anatomy emits distinct stance attributes and line tokens on PRO and CON connectors
+tests/render/t1-canvas.test.tsx > card anatomy keeps BASE, FINAL, and an accessible Details control on one card
+tests/render/t1-canvas.test.tsx > card anatomy keeps Regenerate on the owner canvas argument card
+tests/render/t1-canvas.test.tsx > card anatomy keeps empty, abandoned, and failed cores sunken from a healthy core
+tests/render/t1-canvas.test.tsx > card anatomy maps all completed review outcomes and absence to four distinct compact states
+tests/render/t1-canvas.test.tsx > card anatomy renders nested shell/core bezels and token-typed stance tabs for PRO and CON cards
+tests/render/t1-canvas.test.tsx > card anatomy uses a structural line token for the DebateMap hub ring
+tests/render/t1-canvas.test.tsx > chrome and views keeps the mode toggle present before a tree exists
+tests/render/t1-canvas.test.tsx > chrome and views mounts a working mode toggle on debate chrome
+tests/render/t1-canvas.test.tsx > chrome and views mounts the matching reference screen for every working navbar choice
+tests/render/t1-canvas.test.tsx > chrome and views moves aria-pressed across all four view controls
+tests/render/t1-canvas.test.tsx > chrome and views renders the four existing view labels on the owner debate canvas
+tests/render/t1-canvas.test.tsx > chrome and views uses the compact 1a instrument chrome instead of the legacy action toolbar
+tests/render/t1-canvas.test.tsx > set-aside and synthesis shows the public challenge lock without inventing regeneration
+tests/render/t3-library.test.tsx > chrome keeps the TopBar mode toggle visible in the real signed-in document
+tests/render/t3-library.test.tsx > chrome keeps the global TopBar visible without a landing marker
+tests/render/t3-library.test.tsx > chrome keeps the real layout TopBar as a direct appShell child
+tests/render/t3-library.test.tsx > chrome keeps the signed-in library chrome and excludes the anonymous landing
+tests/render/t3-library.test.tsx > chrome mounts a working mode toggle in the signed-in TopBar
+tests/render/t3-library.test.tsx > chrome mounts an enabled mode toggle in the auth TopBar
+tests/render/t3-library.test.tsx > chrome pins the real signed-in render to zero landing markers
+tests/render/t3-library.test.tsx > chrome renders the signed-in composer copy
+tests/render/t3-library.test.tsx > chrome suppresses the TopBar in the real anonymous landing document
+tests/render/t3-library.test.tsx > chrome suppresses the global TopBar when the landing is the document
+tests/render/t3-library.test.tsx > lists renders a live count for the three Public debates rows
+tests/render/t3-library.test.tsx > lists renders every library row as a shell/core bezel
+tests/render/t3-library.test.tsx > lists renders recased native selectors and a live count for the four Your debates rows
+tests/render/t3-library.test.tsx > lists renders the public search-indexing disclosure once under the list and never on Yours
+tests/render/t9-landing.test.tsx > T9-C1 route split & chrome keeps the route branch immediate and the landing a server component
+tests/render/ui02d-model-identity.test.tsx > UI-02d renders recorded house, family, and exact model id pins the map maker prop through the rendered readout
+tests/render/ui02e-debate-canvas.test.tsx > UI-02e renders the real DebateCanvas gate surface keeps typed maker and score absence visible instead of collapsing to silence
+tests/unit/registration.test.ts > S3 ruled authentication policy S3c B4 keeps the isolated production RSS curve below the published measured bound
+tests/unit/text-control-bytes.test.ts > HYG-01 tracked text control-byte guard finds no forbidden raw control bytes in cached or untracked repository text sources
+tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps kills MUT-A: deleting the V3ScoreBadges JSX render site
+tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps kills MUT-C: deleting the maker meta line from the contentful node header
+tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps uses DR-160 content-aware overflow instead of a fixed collapse breakpoint
+tests/unit/v2ui-pages.test.ts > UI-02d — every non-canvas maker surface preserves its recorded maker prop pins tree, thread, outline, split, map, and drawer at all eight call sites
+tests/unit/v2ui-pages.test.ts > XREV-01 — node review uses the existing V2 card and drawer vocabulary shows typed review outcome and reviewer house on cards, including honest absence

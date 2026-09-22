@@ -17,13 +17,24 @@ import {
  * (goal-v4 lines 80-96). Consumers (T3, T7, T9, T11, T17) READ these rows; no
  * consumer may carry a code constant for any value below.
  *
- * Values: goal-v4 lines 80-96 seed δ=0.02, ε=0.01, γ=0.05, high=0.70, low=0.35
- * and the evaluator loop max = 3. Mission DECISIONS.md J1 rules the values the
- * goal omits: dispersion scale 1.0, disagreement threshold 0.25,
+ * Values: goal-v4 lines 80-96 SEEDED δ=0.02, ε=0.01, γ=0.05, high=0.70,
+ * low=0.35 and the evaluator loop max = 3. Mission DECISIONS.md J1 rules the
+ * values the goal omits: dispersion scale 1.0, disagreement threshold 0.25,
  * repeated-family multiplier 0.5, downgrade bands = the engine's existing band
  * vocabulary one step down, and the provider→family map as the relay layer
  * names its makers, with an unmapped provider yielding family kind UNKNOWN
  * (packages/judgement/src/s04.ts:289 exempts UNKNOWN from the discount).
+ *
+ * D77 (c) REFITTED the two adaptive-stopping thresholds from the first real
+ * M≥2 run (D77 (b) reads the measurements out of that run's own database):
+ * δ 0.02 → 0.01 and ε 0.01 → 0.005. The seeds were coarse against the measured
+ * scale — 0.02 would have called "converged" a round that moved a root by more
+ * than the 0.0113 margin that decided the winner, and 0.01 would have frozen
+ * four of the six plan branches. 0.01 sits just under that margin and 0.005
+ * keeps the goal's δ = 2ε ratio. δ and ε therefore cite D77, the ruling that
+ * CHOSE them; γ, the two cuts and the evaluator loop max still cite the goal,
+ * and the J2 companions (dispersion scale, disagreement threshold) are
+ * explicitly NOT refitted by D77 (c) and keep J1.
  */
 
 export const ADAPTIVE_STOPPING_ROW_KEYS = Object.freeze([
@@ -79,6 +90,13 @@ export const ALGORITHM_REGISTER_ROW_KEYS = Object.freeze(
 
 /** Ruling provenance appended to each row's deployment source ref. */
 export const T16_GOAL_RULING_REF = "goal-v4-2026-09-01:80-96" as const;
+/**
+ * D77 (c): V refitted δ and ε from the first real M≥2 run. The goal only
+ * SEEDED that pair, so after the refit the goal ref would name a ruling that no
+ * longer chose either value — a false ref is audit poison (J8). These two rows,
+ * and no others, move to the ruling that did choose them.
+ */
+export const T16_REFIT_RULING_REF = "algorithm-live-loop-DECISIONS.md#D77" as const;
 export const T16_JUDGE_RULING_REF = "algorithm-live-loop-DECISIONS.md#J1" as const;
 /**
  * J1 rules EXACTLY five values and never mentions the role identities; ruling
@@ -243,8 +261,8 @@ export function buildAlgorithmRegisterRows(
   const synthesisDeadlineMs = Math.max(SYNTHESIS_ROLE_DEADLINE_FLOOR_MS, judgeDeadlineMs);
   const ref = (ruling: string): string => `${deployment}+${ruling}`;
   const rows: readonly AlgorithmRegisterRow[] = [
-    { rowKey: "globalStopDelta", value: { kind: "GLOBAL_STOP_DELTA", delta: 0.02 }, sourceRef: ref(T16_GOAL_RULING_REF) },
-    { rowKey: "branchFreezeEpsilon", value: { kind: "BRANCH_FREEZE_EPSILON", epsilon: 0.01 }, sourceRef: ref(T16_GOAL_RULING_REF) },
+    { rowKey: "globalStopDelta", value: { kind: "GLOBAL_STOP_DELTA", delta: 0.01 }, sourceRef: ref(T16_REFIT_RULING_REF) },
+    { rowKey: "branchFreezeEpsilon", value: { kind: "BRANCH_FREEZE_EPSILON", epsilon: 0.005 }, sourceRef: ref(T16_REFIT_RULING_REF) },
     { rowKey: "verdictMarginGamma", value: { kind: "VERDICT_MARGIN_GAMMA", gamma: 0.05 }, sourceRef: ref(T16_GOAL_RULING_REF) },
     { rowKey: "verdictHighCut", value: { kind: "VERDICT_HIGH_CUT", highCut: 0.7 }, sourceRef: ref(T16_GOAL_RULING_REF) },
     { rowKey: "verdictLowCut", value: { kind: "VERDICT_LOW_CUT", lowCut: 0.35 }, sourceRef: ref(T16_GOAL_RULING_REF) },

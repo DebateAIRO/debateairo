@@ -34,9 +34,18 @@ describe("S04 DDL and runtime attachment contract", () => {
     expect(register).toContain('CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY = "claimTypeCompositionMap"');
     expect(register).toContain("readClaimTypeCompositionMap");
     expect(register).toContain("CLAIM_TYPE_COMPOSITION_MAP_UNRESOLVED");
-    // pin updated 2026-09-02: the runner's loud register read moved from main.ts into readDevelopmentRunnerPolicy (dev-runner-policy.ts), which main.ts awaits at startup (dev drift, see docs/missions/2026-09-01-security-hardening/VERIFICATION.md)
-    expect(runnerMain).toContain("readDevelopmentRunnerPolicy(");
+    // Commit 2d1f86b8 moved the runner's register reads behind one loader:
+    // main.ts calls readDevelopmentRunnerPolicy (DECISIONS.md T14a-G2 —
+    // "readDevelopmentRunnerPolicy is NOT unwired — it is called at
+    // apps/runner/src/main.ts:41"), and that loader performs the loud DR-128
+    // read and its provenance check. Re-pointing at the loader also lets this
+    // contract pin what the bare `toContain` never did: that the row actually
+    // REACHES the runner. A duplicate read in main.ts would add a second query,
+    // not a second safeguard.
     expect(runnerPolicy).toContain("readClaimTypeCompositionMap");
+    expect(runnerPolicy).toContain("DEV_RUNNER_POLICY_PROVENANCE_INVALID");
+    expect(runnerMain).toContain("readDevelopmentRunnerPolicy");
+    expect(runnerMain).toContain("compositionRow: policy.compositionRow");
   });
 
   it("DR-077 records declared selection-rule provenance and attaches selection to the runner", async () => {
