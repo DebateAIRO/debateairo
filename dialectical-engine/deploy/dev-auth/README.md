@@ -30,6 +30,25 @@ run the **hosted** mode instead — it reaches paid vendor APIs over the network
 keeps each vendor key in a file only its service can read, and refuses to start
 a relay at all. Its instructions are `deploy/vps/README.md` §11.
 
+### The local-mode hardening list
+
+What local mode still owes, one line per vendor tool. Each item is done on its
+own, and none of them is done by guesswork: a tool moves off the command line
+only when a test proves it does not hang with its standard input closed to the
+prompt.
+
+| Tool | Today | Owed |
+|---|---|---|
+| `claude` (`acceptance/claude-relay.ts`) | prompt passed as an argument (DR-133) | pass by stdin or a private file once that tool reliably supports it, with a no-hang proof |
+| `codex` (`acceptance/model-shim.ts`) | prompt passed as an argument (DR-133) | pass by stdin or a private file once that tool reliably supports it, with a no-hang proof |
+| `grok` (`acceptance/grok-relay.ts`) | prompt passed as an argument (DR-133) | pass by stdin or a private file once that tool reliably supports it, with a no-hang proof |
+| `hermes` (`acceptance/hermes-relay.ts`, the support chat's relay) | prompt passed as an argument (DR-133) | pass by stdin or a private file once that tool reliably supports it, with a no-hang proof |
+
+V declined "harden all relays now" (V-30(2)), so nothing on this list is
+half-done in the meantime: every relay still closes its standard input and
+passes the prompt as an argument, which is the behaviour the no-hang decision
+bought.
+
 ## Bounded auth-stack supervisor
 
 After the one-time CA trust setup, the intended entry point is:

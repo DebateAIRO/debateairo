@@ -580,7 +580,14 @@ the same codes listed below, and the vendor's credential is named by `authorizat
 inline. Its members are `provider_ref`, `base_url` (`https:`, path ending in `/v1`), `model` and
 `authorization_file` — the API service's own copy of the key file, from step 2 of the procedure
 below. The support model ref published in the support configuration row must equal the
-`provider_ref` written here, or the chat has no model and answers DEGRADED.
+`provider_ref` written here, or the chat has no model, every answer is DEGRADED, and the log
+carries `SUPPORT_RELAY_NOT_COMPOSED:` and the ref that could not be composed.
+
+**What the support chat cannot tell you yet.** Its spend row records the tokens a vendor
+reports, but most vendors report no money at all, so the `cost_usd` column stays empty and the
+daily call cap is the only ceiling until the cost envelope (V-28) is published. A reply that
+carries no cost is logged once as `SUPPORT_MODEL_COST_UNREPORTED`, so an empty column is never
+mistaken for a call that was free.
 
 `DEBATEAI_DEPLOYMENT_MODE` is read by the strict environment loader of both services, so neither
 can start without answering the question. A production unit that omits it refuses with
