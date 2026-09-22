@@ -169,3 +169,42 @@ describe("DL4-F3 — the runner's gateway factory supplies the per-attempt hook"
     expect(body.split(HOOK)).toHaveLength(2);
   });
 });
+
+/**
+ * V-28 (Task 11) x INT3 — the money seam in the same factory.
+ *
+ * Task 11 wires the per-run and daily money ceilings into every call the
+ * runner's gateway factory delegates, through the `costEnvelope` seam built
+ * from `buildCostEnvelopeSeam`. The seam's own behaviour is driven in
+ * `v28-gateway-cost-envelope.test.ts`; its WIRING inside the factory was
+ * pinned only by the Docker-bound `tests/integration/database.test.ts`, which
+ * CI does not run. The merge of Task 11 onto the INT2 tree (INT3, 2026-09-22)
+ * re-seated that wiring by hand inside the same conflicted hunk as the DL4-F3
+ * hook above, so it gets the same kind of pin, for the same reason: dropped
+ * there, every unit and architecture suite would have stayed green while the
+ * money ceilings silently stopped binding hosted calls.
+ *
+ * The seam closes over the LEASED run id, like the hook, and is written once.
+ */
+describe("V-28 — the runner's gateway factory supplies the money seam", () => {
+  const SEAM = "costEnvelope: buildCostEnvelopeSeam(leasedRunId)";
+
+  function factoryBody(source: string): string {
+    const start = source.indexOf("export function createPostgresProviderGateway");
+    expect(start, "createPostgresProviderGateway is declared").toBeGreaterThan(-1);
+    const next = source.indexOf("\nexport ", start + 1);
+    return source.slice(start, next === -1 ? source.length : next);
+  }
+
+  it("wires the money seam into the call it delegates to, from the leased run id, exactly once", async () => {
+    const body = factoryBody(await readFile(
+      new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8"
+    ));
+    expect(body).toContain("http.call({");
+    expect(body).toContain("const { buildCostEnvelopeSeam, ...gatewayOptions } = options;");
+    expect(body).toContain(SEAM);
+    expect(body.split(SEAM)).toHaveLength(2);
+    // Never a re-read of the request's own run id — the lease is the binding.
+    expect(body).not.toContain("buildCostEnvelopeSeam(request.runId");
+  });
+});
