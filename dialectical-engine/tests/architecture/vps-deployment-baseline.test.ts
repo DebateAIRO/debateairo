@@ -394,7 +394,12 @@ describe("VPS baseline: runbook and environment templates", () => {
       "DATABASE_URL", "API_HOST", "API_PORT", "STRANGER_SAMPLE_RATE", "REGISTER_VERSION", "BATTERY_VERSION",
       "SETTLEMENT_WATCH_HANDLE", "PROVIDER_DISCOVERY_TARGETS_JSON", "HATCHET_CLIENT_TOKEN", "HATCHET_HOST_PORT",
       "HATCHET_API_URL", "HATCHET_TENANT_ID", "HATCHET_WORKFLOW_NAME", "HATCHET_TLS_STRATEGY",
-      "DEBATEAI_DEPLOYMENT_MODE"
+      "DEBATEAI_DEPLOYMENT_MODE",
+      // E-I2: both are REQUIRED by apiEnvironmentShape and by the rotation's
+      // own shape, and both were absent — an api.env built from this example
+      // refused at boot with KEK_UNRESOLVED, and the runbook's rotation command
+      // (which loads this same file) refused before touching a record.
+      "SUPPORT_KEK_PATH", "SUPPORT_DATABASE_URL"
     ]) expect(env.has(key), key).toBe(true);
     expect(env.get("NODE_ENV")).toBe("production");
     // V-9(c): both services answer the same question with the same word, or the
@@ -408,18 +413,19 @@ describe("VPS baseline: runbook and environment templates", () => {
     expect(env.get("HATCHET_TLS_STRATEGY")).toBe("tls");
     expect(env.get("HATCHET_HOST_PORT")).toBe("127.0.0.1:7077");
     expect(env.get("ACCOUNT_ERASURE_GRACE_MS")).toBe("604800000");
-    // Five API principals, one URL each (P3-01: api-runtime, content-provision, authorization,
-    // publication-cleanup, erasure). There is no sixth: MIGRATION_DATABASE_URL is the just-in-time
-    // superuser credential and the manifest invariant NO_LONG_LIVED_SUPERUSER_CREDENTIAL forbids
-    // parking it in an EnvironmentFile.
+    // Six API principals, one URL each (P3-01: api-runtime, content-provision, authorization,
+    // publication-cleanup, erasure, api-support). The sixth is SUPPORT_DATABASE_URL, which the
+    // strict shape requires and this example used to omit (E-I2). There is no seventh:
+    // MIGRATION_DATABASE_URL is the just-in-time superuser credential and the manifest invariant
+    // NO_LONG_LIVED_SUPERUSER_CREDENTIAL forbids parking it in an EnvironmentFile.
     const urls = [...env.entries()].filter(([key]) => key.endsWith("DATABASE_URL"));
-    expect(urls.length).toBe(5);
+    expect(urls.length).toBe(6);
     expect(env.has("MIGRATION_DATABASE_URL")).toBe(false);
     const roles = urls.map(([key, url]) => {
       expect(url, key).toMatch(/^postgresql:\/\/debateai_prod_[a-z_]+:<[a-z-]+>@localhost\/debateai\?host=\/var\/run\/postgresql$/);
       return /^postgresql:\/\/([a-z_]+):/.exec(url)?.[1];
     });
-    expect(new Set(roles).size).toBe(5);
+    expect(new Set(roles).size).toBe(6);
     for (const [key] of env) expect(key).not.toMatch(/^DEBATEAI_DEV_|^EVALUATOR_DEV_MENU/);
   });
 
@@ -481,6 +487,45 @@ describe("VPS baseline: runbook and environment templates", () => {
     expect(readme).toMatch(/only after .*KEYS_ROTATE_KEK_OK/i);
     // Content is never re-encrypted — an operator must not expect a content pass.
     expect(readme).toContain("never re-encrypt");
+  });
+
+  /**
+   * FIX WAVE A-I4 / E-I1 / E-I3. The procedure used to describe a changeover
+   * the code could not perform and a key replacement it left half-done: the
+   * runner's own copy of the KEK was never refreshed, its previous path named a
+   * file `debateai-runner` cannot open, and the paste-as-is block would
+   * overwrite the only copy of the previous key on a second paste.
+   */
+  it("README's rotation procedure covers the runner's copy, both previous paths and a re-run guard", () => {
+    const readme = read("deploy/vps/README.md");
+    const section = readme.slice(
+      readme.indexOf("### Changing a master key (V-3)"),
+      readme.indexOf("## 4. PostgreSQL")
+    );
+    expect(section).not.toBe("");
+    // The runner's own two files: the new key, and a previous key inside a
+    // directory its own user owns.
+    expect(section).toContain("/etc/debateai/runner/kek.bin.new");
+    expect(section).toContain("KEK_PREVIOUS_PATH=/etc/debateai/runner-previous/kek.bin");
+    expect(section).toContain(
+      "install -d -m 0700 -o debateai-runner -g debateai-runner /etc/debateai/runner-previous"
+    );
+    // The re-run guard: a second paste must stop before it can overwrite the
+    // only remaining copy of the previous key.
+    expect(section).toContain("test ! -e /etc/debateai/api-previous/kek.bin");
+    // The restart comes BEFORE the rotation command, which is the order that
+    // makes the changeover work at all.
+    const restart = section.indexOf("systemctl restart debateai-api debateai-runner");
+    const rotate = section.indexOf("rotate-kek-cli.ts");
+    expect(restart).toBeGreaterThan(-1);
+    expect(rotate).toBeGreaterThan(restart);
+    // And the confirmation step: the verified count against the store itself.
+    expect(section).toContain("find /var/lib/debateai/api/user-deks/users -mindepth 1 -maxdepth 1 -type d | wc -l");
+    // Every fenced block in this section is a real command, not a result or a
+    // placeholder to fill in (constraint 10).
+    for (const block of section.matchAll(/```sh\n([\s\S]*?)```/gu)) {
+      expect(block[1], block[1]).not.toMatch(/<[a-z-]+>/u);
+    }
   });
 
   it("api.env.example and runner.env.example both opt into the custody group (V-19)", () => {

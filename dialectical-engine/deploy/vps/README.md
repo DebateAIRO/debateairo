@@ -11,6 +11,30 @@ Audit corrections folded in: `L2-F3` (backups must carry custody, secrets escrow
 `L7-F2` (dedicated Hatchet role), `L7-F3` (no seeded admin credentials), `L7-F7`
 (`ProtectProc=invisible`).
 
+## Known-stale sections — refreshed by Task 14
+
+Measured against the tree at this commit. Each is stale in a way that would stop
+a first provision, so read this list before following the section:
+
+- **§11's hosted provider target example** does not carry
+  `input_price_micros_per_million` / `output_price_micros_per_million`, which
+  both services now REQUIRE in hosted mode: provisioned exactly as printed,
+  each unit refuses at boot with `PROVIDER_TARGET_PRICE_REQUIRED:` and the
+  provider ref.
+- **§11's refusal-code table is incomplete.** Six codes this tree can emit are
+  missing from it: `PROVIDER_TARGET_PRICE_REQUIRED`, `PROVIDER_TARGET_PRICE_ZERO`,
+  `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID`, `COST_ENVELOPE_POLICY_UNRESOLVED`,
+  `COST_ENVELOPE_POLICY_INVALID` and `SUPPORT_ADMISSION_SCOPES_NOT_SEALED`.
+- **"the envelopes are not published yet" (§10) is out of date** as a statement
+  of what the code does: a hosted deployment refuses to start until they are
+  sealed, and the daily call cap is no longer the only ceiling.
+- **"KEK rotation is not implemented" (§10) is false.** It shipped as
+  `pnpm keys:rotate-kek`; §3 "Changing a master key" is the procedure.
+- **`deploy/vps/env/api.env.example`** lacked `SUPPORT_KEK_PATH` and
+  `SUPPORT_DATABASE_URL`, both REQUIRED by the API's shape and by the
+  rotation's. Both keys are in the example now; the §3 layout table below still
+  does not list `support-kek.bin` or the support database principal.
+
 ---
 
 ## 1. Topology
@@ -128,7 +152,7 @@ process start: restart both units after either change.
 | `/etc/debateai/hatchet.env` | `0600` | `root:root` | container `env_file`: `DATABASE_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SERVER_ENCRYPTION_*` |
 | `/etc/debateai/api/` | `0700` | `debateai-api` | `kek.bin`, `corpus-kek.bin`, `blind-index-key.bin`, `audit-source-ip-salt.bin` |
 | `/etc/debateai/api/providers/` | `0700` | `debateai-api` | the API's own copy of each vendor credential (V-9, §11) |
-| `/etc/debateai/runner/` | `0700` | `debateai-runner` | `kek.bin` (the runner's own copy of the same bytes) |
+| `/etc/debateai/runner/` | `0700` | `debateai-runner` | `kek.bin` (the runner's own copy of the same bytes — a master-key rotation must replace this file too, §3 "Changing a master key") |
 | `/etc/debateai/runner/providers/` | `0700` | `debateai-runner` | the runner's own copy of each vendor credential (V-9, §11) |
 | `/etc/debateai/postgres-tls/` | `0700` | `postgres` | `server.crt`, `server.key`, `ca.crt` |
 | `/etc/debateai/hatchet-tls/` | `0755` | `root:root` | `server.crt`, `server.key` (`0640 root:docker`), `ca.crt` |
@@ -176,12 +200,15 @@ One OS user per service is right for almost everything: the UI cannot read `api.
 runner cannot read the blind-index key, the audit key store or the audit source-IP salt.
 
 It did **not** work for one thing. With `CONTENT_ENCRYPTION_ENABLED=true` the runner reads the
-**same** user-DEK store the API writes (`apps/runner/src/main.ts:23-26`). `FileUserDekStore.load`
+**same** user-DEK store the API writes (`apps/runner/src/main.ts:51`, measured at this commit).
+`FileUserDekStore.load`
 required mode **exactly `0600`**, so only the file's owner could read it — two OS users could not
 share that store, and a POSIX ACL does not help because the ACL mask surfaces in the group bits
 and the exact-`0600` check then fails.
 
-The KEK is worked around by giving the runner its own `0600` copy of the same bytes. The DEK store
+The KEK is worked around by giving the runner its own `0600` copy of the same bytes — a copy an
+operator must keep in step by hand, which is why a master-key rotation replaces the runner's file
+as well as the API's (§3 "Changing a master key"). The DEK store
 cannot be: the API writes it continuously and a copy would go stale. V ruled the custody group,
 keeping three users, because running one user would hand the runner — the process that talks to
 third-party model CLIs — the identity key material it must never touch.
@@ -236,21 +263,97 @@ It re-wraps keys and **never re-encrypts content**: a master key wraps data keys
 only, so once a user's DEK is re-wrapped every debate under it opens exactly as
 before, untouched.
 
-Provision the new key beside the old one, then point the service at the new key
-and name the old one as the previous key. Both services read both keys for the
-length of the changeover:
+**The order below is the whole procedure.** Do not reorder it. Every step
+depends on the one before it, and two orders that look equivalent are not: a
+rotation run before the restart re-wraps records the still-running services then
+write again under the old key, and a restart done before the previous key is
+named makes every existing record unreadable until the rotation catches up.
+
+A service holds its keys as a RING: the current key, plus the previous one while
+a `*_KEK_PREVIOUS_PATH` is set. It tries the current key first and then the
+previous one, and it always WRITES under the current key — so from the restart
+onward the changeover only shrinks. The previous path is absent in the steady
+state and that is the normal shape of these files.
+
+#### Step 1 — place the new key, keep the old one
+
+The user-DEK KEK exists as two files: the API's and the runner's own `0600`
+copy of the same bytes. Both are replaced, and each service gets a previous-key
+file **its own user can open** — the runner cannot read anything under
+`/etc/debateai/api-previous`, which is `0700 debateai-api`.
+
+The block is one `&&` chain that begins by refusing to run twice. A second paste
+must never overwrite `api-previous/kek.bin`: that file is the only remaining
+copy of the key every stored record is still wrapped under, and losing it loses
+every private debate. Run as root:
 
 ```sh
-install -d -m 0700 -o debateai-api -g debateai-api /etc/debateai/api-previous
-cp -a /etc/debateai/api/kek.bin /etc/debateai/api-previous/kek.bin
-head -c 32 /dev/urandom > /etc/debateai/api/kek.bin.new
-chown debateai-api:debateai-api /etc/debateai/api/kek.bin.new
-chmod 0600 /etc/debateai/api/kek.bin.new
-mv /etc/debateai/api/kek.bin.new /etc/debateai/api/kek.bin
+test ! -e /etc/debateai/api-previous/kek.bin \
+  && test ! -e /etc/debateai/runner-previous/kek.bin \
+  && install -d -m 0700 -o debateai-api -g debateai-api /etc/debateai/api-previous \
+  && install -d -m 0700 -o debateai-runner -g debateai-runner /etc/debateai/runner-previous \
+  && cp -a /etc/debateai/api/kek.bin /etc/debateai/api-previous/kek.bin \
+  && cp -a /etc/debateai/runner/kek.bin /etc/debateai/runner-previous/kek.bin \
+  && (umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/kek.bin.new) \
+  && install -m 0600 -o debateai-runner -g debateai-runner /etc/debateai/api/kek.bin.new /etc/debateai/runner/kek.bin.new \
+  && chown debateai-api:debateai-api /etc/debateai/api/kek.bin.new \
+  && mv /etc/debateai/api/kek.bin.new /etc/debateai/api/kek.bin \
+  && mv /etc/debateai/runner/kek.bin.new /etc/debateai/runner/kek.bin
 ```
 
-Add `KEK_PREVIOUS_PATH=/etc/debateai/api-previous/kek.bin` to `api.env` and
-`runner.env`, restart both units, then run the rotation as the API user:
+If the chain stops at the first `test`, a changeover is already in progress:
+finish or retire that one (last step) before starting another. Nothing has been
+written when it stops there.
+
+The corpus and support KEKs have no runner copy — only the API and the rotation
+command ever open them — so their previous copies live beside the API's. The
+support KEK's file name is checked: it must be exactly `support-kek.bin`
+wherever it lives. Rotate whichever of the two you are rotating, as root:
+
+```sh
+test ! -e /etc/debateai/api-previous/corpus-kek.bin \
+  && cp -a /etc/debateai/api/corpus-kek.bin /etc/debateai/api-previous/corpus-kek.bin \
+  && (umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/corpus-kek.bin.new) \
+  && chown debateai-api:debateai-api /etc/debateai/api/corpus-kek.bin.new \
+  && mv /etc/debateai/api/corpus-kek.bin.new /etc/debateai/api/corpus-kek.bin
+```
+
+```sh
+test ! -e /etc/debateai/api-previous/support-kek.bin \
+  && cp -a /etc/debateai/api/support-kek.bin /etc/debateai/api-previous/support-kek.bin \
+  && (umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/support-kek.bin.new) \
+  && chown debateai-api:debateai-api /etc/debateai/api/support-kek.bin.new \
+  && mv /etc/debateai/api/support-kek.bin.new /etc/debateai/api/support-kek.bin
+```
+
+#### Step 2 — name the previous keys in both `EnvironmentFile`s
+
+In `/etc/debateai/api.env`, add the line for each key being rotated:
+`KEK_PREVIOUS_PATH=/etc/debateai/api-previous/kek.bin`,
+`CORPUS_KEK_PREVIOUS_PATH=/etc/debateai/api-previous/corpus-kek.bin`,
+`SUPPORT_KEK_PREVIOUS_PATH=/etc/debateai/api-previous/support-kek.bin`.
+
+In `/etc/debateai/runner.env`, add
+`KEK_PREVIOUS_PATH=/etc/debateai/runner-previous/kek.bin` — the runner's own
+copy, not the API's. The runner has no corpus or support key, and its strict
+shape carries no setting for one.
+
+A previous path that resolves to the same bytes as the current key is refused at
+start-up with `KEK_RING_NOT_A_CHANGEOVER`: every record would look
+already-current whichever key really wrapped it, so a verification pass over it
+would mean nothing.
+
+#### Step 3 — restart both services
+
+They now hold both keys, and every new record they write is wrapped under the
+new one. Nothing is unreadable during this window, which is what makes the
+rotation an ordinary maintenance task rather than an outage:
+
+```sh
+systemctl restart debateai-api debateai-runner
+```
+
+#### Step 4 — run the rotation
 
 `sudo -u` does not read the unit's `EnvironmentFile`, so the command needs it loaded explicitly.
 `systemd-run` does that without ever putting a secret on a command line or in the process list:
@@ -274,11 +377,8 @@ ids of anything it could not open — user and session UUIDs, the same identifie
 directory names in the store. It contains no key material. Keep it until the retirement step is
 done: on a failure it is the list of records to investigate.
 
-`CORPUS_KEK_PREVIOUS_PATH` and `SUPPORT_KEK_PREVIOUS_PATH` work the same way for
-the other two keys; the support KEK's file is always named `support-kek.bin`, so
-its previous copy lives in its own `0700` directory. The support half connects as
-`debateai_support`, which is the only principal granted `UPDATE` on those two
-columns.
+The support half connects as `debateai_support`, which is the only principal
+granted `UPDATE` on those two columns.
 
 The command prints one line per store, prefixed with the key id it rotated **to** — so a swapped
 current and previous is visible rather than inferred — and five counts: re-wrapped, already
@@ -293,20 +393,62 @@ means the store exists and the command could not rotate it, and always does.
 It is idempotent and resumable: a record already under the current key is skipped, so an
 interrupted run is finished by running it again.
 
-**Retire the old key only after a clean `KEYS_ROTATE_KEK_OK`.** On
+#### Step 5 — confirm the pass covered everything
+
+`KEYS_ROTATE_KEK_OK` is necessary and not sufficient on its own. Each file
+store's report ends with a `verified` count, taken from a SECOND listing of the
+store after the re-wrap pass — so a record written while the pass ran is seen,
+verified and, if it is still under the old key, named and the run failed. Check
+that the count the report printed for `user-deks` equals the number of user
+directories in the store:
+
+```sh
+find /var/lib/debateai/api/user-deks/users -mindepth 1 -maxdepth 1 -type d | wc -l
+```
+
+And, where publication is enabled, for `publication-keys`:
+
+```sh
+find /var/lib/debateai/api/publication-keys/publications -mindepth 1 -maxdepth 1 -type d | wc -l
+```
+
+Equal counts, `0 unreadable` and no `NOT COVERED` line is the pass. A count
+LOWER than the directory count means the command was pointed at a store it did
+not fully see — the wrong path, or a record directory it refused — and the old
+key must not be retired.
+
+#### Step 6 — retire the previous key
+
+**Only after a clean `KEYS_ROTATE_KEK_OK` and a matching count.** On
 `KEYS_ROTATE_KEK_FAILED` the output names every record that opened under no key, each with the
 typed code that refused it, and names any store the command could **not** cover — a store it never
 opened is never a clean store;
 keep the previous key in place, investigate those records, and run it again.
-Once the pass is clean, remove the `*_KEK_PREVIOUS_PATH` lines, restart the
-units and destroy the old key files — their absence is the normal steady state:
+
+Once the pass is clean, remove every `*_KEK_PREVIOUS_PATH` line from `api.env`
+and `runner.env`, restart both units so neither process holds the old key any
+more, and only then destroy the old key files. Their absence is the normal
+steady state, and the shred is what makes the rotation meaningful:
 
 ```sh
-shred -u /etc/debateai/api-previous/kek.bin
-rmdir /etc/debateai/api-previous
+systemctl restart debateai-api debateai-runner
 ```
 
-Run it in a maintenance window. Every support row it writes re-runs a
+```sh
+shred -u /etc/debateai/api-previous/kek.bin /etc/debateai/runner-previous/kek.bin
+```
+
+Shred the corpus and support previous keys too if you rotated them, then remove
+the two directories:
+
+```sh
+rmdir /etc/debateai/api-previous /etc/debateai/runner-previous
+```
+
+`rmdir` refusing means a previous key is still there: read what is in the
+directory before deleting anything.
+
+Run the whole procedure in a maintenance window. Every support row it writes re-runs a
 consistency check that briefly serialises support writes, so a rotation and a
 busy support hour should not overlap. Rehearse it first: take a copy of the
 custody tree and a scratch database, rotate the copy, and confirm the pass is
@@ -600,7 +742,7 @@ can start without answering the question. A production unit that omits it refuse
 | `DEPLOYMENT_MODE_UNRESOLVED` | `NODE_ENV=production` with no `DEBATEAI_DEPLOYMENT_MODE`. |
 | `DEPLOYMENT_MODE_INVALID` | a value that is not exactly `hosted` or `local`, leading or trailing space included. |
 | `PROVIDER_BASE_URL_TLS_REQUIRED:` and the provider ref | a target whose `base_url` is not `https:`. |
-| `PROVIDER_TARGET_LOOPBACK_REFUSED:` and the provider ref | a base URL that NAMES this machine — a relay or a local model server. Any spelling of it: the whole `127.0.0.0/8`, `0.0.0.0/8` and `169.254.0.0/16` ranges, `::`, `::1` and `fe80::/10`, their IPv4-mapped forms, and the names `localhost`, `localhost.localdomain`, `ip6-localhost`, `ip6-loopback` or anything under `.localhost`. |
+| `PROVIDER_TARGET_LOOPBACK_REFUSED:` and the provider ref | a base URL that names this machine or any address no public vendor API can live at. One code covers them all for now: the whole `127.0.0.0/8`, `0.0.0.0/8` and `169.254.0.0/16` ranges, `::`, `::1` and `fe80::/10`; the private ranges `10.0.0.0/8`, `172.16.0.0/12` and `192.168.0.0/16`, the CGNAT range `100.64.0.0/10` and the IPv6 unique-local range `fc00::/7`; the IPv4-mapped form of any of those; **this host's own interface addresses**, read at start-up; and the names `localhost`, `localhost.localdomain`, `ip6-localhost`, `ip6-loopback` or anything under `.localhost`. A hostname that RESOLVES to one of these is still admitted — no name resolution is done — so a vendor's hostname being a genuine public endpoint remains the operator's responsibility. |
 | `PROVIDER_INLINE_CREDENTIAL_REFUSED:` and the provider ref | a credential written into `PROVIDER_DISCOVERY_TARGETS_JSON` instead of a file. |
 | `PROVIDER_AUTHORIZATION_FILE_ABSENT:` and the provider ref | nothing is provisioned at that `authorization_file` path. Provision the file; do not go looking at the one that is there, because there is not one. The reader's own code for this, if you meet it in the source, is `PROVIDER_CREDENTIAL_FILE_ABSENT`. |
 | `PROVIDER_AUTHORIZATION_FILE_UNUSABLE:` the provider ref, then the reason | the credential file is there but cannot be used: it failed custody (`SECRET_CUSTODY_INVALID`), the custody group could not be resolved (`CUSTODY_GROUP_UNRESOLVED`), or its contents are not one printable header line (`PROVIDER_CREDENTIAL_FILE_INVALID`). Neither the path nor a byte of the credential appears in the message. |
@@ -681,12 +823,20 @@ An `authorization_header` member alongside `authorization_file` refuses with
 **4. Publish the register row at a new version.** The configured-providers row
 (`configuredProviderSet`) is **superseded, never edited**: publish a new register version carrying
 the row with one more entry — `providerRef`, `adapterKind` (`openai-compatible-http` for any
-OpenAI-compatible vendor), `maker`, and the `vetting` record from step 1. The builder and the shape
-it enforces are `buildConfiguredProviderSetDeploymentRow` in
-`packages/register/src/configured-provider-set.ts`; publication uses this deployment's ordinary
-register publication path, and `REGISTER_VERSION` in both `EnvironmentFile`s then names the new
-version. Every `provider_ref` in step 3 must appear in this row and in the same order, or both
-services refuse at boot with `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`.
+OpenAI-compatible vendor), `maker`, and the `vetting` record from step 1. The shape is built and
+enforced by `buildConfiguredProviderSetDeploymentRow` in
+`packages/register/src/configured-provider-set.ts`, which `publishGeneral` now applies itself: that
+call takes the deployment (`"hosted"` or `"local"`) and a hosted publication carrying an unvetted
+vendor is refused there rather than at boot.
+
+**There is no hosted publish command yet.** This step is the register publication path — the same
+one the deployment's other rows go through — driven by whoever publishes a register version on
+this host; nothing in `deploy/vps/` runs it for you, and the seeder under `apps/runner/src` is the
+DEVELOPMENT one. Until a hosted command exists, expect to publish the row through that path by
+hand and to verify the new version before restarting anything. `REGISTER_VERSION` in both
+`EnvironmentFile`s then names the new version. Every `provider_ref` in step 3 must appear in this
+row and in the same order, or both services refuse at boot with
+`PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`.
 
 Restart `debateai-api` and `debateai-runner` after steps 3 and 4. A vendor whose endpoint does not
 answer the health probe is reported ABSENT and simply does not join a panel; it does not stop the
