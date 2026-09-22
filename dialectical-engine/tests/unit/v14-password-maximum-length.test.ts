@@ -98,14 +98,40 @@ describe("V-14 the password maximum length is register policy", () => {
     expect(deploymentRow("passwordPolicy").sourceRef)
       .toContain(sealedRow("passwordPolicy").sourceRef);
     expect(deploymentRow("passwordPolicy").sourceRef).toMatch(/V-14/);
-    // Every other authentication row is republished byte-for-byte.
+    // Every row the deployment set does not supersede is republished
+    // byte-for-byte. Two rows are superseded: this one, and `rateLimitPolicy`
+    // under V-25, whose own addition is checked just below.
     expect(AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS.map((row) => row.rowKey))
       .toEqual(AUTH_POLICY_REGISTER_ROWS.map((row) => row.rowKey));
     for (const row of AUTH_POLICY_REGISTER_ROWS) {
-      if (row.rowKey === "passwordPolicy") continue;
+      if (row.rowKey === "passwordPolicy" || row.rowKey === "rateLimitPolicy") continue;
       expect(deploymentRow(row.rowKey).value).toEqual(row.value);
       expect(deploymentRow(row.rowKey).sourceRef).toBe(row.sourceRef);
     }
+  });
+
+  it("supersedes rateLimitPolicy by ONE added member and moves nothing else (V-25)", () => {
+    // The same guarantee V-14 gives for the password row, for the row V-25
+    // supersedes: strip the one member the new version adds and what is left
+    // must be the sealed row, member for member.
+    const sealed = sealedRow("rateLimitPolicy").value as {
+      sketch_design: Readonly<Record<string, unknown>>;
+    };
+    const deployed = deploymentRow("rateLimitPolicy").value as {
+      sketch_design: Readonly<Record<string, unknown>>;
+    };
+    const {
+      isolated_limiter_resident_measurement_versions: added,
+      ...republished
+    } = deployed.sketch_design;
+    expect(added).toBeDefined();
+    expect(republished).toEqual(sealed.sketch_design);
+    expect({ ...deployed, sketch_design: republished }).toEqual(sealed);
+    expect(Object.hasOwn(sealed.sketch_design, "isolated_limiter_resident_measurement_versions"))
+      .toBe(false);
+    expect(deploymentRow("rateLimitPolicy").sourceRef)
+      .toContain(sealedRow("rateLimitPolicy").sourceRef);
+    expect(deploymentRow("rateLimitPolicy").sourceRef).toMatch(/V-25/);
   });
 
   it("refuses a published row whose maximum is below its own minimum", () => {
