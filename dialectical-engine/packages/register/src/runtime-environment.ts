@@ -516,11 +516,20 @@ const keyRotationEnvironmentShape = {
   // touches nothing else, so it asserts the support role alone
   // (assertSupportPrincipalRole) and never holds the runtime credential.
   SUPPORT_DATABASE_URL: z.string().url(),
-  DEBATEAI_CUSTODY_GROUP: z.string().min(1).optional()
+  DEBATEAI_CUSTODY_GROUP: z.string().min(1).optional(),
+  /**
+   * C-I7. Present for the production floors alone, which is the rule C1 wrote
+   * and `tests/unit/production-environment-floors.test.ts` pins: EVERY loader
+   * floors every `*_DATABASE_URL` in production. Without it this command was
+   * the one place `SUPPORT_DATABASE_URL` was never floored — and it is the
+   * command that rewrites both support key columns, so an off-box support
+   * database with no verified TLS carried the whole re-wrap in cleartext.
+   */
+  NODE_ENV: nodeEnvironment
 } as const;
 
 export function parseKeyRotationEnvironment(source: EnvironmentSource) {
-  return parseEnvironmentSource(keyRotationEnvironmentShape, source);
+  return withProductionFloors(parseEnvironmentSource(keyRotationEnvironmentShape, source));
 }
 
 export function loadKeyRotationEnvironment() {

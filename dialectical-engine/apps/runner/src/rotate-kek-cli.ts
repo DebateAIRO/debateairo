@@ -239,9 +239,18 @@ export function keyRotationEnvironmentCode(error: unknown): string {
     if (names.length > 0) return `KEYS_ROTATE_KEK_ENVIRONMENT_INVALID:${names.join(",")}`;
   }
   const code = (error as { readonly code?: unknown } | null)?.code;
-  return typeof code === "string" && code !== ""
-    ? code
-    : "KEYS_ROTATE_KEK_ENVIRONMENT_INVALID";
+  if (typeof code === "string" && code !== "") return code;
+  // C-I7: the production floors refuse with the code as the MESSAGE of a bare
+  // TypeError — `DATABASE_URL_TLS_REQUIRED:SUPPORT_DATABASE_URL` — which is
+  // this loader's house style and names the variable, exactly what M5 asks of
+  // this line. Only a message that IS a typed code is accepted: prose carries
+  // spaces and lower case and can hold a path or a value, and none of it may
+  // reach the printed line.
+  const message = (error as { readonly message?: unknown } | null)?.message;
+  if (typeof message === "string" && /^[A-Z][A-Z0-9_]*(?::[A-Za-z0-9_,.-]+)?$/u.test(message)) {
+    return message;
+  }
+  return "KEYS_ROTATE_KEK_ENVIRONMENT_INVALID";
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

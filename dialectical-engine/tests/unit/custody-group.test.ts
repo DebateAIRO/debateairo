@@ -245,7 +245,25 @@ describe("V-19 custody group: resolving the group name to a gid", () => {
   it("takes a numeric setting as the gid without reading any host file", () => {
     const refuse = (): string => { throw new Error("the group database must not be read"); };
     expect(resolveCustodyGroupGid("4242", refuse)).toBe(4242);
-    expect(resolveCustodyGroupGid(" 0 ", refuse)).toBe(0);
+    expect(resolveCustodyGroupGid(" 1 ", refuse)).toBe(1);
+    // The whole uint32 gid range, and nothing above it.
+    expect(resolveCustodyGroupGid("4294967295", refuse)).toBe(0xffff_ffff);
+  });
+
+  /**
+   * Minor (final review A). A numeric setting was taken as the gid unchecked,
+   * so `0` — root/wheel — and any safe integer above the uint32 gid range
+   * became the custody gid. Fail-closed either way (no file can carry an
+   * impossible gid, and a gid-0 file is root's regardless), but the typo
+   * surfaced as `KEK_CUSTODY_INVALID` at the first key open instead of the
+   * boot-time `CUSTODY_GROUP_UNRESOLVED` V-19 promises the operator.
+   */
+  it("refuses a numeric gid that cannot be a custody group", () => {
+    const refuse = (): string => { throw new Error("the group database must not be read"); };
+    for (const value of ["0", " 0 ", "4294967296", "9007199254740992"]) {
+      expect(() => resolveCustodyGroupGid(value, refuse), value)
+        .toThrowError(expect.objectContaining({ code: "CUSTODY_GROUP_UNRESOLVED" }));
+    }
   });
 
   it("resolves a name through the group database", () => {

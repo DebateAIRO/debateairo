@@ -578,7 +578,14 @@ export function resolveCustodyGroupGid(
   if (value === "") return undefined;
   if (/^[0-9]+$/.test(value)) {
     const gid = Number(value);
-    if (!Number.isSafeInteger(gid)) throw new CustodyGroupUnresolvedError();
+    // A gid is a uint32, and `0` is root/wheel — a group every privileged
+    // process is already in, which is not a custody boundary at all. Both were
+    // accepted unchecked, so a typo became the custody gid and surfaced as
+    // KEK_CUSTODY_INVALID at the first key open instead of here, which is what
+    // V-19 promises the operator (final review A, Minor).
+    if (!Number.isSafeInteger(gid) || gid <= 0 || gid > 0xffff_ffff) {
+      throw new CustodyGroupUnresolvedError();
+    }
     return gid;
   }
   if (!GROUP_NAME.test(value)) throw new CustodyGroupUnresolvedError();
@@ -776,9 +783,12 @@ function readCustodyFile(
     return material;
   } catch (error) {
     material?.fill(0);
-    // A misconfigured custody group is an operator error, not an unsafe key:
-    // it keeps its own code all the way out so the boot message names it.
-    if (error instanceof CustodyGroupUnresolvedError) throw error;
+    // A `CustodyGroupUnresolvedError` branch stood here. Nothing inside the try
+    // above can throw one: the group is resolved ONCE, in
+    // `configureCustodyGroup`, before the first key file is opened, and
+    // `currentCustodyGid()` only reads the variable it left behind. Dead since
+    // the group became eager; removed so no reader believes this path can
+    // report that refusal (final review A, Minor).
     if (error instanceof CryptoCustodyError || error instanceof KekUnresolvedError) throw error;
     // V-9(2): a bounded credential file's own content refusal keeps its name too.
     if (error instanceof ProviderCredentialInvalidError) throw error;
