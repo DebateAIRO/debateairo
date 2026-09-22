@@ -17,6 +17,7 @@ import {
   createWrappedSupportSessionKey
 } from "../../apps/api/src/support/session.js";
 import type { SupportApplication } from "../../apps/api/src/support/index.js";
+import { createEvalSourcePseudonym,supportEvalKekMaterial } from "./sourcePseudonym.js";
 import {
   migrate,
   PostgresSupportCaseRepository,
@@ -390,8 +391,9 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
     const secrets = join(keyRoot,"secrets");
     await mkdir(secrets,{ mode: 0o700 });
     const supportKekPath = join(secrets,"support-kek.bin");
-    await writeFile(supportKekPath,Buffer.alloc(32,0x65),{ mode: 0o600 });
+    await writeFile(supportKekPath,supportEvalKekMaterial(),{ mode: 0o600 });
     keys = await createSupportKeyPort({ supportKekPath });
+    const sourcePseudonym = createEvalSourcePseudonym(keys);
     const sessionRepository = new PostgresSupportSessionRepository(
       database.pool,createWrappedSupportSessionKey(keys)
     );
@@ -445,11 +447,9 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
     });
     const support: SupportApplication = Object.freeze({
       configuration: Object.freeze({ current: async () => EVAL_CONFIGURATION }),
-      // DL5-F3: the real keyed derivation, as production wires it, so the harness
-      // stores what production stores: the disposable database enforces the 64-hex
-      // CHECK on support.admission_event.ip_sha256, which a labelled stand-in failed
-      // on every session open (0/60, "execution" on every case).
-      sourcePseudonym: (value: string) => keys!.sourcePseudonym(value),
+      // DL5-F3 / FW-E: production's keyed derivation. The harness DOES store
+      // this value, under a CHECK that only 64 lowercase hex characters pass.
+      sourcePseudonym,
       sessions: Object.freeze({
         create: sessionRepository.create.bind(sessionRepository),
         read: sessionRepository.read.bind(sessionRepository),
