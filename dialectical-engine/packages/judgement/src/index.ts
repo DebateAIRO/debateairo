@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
-import { CLAIM_TYPES, REVIEW_OUTCOMES, TypedDomainError, type ReviewOutcome, type WayOfKnowing } from "@debateai/kernel";
+import { CLAIM_TYPES, REVIEW_OUTCOMES, TypedDomainError, isRunLevelSpendStop, type ReviewOutcome, type WayOfKnowing } from "@debateai/kernel";
 import {
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
@@ -538,6 +538,11 @@ export class Judge {
           `${error.code}:${error.lastOutcome}`
         );
       }
+      // V-28: a run-level spend stop is the RUN's, not this member's. Rewriting
+      // it as PROVIDER_ERROR misattributed a money ceiling as a transport fault
+      // AND let the panel continue to the next member, which is another billed
+      // call. It leaves exactly as it arrived.
+      if (isRunLevelSpendStop(error)) throw error;
       throw new PanelMemberFailure("PROVIDER_ERROR", error instanceof Error ? error.message : String(error));
     }
     const parsed = parseStructuredArtifact(response.content, judgeAssessmentSchema);

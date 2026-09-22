@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { TypedDomainError } from "@debateai/kernel";
+import {
+  RUN_LEVEL_SPEND_STOP_CODES,
+  TypedDomainError,
+  isRunLevelSpendStop
+} from "@debateai/kernel";
+import { PanelMemberFailure, runJudgePanel } from "@debateai/judgement";
 import {
   envelopeStopKind,
+  envelopeStopPendingAttempts,
   expansionPhaseStop,
   reviewFailureOutcome
 } from "../../apps/runner/src/index.js";
@@ -108,5 +114,103 @@ describe("R2 — an unbillable vendor ends the run cleanly, under its own name",
 
   it("still lets a real failure travel", () => {
     expect(envelopeStopKind(new TypedDomainError("PROVIDER_CALL_FAILED", "x"))).toBeNull();
+  });
+});
+
+/**
+ * RE-REVIEW C2(b) — THE PANEL PATH ERASED THE REFUSAL.
+ *
+ * `PanelJudge.assess` rewrites every non-Provider error into
+ * `PanelMemberFailure("PROVIDER_ERROR")`, and `runJudgePanel` swallows that into
+ * a MEMBER_FAILED note and carries on to the next member. So a money stop was
+ * misattributed as a transport fault, the loop kept going, and a USAGE stop only
+ * fired after another call had already been made and billed.
+ *
+ * A run-level spend stop is not a member's problem: it is the RUN's, and it must
+ * travel untouched through both.
+ */
+describe("C2(b) — a run-level spend stop is never a panel member failure", () => {
+  it("names the three run-level stops, and nothing else", () => {
+    expect([...RUN_LEVEL_SPEND_STOP_CODES].sort()).toEqual([
+      "DAILY_COST_ENVELOPE_REACHED",
+      "PROVIDER_USAGE_UNREPORTED",
+      "RUN_COST_ENVELOPE_MONEY_REACHED"
+    ]);
+    for (const code of RUN_LEVEL_SPEND_STOP_CODES) {
+      expect(isRunLevelSpendStop(new TypedDomainError(code, "x"))).toBe(true);
+    }
+    // The ATTEMPT ceiling is a run-level bound too, but it is NOT in this set:
+    // it has always been a panel member failure and this package does not
+    // change what it does.
+    expect(isRunLevelSpendStop(new TypedDomainError("RUN_COST_ENVELOPE_EXHAUSTED", "x"))).toBe(false);
+    expect(isRunLevelSpendStop(new TypedDomainError("PROVIDER_CALL_FAILED", "x"))).toBe(false);
+    expect(isRunLevelSpendStop(new TypeError("boom"))).toBe(false);
+  });
+
+  it("rethrows a run-level stop out of runJudgePanel instead of noting it", async () => {
+    const reached: string[] = [];
+    await expect(runJudgePanel({
+      artifactProducerRef: "actor:author",
+      primary: { judgementRef: "j0", assessment: {} as never, memberRole: "primary" },
+      members: [
+        {
+          memberRole: "panel-1", actorRef: "actor:one", contractHash: "c1",
+          judge: async () => {
+            reached.push("panel-1");
+            throw new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "spent");
+          }
+        },
+        {
+          memberRole: "panel-2", actorRef: "actor:two", contractHash: "c2",
+          judge: async () => { reached.push("panel-2"); return { judgementRef: "j2", assessment: {} as never }; }
+        }
+      ]
+    })).rejects.toThrowError(
+      expect.objectContaining({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" })
+    );
+
+    // And it stops the panel where it stood: the second member is never called,
+    // which is the whole point — every further member is another billed call.
+    expect(reached).toEqual(["panel-1"]);
+  });
+
+  it("still records an ordinary member failure as a note", async () => {
+    const panel = await runJudgePanel({
+      artifactProducerRef: "actor:author",
+      primary: { judgementRef: "j0", assessment: {} as never, memberRole: "primary" },
+      members: [{
+        memberRole: "panel-1", actorRef: "actor:one", contractHash: "c1",
+        judge: async () => { throw new PanelMemberFailure("TIMEOUT", "slow"); }
+      }]
+    });
+
+    expect(panel.notes).toHaveLength(1);
+    expect(panel.notes[0]).toMatchObject({ kind: "MEMBER_FAILED", failureKind: "TIMEOUT" });
+  });
+});
+
+/**
+ * RE-REVIEW C3 — THE SERVE LEG ASKED THE ATTEMPT QUESTION FOR A USAGE STOP.
+ *
+ * Round 2 branched on `stop === "MONEY"`, so a USAGE stop fell to
+ * `evaluateEnvelope(1)` — "does one more ATTEMPT fit?" — which for a run with
+ * attempts to spare answers WITHIN, and the catch then rethrew. R2's whole point
+ * was that such a run ends cleanly keeping its work; it did not.
+ *
+ * Only the ATTEMPT stop asks the attempt question. Every other stop forces the
+ * hard stop on its own footing, because a run can have dozens of attempts left
+ * and still be unable to pay for, or bill, a single one.
+ */
+describe("C3 — which question each stop asks of the envelope", () => {
+  it("asks the attempt question only for the attempt ceiling", () => {
+    expect(envelopeStopPendingAttempts("ATTEMPTS"))
+      .toEqual({ pendingModelAttempts: 1, forceHardStop: false });
+  });
+
+  it("forces the hard stop for money and for an unbillable vendor alike", () => {
+    for (const stop of ["MONEY", "USAGE"] as const) {
+      expect(envelopeStopPendingAttempts(stop))
+        .toEqual({ pendingModelAttempts: 0, forceHardStop: true });
+    }
   });
 });

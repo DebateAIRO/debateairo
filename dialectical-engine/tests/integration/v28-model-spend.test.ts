@@ -22,6 +22,14 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * The coordinator should run it on the first host with the engine up. Nothing
  * else in this package depends on it passing; everything above the seam does not
  * touch a database.
+ *
+ * RE-REVIEW: it also carries the two whole-run properties nothing else can
+ * prove, both marked below — that a money refusal raised DURING EXPANSION (and
+ * during root authoring at M=2) ends in the envelope terminal with the produced
+ * components kept, rather than as a FAILED work item. The joints are unit-tested
+ * (`expansionPhaseStop`, `reviewFailureOutcome`, `envelopeStopPendingAttempts`,
+ * `isRunLevelSpendStop`) and the terminal they route into is unit-tested; what
+ * only a real run shows is that the joints are wired into the loops that matter.
  */
 let database: TestDatabase;
 
@@ -210,5 +218,41 @@ describe("V-28 the persisted totals answer the two envelope questions", () => {
       [day]
     );
     expect(reserved.rows[0]?.count).toBe("1");
+  });
+});
+
+/**
+ * RE-REVIEW C1/C2(a) — THE WHOLE-RUN PROPERTY. **NOT RUN — Docker.**
+ *
+ * Sketched rather than finished on purpose: standing a run up to the point where
+ * a second root is authored needs the runner's full settings object, a fake
+ * provider panel and a seeded register, all of which the acceptance harness
+ * already builds. The coordinator should wire this to that harness rather than
+ * to a second, private copy of it — a private copy is how test doubles rot.
+ *
+ * WHAT MUST BE TRUE, written down so the assertion is not re-derived later:
+ *
+ *  1. M = 2. Root 0 is authored and panelled normally. The provider seam refuses
+ *     `RUN_COST_ENVELOPE_MONEY_REACHED` on the FIRST call of root 1.
+ *  2. The work item does NOT fail: `executeWorkItem` resolves.
+ *  3. The run reaches `SERVE_CRASH_CLASSES.ENVELOPE_EXHAUSTED.terminal`, its
+ *     condition marks include `ENVELOPE_EXHAUSTED`, and the condition-mark
+ *     record's reason is `RUN_COST_ENVELOPE_MONEY_REACHED` — not
+ *     `RUN_COST_ENVELOPE_EXHAUSTED`, which would send the operator to raise the
+ *     wrong ceiling.
+ *  4. Root 0's node is among the served node ids: the run KEPT what it produced.
+ *  5. `ledger.model_spend` holds the charges for root 0's calls and nothing for
+ *     the call that was refused before it was made.
+ *
+ *  6. The same, with the refusal raised during EXPANSION rather than root
+ *     authoring, which is the case the temporary 0.25 USD ceiling actually
+ *     produces on every run.
+ *  7. The same, with `PROVIDER_USAGE_UNREPORTED`, whose reason must be its own
+ *     code (ruling R2) and whose terminal must fire even though the run has
+ *     attempts to spare (C3).
+ */
+describe.skip("V-28 a spend stop mid-run ends in the envelope terminal (NOT RUN — Docker)", () => {
+  it("keeps root 0 when root 1 is refused on money at M=2", () => {
+    expect.unreachable("wire to the acceptance harness; see the numbered contract above");
   });
 });

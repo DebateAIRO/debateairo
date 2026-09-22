@@ -192,6 +192,24 @@ export function envelopeStopKind(error: unknown): EnvelopeStopKind | null {
  * deliberately `null`: it has always propagated from these phases, changing that
  * is a behaviour nobody ruled, and V-28 is about money.
  */
+/**
+ * C3 (re-review) — WHICH QUESTION THE ENVELOPE IS ASKED, per stop.
+ *
+ * Only the ATTEMPT ceiling asks "does ONE MORE attempt fit?" — the question
+ * T17B's `pendingModelAttempts` exists for. Money and an unbillable vendor ask
+ * neither of the attempt questions: a run can have dozens of attempts left and
+ * still be unable to pay for, or bill, a single one, so the hard stop is
+ * asserted on its own footing and the attempt count is reported as it stands.
+ */
+export function envelopeStopPendingAttempts(stop: EnvelopeStopKind): Readonly<{
+  pendingModelAttempts: number;
+  forceHardStop: boolean;
+}> {
+  return stop === "ATTEMPTS"
+    ? Object.freeze({ pendingModelAttempts: 1, forceHardStop: false })
+    : Object.freeze({ pendingModelAttempts: 0, forceHardStop: true });
+}
+
 export function expansionPhaseStop(error: unknown): EnvelopeStopKind | null {
   const stop = envelopeStopKind(error);
   return stop === "MONEY" || stop === "USAGE" ? stop : null;
@@ -3272,8 +3290,27 @@ export class WalkingSkeletonRunner {
         }) };
     };
 
+    /**
+     * C1 (review round 2) — WHICH SPEND BOUND, IF ANY, STOPPED THIS RUN BODY.
+     *
+     * Set by the authoring, expansion and review phases when the gateway refuses
+     * on money or on an unbillable vendor. It is NOT an error path: the phase
+     * stops where it is, the run keeps everything it has produced, and the
+     * envelope evaluation in front of the serve chain turns it into the ruled
+     * components-only terminal. `null` all the way through is a run that was
+     * never stopped by a spend bound, which is every run today.
+     *
+     * RE-REVIEW: declared HERE, before the secondary and additional ROOT loops.
+     * Round 2 declared it after them, so a refusal while authoring root 1 or 2
+     * threw MAKER_POSITION_UNAVAILABLE and discarded a root 0 that had already
+     * been minted and panelled. Root 0 existing is exactly what makes the
+     * terminal buildable, so that run had something to serve and served nothing.
+     */
+    let runBodyBudgetStop: EnvelopeStopKind | null = null;
     if (effectiveMakerCount > 1) {
-      const secondary = await authorPosition({
+      let secondary: Awaited<ReturnType<typeof authorPosition>> | null = null;
+      try {
+      secondary = await authorPosition({
         authorIndex: 1,
         leg: { kind: "independent-root" },
         callSiteKey: "JUDGE:root:secondary",
@@ -3285,17 +3322,30 @@ export class WalkingSkeletonRunner {
         explorationDecision: "continue",
         edges: []
       });
-      if (secondary.kind === "HALTED") {
-        throw new TypedDomainError(
-          "MAKER_POSITION_UNAVAILABLE",
-          "The secondary maker position failed after the full cooldown and final-retry courtesy"
-        );
+      } catch (error) {
+        const stop = expansionPhaseStop(error);
+        if (stop === null) throw error;
+        // Root 0 is already minted and panelled, so the run HAS something to
+        // serve. Stopping here keeps it; throwing would discard it.
+        runBodyBudgetStop = stop;
       }
-      authoredNodes.set(1, secondary.value);
+      if (secondary !== null) {
+        if (secondary.kind === "HALTED") {
+          throw new TypedDomainError(
+            "MAKER_POSITION_UNAVAILABLE",
+            "The secondary maker position failed after the full cooldown and final-retry courtesy"
+          );
+        }
+        authoredNodes.set(1, secondary.value);
+      }
     }
 
     for (let makerIndex = 2; makerIndex < effectiveMakerCount; makerIndex += 1) {
-      const additionalRoot = await authorPosition({
+      // RE-REVIEW C2(a): root 0 is minted, so the run has something to serve.
+      if (runBodyBudgetStop !== null) break;
+      let additionalRoot: Awaited<ReturnType<typeof authorPosition>>;
+      try {
+      additionalRoot = await authorPosition({
         authorIndex: makerIndex,
         leg: { kind: "independent-root" },
         callSiteKey: `JUDGE:root:${makerIndex}`,
@@ -3307,6 +3357,12 @@ export class WalkingSkeletonRunner {
         explorationDecision: "continue",
         edges: []
       });
+      } catch (error) {
+        const stop = expansionPhaseStop(error);
+        if (stop === null) throw error;
+        runBodyBudgetStop = stop;
+        break;
+      }
       if (additionalRoot.kind === "HALTED") {
         throw new TypedDomainError(
           "MAKER_POSITION_UNAVAILABLE",
@@ -3319,20 +3375,13 @@ export class WalkingSkeletonRunner {
     // DR-184/C-10: reviews are interleaved at round boundaries. Coverage is
     // invariant; reviewer assignment may change because rotation observes the
     // latest landed review, and that behaviour change is deliberately declared.
-    /**
-     * C1 (review round 2) — WHICH SPEND BOUND, IF ANY, STOPPED THIS RUN BODY.
-     *
-     * Set by the authoring, expansion and review phases when the gateway refuses
-     * on money or on an unbillable vendor. It is NOT an error path: the phase
-     * stops where it is, the run keeps everything it has produced, and the
-     * envelope evaluation in front of the serve chain turns it into the ruled
-     * components-only terminal. `null` all the way through is a run that was
-     * never stopped by a spend bound, which is every run today.
-     */
-    let runBodyBudgetStop: EnvelopeStopKind | null = null;
     const reviewScheduledNodeIds = new Set<string>();
     const reviewPendingAuthoredNodes = async (): Promise<void> => {
       if (effectiveMakerCount <= 1) return;
+      // RE-REVIEW I5: three call sites are unconditional, and each review is a
+      // billed call. The guard lives HERE rather than at each of them, so a
+      // fourth call site added tomorrow inherits it.
+      if (runBodyBudgetStop !== null) return;
       for (const authoredNode of authoredNodes.values()) {
         if (reviewScheduledNodeIds.has(authoredNode.nodeId)) continue;
         reviewScheduledNodeIds.add(authoredNode.nodeId);
@@ -3505,6 +3554,11 @@ export class WalkingSkeletonRunner {
       if (activeExpansionRound !== null && leg.round !== activeExpansionRound) {
         await reviewPendingAuthoredNodes();
         activeExpansionRound = leg.round;
+        // RE-REVIEW I5: the review above can itself reach the bound, and the
+        // loop-top check has already run for this iteration. Without this the
+        // leg below would be authored — one more billed call — after the run
+        // was told it cannot pay.
+        if (runBodyBudgetStop !== null) break;
       }
       const skipped = haltedIndices.has(leg.parentIndex) || haltedIndices.has(leg.childIndex)
         || frozenIndices.has(leg.parentIndex) || frozenIndices.has(leg.childIndex);
@@ -4469,9 +4523,11 @@ export class WalkingSkeletonRunner {
         // have dozens of attempts left and still be unable to pay for one, so
         // the pending attempt is 0 (it would be a falsehood about the attempt
         // ledger) and the hard stop is asserted on its own footing.
-        const exhausted = stop === "MONEY"
-          ? await evaluateEnvelope(0, true)
-          : await evaluateEnvelope(1);
+        // RE-REVIEW C3: which question this stop asks is a named decision, so a
+        // third stop kind added tomorrow cannot quietly fall to the attempt
+        // branch the way USAGE did.
+        const asked = envelopeStopPendingAttempts(stop);
+        const exhausted = await evaluateEnvelope(asked.pendingModelAttempts, asked.forceHardStop);
         // NO restatement conjunct. F4 / goal 248-251: the protected-core guard
         // was keyed on R9's gate-hood and is KNOWINGLY RETIRED with it, so the
         // envelope terminal fires on HARD_STOP whenever no served statement
@@ -4841,6 +4897,17 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "CONVERGENCE_CONTROLS_INVALID",
   "CONVERGENCE_CONTROLS_PROVENANCE_MISSING",
   "CONVERGENCE_CONTROLS_UNRESOLVED",
+  "COST_ENVELOPE_CEILING_INVALID",
+  "COST_ENVELOPE_CHARGE_UNREPRESENTABLE",
+  "COST_ENVELOPE_DAY_INVALID",
+  "COST_ENVELOPE_GUARD_INPUT_INVALID",
+  "COST_ENVELOPE_PRICE_INVALID",
+  "COST_ENVELOPE_PRICE_UNPRICED",
+  "COST_ENVELOPE_PROJECTION_INVALID",
+  "COST_ENVELOPE_RESERVATION_TTL_INVALID",
+  "COST_ENVELOPE_RUN_REQUIRED",
+  "COST_ENVELOPE_SPEND_INVALID",
+  "COST_ENVELOPE_USAGE_INVALID",
   "CRITERION_ID_DUPLICATE",
   "CRITERION_ID_INVALID",
   "CRITERION_LABEL_INVALID",
