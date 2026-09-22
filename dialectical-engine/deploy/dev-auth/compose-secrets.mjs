@@ -149,10 +149,18 @@ export async function ensureDevelopmentComposeSecrets(custodyRoot) {
  * One generated credential, for the commands that must USE it rather than only hand the file
  * to compose. Never creates the file: a caller that reads before the data plane generated it
  * is refused, because inventing a second password would silently diverge from the database.
+ *
+ * Two faults, two codes, because the remedies differ. NOT_GENERATED means the data plane has
+ * not run on this custody root yet — run `pnpm dev:auth:up`. INCOMPLETE means a file exists
+ * but predates a key, so the database it belongs to already holds the older credentials —
+ * that needs the volume rebuilt, not another run.
  */
 export async function readDevelopmentComposeSecret(custodyRoot, key) {
   const values = await readValidatedSecrets(developmentComposeSecretsPath(custodyRoot));
-  const value = values?.get(key);
+  if (values === undefined) {
+    throw new DevelopmentComposeSecretsError("DEV_COMPOSE_SECRETS_NOT_GENERATED");
+  }
+  const value = values.get(key);
   if (value === undefined || value.length === 0) {
     throw new DevelopmentComposeSecretsError("DEV_COMPOSE_SECRETS_INCOMPLETE");
   }

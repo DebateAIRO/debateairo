@@ -143,6 +143,11 @@ Then run the one-time trust setup above (`mkcert -install`,
 the old machine's keys — dev users, runs, publications — is not portable by
 design; recreate it.
 
+**Setting that variable on a machine that already has a dev volume is a
+different thing**, and it needs the volume rebuilt first: the volume belongs to
+the compose project, not to the custody root, so it keeps the superuser password
+the old root generated. See reason 3 of "Upgrading an existing dev stack" below.
+
 ## Compose service credentials
 
 `compose-secrets.env` (under the custody root, mode 0600) is generated once by the
@@ -168,19 +173,41 @@ docker compose --env-file .env.compose \
   -f compose.dev.yaml ps
 ```
 
+A command that needs one of these values rather than the whole file — the data
+plane's migrator URL, `oactl provision` — refuses with one of two codes, because
+the remedies differ:
+
+- `DEV_COMPOSE_SECRETS_NOT_GENERATED` — there is no file under this custody root
+  yet. Run `pnpm dev:auth:up` (or `pnpm dev:auth:data-plane`) first; `oactl
+  provision` runs after the stack, never before it.
+- `DEV_COMPOSE_SECRETS_INCOMPLETE` — a file is there but predates one of the five
+  keys, so the database it belongs to already holds the older credentials. Another
+  run cannot fix that; rebuild the volume as below.
+
 ## Upgrading an existing dev stack
 
-Two changes rebuild the database cluster. A PostgreSQL volume keeps the roles and
-passwords it was created with, so an older volume cannot be reused:
+A PostgreSQL volume keeps the roles and passwords it was created with, because
+`POSTGRES_PASSWORD` is honoured at **first initdb only**. Three situations
+therefore need the volume rebuilt:
 
 1. **2026-09-02 hardening.** `deploy/postgres/init-hatchet.sql` creates the
-   dedicated `debateai_dev_hatchet` role at **first initdb only**. An older volume
+   dedicated `debateai_dev_hatchet` role at first initdb only. An older volume
    has no such role, so `hatchet-lite` fails to connect.
 2. **2026-09-22 (V-21a).** The PostgreSQL superuser password is generated into
    `compose-secrets.env` instead of being the fixed literal that used to sit in
    `compose.dev.yaml`. An older volume still has the old password, and an older
    `compose-secrets.env` has four keys rather than five — the data plane refuses it
    with `DEV_COMPOSE_SECRETS_INCOMPLETE` rather than inventing the missing value.
+3. **Changing `DEBATEAI_DEV_CUSTODY_ROOT` while a volume exists** — including the
+   very common case of moving custody out of a cloud-synced checkout. The volume
+   belongs to the **compose project** (`name: debateai-v3`, volume
+   `postgres-data`), not to the custody root, so it does not move with your keys.
+   The new root gets a freshly generated `POSTGRES_SUPERUSER_PASSWORD` while the
+   volume keeps the old one. Nothing refuses at startup: PostgreSQL and
+   `hatchet-lite` come up, and the run then stops at
+   `DEV_AUTH_DATA_PLANE_MIGRATION_FAILED` with no further detail, because the data
+   plane never prints a child's stderr. That bare code, right after you changed the
+   variable, means this.
 
 Recreate the volume and the secrets file once, in this order, from
 `dialectical-engine/` (the `down` still needs the old secrets file, so it comes

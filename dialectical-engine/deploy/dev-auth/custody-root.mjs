@@ -39,8 +39,8 @@ const CLOUD_SYNC_SEGMENT_PAIRS = Object.freeze([
 ]);
 
 export class DevCustodyRootError extends TypeError {
-  constructor(code, detail) {
-    super(`${code}: ${detail}`);
+  constructor(code, detail, options) {
+    super(`${code}: ${detail}`, options);
     this.name = "DevCustodyRootError";
     this.code = code;
   }
@@ -152,6 +152,10 @@ export async function assertDevCustodyDirectory(directory) {
  * apply `assertDevCustodyDirectory` unchanged. An existing directory is never
  * chmod-ed back, so a drifted mode still surfaces (L7-F10). Not recursive: a
  * missing parent is a refusal, not something to invent.
+ *
+ * The filesystem error is kept as the refusal's `cause`: "you may not write
+ * here" (EACCES) and "the mode drifted" are different faults with different
+ * remedies, and a typed code that discards the errno spells them the same way.
  */
 export async function ensureDevCustodyDirectory(directory) {
   const path = resolve(directory);
@@ -161,7 +165,8 @@ export async function ensureDevCustodyDirectory(directory) {
     if (error?.code !== "EEXIST") {
       throw new DevCustodyRootError(
         "DEV_AUTH_CUSTODY_ROOT_INVALID",
-        `${path} could not be created as a directory you own with mode 0700.`
+        `${path} could not be created as a directory you own with mode 0700.`,
+        { cause: error }
       );
     }
   }
