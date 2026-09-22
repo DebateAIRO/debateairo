@@ -1,5 +1,6 @@
 /**
- * V-3 — the operator's master-key rotation.
+ * V-3 — the operator's master-key rotation. Named `pnpm keys:rotate-kek` once
+ * that one-line script exists; until then:
  *
  *   pnpm exec tsx apps/runner/src/rotate-kek-cli.ts
  *
@@ -8,18 +9,24 @@
  * The run is idempotent and resumable: a record already under the current key
  * is skipped, so an interrupted pass is finished by running it again.
  *
- * Exit 0 only on a clean verification pass. A non-zero unreadable count exits 1
+ * Exit 0 only on a clean verification pass over every store it was asked to
+ * cover. A non-zero unreadable count — or a store it could NOT cover — exits 1
  * and says in words that the previous key must not be retired.
  *
  * Every decision this file makes lives in ./rotate-kek.ts, which is unit-tested
  * without a database or a key file. This file only opens things.
  */
 import { pathToFileURL } from "node:url";
-import { createPool, PostgresSupportKeyRotationRepository } from "@debateai/db";
+import {
+  assertSupportDatabaseRole,
+  createPool,
+  PostgresSupportKeyRotationRepository
+} from "@debateai/db";
 import {
   configureCustodyGroup,
   FilePublicationKeyStore,
   FileUserDekStore,
+  kekId,
   loadKek
 } from "@debateai/crypto";
 import type { KekRing } from "@debateai/crypto";
@@ -31,7 +38,26 @@ import {
   rotateSupportKeys,
   rotationFailed
 } from "./rotate-kek.js";
-import type { RotationStoreReport } from "./rotate-kek.js";
+import type { DeclinedStore, RotationStoreReport } from "./rotate-kek.js";
+
+export class KeyRotationFailed extends Error {
+  readonly code = "KEYS_ROTATE_KEK_FAILED";
+
+  constructor(readonly report: string) {
+    super("KEYS_ROTATE_KEK_FAILED");
+    this.name = "KeyRotationFailed";
+  }
+}
+
+export class KeyRotationRefused extends Error {
+  readonly code: string;
+
+  constructor(code: string) {
+    super(code);
+    this.code = code;
+    this.name = "KeyRotationRefused";
+  }
+}
 
 function ring(currentPath: string, previousPath: string | undefined): KekRing {
   const current = loadKek(currentPath);
@@ -41,27 +67,57 @@ function ring(currentPath: string, previousPath: string | undefined): KekRing {
 }
 
 export async function runKeyRotation(): Promise<string> {
-  const environment = loadKeyRotationEnvironment();
+  // M5: every missing or malformed variable leaves by a typed code naming it,
+  // rather than as a ZodError printed as UNKNOWN.
+  let environment: ReturnType<typeof loadKeyRotationEnvironment>;
+  try {
+    environment = loadKeyRotationEnvironment();
+  } catch (error) {
+    throw new KeyRotationRefused(keyRotationEnvironmentCode(error));
+  }
   // The rotation writes into the same custody trees the services read, so it
   // must honour the same contract (V-19) or it would leave records the runner
   // cannot open.
   configureCustodyGroup(environment.DEBATEAI_CUSTODY_GROUP);
 
   const reports: RotationStoreReport[] = [];
-  reports.push(await rotateFileStore("user-deks", new FileUserDekStore(
-    environment.USER_DEK_STORE_PATH,
-    ring(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH)
-  )));
+  const declined: DeclinedStore[] = [];
 
+  const userKeks = ring(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH);
+  reports.push(await rotateFileStore(
+    "user-deks",
+    new FileUserDekStore(environment.USER_DEK_STORE_PATH, userKeks),
+    kekId(userKeks.current)
+  ));
+
+  // A2: the corpus pair is required TOGETHER, exactly as the API refuses to boot
+  // on a half-set pairing. A store this command cannot cover is reported as not
+  // covered and fails the run — never silently counted as a clean zero.
   if (environment.CORPUS_KEK_PATH !== undefined
     && environment.PUBLICATION_KEY_STORE_PATH !== undefined) {
-    reports.push(await rotateFileStore("publication-keys", new FilePublicationKeyStore(
-      environment.PUBLICATION_KEY_STORE_PATH,
-      ring(environment.CORPUS_KEK_PATH, environment.CORPUS_KEK_PREVIOUS_PATH)
-    )));
+    const corpusKeks = ring(
+      environment.CORPUS_KEK_PATH, environment.CORPUS_KEK_PREVIOUS_PATH
+    );
+    reports.push(await rotateFileStore(
+      "publication-keys",
+      new FilePublicationKeyStore(environment.PUBLICATION_KEY_STORE_PATH, corpusKeks),
+      kekId(corpusKeks.current)
+    ));
+  } else if (environment.CORPUS_KEK_PATH !== undefined
+    || environment.PUBLICATION_KEY_STORE_PATH !== undefined) {
+    // Half-set is a misconfiguration, not a choice. The register refuses this
+    // pairing at API boot; the rotation must not quietly skip the store.
+    declined.push(Object.freeze({
+      store: "publication-keys", code: "PUBLICATION_KEY_PATHS_INCOMPLETE"
+    }));
+  } else {
+    declined.push(Object.freeze({
+      store: "publication-keys", code: "PUBLICATION_KEY_PATHS_ABSENT"
+    }));
   }
 
   const pool = createPool(environment.SUPPORT_DATABASE_URL);
+  const runtimePool = createPool(environment.DATABASE_URL);
   const keys = await createSupportKeyPort({
     supportKekPath: environment.SUPPORT_KEK_PATH,
     previousSupportKekPath: environment.SUPPORT_KEK_PREVIOUS_PATH,
@@ -75,26 +131,44 @@ export async function runKeyRotation(): Promise<string> {
     ]
   });
   try {
+    // M3: the same two-sided assertion the API makes before it serves support
+    // traffic — the support principal IS a support member and the ordinary
+    // runtime principal is NOT — so this rotation cannot write those columns as
+    // the wrong principal.
+    await assertSupportDatabaseRole(runtimePool, pool);
     reports.push(await rotateSupportKeys(
       new PostgresSupportKeyRotationRepository(pool), keys
     ));
   } finally {
     await keys.close();
     await pool.end().catch(() => undefined);
+    await runtimePool.end().catch(() => undefined);
   }
 
-  const text = renderRotationReport(reports);
-  if (rotationFailed(reports)) throw new KeyRotationFailed(text);
+  const text = renderRotationReport(reports, declined);
+  if (rotationFailed(reports, declined)) throw new KeyRotationFailed(text);
   return text;
 }
 
-export class KeyRotationFailed extends Error {
-  readonly code = "KEYS_ROTATE_KEK_FAILED";
-
-  constructor(readonly report: string) {
-    super("KEYS_ROTATE_KEK_FAILED");
-    this.name = "KeyRotationFailed";
+/**
+ * Turns the register loader's rejection into a code that NAMES the variable.
+ * A ZodError's issues carry the key; anything else keeps whatever typed code it
+ * has. Nothing from the error's prose is printed, because a key path could be
+ * in it.
+ */
+export function keyRotationEnvironmentCode(error: unknown): string {
+  const issues = (error as { readonly issues?: unknown } | null)?.issues;
+  if (Array.isArray(issues)) {
+    const names = [...new Set(issues.flatMap((issue) => {
+      const path = (issue as { readonly path?: unknown }).path;
+      return Array.isArray(path) && typeof path[0] === "string" ? [path[0]] : [];
+    }))].sort();
+    if (names.length > 0) return `KEYS_ROTATE_KEK_ENVIRONMENT_INVALID:${names.join(",")}`;
   }
+  const code = (error as { readonly code?: unknown } | null)?.code;
+  return typeof code === "string" && code !== ""
+    ? code
+    : "KEYS_ROTATE_KEK_ENVIRONMENT_INVALID";
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

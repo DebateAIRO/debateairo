@@ -250,10 +250,23 @@ mv /etc/debateai/api/kek.bin.new /etc/debateai/api/kek.bin
 Add `KEK_PREVIOUS_PATH=/etc/debateai/api-previous/kek.bin` to `api.env` and
 `runner.env`, restart both units, then run the rotation as the API user:
 
+`sudo -u` does not read the unit's `EnvironmentFile`, so the command needs it loaded explicitly.
+`systemd-run` does that without ever putting a secret on a command line or in the process list:
+
 ```sh
-sudo -u debateai-api /usr/bin/pnpm --dir /opt/debateai/dialectical-engine \
-  exec tsx apps/runner/src/rotate-kek-cli.ts
+systemd-run --pipe --wait --collect \
+  --uid=debateai-api --gid=debateai-api \
+  --property=SupplementaryGroups=debateai-custody \
+  --property=EnvironmentFile=/etc/debateai/api.env \
+  --working-directory=/opt/debateai/dialectical-engine \
+  /usr/bin/pnpm exec tsx apps/runner/src/rotate-kek-cli.ts
 ```
+
+The report goes to stdout, which `--pipe` puts on your terminal; `systemd-run` also records it in
+the journal under the transient unit. It contains counts, key **ids** (not keys) and the record
+ids of anything it could not open — user and session UUIDs, the same identifiers that are already
+directory names in the store. It contains no key material. Keep it until the retirement step is
+done: on a failure it is the list of records to investigate.
 
 `CORPUS_KEK_PREVIOUS_PATH` and `SUPPORT_KEK_PREVIOUS_PATH` work the same way for
 the other two keys; the support KEK's file is always named `support-kek.bin`, so
@@ -268,7 +281,9 @@ idempotent and resumable: a record already under the current key is skipped, so
 an interrupted run is finished by running it again.
 
 **Retire the old key only after a clean `KEYS_ROTATE_KEK_OK`.** On
-`KEYS_ROTATE_KEK_FAILED` the output names every record that opened under no key;
+`KEYS_ROTATE_KEK_FAILED` the output names every record that opened under no key, each with the
+typed code that refused it, and names any store the command could **not** cover — a store it never
+opened is never a clean store;
 keep the previous key in place, investigate those records, and run it again.
 Once the pass is clean, remove the `*_KEK_PREVIOUS_PATH` lines, restart the
 units and destroy the old key files — their absence is the normal steady state:

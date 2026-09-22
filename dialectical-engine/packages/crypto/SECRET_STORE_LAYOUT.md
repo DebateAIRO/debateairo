@@ -26,7 +26,9 @@ is why rotation never re-encrypts content.
 
 ### Changing the master key
 
-`pnpm keys:rotate-kek` re-wraps every stored key under a new master key. It reads
+`pnpm keys:rotate-kek` re-wraps every stored key under a new master key. Until that one-line
+script is added to `package.json` the same command is
+`pnpm exec tsx apps/runner/src/rotate-kek-cli.ts`. It reads
 with both keys (the new one and `*_KEK_PREVIOUS_PATH`), writes each record back
 labelled with the new one, and ends with a verification pass that opens every
 record under the new key alone. The previous-key setting is removed once that

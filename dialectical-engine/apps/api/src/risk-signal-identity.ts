@@ -30,7 +30,8 @@ const UNRECOGNIZED = "unrecognized-error";
  * the two service constants from `apps/api/src/sessions.ts` and
  * `apps/api/src/recovery.ts`; the repository constants from
  * `packages/db/src/auth-risk.ts`; the crypto codes from `CryptoInputError`,
- * `CryptoAuthenticationError` and `KekUnresolvedError` in `packages/crypto`,
+ * `CryptoAuthenticationError`, `KekUnresolvedError` and `CryptoCustodyError` in
+ * `packages/crypto`,
  * whose `message` equals their `code`; the pool codes from `Argon2FailureCode`.
  * The whole `CryptoInputError` union is listed rather than the subset reachable
  * today, because the union is that type's closed contract — enumerating a subset
@@ -52,6 +53,12 @@ const REASONS: ReadonlyMap<string, string> = new Map([
   ["CRYPTO_KEY_INVALID", "CRYPTO_KEY_INVALID"],
   ["CRYPTO_AUTHENTICATION_FAILED", "CRYPTO_AUTHENTICATION_FAILED"],
   ["KEK_UNRESOLVED", "KEK_UNRESOLVED"],
+  // V-19 split the custody refusal out of KEK_UNRESOLVED: "this exists but is
+  // not safe to trust" is a different fault from "nothing is provisioned here".
+  // Both codes of CryptoCustodyError are listed for the same reason the whole
+  // CryptoInputError union is — a code this set omits degrades to the fallback.
+  ["SECRET_CUSTODY_INVALID", "SECRET_CUSTODY_INVALID"],
+  ["KEK_CUSTODY_INVALID", "KEK_CUSTODY_INVALID"],
   ["ARGON2_POOL_CAPACITY_EXHAUSTED", "ARGON2_POOL_CAPACITY_EXHAUSTED"],
   ["ARGON2_POOL_UNAVAILABLE", "ARGON2_POOL_UNAVAILABLE"],
   ["ARGON2_WORKER_FAILED", "ARGON2_WORKER_FAILED"],
@@ -91,6 +98,7 @@ const CLASS_CATEGORIES: ReadonlyMap<string, string> = new Map([
   ["CryptoInputError", "crypto"],
   ["CryptoAuthenticationError", "crypto"],
   ["KekUnresolvedError", "crypto"],
+  ["CryptoCustodyError", "crypto"],
   ["Argon2InfrastructureError", "hashing-unavailable"],
   ["AggregateError", "aggregate-failure"],
   ["error", "database"],

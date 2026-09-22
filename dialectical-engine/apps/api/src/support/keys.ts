@@ -87,6 +87,15 @@ export interface SupportKeyPort {
    * `support.case_key` pin exactly that in a CHECK constraint.
    */
   rewrapDataKey(handle: SupportKeyHandle, wrapped: Uint8Array): Promise<SupportKeyRewrap>;
+  /**
+   * Proves one stored key opens under the CURRENT KEK **alone**, ignoring the
+   * previous one entirely. `unwrapDataKey` is current-then-previous by
+   * construction, so a rotation that verified through it would certify a row
+   * still wrapped by the old key — and the operator would then retire that key.
+   * Resolves on success and raises SUPPORT_KEY_AUTHENTICATION_FAILED otherwise;
+   * it returns nothing, so no data key escapes to the caller.
+   */
+  verifyUnderCurrentKek(handle: SupportKeyHandle, wrapped: Uint8Array): Promise<void>;
   /** A non-secret label for the current KEK, for the rotation's own report. */
   currentKekId(): string;
   seal(handle: SupportKeyHandle, dataKey: Uint8Array, plaintext: Uint8Array): Buffer;
@@ -520,6 +529,17 @@ class FileSupportKeyPort implements SupportKeyPort {
         : this.#openUnder(this.#previousKek, handle, envelope));
     if (opened === undefined) fail("SUPPORT_KEY_AUTHENTICATION_FAILED");
     return opened;
+  }
+
+  async verifyUnderCurrentKek(
+    handle: SupportKeyHandle,
+    wrapped: Uint8Array
+  ): Promise<void> {
+    this.#assertOpen();
+    assertHandle(handle);
+    const opened = this.#openUnder(this.#kek, handle, parseWrappedEnvelope(wrapped));
+    if (opened === undefined) fail("SUPPORT_KEY_AUTHENTICATION_FAILED");
+    opened.fill(0);
   }
 
   async rewrapDataKey(

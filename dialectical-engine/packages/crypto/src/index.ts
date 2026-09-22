@@ -269,7 +269,25 @@ export interface KekRing {
 export type KekSource = KekHandle | KekRing;
 
 function toKekRing(source: KekSource): KekRing {
-  return "current" in source ? source : { current: source };
+  if (!("current" in source)) return { current: source };
+  if (source.previous !== undefined) {
+    // A "previous" key that IS the current one is not a changeover. Every
+    // record would look already-current whichever key really wrapped it, and a
+    // verification pass over it would mean nothing. The support port refuses
+    // the same shape; the file stores used to accept it silently.
+    const current = readKek(source.current);
+    const previous = readKek(source.previous);
+    try {
+      if (current.byteLength === previous.byteLength
+        && timingSafeEqual(current, previous)) {
+        throw new CryptoError("KEK_RING_NOT_A_CHANGEOVER", "KEK_RING_NOT_A_CHANGEOVER");
+      }
+    } finally {
+      current.fill(0);
+      previous.fill(0);
+    }
+  }
+  return source;
 }
 
 /**
@@ -1611,12 +1629,30 @@ async function republishRecord(
   }
 }
 
-/** The sub-directory names of `parent` that are canonical UUIDs, sorted. */
+/**
+ * The sub-directory names of `parent` that are canonical UUIDs, sorted.
+ *
+ * The store ROOT must exist: "not there" is never "empty". A rotation that read
+ * a mistyped store path as an empty store would report a clean pass, and the
+ * runbook keys key-retirement to that pass. The container INSIDE the root may
+ * legitimately be absent — that is a provisioned store nothing has been written
+ * into yet — and only that case answers an empty list.
+ */
 async function listRecordRefs(
+  root: string,
+  absentCode: string,
   parent: string,
-  fileSystem: Pick<UserDekStoreFileSystem, "readdir">,
+  fileSystem: Pick<UserDekStoreFileSystem, "readdir" | "stat">,
   accepts: (name: string) => boolean
 ): Promise<readonly string[]> {
+  try {
+    if (!(await fileSystem.stat(root)).isDirectory()) {
+      throw new CryptoError(absentCode, absentCode);
+    }
+  } catch (error) {
+    if (error instanceof CryptoError) throw error;
+    throw new CryptoError(absentCode, absentCode);
+  }
   let entries: Dirent<string>[];
   try {
     entries = await fileSystem.readdir(parent, { withFileTypes: true });
@@ -1955,6 +1991,8 @@ export class FileUserDekStore implements ReadableUserDekStore {
 
   async listKeyRefs(): Promise<readonly string[]> {
     return listRecordRefs(
+      this.root,
+      "USER_DEK_STORE_ROOT_ABSENT",
       join(this.root, "users"),
       this.fileSystem,
       (name) => USER_DEK_STORE_USER_ID.test(name)
@@ -2822,7 +2860,11 @@ export class FilePublicationKeyStore implements PublicationKeyStore {
 
   async listKeyRefs(): Promise<readonly string[]> {
     return listRecordRefs(
-      join(this.root, "publications"), this.fileSystem, (name) => UUID_V4.test(name)
+      this.root,
+      "PUBLICATION_KEY_STORE_ROOT_ABSENT",
+      join(this.root, "publications"),
+      this.fileSystem,
+      (name) => UUID_V4.test(name)
     );
   }
 
