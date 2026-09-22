@@ -91,7 +91,16 @@ describe("B10 sealed admission-policy register row", () => {
     );
     expect(historicalRows).toContain("PRODUCT_ROLE_POLICY_REGISTER_ROW");
     expect(historicalRows).not.toContain("ADMISSION_POLICY_REGISTER_ROW");
-    expect(devSeed).toContain("ADMISSION_POLICY_REGISTER_ROW");
+    /**
+     * DL1-F2/DL1-F7. What the deployment seed must carry is the SUPERSEDING row
+     * — the sealed three-scope value plus the three support budgets — and it
+     * must carry exactly one `admissionPolicy` row, because publishing both
+     * would make the resolved value a coin toss. The sealed row keeps its own
+     * publisher: the historical set above, which this test already pins.
+     */
+    expect(devSeed).toContain("ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW");
+    expect(devSeed.match(/\bADMISSION_POLICY_(?:DEPLOYMENT_)?REGISTER_ROW\b/gu) ?? [])
+      .toEqual(["ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW", "ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW"]);
     // DL7-F7: the read is a named boot stage now, owned by the custody ledger.
     const readIndex = apiMain.indexOf(
       'boot.run("admission-policy", () => readAdmissionPolicy(pool, environment.REGISTER_VERSION))'

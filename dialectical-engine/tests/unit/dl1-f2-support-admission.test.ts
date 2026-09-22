@@ -3,9 +3,14 @@ import { buildApi, type AskApplication } from "@debateai/api";
 import {
   ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW,
   ADMISSION_POLICY_REGISTER_ROW,
+  ADMISSION_POLICY_ROW_KEY,
   admissionPolicyFromValue,
+  loadBootstrapRegister,
   type AdmissionPolicy
 } from "@debateai/register";
+import { buildDevelopmentDeploymentRegisterPublicationRows } from
+  "../../apps/runner/src/dev-deployment-register.js";
+import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 import { AdmissionLimiter } from "../../apps/api/src/admission.js";
 import { supportHarness } from "../support/supportHarness.js";
 import {
@@ -274,6 +279,44 @@ describe("DL1-F2 authenticated session creation is capped per owner", () => {
       expect((await h.createOwned(OWNER_A, SOURCE_A)).statusCode).toBe(201);
     } finally {
       await h.close();
+    }
+  });
+});
+
+/**
+ * Review round. The three budgets shipped INERT: the superseding row existed
+ * and every reader understood it, but no publisher carried it, so a deployment
+ * register still sealed the three-scope row and `configured(scope)` answered
+ * false for all three. A security control nothing publishes is a control
+ * nothing applies.
+ */
+describe("DL1-F2/DL1-F7 the deployment register actually publishes the budgets", () => {
+  it("seals the superseding admissionPolicy row, with all three support members", async () => {
+    const bootstrap = await loadBootstrapRegister();
+    const rows = await buildDevelopmentDeploymentRegisterPublicationRows(
+      bootstrap, TEST_DEVELOPMENT_PROVIDER_PANEL
+    );
+    const published = rows.filter((row) => row.rowKey === ADMISSION_POLICY_ROW_KEY);
+    // Exactly one admissionPolicy row per deployment version, and it is the
+    // superseding one — publishing both would make the resolved value a coin toss.
+    expect(published).toHaveLength(1);
+    const value = JSON.parse(published[0]!.valueJsonText) as Readonly<Record<string, unknown>>;
+    expect(value).toEqual(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.value);
+    expect(published[0]!.sourceRef).toMatch(/DL1-F2/);
+    expect(published[0]!.sourceRef).toMatch(/DL1-F7/);
+
+    // ...and the reader a booting API uses resolves all three members from it.
+    const policy = admissionPolicyFromValue(value, published[0]!.sourceRef);
+    expect(policy.supportReads)
+      .toEqual({ key: "source", limit: 240, windowMs: QUARTER_MS, capacity: 65_536 });
+    expect(policy.supportSessions)
+      .toEqual({ key: "owner", limit: 10, windowMs: HOUR_MS, capacity: 8_192 });
+    expect(policy.supportModelCalls)
+      .toEqual({ key: "source", limit: 40, windowMs: 24 * 60 * 60_000, capacity: 65_536 });
+    // The limiter a deployment on this row builds carries all three.
+    const limiter = new AdmissionLimiter(policy);
+    for (const scope of ["supportReads", "supportSessions", "supportModelCalls"] as const) {
+      expect(limiter.configured(scope), scope).toBe(true);
     }
   });
 });
