@@ -19,7 +19,10 @@ import {
   resolveProviderTargetCredentials
 } from "@debateai/providers";
 import { createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, WalkingSkeletonRunner } from "./index.js";
-import { createRunnerProviderTopology } from "./provider-topology.js";
+import {
+  assertRunnerPrimaryProviderConfiguration,
+  createRunnerProviderTopology
+} from "./provider-topology.js";
 import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
 import { reconcileRunnerStartupWork } from "./runner-startup-reconciliation.js";
 
@@ -89,13 +92,14 @@ const providerTopology = createRunnerProviderTopology(providerTargets, (target) 
   })
 );
 const runRepository = new RunRepository(pool);
-if (providerTopology.primary.providerRef !== environment.PROVIDER_REF
-  || providerTopology.primary.maker !== environment.VLLM_MAKER
-  || providerTargets[0]?.baseUrl !== environment.VLLM_BASE_URL.replace(/\/$/u, "")
-  || providerTargets[0]?.model !== environment.VLLM_MODEL
-  || providerTargets[0]?.authorizationHeader !== environment.VLLM_AUTHORIZATION) {
-  throw new TypeError("RUNNER_PRIMARY_PROVIDER_CONFIGURATION_DRIFT");
-}
+// V-20: taken on the DECLARED targets, because the three optional keys describe
+// what the operator wrote, credential included — a credential resolved from a
+// file was never in this environment to compare against.
+assertRunnerPrimaryProviderConfiguration({
+  primary: providerTopology.primary,
+  firstTarget: declaredProviderTargets[0],
+  declared: environment
+});
 const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {
   workerId: environment.RUNNER_WORKER_ID, claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS,
   judgeBound: policy.bounds.JUDGE,

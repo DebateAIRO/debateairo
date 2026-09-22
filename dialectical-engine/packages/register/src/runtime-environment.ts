@@ -471,7 +471,13 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
     JUDGEMENT_NUMBER_KIND: z.string().min(1), JUDGEMENT_PRODUCER: z.string().min(1),
     PROPAGATION_NUMBER_KIND: z.string().min(1), PROPAGATION_PRODUCER: z.string().min(1),
     HATCHET_ENGINE_RETRIES: nonNegativeInteger, HATCHET_WORKER_NAME: z.string().min(1),
-    VLLM_BASE_URL: z.string().url(), VLLM_MODEL: z.string().min(1), VLLM_MAKER: z.string().min(1),
+    // V-20, ruled 2026-09-22: despite their name these three describe the
+    // PRIMARY provider, and a hosted deployment has no self-hosted inference
+    // server to describe. Absent, `PROVIDER_DISCOVERY_TARGETS_JSON` is the
+    // single source; present (development), the cross-check is unchanged.
+    VLLM_BASE_URL: z.string().url().optional(),
+    VLLM_MODEL: z.string().min(1).optional(),
+    VLLM_MAKER: z.string().min(1).optional(),
     VLLM_AUTHORIZATION: z.string().min(1).optional(),
     PROVIDER_DISCOVERY_TARGETS_JSON: z.string().min(1).optional(),
     // T3C / F34: the runner re-probes each pinned panel member at claim time
@@ -486,6 +492,19 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
   if (environment.CONTENT_ENCRYPTION_ENABLED === "true"
     && environment.USER_DEK_STORE_PATH === undefined) {
     throw new TypeError("CONTENT_ENCRYPTION_KEY_PATHS_REQUIRED");
+  }
+  // V-20: the three keys are one declaration, all or none. Half a set is neither
+  // source of truth — the cross-check would compare a declared primary against
+  // values nobody finished writing — so it refuses here rather than at the first
+  // claim, and `VLLM_AUTHORIZATION` alone declares a credential for nothing.
+  const declaredPrimary = [
+    environment.VLLM_BASE_URL, environment.VLLM_MODEL, environment.VLLM_MAKER
+  ].filter((value) => value !== undefined).length;
+  if (declaredPrimary !== 0 && declaredPrimary !== 3) {
+    throw new TypeError("RUNNER_PRIMARY_PROVIDER_KEYS_INCOMPLETE");
+  }
+  if (declaredPrimary === 0 && environment.VLLM_AUTHORIZATION !== undefined) {
+    throw new TypeError("RUNNER_PRIMARY_PROVIDER_KEYS_INCOMPLETE");
   }
   assertProductionFloors(environment);
   return {

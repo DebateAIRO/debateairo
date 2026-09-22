@@ -445,9 +445,17 @@ describe("VPS baseline: runbook and environment templates", () => {
 
   it("runner.env.example and ui.env.example carry only what those services need", () => {
     const runner = envKeys(read("deploy/vps/env/runner.env.example"));
-    for (const key of ["NODE_ENV", "KEK_PATH", "DATABASE_URL", "RUNNER_WORKER_ID", "REGISTER_VERSION", "CONTENT_ENCRYPTION_ENABLED", "USER_DEK_STORE_PATH", "HATCHET_CLIENT_TOKEN", "HATCHET_TLS_STRATEGY", "VLLM_BASE_URL", "PROVIDER_REF"]) {
+    // V-20: the three VLLM_* keys are gone from this file on purpose — they
+    // described a primary provider this host does not have, and their
+    // `<unused-on-vps>` placeholders passed the shape check and then failed the
+    // drift cross-check, so the runner could not have started as the kit stood.
+    for (const key of ["NODE_ENV", "KEK_PATH", "DATABASE_URL", "RUNNER_WORKER_ID", "REGISTER_VERSION", "CONTENT_ENCRYPTION_ENABLED", "USER_DEK_STORE_PATH", "HATCHET_CLIENT_TOKEN", "HATCHET_TLS_STRATEGY", "DEBATEAI_DEPLOYMENT_MODE", "PROVIDER_REF", "PROVIDER_DISCOVERY_TARGETS_JSON"]) {
       expect(runner.has(key), key).toBe(true);
     }
+    for (const key of ["VLLM_BASE_URL", "VLLM_MODEL", "VLLM_MAKER", "VLLM_AUTHORIZATION"]) {
+      expect(runner.has(key), key).toBe(false);
+    }
+    expect(runner.get("DEBATEAI_DEPLOYMENT_MODE")).toBe("hosted");
     expect(runner.get("DATABASE_URL")).toMatch(/^postgresql:\/\/debateai_prod_runner_runtime:<[a-z-]+>@localhost\/debateai\?host=\/var\/run\/postgresql$/);
     expect(runner.get("KEK_PATH")).toBe("/etc/debateai/runner/kek.bin");
     expect(runner.has("BLIND_INDEX_KEY_PATH")).toBe(false);
