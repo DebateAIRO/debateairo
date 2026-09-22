@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { SupportConfigurationPort, SupportConfigurationState } from "@debateai/register";
-import { normalizeClientIp } from "../client-ip.js";
+import { clientIpNetworkScope,normalizeClientIp } from "../client-ip.js";
 import { SupportC3AdmissionWindow } from "./c3-admission.js";
 import type { SupportAnswerPort } from "./answer.js";
 import { classifySupportMessage,supportIntentSurface } from "./classify.js";
@@ -55,6 +55,14 @@ export interface SupportApplication {
   readonly ownContext?: SupportOwnContextPort;
   readonly incidents?: Pick<SupportIncidentRepositoryPort,"readActiveIncidents">;
   readonly knowledge: SupportKnowledgeStatusPort;
+  /**
+   * DL5-F3. Turns one caller's network into the pseudonym the two append-only
+   * support tables store. Required, never optional: an absent seam here would
+   * mean writing a reversible digest of a visitor's address, which is exactly
+   * the finding. `apps/api/src/main.ts` passes the support key port's keyed
+   * derivation; a composition that has no key port cannot serve support at all.
+   */
+  readonly sourcePseudonym: (value: string) => string;
   readonly clock?: () => Date;
   readonly reportDiagnostic?: (diagnostic: SupportDiagnostic) => void;
 }
@@ -130,6 +138,15 @@ function clientIp(request: FastifyRequest): string {
   return normalizeClientIp(request.ip)
     ?? normalizeClientIp(request.raw.socket.remoteAddress)
     ?? "unknown";
+}
+
+/**
+ * DL5-F3. The value the support tables record for a caller's network: keyed, so
+ * it cannot be inverted back to an address, and scoped to the IPv6 /64, so one
+ * allocation is one source rather than 2^64 of them.
+ */
+function sourceOf(application: SupportApplication,request: FastifyRequest): string {
+  return application.sourcePseudonym(clientIpNetworkScope(clientIp(request)));
 }
 
 function rateLimited(reply: FastifyReply, language: SupportLanguage) {
@@ -238,7 +255,7 @@ export function installSupportRoutes(
     const timeDecision = admission.observeTime(now.getTime());
     if (!timeDecision.admitted) return rateLimited(reply, language);
     if (request.authenticatedSession === undefined) {
-      const ipSha256 = sha256(clientIp(request));
+      const ipSha256 = sourceOf(application,request);
       if (application.sessions.admitIpSession !== undefined
         && await application.sessions.admitIpSession({
           ipSha256,at: now,
@@ -388,7 +405,7 @@ export function installSupportRoutes(
       const now = (application.clock ?? (() => new Date()))();
       const timeDecision = admission.observeTime(now.getTime());
       if (!timeDecision.admitted) return rateLimited(reply,found.language);
-      const ipSha256 = sha256(clientIp(request));
+      const ipSha256 = sourceOf(application,request);
       const messageSha256 = sha256(body.text);
       const classification = classifySupportMessage(body.text);
       const overrideLanguage = body.language === undefined ? null : languageFrom(body.language);

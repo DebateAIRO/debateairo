@@ -445,6 +445,8 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
     });
     const support: SupportApplication = Object.freeze({
       configuration: Object.freeze({ current: async () => EVAL_CONFIGURATION }),
+      // DL5-F3: a labelled stand-in; the evaluation harness stores nothing.
+      sourcePseudonym: (value: string) => `eval-pseudonym:${value}`,
       sessions: Object.freeze({
         create: sessionRepository.create.bind(sessionRepository),
         read: sessionRepository.read.bind(sessionRepository),

@@ -532,6 +532,9 @@ const api = buildApi({
   admission: new AdmissionLimiter(admissionPolicy),
   support: {
     configuration: supportConfiguration,
+    // DL5-F3: the caller's network is pseudonymised under a key derived from
+    // the support KEK before it ever reaches an append-only table.
+    sourcePseudonym: (value: string) => supportKeys.sourcePseudonym(value),
     sessions: Object.freeze({
       create: supportSessions.create.bind(supportSessions),
       read: supportSessions.read.bind(supportSessions),

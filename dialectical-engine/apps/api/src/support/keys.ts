@@ -1,5 +1,5 @@
 import {
-  createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual
+  createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual
 } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
@@ -98,6 +98,16 @@ export interface SupportKeyPort {
   verifyUnderCurrentKek(handle: SupportKeyHandle, wrapped: Uint8Array): Promise<void>;
   /** A non-secret label for the current KEK, for the rotation's own report. */
   currentKekId(): string;
+  /**
+   * DL5-F3. An unlinkable pseudonym for one source value, under a key nobody
+   * outside this host holds. The two append-only support tables that record a
+   * caller's network used to store a bare `sha256` of it: 2^32 digests for the
+   * whole IPv4 space, so every row inverted to an address for anyone who could
+   * read the schema or a backup. Rendered as bare hex, the grammar
+   * `support.abuse_event.ip_sha256` and `support.admission_event.ip_sha256`
+   * CHECK.
+   */
+  sourcePseudonym(value: string): string;
   sealContent(context: SupportContentContext,dataKey: Uint8Array,plaintext: Uint8Array): Buffer;
   openContent(context: SupportContentContext,dataKey: Uint8Array,ciphertext: Uint8Array): Buffer;
   close(): Promise<void>;
@@ -112,6 +122,7 @@ export type SupportKeyErrorCode =
   | "SUPPORT_KEY_OPERATION_FAILED"
   | "SUPPORT_KEY_DESTROYED"
   | "SUPPORT_KEY_PORT_CLOSED"
+  | "SUPPORT_SOURCE_VALUE_INVALID"
   | "SUPPORT_KEK_CUSTODY_INVALID"
   | "SUPPORT_KEK_PATH_INVALID"
   | "SUPPORT_WRAPPED_KEY_INVALID";
@@ -449,16 +460,44 @@ async function readProtectedKeyIdentity(path: string): Promise<KeyFileIdentity> 
 }
 
 const SUPPORT_KEK_ID_DOMAIN = "debateai:kek-id:v1\0";
+/**
+ * DL5-F3. The pseudonym key is DERIVED from the support KEK rather than loaded
+ * from a file of its own.
+ *
+ * The finding proposes a dedicated `SUPPORT_IP_SALT_PATH` under the same
+ * custody rules as `AUDIT_SOURCE_IP_SALT_PATH`. That would need a new required
+ * key in the API's strict environment shape
+ * (`packages/register/src/runtime-environment.ts`), which another task owns —
+ * so this derives a separate MAC key from custody material the support module
+ * already holds, under its own domain label. B13 key-domain separation holds:
+ * the audit salt is untouched and unreachable from here, this key never wraps
+ * or unwraps anything, and the KEK is never itself the MAC key over
+ * caller-supplied bytes. Consequence for the operator, and the reason a
+ * dedicated salt file may still be worth sealing: rotating the support KEK
+ * rotates this pseudonym too, so the per-source windows (all 24 hours or less)
+ * restart once at the changeover.
+ */
+const SUPPORT_SOURCE_PSEUDONYM_DOMAIN = "debateai:support-source-pseudonym:v1\0";
 
 class FileSupportKeyPort implements SupportKeyPort {
   readonly #kek: Buffer;
   readonly #previousKek: Buffer | undefined;
+  readonly #sourceKey: Buffer;
   readonly #closedLeaseKeys = new WeakSet<object>();
   #closed = false;
 
   constructor(kek: Buffer, previousKek?: Buffer) {
     this.#kek = kek;
     this.#previousKek = previousKek;
+    this.#sourceKey = createHmac("sha256", kek)
+      .update(SUPPORT_SOURCE_PSEUDONYM_DOMAIN, "utf8")
+      .digest();
+  }
+
+  sourcePseudonym(value: string): string {
+    this.#assertOpen();
+    if (typeof value !== "string" || value.length === 0) fail("SUPPORT_SOURCE_VALUE_INVALID");
+    return createHmac("sha256", this.#sourceKey).update(value, "utf8").digest("hex");
   }
 
   /**
@@ -667,6 +706,7 @@ class FileSupportKeyPort implements SupportKeyPort {
     this.#closed = true;
     this.#kek.fill(0);
     this.#previousKek?.fill(0);
+    this.#sourceKey.fill(0);
   }
 }
 

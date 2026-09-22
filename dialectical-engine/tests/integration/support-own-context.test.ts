@@ -104,6 +104,8 @@ function supportApplication(input: Readonly<{
     listSession: async () => []
   };
   return Object.freeze({
+    // DL5-F3: a labelled stand-in; this suite asserts nothing about the value.
+    sourcePseudonym: (value: string) => `test-pseudonym:${value}`,
     configuration: { current: async () => ({
       kind: "AVAILABLE" as const,
       snapshot: {

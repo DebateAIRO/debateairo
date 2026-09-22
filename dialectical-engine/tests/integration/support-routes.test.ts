@@ -272,6 +272,8 @@ describe("SUP-01 support routes", () => {
         configuration: options.configurationPort ?? configuration(enabled, options.configuration),
         sessions: options.sessionPort ?? sessions,
         messages: options.messagePort ?? messageCipher,
+        // DL5-F3: the real keyed derivation, so the routes store what production stores.
+        sourcePseudonym: (value: string) => supportKeys.sourcePseudonym(value),
         cases: options.casePort ?? cases,
         caseAccess: options.caseAccessPort ?? caseAccess,
         knowledge,
