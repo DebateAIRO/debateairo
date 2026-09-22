@@ -470,7 +470,11 @@ describe("V-9 both roots resolve credentials AFTER the mode decision (task 10b)"
 describe("V-9 a new OpenAI-compatible vendor needs no code (task 10c)", () => {
   let server: Server;
   let baseUrl: string;
-  const seen: { authorization: string | undefined; model: string | undefined }[] = [];
+  const seen: {
+    authorization: string | undefined;
+    model: string | undefined;
+    url: string | undefined;
+  }[] = [];
 
   beforeAll(async () => {
     server = createServer((request, response) => {
@@ -480,7 +484,11 @@ describe("V-9 a new OpenAI-compatible vendor needs no code (task 10c)", () => {
         const decoded = JSON.parse(body) as { model?: string };
         seen.push({
           authorization: request.headers.authorization,
-          model: decoded.model
+          model: decoded.model,
+          // The path the adapter actually posted to, recorded rather than
+          // assumed: this vendor's server answers any route, so an unrecorded
+          // URL is an unmeasured one.
+          url: request.url
         });
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify({
@@ -491,7 +499,15 @@ describe("V-9 a new OpenAI-compatible vendor needs no code (task 10c)", () => {
       });
     });
     await new Promise<void>((resolve) => { server.listen(0, "127.0.0.1", resolve); });
-    baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`;
+    /**
+     * A MULTI-SEGMENT prefix on purpose. `normalizedProviderBaseUrl` requires a
+     * base path ending in `/v1`, so `/api/v1` is as lawful as `/v1` — and only a
+     * gateway that appends to whatever base the target row names can answer it.
+     * A bare `/v1` would be satisfied by an adapter with `/v1/chat/completions`
+     * written into it, which is the one thing "vendors are configuration, not
+     * code" must not be able to hide.
+     */
+    baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1`;
   });
 
   afterAll(async () => {
@@ -547,7 +563,14 @@ describe("V-9 a new OpenAI-compatible vendor needs no code (task 10c)", () => {
     expect(result.content).toBe("{\"ok\":true}");
     expect(result.maker).toBe("maker-new");
     expect(result.model).toBe("vendor-new-large");
-    expect(seen).toEqual([{ authorization: CREDENTIAL, model: "vendor-new-large" }]);
+    // V-9(3) on the PATH as well as the header: the vendor is reached at its own
+    // configured prefix plus the adapter's one route, with no code that knows
+    // this vendor exists.
+    expect(seen).toEqual([{
+      authorization: CREDENTIAL,
+      model: "vendor-new-large",
+      url: "/api/v1/chat/completions"
+    }]);
   });
 
   it("refuses the vendor when the register row does not name it", () => {
