@@ -135,7 +135,7 @@ describe("DL5-F3 the support routes record the keyed pseudonym", () => {
     const h = harness();
     try {
       const created = await h.api.inject({
-        method: "POST", url: "/v1/support/sessions",
+        method: "POST", url: "/v1/support/sessions", headers: { origin: TEST_APP_ORIGIN },
         remoteAddress: "2001:db8:1:2::9", payload: { language: "en" }
       });
       expect(created.statusCode).toBe(201);
@@ -148,7 +148,7 @@ describe("DL5-F3 the support routes record the keyed pseudonym", () => {
 
       // A second address in the same /64 is the same source, not a fresh one.
       await h.api.inject({
-        method: "POST", url: "/v1/support/sessions",
+        method: "POST", url: "/v1/support/sessions", headers: { origin: TEST_APP_ORIGIN },
         remoteAddress: "2001:db8:1:2:a:b:c:d", payload: { language: "en" }
       });
       const scopes = h.support.spies.admitIpSession.mock.calls
@@ -157,7 +157,7 @@ describe("DL5-F3 the support routes record the keyed pseudonym", () => {
 
       // And an IPv4 caller keeps its own whole address as the scope.
       await h.api.inject({
-        method: "POST", url: "/v1/support/sessions",
+        method: "POST", url: "/v1/support/sessions", headers: { origin: TEST_APP_ORIGIN },
         remoteAddress: "203.0.113.5", payload: { language: "en" }
       });
       expect(h.support.spies.sourcePseudonym).toHaveBeenCalledWith("203.0.113.5");
@@ -170,7 +170,7 @@ describe("DL5-F3 the support routes record the keyed pseudonym", () => {
     const h = harness();
     try {
       const created = await h.api.inject({
-        method: "POST", url: "/v1/support/sessions",
+        method: "POST", url: "/v1/support/sessions", headers: { origin: TEST_APP_ORIGIN },
         remoteAddress: "198.51.100.7", payload: { language: "en" }
       });
       const body = created.json() as Readonly<{

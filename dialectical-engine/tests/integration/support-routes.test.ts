@@ -250,6 +250,41 @@ describe("SUP-01 support routes", () => {
     if (keyRoot !== undefined) await rm(keyRoot,{ recursive: true,force: true });
   }, 120_000);
 
+  /**
+   * DL1-F7: every mutating support route now requires the exact first-party
+   * Origin, for anonymous callers too. A real browser on the help page always
+   * sends it, and a drive-by from another site cannot — so the harness sends it
+   * on mutations, exactly as the browser this suite stands in for would, unless
+   * a case supplies its own Origin to exercise the refusal.
+   */
+  function asBrowser(server: FastifyInstance): FastifyInstance {
+    const inject: FastifyInstance["inject"] = (options?: unknown) => {
+      if (typeof options !== "object" || options === null) {
+        return (server.inject as (value?: unknown) => never)(options);
+      }
+      const request = options as Readonly<{
+        method?: string;url?: string;headers?: Readonly<Record<string,unknown>>;
+      }>;
+      const mutating = typeof request.method === "string"
+        && request.method.toUpperCase() !== "GET" && request.method.toUpperCase() !== "HEAD";
+      const carriesOrigin = Object.keys(request.headers ?? {})
+        .some((name) => name.toLowerCase() === "origin");
+      if (!mutating || carriesOrigin) {
+        return (server.inject as (value?: unknown) => never)(options);
+      }
+      return (server.inject as (value?: unknown) => never)({
+        ...request, headers: { ...request.headers, origin: TEST_APP_ORIGIN }
+      });
+    };
+    return new Proxy(server, {
+      get(target, property, receiver) {
+        if (property === "inject") return inject;
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === "function" ? (value as () => unknown).bind(target) : value;
+      }
+    });
+  }
+
   function api(
     enabled: boolean,
     options: Readonly<{
@@ -264,7 +299,7 @@ describe("SUP-01 support routes", () => {
       reportDiagnostic?: (diagnostic: string) => void;
     }> = {}
   ) {
-    return buildApi({
+    return asBrowser(buildApi({
       application: askApplication(),
       sessions: testSessionApplication([IDENTITY,CASE_OWNER]),
       allowedOrigin: TEST_APP_ORIGIN,
@@ -282,7 +317,7 @@ describe("SUP-01 support routes", () => {
         ...(options.reportDiagnostic === undefined
           ? {} : { reportDiagnostic: options.reportDiagnostic })
       }
-    });
+    }));
   }
 
   function sessionPort(overrides: Partial<SupportSessionPort>): SupportSessionPort {

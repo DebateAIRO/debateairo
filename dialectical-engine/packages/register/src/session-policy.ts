@@ -132,7 +132,8 @@ const admissionPolicyValueSchema = z.object({
   public_reads: admissionScopeValueSchema("source"),
   recovery_start: admissionScopeValueSchema("source"),
   support_reads: admissionScopeValueSchema("source").optional(),
-  support_sessions: admissionScopeValueSchema("owner").optional()
+  support_sessions: admissionScopeValueSchema("owner").optional(),
+  support_model_calls: admissionScopeValueSchema("source").optional()
 }).strict();
 
 export type AdmissionPolicyValue = z.infer<typeof admissionPolicyValueSchema>;
@@ -151,6 +152,8 @@ export type AdmissionPolicy = Readonly<{
   /** DL1-F2. `null` when the resolved register version carries no such budget. */
   supportReads: AdmissionScopePolicy<"source"> | null;
   supportSessions: AdmissionScopePolicy<"owner"> | null;
+  /** DL1-F7. One source's share of the global daily model-call cap. */
+  supportModelCalls: AdmissionScopePolicy<"source"> | null;
   sourceRef: string;
 }>;
 
@@ -198,11 +201,22 @@ export const ADMISSION_POLICY_REGISTER_ROW = Object.freeze({
  * that made a KEK wrap plus two inserts per call with nothing in the way.
  * Anonymous creation keeps its own per-IP window (`admitIpSession`), so this
  * budget is about the authenticated path the finding names.
+ *
+ * `support_model_calls` — DL1-F7. 40 per rolling 24 hours per source, against a
+ * sealed global daily cap of 500 (`support_daily_call_cap`). The global cap is
+ * one bucket, so about five determined sources could take a whole day's calls
+ * and leave everyone else DEGRADED until the UTC day turned. A share of 8%
+ * means it takes at least thirteen distinct sources to exhaust the day, while
+ * forty model answers is far past what one person asks a help widget. The
+ * window is a rolling 24 hours rather than the UTC day the durable cap uses,
+ * because this budget is a per-process fairness rule, not the spend ledger; the
+ * spend ledger is untouched and still authoritative.
  */
 export const ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
   rowKey: ADMISSION_POLICY_ROW_KEY,
   sourceRef: `${ADMISSION_POLICY_REGISTER_ROW.sourceRef}`
-    + " + DL1-F2 support_reads/support_sessions, V ratification pending (V-1)",
+    + " + DL1-F2 support_reads/support_sessions and DL1-F7 support_model_calls,"
+    + " V ratification pending (V-1)",
   value: Object.freeze({
     ...ADMISSION_POLICY_REGISTER_ROW.value,
     support_reads: Object.freeze({
@@ -210,6 +224,9 @@ export const ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
     }),
     support_sessions: Object.freeze({
       key: "owner" as const, limit: 10, window_ms: 60 * 60_000, capacity: 8_192
+    }),
+    support_model_calls: Object.freeze({
+      key: "source" as const, limit: 40, window_ms: 24 * 60 * 60_000, capacity: 65_536
     })
   })
 });
@@ -250,6 +267,12 @@ export function admissionPolicyFromValue(value: unknown, sourceRef: string): Adm
       limit: policy.support_sessions.limit,
       windowMs: policy.support_sessions.window_ms,
       capacity: policy.support_sessions.capacity
+    }),
+    supportModelCalls: policy.support_model_calls === undefined ? null : Object.freeze({
+      key: policy.support_model_calls.key,
+      limit: policy.support_model_calls.limit,
+      windowMs: policy.support_model_calls.window_ms,
+      capacity: policy.support_model_calls.capacity
     }),
     sourceRef
   });

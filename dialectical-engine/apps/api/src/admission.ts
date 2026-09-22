@@ -7,7 +7,7 @@ import type { AdmissionPolicy } from "@debateai/register";
  * refusal, it is an absence, and the caller must be able to tell them apart.
  */
 export type AdmissionScope = "asks" | "publicReads" | "recoveryStart"
-  | "supportReads" | "supportSessions";
+  | "supportReads" | "supportSessions" | "supportModelCalls";
 
 export type AdmissionDecision =
   | Readonly<{ allowed: true }>
@@ -27,7 +27,7 @@ interface AdmissionEntry {
 interface AdmissionBucket {
   readonly policy: NonNullable<AdmissionPolicy["asks"] | AdmissionPolicy["publicReads"]
     | AdmissionPolicy["recoveryStart"] | AdmissionPolicy["supportReads"]
-    | AdmissionPolicy["supportSessions"]>;
+    | AdmissionPolicy["supportSessions"] | AdmissionPolicy["supportModelCalls"]>;
   readonly entries: Map<string, AdmissionEntry>;
 }
 
@@ -59,6 +59,9 @@ export class AdmissionLimiter {
       ] as const]),
       ...(policy.supportSessions === null ? [] : [[
         "supportSessions", { policy: policy.supportSessions, entries: new Map() }
+      ] as const]),
+      ...(policy.supportModelCalls === null ? [] : [[
+        "supportModelCalls", { policy: policy.supportModelCalls, entries: new Map() }
       ] as const])
     ]);
   }

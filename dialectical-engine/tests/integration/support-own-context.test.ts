@@ -191,11 +191,13 @@ describe("SUP-03 consent and anonymous own-context behavior", () => {
     });
     const consent = await server.inject({
       method: "POST",url: `/v1/support/sessions/${SESSION_ID}/consent`,
-      headers: { "x-support-session-token": TOKEN },payload: { on: true }
+      // DL1-F7: a browser on the first-party page sends this.
+      headers: { origin: TEST_APP_ORIGIN,"x-support-session-token": TOKEN },payload: { on: true }
     });
     const question = await server.inject({
       method: "POST",url: `/v1/support/sessions/${SESSION_ID}/messages`,
-      headers: { "x-support-session-token": TOKEN },payload: { text: "Why is my debate stuck?" }
+      // DL1-F7: a browser on the first-party page sends this.
+      headers: { origin: TEST_APP_ORIGIN,"x-support-session-token": TOKEN },payload: { text: "Why is my debate stuck?" }
     });
     await server.close();
 
@@ -483,7 +485,8 @@ describe("SUP-03 consent and anonymous own-context behavior", () => {
     });
     const response = await server.inject({
       method: "POST",url: `/v1/support/sessions/${SESSION_ID}/messages`,
-      headers: { "x-support-session-token": TOKEN },
+      // DL1-F7: a browser on the first-party page sends this.
+      headers: { origin: TEST_APP_ORIGIN,"x-support-session-token": TOKEN },
       payload: { text }
     });
     await server.close();

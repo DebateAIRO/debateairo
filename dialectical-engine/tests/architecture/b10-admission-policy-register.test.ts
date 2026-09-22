@@ -27,11 +27,13 @@ describe("B10 sealed admission-policy register row", () => {
       asks: { key: "owner", limit: 20, windowMs: 3_600_000, capacity: 8_192 },
       publicReads: { key: "source", limit: 120, windowMs: 900_000, capacity: 65_536 },
       recoveryStart: { key: "source", limit: 15, windowMs: 3_600_000, capacity: 65_536 },
-      // DL1-F2 added two support budgets as a SUPERSEDING deployment row. This
-      // row is the sealed one and carries neither, so both resolve to null and
-      // a host still serving it behaves exactly as it did.
+      // DL1-F2 and DL1-F7 added three support budgets as a SUPERSEDING
+      // deployment row. This row is the sealed one and carries none of them, so
+      // all three resolve to null and a host still serving it behaves exactly
+      // as it did.
       supportReads: null,
       supportSessions: null,
+      supportModelCalls: null,
       sourceRef: ADMISSION_POLICY_REGISTER_ROW.sourceRef
     });
     expect(Object.isFrozen(policy)).toBe(true);

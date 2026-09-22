@@ -73,12 +73,16 @@ export interface SupportApplication {
  * A deployment whose register version publishes no such budget always admits,
  * so support behaves exactly as it does today until the row is published.
  */
-export type SupportAdmission = (
-  reply: FastifyReply,
-  scope: "supportReads" | "supportSessions",
-  route: SupportRoutePath,
-  key: string
-) => boolean;
+export type SupportAdmissionScope = "supportReads" | "supportSessions" | "supportModelCalls";
+
+export type SupportAdmission = Readonly<{
+  /** Charges the budget and, when it is spent, sends the API's own typed 429. */
+  gate(
+    reply: FastifyReply, scope: SupportAdmissionScope, route: SupportRoutePath, key: string
+  ): boolean;
+  /** Charges the budget and only reports: the caller owns the refusal it sends. */
+  charge(scope: SupportAdmissionScope, route: SupportRoutePath, key: string): boolean;
+}>;
 
 export type SupportRoutePolicy = (route: SupportRoutePath) => Readonly<{
   config: Readonly<{
@@ -254,7 +258,7 @@ export function installSupportRoutes(
   api: FastifyInstance,
   application: SupportApplication | undefined,
   policy: SupportRoutePolicy,
-  admit: SupportAdmission = () => true
+  admit: SupportAdmission = Object.freeze({ gate: () => true, charge: () => true })
 ): void {
   const admission = new SupportC3AdmissionWindow();
   /**
@@ -275,7 +279,7 @@ export function installSupportRoutes(
      */
     const ownerRef = request.authenticatedSession?.ownerRef;
     if (ownerRef !== undefined
-      && !admit(reply, "supportSessions", "POST /v1/support/sessions", ownerRef)) {
+      && !admit.gate(reply, "supportSessions", "POST /v1/support/sessions", ownerRef)) {
       return reply;
     }
     const body = typeof request.body === "object" && request.body !== null
@@ -333,7 +337,7 @@ export function installSupportRoutes(
     policy("GET /v1/support/sessions/{id}"),
     async (request, reply) => {
       if (application === undefined) return unavailable(reply);
-      if (!admit(reply, "supportReads", "GET /v1/support/sessions/{id}", clientIp(request))) {
+      if (!admit.gate(reply, "supportReads", "GET /v1/support/sessions/{id}", clientIp(request))) {
         return reply;
       }
       const tokenSha256 = capabilityFrom(request);
@@ -825,6 +829,23 @@ export function installSupportRoutes(
         });
       }
       if (application.answer !== undefined) {
+        /**
+         * DL1-F7. The model budget is one global daily bucket, so a few sources
+         * could take a whole day's calls and leave everyone else DEGRADED. The
+         * per-source share is charged HERE — after the classifier has decided
+         * this message really does need the model, so a refusal, an incident or
+         * an own-context answer costs a source nothing — and the refusal is the
+         * ordinary rate-limit refusal with its evidence, so a spent share looks
+         * to that source like every other window it can hit, and to every other
+         * source like nothing at all.
+         */
+        if (!admit.charge("supportModelCalls",
+          "POST /v1/support/sessions/{id}/messages", ipSha256)) {
+          await recordRateLimitEvidence(application,{
+            sessionId: found.sessionId,messageSha256,ipSha256,at: now
+          });
+          return rateLimited(reply,responseLanguage);
+        }
         const result = await application.answer.respond({
           sessionId: found.sessionId,
           text: body.text,
@@ -980,7 +1001,7 @@ export function installSupportRoutes(
     policy("GET /v1/support/cases/{token}"),
     async (request, reply) => {
       if (application?.caseAccess === undefined) return unavailable(reply);
-      if (!admit(reply, "supportReads", "GET /v1/support/cases/{token}", clientIp(request))) {
+      if (!admit.gate(reply, "supportReads", "GET /v1/support/cases/{token}", clientIp(request))) {
         return reply;
       }
       const configuration = await application.configuration.current();
@@ -1095,7 +1116,7 @@ export function installSupportRoutes(
    */
   api.get("/v1/support/status", policy("GET /v1/support/status"), async (request, reply) => {
     if (application === undefined) return unavailable(reply);
-    if (!admit(reply, "supportReads", "GET /v1/support/status", clientIp(request))) return reply;
+    if (!admit.gate(reply, "supportReads", "GET /v1/support/status", clientIp(request))) return reply;
     const now = (application.clock ?? (() => new Date()))().getTime();
     if (statusCache !== null && now - statusCache.at < SUPPORT_STATUS_CACHE_MS
       && now >= statusCache.at) {

@@ -95,7 +95,9 @@ function harness(policy: AdmissionPolicy | null = PUBLISHED) {
       headers: { "x-support-session-token": token }
     }),
     createAnonymous: (remoteAddress: string) => api.inject({
-      method: "POST", url: "/v1/support/sessions", remoteAddress, payload: { language: "en" }
+      method: "POST", url: "/v1/support/sessions", remoteAddress,
+      // DL1-F7: a browser on the first-party page sends this; a drive-by cannot.
+      headers: { origin: TEST_APP_ORIGIN }, payload: { language: "en" }
     }),
     createOwned: (identity: typeof OWNER_A, remoteAddress: string) => api.inject({
       method: "POST", url: "/v1/support/sessions", remoteAddress,
@@ -121,13 +123,17 @@ describe("DL1-F2 the support budgets supersede, never edit, the sealed row", () 
     expect(SEALED.supportSessions).toBeNull();
   });
 
-  it("publishes a superseding row that adds the two support scopes and nothing else", () => {
+  it("publishes a superseding row that adds the support scopes and nothing else", () => {
     expect(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.rowKey)
       .toBe(ADMISSION_POLICY_REGISTER_ROW.rowKey);
     expect(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.value).toEqual({
       ...ADMISSION_POLICY_REGISTER_ROW.value,
       support_reads: { key: "source", limit: 240, window_ms: QUARTER_MS, capacity: 65_536 },
-      support_sessions: { key: "owner", limit: 10, window_ms: HOUR_MS, capacity: 8_192 }
+      support_sessions: { key: "owner", limit: 10, window_ms: HOUR_MS, capacity: 8_192 },
+      // DL1-F7 rides the same unpublished deployment version; see its own test.
+      support_model_calls: {
+        key: "source", limit: 40, window_ms: 24 * 60 * 60_000, capacity: 65_536
+      }
     });
     expect(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef)
       .toContain(ADMISSION_POLICY_REGISTER_ROW.sourceRef);

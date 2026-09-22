@@ -478,7 +478,8 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
         const identityHeaders = ownContextCase ? testSessionHeaders(EVAL_IDENTITY,true) : {};
         const opened = await activeServer.inject({
           method: "POST",url: "/v1/support/sessions",
-          headers: { ...identityHeaders,"x-forwarded-for": ip },
+          // DL1-F7: the browser this harness stands in for sends the Origin.
+          headers: { origin: TEST_APP_ORIGIN,...identityHeaders,"x-forwarded-for": ip },
           payload: { language: testCase.expectedLanguage }
         });
         if (opened.statusCode !== 201) throw new TypeError("SUPPORT_EVAL_SESSION_FAILED");
@@ -491,7 +492,8 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
             method: "POST",
             url: `/v1/support/sessions/${capability.session.session_id}/consent`,
             headers: {
-              ...identityHeaders,"x-support-session-token": capability.session_token,
+              origin: TEST_APP_ORIGIN,...identityHeaders,
+              "x-support-session-token": capability.session_token,
               "x-forwarded-for": ip
             },
             payload: { on: true }
@@ -510,7 +512,8 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
           response = await activeServer.inject({
             method: "POST",url: `/v1/support/sessions/${capability.session.session_id}/messages`,
             headers: {
-              ...identityHeaders,"x-support-session-token": capability.session_token,
+              origin: TEST_APP_ORIGIN,...identityHeaders,
+              "x-support-session-token": capability.session_token,
               "x-forwarded-for": ip
             },
             payload: {
