@@ -142,17 +142,77 @@ describe("the 2026-09-22 amendment — an obs-capture envelope never carries the
  * error, taxonomyClass, capturePoint, disposition, source, attemptIndex })`,
  * whose return type has no `error` member at all.
  */
+/** The two properties the guard holds, applied to any source text. */
+function captureGuardVerdict(source: string): {
+  readonly emissions: number;
+  readonly builderUses: number;
+  readonly carriesRawError: boolean;
+} {
+  const emissions = source.split(/\bcapture\??\.?emit\(/u).length - 1;
+  // REVIEW ITEM 7: the DEFINITION of the builder matches `captureFailureEnvelope(`
+  // too, so counting it as a use let ONE unconverted emission pass forever.
+  // Every use beyond the definition is a real call site.
+  const builderUses = Math.max(0, (source.split(/captureFailureEnvelope\(/u).length - 1) - 1);
+  // ...and `error` must not appear in an emit's argument list under ANY
+  // spelling — `dev`'s sites are `capture?.emit({ …, error, … })`, which the
+  // old `Object.freeze({` pattern did not match at all.
+  const carriesRawError = /\bcapture\??\.?emit\(\s*(?:Object\.freeze\(\s*)?\{[\s\S]{0,400}?(?:^|[\s,{])error\s*[,}]/mu.test(source);
+  return { emissions, builderUses, carriesRawError };
+}
+
 describe("the 2026-09-22 amendment — no capture site may carry a raw error", () => {
   it("holds across the runner source, including anything a later merge adds", () => {
     const source = readFileSync(
       fileURLToPath(new URL("../../apps/runner/src/index.ts", import.meta.url)),
       "utf8"
     );
-    // Every capture emission must be built by the scrubbing builder.
-    const emissions = source.split(/\bcapture\??\.?emit\(/u).length - 1;
-    const built = source.split(/captureFailureEnvelope\(/u).length - 1;
-    expect(emissions).toBeLessThanOrEqual(built);
-    // ...and no emission may pass an error object along, under any spelling.
-    expect(source).not.toMatch(/capture\??\.?emit\(Object\.freeze\(\{[^}]*\berror\b/u);
+    const verdict = captureGuardVerdict(source);
+    expect(verdict.emissions).toBeLessThanOrEqual(verdict.builderUses);
+    expect(verdict.carriesRawError).toBe(false);
+  });
+
+  /**
+   * REVIEW ITEM 7 — the guard, proved against the real thing it guards.
+   *
+   * A merge guard nobody has seen fail is a merge guard nobody knows works. The
+   * fixture below is `dev` @ `cbf1b281`'s own spelling, byte for byte from the
+   * site in its task body, so this row measures the guard against the exact text
+   * it exists to catch rather than against a paraphrase of it.
+   */
+  it("goes RED on dev's own unconverted spelling", () => {
+    const devSite = `
+        } catch (error) {
+          capture?.emit(Object.freeze({
+            code: error instanceof TypedDomainError ? error.code : "OBS_CAPTURE_SELF",
+            error,
+            taxonomy_class: "JOB_FAILURE",
+            capture_point: "job",
+            disposition: "THROWN",
+            source: "hatchet",
+            attempt_index: attemptIndex
+          }));
+`;
+    const verdict = captureGuardVerdict(devSite);
+    expect(verdict.carriesRawError).toBe(true);
+    // ...and the count half fires too: one emission, no builder use.
+    expect(verdict.emissions).toBe(1);
+    expect(verdict.builderUses).toBe(0);
+    expect(verdict.emissions).toBeGreaterThan(verdict.builderUses);
+  });
+
+  it("goes RED on the un-frozen spelling as well", () => {
+    expect(captureGuardVerdict(`capture?.emit({ code: "X", error, source: "hatchet" });`).carriesRawError)
+      .toBe(true);
+  });
+
+  it("stays GREEN on a converted site", () => {
+    const converted = `
+      export function captureFailureEnvelope(input) { return {}; }
+      capture?.emit(captureFailureEnvelope({ error, taxonomyClass: "JOB_FAILURE" }));
+`;
+    const verdict = captureGuardVerdict(converted);
+    expect(verdict.carriesRawError).toBe(false);
+    expect(verdict.emissions).toBe(1);
+    expect(verdict.builderUses).toBe(1);
   });
 });

@@ -745,11 +745,21 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           modelVersion: responseJson.model
         };
       } catch (error) {
-        // A frame refusal is not a provider failure and must never be absorbed
-        // into one: the packet was never sent, retrying cannot repair it, and
-        // the caller has to see WHICH containment rule its builder broke. It is
-        // the only error raised inside this block that is about our own code.
-        if (error instanceof TypedDomainError && error.code.startsWith("PROMPT_FRAME_")) throw error;
+        /**
+         * Two refusals here are OURS, not the transport's, and neither is
+         * repaired by asking again — so both propagate untouched instead of
+         * being absorbed into a retry loop and re-emerging as
+         * PROVIDER_CALL_FAILED after the ceiling is spent.
+         *
+         *  · a FRAME refusal: the packet was never sent, and the caller has to
+         *    see which containment rule its builder broke.
+         *  · a MODEL IDENTITY change (review item 8): the gateway has already
+         *    proved it answers with the wrong model. Retrying it was three real
+         *    calls, three artifacts and three ledger rows for an answer that
+         *    cannot become correct.
+         */
+        const shortCircuit = error instanceof TypedDomainError
+          && (error.code.startsWith("PROMPT_FRAME_") || error.code === "PROVIDER_MODEL_IDENTITY_CHANGED");
         lastContentRejection = null;
         lastError = error;
         if (!ledgerRecorded) {
@@ -770,6 +780,12 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           finishedAt: new Date()
           });
         }
+        // The attempt is RECORDED before the refusal leaves: a relabelled answer
+        // is a FAILED attempt in the ledger, with its artifact, and only then a
+        // refusal the caller sees unwrapped. A frame refusal on the initial
+        // packet never reaches here at all, and one on a repair packet has
+        // already been ledgered by the rejection branch above.
+        if (shortCircuit) throw error;
       }
       // L4-F2: an oversized packet is deterministic — resending it would burn the ceiling for
       // an identical refusal, so the loop stops on the attempt that refused it.

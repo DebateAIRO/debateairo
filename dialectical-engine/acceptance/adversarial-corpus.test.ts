@@ -301,19 +301,37 @@ describe("P4-13 approved adversarial relay corpus", () => {
       const transcript = JSON.parse(observation.prompt) as {
         messages: readonly { readonly role: string; readonly content: string }[];
       };
+      const systemMessage = transcript.messages.find((message) => message.role === "system");
       const userMessage = transcript.messages.find((message) => message.role === "user");
-      if (userMessage === undefined) throw new Error("P4_CORPUS_USER_MESSAGE_MISSING");
-      return JSON.parse(userMessage.content) as {
+      if (userMessage === undefined || systemMessage === undefined) {
+        throw new Error("P4_CORPUS_USER_MESSAGE_MISSING");
+      }
+      // RUN1 (V-11 addendum): the user message is now one block delimited by the
+      // per-call boundary marker the system message declares, and the envelope
+      // lives INSIDE it. DELIM-01 measures the same property it always did —
+      // that a forged label stays inside the compartment — through the real
+      // transport, so it reads the envelope out of the fence rather than
+      // assuming the whole message is the envelope.
+      const fence = /#\|DEBATEAI-FENCE-[0-9a-f]{32}\|#/u.exec(systemMessage.content)?.[0];
+      if (fence === undefined) throw new Error("P4_CORPUS_FENCE_MISSING");
+      const lines = userMessage.content.split("\n");
+      if (lines[0] !== fence || lines[lines.length - 1] !== fence) {
+        throw new Error("P4_CORPUS_BLOCK_NOT_FENCED");
+      }
+      return JSON.parse(lines.slice(1, -1).join("\n")) as {
         format: string;
+        frame: string;
         fields: readonly { readonly name: string; readonly content: string }[];
       };
     });
     expect(observedPackets[0]).toEqual({
-      format: "debateai.untrusted-prompt-fields.v1",
+      format: "debateai.framed-material.v1",
+      frame: "debateai.prompt-frame.v1",
       fields: [{ name: "question_line", content }]
     });
     expect(observedPackets[1]).toEqual({
-      format: "debateai.untrusted-prompt-fields.v1",
+      format: "debateai.framed-material.v1",
+      frame: "debateai.prompt-frame.v1",
       fields: [
         { name: "question_line", content },
         // W7 / V-BLIND-CONTEXT (2026-09-03, commit abb6b21b): `author_maker` is

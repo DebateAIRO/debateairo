@@ -56,8 +56,9 @@ describe("L4-F10 — the provider-asserted model is compared with the pinned one
     const failure = await gatewayOver("vendor/cheaper-model", sink).call(REQUEST)
       .catch((error: unknown) => error);
 
-    expect(failure).toBeInstanceOf(ProviderCallFailedError);
-    expect(failure).toMatchObject({ cause: { code: "PROVIDER_MODEL_IDENTITY_CHANGED" } });
+    // Review item 8: the refusal propagates as ITSELF. It used to be retried to
+    // exhaustion and re-emerge wrapped in a transport failure.
+    expect(failure).toMatchObject({ code: "PROVIDER_MODEL_IDENTITY_CHANGED" });
     // The evidence of what arrived is kept, and the attempt is ledgered FAILED
     // rather than OK — a relabelled answer is never a successful call.
     expect(sink.artifacts).toHaveLength(1);
@@ -66,16 +67,57 @@ describe("L4-F10 — the provider-asserted model is compared with the pinned one
 
   it("names the pinned model and the provider ref, never the response body", async () => {
     const failure = await gatewayOver("vendor/cheaper-model").call(REQUEST)
-      .catch((error: unknown) => error) as ProviderCallFailedError;
-    const cause = failure.cause as { code: string; message: string };
-    expect(cause.message).toContain(MODEL);
-    expect(cause.message).not.toContain("ok");
+      .catch((error: unknown) => error) as { message: string };
+    expect(failure.message).toContain(MODEL);
+    expect(failure.message).not.toContain("ok");
   });
 
   it("accepts the pinned model", async () => {
     await expect(gatewayOver(MODEL).call(REQUEST)).resolves.toMatchObject({
       content: "ok", model: MODEL, modelVersion: MODEL
     });
+  });
+
+  /**
+   * REVIEW ITEM 8 — a relabelled model is not a transient fault.
+   *
+   * The refusal was thrown INSIDE the attempt loop, so the gateway retried it to
+   * exhaustion: three attempts, three ledger rows, three artifacts, three real
+   * calls to a gateway that has already proved it answers with the wrong model.
+   * Retrying cannot repair an identity mismatch — it is the same class as a
+   * frame refusal, and it short-circuits the same way.
+   */
+  it("does not retry a relabelled model — one attempt, one ledger row", async () => {
+    const sink = { artifacts: [] as { model: string; parseStatus: string }[], ledger: [] as { outcome: string }[] };
+    let fetches = 0;
+    const gateway = new OpenAICompatibleProviderGateway({
+      endpoint: "http://127.0.0.1:1/v1",
+      model: MODEL,
+      maker: "vendor",
+      assertNoOpenWriteTransaction: () => undefined,
+      sleepImplementation: async () => {},
+      persistRawArtifact: async (artifact) => {
+        sink.artifacts.push({ model: artifact.model, parseStatus: artifact.parseStatus });
+        return "artifact:1";
+      },
+      appendLedgerEntry: async (entry) => { sink.ledger.push({ outcome: entry.outcome }); return "ledger:1"; },
+      fetchImplementation: async () => {
+        fetches += 1;
+        return new Response(JSON.stringify({
+          id: "cmpl-1",
+          model: "vendor/cheaper-model",
+          choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }]
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+    });
+    const failure = await gateway.call({ ...REQUEST, bound: { ...REQUEST.bound, maxAttempts: 3 } })
+      .catch((error: unknown) => error);
+
+    // The refusal propagates as itself, not wrapped in a transport failure.
+    expect(failure).toMatchObject({ code: "PROVIDER_MODEL_IDENTITY_CHANGED" });
+    expect(fetches).toBe(1);
+    expect(sink.ledger).toHaveLength(1);
+    expect(sink.artifacts).toHaveLength(1);
   });
 
   it("refuses an over-long model string before it is recorded as lineage", async () => {
