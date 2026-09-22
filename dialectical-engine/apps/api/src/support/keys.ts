@@ -240,6 +240,36 @@ function bytesView(bytes: Uint8Array): Buffer {
   return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }
 
+/**
+ * DL2-F7. Decrypts into an allocation of its own and leaves nothing behind.
+ *
+ * `Buffer.concat` of small pieces answers from Node's shared 8 KiB slab and
+ * copies from two cipher outputs that live in that same slab. Those two copies
+ * were never zeroed, so every unwrapped data key and every decrypted support
+ * message existed in memory the caller could not reach — its own `fill(0)`
+ * erased only the view it was handed. The pieces are zeroed here, on the
+ * authentication-failure path as well, and the result is `allocUnsafeSlow`, so
+ * the caller's buffer owns its bytes and zeroing it is the whole erasure.
+ */
+function decryptSecret(
+  decipher: Readonly<{ update(data: Buffer): Buffer;final(): Buffer }>,
+  encrypted: Buffer
+): Buffer {
+  const pieces: Buffer[] = [];
+  try {
+    pieces.push(decipher.update(encrypted));
+    pieces.push(decipher.final());
+    const plaintext = Buffer.allocUnsafeSlow(
+      pieces.reduce((total,piece) => total + piece.byteLength,0)
+    );
+    let offset = 0;
+    for (const piece of pieces) offset += piece.copy(plaintext,offset);
+    return plaintext;
+  } finally {
+    for (const piece of pieces) piece.fill(0);
+  }
+}
+
 function parseWrappedEnvelope(wrapped: Uint8Array): Readonly<{
   nonce: Buffer;
   encrypted: Buffer;
@@ -335,6 +365,10 @@ async function readSupportKek(supportKekPath: string): Promise<KeyFileIdentity> 
 
   let identity: KeyFileIdentity | undefined;
   let failure: SupportKeyError | undefined;
+  // DL2-F7: the bytes read are named OUTSIDE the try. `realpath` runs after the
+  // read, so a rejection there — or any later throw — used to drop 32 live KEK
+  // bytes un-zeroed, because only the record that was never built held them.
+  let material: Buffer | undefined;
   try {
     const metadata = await handle.stat();
     if (!metadata.isFile()
@@ -344,7 +378,7 @@ async function readSupportKek(supportKekPath: string): Promise<KeyFileIdentity> 
       || metadata.size !== KEY_BYTES) {
       fail("SUPPORT_KEK_CUSTODY_INVALID");
     }
-    const material = await handle.readFile();
+    material = await handle.readFile();
     if (material.byteLength !== KEY_BYTES) fail("SUPPORT_KEK_CUSTODY_INVALID");
     identity = Object.freeze({
       canonicalPath: await realpath(resolvedPath),
@@ -363,7 +397,7 @@ async function readSupportKek(supportKekPath: string): Promise<KeyFileIdentity> 
     failure ??= new SupportKeyError("SUPPORT_KEK_CUSTODY_INVALID");
   }
   if (failure !== undefined || identity === undefined) {
-    identity?.material.fill(0);
+    material?.fill(0);
     throw failure ?? new SupportKeyError("SUPPORT_KEK_CUSTODY_INVALID");
   }
   return identity;
@@ -380,6 +414,8 @@ async function readProtectedKeyIdentity(path: string): Promise<KeyFileIdentity> 
   }
   let identity: KeyFileIdentity | undefined;
   let failure: SupportKeyError | undefined;
+  // DL2-F7, as in `readSupportKek`: zeroed whether or not it became the record.
+  let material: Buffer | undefined;
   try {
     const metadata = await handle.stat();
     if (!metadata.isFile()
@@ -387,7 +423,7 @@ async function readProtectedKeyIdentity(path: string): Promise<KeyFileIdentity> 
       || metadata.size !== KEY_BYTES) {
       fail("SUPPORT_KEK_CUSTODY_INVALID");
     }
-    const material = await handle.readFile();
+    material = await handle.readFile();
     if (material.byteLength !== KEY_BYTES) fail("SUPPORT_KEK_CUSTODY_INVALID");
     identity = Object.freeze({
       canonicalPath,
@@ -406,7 +442,7 @@ async function readProtectedKeyIdentity(path: string): Promise<KeyFileIdentity> 
     failure ??= new SupportKeyError("SUPPORT_KEK_CUSTODY_INVALID");
   }
   if (failure !== undefined || identity === undefined) {
-    identity?.material.fill(0);
+    material?.fill(0);
     throw failure ?? new SupportKeyError("SUPPORT_KEK_CUSTODY_INVALID");
   }
   return identity;
@@ -453,7 +489,7 @@ class FileSupportKeyPort implements SupportKeyPort {
       });
       decipher.setAAD(aad("support", handle));
       decipher.setAuthTag(envelope.tag);
-      return Buffer.concat([decipher.update(envelope.encrypted), decipher.final()]);
+      return decryptSecret(decipher, envelope.encrypted);
     } catch {
       return undefined;
     }
@@ -620,7 +656,7 @@ class FileSupportKeyPort implements SupportKeyPort {
       });
       decipher.setAAD(semanticAad(context));
       decipher.setAuthTag(envelope.tag);
-      return Buffer.concat([decipher.update(envelope.encrypted),decipher.final()]);
+      return decryptSecret(decipher,envelope.encrypted);
     } catch {
       fail("SUPPORT_KEY_AUTHENTICATION_FAILED");
     }
