@@ -68,13 +68,27 @@ export const DEVELOPMENT_RUN_DEATH_POLICY = Object.freeze({
 /**
  * First allocated version on a fresh database; runtime pins use the returned receipt.
  *
- * 5 -> 6 (RUN1, V-11 addendum, 2026-09-22): every prompt contract moved onto the
- * code-owned safety frame, so `judgeContractHash`, `composerContractHash` and
- * `conformanceContractHash` all move. Constraint 5: a sealed value is
- * SUPERSEDED by a new version, never edited — version 5 stays as history.
+ * THE NUMBER IS THE ALLOCATOR'S, NOT THIS FILE'S (C-I4). Migration 0055's
+ * sequence contract sets the next version to
+ * `greatest(4, max(register_version)) + 1`, and the only version a fresh
+ * database holds when `seedDevelopmentDeploymentRegister` publishes is the
+ * sealed bootstrap — imported as HISTORICAL, which never touches the allocator
+ * sequence. So a fresh database allocates 5, and this constant says 5.
+ *
+ * WHAT A STANDING DEV DATABASE GETS, and why that is not a contradiction: one
+ * that already sealed a 5 allocates 6 for the new rows, because the allocator
+ * never reuses a version. That is constraint 5 enforced where it belongs — in
+ * the database — rather than by a number in this file: RUN1 moved the prompt
+ * contract hashes this version carries, and superseding them is a new
+ * publication, whatever number it is given. Both dev roots read the version off
+ * the RECEIPT (`dev-api-process.ts`, `dev-api-environment.ts`), so nothing at
+ * runtime depends on which of the two a particular machine got.
+ *
+ * `tests/architecture/dev-deployment-register.test.ts` recomputes this from the
+ * migration and the bootstrap, so the two cannot drift again.
  */
-export const DEVELOPMENT_REGISTER_VERSION = 6 as const;
-export const DEVELOPMENT_HISTORICAL_REGISTER_VERSION = 5 as const;
+export const DEVELOPMENT_REGISTER_VERSION = 5 as const;
+export const DEVELOPMENT_HISTORICAL_REGISTER_VERSION = 4 as const;
 export const DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_SCHEMA =
   "debateai.dev-deployment-register-receipt.v1" as const;
 /**
