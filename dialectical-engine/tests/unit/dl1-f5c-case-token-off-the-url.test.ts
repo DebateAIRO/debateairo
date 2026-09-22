@@ -161,6 +161,28 @@ describe("DL1-F5c/DL3-F4 the case bearer never travels in a URL", () => {
     expect(source.match(/supportCaseLink\(opened\.token\)/gu) ?? []).toHaveLength(3);
   });
 
+  it("requires an admission bridge rather than defaulting to permissive", async () => {
+    // Review round, item 7. `installSupportRoutes` defaulted `admit` to
+    // `{ gate: () => true, charge: () => true }`. A security control whose
+    // default is "allow" is one forgotten argument away from being absent, and
+    // nothing would have failed to say so.
+    const source = await readFile("apps/api/src/support/index.ts", "utf8");
+    expect(source).not.toContain("admit: SupportAdmission = Object.freeze({");
+    expect(source).toContain("  admit: SupportAdmission");
+  });
+
+  it("drops the tolerance for a link shape the server can no longer mint", async () => {
+    // Review round, item 8. The widget accepted `body.link === "/help?case=…"`
+    // from the API. The API mints only the fragment form now, so that branch
+    // can never be taken: dead tolerance around a bearer is exactly the kind
+    // that outlives the reason it was written.
+    const source = await readFile("apps/ui/components/support/Assistant.tsx", "utf8");
+    expect(source).not.toContain("body.link !== `/help?case=${body.case_token}`");
+    // The browser-side read of a saved `?case=` link stays for one release.
+    const reader = await readFile("apps/ui/components/support/caseLink.ts", "utf8");
+    expect(reader).toContain('searchParams.get("case")');
+  });
+
   it("carries the case bearer through the UI proxy's allowlist", async () => {
     const proxy = await readFile("apps/ui/app/api/[...path]/route.ts", "utf8");
     expect(proxy).toContain("x-support-case-token");

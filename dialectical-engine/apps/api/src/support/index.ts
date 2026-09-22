@@ -307,7 +307,13 @@ export function installSupportRoutes(
   api: FastifyInstance,
   application: SupportApplication | undefined,
   policy: SupportRoutePolicy,
-  admit: SupportAdmission = Object.freeze({ gate: () => true, charge: () => true })
+  /**
+   * Required, never defaulted. A security control whose default is "allow" is
+   * one forgotten argument away from being absent, and nothing would fail to
+   * say so. A composition with no sealed budget passes a bridge that admits —
+   * which is a decision it states, not one it omits.
+   */
+  admit: SupportAdmission
 ): void {
   const admission = new SupportC3AdmissionWindow();
   /**

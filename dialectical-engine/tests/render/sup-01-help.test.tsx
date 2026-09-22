@@ -249,7 +249,7 @@ describe("SUP-01 /help assistant", () => {
 
   it("retains automated token/SLA/link fields from the browser client contract", async () => {
     const token = "B".repeat(43);
-    const link = `/help?case=${token}`;
+    const link = `/help#case=${token}`;
     const acknowledgement = `I've opened case ${token} for a person. Expected reply: within 48 hours. Check replies at ${link}. I can't promise an outcome.`;
     vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({
       message_id: "m-client",outcome: "REFUSE_SAFETY",text: "Fixed refusal.",
@@ -258,9 +258,26 @@ describe("SUP-01 /help assistant", () => {
     await expect(supportAssistantClient.sendMessage(
       SESSION,"ordinary safety request","en"
     )).resolves.toMatchObject({
-      // DL3-F4: the API's ?case= link is accepted and carried as #case=.
-      caseAcknowledgement: { text: acknowledgement,token,slaHours: 48,link: `/help#case=${token}` }
+      // DL1-F5c: the API mints the fragment form, and that is what is carried.
+      caseAcknowledgement: { text: acknowledgement,token,slaHours: 48,link }
     });
+  });
+
+  it("refuses an acknowledgement whose link is the retired query form", async () => {
+    // DL1-F5c: the API can no longer mint `?case=`, so a body carrying it is
+    // not this server's — the widget drops the acknowledgement rather than
+    // rendering a bearer link it cannot account for.
+    const token = "C".repeat(43);
+    const link = `/help?case=${token}`;
+    vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      message_id: "m-legacy",outcome: "REFUSE_SAFETY",text: "Fixed refusal.",
+      case_token: token,sla_hours: 48,link,
+      case_acknowledgement: `Check replies at ${link}.`
+    }),{ status: 200,headers: { "content-type": "application/json" } })));
+    const reply = await supportAssistantClient.sendMessage(
+      SESSION,"ordinary safety request","en"
+    );
+    expect(reply.caseAcknowledgement).toBeUndefined();
   });
 
   it("returns a structured RATE_LIMITED outcome from a real 429 response", async () => {
