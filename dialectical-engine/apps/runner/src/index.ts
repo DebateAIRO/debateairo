@@ -5451,6 +5451,50 @@ function scrubbedTaskFailure(error: unknown): TypedDomainError {
   return scrubbed;
 }
 
+/**
+ * L4-F6: the workflow input, validated before anything reads it. `.strict()` so
+ * an extra key is a refusal rather than a silently ignored surprise, and the
+ * refusal never quotes the value it refused (constraint 6) — a dispatch is
+ * attacker-controllable, so its contents are exactly the class of text that
+ * must not reach a log.
+ */
+const walkingSkeletonDispatchSchema = z.object({
+  runId: z.string().uuid(),
+  workItemId: z.string().uuid()
+}).strict();
+
+/**
+ * AMENDMENT 2026-09-22 (SYNC2 §6.2). `@debateai/obs-capture` is a SECOND sink
+ * for error text beside the job system's own Postgres and stderr, and it
+ * carries whatever it is handed as `payload_ref` once an emitter is installed.
+ * DL4-F1 scrubbed the first sink; this is the same treatment for the second:
+ * a code and a machine PATH, never the error, whose message can hold model
+ * output.
+ *
+ * EVERY `capture.emit` at a failure boundary goes through this builder. There
+ * is no parameter for an error object on the envelope it returns.
+ */
+export function captureFailureEnvelope(input: {
+  readonly error: unknown;
+  readonly taxonomyClass: string;
+  readonly capturePoint: string;
+  readonly disposition: string;
+  readonly source: string;
+  readonly attemptIndex?: number;
+}): Readonly<Record<string, unknown>> & { readonly code: string; readonly path: string } {
+  return Object.freeze({
+    code: input.error instanceof TypedDomainError ? input.error.code : "OBS_CAPTURE_SELF",
+    // The bounded operational diagnostic: a closed alphabet derived from the
+    // error's CLASS and SQLSTATE, never from its text.
+    path: operationalDiagnosticOf(input.error),
+    taxonomy_class: input.taxonomyClass,
+    capture_point: input.capturePoint,
+    disposition: input.disposition,
+    source: input.source,
+    ...(input.attemptIndex === undefined ? {} : { attempt_index: input.attemptIndex })
+  });
+}
+
 export function declareHatchetWalkingSkeletonTask(input: {
   readonly client: Pick<Hatchet, "task">;
   readonly runner: WalkingSkeletonRunner;
@@ -5464,7 +5508,17 @@ export function declareHatchetWalkingSkeletonTask(input: {
   return input.client.task({
     name: input.workflowName,
     retries: input.engineRetries,
-    fn: async (dispatch: { runId: string; workItemId: string }) => {
+    fn: async (rawDispatch: { runId: string; workItemId: string }) => {
+      // L4-F6: BEFORE the runner, before the repository, before anything reads
+      // a field. A malformed dispatch is a typed refusal that names no value.
+      const parsed = walkingSkeletonDispatchSchema.safeParse(rawDispatch);
+      if (!parsed.success) {
+        throw new TypedDomainError(
+          "RUNNER_WORKFLOW_INPUT_INVALID",
+          "RUNNER_WORKFLOW_INPUT_INVALID"
+        );
+      }
+      const dispatch = parsed.data;
       try {
         const result = await input.runner.executeWorkItem(dispatch.workItemId);
         return result.kind === "COMPLETED"

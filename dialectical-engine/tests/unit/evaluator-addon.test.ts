@@ -135,7 +135,16 @@ describe("judge-grading evaluator add-on", () => {
       lane: "evaluator",
       bound: { maxAttempts: 2, tokenCeiling: 256, deadlineMs: 250 }
     });
-    const payload = JSON.parse(request.packet.messages.at(-1)!.content);
+    // V-11 layer 1: the last message is one FENCED block holding the
+    // `debateai.framed-material.v1` envelope, so the blinded sample is read out
+    // of its named field rather than out of a bare JSON body.
+    const block = request.packet.messages.at(-1)!.content;
+    const envelope = JSON.parse(block.split("\n").slice(1, -1).join("\n")) as {
+      fields: { name: string; content: string }[];
+    };
+    const payload = JSON.parse(
+      envelope.fields.find((field) => field.name === "blinded_judge_output")!.content
+    );
     expect(payload).toEqual({
       sampleId: expect.stringMatching(/^opaque:/),
       questionExcerpt: "Is the claim supported?",

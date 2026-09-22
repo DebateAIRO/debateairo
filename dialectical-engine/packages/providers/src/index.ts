@@ -702,6 +702,23 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         }
         lastContentRejection = null;
         const responseJson = responseSchema.parse(decoded);
+        /**
+         * L4-F10: the model the provider SAYS answered, compared with the model
+         * this target is pinned to, before the call can be recorded as OK.
+         *
+         * Until now the asserted value was copied straight into the artifact's
+         * `model`/`modelVersion` — the DR-115 lineage — with nothing checking
+         * it, so a gateway that served a cheaper model produced a debate whose
+         * lineage named a model that never ran, and whose "different maker"
+         * honesty marks rested on it. It fails closed, and it names the PINNED
+         * model and the provider ref only: the response body is not quoted.
+         */
+        if (responseJson.model !== this.#options.model) {
+          throw new TypedDomainError(
+            "PROVIDER_MODEL_IDENTITY_CHANGED",
+            `${request.providerRef} is pinned to ${this.#options.model} and the response asserted a different model`
+          );
+        }
         const ledgerEntryRef = await this.#options.appendLedgerEntry({
           attemptId,
           runId: request.runId,
