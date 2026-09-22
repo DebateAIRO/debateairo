@@ -36,7 +36,17 @@ import { CLAIM_TYPES } from "@debateai/kernel";
  * fenced fields.
  */
 
-const JUDGE_WAY_OF_KNOWING_UNION = ['"LOOKED_UP"', '"REASONING"'].join(" | ");
+/**
+ * S2-3: `RAN` left the judge's output vocabulary, and this constant is THE one
+ * source the strict artifact schema and the declared prompt schema both read —
+ * so the two can no longer drift apart. It lives here, beside the prompt that
+ * renders it, and `index.ts` imports it for the zod enum: a third way of
+ * knowing therefore widens the schema AND the prompt, or neither.
+ */
+export const JUDGE_WAYS_OF_KNOWING = ["LOOKED_UP", "REASONING"] as const;
+export type JudgeClaimedWayOfKnowing = typeof JUDGE_WAYS_OF_KNOWING[number];
+
+const JUDGE_WAY_OF_KNOWING_UNION = JUDGE_WAYS_OF_KNOWING.map((way) => `"${way}"`).join(" | ");
 
 /** The judge's required answer form. Code-owned: an instruction edit cannot drop it. */
 export const JUDGE_ANSWER_FORM =

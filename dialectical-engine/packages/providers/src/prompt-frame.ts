@@ -165,6 +165,28 @@ export function buildFramedPrompt(input: {
   readonly randomBytes?: (size: number) => Buffer;
 }): FramedPrompt {
   const { contract } = input;
+  /**
+   * REVIEW ITEM 9. `readPromptFrame` recovers the fence and the canary by
+   * scanning the whole system message, and the system message OPENS with the
+   * owners' instruction text. Once that text is editable, an instruction
+   * carrying a fence-shaped or canary-shaped token would move the recovery onto
+   * its own substring: the door would then refuse every call for that step, or
+   * read a boundary the material could name. The contract is refused at BUILD
+   * time instead, with its own code, so a bad edit is a loud, local failure and
+   * never a step that mysteriously stops working.
+   *
+   * The PREFIX alone is enough to move an `indexOf`, so the prefix is what is
+   * checked — an instruction that merely talks about boundary markers in prose
+   * is unaffected.
+   */
+  for (const [slot, text] of [["instruction", contract.instruction], ["answerForm", contract.answerForm]] as const) {
+    if (text.includes(FENCE_PREFIX) || text.includes(CANARY_PREFIX)) {
+      throw new TypedDomainError(
+        "PROMPT_INSTRUCTION_RESERVED_TOKEN",
+        `The ${slot} of ${contract.contractId} contains a token reserved for the safety frame`
+      );
+    }
+  }
   if (contract.contractId.trim() === "" || contract.instruction.trim() === "" || contract.answerForm.trim() === "") {
     throw new TypedDomainError(
       "PROMPT_CONTRACT_INCOMPLETE",

@@ -12,10 +12,12 @@ import {
   type ProviderGateway
 } from "@debateai/providers";
 import {
+  JUDGE_WAYS_OF_KNOWING,
   JUDGE_LEG_MATERIAL_FIELDS,
   PANEL_PROMPT_CONTRACT,
   judgePromptContract,
   reviewPromptContract,
+  type JudgeClaimedWayOfKnowing,
   type JudgeLegKind
 } from "./prompts.js";
 import type { Pool, PoolClient } from "pg";
@@ -42,17 +44,14 @@ export * from "./s04.js";
 export * from "./prompts.js";
 
 /**
- * S2-3 (goal-v4 T4): `RAN` left the judge's output vocabulary. Nothing in the
- * engine could ever execute anything on the judge's behalf, so the label was
- * unreachable and its only real use was to dress a guess as a measurement.
- * This constant is the ONE source both change sites read — the strict artifact
- * schema below and the declared prompt schema in `Judge.judge` — so the two can
- * no longer drift apart the way they had.
+ * S2-3 (goal-v4 T4): `RAN` left the judge's output vocabulary. The constant that
+ * says so moved to `./prompts.ts` with the prompt that renders it (review item
+ * 5), and is re-exported by the `export *` below, so this module's zod enum and
+ * the declared prompt schema still read ONE source — which is the whole point of
+ * it. The derived union that used to live here was dead after the move and is
+ * gone: a dead derivation beside a live literal is how the claim came to be
+ * false.
  */
-export const JUDGE_WAYS_OF_KNOWING = ["LOOKED_UP", "REASONING"] as const;
-export type JudgeClaimedWayOfKnowing = typeof JUDGE_WAYS_OF_KNOWING[number];
-
-const JUDGE_WAY_OF_KNOWING_UNION = JUDGE_WAYS_OF_KNOWING.map((way) => `"${way}"`).join(" | ");
 
 /**
  * S2-3: the honesty mark that discloses a downgraded way-of-knowing claim.
