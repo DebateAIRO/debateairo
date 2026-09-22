@@ -10,6 +10,7 @@ import { SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
 import { CLAIM_TYPES } from "@debateai/kernel";
 import {
   ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW,
+  COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
   ALGORITHM_REGISTER_ROW_KEYS,
   AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS,
   ENGINE_BAND_ORDER,
@@ -652,6 +653,11 @@ function developmentRows(
     // V-14's authentication rows above. The sealed three-scope row stays the
     // historical one; this version adds the three support budgets.
     ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW,
+    // V-28 (DL4-F2): the per-run and daily spending ceilings, in money. The
+    // values are the TEMPORARY development ones and the row says so about
+    // itself; the owner seals the real ones as a NEW version after the first
+    // measured paid run, never as an edit of this one (constraint 5).
+    COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
     ...buildDevelopmentDeploymentRegisterRows(providerPanel),
     ...buildDevelopmentAlgorithmRegisterRows(providerPanel, roleRefs)
   ];

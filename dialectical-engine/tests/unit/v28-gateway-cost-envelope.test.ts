@@ -42,6 +42,12 @@ function vendorReporting(usage: unknown, calls: { count: number }): typeof fetch
   };
 }
 
+/**
+ * The seam rides on the REQUEST, not on the gateway: the price is the target's,
+ * but the SPEND is the run's, and one gateway serves every run that reaches that
+ * target. `gatewayWith` therefore builds the gateway and the request-shaped
+ * envelope together, which is exactly what the runner's factory does.
+ */
 function gatewayWith(
   fetchImplementation: typeof fetch,
   costEnvelope: ProviderCostEnvelopeSeam
@@ -53,10 +59,13 @@ function gatewayWith(
     sleepImplementation: async () => undefined,
     persistRawArtifact: async (artifact) => artifact.artifactId,
     appendLedgerEntry: async (entry) => { ledger.push(entry); return `ledger:${ledger.length}`; },
-    assertNoOpenWriteTransaction: () => undefined,
-    costEnvelope
+    assertNoOpenWriteTransaction: () => undefined
   });
-  return { gateway, ledger };
+  return {
+    gateway: { call: (extra: Record<string, unknown> = {}) =>
+      gateway.call(callRequest({ costEnvelope, ...extra })) },
+    ledger
+  };
 }
 
 function callRequest(extra: Record<string, unknown> = {}) {
@@ -114,7 +123,7 @@ describe("V-28 the gateway refuses the call that would cross, BEFORE making it",
       vendorReporting({ prompt_tokens: 100, completion_tokens: 20 }, calls), seam
     );
 
-    await gateway.call(callRequest());
+    await gateway.call();
 
     expect(calls.count).toBe(1);
     expect(state.projections).toHaveLength(1);
@@ -130,7 +139,7 @@ describe("V-28 the gateway refuses the call that would cross, BEFORE making it",
       vendorReporting({ prompt_tokens: 100, completion_tokens: 20 }, calls), seam
     );
 
-    await expect(gateway.call(callRequest())).rejects.toThrowError(
+    await expect(gateway.call()).rejects.toThrowError(
       expect.objectContaining({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" })
     );
 
@@ -150,7 +159,7 @@ describe("V-28 the gateway refuses the call that would cross, BEFORE making it",
       }
     );
 
-    await expect(gateway.call(callRequest())).rejects.toThrowError(
+    await expect(gateway.call()).rejects.toThrowError(
       expect.objectContaining({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" })
     );
 
@@ -169,11 +178,11 @@ describe("V-28 the gateway refuses the call that would cross, BEFORE making it",
       vendorReporting({ prompt_tokens: 300_000, completion_tokens: 200_000 }, calls), seam
     );
 
-    await gateway.call(callRequest());
+    await gateway.call();
     expect(state.charges).toEqual([500_000]);
     expect(state.spentMicros).toBe(500_000);
 
-    await expect(gateway.call(callRequest())).rejects.toThrowError(
+    await expect(gateway.call()).rejects.toThrowError(
       expect.objectContaining({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" })
     );
     expect(calls.count).toBe(1);
@@ -191,6 +200,8 @@ describe("V-28 the gateway refuses the call that would cross, BEFORE making it",
       assertNoOpenWriteTransaction: () => undefined
     });
 
+    // No `costEnvelope` on the request at all: the money gate does not exist
+    // for this call, and a vendor that reports no usage is answered normally.
     const result = await gateway.call(callRequest());
 
     expect(result.model).toBe(MODEL);
@@ -211,7 +222,7 @@ describe("V-28 a hosted target whose vendor reports no usage is refused", () => 
     const { seam } = meteredSeam(1_000_000_000, true);
     const { gateway, ledger } = gatewayWith(vendorReporting(undefined, calls), seam);
 
-    await expect(gateway.call(callRequest())).rejects.toThrowError(
+    await expect(gateway.call()).rejects.toThrowError(
       expect.objectContaining({ code: "PROVIDER_USAGE_UNREPORTED" })
     );
 
@@ -225,7 +236,7 @@ describe("V-28 a hosted target whose vendor reports no usage is refused", () => 
     const { seam } = meteredSeam(1_000_000_000, true);
     const { gateway } = gatewayWith(vendorReporting({ total_tokens: 40 }, calls), seam);
 
-    await expect(gateway.call(callRequest())).rejects.toThrowError(
+    await expect(gateway.call()).rejects.toThrowError(
       expect.objectContaining({ code: "PROVIDER_USAGE_UNREPORTED" })
     );
   });
@@ -235,7 +246,7 @@ describe("V-28 a hosted target whose vendor reports no usage is refused", () => 
     const { seam } = meteredSeam(1_000_000_000, true);
     const { gateway } = gatewayWith(vendorReporting(undefined, calls), seam);
 
-    await expect(gateway.call(callRequest())).rejects.toThrowError(
+    await expect(gateway.call()).rejects.toThrowError(
       expect.objectContaining({ code: "PROVIDER_USAGE_UNREPORTED" })
     );
 
@@ -247,7 +258,7 @@ describe("V-28 a hosted target whose vendor reports no usage is refused", () => 
     const { seam, state } = meteredSeam(1_000_000_000, false);
     const { gateway } = gatewayWith(vendorReporting(undefined, calls), seam);
 
-    await expect(gateway.call(callRequest())).resolves.toMatchObject({ model: MODEL });
+    await expect(gateway.call()).resolves.toMatchObject({ model: MODEL });
     expect(state.charges).toEqual([]);
   });
 });

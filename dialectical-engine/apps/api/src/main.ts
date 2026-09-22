@@ -21,6 +21,7 @@ import type { RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
   assertHostedCostEnvelopesSealed,
+  assertHostedSupportAdmissionSealed,
   loadApiEnvironment,
   createSupportConfigurationPort,
   readDeploymentRiskTier,
@@ -28,6 +29,7 @@ import {
   readEnvelopeFormulaInputs,
   readPanelDiscoveryPolicy,
   readAdmissionPolicy,
+  readCostEnvelopePolicy,
   readAuthPolicy,
   readMfaPolicy,
   readProductRolePolicy,
@@ -36,6 +38,9 @@ import {
   readStructuralCeilingPolicyInputs,
   resolveEffectiveRiskTier,
 } from "@debateai/register";
+// V-28 (DL4-F2): the application-wide daily spending ceiling, over the persisted
+// model-spend ledger migration 0066 created.
+import { CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
 import { loadHelpCorpus } from "@debateai/support-kb";
 import {
   buildApi,
@@ -170,6 +175,33 @@ const mfaPolicy = await boot.run("mfa-policy", () => readMfaPolicy(pool, environ
 const sessionPolicy = await boot.run("session-policy", () => readSessionPolicy(pool, environment.REGISTER_VERSION));
 const recoveryPolicy = await boot.run("recovery-policy", () => readRecoveryPolicy(pool, environment.REGISTER_VERSION));
 const admissionPolicy = await boot.run("admission-policy", () => readAdmissionPolicy(pool, environment.REGISTER_VERSION));
+/**
+ * TASK 11 AMENDMENT (V-28, from task 8's review). The support chat's three
+ * admission budgets are OPTIONAL members of the row, so a host pinned to an
+ * older `REGISTER_VERSION` runs unmetered support reads and an unshared model
+ * cap and says nothing. Hosted refuses; local keeps today's fail-open path.
+ *
+ * It is taken HERE and not beside `assertHostedCostEnvelopesSealed` at the top
+ * of this file, because the question is about the row IN FORCE at this
+ * deployment's register version — which needs the pool that only exists by now.
+ * It is still the earliest moment the question can be asked.
+ */
+await boot.run("support-admission-scopes", async () => {
+  assertHostedSupportAdmissionSealed(environment.DEPLOYMENT_MODE, admissionPolicy);
+});
+/**
+ * V-28(2): the application-wide daily ceiling, read from the row in force. In
+ * local mode there is no money to bound and the guard is not built at all, so
+ * `assertDailyCostEnvelope` is absent below and every ask is admitted exactly as
+ * it is today.
+ */
+const costEnvelopeGuard = environment.DEPLOYMENT_MODE === "hosted"
+  ? new CostEnvelopeGuard({
+      store: new PostgresModelSpendStore(pool),
+      policy: await boot.run("cost-envelope-policy",
+        () => readCostEnvelopePolicy(pool, environment.REGISTER_VERSION))
+    })
+  : undefined;
 await boot.run("product-role-policy", () => readProductRolePolicy(pool, environment.REGISTER_VERSION));
 // Exactly ONE process-owned Argon2 worker pool. It is created before the
 // repository and the registration service, both of which receive this same
@@ -312,6 +344,11 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   registerVersion: environment.REGISTER_VERSION,
   batteryVersion: environment.BATTERY_VERSION,
   settlementWatchHandle: environment.SETTLEMENT_WATCH_HANDLE,
+  // V-28(2): asked FIRST of every new ask, before the panel is discovered —
+  // discovery probes the paid vendors, and a probe is itself a request.
+  ...(costEnvelopeGuard === undefined ? {} : {
+    assertDailyCostEnvelope: () => costEnvelopeGuard.assertDailyEnvelopeAdmitsNewRun()
+  }),
   resolveDiscoveredPanel: resolveProviderPanel,
   resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
     ...structuralInputs,

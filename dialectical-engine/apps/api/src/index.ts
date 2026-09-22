@@ -2277,6 +2277,17 @@ export interface RunCreationSettings {
   readonly batteryVersion: string;
   readonly settlementWatchHandle: string;
   readonly memoryPullPolicy?: MemoryQuestionRegistration["pullPolicy"];
+  /**
+   * V-28(2) — THE DAILY MONEY ENVELOPE, asked of a NEW run and nowhere else.
+   *
+   * Absent means no daily bound, which is local mode's behaviour byte-for-byte:
+   * the relays and loopback model servers spend nothing this could bound. The
+   * hosted composition supplies `CostEnvelopeGuard.assertDailyEnvelopeAdmitsNew-
+   * Run`, which refuses `DAILY_COST_ENVELOPE_REACHED` once the application's UTC
+   * day has reached the sealed ceiling. Runs already under way never consult it
+   * and finish.
+   */
+  readonly assertDailyCostEnvelope?: () => Promise<void>;
   readonly resolveDiscoveredPanel: () => Promise<readonly DiscoveredPanelMember[]>;
   readonly resolveEnvelopeBasis: (input: {
     readonly depthParams: Readonly<Record<string, unknown>>;
@@ -2311,6 +2322,16 @@ export async function evaluateAskAdmission(
   readonly discoveredPanel: readonly DiscoveredPanelMember[];
   readonly criticUnavailableCap: ReturnType<typeof applyCriticUnavailableCap>;
 }> {
+  /**
+   * V-28(2) — FIRST, before anything is discovered or probed.
+   *
+   * Panel discovery probes every configured vendor, and a probe is itself a
+   * request to a paid gateway. Taking the money decision after it would spend
+   * money to find out that no money may be spent, so the day's ceiling is the
+   * first question this function asks. The refusal travels as the typed
+   * `DAILY_COST_ENVELOPE_REACHED` the guard raised.
+   */
+  await settings.assertDailyCostEnvelope?.();
   const risk = settings.resolveRisk(ask.risk_tier, ask.tier_source, ask.tier_provenance_ref);
   const discoveredPanel = await settings.resolveDiscoveredPanel();
   const makers = Object.freeze([...new Set(discoveredPanel.map((member) => member.maker))]);

@@ -87,6 +87,7 @@ import {
   type PromptPacket,
   type ProviderCallRequest,
   type ProviderCallResult,
+  type ProviderCostEnvelopeSeam,
   type ProviderGateway
 } from "@debateai/providers";
 import {
@@ -5598,11 +5599,22 @@ export function declareHatchetWalkingSkeletonTask(input: {
 export function createPostgresProviderGateway(
   pool: Pool,
   options: Omit<OpenAICompatibleGatewayOptions, "persistRawArtifact" | "appendLedgerEntry" | "assertNoOpenWriteTransaction">
+    & {
+      /**
+       * V-28 (DL4-F2): the money bound, built per CALL from the run the gateway
+       * was handed. A gateway is constructed once per target — the price is the
+       * target's — but the spend belongs to the run, and one gateway serves
+       * every run that reaches it, so the seam cannot be a construction-time
+       * value. Absent = no money bound, which is local mode byte-for-byte.
+       */
+      readonly buildCostEnvelopeSeam?: (runId: string) => ProviderCostEnvelopeSeam;
+    }
 ): ProviderGateway {
+  const { buildCostEnvelopeSeam, ...gatewayOptions } = options;
   const ledger = new LedgerRepository(pool);
   const budget = new BudgetRepository(pool);
   const http = new OpenAICompatibleProviderGateway({
-    ...options,
+    ...gatewayOptions,
     assertNoOpenWriteTransaction,
     persistRawArtifact: (artifact) => ledger.appendRawArtifact(artifact),
     appendLedgerEntry: async (entry) => (await ledger.append(entry)).ledgerEntryId
@@ -5661,6 +5673,17 @@ export function createPostgresProviderGateway(
         // run's own RUN_COST_ENVELOPE_EXHAUSTED and no ledger row is written for it.
         ...(authenticatedEvaluatorScope ? {} : {
           assertAttemptAllowed: () => budget.assertModelAttemptAllowed(request.runId!)
+        }),
+        /**
+         * V-28: the money envelope binds EVERY call, the authenticated evaluator
+         * scope included. That scope is exempt from the ATTEMPT ceiling because
+         * its attempts are billed to the evaluator rather than to the run
+         * (`ledger_entry_is_authenticated_scope`), but its calls are made against
+         * the same paid vendor with the same money, so exempting them from the
+         * money ceiling would leave a hole the size of the evaluator leg.
+         */
+        ...(buildCostEnvelopeSeam === undefined ? {} : {
+          costEnvelope: buildCostEnvelopeSeam(request.runId!)
         })
       });
       });

@@ -84,6 +84,13 @@ export interface ProviderCallRequest {
    * database (DL4-F3).
    */
   readonly assertAttemptAllowed?: () => void | Promise<void>;
+  /**
+   * V-28: the money bound for THIS call. Per request and not per gateway,
+   * because the price is the target's but the SPEND is the run's, and a gateway
+   * is built once per target and then serves every run that reaches it.
+   * Absent = no money bound, which is local mode byte-for-byte.
+   */
+  readonly costEnvelope?: ProviderCostEnvelopeSeam;
 }
 
 export class ProviderCallFailedError extends TypedDomainError {
@@ -719,12 +726,6 @@ export interface OpenAICompatibleGatewayOptions {
   readonly fetchImplementation?: typeof fetch;
   /** L4-F8: seam for the bounded backoff between HTTP attempts; real time by default. */
   readonly sleepImplementation?: (milliseconds: number) => Promise<void>;
-  /**
-   * V-28: absent means NO money bound, which is local mode's behaviour
-   * byte-for-byte — the relays and loopback model servers spend nothing this
-   * control could bound, and the attempt ceiling still applies to them.
-   */
-  readonly costEnvelope?: ProviderCostEnvelopeSeam;
 }
 
 /**
@@ -943,7 +944,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
        * no ledger row and burns nothing of the attempt ceiling, exactly as
        * `assertAttemptAllowed` above does.
        */
-      await this.#options.costEnvelope?.assertCallAllowed({
+      await request.costEnvelope?.assertCallAllowed({
         requestBytes: Buffer.byteLength(body, "utf8"),
         completionTokenCeiling: attemptTokenCeiling
       });
@@ -1058,7 +1059,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          * artifact has been persisted so the money is never charged against a
          * call the ledger cannot show.
          */
-        await this.#options.costEnvelope?.recordCall({
+        await request.costEnvelope?.recordCall({
           providerRef: request.providerRef,
           usage: observedUsage.success ? observedUsage.data.usage ?? null : null
         });
