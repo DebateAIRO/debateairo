@@ -798,6 +798,7 @@ export {
   buildFramedRepairPrompt,
   promptContractFingerprintText,
   readPromptFrame,
+  schemaFailureLocator,
   type FramedMaterialField,
   type FramedPrompt,
   type FramedRepairLocator,

@@ -266,6 +266,38 @@ export function buildFramedRepairPrompt(framed: FramedPrompt, locator: FramedRep
 }
 
 /**
+ * DL4-F4 / L4-F11: turn a content rejection into the CODE and the machine PATH
+ * a repair packet may carry.
+ *
+ * `parseError` is zod's message — a JSON document of issues whose `received`,
+ * `message` and `keys` members quote the model's own output. Nothing from it is
+ * copied. The path segments are read structurally and then re-checked against a
+ * strict whitelist, so even a schema that admitted a model-chosen key (none of
+ * the engine's do — they are all `.strict()`) could not smuggle text out
+ * through the locator.
+ */
+export function schemaFailureLocator(rejected: {
+  readonly parseStatus: string;
+  readonly parseError: string;
+}): FramedRepairLocator {
+  const code = REPAIR_CODE.test(rejected.parseStatus) ? rejected.parseStatus : "CONTENT_REJECTED";
+  let path = "";
+  try {
+    const issues = JSON.parse(rejected.parseError) as readonly { readonly path?: readonly unknown[] }[];
+    const first = Array.isArray(issues) ? issues[0] : undefined;
+    const segments = Array.isArray(first?.path) ? first.path : [];
+    path = segments
+      .map((segment: unknown) => String(segment))
+      .filter((segment: string) => /^[A-Za-z0-9_]{1,40}$/u.test(segment))
+      .slice(0, 8)
+      .join(".");
+  } catch {
+    path = "";
+  }
+  return Object.freeze({ code, path });
+}
+
+/**
  * What the door read out of a packet it accepted. The gateway's tripwires work
  * from THIS rather than from a field on the request, so no call site can send a
  * framed packet and quietly withhold the frame from the scan.

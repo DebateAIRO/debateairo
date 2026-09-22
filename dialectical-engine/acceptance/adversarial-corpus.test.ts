@@ -275,6 +275,7 @@ describe("P4-13 approved adversarial relay corpus", () => {
       subjectItemId: "corpus:judge-node",
       callSiteKey: "corpus:judge",
       questionLine: content,
+      leg: { kind: "primary-root" },
       providerRef: "corpus:provider",
       contractHash: "corpus:contract",
       bound: { maxAttempts: 1, tokenCeiling: 2_048, deadlineMs: 5_000 }
