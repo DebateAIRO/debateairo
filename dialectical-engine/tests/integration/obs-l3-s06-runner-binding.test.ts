@@ -512,8 +512,11 @@ export async function resolve(specifier, context, nextResolve) {
       // behind main.ts fails at LINK time and this case stops measuring the
       // install-first ordering it exists for. V-28's
       // \`assertHostedCostEnvelopesSealed\` joined this import line and was
-      // missing here.
-      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {}",
+      // missing here. INT3 (the Task 11 merge) brought \`readCostEnvelopePolicy\`
+      // onto the same line — the hosted start-up's fail-closed read of the
+      // sealed money ceilings — and this case went RED at link time again
+      // until the stub caught up.
+      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {}",
       "./index.js": "export function createPostgresProviderGateway() {} export function declareHatchetWalkingSkeletonTask() {} export class WalkingSkeletonRunner {}",
     };
     if (Object.hasOwn(stubs, specifier)) {
