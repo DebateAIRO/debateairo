@@ -1,6 +1,8 @@
 import type { Pool } from "pg";
 import { z } from "zod";
-import { canonicalDecimal, canonicalRegisterJson } from "./register-publication.js";
+import {
+  canonicalDecimal, canonicalRegisterJson, type CanonicalJsonAst
+} from "./register-publication.js";
 import { TypedDomainError } from "@debateai/kernel";
 
 export const AUTH_POLICY_ROW_KEYS = [
@@ -132,6 +134,70 @@ const rateLimitPolicySchema = z.object({
         "100": z.number().positive()
       }).strict()
     }).strict(),
+    /**
+     * V-25. OPTIONAL, because the sealed row (register version 1) carries the
+     * single-runtime measurement above and must keep parsing byte-for-byte; the
+     * superseding DEPLOYMENT row below carries this map. The member above stays
+     * exactly as sealed — including its `node_v22.23.1_darwin_arm64` literal,
+     * which is part of the sealed shape — and the map's entry for that runtime
+     * IS that object, republished verbatim as history.
+     *
+     * An RSS ceiling is a measurement, and a measurement belongs to ONE runtime:
+     * platform, architecture AND Node version. `by_runtime` is keyed by exactly
+     * that, so a host compares only against a number measured on a host like it.
+     * A runtime with no entry has no published bound and the case that reads it
+     * must say so out loud rather than borrow another runtime's figure.
+     */
+    isolated_limiter_resident_measurement_versions: z.object({
+      /**
+       * The headroom rule, published so a reader recomputes it instead of
+       * trusting a literal: the ceiling is the worst measured curve point
+       * rounded UP to a whole increment. It is the same ruled 32 MiB increment
+       * `booted_process_resident_bound` publishes (ceil(368.7 / 32) * 32 = 384).
+       */
+      measurement_rounding_increment_mib: z.number().int().positive(),
+      by_runtime: z.record(
+        z.string().regex(/^node_v\d+\.\d+\.\d+_[a-z]+_[a-z0-9]+$/),
+        z.object({
+          measurement: z.literal("isolated_process_rss_at_100_percent_slot_occupancy"),
+          runtime: z.string().regex(/^node_v\d+\.\d+\.\d+_[a-z]+_[a-z0-9]+$/),
+          occupancy_percent: z.literal(100),
+          measured_100_percent_rss_mib: z.number().positive(),
+          max_measured_curve_rss_mib: z.number().positive(),
+          isolated_measurement_ceiling_mib: z.number().positive(),
+          includes_isolated_harness_baseline: z.literal(true),
+          includes_application_stack_baseline: z.literal(false),
+          operator_provisioning_field: z.literal(false),
+          operator_instruction: z.string().regex(/not.*provision/i),
+          curve_rss_mib: z.object({
+            "0": z.number().positive(),
+            "25": z.number().positive(),
+            "50": z.number().positive(),
+            "100": z.number().positive()
+          }).strict()
+        }).strict()
+      )
+    }).strict().refine(
+      // Read the map's key and the entry's own `runtime` TOGETHER. A row that
+      // files a darwin measurement under a linux key would parse member by
+      // member and then hand every linux host a number measured on a Mac — a
+      // silent wrong answer published as policy. Fail closed instead.
+      (value) => Object.entries(value.by_runtime)
+        .every(([runtime, entry]) => entry.runtime === runtime),
+      { message: "a runtime measurement is filed under another runtime's key" }
+    ).refine(
+      // The ceiling is DERIVED, never asserted: worst measured curve point
+      // rounded up to a whole increment, and the curve's own 100 % point is the
+      // measurement the row names. A hand-edited ceiling is refused here.
+      (value) => Object.values(value.by_runtime).every((entry) =>
+        entry.measured_100_percent_rss_mib === entry.curve_rss_mib["100"]
+        && Math.max(...Object.values(entry.curve_rss_mib))
+          === entry.max_measured_curve_rss_mib
+        && entry.isolated_measurement_ceiling_mib === Math.ceil(
+          entry.max_measured_curve_rss_mib / value.measurement_rounding_increment_mib
+        ) * value.measurement_rounding_increment_mib),
+      { message: "a runtime measurement's ceiling is not its curve rounded up by the increment" }
+    ).optional(),
     booted_process_resident_bound: z.object({
       measurement: z.literal("booted_registration_process_rss_at_100_percent_slot_occupancy"),
       runtime: z.literal("node_v22.23.1_darwin_arm64"),
@@ -863,15 +929,108 @@ const PASSWORD_POLICY_MAXIMUM_LENGTH_SOURCE_REF =
   " + V-14 ruled 2026-09-21 (V, chat): versioned passwordPolicy row with"
   + " max_length 1024, superseding the sealed row without altering it";
 
+/**
+ * V-25, ruled 2026-09-21: the isolated limiter RSS bound is republished per
+ * runtime, because the project moved to node 26 while the sealed bound was
+ * measured under node 22. This is the runtime-keyed VERSION of the row; the
+ * sealed single-runtime measurement is republished inside it verbatim, never
+ * edited.
+ *
+ * Only node_v22.23.1_darwin_arm64 is published here. The node v26.8.2
+ * measurement was TAKEN and is recorded below, but sealing it needs an owner
+ * ruling that V-25 did not give, because the ruled headroom rule cannot supply
+ * this measurement any headroom.
+ *
+ * Measured 2026-09-22 on the ruled darwin_arm64 Mac under node v26.8.2, with
+ * the very child program the case runs, on a quiet host. Fourteen observations
+ * of the worst curve point: ten standalone rounds 253.6 / 249.5 / 239.9 / 249.4
+ * / 249.3 / 242.6 / 249.2 / 249.3 / 239.4 / 249.4, and four under vitest (the
+ * way the gate runs it) 255.3 / 243.0 / 249.1 / 232.7. Range 232.7-255.3, a
+ * spread of 22.6 MiB; the sealed node 22 measurement's own spread was 5 MiB
+ * (247-252, V-25's row).
+ *
+ * The ruled headroom rule is "round the worst measured curve point UP to a
+ * whole increment" — the 32 MiB increment `booted_process_resident_bound`
+ * publishes as `provisioning_rounding_increment_mib`, which turned its 368.7
+ * into 384 and the sealed row's 250 into 256. Applied to 255.3 it yields 256
+ * again: 0.7 MiB of margin against a measurement that moves by 22.6 MiB. No
+ * increment rescues it — 16, 32, 64, 128 and 256 MiB all round both 250 and
+ * 255.3 to exactly 256, so every increment consistent with the sealed row's own
+ * ceiling gives the new measurement the same 0.7 MiB. Sealing it would publish
+ * a bound the next run can breach, which is a gate that fails on noise rather
+ * than on drift. Granting extra headroom instead (worst + one whole increment
+ * would give 288 MiB) is a CHANGE to a ruled rule, not a re-derivation of it,
+ * so it is the owner's to make and not this row's to assume.
+ *
+ * Also absent, deliberately: linux. The GitHub ubuntu runner read 273 MiB
+ * against this Mac's 256 and no one has measured it under node 26. A runtime
+ * without an entry has no published bound, and the case that reads this map
+ * says so out loud there. A number nobody measured is worse than an honest
+ * absence.
+ */
+const ISOLATED_LIMITER_RSS_ROUNDING_INCREMENT_MIB = "32";
+const ISOLATED_LIMITER_RSS_RUNTIME_SOURCE_REF =
+  " + V-25 ruled 2026-09-21 (V, chat): versioned rateLimitPolicy row carrying the"
+  + " isolated limiter RSS measurement per runtime (platform + architecture + node"
+  + " version), with the sealed node_v22.23.1_darwin_arm64 measurement republished"
+  + " verbatim as history and not edited. node_v26.8.2_darwin_arm64 was measured on"
+  + " 2026-09-22 (14 observations, worst curve 255.3 MiB) and is NOT published: the"
+  + " ruled 32 MiB rounding increment yields 256 MiB, 0.7 MiB of margin against a"
+  + " 22.6 MiB spread, and no increment consistent with the sealed ceiling does"
+  + " better, so the headroom for this runtime awaits an owner ruling. linux has no"
+  + " entry until CI measures one. Every runtime without an entry skips loudly";
+
 const AUTH_POLICY_DEPLOYMENT_PUBLICATION_ROWS = Object.freeze(
-  AUTH_POLICY_PUBLICATION_ROWS.map((row) => row.rowKey !== "passwordPolicy" ? row : Object.freeze({
-    rowKey: row.rowKey,
-    value: Object.freeze({
-      ...row.value,
-      "max_length": canonicalDecimal(PASSWORD_POLICY_MAXIMUM_LENGTH)
-    }),
-    sourceRef: `${row.sourceRef}${PASSWORD_POLICY_MAXIMUM_LENGTH_SOURCE_REF}`
-  }))
+  AUTH_POLICY_PUBLICATION_ROWS.map((row) => {
+    if (row.rowKey === "passwordPolicy") {
+      return Object.freeze({
+        rowKey: row.rowKey,
+        value: Object.freeze({
+          ...row.value,
+          "max_length": canonicalDecimal(PASSWORD_POLICY_MAXIMUM_LENGTH)
+        }),
+        sourceRef: `${row.sourceRef}${PASSWORD_POLICY_MAXIMUM_LENGTH_SOURCE_REF}`
+      });
+    }
+    if (row.rowKey === "rateLimitPolicy") {
+      const value = row.value as unknown as Readonly<Record<string, CanonicalJsonAst>> & {
+        readonly sketch_design: Readonly<Record<string, CanonicalJsonAst>>;
+      };
+      // Fail closed: history is republished from the sealed object, so if the
+      // sealed object is not there the deployment set must not be built at all
+      // rather than be built without its history.
+      const sealedIsolatedMeasurement =
+        value.sketch_design["isolated_limiter_resident_measurement"];
+      if (sealedIsolatedMeasurement === undefined) {
+        throw new TypedDomainError(
+          "AUTH_POLICY_SEALED_MEASUREMENT_MISSING",
+          "The sealed isolated limiter RSS measurement is absent from rateLimitPolicy"
+        );
+      }
+      return Object.freeze({
+        rowKey: row.rowKey,
+        value: Object.freeze({
+          ...value,
+          "sketch_design": Object.freeze({
+            ...value.sketch_design,
+            "isolated_limiter_resident_measurement_versions": Object.freeze({
+              "measurement_rounding_increment_mib":
+                canonicalDecimal(ISOLATED_LIMITER_RSS_ROUNDING_INCREMENT_MIB),
+              "by_runtime": Object.freeze({
+                // The sealed object ITSELF, not a transcription of its numbers:
+                // history cannot drift from what was sealed if it is the same
+                // reference. The sealed member above is left in place too, so
+                // every existing reader keeps resolving unchanged.
+                "node_v22.23.1_darwin_arm64": sealedIsolatedMeasurement
+              })
+            })
+          })
+        }),
+        sourceRef: `${row.sourceRef}${ISOLATED_LIMITER_RSS_RUNTIME_SOURCE_REF}`
+      });
+    }
+    return row;
+  })
 );
 
 export const AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS = Object.freeze(

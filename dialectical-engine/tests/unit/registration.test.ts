@@ -9,6 +9,7 @@ import { performance } from "node:perf_hooks";
 import { promisify } from "node:util";
 import { describe, expect, it, vi } from "vitest";
 import {
+  AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS,
   AUTH_POLICY_REGISTER_ROWS,
   authPolicyFromRegisterRows,
   type AuthPolicyRegisterRow
@@ -268,19 +269,103 @@ describe("S3 ruled authentication policy", () => {
       );
   });
 
-  // The bound is a MEASUREMENT sealed for one runtime (see the row's
-  // isolated_limiter_resident_measurement.runtime = node_v22.23.1_darwin_arm64).
-  // On any other platform/arch the case skips LOUDLY instead of comparing against
-  // a number that was never measured there (the GitHub ubuntu runner reads 273 MiB
-  // against the 256 MiB macOS bound). Sealing a bound per platform is V-25.
-  it.skipIf(`${process.platform}_${process.arch}` !== "darwin_arm64")(
+  /**
+   * V-25, ruled 2026-09-21. The ceiling is a MEASUREMENT, and a measurement
+   * belongs to ONE runtime — platform, architecture AND Node version. The sealed
+   * row (register version 1) carries a single measurement taken under node
+   * v22.23.1 on darwin_arm64; a sealed value is never edited, so the superseding
+   * DEPLOYMENT row republishes that measurement verbatim as history beside a
+   * second one taken under node v26.8.2 on the same Mac, in a map keyed by
+   * runtime.
+   *
+   * A runtime with no published entry SKIPS LOUDLY rather than compare a live
+   * curve against a number that was never measured there — the GitHub ubuntu
+   * runner reads 273 MiB against this Mac's 256 MiB, so a shared number would
+   * quietly stop detecting drift on both. Linux keeps that loud skip until CI
+   * publishes its own measurement.
+   */
+  type IsolatedRuntimeMeasurement = {
+    measurement: string;
+    runtime: string;
+    occupancy_percent: number;
+    measured_100_percent_rss_mib: number;
+    max_measured_curve_rss_mib: number;
+    isolated_measurement_ceiling_mib: number;
+    curve_rss_mib: Record<"0" | "25" | "50" | "100", number>;
+  };
+  const RSS_RUNTIME = `node_${process.version}_${process.platform}_${process.arch}`;
+  const RSS_MEASUREMENT_VERSIONS = (AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS
+    .find((row) => row.rowKey === "rateLimitPolicy")!.value as {
+      sketch_design: {
+        isolated_limiter_resident_measurement_versions?: {
+          measurement_rounding_increment_mib: number;
+          by_runtime: Record<string, IsolatedRuntimeMeasurement>;
+        };
+      };
+    }).sketch_design.isolated_limiter_resident_measurement_versions;
+  const RSS_MEASUREMENT = RSS_MEASUREMENT_VERSIONS?.by_runtime[RSS_RUNTIME];
+  if (RSS_MEASUREMENT === undefined) {
+    const published = Object.keys(RSS_MEASUREMENT_VERSIONS?.by_runtime ?? {});
+    console.warn(
+      `[S3c B4 / V-25] NO PUBLISHED ISOLATED RSS MEASUREMENT FOR ${RSS_RUNTIME}.`
+      + " The live RSS curve case is SKIPPED on this host: comparing it against another"
+      + " runtime's number would stop detecting drift on both."
+      + ` Published runtimes: ${published.length === 0 ? "(none)" : published.join(", ")}.`
+      + " Re-measure on this runtime and publish a NEW versioned register row (V-25)."
+    );
+  }
+
+  it("S3c B4 publishes one isolated RSS measurement per runtime and keeps the sealed one verbatim (V-25)", () => {
+    const sealedSketch = (AUTH_POLICY_REGISTER_ROWS
+      .find((row) => row.rowKey === "rateLimitPolicy")!.value as {
+        sketch_design: { isolated_limiter_resident_measurement: IsolatedRuntimeMeasurement };
+      }).sketch_design;
+    const versions = RSS_MEASUREMENT_VERSIONS;
+    expect(versions).toBeDefined();
+
+    // The exact published set. A runtime may only be added by the change that
+    // measures it, and were an entry to vanish the live curve case would skip
+    // in SILENCE on that host — the failure this list makes impossible.
+    // node_v26.8.2_darwin_arm64 is measured but NOT published: the ruled
+    // rounding rule leaves it 0.7 MiB of margin against a 22.6 MiB spread, so
+    // its headroom awaits an owner ruling (see the row's own note). Until then
+    // this host skips loudly rather than compare against a bound it can breach.
+    expect(Object.keys(versions!.by_runtime).sort())
+      .toEqual(["node_v22.23.1_darwin_arm64"]);
+
+    // Constraint 5: the sealed measurement is superseded, never edited. The
+    // historical entry is the sealed object itself, member for member.
+    expect(versions!.by_runtime["node_v22.23.1_darwin_arm64"])
+      .toEqual(sealedSketch.isolated_limiter_resident_measurement);
+    expect(sealedSketch.isolated_limiter_resident_measurement.runtime)
+      .toBe("node_v22.23.1_darwin_arm64");
+
+    // The headroom rule, recomputed rather than asserted as a literal: the
+    // ruled 32 MiB rounding increment applied to the worst measured curve point
+    // (the same rule booted_process_resident_bound publishes as
+    // provisioning_rounding_increment_mib, ceil(368.7 / 32) * 32 = 384).
+    const increment = versions!.measurement_rounding_increment_mib;
+    expect(increment).toBe(32);
+    for (const [runtime, entry] of Object.entries(versions!.by_runtime)) {
+      expect(entry.runtime, runtime).toBe(runtime);
+      expect(entry.measurement, runtime)
+        .toBe("isolated_process_rss_at_100_percent_slot_occupancy");
+      expect(entry.occupancy_percent, runtime).toBe(100);
+      expect(entry.measured_100_percent_rss_mib, runtime).toBe(entry.curve_rss_mib["100"]);
+      expect(Math.max(...Object.values(entry.curve_rss_mib)), runtime)
+        .toBe(entry.max_measured_curve_rss_mib);
+      expect(entry.isolated_measurement_ceiling_mib, runtime)
+        .toBe(Math.ceil(entry.max_measured_curve_rss_mib / increment) * increment);
+      expect(entry.max_measured_curve_rss_mib, runtime)
+        .toBeLessThanOrEqual(entry.isolated_measurement_ceiling_mib);
+    }
+  });
+
+  it.skipIf(RSS_MEASUREMENT === undefined)(
     "S3c B4 keeps the isolated production RSS curve below the published measured bound", async () => {
     const rateLimitRow = AUTH_POLICY_REGISTER_ROWS.find((row) => row.rowKey === "rateLimitPolicy")!;
     const sketch = (rateLimitRow.value as {
-      sketch_design: {
-        flat_storage: { allocated_bytes: number };
-        isolated_limiter_resident_measurement: { isolated_measurement_ceiling_mib: number };
-      };
+      sketch_design: { flat_storage: { allocated_bytes: number } };
     }).sketch_design;
     const childProgram = [
       "import { InProcessAuthRateLimiter } from './apps/api/src/registration.ts';",
@@ -301,7 +386,12 @@ describe("S3 ruled authentication policy", () => {
     ], {
       cwd: process.cwd(),
       maxBuffer: 1024 * 1024,
-      timeout: 60_000
+      // The fill is ~3.4 M limiter admissions per route. Ten rounds on this Mac
+      // under node v26.8.2 took 105.2-109.5 s wall each (V-25 re-measurement);
+      // the old 60 s budget was a node v22 figure and SIGTERMs the child here
+      // before it ever reaches the 100 % sample, which is why the case could
+      // not find a number on this host. Roughly twice the worst observed round.
+      timeout: 240_000
     });
     const curve = stdout.trim().split("\n").map((line) => JSON.parse(line) as {
       target: number;
@@ -317,13 +407,13 @@ describe("S3 ruled authentication policy", () => {
     expect(curve.at(-1)!.occupied).toBe(curve.at(-1)!.capacity);
     expect(curve.every((sample) => sample.allocated_bytes === sketch.flat_storage.allocated_bytes))
       .toBe(true);
+    // Against THIS runtime's own published measurement, never another's.
+    expect(RSS_MEASUREMENT!.runtime).toBe(RSS_RUNTIME);
     expect(Math.max(...curve.map((sample) => sample.rss_mib)))
-      .toBeLessThanOrEqual(
-        sketch.isolated_limiter_resident_measurement.isolated_measurement_ceiling_mib
-      );
+      .toBeLessThanOrEqual(RSS_MEASUREMENT!.isolated_measurement_ceiling_mib);
     expect(Object.values(curve.at(-1)!.sources).every((sources) => sources > 1_600_000))
       .toBe(true);
-  }, 70_000);
+  }, 300_000);
 
   it("publishes S3c collateral and cooldown plus S3d non-interfering credential lifecycle", () => {
     const rateLimitRow = AUTH_POLICY_REGISTER_ROWS.find((row) => row.rowKey === "rateLimitPolicy")!;
