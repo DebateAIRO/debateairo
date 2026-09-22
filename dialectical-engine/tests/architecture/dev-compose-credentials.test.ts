@@ -1,12 +1,15 @@
 // The proof L7-F2 asked for, finished under owner ruling V-21(a) on 2026-09-22.
 //
-// `POSTGRES_PASSWORD: debateai-dev-only` was a fixed superuser credential in a tracked file,
-// on a published loopback port. Any other process or uid on the workstation could read the
-// identity tables, rewrite the audit chain, weaken the sealed register, and create roles —
-// and hatchet-lite, an engine that is internet-facing by default, held the same credential.
-// The role split landed first (`debateai_dev_hatchet`, NOSUPERUSER); this row retires the
-// literal itself: the superuser password is now generated once into the 0600 custody file
-// that already feeds compose, so the repository carries no service credential at all.
+// `compose.dev.yaml` used to give `POSTGRES_PASSWORD` a fixed value in the tracked file, on a
+// published loopback port. Any other process or uid on the workstation could read the identity
+// tables, rewrite the audit chain, weaken the sealed register, and create roles — and
+// hatchet-lite, an engine that is internet-facing by default, held the same credential. The
+// role split landed first (`debateai_dev_hatchet`, NOSUPERUSER); this row retires the literal
+// itself: the superuser password is now generated once into the 0600 custody file that already
+// feeds compose, so the repository carries no service credential at all.
+//
+// This file must never spell the retired value either — it assembles it below — or the sweep
+// would report itself. That is not pedantry: it is the difference between a guard and a copy.
 //
 // `pnpm dev:auth:up` stays a no-argument command: the data plane generates the file before
 // it starts compose, and reads the same file when it builds the migrator URL.
