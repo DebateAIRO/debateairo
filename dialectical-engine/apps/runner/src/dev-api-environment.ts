@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, open, rename, unlink } from "node:fs/promises";
+import { open, rename, unlink } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { DEVELOPMENT_DATABASE_PRINCIPALS } from "./dev-database-principals.js";
@@ -10,7 +10,11 @@ import {
   parseDevelopmentProviderPanelTargets,
   type DevelopmentProviderPanel
 } from "./dev-provider-panel.js";
-import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
+import {
+  assertDevCustodyDirectory,
+  assertDevCustodyRootCustody,
+  resolveDevCustodyRoot
+} from "../../../deploy/dev-auth/custody-root.mjs";
 import {
   developmentDeploymentRegisterReceiptPath,
   readDevelopmentDeploymentRegisterReceipt,
@@ -20,7 +24,6 @@ import {
 import { parseDevelopmentSupportModelTargetJson } from "./dev-support-model.js";
 
 const PRIVATE_FILE_MODE = 0o600;
-const PRIVATE_DIRECTORY_MODE = 0o700;
 const MAX_CREDENTIAL_FILE_BYTES = 64 * 1024;
 const LOCAL_DATABASE_HOST = "127.0.0.1";
 const LOCAL_DATABASE_PORT = "55432";
@@ -94,14 +97,21 @@ function isFileSystemError(error: unknown, code: string): error is NodeJS.ErrnoE
   return error instanceof Error && "code" in error && error.code === code;
 }
 
+// V-21(c): the 0700 directory rule is the custody resolver's (L7-F10); this command keeps
+// only the code it reports, so the two can never disagree about what "private" means.
 async function assertPrivateDirectory(path: string): Promise<void> {
-  const metadata = await lstat(path).catch(() => null);
-  if (metadata === null
-    || metadata.isSymbolicLink()
-    || !metadata.isDirectory()
-    || metadata.uid !== currentUid()
-    || (metadata.mode & 0o777) !== PRIVATE_DIRECTORY_MODE) {
-    throw new TypeError("DEV_API_ENVIRONMENT_CUSTODY_ROOT_INVALID");
+  try {
+    await assertDevCustodyDirectory(path);
+  } catch (error) {
+    throw new TypeError("DEV_API_ENVIRONMENT_CUSTODY_ROOT_INVALID", { cause: error });
+  }
+}
+
+async function assertPrivateCustodyRoot(custodyRoot: string): Promise<void> {
+  try {
+    await assertDevCustodyRootCustody(custodyRoot);
+  } catch (error) {
+    throw new TypeError("DEV_API_ENVIRONMENT_CUSTODY_ROOT_INVALID", { cause: error });
   }
 }
 
@@ -362,9 +372,7 @@ export async function assembleDevelopmentApiEnvironment(
 ): Promise<DevelopmentApiEnvironmentReceipt> {
   const repositoryRoot = resolve(input.repositoryRoot);
   const custodyRoot = resolveDevCustodyRoot(repositoryRoot);
-  const localRoot = dirname(custodyRoot);
-  await assertPrivateDirectory(localRoot);
-  await assertPrivateDirectory(custodyRoot);
+  await assertPrivateCustodyRoot(custodyRoot);
   await Promise.all([
     assertPrivateDirectory(join(custodyRoot, "secrets")),
     assertPrivateDirectory(join(custodyRoot, "audit-keys")),

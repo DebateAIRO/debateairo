@@ -8,6 +8,7 @@ import {
   assertDevCustodyRootCustody,
   DEV_CUSTODY_ROOT_ENV,
   DevCustodyRootError,
+  ensureDevCustodyDirectory,
   resolveDevCustodyRoot
 } from "../../deploy/dev-auth/custody-root.mjs";
 
@@ -233,6 +234,57 @@ describe("dev custody root (F-05, L2-F1, L2-F2)", () => {
       expect(text, source).toContain(helper);
       expect(text, source).not.toMatch(/\bchmod\(\s*(?:credentialRoot|resolvedPath)/u);
     }
+  });
+
+  // V-21(c), 2026-09-22: the token and principals commands already delegated, but three dev
+  // launchers still spelled "a real directory you own, at exactly 0700" for themselves —
+  // kept under the single-line edit rule when L7-F10 landed. Three copies of one refusal are
+  // three chances to drift apart, and the drift would be invisible: each copy has its own
+  // typed code, so a weakened copy still refuses convincingly. The rule now lives in one
+  // place; a launcher keeps only the code it reports.
+  it("leaves no second copy of the directory-custody rule in the dev launchers (V-21c)", async () => {
+    // The 0600 FILE rule is a different policy (size, link count, per-file bounds) and
+    // deliberately stays with the command that owns the file; only the DIRECTORY rule moves.
+    const spellsTheDirectoryRule = /PRIVATE_DIRECTORY_MODE|0o700|isDirectory\(\)/u;
+    const delegates = /\bassert(?:DevCustodyDirectory|DevCustodyRootCustody)\b|\bensureDevCustodyDirectory\b/u;
+    for (const source of [
+      "apps/runner/src/dev-api-environment.ts",
+      "apps/runner/src/dev-api-process.ts",
+      "apps/runner/src/dev-secret-files.ts"
+    ]) {
+      const text = await readFile(join(REPOSITORY_ROOT, source), "utf8");
+      expect(text, `${source} must ask the shared custody helper`).toMatch(delegates);
+      expect(text, `${source} must not spell the 0700 directory rule again`)
+        .not.toMatch(spellsTheDirectoryRule);
+    }
+  });
+
+  // The secret generator creates the custody tree before it checks it, so the create arm
+  // belongs to the same authority: one mkdir mode, one refusal, and still no repair.
+  it("creates a missing custody directory at 0700 and refuses a drifted or symlinked one (V-21c)", async () => {
+    const root = await temporaryRoot();
+    const created = join(root, "custody");
+    await ensureDevCustodyDirectory(created);
+    expect((await lstat(created)).mode & 0o777).toBe(0o700);
+
+    // Idempotent: a second call accepts the directory it made.
+    await expect(ensureDevCustodyDirectory(created)).resolves.toBeUndefined();
+
+    await chmod(created, 0o750);
+    await expect(ensureDevCustodyDirectory(created)).rejects.toMatchObject({
+      name: "DevCustodyRootError",
+      code: "DEV_AUTH_CUSTODY_ROOT_INVALID"
+    });
+    expect((await lstat(created)).mode & 0o777).toBe(0o750);
+
+    const escape = join(root, "escape");
+    await mkdir(escape, { mode: 0o700 });
+    const linked = join(root, "linked");
+    await symlink(escape, linked);
+    await expect(ensureDevCustodyDirectory(linked)).rejects.toMatchObject({
+      code: "DEV_AUTH_CUSTODY_ROOT_INVALID"
+    });
+    expect(await readdir(escape)).toEqual([]);
   });
 
   it("forwards the override to every child through the allow-listed command environment", async () => {

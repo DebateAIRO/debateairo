@@ -1,9 +1,12 @@
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { constants } from "node:fs";
-import { link, lstat, mkdir, open, unlink } from "node:fs/promises";
+import { link, open, unlink } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
+import {
+  ensureDevCustodyDirectory,
+  resolveDevCustodyRoot
+} from "../../../deploy/dev-auth/custody-root.mjs";
 
 export type DevelopmentSecretFile = Readonly<{
   id: string;
@@ -60,21 +63,14 @@ function isFileSystemError(error: unknown, code: string): error is NodeJS.ErrnoE
   return error instanceof Error && "code" in error && error.code === code;
 }
 
-async function ensureDirectory(
-  directoryPath: string,
-  requirePrivateMode: boolean,
-  errorCode: string
-): Promise<void> {
+// V-21(c): create-then-check at exactly 0700, never repaired, is the custody resolver's rule
+// (L7-F10). This command keeps only the code it reports for each part of the tree — the
+// custody chain itself and the secret stores inside it fail with different codes.
+async function ensureDirectory(directoryPath: string, errorCode: string): Promise<void> {
   try {
-    await mkdir(directoryPath, { mode: 0o700 });
+    await ensureDevCustodyDirectory(directoryPath);
   } catch (error) {
-    if (!isFileSystemError(error, "EEXIST")) throw error;
-  }
-  const metadata = await lstat(directoryPath);
-  if (metadata.isSymbolicLink() || !metadata.isDirectory()
-    || metadata.uid !== currentUid()
-    || (requirePrivateMode && (metadata.mode & 0o777) !== 0o700)) {
-    throw new TypeError(errorCode);
+    throw new TypeError(errorCode, { cause: error });
   }
 }
 
@@ -190,15 +186,11 @@ export async function generateDevelopmentSecretFiles(
   const repositoryRoot = resolve(input.repositoryRoot);
   const custodyRoot = resolveDevCustodyRoot(repositoryRoot);
   const localRoot = dirname(custodyRoot);
-  await ensureDirectory(localRoot, true, "DEV_AUTH_CUSTODY_ROOT_INVALID");
-  await ensureDirectory(custodyRoot, true, "DEV_AUTH_CUSTODY_ROOT_INVALID");
-  await ensureDirectory(join(custodyRoot, "secrets"), true, "DEV_AUTH_SECRET_STORE_INVALID");
+  await ensureDirectory(localRoot, "DEV_AUTH_CUSTODY_ROOT_INVALID");
+  await ensureDirectory(custodyRoot, "DEV_AUTH_CUSTODY_ROOT_INVALID");
+  await ensureDirectory(join(custodyRoot, "secrets"), "DEV_AUTH_SECRET_STORE_INVALID");
   for (const { relativePath } of DEVELOPMENT_SECRET_STORES) {
-    await ensureDirectory(
-      join(custodyRoot, relativePath),
-      true,
-      "DEV_AUTH_SECRET_STORE_INVALID"
-    );
+    await ensureDirectory(join(custodyRoot, relativePath), "DEV_AUTH_SECRET_STORE_INVALID");
   }
 
   const missingSecretPaths = await validateSecretSet(custodyRoot, true);

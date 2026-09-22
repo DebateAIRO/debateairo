@@ -16,4 +16,6 @@ export function resolveDevCustodyRoot(
 
 export function assertDevCustodyDirectory(directory: string): Promise<void>;
 
+export function ensureDevCustodyDirectory(directory: string): Promise<void>;
+
 export function assertDevCustodyRootCustody(custodyRoot: string): Promise<void>;
