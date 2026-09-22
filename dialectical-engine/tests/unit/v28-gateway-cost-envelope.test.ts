@@ -5,11 +5,15 @@ import {
 } from "@debateai/providers";
 import {
   chargeMicrosForUsage,
+  CostEnvelopeGuard,
+  costEnvelopeDay,
   decideRunCostEnvelope,
   projectedCallCeilingMicros,
   providerUsageUnreported,
   readReportedUsage,
-  runCostEnvelopeReached
+  runCostEnvelopeReached,
+  type ModelSpendEntry,
+  type ModelSpendStore
 } from "@debateai/budget";
 import { framedFixturePacket } from "../support/framed-packet.js";
 
@@ -330,5 +334,133 @@ describe("V-28 a hosted target whose vendor reports no usage is refused", () => 
 
     await expect(gateway.call()).resolves.toMatchObject({ model: MODEL });
     expect(state.charges).toEqual([]);
+  });
+});
+
+/**
+ * C-I1 (final review, area C) — THE SHAPE A REAL VENDOR ACTUALLY RETURNS.
+ *
+ * Everything above drives the seam from a fake whose `usage` carries only the
+ * four bounded members. OpenAI's chat completions have not returned that shape
+ * since 2024: every 200 also carries `prompt_tokens_details` and
+ * `completion_tokens_details`. The gateway derived `reportedUsage` from the
+ * STRICT usage schema, so one unknown member turned the whole block into "the
+ * vendor reported nothing": no ledger row, no movement on either ceiling, and
+ * the answer refused as `PROVIDER_USAGE_INVALID` and RETRIED — every attempt
+ * billed by the vendor and invisible to the money.
+ *
+ * So this case runs the REAL guard over a real ledger store, and asks the only
+ * question that matters: after one such answer, is the money on the ledger, and
+ * do both ceilings know about it?
+ */
+describe("C-I1 a 200 carrying a real vendor's usage block is charged", () => {
+  const NOW = new Date("2026-09-22T11:00:00.000Z");
+  /** Verbatim from OpenAI's `chat/completions` today, counts aside. */
+  const OPENAI_USAGE = Object.freeze({
+    prompt_tokens: 1_200,
+    completion_tokens: 300,
+    total_tokens: 1_500,
+    prompt_tokens_details: { cached_tokens: 0, audio_tokens: 0 },
+    completion_tokens_details: {
+      reasoning_tokens: 0,
+      audio_tokens: 0,
+      accepted_prediction_tokens: 0,
+      rejected_prediction_tokens: 0
+    }
+  });
+
+  /** `ledger.model_spend` and its reservations, in memory: the rules, not the SQL. */
+  function ledgerStore() {
+    const rows: ModelSpendEntry[] = [];
+    const reservations: Array<{ reservedMicros: number; expiresAt: Date }> = [];
+    const sum = (kept: readonly ModelSpendEntry[]) =>
+      kept.reduce((total, row) => total + row.chargeMicros, 0);
+    const store: ModelSpendStore = {
+      recordSpend: async (entry) => { rows.push(entry); },
+      readRunSpentMicros: async (runId) => sum(rows.filter((row) => row.runId === runId)),
+      readDaySpentMicros: async (day) => sum(rows.filter((row) => row.chargedOn === day)),
+      admitNewRun: async (input) => {
+        const held = reservations
+          .filter((reservation) => reservation.expiresAt.getTime() > input.now.getTime())
+          .reduce((total, reservation) => total + reservation.reservedMicros, 0);
+        const committedMicros = sum(rows.filter((row) => row.chargedOn === input.day)) + held;
+        const admitted = input.decide(committedMicros);
+        if (admitted) {
+          reservations.push({
+            reservedMicros: input.reservedMicros,
+            expiresAt: input.expiresAt
+          });
+        }
+        return Object.freeze({ admitted, committedMicros });
+      }
+    };
+    return { store, rows };
+  }
+
+  it("charges it to the ledger, to the run's ceiling and to the day's", async () => {
+    const calls = { count: 0 };
+    const { store, rows } = ledgerStore();
+    const guard = new CostEnvelopeGuard({
+      store,
+      // Deliberately tight: ONE such answer costs the whole of both ceilings,
+      // so the run lands EXACTLY on its own (J28's boundary: still within) and
+      // the day is REACHED. A projection larger than this would refuse the
+      // first call outright and fail the case below, never pass it quietly.
+      policy: { perRunCeilingMicros: 1_500, dailyCeilingMicros: 1_500 },
+      clock: () => NOW
+    });
+    const { gateway } = gatewayWith(
+      vendorReporting(OPENAI_USAGE, calls),
+      guard.providerSeam({ runId: "run-1", price: PRICE, requireReportedUsage: true })
+    );
+
+    await expect(gateway.call()).resolves.toMatchObject({ model: MODEL });
+
+    expect(calls.count).toBe(1);
+    // 1 200 + 300 tokens at one micro-unit each.
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      spendSource: "RUN",
+      runId: "run-1",
+      providerRef: "provider:test",
+      chargedOn: costEnvelopeDay(NOW),
+      chargeMicros: 1_500,
+      inputTokens: 1_200,
+      outputTokens: 300
+    });
+    expect(await store.readRunSpentMicros("run-1")).toBe(1_500);
+    expect(await store.readDaySpentMicros(costEnvelopeDay(NOW))).toBe(1_500);
+
+    // The RUN's ceiling now refuses this run's next call...
+    await expect(gateway.call()).rejects.toThrowError(
+      expect.objectContaining({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" })
+    );
+    expect(calls.count).toBe(1);
+    // ...and the DAY's ceiling refuses the next run.
+    await expect(guard.assertDailyEnvelopeAdmitsNewRun()).rejects.toThrowError(
+      expect.objectContaining({ code: "DAILY_COST_ENVELOPE_REACHED" })
+    );
+  });
+
+  it("persists only the four bounded members on the artifact, never the vendor's extras", async () => {
+    const calls = { count: 0 };
+    const artifacts: Array<Readonly<Record<string, unknown>>> = [];
+    const gateway = new OpenAICompatibleProviderGateway({
+      endpoint: "http://fixture/v1", model: MODEL, maker: "fixture",
+      fetchImplementation: vendorReporting(OPENAI_USAGE, calls),
+      sleepImplementation: async () => undefined,
+      persistRawArtifact: async (artifact) => {
+        artifacts.push(artifact.metadata);
+        return artifact.artifactId;
+      },
+      appendLedgerEntry: async () => "ledger:1",
+      assertNoOpenWriteTransaction: () => undefined
+    });
+
+    await expect(gateway.call(callRequest())).resolves.toMatchObject({ model: MODEL });
+
+    expect(artifacts[0]?.usage).toEqual({
+      prompt_tokens: 1_200, completion_tokens: 300, total_tokens: 1_500
+    });
   });
 });

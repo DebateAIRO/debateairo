@@ -821,12 +821,31 @@ function realSleep(milliseconds: number): Promise<void> {
 }
 
 const usageCounter = z.number().int().min(0).max(MAX_USAGE_COUNTER);
+/**
+ * L4-F3 / C-I1 — THE FOUR MEMBERS ARE BOUNDED; THE REST ARE DROPPED, NOT REFUSED.
+ *
+ * Each counter is still exactly what it was: a non-negative safe integer no
+ * larger than 2^31-1, refused by name when it is anything else. What changed is
+ * the treatment of a member this engine does not know. `.strict()` refused the
+ * whole block for one of them — and OpenAI's `chat/completions` has carried
+ * `prompt_tokens_details` and `completion_tokens_details` on every 200 for two
+ * years. That refusal did not stop at the acceptance decision: `reportedUsage`
+ * is read through this same schema, so a real vendor's answer CHARGED NOTHING,
+ * moved neither ceiling, and was retried until the attempt bound was spent —
+ * every attempt billed by the vendor and invisible to the ledger (C-I1).
+ *
+ * Zod STRIPS by default, so the parsed value still carries only the four
+ * bounded members: nothing unbounded reaches `raw_artifact.metadata.usage`, and
+ * the L4-F3 property the strictness was there for — no unbounded vendor text is
+ * persisted from the usage block — is kept by construction rather than by
+ * refusing the answer. A malformed COUNTER is still `PROVIDER_USAGE_INVALID`.
+ */
 const usageSchema = z.object({
   prompt_tokens: usageCounter.optional(),
   completion_tokens: usageCounter.optional(),
   total_tokens: usageCounter.optional(),
   x_cost_usd: z.number().nonnegative().optional()
-}).strict();
+});
 
 const modelIdSchema = z.string().min(1).max(MAX_PROVIDER_MODEL_CHARS);
 
@@ -920,7 +939,7 @@ async function readBoundedResponseText(response: Response): Promise<string> {
   return new TextDecoder("utf-8").decode(Buffer.concat(chunks));
 }
 
-/** Typed refusals for an over-long model id or a usage block outside the four bounded fields (L4-F3). */
+/** Typed refusals for an over-long model id or a usage COUNTER outside its bound (L4-F3, C-I1). */
 function assertBoundedProviderResponse(decoded: unknown): void {
   if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) return;
   const row = decoded as Readonly<Record<string, unknown>>;
@@ -933,7 +952,7 @@ function assertBoundedProviderResponse(decoded: unknown): void {
   if (row.usage !== undefined && row.usage !== null && !usageSchema.safeParse(row.usage).success) {
     throw new TypedDomainError(
       "PROVIDER_USAGE_INVALID",
-      "Provider usage may carry only bounded prompt_tokens, completion_tokens, total_tokens and x_cost_usd"
+      "Provider usage counters must be non-negative integers within the bounded range"
     );
   }
 }
@@ -1038,7 +1057,13 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         const candidate = z.object({ id: z.string(), model: modelIdSchema }).passthrough().safeParse(decoded);
         const observedUsage = z.object({ usage: usageSchema.nullable().optional() })
           .passthrough().safeParse(decoded);
-        /** Read ONCE: the artifact's record, the charge and the hosted check agree by construction. */
+        /**
+         * Read ONCE: the artifact's record, the charge and the hosted check
+         * agree by construction. The schema STRIPS a vendor's extra members
+         * (C-I1), so this is the four bounded counters or nothing — a real
+         * vendor's `prompt_tokens_details` neither reaches the artifact nor
+         * turns a billed call into an uncharged one.
+         */
         const reportedUsage = observedUsage.success ? observedUsage.data.usage ?? null : null;
         const strict = responseSchema.safeParse(decoded);
         const finishReason = observedFinishReason(decoded);
@@ -1122,13 +1147,17 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          * V-28 — THE HOSTED REQUIREMENT, asked only of a SUCCESSFUL completion.
          *
          * The CHARGE is taken earlier, right after the artifact is recorded
-         * (I4): a 200 the engine then refuses — an over-long model id, a usage
-         * block with an unknown field — was still billed by the vendor and is
-         * still retried, so charging here missed real money, repeatedly. This
-         * check stays here, after `assertBoundedProviderResponse`, so a
-         * malformed usage block is still named PROVIDER_USAGE_INVALID rather
-         * than collapsed into "the vendor reported nothing", and after the
+         * (I4): a 200 the engine then refuses — an over-long model id, a
+         * malformed usage counter — was still billed by the vendor and is still
+         * retried, so charging here missed real money, repeatedly. This check
+         * stays here, after `assertBoundedProviderResponse`, so a malformed
+         * usage block is still named PROVIDER_USAGE_INVALID rather than
+         * collapsed into "the vendor reported nothing", and after the
          * `!response.ok` throw so an error page stays a transport failure.
+         *
+         * C-I1: an UNKNOWN member of the usage block is no longer one of those
+         * refusals. It is stripped, the four counters are charged, and the
+         * answer is accepted — which is what a vendor's real 200 looks like.
          */
         await request.costEnvelope?.assertUsageReported({
           providerRef: request.providerRef,

@@ -103,21 +103,29 @@ describe("L4-F3 — provider response body cap", () => {
   });
 });
 
-describe("L4-F3 — strict, bounded usage", () => {
+describe("L4-F3 — bounded usage counters, unknown members dropped", () => {
   const completionWithUsage = (usage: unknown) => JSON.stringify({
     id: "call", model: "configured/model", choices: [{ message: { content: "ok" } }], usage
   });
 
-  it("refuses usage with unknown keys as PROVIDER_USAGE_INVALID and never persists them", async () => {
+  /**
+   * C-I1. Round 1 REFUSED the whole block for one unknown member, which is what
+   * every real OpenAI 200 carries (`prompt_tokens_details`), so the answer was
+   * thrown away, retried and never charged. The L4-F3 property is about what
+   * gets PERSISTED, and stripping keeps it exactly: the artifact records the
+   * four bounded members and nothing else.
+   */
+  it("accepts usage with unknown keys and never persists them", async () => {
     const { gateway, artifacts } = gatewayWith(async () => new Response(completionWithUsage({
-      prompt_tokens: 1, completion_tokens: 1, total_tokens: 2, prompt_tokens_details: { cached_tokens: 0 }
+      prompt_tokens: 1, completion_tokens: 1, total_tokens: 2,
+      prompt_tokens_details: { cached_tokens: 0 },
+      completion_tokens_details: { reasoning_tokens: 0 }
     })));
 
-    await expect(gateway.call(callRequest())).rejects.toMatchObject({
-      code: "PROVIDER_CALL_FAILED", cause: { code: "PROVIDER_USAGE_INVALID" }
-    });
+    await expect(gateway.call(callRequest())).resolves.toMatchObject({ content: "ok" });
     expect(artifacts).toHaveLength(1);
-    expect(artifacts[0]?.metadata.usage).toBeNull();
+    expect(artifacts[0]?.metadata.usage)
+      .toEqual({ prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 });
   });
 
   it("bounds every counter to a non-negative integer at most 2^31 - 1", async () => {
