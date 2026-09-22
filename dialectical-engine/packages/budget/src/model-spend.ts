@@ -307,10 +307,21 @@ export class PostgresModelSpendStore implements ModelSpendStore {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      // A stable 64-bit key for this UTC day; two API processes admitting on the
-      // same day take the same lock, and different days never contend.
+      /**
+       * A stable 64-bit key for this UTC day: two API processes admitting on the
+       * same day take the same lock, and different days never contend.
+       *
+       * The SINGLE-key `bigint` form, over `hashtextextended(<text>, 0)` — the
+       * shape `migrations/0040_account_erasure.sql` uses a dozen times.
+       * PostgreSQL's two-key overload is `(integer, integer)` and `hashtext`
+       * returns integer, so a two-key call built from bigints resolves to NO
+       * function and raises 42883 on every ask. `tests/architecture/
+       * v28-advisory-lock-shape.test.ts` pins this text, because the engine is
+       * down here and nothing can execute it.
+       */
       await client.query(
-        "SELECT pg_advisory_xact_lock(hashtext('debateai.cost_envelope.day')::bigint, hashtext($1)::bigint)",
+        "SELECT pg_advisory_xact_lock("
+        + "pg_catalog.hashtextextended('debateai.cost_envelope.day:' || $1, 0))",
         [input.day]
       );
       const committed = await client.query<{ total: string }>(
