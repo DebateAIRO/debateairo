@@ -3,7 +3,6 @@ import { decideBudgetPressure, parseCostEnvelopeBasis } from "@debateai/budget";
 import {
   buildFactBundle,
   createEnvelopeExhaustedResult,
-  SERVE_CRASH_CLASSES,
   type CompositionBudgetResolution
 } from "@debateai/serve";
 import { ENVELOPE_STOP_REASONS, envelopeStopKind } from "../../apps/runner/src/index.js";
@@ -206,8 +205,9 @@ describe("V-28 a money stop ends in the run's own terminal state, never as a cra
     expect(result.factBundle.facts).toEqual(["the statement the run had already paid for"]);
     // ENVELOPE_EXHAUSTED and DEFECT are independent terminals: a run that ran
     // out of money is not a broken run, and the reader must not be told it is.
+    // The distinction is the crash class and the mark, asserted above — NOT the
+    // terminal, which `TRANSPORT_DEATH` shares (both are `COMPONENTS_ONLY`).
     expect(result.conditionMarks).not.toContain("DEFECT");
-    expect(result.terminal).not.toBe(SERVE_CRASH_CLASSES.TRANSPORT_DEATH.gateTrace);
   });
 
   it("names the money ceiling on the record, not the attempt ceiling", () => {
