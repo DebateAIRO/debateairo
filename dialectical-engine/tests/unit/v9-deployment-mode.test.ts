@@ -227,8 +227,13 @@ describe("V-9 both shipped roots take the mode decision (task 10a)", () => {
     }
   });
 
-  it("asks the runner for sealed cost envelopes before it claims any work", async () => {
-    const source = await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
-    expect(source).toContain("assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE)");
+  it("asks BOTH roots for sealed cost envelopes before either spends anything", async () => {
+    // The runner calls the vendor; the API's ask-time health probe is itself a
+    // model call. A hosted deployment that could spend from either side while
+    // the envelopes are unsealed would only be half a control.
+    for (const path of ["../../apps/api/src/main.ts", "../../apps/runner/src/main.ts"]) {
+      const source = await readFile(new URL(path, import.meta.url), "utf8");
+      expect(source).toContain("assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE)");
+    }
   });
 });

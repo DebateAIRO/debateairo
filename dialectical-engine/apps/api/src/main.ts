@@ -20,6 +20,7 @@ import type { AskRequest } from "@debateai/contract";
 import type { RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
+  assertHostedCostEnvelopesSealed,
   loadApiEnvironment,
   createSupportConfigurationPort,
   readDeploymentRiskTier,
@@ -79,6 +80,11 @@ import { SupportRelayQueue } from "./support/queue.js";
 import { SupportDegradedState } from "./support/degraded.js";
 
 const environment = loadApiEnvironment();
+// V-9(c) / V-28: a hosted deployment may not admit an ask — nor probe a paid
+// vendor, which is itself a model call — until the per-run and daily cost
+// envelopes are sealed. The seam is `readSealedCostEnvelopeStatus` in
+// @debateai/register, which task 11 replaces. Local mode is untouched.
+assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE);
 const supportKnowledge = loadHelpCorpus(resolve("packages/support-kb/content"));
 // V-19: before the first key file is opened, so a group this host cannot
 // resolve refuses at boot instead of at the first private debate.
