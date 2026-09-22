@@ -25,6 +25,7 @@
   "home.noPublishedDebates": "Non è stato ancora pubblicato alcun dibattito.",
   "home.verdictUnavailable": "Verdetto non disponibile",
   "home.models.one": "{count} modello",
+  "home.models.many": "{count} modelli",
   "home.models.other": "{count} modelli",
   "home.practiceEyebrow": "Esercizio, non esibizione",
   "home.heroTitle": "Trova l’anello più debole della tua argomentazione.",

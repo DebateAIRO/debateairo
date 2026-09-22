@@ -24,6 +24,7 @@
   "home.generationFailed": "Debašu ģenerēšana neizdevās: {reason}",
   "home.noPublishedDebates": "Vēl nav publicētas nevienas debates.",
   "home.verdictUnavailable": "Spriedums nav pieejams",
+  "home.models.zero": "{count} modeļu",
   "home.models.one": "{count} modelis",
   "home.models.other": "{count} modeļi",
   "home.practiceEyebrow": "Treniņš, nevis priekšnesums",

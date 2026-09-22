@@ -88,7 +88,7 @@ export function TopBar() {
         <div className="topBarContext" />
       )}
       <div className="topBarActions">
-        <Link className="btn" href="/settings">
+        <Link className="btn" href="/login">
           {t(catalog, "chrome.account")}
         </Link>
         <Link className="btn btnDark" href="/new">

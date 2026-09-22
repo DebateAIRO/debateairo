@@ -1,12 +1,10 @@
 import type { JSX } from "react";
 import { ModeToggle } from "@/components/ModeToggle";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { useChromeI18n } from "@/lib/i18n/I18nProvider";
-import { t } from "@/lib/i18n/translate";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /* The document's floating glass nav: detached, centred, 34px from the top. */
-export function LandingChrome(): JSX.Element {
-  const { catalog } = useChromeI18n();
+export function LandingChrome({ catalog }: { catalog: MessageCatalog }): JSX.Element {
   return (
     <header
       data-landing-section="chrome"

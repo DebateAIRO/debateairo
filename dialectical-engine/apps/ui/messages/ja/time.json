@@ -1,13 +1,9 @@
 {
   "time.justNow": "たった今",
-  "time.minutes.one": "{count}分前",
   "time.minutes.other": "{count}分前",
-  "time.hours.one": "{count}時間前",
   "time.hours.other": "{count}時間前",
   "time.yesterday": "昨日",
-  "time.days.one": "{count}日前",
   "time.days.other": "{count}日前",
-  "time.weeks.one": "{count}週間前",
   "time.weeks.other": "{count}週間前",
   "time.status.complete": "完了",
   "time.status.queued": "待機中",

@@ -12,9 +12,9 @@
   "time.status.complete": "Compleet",
   "time.status.queued": "In de wachtrij",
   "time.status.claimed": "Geclaimd",
-  "time.status.running": "Rennen",
+  "time.status.running": "Wordt uitgevoerd",
   "time.status.holding": "Herstelblokkering van de provider",
-  "time.status.settled": "Gevestigd",
+  "time.status.settled": "Afgerond",
   "time.status.generating": "Genereren",
   "time.status.failed": "Mislukt",
   "time.status.draft": "Voorlopige versie"

@@ -25,6 +25,8 @@
   "home.noPublishedDebates": "Dar nepaskelbta nė vienų debatų.",
   "home.verdictUnavailable": "Verdiktas nepasiekiamas",
   "home.models.one": "{count} modelis",
+  "home.models.few": "{count} modeliai",
+  "home.models.many": "{count} modelio",
   "home.models.other": "{count} modelių",
   "home.practiceEyebrow": "Praktika, ne pasirodymas",
   "home.heroTitle": "Raskite silpniausią savo argumento grandį.",

@@ -25,6 +25,8 @@
   "home.noPublishedDebates": "Objavljena ni bila še nobena razprava.",
   "home.verdictUnavailable": "Razsodba ni na voljo",
   "home.models.one": "{count} model",
+  "home.models.two": "{count} modela",
+  "home.models.few": "{count} modeli",
   "home.models.other": "Število modelov: {count}",
   "home.practiceEyebrow": "Vaja, ne predstava",
   "home.heroTitle": "Poiščite najšibkejši člen svojega argumenta.",

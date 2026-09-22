@@ -5,6 +5,7 @@ import DebatePageClient from "./DebatePageClient";
 import { AuthGate } from "@/components/AuthGate";
 import { SupportWidget } from "@/components/support/SupportWidget";
 import type { DebateDetail } from "@/lib/types";
+import type { MessageCatalog } from "@/lib/i18n/translate";
 
 /**
  * UI-01 (S05): every V3 read is asker-scoped, so the debate workspace needs
@@ -16,13 +17,15 @@ export default function DebatePageGate({
   initialDebate,
   initialAnswer,
   initialError,
-  initialPending
+  initialPending,
+  timeCatalog
 }: {
   id: string;
   initialDebate: DebateDetail | null;
   initialAnswer: Answer | null;
   initialError: string | null;
   initialPending: boolean;
+  timeCatalog: MessageCatalog;
 }) {
   return (
     <>
@@ -34,6 +37,7 @@ export default function DebatePageGate({
           initialAnswer={initialAnswer}
           initialError={initialError}
           initialPending={initialPending}
+          timeCatalog={timeCatalog}
         />
       )}
       </AuthGate>

@@ -1,13 +1,9 @@
 {
   "time.justNow": "vừa xong",
-  "time.minutes.one": "{count} phút trước",
   "time.minutes.other": "{count} phút trước",
-  "time.hours.one": "{count} giờ trước",
   "time.hours.other": "{count} giờ trước",
   "time.yesterday": "Hôm qua",
-  "time.days.one": "{count} ngày trước",
   "time.days.other": "{count} ngày trước",
-  "time.weeks.one": "{count} tuần trước",
   "time.weeks.other": "{count} tuần trước",
   "time.status.complete": "Hoàn tất",
   "time.status.queued": "Đang xếp hàng",

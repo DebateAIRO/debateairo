@@ -18,6 +18,18 @@ test("language search matches native names and ISO codes case-insensitively", ()
   assert.deepEqual(filterLocales("português").map(({ code }) => code), ["pt"]);
 });
 
+test("language-code search is invariant when the host locale has Turkish casing", () => {
+  const original = String.prototype.toLocaleLowerCase;
+  String.prototype.toLocaleLowerCase = function emulateTurkishLowerCase() {
+    return String(this).replaceAll("I", "ı").toLowerCase();
+  };
+  try {
+    assert.deepEqual(filterLocales("ID").map(({ code }) => code), ["id"]);
+  } finally {
+    String.prototype.toLocaleLowerCase = original;
+  }
+});
+
 test("keyboard navigation wraps arrows and supports Home, End, Enter, and Escape", () => {
   assert.equal(handleLanguageSwitcherKey("ArrowDown", 2, 3).highlightedIndex, 0);
   assert.equal(handleLanguageSwitcherKey("ArrowUp", 0, 3).highlightedIndex, 2);

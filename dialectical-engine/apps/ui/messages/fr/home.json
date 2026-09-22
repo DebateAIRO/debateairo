@@ -25,6 +25,7 @@
   "home.noPublishedDebates": "Aucun débat n’a encore été publié.",
   "home.verdictUnavailable": "Verdict indisponible",
   "home.models.one": "{count} modèle",
+  "home.models.many": "{count} modèles",
   "home.models.other": "{count} modèles",
   "home.practiceEyebrow": "S’entraîner, pas se produire",
   "home.heroTitle": "Trouvez le maillon le plus faible de votre propre argument.",

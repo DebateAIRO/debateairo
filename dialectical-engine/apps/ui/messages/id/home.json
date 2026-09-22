@@ -24,7 +24,6 @@
   "home.generationFailed": "Pembuatan debat gagal: {reason}",
   "home.noPublishedDebates": "Belum ada debat yang diterbitkan.",
   "home.verdictUnavailable": "Putusan tidak tersedia",
-  "home.models.one": "{count} model",
   "home.models.other": "{count} model",
   "home.practiceEyebrow": "Latihan, bukan pertunjukan",
   "home.heroTitle": "Temukan mata rantai terlemah dalam argumen Anda sendiri.",

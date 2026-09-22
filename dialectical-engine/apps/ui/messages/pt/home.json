@@ -25,6 +25,7 @@
   "home.noPublishedDebates": "Ainda não foi publicado nenhum debate.",
   "home.verdictUnavailable": "Veredicto indisponível",
   "home.models.one": "{count} modelo",
+  "home.models.many": "{count} modelos",
   "home.models.other": "{count} modelos",
   "home.practiceEyebrow": "Prática, não exibição",
   "home.heroTitle": "Encontre o elo mais fraco do seu próprio argumento.",

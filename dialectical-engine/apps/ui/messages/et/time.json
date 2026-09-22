@@ -9,13 +9,13 @@
   "time.days.other": "{count} päeva tagasi",
   "time.weeks.one": "{count} nädal tagasi",
   "time.weeks.other": "{count} nädalat tagasi",
-  "time.status.complete": "Täielik",
+  "time.status.complete": "Lõpetatud",
   "time.status.queued": "Järjekorras",
-  "time.status.claimed": "Väidetud",
-  "time.status.running": "Jooksmine",
+  "time.status.claimed": "Üle võetud",
+  "time.status.running": "Käimas",
   "time.status.holding": "Pakkuja taastamise ootel",
-  "time.status.settled": "Asunud",
-  "time.status.generating": "Tekib",
+  "time.status.settled": "Lahendatud",
+  "time.status.generating": "Genereerimine",
   "time.status.failed": "Ebaõnnestunud",
   "time.status.draft": "Mustand"
 }

@@ -1,13 +1,9 @@
 {
   "time.justNow": "刚刚",
-  "time.minutes.one": "{count} 分钟前",
   "time.minutes.other": "{count} 分钟前",
-  "time.hours.one": "{count} 小时前",
   "time.hours.other": "{count} 小时前",
   "time.yesterday": "昨天",
-  "time.days.one": "{count} 天前",
   "time.days.other": "{count} 天前",
-  "time.weeks.one": "{count} 周前",
   "time.weeks.other": "{count} 周前",
   "time.status.complete": "已完成",
   "time.status.queued": "已排队",

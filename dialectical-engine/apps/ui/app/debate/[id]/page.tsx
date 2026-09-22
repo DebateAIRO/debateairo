@@ -5,6 +5,8 @@ import DebatePageGate from "./DebatePageGate";
 import { USER_TOKEN_COOKIE, getDebateServer } from "@/lib/serverApi";
 import type { DebateDetail } from "@/lib/types";
 import { debateDetailFromRunProjection } from "@/lib/v3/adapter";
+import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
+import { loadNamespace } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,10 @@ export default async function DebatePage({
 }) {
   const { id } = await params;
   const starting = (await searchParams).starting === "1";
+  const cookieStore = await cookies();
+  const requestedLocale = cookieStore.get(LOCALE_COOKIE)?.value;
+  const locale = isLocale(requestedLocale) ? requestedLocale : "en";
+  const timeCatalog = await loadNamespace(locale, "time");
 
   // The accepted ask already owns a durable run id. Do not make the client
   // transition wait behind the runner's private-content lease: mount the
@@ -31,10 +37,11 @@ export default async function DebatePage({
         initialAnswer={null}
         initialError={null}
         initialPending
+        timeCatalog={timeCatalog}
       />
     );
   }
-  const token = (await cookies()).get(USER_TOKEN_COOKIE)?.value ?? null;
+  const token = cookieStore.get(USER_TOKEN_COOKIE)?.value ?? null;
   const userAgent = (await headers()).get("user-agent") ?? undefined;
 
   // SSR reads the asker-scoped projection with the identity cookie (S05).
@@ -70,6 +77,7 @@ export default async function DebatePage({
       initialAnswer={initialAnswer}
       initialError={initialError}
       initialPending={initialPending}
+      timeCatalog={timeCatalog}
     />
   );
 }

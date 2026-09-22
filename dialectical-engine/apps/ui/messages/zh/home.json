@@ -24,7 +24,6 @@
   "home.generationFailed": "辩论生成失败：{reason}",
   "home.noPublishedDebates": "尚未发布任何辩论。",
   "home.verdictUnavailable": "裁决不可用",
-  "home.models.one": "{count} 个模型",
   "home.models.other": "{count} 个模型",
   "home.practiceEyebrow": "重在练习，而非表演",
   "home.heroTitle": "找出自己论证中最薄弱的一环。",

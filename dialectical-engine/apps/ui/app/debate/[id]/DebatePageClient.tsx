@@ -72,7 +72,7 @@ import { GuideModal } from "@/components/GuideModal";
 import { ModeToggle } from "@/components/ModeToggle";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
-import { t } from "@/lib/i18n/translate";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { Toast } from "@/components/Toast";
 import {
   PublicationControl,type PrivateDeletionStatus
@@ -351,6 +351,7 @@ export default function DebatePageClient({
   initialAnswer = null,
   initialError = null,
   initialPending = false,
+  timeCatalog,
   publicMode = false,
   publicNodesById = null,
   publicExport = null,
@@ -368,6 +369,7 @@ export default function DebatePageClient({
   // client polling/stream below retries. Only a definitive failure sets
   // initialError, which is the sole seed of the fatal `error && !debate` gate.
   initialPending?: boolean;
+  timeCatalog: MessageCatalog;
   /**
    * Public read-only mode. A published debate is the same workspace seen by a
    * stranger: identical chrome, identical views, identical panels — minus every
@@ -863,12 +865,12 @@ export default function DebatePageClient({
     };
     if (debate.tree) walk(debate.tree);
     if (total === 0 && !complete) {
-      const label = statusLabel(debate.run_state ?? "generating");
+      const label = statusLabel(debate.run_state ?? "generating", timeCatalog);
       return { pct: null, label, count: "" };
     }
     const pct = total ? Math.round((done / total) * 100) : 100;
     return { pct, label: "Models arguing", count: `${pct}%` };
-  }, [debate, hasTree, complete]);
+  }, [debate, hasTree, complete, timeCatalog]);
 
   const hasArtifacts = Boolean(
     debate &&
@@ -1133,7 +1135,7 @@ export default function DebatePageClient({
             </span>
             <span className={`pill ${statusKind}`}>
               <span className="dot" />
-              {statusLabel(debate.run_state ?? debate.status)}
+              {statusLabel(debate.run_state ?? debate.status, timeCatalog)}
             </span>
             {debate.completion?.humanReason ? (
               <span className="topSwitchStatus" role="status" title={debate.completion.humanReason}>

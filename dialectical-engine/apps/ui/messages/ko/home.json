@@ -24,7 +24,6 @@
   "home.generationFailed": "토론 생성 실패: {reason}",
   "home.noPublishedDebates": "아직 게시된 토론이 없습니다.",
   "home.verdictUnavailable": "판정을 이용할 수 없음",
-  "home.models.one": "모델 {count}개",
   "home.models.other": "모델 {count}개",
   "home.practiceEyebrow": "보여주기보다 연습하기",
   "home.heroTitle": "내 논거에서 가장 약한 연결 고리를 찾으세요.",

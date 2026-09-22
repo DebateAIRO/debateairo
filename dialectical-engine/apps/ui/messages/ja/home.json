@@ -24,7 +24,6 @@
   "home.generationFailed": "ディベートの生成に失敗しました：{reason}",
   "home.noPublishedDebates": "公開されたディベートはまだありません。",
   "home.verdictUnavailable": "判定を利用できません",
-  "home.models.one": "{count}モデル",
   "home.models.other": "{count}モデル",
   "home.practiceEyebrow": "見せるためでなく、鍛えるために",
   "home.heroTitle": "自分の論証で最も弱いつながりを見つける。",

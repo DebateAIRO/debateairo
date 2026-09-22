@@ -72,10 +72,10 @@ export function getLocale(value: unknown): LocaleDefinition {
 }
 
 export function filterLocales(query: string): readonly LocaleDefinition[] {
-  const normalized = query.trim().toLocaleLowerCase();
+  const normalized = query.trim().toLowerCase();
   if (normalized.length === 0) return LOCALES;
   return LOCALES.filter(({ code, nativeName }) =>
-    code.toLocaleLowerCase().includes(normalized) ||
-    nativeName.toLocaleLowerCase().includes(normalized)
+    code.toLowerCase().includes(normalized) ||
+    nativeName.toLowerCase().includes(normalized)
   );
 }

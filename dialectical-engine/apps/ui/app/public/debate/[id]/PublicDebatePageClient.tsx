@@ -14,6 +14,7 @@ import {
 } from "@/lib/v3/adapter";
 import type { AnswerExport } from "@/lib/v3/answerExport";
 import { buildPublicAnswerExport } from "@/lib/v3/publicAnswerExport";
+import type { MessageCatalog } from "@/lib/i18n/translate";
 
 /**
  * A published debate is the private workspace seen by a stranger. This is a
@@ -22,7 +23,13 @@ import { buildPublicAnswerExport } from "@/lib/v3/publicAnswerExport";
  * `publicMode`. Anything the workspace gains — views, panels, chrome — a public
  * reader gains with it, and the two can never drift apart.
  */
-export function PublicDebatePageClient({ debate }: { debate: PublicDebate }) {
+export function PublicDebatePageClient({
+  debate,
+  timeCatalog
+}: {
+  debate: PublicDebate;
+  timeCatalog: MessageCatalog;
+}) {
   // Publications made before trees were carried have no nodes. That is not an
   // error: the verdict, the summary and the honesty surface are still the
   // debate, so they project the same way and the canvas renders its own empty
@@ -99,6 +106,7 @@ export function PublicDebatePageClient({ debate }: { debate: PublicDebate }) {
       initialDebate={projection.detail}
       initialAnswer={null}
       initialError={null}
+      timeCatalog={timeCatalog}
       publicMode
       publicNodesById={projection.nodesById}
       publicExport={publicExport}

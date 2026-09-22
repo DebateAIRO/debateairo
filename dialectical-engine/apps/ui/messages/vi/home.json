@@ -24,7 +24,6 @@
   "home.generationFailed": "Không thể tạo cuộc tranh luận: {reason}",
   "home.noPublishedDebates": "Chưa có cuộc tranh luận nào được xuất bản.",
   "home.verdictUnavailable": "Không có phán quyết",
-  "home.models.one": "{count} mô hình",
   "home.models.other": "{count} mô hình",
   "home.practiceEyebrow": "Luyện tập, không phải trình diễn",
   "home.heroTitle": "Tìm mắt xích yếu nhất trong chính lập luận của bạn.",

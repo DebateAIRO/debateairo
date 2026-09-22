@@ -4,15 +4,18 @@ import { join } from "node:path";
 import test from "node:test";
 
 const read = (path) => readFileSync(join(process.cwd(), path), "utf8");
-const placement = /<LanguageSwitcher\s*\/>\s*<ModeToggle(?:\s+compact)?\s*\/>/;
+const placement = /<LanguageSwitcher\s*\/>\s*<ModeToggle(?:\s+compact)?\s*\/>/g;
 
 test("the language switcher is immediately before ModeToggle in all four headers", () => {
-  for (const path of [
-    "components/TopBar.tsx",
-    "components/landing/LandingChrome.tsx",
-    "app/debate/[id]/DebatePageClient.tsx",
-    "components/support/Assistant.tsx"
-  ]) assert.match(read(path), placement, path);
+  const expectedPlacements = new Map([
+    ["components/TopBar.tsx", 2],
+    ["components/landing/LandingChrome.tsx", 1],
+    ["app/debate/[id]/DebatePageClient.tsx", 1],
+    ["components/support/Assistant.tsx", 1]
+  ]);
+  for (const [path, expected] of expectedPlacements) {
+    assert.equal(read(path).match(placement)?.length ?? 0, expected, path);
+  }
 });
 
 test("the owner-rejected debate-content caption is absent from UI source", () => {
@@ -26,7 +29,22 @@ test("the owner-rejected debate-content caption is absent from UI source", () =>
     }
   };
   visit(process.cwd());
-  const source = files.map((path) => readFileSync(path, "utf8")).join("\n").toLowerCase();
-  const rejectedCaption = new RegExp("debate content stays" + " in the language it was argued in");
-  assert.doesNotMatch(source, rejectedCaption);
+  const source = files.map((path) => readFileSync(path, "utf8")).join("\n").toLowerCase()
+    .replace(/\{\s*["']\s+["']\s*\}/g, " ")
+    .replace(/[\s\u00a0]+/g, " ");
+  assert.doesNotMatch(source, /debate content stays in the language it was argued in/);
+  assert.doesNotMatch(source, /interface only\./);
+});
+
+test("the switcher exposes keyboard highlight and dismissal state to assistive technology", () => {
+  const switcher = read("components/LanguageSwitcher.tsx");
+  assert.match(switcher, /role="combobox"/);
+  assert.match(switcher, /aria-activedescendant=\{[^}]+\}/);
+  assert.match(switcher, /className="languageSwitcherList"[\s\S]*?role="listbox"/);
+  assert.match(switcher, /role="option"/);
+  assert.match(switcher, /tabIndex=\{-1\}/);
+  assert.match(switcher, /aria-selected=\{selected\}/);
+  assert.match(switcher, /onBlur=\{[^}]*relatedTarget/);
+  assert.match(switcher, /useMemo\(\(\) => filtered\.map/);
+  assert.doesNotMatch(switcher, /onPointerMove=\{\(\) => setHighlightedCode/);
 });

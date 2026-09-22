@@ -53,3 +53,6 @@ components/AnswerHonestyDrawer.tsx
 components/ModelPresentation.tsx
 components/ScoringErrorBoundary.tsx
 components/Toast.tsx
+lib/debatePresentation.ts
+lib/recommendation.ts
+lib/scoringFormat.ts

@@ -9,7 +9,7 @@ import type { MessageCatalog } from "@/lib/i18n/translate";
 export function LandingPage({ catalog }: { catalog: MessageCatalog }): JSX.Element {
   return (
     <main className="lpRoot">
-      <LandingChrome />
+      <LandingChrome catalog={catalog} />
       <LandingHero catalog={catalog} />
       <LandingSample catalog={catalog} />
       <LandingMethod catalog={catalog} />

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useId,
   useMemo,
@@ -35,37 +36,38 @@ export function LanguageSwitcher() {
   const { locale, catalog } = useChromeI18n();
   const current = getLocale(locale);
   const panelId = useId();
+  const listId = `${panelId}-list`;
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => filterLocales(query), [query]);
-  const filteredCodes = filtered.map(({ code }) => code as LocaleCode);
+  const filteredCodes = useMemo(() => filtered.map(({ code }) => code as LocaleCode), [filtered]);
   const [highlightedCode, setHighlightedCode] = useState<LocaleCode>(locale);
+
+  const close = useCallback((returnFocus = false): void => {
+    setOpen(false);
+    setQuery("");
+    setHighlightedCode(locale);
+    if (returnFocus) queueMicrotask(() => buttonRef.current?.focus());
+  }, [locale]);
 
   useEffect(() => {
     if (!open) return;
     searchRef.current?.focus();
     const onPointerDown = (event: PointerEvent) => {
       if (rootRef.current?.contains(event.target as Node)) return;
-      setOpen(false);
+      close(false);
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [open]);
+  }, [close, open]);
 
   useEffect(() => {
     if (filteredCodes.length === 0) return;
     if (!filteredCodes.includes(highlightedCode)) setHighlightedCode(filteredCodes[0]);
   }, [filteredCodes, highlightedCode]);
-
-  function close(returnFocus = false): void {
-    setOpen(false);
-    setQuery("");
-    setHighlightedCode(locale);
-    if (returnFocus) queueMicrotask(() => buttonRef.current?.focus());
-  }
 
   function select(code: LocaleCode): void {
     document.cookie = `${LOCALE_COOKIE}=${code}; Path=/; SameSite=Lax; Max-Age=31536000`;
@@ -77,6 +79,7 @@ export function LanguageSwitcher() {
     const currentIndex = highlightedLocaleIndex(filteredCodes, highlightedCode);
     const result = handleLanguageSwitcherKey(event.key, currentIndex, filtered.length);
     if (!["ArrowDown", "ArrowUp", "Home", "End", "Enter", "Escape"].includes(event.key)) return;
+    if (event.key === "Enter" && event.target !== searchRef.current) return;
     event.preventDefault();
     if (result.close) {
       close(true);
@@ -91,7 +94,14 @@ export function LanguageSwitcher() {
   }
 
   return (
-    <div className="languageSwitcher" ref={rootRef} onKeyDown={open ? onKeyDown : undefined}>
+    <div
+      className="languageSwitcher"
+      ref={rootRef}
+      onKeyDown={open ? onKeyDown : undefined}
+      onBlur={(event) => {
+        if (!rootRef.current?.contains(event.relatedTarget as Node | null)) close(false);
+      }}
+    >
       <button
         ref={buttonRef}
         type="button"
@@ -135,13 +145,19 @@ export function LanguageSwitcher() {
             <input
               ref={searchRef}
               type="search"
+              role="combobox"
               value={query}
+              aria-expanded="true"
+              aria-controls={listId}
+              aria-activedescendant={filteredCodes.length > 0
+                ? `${listId}-${filteredCodes.includes(highlightedCode) ? highlightedCode : filteredCodes[0]}`
+                : undefined}
               aria-label={t(catalog, "chrome.searchLanguage")}
               placeholder={t(catalog, "chrome.searchLanguage")}
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
-          <div className="languageSwitcherList">
+          <div className="languageSwitcherList" id={listId} role="listbox">
             {TIERS.map((tier) => {
               const tierLocales = filtered.filter((candidate) => candidate.tier === tier);
               if (tierLocales.length === 0) return null;
@@ -160,11 +176,14 @@ export function LanguageSwitcher() {
                         <button
                           type="button"
                           key={candidate.code}
+                          id={`${listId}-${candidate.code}`}
                           className="languageSwitcherRow"
+                          role="option"
+                          tabIndex={-1}
                           data-current={selected || undefined}
                           data-highlighted={highlighted || undefined}
+                          aria-selected={selected}
                           aria-current={selected ? "true" : undefined}
-                          onPointerMove={() => setHighlightedCode(candidate.code as LocaleCode)}
                           onFocus={() => setHighlightedCode(candidate.code as LocaleCode)}
                           onClick={() => select(candidate.code as LocaleCode)}
                         >

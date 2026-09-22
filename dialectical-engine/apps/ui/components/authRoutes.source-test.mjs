@@ -61,7 +61,7 @@ test("auth screens share the reference hierarchy and replace the inline gate", (
 });
 
 test("every public and protected entry point reaches the dedicated auth routes", () => {
-  assert.match(topBar, /href="\/settings"[\s\S]*?t\(catalog, "chrome\.account"\)/);
+  assert.match(topBar, /href="\/login"[\s\S]*?t\(catalog, "chrome\.account"\)/);
   assert.match(home, /href="\/login"/);
   assert.match(home, /href="\/sign-up"/);
   assert.match(login, /useState\("\/sign-up"\)/);
@@ -151,8 +151,8 @@ test("primary and recovery emails occupy distinct autocomplete sections", () => 
 });
 
 test("ordinary top bar exposes a neutral account entry without inventing session state", () => {
-  assert.match(topBar, /href="\/settings"[\s\S]*?t\(catalog, "chrome\.account"\)/);
-  assert.doesNotMatch(topBar, />\s*Log in\s*</);
+  assert.match(topBar, /href="\/login"[\s\S]*?t\(catalog, "chrome\.account"\)/);
+  assert.match(topBar, /href="\/settings"[\s\S]*?aria-label=\{t\(catalog, "chrome\.settings"\)\}/);
   assert.doesNotMatch(topBar, /Signed in|Signed out|authenticated|useSession/);
 });
 

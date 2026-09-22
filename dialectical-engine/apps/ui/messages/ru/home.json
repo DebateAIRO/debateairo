@@ -25,6 +25,8 @@
   "home.noPublishedDebates": "Пока не опубликовано ни одной дискуссии.",
   "home.verdictUnavailable": "Вердикт недоступен",
   "home.models.one": "{count} модель",
+  "home.models.few": "{count} модели",
+  "home.models.many": "{count} моделей",
   "home.models.other": "{count} моделей",
   "home.practiceEyebrow": "Практика, а не представление",
   "home.heroTitle": "Найдите самое слабое звено в собственном аргументе.",

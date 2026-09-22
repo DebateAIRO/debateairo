@@ -25,6 +25,7 @@
   "home.noPublishedDebates": "Aún no se ha publicado ningún debate.",
   "home.verdictUnavailable": "Veredicto no disponible",
   "home.models.one": "{count} modelo",
+  "home.models.many": "{count} modelos",
   "home.models.other": "{count} modelos",
   "home.practiceEyebrow": "Práctica, no espectáculo",
   "home.heroTitle": "Encuentre el eslabón más débil de su propio argumento.",

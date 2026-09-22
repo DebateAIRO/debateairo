@@ -1,13 +1,9 @@
 {
   "time.justNow": "baru saja",
-  "time.minutes.one": "{count} menit lalu",
   "time.minutes.other": "{count} menit lalu",
-  "time.hours.one": "{count} jam lalu",
   "time.hours.other": "{count} jam lalu",
   "time.yesterday": "Kemarin",
-  "time.days.one": "{count} hari lalu",
   "time.days.other": "{count} hari lalu",
-  "time.weeks.one": "{count} minggu lalu",
   "time.weeks.other": "{count} minggu lalu",
   "time.status.complete": "Selesai",
   "time.status.queued": "Dalam antrean",

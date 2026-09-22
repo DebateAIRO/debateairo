@@ -25,6 +25,8 @@
   "home.noPublishedDebates": "Nie opublikowano jeszcze żadnej debaty.",
   "home.verdictUnavailable": "Werdykt niedostępny",
   "home.models.one": "{count} model",
+  "home.models.few": "{count} modele",
+  "home.models.many": "{count} modeli",
   "home.models.other": "{count} modeli",
   "home.practiceEyebrow": "Ćwiczenie, nie występ",
   "home.heroTitle": "Znajdź najsłabsze ogniwo własnego argumentu.",

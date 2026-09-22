@@ -25,6 +25,7 @@
   "home.noPublishedDebates": "Nu a fost publicată încă nicio dezbatere.",
   "home.verdictUnavailable": "Verdict indisponibil",
   "home.models.one": "{count} model",
+  "home.models.few": "{count} modele",
   "home.models.other": "{count} modele",
   "home.practiceEyebrow": "Exersare, nu spectacol",
   "home.heroTitle": "Găsiți cea mai slabă verigă din propriul argument.",

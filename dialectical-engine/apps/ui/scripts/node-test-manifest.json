@@ -10,6 +10,7 @@
   "components/modeTransition.test.mjs",
   "scripts/next-config-csp.test.mjs",
   "scripts/no-hardcoded-english.test.mjs",
+  "scripts/server-client-boundary.source-test.mjs",
   "lib/i18n/translate.test.mjs",
   "lib/i18n/catalog.test.mjs",
   "lib/i18n/auth.test.mjs",

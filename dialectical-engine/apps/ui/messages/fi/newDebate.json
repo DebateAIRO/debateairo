@@ -51,7 +51,7 @@
   "newDebate.branchingHint": "Puolesta- ja vastaan-alasolmut väitettä kohden",
   "newDebate.concurrency": "Rinnakkaisuus",
   "newDebate.concurrencyHint": "Rinnakkain suoritettavat mallit",
-  "newDebate.maxTokens": "Tunnisteiden enimmäismäärä",
+  "newDebate.maxTokens": "Tokenien enimmäismäärä",
   "newDebate.maxTokensHint": "Tuotettua argumenttia kohden",
   "newDebate.roleOverrides": "Käyttäjä ei voi muokata roolien ohituksia — mallien roolimääritys on kohdassa",
   "newDebate.settings": "Asetukset →",

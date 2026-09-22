@@ -25,6 +25,8 @@
   "home.noPublishedDebates": "Zatiaľ nebola uverejnená žiadna diskusia.",
   "home.verdictUnavailable": "Verdikt nie je k dispozícii",
   "home.models.one": "{count} model",
+  "home.models.few": "{count} modely",
+  "home.models.many": "{count} modelu",
   "home.models.other": "Počet modelov: {count}",
   "home.practiceEyebrow": "Nácvik, nie predstavenie",
   "home.heroTitle": "Nájdite najslabší článok vo vlastnom argumente.",
