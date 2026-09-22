@@ -155,6 +155,19 @@ export class CustodyGroupUnresolvedError extends CryptoError {
   }
 }
 
+/**
+ * V-9(2), ruled 2026-09-22: a provider credential file exists and satisfies the
+ * custody contract, but its contents are not one printable `authorization`
+ * header line. Its message is the code and NOTHING else — not the path, not a
+ * length, not a prefix of the value — because the value is the credential.
+ */
+export class ProviderCredentialInvalidError extends CryptoError {
+  constructor() {
+    super("PROVIDER_CREDENTIAL_FILE_INVALID", "PROVIDER_CREDENTIAL_FILE_INVALID");
+    this.name = "ProviderCredentialInvalidError";
+  }
+}
+
 /** The handle's master copy has been zeroed; it can never be revived. */
 export class KekDestroyedError extends CryptoError {
   constructor() {
@@ -687,9 +700,16 @@ export function custodyAccepts(
  * The bytes land in an exactly-sized `allocUnsafeSlow` buffer (L2-F7) so the
  * caller's `fill(0)` really erases them instead of a shared pool slab.
  */
-function readCustodyKey(
+function readCustodyFile(
   path: string,
-  code: "KEK_CUSTODY_INVALID" | "SECRET_CUSTODY_INVALID"
+  code: "KEK_CUSTODY_INVALID" | "SECRET_CUSTODY_INVALID",
+  /**
+   * V-9(2): a 32-byte key file pins an EXACT size; a provider credential is a
+   * vendor's text token, so it pins a ceiling instead. Everything else about
+   * the contract — `O_NOFOLLOW`, facts from the descriptor, `custodyAccepts`,
+   * the exactly-sized `allocUnsafeSlow` buffer — is the same for both.
+   */
+  size: Readonly<{ exact: number } | { maximum: number; refuseOversize: () => Error }>
 ): Buffer {
   let descriptor: number;
   try {
@@ -722,13 +742,20 @@ function readCustodyKey(
       {
         callerUid: typeof process.getuid === "function" ? process.getuid() : undefined,
         custodyGid: currentCustodyGid(),
-        expectedSize: KEY_BYTES
+        expectedSize: "exact" in size ? size.exact : undefined
       }
     )) {
       throw new CryptoCustodyError(code);
     }
-    material = Buffer.allocUnsafeSlow(KEY_BYTES);
-    if (readSync(descriptor, material, 0, KEY_BYTES, 0) !== KEY_BYTES) {
+    // A bounded file is checked BEFORE a byte of it is read, so an over-long
+    // one can never be loaded and never reach a message. It is the caller's own
+    // content refusal: permissions were fine, the contents are not.
+    const bytes = "exact" in size ? size.exact : metadata.size;
+    if (!("exact" in size) && (bytes < 1 || bytes > size.maximum)) {
+      throw size.refuseOversize();
+    }
+    material = Buffer.allocUnsafeSlow(bytes);
+    if (readSync(descriptor, material, 0, bytes, 0) !== bytes) {
       throw new CryptoCustodyError(code);
     }
     return material;
@@ -738,6 +765,8 @@ function readCustodyKey(
     // it keeps its own code all the way out so the boot message names it.
     if (error instanceof CustodyGroupUnresolvedError) throw error;
     if (error instanceof CryptoCustodyError || error instanceof KekUnresolvedError) throw error;
+    // V-9(2): a bounded credential file's own content refusal keeps its name too.
+    if (error instanceof ProviderCredentialInvalidError) throw error;
     throw new CryptoCustodyError(code);
   } finally {
     try {
@@ -757,7 +786,7 @@ export function loadKek(pathOrBuffer: string | Uint8Array): KekHandle {
       throw new KekUnresolvedError();
     }
   }
-  const material = readCustodyKey(pathOrBuffer, "KEK_CUSTODY_INVALID");
+  const material = readCustodyFile(pathOrBuffer, "KEK_CUSTODY_INVALID", { exact: KEY_BYTES });
   try {
     return makeKekHandle(material);
   } catch {
@@ -767,8 +796,50 @@ export function loadKek(pathOrBuffer: string | Uint8Array): KekHandle {
   }
 }
 
+/**
+ * V-9(2). A provider credential is text, not 32 raw bytes, so it is bounded
+ * rather than sized exactly. Four kilobytes is far above any vendor's token and
+ * far below anything worth loading by accident.
+ */
+const MAX_PROVIDER_CREDENTIAL_BYTES = 4_096;
+/** One header line: printable US-ASCII only, no control bytes, nothing to fold. */
+const PRINTABLE_HEADER_LINE = /^[\x20-\x7e]+$/u;
+
+/**
+ * V-9(2) / task 10b — the hosted deployment's provider credential, read from a
+ * FILE under the SAME custody contract as every key file (V-19: owner-only, or
+ * the custody group), and returned as the `authorization` header value.
+ *
+ * The file holds the header value verbatim, with at most one trailing newline —
+ * `Bearer ` and the vendor's token, or whatever scheme that vendor's OpenAI-
+ * compatible endpoint documents. Nothing is inferred and nothing is repaired:
+ * a value that is not one printable line is refused, so a stray space or a
+ * second line can never be sent to a vendor as if it were a credential.
+ *
+ * The bytes land in an exactly-sized `allocUnsafeSlow` buffer and are zeroed
+ * before this returns. The header STRING that comes back cannot be zeroed —
+ * JavaScript strings are immutable — so it is built once here, held by the
+ * gateway that needs it, and never written anywhere.
+ */
+export function readCustodyAuthorizationHeader(path: string): string {
+  const material = readCustodyFile(path, "SECRET_CUSTODY_INVALID", {
+    maximum: MAX_PROVIDER_CREDENTIAL_BYTES,
+    refuseOversize: () => new ProviderCredentialInvalidError()
+  });
+  try {
+    const decoded = material.toString("latin1");
+    const value = decoded.endsWith("\n") ? decoded.slice(0, -1) : decoded;
+    if (!PRINTABLE_HEADER_LINE.test(value) || value !== value.trim()) {
+      throw new ProviderCredentialInvalidError();
+    }
+    return value;
+  } finally {
+    material.fill(0);
+  }
+}
+
 export function loadSecretKey(path: string): Buffer {
-  const material = readCustodyKey(path, "SECRET_CUSTODY_INVALID");
+  const material = readCustodyFile(path, "SECRET_CUSTODY_INVALID", { exact: KEY_BYTES });
   try {
     return copyKey(material);
   } catch (error) {
@@ -1669,7 +1740,7 @@ async function listRecordRefs(
 
 /**
  * The async half of the custody contract (L2-F6), for the wrapped-key JSON
- * records the three file stores hold. Same discipline as `readCustodyKey`
+ * records the three file stores hold. Same discipline as `readCustodyFile`
  * minus the 32-byte size rule, because these records are JSON envelopes:
  * O_NOFOLLOW, decisions taken from the opened descriptor, exactly one link,
  * 0600 inside a 0700 directory, both owned by this process.

@@ -5,13 +5,19 @@ import {
   ContentCipher,
   FileRunContentKeyStore,
   FileUserDekStore,
-  loadKek
+  loadKek,
+  readCustodyAuthorizationHeader
 } from "@debateai/crypto";
 import { configureContentEncryption, createPool, RunRepository } from "@debateai/db";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { assertHostedCostEnvelopesSealed, loadRunnerEnvironment } from "@debateai/register";
 import { readDeploymentMakerCapability } from "@debateai/critique";
-import { assertDeploymentProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets } from "@debateai/providers";
+import {
+  assertDeploymentProviderTargets,
+  observeProviderTarget,
+  parseProviderDiscoveryTargets,
+  resolveProviderTargetCredentials
+} from "@debateai/providers";
 import { createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, WalkingSkeletonRunner } from "./index.js";
 import { createRunnerProviderTopology } from "./provider-topology.js";
 import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
@@ -54,13 +60,20 @@ const deploymentMakers = await readDeploymentMakerCapability(pool, environment.R
 if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
   throw new TypeError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
 }
-const providerTargets = parseProviderDiscoveryTargets(
+const declaredProviderTargets = parseProviderDiscoveryTargets(
   environment.PROVIDER_DISCOVERY_TARGETS_JSON,
   deploymentMakers.configuredProviders
 );
-assertDeploymentProviderTargets(providerTargets, {
+// The mode decision is taken on what the operator DECLARED, before any credential
+// is resolved: that is what makes an inline `authorization_header` refusable in
+// hosted mode even though a resolved target legitimately carries a header.
+assertDeploymentProviderTargets(declaredProviderTargets, {
   mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
 });
+// V-9(2): each vendor's credential file, read once under the custody contract.
+const providerTargets = resolveProviderTargetCredentials(
+  declaredProviderTargets, readCustodyAuthorizationHeader
+);
 const hatchet = new Hatchet({
   token: environment.HATCHET_CLIENT_TOKEN, host_port: environment.HATCHET_HOST_PORT,
   api_url: environment.HATCHET_API_URL, tenant_id: environment.HATCHET_TENANT_ID,

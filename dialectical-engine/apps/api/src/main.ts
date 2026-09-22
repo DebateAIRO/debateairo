@@ -12,7 +12,8 @@ import {
   FileUserDekStore,
   loadKek,
   loadSecretKey,
-  PublicationCipher
+  PublicationCipher,
+  readCustodyAuthorizationHeader
 } from "@debateai/crypto";
 import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportOwnContextRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
@@ -60,7 +61,8 @@ import { RecoveryStartService } from "./recovery.js";
 import {
   assertDeploymentProviderTargets,
   createProviderDiscoveryResolver,
-  parseProviderDiscoveryTargets
+  parseProviderDiscoveryTargets,
+  resolveProviderTargetCredentials
 } from "./provider-discovery.js";
 import { riskSignalFailureIdentity } from "./risk-signal-identity.js";
 import { createSupportKeyPort } from "./support/keys.js";
@@ -189,14 +191,20 @@ const structuralInputs = await readStructuralCeilingPolicyInputs(pool, environme
  */
 const envelopeFormulaInputs = await readEnvelopeFormulaInputs(pool, environment.REGISTER_VERSION);
 const probes = new ProviderProbeRepository(pool);
-const providerDiscoveryTargets = parseProviderDiscoveryTargets(
+const declaredProviderTargets = parseProviderDiscoveryTargets(
   environment.PROVIDER_DISCOVERY_TARGETS_JSON,
   deploymentMakers.configuredProviders
 );
-// V-9(c): the same mode decision the runner takes, over the same target set.
-assertDeploymentProviderTargets(providerDiscoveryTargets, {
+// V-9(c): the same mode decision the runner takes, over the same target set, and
+// taken on the DECLARED targets — before any credential file is resolved.
+assertDeploymentProviderTargets(declaredProviderTargets, {
   mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
 });
+// V-9(2): the ask-time health probe needs the same credential the runner uses, so
+// it resolves each vendor's file through the same custody-checked seam.
+const providerDiscoveryTargets = resolveProviderTargetCredentials(
+  declaredProviderTargets, readCustodyAuthorizationHeader
+);
 const resolveProviderPanel = createProviderDiscoveryResolver({
   configuredProviders: deploymentMakers.configuredProviders,
   targets: providerDiscoveryTargets,

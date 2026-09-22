@@ -138,6 +138,13 @@ export type ProviderDiscoveryTarget = Readonly<{
   baseUrl: string;
   model: string;
   authorizationHeader?: string;
+  /**
+   * V-9(2) / task 10b: an absolute path to the vendor's credential FILE, one per
+   * vendor per environment. It is the DECLARED form; `resolveProviderTargetCredentials`
+   * turns it into `authorizationHeader` in memory and drops the path, so nothing
+   * downstream can re-open it and no gateway carries a file name.
+   */
+  authorizationFile?: string;
 }>;
 
 function requiredProviderTargetText(value: unknown, code: string): string {
@@ -205,7 +212,7 @@ export function parseProviderDiscoveryTargets(
     }
     const row = candidate as Readonly<Record<string, unknown>>;
     if (Object.keys(row).some((key) => ![
-      "provider_ref", "base_url", "model", "authorization_header"
+      "provider_ref", "base_url", "model", "authorization_header", "authorization_file"
     ].includes(key))) {
       throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
     }
@@ -224,12 +231,30 @@ export function parseProviderDiscoveryTargets(
           row.authorization_header,
           "PROVIDER_DISCOVERY_AUTHORIZATION_INVALID"
         );
+    // V-9(2): a vendor's credential is named ONE way. Two declarations are an
+    // operator's half-finished migration off the inline form, and guessing which
+    // one is live is exactly how a retired key keeps being used.
+    if (authorizationHeader !== undefined && row.authorization_file !== undefined) {
+      throw new TypeError("PROVIDER_DISCOVERY_AUTHORIZATION_CONFLICT");
+    }
+    const authorizationFile = row.authorization_file === undefined
+      ? undefined
+      : requiredProviderTargetText(
+          row.authorization_file,
+          "PROVIDER_DISCOVERY_AUTHORIZATION_FILE_INVALID"
+        );
+    // Absolute, because a credential resolved against whatever directory the
+    // unit happened to start in is not a credential anyone can audit.
+    if (authorizationFile !== undefined && !authorizationFile.startsWith("/")) {
+      throw new TypeError("PROVIDER_DISCOVERY_AUTHORIZATION_FILE_INVALID");
+    }
     targetsByRef.set(providerRef, Object.freeze({
       providerRef,
       maker,
       baseUrl: normalizedProviderBaseUrl(row.base_url),
       model: requiredProviderTargetText(row.model, "PROVIDER_DISCOVERY_TARGET_MODEL_INVALID"),
-      ...(authorizationHeader === undefined ? {} : { authorizationHeader })
+      ...(authorizationHeader === undefined ? {} : { authorizationHeader }),
+      ...(authorizationFile === undefined ? {} : { authorizationFile })
     }));
   }
   if (targetsByRef.size !== configuredByRef.size) {
@@ -312,6 +337,66 @@ export function assertDeploymentProviderTargets(
     return;
   }
   assertProductionProviderTargets(targets, deployment.nodeEnv);
+}
+
+/** The refusal codes `resolveProviderTargetCredentials` will repeat; anything else is UNKNOWN. */
+const PROVIDER_CREDENTIAL_REFUSAL_CODES = Object.freeze([
+  "SECRET_CUSTODY_INVALID",
+  "KEK_UNRESOLVED",
+  "CUSTODY_GROUP_UNRESOLVED",
+  "PROVIDER_CREDENTIAL_FILE_INVALID"
+] as const);
+
+/** One printable header line — the same shape `@debateai/crypto` enforces on the file. */
+const PRINTABLE_HEADER_LINE = /^[\x20-\x7e]+$/u;
+
+function providerCredentialRefusalCode(error: unknown): string {
+  const code = (error as Readonly<{ code?: unknown }>)?.code;
+  return typeof code === "string"
+    && (PROVIDER_CREDENTIAL_REFUSAL_CODES as readonly string[]).includes(code)
+    ? code
+    : "UNKNOWN";
+}
+
+/**
+ * V-9(2) / task 10b — the ONE place a declared credential FILE becomes an
+ * in-memory `authorization` header.
+ *
+ * `readAuthorizationHeader` is the seam: the shipped composition roots pass
+ * `readCustodyAuthorizationHeader` from `@debateai/crypto`, so the file is read
+ * under the same custody contract as every key file and the bytes are zeroed
+ * after the header is built. Nothing here opens a file, which is what keeps this
+ * decision testable without one.
+ *
+ * The resolved target DROPS `authorizationFile`: after this, no gateway, probe,
+ * log line or error carries a credential path, and nothing downstream can re-open
+ * it. A refusal names the provider ref and a code from a CLOSED set — never the
+ * path, never the thrown message, never a byte of the credential.
+ */
+export function resolveProviderTargetCredentials(
+  targets: readonly ProviderDiscoveryTarget[],
+  readAuthorizationHeader: (path: string) => string
+): readonly ProviderDiscoveryTarget[] {
+  return Object.freeze(targets.map((target) => {
+    if (target.authorizationFile === undefined) return target;
+    const { authorizationFile, ...rest } = target;
+    let authorizationHeader: string;
+    try {
+      authorizationHeader = readAuthorizationHeader(authorizationFile);
+    } catch (error) {
+      throw new TypeError(
+        `PROVIDER_AUTHORIZATION_FILE_UNUSABLE:${target.providerRef}:${providerCredentialRefusalCode(error)}`
+      );
+    }
+    if (typeof authorizationHeader !== "string"
+      || !PRINTABLE_HEADER_LINE.test(authorizationHeader)
+      || authorizationHeader !== authorizationHeader.trim()) {
+      throw new TypeError(
+        `PROVIDER_AUTHORIZATION_FILE_UNUSABLE:${target.providerRef}:PROVIDER_CREDENTIAL_FILE_INVALID`
+      );
+    }
+    return Object.freeze({ ...rest, authorizationHeader });
+  }));
 }
 
 export interface ProviderAdapterRegistration {

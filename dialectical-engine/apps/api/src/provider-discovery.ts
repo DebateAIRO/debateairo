@@ -7,7 +7,8 @@ export {
   assertDeploymentProviderTargets,
   assertHostedProviderTargets,
   assertProductionProviderTargets,
-  parseProviderDiscoveryTargets
+  parseProviderDiscoveryTargets,
+  resolveProviderTargetCredentials
 } from "@debateai/providers";
 
 export type ProviderDiscoveryProbeStore = Readonly<{
