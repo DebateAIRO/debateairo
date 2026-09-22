@@ -374,6 +374,7 @@ packages/evaluator/src/public-aggregate-provider.ts
 packages/evidence/src/index.ts
 packages/graph/src/index.ts
 packages/judgement/src/index.ts
+packages/judgement/src/prompts.ts
 packages/judgement/src/s04.ts
 packages/kernel/src/index.ts
 packages/ledger/src/index.ts
@@ -399,6 +400,8 @@ packages/obs-capture/src/zone/index.ts
 packages/obs-capture/src/zone/manifest.ts
 packages/propagation/src/index.ts
 packages/providers/src/index.ts
+packages/providers/src/prompt-frame.ts
+packages/providers/src/prompt-tripwire.ts
 packages/providers/src/provider-probe.ts
 packages/published-arithmetic/src/index.ts
 packages/register/src/algorithm-policy.ts
