@@ -1,0 +1,552 @@
+diff --git a/dialectical-engine/apps/api/src/index.ts b/dialectical-engine/apps/api/src/index.ts
+index 34db4a4f..3548ebe7 100644
+--- a/dialectical-engine/apps/api/src/index.ts
++++ b/dialectical-engine/apps/api/src/index.ts
+@@ -63,6 +63,7 @@ import type {
+   EvaluatorConsumerSelectionResult,
+   EvaluatorDevMenuView
+ } from "@debateai/evaluator";
++import type { EvaluatorRankingsView } from "../../../packages/evaluator/src/rankings.js";
+ import { Argon2InfrastructureError } from "@debateai/crypto";
+ import {
+   captureHandled,
+@@ -1052,6 +1053,7 @@ export const authorizationPolicyInventory = Object.freeze([
+   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
+   { route: "GET /v1/plan-tiers", auth: "user", resource: "plan-tier-rosters", action: "read" },
+   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
++  { route: "GET /v1/evaluator/rankings", auth: "user", resource: "evaluator", action: "read-rankings" },
+   { route: "GET /v1/dev/evaluator", auth: "operator", resource: "evaluator", action: "read" },
+   { route: "POST /v1/dev/evaluator/consumer-selection", auth: "operator", resource: "evaluator", action: "select-consumer" },
+   { route: "GET /v1/answers", auth: "user", resource: "run-owner", action: "list" },
+@@ -1172,6 +1174,7 @@ export interface ApiOptions {
+   readonly legacyRunClaim?: LegacyRunClaimApplication;
+   readonly allowedOrigin?: string;
+   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
++  readonly evaluatorRankings?: EvaluatorRankingsApplication;
+   readonly evaluatorDevMenuRegisterVersion?: number;
+   readonly evaluatorDevMenuClock?: () => Date;
+   readonly support?: SupportApplication;
+@@ -1187,6 +1190,10 @@ export interface EvaluatorDevMenuApplication {
+   }): Promise<EvaluatorConsumerSelectionResult>;
+ }
+ 
++export interface EvaluatorRankingsApplication {
++  readRankings(): Promise<EvaluatorRankingsView>;
++}
++
+ /**
+  * Marks a domain error that was observed while evaluating whether an ask may
+  * be admitted. Typed errors from deployment reads or persistence deliberately
+@@ -1854,6 +1861,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
+     return reply.send(DeploymentSchema.parse(await options.application.readDeployment(request.session)));
+   });
+ 
++  if (options.evaluatorRankings !== undefined) {
++    api.get("/v1/evaluator/rankings", routePolicy("GET /v1/evaluator/rankings"), async (_request, reply) => {
++      return reply.send(await options.evaluatorRankings!.readRankings());
++    });
++  }
++
+   if (options.evaluatorDevMenu !== undefined) {
+     if (!Number.isInteger(options.evaluatorDevMenuRegisterVersion)
+       || options.evaluatorDevMenuRegisterVersion! < 1) {
+diff --git a/dialectical-engine/docs/superpowers/plans/2026-09-13-evaluator-integration.md b/dialectical-engine/docs/superpowers/plans/2026-09-13-evaluator-integration.md
+new file mode 100644
+index 00000000..87297c2a
+--- /dev/null
++++ b/dialectical-engine/docs/superpowers/plans/2026-09-13-evaluator-integration.md
+@@ -0,0 +1,54 @@
++# Evaluator Integration Implementation Plan
++
++> **For agentic workers:** Use the Superpowers development and verification workflows. Steps use checkboxes for tracking.
++
++**Goal:** Automatically turn terminal debate metrics into useful, honest model rankings visible in settings.
++
++**Architecture:** Reuse the evaluator harvest and profile repositories in a separate numeric worker. Publish a completed-snapshot receipt and expose only that snapshot through a session-authenticated aggregate endpoint.
++
++**Tech Stack:** TypeScript, PostgreSQL, Fastify, React, Vitest, existing pnpm workspace.
++
++**Spec:** `docs/superpowers/specs/2026-09-13-evaluator-integration-design.md`
++
++## Global constraints
++
++- Preserve unrelated working-tree edits and explicit version-1 profile replay.
++- Keep numerical evaluation provider-free; use the evaluator database role.
++- Keep dispatch unbound and private run/content identifiers out of the rankings API.
++- Null domain means unclassified, not an invented global aggregate.
++
++## 1. Numeric refresh worker
++
++- [ ] Add a failing database test that inserts a terminal run and recorded judgement, invokes `runEvaluatorRefreshCycle({pool, strategy, asOf})`, and verifies observations, profiles and a completed receipt; repeat and expect `CURRENT` with no extra cells.
++- [ ] Add `includeReviewReasons: false` harvest mode; retain the run content lease but omit key preparation and review text reads.
++- [ ] Add migration `0062_evaluator_profile_refresh.sql`: append-only receipt and evaluator-worker execution grant for `core.run_private_content_is_live(uuid)`.
++- [ ] Implement a bounded cycle using a session advisory lock, existing reconciliation, `PostgresEvaluatorProfileRepository.deriveAndPersist`, and a receipt appended after success.
++- [ ] Add standalone CLI with `--once`, validated connection/configuration, readiness IPC, retrying non-overlapping polling, and signal-driven drain.
++- [ ] Test with `pnpm exec vitest run tests/integration/evaluator-refresh-database.test.ts` against temporary PostgreSQL.
++
++## 2. Honest version-2 scores
++
++- [ ] Write tests showing raw high tau, automatic agreement, and event truth do not confer higher capability ranks.
++- [ ] Preserve explicit v1 semantics; use v2 diagnostics for propensity and independent evidence for quality.
++- [ ] Verify scoring/profile persistence regression suites.
++
++## 3. Completed rankings surface
++
++- [ ] Add repository tests for exact snapshot joins, all model rows, and absence of stale retired metrics.
++- [ ] Implement `GET /v1/evaluator/rankings` using server-session authentication and numeric aggregate DTOs.
++- [ ] Render `ModelRankings` in the active account settings component with empty/loading/error states, refresh, capabilities, model versions, sample counts and intervals.
++- [ ] Verify HTTP permissions, frontend transport and render tests.
++
++## 4. Development lifecycle
++
++- [ ] Add the evaluator database principal while supporting existing credential-file upgrade shapes.
++- [ ] Enable the numeric read surface in development environment generation and validation.
++- [ ] Start, supervise and drain the evaluator child alongside the runner; pass only its own DB credential and required process configuration.
++- [ ] Enable the active settings rankings panel in the supervised development UI.
++- [ ] Verify credential/environment and lifecycle tests.
++
++## 5. Review and delivery
++
++- [ ] Run combined evaluator, API/UI and lifecycle tests, comparing typecheck diagnostics with baseline.
++- [ ] Independently review the final patch, resolve reportable issues and rerun affected tests.
++- [ ] Update evaluator README with startup, dimensions, missing evidence and deployment limitations.
+diff --git a/dialectical-engine/docs/superpowers/specs/2026-09-13-evaluator-integration-design.md b/dialectical-engine/docs/superpowers/specs/2026-09-13-evaluator-integration-design.md
+new file mode 100644
+index 00000000..e8e53ddc
+--- /dev/null
++++ b/dialectical-engine/docs/superpowers/specs/2026-09-13-evaluator-integration-design.md
+@@ -0,0 +1,21 @@
++# Debate model evaluator integration
++
++The existing evaluator is implemented but disconnected: worker exports have no process entry point or scheduler, profile derivation has no runtime caller, and the developer menu is in an unused settings component behind a retired operator policy.
++
++## Intended behavior
++
++A separate worker reconciles terminal debate runs, meters recorded calls, and derives append-only model profiles and rankings. It runs automatically with the development stack and also supports a standalone one-shot command. Failed runs remain isolated and use the existing three-failure harvest circuit breaker. Polling catches runs completed before startup and later settlement evidence. No evaluator outage changes a debate result.
++
++Numeric evaluation does not require an LLM, private content keys, or paid calls. The harvest reads recorded numeric facts and skips review prose while retaining the existing erasure/content lease. It uses the evaluator worker database principal, never the product runtime principal. A new migration grants only the required liveness predicate and checkpoint permissions.
++
++A refresh receipt names the exact observation sequence, derivation version, and completed snapshot timestamp. Unchanged input does not create repeated profiles. The signed-in rankings endpoint returns only model aggregates from the latest completed snapshot. It does not expose runs, questions, private artifacts, receipts, or other users' identifiers. It is shown in the active settings screen. Existing operator write routes stay restricted.
++
++## Scoring
++
++Version 2 preserves replay of explicit version-1 formulas. Argument strength is labeled a reasoning proxy. A high judgement probability is not evidence of judging skill; agreeing with an author is not evidence of reviewing skill. Those raw quantities may appear as process diagnostics but must not win capability rankings. Independent blind grades support judging quality. Settled forecast accuracy uses the recorded forecast against the resolved event, not the truth value alone. Missing evidence stays missing, and sample counts plus available uncertainty intervals accompany scores. Unclassified domains are labeled honestly.
++
++Ranking is reporting only. The existing dispatch allocator remains unbound because this request concerns measurement and comparison, not a replacement selection policy. Optional local-model tagging and blind grading retain their existing isolated entry points; numerical evaluation works when that local provider is absent.
++
++## Validation
++
++Use focused scoring regression tests, a real temporary PostgreSQL end-to-end terminal-to-profile test under the evaluator role, repeated/concurrent refresh checks, authenticated HTTP read tests, UI rendering, and development process lifecycle tests. Compare repository typecheck diagnostics against the pre-existing baseline. Preserve unrelated working-tree changes.
+diff --git a/dialectical-engine/tests/architecture/dev-database-principals.test.ts b/dialectical-engine/tests/architecture/dev-database-principals.test.ts
+index 4bc14168..016d1d7f 100644
+--- a/dialectical-engine/tests/architecture/dev-database-principals.test.ts
++++ b/dialectical-engine/tests/architecture/dev-database-principals.test.ts
+@@ -18,15 +18,18 @@ describe("DEV-03 development database principal provisioning source contract", (
+     expect(cli).not.toMatch(/console\.(?:log|error)\([^)]*(?:DATABASE_URL|password)/s);
+   });
+ 
+-  it("keeps all eleven fixed wrappers least-privileged and file-backed", async () => {
++  it("keeps all twelve fixed wrappers least-privileged and file-backed", async () => {
+     const source = await readFile("apps/runner/src/dev-database-principals.ts", "utf8");
+-    expect(source.match(/roleName: "debateai_dev_[a-z_]+"/g)).toHaveLength(11);
++    expect(source.match(/roleName: "debateai_dev_[a-z_]+"/g)).toHaveLength(12);
+     expect(source).toContain(`roleName: "debateai_dev_support",
+     capabilityRole: "debateai_support",
+     environmentKey: "SUPPORT_DATABASE_URL"`);
+     expect(source).toContain(`roleName: "debateai_dev_support_config_operator",
+     capabilityRole: "debateai_support_config_operator",
+     environmentKey: "SUPPORT_CONFIG_OPERATOR_DATABASE_URL"`);
++    expect(source).toContain(`roleName: "debateai_dev_evaluator_worker",
++    capabilityRole: "debateai_evaluator_worker",
++    environmentKey: "EVALUATOR_DATABASE_URL"`);
+     expect(source).toContain("LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS");
+     expect(source).toContain("SET LOCAL password_encryption='scram-sha-256'");
+     expect(source).toContain("DEV_DATABASE_PRINCIPAL_ADMIN_REQUIRED");
+diff --git a/dialectical-engine/tests/integration/dev-api-environment.test.ts b/dialectical-engine/tests/integration/dev-api-environment.test.ts
+index 50002302..02de5fa2 100644
+--- a/dialectical-engine/tests/integration/dev-api-environment.test.ts
++++ b/dialectical-engine/tests/integration/dev-api-environment.test.ts
+@@ -178,7 +178,11 @@ describe("DEV-09 private local API environment", () => {
+       .toContain("debateai_dev_evaluator_api");
+     expect(environment.get("EVALUATOR_DEV_MENU_DATABASE_URL"))
+       .not.toBe(environment.get("DATABASE_URL"));
+-    expect(environment.get("EVALUATOR_DEV_MENU_ENABLED")).toBe("false");
++    expect(environment.get("EVALUATOR_DATABASE_URL"))
++      .toContain("debateai_dev_evaluator_worker");
++    expect(environment.get("EVALUATOR_DATABASE_URL"))
++      .not.toBe(environment.get("DATABASE_URL"));
++    expect(environment.get("EVALUATOR_DEV_MENU_ENABLED")).toBe("true");
+     expect(JSON.parse(environment.get("PROVIDER_DISCOVERY_TARGETS_JSON")!)).toEqual(
+       TEST_DEVELOPMENT_PROVIDER_DOCUMENT.providers.map((provider) => ({
+         provider_ref: provider.provider_ref,
+diff --git a/dialectical-engine/tests/integration/dev-ui-process.test.ts b/dialectical-engine/tests/integration/dev-ui-process.test.ts
+index 5c42dd00..6b728b1f 100644
+--- a/dialectical-engine/tests/integration/dev-ui-process.test.ts
++++ b/dialectical-engine/tests/integration/dev-ui-process.test.ts
+@@ -70,7 +70,8 @@ describe("DEV-10C private local UI process", () => {
+       DIALECTICAL_UI_HOST: "127.0.0.1",
+       PORT: "3001",
+       DIALECTICAL_API_BASE: "http://127.0.0.1:8790",
+-      NEXT_PUBLIC_API_BASE: "/api"
++      NEXT_PUBLIC_API_BASE: "/api",
++      NEXT_PUBLIC_EVALUATOR_DEV_MENU_ENABLED: "true"
+     });
+     await uiProcess.stop();
+     expect(runtime.uiChild.terminate).toHaveBeenCalledTimes(1);
+diff --git a/dialectical-engine/tests/unit/dev-evaluator-process.test.ts b/dialectical-engine/tests/unit/dev-evaluator-process.test.ts
+new file mode 100644
+index 00000000..4d54ed6f
+--- /dev/null
++++ b/dialectical-engine/tests/unit/dev-evaluator-process.test.ts
+@@ -0,0 +1,132 @@
++import { describe, expect, it, vi } from "vitest";
++import {
++  startDevelopmentEvaluatorProcess,
++  type DevelopmentEvaluatorChild,
++  type DevelopmentEvaluatorProcessOperations
++} from "../../apps/runner/src/dev-evaluator-process.js";
++
++function deferred<T>() {
++  let resolve!: (value: T) => void;
++  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise; });
++  return { promise, resolve };
++}
++
++function apiEnvironment(): Readonly<Record<string, string>> {
++  return Object.freeze({
++    EVALUATOR_DATABASE_URL:
++      "postgresql://debateai_dev_evaluator_worker:opaque@127.0.0.1:55432/debateai",
++    REGISTER_VERSION: "424242",
++    DATABASE_URL: "postgresql://debateai_dev_runtime:secret@127.0.0.1:55432/debateai",
++    KEK_PATH: "/private/dev/kek.bin",
++    HATCHET_CLIENT_TOKEN: "secret-token"
++  });
++}
++
++function operations(input: Readonly<{
++  ready?: unknown;
++  exitFirst?: boolean;
++  startError?: Error;
++  apiEnvironment?: Readonly<Record<string, string>>;
++}> = {}): DevelopmentEvaluatorProcessOperations & Readonly<{
++  terminate: ReturnType<typeof vi.fn>;
++  environment: Readonly<Record<string, string>>[];
++}> {
++  const ready = deferred<unknown>();
++  const exited = deferred<Readonly<{ code: number | null; signal: NodeJS.Signals | null }>>();
++  const terminate = vi.fn(async () => {
++    exited.resolve(Object.freeze({ code: 0, signal: "SIGTERM" }));
++  });
++  const environment: Readonly<Record<string, string>>[] = [];
++  const child: DevelopmentEvaluatorChild = Object.freeze({
++    ready: ready.promise,
++    exited: exited.promise,
++    terminate
++  });
++  return {
++    terminate,
++    environment,
++    loadApiEnvironment: vi.fn(async () => input.apiEnvironment ?? apiEnvironment()),
++    startEvaluator: vi.fn((values) => {
++      if (input.startError !== undefined) throw input.startError;
++      environment.push(values);
++      if (input.exitFirst === true) {
++        exited.resolve(Object.freeze({ code: 1, signal: null }));
++      } else {
++        ready.resolve(input.ready ?? Object.freeze({ kind: "DEBATEAI_EVALUATOR_READY" }));
++      }
++      return child;
++    })
++  };
++}
++
++describe("development evaluator process lifecycle", () => {
++  it("accepts exact readiness and passes only the bounded evaluator environment", async () => {
++    const runtime = operations();
++    const evaluator = await startDevelopmentEvaluatorProcess({
++      repositoryRoot: "/workspace",
++      commandEnvironment: Object.freeze({
++        PATH: "/usr/bin",
++        HOME: "/private/home",
++        TMPDIR: "/private/tmp",
++        AWS_SECRET_ACCESS_KEY: "must-not-pass",
++        DATABASE_URL: "must-not-pass"
++      }),
++      operations: runtime
++    });
++
++    expect(evaluator.receipt).toEqual({ state: "READY", registerVersion: "424242" });
++    expect(runtime.environment).toEqual([{
++      PATH: "/usr/bin",
++      HOME: "/private/home",
++      TMPDIR: "/private/tmp",
++      EVALUATOR_DATABASE_URL:
++        "postgresql://debateai_dev_evaluator_worker:opaque@127.0.0.1:55432/debateai",
++      REGISTER_VERSION: "424242"
++    }]);
++    await Promise.all([evaluator.stop(), evaluator.stop()]);
++    expect(runtime.terminate).toHaveBeenCalledTimes(1);
++  });
++
++  it.each([
++    ["wrong kind", { kind: "WRONG" }],
++    ["missing receipt", null],
++    ["additional receipt data", { kind: "DEBATEAI_EVALUATOR_READY", registerVersion: "424242" }]
++  ] as const)("terminates on %s readiness", async (_label, ready) => {
++    const runtime = operations({ ready });
++    await expect(startDevelopmentEvaluatorProcess({
++      repositoryRoot: "/workspace", commandEnvironment: {}, operations: runtime
++    })).rejects.toThrow("DEV_EVALUATOR_PROCESS_READINESS_INVALID");
++    expect(runtime.terminate).toHaveBeenCalledTimes(1);
++  });
++
++  it("refuses missing or aliased evaluator credentials before spawning", async () => {
++    for (const environment of [
++      { REGISTER_VERSION: "424242" },
++      {
++        REGISTER_VERSION: "424242",
++        EVALUATOR_DATABASE_URL:
++          "postgresql://debateai_dev_runtime:opaque@127.0.0.1:55432/debateai"
++      }
++    ]) {
++      const runtime = operations({ apiEnvironment: environment });
++      await expect(startDevelopmentEvaluatorProcess({
++        repositoryRoot: "/workspace", commandEnvironment: {}, operations: runtime
++      })).rejects.toThrow("DEV_EVALUATOR_PROCESS_START_FAILED");
++      expect(runtime.environment).toEqual([]);
++    }
++  });
++
++  it("terminates an early exit and wraps synchronous spawn failure", async () => {
++    const exited = operations({ exitFirst: true });
++    await expect(startDevelopmentEvaluatorProcess({
++      repositoryRoot: "/workspace", commandEnvironment: {}, operations: exited
++    })).rejects.toThrow("DEV_EVALUATOR_PROCESS_EXITED");
++    expect(exited.terminate).toHaveBeenCalledTimes(1);
++
++    const failed = operations({ startError: new Error("sensitive spawn detail") });
++    await expect(startDevelopmentEvaluatorProcess({
++      repositoryRoot: "/workspace", commandEnvironment: {}, operations: failed
++    })).rejects.toThrow("DEV_EVALUATOR_PROCESS_START_FAILED");
++    expect(failed.terminate).not.toHaveBeenCalled();
++  });
++});
+diff --git a/dialectical-engine/tests/unit/evaluator-profiles.test.ts b/dialectical-engine/tests/unit/evaluator-profiles.test.ts
+index 91c8fdc7..6c530e54 100644
+--- a/dialectical-engine/tests/unit/evaluator-profiles.test.ts
++++ b/dialectical-engine/tests/unit/evaluator-profiles.test.ts
+@@ -29,6 +29,7 @@ function observation(
+     itemKey: null,
+     subjectMaker: null,
+     authorMaker: null,
++    posterior: null,
+     observedAt: new Date("2026-08-15T12:00:00.000Z"),
+     atSequence: 1,
+     ...rest
+@@ -78,6 +79,119 @@ describe("deterministic evaluator profile derivation", () => {
+     expect(v2.prowessCells[0]!.derivationVersion).toBe(2);
+     expect(v2.prowessCells[0]!.derivationHash).not.toBe(v1.prowessCells[0]!.derivationHash);
+   });
++
++  it("derives v2 quality ranks only from evidence that measures quality", () => {
++    const result = deriveEvaluatorProfiles({
++      observations: [
++        observation({ observationId: "strength:a:1", runId: "run:a", value: 0.2, itemKey: "node:1" }),
++        observation({ observationId: "strength:a:2", runId: "run:a", value: 0.8, itemKey: "node:2", atSequence: 2 }),
++        observation({ observationId: "strength:b", runId: "run:b", value: 1, itemKey: "node:3", atSequence: 3 }),
++        observation({
++          observationId: "settlement:false-correct", runId: "run:c", value: 0,
++          truthBasis: "SETTLEMENT", sourceKind: "EXTERNAL_ANSWER_OUTCOME", posterior: 0.1,
++          atSequence: 4
++        }),
++        observation({
++          observationId: "tau:judge", runId: "run:d", provider: "provider:judge",
++          modelId: "model:judge", step: "JUDGING", sourceKind: "REDUCED_JUDGEMENT",
++          metric: "judging.tau.v1", value: 0.9, atSequence: 5
++        }),
++        observation({
++          observationId: "grade:judge", runId: "run:d", provider: "provider:judge",
++          modelId: "model:judge", step: "JUDGING", sourceKind: "BLIND_JUDGE_GRADE",
++          truthBasis: "BLIND_ADDON", metric: "judging.blind-grade.v1", value: 0.7,
++          atSequence: 6
++        }),
++        observation({
++          observationId: "review:agree", runId: "run:e", provider: "provider:reviewer",
++          modelId: "model:reviewer", step: "REVIEWING", sourceKind: "NODE_REVIEW",
++          metric: "reviewing.outcome.v1", value: null, outcome: "agree", authorMaker: "maker:author",
++          atSequence: 7
++        })
++      ],
++      asOf: AS_OF,
++      derivationVersion: 2
++    });
++
++    expect(result.prowessCells.map((cell) => ({
++      modelId: cell.modelId, metric: cell.metric, value: cell.value, n: cell.n
++    }))).toEqual([
++      { modelId: "model:author", metric: "prowess.consensus-strength.v1", value: 0.75, n: 2 },
++      { modelId: "model:author", metric: "prowess.forecast-accuracy.v2", value: 0.99, n: 1 },
++      { modelId: "model:judge", metric: "process.judging-tau.v2", value: 0.9, n: 1 },
++      { modelId: "model:judge", metric: "prowess.judging-quality.v2", value: 0.7, n: 1 },
++      { modelId: "model:reviewer", metric: "process.review-agreement.v2", value: 1, n: 1 }
++    ]);
++    expect(result.prowessRanks.map((rank) => ({ modelId: rank.modelId, metric: rank.metric })))
++      .toEqual([
++        { modelId: "model:author", metric: "prowess.consensus-strength.v1" },
++        { modelId: "model:author", metric: "prowess.forecast-accuracy.v2" },
++        { modelId: "model:judge", metric: "prowess.judging-quality.v2" }
++      ]);
++    expect(result.judgeRanks).toEqual([
++      expect.objectContaining({
++        modelId: "model:judge", metric: "judging.quality-rank.v2", score: 0.7, n: 1,
++        intervalLower: 0, intervalUpper: 1
++      })
++    ]);
++  });
++
++  it("does not rank unsupported v2 judging, reviewing, or settlement observations", () => {
++    const result = deriveEvaluatorProfiles({
++      observations: [
++        observation({
++          observationId: "tau", runId: "run:1", step: "JUDGING",
++          sourceKind: "REDUCED_JUDGEMENT", value: 0.95
++        }),
++        observation({
++          observationId: "review", runId: "run:1", step: "REVIEWING",
++          sourceKind: "NODE_REVIEW", value: null, outcome: "agree", authorMaker: "maker:author",
++          atSequence: 2
++        }),
++        observation({
++          observationId: "settlement:no-posterior", runId: "run:1", sourceKind: "EXTERNAL_ANSWER_OUTCOME",
++          truthBasis: "SETTLEMENT", value: 1, posterior: null, atSequence: 3
++        })
++      ],
++      asOf: AS_OF,
++      derivationVersion: 2
++    });
++
++    expect(result.prowessCells.map((cell) => cell.metric)).toEqual([
++      "process.judging-tau.v2", "process.review-agreement.v2"
++    ]);
++    expect(result.judgeRanks).toEqual([]);
++    expect(result.prowessRanks).toEqual([]);
++  });
++
++  it("preserves the explicit v1 tau, agreement, and settlement ranking semantics", () => {
++    const result = deriveEvaluatorProfiles({
++      observations: [
++        observation({
++          observationId: "tau", runId: "run:1", step: "JUDGING",
++          sourceKind: "REDUCED_JUDGEMENT", value: 0.9
++        }),
++        observation({
++          observationId: "review", runId: "run:1", step: "REVIEWING",
++          sourceKind: "NODE_REVIEW", value: null, outcome: "agree", authorMaker: "maker:author",
++          atSequence: 2
++        }),
++        observation({
++          observationId: "settlement", runId: "run:1", sourceKind: "EXTERNAL_ANSWER_OUTCOME",
++          truthBasis: "SETTLEMENT", value: 0, posterior: 0.1, atSequence: 3
++        })
++      ],
++      asOf: AS_OF,
++      derivationVersion: 1
++    });
++
++    expect(result.prowessRanks.map((rank) => ({ metric: rank.metric, score: rank.score })))
++      .toEqual([
++        { metric: "prowess.settlement-outcome.v1", score: 0 },
++        { metric: "prowess.judging-tau.v1", score: 0.9 },
++        { metric: "prowess.review-outcome.v1", score: 1 }
++      ]);
++  });
+ });
+ 
+ describe("isolated unbound judge selector", () => {
+diff --git a/dialectical-engine/tests/unit/evaluator-rankings-api.test.ts b/dialectical-engine/tests/unit/evaluator-rankings-api.test.ts
+new file mode 100644
+index 00000000..70ba2023
+--- /dev/null
++++ b/dialectical-engine/tests/unit/evaluator-rankings-api.test.ts
+@@ -0,0 +1,81 @@
++import { describe, expect, it, vi } from "vitest";
++import { buildApi, type AskApplication } from "@debateai/api";
++import {
++  TEST_APP_ORIGIN,
++  testHttpIdentity,
++  testSessionApplication,
++  testSessionHeaders
++} from "../support/httpSession.js";
++
++function askApplication(): AskApplication {
++  return {
++    withContentLease: async <T>(_runId: string, use: () => Promise<T>) => use(),
++    submit: vi.fn(), readAnswer: vi.fn(), readRunAnswer: vi.fn(), readRun: vi.fn(),
++    readAnswerIndex: vi.fn(), readInspection: vi.fn(), readLedgerDigest: vi.fn(),
++    readNode: vi.fn(), recordInvestigation: vi.fn(), unlinkMemoryLink: vi.fn(),
++    readDeployment: vi.fn(), events: vi.fn()
++  } as unknown as AskApplication;
++}
++
++describe("read-only evaluator rankings API", () => {
++  it("requires an authenticated session before reading numeric aggregates", async () => {
++    const readRankings = vi.fn(async () => ({
++      asOf: null, derivationVersion: null, rankings: []
++    }));
++    const api = buildApi({
++      application: askApplication(),
++      evaluatorRankings: { readRankings }
++    } as Parameters<typeof buildApi>[0] & {
++      evaluatorRankings: { readRankings: typeof readRankings };
++    });
++
++    const response = await api.inject({ method: "GET", url: "/v1/evaluator/rankings" });
++
++    expect(response.statusCode).toBe(401);
++    expect(response.json()).toEqual({ error: "SESSION_REQUIRED" });
++    expect(readRankings).not.toHaveBeenCalled();
++    await api.close();
++  });
++
++  it("returns the aggregate cohort to any signed-in user without a CSRF token", async () => {
++    const identity = testHttpIdentity("evaluator-rankings");
++    const readRankings = vi.fn(async () => ({
++      asOf: new Date("2026-09-13T09:30:00.000Z"),
++      derivationVersion: 2,
++      rankings: [{
++        provider: "openai", modelId: "gpt-exact", modelVersion: "2026-09-01",
++        capability: "Authoring strength (reasoning proxy)", step: "AUTHORING",
++        metric: "prowess.reasoning-strength.v2", score: 0.8125, rank: 1,
++        sampleCount: 14, intervalLower: null, intervalUpper: null,
++        domain: { id: null, name: "Unclassified" }
++      }]
++    }));
++    const api = buildApi({
++      application: askApplication(),
++      sessions: testSessionApplication([identity]),
++      allowedOrigin: TEST_APP_ORIGIN,
++      evaluatorRankings: { readRankings }
++    } as Parameters<typeof buildApi>[0] & {
++      evaluatorRankings: { readRankings: typeof readRankings };
++    });
++
++    const response = await api.inject({
++      method: "GET", url: "/v1/evaluator/rankings", headers: testSessionHeaders(identity)
++    });
++
++    expect(response.statusCode).toBe(200);
++    expect(response.json()).toEqual({
++      asOf: "2026-09-13T09:30:00.000Z",
++      derivationVersion: 2,
++      rankings: [{
++        provider: "openai", modelId: "gpt-exact", modelVersion: "2026-09-01",
++        capability: "Authoring strength (reasoning proxy)", step: "AUTHORING",
++        metric: "prowess.reasoning-strength.v2", score: 0.8125, rank: 1,
++        sampleCount: 14, intervalLower: null, intervalUpper: null,
++        domain: { id: null, name: "Unclassified" }
++      }]
++    });
++    expect(readRankings).toHaveBeenCalledTimes(1);
++    await api.close();
++  });
++});

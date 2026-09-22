@@ -79,7 +79,7 @@ afterAll(async () => {
   await database?.stop();
 });
 
-describe.sequential("FIX-07 C1 replica-safe capture lease grants", () => {
+describe("FIX-07 C1 replica-safe capture lease grants", () => {
   it("lets authenticated replica writers refresh one lease in conflict-lock order", async () => {
     const writerA = await connectedWriter();
     const writerB = await connectedWriter();

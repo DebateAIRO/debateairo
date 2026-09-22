@@ -1,5 +1,5 @@
 import type { Answer, EventType, ExecutionLedgerDigest, InvestigationGap } from "@debateai/contract";
-import { AI_EXPORT_DISCLOSURE } from "../aiDisclosure";
+import { AI_EXPORT_DISCLOSURE } from "../aiDisclosure.js";
 
 /**
  * UI-01: the ONE decision behind the answer export.

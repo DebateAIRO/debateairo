@@ -44,7 +44,8 @@ if (mode === "control") {
     if (mode === "corpus") {
       const third = new Error(CORPUS_TOKENS.sixDigitCode);
       const second = new Error(CORPUS_TOKENS.email, { cause: third });
-      const first = new Error(`${CORPUS_TOKENS.bearerApiKey} ${CORPUS_TOKENS.passwordUrl}`, { cause: second });
+      const first: Error & { credential?: string } =
+        new Error(`${CORPUS_TOKENS.bearerApiKey} ${CORPUS_TOKENS.passwordUrl}`, { cause: second });
       first.credential = `${CORPUS_TOKENS.jwt} ${CORPUS_TOKENS.privateKeyHeader}`;
       first.stack = `${first.stack ?? "Error"}\n    at ${CORPUS_TOKENS.sixDigitCode}`;
       error = first;

@@ -837,7 +837,7 @@ afterEach(async () => {
   }
 });
 
-describe.sequential("FIX-07 C2 capture control and launch cadence", () => {
+describe("FIX-07 C2 capture control and launch cadence", () => {
   it("accepts only a nonempty absolute control directory independent of spool", async () => {
     const { readObsControlDir } = await import(
       "../../packages/obs-capture/src/runtime/config.js"
@@ -1331,7 +1331,7 @@ describe.sequential("FIX-07 C2 capture control and launch cadence", () => {
   });
 });
 
-describe.sequential("FIX-07 C3 runtime control and heartbeat", () => {
+describe("FIX-07 C3 runtime control and heartbeat", () => {
   it("settles the initial OFF sample before installing the emitter or its sole timer", async () => {
     vi.useFakeTimers();
     const initialControl = deferred<boolean>();
@@ -1619,7 +1619,7 @@ describe.sequential("FIX-07 C3 runtime control and heartbeat", () => {
   });
 });
 
-describe.sequential("FIX-07 C4 truthful periods and product invariance", () => {
+describe("FIX-07 C4 truthful periods and product invariance", () => {
   const writerPassword = "writer-fix07-c4-only";
   let database: TestDatabase;
 

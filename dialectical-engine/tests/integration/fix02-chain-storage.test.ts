@@ -193,7 +193,7 @@ afterAll(async () => {
   await database?.stop();
 });
 
-describe.sequential("FIX-02 C3 occurrence detail storage", () => {
+describe("FIX-02 C3 occurrence detail storage", () => {
   it("inserts one direct detail only for a nonempty safe chain", async () => {
     const chained = envelope({});
     const empty = envelope({ chain: [] });

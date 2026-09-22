@@ -94,7 +94,7 @@ afterAll(async () => {
   await database?.stop();
 });
 
-describe.sequential("FIX-01 C2 public runtime database path", () => {
+describe("FIX-01 C2 public runtime database path", () => {
   it("joins concurrent startup during stop and never arms a timer after stop", () => {
     const proof = runPublicRuntimeProbe<{
       readonly resolved: boolean;

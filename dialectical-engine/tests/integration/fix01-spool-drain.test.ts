@@ -749,7 +749,7 @@ afterAll(async () => {
   await database?.stop();
 });
 
-describe.sequential("FIX-01 C4 public runtime spool drain", () => {
+describe("FIX-01 C4 public runtime spool drain", () => {
   it("rejects an accessor-backed parsed row without reading or sink admission", async () => {
     const directory = createScratchDirectory();
     const path = join(directory, spoolName("scheduler", DEAD_PID));
@@ -1294,7 +1294,7 @@ describe.sequential("FIX-01 C4 public runtime spool drain", () => {
   }, 15_000);
 });
 
-describe.sequential("FIX-01 C4 hostile spool boundaries", () => {
+describe("FIX-01 C4 hostile spool boundaries", () => {
   it("uses one producer/reader contract and minimizes unsafe producer metadata", async () => {
     const directory = createScratchDirectory();
     const lawful = producerEnvelope({
@@ -1985,7 +1985,7 @@ function expectedStagingPath(sourcePath: string): string {
   );
 }
 
-describe.sequential("FIX-01 C4 indexed recovery protocol", () => {
+describe("FIX-01 C4 indexed recovery protocol", () => {
   it("drains a matching sealed A1 without probing its now-live numeric PID", async () => {
     const fixture = createA1Fixture("matching-seal");
     const result = recordingSink();
