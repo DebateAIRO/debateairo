@@ -517,14 +517,34 @@ export function assertHostedProviderTargets(
     if (target.authorizationHeader !== undefined) {
       throw new TypeError(`PROVIDER_INLINE_CREDENTIAL_REFUSED:${target.providerRef}`);
     }
-    /**
-     * V-28: a hosted target with no declared price cannot be billed against the
-     * per-run or the daily envelope, so its spend is unbounded in exactly the
-     * way V-28(3) refuses to allow — and it would be unbounded SILENTLY, since
-     * every one of its calls would charge zero. The same fail-closed reasoning
-     * as the vendor that reports no usage, one step earlier: refuse at boot,
-     * where the operator can fix the declaration, rather than mid-debate.
-     */
+  }
+}
+
+/**
+ * V-28 — A HOSTED DEBATE TARGET MUST DECLARE ITS PRICE.
+ *
+ * Without one its calls cannot be billed against the per-run or the daily
+ * envelope, so its spend is unbounded in exactly the way V-28(3) refuses to
+ * allow — and unbounded SILENTLY, since every call would charge zero. Same
+ * fail-closed reasoning as the vendor that reports no usage, one step earlier:
+ * refuse at boot, where the operator can fix the declaration, rather than
+ * mid-debate.
+ *
+ * DELIBERATELY SEPARATE from `assertHostedProviderTargets`. That function is the
+ * URL-and-credential rule, and the support chat's own model target goes through
+ * it too (V-30, `parseSupportModelTargetJson`) — but the support chat keeps its
+ * OWN spend accounting on `support.message`, which task 12 owns and task 11 was
+ * told not to duplicate, so nothing would read a price declared on it. A
+ * requirement nobody consumes is configuration theatre. The rule therefore lives
+ * with the control that consumes it, and the two shipped roots call it on the
+ * DEBATE targets beside the mode decision.
+ */
+export function assertPricedProviderTargets(
+  targets: readonly ProviderDiscoveryTarget[],
+  mode: "hosted" | "local"
+): void {
+  if (mode !== "hosted") return;
+  for (const target of targets) {
     if (providerTargetPrice(target) === null) {
       throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
     }

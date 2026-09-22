@@ -67,6 +67,7 @@ import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 import { RecoveryStartService } from "./recovery.js";
 import {
   assertDeploymentProviderTargets,
+  assertPricedProviderTargets,
   createProviderDiscoveryResolver,
   parseProviderDiscoveryTargets,
   resolveProviderTargetCredentials
@@ -254,6 +255,10 @@ const declaredProviderTargets = parseProviderDiscoveryTargets(
 assertDeploymentProviderTargets(declaredProviderTargets, {
   mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
 });
+// V-28: and a hosted DEBATE target must carry its price, or its calls cannot be
+// billed against the per-run and daily envelopes. Separate from the rule above
+// because the support chat's target shares that one and keeps its own accounting.
+assertPricedProviderTargets(declaredProviderTargets, environment.DEPLOYMENT_MODE);
 // V-9(2): the ask-time health probe needs the same credential the runner uses, so
 // it resolves each vendor's file through the same custody-checked seam.
 const providerDiscoveryTargets = resolveProviderTargetCredentials(

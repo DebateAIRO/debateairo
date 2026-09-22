@@ -343,7 +343,9 @@ packages/battery/decision/src/index.ts
 packages/battery/src/index.ts
 packages/battery/src/split.ts
 packages/battery/src/terminal.ts
+packages/budget/src/cost-envelope.ts
 packages/budget/src/index.ts
+packages/budget/src/model-spend.ts
 packages/contract/src/client.ts
 packages/contract/src/generate.ts
 packages/contract/src/index.ts
@@ -408,6 +410,7 @@ packages/register/src/algorithm-policy.ts
 packages/register/src/auth-policy.ts
 packages/register/src/compose-env.ts
 packages/register/src/configured-provider-set.ts
+packages/register/src/cost-envelope-policy.ts
 packages/register/src/engine-shape.ts
 packages/register/src/index.ts
 packages/register/src/mfa-policy.ts

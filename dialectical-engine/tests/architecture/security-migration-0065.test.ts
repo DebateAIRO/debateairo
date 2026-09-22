@@ -380,6 +380,11 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     // duplicated pair the applied order is a lexical accident of the suffix.
     // Nothing may depend on it; a new file must not add another pair.
     expect(files.filter((name) => Number(name.slice(0, 4)) >= 65))
-      .toEqual(["0065_security_delta_guards.sql"]);
+      .toEqual([
+        "0065_security_delta_guards.sql",
+        // V-28 (task 11): the persisted model-spend ledger the per-run and daily
+        // cost envelopes read. A new prefix, no pair.
+        "0066_model_spend_ledger.sql"
+      ]);
   });
 });

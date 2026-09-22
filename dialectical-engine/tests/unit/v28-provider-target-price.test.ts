@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertDeploymentProviderTargets,
+  assertPricedProviderTargets,
   parseProviderDiscoveryTargets,
   providerTargetPrice
 } from "@debateai/providers";
@@ -68,12 +69,19 @@ describe("V-28 a provider target declares its price", () => {
   });
 });
 
-describe("V-28 hosted refuses a target whose spend cannot be bounded", () => {
+/**
+ * The price rule is its OWN assertion and not part of the URL-and-credential one
+ * (`assertHostedProviderTargets`). The support chat's model target goes through
+ * that one too (V-30), but keeps its own spend accounting on `support.message`,
+ * which task 12 owns — so a price declared on it would be read by nothing, and a
+ * requirement nobody consumes is configuration theatre. The rule lives with the
+ * control that consumes it, and both shipped roots call it on the DEBATE targets.
+ */
+describe("V-28 hosted refuses a DEBATE target whose spend cannot be bounded", () => {
   it("refuses a hosted target that declares no price", () => {
     const targets = parseProviderDiscoveryTargets(targetsJson(), CONFIGURED);
-    expect(() => assertDeploymentProviderTargets(targets, {
-      mode: "hosted", nodeEnv: "production"
-    })).toThrowError(new TypeError("PROVIDER_TARGET_PRICE_REQUIRED:provider-1"));
+    expect(() => assertPricedProviderTargets(targets, "hosted"))
+      .toThrowError(new TypeError("PROVIDER_TARGET_PRICE_REQUIRED:provider-1"));
   });
 
   it("admits a hosted target that declares one", () => {
@@ -81,6 +89,7 @@ describe("V-28 hosted refuses a target whose spend cannot be bounded", () => {
       input_price_micros_per_million: 3_000_000,
       output_price_micros_per_million: 15_000_000
     }), CONFIGURED);
+    expect(() => assertPricedProviderTargets(targets, "hosted")).not.toThrow();
     expect(() => assertDeploymentProviderTargets(targets, {
       mode: "hosted", nodeEnv: "production"
     })).not.toThrow();
@@ -92,8 +101,18 @@ describe("V-28 hosted refuses a target whose spend cannot be bounded", () => {
       base_url: "http://127.0.0.1:8000/v1",
       model: "local/model"
     }]), CONFIGURED);
+    expect(() => assertPricedProviderTargets(targets, "local")).not.toThrow();
     expect(() => assertDeploymentProviderTargets(targets, {
       mode: "local", nodeEnv: "production"
+    })).not.toThrow();
+  });
+
+  it("leaves the URL-and-credential rule alone, so the support target is unaffected", () => {
+    // A priceless https: target with a credential FILE still passes the shared
+    // mode decision — which is what `parseSupportModelTargetJson` calls.
+    const targets = parseProviderDiscoveryTargets(targetsJson(), CONFIGURED);
+    expect(() => assertDeploymentProviderTargets(targets, {
+      mode: "hosted", nodeEnv: "production"
     })).not.toThrow();
   });
 });

@@ -20,7 +20,7 @@ import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { assertDeploymentProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
+import { assertDeploymentProviderTargets, assertPricedProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
 import { createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, WalkingSkeletonRunner } from "./index.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
@@ -76,6 +76,10 @@ const declaredProviderTargets = parseProviderDiscoveryTargets(
 assertDeploymentProviderTargets(declaredProviderTargets, {
   mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
 });
+// V-28: and a hosted DEBATE target must carry its price, or its calls cannot be
+// billed against the per-run and daily envelopes. Separate from the rule above
+// because the support chat's target shares that one and keeps its own accounting.
+assertPricedProviderTargets(declaredProviderTargets, environment.DEPLOYMENT_MODE);
 // V-9(2): each vendor's credential file, read once under the custody contract.
 const providerTargets = resolveProviderTargetCredentials(
   declaredProviderTargets, readCustodyAuthorizationHeader
@@ -91,10 +95,10 @@ const hatchet = new Hatchet({
  * HOSTED only, and the mode decides it once here rather than at every call:
  * local mode is the relays and loopback model servers, which report no usage and
  * cost no money, and V-28(3) leaves it untouched with the attempt ceiling it has
- * always had. In hosted mode `assertHostedProviderTargets` has already refused
- * any target with no declared price, so `providerTargetPrice` below cannot be
- * null there — the refusal is kept anyway, because a control that depends on
- * another control having run is one edit away from being no control at all.
+ * always had. In hosted mode `assertPricedProviderTargets` above has already
+ * refused any target with no declared price, so `providerTargetPrice` below
+ * cannot be null there — the refusal is kept anyway, because a control that
+ * depends on another control having run is one edit away from being none.
  */
 const costEnvelopeGuard = environment.DEPLOYMENT_MODE === "hosted"
   ? new CostEnvelopeGuard({
