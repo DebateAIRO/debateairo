@@ -5,7 +5,11 @@ services:
     image: postgres:${POSTGRES_MAJOR_VERSION:?generated from register.bootstrap.json by pnpm compose:env}@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
     environment:
       POSTGRES_USER: debateai
-      POSTGRES_PASSWORD: debateai-dev-only
+      # Set at first initdb and never in the repository: a fixed superuser password on a
+      # published loopback port was readable by every process on the workstation (L7-F2,
+      # V-21a). Supplied by pnpm dev:auth:up from the 0600 dev key-custody file, like the
+      # credentials below.
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?generated into dev key custody by pnpm dev:auth:up}
       POSTGRES_DB: debateai
       # Read once by deploy/postgres/init-hatchet.sql at first initdb. Supplied
       # by pnpm dev:auth:up from the 0600 dev key-custody file (L7-F2).

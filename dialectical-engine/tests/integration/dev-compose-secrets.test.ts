@@ -6,7 +6,7 @@ import {
   DEVELOPMENT_COMPOSE_SECRET_KEYS,
   developmentComposeSecretsPath,
   ensureDevelopmentComposeSecrets
-} from "../../apps/runner/src/dev-compose-secrets.js";
+} from "../../deploy/dev-auth/compose-secrets.mjs";
 
 const roots: string[] = [];
 

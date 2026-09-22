@@ -6,8 +6,9 @@ import { setTimeout as delay } from "node:timers/promises";
 import type { DevelopmentProviderPanel } from "./dev-provider-panel.js";
 import {
   developmentComposeSecretsPath,
-  ensureDevelopmentComposeSecrets
-} from "./dev-compose-secrets.js";
+  ensureDevelopmentComposeSecrets,
+  readDevelopmentComposeSecret
+} from "../../../deploy/dev-auth/compose-secrets.mjs";
 import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
 import {
   parseDevelopmentDeploymentRegisterCliOutput,
@@ -19,9 +20,28 @@ import { loadDevelopmentSupportConfigCliCredentials } from "./support-config-cli
 import { initializeDevelopmentSupportConfiguration } from "./dev-support-config.js";
 
 const DATA_PLANE_SERVICES = Object.freeze(["postgres", "hatchet-lite"] as const);
-const LOCAL_MIGRATOR_DATABASE_URL =
-  "postgresql://debateai:debateai-dev-only@127.0.0.1:55432/debateai";
+const LOCAL_MIGRATOR_ORIGIN = "postgresql://127.0.0.1:55432/debateai";
+const LOCAL_MIGRATOR_ROLE = "debateai";
 const MAX_CHILD_OUTPUT_BYTES = 128 * 1024;
+
+/**
+ * The bootstrap superuser URL the migration, principal and register children connect with.
+ *
+ * V-21(a): the password used to be a literal in this file and in compose.dev.yaml, which made
+ * a superuser on published loopback port 55432 readable by every process on the workstation.
+ * It is now generated once into the 0600 custody file that already feeds compose, and read
+ * back here. The password is opaque material, so it is assigned through URL, never pasted:
+ * a reserved character must not be able to re-point the connection at another host.
+ */
+export function developmentMigratorDatabaseUrl(password: string): string {
+  if (password.length === 0) {
+    throw new DevelopmentAuthDataPlaneError("DEV_AUTH_DATA_PLANE_SECRET_FAILED");
+  }
+  const url = new URL(LOCAL_MIGRATOR_ORIGIN);
+  url.username = LOCAL_MIGRATOR_ROLE;
+  url.password = password;
+  return url.toString();
+}
 
 export type DevelopmentAuthDataPlaneReceipt = Readonly<{
   postgres: "READY";
@@ -282,8 +302,12 @@ export function createDevelopmentAuthDataPlaneOperations(
   const custodyRoot = resolveDevCustodyRoot(cwd, commandEnvironment);
   const secretsEnvFile = developmentComposeSecretsPath(custodyRoot);
   const composeEnvironment = Object.freeze({ VLLM_MODEL: "dev-auth-not-started" });
-  const migrationEnvironment = Object.freeze({
-    MIGRATION_DATABASE_URL: LOCAL_MIGRATOR_DATABASE_URL
+  // Read per step, not once at construction: prepareComposeEnvironment generates the custody
+  // file, so nothing may capture the password before that step has run.
+  const migrationEnvironment = async () => Object.freeze({
+    MIGRATION_DATABASE_URL: developmentMigratorDatabaseUrl(
+      await readDevelopmentComposeSecret(custodyRoot, "POSTGRES_SUPERUSER_PASSWORD")
+    )
   });
   const pnpm = commandEnvironment.PNPM_EXECUTABLE?.trim() || "pnpm";
   const runPnpm = (arguments_: readonly string[], failureCode: string, environment = {}) =>
@@ -378,13 +402,17 @@ export function createDevelopmentAuthDataPlaneOperations(
       throw new DevelopmentAuthDataPlaneError("DEV_AUTH_DATA_PLANE_POSTGRES_UNAVAILABLE");
     },
     async migrate() {
-      await runPnpm(["db:migrate"], "DEV_AUTH_DATA_PLANE_MIGRATION_FAILED", migrationEnvironment);
+      await runPnpm(
+        ["db:migrate"],
+        "DEV_AUTH_DATA_PLANE_MIGRATION_FAILED",
+        await migrationEnvironment()
+      );
     },
     async provisionPrincipals() {
       await runPnpm(
         ["dev:auth:provision-principals"],
         "DEV_AUTH_DATA_PLANE_PRINCIPAL_FAILED",
-        migrationEnvironment
+        await migrationEnvironment()
       );
     },
     async seedRegister() {
@@ -392,7 +420,7 @@ export function createDevelopmentAuthDataPlaneOperations(
         ["dev:auth:seed-register"],
         "DEV_AUTH_DATA_PLANE_REGISTER_FAILED",
         {
-          ...migrationEnvironment,
+          ...await migrationEnvironment(),
           DEBATEAI_DEV_PROVIDER_TARGETS_JSON: providerPanel.targetsJson
         }
       );
