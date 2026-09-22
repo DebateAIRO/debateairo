@@ -31,19 +31,50 @@ const PRICE = Object.freeze({
   outputMicrosPerMillionTokens: 1_000_000
 });
 
-/** An in-memory stand-in for `ledger.model_spend`, with the same two questions. */
+/**
+ * An in-memory stand-in for `ledger.model_spend` and its reservations.
+ *
+ * `admitNewRun` SERIALISES, which is what the shipped store's transaction-scoped
+ * advisory lock does in Postgres: one admission decision at a time per day. That
+ * is the property I1 is about, so the fake has to have it or the racing test
+ * would pass against a store that does not.
+ */
 function fakeStore(seed: readonly ModelSpendEntry[] = []) {
   const rows: ModelSpendEntry[] = [...seed];
+  const reservations: Array<{ reservedMicros: number; expiresAt: Date }> = [];
+  let queue: Promise<unknown> = Promise.resolve();
+  const spentOn = (day: string) => rows
+    .filter((row) => row.chargedOn === day)
+    .reduce((total, row) => total + row.chargeMicros, 0);
+  const spentByRun = (runId: string) => rows
+    .filter((row) => row.runId === runId)
+    .reduce((total, row) => total + row.chargeMicros, 0);
   const store: ModelSpendStore = {
     recordSpend: async (entry) => { rows.push(entry); },
-    readRunSpentMicros: async (runId) => rows
-      .filter((row) => row.runId === runId)
-      .reduce((total, row) => total + row.chargeMicros, 0),
-    readDaySpentMicros: async (day) => rows
-      .filter((row) => row.chargedOn === day)
-      .reduce((total, row) => total + row.chargeMicros, 0)
+    readRunSpentMicros: async (runId) => spentByRun(runId),
+    readDaySpentMicros: async (day) => spentOn(day),
+    admitNewRun: async (input) => {
+      const run = queue.then(async () => {
+        // Committed = money already spent today PLUS what every live admission
+        // token could still spend.
+        const headroom = reservations
+          .filter((reservation) => reservation.expiresAt.getTime() > input.now.getTime())
+          .reduce((total, reservation) => total + reservation.reservedMicros, 0);
+        const committedMicros = spentOn(input.day) + headroom;
+        const admitted = input.decide(committedMicros);
+        if (admitted) {
+          reservations.push({
+            reservedMicros: input.reservedMicros,
+            expiresAt: input.expiresAt
+          });
+        }
+        return { admitted, committedMicros };
+      });
+      queue = run.catch(() => undefined);
+      return run;
+    }
   };
-  return { store, rows };
+  return { store, rows, reservations };
 }
 
 const TODAY = costEnvelopeDay(new Date("2026-09-22T11:00:00.000Z"));
@@ -202,6 +233,111 @@ describe("V-28 the daily envelope stops the NEXT run, never the running one", ()
 
     // Yesterday's spend is yesterday's. The new UTC day starts clean.
     await expect(guardWith(store).assertDailyEnvelopeAdmitsNewRun()).resolves.toBeUndefined();
+  });
+});
+
+/**
+ * I1 (review round 2) — TWO ASKS AT ONCE MUST NOT BOTH BE ADMITTED.
+ *
+ * Round 1 read the day's spend and then decided, with nothing in between. N
+ * simultaneous asks all saw the same low number, all passed, and each could then
+ * spend a full per-run ceiling: the daily ceiling bounded one run at a time and
+ * nothing at all under load — which is exactly when it matters.
+ *
+ * The fix adds no second source of truth. An ADMITTED ask reserves one per-run
+ * ceiling against the day, and the day's committed total is what has been spent
+ * plus what live reservations could still spend. The decision and the
+ * reservation happen together under one lock, so the second ask sees the first
+ * one's reservation.
+ *
+ * WHY A SHORT-LIVED TOKEN AND NOT A RUN. The gate is asked BEFORE the run
+ * exists — that is the whole point of "no new run starts" — so a reservation
+ * cannot be keyed on a run id and cannot be released when a run ends. It EXPIRES
+ * instead, over a window long enough to cover admission reaching its first
+ * charged call. That window is exactly the race, and it makes the control
+ * self-healing: a run that dies at birth cannot wedge the day shut.
+ *
+ * The residual, stated rather than hidden: inside the window a reservation and
+ * that run's first charges are both counted, so the gate is CONSERVATIVE there
+ * (it may refuse slightly early); past the window a run that has not spent
+ * anything yet no longer reserves. Both directions are bounded by one per-run
+ * ceiling per admitted ask, and the conservative one is the safe one.
+ */
+describe("I1 — the daily gate reserves what it admits", () => {
+  const RESERVED = 1_000;
+
+  function racingGuard(seed: readonly ModelSpendEntry[] = []) {
+    const { store, reservations } = fakeStore(seed);
+    const guard = new CostEnvelopeGuard({
+      store,
+      policy: { perRunCeilingMicros: RESERVED, dailyCeilingMicros: 2 * RESERVED },
+      clock: () => new Date("2026-09-22T11:00:00.000Z")
+    });
+    return { guard, reservations };
+  }
+
+  it("admits two runs into a two-run day", async () => {
+    const { guard, reservations } = racingGuard();
+    await expect(Promise.all([
+      guard.assertDailyEnvelopeAdmitsNewRun(),
+      guard.assertDailyEnvelopeAdmitsNewRun()
+    ])).resolves.toEqual([undefined, undefined]);
+    expect(reservations).toHaveLength(2);
+  });
+
+  it("refuses the THIRD of three simultaneous asks, which round 1 admitted", async () => {
+    const { guard, reservations } = racingGuard();
+    const outcomes = await Promise.all(
+      [0, 1, 2].map(() =>
+        guard.assertDailyEnvelopeAdmitsNewRun().then(() => "ADMITTED", () => "REFUSED"))
+    );
+
+    expect(outcomes.filter((outcome) => outcome === "ADMITTED")).toHaveLength(2);
+    expect(outcomes.filter((outcome) => outcome === "REFUSED")).toHaveLength(1);
+    expect(reservations).toHaveLength(2);
+  });
+
+  it("counts real spend AND live reservations, and refuses on their sum", async () => {
+    // A 2 000 day, a 1 000 per-run ceiling. The first ask reserves 1 000, so the
+    // committed total is 1 000. A charge of 400 against that run takes it to
+    // 1 400 — inside the window both are counted, which is the conservative
+    // direction — so a second ask still fits. That second reservation takes the
+    // committed total to 2 400, and the third ask is refused.
+    const { guard } = racingGuard();
+    await guard.assertDailyEnvelopeAdmitsNewRun();
+    const spendSeam = guard.providerSeam({
+      runId: "run-a", price: PRICE, requireReportedUsage: true
+    });
+    await spendSeam.recordCall({
+      providerRef: "provider-1", usage: { prompt_tokens: 400, completion_tokens: 0 }
+    });
+
+    await expect(guard.assertDailyEnvelopeAdmitsNewRun()).resolves.toBeUndefined();
+    await expect(guard.assertDailyEnvelopeAdmitsNewRun())
+      .rejects.toThrowError(expect.objectContaining({ code: "DAILY_COST_ENVELOPE_REACHED" }));
+  });
+
+  it("lets an EXPIRED reservation go, so a dead run cannot wedge the day shut", async () => {
+    const { store } = fakeStore();
+    const guard = new CostEnvelopeGuard({
+      store,
+      policy: { perRunCeilingMicros: RESERVED, dailyCeilingMicros: RESERVED },
+      clock: () => new Date("2026-09-22T11:00:00.000Z"),
+      reservationTtlMs: 60_000
+    });
+    await guard.assertDailyEnvelopeAdmitsNewRun();
+    await expect(guard.assertDailyEnvelopeAdmitsNewRun())
+      .rejects.toThrowError(expect.objectContaining({ code: "DAILY_COST_ENVELOPE_REACHED" }));
+
+    const later = new CostEnvelopeGuard({
+      store,
+      policy: { perRunCeilingMicros: RESERVED, dailyCeilingMicros: RESERVED },
+      // Two minutes on, the dead run's reservation has expired and it spent
+      // nothing, so the day is open again.
+      clock: () => new Date("2026-09-22T11:02:00.000Z"),
+      reservationTtlMs: 60_000
+    });
+    await expect(later.assertDailyEnvelopeAdmitsNewRun()).resolves.toBeUndefined();
   });
 });
 

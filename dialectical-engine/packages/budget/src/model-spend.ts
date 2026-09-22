@@ -62,6 +62,25 @@ export interface ModelSpendStore {
   readRunSpentMicros(runId: string): Promise<number>;
   /** Everything the WHOLE application has been charged on that UTC day. */
   readDaySpentMicros(day: string): Promise<number>;
+  /**
+   * I1 — THE DAILY ADMISSION DECISION AND ITS RESERVATION, TAKEN TOGETHER.
+   *
+   * Reading the day's total and then deciding, with nothing in between, admits
+   * every simultaneous ask: they all see the same low number, and each may then
+   * spend a whole per-run ceiling. So the read, the decision and the reservation
+   * happen as ONE serialised operation — in Postgres, inside a transaction
+   * holding an advisory lock keyed on the day.
+   *
+   * `decide` is the pure rule (`decideDailyCostEnvelope`), passed in rather than
+   * re-implemented in SQL, so there is exactly one definition of the ceiling.
+   */
+  admitNewRun(input: Readonly<{
+    day: string;
+    reservedMicros: number;
+    now: Date;
+    expiresAt: Date;
+    decide: (committedMicros: number) => boolean;
+  }>): Promise<Readonly<{ admitted: boolean; committedMicros: number }>>;
 }
 
 /** The shape `@debateai/providers` asks a gateway's cost seam for, structurally. */
@@ -81,7 +100,18 @@ export interface CostEnvelopeGuardInput {
   readonly policy: Readonly<{ perRunCeilingMicros: number; dailyCeilingMicros: number }>;
   /** Seam for "now", so the day boundary is testable without waiting for midnight. */
   readonly clock?: () => Date;
+  /**
+   * I1 — how long an admission reservation stays live. It must cover admission
+   * reaching its first CHARGED call, which is the window in which a newly
+   * admitted run is invisible to the day's spend; it should not be longer,
+   * because inside it a reservation and that run's early charges are both
+   * counted. Two minutes by default: a full debate's first model call happens in
+   * seconds, and any value here is bounded by one per-run ceiling per ask.
+   */
+  readonly reservationTtlMs?: number;
 }
+
+export const DEFAULT_RESERVATION_TTL_MS = 120_000 as const;
 
 export interface ProviderSeamInput {
   readonly runId: string;
@@ -105,6 +135,7 @@ export class CostEnvelopeGuard {
   readonly #store: ModelSpendStore;
   readonly #policy: Readonly<{ perRunCeilingMicros: number; dailyCeilingMicros: number }>;
   readonly #clock: () => Date;
+  readonly #reservationTtlMs: number;
 
   constructor(input: CostEnvelopeGuardInput) {
     if (input?.store === undefined || input?.policy === undefined) {
@@ -113,6 +144,9 @@ export class CostEnvelopeGuard {
     this.#store = input.store;
     this.#policy = input.policy;
     this.#clock = input.clock ?? (() => new Date());
+    const ttl = input.reservationTtlMs ?? DEFAULT_RESERVATION_TTL_MS;
+    if (!Number.isInteger(ttl) || ttl < 1) throw new TypeError("COST_ENVELOPE_RESERVATION_TTL_INVALID");
+    this.#reservationTtlMs = ttl;
   }
 
   /**
@@ -189,11 +223,24 @@ export class CostEnvelopeGuard {
    * application has already paid for.
    */
   async assertDailyEnvelopeAdmitsNewRun(): Promise<void> {
-    const decision = decideDailyCostEnvelope({
-      spentMicrosToday: await this.#store.readDaySpentMicros(costEnvelopeDay(this.#clock())),
-      ceilingMicros: this.#policy.dailyCeilingMicros
+    const now = this.#clock();
+    const outcome = await this.#store.admitNewRun({
+      day: costEnvelopeDay(now),
+      reservedMicros: this.#policy.perRunCeilingMicros,
+      now,
+      expiresAt: new Date(now.getTime() + this.#reservationTtlMs),
+      // ONE definition of the ceiling, passed in rather than restated in SQL.
+      decide: (committedMicros) => decideDailyCostEnvelope({
+        spentMicrosToday: committedMicros,
+        ceilingMicros: this.#policy.dailyCeilingMicros
+      }).kind === "WITHIN"
     });
-    if (decision.kind === "REACHED") throw dailyCostEnvelopeReached(decision);
+    if (outcome.admitted) return;
+    throw dailyCostEnvelopeReached(Object.freeze({
+      kind: "REACHED",
+      spentMicrosToday: outcome.committedMicros,
+      ceilingMicros: this.#policy.dailyCeilingMicros
+    }));
   }
 }
 
@@ -239,6 +286,59 @@ export class PostgresModelSpendStore implements ModelSpendStore {
       [day]
     );
     return this.#total(result.rows[0]?.total);
+  }
+
+  /**
+   * I1 — the read, the decision and the reservation as ONE serialised operation.
+   *
+   * `pg_advisory_xact_lock` keyed on the day makes concurrent admissions queue
+   * instead of racing, and the lock is released by the commit or the rollback,
+   * so a failure here cannot leave the day locked. Expired reservations are not
+   * deleted — nothing in this schema deletes — they simply stop counting, which
+   * is what makes a run that dies at birth unable to wedge the day shut.
+   */
+  async admitNewRun(input: Readonly<{
+    day: string;
+    reservedMicros: number;
+    now: Date;
+    expiresAt: Date;
+    decide: (committedMicros: number) => boolean;
+  }>): Promise<Readonly<{ admitted: boolean; committedMicros: number }>> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      // A stable 64-bit key for this UTC day; two API processes admitting on the
+      // same day take the same lock, and different days never contend.
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtext('debateai.cost_envelope.day')::bigint, hashtext($1)::bigint)",
+        [input.day]
+      );
+      const committed = await client.query<{ total: string }>(
+        `SELECT (
+           coalesce((SELECT sum(charge_micros) FROM ledger.model_spend WHERE charged_on = $1::date), 0)
+           + coalesce((SELECT sum(reserved_micros) FROM ledger.model_spend_reservation
+                        WHERE reserved_on = $1::date AND expires_at > $2), 0)
+         )::text AS total`,
+        [input.day, input.now]
+      );
+      const committedMicros = this.#total(committed.rows[0]?.total);
+      const admitted = input.decide(committedMicros);
+      if (admitted) {
+        await client.query(
+          `INSERT INTO ledger.model_spend_reservation
+             (reservation_id, reserved_on, reserved_micros, opened_at, expires_at)
+           VALUES (gen_random_uuid(), $1::date, $2, $3, $4)`,
+          [input.day, input.reservedMicros, input.now, input.expiresAt]
+        );
+      }
+      await client.query("COMMIT");
+      return Object.freeze({ admitted, committedMicros });
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   /**

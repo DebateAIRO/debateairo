@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createPool, migrate } from "../../packages/db/src/index.js";
+import { migrate } from "../../packages/db/src/index.js";
 import { CostEnvelopeGuard, PostgresModelSpendStore, costEnvelopeDay } from "@debateai/budget";
+import { RunRepository } from "../../packages/db/src/index.js";
+import { fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
@@ -25,7 +27,10 @@ let database: TestDatabase;
 
 beforeAll(async () => {
   database = await startTestDatabase();
-  await migrate(createPool(database.connectionString));
+  // I5: `migrate(database.pool)` — the suite's own pool, as every other
+  // integration suite does. Round 1 opened a SECOND pool here and never closed
+  // it, so the run leaked a connection pool per execution.
+  await migrate(database.pool);
 }, 600_000);
 
 afterAll(async () => {
@@ -33,12 +38,44 @@ afterAll(async () => {
 });
 
 /**
- * A charge needs a run to point at, and `core.run` is a wide table with its own
- * rules, so the run charges below are written against a run the ordinary
- * repository created. `newRunId` is the one thing this suite needs from the rest
- * of the schema; if `startRun`'s shape has moved by the time this runs, that is
- * what to repair.
+ * I5 — A RUN CHARGE NEEDS A RUN THAT EXISTS.
+ *
+ * `ledger.model_spend.run_id` REFERENCES `core.run(run_id)`, so round 1's
+ * invented uuids would have been refused 23503 on the first execution. Rather
+ * than stand up the whole ask path, the two run-scoped cases below create the
+ * minimum lawful `core.run` row through the repository that owns that shape.
+ * If `startRun`'s signature has moved by the time this suite is first run, this
+ * helper is the one thing to repair.
  */
+/**
+ * The minimum lawful `core.run` row, through the repository that owns its shape.
+ * The legacy (unencrypted) principal is used deliberately: it is the one path
+ * that needs no content cipher, no owner mapping and no provision pool.
+ */
+async function createLegacyRun(): Promise<string> {
+  const runs = new RunRepository(database.pool);
+  return runs.startRun({
+    questionLine: "Is this spend row attributable?",
+    principal: { kind: "legacy", legacyAskerId: `test:${randomUUID()}` },
+    sessionId: randomUUID(),
+    callerScope: "test",
+    asOf: new Date(),
+    askerRiskTier: "casual",
+    effectiveRiskTier: "casual",
+    tierSource: "ASKER",
+    tierProvenanceRef: "asker:test",
+    compositionBudgetTier: "standard",
+    depthParams: { depth: 1 },
+    discoveredPanel: [],
+    strangerSampleRate: 0,
+    envelopeBasis: fixtureStructuralCeiling(4),
+    registerVersion: 1,
+    batteryVersion: "test",
+    askContract: {},
+    batteryRows: []
+  } as never);
+}
+
 async function insertRunCharge(
   store: PostgresModelSpendStore,
   runId: string | null,
@@ -101,10 +138,8 @@ describe("V-28 the persisted totals answer the two envelope questions", () => {
   it("sums one run's charges across vendors, and only that run's", async () => {
     const store = new PostgresModelSpendStore(database.pool);
     const today = costEnvelopeDay(new Date());
-    const runId = randomUUID();
-    const otherRunId = randomUUID();
-    // Both runs must exist in core.run for the foreign key; the repository that
-    // creates them is `RunRepository.startRun` (packages/db/src/index.ts).
+    const runId = await createLegacyRun();
+    const otherRunId = await createLegacyRun();
     await database.pool.query(
       "INSERT INTO ledger.model_spend (spend_id,spend_source,run_id,provider_ref,charged_on,charge_micros,input_tokens,output_tokens) "
       + "VALUES ($1,'RUN',$2,'provider-1',$3::date,100,1,1),($4,'RUN',$2,'provider-2',$3::date,50,1,1),($5,'RUN',$6,'provider-1',$3::date,999,1,1)",
@@ -113,6 +148,16 @@ describe("V-28 the persisted totals answer the two envelope questions", () => {
 
     expect(await store.readRunSpentMicros(runId)).toBe(150);
     expect(await store.readRunSpentMicros(otherRunId)).toBe(999);
+  });
+
+  it("refuses a charge against a run that does not exist", async () => {
+    // The foreign key is the point: a charge must name a run the ledger holds,
+    // or the per-run envelope would sum against a run nobody can audit.
+    await expect(new PostgresModelSpendStore(database.pool).recordSpend({
+      spendId: randomUUID(), spendSource: "RUN", runId: randomUUID(),
+      providerRef: "provider-1", chargedOn: costEnvelopeDay(new Date()),
+      chargeMicros: 1, inputTokens: 1, outputTokens: 1
+    })).rejects.toThrowError(/violates foreign key constraint/u);
   });
 
   it("sums the whole application's day — every run and, when wired, support too", async () => {
@@ -139,5 +184,31 @@ describe("V-28 the persisted totals answer the two envelope questions", () => {
 
     await expect(guard.assertDailyEnvelopeAdmitsNewRun())
       .rejects.toThrowError(expect.objectContaining({ code: "DAILY_COST_ENVELOPE_REACHED" }));
+  });
+
+  /**
+   * I1 — the property the in-memory suite can only approximate: that two
+   * admissions running in two real backends actually serialise. The fake
+   * serialises because it was written to; only Postgres can show that
+   * `pg_advisory_xact_lock` does.
+   */
+  it("admits exactly one of two SIMULTANEOUS asks into a one-run day", async () => {
+    const store = new PostgresModelSpendStore(database.pool);
+    const day = "2026-03-03";
+    const guard = new CostEnvelopeGuard({
+      store,
+      policy: { perRunCeilingMicros: 1_000, dailyCeilingMicros: 1_000 },
+      clock: () => new Date(`${day}T09:00:00.000Z`)
+    });
+
+    const outcomes = await Promise.all([0, 1].map(() =>
+      guard.assertDailyEnvelopeAdmitsNewRun().then(() => "ADMITTED", () => "REFUSED")));
+
+    expect(outcomes.filter((outcome) => outcome === "ADMITTED")).toHaveLength(1);
+    const reserved = await database.pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM ledger.model_spend_reservation WHERE reserved_on = $1::date",
+      [day]
+    );
+    expect(reserved.rows[0]?.count).toBe("1");
   });
 });

@@ -91,3 +91,68 @@ CREATE TRIGGER reject_mutation BEFORE UPDATE OR DELETE ON ledger.model_spend
 -- regardless, and the absent grant says the same thing one layer earlier.
 GRANT SELECT, INSERT ON ledger.model_spend TO debateai_runtime;
 GRANT SELECT ON ledger.model_spend TO debateai_replay;
+
+-- I1 (review round 2) — ADMISSION RESERVATIONS.
+--
+-- Reading the day's total and then deciding, with nothing in between, admits
+-- every simultaneous ask: they all see the same low number, and each may then
+-- spend a whole per-run ceiling. So an admitted ask RESERVES one per-run ceiling
+-- against the day, and the read, the decision and the reservation happen inside
+-- one transaction holding pg_advisory_xact_lock keyed on the day.
+--
+-- The reservation is NOT keyed on a run. The gate is asked BEFORE the run exists
+-- — that is what "no new run starts" means — so it cannot be released when a run
+-- ends. It EXPIRES instead, over a window long enough to cover admission
+-- reaching its first charged call, which is exactly the race. That is what makes
+-- the control self-healing: a run that dies at birth cannot wedge the day shut,
+-- and nothing has to be deleted for the day to recover.
+CREATE TABLE IF NOT EXISTS ledger.model_spend_reservation (
+  reservation_id uuid PRIMARY KEY,
+  reserved_on date NOT NULL,
+  reserved_micros bigint NOT NULL CHECK (reserved_micros > 0),
+  opened_at timestamptz NOT NULL,
+  expires_at timestamptz NOT NULL,
+  CONSTRAINT model_spend_reservation_expires_after_open CHECK (expires_at > opened_at)
+);
+
+-- The admission query's own question: what is still live on this day.
+CREATE INDEX IF NOT EXISTS model_spend_reservation_day_idx
+  ON ledger.model_spend_reservation (reserved_on, expires_at) INCLUDE (reserved_micros);
+
+-- Append-only, like the spend rows and for the same reason: an expired
+-- reservation stops counting by its own timestamp, so nothing ever needs to
+-- update or delete one, and a TRUNCATE would erase the evidence of a burst of
+-- admissions at the moment it mattered most.
+SELECT core.install_truncate_guard('ledger.model_spend_reservation');
+
+DROP TRIGGER IF EXISTS reject_mutation ON ledger.model_spend_reservation;
+CREATE TRIGGER reject_mutation BEFORE UPDATE OR DELETE ON ledger.model_spend_reservation
+  FOR EACH STATEMENT EXECUTE FUNCTION core.reject_mutation();
+
+GRANT SELECT, INSERT ON ledger.model_spend_reservation TO debateai_runtime;
+GRANT SELECT ON ledger.model_spend_reservation TO debateai_replay;
+
+-- THE CONTRACT THIS FILE CLAIMS, checked rather than assumed (the shape 0065
+-- ends with). A migration that creates a guard and does not verify it installed
+-- is a guard nobody has seen work: both relations must carry BOTH triggers —
+-- the TRUNCATE guard and the append-only refusal — or this file refuses to
+-- finish, loudly, with the deployment unchanged.
+DO $model_spend_guard_contract$
+BEGIN
+  IF (
+    SELECT pg_catalog.count(*) FROM pg_catalog.pg_trigger AS trigger
+    WHERE NOT trigger.tgisinternal
+      AND trigger.tgenabled IN ('O','A')
+      AND trigger.tgfoid=ANY(ARRAY[
+        'core.reject_truncate()'::regprocedure,
+        'core.reject_mutation()'::regprocedure
+      ])
+      AND trigger.tgrelid=ANY(ARRAY[
+        'ledger.model_spend'::regclass,
+        'ledger.model_spend_reservation'::regclass
+      ])
+  )<>4 THEN
+    RAISE EXCEPTION 'MODEL_SPEND_APPEND_ONLY_GUARD_INVALID';
+  END IF;
+END
+$model_spend_guard_contract$;
