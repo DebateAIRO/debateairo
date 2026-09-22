@@ -80,7 +80,13 @@ function fixtureAskApplication(): AskApplication {
 
 function harness(policy: AdmissionPolicy | null = PUBLISHED) {
   let now = new Date(T0);
-  const support = supportHarness({ clock: () => now });
+  const support = supportHarness({
+    clock: () => now,
+    // Composed so the case read reaches the admission gate instead of 503.
+    caseAccess: Object.freeze({
+      listOwn: async () => [], readByToken: async () => null, replyByToken: async () => null
+    }) as NonNullable<Parameters<typeof supportHarness>[0]>["caseAccess"]
+  });
   const api = buildApi({
     application: fixtureAskApplication(),
     sessions: testSessionApplication([OWNER_A, OWNER_B]),
@@ -95,6 +101,10 @@ function harness(policy: AdmissionPolicy | null = PUBLISHED) {
     advance: (ms: number) => { now = new Date(now.getTime() + ms); },
     status: (remoteAddress: string) =>
       api.inject({ method: "GET", url: "/v1/support/status", remoteAddress }),
+    readCase: (remoteAddress: string, token: string) => api.inject({
+      method: "GET", url: "/v1/support/case", remoteAddress,
+      headers: { "x-support-case-token": token }
+    }),
     readSession: (remoteAddress: string, id: string, token: string) => api.inject({
       method: "GET", url: `/v1/support/sessions/${id}`, remoteAddress,
       headers: { "x-support-session-token": token }
@@ -317,6 +327,61 @@ describe("DL1-F2/DL1-F7 the deployment register actually publishes the budgets",
     const limiter = new AdmissionLimiter(policy);
     for (const scope of ["supportReads", "supportSessions", "supportModelCalls"] as const) {
       expect(limiter.configured(scope), scope).toBe(true);
+    }
+  });
+});
+
+/**
+ * Review round. The per-source read budget was keyed on the FULL address while
+ * `clientIpNetworkScope` — added in this very branch for exactly this reason —
+ * was used only for the database-side windows and the model share. One IPv6
+ * /64 is a single ordinary allocation and holds 2^64 addresses: its holder got
+ * an unlimited number of 240-read budgets AND could fill the 65 536-key table,
+ * after which the limiter answers CAPACITY to every NEW source — turning a
+ * fairness control into an outage for everyone who arrives next.
+ */
+describe("DL1-F2 the read budget is keyed on the network, not the address", () => {
+  it("gives one /64 a single budget across all three metered reads", async () => {
+    const h = harness(policyWith({
+      support_reads: { key: "source", limit: 2, window_ms: QUARTER_MS, capacity: 64 }
+    }));
+    try {
+      expect((await h.status("2001:db8:1:2::1")).statusCode).toBe(200);
+      // A different address in the same /64 spends the SAME budget...
+      expect((await h.status("2001:db8:1:2:a:b:c:d")).statusCode).toBe(200);
+      const refused = await h.status("2001:db8:1:2:ffff:ffff:ffff:ffff");
+      expect(refused.statusCode).toBe(429);
+      expect(refused.json()).toEqual(REFUSAL);
+      // ...and so does every other metered read from it.
+      expect((await h.readCase("2001:db8:1:2::9", "z".repeat(43))).statusCode).toBe(429);
+      expect((await h.readSession(
+        "2001:db8:1:2::9", "11111111-1111-4111-8111-111111111111", "z".repeat(43)
+      )).statusCode).toBe(429);
+
+      // The next /64 is its own source, and IPv4 keeps its whole address.
+      expect((await h.status("2001:db8:1:3::1")).statusCode).toBe(200);
+      expect((await h.status(SOURCE_A)).statusCode).toBe(200);
+    } finally {
+      await h.close();
+    }
+  });
+
+  it("cannot have its key table filled from inside one /64", async () => {
+    // Capacity 2: with the full address as the key, three addresses from one
+    // /64 would take both slots and refuse the third caller for CAPACITY — and
+    // every genuinely new source after it.
+    const h = harness(policyWith({
+      support_reads: { key: "source", limit: 50, window_ms: QUARTER_MS, capacity: 2 }
+    }));
+    try {
+      for (const address of ["2001:db8:1:2::1", "2001:db8:1:2::2", "2001:db8:1:2::3"]) {
+        expect((await h.status(address)).statusCode, address).toBe(200);
+      }
+      // One /64 has taken exactly one slot, so two real sources still fit.
+      expect((await h.status("2001:db8:9:9::1")).statusCode).toBe(200);
+      expect((await h.status(SOURCE_A)).statusCode).toBe(429);
+    } finally {
+      await h.close();
     }
   });
 });

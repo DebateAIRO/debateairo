@@ -193,12 +193,24 @@ function clientIp(request: FastifyRequest): string {
 }
 
 /**
+ * DL1-F2. The key every per-source support budget counts against: the caller's
+ * NETWORK, not its address. An IPv6 /64 is one ordinary allocation holding
+ * 2^64 addresses, so keying on the address gave its holder an unlimited number
+ * of budgets and let it fill the limiter's key table — after which the limiter
+ * refuses every genuinely new source for CAPACITY, which turns a fairness
+ * control into an outage for whoever arrives next.
+ */
+function sourceNetwork(request: FastifyRequest): string {
+  return clientIpNetworkScope(clientIp(request));
+}
+
+/**
  * DL5-F3. The value the support tables record for a caller's network: keyed, so
- * it cannot be inverted back to an address, and scoped to the IPv6 /64, so one
+ * it cannot be inverted back to an address, and scoped to the same /64, so one
  * allocation is one source rather than 2^64 of them.
  */
 function sourceOf(application: SupportApplication,request: FastifyRequest): string {
-  return application.sourcePseudonym(clientIpNetworkScope(clientIp(request)));
+  return application.sourcePseudonym(sourceNetwork(request));
 }
 
 function rateLimited(reply: FastifyReply, language: SupportLanguage) {
@@ -364,7 +376,7 @@ export function installSupportRoutes(
     policy("GET /v1/support/sessions/{id}"),
     async (request, reply) => {
       if (application === undefined) return unavailable(reply);
-      if (!admit.gate(reply, "supportReads", "GET /v1/support/sessions/{id}", clientIp(request))) {
+      if (!admit.gate(reply, "supportReads", "GET /v1/support/sessions/{id}", sourceNetwork(request))) {
         return reply;
       }
       const tokenSha256 = capabilityFrom(request);
@@ -1028,7 +1040,7 @@ export function installSupportRoutes(
     policy("GET /v1/support/case"),
     async (request, reply) => {
       if (application?.caseAccess === undefined) return unavailable(reply);
-      if (!admit.gate(reply, "supportReads", "GET /v1/support/case", clientIp(request))) {
+      if (!admit.gate(reply, "supportReads", "GET /v1/support/case", sourceNetwork(request))) {
         return reply;
       }
       const configuration = await application.configuration.current();
@@ -1143,7 +1155,7 @@ export function installSupportRoutes(
    */
   api.get("/v1/support/status", policy("GET /v1/support/status"), async (request, reply) => {
     if (application === undefined) return unavailable(reply);
-    if (!admit.gate(reply, "supportReads", "GET /v1/support/status", clientIp(request))) return reply;
+    if (!admit.gate(reply, "supportReads", "GET /v1/support/status", sourceNetwork(request))) return reply;
     const now = (application.clock ?? (() => new Date()))().getTime();
     if (statusCache !== null && now - statusCache.at < SUPPORT_STATUS_CACHE_MS
       && now >= statusCache.at) {

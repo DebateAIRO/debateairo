@@ -85,6 +85,8 @@ export function supportHarness(options: Readonly<{
   clock?: () => Date;
   /** Defaults to a labelled, obviously-fake stand-in for the keyed pseudonym. */
   sourcePseudonym?: (value: string) => string;
+  /** Composed only when a test needs the case routes to get past 503. */
+  caseAccess?: SupportApplication["caseAccess"];
 }> = {}): SupportHarness {
   const stored = new Map<string, SupportSessionRecord>();
   const state = options.configuration ?? (() => supportConfigurationState());
@@ -170,7 +172,8 @@ export function supportHarness(options: Readonly<{
     messages: messagePort,
     knowledge,
     sourcePseudonym,
-    clock
+    clock,
+    ...(options.caseAccess === undefined ? {} : { caseAccess: options.caseAccess })
   });
 
   return Object.freeze({
