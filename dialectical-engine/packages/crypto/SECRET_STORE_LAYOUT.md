@@ -31,9 +31,16 @@ spelled out is `pnpm exec tsx apps/runner/src/rotate-kek-cli.ts`, which is what 
 runbook runs under `systemd-run`. It reads
 with both keys (the new one and `*_KEK_PREVIOUS_PATH`), writes each record back
 labelled with the new one, and ends with a verification pass that opens every
-record under the new key alone. The previous-key setting is removed once that
-pass is clean; its absence is the normal steady state. See
-`deploy/vps/README.md` for the operator procedure.
+record under the new key alone — against a SECOND listing of the store, so a
+record written while the pass ran is verified too rather than missed. The
+previous-key setting is removed once that pass is clean; its absence is the
+normal steady state.
+
+The SERVICES read the same setting: `loadKekRing(currentPath, previousPath)` is
+what both composition roots build, so for the length of a changeover the API and
+the runner open a record under either key and write every new one under the
+current key. Without that the rotation would have to happen while the services
+are down. See `deploy/vps/README.md` for the operator procedure.
 
 The stable audit source-context Argon2id salt is a separate 32-byte mode-0600
 secret at `AUDIT_SOURCE_IP_SALT_PATH`. It is loaded by the API process, never

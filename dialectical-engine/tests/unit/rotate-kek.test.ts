@@ -10,7 +10,7 @@
  * No real key material: every key in this file is generated into a temporary
  * directory that is removed afterwards.
  */
-import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -21,7 +21,7 @@ import {
   kekId,
   loadKek
 } from "../../packages/crypto/src/index.js";
-import type { KekHandle } from "../../packages/crypto/src/index.js";
+import type { KekHandle, RotatableKeyStore } from "../../packages/crypto/src/index.js";
 import {
   createSupportKeyPort, type SupportContentContext
 } from "../../apps/api/src/support/keys.js";
@@ -195,6 +195,70 @@ describe("V-3 rotate: a file store", () => {
     expect(rotationFailed([report])).toBe(true);
     // The readable one really did move.
     await expect(new FileUserDekStore(root, replacement).load(USER_A)).resolves.toBeInstanceOf(Buffer);
+  });
+
+  /**
+   * FIX WAVE A-C1 (final review A, first Critical). The file-store pass listed
+   * the store ONCE and verified each record immediately after its own re-wrap,
+   * so a record written under the PREVIOUS key after `listKeyRefs()` returned
+   * was never seen, never verified, and the run still ended KEYS_ROTATE_KEK_OK
+   * — and the runbook keys key-retirement to that answer. The support half
+   * takes a second listing for exactly this reason; the file stores did not.
+   *
+   * The scenario is the reviewer's: an API instance still holding the old KEK
+   * as current registers a user while the pass runs.
+   */
+  it("fails the run over a record written under the OLD key while the pass ran", async () => {
+    const directory = await temporaryDirectory("debateai-rotate-files-race-");
+    const original = await throwawayKek(directory, "kek.bin");
+    const replacement = await throwawayKek(directory, "kek-new.bin");
+    const root = join(directory, "user-deks");
+    await mkdir(root, { mode: 0o700 });
+    await new FileUserDekStore(root, original).store(USER_A, generateDek());
+
+    const store = new FileUserDekStore(root, { current: replacement, previous: original });
+    // The straggler lands DURING the first pass, under the old key alone —
+    // exactly what a still-running API instance does.
+    const racing: RotatableKeyStore = {
+      listKeyRefs: () => store.listKeyRefs(),
+      verifyUnderCurrentKek: (ref) => store.verifyUnderCurrentKek(ref),
+      rewrapUnderCurrentKek: async (ref) => {
+        const outcome = await store.rewrapUnderCurrentKek(ref);
+        if (ref === USER_A) {
+          await new FileUserDekStore(root, original).store(USER_B, generateDek());
+        }
+        return outcome;
+      }
+    };
+
+    const report = await rotateFileStore("user-deks", racing, kekId(replacement));
+    // The straggler is SEEN by the second listing, named, and fails the run.
+    expect(report.unreadableRefs).toEqual([{ ref: USER_B, code: "KEK_UNRESOLVED" }]);
+    expect(report.counts.unreadable).toBe(1);
+    expect(rotationFailed([report])).toBe(true);
+    expect(renderRotationReport([report])).toContain("KEYS_ROTATE_KEK_FAILED");
+    // And the operator is not told a record verified that did not.
+    expect(report.verified).toBe(1);
+  });
+
+  /**
+   * Minor 4 of the same review: a per-user directory that is a SYMLINK was
+   * skipped by the listing (`isDirectory()` is false for a symlink dirent)
+   * while `load` follows it — the record was neither re-wrapped nor verified
+   * and the run printed OK. Never silently skipped: the listing refuses.
+   */
+  it("refuses a symlinked record directory instead of skipping it", async () => {
+    const directory = await temporaryDirectory("debateai-rotate-files-symlink-");
+    const kek = await throwawayKek(directory, "kek.bin");
+    const root = join(directory, "user-deks");
+    await mkdir(root, { mode: 0o700 });
+    const store = new FileUserDekStore(root, kek);
+    await store.store(USER_A, generateDek());
+    await symlink(join(root, "users", USER_A), join(root, "users", USER_B));
+
+    await expect(store.listKeyRefs()).rejects.toThrowError(
+      expect.objectContaining({ code: "SECRET_CUSTODY_INVALID" })
+    );
   });
 
   it("reports a genuinely empty store as a clean pass", async () => {

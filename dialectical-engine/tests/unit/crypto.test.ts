@@ -316,10 +316,42 @@ describe("S1 crypto foundation", () => {
       ]
     })).toThrow("SECRET_DOMAIN_MUST_BE_SEPARATE");
 
+    /**
+     * FIX ROUND 1, Minor 3. A changeover's PREVIOUS keys are key material this
+     * process holds, so they belong in the same pairwise check: a
+     * `KEK_PREVIOUS_PATH` aimed at the blind-index key file makes the email
+     * HMAC key a KEK for the length of the changeover, and `toKekRing` cannot
+     * see it — it only refuses a previous key EQUAL to its own current one.
+     */
+    const previousKekPath = join(directory, "kek-previous");
+    const previousMaterial = generateDek();
+    await writeFile(previousKekPath, previousMaterial, { mode: 0o600 });
+    const previousKek = loadKek(previousMaterial);
+    expect(() => assertPublicationSecretDomains({
+      ...separated,
+      previousKeks: [{ handle: previousKek, path: previousKekPath }]
+    })).not.toThrow();
+
+    // The previous key IS the blind-index key, under its own name.
+    const aliasedPreviousPath = join(directory, "kek-previous-alias");
+    await writeFile(aliasedPreviousPath, blindIndexKey, { mode: 0o600 });
+    expect(() => assertPublicationSecretDomains({
+      ...separated,
+      previousKeks: [{ handle: loadKek(blindIndexKey), path: aliasedPreviousPath }]
+    })).toThrow("SECRET_DOMAIN_MUST_BE_SEPARATE");
+
+    // Or names the blind-index key's own path, whatever bytes it holds.
+    expect(() => assertPublicationSecretDomains({
+      ...separated,
+      previousKeks: [{ handle: previousKek, path: blindIndexPath }]
+    })).toThrow("SECRET_DOMAIN_MUST_BE_SEPARATE");
+
     // The API process root must run this check with no publication guard.
     const apiMain = await readFile(
       new URL("../../apps/api/src/main.ts", import.meta.url), "utf8"
     );
+    // Fix round 1: the previous keys of both rings reach the check.
+    expect(apiMain).toContain("previousKeks:");
     // DL7-F7: still at the process root and still unguarded by publication; it is
     // a named boot stage now, so a failure zeroes the keys already loaded.
     expect(apiMain).toMatch(
@@ -342,12 +374,15 @@ describe("S1 crypto foundation", () => {
       readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8"),
       readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8")
     ]);
-    expect(apiMain).toContain("loadKek(environment.KEK_PATH)");
+    // V-3 (A-C2): each root loads its KEK as a RING — the current key and, only
+    // while a changeover is configured, the previous one. `loadKekRing` is the
+    // same custody-checked `loadKek` underneath, once per path.
+    expect(apiMain).toContain("loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH");
     expect(apiMain).toContain("supportKekPath: environment.SUPPORT_KEK_PATH");
     expect(apiMain).toContain("protectedKeyPaths:");
     expect(apiMain).not.toContain(
       "createSupportKeyPort({ supportKekPath: environment.KEK_PATH })"
     );
-    expect(runnerMain).toContain("loadKek(environment.KEK_PATH)");
+    expect(runnerMain).toContain("loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH)");
   });
 });

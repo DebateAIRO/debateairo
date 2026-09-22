@@ -3,12 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadObservationAgentEnvironment } from "../../packages/register/src/runtime-environment.js";
 import {
   parseApiEnvironment,
+  parseKeyRotationEnvironment,
   parseLivenessEnvironment,
   parseMigrationEnvironment,
   parseReplaySelfTestEnvironment,
   parseRunnerEnvironment,
   parseSettlementEnvironment
 } from "@debateai/register";
+import { keyRotationEnvironmentCode } from "../../apps/runner/src/rotate-kek-cli.js";
 import { assertProductionProviderTargets, parseProviderDiscoveryTargets } from "@debateai/providers";
 import {
   validApiEnvironmentFixture,
@@ -271,5 +273,64 @@ describe("production floors reach the observation agent's loader (C1, L5-F3)", (
       stubAgentEnvironment(REMOTE_PLAIN, nodeEnvironment);
       expect(loadObservationAgentEnvironment().OBSERVATION_DATABASE_URL, String(nodeEnvironment)).toBe(REMOTE_PLAIN);
     }
+  });
+});
+
+/**
+ * FIX WAVE C-I7 (final review C). The key-rotation loader carried no `NODE_ENV`
+ * and applied no floors, so `SUPPORT_DATABASE_URL` was the one `*_DATABASE_URL`
+ * in the tree that was never floored — and the rotation is precisely the
+ * command that WRITES two support key columns. Run on the production host
+ * against an off-box support database with no `sslmode=verify-full`, the whole
+ * re-wrap travelled in cleartext where every other loader refuses.
+ */
+describe("production floors reach the key-rotation loader (C-I7)", () => {
+  const ROTATION = Object.freeze({
+    KEK_PATH: "/run/secrets/kek",
+    USER_DEK_STORE_PATH: "/run/secrets/user-deks",
+    SUPPORT_KEK_PATH: "/run/secrets/support-kek"
+  });
+
+  it("refuses a remote support database without verified TLS in production", () => {
+    expect(() => parseKeyRotationEnvironment({
+      ...ROTATION, SUPPORT_DATABASE_URL: REMOTE_PLAIN, NODE_ENV: "production"
+    })).toThrow("DATABASE_URL_TLS_REQUIRED:SUPPORT_DATABASE_URL");
+  });
+
+  it("accepts a verified-TLS or unix-socket support database in production", () => {
+    expect(parseKeyRotationEnvironment({
+      ...ROTATION, SUPPORT_DATABASE_URL: REMOTE_VERIFIED, NODE_ENV: "production"
+    }).SUPPORT_DATABASE_URL).toBe(REMOTE_VERIFIED);
+    const socket = "postgresql://debateai_prod_api_support:pw@localhost/debateai?host=/var/run/postgresql";
+    expect(parseKeyRotationEnvironment({
+      ...ROTATION, SUPPORT_DATABASE_URL: socket, NODE_ENV: "production"
+    }).SUPPORT_DATABASE_URL).toBe(socket);
+  });
+
+  it("applies nothing outside production, and NODE_ENV stays optional", () => {
+    for (const nodeEnvironment of ["development", "test", undefined]) {
+      expect(parseKeyRotationEnvironment({
+        ...ROTATION, SUPPORT_DATABASE_URL: REMOTE_PLAIN, NODE_ENV: nodeEnvironment
+      }).SUPPORT_DATABASE_URL, String(nodeEnvironment)).toBe(REMOTE_PLAIN);
+    }
+  });
+
+  /**
+   * M5: a refusal from this loader must still NAME the variable when it reaches
+   * the operator, or the one line the command prints says nothing actionable.
+   */
+  it("names the variable in the line the rotation command prints", () => {
+    const refusal = (() => {
+      try {
+        parseKeyRotationEnvironment({
+          ...ROTATION, SUPPORT_DATABASE_URL: REMOTE_PLAIN, NODE_ENV: "production"
+        });
+        return undefined;
+      } catch (error) {
+        return error;
+      }
+    })();
+    expect(keyRotationEnvironmentCode(refusal))
+      .toBe("DATABASE_URL_TLS_REQUIRED:SUPPORT_DATABASE_URL");
   });
 });

@@ -10,7 +10,7 @@ import {
   FilePublicationKeyStore,
   FileRunContentKeyStore,
   FileUserDekStore,
-  loadKek,
+  loadKekRing,
   loadSecretKey,
   PublicationCipher,
   readCustodyAuthorizationHeader
@@ -105,9 +105,25 @@ configureCustodyGroup(environment.DEBATEAI_CUSTODY_GROUP);
  * row no longer exits with three KEKs live in memory.
  */
 const boot = installBootCustody();
-const kek = boot.holdKek(loadKek(environment.KEK_PATH));
-const corpusKek = environment.PUBLICATION_ENABLED === "true"
-  ? boot.holdKek(loadKek(environment.CORPUS_KEK_PATH!)) : undefined;
+/**
+ * V-3 (fix wave A-C2). The KEK a service holds is a RING: the current key and,
+ * for the length of a changeover, the previous one. Reads try current then
+ * previous; every write uses the current key; verification is current-alone.
+ * With no `*_KEK_PREVIOUS_PATH` set — the steady state — each ring is exactly
+ * the single key this root has always built.
+ *
+ * Both handles are held by the boot ledger the moment they exist (DL7-F7), so a
+ * stage that rejects mid-boot zeroes the previous key too — and the LOAD itself
+ * runs under the ledger, because it can refuse between the two: a missing,
+ * short or duplicate previous key file throws with the current key already
+ * held, which is the residual A-I2 closes.
+ */
+const userKeks = boot.runSync("user-dek-kek", () => loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH, (handle) => boot.holdKek(handle)));
+const kek = userKeks.current;
+const corpusKeks = environment.PUBLICATION_ENABLED === "true"
+  ? boot.runSync("corpus-kek", () => loadKekRing(environment.CORPUS_KEK_PATH!, environment.CORPUS_KEK_PREVIOUS_PATH, (handle) => boot.holdKek(handle)))
+  : undefined;
+const corpusKek = corpusKeks?.current;
 const blindIndexKey = loadSecretKey(environment.BLIND_INDEX_KEY_PATH);
 const sourceIpSalt = loadSecretKey(environment.AUDIT_SOURCE_IP_SALT_PATH);
 // DL7-F7: two plain secret buffers, held the moment they exist. Each has an
@@ -130,6 +146,14 @@ await boot.run("publication-secret-domains", async () => assertPublicationSecret
   }),
   privateKekPath: environment.KEK_PATH,
   privateStorePath: environment.USER_DEK_STORE_PATH,
+  // V-3 (fix round 1): a changeover's previous keys are this process's key
+  // material too, so they join the same pairwise domain check.
+  previousKeks: [
+    ...(userKeks.previous === undefined
+      ? [] : [{ handle: userKeks.previous, path: environment.KEK_PREVIOUS_PATH! }]),
+    ...(corpusKeks?.previous === undefined
+      ? [] : [{ handle: corpusKeks.previous, path: environment.CORPUS_KEK_PREVIOUS_PATH! }])
+  ],
   additionalSecrets: [
     { path: environment.BLIND_INDEX_KEY_PATH, material: blindIndexKey },
     { path: environment.AUDIT_SOURCE_IP_SALT_PATH, material: sourceIpSalt }
@@ -233,9 +257,20 @@ const hatchet = new Hatchet({
 const dispatcher = new HatchetDispatcher(hatchet, environment.HATCHET_WORKFLOW_NAME);
 const deploymentMakers = await boot.run("deployment-makers", () => readDeploymentMakerCapability(pool, environment.REGISTER_VERSION));
 const discoveryPolicy = await boot.run("discovery-policy", () => readPanelDiscoveryPolicy(pool, environment.REGISTER_VERSION));
-if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
-  throw new TypeError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
-}
+/**
+ * DL7-F7 (fix wave A-I2): a SYNCHRONOUS decision answers to the boot ledger
+ * like every awaited one. A hosted first boot whose vendor credential file is
+ * mis-permissioned refuses here — `PROVIDER_AUTHORIZATION_FILE_UNUSABLE` —
+ * and used to end the process by top-level throw with three KEKs, the
+ * blind-index key and the audit salt live in memory and no `api.boot.failed`
+ * line. `boot.runSync` closes the ledger newest-first and names the stage.
+ */
+const providerTargetsJson = boot.runSync("provider-discovery-targets", () => {
+  if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
+  }
+  return environment.PROVIDER_DISCOVERY_TARGETS_JSON;
+});
 const structuralInputs = await boot.run("structural-ceilings", () => readStructuralCeilingPolicyInputs(pool, environment.REGISTER_VERSION));
 /**
  * T17: the sealed `envelopeFormulaInputs` row (T16). The reader is the loud
@@ -246,24 +281,26 @@ const structuralInputs = await boot.run("structural-ceilings", () => readStructu
  */
 const envelopeFormulaInputs = await boot.run("envelope-formula-inputs", () => readEnvelopeFormulaInputs(pool, environment.REGISTER_VERSION));
 const probes = new ProviderProbeRepository(pool);
-const declaredProviderTargets = parseProviderDiscoveryTargets(
-  environment.PROVIDER_DISCOVERY_TARGETS_JSON,
-  deploymentMakers.configuredProviders
-);
-// V-9(c): the same mode decision the runner takes, over the same target set, and
-// taken on the DECLARED targets — before any credential file is resolved.
-assertDeploymentProviderTargets(declaredProviderTargets, {
-  mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
+const declaredProviderTargets = boot.runSync("provider-targets", () => {
+  const declared = parseProviderDiscoveryTargets(
+    providerTargetsJson, deploymentMakers.configuredProviders
+  );
+  // V-9(c): the same mode decision the runner takes, over the same target set,
+  // and taken on the DECLARED targets — before any credential file is resolved.
+  assertDeploymentProviderTargets(declared, {
+    mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
+  });
+  // V-28: and a hosted DEBATE target must carry its price, or its calls cannot
+  // be billed against the per-run and daily envelopes. Separate from the rule
+  // above because the support chat's target shares that one and keeps its own
+  // accounting.
+  assertPricedProviderTargets(declared, environment.DEPLOYMENT_MODE);
+  return declared;
 });
-// V-28: and a hosted DEBATE target must carry its price, or its calls cannot be
-// billed against the per-run and daily envelopes. Separate from the rule above
-// because the support chat's target shares that one and keeps its own accounting.
-assertPricedProviderTargets(declaredProviderTargets, environment.DEPLOYMENT_MODE);
 // V-9(2): the ask-time health probe needs the same credential the runner uses, so
 // it resolves each vendor's file through the same custody-checked seam.
-const providerDiscoveryTargets = resolveProviderTargetCredentials(
-  declaredProviderTargets, readCustodyAuthorizationHeader
-);
+const providerDiscoveryTargets = boot.runSync("provider-credentials", () =>
+  resolveProviderTargetCredentials(declaredProviderTargets, readCustodyAuthorizationHeader));
 const resolveProviderPanel = createProviderDiscoveryResolver({
   configuredProviders: deploymentMakers.configuredProviders,
   targets: providerDiscoveryTargets,
@@ -272,7 +309,12 @@ const resolveProviderPanel = createProviderDiscoveryResolver({
   probeTimeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS
 });
 const deploymentRiskTier = await boot.run("deployment-risk-tier", () => readDeploymentRiskTier(pool, environment.REGISTER_VERSION));
-const dekStore = new FileUserDekStore(environment.USER_DEK_STORE_PATH, kek);
+// V-3: over the RING, so a record still wrapped by the previous key opens for
+// the length of a changeover. Writes stay under the current key. Under the
+// ledger (A-I2) because the construction refuses a store path that is not one
+// and a ring whose two keys are the same key.
+const dekStore = boot.runSync("user-dek-store", () =>
+  new FileUserDekStore(environment.USER_DEK_STORE_PATH, userKeks));
 const authenticationRiskSignals = new PostgresAuthenticationRiskSignalRepository(
   pool,auditContextHasher,dekStore,recoveryPolicy.riskSignals.rawSignalRetentionMs,
   recoveryPolicy.riskSignals.maximumEvaluatorSignals
@@ -287,20 +329,21 @@ const recovery = new RecoveryStartService({
   enumerationFloorMs: authPolicy.verification.enumerationResponseFloorMs,
   publicResponsePolicy: recoveryPolicy.publicResponse
 });
-const runKeyStore = new FileRunContentKeyStore(
-  environment.USER_DEK_STORE_PATH,
-  dekStore,
-  async (ownerRef) => {
-    const resolved = await pool.query<{ user_id: string }>(
-      `SELECT user_id FROM identity."user"
-       WHERE owner_ref=$1 AND state='active'`,
-      [ownerRef]
-    );
-    const userId = resolved.rows[0]?.user_id;
-    if (userId === undefined) throw new TypeError("OWNER_REF_UNRESOLVED");
-    return userId;
-  }
-);
+const runKeyStore = boot.runSync("run-content-key-store", () =>
+  new FileRunContentKeyStore(
+    environment.USER_DEK_STORE_PATH,
+    dekStore,
+    async (ownerRef) => {
+      const resolved = await pool.query<{ user_id: string }>(
+        `SELECT user_id FROM identity."user"
+         WHERE owner_ref=$1 AND state='active'`,
+        [ownerRef]
+      );
+      const userId = resolved.rows[0]?.user_id;
+      if (userId === undefined) throw new TypeError("OWNER_REF_UNRESOLVED");
+      return userId;
+    }
+  ));
 if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
   configureContentEncryption(pool, new ContentCipher(runKeyStore));
 }
@@ -384,9 +427,9 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   server:serverAskAdmissionPool,legacy:legacyAskAdmissionPool
 }));
 const publicationCipher = environment.PUBLICATION_ENABLED === "true"
-  ? new PublicationCipher(new FilePublicationKeyStore(
-      environment.PUBLICATION_KEY_STORE_PATH!,corpusKek!
-    ))
+  ? boot.runSync("publication-key-store", () => new PublicationCipher(new FilePublicationKeyStore(
+      environment.PUBLICATION_KEY_STORE_PATH!,corpusKeks!
+    )))
   : undefined;
 const publications = publicationCipher === undefined
   ? undefined
@@ -402,8 +445,15 @@ if (publications !== undefined) {
   // can accept traffic. Both bounded outboxes continue reconciling while the
   // process is live; an item failure is reported only after later items in the
   // same batch were given a chance to complete.
-  await publications.reconcileKeyProvisionCleanup();
-  await publications.reconcileKeyCleanup();
+  //
+  // DL7-F7 (fix round 1): these two run DURING the boot and were the last
+  // awaits outside the ledger — indented inside this block, which is exactly
+  // what the old line-based scan could not see. A publication pool that refuses
+  // here used to leave every key live and print no `api.boot.failed` line.
+  await boot.run("publication-key-cleanup", async () => {
+    await publications.reconcileKeyProvisionCleanup();
+    await publications.reconcileKeyCleanup();
+  });
   publicationCleanupTimer = setInterval(() => {
     void Promise.all([
       publications.reconcileKeyProvisionCleanup(),
@@ -472,6 +522,10 @@ const supportRelayLeasePool = boot.hold(
 );
 const supportKeys = await boot.run("support-keys", () => createSupportKeyPort({
   supportKekPath: environment.SUPPORT_KEK_PATH,
+  // V-3: the support envelope carries no key label, so a row written before a
+  // changeover is opened by trying the current key and then this one. Absent
+  // outside a changeover, which is the steady state.
+  previousSupportKekPath: environment.SUPPORT_KEK_PREVIOUS_PATH,
   protectedKeyPaths: [
     environment.KEK_PATH,
     environment.CORPUS_KEK_PATH,
@@ -508,10 +562,12 @@ const supportDegraded = new SupportDegradedState();
 // V-30(1): the support chat's model is configuration, on the SAME mode decision
 // the debate targets take above. Hosted refuses a relay target here exactly as
 // it refuses one there; local keeps today's relay path.
-const supportModelTarget = environment.SUPPORT_MODEL_TARGET_JSON === undefined
-  ? undefined : parseSupportModelTargetJson(environment.SUPPORT_MODEL_TARGET_JSON,{
-    mode: environment.DEPLOYMENT_MODE,nodeEnv: environment.NODE_ENV
-  });
+const supportModelTarget = boot.runSync("support-model-target", () =>
+  (environment.SUPPORT_MODEL_TARGET_JSON === undefined
+    ? undefined
+    : parseSupportModelTargetJson(environment.SUPPORT_MODEL_TARGET_JSON,{
+      mode: environment.DEPLOYMENT_MODE,nodeEnv: environment.NODE_ENV
+    })));
 const supportModels = new Map<string,SupportModelPort>(supportModelTarget === undefined ? [] : [[
   supportModelTarget.providerRef,
   // V-9(2): a declared credential FILE is resolved here, through the same
@@ -692,8 +748,15 @@ const startup = installStartupResourceOwner({
     { end: () => supportKeys.close() },
     { end: () => supportConfiguration.close() }
   ],
-  // L2-F7: zeroed after every pool that borrows from them has closed.
-  kekHandles: [kek, ...(corpusKek === undefined ? [] : [corpusKek])]
+  // L2-F7: zeroed after every pool that borrows from them has closed. A
+  // changeover's PREVIOUS keys are in this list for the same reason the current
+  // ones are: the process holds them, so the process zeroes them (V-3).
+  kekHandles: [
+    kek,
+    ...(userKeks.previous === undefined ? [] : [userKeks.previous]),
+    ...(corpusKek === undefined ? [] : [corpusKek]),
+    ...(corpusKeks?.previous === undefined ? [] : [corpusKeks.previous])
+  ]
 });
 // DL7-F7: the boot ledger hands everything it held to the startup resource
 // owner, which is the lifecycle from here on. Exactly one owner at a time:

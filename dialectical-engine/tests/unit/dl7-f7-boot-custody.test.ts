@@ -21,6 +21,39 @@ function heldKek() {
   return handle;
 }
 
+/**
+ * The top-level statement an index belongs to: every line back to the last one
+ * that begins at column 0. An indented line continues the statement above it,
+ * so a decision nested in an `if` block is judged by the whole statement rather
+ * than by its indentation — and a blank line ends one, so nothing reaches back
+ * into the statement before it and finds someone else's `boot.run`.
+ *
+ * Shared by both scans below, which is the point: the synchronous half and the
+ * awaited half must not drift into two different ideas of what "inside a boot
+ * stage" means.
+ */
+function statementOf(source: string, index: number): string {
+  const lines = source.slice(0, index).split("\n");
+  let first = lines.length - 1;
+  while (first > 0 && /^\s/u.test(lines[first] ?? "")) first -= 1;
+  return lines.slice(first).join("\n");
+}
+
+/** A statement that opens a function literal before this point only DEFINES a body. */
+function definesACallback(statement: string): boolean {
+  return /=>|function\s*[\w$]*\s*\(/u.test(statement);
+}
+
+/** 1-based source line of an index, for a failure message that can be looked up. */
+function lineOf(source: string, index: number): number {
+  return source.slice(0, index).split("\n").length;
+}
+
+/** A literal needle as a global regular expression, so every occurrence is judged. */
+function literal(needle: string): RegExp {
+  return new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "gu");
+}
+
 describe("DL7-F7 the boot owns its keys before the startup owner exists", () => {
   it("zeroes every held key and ends every held pool when a stage fails", async () => {
     const order: string[] = [];
@@ -114,17 +147,127 @@ describe("DL7-F7 the boot owns its keys before the startup owner exists", () => 
   });
 });
 
+/**
+ * FIX WAVE A-I2 (final review A). The ledger covered awaited stages only. Every
+ * SYNCHRONOUS throw between the first `boot.holdKek` and `boot.release()` —
+ * `PROVIDER_DISCOVERY_TARGETS_REQUIRED`, the provider-target parse, the two
+ * deployment assertions, the credential resolution, the support model target
+ * parse, the store constructions — ended the process with the private KEK, the
+ * corpus KEK, the blind-index key and the audit salt live in memory and no
+ * `api.boot.failed` line: the exact residual DL7-F7 exists to close.
+ */
+describe("DL7-F7 a synchronous boot decision answers to the ledger too", () => {
+  it("closes everything and names the stage when a synchronous decision throws", async () => {
+    const order: string[] = [];
+    const logger = { error: vi.fn() };
+    const boot = installBootCustody({ logger });
+    const handle = boot.holdKek(heldKek());
+    boot.hold({ end: async () => { order.push("pool"); } });
+
+    expect(() => boot.runSync("provider-targets", () => {
+      throw new TypeError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
+    })).toThrowError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
+
+    expect(order).toEqual(["pool"]);
+    expect(() => kekId(handle)).toThrowError(
+      expect.objectContaining({ code: "KEK_DESTROYED" })
+    );
+    expect(JSON.parse(String(logger.error.mock.calls[0]?.[0]))).toEqual({
+      event: "api.boot.failed", stage: "provider-targets"
+    });
+  });
+
+  it("returns the value of a synchronous decision that succeeds, holding everything", async () => {
+    const boot = installBootCustody({ logger: { error: vi.fn() } });
+    const handle = boot.holdKek(heldKek());
+    expect(boot.runSync("provider-targets", () => ["vendor:acme"])).toEqual(["vendor:acme"]);
+    expect(kekId(handle)).toMatch(/^[0-9a-f]{16}$/u);
+  });
+
+  it("is a pass-through after the handover, like run", async () => {
+    const ended = vi.fn(async () => undefined);
+    const logger = { error: vi.fn() };
+    const boot = installBootCustody({ logger });
+    boot.hold({ end: ended });
+    boot.release();
+    expect(() => boot.runSync("late", () => { throw new Error("after handover"); }))
+      .toThrowError("after handover");
+    expect(ended).not.toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The source-level half: a decision that can throw and is NOT inside a
+   * `boot.run` / `boot.runSync` callback is one the ledger cannot see. The
+   * statement is the unit, so a call nested in an `if` block at the top level
+   * is judged by the statement it belongs to rather than by its indentation —
+   * which is what the old "no unowned await" line scan missed.
+   *
+   * EVERY occurrence is judged, not the first: two `loadKekRing(` calls stand
+   * next to each other, and a scan that stopped at the first one certified the
+   * second (fix round 1, Important 1).
+   */
+  it("runs every throwing synchronous decision of the boot under the ledger", async () => {
+    const source = await readFile("apps/api/src/main.ts", "utf8");
+    const from = source.indexOf("const boot = installBootCustody(");
+    const until = source.indexOf("boot.release()");
+    expect(from).toBeGreaterThan(-1);
+    expect(until).toBeGreaterThan(from);
+
+    for (const decision of [
+      "throw new TypeError(\"PROVIDER_DISCOVERY_TARGETS_REQUIRED\")",
+      "parseProviderDiscoveryTargets(",
+      "assertDeploymentProviderTargets(",
+      "assertPricedProviderTargets(",
+      "resolveProviderTargetCredentials(",
+      "parseSupportModelTargetJson(",
+      // Every key load and every store construction: each one refuses a
+      // mis-provisioned file, and the refusal must reach the ledger.
+      "loadKekRing(",
+      "new FileUserDekStore(",
+      "new FileRunContentKeyStore(",
+      "new FilePublicationKeyStore("
+    ]) {
+      const found = [...source.matchAll(literal(decision))]
+        .map((match) => match.index)
+        .filter((at) => at >= from && at < until);
+      expect(found.length, decision).toBeGreaterThan(0);
+      for (const at of found) {
+        expect(statementOf(source, at), `${decision} @${lineOf(source, at)}`)
+          .toMatch(/boot\.run(?:Sync)?\(/u);
+      }
+    }
+  });
+});
+
 describe("DL7-F7 every awaited boot stage runs under an owner", () => {
-  it("leaves no top-level await in the API boot outside boot.run or startup.run", async () => {
+  /**
+   * Fix round 1, Important 2. The old scan matched only lines that BEGIN with
+   * `await` or `const … = await`, so the two indented awaits inside
+   * `if (publications !== undefined) {` were invisible to it — unowned, and
+   * running during the boot. This one uses the same statement rule as the
+   * synchronous scan above.
+   *
+   * An await inside a function literal the statement only DEFINES is skipped,
+   * and that is a real distinction rather than an escape hatch: the body of a
+   * reconciler, a timer callback or a repository's `prepare` hook runs long
+   * after the boot, when the startup resource owner is the owner. What the
+   * ledger must cover is what EXECUTES while the boot is still running.
+   */
+  it("leaves no await in the API boot outside boot.run or startup.run", async () => {
     const source = await readFile("apps/api/src/main.ts", "utf8");
     const from = source.indexOf("const boot = installBootCustody(");
     expect(from).toBeGreaterThan(-1);
-    // Every await from the first key load to the end of the file: before this
-    // fix the fifteen between the first load and `installStartupResourceOwner`
-    // had no owner at all.
-    const unguarded = source.slice(from).split("\n").filter((line) =>
-      /^(?:(?:const|let)\s+[^=]+=\s*)?await\s/u.test(line)
-      && !/await\s+(?:boot|startup)\.run\(/u.test(line));
+    const unguarded: string[] = [];
+    for (const match of source.slice(from).matchAll(/\bawait\s/gu)) {
+      const at = from + (match.index ?? 0);
+      const statement = statementOf(source, at);
+      const lineEnd = source.indexOf("\n", at);
+      const line = source.slice(at, lineEnd === -1 ? source.length : lineEnd).trim();
+      if (/(?:boot|startup)\.run(?:Sync)?\(/u.test(statement + line)) continue;
+      if (definesACallback(statement)) continue;
+      unguarded.push(`${lineOf(source, at)}: ${line}`);
+    }
     expect(unguarded).toEqual([]);
   });
 
@@ -132,7 +275,9 @@ describe("DL7-F7 every awaited boot stage runs under an owner", () => {
     const source = await readFile("apps/api/src/main.ts", "utf8");
     expect(source).toContain("installBootCustody");
     for (const held of [
-      "boot.holdKek(loadKek(environment.KEK_PATH))",
+      // V-3 (A-C2): the first key load is a RING now — current and, during a
+      // changeover, previous — and `hold` runs on each handle as it is made.
+      "loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH, (handle) => boot.holdKek(handle))",
       "boot.hold(",
       "boot.release()"
     ]) expect(source).toContain(held);

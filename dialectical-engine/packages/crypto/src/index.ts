@@ -18,7 +18,7 @@ import {
   realpathSync,
   statSync
 } from "node:fs";
-import type { Dirent } from "node:fs";
+import type { Dirent, Stats } from "node:fs";
 import { chmod, lstat, mkdir, open, readFile, readdir, rename, rm, stat } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { performance } from "node:perf_hooks";
@@ -403,6 +403,15 @@ export function assertPublicationSecretDomains(input: Readonly<{
   corpusKekPath?: string | undefined;
   privateStorePath: string;
   publicationStorePath?: string | undefined;
+  /**
+   * V-3, fix round 1. The PREVIOUS key of each ring a changeover configures.
+   * They are key material this process holds, so they are in the same pairwise
+   * check as everything else: `toKekRing` only refuses a previous key equal to
+   * its OWN current one, which leaves `KEK_PREVIOUS_PATH` aimed at the
+   * blind-index key, the audit salt or the corpus KEK unnoticed — the L2-F8
+   * aliasing this function exists to refuse, one changeover later.
+   */
+  previousKeks?: readonly Readonly<{ handle: KekHandle;path: string }>[];
   additionalSecrets?: readonly Readonly<{
     path: string;
     material: Uint8Array;
@@ -416,6 +425,9 @@ export function assertPublicationSecretDomains(input: Readonly<{
   try {
     materials.push(readKek(input.privateKek));
     if (input.corpusKek !== undefined) materials.push(readKek(input.corpusKek));
+    for (const previous of input.previousKeks ?? []) {
+      materials.push(readKek(previous.handle));
+    }
     for (const secret of input.additionalSecrets ?? []) {
       materials.push(copyKey(secret.material));
     }
@@ -435,6 +447,7 @@ export function assertPublicationSecretDomains(input: Readonly<{
     ...(input.corpusKekPath === undefined ? [] : [canonicalCandidatePath(input.corpusKekPath)]),
     ...(input.publicationStorePath === undefined
       ? [] : [canonicalCandidatePath(input.publicationStorePath)]),
+    ...(input.previousKeks ?? []).map((previous) => canonicalCandidatePath(previous.path)),
     ...(input.additionalSecrets ?? []).map((secret) => canonicalCandidatePath(secret.path)),
     ...(input.additionalStorePaths ?? []).map(canonicalCandidatePath)
   ];
@@ -578,7 +591,14 @@ export function resolveCustodyGroupGid(
   if (value === "") return undefined;
   if (/^[0-9]+$/.test(value)) {
     const gid = Number(value);
-    if (!Number.isSafeInteger(gid)) throw new CustodyGroupUnresolvedError();
+    // A gid is a uint32, and `0` is root/wheel — a group every privileged
+    // process is already in, which is not a custody boundary at all. Both were
+    // accepted unchecked, so a typo became the custody gid and surfaced as
+    // KEK_CUSTODY_INVALID at the first key open instead of here, which is what
+    // V-19 promises the operator (final review A, Minor).
+    if (!Number.isSafeInteger(gid) || gid <= 0 || gid > 0xffff_ffff) {
+      throw new CustodyGroupUnresolvedError();
+    }
     return gid;
   }
   if (!GROUP_NAME.test(value)) throw new CustodyGroupUnresolvedError();
@@ -776,9 +796,12 @@ function readCustodyFile(
     return material;
   } catch (error) {
     material?.fill(0);
-    // A misconfigured custody group is an operator error, not an unsafe key:
-    // it keeps its own code all the way out so the boot message names it.
-    if (error instanceof CustodyGroupUnresolvedError) throw error;
+    // A `CustodyGroupUnresolvedError` branch stood here. Nothing inside the try
+    // above can throw one: the group is resolved ONCE, in
+    // `configureCustodyGroup`, before the first key file is opened, and
+    // `currentCustodyGid()` only reads the variable it left behind. Dead since
+    // the group became eager; removed so no reader believes this path can
+    // report that refusal (final review A, Minor).
     if (error instanceof CryptoCustodyError || error instanceof KekUnresolvedError) throw error;
     // V-9(2): a bounded credential file's own content refusal keeps its name too.
     if (error instanceof ProviderCredentialInvalidError) throw error;
@@ -809,6 +832,32 @@ export function loadKek(pathOrBuffer: string | Uint8Array): KekHandle {
   } finally {
     material.fill(0);
   }
+}
+
+/**
+ * V-3 — the changeover ring a SERVICE builds from the two paths it is
+ * configured with. `previousPath` absent is the steady state and answers a ring
+ * that is byte-for-byte today's single-key behaviour.
+ *
+ * `hold` exists because of DL7-F7: each handle is offered to the owner the
+ * MOMENT it exists, so a refusal on the previous key can never leave the
+ * current key live in memory with nothing responsible for it. The default is
+ * identity, for callers that own the handles themselves.
+ *
+ * The two keys being the same file, or the same bytes under two names, is
+ * refused here (`KEK_RING_NOT_A_CHANGEOVER`, via `toKekRing`) rather than at the
+ * first store construction: during a changeover that mistake makes every record
+ * look already-current whichever key really wrapped it, so a verification pass
+ * over it would mean nothing.
+ */
+export function loadKekRing(
+  currentPath: string,
+  previousPath: string | undefined,
+  hold: (handle: KekHandle) => KekHandle = (handle) => handle
+): KekRing {
+  const current = hold(loadKek(currentPath));
+  if (previousPath === undefined) return Object.freeze({ current });
+  return Object.freeze(toKekRing({ current, previous: hold(loadKek(previousPath)) }));
 }
 
 /**
@@ -1714,7 +1763,13 @@ async function republishRecord(
     await fileSystem.rm(temporary, { force: true });
     file = await fileSystem.open(temporary, "wx", modes.file);
     await file.writeFile(payload, "utf8");
+    // A-I3: the group first, while the temporary is still 0600, then the mode,
+    // then the read-back — a re-wrap must not turn a readable record into one
+    // the reader refuses, and it is checked before the rename, so the ORIGINAL
+    // record survives a refusal.
+    await applyCustodyGroupOwnership(file, modes);
     await fileSystem.chmod(temporary, modes.file);
+    await assertPublishableUnderCustody(file, directory, modes, fileSystem);
     await file.sync();
     await file.close();
     file = undefined;
@@ -1764,6 +1819,17 @@ async function listRecordRefs(
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return Object.freeze([]);
     throw error;
+  }
+  // A record directory that is a SYMLINK is refused, never skipped. The dirent
+  // of a symlink answers `isDirectory()` false, so it used to fall out of the
+  // listing silently while `load` followed it happily: the record was neither
+  // re-wrapped nor verified and the rotation still printed a clean pass — the
+  // "never opened store reports clean" class, one record at a time. Only an
+  // operator can put a symlink here, and a custody refusal is what a link in a
+  // key store means everywhere else in this module.
+  if (entries.some((entry) =>
+    typeof entry !== "string" && entry.isSymbolicLink() && accepts(entry.name))) {
+    throw new CryptoCustodyError("SECRET_CUSTODY_INVALID");
   }
   return Object.freeze(entries
     .filter((entry) => typeof entry !== "string" && entry.isDirectory() && accepts(entry.name))
@@ -1871,6 +1937,90 @@ async function custodyWriteModes(
     // tree this process creates out of nothing stays single-owner.
   }
   return OWNER_CUSTODY_MODES;
+}
+
+/**
+ * V-19, fix wave A-I3. The first half of the write path's custody step: give
+ * the temporary the custody GROUP, BEFORE the mode is widened to 0640.
+ *
+ * The order is the point. The temporary is created 0600 under the unit's
+ * umask, so while it is still owner-only its group may be changed safely;
+ * widening to 0640 first and setting the group second would leave a window in
+ * which the record is group-readable by the WRITER's primary group — not the
+ * custody group — and no byte of a wrapped key may be readable by the wrong
+ * group, however briefly.
+ *
+ * `fchown(fd, -1, gid)` is attempted rather than required: an owner may only
+ * set a group it belongs to, and on many hosts the gid is already right by
+ * inheritance. The read-back below is the authority, not this call's exit.
+ */
+async function applyCustodyGroupOwnership(
+  file: Readonly<{ chown(uid: number, gid: number): Promise<void> }>,
+  modes: CustodyWriteModes
+): Promise<void> {
+  const custodyGid = currentCustodyGid();
+  if (custodyGid === undefined || modes !== GROUP_CUSTODY_MODES) return;
+  try {
+    await file.chown(-1, custodyGid);
+  } catch {
+    // Not permitted, or not needed. The read-back decides.
+  }
+}
+
+/**
+ * The second half, between `chmod` and the rename: read the record's own facts
+ * back through the acceptance function the READER uses, and refuse to publish
+ * anything that function would not accept.
+ *
+ * Why it is needed. `custodyWriteModes` decides the modes from the store ROOT,
+ * but a new file's gid comes from the directory it lands in — the parent's with
+ * setgid, the writing process's primary group without it — and nothing checked
+ * either. A root provisioned for the custody group above leaf directories that
+ * are still `debateai-api`-grouped (the recipe half-applied, or the root
+ * re-provisioned alone) produced a 0640 record the reader refuses: a
+ * registration that "succeeded" whose user can never log in.
+ *
+ * `SECRET_CUSTODY_INVALID` is the reader's own code for "this exists and is not
+ * safe to trust", which is exactly what the refusal is saying, one moment
+ * earlier and about a record nobody has seen yet.
+ */
+async function assertPublishableUnderCustody(
+  file: Readonly<{ stat(): Promise<Stats> }>,
+  directory: string,
+  modes: CustodyWriteModes,
+  fileSystem: Pick<UserDekStoreFileSystem, "stat">
+): Promise<void> {
+  const custodyGid = currentCustodyGid();
+  // Single-owner modes are what this process creates by itself under its own
+  // umask, and the contract for them is unchanged; the group shape is the one
+  // that depends on facts the writer does not control.
+  if (custodyGid === undefined || modes !== GROUP_CUSTODY_MODES) return;
+  const metadata = await file.stat();
+  const parent = await fileSystem.stat(directory);
+  if (!custodyAccepts(
+    {
+      isFile: metadata.isFile(),
+      nlink: metadata.nlink,
+      mode: metadata.mode,
+      uid: metadata.uid,
+      gid: metadata.gid,
+      size: metadata.size
+    },
+    {
+      isDirectory: parent.isDirectory(),
+      mode: parent.mode,
+      uid: parent.uid,
+      gid: parent.gid
+    },
+    {
+      callerUid: typeof process.getuid === "function" ? process.getuid() : undefined,
+      custodyGid,
+      // A wrapped-key record is a JSON envelope, not a 32-byte key.
+      expectedSize: undefined
+    }
+  )) {
+    throw new CryptoCustodyError("SECRET_CUSTODY_INVALID");
+  }
 }
 
 /**
@@ -2025,7 +2175,12 @@ export class FileUserDekStore implements ReadableUserDekStore {
       await this.fileSystem.chmod(directory, modes.directory);
       file = await this.fileSystem.open(temporary, "wx", modes.file);
       await file.writeFile(userDekRecordJson(userId, this.keks.current, envelope), "utf8");
+      // A-I3: the custody group while the temporary is still 0600, THEN the
+      // wider mode, then the record's own facts through the reader's own
+      // acceptance function, before the rename publishes it.
+      await applyCustodyGroupOwnership(file, modes);
       await this.fileSystem.chmod(temporary, modes.file);
+      await assertPublishableUnderCustody(file, directory, modes, this.fileSystem);
       await file.sync();
       await file.close();
       file = undefined;
@@ -2405,7 +2560,12 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
       await this.fileSystem.chmod(directory, modes.directory);
       file = await this.fileSystem.open(temporary, "wx", modes.file);
       await file.writeFile(JSON.stringify(record), "utf8");
+      // A-I3: the custody group while the temporary is still 0600, THEN the
+      // wider mode, then the record's own facts through the reader's own
+      // acceptance function, before the rename publishes it.
+      await applyCustodyGroupOwnership(file, modes);
       await this.fileSystem.chmod(temporary, modes.file);
+      await assertPublishableUnderCustody(file, directory, modes, this.fileSystem);
       await file.sync();
       await file.close();
       file = undefined;
@@ -2869,7 +3029,12 @@ export class FilePublicationKeyStore implements PublicationKeyStore {
       await this.fileSystem.chmod(directory, modes.directory);
       file = await this.fileSystem.open(temporary, "wx", modes.file);
       await file.writeFile(JSON.stringify(record), "utf8");
+      // A-I3: the custody group while the temporary is still 0600, THEN the
+      // wider mode, then the record's own facts through the reader's own
+      // acceptance function, before the rename publishes it.
+      await applyCustodyGroupOwnership(file, modes);
       await this.fileSystem.chmod(temporary, modes.file);
+      await assertPublishableUnderCustody(file, directory, modes, this.fileSystem);
       await file.sync();
       await file.close();
       file = undefined;

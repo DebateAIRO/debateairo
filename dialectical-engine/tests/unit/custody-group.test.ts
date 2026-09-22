@@ -17,7 +17,10 @@
  * test process already belongs to (`process.getgroups()`) — a test can never
  * create a system group, and must never try.
  */
-import { chmod, chown, link, mkdir, mkdtemp, rm, stat, symlink, writeFile } from "node:fs/promises";
+import {
+  chmod, chown, link, lstat, mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat, symlink,
+  writeFile
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -34,7 +37,8 @@ import {
 } from "../../packages/crypto/src/index.js";
 import type {
   CustodyFileFacts,
-  CustodyParentFacts
+  CustodyParentFacts,
+  UserDekStoreFileSystem
 } from "../../packages/crypto/src/index.js";
 import {
   parseApiEnvironment,
@@ -245,7 +249,25 @@ describe("V-19 custody group: resolving the group name to a gid", () => {
   it("takes a numeric setting as the gid without reading any host file", () => {
     const refuse = (): string => { throw new Error("the group database must not be read"); };
     expect(resolveCustodyGroupGid("4242", refuse)).toBe(4242);
-    expect(resolveCustodyGroupGid(" 0 ", refuse)).toBe(0);
+    expect(resolveCustodyGroupGid(" 1 ", refuse)).toBe(1);
+    // The whole uint32 gid range, and nothing above it.
+    expect(resolveCustodyGroupGid("4294967295", refuse)).toBe(0xffff_ffff);
+  });
+
+  /**
+   * Minor (final review A). A numeric setting was taken as the gid unchecked,
+   * so `0` — root/wheel — and any safe integer above the uint32 gid range
+   * became the custody gid. Fail-closed either way (no file can carry an
+   * impossible gid, and a gid-0 file is root's regardless), but the typo
+   * surfaced as `KEK_CUSTODY_INVALID` at the first key open instead of the
+   * boot-time `CUSTODY_GROUP_UNRESOLVED` V-19 promises the operator.
+   */
+  it("refuses a numeric gid that cannot be a custody group", () => {
+    const refuse = (): string => { throw new Error("the group database must not be read"); };
+    for (const value of ["0", " 0 ", "4294967296", "9007199254740992"]) {
+      expect(() => resolveCustodyGroupGid(value, refuse), value)
+        .toThrowError(expect.objectContaining({ code: "CUSTODY_GROUP_UNRESOLVED" }));
+    }
   });
 
   it("resolves a name through the group database", () => {
@@ -536,6 +558,106 @@ describe("V-19 custody group: the live loaders on real files", () => {
     await expect(store.load(userId)).rejects.toThrowError(
       expect.objectContaining({ code: "SECRET_CUSTODY_INVALID" })
     );
+  });
+
+  /**
+   * FIX WAVE A-I3 (final review A). The group write modes were decided from the
+   * store ROOT's facts, but a new record's gid is inherited from the directory
+   * it lands in — never checked — and nothing read back what it had written.
+   * With the root group-owned and a leaf directory still in another group, the
+   * store wrote a 0640 record the READ contract refuses: a registration that
+   * "succeeded" whose user can never log in, or a rotation that rewrites
+   * readable 0600 records into unreadable ones.
+   *
+   * The write now sets the custody group on the temporary where it may, and
+   * always reads the written record's own facts back through `custodyAccepts`
+   * before the rename — so a record that would not be accepted is never
+   * published at all, and the refusal carries its typed code.
+   */
+  it.skipIf(FEWER_THAN_TWO_GROUPS)("refuses to publish a record the read contract would not accept", async () => {
+    const [custodyGid, strangerGid] = custodyGidPair();
+    const uid = process.getuid!();
+    const directory = await temporaryDirectory("debateai-custody-readback-");
+    const keyPath = join(directory, "kek.bin");
+    await writeFile(keyPath, generateDek(), { mode: 0o600 });
+    await chmod(keyPath, 0o600);
+    await chmod(directory, 0o700);
+    const root = join(directory, "user-deks");
+    await mkdir(root, { mode: 0o750 });
+    await chown(root, uid, custodyGid);
+    await chmod(root, 0o2750);
+    // The half-applied recipe: the root carries the custody group, the
+    // container the records land in does not.
+    const users = join(root, "users");
+    await mkdir(users, { mode: 0o750 });
+    await chown(users, uid, strangerGid);
+    await chmod(users, 0o2750);
+
+    configureCustodyGroup(String(custodyGid));
+    const store = new FileUserDekStore(root, loadKek(keyPath));
+    const userId = "44444444-4444-4444-8444-444444444444";
+    await expect(store.store(userId, generateDek())).rejects.toThrowError(
+      expect.objectContaining({ code: "SECRET_CUSTODY_INVALID" })
+    );
+    // Nothing was published: no half-written record for the reader to refuse.
+    await expect(stat(join(root, "users", userId, "dek.v1.json")))
+      .rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  /**
+   * FIX ROUND 1, Minor 4. Order matters on the write path: the temporary is
+   * created `0600` under the unit's umask, so while it is still owner-only its
+   * group may be set safely. Doing it the other way round — `chmod 0640` first,
+   * `fchown` second — opens a window in which the record is group-readable by
+   * the WRITER's primary group, which is not the custody group. No byte of a
+   * wrapped key may be group-readable by the wrong group, even briefly.
+   */
+  it.skipIf(NO_GROUP)("sets the custody group before it widens the mode, never after", async () => {
+    const custodyGid = oneCustodyGid();
+    const uid = process.getuid!();
+    const directory = await temporaryDirectory("debateai-custody-order-");
+    const keyPath = join(directory, "kek.bin");
+    await writeFile(keyPath, generateDek(), { mode: 0o600 });
+    await chmod(keyPath, 0o600);
+    await chmod(directory, 0o700);
+    const root = join(directory, "user-deks");
+    await mkdir(root, { mode: 0o750 });
+    await chown(root, uid, custodyGid);
+    await chmod(root, 0o2750);
+
+    const events: string[] = [];
+    const io = {
+      mkdir, lstat, readFile, readdir, rename, rm, stat,
+      async chmod(path: string, mode: number) {
+        if (path.endsWith(".tmp")) events.push(`chmod-${mode.toString(8)}`);
+        await chmod(path, mode);
+      },
+      async open(path: string, flags: string, mode?: number) {
+        const handle = await open(path, flags, mode);
+        if (!path.endsWith(".tmp")) return handle;
+        return new Proxy(handle, {
+          get(target, property, receiver) {
+            if (property === "chown") {
+              return async (owner: number, group: number) => {
+                events.push(`chown-${group}`);
+                await handle.chown(owner, group);
+              };
+            }
+            const value = Reflect.get(target, property, receiver) as unknown;
+            return typeof value === "function" ? (value as () => unknown).bind(target) : value;
+          }
+        });
+      }
+    } as unknown as UserDekStoreFileSystem;
+
+    configureCustodyGroup(String(custodyGid));
+    const store = new FileUserDekStore(root, loadKek(keyPath), io);
+    const userId = "66666666-6666-4666-8666-666666666666";
+    await store.store(userId, generateDek());
+
+    expect(events).toEqual([`chown-${custodyGid}`, "chmod-640"]);
+    // And the record still reads back through the contract it was checked against.
+    expect(await store.load(userId)).toBeInstanceOf(Buffer);
   });
 
   /**
