@@ -59,6 +59,62 @@ export class KeyRotationRefused extends Error {
   }
 }
 
+export type PublicationStoreDecision = Readonly<{
+  covered: boolean;
+  declined?: DeclinedStore;
+}>;
+
+/**
+ * Whether the publication-key store is part of this rotation, mirroring the
+ * rule the API itself applies (`assertProductionFloors`: the corpus pair is
+ * required only when `PUBLICATION_ENABLED=true`).
+ *
+ *   enabled + pair        -> covered
+ *   enabled + anything else -> FAILS; publication is on and its keys are not rotatable
+ *   not enabled + neither -> declined BY CONFIGURATION, not a failure: a host
+ *                            that never turned publication on must still be able
+ *                            to reach KEYS_ROTATE_KEK_OK and retire its old key
+ *   half-set              -> ALWAYS fails; half a pair is a misconfiguration
+ *                            whatever the flag says
+ */
+export function publicationStoreDecision(input: Readonly<{
+  publicationEnabled: boolean;
+  corpusKekPath: string | undefined;
+  publicationKeyStorePath: string | undefined;
+}>): PublicationStoreDecision {
+  const both = input.corpusKekPath !== undefined
+    && input.publicationKeyStorePath !== undefined;
+  const neither = input.corpusKekPath === undefined
+    && input.publicationKeyStorePath === undefined;
+  if (both) return Object.freeze({ covered: true });
+  if (!neither) {
+    return Object.freeze({
+      covered: false,
+      declined: Object.freeze({
+        store: "publication-keys", code: "PUBLICATION_KEY_PATHS_INCOMPLETE", fatal: true
+      })
+    });
+  }
+  return Object.freeze({
+    covered: false,
+    declined: Object.freeze({
+      store: "publication-keys",
+      code: "PUBLICATION_KEY_PATHS_ABSENT",
+      fatal: input.publicationEnabled
+    })
+  });
+}
+
+/**
+ * The one line an unexpected refusal prints. The error itself is never printed:
+ * a stack from a key path could name one. A refusal with no code says UNKNOWN
+ * rather than inventing one.
+ */
+export function keyRotationRefusalLine(error: unknown): string {
+  const code = (error as { readonly code?: unknown } | null)?.code;
+  return `KEYS_ROTATE_KEK_REFUSED ${typeof code === "string" && code !== "" ? code : "UNKNOWN"}`;
+}
+
 function ring(currentPath: string, previousPath: string | undefined): KekRing {
   const current = loadKek(currentPath);
   return previousPath === undefined
@@ -90,30 +146,22 @@ export async function runKeyRotation(): Promise<string> {
     kekId(userKeks.current)
   ));
 
-  // A2: the corpus pair is required TOGETHER, exactly as the API refuses to boot
-  // on a half-set pairing. A store this command cannot cover is reported as not
-  // covered and fails the run — never silently counted as a clean zero.
-  if (environment.CORPUS_KEK_PATH !== undefined
-    && environment.PUBLICATION_KEY_STORE_PATH !== undefined) {
+  const publication = publicationStoreDecision({
+    publicationEnabled: environment.PUBLICATION_ENABLED === "true",
+    corpusKekPath: environment.CORPUS_KEK_PATH,
+    publicationKeyStorePath: environment.PUBLICATION_KEY_STORE_PATH
+  });
+  if (publication.covered) {
     const corpusKeks = ring(
-      environment.CORPUS_KEK_PATH, environment.CORPUS_KEK_PREVIOUS_PATH
+      environment.CORPUS_KEK_PATH!, environment.CORPUS_KEK_PREVIOUS_PATH
     );
     reports.push(await rotateFileStore(
       "publication-keys",
-      new FilePublicationKeyStore(environment.PUBLICATION_KEY_STORE_PATH, corpusKeks),
+      new FilePublicationKeyStore(environment.PUBLICATION_KEY_STORE_PATH!, corpusKeks),
       kekId(corpusKeks.current)
     ));
-  } else if (environment.CORPUS_KEK_PATH !== undefined
-    || environment.PUBLICATION_KEY_STORE_PATH !== undefined) {
-    // Half-set is a misconfiguration, not a choice. The register refuses this
-    // pairing at API boot; the rotation must not quietly skip the store.
-    declined.push(Object.freeze({
-      store: "publication-keys", code: "PUBLICATION_KEY_PATHS_INCOMPLETE"
-    }));
-  } else {
-    declined.push(Object.freeze({
-      store: "publication-keys", code: "PUBLICATION_KEY_PATHS_ABSENT"
-    }));
+  } else if (publication.declined !== undefined) {
+    declined.push(publication.declined);
   }
 
   const pool = createPool(environment.SUPPORT_DATABASE_URL);
@@ -177,11 +225,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
       process.stdout.write(`${error.report}\n`);
       process.exitCode = 1;
     } else {
-      // Never print the error itself: a stack from a key path could name one.
-      const code = (error as { code?: unknown }).code;
-      process.stderr.write(
-        `KEYS_ROTATE_KEK_REFUSED ${typeof code === "string" ? code : "UNKNOWN"}\n`
-      );
+      process.stderr.write(`${keyRotationRefusalLine(error)}\n`);
       process.exitCode = 1;
     }
   }

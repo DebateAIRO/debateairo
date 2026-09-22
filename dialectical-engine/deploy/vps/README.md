@@ -278,11 +278,18 @@ its previous copy lives in its own `0700` directory. The support half connects a
 `debateai_support`, which is the only principal granted `UPDATE` on those two
 columns.
 
-The command prints one line per store — re-wrapped, already current, tombstones
-skipped, unreadable, and how many records verified under the **current key
-alone** — and ends with `KEYS_ROTATE_KEK_OK` or `KEYS_ROTATE_KEK_FAILED`. It is
-idempotent and resumable: a record already under the current key is skipped, so
-an interrupted run is finished by running it again.
+The command prints one line per store, prefixed with the key id it rotated **to** — so a swapped
+current and previous is visible rather than inferred — and five counts: re-wrapped, already
+current, tombstones skipped, declined by a concurrent change (a shred that landed mid-rotation
+wins, correctly), and unreadable. Each line ends with how many records verified under the
+**current key alone**. The run ends with `KEYS_ROTATE_KEK_OK` or `KEYS_ROTATE_KEK_FAILED`.
+
+A store the command did not cover is named too. `declined by configuration` means this deployment
+does not have that store — publication was never enabled — and does not fail the run. `NOT COVERED`
+means the store exists and the command could not rotate it, and always does.
+
+It is idempotent and resumable: a record already under the current key is skipped, so an
+interrupted run is finished by running it again.
 
 **Retire the old key only after a clean `KEYS_ROTATE_KEK_OK`.** On
 `KEYS_ROTATE_KEK_FAILED` the output names every record that opened under no key, each with the

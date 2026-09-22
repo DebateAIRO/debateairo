@@ -106,8 +106,14 @@ function refusalCode(error: unknown): string {
   return typeof code === "string" && code !== "" ? code : "UNTYPED_REFUSAL";
 }
 
-/** A store the command could not cover, and the typed reason it could not. */
-export type DeclinedStore = Readonly<{ store: string;code: string }>;
+/**
+ * A store the command could not cover, and the typed reason. `fatal` separates
+ * "this deployment does not have that store" — a host that never enabled
+ * publication, which must still be able to finish cleanly and retire its old
+ * key — from "that store exists and I could not cover it", which must not be
+ * able to produce an OK.
+ */
+export type DeclinedStore = Readonly<{ store: string;code: string;fatal: boolean }>;
 
 /**
  * A rotation is clean only when nothing was left unreadable AND every store was
@@ -118,7 +124,8 @@ export function rotationFailed(
   reports: readonly RotationStoreReport[],
   declined: readonly DeclinedStore[] = []
 ): boolean {
-  return declined.length > 0 || reports.some((report) => report.counts.unreadable > 0);
+  return declined.some((entry) => entry.fatal)
+    || reports.some((report) => report.counts.unreadable > 0);
 }
 
 /**
@@ -291,10 +298,12 @@ export function renderRotationReport(
   const refusals = reports.flatMap((report) =>
     report.unreadableRefs.map((refusal) =>
       `  unreadable ${report.store} ${refusal.ref} ${refusal.code}`));
-  // A store the command did not cover is NOT a clean store. Saying so is the
-  // difference between "nothing to do" and "I never looked".
-  const notCovered = declined.map((entry) =>
-    `  NOT COVERED ${entry.store} ${entry.code}`);
+  // A store the command did not cover is named either way: the difference
+  // between "nothing to do" and "I never looked" belongs in the output, not in
+  // the exit code alone.
+  const notCovered = declined.map((entry) => entry.fatal
+    ? `  NOT COVERED ${entry.store} ${entry.code}`
+    : `  declined by configuration ${entry.store} ${entry.code}`);
   const failed = rotationFailed(reports, declined);
   return [
     ...lines,

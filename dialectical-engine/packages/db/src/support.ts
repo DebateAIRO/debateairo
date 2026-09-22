@@ -2559,6 +2559,18 @@ async function supportRoleWitness(pool: Pool): Promise<SupportRoleWitness | unde
 }
 
 /**
+ * The refusal both role assertions raise. It carries a `code` as well as the
+ * message: an operator command prints `error.code`, and a bare TypeError made a
+ * wrong-role run print UNKNOWN — the one shape the typed-refusal rule exists to
+ * eliminate.
+ */
+function supportDatabaseRoleInvalid(): TypeError {
+  return Object.assign(new TypeError("SUPPORT_DATABASE_ROLE_INVALID"), {
+    code: "SUPPORT_DATABASE_ROLE_INVALID"
+  });
+}
+
+/**
  * The SUPPORT half, on its own: this connection really is the `debateai_support`
  * principal, with exactly the privileges that role is meant to have and nothing
  * outside the support schema.
@@ -2584,7 +2596,7 @@ export async function assertSupportPrincipalRole(supportPool: Pool): Promise<voi
     || support.support_column_update_count !== "13"
     || support.support_forbidden_column_update
     || support.support_forbidden_privilege || support.outside_table_privilege) {
-    throw new TypeError("SUPPORT_DATABASE_ROLE_INVALID");
+    throw supportDatabaseRoleInvalid();
   }
 }
 
@@ -2634,6 +2646,6 @@ export async function assertSupportDatabaseRole(
   // to reach support data.
   if (runtime === undefined || runtime.support_member || runtime.support_schema_usage
     || !runtime.support_structure_valid || runtime.support_table_privilege) {
-    throw new TypeError("SUPPORT_DATABASE_ROLE_INVALID");
+    throw supportDatabaseRoleInvalid();
   }
 }

@@ -303,8 +303,14 @@ export function parseApiEnvironment(
  * V-3. What `apps/runner/src/rotate-kek-cli.ts` needs. Each `*_KEK_PREVIOUS_PATH`
  * is OPTIONAL because its absence is the steady state: an operator sets it only
  * for the length of a changeover and removes it once a verification pass is
- * clean. A store path without its KEK (or the other way round) simply means that
- * store is not part of this rotation; the command says which stores it covered.
+ * clean.
+ *
+ * The corpus pair is NOT optional in the way it looks. The command applies the
+ * API's own rule: with `PUBLICATION_ENABLED=true` both `CORPUS_KEK_PATH` and
+ * `PUBLICATION_KEY_STORE_PATH` are required and their absence fails the run,
+ * and half a pair fails it whatever the flag says. Only a host that never
+ * enabled publication may leave both unset, and the command prints that store
+ * as declined by configuration rather than counting it as a clean zero.
  */
 const keyRotationEnvironmentShape = {
   KEK_PATH: kekPath,
@@ -313,6 +319,7 @@ const keyRotationEnvironmentShape = {
   CORPUS_KEK_PATH: z.string().min(1).optional(),
   CORPUS_KEK_PREVIOUS_PATH: z.string().min(1).optional(),
   PUBLICATION_KEY_STORE_PATH: z.string().min(1).optional(),
+  PUBLICATION_ENABLED: z.enum(["true", "false"]).default("false"),
   SUPPORT_KEK_PATH: kekPath,
   SUPPORT_KEK_PREVIOUS_PATH: z.string().min(1).optional(),
   // The ONLY database this command opens. It writes two support key columns and

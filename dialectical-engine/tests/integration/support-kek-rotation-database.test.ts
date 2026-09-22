@@ -125,7 +125,9 @@ describe("V-3 support-KEK rotation against the real columns", () => {
     // NOT the support principal: the assertion must refuse it. A rotation that
     // ran as the wrong role would be writing key columns it has no business in.
     await expect(assertSupportPrincipalRole(database.pool)).rejects.toThrowError(
-      expect.objectContaining({ message: "SUPPORT_DATABASE_ROLE_INVALID" })
+      // The CODE, not the message: an operator command prints error.code, and a
+      // refusal that carried only a message printed UNKNOWN.
+      expect.objectContaining({ code: "SUPPORT_DATABASE_ROLE_INVALID" })
     );
   }, 600_000);
 

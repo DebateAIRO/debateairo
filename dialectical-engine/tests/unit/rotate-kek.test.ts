@@ -29,7 +29,12 @@ import {
   rotateSupportKeys,
   rotationFailed
 } from "../../apps/runner/src/rotate-kek.js";
-import { keyRotationEnvironmentCode } from "../../apps/runner/src/rotate-kek-cli.js";
+import {
+  keyRotationEnvironmentCode,
+  keyRotationRefusalLine,
+  publicationStoreDecision
+} from "../../apps/runner/src/rotate-kek-cli.js";
+import { assertSupportPrincipalRole } from "../../packages/db/src/index.js";
 import { parseKeyRotationEnvironment } from "../../packages/register/src/runtime-environment.js";
 import type {
   SupportKeyReplacement,
@@ -623,10 +628,10 @@ describe("V-3 rotate: what the operator is told", () => {
     }];
     expect(rotationFailed(clean, [])).toBe(false);
     expect(rotationFailed(clean, [
-      { store: "publication-keys", code: "PUBLICATION_KEY_PATHS_INCOMPLETE" }
+      { store: "publication-keys", code: "PUBLICATION_KEY_PATHS_INCOMPLETE", fatal: true }
     ])).toBe(true);
     const text = renderRotationReport(clean, [
-      { store: "publication-keys", code: "PUBLICATION_KEY_PATHS_INCOMPLETE" }
+      { store: "publication-keys", code: "PUBLICATION_KEY_PATHS_INCOMPLETE", fatal: true }
     ]);
     expect(text).toContain("NOT COVERED publication-keys PUBLICATION_KEY_PATHS_INCOMPLETE");
     expect(text).toContain("KEYS_ROTATE_KEK_FAILED");
@@ -716,5 +721,82 @@ describe("V-3 rotate: least privilege on the database", () => {
       new URL("../../apps/api/src/main.ts", import.meta.url), "utf8"
     );
     expect(main).toContain("assertSupportDatabaseRole(pool, supportPool)");
+  });
+});
+
+describe("V-3 rotate: a refusal reaches the operator as a code", () => {
+  /**
+   * Leftover 1. assertSupportPrincipalRole threw a bare TypeError with no
+   * `code`, so a wrong-role run printed KEYS_ROTATE_KEK_REFUSED UNKNOWN — the
+   * exact shape M5 exists to eliminate, on the path M3 asked to be typed.
+   */
+  it("prints the code of a wrong-role refusal, never UNKNOWN", () => {
+    const wrongRole = Object.assign(
+      new TypeError("SUPPORT_DATABASE_ROLE_INVALID"),
+      { code: "SUPPORT_DATABASE_ROLE_INVALID" }
+    );
+    expect(keyRotationRefusalLine(wrongRole))
+      .toBe("KEYS_ROTATE_KEK_REFUSED SUPPORT_DATABASE_ROLE_INVALID");
+    // And the assertion really does carry a code, not only a message.
+    expect(assertSupportPrincipalRole).toBeTypeOf("function");
+    // Anything genuinely untyped still says so rather than inventing a code.
+    expect(keyRotationRefusalLine(new Error("prose")))
+      .toBe("KEYS_ROTATE_KEK_REFUSED UNKNOWN");
+  });
+});
+
+describe("V-3 rotate: the publication store follows the API's own rule", () => {
+  /**
+   * Leftover 2. Declining the publication store ALWAYS failed the run, so a
+   * host that never enabled publication could never print KEYS_ROTATE_KEK_OK
+   * and could never satisfy the runbook's retirement rule. The API requires the
+   * pair only when PUBLICATION_ENABLED=true; the rotation must say the same.
+   */
+  const CASES = [
+    { name: "enabled, pair present", enabled: true, corpus: true, store: true, covered: true, fatal: false },
+    { name: "enabled, pair absent", enabled: true, corpus: false, store: false, covered: false, fatal: true },
+    { name: "enabled, half-set (corpus only)", enabled: true, corpus: true, store: false, covered: false, fatal: true },
+    { name: "enabled, half-set (store only)", enabled: true, corpus: false, store: true, covered: false, fatal: true },
+    { name: "not enabled, pair absent", enabled: false, corpus: false, store: false, covered: false, fatal: false },
+    { name: "not enabled, half-set (corpus only)", enabled: false, corpus: true, store: false, covered: false, fatal: true },
+    { name: "not enabled, half-set (store only)", enabled: false, corpus: false, store: true, covered: false, fatal: true }
+  ] as const;
+
+  for (const row of CASES) {
+    it(`${row.covered ? "covers" : row.fatal ? "fails" : "declines without failing"} — ${row.name}`, () => {
+      const decision = publicationStoreDecision({
+        publicationEnabled: row.enabled,
+        corpusKekPath: row.corpus ? "/run/secrets/corpus-kek" : undefined,
+        publicationKeyStorePath: row.store ? "/run/secrets/publication-keys" : undefined
+      });
+      expect(decision.covered).toBe(row.covered);
+      if (!row.covered) {
+        expect(decision.declined?.fatal).toBe(row.fatal);
+        expect(decision.declined?.code).toMatch(/^PUBLICATION_KEY_PATHS_/);
+      }
+    });
+  }
+
+  it("lets a host that never enabled publication reach KEYS_ROTATE_KEK_OK", () => {
+    const clean = [{
+      store: "user-deks",
+      kekId: "0123456789abcdef",
+      counts: {
+        rewrapped: 1, alreadyCurrent: 0, tombstonesSkipped: 0, declined: 0, unreadable: 0
+      },
+      verified: 1,
+      unreadableRefs: []
+    }];
+    const byConfiguration = [{
+      store: "publication-keys", code: "PUBLICATION_KEY_PATHS_ABSENT", fatal: false
+    }];
+    expect(rotationFailed(clean, byConfiguration)).toBe(false);
+    const text = renderRotationReport(clean, byConfiguration);
+    expect(text).toContain("declined by configuration publication-keys");
+    expect(text).toContain("KEYS_ROTATE_KEK_OK");
+    // A half-set pair is still always a failure.
+    expect(rotationFailed(clean, [
+      { store: "publication-keys", code: "PUBLICATION_KEY_PATHS_INCOMPLETE", fatal: true }
+    ])).toBe(true);
   });
 });
