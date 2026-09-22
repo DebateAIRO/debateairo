@@ -127,7 +127,9 @@ process start: restart both units after either change.
 | `/etc/debateai/runner.env` | `0600` | `debateai-runner` | runner `EnvironmentFile` |
 | `/etc/debateai/hatchet.env` | `0600` | `root:root` | container `env_file`: `DATABASE_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SERVER_ENCRYPTION_*` |
 | `/etc/debateai/api/` | `0700` | `debateai-api` | `kek.bin`, `corpus-kek.bin`, `blind-index-key.bin`, `audit-source-ip-salt.bin` |
+| `/etc/debateai/api/providers/` | `0700` | `debateai-api` | the API's own copy of each vendor credential (V-9, §11) |
 | `/etc/debateai/runner/` | `0700` | `debateai-runner` | `kek.bin` (the runner's own copy of the same bytes) |
+| `/etc/debateai/runner/providers/` | `0700` | `debateai-runner` | the runner's own copy of each vendor credential (V-9, §11) |
 | `/etc/debateai/postgres-tls/` | `0700` | `postgres` | `server.crt`, `server.key`, `ca.crt` |
 | `/etc/debateai/hatchet-tls/` | `0755` | `root:root` | `server.crt`, `server.key` (`0640 root:docker`), `ca.crt` |
 | `/etc/debateai/ui-edge.secret` | `0400` | `debateai-ui` | the C2b edge secret (a second `0640 root:caddy` copy for Caddy) |
@@ -539,13 +541,130 @@ Record each drill: date, artefact, `core.run` count, chain totals, and the decry
   why that key is offline and held separately.
 - **KEK rotation** is not implemented (`ASK-V V-3` / task B18). Until it is, a suspected KEK
   exposure has no remediation short of destroying the affected runs.
-- **The production maker path is not defined here and must be ruled by V.** The acceptance relays
-  under `acceptance/` are dev-only code, started only by `pnpm dev:auth:up`; they have no
-  production equivalent and none is invented in this baseline. The runner unit gives the maker CLIs
-  a private `HOME` under `/var/lib/debateai-runner` (`0700`) for their credentials — those
-  credentials are the model-spend keys — but *which* CLIs run, how they authenticate and what the
-  spend ceiling is remains open (`ASK-V V-9`).
+- **The production maker path is now ruled (V-9, 2026-09-22) — see §11.** This bullet used to say
+  the path was undefined and that the relays under `acceptance/` were dev-only code. Both halves
+  are superseded. There are TWO supported deployments: this host is the **hosted** one and reaches
+  paid vendor APIs over `https:` with a credential file per vendor, and the relays are the
+  **local** deployment — a supported product path for anyone running the repository on their own
+  computer — which this host refuses in code. What remains open is only the vendor list and the
+  spend ceiling: V names the vendors when the accounts exist, and the per-run and daily cost
+  envelopes are V-28's (until they are sealed, a hosted runner refuses to start with
+  `COST_ENVELOPES_NOT_SEALED`).
 - Six P3-01 principals are `REQUIRED_NOT_WIRED` (`evaluator-worker`, `evaluator-api`,
   `evaluator-reader`, `obs-writer`, `obs-listener`, `obs-watchdog`). The provisioner reconciles all
   sixteen and expects a credential for each; either wire them or provision them with `VALID UNTIL`
   in the past rather than minting live credentials for unused principals.
+
+---
+
+## 11. Providers and vendors (V-9, ruled 2026-09-22)
+
+There are **two supported deployments**, and the engine must work in both. The choice is
+configuration, never an inference from `NODE_ENV`:
+
+| | **hosted** | **local** |
+|---|---|---|
+| What it is | this commercial site | anyone running the repository on their own computer, the owners before launch included |
+| Model access | paid vendor APIs, one credential per vendor | the command-line relays, loopback model servers and, optionally, the user's own API keys |
+| Set by | `DEBATEAI_DEPLOYMENT_MODE=hosted` in `runner.env` and `api.env` | the setting absent outside production, or `DEBATEAI_DEPLOYMENT_MODE=local` |
+
+The relays are the LOCAL deployment — a supported product path, **not** development-only code.
+What this host does is refuse them, which is a different statement.
+
+`DEBATEAI_DEPLOYMENT_MODE` is read by the strict environment loader of both services, so neither
+can start without answering the question. A production unit that omits it refuses with
+`DEPLOYMENT_MODE_UNRESOLVED`; a typo refuses with `DEPLOYMENT_MODE_INVALID`.
+
+### What the hosted mode refuses, in code
+
+| Code | Meaning |
+|---|---|
+| `DEPLOYMENT_MODE_UNRESOLVED` | `NODE_ENV=production` with no `DEBATEAI_DEPLOYMENT_MODE`. |
+| `DEPLOYMENT_MODE_INVALID` | a value that is not exactly `hosted` or `local`, leading or trailing space included. |
+| `PROVIDER_BASE_URL_TLS_REQUIRED:` and the provider ref | a target whose `base_url` is not `https:`. |
+| `PROVIDER_TARGET_LOOPBACK_REFUSED:` and the provider ref | a target pointing at this machine — a relay or a local model server. |
+| `PROVIDER_INLINE_CREDENTIAL_REFUSED:` and the provider ref | a credential written into `PROVIDER_DISCOVERY_TARGETS_JSON` instead of a file. |
+| `PROVIDER_AUTHORIZATION_FILE_UNUSABLE:` the provider ref, then the reason | the credential file failed custody (`SECRET_CUSTODY_INVALID`), is absent (`KEK_UNRESOLVED`) or is not one printable header line (`PROVIDER_CREDENTIAL_FILE_INVALID`). Neither the path nor a byte of the credential appears in the message. |
+| `COST_ENVELOPES_NOT_SEALED` | the per-run and daily cost envelopes (V-28) are not published yet. A hosted runner refuses to claim work until they are. |
+| `RUNNER_PRIMARY_PROVIDER_REF_DRIFT` | `PROVIDER_REF` does not name the FIRST entry of `PROVIDER_DISCOVERY_TARGETS_JSON`. |
+
+### The credential-file contract
+
+The file holds the `authorization` header **value** verbatim — the scheme word, a space and the
+vendor's token — with at most one trailing newline, and nothing else. It is read under the same
+custody contract as every key file (§3): `0600` owned by the service user, one hard link, no
+symlink, inside a `0700` directory owned by the same user, and at most 4 KiB. The bytes are zeroed
+once the header is built, and the path never reaches a gateway, a log line or an error.
+
+A credential never travels any other way: not in `runner.env`, not on a command line, not in a
+process listing.
+
+**Two services read it, so there are two files**, exactly as the KEK has two copies (§3): the
+runner calls the vendor, and the API probes it at ask time. Each service gets its own `0600` copy
+in its own `0700` tree — one inode per principal, so neither service can replace the other's — and
+each `EnvironmentFile` names its own path in `authorization_file`. That is the trade this kit
+already made for the KEK, and it carries the same trap: **rotating a vendor key means replacing
+both files.** Replace both, then restart both units.
+
+### Adding a vendor — the procedure
+
+Adding an OpenAI-compatible vendor needs **no code**. It is four steps, and the first one is not
+optional.
+
+**1. Vet the vendor (V-9(4)).** Read the vendor's API data-use and retention terms and record the
+date you read each. Confirm the vendor is named in the published privacy notice. A vendor without
+that record cannot be published: the register builder refuses with `PROVIDER_VENDOR_NOT_VETTED`
+and the provider ref. Data-processing agreements are V's to arrange, and V names the vendor.
+
+**2. Write the two credential files.** Run these as root on the host. The header value is typed at
+the prompt, so it never appears on a command line or in shell history:
+
+```sh
+install -d -m 0700 -o debateai-runner -g debateai-runner /etc/debateai/runner/providers
+install -d -m 0700 -o debateai-api -g debateai-api /etc/debateai/api/providers
+umask 077
+systemd-ask-password "Acme authorization header value" > /etc/debateai/runner/providers/acme.header
+install -m 0600 -o debateai-api -g debateai-api \
+  /etc/debateai/runner/providers/acme.header /etc/debateai/api/providers/acme.header
+chown debateai-runner:debateai-runner /etc/debateai/runner/providers/acme.header
+chmod 0600 /etc/debateai/runner/providers/acme.header
+```
+
+Check both trees — the `find` printing nothing is the pass:
+
+```sh
+stat -c '%a %U %G %n' /etc/debateai/runner/providers/acme.header /etc/debateai/api/providers/acme.header
+find /etc/debateai/runner/providers -type f ! -perm 0600 -print
+find /etc/debateai/runner/providers ! -user debateai-runner -print
+find /etc/debateai/api/providers -type f ! -perm 0600 -print
+find /etc/debateai/api/providers ! -user debateai-api -print
+```
+
+**3. Add the target entry.** `PROVIDER_DISCOVERY_TARGETS_JSON` in `runner.env` and `api.env` is a
+JSON array; add one object to it. Its members:
+
+| Member | Value |
+|---|---|
+| `provider_ref` | the vendor's ref, identical in both files and in the register row |
+| `base_url` | the vendor's OpenAI-compatible endpoint, `https:`, path ending in `/v1`, no query and no fragment |
+| `model` | the model id to call |
+| `authorization_file` | the absolute path from step 2 — **that service's own copy**: the runner's path in `runner.env`, the API's in `api.env` |
+
+In `runner.env` the entry for the example above reads `{"provider_ref":"vendor:acme","base_url":"https://api.acme.example/v1","model":"acme-large","authorization_file":"/etc/debateai/runner/providers/acme.header"}`,
+and in `api.env` the same entry with `/etc/debateai/api/providers/acme.header`.
+An `authorization_header` member alongside `authorization_file` refuses with
+`PROVIDER_DISCOVERY_AUTHORIZATION_CONFLICT` rather than guessing which one is live.
+
+**4. Publish the register row at a new version.** The configured-providers row
+(`configuredProviderSet`) is **superseded, never edited**: publish a new register version carrying
+the row with one more entry — `providerRef`, `adapterKind` (`openai-compatible-http` for any
+OpenAI-compatible vendor), `maker`, and the `vetting` record from step 1. The builder and the shape
+it enforces are `buildConfiguredProviderSetDeploymentRow` in
+`packages/register/src/configured-provider-set.ts`; publication uses this deployment's ordinary
+register publication path, and `REGISTER_VERSION` in both `EnvironmentFile`s then names the new
+version. Every `provider_ref` in step 3 must appear in this row and in the same order, or both
+services refuse at boot with `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`.
+
+Restart `debateai-api` and `debateai-runner` after steps 3 and 4. A vendor whose endpoint does not
+answer the health probe is reported ABSENT and simply does not join a panel; it does not stop the
+service.

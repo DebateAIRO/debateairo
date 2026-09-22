@@ -341,6 +341,49 @@ describe("VPS baseline: runbook and environment templates", () => {
     ]) expect(readme, needle).toContain(needle);
   });
 
+  /**
+   * V-9, ruled 2026-09-22. The kit used to say the production maker path was
+   * undefined and that the relays were dev-only code. Both halves are superseded:
+   * the relays are the LOCAL deployment, a supported product path, and this host
+   * is the hosted one, which refuses them in code.
+   */
+  it("README rules the provider path and no longer calls the relays dev-only", () => {
+    const readme = read("deploy/vps/README.md");
+    expect(readme).not.toMatch(/relays[^.]*are dev-only code/u);
+    expect(readme).not.toContain("The production maker path is not defined here");
+    for (const needle of [
+      "DEBATEAI_DEPLOYMENT_MODE=hosted",
+      "DEPLOYMENT_MODE_UNRESOLVED",
+      "PROVIDER_TARGET_LOOPBACK_REFUSED",
+      "PROVIDER_INLINE_CREDENTIAL_REFUSED",
+      "COST_ENVELOPES_NOT_SEALED",
+      "authorization_file",
+      "/etc/debateai/runner/providers",
+      "/etc/debateai/api/providers",
+      "systemd-ask-password",
+      "PROVIDER_VENDOR_NOT_VETTED",
+      "buildConfiguredProviderSetDeploymentRow",
+      "superseded, never edited"
+    ]) expect(readme, needle).toContain(needle);
+    // The vetting step V approved, named as the first step of the procedure.
+    expect(readme).toMatch(/data-use and retention terms/u);
+    expect(readme).toMatch(/privacy notice/u);
+  });
+
+  /**
+   * Constraint 10: a fenced block in a document the owner may read holds only
+   * commands that are safe to paste as-is. §11 is new prose, so its blocks are
+   * checked here rather than trusted.
+   */
+  it("README §11's shell blocks carry no angle-bracket placeholder", () => {
+    const readme = read("deploy/vps/README.md");
+    const section = readme.slice(readme.indexOf("## 11. Providers and vendors"));
+    expect(section).not.toBe("");
+    for (const block of section.matchAll(/```sh\n([\s\S]*?)```/gu)) {
+      expect(block[1], block[1]).not.toMatch(/<[a-z-]+>/u);
+    }
+  });
+
   it("api.env.example names every production key with socket URLs, distinct principals and no dev tooling", () => {
     const env = envKeys(read("deploy/vps/env/api.env.example"));
     for (const key of [
@@ -350,9 +393,15 @@ describe("VPS baseline: runbook and environment templates", () => {
       "ERASURE_DATABASE_URL", "ACCOUNT_ERASURE_GRACE_MS", "MAIL_SENDMAIL_PATH", "MAIL_FROM", "PUBLIC_APP_URL",
       "DATABASE_URL", "API_HOST", "API_PORT", "STRANGER_SAMPLE_RATE", "REGISTER_VERSION", "BATTERY_VERSION",
       "SETTLEMENT_WATCH_HANDLE", "PROVIDER_DISCOVERY_TARGETS_JSON", "HATCHET_CLIENT_TOKEN", "HATCHET_HOST_PORT",
-      "HATCHET_API_URL", "HATCHET_TENANT_ID", "HATCHET_WORKFLOW_NAME", "HATCHET_TLS_STRATEGY"
+      "HATCHET_API_URL", "HATCHET_TENANT_ID", "HATCHET_WORKFLOW_NAME", "HATCHET_TLS_STRATEGY",
+      "DEBATEAI_DEPLOYMENT_MODE"
     ]) expect(env.has(key), key).toBe(true);
     expect(env.get("NODE_ENV")).toBe("production");
+    // V-9(c): both services answer the same question with the same word, or the
+    // API would admit a relay target the runner refuses.
+    expect(env.get("DEBATEAI_DEPLOYMENT_MODE")).toBe("hosted");
+    expect(envKeys(read("deploy/vps/env/runner.env.example")).get("DEBATEAI_DEPLOYMENT_MODE"))
+      .toBe("hosted");
     expect(env.get("API_HOST")).toBe("127.0.0.1");
     expect(env.get("API_PORT")).toBe("8790");
     expect(env.get("CONTENT_ENCRYPTION_ENABLED")).toBe("true");
