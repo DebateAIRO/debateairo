@@ -27,7 +27,7 @@
   "home.models.one": "{count} model",
   "home.models.two": "{count} modela",
   "home.models.few": "{count} modeli",
-  "home.models.other": "Število modelov: {count}",
+  "home.models.other": "{count} modelov",
   "home.practiceEyebrow": "Vaja, ne predstava",
   "home.heroTitle": "Poiščite najšibkejši člen svojega argumenta.",
   "home.heroLede": "Vi argumentirate. Nasprotnik, izurjen za iskanje najranljivejše točke v vašem sklepanju, pritiska nanjo, dokler člen ne zdrži ali popusti. Vsaka poteza se oceni glede na dokaze in glede na to, ali ste dejansko odgovorili na vprašanje — nikoli glede na uglajenost ubeseditve.",

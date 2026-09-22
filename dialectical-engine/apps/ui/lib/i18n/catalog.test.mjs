@@ -13,6 +13,22 @@ const readCatalog = (locale, namespace) => JSON.parse(
 const placeholders = (value) => [...value.matchAll(/\{([A-Za-z][A-Za-z0-9_]*)\}/g)]
   .map((match) => match[1]).sort();
 const pluralSuffix = /\.(zero|one|two|few|many|other)$/;
+const numeralFreePluralForms = new Set([
+  "ar/home:home.models.zero",
+  "ar/home:home.models.two",
+  "ar/time:time.minutes.two",
+  "ar/time:time.hours.two",
+  "ar/time:time.days.two",
+  "ar/time:time.weeks.two",
+  "he/home:home.models.two",
+  "he/time:time.minutes.two",
+  "he/time:time.hours.two",
+  "he/time:time.days.two",
+  "he/time:time.weeks.two",
+  "mt/time:time.hours.two",
+  "mt/time:time.days.two",
+  "mt/time:time.weeks.two"
+]);
 
 const expectedKeysForLocale = (english, locale) => {
   const englishKeys = Object.keys(english);
@@ -35,16 +51,24 @@ test("all 35 locales have exact CLDR plural categories, non-plural keys, and pla
 
   for (const namespace of namespaces) {
     const english = readCatalog("en", namespace);
-    const englishKeys = Object.keys(english).sort();
     for (const { code } of LOCALES) {
       const catalog = readCatalog(code, namespace);
       assert.deepEqual(Object.keys(catalog).sort(), expectedKeysForLocale(english, code), `${code}/${namespace} keys`);
-      for (const key of englishKeys.filter((candidate) => Object.hasOwn(catalog, candidate))) {
-        assert.deepEqual(placeholders(catalog[key]), placeholders(english[key]), `${code}/${namespace}:${key} placeholders`);
-      }
       for (const [key, value] of Object.entries(catalog)) {
         assert.equal(typeof value, "string", `${code}/${namespace}:${key} value`);
         assert.notEqual(value.trim(), "", `${code}/${namespace}:${key} value`);
+        const pluralMatch = key.match(pluralSuffix);
+        if (pluralMatch) {
+          if (numeralFreePluralForms.has(`${code}/${namespace}:${key}`)) {
+            assert.deepEqual(placeholders(value), [], `${code}/${namespace}:${key} placeholders`);
+            continue;
+          }
+          const root = key.replace(pluralSuffix, "");
+          const referenceKey = Object.hasOwn(catalog, `${root}.other`) ? `${root}.other` : `${root}.one`;
+          assert.deepEqual(placeholders(value), placeholders(catalog[referenceKey]), `${code}/${namespace}:${key} placeholders`);
+        } else {
+          assert.deepEqual(placeholders(value), placeholders(english[key]), `${code}/${namespace}:${key} placeholders`);
+        }
       }
     }
   }

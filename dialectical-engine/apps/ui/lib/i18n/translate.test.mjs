@@ -51,6 +51,40 @@ test("Croatian catalogues use the numeral forms for minutes and model counts", (
   );
 });
 
+test("count catalogues render the numeral in the grammatical position and form", () => {
+  const catalog = (locale, namespace) => JSON.parse(
+    readFileSync(join(process.cwd(), "messages", locale, `${namespace}.json`), "utf8")
+  );
+  const rendered = (locale, namespace, key, counts) => {
+    const messages = catalog(locale, namespace);
+    return counts.map((count) => tPlural(messages, key, count, locale));
+  };
+
+  assert.deepEqual(rendered("cs", "home", "home.models", [1, 2, 1.5, 5]), [
+    "1 model", "2 modely", "1.5 modelu", "5 modelů"
+  ]);
+  assert.deepEqual(rendered("ro", "home", "home.models", [1, 2, 20]), [
+    "1 model", "2 modele", "20 de modele"
+  ]);
+  assert.deepEqual(rendered("sk", "home", "home.models", [1, 2, 1.5, 5]), [
+    "1 model", "2 modely", "1.5 modelu", "5 modelov"
+  ]);
+  assert.deepEqual(rendered("sl", "home", "home.models", [1, 2, 3, 5]), [
+    "1 model", "2 modela", "3 modeli", "5 modelov"
+  ]);
+  for (const [key, expected] of Object.entries({
+    "time.minutes": ["преди 1 минута", "преди 5 минути"],
+    "time.hours": ["преди 1 час", "преди 5 часа"],
+    "time.days": ["преди 1 ден", "преди 5 дни"],
+    "time.weeks": ["преди 1 седмица", "преди 5 седмици"]
+  })) {
+    assert.deepEqual(rendered("bg", "time", key, [1, 5]), expected, `bg ${key}`);
+  }
+  assert.deepEqual(rendered("bg", "home", "home.models", [1, 5]), ["1 модел", "5 модела"]);
+  assert.deepEqual(rendered("ar", "home", "home.models", [100]), ["100 نموذج"]);
+  assert.deepEqual(rendered("ar", "time", "time.minutes", [100]), ["قبل 100 دقيقة"]);
+});
+
 test("date and number helpers honor the requested locale", () => {
   const instant = new Date("2026-09-22T12:00:00.000Z");
   const dateOptions = { timeZone: "UTC", year: "numeric", month: "long", day: "numeric" };

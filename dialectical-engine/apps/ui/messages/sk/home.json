@@ -27,7 +27,7 @@
   "home.models.one": "{count} model",
   "home.models.few": "{count} modely",
   "home.models.many": "{count} modelu",
-  "home.models.other": "Počet modelov: {count}",
+  "home.models.other": "{count} modelov",
   "home.practiceEyebrow": "Nácvik, nie predstavenie",
   "home.heroTitle": "Nájdite najslabší článok vo vlastnom argumente.",
   "home.heroLede": "Vy argumentujete. Oponent vycvičený na hľadanie najzraniteľnejšieho miesta vo vašom uvažovaní naň tlačí, kým článok neobstojí alebo nepovolí. Každý ťah sa hodnotí podľa dôkazov a podľa toho, či ste skutočne odpovedali na otázku — nikdy nie podľa uhladenosti formulácie.",

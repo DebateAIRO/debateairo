@@ -5,7 +5,7 @@
   "time.minutes.two": "قبل دقيقتين",
   "time.minutes.few": "قبل {count} دقائق",
   "time.minutes.many": "قبل {count} دقيقة",
-  "time.minutes.other": "قبل {count} دقائق",
+  "time.minutes.other": "قبل {count} دقيقة",
   "time.hours.zero": "قبل {count} ساعة",
   "time.hours.one": "قبل {count} ساعة",
   "time.hours.two": "قبل ساعتين",
