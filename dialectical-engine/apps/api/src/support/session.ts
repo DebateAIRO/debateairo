@@ -447,7 +447,7 @@ export function createSupportCaseService(input: Readonly<{
   }
   async function prepare(request: Parameters<SupportCasePort["open"]>[0]) {
     const token = randomBytes(32).toString("base64url");
-    const tokenSha256 = hashSupportCapability(token);
+    const tokenSha256 = hashSupportCapability("support-case",token);
     if (tokenSha256 === null || !SHA256_PATTERN.test(tokenSha256)) {
       throw new SupportSessionError(
         "SUPPORT_CASE_CAPABILITY_GENERATION_FAILED",
@@ -561,14 +561,47 @@ export type SupportSessionCapability = Readonly<{
   tokenSha256: string;
 }>;
 
-export function hashSupportCapability(token: string): string | null {
-  if (!CAPABILITY_PATTERN.test(token)) return null;
-  return createHash("sha256").update(token, "utf8").digest("hex");
+/**
+ * The two purposes a support capability can have. They are members of
+ * `@debateai/crypto`'s `TokenKind`, so no other subsystem can claim the same
+ * label; the digest is computed here because SUP-01's import boundary keeps
+ * support code out of that package.
+ */
+export type SupportCapabilityKind = "support-session" | "support-case";
+
+/**
+ * DL2-F4. B19's purpose-bound token hash,
+ * `sha256("debateai:token:<kind>:v1\0" || token)`, so a token presented as one
+ * kind can never match a hash stored for the other. It was a bare, unlabelled
+ * `sha256(token)` — the very pattern B19 retired, surviving here because this
+ * is a second implementation outside `@debateai/crypto` and the sweep for
+ * callers of the unlabelled digest could not see it.
+ *
+ * The rendering differs from `hashToken` in one way only: `support.session`'s
+ * `session_token_sha256` and `support."case"`'s `token_sha256` are `char(64)`
+ * CHECKed against `^[0-9a-f]{64}$` (migration 0050), so the `sha256:` prefix of
+ * the B19 grammar cannot travel with it. `tests/unit/dl2-f4-support-capability-hash`
+ * pins the two to each other.
+ */
+export function hashSupportCapability(
+  kind: SupportCapabilityKind, token: string
+): string | null {
+  if (kind !== "support-session" && kind !== "support-case") {
+    throw new SupportSessionError(
+      "SUPPORT_CAPABILITY_KIND_INVALID",
+      "Support capability kind is invalid"
+    );
+  }
+  if (typeof token !== "string" || !CAPABILITY_PATTERN.test(token)) return null;
+  return createHash("sha256")
+    .update(`debateai:token:${kind}:v1\0`, "utf8")
+    .update(token, "utf8")
+    .digest("hex");
 }
 
 export function createSupportSessionCapability(): SupportSessionCapability {
   const token = randomBytes(32).toString("base64url");
-  const tokenSha256 = hashSupportCapability(token);
+  const tokenSha256 = hashSupportCapability("support-session", token);
   if (tokenSha256 === null || !SHA256_PATTERN.test(tokenSha256)) {
     throw new SupportSessionError(
       "SUPPORT_SESSION_CAPABILITY_GENERATION_FAILED",

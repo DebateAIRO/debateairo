@@ -73,7 +73,7 @@ function languageFrom(value: unknown): SupportLanguage | null {
 
 function capabilityFrom(request: FastifyRequest): string | null {
   const raw = request.headers["x-support-session-token"];
-  return typeof raw === "string" ? hashSupportCapability(raw) : null;
+  return typeof raw === "string" ? hashSupportCapability("support-session",raw) : null;
 }
 
 function publicSession(record: SupportSessionRecord): Readonly<Record<string, unknown>> {
@@ -924,7 +924,7 @@ export function installSupportRoutes(
       if (configuration.kind !== "AVAILABLE") {
         return reply.status(503).send({ error: configuration.code });
       }
-      const tokenSha256 = hashSupportCapability(request.params.token);
+      const tokenSha256 = hashSupportCapability("support-case",request.params.token);
       if (tokenSha256 === null) return reply.status(404).send({ error: "NOT_FOUND" });
       const rawLimit = request.query.limit;
       const limit = rawLimit === undefined
@@ -987,7 +987,7 @@ export function installSupportRoutes(
       if (configuration.kind !== "AVAILABLE") {
         return reply.status(503).send({ error: configuration.code });
       }
-      const tokenSha256 = hashSupportCapability(request.params.token);
+      const tokenSha256 = hashSupportCapability("support-case",request.params.token);
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Readonly<Record<string,unknown>> : {};
       if (tokenSha256 === null || typeof body.text !== "string" || body.text.trim() === "") {

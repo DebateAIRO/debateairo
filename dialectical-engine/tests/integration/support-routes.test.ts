@@ -30,7 +30,8 @@ import {
   createSupportCaseMaterial,
   createSupportCaseService,
   createSupportMessageCipher,
-  createWrappedSupportSessionKey
+  createWrappedSupportSessionKey,
+  hashSupportCapability
 } from "../../apps/api/src/support/session.js";
 import {
   createSupportKeyPort,
@@ -2292,7 +2293,10 @@ describe("SUP-01 support routes", () => {
       JOIN support.case_key AS key ON key.case_id=opened.case_id
       WHERE opened.case_id=$1
     `,[body.case.case_id])).rows[0]!;
-    expect(stored.token_sha256).toBe(createHash("sha256").update(body.case_token,"utf8").digest("hex"));
+    // DL2-F4: the stored hash carries the case purpose label, never a bare digest.
+    expect(stored.token_sha256).toBe(hashSupportCapability("support-case",body.case_token));
+    expect(stored.token_sha256)
+      .not.toBe(createHash("sha256").update(body.case_token,"utf8").digest("hex"));
     expect(stored.row_text).not.toContain(body.case_token);
     expect(stored.row_text).not.toContain(question);
     expect(stored.transcript_snapshot_ciphertext.includes(Buffer.from(question,"utf8"))).toBe(false);
