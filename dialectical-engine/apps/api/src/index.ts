@@ -2207,7 +2207,20 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       ? reply.status(404).send({ error: "MEMORY_LINK_NOT_FOUND" })
       : reply.send(unlinked);
   });
-  installSupportRoutes(api, options.support, (route: SupportRoutePath) => routePolicy(route));
+  /**
+   * DL1-F2. The B10 limiter never reached a support route: every public support
+   * read was unmetered and the heavy `/status` aggregate ran uncached on every
+   * call. The support routes charge the same limiter, through the same typed
+   * refusal, under their own sealed scopes. A deployment whose register version
+   * carries no support budget is unchanged: `admitSupport` admits.
+   */
+  const admitSupport = (
+    reply: FastifyReply, scope: AdmissionScope, route: SupportRoutePath, key: string
+  ): boolean => options.admission?.configured(scope) !== true
+    || admitOrRefuse(reply, scope, route, key);
+  installSupportRoutes(
+    api, options.support, (route: SupportRoutePath) => routePolicy(route), admitSupport
+  );
   return api;
 }
 

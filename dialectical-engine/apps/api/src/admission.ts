@@ -1,6 +1,13 @@
 import type { AdmissionPolicy } from "@debateai/register";
 
-export type AdmissionScope = "asks" | "publicReads" | "recoveryStart";
+/**
+ * DL1-F2: `supportReads` and `supportSessions` join the three B10 scopes. They
+ * exist only when the resolved register version publishes them, which
+ * `configured` answers — a scope this deployment has no budget for is not a
+ * refusal, it is an absence, and the caller must be able to tell them apart.
+ */
+export type AdmissionScope = "asks" | "publicReads" | "recoveryStart"
+  | "supportReads" | "supportSessions";
 
 export type AdmissionDecision =
   | Readonly<{ allowed: true }>
@@ -18,8 +25,9 @@ interface AdmissionEntry {
 }
 
 interface AdmissionBucket {
-  readonly policy: AdmissionPolicy["asks"] | AdmissionPolicy["publicReads"]
-    | AdmissionPolicy["recoveryStart"];
+  readonly policy: NonNullable<AdmissionPolicy["asks"] | AdmissionPolicy["publicReads"]
+    | AdmissionPolicy["recoveryStart"] | AdmissionPolicy["supportReads"]
+    | AdmissionPolicy["supportSessions"]>;
   readonly entries: Map<string, AdmissionEntry>;
 }
 
@@ -44,8 +52,20 @@ export class AdmissionLimiter {
     this.buckets = new Map<AdmissionScope, AdmissionBucket>([
       ["asks", { policy: policy.asks, entries: new Map() }],
       ["publicReads", { policy: policy.publicReads, entries: new Map() }],
-      ["recoveryStart", { policy: policy.recoveryStart, entries: new Map() }]
+      ["recoveryStart", { policy: policy.recoveryStart, entries: new Map() }],
+      // DL1-F2: present only when the resolved register version carries them.
+      ...(policy.supportReads === null ? [] : [[
+        "supportReads", { policy: policy.supportReads, entries: new Map() }
+      ] as const]),
+      ...(policy.supportSessions === null ? [] : [[
+        "supportSessions", { policy: policy.supportSessions, entries: new Map() }
+      ] as const])
     ]);
+  }
+
+  /** Whether the resolved register version publishes a budget for this scope. */
+  configured(scope: AdmissionScope): boolean {
+    return this.buckets.has(scope);
   }
 
   decide(scope: AdmissionScope, key: string, now: Date): AdmissionDecision {

@@ -119,11 +119,20 @@ const admissionScopeValueSchema = <K extends "owner" | "source">(key: K) => z.ob
   capacity: z.number().int().positive().max(1_048_576)
 }).strict();
 
+/**
+ * DL1-F2. `support_reads` and `support_sessions` are OPTIONAL members: the
+ * sealed row carries neither, and a host still serving it must boot and behave
+ * exactly as it does today rather than refuse. A deployment that publishes the
+ * superseding row below gets the two budgets, and `AdmissionLimiter.configured`
+ * is how a caller tells "this deployment has no such budget" from "refused".
+ */
 const admissionPolicyValueSchema = z.object({
   kind: z.literal("ADMISSION_POLICY"),
   asks: admissionScopeValueSchema("owner"),
   public_reads: admissionScopeValueSchema("source"),
-  recovery_start: admissionScopeValueSchema("source")
+  recovery_start: admissionScopeValueSchema("source"),
+  support_reads: admissionScopeValueSchema("source").optional(),
+  support_sessions: admissionScopeValueSchema("owner").optional()
 }).strict();
 
 export type AdmissionPolicyValue = z.infer<typeof admissionPolicyValueSchema>;
@@ -139,6 +148,9 @@ export type AdmissionPolicy = Readonly<{
   asks: AdmissionScopePolicy<"owner">;
   publicReads: AdmissionScopePolicy<"source">;
   recoveryStart: AdmissionScopePolicy<"source">;
+  /** DL1-F2. `null` when the resolved register version carries no such budget. */
+  supportReads: AdmissionScopePolicy<"source"> | null;
+  supportSessions: AdmissionScopePolicy<"owner"> | null;
   sourceRef: string;
 }>;
 
@@ -162,6 +174,43 @@ export const ADMISSION_POLICY_REGISTER_ROW = Object.freeze({
     // sealed resend per-IP ceiling. Keyed by source and never by address, so
     // the refusal carries no signal about whether an account exists.
     recovery_start: Object.freeze({ key: "source" as const, limit: 15, window_ms: 60 * 60_000, capacity: 65_536 })
+  })
+});
+
+/**
+ * DL1-F2. The SUPERSEDING admission row: the sealed values above, republished
+ * byte for byte, plus the two budgets the support surface had none of. It is a
+ * new DEPLOYMENT version and never an edit (constraint 5).
+ *
+ * Why these numbers, for the owner to rule on with V-1:
+ *
+ * `support_reads` — 240 per 15 minutes per source, the same window and key
+ * table as `public_reads` and twice its limit. One help-page visit makes
+ * several support reads (the status poll, a session read, a case read) where a
+ * library visit makes one, so half of a per-read budget would refuse an
+ * ordinary visitor. At 16 reads a minute a person is never touched, while a
+ * flood that used to run the uncached `/status` aggregate without bound now
+ * costs one refusal per extra call.
+ *
+ * `support_sessions` — 10 per hour per owner, the same key table size as
+ * `asks`. A signed-in account that opens a support conversation opens one, or a
+ * few after a mistake; ten an hour is far past any real use and stops the loop
+ * that made a KEK wrap plus two inserts per call with nothing in the way.
+ * Anonymous creation keeps its own per-IP window (`admitIpSession`), so this
+ * budget is about the authenticated path the finding names.
+ */
+export const ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
+  rowKey: ADMISSION_POLICY_ROW_KEY,
+  sourceRef: `${ADMISSION_POLICY_REGISTER_ROW.sourceRef}`
+    + " + DL1-F2 support_reads/support_sessions, V ratification pending (V-1)",
+  value: Object.freeze({
+    ...ADMISSION_POLICY_REGISTER_ROW.value,
+    support_reads: Object.freeze({
+      key: "source" as const, limit: 240, window_ms: 15 * 60_000, capacity: 65_536
+    }),
+    support_sessions: Object.freeze({
+      key: "owner" as const, limit: 10, window_ms: 60 * 60_000, capacity: 8_192
+    })
   })
 });
 
@@ -189,6 +238,18 @@ export function admissionPolicyFromValue(value: unknown, sourceRef: string): Adm
       limit: policy.recovery_start.limit,
       windowMs: policy.recovery_start.window_ms,
       capacity: policy.recovery_start.capacity
+    }),
+    supportReads: policy.support_reads === undefined ? null : Object.freeze({
+      key: policy.support_reads.key,
+      limit: policy.support_reads.limit,
+      windowMs: policy.support_reads.window_ms,
+      capacity: policy.support_reads.capacity
+    }),
+    supportSessions: policy.support_sessions === undefined ? null : Object.freeze({
+      key: policy.support_sessions.key,
+      limit: policy.support_sessions.limit,
+      windowMs: policy.support_sessions.window_ms,
+      capacity: policy.support_sessions.capacity
     }),
     sourceRef
   });

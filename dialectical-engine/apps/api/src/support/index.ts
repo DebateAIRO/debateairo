@@ -67,6 +67,19 @@ export interface SupportApplication {
   readonly reportDiagnostic?: (diagnostic: SupportDiagnostic) => void;
 }
 
+/**
+ * DL1-F2. The API's own admission bridge: it charges the sealed budget for
+ * `scope` and, when it is spent, sends the API's typed 429 and answers false.
+ * A deployment whose register version publishes no such budget always admits,
+ * so support behaves exactly as it does today until the row is published.
+ */
+export type SupportAdmission = (
+  reply: FastifyReply,
+  scope: "supportReads" | "supportSessions",
+  route: SupportRoutePath,
+  key: string
+) => boolean;
+
 export type SupportRoutePolicy = (route: SupportRoutePath) => Readonly<{
   config: Readonly<{
     auth: "public" | "user" | "operator";
@@ -129,6 +142,14 @@ function notFound(reply: FastifyReply) {
  * body that cannot be lawful at any setting.
  */
 const SUPPORT_MESSAGE_BYTE_CEILING = 16 * 1_024;
+
+/**
+ * DL1-F2. How long one composed `/v1/support/status` answer serves every
+ * caller. One second, matching the support configuration port's own cache, so
+ * an operator watching the widget sees a change within the same beat while a
+ * flood costs one aggregate per second instead of one per request.
+ */
+const SUPPORT_STATUS_CACHE_MS = 1_000;
 
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
@@ -232,12 +253,31 @@ function openedCaseReceipt(
 export function installSupportRoutes(
   api: FastifyInstance,
   application: SupportApplication | undefined,
-  policy: SupportRoutePolicy
+  policy: SupportRoutePolicy,
+  admit: SupportAdmission = () => true
 ): void {
   const admission = new SupportC3AdmissionWindow();
+  /**
+   * DL1-F2. `/v1/support/status` composed a multi-CTE aggregate over
+   * `support.message`/`session`/`rating`/`case`, a configuration read and a
+   * knowledge read on EVERY anonymous call. The body is four fixed fields
+   * (DL1-F4) that no caller can influence, so one answer serves every caller
+   * for a second — the same freshness the configuration port already caches at.
+   */
+  let statusCache: Readonly<{ at: number;body: Readonly<Record<string,unknown>> }> | null = null;
 
   api.post("/v1/support/sessions", policy("POST /v1/support/sessions"), async (request, reply) => {
     if (application === undefined) return unavailable(reply);
+    /**
+     * DL1-F2. An authenticated create skipped `admitIpSession` and had no cap of
+     * its own, so one account could loop a KEK wrap plus two inserts without
+     * bound. Charged before the language check so nothing is done on the way.
+     */
+    const ownerRef = request.authenticatedSession?.ownerRef;
+    if (ownerRef !== undefined
+      && !admit(reply, "supportSessions", "POST /v1/support/sessions", ownerRef)) {
+      return reply;
+    }
     const body = typeof request.body === "object" && request.body !== null
       ? request.body as Readonly<Record<string, unknown>> : {};
     const language = languageFrom(body.language ?? "en");
@@ -293,6 +333,9 @@ export function installSupportRoutes(
     policy("GET /v1/support/sessions/{id}"),
     async (request, reply) => {
       if (application === undefined) return unavailable(reply);
+      if (!admit(reply, "supportReads", "GET /v1/support/sessions/{id}", clientIp(request))) {
+        return reply;
+      }
       const tokenSha256 = capabilityFrom(request);
       if (tokenSha256 === null) return reply.status(404).send({ error: "NOT_FOUND" });
       if (!isResourceId(request.params.id)) return notFound(reply);
@@ -937,6 +980,9 @@ export function installSupportRoutes(
     policy("GET /v1/support/cases/{token}"),
     async (request, reply) => {
       if (application?.caseAccess === undefined) return unavailable(reply);
+      if (!admit(reply, "supportReads", "GET /v1/support/cases/{token}", clientIp(request))) {
+        return reply;
+      }
       const configuration = await application.configuration.current();
       if (configuration.kind !== "AVAILABLE") {
         return reply.status(503).send({ error: configuration.code });
@@ -1047,18 +1093,26 @@ export function installSupportRoutes(
    * in `apps/runner/src/support-status-cli.ts`, which reads the database
    * directly and needs no HTTP route.
    */
-  api.get("/v1/support/status", policy("GET /v1/support/status"), async (_request, reply) => {
+  api.get("/v1/support/status", policy("GET /v1/support/status"), async (request, reply) => {
     if (application === undefined) return unavailable(reply);
+    if (!admit(reply, "supportReads", "GET /v1/support/status", clientIp(request))) return reply;
+    const now = (application.clock ?? (() => new Date()))().getTime();
+    if (statusCache !== null && now - statusCache.at < SUPPORT_STATUS_CACHE_MS
+      && now >= statusCache.at) {
+      return reply.send(statusCache.body);
+    }
     const [configuration, support, knowledge] = await Promise.all([
       application.configuration.current(),
       application.sessions.status(),
       application.knowledge.status()
     ]);
-    return reply.send({
+    const body = Object.freeze({
       configuration: { kind: configuration.kind },
       relay_state: support.relayState ?? "AVAILABLE",
       kb_version: knowledge.kbVersion,
       kb_loaded: { shipped: knowledge.shipped }
     });
+    statusCache = Object.freeze({ at: now, body });
+    return reply.send(body);
   });
 }
