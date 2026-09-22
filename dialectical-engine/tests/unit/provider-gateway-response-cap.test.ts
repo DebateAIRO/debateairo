@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { OpenAICompatibleProviderGateway, ProviderCallFailedError } from "@debateai/providers";
+import {
+  CostEnvelopeGuard,
+  type ModelSpendEntry,
+  type ModelSpendStore
+} from "@debateai/budget";
 import { framedFixturePacket } from "../support/framed-packet.js";
 
 const MIB = 1024 * 1024;
@@ -46,6 +51,44 @@ function completionOfExactly(totalBytes: number, model = "configured/model") {
   const tail = "\"}}]}";
   const contentLength = totalBytes - Buffer.byteLength(head) - Buffer.byteLength(tail);
   return { text: `${head}${"a".repeat(contentLength)}${tail}`, contentLength };
+}
+
+/**
+ * The same gateway with the REAL money seam over an in-memory
+ * `ledger.model_spend`: the charge is the shipped rule, not a fake of it, so
+ * "one row, non-zero" below means one row this deployment would really write.
+ */
+function meteredGatewayWith(fetchImplementation: typeof fetch) {
+  const rows: ModelSpendEntry[] = [];
+  const store: ModelSpendStore = {
+    recordSpend: async (entry) => { rows.push(entry); },
+    readRunSpentMicros: async () => 0,
+    readDaySpentMicros: async () => 0,
+    admitNewRun: async () => Object.freeze({ admitted: true, committedMicros: 0 })
+  };
+  const seam = new CostEnvelopeGuard({
+    store,
+    policy: { perRunCeilingMicros: 1_000_000_000, dailyCeilingMicros: 1_000_000_000 }
+  }).providerSeam({
+    runId: "run-1",
+    price: { inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 },
+    requireReportedUsage: true
+  });
+  const gateway = new OpenAICompatibleProviderGateway({
+    endpoint: "http://fixture/v1", model: "configured/model", maker: "fixture",
+    fetchImplementation,
+    persistRawArtifact: async (artifact) => artifact.artifactId,
+    appendLedgerEntry: async () => "ledger:1",
+    assertNoOpenWriteTransaction: () => undefined,
+    sleepImplementation: async () => {}
+  });
+  return {
+    gateway: {
+      call: (request: ReturnType<typeof callRequest>) =>
+        gateway.call({ ...request, costEnvelope: seam })
+    },
+    rows
+  };
 }
 
 function gatewayWith(fetchImplementation: typeof fetch, pinnedModel = "configured/model") {
@@ -128,16 +171,21 @@ describe("L4-F3 — bounded usage counters, unknown members dropped", () => {
       .toEqual({ prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 });
   });
 
+  const MALFORMED_COUNTERS = Object.freeze([
+    { prompt_tokens: 2 ** 31 },
+    { completion_tokens: -1 },
+    { total_tokens: 1.5 },
+    { prompt_tokens: "3" }
+  ]);
+
   it("bounds every counter to a non-negative integer at most 2^31 - 1", async () => {
-    for (const usage of [
-      { prompt_tokens: 2 ** 31 },
-      { completion_tokens: -1 },
-      { total_tokens: 1.5 },
-      { prompt_tokens: "3" }
-    ]) {
+    for (const usage of MALFORMED_COUNTERS) {
       const { gateway, artifacts } = gatewayWith(async () => new Response(completionWithUsage(usage)));
+      // Fix round 1, Important 1: the refusal now leaves the attempt loop under
+      // its OWN name instead of re-emerging as PROVIDER_CALL_FAILED three
+      // billed calls later.
       await expect(gateway.call(callRequest())).rejects.toMatchObject({
-        code: "PROVIDER_CALL_FAILED", cause: { code: "PROVIDER_USAGE_INVALID" }
+        code: "PROVIDER_USAGE_INVALID"
       });
       expect(artifacts[0]?.metadata.usage).toBeNull();
     }
@@ -145,6 +193,58 @@ describe("L4-F3 — bounded usage counters, unknown members dropped", () => {
     const { gateway, artifacts } = gatewayWith(async () => new Response(completionWithUsage(accepted)));
     await expect(gateway.call(callRequest())).resolves.toMatchObject({ content: "ok" });
     expect(artifacts[0]?.metadata.usage).toEqual(accepted);
+  });
+
+  /**
+   * FIX ROUND 1, Important 1 — A MALFORMED COUNTER IS STILL A BILLED CALL.
+   *
+   * The strict parse refuses the body, which is right: the engine cannot trust
+   * a count it cannot read. But the vendor charged for the call, and round 1
+   * still derived the CHARGE from that same strict parse, so the money
+   * vanished — three billed attempts, no ledger row, neither ceiling moved —
+   * and the comment claimed the case was covered.
+   *
+   * Two separate duties, so two separate reads: the charge reads the raw block
+   * LENIENTLY and falls back to the call's own projected maximum for a part it
+   * cannot read, and the acceptance decision keeps the strict parse. And
+   * because the refusal is deterministic — the same vendor returns the same
+   * malformed count on the retry — it now short-circuits: one billed call,
+   * charged, then a typed stop.
+   */
+  it("charges a malformed counter once, on one call, and does not retry it", async () => {
+    for (const usage of MALFORMED_COUNTERS) {
+      let calls = 0;
+      const { gateway, rows } = meteredGatewayWith(async () => {
+        calls += 1;
+        return new Response(completionWithUsage(usage));
+      });
+
+      const refusal = await gateway.call(callRequest(3))
+        .then(() => null, (thrown: unknown) => thrown);
+
+      // ONE billed call — the retry cannot repair a count the vendor will
+      // report the same way again...
+      expect(calls, JSON.stringify(usage)).toBe(1);
+      // ...ONE row for it, and never a zero one...
+      expect(rows, JSON.stringify(usage)).toHaveLength(1);
+      expect(rows[0]!.chargeMicros, JSON.stringify(usage)).toBeGreaterThan(0);
+      expect(rows[0]!.spendSource).toBe("RUN");
+      // ...and the refusal arrives under its own name, not PROVIDER_CALL_FAILED.
+      expect(refusal, JSON.stringify(usage)).toMatchObject({ code: "PROVIDER_USAGE_INVALID" });
+    }
+  });
+
+  it("still records nothing for a vendor that reported no usage at all", async () => {
+    const { gateway, rows } = meteredGatewayWith(async () => new Response(JSON.stringify({
+      id: "call", model: "configured/model", choices: [{ message: { content: "ok" } }]
+    })));
+
+    // The hosted requirement still refuses it, and no row invents a charge for
+    // a call the vendor said nothing about.
+    await expect(gateway.call(callRequest())).rejects.toMatchObject({
+      code: "PROVIDER_USAGE_UNREPORTED"
+    });
+    expect(rows).toEqual([]);
   });
 });
 

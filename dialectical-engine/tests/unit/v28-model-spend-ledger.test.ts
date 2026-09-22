@@ -38,6 +38,14 @@ const PRICE = Object.freeze({
 });
 
 /**
+ * The call's own pre-send maximum, the two facts the gateway hands the seam.
+ * At one micro-unit per token it projects 400 input + 64 output tokens — the
+ * figure a charge falls back to for a count the vendor's block carries but this
+ * cannot read (fix round 1, Important 1).
+ */
+const PROJECTION = Object.freeze({ requestBytes: 800, completionTokenCeiling: 64 });
+
+/**
  * An in-memory stand-in for `ledger.model_spend` and its reservations.
  *
  * `admitNewRun` SERIALISES, which is what the shipped store's transaction-scoped
@@ -125,7 +133,8 @@ describe("V-28 the per-run seam reads and writes the persisted spend", () => {
 
     await seam.recordCall({
       providerRef: "provider-1",
-      usage: { prompt_tokens: 2_000_000, completion_tokens: 1_000_000 }
+      usage: { prompt_tokens: 2_000_000, completion_tokens: 1_000_000 },
+      projection: PROJECTION
     });
 
     expect(rows).toHaveLength(1);
@@ -152,12 +161,53 @@ describe("V-28 the per-run seam reads and writes the persisted spend", () => {
     // already taken — and writes nothing for a call that reported nothing,
     // because a zero row would read as "this call was free". The REFUSAL is its
     // own question, asked only of a successful completion.
-    await expect(seam.recordCall({ providerRef: "provider-1", usage: null }))
-      .resolves.toBeUndefined();
+    await expect(seam.recordCall({
+      providerRef: "provider-1", usage: null, projection: PROJECTION
+    })).resolves.toBeUndefined();
     expect(rows).toEqual([]);
 
     await expect(seam.assertUsageReported({ providerRef: "provider-1", usage: null }))
       .rejects.toThrowError(expect.objectContaining({ code: "PROVIDER_USAGE_UNREPORTED" }));
+  });
+
+  /**
+   * FIX ROUND 1, Important 1 — a usage block that IS there but carries a count
+   * this cannot read is still a call the vendor billed. The readable side is
+   * charged as reported; the unreadable one falls back to the call's own
+   * projected maximum, which is the number `assertCallAllowed` already admitted
+   * the call against, so the charge can never exceed what the gate allowed.
+   */
+  it("charges the projected maximum for a side whose count it cannot read", async () => {
+    for (const [usage, inputTokens, outputTokens, billable] of [
+      // Readable prompt count, unreadable completion count → 1 000 + 64.
+      [{ prompt_tokens: 1_000, completion_tokens: 300.5 }, 1_000, 64, true],
+      // Neither side readable → the whole projection, 400 + 64.
+      [{ completion_tokens: -1 }, 400, 64, false],
+      [{ total_tokens: 1.5 }, 400, 64, false],
+      [{ prompt_tokens: "3" }, 400, 64, false]
+    ] as const) {
+      const { store, rows } = fakeStore();
+      const seam = guardWith(store).providerSeam({
+        runId: "run-1", price: PRICE, requireReportedUsage: true
+      });
+
+      await seam.recordCall({ providerRef: "provider-1", usage, projection: PROJECTION });
+
+      expect(rows, JSON.stringify(usage)).toHaveLength(1);
+      expect(rows[0], JSON.stringify(usage)).toMatchObject({
+        inputTokens, outputTokens, chargeMicros: inputTokens + outputTokens
+      });
+      // The REFUSAL is still its own question and still answers it on what the
+      // vendor REPORTED, not on what was charged: a block with one readable
+      // side is billable, one with neither is not. (In the gateway both are
+      // refused anyway, one step earlier, as PROVIDER_USAGE_INVALID.)
+      const reported = seam.assertUsageReported({ providerRef: "provider-1", usage });
+      if (billable) await expect(reported).resolves.toBeUndefined();
+      else {
+        await expect(reported)
+          .rejects.toThrowError(expect.objectContaining({ code: "PROVIDER_USAGE_UNREPORTED" }));
+      }
+    }
   });
 
   it("records nothing and refuses nothing when reported usage is not required", async () => {
@@ -166,8 +216,9 @@ describe("V-28 the per-run seam reads and writes the persisted spend", () => {
       runId: "run-1", price: PRICE, requireReportedUsage: false
     });
 
-    await expect(seam.recordCall({ providerRef: "provider-1", usage: null }))
-      .resolves.toBeUndefined();
+    await expect(seam.recordCall({
+      providerRef: "provider-1", usage: null, projection: PROJECTION
+    })).resolves.toBeUndefined();
     await expect(seam.assertUsageReported({ providerRef: "provider-1", usage: null }))
       .resolves.toBeUndefined();
     expect(rows).toEqual([]);
@@ -315,7 +366,9 @@ describe("I1 — the daily gate reserves what it admits", () => {
       runId: "run-a", price: PRICE, requireReportedUsage: true
     });
     await spendSeam.recordCall({
-      providerRef: "provider-1", usage: { prompt_tokens: 400, completion_tokens: 0 }
+      providerRef: "provider-1",
+      usage: { prompt_tokens: 400, completion_tokens: 0 },
+      projection: PROJECTION
     });
 
     await expect(guard.assertDailyEnvelopeAdmitsNewRun()).resolves.toBeUndefined();
@@ -376,15 +429,20 @@ describe("C-I2 the reservation covers the wait for a first charge", () => {
     expect(DEFAULT_RESERVATION_TTL_MS).toBe(30 * 60_000);
   });
 
-  it("covers the judge's own deadline x attempts plus the run-death cooldown", () => {
-    // The numbers are not restated here: they are the rows the dev deployment
-    // seeds and the kit's `runner.env` declares, read from the seeder itself.
+  it("covers the judge's deadline x attempts plus EVERY cooldown hold the policy allows", () => {
+    // No number is restated here: every one is read from the frozen policy
+    // objects the dev deployment seeds, so a change to either row moves this
+    // margin instead of leaving a stale sentence behind (fix round 1, Minor 2 —
+    // the first version of this pin counted ONE cooldown hold, while the policy
+    // allows two).
     const judge = DEVELOPMENT_ORGAN_COST_BOUNDS.organs.JUDGE;
     const exhaustion = judge.deadlineMs * judge.maxAttempts;
-    const cooldown = DEVELOPMENT_RUN_DEATH_POLICY.cooldown_ms;
+    const cooldown = DEVELOPMENT_RUN_DEATH_POLICY.cooldown_ms
+      * DEVELOPMENT_RUN_DEATH_POLICY.max_cooldown_holds_per_run;
     expect(exhaustion + cooldown).toBeLessThanOrEqual(DEFAULT_RESERVATION_TTL_MS);
-    // ...and the rest of the window is the queueing margin, which must exist.
-    expect(DEFAULT_RESERVATION_TTL_MS - (exhaustion + cooldown)).toBeGreaterThan(0);
+    // The margin the window actually leaves, computed and pinned exactly: one
+    // minute, which is what the comment beside the constant must say.
+    expect(DEFAULT_RESERVATION_TTL_MS - (exhaustion + cooldown)).toBe(60_000);
   });
 
   it("stamps that window on the reservation the guard opens", async () => {
@@ -413,5 +471,9 @@ describe("C-I2 the reservation covers the wait for a first charge", () => {
     expect(stated).toMatch(/judge deadline/iu);
     expect(stated).toMatch(/cooldown/u);
     expect(stated).toMatch(/queue/iu);
+    // Minor 2: the arithmetic in that paragraph is the two-hold one, and it
+    // names the margin it really leaves rather than a comfortable one.
+    expect(stated).toMatch(/max_cooldown_holds_per_run/u);
+    expect(stated).toMatch(/SIXTY SECONDS/u);
   });
 });

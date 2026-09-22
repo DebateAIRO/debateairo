@@ -24,6 +24,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import type { Pool } from "pg";
 import {
   chargeMicrosForUsage,
+  chargeableUsage,
   costEnvelopeDay,
   dailyCostEnvelopeReached,
   decideDailyCostEnvelope,
@@ -89,8 +90,16 @@ export interface ProviderCostSeam {
     requestBytes: number;
     completionTokenCeiling: number;
   }>): Promise<void>;
-  /** I4: charges what the vendor billed, and never refuses. */
-  recordCall(observed: Readonly<{ providerRef: string; usage: unknown }>): Promise<void>;
+  /**
+   * I4: charges what the vendor billed, and never refuses. `projection` is the
+   * call's own pre-send maximum, used for a count the vendor's block carries
+   * but this cannot read (Important 1).
+   */
+  recordCall(observed: Readonly<{
+    providerRef: string;
+    usage: unknown;
+    projection: Readonly<{ requestBytes: number; completionTokenCeiling: number }>;
+  }>): Promise<void>;
   /** I4: the hosted requirement, asked only of a successful completion. */
   assertUsageReported(observed: Readonly<{ providerRef: string; usage: unknown }>): Promise<void>;
 }
@@ -116,20 +125,30 @@ export interface CostEnvelopeGuardInput {
    * debate's first model call happens in seconds"). The window that matters is
    * the UNhappy one, and the deployment's own sealed rows set it:
    *
-   *   judge deadline x its attempts     3 x 180 s = 540 s   (`acceptanceOrganCostBounds`;
+   *   judge deadline x its attempts     3 x 180 s =  540 s  (`acceptanceOrganCostBounds`;
    *                                                          the kit's runner.env declares
    *                                                          120 s x 3, which is smaller)
-   * + the run-death cooldown                      600 s     (`runDeathPolicy.cooldown_ms`)
-   * + queueing behind another run on a busy runner
+   * + cooldown x holds allowed per run 2 x 600 s = 1 200 s  (`runDeathPolicy.cooldown_ms`
+   *                                                          x `max_cooldown_holds_per_run`)
    *   ------------------------------------------------
-   *   = 19 minutes before the margin; 30 leaves 11 for the queue.
+   *   = 1 740 s = 29 minutes.
    *
-   * Below that sum the daily ceiling degrades to the ask rate limit exactly
+   * So thirty minutes covers that worst case with a margin of SIXTY SECONDS,
+   * and no more (fix round 1, Minor 2 — the round-1 comment counted one hold
+   * and claimed 11 minutes). Queueing behind another run on a busy runner is
+   * NOT inside the margin: a run that waits longer than a minute past both
+   * cooldown holds for its first charge becomes invisible to the day again.
+   * That residual is accepted rather than papered over, because the TTL is not
+   * free in the other direction either — a reservation and that run's early
+   * charges are both counted while it is live, and the refusal a live
+   * reservation causes answers `Retry-After: next UTC midnight` although the
+   * day reopens when it expires.
+   *
+   * Below this sum the daily ceiling degrades to the ask rate limit exactly
    * when it is most needed: during a vendor outage every ask sees committed = 0,
-   * is admitted, and can later spend a whole per-run ceiling. The cost of the
-   * longer window is the conservative direction — a reservation and that run's
-   * early charges counted together for up to thirty minutes — which can only
-   * refuse a new run early, never admit one late.
+   * is admitted, and can later spend a whole per-run ceiling. Above it, the cost
+   * is only the conservative direction — refusing a new run early, never
+   * admitting one late.
    */
   readonly reservationTtlMs?: number;
 }
@@ -212,11 +231,14 @@ export class CostEnvelopeGuard {
         });
         if (decision.kind === "WOULD_CROSS") throw runCostEnvelopeReached(decision);
       },
-      // I4: charging never refuses. Nothing is written for a call that reported
-      // nothing — a zero row would read as "this call was free", which is the
-      // falsehood the hosted refusal below exists to prevent.
+      // I4: charging never refuses. Nothing is written for a call whose vendor
+      // said nothing at all about usage — a zero row would read as "this call
+      // was free", which is the falsehood the hosted refusal below exists to
+      // prevent. Important 1: a block that IS there but carries a count this
+      // cannot read is charged at the call's own projected maximum, because the
+      // vendor billed for it either way.
       recordCall: async (observed) => {
-        const usage = readReportedUsage(observed.usage);
+        const usage = chargeableUsage(observed.usage, observed.projection);
         if (usage === null) return;
         await this.#store.recordSpend(Object.freeze({
           spendId: randomUUID(),

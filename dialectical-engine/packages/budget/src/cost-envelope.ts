@@ -250,17 +250,76 @@ export function decideDailyCostEnvelope(input: Readonly<{
  * is nearer the truth than charging nothing.
  */
 export function readReportedUsage(usage: unknown): ReportedUsage | null {
-  if (typeof usage !== "object" || usage === null || Array.isArray(usage)) return null;
-  const row = usage as Readonly<Record<string, unknown>>;
-  const prompt = row.prompt_tokens;
-  const completion = row.completion_tokens;
-  const promptReported = typeof prompt === "number" && Number.isInteger(prompt) && prompt >= 0;
-  const completionReported = typeof completion === "number"
-    && Number.isInteger(completion) && completion >= 0;
-  if (!promptReported && !completionReported) return null;
+  const parts = readUsageCounters(usage);
+  if (parts.promptTokens === null && parts.completionTokens === null) return null;
   return Object.freeze({
-    promptTokens: promptReported ? prompt as number : 0,
-    completionTokens: completionReported ? completion as number : 0
+    promptTokens: parts.promptTokens ?? 0,
+    completionTokens: parts.completionTokens ?? 0
+  });
+}
+
+/**
+ * The two priced sides read INDEPENDENTLY: a number for a side this can bill,
+ * `null` for one it cannot. Anything that is not a non-negative integer is
+ * unreadable — a float, a negative, a string, an absent member, a usage block
+ * that is not an object at all.
+ *
+ * The bound the strict schema applies (2^31-1) is deliberately NOT applied
+ * here. This read exists for the CHARGE, which must record money the vendor has
+ * already taken; refusing an over-large count is the acceptance decision's job,
+ * and it still makes it.
+ */
+export function readUsageCounters(usage: unknown): Readonly<{
+  promptTokens: number | null;
+  completionTokens: number | null;
+}> {
+  if (typeof usage !== "object" || usage === null || Array.isArray(usage)) {
+    return Object.freeze({ promptTokens: null, completionTokens: null });
+  }
+  const row = usage as Readonly<Record<string, unknown>>;
+  const counted = (value: unknown): number | null =>
+    typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
+  return Object.freeze({
+    promptTokens: counted(row.prompt_tokens),
+    completionTokens: counted(row.completion_tokens)
+  });
+}
+
+/**
+ * FIX ROUND 1, Important 1 — WHAT A BILLED CALL IS CHARGED WHEN ITS COUNTS
+ * CANNOT BE READ.
+ *
+ * `readReportedUsage` answers "what did the vendor tell us"; this answers "what
+ * do we charge for a call that has already been paid for". They differ in
+ * exactly one place: a usage block that IS there but carries a count this
+ * cannot read — `completion_tokens: 300.5`, a negative, a string, a count past
+ * the bounded range. The strict parse refuses that answer and the engine throws
+ * it away, but the vendor billed for it, so the ledger must show something, and
+ * the only honest figure left is the maximum the engine itself projected for
+ * the call BEFORE it was sent — the same number `assertCallAllowed` admitted it
+ * against, so the charge can never exceed what the per-run gate already allowed.
+ *
+ * `null` — nothing is charged — is kept for the ONE case where the vendor said
+ * nothing about usage at all: no `usage` member, or an explicit null. A charge
+ * there would be inventing spend for a local relay that costs nothing, and
+ * hosted refuses that answer anyway (`PROVIDER_USAGE_UNREPORTED`).
+ */
+export function chargeableUsage(
+  usage: unknown,
+  projection: Readonly<{ requestBytes: number; completionTokenCeiling: number }>
+): ReportedUsage | null {
+  if (usage === undefined || usage === null) return null;
+  const requestBytes = assertCountedInteger(
+    projection?.requestBytes, "COST_ENVELOPE_PROJECTION_INVALID"
+  );
+  const completionTokenCeiling = assertCountedInteger(
+    projection?.completionTokenCeiling, "COST_ENVELOPE_PROJECTION_INVALID"
+  );
+  const parts = readUsageCounters(usage);
+  return Object.freeze({
+    promptTokens: parts.promptTokens
+      ?? Math.ceil(requestBytes / PROJECTED_INPUT_BYTES_PER_TOKEN),
+    completionTokens: parts.completionTokens ?? completionTokenCeiling
   });
 }
 

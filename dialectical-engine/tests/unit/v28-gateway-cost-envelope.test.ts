@@ -5,6 +5,7 @@ import {
 } from "@debateai/providers";
 import {
   chargeMicrosForUsage,
+  chargeableUsage,
   CostEnvelopeGuard,
   costEnvelopeDay,
   decideRunCostEnvelope,
@@ -107,8 +108,11 @@ function meteredSeam(ceilingMicros: number, requireReportedUsage = false) {
     },
     // I4: charging NEVER refuses. It records money the vendor has already
     // taken, and a refusal here would be a reason not to record it.
+    // Important 1: it charges through `chargeableUsage`, the same function the
+    // shipped seam uses, so a count this cannot read falls back to the call's
+    // own projected maximum here exactly as it does in production.
     recordCall: (observed) => {
-      const usage = readReportedUsage(observed.usage);
+      const usage = chargeableUsage(observed.usage, observed.projection);
       if (usage === null) return;
       const charge = chargeMicrosForUsage(PRICE, usage);
       state.charges.push(charge);

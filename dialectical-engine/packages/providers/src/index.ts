@@ -887,8 +887,15 @@ export interface ProviderCostEnvelopeSeam {
    */
   readonly recordCall: (observed: Readonly<{
     providerRef: string;
-    /** The vendor's usage block as it arrived, or `null` if it reported none. */
+    /**
+     * The vendor's usage block EXACTLY as it arrived — not the strict parse.
+     * A malformed count does not make a billed call free (Important 1), so the
+     * policy reads this leniently and uses `projection` for what it cannot
+     * read. `undefined` means the answer carried no usage member at all.
+     */
     usage: unknown;
+    /** This attempt's own pre-send maximum, the two facts `assertCallAllowed` got. */
+    projection: Readonly<{ requestBytes: number; completionTokenCeiling: number }>;
   }>) => void | Promise<void>;
   /**
    * The HOSTED requirement, asked only of a SUCCESSFUL completion: a vendor that
@@ -1195,13 +1202,29 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         const observedUsage = z.object({ usage: usageSchema.nullable().optional() })
           .passthrough().safeParse(decoded);
         /**
-         * Read ONCE: the artifact's record, the charge and the hosted check
-         * agree by construction. The schema STRIPS a vendor's extra members
-         * (C-I1), so this is the four bounded counters or nothing — a real
-         * vendor's `prompt_tokens_details` neither reaches the artifact nor
-         * turns a billed call into an uncharged one.
+         * TWO READS OF ONE BLOCK, and the difference is deliberate.
+         *
+         * `reportedUsage` is what the engine can VOUCH FOR: the strict parse,
+         * with a vendor's extra members stripped (C-I1), so what reaches the
+         * artifact and the hosted usage requirement is the four bounded
+         * counters or nothing. A block that strips to nothing is recorded as
+         * `null` rather than as `{}`, which would claim the vendor reported an
+         * empty usage block (fix round 1, Minor 7).
+         *
+         * `rawUsage` is what the vendor SENT, handed to the charge below,
+         * because a malformed count does not make a billed call free
+         * (Important 1). The charge reads it leniently and falls back to this
+         * attempt's own projected maximum for a part it cannot read; the
+         * acceptance decision keeps the strict parse and still refuses.
          */
-        const reportedUsage = observedUsage.success ? observedUsage.data.usage ?? null : null;
+        const parsedUsage = observedUsage.success ? observedUsage.data.usage ?? null : null;
+        const reportedUsage = parsedUsage !== null && Object.keys(parsedUsage).length > 0
+          ? parsedUsage
+          : null;
+        const rawUsage: unknown = typeof decoded === "object" && decoded !== null
+          && !Array.isArray(decoded)
+          ? (decoded as Readonly<Record<string, unknown>>).usage
+          : undefined;
         const strict = responseSchema.safeParse(decoded);
         const finishReason = observedFinishReason(decoded);
         const content = strict.success ? strict.data.choices[0]!.message.content : null;
@@ -1276,7 +1299,14 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          */
         await request.costEnvelope?.recordCall({
           providerRef: request.providerRef,
-          usage: reportedUsage
+          usage: rawUsage,
+          // The SAME two facts `assertCallAllowed` decided against above, so a
+          // charge that falls back to the projection can never exceed what the
+          // per-run gate already admitted for this attempt.
+          projection: {
+            requestBytes: Buffer.byteLength(body, "utf8"),
+            completionTokenCeiling: attemptTokenCeiling
+          }
         });
         if (!response.ok) throw new Error(`PROVIDER_HTTP_STATUS_${response.status}`);
         assertBoundedProviderResponse(decoded);
@@ -1285,16 +1315,21 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          *
          * The CHARGE is taken earlier, right after the artifact is recorded
          * (I4): a 200 the engine then refuses — an over-long model id, a
-         * malformed usage counter — was still billed by the vendor and is still
-         * retried, so charging here missed real money, repeatedly. This check
-         * stays here, after `assertBoundedProviderResponse`, so a malformed
-         * usage block is still named PROVIDER_USAGE_INVALID rather than
-         * collapsed into "the vendor reported nothing", and after the
-         * `!response.ok` throw so an error page stays a transport failure.
+         * malformed usage counter — was still billed by the vendor, so charging
+         * here missed real money. This check stays here, after
+         * `assertBoundedProviderResponse`, so a malformed usage block is still
+         * named PROVIDER_USAGE_INVALID rather than collapsed into "the vendor
+         * reported nothing", and after the `!response.ok` throw so an error page
+         * stays a transport failure.
          *
-         * C-I1: an UNKNOWN member of the usage block is no longer one of those
-         * refusals. It is stripped, the four counters are charged, and the
-         * answer is accepted — which is what a vendor's real 200 looks like.
+         * Two corrections this comment used to get wrong:
+         *  · C-I1: an UNKNOWN member of the usage block is no longer a refusal
+         *    at all. It is stripped, the four counters are charged, and the
+         *    answer is accepted — which is what a vendor's real 200 looks like.
+         *  · Important 1: a MALFORMED COUNTER is charged (from the raw block,
+         *    falling back to this attempt's projected maximum) and is NOT
+         *    retried — the refusal short-circuits the attempt loop below. One
+         *    billed call, one ledger row, one typed stop.
          */
         await request.costEnvelope?.assertUsageReported({
           providerRef: request.providerRef,
@@ -1420,8 +1455,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         };
       } catch (error) {
         /**
-         * Two refusals here are OURS, not the transport's, and neither is
-         * repaired by asking again — so both propagate untouched instead of
+         * The refusals below are OURS, not the transport's, and none of them is
+         * repaired by asking again — so each propagates untouched instead of
          * being absorbed into a retry loop and re-emerging as
          * PROVIDER_CALL_FAILED after the ceiling is spent.
          *
@@ -1431,6 +1466,10 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          *    proved it answers with the wrong model. Retrying it was three real
          *    calls, three artifacts and three ledger rows for an answer that
          *    cannot become correct.
+         *  · a MALFORMED USAGE COUNTER (Important 1): a vendor that answered
+         *    `completion_tokens: 300.5` answers the same way one backoff later.
+         *    Retrying it was three billed calls to reach one refusal — and,
+         *    before this round, three billed calls charged as nothing.
          *  · V-28: a MONEY refusal from the cost-envelope seam. A ceiling that
          *    is already reached is still reached one backoff later, and a vendor
          *    that reported no usage will report none again, so retrying either
@@ -1440,6 +1479,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         const shortCircuit = error instanceof TypedDomainError
           && (error.code.startsWith("PROMPT_FRAME_")
             || error.code === "PROVIDER_MODEL_IDENTITY_CHANGED"
+            || error.code === "PROVIDER_USAGE_INVALID"
             || (PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).includes(error.code));
         lastContentRejection = null;
         lastError = error;
