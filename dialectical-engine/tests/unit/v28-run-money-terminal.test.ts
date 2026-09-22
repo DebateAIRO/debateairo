@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { decideBudgetPressure, parseCostEnvelopeBasis } from "@debateai/budget";
-import { SERVE_CRASH_CLASSES } from "@debateai/serve";
-import { envelopeStopKind } from "../../apps/runner/src/index.js";
+import {
+  buildFactBundle,
+  createEnvelopeExhaustedResult,
+  SERVE_CRASH_CLASSES,
+  type CompositionBudgetResolution
+} from "@debateai/serve";
+import { ENVELOPE_STOP_REASONS, envelopeStopKind } from "../../apps/runner/src/index.js";
 import { TypedDomainError } from "@debateai/kernel";
 import { fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 
@@ -124,10 +129,91 @@ describe("V-28 the runner tells a money stop from an attempt stop from a failure
     }
   });
 
-  it("ends in the run's own terminal state, never as a crash", () => {
-    // The same terminal the attempt stop reaches — a state of the run, resolved
-    // and readable, not a thrown failure the work item records as terminal.
-    expect(SERVE_CRASH_CLASSES.ENVELOPE_EXHAUSTED.terminal).toBeTruthy();
-    expect(typeof SERVE_CRASH_CLASSES.ENVELOPE_EXHAUSTED.terminal).toBe("string");
+});
+
+/**
+ * FW-F (final review, Important 3) — THIS ROW USED TO CHECK THAT A CONSTANT WAS
+ * A NON-EMPTY STRING.
+ *
+ * It was titled "ends in the run's own terminal state, never as a crash" and
+ * its whole body was `expect(SERVE_CRASH_CLASSES.ENVELOPE_EXHAUSTED.terminal)
+ * .toBeTruthy()` plus a `typeof` check. Nothing about a run reached it. The
+ * reviewer's mutation — delete the runner's `makeEnvelopeTerminal` call and let
+ * the money stop rethrow, so the run DOES crash — left the row green, and so
+ * would renaming `COMPONENTS_ONLY` to anything else non-empty.
+ *
+ * The property has two halves, and both are checked now. The VALUE half is
+ * driven here, from the money hard stop through the constructor the runner
+ * calls, and asserted against literals rather than against the constant it is
+ * testing: a resolved result, in the run's own components-only terminal, with
+ * no answer form, carrying the work the run had already paid for, and NOT a
+ * DEFECT. The WIRING half — that the runner takes this terminal on the run-body
+ * money stop instead of rethrowing — cannot be driven without a pool, and is
+ * pinned on the source by `tests/architecture/v28-serve-decision-wiring.test.ts`
+ * ("FW-F / C1 …"), whose last row proves itself against that same mutation.
+ */
+describe("V-28 a money stop ends in the run's own terminal state, never as a crash", () => {
+  const COMPOSITION_BUDGET: CompositionBudgetResolution = Object.freeze({
+    tier: "low",
+    bound: 100_000,
+    registerRowKey: "compositionBundleBudget.low",
+    registerVersion: 91,
+    sourceRef: "test-layer:V-28"
+  });
+
+  it("carries the money hard stop into a resolved components-only result", () => {
+    const decision = decideBudgetPressure({
+      basis,
+      consumedModelAttempts: 3,
+      forceHardStop: true,
+      pendingRows: [{ batteryRowId: "Q27", affectedNodeIds: ["node:test:q27"] }],
+      verifiedNodeIds: ["node:test:verified"]
+    });
+    expect(decision.kind).toBe("HARD_STOP");
+    if (decision.kind !== "HARD_STOP") return;
+
+    // The runner's `makeEnvelopeTerminal` calls exactly this, with exactly
+    // these members read off the decision (apps/runner/src/index.ts).
+    const result = createEnvelopeExhaustedResult({
+      factBundle: buildFactBundle({
+        facts: Object.freeze(["the statement the run had already paid for"]),
+        residualObjections: Object.freeze([]),
+        badges: Object.freeze([]),
+        conditionMarks: Object.freeze([]),
+        reversalPoint: "No reversal point was reached before the envelope stopped the run",
+        buildsOnPrevious: { value: false, answerRef: null },
+        memoryDisclosure: null
+      }),
+      compositionBudget: COMPOSITION_BUDGET,
+      verifiedNodeIds: decision.terminal.servedNodeIds,
+      skippedEnrichmentRows: decision.enrichmentSkips.map((row) => row.batteryRowId),
+      protectedCoreRestatement: "PASS",
+      servedStatementExists: false
+    });
+
+    // A STATE OF THE RUN, named by its literal value. `toBeTruthy` on the
+    // constant could not tell this from a crash class, and that is the whole
+    // point of the row.
+    expect(result.terminal).toBe("COMPONENTS_ONLY");
+    expect(result.crashClass).toBe("ENVELOPE_EXHAUSTED");
+    expect(result.answerForm).toBeNull();
+    // Reached WITHOUT throwing: the value above exists, so the run has a
+    // terminal to persist rather than a failure the work item records.
+    expect(Object.isFrozen(result)).toBe(true);
+    // It KEEPS what it produced, and says what it could not reach.
+    expect(result.conditionMarks).toContain("ENVELOPE_EXHAUSTED");
+    expect(result.conditionMarks).toContain("SKIPPED-BY-BUDGET");
+    expect(result.factBundle.facts).toEqual(["the statement the run had already paid for"]);
+    // ENVELOPE_EXHAUSTED and DEFECT are independent terminals: a run that ran
+    // out of money is not a broken run, and the reader must not be told it is.
+    expect(result.conditionMarks).not.toContain("DEFECT");
+    expect(result.terminal).not.toBe(SERVE_CRASH_CLASSES.TRANSPORT_DEATH.gateTrace);
+  });
+
+  it("names the money ceiling on the record, not the attempt ceiling", () => {
+    // The terminal is the same for both stops; WHICH bound was reached is the
+    // record's reason, because the operator's lift differs.
+    expect(ENVELOPE_STOP_REASONS.MONEY).toBe("RUN_COST_ENVELOPE_MONEY_REACHED");
+    expect(ENVELOPE_STOP_REASONS.MONEY).not.toBe(ENVELOPE_STOP_REASONS.ATTEMPTS);
   });
 });

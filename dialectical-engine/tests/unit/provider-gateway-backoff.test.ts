@@ -177,8 +177,19 @@ describe("DL4-F3 — the runner's gateway factory supplies the per-attempt hook"
  * runner's gateway factory delegates, through the `costEnvelope` seam built
  * from `buildCostEnvelopeSeam`. The seam's own behaviour is driven in
  * `v28-gateway-cost-envelope.test.ts`; its WIRING inside the factory was
- * pinned only by the Docker-bound `tests/integration/database.test.ts`, which
- * CI does not run. The merge of Task 11 onto the INT2 tree (INT3, 2026-09-22)
+ * pinned by NOTHING.
+ *
+ * FW-F (final review, Important 1) — THAT SENTENCE USED TO READ "pinned only by
+ * the Docker-bound `tests/integration/database.test.ts`, which CI does not
+ * run", and it was false. That suite does not mention `costEnvelope` or
+ * `buildCostEnvelopeSeam` at all (`grep -c` → 0); it merely USES the factory,
+ * which is not a pin on anything the factory hands the call. `buildCostEnvelopeSeam`
+ * appeared in no test file in the repository before the block below existed.
+ * The distinction matters: "pinned, but only where Docker runs" invites an
+ * operator to believe a covered seam is waiting on an environment, while
+ * "pinned nowhere" is the state this block was written to end.
+ *
+ * The merge of Task 11 onto the INT2 tree (INT3, 2026-09-22)
  * re-seated that wiring by hand inside the same conflicted hunk as the DL4-F3
  * hook above, so it gets the same kind of pin, for the same reason: dropped
  * there, every unit and architecture suite would have stayed green while the
