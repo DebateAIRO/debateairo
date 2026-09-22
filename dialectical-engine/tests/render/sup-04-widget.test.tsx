@@ -63,7 +63,10 @@ describe("SUP-04 product-route support widget", () => {
     const createSession = vi.fn(async () => ({
       sessionId: "new-session",token: "new-token",identityBound: false
     }));
-    const escalate = vi.fn(async () => ({ token: "case-token",text: "Case opened" }));
+    // DL1-F5c: a case bearer is 43 base64url characters, and only a value in
+    // that grammar is held in memory and rendered as the case's link — so the
+    // fixture is a bearer the API could actually mint, not a placeholder.
+    const escalate = vi.fn(async () => ({ token: "E".repeat(43),text: "Case opened" }));
     await act(async () => root!.render(<Assistant signedIn={false} client={{
       createSession,sendMessage: vi.fn(),rate: vi.fn(),escalate
     }} />));

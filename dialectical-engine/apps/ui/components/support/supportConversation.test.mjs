@@ -131,6 +131,84 @@ test("DL3-F3: a malformed or throwing store never breaks the widget", async () =
   }));
 });
 
+// ---------------------------------------------- DL1-F5c: the case bearer never rests on disk
+
+/**
+ * A case token is the sole capability to read a whole case — the reporter's
+ * words, V's replies, the model summary — and to reply as the reporter, for
+ * thirty days, with no cookie. The acknowledgement the API writes carries it
+ * three times over: in the message id, in the sentence, and in the link. The
+ * widget kept that message in the transcript it writes to `sessionStorage`, so
+ * the strongest bearer the support surface mints was the one thing that rested
+ * on disk for the life of a tab — exactly what DL3-F3 removed for the weaker
+ * session capability.
+ */
+const CASE_TOKEN = "T".repeat(43);
+const TOKEN_SHAPED = /[A-Za-z0-9_-]{43}/u;
+const CASE_ACKNOWLEDGEMENT = Object.freeze({
+  id: `case-${CASE_TOKEN}`,
+  role: "assistant",
+  text: `I've opened case ${CASE_TOKEN} for a person. Expected reply: within 48 hours. Check replies at /help#case=${CASE_TOKEN}. I can't promise an outcome.`,
+  link: `/help#case=${CASE_TOKEN}`
+});
+
+test("DL1-F5c: a persisted acknowledgement carries no case bearer in its id, text or link", async () => {
+  const { writeStoredSupportConversation } = await loadConversation();
+  const storage = memoryStorage();
+  writeStoredSupportConversation(storage, {
+    language: "en",
+    identityBound: false,
+    messages: [...MESSAGES, { ...CASE_ACKNOWLEDGEMENT, caseOpened: true }],
+    ownContext: { latest: true }
+  });
+  const raw = storage.entries()[KEY];
+  assert.equal(typeof raw, "string");
+  assert.ok(!raw.includes(CASE_TOKEN), "the 30-day case capability is not in what rests in the browser");
+  assert.doesNotMatch(raw, TOKEN_SHAPED, "and nothing token-shaped survives the writer");
+  assert.doesNotMatch(raw, /case=[A-Za-z0-9_-]/u, "nor any link fragment still carrying one");
+  const stored = JSON.parse(raw).messages.at(-1);
+  assert.equal(stored.caseOpened, true, "the transcript still says a case was opened");
+  assert.equal(stored.link, undefined, "the bearer link is dropped, never half-written");
+});
+
+test("DL1-F5c: a bearer left by the pre-fix build is never read back into the page", async () => {
+  const { readStoredSupportConversation } = await loadConversation();
+  const storage = memoryStorage({
+    [KEY]: JSON.stringify({
+      language: "en",
+      identityBound: false,
+      messages: [...MESSAGES, CASE_ACKNOWLEDGEMENT],
+      ownContext: { latest: true }
+    })
+  });
+  const restored = readStoredSupportConversation(storage);
+  assert.notEqual(restored, null);
+  const raw = JSON.stringify(restored);
+  assert.ok(!raw.includes(CASE_TOKEN), "a tab open across the deploy hands its bearer to nobody");
+  assert.doesNotMatch(raw, TOKEN_SHAPED);
+  assert.equal(restored.messages.at(-1).link, undefined);
+});
+
+test("DL1-F5c: the assistant holds the case bearer in memory and stores a token-free notice", () => {
+  const source = read("./Assistant.tsx");
+  assert.doesNotMatch(
+    source,
+    /id:\s*`case-\$\{[^}]*[Tt]oken\}`/u,
+    "no message id is minted from the bearer"
+  );
+  assert.match(source, /setCaseBearer\(/u, "the bearer is React state, like the session capability");
+  assert.match(
+    source,
+    /supportCaseLink\(bearer\.token\)/u,
+    "the link is rebuilt from the in-memory bearer when rendering"
+  );
+  assert.match(
+    source,
+    /CASE_OPENED_NOTICE/u,
+    "and the transcript keeps a token-free notice for when the bearer is gone"
+  );
+});
+
 // ---------------------------------------------- DL3-F3: a stale session is not an outage
 
 test("DL3-F3: the API's 404 is classified as a stale session, not a dead end", async () => {

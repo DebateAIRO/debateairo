@@ -22,6 +22,18 @@ import type { SupportAssistantLanguage, SupportAssistantOutcome } from "./Assist
  * identity changes, and the reader refuses (and erases) any payload written by
  * the pre-fix build. Every entry point tolerates a storage that is absent,
  * full, or throwing — private-mode browsers do all three.
+ *
+ * DL1-F5c, final review. The SESSION capability was kept out and the CASE
+ * bearer walked straight back in: the acknowledgement message the widget
+ * appends carried the 30-day, cookie-free case token three times over — in its
+ * id (`case-<token>`), in the API's sentence, and in its `/help#case=<token>`
+ * link — and the whole `messages` array is what this module writes. That bearer
+ * reads a whole case and replies as the reporter for thirty days, to anyone
+ * holding it, which is a stronger capability than the one that was removed. So
+ * the transcript stores a token-free acknowledgement, and both doors — write
+ * AND read, for a tab that was open across the deploy — strip anything shaped
+ * like a bearer. `Assistant.tsx` keeps the token in React state, renders the
+ * code and the link from there, and shows a token-free notice once it is gone.
  */
 
 export const SUPPORT_CONVERSATION_STORAGE_KEY = "debateai.support.conversation.v1";
@@ -32,6 +44,12 @@ export type SupportConversationMessage = Readonly<{
   text: string;
   link?: string;
   outcome?: SupportAssistantOutcome;
+  /**
+   * DL1-F5c: this message says that a case was opened — and says only that.
+   * The code itself and its link are rendered from the bearer the tab holds in
+   * memory; a transcript restored without that bearer shows the notice alone.
+   */
+  caseOpened?: true;
 }>;
 
 export type SupportOwnContext = Readonly<{ runId: string }> | Readonly<{ latest: true }>;
@@ -60,6 +78,45 @@ function isMessage(value: unknown): value is SupportConversationMessage {
   const message = value as Partial<SupportConversationMessage>;
   return typeof message.id === "string" && typeof message.text === "string"
     && (message.role === "assistant" || message.role === "user");
+}
+
+/**
+ * DL1-F5c. A run of the API's case-capability alphabet at least as long as a
+ * case bearer (43 base64url characters, `apps/ui/components/support/
+ * caseLink.ts`), wherever it appears: in a sentence, in a link, or welded to a
+ * prefix as the acknowledgement's `case-<token>` id was. The whole run goes, so
+ * no fragment of a bearer is left behind. Stripping here is the CONTROL, not a
+ * courtesy — `Assistant.tsx` already appends a token-free acknowledgement, and
+ * this is what makes that true of every caller, including a payload left behind
+ * by the build that did not.
+ */
+const CASE_BEARER = /[A-Za-z0-9_-]{43,}/gu;
+
+function withoutBearer(value: string): string {
+  return value.replace(CASE_BEARER, "");
+}
+
+/**
+ * One message as it may rest in the browser: the known fields and nothing else,
+ * with every bearer taken out. A link that carried one is dropped whole — half
+ * a capability is not a link — and an id that carried one is replaced by its
+ * position, so the transcript keeps distinct React keys.
+ */
+function storedMessage(
+  message: SupportConversationMessage, index: number
+): SupportConversationMessage {
+  const id = withoutBearer(message.id);
+  const link = message.link === undefined || withoutBearer(message.link) !== message.link
+    ? undefined
+    : message.link;
+  return Object.freeze({
+    id: id === message.id ? id : `message-${index}`,
+    role: message.role,
+    text: withoutBearer(message.text),
+    ...(link === undefined ? {} : { link }),
+    ...(message.outcome === undefined ? {} : { outcome: message.outcome }),
+    ...(message.caseOpened === true ? { caseOpened: true as const } : {})
+  });
 }
 
 function ownContextOf(value: unknown): SupportOwnContext {
@@ -92,7 +149,9 @@ export function readStoredSupportConversation(
     return Object.freeze({
       language: value.language,
       identityBound: value.identityBound,
-      messages: Object.freeze([...value.messages]),
+      // DL1-F5c: a tab open across the deploy keeps its sessionStorage, so the
+      // reader takes a bearer out of it rather than handing it back to the page.
+      messages: Object.freeze(value.messages.map(storedMessage)),
       ownContext: ownContextOf(value.ownContext)
     });
   } catch {
@@ -101,8 +160,9 @@ export function readStoredSupportConversation(
 }
 
 /**
- * Writes exactly the four stored fields and nothing else. The whitelist is the
- * control: a caller holding a live session cannot persist it by accident.
+ * Writes exactly the four stored fields and nothing else, each message through
+ * the same door. The whitelist is the control: a caller holding a live session
+ * — or a live case bearer (DL1-F5c) — cannot persist it by accident.
  */
 export function writeStoredSupportConversation(
   storage: SupportConversationStorage | null,
@@ -113,7 +173,7 @@ export function writeStoredSupportConversation(
     storage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY, JSON.stringify({
       language: conversation.language,
       identityBound: conversation.identityBound,
-      messages: conversation.messages,
+      messages: conversation.messages.map(storedMessage),
       ownContext: conversation.ownContext
     }));
   } catch {
@@ -129,7 +189,15 @@ export function clearStoredSupportConversation(
   try {
     storage.removeItem(SUPPORT_CONVERSATION_STORAGE_KEY);
   } catch {
-    // Nothing further to do: the key is tab-scoped and holds no capability.
+    /**
+     * Nothing further to do. The key is tab-scoped, and what it holds is the
+     * transcript: the session capability is in memory (DL3-F3) and so is the
+     * case bearer (DL1-F5c), both stripped by `storedMessage` on the way in and
+     * on the way out. That is an invariant this module enforces, not a claim
+     * about the caller — the final review found the claim false while the
+     * acknowledgement still carried a 30-day case token, which is why the
+     * stripping exists rather than the sentence.
+     */
   }
 }
 

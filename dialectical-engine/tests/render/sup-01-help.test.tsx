@@ -280,6 +280,47 @@ describe("SUP-01 /help assistant", () => {
     expect(reply.caseAcknowledgement).toBeUndefined();
   });
 
+  /**
+   * DL1-F5c, final review (area D, Important 1). The session capability was
+   * kept out of `sessionStorage` and the CASE bearer walked back in through the
+   * acknowledgement message: its id, its sentence and its link all carried the
+   * 30-day, cookie-free token, and the whole transcript is written to the store
+   * on every change. On a shared or kiosk browser the next person to open Help
+   * in that tab inherited it — the whole case, and the right to reply as the
+   * reporter, for thirty days. The code is rendered from memory; what rests in
+   * the browser says only that a case was opened.
+   */
+  it("keeps the case bearer out of sessionStorage while rendering it on the page", async () => {
+    const token = "D".repeat(43);
+    const link = `/help#case=${token}`;
+    const acknowledgement = `I've opened case ${token} for a person. Expected reply: within 48 hours. Check replies at ${link}. I can't promise an outcome.`;
+    vi.stubGlobal("fetch",vi.fn(async (url: string) => {
+      if (url === "/api/v1/session") return new Response("{}",{ status: 401 });
+      if (url === "/api/v1/support/sessions") return new Response(JSON.stringify({
+        session: { session_id: "anonymous-session",identity_bound: false },
+        session_token: "s".repeat(43)
+      }),{ status: 201,headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify({
+        message_id: "m-escalated",outcome: "REFUSE_SAFETY",text: "Fixed refusal.",
+        case_token: token,sla_hours: 48,link,case_acknowledgement: acknowledgement
+      }),{ status: 200,headers: { "content-type": "application/json" } });
+    }));
+
+    await render(<Assistant client={supportAssistantClient} />);
+    await submit("something a person must read");
+
+    // On the page: the code and the fragment link, from the in-memory bearer.
+    expect(document.body.textContent).toContain(acknowledgement);
+    expect(document.querySelector<HTMLAnchorElement>(`a[href="${link}"]`)).not.toBeNull();
+
+    // At rest: the fact, and nothing that opens the case.
+    const stored = sessionStorage.getItem(SUPPORT_CONVERSATION_STORAGE_KEY) ?? "";
+    expect(stored).not.toBe("");
+    expect(stored).not.toContain(token);
+    expect(stored).not.toMatch(/[A-Za-z0-9_-]{43}/u);
+    expect(stored).toContain("A case is open for a person to read.");
+  });
+
   it("returns a structured RATE_LIMITED outcome from a real 429 response", async () => {
     const text = "You've sent a lot of messages in a short time. Please wait a few minutes.";
     vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({
