@@ -125,6 +125,51 @@ export function buildConfiguredProviderSetSealedRow(
 }
 
 /**
+ * C-I5 — THE RULE AT THE PUBLICATION SEAM, over a row that has already been
+ * canonicalised.
+ *
+ * The builder below refuses an unvetted vendor to whoever CALLS it, which is no
+ * control at all while nothing has to call it: a hosted operator can write the
+ * sealed version-1 shape by hand, or hand-write a version-2 shape with a vendor
+ * whose record is missing, and publish it. So the same question is asked again
+ * of the value on its way into the database, where every publication passes —
+ * `RegisterPublicationPort.publishGeneral`, for HOSTED publications only.
+ *
+ * Asked of the parsed value rather than of the builder's output, because by the
+ * time a row reaches the port it is canonical JSON text and its provenance is
+ * unknowable. What is checked is therefore the SHAPE the builder produces: the
+ * deployment set version, and V-9(4)'s record on every vendor in it.
+ *
+ * A hosted publication that carries no `configuredProviderSet` row at all is
+ * untouched — it is changing something else.
+ */
+export function assertHostedConfiguredProviderSetVetted(value: unknown): void {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new TypeError("CONFIGURED_PROVIDER_SET_INVALID");
+  }
+  const row = value as Readonly<Record<string, unknown>>;
+  const providers = row.providers;
+  if (row.kind !== "CONFIGURED_PROVIDER_SET" || !Array.isArray(providers) || providers.length < 1) {
+    throw new TypeError("CONFIGURED_PROVIDER_SET_INVALID");
+  }
+  // Minor 5: the SHAPE question is the builder's own, asked by the same
+  // function — a hand-written hosted row could carry a vetting record on every
+  // vendor and still be a set no reader can use (no `adapterKind`, a duplicate
+  // ref, `requiredDistinctMakers: 0`).
+  assertConfiguredProviderSetShape(
+    row.requiredDistinctMakers,
+    providers as readonly ConfiguredProvider[]
+  );
+  const named = providers as readonly VettedConfiguredProvider[];
+  // The sealed version-1 shape carries no vetting for ANY vendor, so the first
+  // one names the refusal: the operator's next step is the same either way.
+  if (row.setVersion !== CONFIGURED_PROVIDER_SET_DEPLOYMENT_VERSION) {
+    throw new TypeError(`PROVIDER_VENDOR_NOT_VETTED:${named[0]!.providerRef}`);
+  }
+  for (const provider of named) assertVendorVetted(provider);
+}
+
+/**
  * The superseding DEPLOYMENT version. `sealedSourceRef` is the provenance the
  * sealed row carried; the ruling is appended to it rather than replacing it, so
  * the row's history reads forward.

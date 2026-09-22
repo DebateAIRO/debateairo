@@ -1,11 +1,17 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   CostEnvelopeGuard,
   costEnvelopeDay,
+  DEFAULT_RESERVATION_TTL_MS,
   type ModelSpendEntry,
   type ModelSpendStore
 } from "@debateai/budget";
 import { costEnvelopePolicyFromValue, COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW } from "@debateai/register";
+import {
+  DEVELOPMENT_ORGAN_COST_BOUNDS,
+  DEVELOPMENT_RUN_DEATH_POLICY
+} from "../../apps/runner/src/dev-deployment-register.js";
 
 /**
  * V-28 — THE PERSISTED SPEND, BEHIND A REPOSITORY SEAM.
@@ -30,6 +36,14 @@ const PRICE = Object.freeze({
   inputMicrosPerMillionTokens: 1_000_000,
   outputMicrosPerMillionTokens: 1_000_000
 });
+
+/**
+ * The call's own pre-send maximum, the two facts the gateway hands the seam.
+ * At one micro-unit per token it projects 400 input + 64 output tokens — the
+ * figure a charge falls back to for a count the vendor's block carries but this
+ * cannot read (fix round 1, Important 1).
+ */
+const PROJECTION = Object.freeze({ requestBytes: 800, completionTokenCeiling: 64 });
 
 /**
  * An in-memory stand-in for `ledger.model_spend` and its reservations.
@@ -119,7 +133,8 @@ describe("V-28 the per-run seam reads and writes the persisted spend", () => {
 
     await seam.recordCall({
       providerRef: "provider-1",
-      usage: { prompt_tokens: 2_000_000, completion_tokens: 1_000_000 }
+      usage: { prompt_tokens: 2_000_000, completion_tokens: 1_000_000 },
+      projection: PROJECTION
     });
 
     expect(rows).toHaveLength(1);
@@ -146,12 +161,53 @@ describe("V-28 the per-run seam reads and writes the persisted spend", () => {
     // already taken — and writes nothing for a call that reported nothing,
     // because a zero row would read as "this call was free". The REFUSAL is its
     // own question, asked only of a successful completion.
-    await expect(seam.recordCall({ providerRef: "provider-1", usage: null }))
-      .resolves.toBeUndefined();
+    await expect(seam.recordCall({
+      providerRef: "provider-1", usage: null, projection: PROJECTION
+    })).resolves.toBeUndefined();
     expect(rows).toEqual([]);
 
     await expect(seam.assertUsageReported({ providerRef: "provider-1", usage: null }))
       .rejects.toThrowError(expect.objectContaining({ code: "PROVIDER_USAGE_UNREPORTED" }));
+  });
+
+  /**
+   * FIX ROUND 1, Important 1 — a usage block that IS there but carries a count
+   * this cannot read is still a call the vendor billed. The readable side is
+   * charged as reported; the unreadable one falls back to the call's own
+   * projected maximum, which is the number `assertCallAllowed` already admitted
+   * the call against, so the charge can never exceed what the gate allowed.
+   */
+  it("charges the projected maximum for a side whose count it cannot read", async () => {
+    for (const [usage, inputTokens, outputTokens, billable] of [
+      // Readable prompt count, unreadable completion count → 1 000 + 64.
+      [{ prompt_tokens: 1_000, completion_tokens: 300.5 }, 1_000, 64, true],
+      // Neither side readable → the whole projection, 400 + 64.
+      [{ completion_tokens: -1 }, 400, 64, false],
+      [{ total_tokens: 1.5 }, 400, 64, false],
+      [{ prompt_tokens: "3" }, 400, 64, false]
+    ] as const) {
+      const { store, rows } = fakeStore();
+      const seam = guardWith(store).providerSeam({
+        runId: "run-1", price: PRICE, requireReportedUsage: true
+      });
+
+      await seam.recordCall({ providerRef: "provider-1", usage, projection: PROJECTION });
+
+      expect(rows, JSON.stringify(usage)).toHaveLength(1);
+      expect(rows[0], JSON.stringify(usage)).toMatchObject({
+        inputTokens, outputTokens, chargeMicros: inputTokens + outputTokens
+      });
+      // The REFUSAL is still its own question and still answers it on what the
+      // vendor REPORTED, not on what was charged: a block with one readable
+      // side is billable, one with neither is not. (In the gateway both are
+      // refused anyway, one step earlier, as PROVIDER_USAGE_INVALID.)
+      const reported = seam.assertUsageReported({ providerRef: "provider-1", usage });
+      if (billable) await expect(reported).resolves.toBeUndefined();
+      else {
+        await expect(reported)
+          .rejects.toThrowError(expect.objectContaining({ code: "PROVIDER_USAGE_UNREPORTED" }));
+      }
+    }
   });
 
   it("records nothing and refuses nothing when reported usage is not required", async () => {
@@ -160,8 +216,9 @@ describe("V-28 the per-run seam reads and writes the persisted spend", () => {
       runId: "run-1", price: PRICE, requireReportedUsage: false
     });
 
-    await expect(seam.recordCall({ providerRef: "provider-1", usage: null }))
-      .resolves.toBeUndefined();
+    await expect(seam.recordCall({
+      providerRef: "provider-1", usage: null, projection: PROJECTION
+    })).resolves.toBeUndefined();
     await expect(seam.assertUsageReported({ providerRef: "provider-1", usage: null }))
       .resolves.toBeUndefined();
     expect(rows).toEqual([]);
@@ -309,7 +366,9 @@ describe("I1 — the daily gate reserves what it admits", () => {
       runId: "run-a", price: PRICE, requireReportedUsage: true
     });
     await spendSeam.recordCall({
-      providerRef: "provider-1", usage: { prompt_tokens: 400, completion_tokens: 0 }
+      providerRef: "provider-1",
+      usage: { prompt_tokens: 400, completion_tokens: 0 },
+      projection: PROJECTION
     });
 
     await expect(guard.assertDailyEnvelopeAdmitsNewRun()).resolves.toBeUndefined();
@@ -350,5 +409,71 @@ describe("V-28 the day boundary", () => {
 
   it("refuses an instant that is not one", () => {
     expect(() => costEnvelopeDay(new Date("nonsense"))).toThrowError(TypeError);
+  });
+});
+
+/**
+ * C-I2 (final review, area C) — HOW LONG AN ADMISSION RESERVATION MUST HOLD.
+ *
+ * The reservation is the only thing that makes an ADMITTED run visible to the
+ * day before its first charge lands. At two minutes it expired long before a
+ * slow first call reported anything, and in that gap the daily ceiling degraded
+ * to the ask rate limit: during a vendor outage every ask saw committed = 0,
+ * was admitted, and could later spend a whole per-run ceiling. The window has to
+ * cover the WORST first-charge latency the deployment's own sealed rows allow,
+ * and the two that set it are the judge's deadline times its attempts and the
+ * run-death cooldown.
+ */
+describe("C-I2 the reservation covers the wait for a first charge", () => {
+  it("holds for thirty minutes by default", () => {
+    expect(DEFAULT_RESERVATION_TTL_MS).toBe(30 * 60_000);
+  });
+
+  it("covers the judge's deadline x attempts plus EVERY cooldown hold the policy allows", () => {
+    // No number is restated here: every one is read from the frozen policy
+    // objects the dev deployment seeds, so a change to either row moves this
+    // margin instead of leaving a stale sentence behind (fix round 1, Minor 2 —
+    // the first version of this pin counted ONE cooldown hold, while the policy
+    // allows two).
+    const judge = DEVELOPMENT_ORGAN_COST_BOUNDS.organs.JUDGE;
+    const exhaustion = judge.deadlineMs * judge.maxAttempts;
+    const cooldown = DEVELOPMENT_RUN_DEATH_POLICY.cooldown_ms
+      * DEVELOPMENT_RUN_DEATH_POLICY.max_cooldown_holds_per_run;
+    expect(exhaustion + cooldown).toBeLessThanOrEqual(DEFAULT_RESERVATION_TTL_MS);
+    // The margin the window actually leaves, computed and pinned exactly: one
+    // minute, which is what the comment beside the constant must say.
+    expect(DEFAULT_RESERVATION_TTL_MS - (exhaustion + cooldown)).toBe(60_000);
+  });
+
+  it("stamps that window on the reservation the guard opens", async () => {
+    const { store, reservations } = fakeStore();
+    const now = new Date("2026-09-22T11:00:00.000Z");
+    await new CostEnvelopeGuard({
+      store,
+      policy: { perRunCeilingMicros: 1_000, dailyCeilingMicros: 1_000 },
+      clock: () => now
+    }).assertDailyEnvelopeAdmitsNewRun();
+
+    expect(reservations).toHaveLength(1);
+    expect(reservations[0]!.expiresAt.getTime() - now.getTime())
+      .toBe(DEFAULT_RESERVATION_TTL_MS);
+  });
+
+  it("says, where the value is, that it is PROVISIONAL and what it must cover", async () => {
+    const source = await readFile(
+      new URL("../../packages/budget/src/model-spend.ts", import.meta.url), "utf8"
+    );
+    const stated = source.slice(
+      source.indexOf("* I1 — how long an admission reservation"),
+      source.indexOf("export const DEFAULT_RESERVATION_TTL_MS")
+    );
+    expect(stated).toContain("PROVISIONAL");
+    expect(stated).toMatch(/judge deadline/iu);
+    expect(stated).toMatch(/cooldown/u);
+    expect(stated).toMatch(/queue/iu);
+    // Minor 2: the arithmetic in that paragraph is the two-hold one, and it
+    // names the margin it really leaves rather than a comfortable one.
+    expect(stated).toMatch(/max_cooldown_holds_per_run/u);
+    expect(stated).toMatch(/SIXTY SECONDS/u);
   });
 });

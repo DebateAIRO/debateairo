@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { networkInterfaces } from "node:os";
 import { z } from "zod";
 import { TypedDomainError } from "@debateai/kernel";
 import { assertFramedPrompt } from "./prompt-frame.js";
@@ -407,6 +408,100 @@ function isThisMachineIpv4(octets: readonly number[]): boolean {
 }
 
 /**
+ * C-I3 — an IPv4 address that cannot be a paid vendor's public API, because it
+ * is not routable on the public internet at all: `10/8`, `172.16/12` and
+ * `192.168/16` (RFC 1918) plus `100.64/10` (RFC 6598, carrier-grade NAT, which
+ * is also where several hosts put their private networking).
+ */
+function isPrivateNetworkIpv4(octets: readonly number[]): boolean {
+  return octets[0] === 10
+    || (octets[0] === 172 && octets[1]! >= 16 && octets[1]! <= 31)
+    || (octets[0] === 192 && octets[1] === 168)
+    || (octets[0] === 100 && octets[1]! >= 64 && octets[1]! <= 127);
+}
+
+/** Case, a trailing dot and the brackets of an IPv6 literal, normalised away once. */
+function normalizedHostLiteral(hostname: string): string {
+  const bare = hostname.startsWith("[") && hostname.endsWith("]")
+    ? hostname.slice(1, -1)
+    : hostname;
+  return bare.toLowerCase().replace(/\.$/u, "");
+}
+
+/**
+ * C-I3 — the same question as `isThisMachineHost`, one network out: is this
+ * address on a PRIVATE network? Decided on the parsed literal, in the same
+ * three families and the same order, so the two predicates cannot drift.
+ */
+function isPrivateNetworkHost(host: string): boolean {
+  const octets = ipv4Octets(host);
+  if (octets !== undefined) return isPrivateNetworkIpv4(octets);
+  const groups = ipv6Groups(host);
+  if (groups === undefined) return false;
+  // fc00::/7 — unique local addresses (RFC 4193), the IPv6 private range.
+  if ((groups[0]! & 0xfe00) === 0xfc00) return true;
+  const leadingZeroes = groups.slice(0, 5).every((group) => group === 0);
+  if (leadingZeroes && (groups[5] === 0xffff || groups[5] === 0)) {
+    return isPrivateNetworkIpv4([
+      groups[6]! >> 8, groups[6]! & 0xff, groups[7]! >> 8, groups[7]! & 0xff
+    ]);
+  }
+  return false;
+}
+
+/**
+ * One canonical key per literal ADDRESS, or `undefined` for a name.
+ *
+ * `10.0.0.2`, `[::ffff:10.0.0.2]` and `[::ffff:a00:2]` are one address written
+ * three ways, and an interface reports only the first; keying them the same way
+ * is what makes the comparison below independent of the spelling.
+ */
+function literalAddressKey(host: string): string | undefined {
+  const octets = ipv4Octets(host);
+  if (octets !== undefined) return `v4:${octets.join(".")}`;
+  const groups = ipv6Groups(host);
+  if (groups === undefined) return undefined;
+  const leadingZeroes = groups.slice(0, 5).every((group) => group === 0);
+  if (leadingZeroes && (groups[5] === 0xffff || groups[5] === 0)) {
+    return `v4:${[
+      groups[6]! >> 8, groups[6]! & 0xff, groups[7]! >> 8, groups[7]! & 0xff
+    ].join(".")}`;
+  }
+  return `v6:${groups.join(":")}`;
+}
+
+/**
+ * The address keys of a list of interface addresses. A scoped IPv6 address
+ * (`fe80::1%en0`) names its interface in the zone id, which is not part of the
+ * address, so the zone is dropped before the address is keyed.
+ */
+export function thisMachineAddressKeys(addresses: readonly string[]): ReadonlySet<string> {
+  const keys = new Set<string>();
+  for (const address of addresses) {
+    if (typeof address !== "string") continue;
+    const key = literalAddressKey(normalizedHostLiteral(address.split("%")[0] ?? ""));
+    if (key !== undefined) keys.add(key);
+  }
+  return keys;
+}
+
+/**
+ * C-I3 — THIS HOST'S OWN ADDRESSES, READ ONCE AT START-UP.
+ *
+ * A hosted deployment answers on a PUBLIC address of its own, so no range check
+ * can cover the case that matters most: `https://<the VPS's own address>/v1` is
+ * a relay on the web server, and it is in no private range. The addresses are
+ * read from `os.networkInterfaces()` — a local syscall, never DNS — ONCE, when
+ * this module loads, so the hosted check stays a pure decision on the literal
+ * address and no per-target lookup is introduced.
+ */
+const THIS_MACHINE_INTERFACE_ADDRESS_KEYS: ReadonlySet<string> = thisMachineAddressKeys(
+  Object.values(networkInterfaces())
+    .flatMap((entries) => entries ?? [])
+    .map((entry) => entry.address)
+);
+
+/**
  * V-9(c), review finding 1 — "is this address THIS MACHINE?", decided on the
  * PARSED address rather than on the spelling.
  *
@@ -436,10 +531,7 @@ function isThisMachineIpv4(octets: readonly number[]): boolean {
  * those would be an outage rather than a protection.
  */
 export function isThisMachineHost(hostname: string): boolean {
-  const bare = hostname.startsWith("[") && hostname.endsWith("]")
-    ? hostname.slice(1, -1)
-    : hostname;
-  const host = bare.toLowerCase().replace(/\.$/u, "");
+  const host = normalizedHostLiteral(hostname);
   if (THIS_MACHINE_NAMES.has(host) || host.endsWith(".localhost")) return true;
   const octets = ipv4Octets(host);
   if (octets !== undefined) return isThisMachineIpv4(octets);
@@ -460,6 +552,44 @@ export function isThisMachineHost(hostname: string): boolean {
     ]);
   }
   return false;
+}
+
+/**
+ * C-I3 (final review, area C) — WHAT A HOSTED VENDOR TARGET MAY NOT NAME.
+ *
+ * `isThisMachineHost` alone stopped at loopback, `0.0.0.0/8` and link-local. It
+ * therefore ADMITTED the two shapes a hosted operator is most likely to reach
+ * for: a relay one hop away on the private side (`https://10.0.0.2:8443/v1`,
+ * `192.168/16`, `172.16/12`, CGNAT `100.64/10`, ULA `fc00::/7`, and every
+ * IPv4-mapped spelling of those), and the web server's OWN routable address.
+ * Neither can be a paid vendor's public API, and both are the local-mode relay
+ * path V-9(c) ruled must not run hosted.
+ *
+ * Three clauses, all decided on the parsed LITERAL address and with
+ * no name resolution anywhere:
+ *
+ *  1. this machine, exactly as before — nothing that was refused is admitted now;
+ *  2. the private ranges, which are unroutable on the public internet;
+ *  3. the addresses this host actually holds, read once from
+ *     `os.networkInterfaces()` at start-up.
+ *
+ * A NAME is still never resolved: `127.0.0.1.nip.io`, or any public name whose
+ * A record points inward, is admitted and is the operator's responsibility —
+ * the kit's §11 says so in as many words, and a resolved-address check is a
+ * separate control this function does not pretend to be.
+ *
+ * `ownAddressKeys` is a parameter so the class can be driven deterministically
+ * in a test; the shipped call sites take the start-up set.
+ */
+export function isRefusedHostedProviderHost(
+  hostname: string,
+  ownAddressKeys: ReadonlySet<string> = THIS_MACHINE_INTERFACE_ADDRESS_KEYS
+): boolean {
+  if (isThisMachineHost(hostname)) return true;
+  const host = normalizedHostLiteral(hostname);
+  if (isPrivateNetworkHost(host)) return true;
+  const key = literalAddressKey(host);
+  return key !== undefined && ownAddressKeys.has(key);
 }
 
 /**
@@ -492,11 +622,15 @@ export function assertProductionProviderTargets(
  *
  * - every base URL is `https:` — a cleartext hop would carry the vendor credential and every
  *   prompt in the clear, and there is no loopback exception here (see below);
- * - no target whose base URL NAMES this machine (`isThisMachineHost`, decided on the parsed
- *   LITERAL address and not on the spelling; it does no name resolution, so a public hostname
- *   pointed at loopback is the operator's responsibility — README §11 says so) — a relay or a
- *   local model server on the web server is precisely the local-mode path V ruled must not run
- *   hosted (V-30(1) says the same for the support chat);
+ * - no target whose base URL NAMES this machine or a private network
+ *   (`isRefusedHostedProviderHost`: loopback and its aliases, the RFC 1918 ranges, CGNAT, ULA,
+ *   and this host's own interface addresses read once at start-up) — a relay or a local model
+ *   server on the web server, or one hop away on its private side, is precisely the local-mode
+ *   path V ruled must not run hosted (V-30(1) says the same for the support chat). Every clause
+ *   is decided on the parsed LITERAL address and not on the spelling, and NONE does name
+ *   resolution: a public hostname pointed at loopback is admitted and is the operator's
+ *   responsibility — README §11 says so, and it is the one sentence there this rule does not
+ *   cover;
  * - no credential inline in `PROVIDER_DISCOVERY_TARGETS_JSON`. Hosted credentials live in
  *   custody-checked FILES (`authorization_file`, task 10b), so a bearer token can never sit in
  *   an `EnvironmentFile`, in `/proc/<pid>/environ` or in a process listing.
@@ -511,7 +645,10 @@ export function assertHostedProviderTargets(
     if (parsed.protocol !== "https:") {
       throw new TypeError(`PROVIDER_BASE_URL_TLS_REQUIRED:${target.providerRef}`);
     }
-    if (isThisMachineHost(parsed.hostname)) {
+    // C-I3: one code for the whole class. `PROVIDER_TARGET_LOOPBACK_REFUSED` is
+    // the name every pinned copy of the error alphabet already carries, and a
+    // private-range target is refused for the same reason a loopback one is.
+    if (isRefusedHostedProviderHost(parsed.hostname)) {
       throw new TypeError(`PROVIDER_TARGET_LOOPBACK_REFUSED:${target.providerRef}`);
     }
     if (target.authorizationHeader !== undefined) {
@@ -750,8 +887,15 @@ export interface ProviderCostEnvelopeSeam {
    */
   readonly recordCall: (observed: Readonly<{
     providerRef: string;
-    /** The vendor's usage block as it arrived, or `null` if it reported none. */
+    /**
+     * The vendor's usage block EXACTLY as it arrived — not the strict parse.
+     * A malformed count does not make a billed call free (Important 1), so the
+     * policy reads this leniently and uses `projection` for what it cannot
+     * read. `undefined` means the answer carried no usage member at all.
+     */
     usage: unknown;
+    /** This attempt's own pre-send maximum, the two facts `assertCallAllowed` got. */
+    projection: Readonly<{ requestBytes: number; completionTokenCeiling: number }>;
   }>) => void | Promise<void>;
   /**
    * The HOSTED requirement, asked only of a SUCCESSFUL completion: a vendor that
@@ -790,6 +934,10 @@ export interface OpenAICompatibleGatewayOptions {
 export const PROVIDER_COST_ENVELOPE_REFUSAL_CODES = Object.freeze([
   "RUN_COST_ENVELOPE_MONEY_REACHED",
   "PROVIDER_USAGE_UNREPORTED",
+  // Round 2, Critical B: a charge that cannot be computed exactly is raised
+  // HERE, inside the attempt loop, and a retry would be a second billed call
+  // for the same unrepresentable number.
+  "COST_ENVELOPE_CHARGE_UNREPRESENTABLE",
   // SMALL (round 3): the gateway's seam cannot raise this today — the daily
   // envelope is asked when a NEW run is admitted, not per call — but retrying a
   // day that is spent would be as pointless as retrying a run that is, and the
@@ -821,12 +969,31 @@ function realSleep(milliseconds: number): Promise<void> {
 }
 
 const usageCounter = z.number().int().min(0).max(MAX_USAGE_COUNTER);
+/**
+ * L4-F3 / C-I1 — THE FOUR MEMBERS ARE BOUNDED; THE REST ARE DROPPED, NOT REFUSED.
+ *
+ * Each counter is still exactly what it was: a non-negative safe integer no
+ * larger than 2^31-1, refused by name when it is anything else. What changed is
+ * the treatment of a member this engine does not know. `.strict()` refused the
+ * whole block for one of them — and OpenAI's `chat/completions` has carried
+ * `prompt_tokens_details` and `completion_tokens_details` on every 200 for two
+ * years. That refusal did not stop at the acceptance decision: `reportedUsage`
+ * is read through this same schema, so a real vendor's answer CHARGED NOTHING,
+ * moved neither ceiling, and was retried until the attempt bound was spent —
+ * every attempt billed by the vendor and invisible to the ledger (C-I1).
+ *
+ * Zod STRIPS by default, so the parsed value still carries only the four
+ * bounded members: nothing unbounded reaches `raw_artifact.metadata.usage`, and
+ * the L4-F3 property the strictness was there for — no unbounded vendor text is
+ * persisted from the usage block — is kept by construction rather than by
+ * refusing the answer. A malformed COUNTER is still `PROVIDER_USAGE_INVALID`.
+ */
 const usageSchema = z.object({
   prompt_tokens: usageCounter.optional(),
   completion_tokens: usageCounter.optional(),
   total_tokens: usageCounter.optional(),
   x_cost_usd: z.number().nonnegative().optional()
-}).strict();
+});
 
 const modelIdSchema = z.string().min(1).max(MAX_PROVIDER_MODEL_CHARS);
 
@@ -920,7 +1087,7 @@ async function readBoundedResponseText(response: Response): Promise<string> {
   return new TextDecoder("utf-8").decode(Buffer.concat(chunks));
 }
 
-/** Typed refusals for an over-long model id or a usage block outside the four bounded fields (L4-F3). */
+/** Typed refusals for an over-long model id or a usage COUNTER outside its bound (L4-F3, C-I1). */
 function assertBoundedProviderResponse(decoded: unknown): void {
   if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) return;
   const row = decoded as Readonly<Record<string, unknown>>;
@@ -933,7 +1100,7 @@ function assertBoundedProviderResponse(decoded: unknown): void {
   if (row.usage !== undefined && row.usage !== null && !usageSchema.safeParse(row.usage).success) {
     throw new TypedDomainError(
       "PROVIDER_USAGE_INVALID",
-      "Provider usage may carry only bounded prompt_tokens, completion_tokens, total_tokens and x_cost_usd"
+      "Provider usage counters must be non-negative integers within the bounded range"
     );
   }
 }
@@ -1038,8 +1205,30 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         const candidate = z.object({ id: z.string(), model: modelIdSchema }).passthrough().safeParse(decoded);
         const observedUsage = z.object({ usage: usageSchema.nullable().optional() })
           .passthrough().safeParse(decoded);
-        /** Read ONCE: the artifact's record, the charge and the hosted check agree by construction. */
-        const reportedUsage = observedUsage.success ? observedUsage.data.usage ?? null : null;
+        /**
+         * TWO READS OF ONE BLOCK, and the difference is deliberate.
+         *
+         * `reportedUsage` is what the engine can VOUCH FOR: the strict parse,
+         * with a vendor's extra members stripped (C-I1), so what reaches the
+         * artifact and the hosted usage requirement is the four bounded
+         * counters or nothing. A block that strips to nothing is recorded as
+         * `null` rather than as `{}`, which would claim the vendor reported an
+         * empty usage block (fix round 1, Minor 7).
+         *
+         * `rawUsage` is what the vendor SENT, handed to the charge below,
+         * because a malformed count does not make a billed call free
+         * (Important 1). The charge reads it leniently and falls back to this
+         * attempt's own projected maximum for a part it cannot read; the
+         * acceptance decision keeps the strict parse and still refuses.
+         */
+        const parsedUsage = observedUsage.success ? observedUsage.data.usage ?? null : null;
+        const reportedUsage = parsedUsage !== null && Object.keys(parsedUsage).length > 0
+          ? parsedUsage
+          : null;
+        const rawUsage: unknown = typeof decoded === "object" && decoded !== null
+          && !Array.isArray(decoded)
+          ? (decoded as Readonly<Record<string, unknown>>).usage
+          : undefined;
         const strict = responseSchema.safeParse(decoded);
         const finishReason = observedFinishReason(decoded);
         const content = strict.success ? strict.data.choices[0]!.message.content : null;
@@ -1114,7 +1303,14 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          */
         await request.costEnvelope?.recordCall({
           providerRef: request.providerRef,
-          usage: reportedUsage
+          usage: rawUsage,
+          // The SAME two facts `assertCallAllowed` decided against above, so a
+          // charge that falls back to the projection can never exceed what the
+          // per-run gate already admitted for this attempt.
+          projection: {
+            requestBytes: Buffer.byteLength(body, "utf8"),
+            completionTokenCeiling: attemptTokenCeiling
+          }
         });
         if (!response.ok) throw new Error(`PROVIDER_HTTP_STATUS_${response.status}`);
         assertBoundedProviderResponse(decoded);
@@ -1122,13 +1318,22 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          * V-28 — THE HOSTED REQUIREMENT, asked only of a SUCCESSFUL completion.
          *
          * The CHARGE is taken earlier, right after the artifact is recorded
-         * (I4): a 200 the engine then refuses — an over-long model id, a usage
-         * block with an unknown field — was still billed by the vendor and is
-         * still retried, so charging here missed real money, repeatedly. This
-         * check stays here, after `assertBoundedProviderResponse`, so a
-         * malformed usage block is still named PROVIDER_USAGE_INVALID rather
-         * than collapsed into "the vendor reported nothing", and after the
-         * `!response.ok` throw so an error page stays a transport failure.
+         * (I4): a 200 the engine then refuses — an over-long model id, a
+         * malformed usage counter — was still billed by the vendor, so charging
+         * here missed real money. This check stays here, after
+         * `assertBoundedProviderResponse`, so a malformed usage block is still
+         * named PROVIDER_USAGE_INVALID rather than collapsed into "the vendor
+         * reported nothing", and after the `!response.ok` throw so an error page
+         * stays a transport failure.
+         *
+         * Two corrections this comment used to get wrong:
+         *  · C-I1: an UNKNOWN member of the usage block is no longer a refusal
+         *    at all. It is stripped, the four counters are charged, and the
+         *    answer is accepted — which is what a vendor's real 200 looks like.
+         *  · Important 1: a MALFORMED COUNTER is charged (from the raw block,
+         *    falling back to this attempt's projected maximum) and is NOT
+         *    retried — the refusal short-circuits the attempt loop below. One
+         *    billed call, one ledger row, one typed stop.
          */
         await request.costEnvelope?.assertUsageReported({
           providerRef: request.providerRef,
@@ -1254,8 +1459,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         };
       } catch (error) {
         /**
-         * Two refusals here are OURS, not the transport's, and neither is
-         * repaired by asking again — so both propagate untouched instead of
+         * The refusals below are OURS, not the transport's, and none of them is
+         * repaired by asking again — so each propagates untouched instead of
          * being absorbed into a retry loop and re-emerging as
          * PROVIDER_CALL_FAILED after the ceiling is spent.
          *
@@ -1265,6 +1470,10 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          *    proved it answers with the wrong model. Retrying it was three real
          *    calls, three artifacts and three ledger rows for an answer that
          *    cannot become correct.
+         *  · a MALFORMED USAGE COUNTER (Important 1): a vendor that answered
+         *    `completion_tokens: 300.5` answers the same way one backoff later.
+         *    Retrying it was three billed calls to reach one refusal — and,
+         *    before this round, three billed calls charged as nothing.
          *  · V-28: a MONEY refusal from the cost-envelope seam. A ceiling that
          *    is already reached is still reached one backoff later, and a vendor
          *    that reported no usage will report none again, so retrying either
@@ -1274,6 +1483,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         const shortCircuit = error instanceof TypedDomainError
           && (error.code.startsWith("PROMPT_FRAME_")
             || error.code === "PROVIDER_MODEL_IDENTITY_CHANGED"
+            || error.code === "PROVIDER_USAGE_INVALID"
             || (PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).includes(error.code));
         lastContentRejection = null;
         lastError = error;

@@ -228,7 +228,8 @@ async function publishAlgorithmRows(
     publicationId: randomUUID(),
     baseRegisterVersion: parseRegisterVersionText(String(bootstrap.registerVersion)),
     rows: rows.map(row => registerFixtureRow(row.rowKey, row.value, "t16-test:scratch")),
-    sourceRef: "t16-test:scratch"
+    sourceRef: "t16-test:scratch",
+    deployment: "local"
   });
   return registerVersionToSafeLegacyNumber(receipt.registerVersion);
 }

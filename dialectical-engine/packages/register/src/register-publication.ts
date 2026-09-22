@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
+import {
+  CONFIGURED_PROVIDER_SET_ROW_KEY,
+  assertHostedConfiguredProviderSetVetted
+} from "./configured-provider-set.js";
 
 export type RegisterVersionText = string & {
   readonly __registerVersionText: unique symbol;
@@ -396,11 +400,32 @@ export interface RegisterPublicationRow {
   readonly sourceRef: string;
 }
 
-export interface GeneralRegisterPublication {
+/**
+ * WHICH DEPLOYMENT IS PUBLISHING (C-I5). Hosted publications carry rules local
+ * ones do not — today, V-9(4)'s vendor vetting on `configuredProviderSet`.
+ *
+ * It is a REQUIRED member of the publication and deliberately not an option
+ * with a default: the hosted publication path belongs to the VPS kit and does
+ * not exist yet, and a path that forgets to declare itself must fail to
+ * compile rather than quietly inherit the permissive answer.
+ */
+export type RegisterPublicationDeployment = "hosted" | "local";
+
+/** The four members that make a publication's request identity (its sha256). */
+export interface GeneralRegisterPublicationRequest {
   readonly publicationId: string;
   readonly baseRegisterVersion: RegisterVersionText;
   readonly rows: readonly RegisterPublicationRow[];
   readonly sourceRef: string;
+}
+
+export interface GeneralRegisterPublication extends GeneralRegisterPublicationRequest {
+  /**
+   * Not part of the request hash: it is a gate on WHO may publish these rows,
+   * not a fact about the rows, and two deployments publishing identical rows
+   * must still replay identically.
+   */
+  readonly deployment: RegisterPublicationDeployment;
 }
 
 export interface HistoricalRegisterImport {
@@ -495,6 +520,30 @@ function validateCanonicalText(value: unknown, code: string): asserts value is C
   if (typeof value !== "string") fail(code);
   const parsed = parseCanonicalRegisterJson(Buffer.from(value, "utf8"));
   if (parsed !== value) fail(code);
+}
+
+/**
+ * C-I5 — THE HOSTED PUBLICATION'S OWN RULES, asked at the one door every
+ * publication passes through.
+ *
+ * Today there is exactly one: V-9(4)'s vetting record on every vendor in the
+ * `configuredProviderSet` row, which is what makes `PROVIDER_VENDOR_NOT_VETTED`
+ * reachable in production rather than only from a builder nothing calls. It is
+ * asked BEFORE the transaction opens, so a refusal publishes nothing and leaves
+ * no trace to roll back.
+ *
+ * A row is canonical JSON text by the time it is here, so the value is parsed
+ * back — it has already been validated as canonical by `validateRows`.
+ */
+function assertHostedPublicationRows(
+  rows: readonly RegisterPublicationRow[],
+  deployment: RegisterPublicationDeployment
+): void {
+  if (deployment !== "hosted") return;
+  for (const row of rows) {
+    if (row.rowKey !== CONFIGURED_PROVIDER_SET_ROW_KEY) continue;
+    assertHostedConfiguredProviderSetVetted(JSON.parse(row.valueJsonText) as unknown);
+  }
 }
 
 function validateRows(rows: readonly RegisterPublicationRow[], allowSupport: boolean): void {
@@ -603,7 +652,9 @@ export function computeRegisterSnapshotSha256(rows: readonly RegisterPublication
   return sha256(sortedRows(rows).flatMap((row) => [lp(row.rowKey), lp(row.valueJsonText), lp(row.sourceRef)]));
 }
 
-export function computeGeneralPublicationRequestSha256(input: GeneralRegisterPublication): string {
+export function computeGeneralPublicationRequestSha256(
+  input: GeneralRegisterPublicationRequest
+): string {
   validateRows(input.rows, true);
   if (!UUID_PATTERN.test(input.publicationId) || !validBoundedText(input.sourceRef, 1024)) {
     fail("REGISTER_PUBLICATION_INPUT_INVALID");
@@ -803,9 +854,17 @@ export function createPostgresRegisterPublicationPort(pool: Pool): RegisterPubli
     },
 
     async publishGeneral(input: GeneralRegisterPublication) {
-      requirePlainExact(input, ["publicationId", "baseRegisterVersion", "rows", "sourceRef"], "REGISTER_PUBLICATION_INPUT_INVALID");
+      requirePlainExact(
+        input,
+        ["publicationId", "baseRegisterVersion", "rows", "sourceRef", "deployment"],
+        "REGISTER_PUBLICATION_INPUT_INVALID"
+      );
+      if (input.deployment !== "hosted" && input.deployment !== "local") {
+        fail("REGISTER_PUBLICATION_INPUT_INVALID");
+      }
       validateRows(input.rows, true);
       if (input.rows.some((row) => row.rowKey === "supportActivation")) fail("REGISTER_PUBLICATION_INPUT_INVALID");
+      assertHostedPublicationRows(input.rows, input.deployment);
       const requestSha256 = computeGeneralPublicationRequestSha256(input);
       const snapshotSha256 = computeRegisterSnapshotSha256(input.rows);
       return transaction(pool, async (client) => {
