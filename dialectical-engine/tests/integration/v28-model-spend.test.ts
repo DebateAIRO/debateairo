@@ -250,9 +250,34 @@ describe("V-28 the persisted totals answer the two envelope questions", () => {
  *  7. The same, with `PROVIDER_USAGE_UNREPORTED`, whose reason must be its own
  *     code (ruling R2) and whose terminal must fire even though the run has
  *     attempts to spare (C3).
+ *
+ * ROUND 4 (rulings R-A / R-B), added to the contract above:
+ *
+ *  8. In case 1 no review ever ran (the review guard returns on a stop, and
+ *     none may be re-opened), yet root 0 is NOT hidden: `ledger.node_review`
+ *     holds no row for this run and the answer still serves root 0 — the
+ *     spend-stopped run is projected on the single-maker footing (R-A). This
+ *     is the property three rounds moved downstream and never closed; the
+ *     pure decision is proven in `tests/unit/v28-spend-stopped-serve-decision.test.ts`
+ *     and the wiring is pinned in `tests/architecture/v28-serve-decision-wiring.test.ts`,
+ *     so what this case adds is the run through the real pool.
+ *  9. In case 1 the answer's condition marks include `SINGLE-LINEAGE`, with a
+ *     persisted record whose reason is `RUN_COST_ENVELOPE_MONEY_REACHED` (case 7:
+ *     `PROVIDER_USAGE_UNREPORTED`) — never `MONO_MAKER_RUN` — and no
+ *     `UNSERVED-MAKER-POSITION` mark, because no second position exists (R-B).
+ * 10. M = 3 with the refusal on root 2: the work item resolves, the stronger of
+ *     roots 0 and 1 is served, the other is disclosed `UNSERVED-MAKER-POSITION`,
+ *     and `SINGLE-LINEAGE` is ABSENT, because two lineages exist.
+ * 11. M = 2 with the refusal on the FIRST review call (root 0's): both roots
+ *     authored, zero reviews landed, the work item resolves and serves the
+ *     stronger root. (The round-3 re-review's "a review has landed by then"
+ *     holds from the second review onward only.)
+ * 12. In case 6, a child whose review LANDED `cannot-assess` before the stop
+ *     keeps its `HIDDEN-UNJUDGEABLE` record; a child the stop denied a review
+ *     is not hidden.
  */
 describe.skip("V-28 a spend stop mid-run ends in the envelope terminal (NOT RUN — Docker)", () => {
-  it("keeps root 0 when root 1 is refused on money at M=2", () => {
+  it("keeps root 0 when root 1 is refused on money at M=2, and says it rests on one lineage", () => {
     expect.unreachable("wire to the acceptance harness; see the numbered contract above");
   });
 });
