@@ -126,6 +126,14 @@ export function parseEncodedArgon2id(encoded: string): Argon2idEncodingParameter
  * records minted under an older, higher cost still verify if the ruled cost is
  * ever lowered — no real user is locked out by a policy change.
  *
+ * THE ONE WAY THIS RULE CAN LOCK A REAL USER OUT: lowering a ruled cost by MORE
+ * than half. Records minted under the old cost then sit above twice the new one
+ * and are refused, and nothing rehashes a password on successful login, so they
+ * are stranded until their owner goes through recovery. Halving is safe (an old
+ * record lands exactly on the ceiling); a deeper cut needs rehash-on-login
+ * first, or a superseding row that keeps the old cost as the governing one
+ * until every record has been re-minted.
+ *
  * A carrier, like the table above, rather than a bare exported number: the
  * structural source law refuses those outside published-arithmetic.
  */

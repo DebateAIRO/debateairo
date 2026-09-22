@@ -118,11 +118,20 @@ describe("V-2 (5) the e-mail-verification route charges the visitor's budget fir
 
   it("keeps refusing a malformed token before it costs the visitor anything", async () => {
     const { service, limiter, findAuditIdentityByVerificationHash } = harness(null);
-    await expect(service.verifyEmail({ token: "too-short" }, source("203.0.113.34")))
+    const ip = "203.0.113.34";
+    // Spend all but ONE of the budget first. Without that, "the next consume is
+    // still allowed" is true whether or not the malformed attempt charged, and
+    // the case proves nothing.
+    for (let attempt = 0; attempt < POLICY.rateLimits.verify.admissionPerSource - 1; attempt += 1) {
+      expect(limiter.consume({ route: "verify", ip, addressKey: "unused", now: NOW }).allowed).toBe(true);
+    }
+    await expect(service.verifyEmail({ token: "too-short" }, source(ip)))
       .rejects.toMatchObject({ code: "VERIFICATION_TOKEN_INVALID" });
     expect(findAuditIdentityByVerificationHash).not.toHaveBeenCalled();
-    expect(limiter.consume({
-      route: "verify", ip: "203.0.113.34", addressKey: "unused", now: NOW
-    }).allowed).toBe(true);
+    // The one remaining admission is still there, so the malformed attempt was
+    // refused on shape and charged nothing...
+    expect(limiter.consume({ route: "verify", ip, addressKey: "unused", now: NOW }).allowed).toBe(true);
+    // ...and that really was the last one.
+    expect(limiter.consume({ route: "verify", ip, addressKey: "unused", now: NOW }).allowed).toBe(false);
   });
 });
