@@ -229,7 +229,7 @@ describe("S02 tier roster architecture", () => {
     expect(PLAN_TIER_ROSTERS.premium).toEqual([
       "gpt-5.6-sol",
       "claude-opus-5",
-      "grok-4.6-build"
+      "grok-4.7-build"
     ]);
   });
 
@@ -239,7 +239,7 @@ describe("S02 tier roster architecture", () => {
       "glm-5.3-flash": [],
       "gpt-5.6-sol": [],
       "claude-opus-5": [],
-      "grok-4.6-build": [],
+      "grok-4.7-build": [],
       "claude-sonnet-5": []
     };
 

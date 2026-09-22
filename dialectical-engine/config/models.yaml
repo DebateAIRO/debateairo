@@ -19,9 +19,9 @@ premium:
   - cli: claude
     model: claude-opus-5
   - cli: grok
-    model: grok-4.6-build
+    model: grok-4.7-build
 
 # Put Grok in Free too:
 #   add under free:
 #   - cli: grok
-#     model: grok-4.6-build
+#     model: grok-4.7-build

@@ -38,7 +38,7 @@ function deploymentWithRosters(rosters: Readonly<{
 
 const deploymentFixture = deploymentWithRosters({
   free: ["gpt-5.6-luna", "glm-5.3-flash"],
-  premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build"]
+  premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.7-build"]
 });
 
 vi.mock("next/navigation", () => ({
@@ -238,7 +238,7 @@ describe("S01 /new plan tier", () => {
       "glm-5.3-flash",
       "gpt-5.6-sol",
       "claude-opus-5",
-      "grok-4.6-build"
+      "grok-4.7-build"
     ]);
     expect(document.body.textContent).not.toContain("OPERATOR_REQUIRED");
   });
@@ -252,7 +252,7 @@ describe("S01 /new plan tier", () => {
       EXPANSION_DEPTH_MAX: 5,
       PLAN_TIER_ROSTERS: {
         free: ["gpt-5.6-luna", "claude-sonnet-5"],
-        premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build"]
+        premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.7-build"]
       }
     }));
     try {
@@ -277,7 +277,7 @@ describe("S01 /new plan tier", () => {
     expect(document.querySelector('#planTier-free')?.textContent).toContain("glm-5.3-flash");
     expect(document.querySelector('#planTier-premium')?.textContent).toContain("gpt-5.6-sol");
     expect(document.querySelector('#planTier-premium')?.textContent).toContain("claude-opus-5");
-    expect(document.querySelector('#planTier-premium')?.textContent).toContain("grok-4.6-build");
+    expect(document.querySelector('#planTier-premium')?.textContent).toContain("grok-4.7-build");
     expect(document.querySelector('#planTier-free .ndTierName')?.textContent).toBe("Free");
     expect(document.querySelector('#planTier-premium .ndTierName')?.textContent).toBe("Premium");
     expect(document.querySelector('#planTier-free .ndTierPromise')?.textContent).toBe(
@@ -295,7 +295,7 @@ describe("S01 /new plan tier", () => {
     const premiumModels = [...document.querySelectorAll<HTMLElement>('#planTier-premium .ndTierModel')];
     const expectedRosters = {
       free: ["gpt-5.6-luna", "glm-5.3-flash"],
-      premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build"]
+      premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.7-build"]
     };
     expect({
       free: freeModels.map((model) => model.textContent?.trim()),
@@ -315,7 +315,7 @@ describe("S01 /new plan tier", () => {
   it("uses shared model metadata for the five real and six alternate roster id shapes", async () => {
     mocks.readPlanTiers.mockResolvedValueOnce({
       free: ["gpt-5.6-luna", "claude-sonnet-5", "openai-o3", "sol-gpt-5", "GPT-5.6-SOL"],
-      premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build", "claude_opus", "grok/4.6", "gemini-3"]
+      premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.7-build", "claude_opus", "grok/4.6", "gemini-3"]
     });
     await renderPage();
 
@@ -350,7 +350,7 @@ describe("S01 /new plan tier", () => {
       { name: "glm-5.3-flash", dot: "var(--m-default)" },
       { name: "gpt-5.6-sol", dot: "var(--m-gpt)" },
       { name: "claude-opus-5", dot: "var(--m-claude)" },
-      { name: "grok-4.6-build", dot: "var(--m-grok)" }
+      { name: "grok-4.7-build", dot: "var(--m-grok)" }
     ]);
   });
 

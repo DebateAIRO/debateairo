@@ -31,7 +31,7 @@ premium:
   - cli: claude
     model: claude-opus-5
   - cli: grok
-    model: grok-4.6-build
+    model: grok-4.7-build
 `;
 
 const temporaryRoots: string[] = [];
@@ -79,7 +79,7 @@ describe("model configuration file", () => {
     });
     expect(config.premium[2]).toMatchObject({
       transport: "cli",
-      model: "grok-4.6-build"
+      model: "grok-4.7-build"
     });
   });
 
@@ -141,7 +141,7 @@ describe("model configuration file", () => {
     };
     expect(generated.GENERATED_PLAN_TIER_ROSTERS).toEqual({
       free: ["gpt-5.6-luna", "glm-5.3-flash"],
-      premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build"]
+      premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.7-build"]
     });
   });
 
@@ -161,9 +161,10 @@ describe("model configuration file", () => {
     expect(config.premium.map((entry) => entry.model)).toEqual([
       "gpt-5.6-sol",
       "claude-opus-5",
-      "grok-4.6-build"
+      "grok-4.7-build"
     ]);
     expect(source.match(/claude-sonnet-5/gu) ?? []).toHaveLength(0);
+    expect(source.match(/grok-4\.6-build/gu) ?? []).toHaveLength(0);
     expect(source).toContain("# config/models.yaml");
     expect(source).toContain("# Which models debate in each tier.");
     expect(source).toContain("# Edit, then restart the stack.");
@@ -171,6 +172,6 @@ describe("model configuration file", () => {
     expect(source).toContain(`# Put Grok in Free too:
 #   add under free:
 #   - cli: grok
-#     model: grok-4.6-build`);
+#     model: grok-4.7-build`);
   });
 });

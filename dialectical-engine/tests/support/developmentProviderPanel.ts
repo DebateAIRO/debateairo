@@ -23,7 +23,7 @@ export const TEST_DEVELOPMENT_PROVIDER_DOCUMENT = Object.freeze({
       provider_ref: "development:grok-cli",
       maker: "xAI",
       base_url: "http://127.0.0.1:8793/v1",
-      model: "grok-4.6-build",
+      model: "grok-4.7-build",
       authorization_header: "test-grok-relay-header"
     }),
     Object.freeze({

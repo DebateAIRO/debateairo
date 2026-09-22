@@ -27,7 +27,7 @@ premium:
   - cli: claude
     model: claude-opus-5
   - cli: grok
-    model: grok-4.6-build
+    model: grok-4.7-build
 `;
 
 const temporaryRoots: string[] = [];
@@ -191,7 +191,7 @@ describe("model configuration shape classes", () => {
     expectShapeError(
       VALID_CONFIG.replace(
         `  - cli: grok
-    model: grok-4.6-build
+    model: grok-4.7-build
 `,
         `  - cli: claude
     model: claude-sonnet-5

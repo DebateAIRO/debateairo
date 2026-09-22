@@ -137,7 +137,7 @@ describe("development real CLI provider panel", () => {
     const withFreeGrok = {
       ...committed,
       free: [...committed.free, {
-        transport: "cli", tier: "free", cli: "grok", model: "grok-4.6-build"
+        transport: "cli", tier: "free", cli: "grok", model: "grok-4.7-build"
       }]
     } as ModelConfig;
     const withoutPremiumGrok = {
@@ -165,14 +165,14 @@ describe("development real CLI provider panel", () => {
     const duplicated = {
       ...committed,
       free: [...committed.free, {
-        transport: "cli", tier: "free", cli: "grok", model: "grok-4.6-build"
+        transport: "cli", tier: "free", cli: "grok", model: "grok-4.7-build"
       }]
     } as ModelConfig;
     const duplicateSlots = slots(duplicated).filter(({ word }) => word === "grok");
     expect(duplicateSlots.map(({ providerRef }) => providerRef).sort()).toEqual([
       "development:grok-cli", "development:grok-free-cli"
     ]);
-    expect(new Set(duplicateSlots.map(({ model }) => model))).toEqual(new Set(["grok-4.6-build"]));
+    expect(new Set(duplicateSlots.map(({ model }) => model))).toEqual(new Set(["grok-4.7-build"]));
   });
 
   it("orders CLI slots before API slots with Premium preceding Free in each group", async () => {
@@ -252,7 +252,7 @@ describe("development real CLI provider panel", () => {
   // Production break: map a rejected Promise.allSettled outcome silently to the unavailable model.
   it("prints one class-(c) line for a rejected CLI relay", async () => {
     const mismatchCode =
-      "GROK_CLI_MODEL_MISMATCH expected=grok-4.6-build answered=grok-4.5-build";
+      "GROK_CLI_MODEL_MISMATCH expected=grok-4.7-build answered=grok-4.5-build";
     const warnings: string[] = [];
     const handle = await startDevelopmentCliProviderPanel(
       loadModelConfig(process.cwd()),
@@ -265,7 +265,7 @@ describe("development real CLI provider panel", () => {
     );
 
     expect(warnings).toEqual([
-      `DEV_PROVIDER_SLOT_UNAVAILABLE class (c) tier=premium model=grok-4.6-build code=${mismatchCode}`
+      `DEV_PROVIDER_SLOT_UNAVAILABLE class (c) tier=premium model=grok-4.7-build code=${mismatchCode}`
     ]);
     await handle.stop();
   });
@@ -368,7 +368,7 @@ describe("development CLI full-id starts", () => {
     await operations.starts[2]!(8793);
     const panelOptions = relayStarts.grok.mock.calls[0]?.[0];
     expect(panelOptions).toEqual({
-      port: 8793, timeoutMs: 180000, model: "grok-4.6-build", sandboxProfile: "none"
+      port: 8793, timeoutMs: 180000, model: "grok-4.7-build", sandboxProfile: "none"
     });
 
     const { startGrokRelay } = await vi.importActual<
@@ -387,7 +387,7 @@ describe("development CLI full-id starts", () => {
       '  console.log(JSON.stringify({',
       '    text: JSON.stringify({ argumentList: process.argv }),',
       '    stopReason: "end_turn",',
-      '    modelUsage: { "grok-4.6-build": {} }',
+      '    modelUsage: { "grok-4.7-build": {} }',
       '  }));',
       '}'
     ].join("");
@@ -416,7 +416,7 @@ describe("development CLI full-id starts", () => {
       const relayed = JSON.parse(completion.choices[0]!.message.content) as {
         argumentList: readonly string[];
       };
-      expect(relay.model).toBe("grok-4.6-build");
+      expect(relay.model).toBe("grok-4.7-build");
       expect(relayed.argumentList).not.toContain("--model");
     } finally {
       await relay.close();

@@ -123,7 +123,7 @@ describe("S02 tier roster admission", () => {
     const panelSizes: number[] = [];
     const result = await evaluateAskAdmission(settingsFor([
       member("gpt-5.6-luna", "luna"),
-      member("grok-4.6-build", "grok"),
+      member("grok-4.7-build", "grok"),
       member("claude-opus-5", "opus"),
       member("glm-5.3-flash", "glm"),
       member("gpt-5.6-sol", "sol")
@@ -132,7 +132,7 @@ describe("S02 tier roster admission", () => {
     expect(result.discoveredPanel.map(({ model_id }) => model_id)).toEqual([
       "gpt-5.6-sol",
       "claude-opus-5",
-      "grok-4.6-build"
+      "grok-4.7-build"
     ]);
     expect(panelSizes).toEqual([3]);
   });
@@ -188,7 +188,7 @@ describe("S02 tier roster admission", () => {
     expect(error).toMatchObject({
       name: "AskRefusal",
       code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
-      message: "The premium plan needs gpt-5.6-sol, claude-opus-5, grok-4.6-build, and they are not available right now"
+      message: "The premium plan needs gpt-5.6-sol, claude-opus-5, grok-4.7-build, and they are not available right now"
     });
   });
 
@@ -200,7 +200,7 @@ describe("S02 tier roster admission", () => {
 
     expect(error).toMatchObject({
       code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
-      message: "The premium plan needs grok-4.6-build, and it is not available right now"
+      message: "The premium plan needs grok-4.7-build, and it is not available right now"
     });
   });
 
@@ -211,7 +211,7 @@ describe("S02 tier roster admission", () => {
 
     expect(error).toMatchObject({ code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE" });
     expect(error).toMatchObject({ message: expect.stringContaining("claude-opus-5") });
-    expect(error).toMatchObject({ message: expect.stringContaining("grok-4.6-build") });
+    expect(error).toMatchObject({ message: expect.stringContaining("grok-4.7-build") });
     expect(error).toMatchObject({ message: expect.stringContaining("premium") });
   });
 
@@ -410,8 +410,8 @@ describe("S02 tier roster admission", () => {
     const result = await evaluateAskAdmission(settingsFor([
       member("gpt-5.6-sol", "a"),
       member("claude-opus-5", "b"),
-      member("grok-4.6-build", "c"),
-      member("grok-4.6-build", "d")
+      member("grok-4.7-build", "c"),
+      member("grok-4.7-build", "d")
     ], panelSizes), ask("premium"));
 
     expect(result.discoveredPanel.map(({ model_id, provider_ref }) => ({
@@ -420,7 +420,7 @@ describe("S02 tier roster admission", () => {
     }))).toEqual([
       { model_id: "gpt-5.6-sol", provider_ref: "provider:a" },
       { model_id: "claude-opus-5", provider_ref: "provider:b" },
-      { model_id: "grok-4.6-build", provider_ref: "provider:c" }
+      { model_id: "grok-4.7-build", provider_ref: "provider:c" }
     ]);
     expect(result.discoveredPanel).toHaveLength(3);
     expect(panelSizes).toEqual([3]);

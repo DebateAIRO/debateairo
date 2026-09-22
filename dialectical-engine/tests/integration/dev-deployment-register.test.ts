@@ -166,7 +166,7 @@ async function runCli(environment: NodeJS.ProcessEnv): Promise<Readonly<{
     "  - cli: claude",
     "    model: claude-opus-5",
     "  - cli: grok",
-    "    model: grok-4.6-build",
+    "    model: grok-4.7-build",
     ""
   ].join("\n"), { mode: 0o600 });
   const childEnvironment: NodeJS.ProcessEnv = {

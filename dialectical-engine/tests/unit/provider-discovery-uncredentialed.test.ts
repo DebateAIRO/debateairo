@@ -45,7 +45,7 @@ const TARGETS = Object.freeze([
     providerRef: "development:grok-cli",
     maker: "xAI",
     baseUrl: "http://127.0.0.1:8793/v1",
-    model: "grok-4.6-build",
+    model: "grok-4.7-build",
     authorizationHeader: "Bearer local-grok"
   })
 ]);
