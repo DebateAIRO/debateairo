@@ -762,11 +762,21 @@ export {
   buildFramedPrompt,
   buildFramedRepairPrompt,
   promptContractFingerprintText,
+  readPromptFrame,
   type FramedMaterialField,
   type FramedPrompt,
   type FramedRepairLocator,
-  type PromptContract
+  type PromptContract,
+  type PromptFramePresence
 } from "./prompt-frame.js";
+
+// V-11 addendum layer 5: tripwires — typed signals on the run, never gates.
+export {
+  PROMPT_TRIPWIRE_SIGNALS,
+  scanPromptTripwires,
+  type PromptTripwireSignal,
+  type PromptTripwireSignalCode
+} from "./prompt-tripwire.js";
 
 // DR-181/DR-182's provider health probe (moved here by ruling J21 so the API and
 // the runner share ONE implementation). See ./provider-probe.ts.

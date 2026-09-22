@@ -260,12 +260,28 @@ export function buildFramedRepairPrompt(framed: FramedPrompt, locator: FramedRep
 }
 
 /**
+ * What the door read out of a packet it accepted. The gateway's tripwires work
+ * from THIS rather than from a field on the request, so no call site can send a
+ * framed packet and quietly withhold the frame from the scan.
+ */
+export interface PromptFramePresence {
+  readonly fence: string;
+  readonly canary: string;
+  readonly fields: readonly FramedMaterialField[];
+}
+
+/** `assertFramedPrompt` and the frame it read. Throws exactly where that does. */
+export function readPromptFrame(packet: PromptPacket): PromptFramePresence {
+  return assertFramedPrompt(packet);
+}
+
+/**
  * THE DOOR. The provider gateway calls this on the initial packet and on every
  * repair packet, so a hand-off that assembles a prompt without the frame is
  * refused before any bytes leave the process — the structural form of "no call
  * site can assemble a prompt without the frame".
  */
-export function assertFramedPrompt(packet: PromptPacket): void {
+export function assertFramedPrompt(packet: PromptPacket): PromptFramePresence {
   const [system, ...rest] = packet.messages;
   if (system === undefined || system.role !== "system"
     || !system.content.includes(PROMPT_FRAME_VERSION)
@@ -290,9 +306,17 @@ export function assertFramedPrompt(packet: PromptPacket): void {
   if (declared === undefined) {
     throw new TypedDomainError("PROMPT_FRAME_ABSENT", "The safety frame declares no boundary marker");
   }
+  const canaryAt = system.content.indexOf(CANARY_PREFIX);
+  const canary = canaryAt < 0
+    ? undefined
+    : system.content.slice(canaryAt, canaryAt + CANARY_PREFIX.length + 24);
+  if (canary === undefined || !/^[0-9a-f]{24}$/u.test(canary.slice(CANARY_PREFIX.length))) {
+    throw new TypedDomainError("PROMPT_FRAME_ABSENT", "The safety frame declares no canary");
+  }
   if (rest.length === 0) {
     throw new TypedDomainError("PROMPT_FRAME_ABSENT", "A framed packet carries at least one fenced material block");
   }
+  const fields: FramedMaterialField[] = [];
   for (const message of rest) {
     if (message.role !== "user") {
       throw new TypedDomainError(
@@ -335,6 +359,8 @@ export function assertFramedPrompt(packet: PromptPacket): void {
           "Material may never contain the boundary marker that delimits it"
         );
       }
+      fields.push(Object.freeze({ name: field.name, content: field.content }));
     }
   }
+  return Object.freeze({ fence: declared, canary, fields: Object.freeze(fields) });
 }
