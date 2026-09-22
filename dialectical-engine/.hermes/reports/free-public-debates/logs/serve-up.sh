@@ -8,6 +8,7 @@ LANE=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/al
 LOG=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine/.hermes/reports/free-public-debates/logs/serve-up.log; PIDF=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine/.hermes/reports/free-public-debates/logs/serve-up.pid
 [ -d "$LANE/.local/dev-auth" ] || { echo "custody missing"; exit 1; }
 unset DEBATEAI_DEV_AUTH_STACK_PROFILE
+export PNPM_EXECUTABLE=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/all/dialectical-engine/.hermes/reports/free-public-debates/logs/pnpm-quiet.sh
 cd "$LANE" || exit 1
 python3 - <<PY
 import subprocess,os
