@@ -11,6 +11,7 @@ import {
 } from "../../packages/crypto/src/index.js";
 import {
   BLIND_SAMPLE_EXCERPT_MAX_BYTES,
+  CONSUMER_AGGREGATE_PROMPT_CONTRACT,
   createOpenAiPublicAggregateProvider,
   PostgresEvaluatorConsumerRepository,
   type EvaluatorProviderFamilyRow,
@@ -22,6 +23,7 @@ import {
 } from "../../apps/evaluator-worker/src/index.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
+import { framedField, readFramedMaterial, wirePacket } from "../support/framed-packet.js";
 
 let database: TestDatabase;
 let selectionId: string;
@@ -327,27 +329,24 @@ describe("persisted evaluator consumer refresh", () => {
     }
 
     expect(provider.requestBodies).toHaveLength(3);
-    const onWire = JSON.parse(provider.requestBodies[0]!) as {
-      messages: readonly { readonly role: string; readonly content: string }[];
-    };
+    const onWire = wirePacket(provider.requestBodies[0]!);
     const requestBytes = JSON.stringify(onWire.messages);
-    const payload = JSON.parse(onWire.messages[1]!.content) as {
-      blinded_samples: readonly {
-        sample_id: string;
-        question_excerpt: string;
-        task_excerpt: string;
-      }[];
+    // RUN1 (V-11 addendum), round 4: the aggregate is MATERIAL. It no longer
+    // rides bare as the user message; it is the `evaluator_aggregate` field of
+    // the fenced block, read here through the same frame the door reads.
+    const aggregatePayload = (body: string): {
+      blinded_samples: readonly { sample_id: string; question_excerpt: string; task_excerpt: string }[];
+    } => {
+      const material = readFramedMaterial(wirePacket(body));
+      expect(material.contractId).toBe(CONSUMER_AGGREGATE_PROMPT_CONTRACT.contractId);
+      return JSON.parse(framedField(material, "evaluator_aggregate")) as ReturnType<typeof aggregatePayload>;
     };
+    const payload = aggregatePayload(provider.requestBodies[0]!);
     expect(payload.blinded_samples).toHaveLength(1);
     expect(payload.blinded_samples.every((sample) => sample.sample_id.startsWith("opaque:sample-")))
       .toBe(true);
     for (const body of provider.requestBodies) {
-      const request = JSON.parse(body) as {
-        messages: readonly { readonly role: string; readonly content: string }[];
-      };
-      const requestPayload=JSON.parse(request.messages[1]!.content) as {
-        blinded_samples:readonly { sample_id:string;question_excerpt:string;task_excerpt:string }[];
-      };
+      const requestPayload = aggregatePayload(body);
       expect(requestPayload.blinded_samples).toHaveLength(1);
       expect(requestPayload.blinded_samples.every((sample) =>
         Buffer.byteLength(sample.question_excerpt,"utf8")<=BLIND_SAMPLE_EXCERPT_MAX_BYTES
