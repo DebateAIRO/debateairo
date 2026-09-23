@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe,expect,it } from "vitest";
-import { buildSupportAnswerPrompt } from "../../apps/api/src/support/prompt.js";
+import { buildSupportDraftAnswerPrompt } from "../../apps/api/src/support/prompt.js";
 import {
   discoverSupportEvalCases,
   createInProcessSupportEvalExecutor,
@@ -73,7 +73,7 @@ describe("SUP-01 support eval release gate", () => {
     // packet, the OUTPUT CONTRACT in its instruction slot — never a system string.
     const completion = createDeterministicStructuralCompletion({
       language:"en",
-      packet:buildSupportAnswerPrompt({
+      packet:buildSupportDraftAnswerPrompt({
         instruction:[
           "SUPPORT POLICY","OUTPUT CONTRACT",
           `sourceIds=${sourceReferences.join(",")}`,

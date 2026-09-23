@@ -10,6 +10,8 @@ import {
 
 const MAX_RAW_CODE_POINTS = 8_192;
 const MAX_TEXT_CODE_POINTS = 4_000;
+/** An answer draft cites at least this many sources (enforced below, stated by the frame). */
+const MIN_SOURCE_IDS = 1;
 const identifier = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u);
 const schema = z.object({
   kind: z.literal("answer"),
@@ -23,6 +25,31 @@ const caseSummarySchema = z.object({
   sourceIds: z.array(z.never()).length(0),
   actionIds: z.array(z.never()).length(0)
 }).strict();
+
+/**
+ * SYNC3 / R1 — THE ONE SOURCE FOR THE SUPPORT FRAME'S LOCKED ANSWER FORM.
+ *
+ * The support chat's prompt contracts (`./prompt.ts`) carry a code-owned answer
+ * form, and the form must say exactly what this parser accepts. It is therefore
+ * RENDERED from the parser's own schema objects (`z.toJSONSchema`, the dialect
+ * key dropped because it names JSON Schema, not the draft), never written by
+ * hand and never read from the owners' editable instruction text. A change to
+ * a schema here changes the form's bytes, which the byte pins in
+ * `tests/unit/prompt-text-pins.test.ts` then refuse until a NEW sealed contract
+ * version is minted for it.
+ */
+export function supportDraftJsonShape(kind: "answer" | "case_summary"): string {
+  const { $schema: _dialect, ...shape } = z.toJSONSchema(
+    kind === "answer" ? schema : caseSummarySchema
+  ) as Readonly<Record<string,unknown>>;
+  return JSON.stringify(shape);
+}
+
+/** The rules the parser enforces beyond the JSON shape, for the same form. */
+export const SUPPORT_DRAFT_RULES = Object.freeze({
+  maxTextCodePoints: MAX_TEXT_CODE_POINTS,
+  minSourceIds: MIN_SOURCE_IDS
+});
 
 export type SupportDraft = Readonly<{
   kind: "answer";
@@ -356,7 +383,7 @@ export function diagnoseSupportDraft(
   if (!parsed.success) return result("SCHEMA_INVALID","SCHEMA",values);
   const unsafeText = screenCategory(parsed.data.text,narrativeInternalIds);
   if (unsafeText !== null) return result(unsafeText.code,unsafeText.predicate,values);
-  if (parsed.data.sourceIds.length === 0
+  if (parsed.data.sourceIds.length < MIN_SOURCE_IDS
     || new Set(parsed.data.sourceIds).size !== parsed.data.sourceIds.length
     || values.allowedSourceIdCount !== parsed.data.sourceIds.length) {
     return result("SOURCE_MEMBERSHIP_INVALID","SOURCE_MEMBERSHIP",values);
@@ -403,7 +430,7 @@ export function validateSupportDraft(
 ): SupportDraft | null {
   const sourceSet = new Set(allowedSourceIds);
   const actionSet = new Set<string>(requestedActions);
-  if (draft.sourceIds.length === 0
+  if (draft.sourceIds.length < MIN_SOURCE_IDS
     || new Set(draft.sourceIds).size !== draft.sourceIds.length
     || new Set(draft.actionIds).size !== draft.actionIds.length
     || draft.sourceIds.some((id) => !sourceSet.has(id))

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { TypedDomainError } from "@debateai/kernel";
 import type { PromptPacket } from "@debateai/providers";
 import type { SupportKeyPort } from "./keys.js";
-import { buildSupportSummaryPrompt } from "./prompt.js";
+import { buildSupportDraftSummaryPrompt } from "./prompt.js";
 import { redactSupportMessage } from "./session.js";
 import {
   parseSupportCaseSummaryDraft,screenSupportModelText
@@ -44,6 +44,11 @@ export type SupportCaseRecord = Readonly<{
   state: SupportCaseState;
 }>;
 
+/**
+ * The OWNERS' instruction slot of `support.case-summary.v2` (SYNC3, R1): dev's
+ * reviewed directive, which restates the JSON draft's shape. The code-owned
+ * answer form of that contract states the same shape, rendered from the parser.
+ */
 export const SUPPORT_SUMMARY_PROMPT =
   "Return only JSON with exactly kind, text, sourceIds, and actionIds. "
   + "kind must be case_summary; sourceIds and actionIds must both be empty arrays. "
@@ -113,7 +118,9 @@ export function createAdvisorySummaryService(input: Readonly<{
       const deadlineAt = new Date(createdAtMs + timeoutMs);
       const signal = AbortSignal.timeout(timeoutMs);
       const completion = input.complete({
-        packet: buildSupportSummaryPrompt({
+        // SYNC3 / R1: the JSON-draft contract, whose locked form states the
+        // shape `parseSupportCaseSummaryDraft` enforces below.
+        packet: buildSupportDraftSummaryPrompt({
           instruction: SUPPORT_SUMMARY_PROMPT,
           transcript: request.transcript
         }).packet,

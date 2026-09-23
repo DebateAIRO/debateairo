@@ -29,12 +29,16 @@ import {
   type SynthesisLoopControls
 } from "@debateai/serve";
 import type { HelpCorpusEntry } from "../../packages/support-kb/src/index.js";
-import { supportAnswerInstruction } from "../../apps/api/src/support/answer.js";
+import { SUPPORT_ACTION_IDS, SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
+import { buildSupportKnowledgeContext } from "../../packages/support-kb/src/context.js";
+import { resolveSupportActions } from "../../packages/support-kb/src/navigation.js";
+import { supportDraftAnswerInstruction } from "../../apps/api/src/support/answer.js";
 import { SUPPORT_SUMMARY_PROMPT } from "../../apps/api/src/support/cases.js";
 import { RelayAdapter } from "../../apps/api/src/support/model.js";
+import { createSupportModelReferenceFactory } from "../../apps/api/src/support/model-references.js";
 import {
-  buildSupportAnswerPrompt,
-  buildSupportSummaryPrompt
+  buildSupportDraftAnswerPrompt,
+  buildSupportDraftSummaryPrompt
 } from "../../apps/api/src/support/prompt.js";
 import { wirePacket } from "../support/framed-packet.js";
 
@@ -225,9 +229,26 @@ const SUPPORT_HELP_ENTRIES: readonly HelpCorpusEntry[] = Object.freeze([Object.f
   verifiedAgainst: "injection-corpus",
   ratifiedBy: "V" as const,
   ratifiedOn: "2026-09-04",
-  body: "Owners publish a debate from its page and complete re-authentication."
+  body: "Owners publish a debate from its page and complete re-authentication.",
+  modelProjection: "Owners publish a debate from its page and complete re-authentication."
 })]);
-const SUPPORT_INSTRUCTION = supportAnswerInstruction(SUPPORT_HELP_ENTRIES, "en");
+/**
+ * SYNC3 / R1: the support rows drive the JSON-draft contracts the API root
+ * composes (`support.chat-answer.v2`, `support.case-summary.v2`). The answer's
+ * instruction slot is built exactly as `respond` builds it — dev's reviewed
+ * preamble over the reviewed knowledge context and its OUTPUT CONTRACT.
+ */
+const SUPPORT_INSTRUCTION = supportDraftAnswerInstruction(buildSupportKnowledgeContext({
+  entries: SUPPORT_HELP_ENTRIES,
+  capabilities: SUPPORT_CAPABILITIES,
+  language: "en",
+  query: "How do I publish a debate?",
+  historyText: "",
+  availableActionIds: resolveSupportActions(SUPPORT_ACTION_IDS, { signedIn: false, language: "en" })
+    .map(({ id }) => id),
+  referenceFor: createSupportModelReferenceFactory("10000000-0000-4000-8000-000000000001").referenceFor,
+  maxCodePoints: 20_000
+}).text, "en");
 const SUPPORT_RELAY_ANSWER = JSON.stringify({
   choices: [{ message: { content: "Open the debate page as its owner." }, finish_reason: "stop" }]
 });
@@ -477,7 +498,7 @@ const HAND_OFFS = [
   {
     name: "support:chat-answer (visitor_message — a visitor's text)",
     payloadIn: "visitor_message",
-    render: (attack: string): readonly PromptPacket[] => [buildSupportAnswerPrompt({
+    render: (attack: string): readonly PromptPacket[] => [buildSupportDraftAnswerPrompt({
       instruction: SUPPORT_INSTRUCTION,
       visitorMessage: attack
     }).packet]
@@ -485,7 +506,7 @@ const HAND_OFFS = [
   {
     name: "support:case-summary (case_transcript — the visitor's words and the model's)",
     payloadIn: "case_transcript",
-    render: (attack: string): readonly PromptPacket[] => [buildSupportSummaryPrompt({
+    render: (attack: string): readonly PromptPacket[] => [buildSupportDraftSummaryPrompt({
       instruction: SUPPORT_SUMMARY_PROMPT,
       transcript: `USER> ${attack}\nASSISTANT> I cannot help with that from the help entries.`
     }).packet]
@@ -513,7 +534,7 @@ const HAND_OFFS = [
           });
         }
       }).complete({
-        packet: buildSupportAnswerPrompt({
+        packet: buildSupportDraftAnswerPrompt({
           instruction: SUPPORT_INSTRUCTION, visitorMessage: attack
         }).packet,
         language: "en"
@@ -578,6 +599,19 @@ describe("V-11 layer 4 — the injection corpus covers both languages and every 
     // Every row's name says which lane it belongs to, so the count above cannot
     // be satisfied by three more copies of one lane.
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("support:"))).toHaveLength(3);
+  });
+
+  it("drives the support contracts the API actually sends (SYNC3 / R1: the v2 JSON drafts)", async () => {
+    const contracts = await Promise.all(HAND_OFFS
+      .filter(({ name }) => name.startsWith("support:"))
+      .map(async (row) => (await packetsFor(row, CLEAN_STATEMENT))
+        .map((packet) => assertFramedPrompt(packet).contractId)));
+    expect(contracts).toEqual([
+      ["support.chat-answer.v2"], ["support.case-summary.v2"], ["support.chat-answer.v2"]
+    ]);
+    // The owners' slot the chat answer rows carry is the one `respond` builds:
+    // dev's reviewed context, ending in its OUTPUT CONTRACT.
+    expect(SUPPORT_INSTRUCTION).toContain("\n\nOUTPUT CONTRACT\nsourceIds=");
   });
 });
 

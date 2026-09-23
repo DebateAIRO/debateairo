@@ -13,7 +13,7 @@ import { buildSupportKnowledgeContext } from "@debateai/support-kb/context";
 import { resolveSupportActions } from "@debateai/support-kb/navigation";
 import { redactSupportMessage, type SupportMessageCipherPort } from "./session.js";
 import { SupportModelError, type SupportModelPort, type SupportModelUsage } from "./model.js";
-import { buildSupportAnswerPrompt } from "./prompt.js";
+import { buildSupportAnswerPrompt,buildSupportDraftAnswerPrompt } from "./prompt.js";
 import { supportTemplate, type SupportLanguage } from "./templates.js";
 import { supportIntentSurface } from "./classify.js";
 import {
@@ -154,6 +154,12 @@ export function supportAnswerInstruction(
   return [...`${preamble}\n\n${joined}`].slice(0,MAX_SYSTEM_CODE_POINTS).join("");
 }
 
+/**
+ * dev's reviewed structured-draft preamble — the OWNERS' instruction slot of
+ * `support.chat-answer.v2` (SYNC3, R1), ahead of the reviewed context and its
+ * OUTPUT CONTRACT. It restates the JSON shape the code-owned form states; the
+ * form, not this text, is what an edit can never remove.
+ */
 function structuredInstruction(language: SupportLanguage): string {
   const shape = '{"kind":"answer","text":"<grounded answer>","sourceIds":["<allowed source reference>"],"actionIds":[]}';
   return language === "ro"
@@ -161,7 +167,12 @@ function structuredInstruction(language: SupportLanguage): string {
     : `Return only one JSON object, with no other keys and no text before or after it: ${shape}. kind must be answer. The final OUTPUT CONTRACT lists the only allowed sourceIds and actionIds; replace the examples and copy identifiers exactly, citing at least one sourceId. Never write source IDs, action IDs, capability IDs, routes, or paths inside text; express navigation only through actionIds. You may explain limitations and prerequisites for security settings, but never request, receive, transform, validate, or repeat passwords, codes, or other credentials, and never claim that you performed a security change.`;
 }
 
-function boundedStructuredSystem(context: string,language: SupportLanguage): string {
+/**
+ * The v2 instruction slot exactly as `respond` sends it, exported so the byte
+ * pins and the injection corpus drive the text the engine really sends. Bounded
+ * at `MAX_SYSTEM_CODE_POINTS`; the code-owned frame follows it in the packet.
+ */
+export function supportDraftAnswerInstruction(context: string,language: SupportLanguage): string {
   const system = `${structuredInstruction(language)}\n\n${context}`;
   if ([...system].length > MAX_SYSTEM_CODE_POINTS) {
     throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
@@ -313,13 +324,20 @@ export function createSupportAnswerService(input: Readonly<{
            * `safeText` is the redacted visitor message — untrusted, and now
            * inside the fenced `visitor_message` field instead of beside the
            * instruction as a bare `user` turn.
+           *
+           * SYNC3 / R1: the structured path — the one the API root composes —
+           * is framed under `support.chat-answer.v2`, whose locked form states
+           * the JSON shape the parse below enforces; the prose path keeps v1.
            */
-          const framed = buildSupportAnswerPrompt({
-            instruction: structured
-              ? boundedStructuredSystem(context!.text,request.language)
-              : supportAnswerInstruction(entries,request.language),
-            visitorMessage: safeText
-          });
+          const framed = structured
+            ? buildSupportDraftAnswerPrompt({
+              instruction: supportDraftAnswerInstruction(context!.text,request.language),
+              visitorMessage: safeText
+            })
+            : buildSupportAnswerPrompt({
+              instruction: supportAnswerInstruction(entries,request.language),
+              visitorMessage: safeText
+            });
           const complete = (signal?: AbortSignal) => {
             modelCalled = true;
             return input.modelFor(request.modelRef).complete({

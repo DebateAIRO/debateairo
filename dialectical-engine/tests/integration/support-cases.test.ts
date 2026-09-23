@@ -16,7 +16,7 @@ import {
   type SupportCaseSummaryRecord
 } from "../../apps/api/src/support/cases.js";
 import { SupportModelError } from "../../apps/api/src/support/model.js";
-import { SUPPORT_SUMMARY_CONTRACT_ID } from "../../apps/api/src/support/prompt.js";
+import { SUPPORT_DRAFT_SUMMARY_CONTRACT_ID } from "../../apps/api/src/support/prompt.js";
 import { createSupportCaseService } from "../../apps/api/src/support/session.js";
 import { readFramedMaterial } from "../support/framed-packet.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -507,10 +507,11 @@ describe("SUP-02 cases", () => {
       complete: async (request) => {
         // FW-B / B-I1: the summary directive is the OWNERS' instruction slot of
         // a framed packet now, and the door's own reader is the only way a test
-        // may open one. dev's directive now asks for a JSON draft; the reply is
-        // dev's case_summary object.
+        // may open one. dev's directive asks for a JSON draft, so the packet is
+        // the sealed v2 JSON-draft contract (SYNC3, R1); the reply is dev's
+        // case_summary object.
         const material = readFramedMaterial(request.packet);
-        expect(material.contractId).toBe(SUPPORT_SUMMARY_CONTRACT_ID);
+        expect(material.contractId).toBe(SUPPORT_DRAFT_SUMMARY_CONTRACT_ID);
         expect(request.packet.messages[0]!.content)
           .toContain("exactly kind, text, sourceIds, and actionIds");
         expect(request.packet.messages[0]!.content).toContain(
