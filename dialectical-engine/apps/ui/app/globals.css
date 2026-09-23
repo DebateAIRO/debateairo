@@ -8764,10 +8764,10 @@ a:focus-visible {
   cursor: pointer;
 }
 
-/* The hairline sits between the two rows, so it belongs to the FIRST row only (:2 carries it,
-   :6 does not). Written as a child selector on the group rather than as a `:not(:last-child)`
-   so a third row could never inherit it silently. */
-.consentGroup > .consentRow:first-child {
+/* The hairline sits BETWEEN rows, so every row but the last carries it (artboard 8a: :2 carries
+   it, :6 — the last — does not). Written as a child selector on the group so a row nested in
+   some other container could never pick it up. */
+.consentGroup > .consentRow:not(:last-child) {
   border-bottom: 1px solid var(--line);
 }
 

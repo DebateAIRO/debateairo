@@ -4,7 +4,7 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PrivacyPolicyModal } from "../../apps/ui/components/consent/PrivacyPolicyModal.js";
-import { POLICY_JUMP } from "../../apps/ui/lib/privacyPolicy.js";
+import { POLICY_JUMP, POLICY_SECTIONS } from "../../apps/ui/lib/privacyPolicy.js";
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
@@ -92,7 +92,8 @@ function stubScrollIntoView(): Map<string, ReturnType<typeof vi.fn>> {
     (section as unknown as { scrollIntoView: unknown }).scrollIntoView = stub;
     stubs.set(section.id, stub);
   }
-  expect(stubs.size).toBe(11);
+  expect(stubs.size).toBe(POLICY_SECTIONS.length);
+  expect(stubs.size).toBe(25);
   return stubs;
 }
 
@@ -385,8 +386,9 @@ describe("privacy policy modal — behaviour", () => {
         expect(call[0]).toEqual({ block: "start", behavior: "smooth" });
       }
     }
-    // The three sections with no pill (02, 09, 10) are the zero half of that assertion.
-    expect(stubs.size - targets.size).toBe(3);
+    // The seventeen sections with no pill (the summary, 03, 08, 09, 11, 12, 14, the annex and
+    // its nine parts) are the zero half of that assertion.
+    expect(stubs.size - targets.size).toBe(17);
   });
 
   it("asks for no animation when the reader has asked for reduced motion", async () => {

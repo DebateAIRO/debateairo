@@ -43,9 +43,14 @@ test("sign-up exposes only fields backed by the registration contract", () => {
   assert.match(signUp, /name="recovery-email"[\s\S]*?required/);
   assert.match(signUp, /name="password"[\s\S]*?minLength=\{8\}/);
   assert.match(signUp, /name="adult-affirmed"[\s\S]*?required/);
+  assert.match(signUp, /name="privacy-accepted"[\s\S]*?required/);
+  assert.match(signUp, /name="terms-accepted"[\s\S]*?required/);
   assert.match(signUp, /result\.message/);
   assert.match(signUp, /role="status"/);
-  assert.doesNotMatch(signUp, /localStorage|sessionStorage|Bearer|Google|Model API|terms|privacy notice/i);
+  // `terms` left this list when the Terms of Service became a document in the product
+  // (`apps/ui/legal/terms-of-service.md` → `TermsOfServiceModal`); the sign-up card may
+  // now name it because it can show it.
+  assert.doesNotMatch(signUp, /localStorage|sessionStorage|Bearer|Google|Model API|privacy notice/i);
 });
 
 test("auth screens share the reference hierarchy and replace the inline gate", () => {

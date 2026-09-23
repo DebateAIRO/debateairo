@@ -19,6 +19,8 @@
     "audit:text-bytes": "tsx tools/check-text-control-bytes.ts",
     "audit:orphans": "tsx tools/orphan-audit/src/cli.ts orphans",
     "generate:contract": "tsx packages/contract/src/generate.ts",
+    "generate:legal": "node apps/ui/scripts/generate-legal-data.mjs",
+    "generate:legal:check": "node apps/ui/scripts/generate-legal-data.mjs --check",
     "db:migrate": "tsx apps/runner/src/migrate-cli.ts",
     "db:provision-principals": "tsx apps/runner/src/production-database-principals-cli.ts",
     "dev:auth:provision-principals": "tsx apps/runner/src/dev-database-principals-cli.ts",

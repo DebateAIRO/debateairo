@@ -72,25 +72,29 @@ describe("privacy policy modal — rendered", () => {
 
     expect(dialog.getAttribute("aria-modal")).toBe("true");
     const labelledBy = dialog.getAttribute("aria-labelledby");
-    expect(labelledBy).not.toBeNull();
+    expect(labelledBy).toBe("policy-modal-title");
     const title = document.getElementById(labelledBy!);
     expect(title, `aria-labelledby="${labelledBy}" resolves to nothing`).not.toBeNull();
     expect(title!.textContent).toBe("What we store, and why");
+    expect(dialog.querySelector(".policyBody")!.getAttribute("aria-label")).toBe(
+      "Privacy Policy text"
+    );
 
     expect(dialog.querySelectorAll(".policyCore .policyTab").length).toBe(1);
   });
 
-  // S02-S35 — header copy is byte-exact and `×` is labelled.
+  // S02-S35 — header copy is byte-exact and `×` is labelled. The eyebrow and the lede are
+  // derived from the v3.0 draft's own version line by the generator.
   it("shows the header copy byte-exact and labels the close control", async () => {
     await render(<PrivacyPolicyModal open mode="consent" onClose={vi.fn()} />);
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
 
     expect(dialog.querySelector(".policyEyebrow")!.textContent).toBe(
-      "PRIVACY POLICY · v2.1 · EFFECTIVE 12 AUG 2026"
+      "PRIVACY POLICY · v3.0 · EFFECTIVE [DATE]"
     );
     expect(dialog.querySelector(".policyTitle")!.textContent).toBe("What we store, and why");
     expect(dialog.querySelector(".policyLede")!.textContent).toBe(
-      "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Eleven sections — scroll to the end."
+      "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end."
     );
 
     const closers = [...dialog.querySelectorAll("*")].filter(
@@ -121,26 +125,22 @@ describe("privacy policy modal — rendered", () => {
     }
   });
 
-  // S02-S37 — eleven sections with number, title, body, bullets and their accent.
-  it("renders the eleven sections in order, with their bullets and their accent tokens", async () => {
+  // S02-S37 — every section of the v3.0 draft, in order: the summary, fourteen numbered
+  // sections, the annex and its nine parts, each with number, title, paragraphs, bullets and
+  // accent.
+  it("renders the twenty-five sections in order, with their paragraphs, bullets and accent tokens", async () => {
     await render(<PrivacyPolicyModal open mode="consent" onClose={vi.fn()} />);
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
 
     const sections = [...dialog.querySelectorAll<HTMLElement>('[id^="policy-section-"]')];
-    expect(sections.length).toBe(11);
-    expect(sections.map((section) => section.id)).toEqual([
-      "policy-section-01",
-      "policy-section-02",
-      "policy-section-03",
-      "policy-section-04",
-      "policy-section-05",
-      "policy-section-06",
-      "policy-section-07",
-      "policy-section-08",
-      "policy-section-09",
-      "policy-section-10",
-      "policy-section-11"
-    ]);
+    expect(POLICY_SECTIONS.length).toBe(25);
+    expect(sections.map((section) => section.id)).toEqual(
+      POLICY_SECTIONS.map((section) => `policy-section-${section.no}`)
+    );
+    expect(sections[0]!.id).toBe("policy-section-00");
+    expect(sections[1]!.id).toBe("policy-section-01");
+    expect(sections[15]!.id).toBe("policy-section-B");
+    expect(sections[24]!.id).toBe("policy-section-B.9");
 
     expect(sections.map((section) => section.querySelector(".policySectionTitle")!.textContent)).toEqual(
       POLICY_SECTIONS.map((section) => section.title)
@@ -148,14 +148,41 @@ describe("privacy policy modal — rendered", () => {
     expect(sections.map((section) => section.querySelector(".policyNo")!.textContent)).toEqual(
       POLICY_SECTIONS.map((section) => section.no)
     );
-    expect(sections.map((section) => section.querySelector(".policyText")!.textContent)).toEqual(
-      POLICY_SECTIONS.map((section) => section.body)
-    );
 
-    // The expected bullet total is DERIVED from the data (3 + 4 + 5), and the data's own total is
-    // then pinned at the SPEC's number, so neither a dropped bullet nor a dropped list passes.
-    const expectedBullets = POLICY_SECTIONS.reduce((total, section) => total + section.items.length, 0);
-    expect(expectedBullets).toBe(12);
+    // Paragraphs and bullets are rendered in DOCUMENT order from the section's blocks. The
+    // expected totals are DERIVED from the data and the data's own totals are then pinned, so
+    // neither a dropped paragraph, a dropped table row nor a dropped list passes.
+    for (const [index, section] of sections.entries()) {
+      const blocks = POLICY_SECTIONS[index]!.blocks;
+      const paragraphs = [...section.querySelectorAll(".policyText")].map(
+        (element) => element.textContent
+      );
+      expect(paragraphs, `section ${POLICY_SECTIONS[index]!.no} paragraphs`).toEqual(
+        blocks.filter((block) => block.kind === "p").map((block) => block.text)
+      );
+      const bullets = [...section.querySelectorAll(".policyItemText")].map(
+        (element) => element.textContent
+      );
+      expect(bullets, `section ${POLICY_SECTIONS[index]!.no} bullets`).toEqual(
+        blocks.flatMap((block) => (block.kind === "list" ? [...block.items] : []))
+      );
+    }
+    const expectedParagraphs = POLICY_SECTIONS.reduce(
+      (total, section) => total + section.blocks.filter((block) => block.kind === "p").length,
+      0
+    );
+    const expectedBullets = POLICY_SECTIONS.reduce(
+      (total, section) =>
+        total +
+        section.blocks.reduce(
+          (inner, block) => inner + (block.kind === "list" ? block.items.length : 0),
+          0
+        ),
+      0
+    );
+    expect(expectedParagraphs).toBe(45);
+    expect(expectedBullets).toBe(38);
+    expect(dialog.querySelectorAll(".policyText").length).toBe(expectedParagraphs);
     expect(dialog.querySelectorAll(".policyItem").length).toBe(expectedBullets);
 
     for (const [index, section] of sections.entries()) {
@@ -178,7 +205,7 @@ describe("privacy policy modal — rendered", () => {
 
     const scrollRegion = dialog.querySelector(".policyBody")!;
     const last = scrollRegion.lastElementChild!;
-    expect(last.textContent).toBe("END OF POLICY · GDPR (EU) 2016/679 · v2.1");
+    expect(last.textContent).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.0");
 
     // The honesty rule: this repository generates no policy PDF, so no control claims one.
     const pdf = [...dialog.querySelectorAll("*")].filter(
