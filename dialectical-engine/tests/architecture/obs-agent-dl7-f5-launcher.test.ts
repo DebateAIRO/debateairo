@@ -63,6 +63,28 @@ describe("DL7-F5 observation-agent launcher", () => {
     expect(proof).toBeLessThan(source.indexOf("\nexec "));
   });
 
+  /**
+   * SYNC3-C. The launcher is ZSH, and zsh ties the lowercase array `path` to
+   * `PATH` (likewise `fpath`, `cdpath`, `manpath`, `mailpath`, `module_path`). A
+   * `local` or `typeset` of one of them starts EMPTY, so inside that function
+   * PATH is empty and `command -v` finds nothing. `require_program` declared
+   * `local name=$1 path real`, the idiom copied from the BASH `closing-run.sh`,
+   * where `path` is an ordinary name. So every launch refused
+   * `OBSERVATION_RUNTIME_PATH_INVALID node` and the agent never started. Nothing
+   * in the gate ran the launcher; its behavioural witness is
+   * `tests/integration/obs-agent-01-supervision.test.ts` ("launches from the
+   * repository root …"), which runs it against a fake `node`.
+   */
+  it("never declares a local that zsh ties to PATH or another search path", async () => {
+    const source = await readFile(LAUNCHER, "utf8");
+    expect(source.split("\n")[0]).toBe("#!/bin/zsh");
+    const tiedSpecial = /^\s*(?:local|typeset|declare|integer|readonly)\b[^#\n]*\b(?:path|fpath|cdpath|manpath|mailpath|module_path)\b/u;
+    const offending = source.split("\n")
+      .map((line, index) => ({ line: index + 1, text: line }))
+      .filter(({ text }) => tiedSpecial.test(text));
+    expect(offending).toEqual([]);
+  });
+
   it("carries no one-machine absolute path and deduces the repository root", async () => {
     const source = await readFile(LAUNCHER, "utf8");
     expect(source).not.toMatch(/\/(?:Users|home)\/[A-Za-z0-9._-]+/u);

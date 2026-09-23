@@ -71,14 +71,18 @@ is_program() {
 # require_program <name>: prints the absolute path of <name> as deduced from
 # PATH, or refuses loudly with a typed code. Symlinks are followed on purpose —
 # nearly every real launcher is one, and the defect lives in the target.
+#
+# The local is `candidate`, never `path`: in zsh a local `path` is a fresh copy
+# of the array tied to PATH, and it starts empty, so `command -v` found nothing
+# and every launch refused OBSERVATION_RUNTIME_PATH_INVALID (SYNC3-C).
 require_program() {
-  local name=$1 path real
-  path="$(command -v "$name" 2>/dev/null || true)"
-  if [[ -z "$path" ]]; then
+  local name=$1 candidate real
+  candidate="$(command -v "$name" 2>/dev/null || true)"
+  if [[ -z "$candidate" ]]; then
     print -u2 -- "OBSERVATION_RUNTIME_PATH_INVALID $name"
     return 1
   fi
-  real="$(readlink -f "$path" 2>/dev/null || print -r -- "$path")"
+  real="$(readlink -f "$candidate" 2>/dev/null || print -r -- "$candidate")"
   if [[ ! -f "$real" || ! -s "$real" || ! -x "$real" ]] || ! is_program "$real"; then
     print -u2 -- "OBSERVATION_RUNTIME_NOT_A_PROGRAM $name $real"
     return 1
