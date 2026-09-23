@@ -20,7 +20,7 @@ PENDING is the best result this bench can give on its own, on purpose: it will o
 
 | Checked | Result |
 |---|---|
-| The work branch | `security/dev-sync-2026-09-18`, clean, **nothing pushed anywhere** |
+| The work branch | `security/dev-sync-2026-09-18` — **pushed to GitHub on 23 September** (your "push to dev"); GitHub's secret check found nothing. Pull request #8 now points at it — but it **cannot merge yet**: `dev` gained 127 commits (the support-agent work and the sign-up terms gate) since this branch last absorbed it, and 20 files collide, mostly the support chat where both sides changed the same code. A third bringing-up-to-date is needed first |
 | GitHub switches | **23 September: secret scanning + push protection are ON** (your "go 1"). That was the one switch that had to precede the first push. The others wait for their own "go" |
 | This Mac's Node version (Node is the program that runs the code) | 26.8.2 — exactly what `dev` now requires |
 | `dev`, the main V3 line | has moved on by 36 commits since this branch last absorbed it |
