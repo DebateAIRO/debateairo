@@ -5,6 +5,7 @@ import test from "node:test";
 import ts from "typescript";
 
 import { t, tPlural } from "./translate.ts";
+import { assertLocalizedCatalog, assertTranslationSample } from "./catalogContractAssertions.mjs";
 
 const root = process.cwd();
 const namespace = "misc";
@@ -80,15 +81,19 @@ test("every misc key used by the owned components exists in English", () => {
   );
 });
 
-test("all 35 locales carry the final English misc catalog", () => {
+test("all 35 locales carry the exact misc contract and translated sample", () => {
   const locales = readdirSync(join(root, "messages"), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
   assert.equal(locales.length, 35);
+  const catalogs = new Map();
   for (const locale of locales) {
-    assert.deepEqual(JSON.parse(source(`messages/${locale}/misc.json`)), english, `${locale}/misc catalog`);
+    const localized = JSON.parse(source(`messages/${locale}/misc.json`));
+    catalogs.set(locale, localized);
+    assertLocalizedCatalog({ english, localized, locale, namespace });
   }
+  assertTranslationSample({ catalogs, english, namespace });
 });
 
 test("misc components contain no hard-coded user-visible English", () => {

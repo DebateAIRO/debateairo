@@ -4,6 +4,8 @@ import { join } from "node:path";
 import test from "node:test";
 import ts from "typescript";
 
+import { assertLocalizedCatalog, assertTranslationSample } from "./catalogContractAssertions.mjs";
+
 const root = process.cwd();
 const read = (path) => readFileSync(join(root, path), "utf8");
 const sourcePaths = [
@@ -74,7 +76,7 @@ const visibleEnglishFromSource = (path, source) => {
   return failures;
 };
 
-test("all 35 locales expose the exact English debate chrome catalogue", () => {
+test("all 35 locales expose the exact debate chrome contract and translated sample", () => {
   const localeDirectories = readdirSync(join(root, "messages"), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
@@ -82,10 +84,13 @@ test("all 35 locales expose the exact English debate chrome catalogue", () => {
   assert.equal(localeDirectories.length, 35);
   const english = JSON.parse(read("messages/en/debateChrome.json"));
   assert.ok(Object.keys(english).length > 0);
+  const catalogs = new Map();
   for (const locale of localeDirectories) {
     const catalog = JSON.parse(read(`messages/${locale}/debateChrome.json`));
-    assert.deepEqual(catalog, english, `${locale}/debateChrome must match the English rollout source`);
+    catalogs.set(locale, catalog);
+    assertLocalizedCatalog({ english, localized: catalog, locale, namespace: "debateChrome" });
   }
+  assertTranslationSample({ catalogs, english, namespace: "debateChrome" });
 });
 
 test("every debateChrome key used by the owned sources exists in English", () => {

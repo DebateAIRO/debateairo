@@ -4,6 +4,8 @@ import { join } from "node:path";
 import test from "node:test";
 import ts from "typescript";
 
+import { assertLocalizedCatalog, assertTranslationSample } from "./catalogContractAssertions.mjs";
+
 const root = process.cwd();
 const ownedFiles = [
   "app/settings/page.tsx",
@@ -95,7 +97,7 @@ test("every settings translation key used by owned source exists in English", ()
   assert.deepEqual([...used].sort(), Object.keys(english).sort());
 });
 
-test("all 35 locales expose the final English settings key set", () => {
+test("all 35 locales expose the exact settings contract and translated sample", () => {
   assert.ok(existsSync(englishPath), "messages/en/settings.json must exist");
   const english = JSON.parse(readFileSync(englishPath, "utf8"));
   const localeDirectories = readdirSync(join(root, "messages"), { withFileTypes: true })
@@ -103,10 +105,13 @@ test("all 35 locales expose the final English settings key set", () => {
     .map((entry) => entry.name)
     .sort();
   assert.equal(localeDirectories.length, 35);
+  const catalogs = new Map();
   for (const locale of localeDirectories) {
     const catalog = JSON.parse(source(`messages/${locale}/settings.json`));
-    assert.deepEqual(catalog, english, `${locale}/settings must retain English values for the translation wave`);
+    catalogs.set(locale, catalog);
+    assertLocalizedCatalog({ english, localized: catalog, locale, namespace: "settings" });
   }
+  assertTranslationSample({ catalogs, english, namespace: "settings" });
 });
 
 test("protected product names stay out of translatable settings copy", () => {

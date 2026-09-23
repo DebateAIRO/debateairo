@@ -5,6 +5,7 @@ import test from "node:test";
 import ts from "typescript";
 
 import { t, tPlural } from "./translate.ts";
+import { assertLocalizedCatalog, assertTranslationSample } from "./catalogContractAssertions.mjs";
 
 const root = process.cwd();
 const namespace = "debateDrawers";
@@ -154,7 +155,7 @@ test("all drawer components default to the English drawer catalogue and every us
   );
 });
 
-test("all 35 locales carry the final English debateDrawers key set for the translation wave", () => {
+test("all 35 locales carry the exact debateDrawers contract and translated sample", () => {
   const english = readEnglish();
   const localeDirectories = readdirSync(join(root, "messages"), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -165,11 +166,15 @@ test("all 35 locales carry the final English debateDrawers key set for the trans
     !existsSync(join(root, "messages", locale, `${namespace}.json`))
   );
   assert.deepEqual(missing, [], "every locale has a debateDrawers catalogue");
+  const catalogs = new Map();
   for (const locale of localeDirectories) {
     const path = join(root, "messages", locale, `${namespace}.json`);
     if (!existsSync(path)) continue;
-    assert.deepEqual(JSON.parse(readFileSync(path, "utf8")), english, `${locale}/${namespace}`);
+    const localized = JSON.parse(readFileSync(path, "utf8"));
+    catalogs.set(locale, localized);
+    assertLocalizedCatalog({ english, localized, locale, namespace });
   }
+  assertTranslationSample({ catalogs, english, namespace });
 });
 
 test("drawer sources contain no hard-coded user-visible English", () => {

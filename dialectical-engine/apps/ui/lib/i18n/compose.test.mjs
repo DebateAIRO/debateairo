@@ -4,6 +4,8 @@ import { join } from "node:path";
 import test from "node:test";
 import ts from "typescript";
 
+import { assertLocalizedCatalog, assertTranslationSample } from "./catalogContractAssertions.mjs";
+
 const root = process.cwd();
 const ownedFiles = [
   "lib/scrutiny.ts",
@@ -46,17 +48,20 @@ test("every compose key used by the owned helpers exists in English", () => {
   assert.deepEqual([...used].sort(), Object.keys(english).sort(), "compose catalog has no missing or unused keys");
 });
 
-test("all 35 locales carry the final English compose catalog", () => {
+test("all 35 locales carry the exact compose contract and translated sample", () => {
   const messagesRoot = join(root, "messages");
   const locales = readdirSync(messagesRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
   assert.equal(locales.length, 35);
+  const catalogs = new Map();
   for (const locale of locales) {
     const localized = JSON.parse(source(`messages/${locale}/compose.json`));
-    assert.deepEqual(localized, english, `${locale}/compose catalog`);
+    catalogs.set(locale, localized);
+    assertLocalizedCatalog({ english, localized, locale, namespace: "compose" });
   }
+  assertTranslationSample({ catalogs, english, namespace: "compose" });
 });
 
 const formerUserVisibleCopy = [

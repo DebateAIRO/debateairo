@@ -5,6 +5,7 @@ import test from "node:test";
 import ts from "typescript";
 
 import { LOCALES } from "./locales.ts";
+import { assertLocalizedCatalog, assertTranslationSample } from "./catalogContractAssertions.mjs";
 
 const root = process.cwd();
 const componentDirectory = join(root, "components/consent");
@@ -69,19 +70,19 @@ test("every consent key used by owned source exists in English", () => {
   }
 });
 
-test("all 35 locales expose the final English consent catalog and placeholders", () => {
+test("all 35 locales expose the exact consent contract and translated sample", () => {
   const localeDirectories = readdirSync(join(root, "messages"), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
   assert.deepEqual(localeDirectories, LOCALES.map(({ code }) => code).sort());
+  const catalogs = new Map();
   for (const locale of localeDirectories) {
     const catalog = JSON.parse(source(`messages/${locale}/consent.json`));
-    assert.deepEqual(catalog, english, `${locale}/consent must retain English values for translation`);
-    for (const [key, value] of Object.entries(catalog)) {
-      assert.deepEqual(placeholders(value), placeholders(english[key]), `${locale}/${key} placeholders`);
-    }
+    catalogs.set(locale, catalog);
+    assertLocalizedCatalog({ english, localized: catalog, locale, namespace: "consent" });
   }
+  assertTranslationSample({ catalogs, english, namespace: "consent" });
 });
 
 test("consent components contain no hard-coded user-visible English", () => {

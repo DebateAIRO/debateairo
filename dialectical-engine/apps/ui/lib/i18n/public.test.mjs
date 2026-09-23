@@ -4,6 +4,8 @@ import { join } from "node:path";
 import test from "node:test";
 import ts from "typescript";
 
+import { assertLocalizedCatalog, assertTranslationSample } from "./catalogContractAssertions.mjs";
+
 const root = process.cwd();
 const sourcePaths = [
   "app/public/debate/[id]/PublicDebatePageClient.tsx",
@@ -98,7 +100,7 @@ test("the public namespace exists and covers every public translation call", () 
   assert.deepEqual([...usedKeys].sort(), Object.keys(catalog).sort(), "public catalog has no unused keys");
 });
 
-test("all 35 locales carry the final English public catalog", () => {
+test("all 35 locales carry the exact public contract and translated sample", () => {
   const messagesRoot = join(root, "messages");
   const localeDirectories = readdirSync(messagesRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -106,10 +108,13 @@ test("all 35 locales carry the final English public catalog", () => {
     .sort();
   assert.equal(localeDirectories.length, 35);
   const english = JSON.parse(readFileSync(catalogPath, "utf8"));
+  const catalogs = new Map();
   for (const locale of localeDirectories) {
     const localized = JSON.parse(readFileSync(join(messagesRoot, locale, "public.json"), "utf8"));
-    assert.deepEqual(localized, english, `${locale}/public catalog`);
+    catalogs.set(locale, localized);
+    assertLocalizedCatalog({ english, localized, locale, namespace: "public" });
   }
+  assertTranslationSample({ catalogs, english, namespace: "public" });
 });
 
 test("S2-public sources contain no hard-coded user-visible English", () => {
