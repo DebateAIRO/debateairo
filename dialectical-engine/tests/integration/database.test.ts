@@ -408,6 +408,26 @@ function panelAssessmentDouble(fidelity: number): string {
   });
 }
 
+/**
+ * L4-F10 (SYNC3-B): the model an OpenAI-compatible request asks for. The gateway
+ * sends its target's PIN as `model` and refuses, as PROVIDER_MODEL_IDENTITY_CHANGED,
+ * an answer asserting any other model, so the double below — an HONEST vendor —
+ * answers with the model it was asked for. It used to assert a placeholder
+ * ("test-layer/model", "model:test-layer") whatever the target was pinned to,
+ * which only a gateway without the check could accept. A body naming no model is
+ * answered without one, which the gateway refuses as malformed: the double never
+ * guesses a model. The refusal of a relabelled answer is proved where the check
+ * lives, `tests/unit/provider-gateway-model-identity.test.ts`.
+ */
+function requestedModel(body: string): string | undefined {
+  try {
+    const model = (JSON.parse(body) as { readonly model?: unknown }).model;
+    return typeof model === "string" ? model : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function startProviderDouble(
   contents: readonly ProviderDoubleResponse[],
   panelAssessment: string = DEFAULT_PANEL_ASSESSMENT
@@ -456,6 +476,7 @@ async function startProviderDouble(
     request.on("end", () => {
       const body = Buffer.concat(chunks).toString("utf8");
       bodies.push(body);
+      const askedModel = requestedModel(body);
       // J12 coherence (T3/S2-2): every M>=2 fixture below now runs a judge panel, so
       // each authored node draws one assess call per non-author maker. Those legs are
       // answered FROM THE CONTRACT and never consume `pending`, so every fixture's
@@ -475,7 +496,7 @@ async function startProviderDouble(
         calls += 1;
         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
           id: `panel-assess-${calls}`,
-          model: "model:test-layer",
+          model: askedModel,
           choices: [{ message: { content: panelAssessment } }]
         }));
         return;
@@ -512,7 +533,7 @@ async function startProviderDouble(
         return;
       }
       response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
-        id: `completion-test-${calls}`, model: "test-layer/model",
+        id: `completion-test-${calls}`, model: askedModel,
         choices: [{ message: { content } }]
       }));
     });
