@@ -92,6 +92,13 @@ describe("CI security gates (F-03)", () => {
     }
   });
 
+  // B7b, AMENDED 2026-09-23 (the first CI run of the synced branch): the BLOCKING scan
+  // covers the change under review — a pull request's base..head, a push's before..after
+  // (a brand-new branch falls back to every ref) — and the weekly schedule keeps scanning
+  // every ref as the history audit. With --all on every run, 253 findings that live in
+  // OTHER branches' histories blocked a pull request that added none of them. Findings are
+  // printed redacted and verbose (file, commit, rule — never the value), and every
+  // .gitleaksignore fingerprint carries its reason above it.
   it("runs gitleaks as a pinned, sha256-verified binary, not the licensed action (B7b)", () => {
     const wf = read(".github/workflows/security.yml");
     expect(wf).not.toContain("gitleaks-action");
@@ -100,8 +107,25 @@ describe("CI security gates (F-03)", () => {
     expect(wf).toMatch(/GITLEAKS_SHA256: [0-9a-f]{64}/);
     expect(wf).toMatch(/curl -sSfL[^\n]*gitleaks_\$\{GITLEAKS_VERSION\}_linux_x64\.tar\.gz/);
     expect(wf).toMatch(/sha256sum (--check|-c)/);
-    expect(wf).toMatch(/gitleaks" git [^\n]*--redact[^\n]*--config \.gitleaks\.toml[^\n]*--log-opts="--all"/);
+    expect(wf).toMatch(/gitleaks" git [^\n]*--redact[^\n]*--verbose[^\n]*--config \.gitleaks\.toml[^\n]*--log-opts="\$LOG_OPTS"/);
     expect(wf).toContain("fetch-depth: 0");
+  });
+
+  it("scopes the blocking secret scan to the change under review and keeps every ref on the schedule (B7b, 2026-09-23)", () => {
+    const wf = read(".github/workflows/security.yml");
+    expect(wf).toMatch(/pull_request\) LOG_OPTS="\$PR_BASE_SHA\.\.\$HEAD_SHA"/);
+    expect(wf).toMatch(/push\)[\s\S]*LOG_OPTS="\$PUSH_BEFORE_SHA\.\.\$HEAD_SHA"[\s\S]*LOG_OPTS="--all"/);
+    expect(wf).toMatch(/\*\) LOG_OPTS="--all"/);
+    expect(wf).toMatch(/PUSH_BEFORE_SHA" != "0{40}"/);
+    expect(wf).toMatch(/schedule: \[\{ cron: "[^"]+" \}\]/);
+    const ignore = read(".gitleaksignore").split("\n");
+    const fingerprints = ignore.filter((line) => /^[0-9a-f]{40}:/.test(line));
+    expect(fingerprints.length).toBeGreaterThan(0);
+    for (const [index, line] of ignore.entries()) {
+      if (!/^[0-9a-f]{40}:/.test(line)) continue;
+      const above = ignore.slice(0, index).reverse().find((candidate) => candidate.trim() !== "");
+      expect(above, `a reason above ${line.slice(0, 48)}`).toMatch(/^#/);
+    }
   });
   // L6-F13, AMENDED 2026-09-22 (DEV-SYNC). Humans and CI must still install exactly one
   // Node version and it must be the one the project declares — now the floor of the
