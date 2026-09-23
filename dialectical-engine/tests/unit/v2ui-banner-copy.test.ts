@@ -77,6 +77,37 @@ describe("DL3-F7 page banners carry classified copy, never contract error text",
       .not.toMatch(/refus|reject|declin/iu);
   });
 
+  /**
+   * SYNC3 (map section 2, item 4). dev's debate tiers refuse an ask the plan
+   * cannot serve with a 422 carrying its own typed code. dev's /new rendered the
+   * server's sentence; DL3-F7 renders classified copy, which read a 422 as
+   * "could not be read, so the outcome is unknown" — hiding an OBSERVED refusal.
+   * Each tier code gets a constant clause of its own, and the server's sentence
+   * (which names the unavailable models) still never reaches the page.
+   */
+  it("names dev's plan-tier refusals as refusals, in copy the server never wrote", () => {
+    const server = "The premium plan needs grok-4.6-build, and it is not available right now";
+    const invalid = classifyRequestFailure("DEBATE_CREATE", new ContractHttpError(
+      "UNPROCESSABLE", 422, `ASK_PLAN_TIER_INVALID: ${server}`, "ASK_PLAN_TIER_INVALID"
+    ));
+    const unavailable = classifyRequestFailure("DEBATE_CREATE", new ContractHttpError(
+      "UNPROCESSABLE", 422, `ASK_PLAN_TIER_MODEL_UNAVAILABLE: ${server}`, "ASK_PLAN_TIER_MODEL_UNAVAILABLE"
+    ));
+    expect(invalid.kind).toBe("PLAN_TIER_INVALID");
+    expect(unavailable.kind).toBe("PLAN_TIER_UNAVAILABLE");
+    for (const classified of [invalid, unavailable]) {
+      expect(classified.message).toMatch(/refused/u);
+      expect(classified.message).not.toMatch(/unknown/u);
+      expect(classified.message).not.toContain("grok");
+      expect(classified.message).not.toContain("ASK_PLAN_TIER");
+    }
+    expect(invalid.message).not.toBe(unavailable.message);
+    // Any other 422 stays what it was: unreadable, outcome unknown.
+    expect(classifyRequestFailure("DEBATE_CREATE", new ContractHttpError(
+      "UNPROCESSABLE", 422, "OTHER: x", "OTHER"
+    )).kind).toBe("UNREADABLE");
+  });
+
   it("leaves no contract error text in a page's error banner", async () => {
     const [create, debate] = await Promise.all([
       readFile(new URL("apps/ui/app/new/page.tsx", root), "utf8"),

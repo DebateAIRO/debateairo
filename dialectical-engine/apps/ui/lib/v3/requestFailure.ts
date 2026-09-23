@@ -43,6 +43,10 @@ export type RequestFailureKind =
   | "SERVER_FAILED"
   /** The coordinator answered with something this client cannot read. */
   | "UNREADABLE"
+  /** SYNC3: the coordinator refused the ask's plan tier (dev's debate tiers, 422). */
+  | "PLAN_TIER_INVALID"
+  /** SYNC3: the coordinator refused the ask: a model its plan needs is not available (422). */
+  | "PLAN_TIER_UNAVAILABLE"
   /** Something failed that this seam cannot classify; say exactly that. */
   | "UNCLASSIFIED";
 
@@ -67,13 +71,32 @@ const KIND_CLAUSE: Readonly<Record<RequestFailureKind, string>> = Object.freeze(
   UNREACHABLE: "The coordinator could not be reached, so the outcome is unknown.",
   SERVER_FAILED: "The coordinator failed while handling it, so the outcome is unknown.",
   UNREADABLE: "The coordinator's reply could not be read, so the outcome is unknown.",
+  PLAN_TIER_INVALID: "The coordinator refused the plan choice. Choose Free or Premium, then retry.",
+  PLAN_TIER_UNAVAILABLE:
+    "The coordinator refused it: a model this plan needs is not available right now. "
+    + "Retry later, or choose the other plan.",
   UNCLASSIFIED:
     "It failed before any answer arrived, so the outcome is unknown. "
     + "This is not a decision the coordinator made."
 });
 
+/**
+ * SYNC3 (map section 2, item 4). dev's debate tiers refuse an ask its plan
+ * cannot serve with a 422 carrying the refusal's own typed code. That is an
+ * OBSERVED refusal, so it is named as one — in a constant clause, never the
+ * server's sentence, which lists the unavailable models by name.
+ */
+const PLAN_TIER_REFUSALS: Readonly<Record<string, RequestFailureKind>> = Object.freeze({
+  ASK_PLAN_TIER_INVALID: "PLAN_TIER_INVALID",
+  ASK_PLAN_TIER_MODEL_UNAVAILABLE: "PLAN_TIER_UNAVAILABLE"
+});
+
 function kindOf(error: unknown): RequestFailureKind {
   if (!(error instanceof ContractHttpError)) return "UNCLASSIFIED";
+  if (error.status === 422 && error.serverCode !== null
+    && Object.hasOwn(PLAN_TIER_REFUSALS, error.serverCode)) {
+    return PLAN_TIER_REFUSALS[error.serverCode]!;
+  }
   if (error.serverCode === "API_UPSTREAM_UNREACHABLE" || [502, 503, 504].includes(error.status)) {
     return "UNREACHABLE";
   }
