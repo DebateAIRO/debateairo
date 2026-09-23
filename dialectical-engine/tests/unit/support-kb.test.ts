@@ -108,7 +108,7 @@ afterEach(() => {
 });
 
 describe("Help Corpus loader", () => {
-  it("loads all 20 locale templates without changing the English or Romanian bytes",() => {
+  it("loads every locale template without changing the English or Romanian bytes",() => {
     const directory = fileURLToPath(new URL(
       "../../packages/support-kb/content/templates/",import.meta.url
     ));

@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Bekend incident sinds {started_at}: {summary_en} (gepubliceerd door het team). Als uw probleem hiermee overeenkomt, hoeft u het niet te melden; kies anders 'Met een medewerker praten'.",
   "NO_INCIDENT": "Ik heb geen gegevens over een actueel bekend incident. Dat sluit een incident niet uit — als iets niet lijkt te werken, kiest u 'Met een medewerker praten' en beschrijft u het probleem.",
   "INCIDENT_NOTICE": "Opmerking: sinds {started_at} is er een bekend incident dat gevolgen heeft voor {surface}.",
-  "QUEUED": "Wachten op het model van de assistent… u bent nummer {n} in de wachtrij."
+  "QUEUED": "Wachten op het model van de assistent… u bent nummer {n} in de wachtrij.",
+  "SUMMARY_REPLACED": "De adviserende samenvatting is weggelaten omdat deze niet door de veiligheidscontroles van Support kwam.",
+  "SHREDDED_NOTICE": "Dit gesprek is op verzoek van de eigenaar gewist.",
+  "INCIDENT_SURFACE_DEBATES": "debatten",
+  "INCIDENT_SURFACE_PUBLISHING": "publicatie",
+  "INCIDENT_SURFACE_SIGN_IN": "aanmelden",
+  "INCIDENT_SURFACE_WHOLE_SITE": "de hele site"
 }

@@ -197,6 +197,26 @@ describe("CP1 support model response policy", () => {
     }),["app-navigation"],["home"])).toMatchObject({ code:"ACTION_MEMBERSHIP_INVALID" });
   });
 
+  it("requires request-local source authority for every structured action independent of prose language", () => {
+    const valid = {
+      kind: "answer" as const,
+      text: "ホームを開くことができます。",
+      sourceIds: ["app-navigation"],
+      actionIds: ["home"],
+    };
+    expect(bindSupportDraftAuthority(valid,["app-navigation"],["home"])).toEqual(valid);
+    expect(bindSupportDraftAuthority({
+      ...valid,
+      sourceIds: ["support-status-limits"],
+    },["app-navigation","support-status-limits"],["home"])).toBeNull();
+    expect(bindSupportDraftAuthority(valid,["app-navigation"],[])).toBeNull();
+    expect(bindSupportDraftAuthority({
+      ...valid,
+      sourceIds: ["account-access"],
+      actionIds: ["forgot-password"],
+    },["account-access"],["forgot-password"])).toBeNull();
+  });
+
   it("rejects case-email conflation while preserving the separate mail workflow", () => {
     expect(bindSupportDraftAuthority({
       kind:"answer",text:"A human case is created through escalation or the support-email flow.",

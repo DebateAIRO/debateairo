@@ -21,7 +21,7 @@ import {
   type SupportSessionPort,
   type SupportSessionRecord
 } from "./session.js";
-import { SHREDDED_NOTICE,supportTemplate } from "./templates.js";
+import { supportTemplate } from "./templates.js";
 import { recoverySecurityGuidance,type SupportSecurityRecoveryKind } from "./security-guidance.js";
 
 export const SUPPORT_ROUTE_PATHS = Object.freeze([
@@ -113,7 +113,7 @@ function rateLimited(reply: FastifyReply, language: SupportLanguage) {
 
 function shredded(reply: FastifyReply,language: SupportLanguage) {
   return reply.send({
-    kind: "SHREDDED",outcome: "SHREDDED",text: SHREDDED_NOTICE[language]
+    kind: "SHREDDED",outcome: "SHREDDED",text: supportTemplate("SHREDDED_NOTICE",language)
   });
 }
 
@@ -260,7 +260,9 @@ export function installSupportRoutes(
         return reply.status(404).send({ error: "NOT_FOUND" });
       }
       if (found.shreddedAt !== undefined && found.shreddedAt !== null) {
-        return reply.send({ kind: "SHREDDED",text: SHREDDED_NOTICE[found.language] });
+        return reply.send({
+          kind: "SHREDDED",text: supportTemplate("SHREDDED_NOTICE",found.language)
+        });
       }
       return reply.send({ kind: "READABLE",session: publicSession(found) });
     }

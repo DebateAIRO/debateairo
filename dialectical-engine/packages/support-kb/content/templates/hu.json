@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Ismert incidens {started_at} óta: {summary_en} (a csapat tette közzé). Ha a problémája megfelel ennek, nem kell jelentenie; ellenkező esetben válassza a „Beszélgetés munkatárssal” lehetőséget.",
   "NO_INCIDENT": "Nincs tudomásom jelenleg fennálló ismert incidensről. Ez nem zárja ki, hogy van ilyen — ha valami hibásnak tűnik, válassza a „Beszélgetés munkatárssal” lehetőséget, és írja le a problémát.",
   "INCIDENT_NOTICE": "Megjegyzés: {started_at} óta ismert incidens érinti ezt: {surface}.",
-  "QUEUED": "Várakozás az asszisztens modelljére… Ön a(z) {n}. a sorban."
+  "QUEUED": "Várakozás az asszisztens modelljére… Ön a(z) {n}. a sorban.",
+  "SUMMARY_REPLACED": "A tájékoztató összefoglaló kimaradt, mert nem felelt meg a támogatás biztonsági ellenőrzésein.",
+  "SHREDDED_NOTICE": "Ezt a beszélgetést a tulajdonos kérésére töröltük.",
+  "INCIDENT_SURFACE_DEBATES": "vitákat",
+  "INCIDENT_SURFACE_PUBLISHING": "a közzétételt",
+  "INCIDENT_SURFACE_SIGN_IN": "a bejelentkezést",
+  "INCIDENT_SURFACE_WHOLE_SITE": "a teljes webhelyet"
 }

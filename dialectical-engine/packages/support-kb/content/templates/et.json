@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Teadaolev intsident alates {started_at}: {summary_en} (meeskonna avaldatud). Kui teie probleem sellega ühtib, pole vaja sellest teatada; muul juhul valige „Rääkige inimesega“.",
   "NO_INCIDENT": "Mul pole andmeid praeguse teadaoleva intsidendi kohta. See ei välista intsidendi olemasolu — kui miski näib olevat rikkis, valige „Rääkige inimesega“ ja kirjeldage probleemi.",
   "INCIDENT_NOTICE": "Märkus: alates {started_at} mõjutab teadaolev intsident komponenti {surface}.",
-  "QUEUED": "Ootame assistendi mudelit… teie järjekorranumber on {n}."
+  "QUEUED": "Ootame assistendi mudelit… teie järjekorranumber on {n}.",
+  "SUMMARY_REPLACED": "Soovituslik kokkuvõte jäeti välja, sest see ei läbinud kasutajatoe turvakontrolle.",
+  "SHREDDED_NOTICE": "See vestlus kustutati omaniku taotlusel.",
+  "INCIDENT_SURFACE_DEBATES": "väitlusi",
+  "INCIDENT_SURFACE_PUBLISHING": "avaldamist",
+  "INCIDENT_SURFACE_SIGN_IN": "sisselogimist",
+  "INCIDENT_SURFACE_WHOLE_SITE": "kogu saiti"
 }

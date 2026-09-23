@@ -8,6 +8,7 @@ import roChrome from "../../apps/ui/messages/ro/chrome.json" with { type: "json"
 import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
 import { buildSupportKnowledgeContext as buildContext } from "../../packages/support-kb/src/context.js";
 import { loadHelpCorpus,type HelpCorpusEntry } from "../../packages/support-kb/src/index.js";
+import { SUPPORT_LOCALES } from "../../packages/support-kb/src/locale.js";
 import { resolveSupportActions } from "../../packages/support-kb/src/navigation.js";
 
 type ContextInput = Parameters<typeof buildContext>[0];
@@ -61,6 +62,21 @@ function productionReviewedCorpus() {
     requireReviewedRecovery:true
   });
 }
+
+const TOPIC_SOURCE_IDS = {
+  "support.topic.gettingStarted.prompt": [
+    "getting-started-debate", "risk-tier-choice", "budget-tier-choice",
+  ],
+  "support.topic.reading.prompt": ["guide-how-it-works"],
+  "support.topic.scores.prompt": [],
+  "support.topic.publishing.prompt": [
+    "unpublish-a-debate", "delete-a-private-debate", "public-answer-disclosure",
+  ],
+  "support.topic.account.prompt": ["settings-help-menus", "account-settings"],
+  "support.topic.privacy.prompt": [
+    "app-navigation", "settings-help-menus", "support-cases",
+  ],
+} as const;
 
 describe("Support knowledge context", () => {
   const entries = [
@@ -515,6 +531,31 @@ describe("Support knowledge context", () => {
     });
     expect(kanaOnly.sourceIds).toEqual([]);
     expect(kanaOnly.requestedActionIds).toEqual([]);
+  });
+
+  it("binds every exact localized topic prompt to the English prompt's pinned source ids", () => {
+    // Regression: stale generated prompts made localized topic chips return NO_SOURCE or wrong articles.
+    const corpus = productionReviewedCorpus();
+    for (const locale of SUPPORT_LOCALES) {
+      const catalogue = JSON.parse(readFileSync(resolve(
+        process.cwd(), "apps/ui/messages", locale, "support.json",
+      ), "utf8")) as Record<string, string>;
+      for (const [key, sourceIds] of Object.entries(TOPIC_SOURCE_IDS)) {
+        const result = buildSupportKnowledgeContext({
+          entries: corpus.entries,
+          capabilities: SUPPORT_CAPABILITIES,
+          availableActionIds: SUPPORT_ACTION_IDS,
+          language: locale,
+          query: catalogue[key]!,
+          historyText: "",
+          maxCodePoints: 24_000,
+        });
+        expect.soft(result.sourceIds, `${locale}:${key}:count`).toHaveLength(sourceIds.length);
+        expect.soft(result.sourceIds, `${locale}:${key}:ids`).toEqual(
+          expect.arrayContaining([...sourceIds]),
+        );
+      }
+    }
   });
 
   it.each([

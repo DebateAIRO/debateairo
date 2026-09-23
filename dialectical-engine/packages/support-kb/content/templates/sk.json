@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Známy incident od {started_at}: {summary_en} (zverejnené tímom). Ak mu váš problém zodpovedá, nemusíte ho hlásiť; inak vyberte „Porozprávať sa s človekom“.",
   "NO_INCIDENT": "Nemám záznam o žiadnom aktuálnom známom incidente. To nevylučuje jeho existenciu — ak sa zdá, že niečo nefunguje, vyberte „Porozprávať sa s človekom“ a problém opíšte.",
   "INCIDENT_NOTICE": "Poznámka: od {started_at} je známy incident, ktorý ovplyvňuje {surface}.",
-  "QUEUED": "Čaká sa na model asistenta… v poradí ste číslo {n}."
+  "QUEUED": "Čaká sa na model asistenta… v poradí ste číslo {n}.",
+  "SUMMARY_REPLACED": "Orientačné zhrnutie bolo vynechané, pretože neprešlo bezpečnostnými kontrolami podpory.",
+  "SHREDDED_NOTICE": "Táto konverzácia bola vymazaná na žiadosť vlastníka.",
+  "INCIDENT_SURFACE_DEBATES": "diskusie",
+  "INCIDENT_SURFACE_PUBLISHING": "publikovanie",
+  "INCIDENT_SURFACE_SIGN_IN": "prihlásenie",
+  "INCIDENT_SURFACE_WHOLE_SITE": "celú lokalitu"
 }

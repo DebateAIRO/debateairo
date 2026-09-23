@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Inċident magħruf minn {started_at}: {summary_en} (ippubblikat mit-tim). Jekk il-problema tiegħek taqbel miegħu, m'hemmx għalfejn tirrapportaha; inkella agħżel “Tkellem ma' persuna”.",
   "NO_INCIDENT": "M'għandi l-ebda rekord ta' inċident magħruf bħalissa. Dan ma jeskludix li hemm wieħed — jekk xi ħaġa tidher li ma taħdimx, agħżel “Tkellem ma' persuna” u ddeskriviha.",
   "INCIDENT_NOTICE": "Nota: hemm inċident magħruf li qed jaffettwa {surface} minn {started_at}.",
-  "QUEUED": "Qed tistenna l-mudell tal-assistent… inti n-numru {n} fil-kju."
+  "QUEUED": "Qed tistenna l-mudell tal-assistent… inti n-numru {n} fil-kju.",
+  "SUMMARY_REPLACED": "Is-sommarju konsultattiv tħalla barra għax ma għaddiex mill-kontrolli tas-sigurtà tal-Appoġġ.",
+  "SHREDDED_NOTICE": "Din il-konverżazzjoni tħassret fuq talba tas-sid.",
+  "INCIDENT_SURFACE_DEBATES": "id-dibattiti",
+  "INCIDENT_SURFACE_PUBLISHING": "il-pubblikazzjoni",
+  "INCIDENT_SURFACE_SIGN_IN": "id-dħul",
+  "INCIDENT_SURFACE_WHOLE_SITE": "is-sit kollu"
 }

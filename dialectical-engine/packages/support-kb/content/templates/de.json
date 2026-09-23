@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Bekannter Vorfall seit {started_at}: {summary_en} (vom Team veröffentlicht). Wenn dies Ihrem Problem entspricht, müssen Sie es nicht melden; wählen Sie andernfalls „Mit einem Menschen sprechen“.",
   "NO_INCIDENT": "Mir ist derzeit kein bekannter Vorfall gemeldet. Das schließt einen Vorfall nicht aus — wenn etwas nicht zu funktionieren scheint, wählen Sie „Mit einem Menschen sprechen“ und beschreiben Sie das Problem.",
   "INCIDENT_NOTICE": "Hinweis: Seit {started_at} betrifft ein bekannter Vorfall {surface}.",
-  "QUEUED": "Warten auf das Modell des Assistenten… Sie sind Nummer {n} in der Warteschlange."
+  "QUEUED": "Warten auf das Modell des Assistenten… Sie sind Nummer {n} in der Warteschlange.",
+  "SUMMARY_REPLACED": "Die unverbindliche Zusammenfassung wurde ausgelassen, weil sie die Sicherheitsprüfungen des Supports nicht bestanden hat.",
+  "SHREDDED_NOTICE": "Diese Unterhaltung wurde auf Wunsch des Eigentümers gelöscht.",
+  "INCIDENT_SURFACE_DEBATES": "Debatten",
+  "INCIDENT_SURFACE_PUBLISHING": "Veröffentlichungen",
+  "INCIDENT_SURFACE_SIGN_IN": "die Anmeldung",
+  "INCIDENT_SURFACE_WHOLE_SITE": "die gesamte Website"
 }

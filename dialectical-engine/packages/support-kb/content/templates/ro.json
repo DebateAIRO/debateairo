@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Incident cunoscut din {started_at}: {summary_ro} (publicat de echipă). Dacă problema ta se potrivește, nu e nevoie să o raportezi; altfel alege „Vorbește cu o persoană”.",
   "NO_INCIDENT": "Nu am nicio înregistrare a unui incident cunoscut în acest moment. Asta nu exclude unul — dacă ceva pare stricat, alege „Vorbește cu o persoană” și descrie problema.",
   "INCIDENT_NOTICE": "Notă: există un incident cunoscut care afectează {surface} din {started_at}.",
-  "QUEUED": "Se așteaptă modelul asistentului… ești numărul {n} la rând."
+  "QUEUED": "Se așteaptă modelul asistentului… ești numărul {n} la rând.",
+  "SUMMARY_REPLACED": "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței.",
+  "SHREDDED_NOTICE": "Această conversație a fost ștearsă la cererea proprietarului.",
+  "INCIDENT_SURFACE_DEBATES": "dezbateri",
+  "INCIDENT_SURFACE_PUBLISHING": "publicare",
+  "INCIDENT_SURFACE_SIGN_IN": "autentificare",
+  "INCIDENT_SURFACE_WHOLE_SITE": "întregul site"
 }

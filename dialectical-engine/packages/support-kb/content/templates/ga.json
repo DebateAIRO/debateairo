@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Teagmhas aitheanta ó {started_at}: {summary_en} (foilsithe ag an bhfoireann). Má mheaitseálann d’fhadhb é, ní gá í a thuairisciú; murach sin, roghnaigh ‘Labhair le duine’.",
   "NO_INCIDENT": "Níl aon taifead agam ar theagmhas aitheanta atá ar siúl faoi láthair. Ní chiallaíonn sé sin nach bhfuil ceann ann — má tá an chuma ar rud éigin go bhfuil sé briste, roghnaigh ‘Labhair le duine’ agus déan cur síos air.",
   "INCIDENT_NOTICE": "Nóta: tá teagmhas aitheanta ann a théann i bhfeidhm ar {surface} ó {started_at}.",
-  "QUEUED": "Ag fanacht le samhail an chúntóra… is tusa uimhir {n} sa chiú."
+  "QUEUED": "Ag fanacht le samhail an chúntóra… is tusa uimhir {n} sa chiú.",
+  "SUMMARY_REPLACED": "Fágadh an achoimre chomhairleach ar lár mar níor éirigh léi i seiceálacha sábháilteachta na Tacaíochta.",
+  "SHREDDED_NOTICE": "Scriosadh an comhrá seo ar iarratas an úinéara.",
+  "INCIDENT_SURFACE_DEBATES": "na díospóireachtaí",
+  "INCIDENT_SURFACE_PUBLISHING": "an fhoilsitheoireacht",
+  "INCIDENT_SURFACE_SIGN_IN": "an síniú isteach",
+  "INCIDENT_SURFACE_WHOLE_SITE": "an suíomh iomlán"
 }

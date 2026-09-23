@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Kendt hændelse siden {started_at}: {summary_en} (offentliggjort af teamet). Hvis dit problem svarer til den, behøver du ikke rapportere det; ellers skal du vælge 'Tal med et menneske'.",
   "NO_INCIDENT": "Jeg har ingen registrering af en aktuel kendt hændelse. Det udelukker ikke, at der er en — hvis noget ser ud til ikke at virke, skal du vælge 'Tal med et menneske' og beskrive det.",
   "INCIDENT_NOTICE": "Bemærk: Der er en kendt hændelse, som har påvirket {surface} siden {started_at}.",
-  "QUEUED": "Venter på assistentens model… du er nummer {n} i køen."
+  "QUEUED": "Venter på assistentens model… du er nummer {n} i køen.",
+  "SUMMARY_REPLACED": "Det vejledende resumé blev udeladt, fordi det ikke bestod Supports sikkerhedskontrol.",
+  "SHREDDED_NOTICE": "Denne samtale blev slettet efter ejerens anmodning.",
+  "INCIDENT_SURFACE_DEBATES": "debatter",
+  "INCIDENT_SURFACE_PUBLISHING": "udgivelse",
+  "INCIDENT_SURFACE_SIGN_IN": "login",
+  "INCIDENT_SURFACE_WHOLE_SITE": "hele webstedet"
 }

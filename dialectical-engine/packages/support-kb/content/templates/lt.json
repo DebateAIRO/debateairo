@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Nuo {started_at} žinomas sutrikimas: {summary_en} (paskelbė komanda). Jei jūsų problema su juo sutampa, pranešti nereikia; kitu atveju pasirinkite „Kalbėtis su žmogumi“.",
   "NO_INCIDENT": "Neturiu duomenų apie šiuo metu žinomą sutrikimą. Tai nereiškia, kad jo nėra — jei atrodo, kad kažkas neveikia, pasirinkite „Kalbėtis su žmogumi“ ir aprašykite problemą.",
   "INCIDENT_NOTICE": "Pastaba: nuo {started_at} žinomas sutrikimas, paveikiantis {surface}.",
-  "QUEUED": "Laukiama asistento modelio… jūsų eilės numeris yra {n}."
+  "QUEUED": "Laukiama asistento modelio… jūsų eilės numeris yra {n}.",
+  "SUMMARY_REPLACED": "Patariamasis apibendrinimas buvo praleistas, nes neatitiko palaikymo saugos patikrų.",
+  "SHREDDED_NOTICE": "Šis pokalbis buvo ištrintas savininko prašymu.",
+  "INCIDENT_SURFACE_DEBATES": "debatus",
+  "INCIDENT_SURFACE_PUBLISHING": "publikavimą",
+  "INCIDENT_SURFACE_SIGN_IN": "prisijungimą",
+  "INCIDENT_SURFACE_WHOLE_SITE": "visą svetainę"
 }

@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Incident connu depuis {started_at} : {summary_en} (publié par l’équipe). Si votre problème correspond, inutile de le signaler ; sinon, choisissez « Parler à une personne ».",
   "NO_INCIDENT": "Je n’ai connaissance d’aucun incident en cours. Cela n’exclut pas qu’il y en ait un — si quelque chose semble défectueux, choisissez « Parler à une personne » et décrivez le problème.",
   "INCIDENT_NOTICE": "Remarque : un incident connu affecte {surface} depuis {started_at}.",
-  "QUEUED": "En attente du modèle de l’assistant… vous êtes numéro {n} dans la file."
+  "QUEUED": "En attente du modèle de l’assistant… vous êtes numéro {n} dans la file.",
+  "SUMMARY_REPLACED": "Le résumé indicatif a été omis, car il n’a pas passé les contrôles de sécurité de l’assistance.",
+  "SHREDDED_NOTICE": "Cette conversation a été effacée à la demande du propriétaire.",
+  "INCIDENT_SURFACE_DEBATES": "les débats",
+  "INCIDENT_SURFACE_PUBLISHING": "la publication",
+  "INCIDENT_SURFACE_SIGN_IN": "la connexion",
+  "INCIDENT_SURFACE_WHOLE_SITE": "l’ensemble du site"
 }

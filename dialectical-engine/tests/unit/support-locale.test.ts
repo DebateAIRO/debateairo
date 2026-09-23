@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { createSupportCaseAccessService } from "../../apps/api/src/support/cases.js";
+import {
+  createAdvisorySummaryService,
+  createSupportCaseAccessService,
+} from "../../apps/api/src/support/cases.js";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
 import {
   SUPPORT_LOCALES,
@@ -67,5 +70,95 @@ describe("stored support interface locales", () => {
   it("fails the read instead of coercing an unknown stored locale to English", async () => {
     await expect(caseAccessWithLanguage("jp").listOwn("owner-id"))
       .rejects.toThrow("SUPPORT_LANGUAGE_INVALID");
+  });
+
+  it("uses the interface locale when an unsafe generated advisory summary is replaced", async () => {
+    const sealed: string[] = [];
+    const service = createAdvisorySummaryService({
+      complete: async () => JSON.stringify({
+        kind: "case_summary",
+        text: "Open //invalid.example/reset with password syntheticvalue7.",
+        sourceIds: [],
+        actionIds: [],
+      }),
+      seal: async (_caseId, summary) => {
+        sealed.push(summary);
+        return Buffer.from(summary, "utf8");
+      },
+      persist: async () => undefined,
+      clock: () => new Date("2026-09-23T00:00:01.000Z"),
+    });
+
+    await service.summarize({
+      caseId: "case-id",
+      language: "ja",
+      transcript: "USER> Help",
+      createdAt: new Date("2026-09-23T00:00:00.000Z"),
+    });
+
+    expect(sealed).toEqual([
+      "助言用の要約は、サポートの安全性チェックに合格しなかったため省略されました。",
+    ]);
+  });
+
+  it("uses the interface locale when an unsafe stored advisory summary is replaced", async () => {
+    const service = createSupportCaseAccessService({
+      repository: {
+        listOwnCases: async () => [],
+        readCaseEncrypted: async () => ({
+          case_id: "case-id",
+          language: "ja",
+          state: "NEW",
+          sla_hours: 48,
+          shredded_at: null,
+          destroyed_at: null,
+          wrapped_key: Buffer.from("wrapped"),
+          transcript_snapshot_ciphertext: Buffer.from("transcript"),
+          summary_ciphertext: Buffer.from("summary"),
+          case_message_next_cursor: null,
+          case_messages: [],
+        }),
+        appendCaseMessage: async () => null,
+      },
+      keys: {
+        unwrapDataKey: async () => Buffer.alloc(32),
+        openContent: (description) => description.kind === "case-snapshot"
+          ? Buffer.from("[]", "utf8")
+          : Buffer.from("Open //invalid.example/reset with password syntheticvalue7.", "utf8"),
+        sealContent: () => Buffer.alloc(29),
+      },
+    });
+
+    await expect(service.readByToken("token")).resolves.toMatchObject({
+      kind: "READABLE",
+      summary: "助言用の要約は、サポートの安全性チェックに合格しなかったため省略されました。",
+    });
+  });
+
+  it("uses the interface locale for a shredded case notice", async () => {
+    const service = createSupportCaseAccessService({
+      repository: {
+        listOwnCases: async () => [],
+        readCaseEncrypted: async () => ({
+          case_id: "case-id",
+          language: "ja",
+          state: "NEW",
+          sla_hours: 48,
+          shredded_at: new Date("2026-09-23T00:00:00.000Z"),
+          destroyed_at: null,
+        }),
+        appendCaseMessage: async () => null,
+      },
+      keys: {
+        unwrapDataKey: async () => { throw new Error("must not unwrap"); },
+        openContent: () => { throw new Error("must not open"); },
+        sealContent: () => { throw new Error("must not seal"); },
+      },
+    });
+
+    await expect(service.readByToken("token")).resolves.toMatchObject({
+      kind: "SHREDDED",
+      notice: "この会話は、所有者の依頼により消去されました。",
+    });
   });
 });

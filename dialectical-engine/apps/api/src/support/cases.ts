@@ -3,7 +3,6 @@ import { TypedDomainError } from "@debateai/kernel";
 import {
   isSupportLanguage,
   supportLocaleNames,
-  type SupportCorpusLanguage,
   type SupportLanguage,
 } from "@debateai/support-kb/catalog";
 import type { SupportKeyPort } from "./keys.js";
@@ -11,7 +10,7 @@ import { redactSupportMessage } from "./session.js";
 import {
   parseSupportCaseSummaryDraft,screenSupportModelText
 } from "./response-policy.js";
-import { SHREDDED_NOTICE } from "./templates.js";
+import { supportTemplate } from "./templates.js";
 
 export type SupportCasePredicate = "E1" | "E2" | "E3" | "E4" | "E5" | "E6" | "E7" | "E8";
 export type SupportCaseState = "NEW" | "WAITING_ON_V" | "WAITING_ON_USER" | "CLOSED";
@@ -54,11 +53,6 @@ export const SUPPORT_SUMMARY_PROMPT =
   + "Summarize the user's problem in one paragraph of at most 80 words. "
   + "Do not state or guess who the user is, whether they are the account owner, "
   + "or whether their request is legitimate.";
-
-const SUPPORT_SUMMARY_REPLACEMENT: Readonly<Record<SupportCorpusLanguage,string>> = Object.freeze({
-  en: "The advisory summary was omitted because it did not pass Support safety checks.",
-  ro: "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței."
-});
 
 export type SupportCaseSummaryRecord = Readonly<{
   caseId: string;
@@ -137,9 +131,7 @@ export function createAdvisorySummaryService(input: Readonly<{
         ? parseSupportCaseSummaryDraft(result.text) : null;
       const candidate = draft === null ? null : boundedSummary(draft.text);
       const summary = timedOut ? null
-        : candidate ?? SUPPORT_SUMMARY_REPLACEMENT[
-          request.language === "ro" ? "ro" : "en"
-        ];
+        : candidate ?? supportTemplate("SUMMARY_REPLACED",request.language);
       if (timedOut) {
         try {
           await input.persist({
@@ -377,7 +369,7 @@ export function createSupportCaseAccessService(input: Readonly<{
             const opened = summaryPlaintext.toString("utf8");
             const bounded = boundedSummary(opened);
             summary = bounded !== null && screenSupportModelText(bounded)
-              ? bounded : SUPPORT_SUMMARY_REPLACEMENT[language === "ro" ? "ro" : "en"];
+              ? bounded : supportTemplate("SUMMARY_REPLACED",language);
           }
         } finally { summaryCiphertext?.fill(0); }
         return Object.freeze({
@@ -419,7 +411,7 @@ export function createSupportCaseAccessService(input: Readonly<{
           kind: "SHREDDED",caseId: String(row.case_id),language,
           state: row.state as SupportCaseState,slaHours: Number(row.sla_hours),
           messages: Object.freeze([]),summary: null,nextCursor: null,
-          notice: SHREDDED_NOTICE[language]
+          notice: supportTemplate("SHREDDED_NOTICE",language)
         });
       }
       return read(row);
@@ -436,7 +428,7 @@ export function createSupportCaseAccessService(input: Readonly<{
       if (row === null) return null;
       const language = storedSupportLanguage(row.language);
       if (shreddedRow(row)) return Object.freeze({
-        kind: "SHREDDED" as const,notice: SHREDDED_NOTICE[language]
+        kind: "SHREDDED" as const,notice: supportTemplate("SHREDDED_NOTICE",language)
       });
       const prepared = redactSupportMessage(request.text);
       const plaintext = Buffer.from(prepared.text,"utf8");
@@ -457,7 +449,7 @@ export function createSupportCaseAccessService(input: Readonly<{
           throw new SupportCaseError("SUPPORT_CASE_MESSAGE_LIMIT");
         }
         if (appended === "SHREDDED") return Object.freeze({
-          kind: "SHREDDED" as const,notice: SHREDDED_NOTICE[language]
+          kind: "SHREDDED" as const,notice: supportTemplate("SHREDDED_NOTICE",language)
         });
         return appended;
       } finally { plaintext.fill(0);ciphertext?.fill(0); }

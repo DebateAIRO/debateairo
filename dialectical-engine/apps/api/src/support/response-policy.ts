@@ -125,6 +125,10 @@ export function bindSupportDraftAuthority(
   }
 
   const requiredActions = new Set<SupportActionId>();
+  for (const id of draft.actionIds) {
+    if (!SUPPORT_ACTION_IDS.includes(id as SupportActionId)) return null;
+    requiredActions.add(id as SupportActionId);
+  }
   for (const clause of text.split(/[.!?;\n]+/u)) {
     if (!NAVIGATION_COMMITMENT.test(clause)) continue;
     for (const { actionId } of navigationMatches(clause)) requiredActions.add(actionId);

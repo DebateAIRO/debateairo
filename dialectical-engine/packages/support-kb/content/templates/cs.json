@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Známý incident trvá od {started_at}: {summary_en} (zveřejnil tým). Pokud mu váš problém odpovídá, nemusíte jej hlásit; jinak zvolte „Promluvit si s člověkem“.",
   "NO_INCIDENT": "Nemám záznam o žádném aktuálním známém incidentu. To nevylučuje, že nějaký existuje — pokud se zdá, že něco nefunguje, zvolte „Promluvit si s člověkem“ a problém popište.",
   "INCIDENT_NOTICE": "Poznámka: od {started_at} ovlivňuje {surface} známý incident.",
-  "QUEUED": "Čeká se na model asistenta… ve frontě jste na pozici {n}."
+  "QUEUED": "Čeká se na model asistenta… ve frontě jste na pozici {n}.",
+  "SUMMARY_REPLACED": "Orientační shrnutí bylo vynecháno, protože neprošlo bezpečnostními kontrolami podpory.",
+  "SHREDDED_NOTICE": "Tato konverzace byla na žádost vlastníka vymazána.",
+  "INCIDENT_SURFACE_DEBATES": "debaty",
+  "INCIDENT_SURFACE_PUBLISHING": "publikování",
+  "INCIDENT_SURFACE_SIGN_IN": "přihlášení",
+  "INCIDENT_SURFACE_WHOLE_SITE": "celý web"
 }

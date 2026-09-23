@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Kopš {started_at} zināms incidents: {summary_en} (publicējusi komanda). Ja jūsu problēma tam atbilst, par to nav jāziņo; citādi izvēlieties “Runāt ar cilvēku”.",
   "NO_INCIDENT": "Man nav informācijas par pašlaik zināmu incidentu. Tas neizslēdz incidenta iespējamību — ja šķiet, ka kaut kas nedarbojas, izvēlieties “Runāt ar cilvēku” un aprakstiet problēmu.",
   "INCIDENT_NOTICE": "Piezīme. Kopš {started_at} ir zināms incidents, kas ietekmē {surface}.",
-  "QUEUED": "Gaida asistenta modeli… jūsu kārtas numurs ir {n}."
+  "QUEUED": "Gaida asistenta modeli… jūsu kārtas numurs ir {n}.",
+  "SUMMARY_REPLACED": "Ieteikuma kopsavilkums tika izlaists, jo tas neizturēja atbalsta drošības pārbaudes.",
+  "SHREDDED_NOTICE": "Šī saruna tika izdzēsta pēc īpašnieka pieprasījuma.",
+  "INCIDENT_SURFACE_DEBATES": "debates",
+  "INCIDENT_SURFACE_PUBLISHING": "publicēšanu",
+  "INCIDENT_SURFACE_SIGN_IN": "pierakstīšanos",
+  "INCIDENT_SURFACE_WHOLE_SITE": "visu vietni"
 }

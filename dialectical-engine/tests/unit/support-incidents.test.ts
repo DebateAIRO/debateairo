@@ -150,6 +150,14 @@ describe("SUP-05 deterministic incident answers", () => {
     expect(applyIncidentNotice(reply,"publishing",[],"en")).toBe(reply);
   });
 
+  it("renders the incident surface label in the interface locale", () => {
+    const reply = "モデルの回答。";
+    expect(applyIncidentNotice(reply,"publishing",[ACTIVE],"ja")).toBe(
+      "注：2026-09-07T08:30:00.000Z 以降、ディベートに影響する既知の障害があります。\n\n"
+      + reply
+    );
+  });
+
   it("adds the notice after relay completion without putting it in the model prompt", async () => {
     const complete = vi.fn(async (_input: Parameters<SupportModelPort["complete"]>[0]) => ({
       text: "Model reply."

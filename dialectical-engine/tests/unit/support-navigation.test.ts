@@ -1,4 +1,6 @@
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import enAuth from "../../apps/ui/messages/en/auth.json" with { type: "json" };
@@ -33,6 +35,33 @@ const LABEL_SOURCES = {
 } as const;
 
 describe("Support navigation", () => {
+  it("keeps the committed UI-label artifact current with a fresh isolated generation", () => {
+    // Regression: editing a locale catalogue without regenerating all three tables must fail this gate.
+    const temporaryRoot = mkdtempSync(resolve(tmpdir(), "support-ui-labels-"));
+    const packageRoot = resolve(temporaryRoot, "packages/support-kb");
+    try {
+      mkdirSync(resolve(packageRoot, "scripts"), { recursive: true });
+      mkdirSync(resolve(packageRoot, "src"), { recursive: true });
+      mkdirSync(resolve(temporaryRoot, "apps/ui"), { recursive: true });
+      copyFileSync(
+        resolve(process.cwd(), "packages/support-kb/scripts/generate-ui-labels.mjs"),
+        resolve(packageRoot, "scripts/generate-ui-labels.mjs"),
+      );
+      symlinkSync(
+        resolve(process.cwd(), "apps/ui/messages"),
+        resolve(temporaryRoot, "apps/ui/messages"),
+        "dir",
+      );
+
+      execFileSync(process.execPath, [resolve(packageRoot, "scripts/generate-ui-labels.mjs")]);
+
+      expect(readFileSync(resolve(process.cwd(), "packages/support-kb/src/ui-labels.ts"), "utf8"))
+        .toBe(readFileSync(resolve(packageRoot, "src/ui-labels.ts"), "utf8"));
+    } finally {
+      rmSync(temporaryRoot, { recursive: true, force: true });
+    }
+  });
+
   it("keeps every generated action label byte-equal to its UI catalogue source",() => {
     for (const locale of SUPPORT_LOCALES) for (const [id,[namespace,key]] of Object.entries(LABEL_SOURCES)) {
       const catalogue = JSON.parse(readFileSync(resolve(

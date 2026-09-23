@@ -19,7 +19,9 @@ export const SUPPORT_TEMPLATE_IDS = Object.freeze([
   "DISCLOSURE", "NO_SOURCE", "REFUSE_ZONE", "REFUSE_INJECTION", "REFUSE_SAFETY",
   "DEGRADED", "DISABLED", "RATE_LIMITED", "RATING", "CASE_OPENED_MINIMAL", "CASE_OPENED",
   "HUMAN_LABEL", "NOT_FOUND", "CLOSED_LABEL", "SUMMARY_LABEL", "SOURCE_LINE",
-  "INCIDENT_ACTIVE", "NO_INCIDENT", "INCIDENT_NOTICE", "QUEUED"
+  "INCIDENT_ACTIVE", "NO_INCIDENT", "INCIDENT_NOTICE", "QUEUED",
+  "SUMMARY_REPLACED", "SHREDDED_NOTICE", "INCIDENT_SURFACE_DEBATES",
+  "INCIDENT_SURFACE_PUBLISHING", "INCIDENT_SURFACE_SIGN_IN", "INCIDENT_SURFACE_WHOLE_SITE"
 ] as const);
 
 export type SupportTemplateId = typeof SUPPORT_TEMPLATE_IDS[number];
@@ -75,17 +77,6 @@ export function supportTemplate(id: SupportTemplateId,language: SupportLanguage)
     : value;
 }
 
-const SHREDDED_NOTICE_COPY = Object.freeze({
-  en: "This conversation was erased at the owner's request.",
-  ro: "Această conversație a fost ștearsă la cererea proprietarului."
-});
-
-export const SHREDDED_NOTICE = Object.freeze(Object.fromEntries(
-  SUPPORT_LOCALES.map((locale) => [
-    locale,locale === "ro" ? SHREDDED_NOTICE_COPY.ro : SHREDDED_NOTICE_COPY.en
-  ])
-)) as Readonly<Record<SupportLanguage,string>>;
-
 export async function readSupportContent(input: Readonly<{
   shreddedAt: Date | null;
   destroyedAt: Date | null;
@@ -99,7 +90,7 @@ export async function readSupportContent(input: Readonly<{
     return Object.freeze({
       kind: "SHREDDED",
       terminal: "[SHREDDED]",
-      notice: SHREDDED_NOTICE[input.language]
+      notice: supportTemplate("SHREDDED_NOTICE",input.language)
     });
   }
   return Object.freeze({ kind: "READABLE",content: await input.read() });

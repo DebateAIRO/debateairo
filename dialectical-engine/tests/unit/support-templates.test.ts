@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   OUTCOMES,
   readSupportContent,
-  SHREDDED_NOTICE,
   SUPPORT_TEMPLATE_IDS,
   SUPPORT_TEMPLATES
 } from "../../apps/api/src/support/templates.js";
@@ -24,7 +23,9 @@ describe("SUP-01 closed support copy", () => {
       "DISCLOSURE", "NO_SOURCE", "REFUSE_ZONE", "REFUSE_INJECTION", "REFUSE_SAFETY",
       "DEGRADED", "DISABLED", "RATE_LIMITED", "RATING", "CASE_OPENED_MINIMAL", "CASE_OPENED",
       "HUMAN_LABEL", "NOT_FOUND", "CLOSED_LABEL", "SUMMARY_LABEL", "SOURCE_LINE",
-      "INCIDENT_ACTIVE", "NO_INCIDENT", "INCIDENT_NOTICE", "QUEUED"
+      "INCIDENT_ACTIVE", "NO_INCIDENT", "INCIDENT_NOTICE", "QUEUED",
+      "SUMMARY_REPLACED", "SHREDDED_NOTICE", "INCIDENT_SURFACE_DEBATES",
+      "INCIDENT_SURFACE_PUBLISHING", "INCIDENT_SURFACE_SIGN_IN", "INCIDENT_SURFACE_WHOLE_SITE"
     ]);
     for (const id of SUPPORT_TEMPLATE_IDS) {
       expect(Object.keys(SUPPORT_TEMPLATES[id])).toEqual(SUPPORT_LOCALES);
@@ -35,16 +36,17 @@ describe("SUP-01 closed support copy", () => {
     }
   });
 
-  it("pins the frozen bilingual shredded notice as exact UTF-8 bytes", () => {
-    expect({ en:SHREDDED_NOTICE.en,ro:SHREDDED_NOTICE.ro }).toEqual({
+  it("pins the frozen bilingual shredded-notice template as exact UTF-8 bytes", () => {
+    const shreddedNotice = SUPPORT_TEMPLATES.SHREDDED_NOTICE;
+    expect({ en:shreddedNotice.en,ro:shreddedNotice.ro }).toEqual({
       en: "This conversation was erased at the owner's request.",
       ro: "Această conversație a fost ștearsă la cererea proprietarului."
     });
-    expect(Object.isFrozen(SHREDDED_NOTICE)).toBe(true);
-    expect(Buffer.from(SHREDDED_NOTICE.en, "utf8").toString("hex")).toBe(
+    expect(Object.isFrozen(shreddedNotice)).toBe(true);
+    expect(Buffer.from(shreddedNotice.en, "utf8").toString("hex")).toBe(
       "5468697320636f6e766572736174696f6e207761732065726173656420617420746865206f776e6572277320726571756573742e"
     );
-    expect(Buffer.from(SHREDDED_NOTICE.ro, "utf8").toString("hex")).toBe(
+    expect(Buffer.from(shreddedNotice.ro, "utf8").toString("hex")).toBe(
       "416365617374c48320636f6e7665727361c89b6965206120666f737420c8997465617273c483206c6120636572657265612070726f70726965746172756c75692e"
     );
   });

@@ -17,6 +17,12 @@
   "SOURCE_LINE": "出典：{title}（{id}）",
   "INCIDENT_ACTIVE": "{started_at} 以降の既知の障害：{summary_en}（チームが公開）。問題がこれに該当する場合は報告不要です。該当しない場合は「担当者と話す」を選択してください。",
   "NO_INCIDENT": "現在確認されている障害の記録はありません。ただし、障害がないとは限りません。何かが正常に動作していない場合は、「担当者と話す」を選択して状況を説明してください。",
-  "INCIDENT_NOTICE": "注：{started_at} 以降、{surface} に影響する既知の障害があります。",
-  "QUEUED": "アシスタントのモデルを待っています…待機列の {n} 番目です。"
+  "INCIDENT_NOTICE": "注：{started_at} 以降、{surface}に影響する既知の障害があります。",
+  "QUEUED": "アシスタントのモデルを待っています…待機列の {n} 番目です。",
+  "SUMMARY_REPLACED": "助言用の要約は、サポートの安全性チェックに合格しなかったため省略されました。",
+  "SHREDDED_NOTICE": "この会話は、所有者の依頼により消去されました。",
+  "INCIDENT_SURFACE_DEBATES": "ディベート",
+  "INCIDENT_SURFACE_PUBLISHING": "公開",
+  "INCIDENT_SURFACE_SIGN_IN": "サインイン",
+  "INCIDENT_SURFACE_WHOLE_SITE": "サイト全体"
 }

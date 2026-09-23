@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Tunnettu häiriö alkaen {started_at}: {summary_en} (tiimin julkaisema). Jos ongelmanne vastaa tätä, sitä ei tarvitse ilmoittaa. Muussa tapauksessa valitkaa ”Keskustele henkilön kanssa”.",
   "NO_INCIDENT": "Tiedossani ei ole tällä hetkellä tunnettua häiriötä. Se ei sulje häiriötä pois — jos jokin näyttää olevan rikki, valitkaa ”Keskustele henkilön kanssa” ja kuvatkaa ongelma.",
   "INCIDENT_NOTICE": "Huomautus: tunnettu häiriö on vaikuttanut kohteeseen {surface} alkaen {started_at}.",
-  "QUEUED": "Odotetaan avustajan mallia… jonosijanne on {n}."
+  "QUEUED": "Odotetaan avustajan mallia… jonosijanne on {n}.",
+  "SUMMARY_REPLACED": "Neuvoa-antava yhteenveto jätettiin pois, koska se ei läpäissyt tuen turvallisuustarkistuksia.",
+  "SHREDDED_NOTICE": "Tämä keskustelu poistettiin omistajan pyynnöstä.",
+  "INCIDENT_SURFACE_DEBATES": "väittelyihin",
+  "INCIDENT_SURFACE_PUBLISHING": "julkaisemiseen",
+  "INCIDENT_SURFACE_SIGN_IN": "sisäänkirjautumiseen",
+  "INCIDENT_SURFACE_WHOLE_SITE": "koko sivustoon"
 }

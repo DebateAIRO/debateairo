@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "自 {started_at} 起的已知事件：{summary_en}（由团队发布）。如果您的问题与之相符，则无需报告；否则请选择“与人工客服交谈”。",
   "NO_INCIDENT": "我没有当前已知事件的记录。这并不代表一定没有事件——如果某项功能似乎出现故障，请选择“与人工客服交谈”并描述问题。",
   "INCIDENT_NOTICE": "注意：自 {started_at} 起，有一个已知事件正在影响 {surface}。",
-  "QUEUED": "正在等待助手所用的模型…您排在第 {n} 位。"
+  "QUEUED": "正在等待助手所用的模型…您排在第 {n} 位。",
+  "SUMMARY_REPLACED": "由于未通过支持服务的安全检查，建议性摘要已被省略。",
+  "SHREDDED_NOTICE": "此对话已应所有者要求删除。",
+  "INCIDENT_SURFACE_DEBATES": "辩论",
+  "INCIDENT_SURFACE_PUBLISHING": "发布",
+  "INCIDENT_SURFACE_SIGN_IN": "登录",
+  "INCIDENT_SURFACE_WHOLE_SITE": "整个网站"
 }

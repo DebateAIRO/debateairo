@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Znan incident od {started_at}: {summary_en} (objavila ga je ekipa). Če se vaša težava ujema z njim, je ni treba prijaviti; sicer izberite »Pogovorite se z osebo«.",
   "NO_INCIDENT": "Nimam podatka o trenutno znanem incidentu. To ne izključuje njegovega obstoja — če je videti, da nekaj ne deluje, izberite »Pogovorite se z osebo« in opišite težavo.",
   "INCIDENT_NOTICE": "Opomba: od {started_at} je znan incident, ki vpliva na {surface}.",
-  "QUEUED": "Čakanje na pomočnikov model… v vrsti ste številka {n}."
+  "QUEUED": "Čakanje na pomočnikov model… v vrsti ste številka {n}.",
+  "SUMMARY_REPLACED": "Svetovalni povzetek je bil izpuščen, ker ni prestal varnostnih preverjanj podpore.",
+  "SHREDDED_NOTICE": "Ta pogovor je bil izbrisan na zahtevo lastnika.",
+  "INCIDENT_SURFACE_DEBATES": "razprave",
+  "INCIDENT_SURFACE_PUBLISHING": "objavljanje",
+  "INCIDENT_SURFACE_SIGN_IN": "prijavo",
+  "INCIDENT_SURFACE_WHOLE_SITE": "celotno spletno mesto"
 }

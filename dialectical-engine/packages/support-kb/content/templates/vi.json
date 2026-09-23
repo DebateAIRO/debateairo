@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Sự cố đã biết từ {started_at}: {summary_en} (do nhóm công bố). Nếu vấn đề của bạn trùng khớp, bạn không cần báo cáo; nếu không, hãy chọn “Trò chuyện với nhân viên hỗ trợ”.",
   "NO_INCIDENT": "Tôi không có hồ sơ về sự cố nào đã biết đang diễn ra. Điều đó không có nghĩa là chắc chắn không có sự cố — nếu có nội dung dường như bị lỗi, hãy chọn “Trò chuyện với nhân viên hỗ trợ” và mô tả sự việc.",
   "INCIDENT_NOTICE": "Lưu ý: có một sự cố đã biết ảnh hưởng đến {surface} từ {started_at}.",
-  "QUEUED": "Đang chờ mô hình của trợ lý… bạn ở vị trí thứ {n} trong hàng đợi."
+  "QUEUED": "Đang chờ mô hình của trợ lý… bạn ở vị trí thứ {n} trong hàng đợi.",
+  "SUMMARY_REPLACED": "Bản tóm tắt tham khảo đã bị lược bỏ vì không vượt qua các bước kiểm tra an toàn của bộ phận Hỗ trợ.",
+  "SHREDDED_NOTICE": "Cuộc trò chuyện này đã bị xóa theo yêu cầu của chủ sở hữu.",
+  "INCIDENT_SURFACE_DEBATES": "các cuộc tranh luận",
+  "INCIDENT_SURFACE_PUBLISHING": "việc xuất bản",
+  "INCIDENT_SURFACE_SIGN_IN": "việc đăng nhập",
+  "INCIDENT_SURFACE_WHOLE_SITE": "toàn bộ trang web"
 }

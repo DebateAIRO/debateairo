@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "{started_at} 이후 알려진 장애: {summary_en}(팀에서 게시). 문제가 이 내용과 일치하면 신고할 필요가 없습니다. 그렇지 않으면 ‘상담원과 대화하기’를 선택하세요.",
   "NO_INCIDENT": "현재 알려진 장애에 대한 기록은 없습니다. 그렇다고 장애가 없다는 뜻은 아닙니다. 문제가 있는 것 같으면 ‘상담원과 대화하기’를 선택하고 상황을 설명하세요.",
   "INCIDENT_NOTICE": "참고: {started_at} 이후 {surface}에 영향을 주는 알려진 장애가 있습니다.",
-  "QUEUED": "도우미의 모델을 기다리는 중입니다… 대기 순번은 {n}번입니다."
+  "QUEUED": "도우미의 모델을 기다리는 중입니다… 대기 순번은 {n}번입니다.",
+  "SUMMARY_REPLACED": "안내용 요약은 지원 안전 검사를 통과하지 못해 생략되었습니다.",
+  "SHREDDED_NOTICE": "이 대화는 소유자의 요청에 따라 삭제되었습니다.",
+  "INCIDENT_SURFACE_DEBATES": "토론",
+  "INCIDENT_SURFACE_PUBLISHING": "게시",
+  "INCIDENT_SURFACE_SIGN_IN": "로그인",
+  "INCIDENT_SURFACE_WHOLE_SITE": "사이트 전체"
 }

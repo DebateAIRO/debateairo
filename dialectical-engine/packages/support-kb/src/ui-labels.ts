@@ -9,7 +9,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "الحساب",
     "sign-up": "إنشاء حساب",
     "help": "المساعدة",
-    "support-status": "Service status",
+    "support-status": "حالة الخدمة",
     "method": "آلية العمل",
     "sample-transcript": "السجلات",
     "settings": "الإعدادات",
@@ -19,8 +19,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "حذف الحساب",
     "public-catalog": "المناظرات العامة",
     "your-debates": "مناظراتك",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "فتح مناظرتك",
+    "public-debate": "فتح المناظرة العامة"
   },
   "bg": {
     "home": "Dialectical Engine — дом",
@@ -28,7 +28,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Профил",
     "sign-up": "Създаване на профил",
     "help": "Помощ",
-    "support-status": "Service status",
+    "support-status": "Състояние на услугата",
     "method": "Как работи",
     "sample-transcript": "Преписи",
     "settings": "Настройки",
@@ -38,8 +38,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "Изтриване на профила",
     "public-catalog": "Публични дебати",
     "your-debates": "Вашите дебати",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Отворете Вашия дебат",
+    "public-debate": "Отворете публичен дебат"
   },
   "cs": {
     "home": "Dialectical Engine — domů",
@@ -47,7 +47,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Účet",
     "sign-up": "Vytvořit účet",
     "help": "Pomoc",
-    "support-status": "Service status",
+    "support-status": "Stav služby",
     "method": "Jak to funguje",
     "sample-transcript": "Přepisy",
     "settings": "Nastavení",
@@ -57,8 +57,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "Smazat účet",
     "public-catalog": "Veřejné debaty",
     "your-debates": "Vaše debaty",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Otevřít vaši debatu",
+    "public-debate": "Otevřít veřejnou debatu"
   },
   "da": {
     "home": "Dialectical Engine — hjem",
@@ -66,7 +66,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Konto",
     "sign-up": "Opret en",
     "help": "Hjælp",
-    "support-status": "Service status",
+    "support-status": "Tjenestestatus",
     "method": "Hvordan det virker",
     "sample-transcript": "Afskrifter",
     "settings": "Indstillinger",
@@ -76,8 +76,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "Slet konto",
     "public-catalog": "Offentlige debatter",
     "your-debates": "Dine debatter",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Åbn din debat",
+    "public-debate": "Åbn offentlig debat"
   },
   "de": {
     "home": "Dialectical Engine — Startseite",
@@ -85,7 +85,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Konto",
     "sign-up": "erstellen ein",
     "help": "Hilfe",
-    "support-status": "Service status",
+    "support-status": "Dienststatus",
     "method": "Funktionsweise",
     "sample-transcript": "Transkripte",
     "settings": "Einstellungen",
@@ -95,8 +95,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "löschen Konto",
     "public-catalog": "Öffentliche Debatten",
     "your-debates": "Ihre Debatten",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Ihre Debatte öffnen",
+    "public-debate": "Öffentliche Debatte öffnen"
   },
   "el": {
     "home": "Dialectical Engine — αρχική σελίδα",
@@ -104,7 +104,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Λογαριασμός",
     "sign-up": "δημιουργία ένα",
     "help": "Βοήθεια",
-    "support-status": "Service status",
+    "support-status": "Κατάσταση υπηρεσίας",
     "method": "Πώς λειτουργεί",
     "sample-transcript": "Απομαγνητοφωνήσεις",
     "settings": "Ρυθμίσεις",
@@ -114,8 +114,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "διαγραφή λογαριασμός",
     "public-catalog": "Δημόσιες αντιπαραθέσεις",
     "your-debates": "Οι αντιπαραθέσεις σας",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Άνοιγμα της αντιπαράθεσής σας",
+    "public-debate": "Άνοιγμα δημόσιας αντιπαράθεσης"
   },
   "en": {
     "home": "Dialectical Engine — home",
@@ -142,7 +142,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Cuenta",
     "sign-up": "Cree una",
     "help": "Ayuda",
-    "support-status": "Service status",
+    "support-status": "Estado del servicio",
     "method": "Cómo funciona",
     "sample-transcript": "Transcripciones",
     "settings": "Configuración",
@@ -152,8 +152,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "ELIMINAR cuenta",
     "public-catalog": "Debates públicos",
     "your-debates": "Sus debates",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Abrir su debate",
+    "public-debate": "Abrir el debate público"
   },
   "et": {
     "home": "Dialectical Engine — kodu",
@@ -161,7 +161,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "konto",
     "sign-up": "loo üks",
     "help": "Abi",
-    "support-status": "Service status",
+    "support-status": "Teenuse olek",
     "method": "Kuidas see toimib",
     "sample-transcript": "Ärakirjad",
     "settings": "Seaded",
@@ -171,8 +171,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "kustuta konto",
     "public-catalog": "Avalikud arutelud",
     "your-debates": "Teie arutelud",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Avage oma väitlus",
+    "public-debate": "Avage avalik väitlus"
   },
   "fi": {
     "home": "Dialectical Engine — etusivu",
@@ -180,7 +180,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Tili",
     "sign-up": "luo yksi",
     "help": "Ohje",
-    "support-status": "Service status",
+    "support-status": "Palvelun tila",
     "method": "Näin se toimii",
     "sample-transcript": "Litteroinnit",
     "settings": "Asetukset",
@@ -190,8 +190,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "poista tili",
     "public-catalog": "Julkiset väittelyt",
     "your-debates": "Omat väittelysi",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Avaa väittelysi",
+    "public-debate": "Avaa julkinen väittely"
   },
   "fr": {
     "home": "Dialectical Engine — accueil",
@@ -199,7 +199,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Compte",
     "sign-up": "créer un",
     "help": "Aide",
-    "support-status": "Service status",
+    "support-status": "État du service",
     "method": "Fonctionnement",
     "sample-transcript": "Transcriptions",
     "settings": "Paramètres",
@@ -209,8 +209,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "supprimer compte",
     "public-catalog": "Débats publics",
     "your-debates": "Vos débats",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Ouvrir votre débat",
+    "public-debate": "Ouvrir le débat public"
   },
   "ga": {
     "home": "Dialectical Engine — baile",
@@ -218,7 +218,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Cuntas",
     "sign-up": "Cruthaigh aon",
     "help": "Cabhair",
-    "support-status": "Service status",
+    "support-status": "Stádas seirbhíse",
     "method": "Conas a oibríonn sé",
     "sample-transcript": "Tras-scríbhinní",
     "settings": "Socruithe",
@@ -228,8 +228,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "Scrios cuntas",
     "public-catalog": "Díospóireachtaí poiblí",
     "your-debates": "Do chuid díospóireachtaí",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Oscail do dhíospóireacht",
+    "public-debate": "Oscail díospóireacht phoiblí"
   },
   "he": {
     "home": "Dialectical Engine — דף הבית",
@@ -237,7 +237,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "חשבון",
     "sign-up": "יצירת חשבון",
     "help": "עזרה",
-    "support-status": "Service status",
+    "support-status": "מצב השירות",
     "method": "איך זה עובד",
     "sample-transcript": "תמלילים",
     "settings": "הגדרות",
@@ -247,8 +247,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "מחיקה החשבון",
     "public-catalog": "דיונים ציבוריים",
     "your-debates": "הדיונים שלך",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "פתיחת הדיון שלך",
+    "public-debate": "פתיחת דיון ציבורי"
   },
   "hi": {
     "home": "Dialectical Engine — मुख्य पृष्ठ",
@@ -256,7 +256,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "खाता",
     "sign-up": "एक बनाएँ",
     "help": "सहायता",
-    "support-status": "Service status",
+    "support-status": "सेवा की स्थिति",
     "method": "यह कैसे काम करता है",
     "sample-transcript": "प्रतिलिपियाँ",
     "settings": "सेटिंग",
@@ -266,8 +266,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "हटाएँ खाता",
     "public-catalog": "सार्वजनिक बहसें",
     "your-debates": "आपकी बहसें",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "अपनी बहस खोलें",
+    "public-debate": "सार्वजनिक बहस खोलें"
   },
   "hr": {
     "home": "Dialectical Engine — dom",
@@ -275,7 +275,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Račun",
     "sign-up": "Izradite ga",
     "help": "Pomoć",
-    "support-status": "Service status",
+    "support-status": "Stanje usluge",
     "method": "Kako radi",
     "sample-transcript": "Prijepisi",
     "settings": "Postavke",
@@ -285,8 +285,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "Izbriši račun",
     "public-catalog": "Javne rasprave",
     "your-debates": "Vaše rasprave",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Otvorite svoju raspravu",
+    "public-debate": "Otvorite javnu raspravu"
   },
   "hu": {
     "home": "Dialectical Engine — kezdőlap",
@@ -294,7 +294,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Fiók",
     "sign-up": "Létrehozás egy",
     "help": "Súgó",
-    "support-status": "Service status",
+    "support-status": "Szolgáltatás állapota",
     "method": "Hogyan működik?",
     "sample-transcript": "Átiratok",
     "settings": "Beállítások",
@@ -304,8 +304,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "Törlés fiók",
     "public-catalog": "Nyilvános viták",
     "your-debates": "Saját viták",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Vita megnyitása",
+    "public-debate": "Nyilvános vita megnyitása"
   },
   "id": {
     "home": "Dialectical Engine — beranda",
@@ -313,7 +313,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Akun",
     "sign-up": "Buat akun",
     "help": "Bantuan",
-    "support-status": "Service status",
+    "support-status": "Status layanan",
     "method": "Cara kerjanya",
     "sample-transcript": "Transkrip",
     "settings": "Pengaturan",
@@ -323,8 +323,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "hapus akun",
     "public-catalog": "Debat publik",
     "your-debates": "Debat Anda",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Buka debat Anda",
+    "public-debate": "Buka debat publik"
   },
   "it": {
     "home": "Dialectical Engine — pagina iniziale",
@@ -332,7 +332,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Account",
     "sign-up": "Crea uno",
     "help": "Aiuto",
-    "support-status": "Service status",
+    "support-status": "Stato del servizio",
     "method": "Come funziona",
     "sample-transcript": "Trascrizioni",
     "settings": "Impostazioni",
@@ -342,8 +342,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "Elimina account",
     "public-catalog": "Dibattiti pubblici",
     "your-debates": "I tuoi dibattiti",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Apri il tuo dibattito",
+    "public-debate": "Apri dibattito pubblico"
   },
   "ja": {
     "home": "Dialectical Engine — ホーム",
@@ -351,7 +351,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "アカウント",
     "sign-up": "作成する",
     "help": "ヘルプ",
-    "support-status": "Service status",
+    "support-status": "サービス状況",
     "method": "仕組み",
     "sample-transcript": "記録",
     "settings": "設定",
@@ -361,8 +361,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "削除 アカウント",
     "public-catalog": "公開ディベート",
     "your-debates": "自分のディベート",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "自分のディベートを開く",
+    "public-debate": "公開ディベートを開く"
   },
   "ko": {
     "home": "Dialectical Engine — 홈",
@@ -370,7 +370,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "계정",
     "sign-up": "계정 만들기",
     "help": "도움말",
-    "support-status": "Service status",
+    "support-status": "서비스 상태",
     "method": "작동 방식",
     "sample-transcript": "기록",
     "settings": "설정",
@@ -380,8 +380,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "삭제 계정",
     "public-catalog": "공개 토론",
     "your-debates": "내 토론",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "내 토론 열기",
+    "public-debate": "공개 토론 열기"
   },
   "lt": {
     "home": "Dialectical Engine — pradžia",
@@ -389,7 +389,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Paskyra",
     "sign-up": "Sukurti vienas",
     "help": "Pagalba",
-    "support-status": "Service status",
+    "support-status": "Paslaugos būsena",
     "method": "Kaip tai veikia",
     "sample-transcript": "Stenogramos",
     "settings": "Nuostatos",
@@ -399,8 +399,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "Ištrinti paskyra",
     "public-catalog": "Vieši debatai",
     "your-debates": "Jūsų debatai",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Atverti savo debatus",
+    "public-debate": "Atverti viešus debatus"
   },
   "lv": {
     "home": "Dialectical Engine — sākums",
@@ -408,7 +408,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Konts",
     "sign-up": "Izveidot viens",
     "help": "Palīdzība",
-    "support-status": "Service status",
+    "support-status": "Pakalpojuma statuss",
     "method": "Kā tas darbojas",
     "sample-transcript": "Transkripti",
     "settings": "Iestatījumi",
@@ -418,8 +418,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "Dzēst konts",
     "public-catalog": "Publiskās debates",
     "your-debates": "Jūsu debates",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Atvērt savas debates",
+    "public-debate": "Atvērt publiskās debates"
   },
   "mt": {
     "home": "Dialectical Engine — paġna ewlenija",
@@ -427,7 +427,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Kont",
     "sign-up": "Oħloq wieħed",
     "help": "Għajnuna",
-    "support-status": "Service status",
+    "support-status": "Status tas-servizz",
     "method": "Kif jaħdem",
     "sample-transcript": "Traskrizzjonijiet",
     "settings": "Issettjar",
@@ -437,8 +437,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "Ħassar kont",
     "public-catalog": "Dibattiti pubbliċi",
     "your-debates": "Id-dibattiti tiegħek",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Iftaħ id-dibattitu tiegħek",
+    "public-debate": "Iftaħ dibattitu pubbliku"
   },
   "nl": {
     "home": "Dialectical Engine — thuis",
@@ -446,7 +446,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Account",
     "sign-up": "Maak er een aan",
     "help": "Hulp",
-    "support-status": "Service status",
+    "support-status": "Servicestatus",
     "method": "Hoe het werkt",
     "sample-transcript": "Transcripties",
     "settings": "Instellingen",
@@ -456,8 +456,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "Account verwijderen",
     "public-catalog": "Publieke debatten",
     "your-debates": "Jouw debatten",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Uw debat openen",
+    "public-debate": "Openbaar debat openen"
   },
   "pl": {
     "home": "Dialectical Engine — strona główna",
@@ -465,7 +465,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Konto",
     "sign-up": "Utwórz jeden",
     "help": "Pomoc",
-    "support-status": "Service status",
+    "support-status": "Stan usługi",
     "method": "Jak to działa",
     "sample-transcript": "Transkrypcje",
     "settings": "Ustawienia",
@@ -475,8 +475,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "Usuń konto",
     "public-catalog": "Debaty publiczne",
     "your-debates": "Twoje debaty",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Otwórz swoją debatę",
+    "public-debate": "Otwórz debatę publiczną"
   },
   "pt": {
     "home": "Dialectical Engine — início",
@@ -484,7 +484,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Conta",
     "sign-up": "Criar um",
     "help": "Ajuda",
-    "support-status": "Service status",
+    "support-status": "Estado do serviço",
     "method": "Como funciona",
     "sample-transcript": "Transcrições",
     "settings": "Definições",
@@ -494,8 +494,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "Eliminar conta",
     "public-catalog": "Debates públicos",
     "your-debates": "Os seus debates",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Abrir o seu debate",
+    "public-debate": "Abrir debate público"
   },
   "ro": {
     "home": "Dialectical Engine — pagina principală",
@@ -503,7 +503,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Cont",
     "sign-up": "Creați un",
     "help": "Ajutor",
-    "support-status": "Service status",
+    "support-status": "Starea serviciului",
     "method": "Cum funcționează",
     "sample-transcript": "Transcrieri",
     "settings": "Setări",
@@ -513,8 +513,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "Ștergeți cont",
     "public-catalog": "Dezbateri publice",
     "your-debates": "Dezbaterile dvs.",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Deschideți dezbaterea dumneavoastră",
+    "public-debate": "Deschideți dezbaterea publică"
   },
   "ru": {
     "home": "Dialectical Engine — главная",
@@ -522,7 +522,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Учётная запись",
     "sign-up": "Создать один",
     "help": "Помощь",
-    "support-status": "Service status",
+    "support-status": "Состояние сервиса",
     "method": "Как это работает",
     "sample-transcript": "Стенограммы",
     "settings": "Настройки",
@@ -532,8 +532,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "Удалить учётная запись",
     "public-catalog": "Публичные дискуссии",
     "your-debates": "Ваши дискуссии",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Открыть ваши дебаты",
+    "public-debate": "Открыть общедоступные дебаты"
   },
   "sk": {
     "home": "Dialectical Engine — domovská stránka",
@@ -541,7 +541,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Účet",
     "sign-up": "Vytvoriť účet",
     "help": "Pomoc",
-    "support-status": "Service status",
+    "support-status": "Stav služby",
     "method": "Ako to funguje",
     "sample-transcript": "Prepisy",
     "settings": "Nastavenia",
@@ -551,8 +551,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "Smazat účet",
     "public-catalog": "Verejné diskusie",
     "your-debates": "Vaše diskusie",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Otvoriť vašu diskusiu",
+    "public-debate": "Otvoriť verejnú diskusiu"
   },
   "sl": {
     "home": "Dialectical Engine — domača stran",
@@ -560,7 +560,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Račun",
     "sign-up": "Ustvarite ga",
     "help": "Pomoč",
-    "support-status": "Service status",
+    "support-status": "Stanje storitve",
     "method": "Kako deluje",
     "sample-transcript": "Prepisi",
     "settings": "Nastavitve",
@@ -570,8 +570,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "IZBRIŠI račun",
     "public-catalog": "Javne razprave",
     "your-debates": "Vaše razprave",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Odpri svojo razpravo",
+    "public-debate": "Odpri javno razpravo"
   },
   "sv": {
     "home": "Dialectical Engine — startsida",
@@ -579,7 +579,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Konto",
     "sign-up": "Skapa ett",
     "help": "Hjälp",
-    "support-status": "Service status",
+    "support-status": "Tjänstestatus",
     "method": "Så fungerar det",
     "sample-transcript": "Transkriptioner",
     "settings": "Inställningar",
@@ -589,8 +589,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "RADERA konto",
     "public-catalog": "Offentliga debatter",
     "your-debates": "Dina debatter",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Öppna din debatt",
+    "public-debate": "Öppna offentlig debatt"
   },
   "tr": {
     "home": "Dialectical Engine — ana sayfa",
@@ -598,7 +598,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Hesap",
     "sign-up": "Hesap oluştur",
     "help": "Yardım",
-    "support-status": "Service status",
+    "support-status": "Hizmet durumu",
     "method": "Nasıl çalışır",
     "sample-transcript": "Tutanaklar",
     "settings": "Ayarlar",
@@ -608,8 +608,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "Sil hesap",
     "public-catalog": "Herkese açık tartışmalar",
     "your-debates": "Tartışmalarınız",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Tartışmanızı aç",
+    "public-debate": "Herkese açık tartışmayı aç"
   },
   "uk": {
     "home": "Dialectical Engine — головна",
@@ -617,7 +617,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Обліковий запис",
     "sign-up": "Створити",
     "help": "Довідка",
-    "support-status": "Service status",
+    "support-status": "Стан сервісу",
     "method": "Як це працює",
     "sample-transcript": "Стенограми",
     "settings": "Налаштування",
@@ -627,8 +627,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "ВИДАЛИТИ обліковий запис",
     "public-catalog": "Публічні дебати",
     "your-debates": "Ваші дебати",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Відкрити ваші дебати",
+    "public-debate": "Відкрити загальнодоступні дебати"
   },
   "vi": {
     "home": "Dialectical Engine — trang chủ",
@@ -636,7 +636,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "Tài khoản",
     "sign-up": "Tạo tài khoản",
     "help": "Trợ giúp",
-    "support-status": "Service status",
+    "support-status": "Trạng thái dịch vụ",
     "method": "Cách hoạt động",
     "sample-transcript": "Bản ghi",
     "settings": "Cài đặt",
@@ -646,8 +646,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "Xóa tài khoản",
     "public-catalog": "Các cuộc tranh luận công khai",
     "your-debates": "Các cuộc tranh luận của bạn",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "Mở cuộc tranh luận của bạn",
+    "public-debate": "Mở cuộc tranh luận công khai"
   },
   "zh": {
     "home": "Dialectical Engine — 首页",
@@ -655,7 +655,7 @@ export const SUPPORT_UI_LABELS = {
     "sign-in": "账户",
     "sign-up": "创建账户",
     "help": "帮助",
-    "support-status": "Service status",
+    "support-status": "服务状态",
     "method": "运作方式",
     "sample-transcript": "文字记录",
     "settings": "设置",
@@ -665,8 +665,8 @@ export const SUPPORT_UI_LABELS = {
     "delete-account": "删除 账户",
     "public-catalog": "公开辩论",
     "your-debates": "您的辩论",
-    "owner-debate": "Open your debate",
-    "public-debate": "Open public debate"
+    "owner-debate": "打开您的辩论",
+    "public-debate": "打开公开辩论"
   }
 } as const satisfies Readonly<Record<SupportLanguage, Readonly<Record<Exclude<SupportActionId, "forgot-password">, string>>>>;
 
@@ -690,7 +690,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "المساعدة"
     ],
     "support-status": [
-      "Service status"
+      "حالة الخدمة"
     ],
     "method": [
       "آلية العمل",
@@ -721,10 +721,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "مناظراتك"
     ],
     "owner-debate": [
-      "Open your debate"
+      "فتح مناظرتك"
     ],
     "public-debate": [
-      "Open public debate"
+      "فتح المناظرة العامة"
     ]
   },
   "bg": {
@@ -746,7 +746,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Помощ"
     ],
     "support-status": [
-      "Service status"
+      "Състояние на услугата"
     ],
     "method": [
       "Как работи",
@@ -777,10 +777,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Вашите дебати"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Отворете Вашия дебат"
     ],
     "public-debate": [
-      "Open public debate"
+      "Отворете публичен дебат"
     ]
   },
   "cs": {
@@ -802,7 +802,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Pomoc"
     ],
     "support-status": [
-      "Service status"
+      "Stav služby"
     ],
     "method": [
       "Jak to funguje",
@@ -833,10 +833,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Vaše debaty"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Otevřít vaši debatu"
     ],
     "public-debate": [
-      "Open public debate"
+      "Otevřít veřejnou debatu"
     ]
   },
   "da": {
@@ -858,7 +858,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Hjælp"
     ],
     "support-status": [
-      "Service status"
+      "Tjenestestatus"
     ],
     "method": [
       "Hvordan det virker",
@@ -889,10 +889,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Dine debatter"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Åbn din debat"
     ],
     "public-debate": [
-      "Open public debate"
+      "Åbn offentlig debat"
     ]
   },
   "de": {
@@ -914,7 +914,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Hilfe"
     ],
     "support-status": [
-      "Service status"
+      "Dienststatus"
     ],
     "method": [
       "Funktionsweise",
@@ -945,10 +945,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Ihre Debatten"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Ihre Debatte öffnen"
     ],
     "public-debate": [
-      "Open public debate"
+      "Öffentliche Debatte öffnen"
     ]
   },
   "el": {
@@ -970,7 +970,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Βοήθεια"
     ],
     "support-status": [
-      "Service status"
+      "Κατάσταση υπηρεσίας"
     ],
     "method": [
       "Πώς λειτουργεί",
@@ -1001,10 +1001,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Οι αντιπαραθέσεις σας"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Άνοιγμα της αντιπαράθεσής σας"
     ],
     "public-debate": [
-      "Open public debate"
+      "Άνοιγμα δημόσιας αντιπαράθεσης"
     ]
   },
   "en": {
@@ -1082,7 +1082,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Ayuda"
     ],
     "support-status": [
-      "Service status"
+      "Estado del servicio"
     ],
     "method": [
       "Cómo funciona",
@@ -1113,10 +1113,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Sus debates"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Abrir su debate"
     ],
     "public-debate": [
-      "Open public debate"
+      "Abrir el debate público"
     ]
   },
   "et": {
@@ -1138,7 +1138,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Abi"
     ],
     "support-status": [
-      "Service status"
+      "Teenuse olek"
     ],
     "method": [
       "Kuidas see toimib",
@@ -1169,10 +1169,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Teie arutelud"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Avage oma väitlus"
     ],
     "public-debate": [
-      "Open public debate"
+      "Avage avalik väitlus"
     ]
   },
   "fi": {
@@ -1194,7 +1194,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Ohje"
     ],
     "support-status": [
-      "Service status"
+      "Palvelun tila"
     ],
     "method": [
       "Näin se toimii",
@@ -1225,10 +1225,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Omat väittelysi"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Avaa väittelysi"
     ],
     "public-debate": [
-      "Open public debate"
+      "Avaa julkinen väittely"
     ]
   },
   "fr": {
@@ -1250,7 +1250,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Aide"
     ],
     "support-status": [
-      "Service status"
+      "État du service"
     ],
     "method": [
       "Fonctionnement",
@@ -1281,10 +1281,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Vos débats"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Ouvrir votre débat"
     ],
     "public-debate": [
-      "Open public debate"
+      "Ouvrir le débat public"
     ]
   },
   "ga": {
@@ -1306,7 +1306,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Cabhair"
     ],
     "support-status": [
-      "Service status"
+      "Stádas seirbhíse"
     ],
     "method": [
       "Conas a oibríonn sé",
@@ -1337,10 +1337,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Do chuid díospóireachtaí"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Oscail do dhíospóireacht"
     ],
     "public-debate": [
-      "Open public debate"
+      "Oscail díospóireacht phoiblí"
     ]
   },
   "he": {
@@ -1362,7 +1362,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "עזרה"
     ],
     "support-status": [
-      "Service status"
+      "מצב השירות"
     ],
     "method": [
       "איך זה עובד",
@@ -1393,10 +1393,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "הדיונים שלך"
     ],
     "owner-debate": [
-      "Open your debate"
+      "פתיחת הדיון שלך"
     ],
     "public-debate": [
-      "Open public debate"
+      "פתיחת דיון ציבורי"
     ]
   },
   "hi": {
@@ -1418,7 +1418,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "सहायता"
     ],
     "support-status": [
-      "Service status"
+      "सेवा की स्थिति"
     ],
     "method": [
       "यह कैसे काम करता है",
@@ -1449,10 +1449,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "आपकी बहसें"
     ],
     "owner-debate": [
-      "Open your debate"
+      "अपनी बहस खोलें"
     ],
     "public-debate": [
-      "Open public debate"
+      "सार्वजनिक बहस खोलें"
     ]
   },
   "hr": {
@@ -1474,7 +1474,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Pomoć"
     ],
     "support-status": [
-      "Service status"
+      "Stanje usluge"
     ],
     "method": [
       "Kako radi",
@@ -1505,10 +1505,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Vaše rasprave"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Otvorite svoju raspravu"
     ],
     "public-debate": [
-      "Open public debate"
+      "Otvorite javnu raspravu"
     ]
   },
   "hu": {
@@ -1530,7 +1530,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Súgó"
     ],
     "support-status": [
-      "Service status"
+      "Szolgáltatás állapota"
     ],
     "method": [
       "Hogyan működik?",
@@ -1561,10 +1561,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Saját viták"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Vita megnyitása"
     ],
     "public-debate": [
-      "Open public debate"
+      "Nyilvános vita megnyitása"
     ]
   },
   "id": {
@@ -1586,7 +1586,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Bantuan"
     ],
     "support-status": [
-      "Service status"
+      "Status layanan"
     ],
     "method": [
       "Cara kerjanya",
@@ -1617,10 +1617,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Debat Anda"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Buka debat Anda"
     ],
     "public-debate": [
-      "Open public debate"
+      "Buka debat publik"
     ]
   },
   "it": {
@@ -1642,7 +1642,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Aiuto"
     ],
     "support-status": [
-      "Service status"
+      "Stato del servizio"
     ],
     "method": [
       "Come funziona",
@@ -1673,10 +1673,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "I tuoi dibattiti"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Apri il tuo dibattito"
     ],
     "public-debate": [
-      "Open public debate"
+      "Apri dibattito pubblico"
     ]
   },
   "ja": {
@@ -1698,7 +1698,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "ヘルプ"
     ],
     "support-status": [
-      "Service status"
+      "サービス状況"
     ],
     "method": [
       "仕組み",
@@ -1729,10 +1729,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "自分のディベート"
     ],
     "owner-debate": [
-      "Open your debate"
+      "自分のディベートを開く"
     ],
     "public-debate": [
-      "Open public debate"
+      "公開ディベートを開く"
     ]
   },
   "ko": {
@@ -1754,7 +1754,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "도움말"
     ],
     "support-status": [
-      "Service status"
+      "서비스 상태"
     ],
     "method": [
       "작동 방식",
@@ -1785,10 +1785,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "내 토론"
     ],
     "owner-debate": [
-      "Open your debate"
+      "내 토론 열기"
     ],
     "public-debate": [
-      "Open public debate"
+      "공개 토론 열기"
     ]
   },
   "lt": {
@@ -1810,7 +1810,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Pagalba"
     ],
     "support-status": [
-      "Service status"
+      "Paslaugos būsena"
     ],
     "method": [
       "Kaip tai veikia",
@@ -1841,10 +1841,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Jūsų debatai"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Atverti savo debatus"
     ],
     "public-debate": [
-      "Open public debate"
+      "Atverti viešus debatus"
     ]
   },
   "lv": {
@@ -1866,7 +1866,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Palīdzība"
     ],
     "support-status": [
-      "Service status"
+      "Pakalpojuma statuss"
     ],
     "method": [
       "Kā tas darbojas",
@@ -1897,10 +1897,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Jūsu debates"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Atvērt savas debates"
     ],
     "public-debate": [
-      "Open public debate"
+      "Atvērt publiskās debates"
     ]
   },
   "mt": {
@@ -1922,7 +1922,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Għajnuna"
     ],
     "support-status": [
-      "Service status"
+      "Status tas-servizz"
     ],
     "method": [
       "Kif jaħdem",
@@ -1953,10 +1953,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Id-dibattiti tiegħek"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Iftaħ id-dibattitu tiegħek"
     ],
     "public-debate": [
-      "Open public debate"
+      "Iftaħ dibattitu pubbliku"
     ]
   },
   "nl": {
@@ -1978,7 +1978,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Hulp"
     ],
     "support-status": [
-      "Service status"
+      "Servicestatus"
     ],
     "method": [
       "Hoe het werkt",
@@ -2009,10 +2009,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Jouw debatten"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Uw debat openen"
     ],
     "public-debate": [
-      "Open public debate"
+      "Openbaar debat openen"
     ]
   },
   "pl": {
@@ -2034,7 +2034,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Pomoc"
     ],
     "support-status": [
-      "Service status"
+      "Stan usługi"
     ],
     "method": [
       "Jak to działa",
@@ -2065,10 +2065,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Twoje debaty"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Otwórz swoją debatę"
     ],
     "public-debate": [
-      "Open public debate"
+      "Otwórz debatę publiczną"
     ]
   },
   "pt": {
@@ -2090,7 +2090,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Ajuda"
     ],
     "support-status": [
-      "Service status"
+      "Estado do serviço"
     ],
     "method": [
       "Como funciona",
@@ -2121,10 +2121,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Os seus debates"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Abrir o seu debate"
     ],
     "public-debate": [
-      "Open public debate"
+      "Abrir debate público"
     ]
   },
   "ro": {
@@ -2146,7 +2146,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Ajutor"
     ],
     "support-status": [
-      "Service status"
+      "Starea serviciului"
     ],
     "method": [
       "Cum funcționează",
@@ -2177,10 +2177,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Dezbaterile dvs."
     ],
     "owner-debate": [
-      "Open your debate"
+      "Deschideți dezbaterea dumneavoastră"
     ],
     "public-debate": [
-      "Open public debate"
+      "Deschideți dezbaterea publică"
     ]
   },
   "ru": {
@@ -2202,7 +2202,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Помощь"
     ],
     "support-status": [
-      "Service status"
+      "Состояние сервиса"
     ],
     "method": [
       "Как это работает",
@@ -2233,10 +2233,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Ваши дискуссии"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Открыть ваши дебаты"
     ],
     "public-debate": [
-      "Open public debate"
+      "Открыть общедоступные дебаты"
     ]
   },
   "sk": {
@@ -2258,7 +2258,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Pomoc"
     ],
     "support-status": [
-      "Service status"
+      "Stav služby"
     ],
     "method": [
       "Ako to funguje",
@@ -2289,10 +2289,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Vaše diskusie"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Otvoriť vašu diskusiu"
     ],
     "public-debate": [
-      "Open public debate"
+      "Otvoriť verejnú diskusiu"
     ]
   },
   "sl": {
@@ -2314,7 +2314,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Pomoč"
     ],
     "support-status": [
-      "Service status"
+      "Stanje storitve"
     ],
     "method": [
       "Kako deluje",
@@ -2345,10 +2345,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Vaše razprave"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Odpri svojo razpravo"
     ],
     "public-debate": [
-      "Open public debate"
+      "Odpri javno razpravo"
     ]
   },
   "sv": {
@@ -2370,7 +2370,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Hjälp"
     ],
     "support-status": [
-      "Service status"
+      "Tjänstestatus"
     ],
     "method": [
       "Så fungerar det",
@@ -2401,10 +2401,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Dina debatter"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Öppna din debatt"
     ],
     "public-debate": [
-      "Open public debate"
+      "Öppna offentlig debatt"
     ]
   },
   "tr": {
@@ -2426,7 +2426,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Yardım"
     ],
     "support-status": [
-      "Service status"
+      "Hizmet durumu"
     ],
     "method": [
       "Nasıl çalışır",
@@ -2457,10 +2457,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Tartışmalarınız"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Tartışmanızı aç"
     ],
     "public-debate": [
-      "Open public debate"
+      "Herkese açık tartışmayı aç"
     ]
   },
   "uk": {
@@ -2482,7 +2482,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Довідка"
     ],
     "support-status": [
-      "Service status"
+      "Стан сервісу"
     ],
     "method": [
       "Як це працює",
@@ -2513,10 +2513,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Ваші дебати"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Відкрити ваші дебати"
     ],
     "public-debate": [
-      "Open public debate"
+      "Відкрити загальнодоступні дебати"
     ]
   },
   "vi": {
@@ -2538,7 +2538,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Trợ giúp"
     ],
     "support-status": [
-      "Service status"
+      "Trạng thái dịch vụ"
     ],
     "method": [
       "Cách hoạt động",
@@ -2569,10 +2569,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "Các cuộc tranh luận của bạn"
     ],
     "owner-debate": [
-      "Open your debate"
+      "Mở cuộc tranh luận của bạn"
     ],
     "public-debate": [
-      "Open public debate"
+      "Mở cuộc tranh luận công khai"
     ]
   },
   "zh": {
@@ -2594,7 +2594,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "帮助"
     ],
     "support-status": [
-      "Service status"
+      "服务状态"
     ],
     "method": [
       "运作方式",
@@ -2625,10 +2625,10 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "您的辩论"
     ],
     "owner-debate": [
-      "Open your debate"
+      "打开您的辩论"
     ],
     "public-debate": [
-      "Open public debate"
+      "打开公开辩论"
     ]
   }
 } as const satisfies Readonly<Record<SupportLanguage, Readonly<Record<Exclude<SupportActionId, "forgot-password">, readonly string[]>>>>;
@@ -2636,7 +2636,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
 export const SUPPORT_TOPIC_PROMPTS = {
   "ar": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "كيف أبدأ مناظرتي الأولى؟",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -2644,17 +2644,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "ما دلالة علامة الشرط؟",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "كيف أقرأ الدرجات والمراجعات والأحكام؟",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "هل يمكنني إلغاء نشر مناظرة؟",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -2662,14 +2662,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "كيف أدير MFA والجلسات النشطة؟",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "كيف تتم حماية محادثة الدعم الخاصة بي؟",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -2679,7 +2679,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "bg": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Как да започна първия си дебат?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -2687,17 +2687,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Какво означава знакът за условие?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Как да разчитам оценките, прегледите и решенията?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Мога ли да отменя публикуването на дебат?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -2705,14 +2705,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Как да управлявам MFA и активните сесии?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Как е защитен разговорът ми с поддръжката?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -2722,7 +2722,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "cs": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Jak zahájím svou první debatu?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -2730,17 +2730,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Co znamená značka podmínky?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Jak mám číst skóre, hodnocení a verdikty?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Mohu zrušit publikování debaty?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -2748,14 +2748,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Jak mohu spravovat MFA a aktivní relace?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Jak je chráněna moje konverzace s podporou?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -2765,7 +2765,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "da": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Hvordan starter jeg min første debat?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -2773,17 +2773,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Hvad betyder en betingelsesmarkering?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Hvordan skal jeg læse point, vurderinger og afgørelser?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Kan jeg afpublicere en debat?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -2791,14 +2791,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Hvordan administrerer jeg MFA og aktive sessioner?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Hvordan beskyttes min supportsamtale?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -2808,7 +2808,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "de": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Wie starte ich meine erste Debatte?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -2816,17 +2816,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Was bedeutet eine Bedingungsmarkierung?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Wie sind Punktzahlen, Bewertungen und Urteile zu lesen?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Kann ich die Veröffentlichung einer Debatte zurücknehmen?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -2834,14 +2834,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Wie verwalte ich MFA und aktive Sitzungen?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Wie wird mein Supportgespräch geschützt?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -2851,7 +2851,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "el": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Πώς μπορώ να ξεκινήσω την πρώτη μου αντιπαράθεση;",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -2859,17 +2859,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Τι σημαίνει μια ένδειξη συνθήκης;",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Πώς πρέπει να διαβάζω τις βαθμολογίες, τις αξιολογήσεις και τις ετυμηγορίες;",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Μπορώ να αναιρέσω τη δημοσίευση μιας αντιπαράθεσης;",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -2877,14 +2877,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Πώς διαχειρίζομαι το MFA και τις ενεργές συνεδρίες;",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Πώς προστατεύεται η συνομιλία μου με την υποστήριξη;",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -2937,7 +2937,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "es": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "¿Cómo inicio mi primer debate?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -2945,17 +2945,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "¿Qué significa una marca de condición?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "¿Cómo debo interpretar las puntuaciones, las revisiones y los veredictos?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "¿Puedo retirar la publicación de un debate?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -2963,14 +2963,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "¿Cómo gestiono MFA y las sesiones activas?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "¿Cómo se protege mi conversación con soporte?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -2980,7 +2980,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "et": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Kuidas alustada oma esimest väitlust?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -2988,17 +2988,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Mida tähendab tingimusmärge?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Kuidas lugeda punkte, hinnanguid ja otsuseid?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Kas ma saan väitluse avaldamise tühistada?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3006,14 +3006,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Kuidas hallata MFA-d ja aktiivseid seansse?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Kuidas on minu vestlus kasutajatoega kaitstud?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3023,7 +3023,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "fi": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Miten aloitan ensimmäisen väittelyni?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3031,17 +3031,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Mitä ehtomerkintä tarkoittaa?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Kuinka pisteitä, arvioita ja ratkaisuja tulisi tulkita?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Voinko perua väittelyn julkaisun?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3049,14 +3049,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Miten hallitsen MFA:ta ja aktiivisia istuntoja?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Miten tukikeskusteluni suojataan?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3066,7 +3066,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "fr": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Comment lancer mon premier débat ?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3074,17 +3074,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Que signifie un marqueur de condition ?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Comment interpréter les scores, les évaluations et les verdicts ?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Puis-je dépublier un débat ?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3092,14 +3092,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Comment gérer le MFA et les sessions actives ?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Comment ma conversation avec l’assistance est-elle protégée ?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3109,7 +3109,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "ga": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Conas a chuirim tús le mo chéad díospóireacht?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3117,17 +3117,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Cad is brí le marc coinníll?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Conas ba cheart dom scóir, léirmheasanna agus breithiúnais a léamh?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "An féidir liom díospóireacht a dhífhoilsiú?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3135,14 +3135,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Conas a bhainistím MFA agus seisiúin ghníomhacha?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Conas a chosnaítear mo chomhrá tacaíochta?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3152,7 +3152,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "he": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "כיצד מתחילים דיון ראשון?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3160,17 +3160,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "מה המשמעות של סימון תנאי?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "כיצד יש לקרוא ציונים, ביקורות והכרעות?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "האם ניתן לבטל פרסום של דיון?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3178,14 +3178,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "כיצד מנהלים MFA והפעלות פעילות?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "כיצד מוגנת שיחת התמיכה שלי?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3195,7 +3195,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "hi": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "अपनी पहली बहस कैसे शुरू करूँ?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3203,17 +3203,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "शर्त चिह्न का क्या अर्थ है?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "अंकों, समीक्षाओं और निर्णयों को कैसे समझूँ?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "क्या बहस का प्रकाशन रद्द किया जा सकता है?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3221,14 +3221,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "MFA और सक्रिय सत्र कैसे प्रबंधित किए जाते हैं?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "मेरी सहायता बातचीत को कैसे सुरक्षित रखा जाता है?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3238,7 +3238,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "hr": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Kako započeti prvu raspravu?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3246,17 +3246,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Što znači oznaka uvjeta?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Kako tumačiti ocjene, osvrte i odluke?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Mogu li povući objavu rasprave?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3264,14 +3264,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Kako upravljati MFA-om i aktivnim sesijama?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Kako je zaštićen moj razgovor s podrškom?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3281,7 +3281,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "hu": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Hogyan indíthatom el az első vitámat?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3289,17 +3289,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Mit jelent a feltételjelölés?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Hogyan értelmezzem a pontszámokat, értékeléseket és döntéseket?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Visszavonhatom egy vita közzétételét?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3307,14 +3307,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Hogyan kezelhetem az MFA-t és az aktív munkameneteket?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Hogyan védjük az ügyfélszolgálati beszélgetésemet?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3324,7 +3324,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "id": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Bagaimana cara memulai debat pertama saya?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3332,17 +3332,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Apa arti tanda kondisi?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Bagaimana cara membaca skor, ulasan, dan putusan?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Dapatkah saya membatalkan penerbitan debat?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3350,14 +3350,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Bagaimana cara mengelola MFA dan sesi aktif?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Bagaimana percakapan dukungan saya dilindungi?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3367,7 +3367,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "it": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Come posso avviare il mio primo dibattito?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3375,17 +3375,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Che cosa significa un indicatore di condizione?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Come si interpretano punteggi, revisioni e verdetti?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Posso annullare la pubblicazione di un dibattito?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3393,14 +3393,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Come gestisco l'MFA e le sessioni attive?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Come viene protetta la mia conversazione con il supporto?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3410,7 +3410,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "ja": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "最初のディベートを始めるにはどうすればよいですか？",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3418,17 +3418,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "条件マークとは何ですか？",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "スコア、レビュー、判定はどう読めばよいですか？",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "ディベートの公開を取り消せますか？",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3436,14 +3436,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "MFAとアクティブなセッションを管理するには？",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "サポートでの会話はどのように保護されますか？",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3453,7 +3453,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "ko": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "첫 토론을 어떻게 시작하나요?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3461,17 +3461,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "조건 표시의 의미는 무엇인가요?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "점수, 검토 및 판정은 어떻게 해석하나요?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "토론 게시를 취소할 수 있나요?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3479,14 +3479,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "MFA와 활성 세션을 어떻게 관리하나요?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "지원 대화는 어떻게 보호되나요?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3496,7 +3496,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "lt": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Kaip pradėti pirmuosius debatus?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3504,17 +3504,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Ką reiškia sąlygos žyma?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Kaip vertinti balus, apžvalgas ir verdiktus?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Ar galiu atšaukti debatų paskelbimą?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3522,14 +3522,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Kaip valdyti MFA ir aktyvius seansus?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Kaip saugomas mano pokalbis su pagalbos tarnyba?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3539,7 +3539,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "lv": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Kā sākt pirmās debates?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3547,17 +3547,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Ko nozīmē nosacījuma atzīme?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Kā interpretēt vērtējumus, pārskatus un spriedumus?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Vai varu atcelt debašu publicēšanu?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3565,14 +3565,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Kā pārvaldīt MFA un aktīvās sesijas?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Kā tiek aizsargāta mana saruna ar atbalsta dienestu?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3582,7 +3582,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "mt": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Kif nibda l-ewwel dibattitu tiegħi?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3590,17 +3590,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Xi tfisser marka ta' kundizzjoni?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Kif għandi naqra l-punteġġi, ir-rieżamijiet u l-verdetti?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Nista' nneħħi dibattitu mill-pubblikazzjoni?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3608,14 +3608,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Kif nimmaniġġja l-MFA u s-sessjonijiet attivi?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Kif tiġi protetta l-konverżazzjoni tiegħi mal-appoġġ?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3625,7 +3625,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "nl": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Hoe start ik mijn eerste debat?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3633,17 +3633,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Wat betekent een voorwaardemarkering?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Hoe moet ik scores, beoordelingen en oordelen lezen?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Kan ik de publicatie van een debat intrekken?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3651,14 +3651,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Hoe beheer ik MFA en actieve sessies?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Hoe wordt mijn gesprek met ondersteuning beschermd?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3668,7 +3668,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "pl": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Jak rozpocząć pierwszą debatę?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3676,17 +3676,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Co oznacza znacznik warunku?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Jak interpretować punkty, recenzje i werdykty?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Czy mogę cofnąć publikację debaty?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3694,14 +3694,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Jak zarządzać MFA i aktywnymi sesjami?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Jak chroniona jest moja rozmowa z pomocą techniczną?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3711,7 +3711,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "pt": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Como inicio o meu primeiro debate?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3719,17 +3719,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "O que significa um marcador de condição?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Como devo interpretar pontuações, análises e veredictos?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Posso retirar a publicação de um debate?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3737,14 +3737,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Como posso gerir a MFA e as sessões ativas?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Como é protegida a minha conversa com o apoio?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3754,7 +3754,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "ro": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Cum încep prima mea dezbatere?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3762,17 +3762,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Ce înseamnă un marcaj de condiție?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Cum ar trebui să interpretez punctajele, evaluările și verdictele?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Pot anula publicarea unei dezbateri?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3780,14 +3780,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Cum gestionez MFA și sesiunile active?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Cum este protejată conversația mea cu serviciul de asistență?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3797,7 +3797,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "ru": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Как начать свои первые дебаты?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3805,17 +3805,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Что означает метка условия?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Как читать оценки, рецензии и вердикты?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Можно ли отменить публикацию дебатов?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3823,14 +3823,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Как управлять MFA и активными сеансами?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Как защищена моя переписка со службой поддержки?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3840,7 +3840,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "sk": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Ako začnem svoju prvú diskusiu?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3848,17 +3848,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Čo znamená značka podmienky?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Ako mám čítať skóre, posudky a verdikty?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Môžem zrušiť zverejnenie diskusie?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3866,14 +3866,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Ako spravujem MFA a aktívne relácie?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Ako je chránená moja konverzácia s podporou?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3883,7 +3883,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "sl": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Kako začnem svojo prvo razpravo?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3891,17 +3891,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Kaj pomeni oznaka pogoja?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Kako naj berem ocene, preglede in razsodbe?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Ali lahko prekličem objavo razprave?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3909,14 +3909,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Kako upravljam MFA in aktivne seje?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Kako je zaščiten moj pogovor s podporo?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3926,7 +3926,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "sv": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Hur startar jag min första debatt?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3934,17 +3934,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Vad betyder en villkorsmarkering?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Hur ska jag tolka poäng, granskningar och utslag?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Kan jag avpublicera en debatt?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3952,14 +3952,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Hur hanterar jag MFA och aktiva sessioner?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Hur skyddas mitt supportsamtal?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -3969,7 +3969,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "tr": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "İlk tartışmamı nasıl başlatırım?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -3977,17 +3977,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Koşul işareti ne anlama gelir?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Puanları, değerlendirmeleri ve hükümleri nasıl okumalıyım?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Bir tartışmayı yayından kaldırabilir miyim?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -3995,14 +3995,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "MFA'yı ve etkin oturumları nasıl yönetirim?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Destek görüşmem nasıl korunuyor?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -4012,7 +4012,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "uk": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Як розпочати свої перші дебати?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -4020,17 +4020,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Що означає позначка умови?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Як читати оцінки, рецензії та вердикти?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Чи можна скасувати публікацію дебатів?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -4038,14 +4038,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Як керувати MFA та активними сеансами?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Як захищено мою розмову зі службою підтримки?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -4055,7 +4055,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "vi": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "Làm thế nào để bắt đầu cuộc tranh luận đầu tiên?",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -4063,17 +4063,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "Dấu điều kiện có ý nghĩa gì?",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "Tôi nên đọc điểm số, đánh giá và phán quyết như thế nào?",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "Tôi có thể hủy xuất bản một cuộc tranh luận không?",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -4081,14 +4081,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "Tôi quản lý MFA và các phiên đang hoạt động như thế nào?",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "Cuộc trò chuyện hỗ trợ của tôi được bảo vệ như thế nào?",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",
@@ -4098,7 +4098,7 @@ export const SUPPORT_TOPIC_PROMPTS = {
   ],
   "zh": [
     {
-      "prompt": "How do I start my first debate?",
+      "prompt": "如何开始我的第一次辩论？",
       "sourceIds": [
         "getting-started-debate",
         "risk-tier-choice",
@@ -4106,17 +4106,17 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "What does a condition mark mean?",
+      "prompt": "条件标记是什么意思？",
       "sourceIds": [
         "guide-how-it-works"
       ]
     },
     {
-      "prompt": "How should I read scores, reviews, and verdicts?",
+      "prompt": "如何理解分数、评审和裁决？",
       "sourceIds": []
     },
     {
-      "prompt": "Can I unpublish a debate?",
+      "prompt": "可以取消发布辩论吗？",
       "sourceIds": [
         "unpublish-a-debate",
         "delete-a-private-debate",
@@ -4124,14 +4124,14 @@ export const SUPPORT_TOPIC_PROMPTS = {
       ]
     },
     {
-      "prompt": "How do I manage MFA and active sessions?",
+      "prompt": "如何管理 MFA 和活动会话？",
       "sourceIds": [
         "settings-help-menus",
         "account-settings"
       ]
     },
     {
-      "prompt": "How is my support conversation protected?",
+      "prompt": "我的支持对话如何得到保护？",
       "sourceIds": [
         "app-navigation",
         "settings-help-menus",

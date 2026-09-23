@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Insiden yang diketahui sejak {started_at}: {summary_en} (diterbitkan oleh tim). Jika masalah Anda sesuai, Anda tidak perlu melaporkannya; jika tidak, pilih ‘Bicara dengan petugas’.",
   "NO_INCIDENT": "Saya tidak memiliki catatan tentang insiden yang diketahui saat ini. Itu tidak menutup kemungkinan adanya insiden — jika sesuatu tampak rusak, pilih ‘Bicara dengan petugas’ dan jelaskan masalahnya.",
   "INCIDENT_NOTICE": "Catatan: ada insiden yang diketahui memengaruhi {surface} sejak {started_at}.",
-  "QUEUED": "Menunggu model asisten… Anda berada di urutan ke-{n}."
+  "QUEUED": "Menunggu model asisten… Anda berada di urutan ke-{n}.",
+  "SUMMARY_REPLACED": "Ringkasan panduan dihilangkan karena tidak lolos pemeriksaan keamanan Dukungan.",
+  "SHREDDED_NOTICE": "Percakapan ini dihapus atas permintaan pemilik.",
+  "INCIDENT_SURFACE_DEBATES": "debat",
+  "INCIDENT_SURFACE_PUBLISHING": "penerbitan",
+  "INCIDENT_SURFACE_SIGN_IN": "proses masuk",
+  "INCIDENT_SURFACE_WHOLE_SITE": "seluruh situs"
 }

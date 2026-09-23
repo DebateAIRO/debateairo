@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Incidente conocido desde {started_at}: {summary_en} (publicado por el equipo). Si su problema coincide, no es necesario que lo comunique; de lo contrario, elija «Hablar con una persona».",
   "NO_INCIDENT": "No tengo constancia de ningún incidente conocido en este momento. Eso no descarta que exista uno: si algo parece no funcionar, elija «Hablar con una persona» y descríbalo.",
   "INCIDENT_NOTICE": "Nota: hay un incidente conocido que afecta a {surface} desde {started_at}.",
-  "QUEUED": "Esperando al modelo del asistente… ocupa el puesto {n} de la cola."
+  "QUEUED": "Esperando al modelo del asistente… ocupa el puesto {n} de la cola.",
+  "SUMMARY_REPLACED": "El resumen orientativo se omitió porque no superó las comprobaciones de seguridad de Soporte.",
+  "SHREDDED_NOTICE": "Esta conversación se eliminó a petición del propietario.",
+  "INCIDENT_SURFACE_DEBATES": "los debates",
+  "INCIDENT_SURFACE_PUBLISHING": "la publicación",
+  "INCIDENT_SURFACE_SIGN_IN": "el inicio de sesión",
+  "INCIDENT_SURFACE_WHOLE_SITE": "todo el sitio"
 }

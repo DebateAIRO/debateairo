@@ -1,7 +1,6 @@
 export {
   OUTCOMES,
   readSupportContent,
-  SHREDDED_NOTICE,
   SUPPORT_TEMPLATE_IDS,
   SUPPORT_TEMPLATES,
   SupportTemplateError,

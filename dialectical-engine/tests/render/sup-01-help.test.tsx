@@ -314,7 +314,9 @@ describe("SUP-01 /help assistant", () => {
     vi.mocked(transport.createSession).mockResolvedValue(roSession);
     await renderLocalized("ro",<Assistant client={transport} />);
     await submit("Cum funcționează dezbaterile?");
-    expect(document.querySelector('[aria-label="Support conversation"]')?.firstElementChild?.textContent)
+    expect(document.querySelector(
+      `[aria-label="${supportRomanian["support.conversation"]}"]`
+    )?.firstElementChild?.textContent)
       .toContain("sunt asistentul de suport Dialectical Engine");
     expect(transport.createSession).toHaveBeenCalledWith("ro");
     expect(transport.sendMessage).toHaveBeenCalledWith(

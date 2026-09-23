@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Incidente noto dal {started_at}: {summary_en} (pubblicato dal team). Se il suo problema corrisponde, non occorre segnalarlo; altrimenti scelga «Parla con una persona».",
   "NO_INCIDENT": "Non risulta alcun incidente noto in corso. Ciò non ne esclude l'esistenza: se qualcosa sembra non funzionare, scelga «Parla con una persona» e descriva il problema.",
   "INCIDENT_NOTICE": "Nota: è in corso un incidente noto che interessa {surface} dal {started_at}.",
-  "QUEUED": "In attesa del modello dell'assistente… la sua posizione in coda è {n}."
+  "QUEUED": "In attesa del modello dell'assistente… la sua posizione in coda è {n}.",
+  "SUMMARY_REPLACED": "Il riepilogo orientativo è stato omesso perché non ha superato i controlli di sicurezza dell’assistenza.",
+  "SHREDDED_NOTICE": "Questa conversazione è stata cancellata su richiesta del proprietario.",
+  "INCIDENT_SURFACE_DEBATES": "i dibattiti",
+  "INCIDENT_SURFACE_PUBLISHING": "la pubblicazione",
+  "INCIDENT_SURFACE_SIGN_IN": "l’accesso",
+  "INCIDENT_SURFACE_WHOLE_SITE": "l’intero sito"
 }

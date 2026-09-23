@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "{started_at} tarihinden beri bilinen olay: {summary_en} (ekip tarafından yayımlandı). Sorununuz bununla eşleşiyorsa bildirmenize gerek yoktur; aksi halde “Bir yetkiliyle görüş” seçeneğini belirleyin.",
   "NO_INCIDENT": "Şu anda bilinen etkin bir olaya ilişkin kaydım yok. Bu, böyle bir olayın bulunmadığı anlamına gelmez — bir şey bozuk görünüyorsa “Bir yetkiliyle görüş” seçeneğini belirleyip sorunu açıklayın.",
   "INCIDENT_NOTICE": "Not: {started_at} tarihinden beri {surface} alanını etkileyen bilinen bir olay var.",
-  "QUEUED": "Asistanın modeli bekleniyor… sırada {n}."
+  "QUEUED": "Asistanın modeli bekleniyor… sırada {n}.",
+  "SUMMARY_REPLACED": "Danışma amaçlı özet, Destek güvenlik kontrollerinden geçemediği için çıkarıldı.",
+  "SHREDDED_NOTICE": "Bu görüşme, sahibinin isteği üzerine silindi.",
+  "INCIDENT_SURFACE_DEBATES": "tartışmaları",
+  "INCIDENT_SURFACE_PUBLISHING": "yayımlamayı",
+  "INCIDENT_SURFACE_SIGN_IN": "oturum açmayı",
+  "INCIDENT_SURFACE_WHOLE_SITE": "sitenin tamamını"
 }

@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Znany incydent od {started_at}: {summary_en} (opublikowany przez zespół). Jeśli Państwa problem jest z nim związany, nie trzeba go zgłaszać; w przeciwnym razie proszę wybrać opcję „Porozmawiaj z człowiekiem”.",
   "NO_INCIDENT": "Nie mam informacji o żadnym obecnie znanym incydencie. Nie wyklucza to jego wystąpienia — jeśli coś wygląda na niesprawne, proszę wybrać opcję „Porozmawiaj z człowiekiem” i opisać problem.",
   "INCIDENT_NOTICE": "Uwaga: od {started_at} trwa znany incydent wpływający na {surface}.",
-  "QUEUED": "Oczekiwanie na model asystenta… Państwa numer w kolejce to {n}."
+  "QUEUED": "Oczekiwanie na model asystenta… Państwa numer w kolejce to {n}.",
+  "SUMMARY_REPLACED": "Orientacyjne podsumowanie pominięto, ponieważ nie przeszło kontroli bezpieczeństwa Pomocy.",
+  "SHREDDED_NOTICE": "Ta rozmowa została usunięta na prośbę właściciela.",
+  "INCIDENT_SURFACE_DEBATES": "debaty",
+  "INCIDENT_SURFACE_PUBLISHING": "publikowanie",
+  "INCIDENT_SURFACE_SIGN_IN": "logowanie",
+  "INCIDENT_SURFACE_WHOLE_SITE": "całą witrynę"
 }

@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Poznati incident traje od {started_at}: {summary_en} (objavio ga je tim). Ako se Vaš problem podudara s njim, ne morate ga prijaviti; u suprotnom odaberite „Razgovor s osobom“.",
   "NO_INCIDENT": "Nemam zapis o trenutačnom poznatom incidentu. To ne znači da ga nema — ako nešto izgleda neispravno, odaberite „Razgovor s osobom“ i opišite problem.",
   "INCIDENT_NOTICE": "Napomena: poznati incident utječe na {surface} od {started_at}.",
-  "QUEUED": "Čeka se model asistenta… Vaš je broj u redu {n}."
+  "QUEUED": "Čeka se model asistenta… Vaš je broj u redu {n}.",
+  "SUMMARY_REPLACED": "Savjetodavni sažetak izostavljen je jer nije prošao sigurnosne provjere podrške.",
+  "SHREDDED_NOTICE": "Ovaj je razgovor izbrisan na zahtjev vlasnika.",
+  "INCIDENT_SURFACE_DEBATES": "rasprave",
+  "INCIDENT_SURFACE_PUBLISHING": "objavljivanje",
+  "INCIDENT_SURFACE_SIGN_IN": "prijavu",
+  "INCIDENT_SURFACE_WHOLE_SITE": "cijelo web-mjesto"
 }

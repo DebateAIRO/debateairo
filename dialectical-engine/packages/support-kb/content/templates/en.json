@@ -18,5 +18,11 @@
   "INCIDENT_ACTIVE": "Known incident since {started_at}: {summary_en} (published by the team). If your problem matches, no need to report it; otherwise choose 'Talk to a human'.",
   "NO_INCIDENT": "I have no record of a current known incident. That doesn't rule one out — if something looks broken, choose 'Talk to a human' and describe it.",
   "INCIDENT_NOTICE": "Note: there is a known incident affecting {surface} since {started_at}.",
-  "QUEUED": "Waiting for the assistant's model… you are number {n} in line."
+  "QUEUED": "Waiting for the assistant's model… you are number {n} in line.",
+  "SUMMARY_REPLACED": "The advisory summary was omitted because it did not pass Support safety checks.",
+  "SHREDDED_NOTICE": "This conversation was erased at the owner's request.",
+  "INCIDENT_SURFACE_DEBATES": "debates",
+  "INCIDENT_SURFACE_PUBLISHING": "publishing",
+  "INCIDENT_SURFACE_SIGN_IN": "sign-in",
+  "INCIDENT_SURFACE_WHOLE_SITE": "the whole site"
 }

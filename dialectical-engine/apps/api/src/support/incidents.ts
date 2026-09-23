@@ -180,8 +180,14 @@ export function applyIncidentNotice(
   const active = incidents.find((incident) => incident.endedAt === null
     && touches(incident.affectedSurface,intentSurface));
   if (active === undefined) return reply;
+  const surface = supportTemplate(({
+    debates: "INCIDENT_SURFACE_DEBATES",
+    publishing: "INCIDENT_SURFACE_PUBLISHING",
+    "sign-in": "INCIDENT_SURFACE_SIGN_IN",
+    "whole-site": "INCIDENT_SURFACE_WHOLE_SITE"
+  } as const)[active.affectedSurface],language);
   const notice = supportTemplate("INCIDENT_NOTICE",language)
-    .replace("{surface}",active.affectedSurface)
+    .replace("{surface}",surface)
     .replace("{started_at}",active.startedAt.toISOString());
   return `${notice}\n\n${reply}`;
 }
