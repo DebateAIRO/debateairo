@@ -6,6 +6,7 @@ import {
   SUPPORT_TEMPLATE_IDS,
   SUPPORT_TEMPLATES
 } from "../../apps/api/src/support/templates.js";
+import { SUPPORT_LOCALES } from "../../packages/support-kb/src/locale.js";
 
 describe("SUP-01 closed support copy", () => {
   it("exports the exact outcome vocabulary", () => {
@@ -18,7 +19,7 @@ describe("SUP-01 closed support copy", () => {
     expect(Object.isFrozen(OUTCOMES)).toBe(true);
   });
 
-  it("has one frozen non-empty English and Romanian value for every fixed template", () => {
+  it("has one frozen non-empty value in every support locale for every fixed template", () => {
     expect(SUPPORT_TEMPLATE_IDS).toEqual([
       "DISCLOSURE", "NO_SOURCE", "REFUSE_ZONE", "REFUSE_INJECTION", "REFUSE_SAFETY",
       "DEGRADED", "DISABLED", "RATE_LIMITED", "RATING", "CASE_OPENED_MINIMAL", "CASE_OPENED",
@@ -26,15 +27,16 @@ describe("SUP-01 closed support copy", () => {
       "INCIDENT_ACTIVE", "NO_INCIDENT", "INCIDENT_NOTICE", "QUEUED"
     ]);
     for (const id of SUPPORT_TEMPLATE_IDS) {
-      expect(Object.keys(SUPPORT_TEMPLATES[id])).toEqual(["en", "ro"]);
-      expect(SUPPORT_TEMPLATES[id].en.length).toBeGreaterThan(0);
-      expect(SUPPORT_TEMPLATES[id].ro.length).toBeGreaterThan(0);
+      expect(Object.keys(SUPPORT_TEMPLATES[id])).toEqual(SUPPORT_LOCALES);
+      for (const locale of SUPPORT_LOCALES) {
+        expect(SUPPORT_TEMPLATES[id][locale].length).toBeGreaterThan(0);
+      }
       expect(Object.isFrozen(SUPPORT_TEMPLATES[id])).toBe(true);
     }
   });
 
   it("pins the frozen bilingual shredded notice as exact UTF-8 bytes", () => {
-    expect(SHREDDED_NOTICE).toEqual({
+    expect({ en:SHREDDED_NOTICE.en,ro:SHREDDED_NOTICE.ro }).toEqual({
       en: "This conversation was erased at the owner's request.",
       ro: "Această conversație a fost ștearsă la cererea proprietarului."
     });

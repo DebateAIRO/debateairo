@@ -1,8 +1,11 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe,expect,it,vi } from "vitest";
+import jaChrome from "../../apps/ui/messages/ja/chrome.json" with { type: "json" };
 
-import { createSupportAnswerService } from "../../apps/api/src/support/answer.js";
+import {
+  createSupportAnswerService,structuredInstruction
+} from "../../apps/api/src/support/answer.js";
 import type { SupportModelPort } from "../../apps/api/src/support/model.js";
 import {
   createHelpCorpusSnapshotLookup,loadHelpCorpus,type HelpCorpusEntry,type LoadedHelpCorpus
@@ -74,6 +77,17 @@ function request(snapshot: LoadedHelpCorpus) {
 
 describe("CP1 composed answer context", () => {
   it.each([
+    ["ja" as const,"Japanese (日本語)"],
+    ["ro" as const,"Romanian (Română)"]
+  ])("keeps the English structured-output contract while selecting %s prose",(language,name) => {
+    const instruction = structuredInstruction(language);
+    expect(instruction).toContain(name);
+    expect(instruction).toContain("kind must be answer");
+    expect(instruction).toContain('"kind":"answer"');
+    expect(instruction).not.toContain("Returnează numai");
+  });
+
+  it.each([
     "What is Dialectical-Engine?",
     "What is Dialectical Engine?",
     "What is DebateAIRO?",
@@ -126,6 +140,42 @@ describe("CP1 composed answer context", () => {
     expect(result).toMatchObject({
       outcome:"ANSWER_GROUNDED",sources:[{ id:"product-identity" }],actions:[]
     });
+  });
+
+  it("answers Japanese from the English corpus while preserving canonical citations",async () => {
+    const guide = Object.freeze({
+      ...entry("settings-help-menus","Settings contains account controls."),
+      title:"Settings and help"
+    });
+    const snapshot = corpus([guide],"ja-corpus-split");
+    let system = "";
+    const complete = vi.fn(async (input: Readonly<{ system:string }>) => {
+      system = input.system;
+      return Object.freeze({ text:JSON.stringify({
+        kind:"answer",text:"設定を開いてください。",
+        sourceIds:[SOURCE_REFERENCE],actionIds:[ACTION_REFERENCE]
+      }) });
+    });
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-17T12:00:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({
+      ...request(snapshot),text:`${jaChrome["chrome.settings"]} はどこですか？`,
+      language:"ja",detectedLanguage:"en",signedIn:true
+    });
+
+    expect(result).toMatchObject({
+      outcome:"ANSWER_GROUNDED",text:"設定を開いてください。",
+      sources:[{ id:"settings-help-menus",label:"Settings and help" }],
+      actions:[{ id:"settings",label:jaChrome["chrome.settings"],href:"/settings" }]
+    });
+    expect(result.sources?.[0]?.id).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u);
+    expect(system).toContain("Japanese (日本語)");
+    expect(system).toContain(jaChrome["chrome.settings"]);
+    expect(system).not.toContain("actions=Settings");
   });
 
   it.each([

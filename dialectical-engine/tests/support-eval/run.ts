@@ -6,6 +6,7 @@ import type { FastifyInstance } from "fastify";
 import {
   createHelpCorpusSnapshotLookup,loadHelpCorpus
 } from "../../packages/support-kb/src/index.js";
+import type { SupportLanguage } from "../../packages/support-kb/src/catalog.js";
 import { buildApi,type AskApplication } from "../../apps/api/src/index.js";
 import { createSupportAnswerService } from "../../apps/api/src/support/answer.js";
 import { createSupportKeyPort } from "../../apps/api/src/support/keys.js";
@@ -348,7 +349,7 @@ function outputReferences(system: string,key: "sourceIds"|"actionIds"): readonly
 
 export function createDeterministicStructuralCompletion(input: Readonly<{
   system:string;
-  language:"en"|"ro";
+  language:SupportLanguage;
 }>): Readonly<{ text:string }> {
   return Object.freeze({ text:JSON.stringify({
     kind:"answer",

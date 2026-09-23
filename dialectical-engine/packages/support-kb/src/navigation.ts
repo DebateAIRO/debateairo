@@ -6,6 +6,7 @@ import {
   type SupportActionId,
   type SupportLanguage,
 } from "./catalog.js";
+import { SUPPORT_UI_LABELS } from "./ui-labels.js";
 
 export type SupportNavigationContext = Readonly<{
   signedIn: boolean;
@@ -91,9 +92,10 @@ export function resolveSupportActions(
     if (definition === undefined || !isApplicable(definition, context)) continue;
     const href = hrefFor(definition, context);
     if (href === null || !isSafeHref(href)) continue;
+    if (definition.id === "forgot-password") continue;
     resolved.push(Object.freeze({
       id: definition.id,
-      label: definition.labels[context.language],
+      label: SUPPORT_UI_LABELS[context.language][definition.id],
       href,
     }));
   }

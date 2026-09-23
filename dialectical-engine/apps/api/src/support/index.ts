@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { SupportConfigurationPort, SupportConfigurationState } from "@debateai/register";
 import type { LoadedHelpCorpus } from "@debateai/support-kb";
+import { isSupportLanguage,type SupportLanguage } from "@debateai/support-kb/catalog";
 import { normalizeClientIp } from "../client-ip.js";
 import { SupportC3AdmissionWindow } from "./c3-admission.js";
 import type { SupportAnswerPort } from "./answer.js";
@@ -20,7 +21,7 @@ import {
   type SupportSessionPort,
   type SupportSessionRecord
 } from "./session.js";
-import { SHREDDED_NOTICE,supportTemplate,type SupportLanguage } from "./templates.js";
+import { SHREDDED_NOTICE,supportTemplate } from "./templates.js";
 import { recoverySecurityGuidance,type SupportSecurityRecoveryKind } from "./security-guidance.js";
 
 export const SUPPORT_ROUTE_PATHS = Object.freeze([
@@ -66,7 +67,7 @@ export type SupportRoutePolicy = (route: SupportRoutePath) => Readonly<{
 }>;
 
 function languageFrom(value: unknown): SupportLanguage | null {
-  return value === "en" || value === "ro" ? value : null;
+  return isSupportLanguage(value) ? value : null;
 }
 
 function capabilityFrom(request: FastifyRequest): string | null {

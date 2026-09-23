@@ -39,11 +39,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const cookieLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
   const locale = isLocale(cookieLocale) ? cookieLocale : "en";
   const localeDefinition = getLocale(locale);
-  const [chrome, debateViews] = await Promise.all([
+  const [chrome, debateViews, support] = await Promise.all([
     loadNamespace(locale, "chrome"),
-    loadNamespace(locale, "debateViews")
+    loadNamespace(locale, "debateViews"),
+    loadNamespace(locale, "support")
   ]);
-  const sharedCatalog = Object.freeze({ ...chrome, ...debateViews });
+  const sharedCatalog = Object.freeze({ ...chrome, ...debateViews, ...support });
 
   return (
     <html

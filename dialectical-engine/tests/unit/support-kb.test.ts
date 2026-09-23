@@ -11,6 +11,10 @@ import {
   loadHelpCorpus,
   type SupportReviewManifest,
 } from "../../packages/support-kb/src/index.js";
+import { SUPPORT_LOCALES } from "../../packages/support-kb/src/locale.js";
+import {
+  loadSupportTemplates,SUPPORT_TEMPLATE_IDS,SUPPORT_TEMPLATES
+} from "../../packages/support-kb/src/templates.js";
 
 type EntryFixture = {
   id: string;
@@ -104,6 +108,42 @@ afterEach(() => {
 });
 
 describe("Help Corpus loader", () => {
+  it("loads all 20 locale templates without changing the English or Romanian bytes",() => {
+    const directory = fileURLToPath(new URL(
+      "../../packages/support-kb/content/templates/",import.meta.url
+    ));
+    const en = JSON.parse(readFileSync(join(directory,"en.json"),"utf8")) as Record<string,string>;
+    const ro = JSON.parse(readFileSync(join(directory,"ro.json"),"utf8")) as Record<string,string>;
+    expect(Object.keys(en)).toEqual(SUPPORT_TEMPLATE_IDS);
+    expect(Object.keys(ro)).toEqual(SUPPORT_TEMPLATE_IDS);
+    expect(Object.fromEntries(SUPPORT_TEMPLATE_IDS.map((id) => [id,SUPPORT_TEMPLATES[id].en])))
+      .toEqual(en);
+    expect(Object.fromEntries(SUPPORT_TEMPLATE_IDS.map((id) => [id,SUPPORT_TEMPLATES[id].ro])))
+      .toEqual(ro);
+    for (const locale of SUPPORT_LOCALES) {
+      const values = JSON.parse(readFileSync(
+        join(directory,`${locale}.json`),"utf8"
+      )) as Record<string,string>;
+      expect(Object.keys(values)).toEqual(SUPPORT_TEMPLATE_IDS);
+      if (locale !== "en" && locale !== "ro") expect(values).toEqual(en);
+    }
+  });
+
+  it("fails closed with SUPPORT_TEMPLATE_MISSING when one locale key is absent",() => {
+    const source = fileURLToPath(new URL(
+      "../../packages/support-kb/content/templates/",import.meta.url
+    ));
+    const directory = fixtureDirectory();
+    for (const locale of SUPPORT_LOCALES) {
+      const values = JSON.parse(readFileSync(join(source,`${locale}.json`),"utf8")) as Record<string,string>;
+      if (locale === "ja") delete values.NO_SOURCE;
+      writeFileSync(join(directory,`${locale}.json`),`${JSON.stringify(values)}\n`);
+    }
+    expect(() => loadSupportTemplates(directory)).toThrowError(expect.objectContaining({
+      code:"SUPPORT_TEMPLATE_MISSING"
+    }));
+  });
+
   it("keeps paired public scoring and human-case draft facts aligned", () => {
     const content = fileURLToPath(
       new URL("../../packages/support-kb/content/", import.meta.url),

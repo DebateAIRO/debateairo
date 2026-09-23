@@ -319,6 +319,19 @@ describe("CP1 support model response policy", () => {
     )).toEqual(parsed);
   });
 
+  it("accepts localized text only when the machine envelope stays in English",() => {
+    expect(parseSupportDraft(JSON.stringify({
+      kind:"answer",text:"最初のディベートを開始できます。",
+      sourceIds:["getting-started-debate"],actionIds:[]
+    }))).toEqual({
+      kind:"answer",text:"最初のディベートを開始できます。",
+      sourceIds:["getting-started-debate"],actionIds:[]
+    });
+    for (const kind of ["回答","răspuns"]) expect(parseSupportDraft(JSON.stringify({
+      kind,text:"Grounded text.",sourceIds:["getting-started-debate"],actionIds:[]
+    }))).toBeNull();
+  });
+
   it.each([
     "Settings does not offer controls to replace a password or regenerate MFA. Support cannot accept credentials.",
     "A fresh sign in may be required in Settings, but Support cannot receive passwords or security codes.",

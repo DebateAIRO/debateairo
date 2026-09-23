@@ -1,6 +1,7 @@
 import chromeEnglish from "../../messages/en/chrome.json" with { type: "json" };
 import homeEnglish from "../../messages/en/home.json" with { type: "json" };
 import newDebateEnglish from "../../messages/en/newDebate.json" with { type: "json" };
+import supportEnglish from "../../messages/en/support.json" with { type: "json" };
 import timeEnglish from "../../messages/en/time.json" with { type: "json" };
 
 export type MessageCatalog = Readonly<Record<string, string>>;
@@ -10,6 +11,7 @@ const ENGLISH_MESSAGES: MessageCatalog = Object.freeze({
   ...chromeEnglish,
   ...homeEnglish,
   ...newDebateEnglish,
+  ...supportEnglish,
   ...timeEnglish
 });
 

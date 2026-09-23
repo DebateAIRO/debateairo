@@ -1,6 +1,9 @@
 import { readdirSync,readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import enChrome from "../../apps/ui/messages/en/chrome.json" with { type: "json" };
+import jaChrome from "../../apps/ui/messages/ja/chrome.json" with { type: "json" };
+import roChrome from "../../apps/ui/messages/ro/chrome.json" with { type: "json" };
 
 import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
 import { buildSupportKnowledgeContext as buildContext } from "../../packages/support-kb/src/context.js";
@@ -477,6 +480,41 @@ describe("Support knowledge context", () => {
     });
     expect(result.sourceIds.length).toBeGreaterThan(0);
     expect(result.requestedActionIds).toEqual(expectedActionIds);
+    if (expectedActionIds.includes("help")) {
+      const [action] = resolveSupportActions(result.requestedActionIds,{ signedIn:false,language });
+      expect(action?.label).toBe(language === "ro"
+        ? roChrome["chrome.help"] : enChrome["chrome.help"]);
+      expect(action?.label).not.toBe("Help desk");
+      expect(action?.label).not.toBe("Centrul de ajutor");
+    }
+  });
+
+  it("uses the Japanese Settings catalogue label without treating arbitrary kana as navigation",() => {
+    const corpus = productionReviewedCorpus();
+    const availableActionIds = resolveSupportActions(SUPPORT_ACTION_IDS,{
+      signedIn:true,language:"ja"
+    }).map(({ id }) => id);
+    const localized = buildSupportKnowledgeContext({
+      entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,availableActionIds,
+      language:"ja",query:`${jaChrome["chrome.settings"]} はどこですか？`,
+      historyText:"",maxCodePoints:24_000
+    });
+    expect(localized.sourceIds.length).toBeGreaterThan(0);
+    expect(localized.requestedActionIds).toEqual(["settings"]);
+    expect(localized.text).toContain(jaChrome["chrome.settings"]);
+    expect(localized.text).not.toContain("actions=Settings");
+    const english = buildSupportKnowledgeContext({
+      entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,availableActionIds,
+      language:"en",query:"Where is Settings?",historyText:"",maxCodePoints:24_000
+    });
+    expect(localized.requestedActionIds).toEqual(english.requestedActionIds);
+
+    const kanaOnly = buildSupportKnowledgeContext({
+      entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,availableActionIds,
+      language:"ja",query:"かなだけ",historyText:"",maxCodePoints:24_000
+    });
+    expect(kanaOnly.sourceIds).toEqual([]);
+    expect(kanaOnly.requestedActionIds).toEqual([]);
   });
 
   it.each([

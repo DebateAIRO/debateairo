@@ -2,8 +2,9 @@ import type { HelpCorpusEntry } from "./index.js";
 import {
   SUPPORT_ACTION_CATALOG,SUPPORT_GUIDE_LABELS,SUPPORT_SOURCE_POLICIES,
   type SupportActionDefinition,type SupportActionId,type SupportCapability,type SupportLanguage,
-  type SupportSourcePolicy
+  type SupportCorpusLanguage,type SupportSourcePolicy
 } from "./catalog.js";
+import { SUPPORT_TOPIC_PROMPTS,SUPPORT_UI_LABEL_ALIASES,SUPPORT_UI_LABELS } from "./ui-labels.js";
 
 export type SupportKnowledgeReference<CanonicalId extends string = string> = Readonly<{
   reference: string;
@@ -20,7 +21,7 @@ export type SupportKnowledgeContext = Readonly<{
   recoverySourceIds: readonly string[];
 }>;
 
-const POLICY: Readonly<Record<SupportLanguage, readonly string[]>> = Object.freeze({
+const POLICY: Readonly<Record<SupportCorpusLanguage, readonly string[]>> = Object.freeze({
   en: Object.freeze([
     "Use only the reviewed sources and capability catalog below.",
     "Never request, receive, repeat, or submit credentials or security codes.",
@@ -219,14 +220,18 @@ function endsWithPhrase(value: string,term: string): boolean {
 }
 
 function actionEvidenceScore(
-  query: string,definition: SupportActionDefinition,language: SupportLanguage
+  query: string,definition: SupportActionDefinition,language: SupportLanguage,
+  corpusLocale: SupportCorpusLanguage
 ): number {
-  const hasIntent = ACTION_INTENT.test(query);
+  const uiAliases = definition.id === "forgot-password"
+    ? [] : SUPPORT_UI_LABEL_ALIASES[language][definition.id];
+  const hasIntent = ACTION_INTENT.test(query)
+    || language !== corpusLocale && uiAliases.some((label) => phraseScore(query,label) > 0);
   const guideAliases = SUPPORT_GUIDE_LABELS
     .filter(({ actionId }) => actionId === definition.id)
     .filter(({ requiresNavigationIntent }) => !requiresNavigationIntent || hasIntent)
-    .flatMap(({ labels }) => labels[language]);
-  return Math.max(0,...[definition.labels[language],...guideAliases].map((term) => {
+    .flatMap(({ labels }) => labels[corpusLocale]);
+  return Math.max(0,...[...uiAliases,...guideAliases].map((term) => {
     const score = orderedPhraseScore(query,term);
     if (definition.id === "method"
       && /^(?:how\s+it\s+works|cum\s+functioneaza)$/u.test(normalizedText(term))
@@ -250,11 +255,12 @@ function isParentDestination(
 function baseSection(
   capabilities: readonly SupportCapability[],
   language: SupportLanguage,
+  corpusLocale: SupportCorpusLanguage,
   availableActionIds: ReadonlySet<SupportActionId>,
 ): string {
-  const policy = POLICY[language].map((line) => `- ${line}`).join("\n");
+  const policy = POLICY[corpusLocale].map((line) => `- ${line}`).join("\n");
   const actionById = new Map(SUPPORT_ACTION_CATALOG.map((action) => [action.id,action]));
-  const availability: Readonly<Record<SupportCapability["availability"],Readonly<Record<SupportLanguage,string>>>> = {
+  const availability: Readonly<Record<SupportCapability["availability"],Readonly<Record<SupportCorpusLanguage,string>>>> = {
     public: { en:"available to all visitors",ro:"disponibilă tuturor vizitatorilor" },
     "signed-out": { en:"available to signed-out visitors",ro:"disponibilă vizitatorilor neautentificați" },
     "signed-in": { en:"available to signed-in visitors",ro:"disponibilă vizitatorilor autentificați" },
@@ -266,9 +272,10 @@ function baseSection(
   const catalog = capabilities.map((item) => {
     const available = item.actionIds.filter((id) => availableActionIds.has(id));
     const actions = available.length === 0 ? "none" : available
-      .map((id) => actionById.get(id)?.labels[language])
-      .filter((label): label is string => label !== undefined).join(", ");
-    return `- ${item.labels[language]} | ${availability[item.availability][language]} | actions=${actions}`;
+      .map((id) => id === "forgot-password" || actionById.get(id) === undefined
+        ? undefined : SUPPORT_UI_LABELS[language][id])
+      .filter((label) => label !== undefined).join(", ");
+    return `- ${item.labels[corpusLocale]} | ${availability[item.availability][corpusLocale]} | actions=${actions}`;
   }).join("\n");
   return `SUPPORT POLICY\n${policy}\n\nCAPABILITY CATALOG\n${catalog}`;
 }
@@ -298,15 +305,19 @@ export function buildSupportKnowledgeContext(input: Readonly<{
   referenceFor(kind: "source" | "action",index: number): string;
 }>): SupportKnowledgeContext {
   if (input.historyText !== "") throw new Error("SUPPORT_KB_HISTORY_NOT_AVAILABLE_IN_CP1");
+  const corpusLocale: SupportCorpusLanguage = input.language === "ro" ? "ro" : "en";
   const availableActionIds = new Set(input.availableActionIds);
-  const base = baseSection(input.capabilities,input.language,availableActionIds);
+  const base = baseSection(input.capabilities,input.language,corpusLocale,availableActionIds);
 
   const product = productQuery(input.query);
   const affirmative = affirmativeQuery(input.query);
-  const hasActionIntent = ACTION_INTENT.test(affirmative);
+  const hasLocalizedActionLabel = Object.values(SUPPORT_UI_LABEL_ALIASES[input.language])
+    .flat().some((label) => phraseScore(affirmative,label) > 0);
+  const hasActionIntent = ACTION_INTENT.test(affirmative)
+    || corpusLocale === "en" && input.language !== "en" && hasLocalizedActionLabel;
   const queryWords = product.words;
   const eligibleEntries = input.entries.filter(({ lang,modelProjection }) =>
-    lang === input.language && modelProjection !== undefined
+    lang === corpusLocale && modelProjection !== undefined
   );
   const identityEntryScore = Math.max(0,...eligibleEntries
     .filter(({ id }) => id === "product-identity")
@@ -317,9 +328,14 @@ export function buildSupportKnowledgeContext(input: Readonly<{
   const identityRequest = product.identityOverview || identityFactQuestion;
   const scoringWords = product.branded ? product.substantiveWords : normalizeWords(affirmative);
   const directWords = product.branded ? product.substantiveWords : evidenceWords(input.query);
+  const topicBinding = SUPPORT_TOPIC_PROMPTS[input.language]
+    .find(({ prompt }) => prompt === input.query);
+  const topicSourceIds = topicBinding?.sourceIds ?? [];
   const guideMatches = SUPPORT_GUIDE_LABELS.map((item) => {
     if (item.requiresNavigationIntent && !hasActionIntent) return Object.freeze({ item,score:0 });
-    const score = Math.max(0,...item.labels[input.language].map((label) => {
+    const uiAliases = item.actionId === null || item.actionId === "forgot-password"
+      ? [] : SUPPORT_UI_LABEL_ALIASES[input.language][item.actionId];
+    const score = Math.max(0,...[...item.labels[corpusLocale],...uiAliases].map((label) => {
       const matched = item.actionId === null
         ? phraseScore(affirmative,label)
         : canonicalActionPhraseScore(affirmative,label);
@@ -337,6 +353,10 @@ export function buildSupportKnowledgeContext(input: Readonly<{
   }).filter(({ score }) => score > 0);
   const matchedGuideActionIds = new Set(guideMatches.flatMap(({ item }) =>
     item.actionId === null ? [] : [item.actionId]));
+  const explicitSignInEvidence = SUPPORT_GUIDE_LABELS
+    .filter(({ actionId }) => actionId === "sign-in")
+    .flatMap(({ labels }) => labels[corpusLocale])
+    .some((label) => canonicalActionPhraseScore(affirmative,label) > 0);
   const sourcePolicyDefinition = SUPPORT_SOURCE_POLICIES.find(({ requiredActionIds }) =>
     requiredActionIds.every((id) => matchedGuideActionIds.has(id)));
   const sourcePolicy: SupportSourcePolicy | null = sourcePolicyDefinition === undefined ? null
@@ -351,6 +371,9 @@ export function buildSupportKnowledgeContext(input: Readonly<{
     if (item.sourceBinding) guideArticleEvidence.set(
       item.articleId,Math.max(guideArticleEvidence.get(item.articleId) ?? 0,score)
     );
+  }
+  for (const id of topicSourceIds) {
+    guideArticleEvidence.set(id,Math.max(guideArticleEvidence.get(id) ?? 0,100));
   }
   const articleEvidence = new Map(eligibleEntries.map((entry) => {
     const titleScore = overlapScore(directWords,entry.title);
@@ -373,12 +396,17 @@ export function buildSupportKnowledgeContext(input: Readonly<{
   const actionEvidence = SUPPORT_ACTION_CATALOG
     .filter(({ id }) => availableActionIds.has(id))
     .map((definition) => Object.freeze({
-      definition,score:actionEvidenceScore(affirmative,definition,input.language),
+      definition,score:actionEvidenceScore(
+        affirmative,definition,input.language,corpusLocale
+      ),
       sourceArticleIds:Object.freeze(guideMatches
         .filter(({ item }) => item.capabilityBinding && item.actionId === definition.id)
         .map(({ item }) => item.articleId))
     }))
-    .filter(({ score }) => score > 0);
+    .filter(({ definition,score }) => score > 0
+      && (definition.id !== "sign-in"
+        || explicitSignInEvidence
+        || ![...matchedGuideActionIds].some((id) => id !== "sign-in")));
   const matchedActionIds = new Set(actionEvidence.map(({ definition }) => definition.id));
   const matchedCapabilities = (identityRequest
     ? input.capabilities.filter(({ id }) => id === "product-identity").map((item) => ({
@@ -389,7 +417,7 @@ export function buildSupportKnowledgeContext(input: Readonly<{
       item,
       catalogScore: overlapScore(
         scoringWords,
-        `${item.labels[input.language]} ${item.searchTerms[input.language].join(" ")}`,
+        `${item.labels[corpusLocale]} ${item.searchTerms[corpusLocale].join(" ")}`,
       ),
       articleScore: Math.max(0,...eligibleEntries
         .filter(({ id }) => item.articleIds.includes(id))
@@ -402,7 +430,7 @@ export function buildSupportKnowledgeContext(input: Readonly<{
           && sourceArticleIds.some((articleId) => item.articleIds.includes(articleId)))?.score ?? 0)),
       catalogComplete:(() => {
         const required = normalizeWords(
-          `${item.labels[input.language]} ${item.searchTerms[input.language].join(" ")}`
+          `${item.labels[corpusLocale]} ${item.searchTerms[corpusLocale].join(" ")}`
         );
         return required.size > 0 && overlapScore(required,input.query) === required.size;
       })(),
@@ -475,6 +503,7 @@ export function buildSupportKnowledgeContext(input: Readonly<{
         + (articleEvidence.get(entry.id)?.score ?? 0) * 1_000_000,
     }))
     .filter(({ entry,evidence,capability }) => {
+      if (topicBinding !== undefined && !topicSourceIds.includes(entry.id)) return false;
       if (sourcePolicy !== null && !sourcePolicy.allowedSourceIds.includes(entry.id)) return false;
       if (!hasCompleteCatalogMatch && product.preferredArticleId !== null
         && entry.id !== product.preferredArticleId) {

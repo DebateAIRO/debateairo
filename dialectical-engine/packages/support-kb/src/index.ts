@@ -474,6 +474,7 @@ export function loadHelpCorpus(
   })();
 
   const parsedFiles: ParsedFile[] = directoryEntries
+    .filter((directoryEntry) => directoryEntry.name !== "templates")
     .sort((left, right) => left.name.localeCompare(right.name, "en"))
     .map((directoryEntry) => {
       if (!directoryEntry.isFile()) {

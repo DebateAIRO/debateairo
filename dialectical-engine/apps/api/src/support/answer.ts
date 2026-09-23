@@ -7,7 +7,8 @@ import {
   selectSupportRecoveryEntry,supportSourceIdsSatisfyPolicy
 } from "@debateai/support-kb";
 import {
-  SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,type SupportAction
+  SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,supportLocaleNames,
+  type SupportAction,type SupportCorpusLanguage
 } from "@debateai/support-kb/catalog";
 import { buildSupportKnowledgeContext } from "@debateai/support-kb/context";
 import { resolveSupportActions } from "@debateai/support-kb/navigation";
@@ -70,8 +71,8 @@ export interface SupportAnswerPort {
     sessionId: string;
     text: string;
     language: SupportLanguage;
-    detectedLanguage: SupportLanguage;
-    overrideLanguage: SupportLanguage | null;
+    detectedLanguage: SupportCorpusLanguage;
+    overrideLanguage: SupportCorpusLanguage | null;
     modelRef: string;
     kbVersion?: string;
     snapshot?: LoadedHelpCorpus;
@@ -95,13 +96,13 @@ function normalizedText(value: string): string {
 function retrieve(
   entries: readonly HelpCorpusEntry[],
   text: string,
-  language: SupportLanguage
+  corpusLocale: SupportCorpusLanguage
 ): readonly HelpCorpusEntry[] {
   const query = tokens(text);
   if (query.size === 0) return Object.freeze([]);
   const normalized = normalizedText(text);
   return Object.freeze(entries
-    .filter((entry) => entry.lang === language
+    .filter((entry) => entry.lang === corpusLocale
       && entry.status === "shipped"
       && entry.ratifiedBy === "V"
       && entry.ratifiedOn !== "")
@@ -122,9 +123,8 @@ function retrieve(
 }
 
 function boundedSystem(entries: readonly HelpCorpusEntry[], language: SupportLanguage): string {
-  const preamble = language === "ro"
-    ? "Răspunde numai în română și numai cu fapte din intrările furnizate. Nu inventa surse și nu include linii Sursă."
-    : "Answer only in English and only with facts from the supplied entries. Do not invent sources or include Source lines.";
+  const { english,native } = supportLocaleNames(language);
+  const preamble = `Answer only in ${english} (${native}) and only with facts from the supplied entries. Do not invent sources or include Source lines.`;
   const joined = entries.map((entry) => [
     `ENTRY ${entry.id}`,
     `TITLE ${entry.title}`,
@@ -133,11 +133,10 @@ function boundedSystem(entries: readonly HelpCorpusEntry[], language: SupportLan
   return [...`${preamble}\n\n${joined}`].slice(0,MAX_SYSTEM_CODE_POINTS).join("");
 }
 
-function structuredInstruction(language: SupportLanguage): string {
+export function structuredInstruction(language: SupportLanguage): string {
   const shape = '{"kind":"answer","text":"<grounded answer>","sourceIds":["<allowed source reference>"],"actionIds":[]}';
-  return language === "ro"
-    ? `Returnează numai un singur obiect JSON, fără alte chei și fără text înainte sau după: ${shape}. kind trebuie să fie answer. Secțiunea finală OUTPUT CONTRACT enumeră singurele sourceIds și actionIds permise; înlocuiește exemplele și copiază identificatorii exact, citând cel puțin un sourceId. Nu scrie niciodată identificatori de surse, acțiuni sau capabilități, rute ori căi în text; exprimă navigarea numai prin actionIds. Poți explica limite și condiții despre setările de securitate, dar nu solicita, primi, transforma, verifica sau repeta niciodată parole, coduri ori alte date de autentificare și nu afirma că ai efectuat o schimbare de securitate.`
-    : `Return only one JSON object, with no other keys and no text before or after it: ${shape}. kind must be answer. The final OUTPUT CONTRACT lists the only allowed sourceIds and actionIds; replace the examples and copy identifiers exactly, citing at least one sourceId. Never write source IDs, action IDs, capability IDs, routes, or paths inside text; express navigation only through actionIds. You may explain limitations and prerequisites for security settings, but never request, receive, transform, validate, or repeat passwords, codes, or other credentials, and never claim that you performed a security change.`;
+  const { english,native } = supportLocaleNames(language);
+  return `Write the text field in ${english} (${native}). Keep JSON keys (kind, text, sourceIds, actionIds), the literal kind "answer", source ids, action ids, routes, and paths in English exactly as specified; never translate an identifier or literal. Return only one JSON object, with no other keys and no text before or after it: ${shape}. kind must be answer. The final OUTPUT CONTRACT lists the only allowed sourceIds and actionIds; replace the examples and copy identifiers exactly, citing at least one sourceId. Never write source IDs, action IDs, capability IDs, routes, or paths inside text; express navigation only through actionIds. You may explain limitations and prerequisites for security settings, but never request, receive, transform, validate, or repeat passwords, codes, or other credentials, and never claim that you performed a security change.`;
 }
 
 function boundedStructuredSystem(context: string,language: SupportLanguage): string {
@@ -199,6 +198,7 @@ export function createSupportAnswerService(input: Readonly<{
   const clock = input.clock ?? (() => new Date());
   return Object.freeze({
     respond: async (request: Parameters<SupportAnswerPort["respond"]>[0]) => {
+      const corpusLocale: SupportCorpusLanguage = request.language === "ro" ? "ro" : "en";
       const prepared = redactSupportMessage(request.text);
       const routeSnapshot = request.snapshot !== undefined
         && typeof request.snapshot.kbVersion === "string"
@@ -226,11 +226,11 @@ export function createSupportAnswerService(input: Readonly<{
       const entries = structured
         ? context!.sourceIds.flatMap((id) => {
           const entry = eligibleEntries.find((candidate) =>
-            candidate.lang === request.language && candidate.id === id
+            candidate.lang === corpusLocale && candidate.id === id
           );
           return entry === undefined ? [] : [entry];
         })
-        : retrieve(eligibleEntries,prepared.text,request.language);
+        : retrieve(eligibleEntries,prepared.text,corpusLocale);
       if (entries.length === 0) {
         const completedAt = strictAfter(request.receivedAt,clock);
         const text = supportTemplate("NO_SOURCE",request.language);

@@ -7,6 +7,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import {
   createHelpCorpusSnapshotLookup,loadHelpCorpus,type HelpCorpusEntry,type LoadedHelpCorpus
 } from "../../packages/support-kb/src/index.js";
+import type { SupportLanguage } from "../../packages/support-kb/src/catalog.js";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildApi, type AskApplication } from "../../apps/api/src/index.js";
 import type {
@@ -327,7 +328,7 @@ describe("SUP-01 support routes", () => {
   }
 
   async function openSession(
-    server: FastifyInstance,ip = "203.0.113.10",language: "en" | "ro" = "en"
+    server: FastifyInstance,ip = "203.0.113.10",language: SupportLanguage = "en"
   ) {
     const response = await server.inject({
       method: "POST",
@@ -866,7 +867,8 @@ describe("SUP-01 support routes", () => {
 
   it.each([
     { text: "Pricing",language: "en" as const,ip: "203.0.113.220" },
-    { text: "Account",language: "ro" as const,ip: "203.0.113.221" }
+    { text: "Account",language: "ro" as const,ip: "203.0.113.221" },
+    { text: "Pricing",language: "ja" as const,ip: "203.0.113.219" }
   ])("uses stored session language for ambiguous text: $language", async ({ text,language,ip }) => {
     const respond = vi.fn<SupportAnswerPort["respond"]>(async (input) => Object.freeze({
       messageId: randomUUID(),outcome: "NO_SOURCE" as const,
@@ -886,6 +888,16 @@ describe("SUP-01 support routes", () => {
     });
     expect(response.statusCode).toBe(200);
     expect(respond).toHaveBeenCalledWith(expect.objectContaining({ text,language }));
+    await server.close();
+  });
+
+  it("rejects an unknown session locale before creating a session",async () => {
+    const server = api(true);
+    const response = await server.inject({
+      method:"POST",url:"/v1/support/sessions",payload:{ language:"jp" }
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error:"SUPPORT_LANGUAGE_INVALID" });
     await server.close();
   });
 
@@ -2806,6 +2818,36 @@ describe("SUP-01 support routes", () => {
     expect(rows.rows.every((row) => row.outcome === "NO_SOURCE")).toBe(true);
     expect(rows.rows.some((row) => row.content_ciphertext.includes(Buffer.from(response.json().text,"utf8"))))
       .toBe(false);
+    await server.close();
+  });
+
+  it("stores the Japanese answer locale separately from English detection",async () => {
+    const answer = createSupportAnswerService({
+      entries:[],messages:messageCipher,
+      modelFor:() => Object.freeze({ complete:async () => Object.freeze({ text:"must not run" }) }),
+      clock:() => new Date(CLOCK_BASE_MS + 11)
+    });
+    const server = api(true,{ clock:() => new Date(CLOCK_BASE_MS + 1),answerPort:answer });
+    const opened = await openSession(server,"203.0.113.93","ja");
+    const response = await sendMessage(
+      server,opened.body,"How much does it cost?","203.0.113.93"
+    );
+    const jaTemplates = JSON.parse(await readFile(
+      join(process.cwd(),"packages/support-kb/content/templates/ja.json"),"utf8"
+    )) as Record<string,string>;
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ outcome:"NO_SOURCE",text:jaTemplates.NO_SOURCE });
+    const rows = await database.pool.query<{
+      language:string;detected_language:string;override_language:string | null;
+    }>(`
+      SELECT language,detected_language,override_language
+      FROM support.message WHERE session_id=$1 ORDER BY role DESC
+    `,[opened.body.session_id]);
+    expect(rows.rows).toHaveLength(2);
+    expect(rows.rows).toEqual([
+      { language:"ja",detected_language:"en",override_language:null },
+      { language:"ja",detected_language:"en",override_language:null }
+    ]);
     await server.close();
   });
 

@@ -4,7 +4,5 @@
 
 # S2 debate drawers and public
 # S2 settings, consent, and support
-components/support/**
-app/help/page.tsx
 
 # Remaining already-ticketed interface surfaces

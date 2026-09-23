@@ -1,0 +1,22 @@
+{
+  "DISCLOSURE": "Bună — sunt asistentul de suport Dialectical Engine, o inteligență artificială. Pot explica cum funcționează produsul și te pot îndruma către pagina potrivită. Nu pot să te autentific, să îți modific contul sau să resetez ceva. Pentru acestea folosește linkurile pe care ți le dau sau cere să vorbești cu o persoană.",
+  "NO_SOURCE": "Nu am o sursă pentru asta, așa că nu voi ghici. Întreabă-mă altceva despre cum funcționează dezbaterile sau alege „Vorbește cu o persoană”.",
+  "REFUSE_ZONE": "Nu pot ajuta cu autentificarea, parolele, codurile de verificare, autentificarea în doi pași, recuperarea contului, schimbarea emailului sau ștergerea contului — nici măcar să le verific. Acestea se fac doar din paginile contului tău: {link}. Dacă pagina nu funcționează, alege „Vorbește cu o persoană”.",
+  "REFUSE_INJECTION": "Urmez doar instrucțiunile produsului, așa că voi sări peste această cerere. Mesajul tău a fost înregistrat. Întreabă-mă despre produs sau alege „Vorbește cu o persoană”.",
+  "REFUSE_SAFETY": "Aici e nevoie de o persoană, nu de un asistent. Alege „Vorbește cu o persoană” și o persoană îți va citi mesajul.",
+  "DEGRADED": "Modelul asistentului nu este disponibil acum. Poți totuși lăsa un mesaj pentru o persoană: alege „Vorbește cu o persoană”.",
+  "DISABLED": "Asistentul de suport este oprit momentan.",
+  "RATE_LIMITED": "Ai trimis multe mesaje într-un timp scurt. Te rugăm să aștepți câteva minute.",
+  "RATING": "Ți-a răspuns la întrebare? Da · Nu · Vorbește cu o persoană",
+  "CASE_OPENED_MINIMAL": "Am salvat această conversație pentru o persoană, cazul {token}. Păstrează codul; răspunsurile vor apărea aici după ce o persoană a răspuns.",
+  "CASE_OPENED": "Am deschis cazul {token} pentru o persoană. Răspuns estimat: în {sla} ore. Vezi răspunsurile la {link}. Nu pot promite un rezultat.",
+  "HUMAN_LABEL": "Suport (o persoană)",
+  "NOT_FOUND": "Nu există niciun caz cu acest cod.",
+  "CLOSED_LABEL": "Acest caz este închis. Poți răspunde pentru a-l redeschide.",
+  "SUMMARY_LABEL": "Rezumat scris de model — orientativ",
+  "SOURCE_LINE": "Sursă: {title} ({id})",
+  "INCIDENT_ACTIVE": "Incident cunoscut din {started_at}: {summary_ro} (publicat de echipă). Dacă problema ta se potrivește, nu e nevoie să o raportezi; altfel alege „Vorbește cu o persoană”.",
+  "NO_INCIDENT": "Nu am nicio înregistrare a unui incident cunoscut în acest moment. Asta nu exclude unul — dacă ceva pare stricat, alege „Vorbește cu o persoană” și descrie problema.",
+  "INCIDENT_NOTICE": "Notă: există un incident cunoscut care afectează {surface} din {started_at}.",
+  "QUEUED": "Se așteaptă modelul asistentului… ești numărul {n} la rând."
+}

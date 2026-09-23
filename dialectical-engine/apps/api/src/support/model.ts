@@ -1,4 +1,5 @@
 import { TypedDomainError } from "@debateai/kernel";
+import type { SupportLanguage } from "@debateai/support-kb/catalog";
 
 const MAX_RELAY_RESPONSE_BYTES = 256 * 1024;
 const MAX_COMPLETION_CODE_POINTS = 16_000;
@@ -28,7 +29,7 @@ export interface SupportModelPort {
   complete(input: Readonly<{
     system: string;
     messages: readonly SupportModelMessage[];
-    language: "en" | "ro";
+    language: SupportLanguage;
     signal?: AbortSignal;
   }>): Promise<Readonly<{ text: string;usage?: SupportModelUsage }>>;
 }

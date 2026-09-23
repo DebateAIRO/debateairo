@@ -1,18 +1,55 @@
 // @vitest-environment jsdom
 
-import { act } from "react";
+import { act,createElement,createContext,useContext,type ReactNode } from "react";
 import { createRoot,type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach,beforeEach,describe,expect,it,vi } from "vitest";
+import type { LocaleCode } from "../../apps/ui/lib/i18n/locales.js";
+import type { MessageCatalog } from "../../apps/ui/lib/i18n/translate.js";
+import chromeJapanese from "../../apps/ui/messages/ja/chrome.json" with { type: "json" };
+import supportJapanese from "../../apps/ui/messages/ja/support.json" with { type: "json" };
+import chromeRomanian from "../../apps/ui/messages/ro/chrome.json" with { type: "json" };
+import supportRomanian from "../../apps/ui/messages/ro/support.json" with { type: "json" };
+import chromeEnglish from "../../apps/ui/messages/en/chrome.json" with { type: "json" };
+import consentEnglish from "../../apps/ui/messages/en/consent.json" with { type: "json" };
+import supportEnglish from "../../apps/ui/messages/en/support.json" with { type: "json" };
+
+const TestI18nContext = createContext<Readonly<{
+  locale: LocaleCode;
+  catalog: MessageCatalog;
+}> | null>(null);
+
+vi.mock("@/lib/i18n/I18nProvider", () => ({
+  I18nProvider({ locale,catalog,children }: Readonly<{
+    locale: LocaleCode;
+    catalog: MessageCatalog;
+    children: ReactNode;
+  }>) {
+    return createElement(TestI18nContext.Provider,{ value: { locale,catalog } },children);
+  },
+  useChromeI18n() {
+    const context = useContext(TestI18nContext);
+    return context ?? Object.freeze({
+      locale: "en" as const,
+      catalog: Object.freeze({ ...chromeEnglish,...supportEnglish })
+    });
+  }
+}));
+
+import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import {
   Assistant,
   SUPPORT_CONVERSATION_STORAGE_KEY,
   supportAssistantClient,
   type SupportAssistantClient
 } from "../../apps/ui/components/support/Assistant.js";
+import { CaseView } from "../../apps/ui/components/support/CaseView.js";
 import { subscribeToPreferenceRequests } from "../../apps/ui/lib/consent.js";
 
-const SESSION = Object.freeze({ sessionId: "session-1",token: "token-1",identityBound: false });
+const SESSION = Object.freeze({
+  sessionId: "session-1",token: "token-1",identityBound: false,
+  firstMessage: "Hi — I'm the Dialectical Engine support assistant, an AI."
+});
 let root: Root | null = null;
 
 type ClientReply = Awaited<ReturnType<SupportAssistantClient["sendMessage"]>>;
@@ -44,6 +81,17 @@ async function render(component: React.ReactNode): Promise<void> {
   await settle();
 }
 
+function localized(locale: "en" | "ro",component: React.ReactNode): React.ReactNode {
+  const catalog = locale === "ro"
+    ? Object.freeze({ ...chromeRomanian,...supportRomanian })
+    : Object.freeze({ ...chromeEnglish,...supportEnglish });
+  return <I18nProvider locale={locale} catalog={catalog}>{component}</I18nProvider>;
+}
+
+async function renderLocalized(locale: "en" | "ro",component: React.ReactNode): Promise<void> {
+  await render(localized(locale,component));
+}
+
 async function submit(text: string): Promise<void> {
   const input = document.querySelector<HTMLInputElement>('input[name="support-message"]')!;
   await act(async () => {
@@ -73,6 +121,29 @@ describe("SUP-01 /help assistant", () => {
     vi.unstubAllGlobals();
   });
 
+  it.each([
+    ["ja",chromeJapanese,supportJapanese],
+    ["ro",chromeRomanian,supportRomanian]
+  ] as const)("uses the %s interface locale for help chrome and new sessions", async (
+    locale,chromeCatalog,supportCatalog
+  ) => {
+    const transport = client({ messageId: `${locale}-answer`,outcome: "NO_SOURCE",text: "Server text" });
+    const catalog = Object.freeze({ ...chromeCatalog,...supportCatalog });
+    await render(<I18nProvider locale={locale} catalog={catalog}>
+      <Assistant fullPage client={transport} />
+    </I18nProvider>);
+
+    expect(document.body.textContent).toContain(chromeCatalog["chrome.help"]);
+    expect(document.querySelector<HTMLInputElement>('[name="support-message"]')?.placeholder)
+      .toBe(supportCatalog["support.placeholder"]);
+    expect(document.querySelector('[aria-label="Language override"]')).toBeNull();
+    expect([...document.querySelectorAll("button")].map((button) => button.textContent))
+      .not.toEqual(expect.arrayContaining(["EN","RO"]));
+
+    await submit("Locale request");
+    expect(transport.createSession).toHaveBeenCalledWith(locale);
+  });
+
   it("renders the complete Turn 11 help desk information architecture", () => {
     const html = renderToStaticMarkup(<Assistant fullPage client={client({
       messageId: "turn-11",outcome: "NO_SOURCE",text: "No source."
@@ -86,12 +157,12 @@ describe("SUP-01 /help assistant", () => {
       .toHaveLength(6);
     expect(parsed.querySelector('[aria-label="Service status"]')?.textContent)
       .toContain("Debate engine");
-    expect(parsed.querySelector('[aria-label="Support agent conversation"]')?.textContent)
+    expect(parsed.querySelector(`[aria-label="${supportEnglish["support.agentTitle"]}"]`)?.textContent)
       .toContain("Support agent");
-    expect(parsed.querySelector('[aria-label="Conversation details"]')?.textContent)
+    expect(parsed.querySelector(`[aria-label="${supportEnglish["support.thisConversation"]}"]`)?.textContent)
       .toContain("This conversation");
-    expect(parsed.querySelector('[aria-label="Support shortcuts"]')?.textContent)
-      .toContain("Cookie preferences");
+    expect(parsed.querySelector(`[aria-label="${supportEnglish["support.shortcuts"]}"]`)?.textContent)
+      .toContain(supportEnglish["support.topic.privacy"]);
     expect(parsed.body.textContent).toContain("New conversation");
     expect(parsed.body.textContent).not.toContain("Attach a debate");
     expect(parsed.body.textContent).toContain("Escalate to a human");
@@ -103,27 +174,29 @@ describe("SUP-01 /help assistant", () => {
         messageId: "signed-out-shortcuts",outcome: "NO_SOURCE",text: "No source."
       })} />
     ),"text/html");
-    const signedOutShortcuts = signedOut.querySelector('[aria-label="Support shortcuts"]')!;
+    const signedOutShortcuts = signedOut.querySelector(
+      `[aria-label="${supportEnglish["support.shortcuts"]}"]`
+    )!;
     expect([...signedOutShortcuts.querySelectorAll("a")].map((anchor) => anchor.getAttribute("href")))
       .not.toContain("/settings#privacy");
     expect(signedOutShortcuts.querySelector('a[href="/settings#consent-privacy-heading"]'))
       .toBeNull();
     expect([...signedOutShortcuts.querySelectorAll("button")].map((button) => button.textContent?.trim()))
-      .toContain("Cookie preferences ↗");
+      .toContain(`${supportEnglish["support.topic.privacy"]} ↗`);
 
     await render(<Assistant fullPage signedIn client={client({
       messageId: "signed-in-shortcuts",outcome: "NO_SOURCE",text: "No source."
     })} />);
-    const shortcuts = document.querySelector('[aria-label="Support shortcuts"]')!;
+    const shortcuts = document.querySelector(`[aria-label="${supportEnglish["support.shortcuts"]}"]`)!;
     const privacy = shortcuts.querySelector<HTMLAnchorElement>(
       'a[href="/settings#consent-privacy-heading"]'
     );
-    expect(privacy?.textContent?.trim()).toBe("Privacy preferences ↗");
+    expect(privacy?.textContent?.trim()).toBe(`${consentEnglish["consent.settings.title"]} ↗`);
     expect([...shortcuts.querySelectorAll("a")].map((anchor) => anchor.getAttribute("href")))
       .not.toContain("/settings#cookies");
 
     const cookie = [...shortcuts.querySelectorAll<HTMLButtonElement>("button")]
-      .find((button) => button.textContent?.includes("Cookie preferences"))!;
+      .find((button) => button.textContent?.includes(supportEnglish["support.topic.privacy"]))!;
     const requests: Array<HTMLElement | null> = [];
     const unsubscribe = subscribeToPreferenceRequests((opener) => requests.push(opener));
     try {
@@ -133,10 +206,9 @@ describe("SUP-01 /help assistant", () => {
       unsubscribe();
     }
 
-    await act(async () => ([...document.querySelectorAll<HTMLButtonElement>("button")]
-      .find((button) => button.textContent === "RO")!).click());
-    expect(privacy?.textContent?.trim()).toBe("Preferințe de confidențialitate ↗");
-    expect(cookie.textContent?.trim()).toBe("Cookie preferences ↗");
+    expect(document.querySelector('[aria-label="Language override"]')).toBeNull();
+    expect(privacy?.textContent?.trim()).toBe(`${consentEnglish["consent.settings.title"]} ↗`);
+    expect(cookie.textContent?.trim()).toBe(`${supportEnglish["support.topic.privacy"]} ↗`);
   });
 
   it("submits a Turn 11 suggestion immediately without priming the composer", async () => {
@@ -170,7 +242,7 @@ describe("SUP-01 /help assistant", () => {
     const reset = [...document.querySelectorAll<HTMLButtonElement>("button")]
       .find((button) => button.textContent === "New conversation")!;
     await act(async () => reset.click());
-    expect(document.querySelectorAll('[aria-label="Support conversation"] article')).toHaveLength(1);
+    expect(document.querySelectorAll('[aria-label="Support conversation"] article')).toHaveLength(0);
   });
 
   it("reports the public Support configuration as unavailable even when the relay is healthy", async () => {
@@ -193,10 +265,11 @@ describe("SUP-01 /help assistant", () => {
       messageId: "m1",outcome: "NO_SOURCE",text: "No source."
     })} />);
     const parsed = new DOMParser().parseFromString(html,"text/html");
+    const notice = parsed.querySelector(".aiNotice--banner")!;
     const conversation = parsed.querySelector('[aria-label="Support conversation"]')!;
-    expect(conversation.firstElementChild?.textContent).toContain(
-      "I'm the Dialectical Engine support assistant, an AI"
-    );
+    expect(notice.textContent).toContain(supportEnglish["support.bannerLead"]);
+    expect(notice.compareDocumentPosition(conversation) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .not.toBe(0);
     const form = parsed.querySelector("form")!;
     const label = form.querySelector('label[for="support-message"]');
     const input = form.querySelector<HTMLInputElement>('#support-message');
@@ -205,43 +278,76 @@ describe("SUP-01 /help assistant", () => {
     expect(form.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);
   });
 
-  it("applies the Romanian override to disclosure and every typed request", async () => {
-    const transport = client({ messageId: "m2",outcome: "NO_SOURCE",text: "Nu am o sursă." });
+  it("renders readable case notices from the server instead of client copy", () => {
+    const html = renderToStaticMarkup(localized("en",<CaseView
+      token="case-token"
+      state="CLOSED"
+      messages={[]}
+      text="Server-provided closed notice."
+    />));
+    expect(html).toContain("Server-provided closed notice.");
+    expect(html).toContain(supportEnglish["support.case.reply"]);
+  });
+
+  it("keeps the submitted text visible when session creation returns a terminal reply", async () => {
+    const transport: SupportAssistantClient = Object.freeze({
+      createSession: vi.fn().mockResolvedValue({
+        messageId: "disabled",outcome: "DISABLED",text: "Server terminal notice."
+      }),
+      sendMessage: vi.fn(),rate: vi.fn(),escalate: vi.fn()
+    });
     await render(<Assistant client={transport} />);
-    const ro = [...document.querySelectorAll("button")]
-      .find((button) => button.textContent === "RO")! as HTMLButtonElement;
-    await act(async () => ro.click());
+
+    await submit("My submitted question");
+
+    expect(document.body.textContent).toContain("My submitted question");
+    expect(document.body.textContent).toContain("Server terminal notice.");
+    expect(transport.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("applies the Romanian interface locale to server disclosure and every typed request", async () => {
+    const transport = client({ messageId: "m2",outcome: "NO_SOURCE",text: "Nu am o sursă." });
+    const roSession = Object.freeze({
+      ...SESSION,
+      firstMessage: "Bună — sunt asistentul de suport Dialectical Engine."
+    });
+    vi.mocked(transport.createSession).mockResolvedValue(roSession);
+    await renderLocalized("ro",<Assistant client={transport} />);
+    await submit("Cum funcționează dezbaterile?");
     expect(document.querySelector('[aria-label="Support conversation"]')?.firstElementChild?.textContent)
       .toContain("sunt asistentul de suport Dialectical Engine");
-    await submit("Cum funcționează dezbaterile?");
     expect(transport.createSession).toHaveBeenCalledWith("ro");
     expect(transport.sendMessage).toHaveBeenCalledWith(
-      SESSION,"Cum funcționează dezbaterile?"
+      roSession,"Cum funcționează dezbaterile?"
     );
   });
 
-  it("invalidates the active session when language changes and sends text only", async () => {
-    const enSession = Object.freeze({ sessionId: "session-en",token: "token-en",identityBound: false });
-    const roSession = Object.freeze({ sessionId: "session-ro",token: "token-ro",identityBound: false });
-    const transport: SupportAssistantClient = Object.freeze({
-      createSession: vi.fn()
-        .mockResolvedValueOnce(enSession)
-        .mockResolvedValueOnce(roSession),
-      sendMessage: vi.fn().mockResolvedValue({
-        messageId: "answer",outcome: "NO_SOURCE",text: "answer"
-      }),
-      rate: vi.fn(),escalate: vi.fn()
-    });
-    await render(<Assistant client={transport} />);
-    await submit("Pricing");
-    await act(async () => ([...document.querySelectorAll<HTMLButtonElement>("button")]
-      .find((button) => button.textContent === "RO")!).click());
+  it("drops a stored conversation from another locale and sends text only", async () => {
+    sessionStorage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY,JSON.stringify({
+      language: "en",
+      session: { sessionId: "session-en",token: "token-en",identityBound: false },
+      messages: [{ id: "old",role: "assistant",text: "Old English conversation" }]
+    }));
+    const calls: Array<Readonly<{ url: string;body: unknown }>> = [];
+    vi.stubGlobal("fetch",vi.fn(async (url: string,init: RequestInit = {}) => {
+      calls.push({ url,body: typeof init.body === "string" ? JSON.parse(init.body) : null });
+      if (url === "/api/v1/session") return new Response("{}",{ status: 401 });
+      if (url === "/api/v1/support/sessions") return new Response(JSON.stringify({
+        session: { session_id: "session-ro",identity_bound: false },session_token: "token-ro",
+        first_message: { role: "assistant",text: "Mesaj de server." }
+      }),{ status: 201,headers: { "content-type": "application/json" } });
+      if (url === "/api/v1/support/sessions/session-ro/messages") return new Response(JSON.stringify({
+        message_id: "answer",outcome: "NO_SOURCE",text: "answer"
+      }),{ status: 200,headers: { "content-type": "application/json" } });
+      throw new Error(`UNEXPECTED_FETCH:${url}`);
+    }));
+    await renderLocalized("ro",<Assistant client={supportAssistantClient} signedIn={false} />);
     await submit("Account");
 
-    expect(transport.createSession).toHaveBeenNthCalledWith(1,"en");
-    expect(transport.createSession).toHaveBeenNthCalledWith(2,"ro");
-    expect(transport.sendMessage).toHaveBeenNthCalledWith(1,enSession,"Pricing");
-    expect(transport.sendMessage).toHaveBeenNthCalledWith(2,roSession,"Account");
+    expect(calls.map(({ url }) => url)).not.toContain("/api/v1/support/sessions/session-en/messages");
+    expect(calls.find(({ url }) => url === "/api/v1/support/sessions")?.body).toEqual({ language: "ro" });
+    expect(calls.find(({ url }) => url.endsWith("/messages"))?.body).toEqual({ text: "Account" });
+    expect(JSON.parse(sessionStorage.getItem(SUPPORT_CONVERSATION_STORAGE_KEY)!).language).toBe("ro");
   });
 
   it("renders conversation content as text and never links external response URLs", async () => {
@@ -261,16 +367,12 @@ describe("SUP-01 /help assistant", () => {
     ["en","The support assistant is switched off at the moment."],
     ["ro","Asistentul de suport este oprit momentan."]
   ] as const)("renders the exact deterministic %s DISABLED notice", async (language,text) => {
-    await render(<Assistant client={client({
+    await renderLocalized(language,<Assistant client={client({
       messageId: `disabled-${language}`,outcome: "DISABLED",text
     })} />);
-    if (language === "ro") {
-      await act(async () => ([...document.querySelectorAll("button")]
-        .find((button) => button.textContent === "RO") as HTMLButtonElement).click());
-    }
     await submit("How do I start my first debate?");
     expect(document.body.textContent).toContain(text);
-    expect(document.querySelector('[aria-label="Answer rating"]')).toBeNull();
+    expect(document.querySelector(`[aria-label="${supportEnglish["support.ratingQuestion"]}"]`)).toBeNull();
   });
 
   it("admits only frozen same-origin response links as anchors", async () => {
@@ -296,11 +398,7 @@ describe("SUP-01 /help assistant", () => {
       messageId: "m-auto",outcome: "REFUSE_SAFETY",text: "Fixed refusal.",
       caseAcknowledgement: { text: acknowledgement,token,slaHours: 48,link }
     });
-    await render(<Assistant client={transport} />);
-    if (language === "ro") {
-      await act(async () => ([...document.querySelectorAll("button")]
-        .find((button) => button.textContent === "RO") as HTMLButtonElement).click());
-    }
+    await renderLocalized(language,<Assistant client={transport} />);
     await submit("ordinary safety request");
     expect(document.body.textContent).toContain(acknowledgement);
     expect(document.querySelector<HTMLAnchorElement>(`a[href="${link}"]`)).not.toBeNull();
@@ -497,7 +595,7 @@ describe("SUP-01 /help assistant", () => {
     async (outcome) => {
       await render(<Assistant client={client({ messageId: "m5",outcome,text: "answer" })} />);
       await submit("question");
-      expect(document.querySelector('[aria-label="Answer rating"]')).not.toBeNull();
+      expect(document.querySelector(`[aria-label="${supportEnglish["support.ratingQuestion"]}"]`)).not.toBeNull();
       expect(document.body.textContent).toContain("Talk to a human");
     }
   );
@@ -507,15 +605,15 @@ describe("SUP-01 /help assistant", () => {
     async (outcome) => {
       await render(<Assistant client={client({ messageId: "m6",outcome,text: "fixed" })} />);
       await submit("question");
-      expect(document.querySelector('[aria-label="Answer rating"]')).toBeNull();
+      expect(document.querySelector(`[aria-label="${supportEnglish["support.ratingQuestion"]}"]`)).toBeNull();
     }
   );
 
   it.each([
     [false,"en","Sources","Actions","Start a debate","/login?next=%2Fnew"],
     [true,"en","Sources","Actions","Start a debate","/login?next=%2Fnew"],
-    [false,"ro","Surse","Acțiuni","Pornește o dezbatere","/login?next=%2Fnew"],
-    [true,"ro","Surse","Acțiuni","Pornește o dezbatere","/login?next=%2Fnew"]
+    [false,"ro",supportRomanian["support.sources"],supportRomanian["support.actions"],"Pornește o dezbatere","/login?next=%2Fnew"],
+    [true,"ro",supportRomanian["support.sources"],supportRomanian["support.actions"],"Pornește o dezbatere","/login?next=%2Fnew"]
   ] as const)(
     "renders reviewed sources and canonical actions in fullPage=%s language=%s",
     async (fullPage,language,sourcesName,actionsName,actionLabel,href) => {
@@ -529,11 +627,7 @@ describe("SUP-01 /help assistant", () => {
         ],
         actions: [{ id: "start-debate",label: actionLabel,href }]
       });
-      await render(<Assistant fullPage={fullPage} client={transport} />);
-      if (language === "ro") {
-        await act(async () => ([...document.querySelectorAll("button")]
-          .find((button) => button.textContent === "RO") as HTMLButtonElement).click());
-      }
+      await renderLocalized(language,<Assistant fullPage={fullPage} client={transport} />);
       await submit(language === "en" ? "How do I create a debate?" : "Cum creez o dezbatere?");
 
       const sources = document.querySelector(`[aria-label="${sourcesName}"]`)!;
@@ -625,7 +719,7 @@ describe("SUP-01 /help assistant", () => {
     await render(<Assistant client={supportAssistantClient} signedIn={false} />);
 
     expect(document.body.textContent).not.toContain("Stored forged message");
-    expect(document.body.textContent).toContain("I'm the Dialectical Engine support assistant, an AI");
+    expect(document.body.textContent).toContain(supportEnglish["support.bannerLead"]);
   });
 
   it("clears stale A and retries the same redacted turn once through fresh B", async () => {
@@ -748,11 +842,7 @@ describe("SUP-01 /help assistant", () => {
         sources: [],actions: []
       }),{ status: 200,headers: { "content-type": "application/json" } });
     }));
-    await render(<Assistant client={supportAssistantClient} signedIn={false} />);
-    if (language === "ro") {
-      await act(async () => ([...document.querySelectorAll("button")]
-        .find((button) => button.textContent === "RO") as HTMLButtonElement).click());
-    }
+    await renderLocalized(language,<Assistant client={supportAssistantClient} signedIn={false} />);
     await submit(request);
 
     expect(urls).toEqual([

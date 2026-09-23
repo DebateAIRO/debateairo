@@ -163,8 +163,7 @@ export function formatIncidentAnswer(
     outcome: "ANSWER_INCIDENT",
     text: supportTemplate("INCIDENT_ACTIVE",language)
       .replace("{started_at}",active.startedAt.toISOString())
-      .replace(language === "ro" ? "{summary_ro}" : "{summary_en}",
-        language === "ro" ? active.summaryRo : active.summaryEn)
+      .replace("{summary}",language === "ro" ? active.summaryRo : active.summaryEn)
   });
 }
 

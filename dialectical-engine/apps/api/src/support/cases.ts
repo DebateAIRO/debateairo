@@ -1,11 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { TypedDomainError } from "@debateai/kernel";
+import {
+  isSupportLanguage,
+  supportLocaleNames,
+  type SupportCorpusLanguage,
+  type SupportLanguage,
+} from "@debateai/support-kb/catalog";
 import type { SupportKeyPort } from "./keys.js";
 import { redactSupportMessage } from "./session.js";
 import {
   parseSupportCaseSummaryDraft,screenSupportModelText
 } from "./response-policy.js";
-import { SHREDDED_NOTICE,type SupportLanguage } from "./templates.js";
+import { SHREDDED_NOTICE } from "./templates.js";
 
 export type SupportCasePredicate = "E1" | "E2" | "E3" | "E4" | "E5" | "E6" | "E7" | "E8";
 export type SupportCaseState = "NEW" | "WAITING_ON_V" | "WAITING_ON_USER" | "CLOSED";
@@ -49,7 +55,7 @@ export const SUPPORT_SUMMARY_PROMPT =
   + "Do not state or guess who the user is, whether they are the account owner, "
   + "or whether their request is legitimate.";
 
-const SUPPORT_SUMMARY_REPLACEMENT: Readonly<Record<SupportLanguage,string>> = Object.freeze({
+const SUPPORT_SUMMARY_REPLACEMENT: Readonly<Record<SupportCorpusLanguage,string>> = Object.freeze({
   en: "The advisory summary was omitted because it did not pass Support safety checks.",
   ro: "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței."
 });
@@ -81,6 +87,11 @@ function boundedSummary(text: string): string | null {
   return boundary < 0 ? null : firstEighty.slice(0,boundary + 1).join(" ");
 }
 
+function storedSupportLanguage(value: unknown): SupportLanguage {
+  if (!isSupportLanguage(value)) throw new TypeError("SUPPORT_LANGUAGE_INVALID");
+  return value;
+}
+
 export function createAdvisorySummaryService(input: Readonly<{
   complete(request: Readonly<{
     system: string;
@@ -97,6 +108,7 @@ export function createAdvisorySummaryService(input: Readonly<{
   const timeoutMs = input.timeoutMs ?? 60_000;
   return Object.freeze({
     summarize: async (request) => {
+      const { english,native } = supportLocaleNames(request.language);
       const createdAtMs = request.createdAt.getTime();
       if (!Number.isFinite(createdAtMs)
         || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 60_000) {
@@ -105,7 +117,7 @@ export function createAdvisorySummaryService(input: Readonly<{
       const deadlineAt = new Date(createdAtMs + timeoutMs);
       const signal = AbortSignal.timeout(timeoutMs);
       const completion = input.complete({
-        system: SUPPORT_SUMMARY_PROMPT,
+        system: `${SUPPORT_SUMMARY_PROMPT} Write text in ${english} (${native}). kind stays case_summary.`,
         messages: [{ role: "user",content: request.transcript }],
         language: request.language,signal
       }).then((text) => Object.freeze({ kind: "DONE" as const,text }));
@@ -125,7 +137,9 @@ export function createAdvisorySummaryService(input: Readonly<{
         ? parseSupportCaseSummaryDraft(result.text) : null;
       const candidate = draft === null ? null : boundedSummary(draft.text);
       const summary = timedOut ? null
-        : candidate ?? SUPPORT_SUMMARY_REPLACEMENT[request.language];
+        : candidate ?? SUPPORT_SUMMARY_REPLACEMENT[
+          request.language === "ro" ? "ro" : "en"
+        ];
       if (timedOut) {
         try {
           await input.persist({
@@ -304,6 +318,7 @@ export function createSupportCaseAccessService(input: Readonly<{
   }
 
   async function read(row: Readonly<Record<string,unknown>>): Promise<SupportCaseViewRecord> {
+    const language = storedSupportLanguage(row.language);
     return withDataKey(row,(dataKey) => {
       const caseId = String(row.case_id);
       const transcriptCiphertext = encryptedBytes(row.transcript_snapshot_ciphertext);
@@ -362,14 +377,12 @@ export function createSupportCaseAccessService(input: Readonly<{
             const opened = summaryPlaintext.toString("utf8");
             const bounded = boundedSummary(opened);
             summary = bounded !== null && screenSupportModelText(bounded)
-              ? bounded : SUPPORT_SUMMARY_REPLACEMENT[
-                row.language === "ro" ? "ro" : "en"
-              ];
+              ? bounded : SUPPORT_SUMMARY_REPLACEMENT[language === "ro" ? "ro" : "en"];
           }
         } finally { summaryCiphertext?.fill(0); }
         return Object.freeze({
           kind: "READABLE",caseId,
-          language: row.language as SupportLanguage,state: row.state as SupportCaseState,
+          language,state: row.state as SupportCaseState,
           slaHours: Number(row.sla_hours),messages: Object.freeze(messages),summary,
           nextCursor: encodeCaseCursor(row.case_message_next_cursor)
         });
@@ -383,12 +396,15 @@ export function createSupportCaseAccessService(input: Readonly<{
 
   return Object.freeze({
     listOwn: async (identityOwnerRef) => Object.freeze(
-      (await input.repository.listOwnCases(identityOwnerRef)).map((row) => Object.freeze({
-        caseId: String(row.case_id),
-        state: String(row.state) as SupportCaseState,
-        language: row.language === "ro" ? "ro" : "en",
-        createdAt: new Date(String(row.created_at))
-      }))
+      (await input.repository.listOwnCases(identityOwnerRef)).map((row) => {
+        const language = storedSupportLanguage(row.language);
+        return Object.freeze({
+          caseId: String(row.case_id),
+          state: String(row.state) as SupportCaseState,
+          language,
+          createdAt: new Date(String(row.created_at))
+        });
+      })
     ),
     readByToken: async (tokenSha256,pagination) => {
       const cursor = decodeCaseCursor(pagination?.cursor);
@@ -397,8 +413,8 @@ export function createSupportCaseAccessService(input: Readonly<{
         page: { limit: pagination?.limit ?? 40,...cursor }
       });
       if (row === null) return null;
+      const language = storedSupportLanguage(row.language);
       if (shreddedRow(row)) {
-        const language = row.language === "ro" ? "ro" : "en";
         return Object.freeze({
           kind: "SHREDDED",caseId: String(row.case_id),language,
           state: row.state as SupportCaseState,slaHours: Number(row.sla_hours),
@@ -418,7 +434,7 @@ export function createSupportCaseAccessService(input: Readonly<{
       }
       const row = await input.repository.readCaseEncrypted({ tokenSha256: request.tokenSha256 });
       if (row === null) return null;
-      const language = row.language === "ro" ? "ro" : "en";
+      const language = storedSupportLanguage(row.language);
       if (shreddedRow(row)) return Object.freeze({
         kind: "SHREDDED" as const,notice: SHREDDED_NOTICE[language]
       });
